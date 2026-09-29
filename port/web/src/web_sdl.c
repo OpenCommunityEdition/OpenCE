@@ -280,10 +280,12 @@ SDL_GLContext SDL_GL_CreateContext(SDL_Window *window)
 	if (!gl_context)
 	{
 		const char *batch_streams = getenv("HALO_WEB_BATCH_STREAMS");
+		const char *geometry_cache = getenv("HALO_WEB_GEOMETRY_CACHE");
 
 		display_size(&canvas_width, &canvas_height);
 		gl_context = web_js_gl_create(canvas_width, canvas_height,
-			!batch_streams || strcmp(batch_streams, "0"));
+			(!batch_streams || strcmp(batch_streams, "0")) &&
+			!(geometry_cache && !strcmp(geometry_cache, "1")));
 		if (!gl_context)
 		{
 			set_error("WebGL 2 is not available");

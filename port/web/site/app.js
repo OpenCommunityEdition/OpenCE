@@ -23,6 +23,8 @@ can run the game, copies the game data out of the player's disc image
   const REQUIRED_BYTES = 2.1e9;
   const DEFAULT_ROOM = window.HALO_BROWSER_CONFIG?.defaultRoom ?? 'FQLX01';
   const diagnosticOptions = new URLSearchParams(location.search);
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   const state = {
     memory: null,
@@ -552,11 +554,12 @@ can run the game, copies the game data out of the player's disc image
     const short = Math.min(window.innerWidth, window.innerHeight);
     let width = Math.round(long * scale);
     let height = Math.round(short * scale);
-    // The game draws 480 lines and scales them up. An optional cap makes
-    // presentation costs comparable without changing the game's rendering.
+    // The game draws 480 lines. Keep iOS bitmap handoffs at that size instead
+    // of upscaling on the worker and copying a Retina-sized frame each time.
+    // CSS scales the canvas to the screen; diagnostics can override the cap.
     const requestedHeight = Number(diagnosticOptions.get('render_height'));
     const maximumHeight = Number.isFinite(requestedHeight) && requestedHeight > 0 ?
-      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : 1440;
+      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : (ios ? 480 : 1440);
     if (height > maximumHeight) {
       width = Math.round(width * maximumHeight / height);
       height = maximumHeight;
@@ -742,6 +745,7 @@ can run the game, copies the game data out of the player's disc image
       if (role === 'join' && target) argumentsList.push('--HALO_QUICK_PLAY_TARGET=' + HaloNet.addressText(target));
     }
     if (diagnosticOptions.get('batch_streams') === '0') argumentsList.push('--HALO_WEB_BATCH_STREAMS=0');
+    if (diagnosticOptions.get('geometry_cache') === '1') argumentsList.push('--HALO_WEB_GEOMETRY_CACHE=1');
     if (!settings.vsync) argumentsList.push('--HALO_NO_VSYNC=1');
     if (settings.glDebug) argumentsList.push('--HALO_GL_DEBUG=1');
 
@@ -750,13 +754,25 @@ can run the game, copies the game data out of the player's disc image
       arguments: argumentsList,
       print: (text) => log(text),
       printErr: (text) => log(text),
-      haloPresent: (bitmap) => {
-        if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
+      haloPresent: (bitmap, pendingBuffer) => {
+        try {
+          // A bitmap sent just before the tab was hidden may arrive after
+          // rendering stops. Release it without updating the hidden canvas.
+          if (document.hidden) return;
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          context.transferFromImageBitmap(bitmap);
+          countPresent?.();
+        } finally {
+          try { bitmap.close?.(); }
+          finally {
+            // Older runtimes send only the bitmap; newer ones bound their
+            // transfer queue with this shared acknowledgement counter.
+            if (pendingBuffer) Atomics.sub(new Int32Array(pendingBuffer), 0, 1);
+          }
         }
-        context.transferFromImageBitmap(bitmap);
-        countPresent?.();
       },
       haloMessage: (kind, text) => {
         if (kind === 0) log('game: ' + text);
@@ -1134,8 +1150,6 @@ can run the game, copies the game data out of the player's disc image
 
     const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches ||
       matchMedia('(display-mode: fullscreen)').matches;
-    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     $('install-hint').hidden = standalone || !ios;
     $('iphone-tips').hidden = !ios;
     $('rotate-iphone-tips').hidden = !ios;

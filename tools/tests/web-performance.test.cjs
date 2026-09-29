@@ -131,6 +131,13 @@ test('batch stream opt-out reaches the worker runtime arguments only when reques
   assert.equal(disabled.context.Module.arguments.filter(value => value === argument).length, 1);
 });
 
+test('reference geometry path is opt-in for controlled comparisons', async () => {
+  for (const query of ['', '?geometry_cache=0', '?geometry_cache=1']) {
+    const page = await launch(query);
+    assert.equal(page.context.Module.arguments.includes('--HALO_WEB_GEOMETRY_CACHE=1'), query.endsWith('=1'));
+  }
+});
+
 test('hidden frames and elapsed hidden time are excluded after a visibility reset', async () => {
   const page = await launch('?fps=1');
   page.present(30);
@@ -143,7 +150,7 @@ test('hidden frames and elapsed hidden time are excluded after a visibility rese
   page.present(60, 1920, 1080);
   page.tick();
   assert.deepEqual(page.samples().at(-1), {
-    fps: 60, frames: 170, ms: 62000, windowMs: 1000, width: 1920, height: 1080,
+    fps: 60, frames: 90, ms: 62000, windowMs: 1000, width: 1920, height: 1080,
   });
 });
 
@@ -180,4 +187,20 @@ test('presentation height override is bounded, preserves aspect, and leaves the 
   assert.deepEqual(portrait.displaySize(), [1280, 720]);
   const small = await launch('?render_height=720', { devicePixelRatio: 1, innerWidth: 640, innerHeight: 360 });
   assert.deepEqual(small.displaySize(), [640, 360], 'a maximum does not upscale small viewports');
+});
+
+test('iPhone and desktop-mode iPad avoid Retina-sized bitmap copies and retain overrides', async () => {
+  for (const navigator of [
+    { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', platform: 'iPhone' },
+    { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X)', platform: 'MacIntel', maxTouchPoints: 5 },
+  ]) {
+    navigator.storage = { getDirectory() {} };
+    const viewport = { navigator, innerWidth: 402, innerHeight: 874, devicePixelRatio: 3 };
+    const page = await launch('', viewport);
+    assert.deepEqual(page.displaySize(), [1044, 480]);
+    const override = await launch('?render_height=1440', viewport);
+    assert.deepEqual(override.displaySize(), [1748, 804]);
+    const landscape = await launch('', { ...viewport, innerWidth: 874, innerHeight: 402 });
+    assert.deepEqual(landscape.displaySize(), page.displaySize());
+  }
 });

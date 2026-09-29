@@ -546,6 +546,10 @@ static void state_element_array_buffer(GLuint buffer)
 	}
 }
 
+#ifdef HALO_WEB
+#include "web_geometry.h"
+#endif
+
 static void state_attribute_pointer(GLuint index, GLuint buffer, GLint size, GLenum type, GLboolean normalized,
 	BOOL integer, GLsizei stride, unsigned long offset)
 {
@@ -915,7 +919,19 @@ static void gl_initialize(void)
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
+#ifdef HALO_WEB
+	{
+		const char *geometry_cache = getenv("HALO_WEB_GEOMETRY_CACHE");
+
+		web_geometry.enabled = geometry_cache && !strcmp(geometry_cache, "1");
+		if (web_geometry.enabled)
+			platform_log("browser geometry cache: rotating uploads and retained vertices enabled");
+	}
+#endif
 #ifdef HALO_ANDROID
+#ifdef HALO_WEB
+	if (!web_geometry.enabled)
+#endif
 	{
 		int ring;
 
@@ -2936,6 +2952,12 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	unsigned long segment, first, last, page, oldest = ~0UL, newest = 0;
 	BOOL present = TRUE;
 
+#ifdef HALO_WEB
+	/* The retained cache compares the exact bytes consumed by this draw,
+	including swizzled colours, rather than hashing entire guest pages. */
+	if (web_geometry.enabled)
+		return FALSE;
+#endif
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
 	segment = start / MIRROR_SEGMENT_SIZE;
@@ -3034,6 +3056,10 @@ between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		return;
+#endif
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -3043,10 +3069,18 @@ static void stream_reserve(unsigned long size)
 	}
 }
 
-static unsigned long stream_upload(const void *data, unsigned long size)
+static unsigned long stream_upload_key(const void *key, const void *data, unsigned long size)
 {
 	unsigned long offset;
 
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+	{
+		device.stream_buffer = web_geometry_vertices(key, data, size);
+		return 0;
+	}
+#endif
+	(void)key;
 	size = (size + 15) & ~15UL;
 	stream_reserve(size);
 	offset = device.stream_offset;
@@ -3058,6 +3092,11 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 #endif
 	device.stream_offset += size;
 	return offset;
+}
+
+static unsigned long stream_upload(const void *data, unsigned long size)
+{
+	return stream_upload_key(data, data, size);
 }
 
 #ifdef HALO_ANDROID
@@ -3098,7 +3137,9 @@ static unsigned long stream_upload_swizzled(const struct vertex_shader_object *d
 			color[2] = blue;
 		}
 	}
-	return stream_upload(scratch, size);
+	/* The scratch allocation is shared by all streams. Cache by the source
+	range and compare the converted bytes, not by the scratch address. */
+	return stream_upload_key(data, scratch, size);
 }
 #endif
 
@@ -3106,6 +3147,13 @@ static unsigned long index_upload(const void *data, unsigned long size)
 {
 	unsigned long offset;
 
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+	{
+		device.index_buffer = web_geometry_stream(GL_ELEMENT_ARRAY_BUFFER, data, size);
+		return 0;
+	}
+#endif
 	size = (size + 15) & ~15UL;
 	state_element_array_buffer(device.index_buffer);
 	if (device.index_offset + size > INDEX_BUFFER_SIZE)
@@ -3308,6 +3356,10 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 {
 	if (!vertex_count || !prepare_draw(FALSE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	trace_draw("draw", primitive_type, vertex_count, NULL);
 	setup_streams(start_vertex, vertex_count);
 	if (primitive_type == D3DPT_QUADLIST)
@@ -3336,6 +3388,10 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 
 	if (!vertex_count || !index_data || !prepare_draw(FALSE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	/* quads are drawn as triangles, from indices made for the draw */
 	mirrored = primitive_type != D3DPT_QUADLIST &&
 #ifdef HALO_ANDROID
@@ -3414,6 +3470,10 @@ void WINAPI D3DDevice_End(void)
 	device.immediate_active = FALSE;
 	if (!count || !prepare_draw(TRUE))
 		return;
+#ifdef HALO_WEB
+	if (web_geometry.enabled)
+		web_geometry_begin_draw(device.frame);
+#endif
 	trace_draw("immediate", type, count, device.immediate_vertices);
 #ifdef HALO_WEB
 	/* WebGL allows strides of at most 255 bytes, less than a whole immediate
@@ -3690,13 +3750,18 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		xgpu_gl_state_invalidate();
 		xgpu_texture_cache_begin_frame();
 #ifdef HALO_ANDROID
-		host_gl_fence_frame((unsigned int)device.buffer_ring);
-		device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
-		host_gl_wait_frame((unsigned int)device.buffer_ring);
-		device.stream_buffer = device.stream_buffers[device.buffer_ring];
-		device.index_buffer = device.index_buffers[device.buffer_ring];
-		device.stream_offset = 0;
-		device.index_offset = 0;
+#ifdef HALO_WEB
+		if (!web_geometry.enabled)
+#endif
+		{
+			host_gl_fence_frame((unsigned int)device.buffer_ring);
+			device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
+			host_gl_wait_frame((unsigned int)device.buffer_ring);
+			device.stream_buffer = device.stream_buffers[device.buffer_ring];
+			device.index_buffer = device.index_buffers[device.buffer_ring];
+			device.stream_offset = 0;
+			device.index_offset = 0;
+		}
 #else
 		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 		device.index_offset = INDEX_BUFFER_SIZE;
@@ -3706,6 +3771,20 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	stats.presents++;
 	if (debug_settings.statistics && device.frame % 60 == 0)
 	{
+#ifdef HALO_WEB
+		if (web_geometry.enabled)
+		{
+			platform_log("browser geometry: %lu hits, %lu misses, %lu promotions, %lu invalidations; "
+				"%lu KB uploaded, %lu KB avoided, %lu KB compared; %lu KB retained, "
+				"%lu KB stream storage (%lu KB peak), %lu buffers trimmed",
+				web_geometry.stats.hits, web_geometry.stats.misses, web_geometry.stats.promotions,
+				web_geometry.stats.invalidations, web_geometry.stats.uploaded_bytes / 1024,
+				web_geometry.stats.avoided_bytes / 1024, web_geometry.stats.comparisons / 1024,
+				web_geometry.snapshot_bytes / 1024, web_geometry.stream_bytes / 1024,
+				web_geometry.stats.peak_stream_bytes / 1024, web_geometry.stats.trimmed_buffers);
+			memset(&web_geometry.stats, 0, sizeof(web_geometry.stats));
+		}
+#endif
 		platform_log("frame %lu: %lu draws, %lu immediate, %lu clears, %lu target changes; skipped %lu no program, %lu no target, %lu link; "
 			"%lu KB mirrored, %lu KB streamed",
 			device.frame, stats.draws / stats.presents, stats.immediate_draws / stats.presents, stats.clears / stats.presents,

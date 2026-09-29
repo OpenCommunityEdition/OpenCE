@@ -219,7 +219,7 @@ Android guest's list, `port/android/guest/runtime/guest_sdl.c`).
 
 ### Browser performance and diagnostics
 
-The source worker now uses the same append-only stream upload batching as the
+By default, the source worker uses the same append-only stream upload batching as the
 Apollo runner. The shared recorder is embedded in `halo.js`, installed on the
 worker's WebGL context, and flushed before each image is sent to the page.
 This avoids repeatedly updating the large vertex/index rings between draws.
@@ -234,8 +234,27 @@ elapsed time and canvas size; animation callbacks do not count as game frames.
 Hidden time is excluded, while visible stalls count toward the measured FPS.
 Compare `?fps=1&batch_streams=0` to disable batching (or pass
 `--HALO_WEB_BATCH_STREAMS=0` to the runtime). Reload between comparisons.
-`?fps=1&render_height=720` optionally caps presentation height for diagnostics;
-the default remains at most 1440 lines, and the engine still renders 480 lines.
+`?fps=1&render_height=720` overrides the presentation-height cap for diagnostics
+(480–1440 lines). The default cap is 480 lines on iPhone/iPad and 1440 elsewhere;
+the engine still renders 480 lines, and CSS scales the displayed canvas to the
+screen. At most two bitmap transfers can await the page's acknowledgement.
+When that queue is full, the worker submits GPU commands without creating
+another bitmap or blocking simulation. Hidden or failed presentations release
+their bitmap and acknowledgement too.
+
+`?fps=1&geometry_cache=1` enables an experimental native geometry path (runtime
+argument `--HALO_WEB_GEOMETRY_CACHE=1`) and automatically disables JavaScript
+stream batching. Dynamic vertex/index uploads use separate buffers in three
+rotating frame buckets. Vertex ranges observed unchanged twice are retained;
+exact comparisons of the uploaded bytes, including color conversion, invalidate
+changed data. Streams used by the current draw cannot evict each other. The
+cache is limited to 8 MiB of CPU snapshots and up to 8 MiB of retained GPU data.
+Stream storage has a 32 MiB target and trims old allocations under pressure;
+a single larger draw may exceed that target until subsequent draws can trim it.
+Driver-held copies for in-flight draws are outside this accounting. With
+`--HALO_GPU_STATS=1`, the log reports cache reuse, upload bytes, and stream
+storage/evictions. This path remains opt-in pending browser and device FPS
+measurements.
 
 On September 29, 2026, a local Apple Silicon/Chrome comparison used the
 Silent Cartographer opening and the same 1960 × 1044 presentation size.
@@ -246,6 +265,8 @@ combat in those runs was around 59–79 FPS. The brief Pelican ride reached the
 120 Hz display limit. These are scene-specific local observations, not a
 sustained or physical-iPhone performance guarantee. Each launch reused the
 same assets and saves; rendering remained at the original quality settings.
+Those measurements predate the native geometry cache and presentation changes
+above and do not establish their FPS effect.
 
 Validation covers the DOM-free worker installer, opt-out, explicit flush before
 bitmap transfer, existing upload/readback/VAO/uniform snapshot cases, bounded
@@ -254,7 +275,12 @@ measurement history, hidden intervals, and visible stalls. Run:
 ```sh
 node tools/test_stream_batch.mjs
 node --test tools/tests/*.test.cjs
+python3 tools/test_web_geometry.py
 ```
+
+The native geometry test uses mocked GL storage with AddressSanitizer and
+UndefinedBehaviorSanitizer to check changed-byte invalidation, multistream
+isolation, exact upload sizes, frame rotation, and cache/storage limits.
 
 ### WebGL 2
 
@@ -268,7 +294,9 @@ these differences for WebGL 2 (`#ifdef HALO_WEB` in `xbox_textures.c` and
   four; the others are decoded. iOS has no S3TC: all are decoded.
 - The visibility tests (lens flares) report every sample visible: WebGL gives
   query results only between tasks, which the game's thread never reaches.
-- Buffer writes are `glBufferSubData`, which copies: there are no fences.
+- Default streamed buffer writes use `glBufferSubData`, which copies. The
+  opt-in geometry cache uses per-upload `glBufferData` and retained buffers;
+  neither path uses GPU fences in the browser.
 - Strides are at most 255 bytes: the immediate mode's vertices (16
   attributes of 4 floats) go up as one array per attribute.
 
