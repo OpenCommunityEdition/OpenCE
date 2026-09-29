@@ -1380,9 +1380,11 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
-	/* the test is scissored to the viewport, so the samples cover the viewport's
-	area, not the whole target: a split-screen window is half as wide */
-	device.query_area[index] = (float)device.viewport.Width * device.viewport.Height * target_scale[0] * target_scale[1];
+	/* the target's pixels to a game pixel: the result is a count of the
+	game's pixels (visibility_unscaled), which the game divides by its own
+	test's area (lens flares, rasterizer_lights.c), a split-screen window's
+	or the screen's alike */
+	device.query_area[index] = target_scale[0] * target_scale[1];
 	/* swap the scratch query into the requested slot */
 	scratch = device.queries[0];
 	device.queries[0] = device.queries[index];
@@ -2249,16 +2251,14 @@ static void apply_raster_state(BOOL has_depth)
 	/* the game never issues a scissor rectangle, and the NV2A scissor register
 	defaults to the viewport, so fragment clipping follows the viewport: this is
 	what keeps a split-screen window's geometry from bleeding across the divider */
-	scissor[0] = viewport[0];
-	scissor[1] = viewport[1];
-	scissor[2] = viewport[0] + viewport[2];
-	scissor[3] = viewport[1] + viewport[3];
+	/* (glScissor takes the corner and the size, as glViewport does) */
+	memcpy(scissor, viewport, sizeof(scissor));
 	if (memcmp(gl_state.scissor, scissor, sizeof(scissor)))
 	{
 		memcpy(gl_state.scissor, scissor, sizeof(scissor));
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
-	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > scissor[0] && scissor[3] > scissor[1]);
+	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
 	depth_range[0] = device.viewport.MinZ;
 	depth_range[1] = device.viewport.MaxZ;
 	if (memcmp(gl_state.depth_range, depth_range, sizeof(depth_range)))
