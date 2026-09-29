@@ -706,6 +706,7 @@ boolean display_framerate = FALSE;
 boolean display_vblank_deltas = FALSE;
 boolean display_precache_progress = FALSE;
 struct _screenshot_and_framerate_globals global_screenshot_count = { 0 };
+boolean debug_render_freeze;
 
 /* ---------- public code */
 

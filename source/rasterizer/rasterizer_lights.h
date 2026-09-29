@@ -41,7 +41,7 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 void rasterizer_lens_flares_draw(
 	void);
 void rasterizer_sun_glow_draw(
-	struct rasterizer_lens_flare_submit_parameters const *parameters);
+	struct rasterizer_lens_flare_submit_parameters const *flare);
 
 /* ---------- globals */
 

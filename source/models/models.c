@@ -81,6 +81,7 @@ symbols in this file:
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "rasterizer/rasterizer_model_types.h"
 
 /* ---------- constants */
 
@@ -218,27 +219,6 @@ struct render_sort_filth
 	short next_part_index;
 	short part_index;
 	word pad;
-};
-
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	byte reserved[0x20];
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct render_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct render_model_effect effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
 };
 
 typedef char verify_render_model_effect_size[sizeof(struct render_model_effect) == 0x28 ? 1 : -1];

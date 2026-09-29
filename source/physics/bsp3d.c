@@ -86,7 +86,7 @@ static __inline real bsp3d_polygon_plane_distance_to_point(
 
 /* ---------- globals */
 
-extern long node_count;
+long node_count;
 
 /* ---------- public code */
 

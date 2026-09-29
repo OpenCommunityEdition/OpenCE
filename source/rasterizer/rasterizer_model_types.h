@@ -48,7 +48,7 @@ struct render_model_effect
 	real parameter;
 	long source_object_index;
 	real_point3d source_object_centroid;
-	struct shader const *modifier_shader;
+	struct shader *modifier_shader;
 	struct render_animation modifier_animation;
 };
 

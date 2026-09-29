@@ -145,6 +145,7 @@ static struct widget_type_definition data_0030b2b0[NUMBER_OF_WIDGET_TYPES] =
 		lightning_submit
 	}
 };
+struct data_array *widget_data;
 
 /* ---------- public code */
 

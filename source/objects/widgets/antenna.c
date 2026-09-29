@@ -73,6 +73,8 @@ static void antenna_update(
 
 /* ---------- globals */
 
+struct data_array *antenna_data;
+
 /* ---------- public code */
 
 void antennas_initialize(

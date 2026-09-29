@@ -66,12 +66,6 @@ typedef void (*director_camera_update_proc)(
 	void *command,
 	void *result);
 
-struct director_scripting_globals
-{
-	boolean camera_scripted;
-	byte pad[3];
-};
-
 struct director_variable_instance
 {
 	real value;
@@ -165,7 +159,7 @@ void director_update(
 
 /* ---------- globals */
 
-extern struct director_scripting_globals *director_camera_scripted;
+extern boolean *director_camera_scripted;
 extern boolean director_camera_switch_fast;
 
 /* ---------- public code */

@@ -203,7 +203,7 @@ static void temporary_hud_draw(
 
 struct hud_globals_definition *hud_globals = NULL;
 struct hud_scripted_globals_definition *hud_scripted_globals = NULL;
-extern boolean temporary_hud;
+boolean temporary_hud;
 
 static wchar_t const *default_string = L"";
 

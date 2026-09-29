@@ -546,7 +546,7 @@ static void impulse_effect_initialize(
 // effect_generate_part: the part definition and the location instance are passed in registers
 static void effect_generate_part(
 	struct effect_datum const *effect,
-	struct effect_part_definition const *part,
+	struct effect_part_definition const *part_definition,
 	struct effect_location_datum const *instance,
 	real_point3d const *world_point,
 	real_vector3d const *world_forward,
@@ -651,7 +651,7 @@ static void effect_set_event(
 /* ---------- globals */
 
 extern struct data_array *effect_data;
-extern struct data_array *effect_location_data;
+struct data_array *effect_location_data;
 
 boolean effects_corpse_nonviolent = TRUE;
 
@@ -1605,7 +1605,7 @@ static void impulse_effect_initialize(
 
 static void effect_generate_part(
 	struct effect_datum const *effect,
-	struct effect_part_definition const *part,
+	struct effect_part_definition const *part_definition,
 	struct effect_location_datum const *instance,
 	real_point3d const *world_point,
 	real_vector3d const *world_forward,
@@ -1615,14 +1615,14 @@ static void effect_generate_part(
 	real_vector3d direction;
 	real_vector3d velocity;
 
-	switch (part->runtime_base_class_tag)
+	switch (part_definition->runtime_base_class_tag)
 	{
 		case PARTICLE_SYSTEM_DEFINITION_TAG:
 		{
-			real_argb_color color;
+			real_argb_color tint;
 
-			color.alpha = 1.0f;
-			color.rgb = effect->color;
+			tint.alpha = 1.0f;
+			tint.rgb = effect->color;
 
 			effect_random_translational_velocity(
 				get_global_local_random_seed_address(),
@@ -1630,21 +1630,21 @@ static void effect_generate_part(
 				world_forward,
 				&direction,
 				&velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
 			velocity.i += effect->velocity.i;
 			velocity.j += effect->velocity.j;
 			velocity.k += effect->velocity.k;
 
 			particle_system_new_unattached(
-				part->reference.index,
+				part_definition->reference.index,
 				world_point,
 				&velocity,
-				&color,
+				&tint,
 				scale);
 			break;
 		}
@@ -1659,7 +1659,7 @@ static void effect_generate_part(
 
 				object_impulse_sound_new(
 					effect->object_index,
-					part->reference.index,
+					part_definition->reference.index,
 					node_index,
 					&instance->matrix.position,
 					&instance->matrix.forward,
@@ -1675,7 +1675,7 @@ static void effect_generate_part(
 				location.game_location = effect->location;
 
 				unattached_impulse_sound_new(
-					part->reference.index,
+					part_definition->reference.index,
 					&location,
 					scale);
 			}
@@ -1683,45 +1683,45 @@ static void effect_generate_part(
 
 		case OBJECT_DEFINITION_TAG:
 		{
-			struct object_placement_data placement;
+			struct object_placement_data data;
 			unsigned long *seed;
 
 			object_placement_data_new(
-				&placement,
-				part->reference.index,
+				&data,
+				part_definition->reference.index,
 				effect->owner_object_index);
 
-			placement.position = *world_point;
-			placement.forward = *world_forward;
-			placement.up = *world_up;
+			data.position = *world_point;
+			data.forward = *world_forward;
+			data.up = *world_up;
 
 			effect_random_translational_velocity(
 				get_global_random_seed_address(),
 				effect,
 				world_forward,
 				&direction,
-				&placement.translational_velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				&data.translational_velocity,
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
-			placement.translational_velocity.i += effect->velocity.i;
-			placement.translational_velocity.j += effect->velocity.j;
-			placement.translational_velocity.k += effect->velocity.k;
+			data.translational_velocity.i += effect->velocity.i;
+			data.translational_velocity.j += effect->velocity.j;
+			data.translational_velocity.k += effect->velocity.k;
 
 			seed = get_global_random_seed_address();
 			effect_random_angular_velocity(
 				seed,
 				effect,
-				&placement.angular_velocity,
-				part->angular_velocity_lower_bound,
-				part->angular_velocity_upper_bound,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				&data.angular_velocity,
+				part_definition->angular_velocity_lower_bound,
+				part_definition->angular_velocity_upper_bound,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
-			object_new(&placement);
+			object_new(&data);
 			break;
 		}
 
@@ -1735,19 +1735,19 @@ static void effect_generate_part(
 				world_forward,
 				&direction,
 				&velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
 			radius_modifier = real_seed_random_range(
 				get_global_local_random_seed_address(),
-				part->radius_modifier_lower_bound,
-				part->radius_modifier_upper_bound);
+				part_definition->radius_modifier_lower_bound,
+				part_definition->radius_modifier_upper_bound);
 
 			decal_new(
-				part->reference.index,
+				part_definition->reference.index,
 				world_point,
 				&velocity,
 				radius_modifier,
@@ -1763,7 +1763,7 @@ static void effect_generate_part(
 			struct object_datum *owner =
 				object_try_and_get(effect->owner_object_index);
 
-			damage_data_new(&damage, part->reference.index);
+			damage_data_new(&damage, part_definition->reference.index);
 
 			if (owner)
 			{
@@ -1790,7 +1790,7 @@ static void effect_generate_part(
 				node_index &= (short)(FLAG(_effect_location_first_person_bit) - 1);
 
 			light_new_unattached(
-				part->reference.index,
+				part_definition->reference.index,
 				effect->object_index,
 				node_index,
 				&instance->matrix.position,
@@ -1808,7 +1808,7 @@ static void effect_generate_part(
 					temporary,
 					"effect %s has a bad part %s",
 					tag_get_name(effect->definition_index),
-					part->reference.name));
+					part_definition->reference.name));
 			break;
 	}
 
@@ -1995,9 +1995,9 @@ static void effect_generate_particles(
 				instance_particle_index++)
 			{
 				struct new_particle_data data;
-				real_vector3d random_direction;
-				real_vector3d emission_offset;
-				real_point3d world_position;
+				real_vector3d random_offset;
+				real_vector3d relative_offset;
+				real_point3d world_point;
 				real_vector3d world_direction;
 				real_vector3d world_velocity;
 				real emission_radius = effect_real_random_range(
@@ -2009,18 +2009,18 @@ static void effect_generate_particles(
 					particles->scale_b_flags,
 					_effect_particle_distribution_radius_bit);
 
-				local_random_direction3d(&random_direction);
+				local_random_direction3d(&random_offset);
 				matrix4x3_transform_vector(
 					&instance->matrix,
 					&particles->offset,
-					&emission_offset);
+					&relative_offset);
 
 				data.position.x = instance->matrix.position.x +
-					random_direction.i * emission_radius + emission_offset.i;
+					random_offset.i * emission_radius + relative_offset.i;
 				data.position.y = instance->matrix.position.y +
-					random_direction.j * emission_radius + emission_offset.j;
+					random_offset.j * emission_radius + relative_offset.j;
 				data.position.z = instance->matrix.position.z +
-					random_direction.k * emission_radius + emission_offset.k;
+					random_offset.k * emission_radius + relative_offset.k;
 
 				effect_random_translational_velocity(
 					get_global_local_random_seed_address(),
@@ -2052,7 +2052,7 @@ static void effect_generate_particles(
 					matrix4x3_transform_point(
 						node_matrix,
 						&data.position,
-						&world_position);
+						&world_point);
 					matrix4x3_transform_normal(
 						node_matrix,
 						&data.direction,
@@ -2064,7 +2064,7 @@ static void effect_generate_particles(
 				}
 				else
 				{
-					world_position = data.position;
+					world_point = data.position;
 					world_direction = data.direction;
 					world_velocity = data.velocity;
 				}
@@ -2072,7 +2072,7 @@ static void effect_generate_particles(
 				if (effect_allowed_by_environment(
 					particles->environment,
 					&effect->location,
-					&world_position))
+					&world_point))
 				{
 					data.definition_index = particles->particle.index;
 
@@ -2093,7 +2093,7 @@ static void effect_generate_particles(
 						{
 							effect->impulse_field.translational_function(
 								&data.initial_impulse,
-								&world_position,
+								&world_point,
 								effect->impulse_field.user_data);
 						}
 						else
@@ -2102,7 +2102,7 @@ static void effect_generate_particles(
 						}
 
 						data.object_index = NONE;
-						data.position = world_position;
+						data.position = world_point;
 						data.direction = world_direction;
 						data.velocity.i = world_velocity.i + effect->velocity.i * 30.0f;
 						data.velocity.j = world_velocity.j + effect->velocity.j * 30.0f;

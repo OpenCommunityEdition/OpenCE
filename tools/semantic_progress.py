@@ -10,10 +10,13 @@ semantic relocation comparison proves exact equality.
 """
 
 import copy
+import datetime
 import hashlib
 import json
+import re
 import struct
 import subprocess
+import sys
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -681,6 +684,16 @@ _IMAGE_SYM_CLASS_EXTERNAL = 2
 # selections depend on auxiliary fields (checksum, associated section) that the
 # executable split does not reproduce and the member checks do not compare.
 _MODEL_ALLOWED_SELECTIONS = frozenset({None, 0, _IMAGE_COMDAT_SELECT_ANY})
+_IMAGE_SCN_MEM_WRITE = 0x80000000
+_IMAGE_COMDAT_SELECT_NODUPLICATES = 1
+# A surplus helper function (see _verify_helper_reached_constant): csplit
+# writes every January function COMDAT as select-noduplicates, so the January
+# provider's copy may carry either selection; the rebuilt copies must be
+# select-any so that the linker can fold ours into the provider's.
+_HELPER_JANUARY_SELECTIONS = frozenset({
+    _IMAGE_COMDAT_SELECT_NODUPLICATES, _IMAGE_COMDAT_SELECT_ANY})
+_HELPER_REBUILT_SELECTIONS = frozenset({_IMAGE_COMDAT_SELECT_ANY})
+_IMAGE_SYM_CLASS_WEAK_EXTERNAL = 105
 
 
 def _objdiff_data_section(section):
@@ -1151,8 +1164,299 @@ def _january_definers(project_root, config_units, symbol_names):
     return definers
 
 
+def _relocation_rows(obj, section_number):
+    """(address, type, target symbol) of every relocation, in table order."""
+    section = obj["sections"][section_number - 1]
+    rows = []
+    for index in range(section["reloc_count"]):
+        address, symbol_index, kind = struct.unpack_from(
+            "<LLH", obj["data"], section["reloc"] + index * 10)
+        if symbol_index not in obj["by_index"]:
+            raise SemanticProgressError(
+                f"relocation {index} of section {section_number} names no "
+                f"symbol")
+        rows.append((address, kind, obj["by_index"][symbol_index]))
+    return rows
+
+
+def _sections_reaching(obj, symbol_name, section_number):
+    """Every section holding a relocation that reaches a symbol's section.
+
+    A relocation reaches it through the symbol's name or through any symbol
+    defined in its section (the section symbol included).  A weak external
+    or an /ALTERNATENAME directive would let a relocation name one symbol and
+    bind another, so an object holding either fails closed instead: no
+    spelling of the reference escapes the scan.
+    """
+    if any(int(item["storage"]) == _IMAGE_SYM_CLASS_WEAK_EXTERNAL
+           for item in obj["symbols"]):
+        raise SemanticProgressError(
+            "the rebuilt object has a weak external")
+    for section in obj["sections"]:
+        if section["name"] == ".drectve" and b"alternatename" in bytes(
+                obj["data"][section["raw"]:section["raw"] + section["size"]]
+                ).lower():
+            raise SemanticProgressError(
+                "the rebuilt object has an /ALTERNATENAME directive")
+    reaching = set()
+    for section in obj["sections"]:
+        number = int(section["index"])
+        for _, _, destination in _relocation_rows(obj, number):
+            if destination["name"] == symbol_name \
+                    or int(destination["section"]) == section_number:
+                reaching.add(number)
+    return reaching
+
+
+def _single_function_comdat(obj, name, description, selections):
+    """A code COMDAT holding only its section symbol and one external
+    function at offset 0, with a COMDAT selection in ``selections``."""
+    try:
+        owner = _unique_defined_symbol(obj, name, description)
+        number = int(owner["section"])
+        section = obj["sections"][number - 1]
+        selection = _comdat_selection(obj, number)
+    except (CoffError, KeyError, IndexError) as error:
+        raise SemanticProgressError(
+            f"cannot read {description} {name!r}: {error}") from error
+    flags = int(section["flags"])
+    if not flags & IMAGE_SCN_CNT_CODE or not flags & _IMAGE_SCN_LNK_COMDAT:
+        raise SemanticProgressError(
+            f"{description} {name!r} is not a code COMDAT")
+    if int(owner["storage"]) != _IMAGE_SYM_CLASS_EXTERNAL \
+            or int(owner["value"]) != 0:
+        raise SemanticProgressError(
+            f"{description} {name!r} is not an external at offset 0")
+    expected = sorted([
+        (section["name"], 0, 0, _IMAGE_SYM_CLASS_STATIC),
+        (name, 0, int(owner["type"]), _IMAGE_SYM_CLASS_EXTERNAL)])
+    if _defined_section_symbols(obj, number) != expected:
+        raise SemanticProgressError(
+            f"{description} {name!r} shares its section")
+    if selection not in selections:
+        raise SemanticProgressError(
+            f"{description} {name!r} has COMDAT selection {selection}")
+    return owner, section
+
+
+def _verify_surplus_helper(project_root, config_units, target, base,
+                           unit_name, helper_number, provider,
+                           symbol_addresses):
+    """Prove one rebuilt code section is a surplus copy of a January helper.
+
+    The section must be a select-any COMDAT holding one external function F
+    that January's object for this unit imports (undefined, relocated to)
+    but does not define; exactly one January object defines F, and it is
+    ``provider``.  The provider's January and rebuilt copies of F must equal
+    ours byte for byte outside relocations, relocation for relocation
+    (address, type, target name, addend, image-resolved destination), with the
+    same flags, size and symbol table.  Every relocation target is either
+    imported by this unit (its image address is then proved) or a data
+    constant this unit defines; each such constant must be the very constant
+    the provider's January copy of F references at that relocation, defined by
+    the provider, and identical (strict comparator, flags, size, select-any)
+    in the provider's January and rebuilt objects.  Returns F and the names of
+    those constants.
+    """
+    section = base["sections"][helper_number - 1]
+    functions = [item for item in base["symbols"]
+                 if int(item["section"]) == helper_number
+                 and item["name"] != section["name"]]
+    if len(functions) != 1:
+        raise SemanticProgressError(
+            f"rebuilt section {helper_number} ({section['name']}) is not a "
+            f"single-function helper")
+    helper = functions[0]["name"]
+    if any(entry["name"] == helper and int(entry["section"]) > 0
+           for entry in target["symbols"]):
+        raise SemanticProgressError(
+            f"it is reached from {helper!r}, which January's unit defines")
+    _, ours_section = _single_function_comdat(
+        base, helper, "rebuilt surplus helper", _HELPER_REBUILT_SELECTIONS)
+    references = [entry for entry in target["symbols"]
+                  if entry["name"] == helper]
+    if not references or any(
+            int(entry["section"]) != 0
+            or int(entry["storage"]) != _IMAGE_SYM_CLASS_EXTERNAL
+            for entry in references):
+        raise SemanticProgressError(
+            f"helper {helper!r} is not a January undefined reference of this "
+            f"unit")
+    if not any(destination["name"] == helper
+               for number in range(1, len(target["sections"]) + 1)
+               for _, _, destination in _relocation_rows(target, number)):
+        raise SemanticProgressError(
+            f"January's unit never relocates to helper {helper!r}")
+    definers = _january_definers(project_root, config_units, [helper])[helper]
+    if definers != [provider]:
+        raise SemanticProgressError(
+            f"helper {helper!r} provider {provider!r} is not January's unique "
+            f"definer (definers {definers})")
+    provider_config = config_units[provider]
+    try:
+        january_provider = load(
+            Path(project_root) / provider_config["target_path"])
+        rebuilt_provider = load(
+            Path(project_root) / provider_config["base_path"])
+        ours_info = section_info_by_number(base, helper_number)
+        ours_resolved = section_info_resolved(base, helper, symbol_addresses)
+    except (CoffError, KeyError, OSError) as error:
+        raise SemanticProgressError(
+            f"cannot read helper {helper!r} or its provider {provider}: "
+            f"{error}") from error
+    ours_rows = _relocation_rows(base, helper_number)
+    january_rows = None
+    for obj, description, selections in (
+            (january_provider, f"January provider {provider}",
+             _HELPER_JANUARY_SELECTIONS),
+            (rebuilt_provider, f"rebuilt provider {provider}",
+             _HELPER_REBUILT_SELECTIONS)):
+        owner, theirs_section = _single_function_comdat(
+            obj, helper, f"{description} helper", selections)
+        try:
+            info = section_info_by_number(obj, int(owner["section"]))
+            resolved = section_info_resolved(obj, helper, symbol_addresses)
+        except (CoffError, KeyError) as error:
+            raise SemanticProgressError(
+                f"cannot resolve helper {helper!r} in {description}: {error}"
+            ) from error
+        if int(theirs_section["flags"]) != int(ours_section["flags"]) \
+                or theirs_section["size"] != ours_section["size"] \
+                or not section_infos_equal(info, ours_info):
+            raise SemanticProgressError(
+                f"helper {helper!r} bytes or relocations differ from "
+                f"{description}")
+        if _defined_section_symbols(obj, int(owner["section"])) \
+                != _defined_section_symbols(base, helper_number):
+            raise SemanticProgressError(
+                f"helper {helper!r} section symbol table differs from "
+                f"{description}")
+        for measured in (resolved, ours_resolved):
+            if any(relocation["target"][0] != "address"
+                   for relocation in measured["relocations"]):
+                raise SemanticProgressError(
+                    f"helper {helper!r} relocation has no image address")
+        if resolved != ours_resolved:
+            raise SemanticProgressError(
+                f"helper {helper!r} resolved relocations differ from "
+                f"{description}")
+        rows = _relocation_rows(obj, int(owner["section"]))
+        for side in (rows, ours_rows):
+            if any(int(destination["storage"]) != _IMAGE_SYM_CLASS_EXTERNAL
+                   for _, _, destination in side):
+                raise SemanticProgressError(
+                    f"helper {helper!r} relocates through a non-external "
+                    f"symbol")
+        if [(address, kind, destination["name"])
+                for address, kind, destination in rows] \
+                != [(address, kind, destination["name"])
+                    for address, kind, destination in ours_rows]:
+            raise SemanticProgressError(
+                f"helper {helper!r} relocation targets differ from "
+                f"{description}")
+        if january_rows is None:
+            january_rows = rows
+    constants = set()
+    for (address, _, ours_target), (_, _, january_target) in zip(
+            ours_rows, january_rows):
+        number = int(ours_target["section"])
+        if number == 0:
+            continue
+        name = ours_target["name"]
+        if not 0 < number <= len(base["sections"]) \
+                or int(base["sections"][number - 1]["flags"]) \
+                & (IMAGE_SCN_CNT_CODE | _IMAGE_SCN_MEM_EXECUTE):
+            raise SemanticProgressError(
+                f"helper {helper!r} relocates to {name!r}, which is not a "
+                f"data constant")
+        if int(january_target["section"]) <= 0:
+            raise SemanticProgressError(
+                f"helper {helper!r} constant {name!r} is not defined by the "
+                f"January provider {provider}")
+        ours_constant = _select_any_definition(
+            base, name, "rebuilt helper constant")
+        # The identity proved below covers the constant's own bytes, so the
+        # relocation must address one of them (all three copies carry the
+        # same addend: the strict comparator compared it).
+        addend = struct.unpack_from(
+            "<i", base["data"], ours_section["raw"] + address)[0]
+        if not 0 <= int(ours_target["value"]) + addend \
+                < int(ours_constant[0]["size"]):
+            raise SemanticProgressError(
+                f"helper {helper!r} relocation at {address:#x} addresses "
+                f"outside constant {name!r}")
+        for obj, description in (
+                (january_provider, f"January provider {provider}"),
+                (rebuilt_provider, f"rebuilt provider {provider}")):
+            theirs = _select_any_definition(
+                obj, name, f"{description} helper constant")
+            if int(theirs[0]["flags"]) != int(ours_constant[0]["flags"]) \
+                    or theirs[0]["size"] != ours_constant[0]["size"] \
+                    or _defined_section_symbols(obj, int(theirs[0]["index"])) \
+                    != _defined_section_symbols(
+                        base, int(ours_constant[0]["index"])) \
+                    or not section_infos_equal(theirs[1], ours_constant[1]):
+                raise SemanticProgressError(
+                    f"helper {helper!r} constant {name!r} differs from "
+                    f"{description}")
+        constants.add(name)
+    return helper, constants
+
+
+def _verify_helper_reached_constant(project_root, config_units, target, base,
+                                   unit_name, item, symbol_addresses,
+                                   helpers):
+    """Accept a surplus constant January's unit does not name at all.
+
+    Such a constant is admissible only as a folded copy reached solely
+    through surplus helper functions of this unit whose single January
+    provider (the item's provider) holds the identical helper and the
+    identical constant: see _verify_surplus_helper.  Nothing else reaches
+    this path: a constant also reached from any other section (code, data or
+    debug), a writable or relocated one, or one no section reaches, fails.
+    ``helpers`` caches verified helper sections per provider.
+    """
+    symbol_name = item["symbol"]
+    provider = item["provider"]
+    if not isinstance(provider, str) or provider == unit_name \
+            or provider not in config_units:
+        raise SemanticProgressError(f"invalid provider {provider!r}")
+    if symbol_addresses is None:
+        raise SemanticProgressError("no image symbol addresses")
+    try:
+        owner = _unique_defined_symbol(
+            base, symbol_name, "rebuilt surplus constant")
+        number = int(owner["section"])
+        section = base["sections"][number - 1]
+    except (CoffError, KeyError, IndexError) as error:
+        raise SemanticProgressError(str(error)) from error
+    flags = int(section["flags"])
+    if flags & (IMAGE_SCN_CNT_CODE | _IMAGE_SCN_MEM_EXECUTE
+                | _IMAGE_SCN_MEM_WRITE) \
+            or not flags & _IMAGE_SCN_CNT_INITIALIZED_DATA \
+            or section["reloc_count"]:
+        raise SemanticProgressError("it is not a read-only constant")
+    reaching = _sections_reaching(base, symbol_name, number)
+    if not reaching:
+        raise SemanticProgressError("no rebuilt section references it")
+    for helper_number in sorted(reaching):
+        if not int(base["sections"][helper_number - 1]["flags"]) \
+                & IMAGE_SCN_CNT_CODE:
+            raise SemanticProgressError(
+                f"it is reached from non-code section {helper_number}")
+        key = (helper_number, provider)
+        if key not in helpers:
+            helpers[key] = _verify_surplus_helper(
+                project_root, config_units, target, base, unit_name,
+                helper_number, provider, symbol_addresses)
+        helper, constants = helpers[key]
+        if symbol_name not in constants:
+            raise SemanticProgressError(
+                f"helper {helper!r} does not reference it by name")
+
+
 def _verify_surplus_providers(project_root, config_units, target, base,
-                              unit_name, surplus):
+                              unit_name, surplus, symbol_addresses=None):
     """Prove every surplus literal is a folded copy of one selected provider.
 
     For each item: January's object for this unit references the symbol only
@@ -1162,18 +1466,35 @@ def _verify_surplus_providers(project_root, config_units, target, base,
     to this unit's rebuilt copy (strict comparator, flags and selection).  The
     copies can therefore only fold into the provider's, and the surplus bytes
     are never credited here.
+
+    One exception replaces only the first requirement: a constant January's
+    object does not name at all may instead be reached solely through surplus
+    helper functions proved identical to the same provider's January helper,
+    constant for constant (_verify_helper_reached_constant).  Every other
+    requirement still applies to it.
     """
     if not surplus:
         return
     definers = _january_definers(
         project_root, config_units, [item["symbol"] for item in surplus])
+    helpers = {}
     for item in surplus:
         symbol_name = item["symbol"]
         provider = item["provider"]
         item_label = f"{unit_name}:{symbol_name}"
         references = [entry for entry in target["symbols"]
                       if entry["name"] == symbol_name]
-        if not references or any(
+        if not references:
+            try:
+                _verify_helper_reached_constant(
+                    project_root, config_units, target, base, unit_name,
+                    item, symbol_addresses, helpers)
+            except SemanticProgressError as error:
+                raise SemanticProgressError(
+                    f"semantic data surplus is not a January undefined "
+                    f"reference of this unit: {item_label} (nor a verified "
+                    f"surplus-helper constant: {error})") from error
+        elif any(
                 int(entry["section"]) != 0
                 or int(entry["storage"]) != _IMAGE_SYM_CLASS_EXTERNAL
                 for entry in references):
@@ -1551,7 +1872,7 @@ def apply_semantic_data_matches(
                     entry.get("surplus"), unit_name, section_label)
                 _verify_surplus_providers(
                     project_root, config_units, target, base, unit_name,
-                    entry.get("surplus") or [])
+                    entry.get("surplus") or [], symbol_addresses)
                 for (symbol, address, target_class, base_class,
                      base_target_section) in linkage_differences:
                     if target_class == ("undefined", _IMAGE_SYM_CLASS_EXTERNAL) \
@@ -1666,3 +1987,1148 @@ def apply_semantic_data_matches(
             f"{unit_name}:{section_label} (+{unmatched_data} data bytes)")
 
     return credited
+
+
+# Data-denominator category reassignment: accounting only, never credit.
+#
+# objdiff charges a unit's whole data extent to the unit's progress category.
+# January's linker pools every COMMON record, Halo and vendor alike, together
+# with two linker-generated records into one '* Linker *' contribution, which
+# the executable split turns into the single unit source/linker_common.  An
+# entry of config/data_category_reassignments.json names each record of such a
+# unit that belongs to another category, with its provenance, and this step
+# moves that record's share of the unit's reported data extent from the unit's
+# category to the named one.  A record's share is its increment under the
+# pinned objdiff-3.3.1-combined extent model (its size plus the padding the
+# model inserts after it), so the moved and the remaining shares always sum to
+# exactly the size objdiff reports for the unit.  Only category denominators
+# move: the overall measures, every unit row, matched data, functions, units
+# and completion are untouched, and a unit with any matched or complete data
+# fails closed (its matched bytes would need an attribution of their own).
+DATA_CATEGORY_REASSIGNMENT_MODELS = frozenset({OBJDIFF_331_COMBINED_EXTENT})
+_REASSIGNMENT_MANIFEST_KEYS = frozenset({"categories", "entries"})
+_REASSIGNMENT_CATEGORY_KEYS = frozenset({"id", "name"})
+_REASSIGNMENT_ENTRY_KEYS = frozenset({
+    "unit", "from_category", "extent_model", "unit_total_data", "moved",
+    "reason", "records"})
+_REASSIGNMENT_RECORD_KEYS = frozenset({
+    "symbol", "section", "size", "to_category", "evidence"})
+
+
+def _nonempty_string(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _manifest_count(value, description):
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    raise SemanticProgressError(f"malformed {description}: {value!r}")
+
+
+def _objdiff_named_sections(obj, unit_name):
+    """The object's sections under the names objdiff reports them by.
+
+    A long section name is stored in the section header as '/<decimal
+    offset>' into the string table.  objdiff's object reader resolves it (the
+    split's '/20' reports as '.rdata$debug'), so it is resolved here too; a
+    malformed or dangling reference fails closed.
+    """
+    data = obj["data"]
+    symbol_offset, symbol_count = struct.unpack_from("<LL", data, 8)
+    strings = symbol_offset + symbol_count * SYMBOL_ENTRY_SIZE
+    strings_end = strings
+    if strings + 4 <= len(data):
+        strings_end = min(
+            len(data), strings + struct.unpack_from("<L", data, strings)[0])
+    named = []
+    for section in obj["sections"]:
+        name = section["name"]
+        if name.startswith("/"):
+            digits = name[1:]
+            if not digits.isascii() or not digits.isdigit() \
+                    or int(digits) < 4:
+                raise SemanticProgressError(
+                    f"malformed long section name {name!r}: {unit_name}")
+            start = strings + int(digits)
+            end = data.find(b"\0", start, strings_end)
+            if end < 0:
+                raise SemanticProgressError(
+                    f"unresolvable long section name {name!r}: {unit_name}")
+            try:
+                name = data[start:end].decode("ascii")
+            except UnicodeDecodeError as error:
+                raise SemanticProgressError(
+                    f"undecodable long section name {name!r}: {unit_name}"
+                ) from error
+        named.append(dict(section, name=name))
+    return {"sections": named}
+
+
+def _objdiff_report_shares(sections):
+    """Each section's share of _objdiff_report_extent, in the same order.
+
+    A share is how far the running offset advances for that section: its
+    size plus the alignment padding the model inserts after it.  The shares
+    must sum to _objdiff_report_extent; any disagreement fails closed.
+    """
+    if len(sections) == 1:
+        shares = {int(sections[0]["index"]): int(sections[0]["size"])}
+    else:
+        shares = {}
+        offset = 0
+        for section in sorted(
+                sections,
+                key=lambda item: ("$" not in item["name"], item["name"])):
+            code = (int(section["flags"]) >> 20) & 0xF
+            if code > 14:
+                raise SemanticProgressError(
+                    f"invalid COFF section alignment code {code} in section "
+                    f"{section['index']}")
+            alignment = max(1 << (code - 1) if code else 16, 4)
+            advanced = (offset + int(section["size"]) + alignment - 1) \
+                & ~(alignment - 1)
+            shares[int(section["index"])] = advanced - offset
+            offset = advanced
+    if sum(shares.values()) != _objdiff_report_extent(sections):
+        raise SemanticProgressError(
+            "objdiff extent shares do not sum to the report extent")
+    return shares
+
+
+def _move_total_data(measures, delta, category_id):
+    total = int(measures.get("total_data", 0)) + delta
+    matched = int(measures.get("matched_data", 0))
+    complete = int(measures.get("complete_data", 0))
+    if total < matched or total < complete:
+        raise SemanticProgressError(
+            f"data reassignment would leave category {category_id} below its "
+            f"matched or complete data")
+    measures["total_data"] = total
+    measures["matched_data_percent"] = _percent(matched, total)
+    measures["complete_data_percent"] = _percent(complete, total)
+
+
+def _unit_categories(unit, description):
+    categories = unit.get("metadata", {}).get("progress_categories", [])
+    if isinstance(categories, str):
+        categories = [categories]
+    if not isinstance(categories, list):
+        raise SemanticProgressError(
+            f"malformed progress categories for {description}")
+    return categories
+
+
+def _plan_data_category_reassignment(entry, report_units, config_units,
+                                     categories, project_root, seen_units):
+    """Verify one manifest entry; return (unit, from, {to: bytes}, rows)."""
+    if not isinstance(entry, dict) or set(entry) != _REASSIGNMENT_ENTRY_KEYS:
+        keys = sorted(entry) if isinstance(entry, dict) else entry
+        raise SemanticProgressError(
+            f"data category reassignment entry must have exactly the keys "
+            f"{sorted(_REASSIGNMENT_ENTRY_KEYS)}: {keys!r}")
+    unit_name = entry["unit"]
+    if not _nonempty_string(unit_name):
+        raise SemanticProgressError(
+            f"malformed data category reassignment unit: {unit_name!r}")
+    if unit_name in seen_units:
+        raise SemanticProgressError(
+            f"data category reassignment unit listed twice: {unit_name}")
+    seen_units.add(unit_name)
+    if unit_name not in report_units or unit_name not in config_units:
+        raise SemanticProgressError(
+            f"data category reassignment unit not found: {unit_name}")
+    if entry["extent_model"] not in DATA_CATEGORY_REASSIGNMENT_MODELS:
+        raise SemanticProgressError(
+            f"unknown data category reassignment extent model "
+            f"{entry['extent_model']!r}: {unit_name}")
+    if not _nonempty_string(entry["reason"]):
+        raise SemanticProgressError(
+            f"data category reassignment needs a reason: {unit_name}")
+    from_category = entry["from_category"]
+    report_unit = report_units[unit_name]
+    config_unit = config_units[unit_name]
+    for unit, side in ((report_unit, "report"), (config_unit, "objdiff.json")):
+        if _unit_categories(unit, f"{unit_name} ({side})") != [from_category]:
+            raise SemanticProgressError(
+                f"data category reassignment unit is not solely in "
+                f"{from_category!r} ({side}): {unit_name}")
+    if from_category not in categories:
+        raise SemanticProgressError(
+            f"progress category not found: {from_category}")
+    measures = report_unit.get("measures", {})
+    if config_unit.get("metadata", {}).get("complete") \
+            or report_unit.get("metadata", {}).get("complete") \
+            or _report_count(measures.get("matched_data", 0),
+                             f"matched_data for {unit_name}") \
+            or _report_count(measures.get("complete_data", 0),
+                             f"complete_data for {unit_name}") \
+            or _report_count(measures.get("complete_units", 0),
+                             f"complete_units for {unit_name}"):
+        raise SemanticProgressError(
+            f"data category reassignment needs a unit with no matched or "
+            f"complete data: {unit_name}")
+
+    target = load(project_root / config_unit["target_path"])
+    named = _objdiff_named_sections(target, unit_name)
+    _require_report_binding(
+        named, report_unit, unit_name, "data-category-reassignment")
+    unit_total = _report_count(
+        measures.get("total_data", 0), f"total_data for {unit_name}")
+    if unit_total != _manifest_count(
+            entry["unit_total_data"], f"unit_total_data for {unit_name}"):
+        raise SemanticProgressError(
+            f"data category reassignment unit total changed: {unit_name} "
+            f"(report {unit_total}, manifest {entry['unit_total_data']})")
+    shares = {}
+    for sections in _objdiff_report_data_groups(named).values():
+        shares.update(_objdiff_report_shares(sections))
+    sections = {int(section["index"]): section for section in named["sections"]}
+    externals = {}
+    for item in target["symbols"]:
+        if int(item["section"]) > 0 \
+                and int(item["storage"]) == _IMAGE_SYM_CLASS_EXTERNAL:
+            externals.setdefault(item["name"], []).append(item)
+            externals.setdefault(("section", int(item["section"])), []) \
+                .append(item)
+
+    records = entry["records"]
+    if not isinstance(records, list) or not records:
+        raise SemanticProgressError(
+            f"data category reassignment needs records: {unit_name}")
+    moved, rows, seen_symbols, seen_sections = {}, [], set(), set()
+    for record in records:
+        if not isinstance(record, dict) \
+                or set(record) != _REASSIGNMENT_RECORD_KEYS:
+            raise SemanticProgressError(
+                f"data category reassignment record must have exactly the "
+                f"keys {sorted(_REASSIGNMENT_RECORD_KEYS)}: {unit_name}: "
+                f"{record!r}")
+        symbol = record["symbol"]
+        label = f"{unit_name}:{symbol}"
+        if not _nonempty_string(symbol) or not _nonempty_string(
+                record["evidence"]) or not _nonempty_string(record["section"]):
+            raise SemanticProgressError(
+                f"malformed data category reassignment record: {label}")
+        if symbol in seen_symbols:
+            raise SemanticProgressError(
+                f"data category reassignment record listed twice: {label}")
+        seen_symbols.add(symbol)
+        definitions = externals.get(symbol, [])
+        if len(definitions) != 1:
+            raise SemanticProgressError(
+                f"data category reassignment record is not one defined "
+                f"external symbol of the target: {label} "
+                f"({len(definitions)} definitions)")
+        number = int(definitions[0]["section"])
+        if int(definitions[0]["value"]) != 0 \
+                or len(externals[("section", number)]) != 1:
+            raise SemanticProgressError(
+                f"data category reassignment record does not own its whole "
+                f"section: {label}")
+        if number in seen_sections or number not in shares:
+            raise SemanticProgressError(
+                f"data category reassignment record is not a distinct "
+                f"reported data section: {label}")
+        seen_sections.add(number)
+        section = sections[number]
+        size = _manifest_count(record["size"], f"size for {label}")
+        if section["name"] != record["section"] \
+                or int(section["size"]) != size:
+            raise SemanticProgressError(
+                f"data category reassignment record does not match the "
+                f"target: {label} (target {section['name']} "
+                f"{section['size']} B, manifest {record['section']} {size} B)")
+        to_category = record["to_category"]
+        if to_category == from_category or to_category not in categories:
+            raise SemanticProgressError(
+                f"invalid data category reassignment target "
+                f"{to_category!r}: {label}")
+        moved[to_category] = moved.get(to_category, 0) + shares[number]
+        rows.append((size, shares[number]))
+    pinned = entry["moved"]
+    if not isinstance(pinned, dict) or {
+            key: _manifest_count(value, f"moved {key} for {unit_name}")
+            for key, value in pinned.items()} != moved:
+        raise SemanticProgressError(
+            f"data category reassignment totals changed: {unit_name} "
+            f"(computed {dict(sorted(moved.items()))}, manifest {pinned!r})")
+    return unit_name, from_category, moved, rows
+
+
+def apply_data_category_reassignments(report, project_root, manifest_path,
+                                      objdiff_config_path):
+    """Move proven foreign records' data denominators between categories.
+
+    Accounting only: see the comment above DATA_CATEGORY_REASSIGNMENT_MODELS.
+    Every entry is verified before any measure changes; any failure raises.
+    """
+    if not manifest_path.is_file():
+        return []
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) \
+            or not set(manifest) <= _REASSIGNMENT_MANIFEST_KEYS \
+            or not isinstance(manifest.get("entries"), list) \
+            or not isinstance(manifest.get("categories", []), list):
+        raise SemanticProgressError(
+            "data category reassignment manifest must be an object with an "
+            "entries list and an optional categories list")
+    objdiff = json.loads(objdiff_config_path.read_text(encoding="utf-8"))
+    report_units = {unit["name"]: unit for unit in report.get("units", [])}
+    config_units = {unit["name"]: unit for unit in objdiff.get("units", [])}
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    declared = []
+    for item in manifest.get("categories", []):
+        if not isinstance(item, dict) \
+                or set(item) != _REASSIGNMENT_CATEGORY_KEYS \
+                or not _nonempty_string(item["id"]) \
+                or not _nonempty_string(item["name"]):
+            raise SemanticProgressError(
+                f"malformed declared progress category: {item!r}")
+        if item["id"] in categories:
+            raise SemanticProgressError(
+                f"declared progress category already exists: {item['id']}")
+        categories[item["id"]] = {
+            "id": item["id"], "name": item["name"],
+            "measures": {
+                "fuzzy_match_percent": 100.0, "matched_code_percent": 100.0,
+                "matched_functions_percent": 100.0,
+                "complete_code_percent": 100.0, "total_data": 0,
+                "matched_data": 0, "matched_data_percent": 0.0,
+                "complete_data": 0, "complete_data_percent": 0.0,
+                "total_units": 0, "complete_units": 0}}
+        declared.append(item["id"])
+
+    plans, seen_units = [], set()
+    for entry in manifest["entries"]:
+        plans.append(_plan_data_category_reassignment(
+            entry, report_units, config_units, categories,
+            Path(project_root), seen_units))
+    used = {to for _, _, moved, _ in plans for to in moved}
+    unused = sorted(set(declared) - used)
+    if unused:
+        raise SemanticProgressError(
+            f"declared progress category receives no data: {unused}")
+
+    for category_id in declared:
+        report.setdefault("categories", []).append(categories[category_id])
+    notes = []
+    for unit_name, from_category, moved, rows in plans:
+        total = sum(moved.values())
+        _move_total_data(
+            categories[from_category]["measures"], -total, from_category)
+        for to_category, share in sorted(moved.items()):
+            _move_total_data(
+                categories[to_category]["measures"], share, to_category)
+        raw = sum(size for size, _ in rows)
+        notes.append(
+            f"{unit_name}: {from_category} -{total} -> "
+            + ", ".join(f"{to} +{share}" for to, share in sorted(moved.items()))
+            + f" ({len(rows)} records: {raw} raw + {total - raw} objdiff "
+            f"padding bytes)")
+    return notes
+
+
+# Pooled COMMON record credit (owner ruling Q10, 2026-09-28): data credit only.
+#
+# January's linker pools every COMMON (tentative) record into one '* Linker *'
+# contribution, which the executable split turns into the single unit
+# source/linker_common.  objdiff has no rebuilt object for that unit, so it can
+# never match any of its data.  config/common_pool_credit.json pins the reviewed
+# per-record verifier (tools/common_pool_verify.py), its provenance ledger and
+# its XDK library manifest by LF sha256, names the XDK library directory, and
+# lists the Halo records to credit with each record's objdiff-3.3.1-combined
+# extent share (the 38f82c59 model: size plus the padding the model inserts
+# after it).  Every progress run re-runs the verifier as its reviewed command
+# line (with --xdk-lib-dir and the manifest its own pin requires) and credits
+# exactly the listed shares, and only while each listed record is still a
+# qualifying PASS: verdict PASS (tag inferred or probable), Halo segment, in a
+# complete run with no global failure.  PASS-OWNER-UNRESOLVED, FAIL, vendor
+# and linker records earn nothing, and a PASS record that is not listed earns
+# nothing either.  Only matched data moves (overall, the unit's category and
+# the unit): denominators, functions, units, completion and the unit's MISSING
+# status are untouched, so there is no whole-pool Matching claim.  Any failure
+# - a pin mismatch, a missing or unreadable input, malformed evidence, a
+# verifier run that fails closed, or a listed record that no longer qualifies -
+# raises SemanticProgressError, so progress fails exactly as it does for every
+# other semantic data verification.  Every attempt writes a receipt first.
+# The COFF reader (tools/coff_compare.py) is pinned too (Q10 addition): the
+# file, the reader this process loaded (by content) and the reader the
+# verifier's receipt names must all equal the pin; changing the reader needs
+# an explicit reviewed re-pin.  Pins bind files, not the interpreter that runs
+# them.  Pinning prevents unnoticed changes to reviewed assumptions; it does
+# not prove those assumptions or January ownership (limitation L1).
+COMMON_POOL_CREDIT_SCHEMA = "common-pool-credit/1"
+COMMON_POOL_CREDIT_RECEIPT_SCHEMA = "common-pool-credit-receipt/1"
+COMMON_POOL_VERIFY_RECEIPT_SCHEMA = "common-pool-verify-receipt/1"
+COMMON_POOL_VERIFIER_PATH = "tools/common_pool_verify.py"
+COMMON_POOL_VERIFIER_MODULE = "tools.common_pool_verify"
+COMMON_POOL_READER_PATH = "tools/coff_compare.py"
+COMMON_POOL_OUTPUT_DIR = "common_pool"
+COMMON_POOL_QUALIFYING_VERDICT = "PASS"
+COMMON_POOL_QUALIFYING_TAGS = frozenset({"inferred", "probable"})
+COMMON_POOL_HALO_SEGMENT = "halo"
+COMMON_POOL_L1 = ("L1: pinning prevents unnoticed changes to reviewed "
+                  "assumptions; it does not prove those assumptions or "
+                  "January ownership.")
+# L1 trust root 8 (owner, Q10 additions), carried by every receipt
+COMMON_POOL_ENVIRONMENT = (
+    "Pins are not protection against a compromised execution environment. "
+    "The Python interpreter, its module search path and bytecode cache, the "
+    "unpinned progress code and the generated build outputs are trusted, not "
+    "pinned (L1 trust root 8).")
+# 0 = complete, no failing record; 1 = complete, failing records (FAIL rows
+# earn nothing) or global failures (refused below).  2-5 are the verifier's
+# fail-closed classes and carry no accounting.
+COMMON_POOL_COMPLETE_EXITS = frozenset({0, 1})
+# credit_receipt.json first: once it is gone, no earlier run's outcome can
+# stand in for this run, even when removing a verifier output fails next
+# (that failure is then receipted).
+_POOL_OUTPUT_FILES = ("credit_receipt.json", "verify_receipt.json",
+                      "verify_report.json", "verify_report.txt")
+_POOL_ENTRY_KEYS = frozenset({
+    "schema", "reason", "scope", "limitation", "unit", "category",
+    "extent_model", "unit_total_data", "verifier", "reader", "ledger",
+    "xdk_manifest", "xdk_lib_dir", "linked_libraries_not_in_extract", "credit",
+    "records"})
+_POOL_PIN_KEYS = frozenset({"path", "sha256_lf"})
+# pins whose path is fixed: the verifier the hook runs and its COFF reader
+_POOL_FIXED_PIN_PATHS = {"verifier": COMMON_POOL_VERIFIER_PATH,
+                         "reader": COMMON_POOL_READER_PATH}
+_POOL_CREDIT_KEYS = frozenset({"records", "raw", "padding", "total"})
+_POOL_RECORD_KEYS = frozenset({"symbol", "rva", "size", "share", "tag", "owner"})
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+_RVA_HEX = re.compile(r"0x[0-9a-f]+")
+
+
+def _strict_json_file(path, description):
+    """Read JSON that must not repeat a key; any defect fails closed."""
+    def no_duplicates(pairs):
+        keys = [key for key, _ in pairs]
+        repeated = sorted({key for key in keys if keys.count(key) > 1})
+        if repeated:
+            raise SemanticProgressError(
+                f"{description} repeats JSON key(s) {repeated}: {path}")
+        return dict(pairs)
+
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except (OSError, ValueError) as error:
+        raise SemanticProgressError(
+            f"cannot read {description} {path}: {error}") from error
+    try:
+        return json.loads(text, object_pairs_hook=no_duplicates)
+    except ValueError as error:
+        raise SemanticProgressError(
+            f"malformed {description} {path}: {error}") from error
+
+
+def _lf_sha256(path, description):
+    try:
+        data = Path(path).read_bytes()
+    except OSError as error:
+        raise SemanticProgressError(
+            f"cannot read {description} {path}: {error}") from error
+    return hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _pool_count(value, description, positive=False):
+    if isinstance(value, int) and not isinstance(value, bool) \
+            and value >= (1 if positive else 0):
+        return value
+    raise SemanticProgressError(
+        f"malformed COMMON pool credit {description}: {value!r}")
+
+
+def _pool_relative_path(value, description):
+    """A repository-relative POSIX path (never absolute, never '..')."""
+    if not _nonempty_string(value) or "\\" in value or value.startswith("/") \
+            or ":" in value or ".." in value.split("/"):
+        raise SemanticProgressError(
+            f"COMMON pool credit {description} must be a repository-relative "
+            f"path: {value!r}")
+    return value
+
+
+def _pool_pin(entry, key, fixed_path=None):
+    pin = entry[key]
+    if not isinstance(pin, dict) or set(pin) != _POOL_PIN_KEYS \
+            or not isinstance(pin["sha256_lf"], str) \
+            or not _SHA256_HEX.fullmatch(pin["sha256_lf"]):
+        raise SemanticProgressError(
+            f"COMMON pool credit {key} pin must be {{path, sha256_lf}} with a "
+            f"64-digit lowercase sha256: {pin!r}")
+    path = _pool_relative_path(pin["path"], f"{key} path")
+    if fixed_path is not None and path != fixed_path:
+        raise SemanticProgressError(
+            f"COMMON pool credit {key} path must be {fixed_path}: {path}")
+    return path, pin["sha256_lf"]
+
+
+def _validate_pool_entry(entry):
+    if not isinstance(entry, dict) or set(entry) != _POOL_ENTRY_KEYS:
+        keys = sorted(entry) if isinstance(entry, dict) else entry
+        raise SemanticProgressError(
+            f"COMMON pool credit entry must have exactly the keys "
+            f"{sorted(_POOL_ENTRY_KEYS)}: {keys!r}")
+    if entry["schema"] != COMMON_POOL_CREDIT_SCHEMA:
+        raise SemanticProgressError(
+            f"COMMON pool credit schema {entry['schema']!r} != "
+            f"{COMMON_POOL_CREDIT_SCHEMA!r}")
+    for key in ("reason", "scope", "limitation", "unit", "category",
+                "xdk_lib_dir"):
+        if not _nonempty_string(entry[key]):
+            raise SemanticProgressError(
+                f"COMMON pool credit {key} must be a non-empty string")
+    if entry["extent_model"] != OBJDIFF_331_COMBINED_EXTENT:
+        raise SemanticProgressError(
+            f"unknown COMMON pool credit extent model "
+            f"{entry['extent_model']!r}")
+    _pool_count(entry["unit_total_data"], "unit_total_data")
+    for key in ("verifier", "reader", "ledger", "xdk_manifest"):
+        _pool_pin(entry, key, _POOL_FIXED_PIN_PATHS.get(key))
+    absent = entry["linked_libraries_not_in_extract"]
+    if not isinstance(absent, list) or not all(
+            _nonempty_string(item) for item in absent):
+        raise SemanticProgressError(
+            "COMMON pool credit linked_libraries_not_in_extract must be a "
+            "list of library names")
+    credit = entry["credit"]
+    if not isinstance(credit, dict) or set(credit) != _POOL_CREDIT_KEYS:
+        raise SemanticProgressError(
+            f"COMMON pool credit totals must have exactly the keys "
+            f"{sorted(_POOL_CREDIT_KEYS)}: {credit!r}")
+    for key in sorted(_POOL_CREDIT_KEYS):
+        _pool_count(credit[key], f"credit {key}")
+    records = entry["records"]
+    if not isinstance(records, list) or not records:
+        raise SemanticProgressError("COMMON pool credit needs records")
+    symbols, rvas = set(), set()
+    for record in records:
+        if not isinstance(record, dict) or set(record) != _POOL_RECORD_KEYS:
+            raise SemanticProgressError(
+                f"COMMON pool credit record must have exactly the keys "
+                f"{sorted(_POOL_RECORD_KEYS)}: {record!r}")
+        symbol = record["symbol"]
+        if not _nonempty_string(symbol) or not isinstance(record["rva"], str) \
+                or not _RVA_HEX.fullmatch(record["rva"]) \
+                or not _nonempty_string(record["owner"]) \
+                or not isinstance(record["tag"], str) \
+                or record["tag"] not in COMMON_POOL_QUALIFYING_TAGS:
+            raise SemanticProgressError(
+                f"malformed COMMON pool credit record: {record!r}")
+        size = _pool_count(record["size"], f"size of {symbol}", positive=True)
+        if _pool_count(record["share"], f"share of {symbol}") < size:
+            raise SemanticProgressError(
+                f"COMMON pool credit share of {symbol} is below its size")
+        if symbol in symbols or record["rva"] in rvas:
+            raise SemanticProgressError(
+                f"COMMON pool credit lists a record twice: {symbol}")
+        symbols.add(symbol)
+        rvas.add(record["rva"])
+    raw = sum(record["size"] for record in records)
+    total = sum(record["share"] for record in records)
+    if credit != {"records": len(records), "raw": raw,
+                  "padding": total - raw, "total": total}:
+        raise SemanticProgressError(
+            f"COMMON pool credit totals do not add up: {credit!r} (records "
+            f"{len(records)}, raw {raw}, padding {total - raw}, total {total})")
+
+
+def run_common_pool_verifier(project_root, argv, timeout=600):
+    """Run the reviewed verifier command line; return (status, stdout, stderr)."""
+    try:
+        process = subprocess.run(
+            [sys.executable, "-B", "-m", COMMON_POOL_VERIFIER_MODULE, *argv],
+            cwd=str(project_root), capture_output=True, text=True,
+            timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SemanticProgressError(
+            f"COMMON pool verifier could not run: {error}") from error
+    return process.returncode, process.stdout, process.stderr
+
+
+def _pool_side_symbols(path):
+    """Every unit and symbol that a semantic data entry names."""
+    entries = _strict_json_file(path, "semantic data manifest")
+    if not isinstance(entries, list):
+        raise SemanticProgressError(
+            "semantic data manifest must be a list of entries")
+    units, symbols = set(), set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SemanticProgressError(
+                "semantic data manifest entry must be an object")
+        units.add(entry.get("unit"))
+        if isinstance(entry.get("symbol"), str):
+            symbols.add(entry["symbol"])
+        for key in ("members", "surplus"):
+            for item in entry.get(key) or []:
+                if isinstance(item, dict):
+                    for name in ("symbol", "base_symbol"):
+                        if isinstance(item.get(name), str):
+                            symbols.add(item[name])
+    return units, symbols
+
+
+def _pool_reassigned_symbols(path, unit_name):
+    if not Path(path).is_file():
+        return set()
+    manifest = _strict_json_file(path, "data category reassignment manifest")
+    if not isinstance(manifest, dict) \
+            or not isinstance(manifest.get("entries"), list):
+        raise SemanticProgressError(
+            "data category reassignment manifest must have an entries list")
+    symbols = set()
+    for entry in manifest["entries"]:
+        if isinstance(entry, dict) and entry.get("unit") == unit_name:
+            for record in entry.get("records") or []:
+                if not isinstance(record, dict) \
+                        or not _nonempty_string(record.get("symbol")):
+                    raise SemanticProgressError(
+                        f"malformed data category reassignment record for "
+                        f"{unit_name}")
+                symbols.add(record["symbol"])
+    return symbols
+
+
+def _pool_resolve(project_root, path):
+    path = Path(path)
+    return path if path.is_absolute() else Path(project_root) / path
+
+
+def _loaded_reader_file():
+    """The source file of the COFF reader this process computes the shares with.
+
+    That is the file that defines the ``load`` this module calls (a reader
+    loaded from another place on sys.path names that place).  It names the
+    source file even when Python ran a cached bytecode copy of it: pins bind
+    files, not the interpreter (limitation L1, trust root 8).
+    """
+    filename = getattr(getattr(load, "__code__", None), "co_filename", None)
+    if not _nonempty_string(filename):
+        raise SemanticProgressError(
+            "cannot identify the COFF reader this process loaded")
+    return Path(filename)
+
+
+def _plan_common_pool_credit(report, project_root, entry_path,
+                             objdiff_config_path, semantic_data_matches_path,
+                             reassignments_path, out_dir, run_verifier,
+                             receipt):
+    """Verify everything; return the credit plan.  Changes no measure."""
+    entry = _strict_json_file(entry_path, "COMMON pool credit entry")
+    _validate_pool_entry(entry)
+    unit_name, category_id = entry["unit"], entry["category"]
+    receipt["entry"]["unit"] = unit_name
+    receipt["entry"]["category"] = category_id
+    # disclosures every receipt of a valid entry carries (OQ-DM1, the scope)
+    receipt["linked_libraries_not_in_extract"] = list(
+        entry["linked_libraries_not_in_extract"])
+    receipt["scope"] = entry["scope"]
+
+    # -- the unit: one MISSING split unit that objdiff cannot match --
+    objdiff = _strict_json_file(objdiff_config_path, "objdiff configuration")
+    config_units = [unit for unit in objdiff.get("units", [])
+                    if isinstance(unit, dict) and unit.get("name") == unit_name]
+    report_units = [unit for unit in report.get("units", [])
+                    if unit.get("name") == unit_name]
+    if len(config_units) != 1 or len(report_units) != 1:
+        raise SemanticProgressError(
+            f"COMMON pool credit unit is not one objdiff and one report unit: "
+            f"{unit_name}")
+    config_unit, report_unit = config_units[0], report_units[0]
+    if "base_path" in config_unit or not _nonempty_string(
+            config_unit.get("target_path")):
+        raise SemanticProgressError(
+            f"COMMON pool credit unit must have a target and no rebuilt "
+            f"object: {unit_name}")
+    for unit, side in ((report_unit, "report"), (config_unit, "objdiff.json")):
+        if _unit_categories(unit, f"{unit_name} ({side})") != [category_id]:
+            raise SemanticProgressError(
+                f"COMMON pool credit unit is not solely in {category_id!r} "
+                f"({side}): {unit_name}")
+        if unit.get("metadata", {}).get("complete"):
+            raise SemanticProgressError(
+                f"COMMON pool credit unit is marked complete ({side}); a "
+                f"whole-pool Matching claim is not allowed: {unit_name}")
+    build_config = _strict_json_file(
+        Path(entry_path).parent / "config.json", "build configuration")
+    statuses = [obj.get("status")
+                for project in build_config.get("projects", [])
+                for obj in project.get("objects", [])
+                if isinstance(obj, dict) and isinstance(obj.get("name"), str)
+                and obj["name"].rsplit(".", 1)[0] == unit_name]
+    if statuses != ["MISSING"]:
+        raise SemanticProgressError(
+            f"COMMON pool credit unit must be one MISSING config object (no "
+            f"whole-pool Matching claim): {unit_name} {statuses}")
+    categories = {item["id"]: item for item in report.get("categories", [])}
+    if category_id not in categories:
+        raise SemanticProgressError(
+            f"progress category not found: {category_id}")
+    measures = report_unit.get("measures", {})
+    unit_total = _report_count(measures.get("total_data", 0),
+                               f"total_data for {unit_name}")
+    if unit_total != entry["unit_total_data"]:
+        raise SemanticProgressError(
+            f"COMMON pool credit unit total changed: {unit_name} (report "
+            f"{unit_total}, entry {entry['unit_total_data']})")
+    for key in ("matched_data", "complete_data", "complete_units"):
+        if _report_count(measures.get(key, 0), f"{key} for {unit_name}"):
+            raise SemanticProgressError(
+                f"COMMON pool credit needs a unit with no matched or complete "
+                f"data ({key}): {unit_name}")
+
+    # -- no double counting with the other data entries --
+    pinned = {record["symbol"]: record for record in entry["records"]}
+    if Path(semantic_data_matches_path).is_file():
+        units, symbols = _pool_side_symbols(semantic_data_matches_path)
+        if unit_name in units:
+            raise SemanticProgressError(
+                f"COMMON pool credit unit also has a semantic data entry: "
+                f"{unit_name}")
+        both = sorted(set(pinned) & symbols)
+        if both:
+            raise SemanticProgressError(
+                f"COMMON pool credit record also named by a semantic data "
+                f"entry: {both[:8]}")
+    reassigned = _pool_reassigned_symbols(reassignments_path, unit_name)
+    both = sorted(set(pinned) & reassigned)
+    if both:
+        raise SemanticProgressError(
+            f"COMMON pool credit record was reassigned to another category: "
+            f"{both[:8]}")
+
+    # -- pins, checked before the verifier runs --
+    _, verifier_pin = _pool_pin(entry, "verifier", COMMON_POOL_VERIFIER_PATH)
+    _, reader_pin = _pool_pin(entry, "reader", COMMON_POOL_READER_PATH)
+    ledger_path, ledger_pin = _pool_pin(entry, "ledger")
+    manifest_path, manifest_pin = _pool_pin(entry, "xdk_manifest")
+    for key, path, pin in (("verifier", COMMON_POOL_VERIFIER_PATH, verifier_pin),
+                           ("reader", COMMON_POOL_READER_PATH, reader_pin),
+                           ("ledger", ledger_path, ledger_pin),
+                           ("xdk_manifest", manifest_path, manifest_pin)):
+        actual = _lf_sha256(_pool_resolve(project_root, path), f"pinned {key}")
+        receipt["pins"][key] = {"path": path, "expected": pin, "actual": actual}
+        if actual != pin:
+            raise SemanticProgressError(
+                f"COMMON pool credit pin mismatch: {key} {path} LF sha256 "
+                f"{actual} != pinned {pin}")
+    # the reader this process loaded computes the shares: it must be the
+    # pinned reader too (by content; a copy elsewhere on sys.path that differs
+    # is refused)
+    loaded_reader = _loaded_reader_file()
+    loaded_sha = _lf_sha256(loaded_reader, "COFF reader this process loaded")
+    receipt["pins"]["reader"]["loaded_by_hook"] = {
+        "path": str(loaded_reader), "actual": loaded_sha}
+    if loaded_sha != reader_pin:
+        raise SemanticProgressError(
+            f"COMMON pool credit pin mismatch: the COFF reader this process "
+            f"loaded ({loaded_reader}) has LF sha256 {loaded_sha} != pinned "
+            f"{reader_pin}")
+
+    # -- the reviewed verifier, run as its command line --
+    target_path = _pool_resolve(project_root, config_unit["target_path"])
+    names = {name: out_dir / name for name in _POOL_OUTPUT_FILES}
+    argv = ["--root", str(project_root),
+            "--config-dir", str(Path(entry_path).parent),
+            "--objects", str(out_dir.parent / "base"),
+            "--split-pool", str(target_path),
+            "--ledger", str(_pool_resolve(project_root, ledger_path)),
+            "--xdk-lib-dir", entry["xdk_lib_dir"],
+            "--xdk-lib-manifest",
+            str(_pool_resolve(project_root, manifest_path)),
+            "--receipt", str(names["verify_receipt.json"]),
+            "--json", str(names["verify_report.json"]),
+            "--text", str(names["verify_report.txt"])]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    status, _stdout, stderr = run_verifier(project_root, argv)
+    receipt["verifier_run"] = {"argv": argv, "exit_code": status,
+                               "stderr_tail": (stderr or "")[-2000:]}
+    verify_receipt = None
+    if names["verify_receipt.json"].is_file():
+        verify_receipt = _strict_json_file(
+            names["verify_receipt.json"], "COMMON pool verifier receipt")
+        receipt["verifier_run"]["receipt_sha256"] = hashlib.sha256(
+            names["verify_receipt.json"].read_bytes()).hexdigest()
+    if status not in COMMON_POOL_COMPLETE_EXITS:
+        fail = verify_receipt.get("fail_closed") \
+            if isinstance(verify_receipt, dict) else None
+        fail = fail if isinstance(fail, dict) else {}
+        raise SemanticProgressError(
+            f"COMMON pool verifier failed closed: exit {status} "
+            f"({fail.get('class', 'no receipt')}): "
+            f"{fail.get('message') or (stderr or '').strip()[-400:]}")
+    if verify_receipt is None or not names["verify_report.json"].is_file():
+        raise SemanticProgressError(
+            f"COMMON pool verifier exited {status} without its receipt and "
+            f"report")
+    verify_report = _strict_json_file(
+        names["verify_report.json"], "COMMON pool verifier report")
+    receipt["verifier_run"]["report_sha256"] = hashlib.sha256(
+        names["verify_report.json"].read_bytes()).hexdigest()
+
+    # -- the receipt binds the run to the pins and to this split pool --
+    try:
+        target_bytes = target_path.read_bytes()
+    except OSError as error:
+        raise SemanticProgressError(
+            f"cannot read the COMMON pool split object {target_path}: {error}"
+        ) from error
+    target_sha = hashlib.sha256(target_bytes).hexdigest()
+    receipt["split_pool"] = {"path": config_unit["target_path"],
+                             "sha256": target_sha}
+    try:
+        inputs = verify_receipt["inputs"]
+        libraries = verify_receipt["xdk_libraries"]
+        # the reader beside the verifier file that ran (None: it found none)
+        verifier_reader = verify_receipt["verifier"]["coff_compare_sha256_lf"]
+        receipt["pins"]["reader"]["verifier_receipt"] = verifier_reader
+        bound = {
+            "receipt schema": (verify_receipt["schema"],
+                               COMMON_POOL_VERIFY_RECEIPT_SCHEMA),
+            "receipt exit code": (verify_receipt["exit_code"], status),
+            "receipt result": (verify_receipt["result"], "COMPLETE"),
+            "receipt fail_closed": (verify_receipt["fail_closed"], None),
+            "report exit code": (verify_report["exit_code"], status),
+            "report result": (verify_report["result"], "COMPLETE"),
+            "report receipt": (verify_report["receipt"], verify_receipt),
+            "verifier sha256_lf": (verify_receipt["verifier"]["sha256_lf"],
+                                   verifier_pin),
+            "reader sha256_lf": (verifier_reader, reader_pin),
+            "ledger sha256_lf": (inputs["ledger"]["sha256_lf"], ledger_pin),
+            "manifest sha256_lf": (inputs["xdk_manifest"]["sha256_lf"],
+                                   manifest_pin),
+            "split pool sha256": (inputs["split_pool"]["sha256"], target_sha),
+            "libraries not in the extract": (
+                libraries["linked_not_in_extract"],
+                entry["linked_libraries_not_in_extract"]),
+            "global failures": (verify_report["global_failures"], []),
+            "conservation": (
+                verify_report["accounting"]["conservation"]["holds"], True),
+        }
+        library_rows = libraries["libraries"]
+        unverified = sorted(name for name, row in library_rows.items()
+                            if row.get("verified") is not True)
+        rows = verify_report["records"]
+        excluded = verify_report["excluded_linker_records"]
+        if not isinstance(rows, list) or not isinstance(excluded, list):
+            raise TypeError("records and excluded_linker_records must be lists")
+    except (KeyError, TypeError, AttributeError) as error:
+        raise SemanticProgressError(
+            f"malformed COMMON pool verifier receipt or report: "
+            f"{type(error).__name__}: {error}") from error
+    for name, (actual, expected) in bound.items():
+        if actual != expected:
+            raise SemanticProgressError(
+                f"COMMON pool verifier run is not bound to the pins: {name} "
+                f"{str(actual)[:120]!r} != {str(expected)[:120]!r}")
+    if unverified or not library_rows:
+        raise SemanticProgressError(
+            f"COMMON pool verifier receipt has unverified libraries: "
+            f"{unverified[:8]}")
+
+    # -- qualifying PASS records --
+    by_name = {}
+    for row in rows:
+        if not isinstance(row, dict) or not _nonempty_string(row.get("name")) \
+                or row["name"] in by_name:
+            raise SemanticProgressError(
+                "COMMON pool verifier report rows must name distinct records")
+        by_name[row["name"]] = row
+
+    def qualifies(row):
+        return (row.get("verdict") == COMMON_POOL_QUALIFYING_VERDICT
+                and row.get("segment") == COMMON_POOL_HALO_SEGMENT
+                and row.get("category") == category_id
+                and row.get("tag") in COMMON_POOL_QUALIFYING_TAGS
+                and row.get("reasons") == [])
+
+    for symbol, record in pinned.items():
+        row = by_name.get(symbol)
+        if row is None or not qualifies(row):
+            raise SemanticProgressError(
+                f"COMMON pool credit record is not a qualifying PASS: {symbol} "
+                f"(verdict {None if row is None else row.get('verdict')}, "
+                f"segment {None if row is None else row.get('segment')}, "
+                f"reasons {None if row is None else row.get('reasons')})")
+        actual = {"rva": row.get("rva"), "size": row.get("size"),
+                  "tag": row.get("tag"), "owner": row.get("owner")}
+        expected = {key: record[key] for key in actual}
+        if actual != expected:
+            raise SemanticProgressError(
+                f"COMMON pool credit record changed: {symbol} (verifier "
+                f"{actual}, entry {expected})")
+    unpinned = sorted(row["name"] for row in rows
+                      if qualifies(row) and row["name"] not in pinned)
+
+    # -- each record's objdiff-3.3.1-combined extent share --
+    try:
+        target = load(target_bytes)
+    except CoffError as error:
+        raise SemanticProgressError(
+            f"cannot read the COMMON pool split object {target_path}: {error}"
+        ) from error
+    named = _objdiff_named_sections(target, unit_name)
+    _require_report_binding(named, report_unit, unit_name, "common-pool-credit")
+    shares = {}
+    for sections in _objdiff_report_data_groups(named).values():
+        shares.update(_objdiff_report_shares(sections))
+    sections = {int(section["index"]): section
+                for section in named["sections"]}
+    externals = {}
+    for item in target["symbols"]:
+        if int(item["section"]) > 0 \
+                and int(item["storage"]) == _IMAGE_SYM_CLASS_EXTERNAL:
+            externals.setdefault(item["name"], []).append(item)
+            externals.setdefault(("section", int(item["section"])), []) \
+                .append(item)
+
+    def share_of(symbol):
+        definitions = externals.get(symbol, [])
+        if len(definitions) != 1 or int(definitions[0]["value"]) != 0:
+            raise SemanticProgressError(
+                f"COMMON pool record is not one external symbol at the start "
+                f"of its section: {symbol}")
+        number = int(definitions[0]["section"])
+        if len(externals[("section", number)]) != 1 or number not in shares:
+            raise SemanticProgressError(
+                f"COMMON pool record does not own one reported data section: "
+                f"{symbol}")
+        return number, sections[number], shares[number]
+
+    credited, seen_sections = [], set()
+    for symbol, record in pinned.items():
+        number, section, share = share_of(symbol)
+        if number in seen_sections:
+            raise SemanticProgressError(
+                f"COMMON pool credit counts a section twice: {symbol}")
+        seen_sections.add(number)
+        if not int(section["flags"]) & IMAGE_SCN_CNT_UNINITIALIZED_DATA \
+                or int(section["size"]) != record["size"] \
+                or share != record["share"]:
+            raise SemanticProgressError(
+                f"COMMON pool credit record does not match the split object: "
+                f"{symbol} (section {section['name']} {section['size']} B, "
+                f"share {share}; entry {record['size']} B, share "
+                f"{record['share']})")
+        credited.append((symbol, record["tag"], record["size"], share))
+    reassigned_share = sum(share_of(symbol)[2] for symbol in sorted(reassigned))
+    total = sum(share for _, _, _, share in credited)
+    raw = sum(size for _, _, size, _ in credited)
+    if total != entry["credit"]["total"] or raw != entry["credit"]["raw"]:
+        raise SemanticProgressError(
+            f"COMMON pool credit totals changed: {total} ({raw} raw), entry "
+            f"{entry['credit']}")
+    if total > unit_total - reassigned_share:
+        raise SemanticProgressError(
+            f"COMMON pool credit {total} exceeds the unit's {category_id} "
+            f"share {unit_total - reassigned_share}")
+    for description, target_measures in (
+            ("overall", report.get("measures", {})),
+            (category_id, categories[category_id]["measures"])):
+        matched = _report_count(target_measures.get("matched_data", 0),
+                                f"{description} matched_data")
+        whole = _report_count(target_measures.get("total_data", 0),
+                              f"{description} total_data")
+        if matched + total > whole:
+            raise SemanticProgressError(
+                f"COMMON pool credit would exceed the {description} data total")
+
+    def tally(selected):
+        return [len(selected), sum(int(row.get("size", 0)) for row in selected)]
+
+    halo_rows = [row for row in rows
+                 if row.get("segment") == COMMON_POOL_HALO_SEGMENT]
+    by_tag = {}
+    for _, tag, size, share in credited:
+        item = by_tag.setdefault(
+            tag, {"records": 0, "raw": 0, "padding": 0, "share": 0})
+        item["records"] += 1
+        item["raw"] += size
+        item["padding"] += share - size
+        item["share"] += share
+    # the record that carries most of the credit, disclosed by name (Q10
+    # additions: today _render, 643,744 of the 657,556 bytes)
+    symbol, tag, size, share = max(credited, key=lambda row: row[3])
+    largest = {"symbol": symbol, "tag": tag, "raw": size,
+               "padding": share - size, "share": share}
+    return {
+        "unit": unit_name, "category": category_id, "report_unit": report_unit,
+        "credited": credited, "total": total, "raw": raw, "by_tag": by_tag,
+        "largest": largest, "unpinned": unpinned,
+        "uncredited": {
+            "halo_pass_owner_unresolved": tally(
+                [row for row in halo_rows
+                 if row.get("verdict") == "PASS-OWNER-UNRESOLVED"]),
+            "halo_fail": tally([row for row in halo_rows
+                                if row.get("verdict") == "FAIL"]),
+            "halo_pass_not_listed": tally(
+                [by_name[name] for name in unpinned]),
+            "vendor": tally([row for row in rows
+                             if row.get("segment") == "vendor"]),
+            "linker_excluded": [len(excluded), sum(
+                int(item.get("size", 0)) for item in excluded)],
+        },
+    }
+
+
+def clear_common_pool_outputs(build_dir=Path("build"), project_root=None):
+    """Remove every output of an earlier COMMON pool credit run.
+
+    calculate_progress calls this before its first step, so a progress run
+    that fails before apply_common_pool_credit (or never reaches it) leaves
+    no receipt that could be read as its own.  Returns the output directory.
+    An output that cannot be removed fails closed: once the earlier receipt
+    is gone (it goes first) a FAIL-CLOSED receipt records the failure;
+    SemanticProgressError names the output either way.
+    """
+    root = Path.cwd() if project_root is None else Path(project_root)
+    out_dir = _pool_resolve(root, build_dir) / COMMON_POOL_OUTPUT_DIR
+    receipt_path = out_dir / "credit_receipt.json"
+    for name in _POOL_OUTPUT_FILES:
+        try:
+            (out_dir / name).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            message = (f"cannot remove the stale COMMON pool output {name}: "
+                       f"{error}; it does not describe this run")
+            if name != "credit_receipt.json":
+                try:
+                    _write_pool_receipt(receipt_path, {
+                        "schema": COMMON_POOL_CREDIT_RECEIPT_SCHEMA,
+                        "utc": datetime.datetime.now(
+                            datetime.timezone.utc).isoformat(
+                                timespec="seconds"),
+                        "outcome": "FAIL-CLOSED", "reason": message,
+                        "entry": None, "pins": {}, "verifier_run": None,
+                        "split_pool": None, "credit": None,
+                        "linked_libraries_not_in_extract": None,
+                        "scope": None, "limitation": COMMON_POOL_L1,
+                        "environment": COMMON_POOL_ENVIRONMENT})
+                except SemanticProgressError as unwritable:
+                    message = f"{message}; and {unwritable}"
+            raise SemanticProgressError(message) from error
+    return out_dir
+
+
+def _write_pool_receipt(path, receipt):
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(receipt, indent=1) + "\n",
+                              encoding="utf-8")
+    except (OSError, ValueError) as error:
+        raise SemanticProgressError(
+            f"cannot write the COMMON pool credit receipt {path}: {error}"
+        ) from error
+
+
+def apply_common_pool_credit(report, project_root, entry_path,
+                             objdiff_config_path, semantic_data_matches_path,
+                             reassignments_path, build_dir=Path("build"),
+                             run_verifier=None):
+    """Credit the listed qualifying PASS Halo COMMON records (see above).
+
+    Runs after apply_data_category_reassignments, which refuses a unit that
+    already has matched data.  Returns note lines; raises
+    SemanticProgressError, with a FAIL-CLOSED receipt written, on any failure.
+    """
+    project_root = Path(project_root)
+    entry_path = _pool_resolve(project_root, entry_path)
+    out_dir = _pool_resolve(project_root, build_dir) / COMMON_POOL_OUTPUT_DIR
+    receipt_path = out_dir / "credit_receipt.json"
+    # a previous run's receipt or report must never stand in for this one; a
+    # removal failure is receipted below whenever the receipt itself could be
+    # removed (it goes first), and the absent-entry path raises it too
+    try:
+        clear_common_pool_outputs(build_dir, project_root)
+        stale = None
+    except SemanticProgressError as error:
+        stale = error
+    if not entry_path.is_file():
+        if stale is not None:
+            raise stale
+        return []
+    receipt = {
+        "schema": COMMON_POOL_CREDIT_RECEIPT_SCHEMA,
+        "utc": datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="seconds"),
+        "outcome": None, "reason": None,
+        "entry": {"path": str(entry_path), "sha256_lf": None},
+        "pins": {}, "verifier_run": None, "split_pool": None, "credit": None,
+        "linked_libraries_not_in_extract": None, "scope": None,
+        "limitation": COMMON_POOL_L1, "environment": COMMON_POOL_ENVIRONMENT,
+    }
+    try:
+        if stale is not None:
+            raise stale
+        receipt["entry"]["sha256_lf"] = _lf_sha256(
+            entry_path, "COMMON pool credit entry")
+        plan = _plan_common_pool_credit(
+            report, project_root, entry_path,
+            _pool_resolve(project_root, objdiff_config_path),
+            _pool_resolve(project_root, semantic_data_matches_path),
+            _pool_resolve(project_root, reassignments_path), out_dir,
+            run_verifier or run_common_pool_verifier, receipt)
+    except Exception as error:  # deliberately total: every failure is receipted
+        message = (str(error) if isinstance(error, SemanticProgressError)
+                   else f"unexpected {type(error).__name__}: {error}")
+        receipt.update(outcome="FAIL-CLOSED", reason=message)
+        try:
+            _write_pool_receipt(receipt_path, receipt)
+        except SemanticProgressError as unwritable:
+            # the failure itself must not be lost with its receipt
+            raise SemanticProgressError(
+                f"COMMON pool credit failed closed: {message}; and {unwritable}"
+            ) from error
+        raise SemanticProgressError(
+            f"COMMON pool credit failed closed: {message} (receipt "
+            f"{receipt_path})") from error
+
+    total, raw = plan["total"], plan["raw"]
+    overall = report["measures"]
+    category = {item["id"]: item for item in report["categories"]}[
+        plan["category"]]["measures"]
+    unit_measures = plan["report_unit"]["measures"]
+    before = {name: _report_count(measures.get("matched_data", 0),
+                                  f"{name} matched_data")
+              for name, measures in (("overall", overall),
+                                     ("category", category),
+                                     ("unit", unit_measures))}
+    receipt.update(outcome="CREDITED", credit={
+        "records": len(plan["credited"]), "raw": raw, "padding": total - raw,
+        "total": total, "by_tag": plan["by_tag"],
+        "largest_record": plan["largest"],
+        "rows": [list(row) for row in plan["credited"]],
+        "uncredited": plan["uncredited"], "not_listed": plan["unpinned"],
+        "matched_data_before": before,
+        "matched_data_after": {name: value + total
+                               for name, value in before.items()},
+    })
+    _write_pool_receipt(receipt_path, receipt)
+    _credit_data(overall, total)
+    _credit_data(category, total)
+    _credit_data(unit_measures, total)
+    # bytes by tag, raw versus padding, and the largest record's share
+    # (owner, Q10 additions)
+    tags = ", ".join(
+        f"{tag} {item['records']} records +{item['share']} ({item['raw']} raw "
+        f"+ {item['padding']} padding)"
+        for tag, item in sorted(plan["by_tag"].items()))
+    largest = plan["largest"]
+    uncredited = plan["uncredited"]
+    return [
+        f"{plan['unit']}: +{total} {plan['category']} data bytes "
+        f"({len(plan['credited'])} PASS Halo records: {raw} raw + "
+        f"{total - raw} objdiff padding bytes); uncredited: "
+        f"{uncredited['halo_pass_owner_unresolved'][0]} "
+        f"PASS-OWNER-UNRESOLVED, {uncredited['halo_fail'][0]} FAIL, "
+        f"{uncredited['halo_pass_not_listed'][0]} unlisted PASS, "
+        f"{uncredited['vendor'][0]} vendor and "
+        f"{uncredited['linker_excluded'][0]} linker records; the unit stays "
+        f"MISSING (no Matching claim); receipt {receipt_path}",
+        f"{plan['unit']} by tag: {tags}; largest record {largest['symbol']} "
+        f"({largest['tag']}) +{largest['share']} ({largest['raw']} raw + "
+        f"{largest['padding']} padding) = "
+        f"{100.0 * largest['share'] / total:.1f}% of the credit"]

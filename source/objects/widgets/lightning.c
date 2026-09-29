@@ -262,14 +262,14 @@ static void lightning_offset_marker_position(
 
 void lightning_submit(
 	long object_index,
-	long lightning_index,
+	long widget_index,
 	struct render_lighting const *lighting,
 	struct render_animation const *animation)
 {
 	(void)lighting;
-	if (object_index != NONE && lightning_index != NONE)
+	if (object_index != NONE && widget_index != NONE)
 	{
-		struct lightning_datum *lightning = lightning_get(lightning_index);
+		struct lightning_datum *lightning = lightning_get(widget_index);
 		struct lightning_definition *definition = lightning_definition_get(lightning->definition_index);
 		struct object_marker marker;
 

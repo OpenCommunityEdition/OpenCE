@@ -869,9 +869,9 @@ void rasterizer_lens_flares_draw(
 					LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color) > 0 &&
 					definition->reflections.count > 0)
 				{
-					real_point3d position = lens_flare_parameters->position;
-					real_vector3d camera_offset;
-					real_vector3d mirror;
+					real_point3d corona_position = lens_flare_parameters->position;
+					real_vector3d eye_to_corona_vector;
+					real_vector3d corona_axis;
 					real depth;
 					real occlusion_fraction;
 					real light_brightness;
@@ -885,13 +885,13 @@ void rasterizer_lens_flares_draw(
 
 					vector_from_points3d(
 						&global_window_parameters.camera.position,
-						&position,
-						&camera_offset);
-					depth = dot_product3d(&global_window_parameters.camera.forward, &camera_offset);
+						&corona_position,
+						&eye_to_corona_vector);
+					depth = dot_product3d(&global_window_parameters.camera.forward, &eye_to_corona_vector);
 
-					scale_vector3d(&global_window_parameters.camera.forward, depth, &mirror);
-					subtract_vectors3d(&mirror, &camera_offset, &mirror);
-					scale_vector3d(&mirror, 2.0f, &mirror);
+					scale_vector3d(&global_window_parameters.camera.forward, depth, &corona_axis);
+					subtract_vectors3d(&corona_axis, &eye_to_corona_vector, &corona_axis);
+					scale_vector3d(&corona_axis, 2.0f, &corona_axis);
 
 					occlusion_fraction = *occlusion_test_result*(1.0f/255.0f);
 
@@ -915,14 +915,14 @@ void rasterizer_lens_flares_draw(
 						definition->corona_rotation_function,
 						lens_flare_parameters)*definition->corona_rotation_function_scale;
 					screen_rotation = (real)atan2(
-						dot_product3d(&global_window_parameters.frustum.view_to_world.forward, &camera_offset),
-						dot_product3d(&global_window_parameters.frustum.view_to_world.left, &camera_offset))*(180.0f/((real)M_PI));
+						dot_product3d(&global_window_parameters.frustum.view_to_world.forward, &eye_to_corona_vector),
+						dot_product3d(&global_window_parameters.frustum.view_to_world.left, &eye_to_corona_vector))*(180.0f/((real)M_PI));
 
 					cosine_scale = 1.0f/
 						(definition->runtime_cosine_falloff_angle-definition->runtime_cosine_cutoff_angle);
 					cosine_offset = -(definition->runtime_cosine_cutoff_angle*cosine_scale);
 
-					normalize3d(&camera_offset);
+					normalize3d(&eye_to_corona_vector);
 
 					scale_functions[_lens_flare_reflection_scale_function_none] = 1.0f;
 					scale_functions[_lens_flare_reflection_scale_function_light_direction] = PIN(
@@ -930,11 +930,11 @@ void rasterizer_lens_flares_draw(
 						0.0f,
 						1.0f);
 					scale_functions[_lens_flare_reflection_scale_function_light_to_camera] = PIN(
-						-dot_product3d(&direction, &camera_offset)*cosine_scale+cosine_offset,
+						-dot_product3d(&direction, &eye_to_corona_vector)*cosine_scale+cosine_offset,
 						0.0f,
 						1.0f);
 					scale_functions[_lens_flare_reflection_scale_function_camera_direction] = PIN(
-						dot_product3d(&global_window_parameters.camera.forward, &camera_offset)*cosine_scale+cosine_offset,
+						dot_product3d(&global_window_parameters.camera.forward, &eye_to_corona_vector)*cosine_scale+cosine_offset,
 						0.0f,
 						1.0f);
 
@@ -964,7 +964,7 @@ void rasterizer_lens_flares_draw(
 								real radius = radius_lower_bound+
 									(reflection->radius_upper_bounds-radius_lower_bound)*light_scale;
 								real_argb_color color;
-								real_vector2d radius_scale;
+								real_vector2d scale;
 								real rotation;
 								pixel32 pixel;
 								real tint_factor;
@@ -1042,12 +1042,12 @@ void rasterizer_lens_flares_draw(
 								if (reflection_index == 0)
 								{
 									rotation = corona_rotation+reflection->rotation_offset;
-									radius_scale = definition->corona_radius_scale;
+									scale = definition->corona_radius_scale;
 								}
 								else
 								{
 									rotation = reflection->rotation_offset;
-									radius_scale.i = radius_scale.j = 1.0f;
+									scale.i = scale.j = 1.0f;
 								}
 
 								if (TEST_FLAG(reflection->flags, _lens_flare_reflection_rotate_from_center_of_screen_bit))
@@ -1067,9 +1067,9 @@ void rasterizer_lens_flares_draw(
 									real offset = reflection->offset;
 									real_point3d point;
 
-									point.x = offset*mirror.i + position.x;
-									point.y = offset*mirror.j + position.y;
-									point.z = offset*mirror.k + position.z;
+									point.x = offset*corona_axis.i + corona_position.x;
+									point.y = offset*corona_axis.j + corona_position.y;
+									point.z = offset*corona_axis.k + corona_position.z;
 
 									if (rasterizer_widget_set_texture(
 										0,
@@ -1092,7 +1092,7 @@ void rasterizer_lens_flares_draw(
 									rasterizer_widget_draw_sprite3d(
 										&point,
 										radius,
-										&radius_scale,
+										&scale,
 										rotation*(_pi/180.0f),
 										pixel);
 								}

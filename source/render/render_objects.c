@@ -111,6 +111,7 @@ symbols in this file:
 #include "tag_files/tag_files.h"
 #include "saved games/game_state.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "rasterizer/rasterizer_model_types.h"
 
 /* ---------- constants */
 
@@ -156,18 +157,6 @@ enum
 	((struct object_render_state *)datum_get(cached_object_render_states, (index)))
 
 /* ---------- structures */
-
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	real parameter;
-	long source_object_index;
-	real_point3d source_object_centroid;
-	struct shader const *modifier_shader;
-	struct render_animation modifier_animation;
-};
 
 struct object_render_data
 {

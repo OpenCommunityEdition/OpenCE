@@ -470,7 +470,7 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 	&sound_scenery_data_definition
 };
 
-extern struct object_type_definition *first_object_type_definition;
+struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
 #pragma bss_seg(".bss")
 static word processed_bsp_flags;

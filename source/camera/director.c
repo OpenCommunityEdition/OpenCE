@@ -224,6 +224,7 @@ static struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLE
 static struct director_globals director_globals = {0};
 boolean director_camera_switch_fast = FALSE;
 static boolean hyper_key_down = FALSE;
+boolean *director_camera_scripted;
 
 /* ---------- public code */
 
@@ -237,8 +238,8 @@ static struct director *director_get(
 void director_initialize(
 	void)
 {
-	director_camera_scripted = game_state_malloc("director scripting", NULL, sizeof(*director_camera_scripted));
-	director_camera_scripted->camera_scripted = FALSE;
+	director_camera_scripted = game_state_malloc("director scripting", NULL, 4);
+	*director_camera_scripted = FALSE;
 	return;
 }
 
@@ -262,7 +263,7 @@ void director_dispose_from_old_map(
 		director->debug_controls = FALSE;
 	}
 
-	director_camera_scripted->camera_scripted = FALSE;
+	*director_camera_scripted = FALSE;
 	return;
 }
 
@@ -653,7 +654,7 @@ void director_script_camera(
 {
 	short local_player_index;
 
-	director_camera_scripted->camera_scripted = scripted;
+	*director_camera_scripted = scripted;
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
@@ -701,7 +702,7 @@ static void director_choose_camera_game(
 
 		if (key)
 			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
-		if (!director_camera_scripted->camera_scripted)
+		if (!*director_camera_scripted)
 		{
 			director_choose_game_perspective(local_player_index, initialize);
 			if (use_dead_camera)
@@ -1039,7 +1040,7 @@ void director_initialize_for_saved_game(
 	void)
 {
 	director_initialize_for_new_map();
-	director_script_camera(director_camera_scripted->camera_scripted);
+	director_script_camera(*director_camera_scripted);
 
 	return;
 }

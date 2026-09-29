@@ -234,6 +234,8 @@ symbols in this file:
 #include "actor_definitions.h"
 #include "actor_types.h"
 #include "ai.h"
+#include "ai/ai_globals.h"
+#include "ai/ai_scenario_definitions.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
@@ -322,37 +324,8 @@ enum
 
 /* ---------- structures */
 
-/* The fields used here from the 0x74-byte scenario conversation record. */
-struct scenario_conversation_action_definition
-{
-	char name[TAG_STRING_LENGTH + 1];
-	word flags;
-	byte __unknown22[0x52];
-};
-
 typedef char scenario_conversation_action_definition_size_assert[
-	sizeof(struct scenario_conversation_action_definition) == 0x74 ? 1 : -1];
-
-/* Only the January-proven field consumed by this translation unit is named. */
-struct ai_vehicle_enterable
-{
-	long vehicle_index;
-	real radius;
-	short team_bitmask;
-	short actor_type_bitmask;
-	short ai_indices_count;
-	word __pad0E;
-	long ai_indices[6];
-};
-
-struct ai_globals_action_data
-{
-	byte __unknown0[0x3B4];
-	boolean grenades_enabled;
-	byte __unknown3B5;
-	short enterable_vehicle_count;
-	struct ai_vehicle_enterable enterable_vehicles[32];
-};
+	sizeof(struct ai_conversation) == 0x74 ? 1 : -1];
 
 /* The January iterator is exactly three datum indices; callers consume the
  * current actor index after encounter_actor_iterator_next advances it. */
@@ -383,11 +356,9 @@ struct vehicle_definition
 typedef char ai_globals_action_vehicle_size_assert[
 	sizeof(struct ai_vehicle_enterable) == 0x28 ? 1 : -1];
 typedef char ai_globals_action_grenades_enabled_offset_assert[
-	offsetof(struct ai_globals_action_data, grenades_enabled) == 0x3B4 ? 1 : -1];
+	offsetof(struct ai_globals, grenades_enabled) == 0x3B4 ? 1 : -1];
 typedef char ai_globals_action_enterable_vehicles_offset_assert[
-	offsetof(struct ai_globals_action_data, enterable_vehicles) == 0x3B8 ? 1 : -1];
-typedef char ai_globals_action_data_size_assert[
-	sizeof(struct ai_globals_action_data) == 0x8B8 ? 1 : -1];
+	offsetof(struct ai_globals, enterable_vehicles) == 0x3B8 ? 1 : -1];
 typedef char actions_prop_enemy_offset_assert[
 	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
 typedef char actions_prop_dead_offset_assert[
@@ -467,8 +438,6 @@ static boolean actor_action_allowed_to_enter_vehicle(
 	long vehicle_index);
 
 /* ---------- globals */
-
-extern struct ai_globals_action_data *ai_globals;
 
 real_argb_color global_temporary_render_color;
 
@@ -1536,13 +1505,13 @@ boolean actor_action_can_stop_conversing(
 	if (conversation_index != NONE)
 	{
 		word flags;
-		struct ai_conversation_datum_header *conversation =
+		struct conversation_datum *conversation =
 			ai_conversation_header_get(conversation_index);
-		struct scenario_conversation_action_definition *definition =
+		struct ai_conversation *definition =
 			TAG_BLOCK_GET_ELEMENT(
 				&global_scenario_get()->ai_conversations,
 				conversation->scenario_conversation_index,
-				struct scenario_conversation_action_definition);
+				struct ai_conversation);
 
 		flags = definition->flags;
 
@@ -3827,7 +3796,7 @@ boolean actor_action_handle_vehicle_entry(
 	long best_vehicle_index;
 	real attempt_distance;
 	real continue_distance;
-	struct action_state_data state;
+	struct action_state_data new_state_data;
 
 	if (actor->state.action == _actor_action_flee &&
 		actor->state.action_data.flee.panic_type > _actor_panic_none)
@@ -3877,13 +3846,13 @@ boolean actor_action_handle_vehicle_entry(
 				if (vehicle &&
 					vehicle->unit.driver_object_index == prop->unit_index)
 				{
-					real_point3d origin;
+					real_point3d vehicle_origin;
 					real distance_squared;
 
-					object_get_origin(prop->vehicle_index, &origin);
+					object_get_origin(prop->vehicle_index, &vehicle_origin);
 					distance_squared = distance_squared3d(
 						&actor->input.position.body_position,
-						&origin);
+						&vehicle_origin);
 
 					if (distance_squared < 100.0f &&
 						distance_squared < best_distance_squared)
@@ -3918,7 +3887,7 @@ boolean actor_action_handle_vehicle_entry(
 		{
 			struct ai_vehicle_enterable *enterable =
 				&ai_globals->enterable_vehicles[(short)slot];
-			real_point3d origin;
+			real_point3d position;
 			real distance_squared;
 			short team_bitmask;
 			short actor_type_bitmask;
@@ -3929,9 +3898,9 @@ boolean actor_action_handle_vehicle_entry(
 				continue;
 			}
 
-			object_get_origin(enterable->vehicle_index, &origin);
+			object_get_origin(enterable->vehicle_index, &position);
 			distance_squared = distance_squared3d(
-				&origin,
+				&position,
 				&actor->input.position.body_position);
 
 			if (!(distance_squared < best_distance_squared) ||
@@ -4013,9 +3982,9 @@ setup_entry:
 		best_vehicle_index,
 		attempt_distance,
 		continue_distance,
-		&state.vehicle))
+		&new_state_data.vehicle))
 	{
-		actor_action_change(actor_index, _actor_action_vehicle, &state);
+		actor_action_change(actor_index, _actor_action_vehicle, &new_state_data);
 		result = TRUE;
 	}
 	else

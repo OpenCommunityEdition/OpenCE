@@ -117,6 +117,7 @@ symbols in this file:
 #include <xtl.h>
 
 #include "interface/progress_bar_internal.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
@@ -209,31 +210,6 @@ enum
 
 /* ---------- structures */
 
-struct rasterizer_model_effect_parameters
-{
-	short type;
-	word pad02;
-	real intensity;
-	byte reserved08[4];
-	long source_object_index;
-	real_point3d centroid;
-	struct shader *shader;
-	struct render_animation animation;
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct render_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct rasterizer_model_effect_parameters effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
-
 struct shader_model_properties
 {
 	word flags;
@@ -305,7 +281,7 @@ struct transparent_geometry_group
 	struct shader *shader;
 	short shader_permutation_index;
 	word pad12;
-	struct rasterizer_model_effect_parameters effect;
+	struct render_model_effect effect;
 	real_vector2d model_base_map_scale;
 	long dynamic_triangle_buffer_index;
 	struct triangle_buffer const *triangle_buffer;
@@ -468,10 +444,10 @@ typedef char verify_shader_environment_cube_map_offset[
 		environment.reflection.cube_map) == 0x324 ? 1 : -1];
 
 typedef char verify_rasterizer_model_parameters_effect_shader_offset[
-	offsetof(struct rasterizer_model_begin_parameters, effect.shader) == 0xA8
+	offsetof(struct rasterizer_model_begin_parameters, effect.modifier_shader) == 0xA8
 		? 1 : -1];
 typedef char verify_rasterizer_model_parameters_effect_animation_offset[
-	offsetof(struct rasterizer_model_begin_parameters, effect.animation) == 0xAC
+	offsetof(struct rasterizer_model_begin_parameters, effect.modifier_animation) == 0xAC
 		? 1 : -1];
 typedef char verify_rasterizer_models_statistics_vertex_shader_work_offset[
 	offsetof(
@@ -1665,16 +1641,16 @@ void _rasterizer_model_draw(
 			676,
 			shader);
 
-		if (local_parameters->effect.shader)
+		if (local_parameters->effect.modifier_shader)
 		{
 			intensity_exponent_source = NONE;
 
-			if (local_parameters->effect.shader->base.type ==
+			if (local_parameters->effect.modifier_shader->base.type ==
 				_shader_type_transparent_plasma)
 			{
 				plasma = (struct shader_transparent_plasma_definition const *)
 					shader_get_and_verify_type(
-						local_parameters->effect.shader,
+						local_parameters->effect.modifier_shader,
 						_shader_type_transparent_plasma);
 				intensity_exponent_source = plasma->intensity_exponent_source;
 			}
@@ -1682,12 +1658,12 @@ void _rasterizer_model_draw(
 			if (intensity_exponent_source < 1 ||
 				intensity_exponent_source >
 					NUMBER_OF_SHADER_ANIMATION_FUNCTIONS ||
-				!local_parameters->effect.animation.values ||
-				local_parameters->effect.animation.values[
+				!local_parameters->effect.modifier_animation.values ||
+				local_parameters->effect.modifier_animation.values[
 					intensity_exponent_source-1] != 0.0f)
 			{
 				group = _rasterizer_model_transparent_geometry_submit(
-					local_parameters->effect.shader,
+					local_parameters->effect.modifier_shader,
 					shader_permutation_index,
 					triangle_buffer,
 					dynamic_triangle_buffer_index,
@@ -1700,7 +1676,7 @@ void _rasterizer_model_draw(
 				if (group)
 				{
 					group->animation = rasterizer_memory_alloc(
-						&local_parameters->effect.animation,
+						&local_parameters->effect.modifier_animation,
 						sizeof(struct render_animation));
 				}
 			}
@@ -2474,7 +2450,7 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 	struct transparent_geometry_group *group;
 	unsigned long geometry_flags;
 	real_vector3d relative_centroid;
-	real_plane3d plane;
+	real_plane3d zero_plane;
 	boolean alpha_blended_decal;
 	boolean submit_decals;
 
@@ -2578,10 +2554,10 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 
 			if (group)
 			{
-				plane.n.i = 0.0f;
-				plane.n.j = 0.0f;
-				plane.n.k = 0.0f;
-				plane.d = 0.0f;
+				zero_plane.n.i = 0.0f;
+				zero_plane.n.j = 0.0f;
+				zero_plane.n.k = 0.0f;
+				zero_plane.d = 0.0f;
 
 				group->geometry_flags = geometry_flags;
 				group->object_index = local_parameters->unique_identifier;
@@ -2598,7 +2574,7 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 						local_parameters->effect.source_object_index!=0);
 					group->source_object_index =
 						local_parameters->effect.source_object_index;
-					group->centroid = local_parameters->effect.centroid;
+					group->centroid = local_parameters->effect.source_object_centroid;
 				}
 				group->shader = shader;
 				group->shader_permutation_index = shader_permutation_index;
@@ -2617,7 +2593,7 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 				group->z_sort = -dot_product3d(
 					&global_window_parameters.camera.forward,
 					&relative_centroid);
-				group->plane = plane;
+				group->plane = zero_plane;
 				group->model_base_map_scale.i = local_parameters->base_map_scale.i;
 				group->model_base_map_scale.j = local_parameters->base_map_scale.j;
 				group->previous_group_presorted_index = NONE;

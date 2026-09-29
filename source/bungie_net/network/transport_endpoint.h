@@ -99,7 +99,7 @@ void disconnect_endpoint(
 	struct transport_endpoint *endpoint);
 short poll_endpoint_set(
 	struct transport_endpoint_set *set,
-	word timeout);
+	word millisec_timeout);
 void rewind_endpoint_set(
 	struct transport_endpoint_set *set);
 struct transport_endpoint *get_next_endpoint_from_set(

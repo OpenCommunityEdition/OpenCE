@@ -90,6 +90,7 @@ symbols in this file:
 #include "math/geometry.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_models.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
@@ -145,55 +146,10 @@ enum
 
 /* ---------- structures */
 
-/* Target-proven vertex layouts used by this translation unit's quad helper. */
-struct model_vertex_uncompressed
-{
-	real_point3d position;
-	real_vector3d normal;
-	real_vector3d binormal;
-	real_vector3d tangent;
-	real_point2d texcoord;
-	short nodes[2];
-	real node_weights[2];
-};
-
-struct model_vertex_compressed
-{
-	real_point3d position;
-	unsigned long normal;
-	unsigned long binormal;
-	unsigned long tangent;
-	point2d texcoord;
-	byte nodes[2];
-	short node_weight;
-};
-
 typedef char verify_model_vertex_uncompressed_size[
 	sizeof(struct model_vertex_uncompressed) == 0x44 ? 1 : -1];
 typedef char verify_model_vertex_compressed_size[
 	sizeof(struct model_vertex_compressed) == 0x20 ? 1 : -1];
-
-/* January-local render packet layouts used by render_dynamic_quad. */
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	byte reserved[0x20];
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct render_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct render_model_effect effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
 
 typedef char verify_rasterizer_model_begin_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
@@ -222,8 +178,8 @@ static void king_calculate_hill_state(
 /* ---------- globals */
 
 /* Shared rasterizer defaults, named by the January image. */
-extern real_rgb_color global_default_animation_colors[4];
-extern real global_default_animation_values[4];
+real_rgb_color global_default_animation_colors[4];
+real global_default_animation_values[4];
 
 static struct king_globals king_globals = { 0 };
 /* king_engine_num_hills: name from the 2003 PC demo PDB (file static short at king_globals+0x1AC),

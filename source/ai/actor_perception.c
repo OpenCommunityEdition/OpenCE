@@ -1935,12 +1935,12 @@ boolean actor_perception_friend_prop_is_attacking(
 }
 
 short actor_perception_aiming_vector_test_blockage(
-	real_point3d const *origin,
-	real_vector3d const *aiming_vector,
-	real_point3d const *point,
-	real_vector3d *error)
+	real_point3d const *source_position,
+	real_vector3d const *source_vector,
+	real_point3d const *friend_position,
+	real_vector3d *friend_direction_to_aiming_vector)
 {
-	real_vector2d horizontal_aiming;
+	real_vector2d source_planar_direction;
 	real_vector3d friend_vector;
 	real_vector3d blockage_vector;
 	real horizontal_aiming_magnitude;
@@ -1949,15 +1949,15 @@ short actor_perception_aiming_vector_test_blockage(
 	real horizontal_error_squared;
 	short blockage = 0;
 
-	horizontal_aiming.i = aiming_vector->i;
-	horizontal_aiming.j = aiming_vector->j;
-	horizontal_aiming_magnitude = magnitude2d(&horizontal_aiming);
+	source_planar_direction.i = source_vector->i;
+	source_planar_direction.j = source_vector->j;
+	horizontal_aiming_magnitude = magnitude2d(&source_planar_direction);
 	if (!(_real_epsilon > fabs(horizontal_aiming_magnitude)))
 	{
 		real inverse_magnitude = 1.0f / horizontal_aiming_magnitude;
 
-		horizontal_aiming.i *= inverse_magnitude;
-		horizontal_aiming.j *= inverse_magnitude;
+		source_planar_direction.i *= inverse_magnitude;
+		source_planar_direction.j *= inverse_magnitude;
 	}
 	else
 	{
@@ -1967,10 +1967,10 @@ short actor_perception_aiming_vector_test_blockage(
 	if (!(horizontal_aiming_magnitude > 0.0f))
 		goto done;
 
-	vector_from_points3d(origin, point, &friend_vector);
+	vector_from_points3d(source_position, friend_position, &friend_vector);
 	projection =
-		friend_vector.i * horizontal_aiming.i +
-		friend_vector.j * horizontal_aiming.j;
+		friend_vector.i * source_planar_direction.i +
+		friend_vector.j * source_planar_direction.j;
 	friend_distance = square_root(
 		friend_vector.i * friend_vector.i +
 		friend_vector.j * friend_vector.j);
@@ -1981,17 +1981,17 @@ short actor_perception_aiming_vector_test_blockage(
 
 	projection = -projection;
 	blockage_vector.i =
-		friend_vector.i + projection * aiming_vector->i;
+		friend_vector.i + projection * source_vector->i;
 	blockage_vector.j =
-		friend_vector.j + projection * aiming_vector->j;
+		friend_vector.j + projection * source_vector->j;
 	blockage_vector.k =
-		friend_vector.k + projection * aiming_vector->k;
+		friend_vector.k + projection * source_vector->k;
 
-	if (error != NULL)
+	if (friend_direction_to_aiming_vector != NULL)
 	{
-		error->i = -blockage_vector.i;
-		error->j = -blockage_vector.j;
-		error->k = -blockage_vector.k;
+		friend_direction_to_aiming_vector->i = -blockage_vector.i;
+		friend_direction_to_aiming_vector->j = -blockage_vector.j;
+		friend_direction_to_aiming_vector->k = -blockage_vector.k;
 	}
 
 	if (blockage_vector.k > -0.5f && blockage_vector.k < 0.9f)

@@ -434,6 +434,19 @@ struct ai_command_list_definition
 	struct tag_block unused_blocks[2];
 };
 
+struct ai_conversation
+{
+	char name[32];
+	word flags;
+	word pad22;
+	real trigger_distance;
+	real run_to_player_dist;
+	byte __unknown2C[0x24];
+	struct tag_block participants;
+	struct tag_block lines;
+	struct tag_block unused;
+};
+
 /* ---------- prototypes/AI_SCENARIO_DEFINITIONS.C */
 
 /* ---------- globals */

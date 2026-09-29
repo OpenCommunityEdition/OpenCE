@@ -473,7 +473,7 @@ static void render_state_bitmap(
 /* ---------- globals */
 
 static struct hud_messaging_globals_definition *hud_messaging_globals;
-extern struct hud_messaging_parameters_definition *hud_msg_def;
+struct hud_messaging_parameters_definition *hud_msg_def;
 static char button_mappings[_icon_custom_1 - _icon_action] =
 {
 	2,

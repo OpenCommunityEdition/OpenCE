@@ -84,6 +84,7 @@ symbols in this file:
  * replace these wrappers with handwritten bodies. */
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
@@ -132,32 +133,6 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct rasterizer_model_lighting_parameters
-{
-	byte data[0x74];
-};
-
-struct rasterizer_model_effect_parameters
-{
-	short type;
-	word pad02;
-	real intensity;
-	byte reserved08[0x20];
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct render_skinning skinning;
-	struct rasterizer_model_lighting_parameters lighting;
-	struct render_animation animation;
-	struct rasterizer_model_effect_parameters effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
 
 struct shader_model_definition
 {

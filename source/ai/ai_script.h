@@ -22,14 +22,6 @@ struct platoon_datum;
 struct scenario;
 struct squad_datum;
 
-struct ai_script_vehicle_enterable
-{
-	long vehicle_index;
-	real radius;
-	short team_bitmask;
-	short actor_type_bitmask;
-};
-
 struct ai_script_platoon_iterator
 {
 	long encounter_index;
@@ -97,7 +89,7 @@ struct platoon_datum *ai_index_platoon_iterator_next(
 	struct ai_script_platoon_iterator *iterator);
 long object_list_from_ai_reference(
 	long ai_reference);
-struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
+struct ai_vehicle_enterable *ai_scripting_find_vehicle_enterable(
 	long vehicle_index);
 void ai_scripting_vehicle_enterable_distance(
 	long ai_reference,

@@ -1285,7 +1285,7 @@ class SemanticDataExtentModelTests(unittest.TestCase):
                 ("negative matched", {"matched": -1}),
                 ("non-numeric total", {"total": "13x"}),
                 ("empty total", {"total": ""}),
-                ("non-ASCII digit total", {"total": "１３１"}),
+                ("non-ASCII digit total", {"total": "ï¼‘ï¼“ï¼‘"}),
                 ("float total", {"total": 131.0}),
                 ("boolean matched", {"matched": True})):
             with self.subTest(label=label):
@@ -2435,6 +2435,729 @@ class SurplusProviderProofTests(unittest.TestCase):
                 apply_semantic_data_matches(
                     report, *arguments,
                     rescore_report_unit=trust_fixture_report(report))
+
+
+# Surplus-helper constants (the source/ai/actions shape).  January's object for
+# the unit imports a helper function; the rebuilt object carries its own
+# select-any copy of the helper and of the two constants the helper loads,
+# which January's object never names.  The single January definer of the
+# helper (the provider) holds the identical helper and the identical constants.
+_HELPER = "_helper2d"
+_CALLER = "_caller"
+_C1 = _REAL
+_C2 = "__real@3f1a36e2e0000000"
+_C1_BYTES = b"\x00\x00\x80\x3f"
+_C2_BYTES = bytes.fromhex("000000e0e2361a3f")
+_SCN_CODE_COMDAT = _SCN_CODE_ALIGN16 | _SCN_COMDAT
+# fld qword [C2]; fmul dword [C1]; ret; padding.
+_HELPER_RAW = b"\xdd\x05" + bytes(4) + b"\xd8\x0d" + bytes(4) + b"\xc3" + b"\xcc" * 3
+_HELPER_RELOCS = ((2, _C2, _DIR32, 0), (8, _C1, _DIR32, 0))
+_SCN_DEBUG = 0x42100040
+_WRITE = 0x80000000
+
+
+def _helper_section(selection=_SELECT_ANY, relocs=_HELPER_RELOCS,
+                    raw=_HELPER_RAW, symbols=((_HELPER, 0, 2),),
+                    flags=_SCN_CODE_COMDAT):
+    return _v1_section(".text", raw, flags, symbols, relocs, selection=selection)
+
+
+def _caller_section(extra_relocs=()):
+    # call _helper2d; ret; padding (bytes 6..15 can hold extra relocations).
+    raw = b"\xe8" + bytes(4) + b"\xc3" + b"\xcc" * 10
+    return _v1_section(".text", raw, _SCN_CODE_ALIGN16, [(_CALLER, 0, 2)],
+                       [(1, _HELPER, _REL32, -4)] + list(extra_relocs))
+
+
+def _c1(raw=_C1_BYTES, **options):
+    return _v1_literal(_C1, raw, **options)
+
+
+def _c2(raw=_C2_BYTES, **options):
+    return _v1_literal(_C2, raw, code=options.pop("code", 4), **options)
+
+
+class HelperFixture(V1Fixture):
+    """V1Fixture plus a surplus helper whose constants January never names.
+
+    base: .data, xyz, C1, C2, abc, table, hello, w, .bss, caller, helper.
+    provider (January and rebuilt): xyz, helper, C1, C2.
+    """
+
+    SURPLUS = [_XYZ, _C1, _C2]
+
+    def __init__(self):
+        super().__init__()
+        self.target.append(_caller_section())
+        self.target_externals = self.target_externals + [_HELPER]
+        self.base.insert(2, _c1())
+        self.base.insert(3, _c2())
+        self.base.append(_caller_section())
+        self.base.append(_helper_section())
+        self.provider_target += [
+            _helper_section(selection=_SELECT_NODUPLICATES), _c1(), _c2()]
+        self.provider_base += [_helper_section(), _c1(), _c2()]
+        self.addresses.update({_HELPER: 0x6200, _CALLER: 0x6300, _C2: 0x5108})
+        self.provider_target_imports = []
+
+    def materialize(self, root):
+        # V1Fixture writes provider objects without imports; a provider that
+        # imports a name is written again with it (placeholders let the base
+        # writer resolve the name first).
+        if not self.provider_target_imports:
+            return super().materialize(root)
+        real = self.provider_target
+        self.provider_target = real + [
+            _v1_literal(name, bytes(4)) for name in self.provider_target_imports]
+        try:
+            report = super().materialize(root)
+        finally:
+            self.provider_target = real
+        (Path(root) / "provider_target.obj").write_bytes(
+            _v1_coff(real, self.provider_target_imports))
+        return report
+
+
+def _retarget_relocation(data, obj, section_symbol, address, new_index):
+    """Byte-patch one relocation of ``section_symbol``'s section to symbol
+    index ``new_index`` (a spelling the fixture builder cannot express)."""
+    number = [item for item in obj["symbols"]
+              if item["name"] == section_symbol and item["section"] > 0][0]["section"]
+    section = obj["sections"][number - 1]
+    for index in range(section["reloc_count"]):
+        offset = section["reloc"] + 10 * index
+        if struct.unpack_from("<L", data, offset)[0] == address:
+            struct.pack_into("<L", data, offset + 4, new_index)
+            return
+    raise AssertionError(f"no relocation at {address:#x}")
+
+
+def _section_symbol_index(obj, symbol):
+    number = [item for item in obj["symbols"]
+              if item["name"] == symbol and item["section"] > 0][0]["section"]
+    name = obj["sections"][number - 1]["name"]
+    return [item for item in obj["symbols"]
+            if item["section"] == number and item["name"] == name
+            and item["storage"] == 3][0]["index"]
+
+
+_HELPER_PATH = (r"is not a January undefined reference of this unit: "
+                r"data_unit:__real@[0-9a-f]+ \(nor a verified surplus-helper "
+                r"constant: .*")
+
+
+class SurplusHelperConstantTests(unittest.TestCase):
+    """Surplus constants reached only through a surplus helper (RF-CO).
+
+    The controls credit exactly the fixture's report gap; every adversarial
+    case fails closed.  ``helper_path=False`` marks a case an unchanged,
+    earlier check refuses before the helper path is reached.
+    """
+
+    def _rejects(self, mutate, pattern, helper_path=True, post_base=None):
+        fixture = HelperFixture()
+        mutate(fixture)
+        expected = (_HELPER_PATH + pattern) if helper_path else pattern
+        with self.assertRaisesRegex(SemanticProgressError, expected):
+            _run_fixture(fixture, post_base=post_base)
+
+    # -- controls --------------------------------------------------------
+    def test_control_helper_constants_credit_only_the_report_gap(self):
+        self.assertEqual(_run_fixture(HelperFixture()),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_control_section_table_permutation(self):
+        # Section numbers are object-local: moving the helper and constants
+        # changes no name, byte or relocation, so it is not an identity change.
+        fixture = HelperFixture()
+        fixture.base.insert(1, fixture.base.pop())
+        fixture.base.append(fixture.base.pop(4))
+        fixture.provider_target.reverse()
+        self.assertEqual(_run_fixture(fixture),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_january_imported_constant_skips_the_helper_path(self):
+        # January imports C1: the ordinary rule accepts it without the helper;
+        # C2 still takes the helper path, which now refuses a changed helper.
+        fixture = HelperFixture()
+        fixture.target_externals = fixture.target_externals + [_C1]
+        fixture.base[-1] = _helper_section(raw=b"\x90" + _HELPER_RAW[1:])
+        with self.assertRaisesRegex(
+                SemanticProgressError,
+                _HELPER_PATH.replace("[0-9a-f]+", "3f1a36e2e0000000")
+                + "bytes or relocations differ from January provider"):
+            _run_fixture(fixture)
+
+    # -- helper byte / relocation mismatch -------------------------------
+    def test_helper_byte_differs_from_january_provider(self):
+        self._rejects(lambda f: f.provider_target.__setitem__(
+            1, _helper_section(selection=_SELECT_NODUPLICATES,
+                               raw=_HELPER_RAW[:12] + b"\xc2" + b"\xcc" * 3)),
+            "bytes or relocations differ from January provider")
+
+    def test_helper_byte_differs_from_rebuilt_provider(self):
+        self._rejects(lambda f: f.provider_base.__setitem__(
+            1, _helper_section(raw=_HELPER_RAW[:-1] + b"\x90")),
+            "bytes or relocations differ from rebuilt provider")
+
+    def test_our_helper_byte_differs(self):
+        self._rejects(lambda f: f.base.__setitem__(
+            -1, _helper_section(raw=b"\xd9" + _HELPER_RAW[1:])),
+            "bytes or relocations differ from January provider")
+
+    def test_helper_relocation_type_differs(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            relocs=((2, _C2, _DIR32NB, 0), (8, _C1, _DIR32, 0)))),
+            "bytes or relocations differ from January provider")
+
+    def test_helper_relocation_addend_differs(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            relocs=((2, _C2, _DIR32, 0), (8, _C1, _DIR32, 4)))),
+            "bytes or relocations differ from January provider")
+
+    def test_provider_helper_section_name_differs(self):
+        self._rejects(lambda f: f.provider_base.__setitem__(1, _v1_section(
+            ".text$mn", _HELPER_RAW, _SCN_CODE_COMDAT, [(_HELPER, 0, 2)],
+            _HELPER_RELOCS, selection=_SELECT_ANY)),
+            "section symbol table differs from rebuilt provider")
+
+    def test_provider_helper_spells_the_constant_through_a_static_alias(self):
+        # The strict comparator and the image addresses both accept a static
+        # alias at the constant's offset; the relocation rows must not.
+        def mutate(fixture):
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES,
+                relocs=((2, _C2, _DIR32, 0), (8, "_c1_alias", _DIR32, 0)))
+            fixture.provider_target[2]["symbols"].append(["_c1_alias", 0, 3])
+            fixture.addresses["_c1_alias"] = 0x5100
+        self._rejects(mutate, "relocates through a non-external symbol")
+
+    def test_provider_helper_spells_the_constant_as_another_name_plus_addend(self):
+        # csplit-style "other external + addend" reaching the same address:
+        # strict comparator and image addresses agree, the names do not.
+        def mutate(fixture):
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES,
+                relocs=((2, _C2, _DIR32, 0), (8, "_c1_tail", _DIR32, -4)))
+            fixture.provider_target[2]["symbols"].append(["_c1_tail", 4, 2])
+            fixture.addresses["_c1_tail"] = 0x5104
+        self._rejects(mutate, "relocation targets differ from January provider")
+
+    def test_helper_relocation_without_image_address(self):
+        self._rejects(lambda f: f.addresses.pop(_C2),
+                      "relocation has no image address")
+
+    def test_helper_without_image_address(self):
+        self._rejects(lambda f: f.addresses.pop(_HELPER),
+                      "image address unavailable")
+
+    def test_helper_section_holds_another_symbol(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            symbols=((_HELPER, 0, 2), ("$L100", 12, 3)))),
+            "not a single-function helper")
+
+    def test_helper_is_static(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            symbols=((_HELPER, 0, 3),))), "not an external at offset 0")
+
+    def test_our_helper_is_not_select_any(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            selection=_SELECT_NODUPLICATES)), "has COMDAT selection 1")
+
+    def test_our_helper_is_not_a_comdat(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            flags=_SCN_CODE_ALIGN16, selection=0)), "is not a code COMDAT")
+
+    def test_rebuilt_provider_helper_is_not_select_any(self):
+        self._rejects(lambda f: f.provider_base.__setitem__(1, _helper_section(
+            selection=_SELECT_NODUPLICATES)), "has COMDAT selection 1")
+
+    def test_january_provider_helper_other_selection(self):
+        self._rejects(lambda f: f.provider_target.__setitem__(1, _helper_section(
+            selection=5)), "has COMDAT selection 5")
+
+    def test_provider_helper_alignment_differs(self):
+        self._rejects(lambda f: f.provider_base.__setitem__(1, _helper_section(
+            flags=0x60000020 | _align(6) | _SCN_COMDAT)),
+            "bytes or relocations differ from rebuilt provider")
+
+    def test_helper_reaches_constant_through_its_section_symbol(self):
+        def post_base(data, obj):
+            _retarget_relocation(data, obj, _HELPER, 8,
+                                 _section_symbol_index(obj, _C1))
+        self._rejects(lambda f: None, "relocation has no image address",
+                      post_base=post_base)
+
+    # -- constant mismatch (complete constant identity) ------------------
+    def test_our_constant_differs(self):
+        def mutate(fixture):
+            fixture.base[2] = _c1(raw=b"\x01\x00\x80\x3f")
+        self._rejects(mutate, "constant '__real@3f800000' differs from "
+                              "January provider")
+
+    def test_january_provider_constant_differs(self):
+        self._rejects(lambda f: f.provider_target.__setitem__(
+            2, _c1(raw=b"\x00\x00\x00\x3f")),
+            "constant '__real@3f800000' differs from January provider")
+
+    def test_rebuilt_provider_constant_differs(self):
+        self._rejects(lambda f: f.provider_base.__setitem__(
+            3, _c2(raw=bytes(8))),
+            "constant '__real@3f1a36e2e0000000' differs from rebuilt provider")
+
+    def test_constant_section_name_differs(self):
+        self._rejects(lambda f: f.base.__setitem__(2, _v1_section(
+            ".rdata$r", _C1_BYTES, _SCN_RDATA | _SCN_COMDAT | _align(3),
+            [(_C1, 0, 2)], selection=_SELECT_ANY)),
+            "constant '__real@3f800000' differs from January provider")
+
+    def test_constant_alignment_differs(self):
+        self._rejects(lambda f: f.base.__setitem__(3, _c2(code=5)),
+                      "constant '__real@3f1a36e2e0000000' differs from "
+                      "January provider")
+
+    def test_provider_helper_imports_the_constant(self):
+        # The provider's January helper loads a C1 it does not define (another
+        # January object owns it): no identity against the provider exists.
+        def mutate(fixture):
+            del fixture.provider_target[2]
+            fixture.provider_target_imports = [_C1]
+        self._rejects(mutate, "constant '__real@3f800000' is not defined by "
+                              "the January provider")
+
+    def test_constant_referenced_by_another_name_in_the_provider(self):
+        other = "__real@3f800001"
+
+        def mutate(fixture):
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES,
+                relocs=((2, _C2, _DIR32, 0), (8, other, _DIR32, 0)))
+            fixture.provider_target.append(_v1_literal(other, _C1_BYTES))
+        self._rejects(mutate, "bytes or relocations differ from January provider")
+
+    # -- reordered sections / relocations --------------------------------
+    def test_swapped_constant_references(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            relocs=((2, _C1, _DIR32, 0), (8, _C2, _DIR32, 0)))),
+            "bytes or relocations differ from January provider")
+
+    def test_reordered_relocation_records(self):
+        self._rejects(lambda f: f.base.__setitem__(-1, _helper_section(
+            relocs=tuple(reversed(_HELPER_RELOCS)))),
+            "bytes or relocations differ from January provider")
+
+    def test_provider_constants_exchanged_between_names(self):
+        # Two same-sized constants exchange values in the January provider:
+        # names, bytes and relocations of the helpers still agree, only the
+        # constant identity check can see it.
+        other = "__real@3f000000"
+        half = b"\x00\x00\x00\x3f"
+
+        def mutate(fixture):
+            relocs = _HELPER_RELOCS + ((12, other, _DIR32, 0),)
+            raw = _HELPER_RAW[:12] + bytes(4)
+            fixture.base[-1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.base.insert(4, _v1_literal(other, half))
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES, relocs=relocs, raw=raw)
+            fixture.provider_base[1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.provider_target[2] = _c1(raw=half)
+            fixture.provider_target.append(_v1_literal(other, _C1_BYTES))
+            fixture.provider_base.append(_v1_literal(other, half))
+            fixture.addresses[other] = 0x5110
+            fixture.SURPLUS = [_XYZ, _C1, _C2, other]
+        self._rejects(mutate, "constant '__real@3f800000' differs from "
+                              "January provider")
+
+    # -- constant also reached from non-helper sections ------------------
+    def test_constant_also_referenced_by_january_defined_code(self):
+        self._rejects(lambda f: f.base.__setitem__(-2, _caller_section(
+            [(8, _C1, _DIR32, 0)])), "which January's unit defines")
+
+    def test_constant_reached_by_section_symbol_from_other_code(self):
+        def post_base(data, obj):
+            _retarget_relocation(data, obj, _CALLER, 8,
+                                 _section_symbol_index(obj, _C1))
+        self._rejects(lambda f: f.base.__setitem__(-2, _caller_section(
+            [(8, _C2, _DIR32, 0)])), "which January's unit defines",
+            post_base=post_base)
+
+    def test_constant_referenced_from_a_debug_section(self):
+        self._rejects(lambda f: f.base.append(_v1_section(
+            ".debug$S", bytes(8), _SCN_DEBUG, [], [(4, _C1, 0x0B, 0)])),
+            "reached from non-code section")
+
+    def test_constant_referenced_by_a_second_unverified_helper(self):
+        # A second rebuilt-only select-any helper January never imports.
+        self._rejects(lambda f: f.base.append(_helper_section(
+            symbols=(("_helper3d", 0, 2),))),
+            "helper '_helper3d' is not a January undefined reference")
+
+    # -- helper not imported by January's unit ---------------------------
+    def test_helper_not_named_by_january_unit(self):
+        def mutate(fixture):
+            fixture.target_externals = [name for name in fixture.target_externals
+                                        if name != _HELPER]
+            fixture.target[-1] = _v1_section(
+                ".text", b"\xc3" + b"\xcc" * 15, _SCN_CODE_ALIGN16,
+                [(_CALLER, 0, 2)])
+        self._rejects(mutate, "helper '_helper2d' is not a January undefined "
+                              "reference of this unit\\)")
+
+    def test_helper_named_but_never_relocated_by_january_unit(self):
+        self._rejects(lambda f: f.target.__setitem__(-1, _v1_section(
+            ".text", b"\xc3" + b"\xcc" * 15, _SCN_CODE_ALIGN16,
+            [(_CALLER, 0, 2)])), "never relocates to helper")
+
+    def test_helper_defined_by_january_unit(self):
+        def mutate(fixture):
+            fixture.target_externals = [name for name in fixture.target_externals
+                                        if name != _HELPER]
+            fixture.target.append(_helper_section(
+                selection=_SELECT_NODUPLICATES, relocs=()))
+        self._rejects(mutate, "'_helper2d', which January's unit defines")
+
+    # -- multiple / unauthenticated providers ----------------------------
+    def test_helper_has_two_january_definers(self):
+        def mutate(fixture):
+            fixture.other_sections = [
+                _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
+                            [("_bss_var", 0, 2)]),
+                _helper_section(selection=_SELECT_NODUPLICATES, relocs=())]
+        self._rejects(mutate, "provider 'provider_unit' is not January's "
+                              "unique definer \\(definers \\['other_unit', "
+                              "'provider_unit'\\]\\)")
+
+    def test_helper_has_no_january_definer(self):
+        self._rejects(lambda f: f.provider_target.pop(1),
+                      "not January's unique definer \\(definers \\[\\]\\)")
+
+    def test_constant_names_a_provider_that_does_not_define_the_helper(self):
+        def mutate(fixture):
+            entry = fixture.entry()
+            for item in entry["surplus"]:
+                if item["symbol"] == _C1:
+                    item["provider"] = "other_unit"
+            fixture.entries = [entry]
+        self._rejects(mutate, "provider 'other_unit' is not January's unique "
+                              "definer")
+
+    def test_constant_names_its_own_unit_or_a_missing_unit(self):
+        for provider in ("data_unit", "missing_unit"):
+            with self.subTest(provider=provider):
+                def mutate(fixture, provider=provider):
+                    entry = fixture.entry()
+                    for item in entry["surplus"]:
+                        if item["symbol"] == _C1:
+                            item["provider"] = provider
+                    fixture.entries = [entry]
+                self._rejects(mutate, "invalid provider")
+
+    def test_missing_january_provider_object(self):
+        fixture = HelperFixture()
+        with tempfile.TemporaryDirectory() as root:
+            report, arguments = _materialize(fixture, root)
+            (Path(root) / "provider_target.obj").unlink()
+            with self.assertRaisesRegex(SemanticProgressError,
+                                        "January object missing"):
+                apply_semantic_data_matches(
+                    report, *arguments,
+                    rescore_report_unit=trust_fixture_report(report))
+
+    def test_constant_has_another_january_definer(self):
+        # The helper's provider is unique, but another January object also
+        # defines the constant: the unchanged provider check still refuses.
+        def mutate(fixture):
+            fixture.other_sections = [
+                _v1_section(".bss", bytes(8), _SCN_BSS | _align(3),
+                            [("_bss_var", 0, 2)]), _c1()]
+        self._rejects(mutate, "__real@3f800000 \\(definers "
+                              "\\['other_unit', 'provider_unit'\\]\\)",
+                      helper_path=False)
+
+    # -- unrelated surplus data riding along -----------------------------
+    def _extra_constant(self, fixture, extra):
+        fixture.base.insert(4, _v1_literal(extra, b"\x00\x00\x00\x40"))
+        fixture.provider_target.append(_v1_literal(extra, b"\x00\x00\x00\x40"))
+        fixture.provider_base.append(_v1_literal(extra, b"\x00\x00\x00\x40"))
+        fixture.addresses[extra] = 0x5120
+
+    def test_unreferenced_surplus_constant(self):
+        def mutate(fixture):
+            self._extra_constant(fixture, "__real@40000000")
+            fixture.SURPLUS = [_XYZ, "__real@40000000", _C1, _C2]
+        self._rejects(mutate, "no rebuilt section references it")
+
+    def test_surplus_constant_used_only_by_january_defined_code(self):
+        def mutate(fixture):
+            self._extra_constant(fixture, "__real@40000000")
+            fixture.base[-2] = _caller_section([(8, "__real@40000000", _DIR32, 0)])
+            fixture.SURPLUS = [_XYZ, "__real@40000000", _C1, _C2]
+        self._rejects(mutate, "which January's unit defines")
+
+    def test_extra_constant_loaded_only_by_our_helper(self):
+        def mutate(fixture):
+            self._extra_constant(fixture, "__real@40000000")
+            fixture.base[-1] = _helper_section(
+                relocs=_HELPER_RELOCS + ((12, "__real@40000000", _DIR32, 0),),
+                raw=_HELPER_RAW[:12] + bytes(4))
+            fixture.SURPLUS = [_XYZ, _C1, _C2, "__real@40000000"]
+        self._rejects(mutate, "bytes or relocations differ from January provider")
+
+    def test_writable_data_reached_only_by_the_helper(self):
+        self._rejects(lambda f: f.base.__setitem__(2, _c1(
+            flags=_SCN_RDATA | _WRITE | _SCN_COMDAT | _align(3))),
+            "not a read-only constant")
+
+    def test_relocated_constant_reached_only_by_the_helper(self):
+        self._rejects(lambda f: f.base.__setitem__(2, _v1_section(
+            ".rdata", _C1_BYTES, _SCN_RDATA | _SCN_COMDAT | _align(3),
+            [(_C1, 0, 2)], [(0, "_ext_function", _DIR32, 0)],
+            selection=_SELECT_ANY)), "not a read-only constant")
+
+    def test_helper_loads_code_this_unit_defines(self):
+        def mutate(fixture):
+            relocs = _HELPER_RELOCS + ((12, _CALLER, _DIR32, 0),)
+            raw = _HELPER_RAW[:12] + bytes(4)
+            fixture.base[-1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES, relocs=relocs, raw=raw)
+            fixture.provider_base[1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.provider_target.append(_caller_section())
+            fixture.provider_base.append(_caller_section())
+        self._rejects(mutate, "relocates to '_caller', which is not a data "
+                              "constant")
+
+    def test_helper_target_in_a_section_that_does_not_exist(self):
+        # A malformed rebuilt symbol (section number past the section table)
+        # is refused with the verifier's error, never an IndexError.
+        def mutate(fixture):
+            relocs = _HELPER_RELOCS + ((12, "_x_far", _DIR32, 0),)
+            raw = _HELPER_RAW[:12] + bytes(4)
+            fixture.base[-1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.base_externals = fixture.base_externals + ["_x_far"]
+            fixture.provider_target[1] = _helper_section(
+                selection=_SELECT_NODUPLICATES, relocs=relocs, raw=raw)
+            fixture.provider_base[1] = _helper_section(relocs=relocs, raw=raw)
+            fixture.provider_target.append(_v1_literal("_x_far", bytes(4)))
+            fixture.provider_base.append(_v1_literal("_x_far", bytes(4)))
+            fixture.addresses["_x_far"] = 0x5130
+
+        def post_base(data, obj):
+            index = [item for item in obj["symbols"]
+                     if item["name"] == "_x_far"][0]["index"]
+            symbol_offset = struct.unpack_from("<L", data, 8)[0]
+            struct.pack_into("<h", data, symbol_offset + 18 * index + 12, 999)
+        self._rejects(mutate, "relocates to '_x_far', which is not a data "
+                              "constant", post_base=post_base)
+
+    def test_helper_constant_outside_the_covered_report_sections(self):
+        self._rejects(lambda f: f.base.__setitem__(2, _v1_section(
+            ".rdat2", _C1_BYTES, _SCN_RDATA | _SCN_COMDAT | _align(3),
+            [(_C1, 0, 2)], selection=_SELECT_ANY)),
+            "outside the covered report sections", helper_path=False)
+
+    def test_helper_constant_left_undeclared(self):
+        def mutate(fixture):
+            fixture.SURPLUS = [_XYZ, _C2]
+        self._rejects(mutate, "leaves rebuilt sections undeclared",
+                      helper_path=False)
+
+    def test_helper_constant_declared_twice(self):
+        def mutate(fixture):
+            fixture.SURPLUS = [_XYZ, _C1, _C2, _C1]
+        self._rejects(mutate, "repeats a section", helper_path=False)
+
+    # -- extra members ---------------------------------------------------
+    @staticmethod
+    def _with_member(fixture, symbol):
+        entry = fixture.entry()
+        section, owner = _v1_find(fixture.base, symbol)
+        snapshot = _v1_normalized_snapshot(section, owner)
+        entry["members"].append({"symbol": symbol, "measurements": {
+            "target": snapshot, "base": snapshot}})
+        fixture.entries = [entry]
+
+    def test_helper_constant_listed_as_a_member(self):
+        self._rejects(lambda f: self._with_member(f, _C1),
+                      "cannot verify semantic data group member",
+                      helper_path=False)
+
+    def test_helper_listed_as_a_member(self):
+        self._rejects(lambda f: self._with_member(f, _HELPER),
+                      "cannot verify semantic data group member",
+                      helper_path=False)
+
+    def test_helper_listed_as_surplus(self):
+        def mutate(fixture):
+            entry = fixture.entry()
+            section, owner = _v1_find(fixture.base, _HELPER)
+            entry["surplus"].append({
+                "symbol": _HELPER, "provider": fixture.provider,
+                "measurements": {"base": _v1_normalized_snapshot(section, owner)}})
+            fixture.entries = [entry]
+        self._rejects(mutate, "cannot verify semantic data surplus",
+                      helper_path=False)
+
+    def test_extra_matched_member(self):
+        self._rejects(lambda f: self._with_member(f, "_bss_var"),
+                      "does not cover the reported unmatched sections",
+                      helper_path=False)
+
+    # -- direct call without image addresses -----------------------------
+    def test_helper_path_needs_image_addresses(self):
+        fixture = HelperFixture()
+        with tempfile.TemporaryDirectory() as root:
+            fixture.materialize(root)
+            config_units = {unit["name"]: unit for unit in json.loads(
+                (Path(root) / "objdiff.json").read_text())["units"]}
+            item = fixture.entry()["surplus"][1]
+            with self.assertRaisesRegex(
+                    SemanticProgressError,
+                    _HELPER_PATH + "no image symbol addresses"):
+                semantic_progress._verify_surplus_providers(
+                    Path(root), config_units, load(Path(root) / "target.obj"),
+                    load(Path(root) / "base.obj"), "data_unit", [item])
+
+
+def _append_weak_external(data, name, default_index):
+    """Byte-append a weak external (one aux record naming ``default_index``)
+    to the symbol table; the string table after it keeps its offsets."""
+    symbol_offset, count = struct.unpack_from("<LL", data, 8)
+    strings = symbol_offset + 18 * count
+    data[strings:strings] = (
+        name.encode("ascii").ljust(8, b"\0")
+        + struct.pack("<LhHBB", 0, 0, 0, 105, 1)
+        + struct.pack("<LL10x", default_index, 3))
+    struct.pack_into("<L", data, 12, count + 2)
+    return count
+
+
+class SurplusHelperReviewTests(unittest.TestCase):
+    """Independent review (RF-CU) of the surplus-helper constant rule.
+
+    Spellings the reach scan cannot follow fail closed, a helper relocation
+    must address a byte of the constant whose identity is proved, and the
+    "constant among the helper's constants" check is load-bearing.
+    """
+
+    def test_weak_external_to_the_constant_fails_closed(self):
+        # _caller (no helper) reaches C1 through a weak external whose default
+        # is C1: the relocation names another symbol, the linker binds C1.
+        fixture = HelperFixture()
+        fixture.base[-2] = _caller_section([(6, _C1, _DIR32, 0)])
+
+        def weak(data, obj):
+            default = [item for item in obj["symbols"]
+                       if item["name"] == _C1 and item["section"] > 0][0]
+            index = _append_weak_external(data, "_w_c1", default["index"])
+            _retarget_relocation(data, obj, _CALLER, 6, index)
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    _HELPER_PATH + "has a weak external"):
+            _run_fixture(fixture, post_base=weak)
+
+    def test_alternatename_directive_fails_closed(self):
+        fixture = HelperFixture()
+        fixture.base[-2] = _caller_section([(6, "_alias_c1", _DIR32, 0)])
+        fixture.base_externals = fixture.base_externals + ["_alias_c1"]
+        fixture.base.append(_v1_section(
+            ".drectve", b" /ALTERNATENAME:_alias_c1=" + _C1.encode() + b" ",
+            0x00100A00, []))
+        with self.assertRaisesRegex(
+                SemanticProgressError,
+                _HELPER_PATH + "has an /ALTERNATENAME directive"):
+            _run_fixture(fixture)
+
+    def _set_addend(self, fixture, address, addend):
+        relocs = [list(item) for item in _HELPER_RELOCS]
+        for item in relocs:
+            if item[0] == address:
+                item[3] = addend
+        fixture.base[-1] = _helper_section(relocs=relocs)
+        fixture.provider_target[1] = _helper_section(
+            selection=_SELECT_NODUPLICATES, relocs=relocs)
+        fixture.provider_base[1] = _helper_section(relocs=relocs)
+
+    def test_helper_addressing_past_the_constant_fails_closed(self):
+        # all three helpers load C1+4: the four bytes after C1, whose identity
+        # nothing proves
+        fixture = HelperFixture()
+        self._set_addend(fixture, 8, 4)
+        with self.assertRaisesRegex(
+                SemanticProgressError,
+                _HELPER_PATH + "relocation at 0x8 addresses outside constant"):
+            _run_fixture(fixture)
+
+    def test_control_helper_addressing_inside_the_constant(self):
+        # C2 is 8 bytes: C2+4 (its high dword) is inside the proved bytes
+        fixture = HelperFixture()
+        self._set_addend(fixture, 2, 4)
+        self.assertEqual(_run_fixture(fixture),
+                         ["data_unit:v1-group (+56 data bytes)"])
+
+    def test_helper_reaching_the_constant_through_an_undefined_duplicate(self):
+        # ours also carries an undefined C1 entry and the helper relocates
+        # through it: the reach scan matches the name, the comparator and the
+        # image addresses agree, only "C1 is among the helper's constants"
+        # refuses (RF-CO's surviving mutant M18 is not implied).
+        fixture = HelperFixture()
+        fixture.base_externals = fixture.base_externals + [_C1]
+
+        def undefined(data, obj):
+            index = [item for item in obj["symbols"]
+                     if item["name"] == _C1 and item["section"] == 0][0]["index"]
+            _retarget_relocation(data, obj, _HELPER, 8, index)
+        with self.assertRaisesRegex(
+                SemanticProgressError,
+                _HELPER_PATH + "does not reference it by name"):
+            _run_fixture(fixture, post_base=undefined)
+
+
+class ActionsHelperConstantProductionTests(unittest.TestCase):
+    """The real source/ai/actions shape on the local build (skips without it)."""
+
+    ROOT = Path(__file__).resolve().parents[1]
+    UNIT = "source/ai/actions"
+    CONSTANTS = ("__real@3f800000", "__real@3f1a36e2e0000000")
+
+    def setUp(self):
+        objdiff = self.ROOT / "objdiff.json"
+        symbols = self.ROOT / "config" / "symbols.json"
+        if not objdiff.is_file() or not symbols.is_file():
+            self.skipTest("SKIPPED: local build inputs are unavailable")
+        self.config_units = {unit["name"]: unit for unit in json.loads(
+            objdiff.read_text(encoding="utf-8"))["units"]}
+        unit = self.config_units.get(self.UNIT)
+        paths = [self.ROOT / unit[key] for key in ("target_path", "base_path")] \
+            if unit else []
+        if not paths or not all(path.is_file() for path in paths):
+            self.skipTest("SKIPPED: actions objects are unavailable")
+        self.target, self.base = (load(path) for path in paths)
+        self.addresses = semantic_progress.image_symbol_addresses(json.loads(
+            symbols.read_text(encoding="utf-8")))
+
+    def _verify(self, provider, addresses=True):
+        items = [{"symbol": name, "provider": provider, "measurements": {}}
+                 for name in self.CONSTANTS]
+        semantic_progress._verify_surplus_providers(
+            self.ROOT, self.config_units, self.target, self.base, self.UNIT,
+            items, self.addresses if addresses else None)
+
+    def test_helper_constants_verify_against_action_charge(self):
+        try:
+            self._verify("source/ai/action_charge")
+        except SemanticProgressError as error:
+            self.fail(f"actions helper constants do not verify: {error}")
+
+    def test_helper_constants_refuse_another_provider(self):
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "is not January's unique definer"):
+            self._verify("source/ai/action_obey")
+
+    def test_helper_constants_refuse_without_image_addresses(self):
+        with self.assertRaisesRegex(SemanticProgressError,
+                                    "no image symbol addresses"):
+            self._verify("source/ai/action_charge", addresses=False)
 
 
 class ProductionSemanticDataManifestTests(unittest.TestCase):

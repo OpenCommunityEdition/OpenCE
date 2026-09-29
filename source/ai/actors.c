@@ -289,6 +289,7 @@ symbols in this file:
 #include "props.h"
 
 #include "ai.h"
+#include "ai/ai_globals.h"
 #include "math/real_math.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
@@ -528,27 +529,12 @@ typedef char vehicle_definition_flags_offset_assert[
 typedef char vehicle_definition_ai_destination_radius_offset_assert[
 	offsetof(struct vehicle_definition, ai_destination_radius) == 0x384 ? 1 : -1];
 
-/* ai.h does not yet declare the ai globals; actors touches only the
- * January-authenticated service-timer prefix, so model that view locally
- * (the leading flags follow the ai.c prefix). */
-struct ai_globals_service_data
-{
-	boolean ai_active;
-	boolean ai_initialized_for_map;
-	byte reserved002;
-	boolean time_given_this_frame;
-	short last_highest_service_timer;
-	short current_highest_service_timer;
-	byte reserved008[0x3AC];
-	boolean grenades_enabled;
-};
-
 typedef char ai_globals_service_data_time_given_offset_assert[
-	offsetof(struct ai_globals_service_data, time_given_this_frame) == 0x3 ? 1 : -1];
+	offsetof(struct ai_globals, time_given_this_frame) == 0x3 ? 1 : -1];
 typedef char ai_globals_service_data_current_highest_offset_assert[
-	offsetof(struct ai_globals_service_data, current_highest_service_timer) == 0x6 ? 1 : -1];
+	offsetof(struct ai_globals, current_highest_service_timer) == 0x6 ? 1 : -1];
 typedef char ai_globals_service_data_grenades_enabled_offset_assert[
-	offsetof(struct ai_globals_service_data, grenades_enabled) == 0x3B4 ? 1 : -1];
+	offsetof(struct ai_globals, grenades_enabled) == 0x3B4 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -571,8 +557,6 @@ short const global_movement_animation_states[NUMBER_OF_ACTOR_MOVEMENT_TYPES] =
 	_unit_animation_state_flee,
 	_unit_animation_state_flaming,
 };
-
-extern struct ai_globals_service_data *ai_globals;
 
 /* ---------- public code */
 

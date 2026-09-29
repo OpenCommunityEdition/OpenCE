@@ -194,6 +194,8 @@ static particle_system_particle_update_proc const particle_update_functions[] =
 
 real const ground_error = 0.05f;
 static real const seconds_per_tick = 1.0f/TICKS_PER_SECOND;
+struct data_array *particle_systems;
+struct data_array *system_particles;
 
 /* ---------- public code */
 

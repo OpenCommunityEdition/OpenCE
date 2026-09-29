@@ -1,0 +1,125 @@
+BASELINE (unmutated) exit 0: 152 passed, 1 skipped in 5.73s
+KILLED   DE01 RF-DE size-mismatch: killers 2 failed 2 | 2 failed in 0.37s
+KILLED   DE02 RF-DE alignment-class-differs: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DE03 RF-DE duplicate-definers: killers 2 failed 2 | 2 failed in 0.39s
+KILLED   DE04 RF-DE no-definer: killers 3 failed 3 | 4 failed in 0.45s
+KILLED   DE05 RF-DE real-definition: killers 3 failed 3 | 5 failed in 0.52s
+KILLED   DE06 RF-DE static-definition: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE07 RF-DE static scan: killers 1 failed 1 | 1 failed in 0.31s
+KILLED   DE08 RF-DE missing-provenance-tag: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE09 RF-DE invalid-provenance-tag: killers 1 failed 1 | 4 failed in 0.50s
+KILLED   DE10 RF-DE tag-exceeds-evidence: killers 5 failed 5 | 10 failed in 0.78s
+KILLED   DE11 RF-DE ceiling: families not deduplicated: killers 1 failed 1 | 1 failed, 5 passed in 0.43s
+KILLED   DE12 RF-DE ceiling: sibling counts as direct: killers 1 failed 1 | 1 failed, 5 passed in 0.43s
+KILLED   DE13 RF-DE ceiling: uncounted readouts count: killers 2 failed 2 | 7 failed, 5 passed in 0.71s
+KILLED   DE14 RF-DE ceiling: other owner counts: killers 1 failed 1 | 1 failed, 5 passed in 0.45s
+KILLED   DE15 RF-DE missing-name-evidence: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DE16 RF-DE missing-evidence-owner: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE17 RF-DE unresolved-record-carries-owner: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE18 RF-DE definer-disagrees-with-evidence-owner: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DE19 RF-DE owner-violates-pool-order: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE20 RF-DE no-ledger-entry: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE21 RF-DE ledger-rva-mismatch: killers 1 failed 1 | 1 failed in 0.29s
+KILLED   DE22 RF-DE linker-record-in-ledger: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE23 RF-DE ledger-entry-not-in-pool: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DE24 RF-DE surplus-common: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DE25 RF-DE linker rows counted: killers 28 failed 28 | 32 failed, 3 passed in 2.48s
+KILLED   DE26 RF-DE tally accepts linker rows: killers 1 failed 1 | 1 failed in 0.26s
+KILLED   DE27 RF-DE tally accepts mixed rows: killers 1 failed 1 | 1 failed in 0.26s
+KILLED   DE28 RF-DE segment conflicts still tallied: killers 11 failed 11 | 15 failed, 3 passed in 1.37s
+KILLED   DE29 RF-DE readout-channel-not-valid-for-segment: killers 1 failed 1 | 1 failed in 0.37s
+KILLED   DE30 RF-DE owner-category-mismatch: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DE31 RF-DE definer-category-mismatch: killers 2 failed 2 | 2 failed in 0.41s
+KILLED   DE32 RF-DE definer-category-unknown: killers 2 failed 2 | 2 failed in 0.43s
+KILLED   DE33 RF-DE halo-record-defined-by-vendor-library: killers 2 failed 2 | 4 failed in 0.63s
+KILLED   DE34 RF-DE vendor-readout-not-reproduced: killers 2 failed 2 | 2 failed in 0.43s
+KILLED   DE35 RF-DE vendor-readout-library-not-category: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DE36 RF-DE segment-order-conflict: killers 2 failed 2 | 2 failed in 0.47s
+KILLED   DE37 RF-DE january-alignment-law: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DE38 RF-DE january-misaligned: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DE39 RF-DE january-slot-inconsistent: killers 3 failed 3 | 3 failed in 0.50s
+KILLED   DE40 RF-DE january static flag: killers 1 failed 1 | 1 failed in 0.39s
+KILLED   DE41 RF-DE split size check: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DE42 RF-DE law: no 32 cap: killers 1 failed 1 | 1 failed in 0.29s
+KILLED   DE43 RF-DE conservation always true: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DH01 RF-DH F1 tree reasons back in SEGMENT_CONFLICTS: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DH02 RF-DH F2 vendor needs library readout: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DH03 RF-DH F2 unreproduced readout not a conflict: killers 2 failed 2 | 2 failed in 0.44s
+KILLED   DH04 RF-DH F2 order check one-sided: killers 1 failed 1 | 1 failed in 0.41s
+KILLED   DH05 RF-DH F2 ledger-only fallback restored: killers 2 failed 2 | 2 failed in 0.43s
+KILLED   DH06 RF-DH F3 code definitions skipped: killers 1 failed 1 | 1 failed, 1 passed in 0.38s
+KILLED   DH07 RF-DH F3 weak externals skipped: killers 1 failed 1 | 1 failed, 1 passed in 0.40s
+KILLED   DH08 RF-DH F4 counted type unchecked: killers 3 failed 3 | 8 failed, 17 passed in 1.27s
+KILLED   DH09 RF-DH F5 duplicates tallied: killers 1 failed 1 | 1 failed in 0.45s
+KILLED   DH10 RF-DH F6 readouts shape unchecked: killers 3 failed 3 | 9 failed, 16 passed in 1.42s
+KILLED   DH11 RF-DH F6 generic malformed input no longer fails closed: killers 1 failed 1 | 1 failed in 0.46s
+KILLED   DH12 RF-DH F6 duplicate January name: killers 1 failed 1 | 1 failed in 0.41s
+KILLED   DH13 RF-DH F7 writable data excluded as linker: killers 1 failed 1 | 1 failed in 0.41s
+KILLED   DH14 RF-DH F8 names unchecked: killers 1 failed 1 | 1 failed in 0.41s
+KILLED   DH15 RF-DH F9 caveat ignored: killers 1 failed 1 | 1 failed in 0.41s
+KILLED   DH16 RF-DH F9 referencer ignored: killers 1 failed 1 | 1 failed in 0.37s
+KILLED   DM01 RF-DM manifest not required: killers 1 failed 1 | 1 failed in 0.44s
+KILLED   DM02 RF-DM library sha256/size not compared: killers 3 failed 3 | 3 failed in 0.56s
+KILLED   DM03 RF-DM library size not compared: killers 1 failed 1 | 1 failed in 0.35s
+KILLED   DM04 RF-DM missing library accepted: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DM05 RF-DM unlisted library accepted: killers 1 failed 1 | 1 failed in 0.35s
+KILLED   DM06 RF-DM vendor category without library accepted: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DM07 RF-DM vendor records of an absent library accepted: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DM08 RF-DM anonymous member skipped: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DM09 RF-DM non-i386 members skipped (the RF-DE/RF-DH reader): killers 2 failed 2 | 3 failed, 1 passed in 0.48s
+KILLED   DM10 RF-DM CVTRES zero-length string table rejected: killers 1 failed 1 | 1 failed, 2 passed in 0.45s
+KILLED   DM11 RF-DM schema: unknown keys accepted: killers 1 failed 1 | 2 failed, 11 passed in 0.74s
+KILLED   DM12 RF-DM schema: types unchecked: killers 4 failed 4 | 16 failed, 15 passed in 1.79s
+KILLED   DM13 RF-DM schema: missing keys accepted: killers 2 failed 2 | 3 failed, 16 passed in 0.96s
+KILLED   DM14 RF-DM schema: ledger version unchecked: killers 1 failed 1 | 1 failed, 12 passed in 0.72s
+KILLED   DM15 RF-DM ambiguous classification tallied: killers 15 failed 15 | 19 failed, 3 passed in 2.39s
+KILLED   DM16 RF-DM unexpected contribution not fail-closed: killers 1 failed 1 | 1 failed in 0.38s
+KILLED   DM17 RF-DM tally accepts unclassified rows: killers 1 failed 1 | 1 failed in 0.30s
+KILLED   DM18 RF-DM containment counted as a definer readout: killers 3 failed 3 | 3 failed in 0.46s
+KILLED   DM19 RF-DM candidate owner reported as owner: killers 2 failed 2 | 2 failed in 0.38s
+KILLED   DM20 RF-DM containment candidate unchecked: killers 1 failed 1 | 1 failed in 0.39s
+KILLED   DM21 RF-DM vendor evidence missing accepted: killers 1 failed 1 | 1 failed in 0.35s
+KILLED   DM22 RF-DM vendor evidence hash unchecked: killers 1 failed 1 | 1 failed, 5 passed in 0.49s
+KILLED   DM23 RF-DM vendor evidence hash mismatch not a conflict: killers 1 failed 1 | 1 failed, 5 passed in 0.46s
+KILLED   DM24 RF-DM vendor record raised to inferred: killers 1 failed 1 | 1 failed in 0.38s
+KILLED   DM25 RF-DM vendor evidence on a Halo record accepted: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DM26 RF-DM receipt: wrong verifier hash: killers 1 failed 1 | 1 failed in 0.44s
+KILLED   DM27 RF-DM receipt: not written on fail-closed runs: killers 5 failed 5 | 10 failed in 0.99s
+KILLED   DM28 RF-DM receipt: ledger hash depends on line endings: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DM29 RF-DM receipt: build snapshot not recursive: killers 1 failed 1 | 1 failed in 0.31s
+KILLED   DM30 RF-DM truncated archive member accepted: killers 1 failed 1 | 1 failed in 0.29s
+KILLED   DM31 RF-DM manifest duplicate library accepted: killers 1 failed 1 | 1 failed, 5 passed in 0.45s
+KILLED   DM32 RF-DM manifest sha256 format unchecked: killers 1 failed 1 | 1 failed, 5 passed in 0.48s
+KILLED   DM33 RF-DM unlinked library satisfies a category: killers 1 failed 1 | 1 failed in 0.37s
+KILLED   DM34 RF-DM unlinked libraries scanned: killers 1 failed 1 | 1 failed in 0.39s
+KILLED   DM35 RF-DM absent linked libraries not disclosed: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DM36 RF-DM malformed generic errors reported as failures: killers 1 failed 1 | 1 failed in 0.38s
+KILLED   DP01 RF-DP D3 duplicate JSON keys accepted again: killers 2 failed 2 | 4 failed in 0.54s
+KILLED   DP02 RF-DP D2 linked flag no longer tied to the January module count: killers 1 failed 1 | 1 failed in 0.43s
+KILLED   DP03 RF-DP D2 absent library may claim 0 January modules: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DP04 RF-DP D2 config vendor category's listed library may be unlinked: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DP05 RF-DP D2 a present library may be declared absent: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DP06 RF-DP D2 a listed library's category may be declared absent: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DP07 RF-DP D10 library names differing only in case accepted: killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DP08 RF-DP D8 absent object of a built unit skipped again: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DP09 RF-DP D6 section number no longer bounded: killers 1 failed 1 | 1 failed in 0.31s
+KILLED   DP10 RF-DP D7 missing January split object skipped again: killers 2 failed 2 | 2 failed in 0.37s
+KILLED   DP11 RF-DP D7 missing/unreadable split objects no longer fail closed: killers 2 failed 2 | 2 failed in 0.36s
+KILLED   DP12 RF-DP D5 inputs changed during the run accepted: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DP13 RF-DP D6 OSError escapes as a traceback (exit 1, no receipt): killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DP14 RF-DP D6 unreadable recorded library no longer a library failure: killers 1 failed 1 | 1 failed in 0.35s
+KILLED   DP15 RF-DP D9 excluded-record inconsistency ignored again: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DP16 RF-DP P10 vendor readout reproduced from any library: killers 1 failed 1 | 1 failed in 0.33s
+KILLED   DP17 RF-DP P15 manifest may declare a present library absent: killers 1 failed 1 | 1 failed in 0.36s
+KILLED   DP18 RF-DP P39 split section count vs contributions unchecked: killers 1 failed 1 | 1 failed in 0.31s
+KILLED   DP19 RF-DP P47 upper-case .LIB invisible to the unlisted check: killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DX01 RF-DX D6 unanticipated exception escapes as status 1 again (catch-all narrowed): killers 1 failed 1 | 1 failed in 0.39s
+KILLED   DX02 RF-DX D6 a report that cannot be written escapes as status 1 again: killers 1 failed 1 | 2 failed in 0.47s
+KILLED   DX03 RF-DX D6 an exit-2 run leaves the reports it already wrote (accounting) behind: killers 2 failed 2 | 2 failed, 1 passed in 0.42s
+KILLED   DX04 RF-DX D6 an unlistable library directory is exit 2 instead of a library failure (3): killers 1 failed 1 | 1 failed in 0.32s
+KILLED   DX05 RF-DX D11 another linked library defining a vendor name is ignored: killers 1 failed 1 | 2 failed in 0.39s
+KILLED   DX06 RF-DX D11 another linked library defining a vendor name is only a record FAIL (no fail-closed): killers 1 failed 1 | 2 failed in 0.38s
+KILLED   DX07 RF-DX D6 IndexError no longer malformed input (falls through to the catch-all, exit 2): killers 1 failed 1 | 1 failed in 0.34s
+KILLED   DX08 RF-DX D6 a run whose receipt cannot be written keeps its reports: killers 1 failed 1 | 1 failed in 0.31s
+KILLED   DX09 RF-DX D2 (optional pin) a manifest other than the reviewed one accepted: killers 1 failed 1 | 1 failed in 0.31s
+mutations 123, not killed 0

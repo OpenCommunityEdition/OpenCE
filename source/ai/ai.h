@@ -172,11 +172,11 @@ void ai_handle_allegiance_broken_notification(
 boolean ai_test_ballistic_line_of_fire(
 	long actor_index,
 	union real_point3d const *origin,
-	real ticks,
-	union real_vector3d const *velocity,
-	real gravity,
+	real arc_time,
+	union real_vector3d const *arc_initial_velocity,
+	real arc_acceleration,
 	long ignore_object_index,
-	boolean in_vehicle);
+	boolean ignore_vehicles);
 boolean ai_test_line_of_fire(
 	long actor_index,
 	long ignore_unit_index,

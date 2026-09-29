@@ -2099,7 +2099,7 @@ static void update_alien_scout_physics(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
 		definition->unit.object.physics.index);
-	real_matrix4x3 matrix;
+	real_matrix4x3 vehicle_matrix;
 	real_vector3d local_velocity;
 	real_vector3d magic_force;
 	real_vector3d magic_torque;
@@ -2131,9 +2131,9 @@ static void update_alien_scout_physics(
 		real_vector3d const *object_up = &vehicle->object.up;
 		real_vector3d const *object_angular_velocity =
 			&vehicle->object.angular_velocity;
-		matrix4x3_from_point_and_vectors(&matrix, &vehicle->object.position,
+		matrix4x3_from_point_and_vectors(&vehicle_matrix, &vehicle->object.position,
 			object_forward, object_up);
-		matrix4x3_inverse_transform_vector(&matrix,
+		matrix4x3_inverse_transform_vector(&vehicle_matrix,
 			&vehicle->object.translational_velocity, &local_velocity);
 
 		if (vehicle->vehicle.hover>0.0f)
@@ -2162,7 +2162,7 @@ static void update_alien_scout_physics(
 			}
 
 			limit3d(&acceleration, maximum_acceleration);
-			matrix4x3_transform_vector(&matrix, &acceleration, &acceleration);
+			matrix4x3_transform_vector(&vehicle_matrix, &acceleration, &acceleration);
 
 			scale = physics->mass*vehicle->vehicle.hover;
 			magic_force.i += acceleration.i*scale;

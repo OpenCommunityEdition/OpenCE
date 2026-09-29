@@ -527,13 +527,14 @@ static void hs_global_reconcile_write(
 
 /* ---------- globals */
 
-extern struct data_array *hs_global_data;
-extern struct data_array *hs_thread_data;
+struct data_array *hs_global_data;
+struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
 extern short const hs_external_global_count;
 extern short const hs_type_sizes[NUMBER_OF_HS_TYPES];
-extern boolean debug_scripting;
-extern unsigned long hs_debug_data[];
+boolean debug_scripting;
+unsigned long hs_debug_data[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_TRIGGER_VOLUMES_PER_SCENARIO)];
+typedef char verify_hs_debug_data_size[sizeof(hs_debug_data) == 0x20 ? 1 : -1];
 static hs_inspection_procedure hs_type_inspectors[NUMBER_OF_HS_TYPES] =
 {
 	NULL,
@@ -715,6 +716,7 @@ extern long const _hs_type_weapon_default;
 extern long const _hs_type_device_default;
 extern long const _hs_type_scenery_default;
 extern short const _hs_type_object_name_default;
+boolean debug_trigger_volumes;
 
 /* ---------- public code */
 

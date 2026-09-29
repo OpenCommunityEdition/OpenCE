@@ -263,7 +263,7 @@ short transport_initialize(
 {
 	if (!transport_initialized)
 	{
-		WSADATA wsa_data = { 0 };
+		WSADATA info = { 0 };
 		XNetStartupParams startup_params = { 0 };
 		DWORD link_status;
 		DWORD address_status;
@@ -301,7 +301,7 @@ short transport_initialize(
 		if (XNetStartup(&startup_params) != 0)
 			return _transport_error_not_initialized;
 
-		wsa_error = WSAStartup(MAKEWORD(2, 0), &wsa_data);
+		wsa_error = WSAStartup(MAKEWORD(2, 0), &info);
 		if (wsa_error != 0)
 		{
 			XNetCleanup();
@@ -495,7 +495,7 @@ static int __cdecl poll_ep_array_compare_proc(
 
 short poll_endpoint_set(
 	struct transport_endpoint_set *set,
-	word timeout)
+	word millisec_timeout)
 {
 	short result = _transport_error_none;
 	struct timeval timeout_value;
@@ -512,7 +512,7 @@ short poll_endpoint_set(
 		0x1DE,
 		transport_initialized);
 
-	timeout_value.tv_usec = timeout * MILLISECONDS_PER_SECOND;
+	timeout_value.tv_usec = millisec_timeout * MILLISECONDS_PER_SECOND;
 	timeout_value.tv_sec = 0;
 
 	if (set->needs_compaction)

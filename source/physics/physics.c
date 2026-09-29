@@ -713,11 +713,11 @@ void physics_compute_new(
 			&mass_point->position);
 		if (powered_mass_point)
 		{
-			real_matrix4x3 powered_matrix;
+			real_matrix4x3 powered_world_matrix;
 
-			matrix4x3_multiply(&instance->world_matrix, &powered_mass_point->rotation_matrix, &powered_matrix);
-			matrix4x3_transform_normal(&powered_matrix, &mass_point_definition->forward, &mass_point->forward);
-			matrix4x3_transform_normal(&powered_matrix, &mass_point_definition->up, &mass_point->up);
+			matrix4x3_multiply(&instance->world_matrix, &powered_mass_point->rotation_matrix, &powered_world_matrix);
+			matrix4x3_transform_normal(&powered_world_matrix, &mass_point_definition->forward, &mass_point->forward);
+			matrix4x3_transform_normal(&powered_world_matrix, &mass_point_definition->up, &mass_point->up);
 		}
 		else
 		{
@@ -897,7 +897,7 @@ void physics_compute_new(
 			if (TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_antigrav_bit))
 			{
 				real probe_length = mass_point_definition->radius + powered_mass_point_definition->antigrav_height;
-				real_point3d probe_point = mass_point->position;
+				real_point3d point = mass_point->position;
 				real_vector3d probe_vector;
 				struct collision_result collision;
 
@@ -905,7 +905,7 @@ void physics_compute_new(
 
 				if (collision_test_vector(
 						_collision_test_for_bipeds_dead_flags,
-						&probe_point,
+						&point,
 						&probe_vector,
 						instance->object_index,
 						&collision))
@@ -1636,18 +1636,18 @@ static void physics_update_old(
 
 		if (powered_mass_point)
 		{
-			real_matrix4x3 powered_matrix;
+			real_matrix4x3 powered_world_matrix;
 
 			matrix4x3_multiply(
 				&world_matrix,
 				&powered_mass_point->rotation_matrix,
-				&powered_matrix);
+				&powered_world_matrix);
 			matrix4x3_transform_normal(
-				&powered_matrix,
+				&powered_world_matrix,
 				&mass_point_definition->forward,
 				&mass_point->forward);
 			matrix4x3_transform_normal(
-				&powered_matrix,
+				&powered_world_matrix,
 				&mass_point_definition->up,
 				&mass_point->up);
 		}
@@ -1916,14 +1916,14 @@ static void physics_update_old(
 			{
 				real probe_length =
 					mass_point_definition->radius + powered_mass_point_definition->antigrav_height;
-				real_point3d probe_point = mass_point->position;
+				real_point3d point = mass_point->position;
 				real_vector3d probe_vector;
 				struct collision_result collision;
 
 				scale_vector3d(global_down3d, probe_length, &probe_vector);
 				if (collision_test_vector(
 						_collision_test_for_bipeds_dead_flags,
-						&probe_point,
+						&point,
 						&probe_vector,
 						object_index,
 						&collision))

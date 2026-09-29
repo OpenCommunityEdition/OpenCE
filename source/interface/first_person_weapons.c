@@ -117,6 +117,7 @@ symbols in this file:
 #include "models/models.h"
 #include "networking/network_connection.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
@@ -228,19 +229,6 @@ struct animation_graph_node
 
 typedef char verify_animation_graph_node_size[
 	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
-
-/* TU-private rendering packet layout, also recovered independently by the rendering owners. */
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	real parameter;
-	long source_object_index;
-	real_point3d source_object_centroid;
-	struct shader const *modifier_shader;
-	byte reserved0020[8];			/* render_animation modifier_animation */
-};
 
 typedef char verify_render_model_effect_size[
 	sizeof(struct render_model_effect) == 0x28 ? 1 : -1];

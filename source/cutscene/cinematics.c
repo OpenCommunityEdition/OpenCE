@@ -424,21 +424,21 @@ void cinematic_render(
 			}
 
 			{
-				real_argb_color color;
+				real_argb_color text_color;
 				long shadow_alpha;
 
 				pixel32_to_real_argb_color(
 					title->foreground_color,
-					&color);
-				color.alpha *= fade_amount;
+					&text_color);
+				text_color.alpha *= fade_amount;
 
-				if (fabs(color.red - 1.0f) < _real_epsilon &&
-					fabs(color.green - 1.0f) < _real_epsilon &&
-					fabs(color.blue - 1.0f) < _real_epsilon)
+				if (fabs(text_color.red - 1.0f) < _real_epsilon &&
+					fabs(text_color.green - 1.0f) < _real_epsilon &&
+					fabs(text_color.blue - 1.0f) < _real_epsilon)
 				{
-					color.red = MIN(color.red, 0.8f);
-					color.green = MIN(color.green, 0.8f);
-					color.blue = MIN(color.blue, 0.8f);
+					text_color.red = MIN(text_color.red, 0.8f);
+					text_color.green = MIN(text_color.green, 0.8f);
+					text_color.blue = MIN(text_color.blue, 0.8f);
 				}
 
 				draw_string_set_draw_mode(
@@ -446,7 +446,7 @@ void cinematic_render(
 					title->style - 1,
 					title->justification,
 					title->text_flags,
-					&color);
+					&text_color);
 
 				shadow_alpha = PIN(
 					fast_ftol(

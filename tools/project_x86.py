@@ -28,10 +28,13 @@ from . import ninja_syntax
 from .ninja_syntax import serialize_path
 from .semantic_progress import (
     SemanticProgressError,
+    apply_common_pool_credit,
+    apply_data_category_reassignments,
     apply_semantic_accepted_ledger,
     apply_semantic_data_matches,
     apply_semantic_matches,
     apply_semantic_rejections,
+    clear_common_pool_outputs,
     require_symbol_ownership_snapshots,
     revoke_incomplete_units,
 )
@@ -467,6 +470,11 @@ def generate_build_ninja(sln: SolutionConfig) -> None:
             sln.config_dir / "symbols.json",
             sln.config_dir / "symbol_ownership.json",
             sln.config_dir / "parked.json",
+            sln.config_dir / "data_category_reassignments.json",
+            # The COMMON pool credit entry, its verifier and the Q10 ledger
+            # and manifest are deliberately not inputs: this edge always runs,
+            # and a ninja "missing input" error would pre-empt the credit's
+            # fail-closed receipt (owner ruling Q10).
             sln.tools_dir / "coff_compare.py",
             sln.tools_dir / "parked_functions.py",
             sln.tools_dir / "semantic_progress.py",
@@ -668,6 +676,12 @@ def generate_solution(sln: SolutionConfig) -> None:
 # Print progress information from objdiff report
 def calculate_progress(sln: SolutionConfig) -> None:
     sln.validate()
+    try:
+        # No receipt of an earlier COMMON pool credit run may outlive a
+        # progress run that fails before (or without reaching) that step.
+        clear_common_pool_outputs(sln.build_dir, Path.cwd())
+    except SemanticProgressError as error:
+        sys.exit(f"Semantic progress verification failed: {error}")
     report_path = sln.build_dir / "report.json"
     if not report_path.is_file():
         sys.exit(f"Report file {report_path} does not exist")
@@ -714,6 +728,21 @@ def calculate_progress(sln: SolutionConfig) -> None:
             Path("objdiff.json"),
         )
         incomplete_units = revoke_incomplete_units(report_data)
+        data_category_reassignments = apply_data_category_reassignments(
+            report_data,
+            Path.cwd(),
+            sln.config_dir / "data_category_reassignments.json",
+            Path("objdiff.json"),
+        )
+        common_pool_credits = apply_common_pool_credit(
+            report_data,
+            Path.cwd(),
+            sln.config_dir / "common_pool_credit.json",
+            Path("objdiff.json"),
+            sln.config_dir / "semantic_data_matches.json",
+            sln.config_dir / "data_category_reassignments.json",
+            sln.build_dir,
+        )
         parked = require_valid_parked_functions(
             Path.cwd(),
             report_path,
@@ -754,6 +783,13 @@ def calculate_progress(sln: SolutionConfig) -> None:
     for incomplete_unit in incomplete_units:
         progress_print(
             f"  Revoked premature complete unit: {incomplete_unit}")
+    for reassignment in data_category_reassignments:
+        progress_print(
+            f"  Reassigned data denominator (accounting only): {reassignment}")
+    for common_pool_credit in common_pool_credits:
+        progress_print(
+            f"  Verified COMMON pool record credit (data only): "
+            f"{common_pool_credit}")
     progress_print(
         f"  Validated parked compiler ties: {parked['summary']['active']}"
     )

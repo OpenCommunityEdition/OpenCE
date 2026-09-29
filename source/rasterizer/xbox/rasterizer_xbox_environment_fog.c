@@ -134,6 +134,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
 #include "shaders/shader_definitions.h"
@@ -299,31 +300,6 @@ struct shader_transparent_chicago_definition
 	struct tag_reference map;
 };
 
-struct rasterizer_model_effect_parameters
-{
-	short type;
-	word pad02;
-	real intensity;
-	byte reserved08[4];
-	long source_object_index;
-	real_point3d centroid;
-	struct shader *shader;
-	struct render_animation animation;
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct render_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct rasterizer_model_effect_parameters effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -332,7 +308,7 @@ struct transparent_geometry_group
 	struct shader *shader;
 	short shader_permutation_index;
 	word pad12;
-	struct rasterizer_model_effect_parameters effect;
+	struct render_model_effect effect;
 	real_vector2d model_base_map_scale;
 	long dynamic_triangle_buffer_index;
 	struct triangle_buffer const *triangle_buffer;

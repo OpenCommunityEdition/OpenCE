@@ -119,9 +119,7 @@ struct game_options;
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-#define set_random_seed set_random_seed_inline
 #include "game/game.h"
-#undef set_random_seed
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
@@ -525,14 +523,6 @@ boolean game_is_cooperative(
 	return player_spawn_count > 1;
 }
 
-void set_random_seed(
-	unsigned long seed)
-{
-	*get_global_random_seed_address() = seed;
-
-	return;
-}
-
 boolean game_load(
 	struct game_options *options)
 {
@@ -562,8 +552,6 @@ boolean game_load(
 void game_initialize_for_new_map(
 	void)
 {
-	unsigned long random_seed;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game.c",
 		0x1D1,
@@ -573,8 +561,7 @@ void game_initialize_for_new_map(
 		0x1D2,
 		!game_globals->active);
 
-	random_seed = game_globals->options.random_seed;
-	*get_global_random_seed_address() = random_seed;
+	set_random_seed(game_globals->options.random_seed);
 	game_engine_dispose();
 	game_engine_initialize(&game_variant_global);
 	real_math_reset_precision();
