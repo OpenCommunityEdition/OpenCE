@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Package the verified browser runtime for a static host, without game data."""
+import argparse
 import json
 from pathlib import Path
 import shutil
@@ -13,6 +14,9 @@ OUTPUT = ROOT / "dist/github-pages"
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-repository", help="Optional public source repository URL for the deployment receipt")
+    args = parser.parse_args()
     # Never copy build/web wholesale: it can contain local experiments.
     expected = set(setup_browser.FILES) | set(setup_browser.LOCAL_SCRIPTS) | {
         "download-provenance.json", ".nojekyll", "deployment.json",
@@ -38,12 +42,13 @@ def main():
         deployment = {
             "source_commit": subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-            "source_repository": "https://github.com/fqlx/halo-ce-universal",
             "game_data_included": False,
             "files": {path.name: {"bytes": path.stat().st_size,
                                   "sha256": setup_browser.digest(path.read_bytes())}
                       for path in sorted(staging.iterdir())},
         }
+        if args.source_repository:
+            deployment["source_repository"] = args.source_repository
         (staging / "deployment.json").write_text(json.dumps(deployment, indent=2) + "\n")
         assert {path.name for path in staging.iterdir()} == expected
         for path in staging.iterdir():

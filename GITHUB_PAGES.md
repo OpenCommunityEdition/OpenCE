@@ -1,6 +1,7 @@
 # Play Halo on GitHub Pages
 
-Public game: <https://fqlx.github.io/halo-ce-universal/>
+Hosted demo: <https://abwburns.com/halo-ce-universal/> (GitHub Pages on the
+`fqlx` fork; <https://fqlx.github.io/halo-ce-universal/> redirects there).
 
 Open the link in current desktop Chrome or Edge, choose your own Xbox Halo
 disc image, and click **Play** after import. The maps and saves stay in that
@@ -16,7 +17,7 @@ of the engine.
 
 ## Rebuild
 
-From source branch `fqlx/github-pages`, run:
+From a checkout containing the browser runner and packager, run:
 
 ```sh
 python3 tools/build_pages.py
@@ -27,11 +28,17 @@ only the hash-pinned runtime files, applies the existing local rendering
 fixes, and writes a file-by-file deployment receipt. It never copies the local
 web directory, maps, disc images, Xbox SDK, or experimental scripts.
 
-Publish only the contents of that output directory to the root of branch
-`fqlx/pages-static` in `fqlx/halo-ce-universal`. GitHub Pages is configured to
-deploy that branch's root; `.nojekyll` prevents template processing. Keep the
-existing branch history when publishing updates. Commit the source before
-building so `deployment.json` identifies the version used.
+Optionally add `--source-repository https://github.com/OWNER/REPOSITORY` to
+record your public source URL. The current Git commit is recorded regardless;
+the packager does not assume a particular fork or remote.
+
+Publish only the contents of that output directory to a deployment branch in
+your repository, then configure GitHub Pages to deploy that branch's root.
+For the hosted demo, the repository is `fqlx/halo-ce-universal` and the branch
+is `fqlx/pages-static`. Enable HTTPS in Pages settings: browser threads and
+file storage require a secure context. `.nojekyll` prevents template
+processing. Keep the existing branch history when publishing updates. Commit
+the source before building so `deployment.json` identifies the version used.
 
 ## Browser threads and links
 

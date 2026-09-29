@@ -3,6 +3,9 @@
 Run the published [bnunu Apollo browser beta](https://bnunu.itch.io/apollobeta)
 locally with an opaque canvas fix and batched WebGL stream uploads.
 
+For a hosted demo or to publish the same runtime on GitHub Pages, see
+[GITHUB_PAGES.md](GITHUB_PAGES.md).
+
 This is a runner for the publisher's pinned HTML build `19421784`, **not an
 Emscripten source-build target for this checkout**. The setup script verifies
 SHA-256 hashes before installing the runtime into ignored `build/web/` and
