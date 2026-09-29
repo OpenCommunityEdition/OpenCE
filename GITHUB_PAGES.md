@@ -1,7 +1,8 @@
 # Play Halo on GitHub Pages
 
-Hosted demo: <https://abwburns.com/halo-ce-universal/> (GitHub Pages on the
-`fqlx` fork; <https://fqlx.github.io/halo-ce-universal/> redirects there).
+Hosted demo: <https://fqlx.github.io/halo-ce-universal/> (GitHub Pages on the
+`fqlx` fork). The mirror at <https://abwburns.com/halo-ce-universal/> stays
+available. The GitHub link does not redirect to the personal domain.
 
 Open the link in current desktop Chrome or Edge. The first visit downloads
 about 1.9 GB of map data automatically; keep the tab open, then click **Play**.
@@ -10,6 +11,8 @@ missing maps, and a complete cache needs no map downloads on later visits.
 The download panel shows a progress bar, percentage and downloaded size;
 cached visits show a full bar labeled **Already downloaded**.
 Browser storage can be cleared or evicted; each device/browser has its own cache.
+The two domains also have separate caches, so switching to the GitHub link
+downloads the maps once on that domain even if the other link is already cached.
 Use **Cancel download** or `?manual` to import your own Xbox Halo disc image
 instead. Multiplayer is not verified.
 
@@ -65,6 +68,14 @@ is `fqlx/pages-static`. Enable HTTPS in Pages settings: browser threads and
 file storage require a secure context. `.nojekyll` prevents template
 processing. Keep the existing branch history when publishing updates. Commit
 the source before building so `deployment.json` identifies the version used.
+
+The account repository `fqlx/fqlx.github.io` has no custom domain. The personal
+website at `abwburns.com` is published separately from `fqlx/abwburns-site`,
+branch `fqlx/site`. Its `halo-ce-universal/` directory holds the game mirror.
+When updating the demo, publish the same generated package to `fqlx/pages-static`
+and that mirror directory. Preserve the mirror repository's root website files
+and `CNAME`. This separation keeps the GitHub game URL from inheriting the
+personal site's domain.
 
 ## Browser threads and links
 
