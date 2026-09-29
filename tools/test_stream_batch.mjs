@@ -275,6 +275,72 @@ compare("mixed uniform snapshots retain source offsets and survive later source 
 }
 process.stdout.write("PASS fixed queue bound and complete large-frame replay\n");
 
+// The worker has no document, window, timers or animation-frame callback.
+// Exercise the same installer through the source runtime's presentation path,
+// including a frame without a final blit and the explicit source opt-out.
+const workerLibrary = readFileSync(new URL("../port/web/src/web_library.js", import.meta.url), "utf8");
+for (const enabled of [0, 1]) {
+    const gl = new MockGL(), messages = [];
+    let library, bitmapTransfers = 0;
+    const context = vm.createContext({
+        Uint8Array, ArrayBuffer,
+        WebGLRenderingContext: { prototype: MockGL.prototype }, WebGL2RenderingContext: { prototype: {} },
+        OffscreenCanvas: class {
+            constructor(width, height) { this.width = width; this.height = height; }
+            getContext(type) { assert.equal(type, "webgl2"); return gl; }
+            transferToImageBitmap() {
+                bitmapTransfers++;
+                assert.equal(gl.draws.length, 2, "all draws must execute before bitmap transfer");
+                return { width: this.width, height: this.height, draws: gl.draws.slice() };
+            }
+        },
+        GL: { registerContext(value) { assert.equal(value, gl); return 7; }, makeContextCurrent() {} },
+        ENVIRONMENT_IS_PTHREAD: true,
+        postMessage(message, transfer) { messages.push({ message, transfer }); },
+        addToLibrary(value) { library = value; },
+    });
+    vm.runInContext(source, context);
+    vm.runInContext(workerLibrary, context);
+    context.webHalo = library.$webHalo;
+    assert.equal(library.web_js_gl_create(640, 480, enabled), 7);
+    const controller = context.webHalo.streamBatch;
+    if (enabled) assert.equal(context.HaloStreamBatch.install(gl), controller, "install must be idempotent");
+    else assert.equal(controller, null);
+    vertexBuffer(gl);
+    if (enabled) controller.flush();
+    const vertices = new Uint8Array([1, 2, 3]);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    vertices.set([4, 5, 6]);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 4, vertices);
+    gl.vertexAttribPointer(0, 1, gl.UNSIGNED_BYTE, false, 1, 4); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    vertices.fill(9);
+    assert.equal(gl.draws.length, enabled ? 0 : 2, "source opt-out must retain the immediate path");
+    library.web_js_gl_present();
+    assert.equal(bitmapTransfers, 1);
+    assert.equal(gl.uploads, enabled ? 1 : 2);
+    assert.deepEqual(gl.draws.map(draw => draw.vertices), [[1, 2, 3], [4, 5, 6]]);
+    assert.equal(messages[0].message.handler, "haloPresent");
+    assert.equal(messages[0].message.args[0], messages[0].transfer[0]);
+    if (enabled) {
+        assert.equal(controller.snapshot().uploadsSaved, 1);
+        controller.resetStats();
+        assert.equal(controller.snapshot().uploadsSaved, 0);
+    }
+    // SDL's hidden quick-play swap uses a flush-only barrier. Each frame
+    // replays immediately, without retaining draws until visibility returns
+    // and without creating or posting any additional bitmap.
+    for (let frame = 0; frame < 10; frame++) {
+        gl.bufferSubData(gl.ARRAY_BUFFER, 4, new Uint8Array([frame, 8, 9]));
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        library.web_js_gl_flush();
+        assert.equal(gl.draws.length, frame + 3);
+        assert.deepEqual(gl.draws.at(-1).vertices, [frame, 8, 9]);
+    }
+    assert.equal(bitmapTransfers, 1, "hidden frame barriers must not transfer bitmaps");
+    assert.equal(messages.length, 1, "hidden frames must not queue page presentation messages");
+}
+process.stdout.write("PASS worker source runtime flushes visible and hidden frames and supports opt-out\n");
+
 // Optional CPU-only comparison of recorder overhead. This uses no-op native GL
 // methods; it cannot predict GPU time or game FPS. Pin a checked-in baseline:
 // node tools/test_stream_batch.mjs --benchmark --baseline-ref=b9da047

@@ -809,6 +809,9 @@ static void network_game_server_dump(
 
 struct network_game_server network_game_server_memory_do_not_use_directly;
 boolean network_game_server_memory_do_not_use_directly_in_use = FALSE;
+#ifdef HALO_WEB
+static struct network_game_server *quick_play_server;
+#endif
 
 /* ---------- public code */
 
@@ -823,6 +826,9 @@ struct network_game_server *network_game_server_create(
 		0xE0,
 		!network_game_server_memory_do_not_use_directly_in_use);
 	network_game_server_memory_do_not_use_directly_in_use = TRUE;
+#ifdef HALO_WEB
+	quick_play_server = NULL;
+#endif
 
 	csmemset(server, 0, sizeof(*server));
 
@@ -892,6 +898,10 @@ void network_game_server_dispose(
 	struct network_game_server *server)
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
+#ifdef HALO_WEB
+	if (quick_play_server == server)
+		quick_play_server = NULL;
+#endif
 
 	switch (server->state)
 	{
@@ -2245,6 +2255,11 @@ boolean server_has_enough_machines(
 	long machine_count = 0;
 	long client_machine_index;
 
+#ifdef HALO_WEB
+	if (quick_play_server == server && network_game_distributed())
+		minimum_machine_count = 1;
+#endif
+
 	for (client_machine_index = 0;
 		client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
 		client_machine_index++)
@@ -2534,6 +2549,18 @@ void network_game_server_change_game_variant(
 
 	return;
 }
+
+#ifdef HALO_WEB
+boolean network_game_server_enable_quick_play(struct network_game_server *server)
+{
+	if (!server || server->state != _network_game_server_state_pregame || !network_game_distributed() ||
+		server->game.variant.game_engine_index != game_engine_slayer || server->game.variant.universal_variant.teams)
+		return FALSE;
+	quick_play_server = server;
+	server->game.minimum_players = 1;
+	return network_game_server_send_game_data_pregame(server);
+}
+#endif
 
 boolean network_game_server_remove_client_machine_from_game(
 	struct network_game_server *server,

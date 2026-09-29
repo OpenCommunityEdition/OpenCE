@@ -4,9 +4,11 @@ WEB_HOST.C
 The services the Android host supplies to the shared OpenGL ES renderer
 (port/linux/src/xgpu.h), for WebGL 2.
 
-WebGL copies buffer data when it is given, so the renderer's ring of
-stream buffers never has to wait for the GPU, and it has no fences a thread
-that never returns to its event loop could wait on.
+The worker recorder snapshots buffer data when it is given, then merges
+append-only stream writes before replaying their draws. A frame's commands
+are flushed before presentation. This avoids repeatedly modifying the large
+stream buffers between draws without adding GPU fences that this continuously
+running worker could not wait on.
 */
 
 #include <GLES3/gl3.h>

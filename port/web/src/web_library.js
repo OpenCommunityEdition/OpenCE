@@ -14,6 +14,7 @@ page, which shows it (Module.haloPresent in port/web/site/app.js).
 addToLibrary({
   $webHalo: {
     canvas: null,
+    streamBatch: null,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -27,7 +28,7 @@ addToLibrary({
   },
 
   web_js_gl_create__deps: ['$GL', '$webHalo'],
-  web_js_gl_create: (width, height) => {
+  web_js_gl_create: (width, height, batchStreams) => {
     if (typeof OffscreenCanvas == 'undefined') {
       webHalo.post('haloMessage', [3, 'This browser cannot draw from a worker (OffscreenCanvas). iOS 17 or later is needed.']);
       return 0;
@@ -48,6 +49,10 @@ addToLibrary({
       webHalo.post('haloMessage', [3, 'WebGL 2 is not available.']);
       return 0;
     }
+    // The shared recorder is bundled into halo.js with --pre-js, including
+    // the pthread runtime. Native state caches already suppress redundant
+    // setters; this merges append-only streamed uploads before their draws.
+    webHalo.streamBatch = batchStreams ? globalThis.HaloStreamBatch.install(context) : null;
     canvas.addEventListener?.('webglcontextlost', (event) => {
       event.preventDefault();
       webHalo.post('haloMessage', [3, 'The graphics context was lost. Reload the page to continue.']);
@@ -71,10 +76,20 @@ addToLibrary({
     }
   },
 
+  // Hidden quick-play frames still need a replay barrier, without producing
+  // ImageBitmaps that the suspended page cannot present.
+  web_js_gl_flush__deps: ['$webHalo'],
+  web_js_gl_flush: () => {
+    webHalo.streamBatch?.flush();
+  },
+
   web_js_gl_present__deps: ['$webHalo'],
   web_js_gl_present: () => {
     var canvas = webHalo.canvas;
     if (!canvas) return;
+    // Explicitly flush even when a frame has no final blit. Timers and RAF
+    // cannot provide this barrier on the continuously running game worker.
+    webHalo.streamBatch?.flush();
     var bitmap = canvas.transferToImageBitmap();
     webHalo.post('haloPresent', [bitmap], [bitmap]);
   },

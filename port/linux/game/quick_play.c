@@ -234,6 +234,11 @@ void quick_play_update(boolean main_menu_loaded)
 			variant = *game_engine_get_variant_by_name(&variant, "slayer");
 			player_ui_set_game_variant(&variant);
 			network_game_server_change_game_variant(server, &variant);
+			if (!network_game_server_enable_quick_play(server))
+			{
+				quick_play_finish("error", "Quick play requires the distributed Slayer game mode.", TRUE);
+				return;
+			}
 			quick_play.map_set = TRUE;
 		}
 		if (!quick_play.player_confirmed && network_game_client_has_local_player(client, 0))
@@ -247,11 +252,18 @@ void quick_play_update(boolean main_menu_loaded)
 			quick_play.retry_at = now;
 			network_game_client_add_player(client, 0);
 		}
-		if (quick_play.host && quick_play.player_confirmed && quick_play.phase != QUICK_STARTING &&
-			now - quick_play.player_at >= 3000UL)
+		if (quick_play.host && quick_play.player_confirmed && now - quick_play.player_at >= 3000UL &&
+			(quick_play.phase != QUICK_STARTING || (now - quick_play.retry_at >= 1000UL &&
+				network_game_client_get_seconds_to_game_start(client) < 0)))
 		{
+			/* A start request can arrive while lobby changes are still pending.
+			Retry only until the normal countdown acknowledges it; retain the
+			overall deadline, precache checks and remote-player readiness gates. */
+			network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
 			network_game_client_request_immediate_start();
-			quick_play_phase(QUICK_STARTING, now, "loading", "Loading Blood Gulch...");
+			quick_play.retry_at = now;
+			if (quick_play.phase != QUICK_STARTING)
+				quick_play_phase(QUICK_STARTING, now, "loading", "Loading Blood Gulch...");
 		}
 		else if (!quick_play.host && quick_play.phase != QUICK_STARTING && network_game_client_server_has_started_game(client))
 			quick_play_phase(QUICK_STARTING, now, "loading", "Loading the multiplayer map...");

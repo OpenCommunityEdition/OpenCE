@@ -9,15 +9,13 @@
 // Readbacks, texture transfers and buffer mutations outside this pattern flush
 // the queue. Use ?batch_streams=0 to compare with the unmodified GL call path.
 (() => {
-    if (new URLSearchParams(location.search).get("batch_streams") === "0") return;
     const commandLimit = 40000;
-    const canvas = document.getElementById("canvas");
-    const getContext = canvas.getContext.bind(canvas);
-    let wrapped = false;
-    canvas.getContext = (type, options) => {
-        const gl = getContext(type, options);
-        if (!gl || wrapped || type !== "webgl2") return gl;
-        wrapped = true;
+    const installed = new WeakMap();
+    // The source-built runtime installs this directly on its worker-owned
+    // OffscreenCanvas context. It must flush before transferring the bitmap;
+    // that worker never returns to its event loop or schedules animation frames.
+    const install = gl => {
+        if (installed.has(gl)) return installed.get(gl);
         const native = {};
         const methodNames = new Set([...Object.getOwnPropertyNames(WebGLRenderingContext.prototype), ...Object.getOwnPropertyNames(WebGL2RenderingContext.prototype)]);
         for (const name of methodNames) if (name !== "constructor" && typeof gl[name] === "function") native[name] = gl[name].bind(gl);
@@ -34,10 +32,6 @@
         const stats = { flushes: 0, commands: 0, batches: 0, uploadsSaved: 0, mergedBytes: 0, recordBytes: 0, numericAllocations: 0, typedAllocations: 0, eligibleGroups: 0, overlappingGroups: 0, outOfRangeGroups: 0, uploadsWithoutOrphan: 0, groupsWithMultipleUploads: 0, persistentGroups: 0 };
         const allocationKinds = new Map(), uploadTargets = new Map();
         const countKind = (map, key) => { if (map.size < 32 || map.has(key)) map.set(key, (map.get(key) || 0) + 1); };
-        const publish = () => {
-            const output = document.getElementById("performance-stats");
-            if (output) output.dataset.streamBatch = JSON.stringify({ ...stats, commandLimit, allocationKinds: Object.fromEntries(allocationKinds), uploadTargets: Object.fromEntries(uploadTargets) });
-        };
         const flush = () => {
             if (flushing || !commands.length) return;
             flushing = true;
@@ -232,11 +226,36 @@
             const destination = bound(writeTarget);
             if (destination) storage.delete(destination);
         };
+        const controller = {
+            flush,
+            snapshot: () => ({ ...stats, commandLimit,
+                allocationKinds: Object.fromEntries(allocationKinds), uploadTargets: Object.fromEntries(uploadTargets) }),
+            resetStats: () => { for (const key of Object.keys(stats)) stats[key] = 0; },
+        };
+        installed.set(gl, controller);
+        return controller;
+    };
+    globalThis.HaloStreamBatch = { install };
+
+    // Retain the publisher/Apollo page integration. The reusable installer
+    // above has no document, window, location or timer dependency.
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+    if (new URLSearchParams(location.search).get("batch_streams") === "0") return;
+    const canvas = document.getElementById("canvas");
+    if (!canvas) return;
+    const getContext = canvas.getContext.bind(canvas);
+    let wrapped = false;
+    canvas.getContext = (type, options) => {
+        const gl = getContext(type, options);
+        if (!gl || wrapped || type !== "webgl2") return gl;
+        wrapped = true;
+        const controller = install(gl);
         const requestFrame = window.requestAnimationFrame.bind(window);
-        window.requestAnimationFrame = callback => { flush(); return requestFrame(callback); };
+        window.requestAnimationFrame = callback => { controller.flush(); return requestFrame(callback); };
         setInterval(() => {
-            publish();
-            for (const key of Object.keys(stats)) stats[key] = 0;
+            const output = document.getElementById("performance-stats");
+            if (output) output.dataset.streamBatch = JSON.stringify(controller.snapshot());
+            controller.resetStats();
         }, 1000);
         return gl;
     };

@@ -17,6 +17,7 @@ static unsigned long clock_ms, last_target;
 static const char *mode, *target;
 static short connection, join_result;
 static int cancel, created, aborts, menus, add_requests, starts, searches, reports, maps;
+static int quick_policy, policy_requests, countdown;
 static char last_phase[32];
 
 unsigned long system_milliseconds(void) { return clock_ms; }
@@ -40,6 +41,10 @@ void network_game_server_change_map_name(struct network_game_server *value, cons
 { assert(value == server); assert(!strcmp(path, "levels\\test\\bloodgulch\\bloodgulch")); maps++; }
 void network_game_server_change_game_variant(struct network_game_server *value, struct game_variant *variant)
 { assert(value == server && variant); }
+boolean network_game_server_enable_quick_play(struct network_game_server *value)
+{ assert(value == server); policy_requests++; return quick_policy; }
+void network_game_server_pause_countdown(struct network_game_server *value, boolean paused)
+{ assert(value == server && !paused); }
 struct game_variant *game_engine_get_variant_by_name(struct game_variant *variant, const char *name)
 { assert(!strcmp(name, "slayer")); variant->unused = 0; return variant; }
 void player_ui_set_game_variant(struct game_variant *variant) { assert(variant); }
@@ -49,6 +54,8 @@ void *ui_widget_load_by_name_or_tag(const char *a, int b, void *c, int d, int e,
 short network_game_client_get_state(struct network_game_client *value, short *data)
 { (void)data; return value->state; }
 short network_game_client_get_error(struct network_game_client *value) { return value->error; }
+short network_game_client_get_seconds_to_game_start(struct network_game_client *value)
+{ assert(value == client); return (short)countdown; }
 boolean network_game_client_has_local_player(struct network_game_client *value, short controller)
 { assert(controller == 0); return value->player; }
 boolean network_game_client_add_player(struct network_game_client *value, short controller)
@@ -65,6 +72,7 @@ static void reset(const char *setting)
 	client = NULL; server = NULL; mode = setting; target = "";
 	clock_ms = 1000; last_target = 0; connection = 0; join_result = 0;
 	cancel = created = aborts = menus = add_requests = starts = searches = reports = maps = 0;
+	quick_policy = TRUE; policy_requests = 0; countdown = NONE;
 	last_phase[0] = 0;
 }
 static void step(unsigned long elapsed, boolean menu)
@@ -112,11 +120,19 @@ int main(void)
 	launch("host"); mock_client.state = _network_game_client_state_pregame;
 	step(500, TRUE); mock_client.player = TRUE; step(1, TRUE);
 	step(2999, TRUE); assert(!starts); step(1, TRUE); assert(starts == 1);
-	step(10000, TRUE); assert(starts == 1 && maps == 1);
+	step(999, TRUE); assert(starts == 1); step(1, TRUE); assert(starts == 2);
+	countdown = 0; step(10000, TRUE); assert(starts == 2 && maps == 1 && policy_requests == 1);
 	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	assert(!strcmp(last_phase, "playing")); step(1000000, FALSE);
-	assert(starts == 1 && !aborts); cancel = 1; step(1, FALSE);
+	assert(starts == 2 && !aborts); cancel = 1; step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
+
+	launch("host"); quick_policy = FALSE; mock_client.state = _network_game_client_state_pregame;
+	step(500, TRUE); assert(!strcmp(last_phase, "error") && !starts && aborts == 1);
+	launch("host"); mock_client.state = _network_game_client_state_pregame;
+	step(500, TRUE); mock_client.player = TRUE; step(1, TRUE); step(3000, TRUE);
+	assert(starts == 1); step(1000, TRUE); assert(starts == 2);
+	step(120001, TRUE); assert(!strcmp(last_phase, "error") && starts == 2 && aborts == 1);
 
 	/* A late join follows normal pregame/player acceptance, then enters the
 	already running match without issuing a host start or scripted input. */

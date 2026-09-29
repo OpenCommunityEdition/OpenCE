@@ -113,8 +113,10 @@ async function launcher(useTransport = async () => {}, options = {}) {
     return elements.get(id);
   }
   const context = {
-    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException, setTimeout, clearTimeout,
-    navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} } },
+    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException,
+    setTimeout: options.setTimeout || setTimeout, clearTimeout: options.clearTimeout || clearTimeout,
+    navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} },
+      ...(options.serviceWorker ? { serviceWorker: options.serviceWorker } : {}) },
     location: new URL(options.url || 'http://localhost:8780/'),
     document: { getElementById: element, createElement: () => element(Symbol()),
       body: element('body'), documentElement: {}, addEventListener() {} },
@@ -128,7 +130,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
     screen: {}, history: { pushState() {}, replaceState(_state, _title, url) { context.location.href = String(url); } },
     crossOriginIsolated: true,
     OffscreenCanvas: class { getContext() { return {}; } },
-    WebAssembly: { Memory: class {} }, fetch: async () => { throw new Error('Offline'); },
+    WebAssembly: { Memory: class {} }, fetch: options.fetch || (async () => { throw new Error('Offline'); }),
     HALO_BROWSER_CONFIG: { relayUrl: options.relayUrl ?? 'ws://localhost:8781/join',
       ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
@@ -163,7 +165,53 @@ async function launcher(useTransport = async () => {}, options = {}) {
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
   if (!options.mapsState) assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
-  return { element, context, storage, joins, quickCalls, phases, windowEvents };
+  return { element, context, storage, joins, quickCalls, phases, windowEvents,
+    emitNetwork: (type, detail) => listeners.forEach(listener => listener(type, detail)) };
+}
+
+for (const autoLaunch of [false, true]) {
+  test(`update notice survives room notifications and remains retryable ${autoLaunch ? 'after auto-launch' : 'in the launcher'}`, async () => {
+    const messages = [], timers = new Map();
+    let receiveWorkerMessage, nextTimer = 0;
+    const { element, context, emitNetwork } = await launcher(undefined, {
+      url: autoLaunch ? 'http://localhost:8780/' : 'http://localhost:8780/?menu=1',
+      quickPlay: async ({ room }) => ({ role: 'host', room, hostAddress: ADDRESS }),
+      setTimeout: callback => { timers.set(++nextTimer, callback); return nextTimer; },
+      clearTimeout: id => timers.delete(id),
+      fetch: async url => ({ json: async () => ({ version: url.includes('latest') ? 'new' : 'old' }) }),
+      serviceWorker: {
+        register: async () => {},
+        controller: { postMessage: message => messages.push(message) },
+        addEventListener: (_type, listener) => { receiveWorkerMessage = listener; },
+      },
+    });
+    assert.equal(!!context.Module, autoLaunch);
+    assert.equal(element('update-notice').hidden, false, 'new build has a persistent update notice');
+    const runToastTimer = () => {
+      for (const callback of timers.values()) callback();
+      timers.clear();
+    };
+    emitNetwork('joined', { name: 'Player' });
+    assert.equal(element('toast').textContent, 'Player joined the room.');
+    runToastTimer();
+    assert.equal(element('toast').hidden, true);
+    assert.equal(element('update-notice').hidden, false, 'toast expiry cannot hide the update');
+    element('update-button').onclick();
+    assert.deepEqual(messages, ['update'], 'update action remains reachable after status messages');
+    assert.equal(element('update-button').disabled, true);
+    assert.match(element('update-message').textContent, /restart/);
+    receiveWorkerMessage({ data: 'update-failed' });
+    const failure = element('update-message').textContent;
+    assert.match(failure, /could not be downloaded/);
+    assert.equal(element('update-button').disabled, false);
+    assert.equal(element('update-button').textContent, 'Retry update');
+    emitNetwork('left', { name: 'Player' });
+    runToastTimer();
+    assert.equal(element('update-notice').hidden, false);
+    assert.equal(element('update-message').textContent, failure, 'room status cannot overwrite the persistent update status');
+    element('update-button').onclick();
+    assert.deepEqual(messages, ['update', 'update']);
+  });
 }
 
 test('an offline host after relay ready allows a fresh invite; in-game disconnect still requires reload', async () => {

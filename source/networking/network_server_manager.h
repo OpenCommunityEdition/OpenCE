@@ -58,6 +58,11 @@ void network_game_server_change_map_name(
 void network_game_server_change_game_variant(
 	struct network_game_server *server,
 	struct game_variant *variant);
+#ifdef HALO_WEB
+/* A quick-play Slayer host may begin with its real local player, remaining
+open for distributed in-progress joins. Ordinary System Link is unchanged. */
+boolean network_game_server_enable_quick_play(struct network_game_server *server);
+#endif
 
 /* ---------- globals */
 

@@ -29,8 +29,9 @@ frame goes to the page as an ImageBitmap.
 #include "web_shared.h"
 
 /* web_library.js */
-int web_js_gl_create(int width, int height);
+int web_js_gl_create(int width, int height, int batch_streams);
 void web_js_gl_resize(int width, int height);
+void web_js_gl_flush(void);
 void web_js_gl_present(void);
 void web_js_post(int kind, const char *text);
 int web_quick_play_background_active(void);
@@ -278,8 +279,11 @@ SDL_GLContext SDL_GL_CreateContext(SDL_Window *window)
 	(void)window;
 	if (!gl_context)
 	{
+		const char *batch_streams = getenv("HALO_WEB_BATCH_STREAMS");
+
 		display_size(&canvas_width, &canvas_height);
-		gl_context = web_js_gl_create(canvas_width, canvas_height);
+		gl_context = web_js_gl_create(canvas_width, canvas_height,
+			!batch_streams || strcmp(batch_streams, "0"));
 		if (!gl_context)
 		{
 			set_error("WebGL 2 is not available");
@@ -319,6 +323,8 @@ bool SDL_GL_SwapWindow(SDL_Window *window)
 		web_js_gl_present();
 		__atomic_add_fetch(&shared_state.frames_presented, 1, __ATOMIC_SEQ_CST);
 	}
+	else
+		web_js_gl_flush();
 
 	/* the next frame waits for the page's next animation frame, as a swap
 	interval of one waits for the display. Quick play keeps a bounded 30Hz

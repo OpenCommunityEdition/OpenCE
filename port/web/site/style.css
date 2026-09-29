@@ -212,6 +212,25 @@ code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
   max-width: calc(100vw - 32px);
 }
 
+.update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(21, 25, 34, 0.98);
+  z-index: 31;
+  font-size: 14px;
+}
+.update-notice .button { flex-shrink: 0; }
+
 /* ---------- touch controls
 
 Laid out like the original Xbox controller (the Controller S): A, B, X and Y

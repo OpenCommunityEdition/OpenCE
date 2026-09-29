@@ -26,6 +26,8 @@ void network_game_abort(void);
 void network_game_client_request_immediate_start(void);
 void network_game_server_change_map_name(struct network_game_server *, const char *);
 void network_game_server_change_game_variant(struct network_game_server *, struct game_variant *);
+boolean network_game_server_enable_quick_play(struct network_game_server *);
+void network_game_server_pause_countdown(struct network_game_server *, boolean);
 struct game_variant *game_engine_get_variant_by_name(struct game_variant *, const char *);
 void player_ui_set_game_variant(struct game_variant *);
 void ui_widgets_close_all(void);
