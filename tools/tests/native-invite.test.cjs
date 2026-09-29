@@ -389,17 +389,30 @@ test('leaving while automatic room setup is pending remains outside the room', a
   assert.equal(pending.storage.has('halo-web-room'), false);
 });
 
-test('stable host selection automatically loads multiplayer and first gesture unlocks controls', async () => {
+test('stable host selection loads multiplayer without an enable prompt', async () => {
   const launched = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'host', room }) });
   assert.ok(launched.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
   assert.equal(launched.context.Module.arguments.some(value => value.includes('NETWORK_TEST')), false);
   assert.equal(launched.element('quick-panel').hidden, false);
-  assert.equal(launched.element('interaction-prompt').hidden, false);
+  assert.equal(launched.element('play').hidden, true);
+  assert.equal(launched.element('interaction-prompt').hidden, true);
   launched.windowEvents.get('pointerdown').forEach(listener => listener({}));
   assert.equal(launched.element('interaction-prompt').hidden, true);
   launched.context.Module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Blood Gulch.' }));
   assert.equal(launched.element('quick-panel').hidden, true);
   assert.deepEqual(launched.phases, ['playing']);
+});
+
+test('new launcher markup keeps cached interaction handlers inert and compatible', () => {
+  const html = fs.readFileSync(require.resolve('../../port/web/site/index.html'), 'utf8');
+  // A hard reload can fetch the new document before a previously installed
+  // service worker serves its cached script. Old startup binds both buttons.
+  const ids = new Set(Array.from(html.matchAll(/\bid="([^"]+)"/g), match => match[1]));
+  for (const id of ['interaction-enable', 'interaction-menu', 'room-toggle', 'room-close']) {
+    assert.ok(ids.has(id), `cached script can bind ${id}`);
+  }
+  assert.match(html, /id="interaction-prompt"[^>]*aria-hidden="true"[^>]*style="display:none!important"/);
+  assert.doesNotMatch(html, /Enable sound &amp; controls|Click or tap to enable sound/);
 });
 
 test('existing host selection joins its exact address without a menu click', async () => {

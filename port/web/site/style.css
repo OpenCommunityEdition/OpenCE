@@ -64,7 +64,7 @@ body.playing.room-settings #launcher {
   z-index: 15;
 }
 
-.quick-panel, .interaction-prompt {
+.quick-panel {
   position: fixed;
   z-index: 15;
   left: 50%;
@@ -76,9 +76,8 @@ body.playing.room-settings #launcher {
   background: rgba(21, 25, 34, 0.96);
 }
 .quick-panel { top: max(12px, env(safe-area-inset-top)); }
-.quick-panel p, .interaction-prompt p { margin: 0 0 10px; }
+.quick-panel p { margin: 0 0 10px; }
 .quick-panel[data-state=error] { border-color: var(--danger); }
-.interaction-prompt { top: 50%; transform: translate(-50%, -50%); z-index: 16; }
 
 #launcher {
   min-height: 100%;

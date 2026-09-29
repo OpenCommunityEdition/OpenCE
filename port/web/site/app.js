@@ -55,7 +55,6 @@ can run the game, copies the game data out of the player's disc image
     quickFailed: false,
     quickRole: null,
     quickPhase: null,
-    interactionUnlocked: false,
     audioStarted: false,
     roomSettingsOpen: false,
   };
@@ -208,7 +207,8 @@ can run the game, copies the game data out of the player's disc image
 
   function updatePlayButton() {
     const automatic = !state.manualMode && !!(state.invite || state.selectedRoom);
-    $('play').textContent = automatic ? 'Enable sound & controls' : 'Play main menu';
+    $('play').hidden = automatic;
+    $('play').textContent = 'Play main menu';
     $('play').disabled = state.started || (!automatic && (!state.maps || state.dataBusy));
   }
 
@@ -536,17 +536,13 @@ can run the game, copies the game data out of the player's disc image
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       state.audio = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
-      state.audio.onstatechange = () => {
-        $('interaction-prompt').hidden = !state.started || (state.interactionUnlocked && state.audio.state === 'running');
-      };
     } catch (error) { log('audio context: ' + error); }
   }
 
-  function unlockInteraction() {
-    state.interactionUnlocked = true;
+  function unlockInteraction(userGesture = true) {
     makeAudioContext();
     state.audio?.resume().catch(() => {});
-    if (state.started) {
+    if (state.started && userGesture) {
       const root = document.documentElement;
       if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
       if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => {});
@@ -554,9 +550,8 @@ can run the game, copies the game data out of the player's disc image
       if (canvas.requestPointerLock && matchMedia('(pointer: fine)').matches) {
         try { canvas.requestPointerLock()?.catch(() => {}); } catch { /* unsupported */ }
       }
-      if (state.shared && !state.audioStarted) startAudio();
     }
-    $('interaction-prompt').hidden = true;
+    if (state.shared && !state.audioStarted) startAudio();
   }
 
   function landscapeSize() {
@@ -710,8 +705,7 @@ can run the game, copies the game data out of the player's disc image
       return;
     }
     state.started = true;
-    makeAudioContext();
-    if (userGesture) unlockInteraction();
+    unlockInteraction(userGesture);
     try {
       if (navigator.locks) {
         await new Promise((resolve, reject) => {
@@ -735,7 +729,6 @@ can run the game, copies the game data out of the player's disc image
     updatePlayButton();
     document.body.classList.add('playing');
     $('room-toggle').hidden = !!state.invite;
-    $('interaction-prompt').hidden = state.interactionUnlocked && (!state.audio || state.audio.state === 'running');
     $('quick-panel').hidden = !role;
     requestWakeLock();
     // the system's back gesture or button (Android) backs out of menus, as
@@ -1171,7 +1164,6 @@ can run the game, copies the game data out of the player's disc image
     $('room-toggle').onclick = () => showRoomSettings(true);
     $('room-close').onclick = () => showRoomSettings(false);
     $('quick-menu').onclick = openMainMenu;
-    $('interaction-menu').onclick = openMainMenu;
     $('fatal-menu').onclick = openMainMenu;
     $('update-button').onclick = () => {
       if ($('update-button').disabled) return;
@@ -1182,11 +1174,14 @@ can run the game, copies the game data out of the player's disc image
         navigator.serviceWorker.controller.postMessage('update');
       } catch { updateFailed(); }
     };
-    $('interaction-enable').onclick = unlockInteraction;
     $('quick-retry').onclick = () => { state.quickFailed = false; state.manualMode = false; return maybeQuickPlay(); };
     for (const type of ['pointerdown', 'keydown', 'touchstart']) {
-      window.addEventListener(type, () => {
-        if (state.started && !state.interactionUnlocked) unlockInteraction();
+      window.addEventListener(type, (event) => {
+        // Browser autoplay and pointer lock may require a normal game interaction.
+        if (state.started && !state.roomSettingsOpen && (state.audio?.state !== 'running' ||
+            (type === 'pointerdown' && event.target === $('screen') && !document.pointerLockElement))) {
+          unlockInteraction();
+        }
       }, { passive: true });
     }
     $('export-saves').onclick = exportSaves;
