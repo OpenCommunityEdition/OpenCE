@@ -40,19 +40,13 @@ The port does not include the game data. Download an Xbox disc image
 (`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
 operate.
 
-On Linux and Windows:
-
 1. Start the game.
 2. At the first start, the game asks for the disc image. Select it.
-3. The game extracts the `maps/` folder next to the executable. Then the
-   game starts.
+3. The game extracts the `maps/` folder. Then the game starts.
 
-On Android:
-
-1. Extract the `maps/` folder with the Linux or Windows version.
-2. Copy the `maps/` folder to the phone.
-3. Start the app and select the folder in the folder picker. The app
-   copies the data. Refer to [port/android/README.md](port/android/README.md).
+On Linux and Windows, the game puts `maps/` next to the executable. On
+Android, copy the disc image to the phone first. The app puts `maps/` in its
+data folder. Refer to [port/android/README.md](port/android/README.md).
 
 ## Platforms
 

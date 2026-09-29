@@ -40,18 +40,19 @@ ninja) and these items:
 
 ## Game data
 
-The game needs the `maps/` folder from an Xbox disc image of any version of
-the game. The app cannot extract the disc image. Extract `maps/` with the
-Linux or Windows version (refer to the main
-[README](../../README.md#game-data)), then copy it to the phone. The app
-keeps the data in `/sdcard/Android/data/com.halo.decomp/files`.
+The game needs the `maps/` folder from an Xbox disc image (`.xiso` or
+`.iso`) of any version of the game. The app extracts `maps/` from the disc
+image. The app keeps the data in `/sdcard/Android/data/com.halo.decomp/files`.
 
 To install the data with the app:
 
-1. Start the app.
-2. Push the button. The folder picker of the system opens.
-3. Select the folder that contains `maps`, or `maps` itself.
-4. Wait while the app copies the data (approximately 1.8 GB).
+1. Copy the disc image to the phone.
+2. Start the app.
+3. Push the button. The file picker of the system opens.
+4. Select the disc image.
+5. Wait while the app extracts the data (approximately 1.8 GB). Then the
+   game starts.
+6. You can delete the disc image.
 
 To install the data from a computer:
 

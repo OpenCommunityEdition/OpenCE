@@ -81,11 +81,10 @@ def main() -> int:
     for output in outputs:
         shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)
-    if args.platform != "android":
-        # the desktop builds' disc image reader (port/linux/src/xiso.c)
-        # follows extract-xiso, whose license asks binaries to carry its
-        # notice
-        shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
+    # the disc image readers (port/linux/src/xiso.c, and the Android app's
+    # XisoExtractor.java) follow extract-xiso, whose license asks binaries
+    # to carry its notice
+    shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
     if args.platform == "linux":
         # the self-updater's TLS (port/third_party/mbedtls), whose Apache
         # license asks the same
