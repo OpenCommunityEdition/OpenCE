@@ -66,6 +66,37 @@ accepts none of a map's typed starting locations without a game engine).
 shows while the Xbox's BACK button is held: F1 on the keyboard, or the
 controller's Back button.
 
+### In the multiplayer menus
+
+With the setting on, the multiplayer map list offers every Custom Edition
+multiplayer map in the data root's `maps` folder (OpenSauce `.yelo` maps
+among them) after the thirteen Xbox levels, in the order of their names; the
+pregame lobby and the system link game list show them too
+(`port/linux/game/custom_edition_maps.c`). A map is listed under its file's
+name, `beavercreek_halo3.yelo` as "Beavercreek Halo3", as the level
+`levels\test\<name>\<name>`. The game engine keeps a level name in 64
+characters, so a map whose file name is longer than 25 characters is left
+out, as is one named as an Xbox level, which that level already offers. Two
+optional files beside the map give it what the Xbox levels have:
+
+- `<name>.bmp`, its picture: an uncompressed 24-bit or 32-bit Windows
+  bitmap (Paint saves one), up to 8192 pixels a side. The menus show the
+  middle of it with the shape of their level pictures, 140 by 114, so a
+  picture of that shape shows whole. Without one, the map shows the unknown
+  level's picture.
+- `<name>.txt`, its description: plain text, its lines shown as written.
+  The Xbox levels' descriptions are two lines of about 20 characters, an
+  empty line and the number of players:
+
+  ```
+  Two bases and
+  a long canyon
+
+  2-16 players
+  ```
+
+  Without one, the map is described as "Halo Custom Edition map".
+
 ## What the native builds do
 
 - **With the setting off** (the default), a Custom Edition cache in
@@ -352,6 +383,15 @@ automated test. `python -m pytest tools/test_custom_edition_tag_footprints.py`
 (4 tests) checks the tag comparison tool of
 [the measurements below](#how-far-custom-edition-tags-are-from-the-xbox-tags).
 
+`python -m pytest tools/test_bmp_files.py` (41 tests; needs clang) checks
+the reader of the menus' map pictures (`port/linux/game/bmp_files.c`) the
+same way, through the report tool `port/tools/bmp_file_report.c`: every kind
+of picture it reads (bottom-up and top-down rows, 24-bit and 32-bit, bit
+masks, each header version, a color table), the averaging, enlarging and
+cropping to a shape, 25 kinds of file it refuses, every truncation of three
+valid files, and 200 seeded random corruptions of their headers (sampled
+evidence, as above).
+
 ### Maps
 
 The sample supplied for this work (`custom_edition.zip`, 28 entries): the 20
@@ -495,6 +535,18 @@ seconds, `hugeass.map` in slayer for 40. The logs report the conversions of
 the tables above, the level and HUD were drawn as before, and `hugeass.map`
 kept its day structure BSP. Every run was one machine's local game: no
 network game, with either netcode, was played on a Custom Edition map.
+
+### In the multiplayer menus
+
+The Windows build was run windowed on a data root holding the Xbox maps,
+`extinction.map`, `hugeass.map`, `beavercreek_halo3.yelo`, the stock
+resource maps, and a picture (a screenshot of the map the owner supplied,
+cropped) and a description for `extinction.map` and `hugeass.map`. Opening
+the multiplayer map list logged `3 multiplayer maps for the level list`, and
+the owner, looking at the list, judged the two maps' names, pictures and
+descriptions right. Choosing a Custom Edition map from the list and playing
+it, and the lobby and the system link game list showing one, were not
+observed.
 
 ### Not tested or not observed
 

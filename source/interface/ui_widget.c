@@ -678,6 +678,9 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+#ifdef HALO_LINUX
+#include "custom_edition_maps.h"
+#endif
 
 /* ---------- constants */
 
@@ -5724,6 +5727,10 @@ static void widget_instance_render_recursive(
 	long input_index;
 	struct widget_instance *child;
 	struct bitmap_data *bitmap;
+#ifdef HALO_LINUX
+	struct bitmap_data *custom_edition_picture;
+	short frame_index;
+#endif
 
 	if (!use_nifty_plasma_fx &&
 		TEST_FLAG(definition->flags, _widget_always_render_with_nifty_fx_bit))
@@ -5747,11 +5754,23 @@ static void widget_instance_render_recursive(
 		return;
 #ifdef HALO_LINUX
 	ui_mouse_note_target(widget, definition, offset);
-#endif
+	/* a Custom Edition map's picture, drawn over the whole widget, or the
+	unknown level's frame for a map without one
+	(port/linux/game/custom_edition_maps.c) */
+	frame_index = widget->animation.current_frame_index;
+	custom_edition_picture = custom_edition_maps_picture(
+		definition->background_bitmap.index,
+		&frame_index);
+	bitmap = custom_edition_picture ? custom_edition_picture : bitmap_group_get_bitmap_from_sequence(
+		definition->background_bitmap.index,
+		0,
+		frame_index);
+#else
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
 		widget->animation.current_frame_index);
+#endif
 	if (bitmap)
 	{
 		real alpha = alpha_modifier;
@@ -5798,7 +5817,11 @@ static void widget_instance_render_recursive(
 		draw_bitmap_in_rect(
 			bitmap,
 			&bounds,
+#ifdef HALO_LINUX
+			custom_edition_picture ? NULL : &bounds,
+#else
 			&bounds,
+#endif
 			clip,
 			color,
 			&multitexture_params,

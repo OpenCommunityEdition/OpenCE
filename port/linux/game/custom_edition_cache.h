@@ -44,6 +44,10 @@ void opensauce_cache_path_find(
 it is then read in place, never copied to the cache partition. */
 boolean custom_edition_cache_playable(
 	char const *map_name);
+/* The same, for a map of a multiplayer scenario (the multiplayer menus,
+custom_edition_maps.c). */
+boolean custom_edition_cache_multiplayer(
+	char const *map_name);
 
 /* Loads the Custom Edition map `map_name` names into its tag cache and
 converts its tags for this build, copying its cache header to `header`

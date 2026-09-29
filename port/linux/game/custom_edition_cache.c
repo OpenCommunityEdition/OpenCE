@@ -25,6 +25,7 @@ where its offset falls in their combined offset space.
 #include "tag_files/files.h"
 #include "tag_files/tag_files.h"
 #include "cache/cache_files.h"
+#include "scenario/scenario_definitions.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
 
@@ -298,6 +299,33 @@ static boolean custom_edition_cache_tags_convert(
 		custom_edition_cache_models_convert(tag_cache, report);
 }
 
+/* Whether Custom Edition maps may run (game.custom_edition) and the map
+`map_name` names is a Custom Edition cache, whose header is then described
+in `identity`. */
+static boolean custom_edition_cache_identify(
+	char const *map_name,
+	struct cache_file_identity *identity)
+{
+	char path[MAP_PATH_SIZE];
+	struct custom_edition_file file;
+	boolean identified = FALSE;
+
+	if (!halo_custom_edition_tag_cache() ||
+		!custom_edition_map_path(map_name, path) ||
+		!custom_edition_file_open(&file, path))
+	{
+		return FALSE;
+	}
+	if (cache_file_identify(&file.source, identity) == _cache_file_status_ok &&
+		identity->format == _cache_file_format_custom_edition_cache)
+	{
+		identified = TRUE;
+	}
+	custom_edition_file_close(&file);
+
+	return identified;
+}
+
 static void custom_edition_cache_report_log(
 	struct custom_edition_load_report const *report)
 {
@@ -383,25 +411,18 @@ void opensauce_cache_path_find(
 boolean custom_edition_cache_playable(
 	char const *map_name)
 {
-	char path[MAP_PATH_SIZE];
-	struct custom_edition_file file;
 	struct cache_file_identity identity;
-	boolean playable = FALSE;
 
-	if (!halo_custom_edition_tag_cache() ||
-		!custom_edition_map_path(map_name, path) ||
-		!custom_edition_file_open(&file, path))
-	{
-		return FALSE;
-	}
-	if (cache_file_identify(&file.source, &identity) == _cache_file_status_ok &&
-		identity.format == _cache_file_format_custom_edition_cache)
-	{
-		playable = TRUE;
-	}
-	custom_edition_file_close(&file);
+	return custom_edition_cache_identify(map_name, &identity);
+}
 
-	return playable;
+boolean custom_edition_cache_multiplayer(
+	char const *map_name)
+{
+	struct cache_file_identity identity;
+
+	return custom_edition_cache_identify(map_name, &identity) &&
+		identity.scenario_type == _scenario_type_multiplayer;
 }
 
 struct cache_file_tag_header *custom_edition_cache_tags_load(
