@@ -16,6 +16,8 @@ import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
+import android.text.TextUtils;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -57,6 +59,7 @@ public class LauncherActivity extends Activity {
     private static final int REQUEST_STORAGE = 3;
 
     private static final int COLOR_ACTIVE = HaloUi.CYAN;
+    private static final String TAG = "halo-import";
 
     private File dataRoot;
     private TextView status;
@@ -68,7 +71,9 @@ public class LauncherActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<String> lines = new ArrayList<>();
-    private final List<File> foundImages = new ArrayList<>();
+    private final List<Candidate> haloImages = new ArrayList<>();
+    private final List<Candidate> otherImages = new ArrayList<>();
+    private File currentImage;
     private boolean archiveAccess;
     private volatile boolean extracting;
     private volatile boolean scanning;
@@ -85,6 +90,17 @@ public class LauncherActivity extends Activity {
             this.uri = uri;
             this.path = path;
             this.size = size;
+        }
+    }
+
+    /** a disc image the search found, with what probing it learned */
+    private static final class Candidate {
+        final File file;
+        final DiscImage.Info info;
+
+        Candidate(File file, DiscImage.Info info) {
+            this.file = file;
+            this.info = info;
         }
     }
 
@@ -322,12 +338,53 @@ public class LauncherActivity extends Activity {
             scan(new File(dataRoot.getAbsolutePath()), 3, seen, found);
             scan(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), 2, seen, found);
             scan(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), 2, seen, found);
-            scan(Environment.getExternalStorageDirectory(), 2, seen, found);
+            scan(Environment.getExternalStorageDirectory(), 1, seen, found);
+            // tell the Halo discs apart from any other ROM the player keeps
+            List<Candidate> halo = new ArrayList<>();
+            List<Candidate> other = new ArrayList<>();
+            for (File image : found) {
+                DiscImage.Info info = probe(image);
+                Candidate candidate = new Candidate(image, info);
+                if (info.halo)
+                    halo.add(candidate);
+                else
+                    other.add(candidate);
+            }
+            sort(halo);
+            sort(other);
+            Log.i(TAG, "scan: " + found.size() + " image(s), " + halo.size()
+                + " Xbox Halo disc(s), archive access=" + access);
             handler.post(() -> {
                 scanning = false;
-                presentScan(found, access);
+                presentScan(halo, other, access);
             });
         }, "archive-scan").start();
+    }
+
+    /** opens the image and asks DiscImage what it holds */
+    private DiscImage.Info probe(File image) {
+        FileChannel channel = null;
+        try {
+            channel = DiscImage.open(image);
+            return DiscImage.probe(channel);
+        } catch (Exception exception) {
+            return new DiscImage.Info();
+        } finally {
+            close(channel);
+        }
+    }
+
+    /** whole Halo discs first, then the fullest, then the biggest, then by name */
+    private static void sort(List<Candidate> candidates) {
+        candidates.sort((a, b) -> {
+            if (a.info.complete != b.info.complete)
+                return a.info.complete ? -1 : 1;
+            if (a.info.mapCount != b.info.mapCount)
+                return b.info.mapCount - a.info.mapCount;
+            if (a.info.dataBytes != b.info.dataBytes)
+                return Long.compare(b.info.dataBytes, a.info.dataBytes);
+            return a.file.getName().compareToIgnoreCase(b.file.getName());
+        });
     }
 
     private void scan(File directory, int depth, Set<String> seen, List<File> out) {
@@ -348,42 +405,145 @@ public class LauncherActivity extends Activity {
         }
     }
 
-    private void presentScan(List<File> found, boolean access) {
+    private void presentScan(List<Candidate> halo, List<Candidate> other, boolean access) {
         if (extracting)
             return;
-        foundImages.clear();
-        foundImages.addAll(found);
+        haloImages.clear();
+        haloImages.addAll(halo);
+        otherImages.clear();
+        otherImages.addAll(other);
         archiveAccess = access;
         buttons.removeAllViews();
 
         if (!access)
             log("> deep scan locked: grant archive access to search shared storage");
 
-        if (!found.isEmpty()) {
-            setStatus("Archive image detected");
-            log("> " + found.size() + " candidate(s) located");
-            if (autoExtractPending && found.size() == 1) {
+        File remembered = rememberedDisc();
+
+        if (!halo.isEmpty()) {
+            Candidate automatic = automatic(halo, remembered);
+            if (autoExtractPending && automatic != null) {
                 autoExtractPending = false;
-                log("> opening " + found.get(0).getName());
-                beginExtract(found.get(0), found.get(0).getName());
+                log("> opening " + automatic.file.getName());
+                beginExtract(automatic.file, automatic.file.getName());
                 return;
             }
             autoExtractPending = false;
-            for (File image : found) {
-                String label = image.getName();
-                addButton("Restore from " + trim(label, 30), () -> beginExtract(image, label));
-            }
+            setStatus(halo.size() == 1 ? "Halo disc detected" : "Halo discs detected");
+            log("> " + halo.size() + " Halo disc(s) identified");
+            for (Candidate candidate : halo)
+                buttons.addView(candidateRow(candidate, candidate == halo.get(0),
+                    sameFile(candidate.file, remembered)));
+        } else if (!other.isEmpty()) {
+            autoExtractPending = false;
+            setStatus("No Halo disc found");
+            log("> " + other.size() + " image(s) here are not Halo discs");
         } else {
             autoExtractPending = false;
             setStatus("No archive image found");
             log("> no .iso or .xiso in reach");
         }
 
+        if (!other.isEmpty()) {
+            sectionLabel("OTHER IMAGES");
+            for (Candidate candidate : other)
+                buttons.addView(candidateRow(candidate, false, false));
+        }
+
+        sectionLabel("ACTIONS");
         if (!access)
             addButton("Grant archive access", this::requestArchiveAccess);
         addButton("Select disc image", this::pickImage);
         addButton("Select game data folder", this::pickFolder);
         addButton("Scan again", this::scanForImages);
+    }
+
+    /**
+     * The disc to restore without asking: the one that worked last time,
+     * else the only whole Halo disc. More than one whole disc is the
+     * player's choice.
+     */
+    private Candidate automatic(List<Candidate> halo, File remembered) {
+        if (remembered != null) {
+            for (Candidate candidate : halo)
+                if (sameFile(candidate.file, remembered) && candidate.info.complete)
+                    return candidate;
+        }
+        Candidate complete = null;
+        int count = 0;
+        for (Candidate candidate : halo)
+            if (candidate.info.complete) {
+                complete = candidate;
+                count++;
+            }
+        return count == 1 ? complete : null;
+    }
+
+    /** a disc image as a tappable pane: the name, and what probing found */
+    private View candidateRow(Candidate candidate, boolean recommended, boolean lastUsed) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setBackground(HaloUi.entryBackground(this));
+        int pad = HaloUi.dp(this, 16);
+        row.setPadding(pad, HaloUi.dp(this, 12), pad, HaloUi.dp(this, 12));
+        row.setClickable(true);
+        row.setFocusable(true);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView name = HaloUi.text(this, candidate.file.getName(), HaloUi.CYAN, 15, HaloUi.DISPLAY_BOLD);
+        name.setLetterSpacing(0.06f);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (lastUsed || recommended) {
+            TextView tag = HaloUi.text(this, lastUsed ? "LAST USED" : "RECOMMENDED", HaloUi.AMBER, 10,
+                HaloUi.MONO);
+            top.addView(tag);
+        }
+        row.addView(top);
+        row.addView(HaloUi.text(this, candidate.info.summary(), HaloUi.TEXT_DIM, 11.5f, HaloUi.MONO));
+        row.setOnClickListener(view -> beginExtract(candidate.file, candidate.file.getName()));
+        row.setLayoutParams(margins(0, 0, 0, 10));
+        return row;
+    }
+
+    private void sectionLabel(String text) {
+        TextView label = HaloUi.text(this, text, HaloUi.CYAN_DIM, 11, HaloUi.MONO);
+        label.setLetterSpacing(0.22f);
+        buttons.addView(label, margins(0, 8, 0, 8));
+    }
+
+    private File rememberedDisc() {
+        String path = getSharedPreferences("halo-import", MODE_PRIVATE).getString("disc", null);
+        File file = path != null ? new File(path) : null;
+        return file != null && file.isFile() ? file : null;
+    }
+
+    private void rememberDisc(File file) {
+        if (file == null)
+            return;
+        String path;
+        try {
+            path = file.getCanonicalPath();
+        } catch (IOException exception) {
+            path = file.getAbsolutePath();
+        }
+        getSharedPreferences("halo-import", MODE_PRIVATE).edit().putString("disc", path).apply();
+    }
+
+    /** the same disc, however the two paths spell it (/sdcard vs /storage/emulated/0) */
+    private static boolean sameFile(File a, File b) {
+        if (a == null || b == null)
+            return false;
+        if (a.equals(b))
+            return true;
+        try {
+            return a.getCanonicalPath().equals(b.getCanonicalPath());
+        } catch (IOException exception) {
+            return false;
+        }
     }
 
     private static String trim(String value, int length) {
@@ -449,7 +609,9 @@ public class LauncherActivity extends Activity {
     }
 
     private void beginExtract(Uri image, String label) {
-        beginExtract(null, image, label);
+        File file = "file".equals(image.getScheme()) && image.getPath() != null
+            ? new File(image.getPath()) : null;
+        beginExtract(file, image, label);
     }
 
     private void beginExtract(File file, Uri uri, String label) {
@@ -457,12 +619,14 @@ public class LauncherActivity extends Activity {
             return;
         extracting = true;
         cancelled = false;
+        currentImage = file;
         lastLoggedPercent = -1;
         buttons.removeAllViews();
         seal.setText("LIVE");
         seal.setTextColor(HaloUi.AMBER);
         setStatus("Reading archive");
         log("> " + trim(label, 40));
+        Log.i(TAG, "extracting " + label);
         showProgress(true);
         progress.setProgress(0f);
         percent.setText("0%");
@@ -489,6 +653,7 @@ public class LauncherActivity extends Activity {
             } catch (DiscImage.Cancelled stop) {
                 handler.post(() -> reset("Recovery halted by operator."));
             } catch (Exception exception) {
+                Log.w(TAG, "extraction failed", exception);
                 handler.post(() -> reset(exception.getMessage() != null ? exception.getMessage()
                     : exception.toString()));
             } finally {
@@ -517,6 +682,8 @@ public class LauncherActivity extends Activity {
         if (haveData()) {
             setStatus("Archive restored");
             log("> maps/ui.map verified — starting game");
+            Log.i(TAG, "maps/ui.map verified; starting the game");
+            rememberDisc(currentImage);
             handler.postDelayed(this::startGame, 650);
         } else {
             reset("The copy finished but maps/ui.map is missing.");
@@ -530,7 +697,7 @@ public class LauncherActivity extends Activity {
         showProgress(false);
         setStatus("Recovery halted");
         log("! " + message);
-        presentScan(foundImages, archiveAccess);
+        presentScan(haloImages, otherImages, archiveAccess);
     }
 
     private static void close(java.io.Closeable closeable) {

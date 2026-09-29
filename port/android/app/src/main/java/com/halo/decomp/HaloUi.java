@@ -104,6 +104,17 @@ final class HaloUi {
         return states;
     }
 
+    /** a tappable candidate pane, brighter while pressed */
+    static Drawable entryBackground(Context context) {
+        int cut = dp(context, 12);
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed },
+            new Chamfer(0xE61B4656, 0xFF7EE7FF, dp(context, 1), cut));
+        states.addState(new int[] {},
+            new Chamfer(0x7A0A1A24, 0x667EE7FF, dp(context, 1), cut));
+        return states;
+    }
+
     /** corner brackets, so a pane reads as a framed instrument panel */
     static final class Brackets extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);

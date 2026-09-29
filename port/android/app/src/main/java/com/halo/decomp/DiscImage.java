@@ -58,6 +58,71 @@ final class DiscImage {
         return new RandomAccessFile(file, "r").getChannel();
     }
 
+    /** what probing an image found: whether it is a Halo disc and how whole it is */
+    static final class Info {
+        boolean halo;
+        int mapCount;
+        long dataBytes;
+        boolean complete;
+
+        String summary() {
+            String size = human(dataBytes);
+            if (!halo)
+                return "NOT A HALO DISC  ·  " + size;
+            return mapCount + " MAPS  ·  " + size + (complete ? "  ·  READY" : "  ·  INCOMPLETE");
+        }
+
+        private static String human(long bytes) {
+            if (bytes >= 1L << 30)
+                return String.format(java.util.Locale.US, "%.1f GB", bytes / (double) (1L << 30));
+            return String.format(java.util.Locale.US, "%.0f MB", bytes / (double) (1L << 20));
+        }
+    }
+
+    /**
+     * Reads an image's file system just far enough to tell a Halo disc from
+     * another ROM, and whether every map in it lies inside the file.
+     */
+    static Info probe(FileChannel channel) {
+        Info info = new Info();
+        try {
+            long[] volume = findVolume(channel);
+            if (volume == null)
+                return info;
+            byte[] root = readDirectory(channel, volume[0], volume[1], volume[2]);
+            List<Entry> directories = new ArrayList<>();
+            walk(root, 0, 0, true, directories, new int[1]);
+            Entry maps = find(directories, "maps");
+            if (maps == null)
+                return info;
+            byte[] table = readDirectory(channel, volume[0], maps.sector, maps.size);
+            List<Entry> files = new ArrayList<>();
+            walk(table, 0, 0, false, files, new int[1]);
+            if (find(files, "ui.map") == null)
+                return info;
+            info.halo = true;
+            info.mapCount = files.size();
+            long length = channel.size();
+            long total = 0;
+            boolean complete = true;
+            for (Entry file : files) {
+                total += file.size;
+                if (volume[0] + file.sector * SECTOR + file.size > length)
+                    complete = false;
+            }
+            info.dataBytes = total;
+            info.complete = complete;
+        } catch (IOException | RuntimeException exception) {
+            // not readable as an Xbox disc
+        }
+        return info;
+    }
+
+    /** true if the image is an Xbox disc with a Halo maps/ui.map in it */
+    static boolean isHaloDisc(FileChannel channel) {
+        return probe(channel).halo;
+    }
+
     /** extracts maps/ into destination; throws with a player-readable reason */
     static File extract(FileChannel channel, File destination, Progress progress) throws IOException {
         long[] volume = findVolume(channel);
