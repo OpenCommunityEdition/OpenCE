@@ -285,6 +285,14 @@ static void cache_file_rebase_tag_data(
 	header->tag_instances = (struct cache_file_tag_instance *)cache_file_rebase_address(header->tag_instances);
 	header->vertex_buffers = (D3DVertexBuffer *)cache_file_rebase_address(header->vertex_buffers);
 	header->index_buffers = (D3DIndexBuffer *)cache_file_rebase_address(header->index_buffers);
+	/* an index buffer is not registered, so nothing else turns the address
+	the map wrote for its data into one this process can use */
+	for (index = 0; index < header->index_buffer_count; index++)
+	{
+		D3DIndexBuffer *buffer = &header->index_buffers[index];
+
+		buffer->Data = (unsigned long)cache_file_rebase_address((void *)buffer->Data);
+	}
 	for (index = 0; index < header->tag_count; index++)
 	{
 		header->tag_instances[index].name = (char *)cache_file_rebase_address(header->tag_instances[index].name);
@@ -292,12 +300,31 @@ static void cache_file_rebase_tag_data(
 	}
 }
 
+/* cache_files_windows.c has its own, differently-named definition of the
+structure bsp header, and that is the one the functions that walk the header
+use. They were matched against the original and are left alone; the rebase
+below needs the real layout, and this is it. */
+struct rebase_structure_bsp_header
+{
+	void *base_address;
+	long vertex_buffer_count;
+	D3DVertexBuffer *vertex_buffers;
+	long lightmap_vertex_buffer_count;
+	D3DVertexBuffer *lightmap_vertex_buffers;
+	unsigned long signature;
+};
+
 static void cache_file_rebase_structure_bsp(
 	struct cache_file_structure_bsp_header *header)
 {
-	header->base_address = cache_file_rebase_address(header->base_address);
-	header->vertex_buffers = cache_file_rebase_address(header->vertex_buffers);
-	header->index_buffers = cache_file_rebase_address(header->index_buffers);
+	struct rebase_structure_bsp_header *bsp = (struct rebase_structure_bsp_header *)header;
+
+	/* the buffers' own Data fields are left alone: the Direct3D layer turns
+	those into offsets within the window when it registers the buffer */
+	bsp->base_address = cache_file_rebase_address(bsp->base_address);
+	bsp->vertex_buffers = (D3DVertexBuffer *)cache_file_rebase_address(bsp->vertex_buffers);
+	bsp->lightmap_vertex_buffers =
+		(D3DVertexBuffer *)cache_file_rebase_address(bsp->lightmap_vertex_buffers);
 }
 #endif
 

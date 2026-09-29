@@ -59,7 +59,7 @@ enum
 
 #define animation_graph_animation_index_get(block)	((struct animation_graph_animation_index *)((block)->address))
 
-#define animation_get_default_data(animation) ((animation)->default_data.address)
+#define animation_get_default_data(animation) (TAG_DATA_ADDRESS((animation)->default_data))
 
 /* ---------- structures */
 

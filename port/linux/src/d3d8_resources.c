@@ -13,6 +13,8 @@ follows xbox_textures.c, so locks and uploads agree.
 
 #include "xgpu.h"
 
+#include "halo_port_window.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -101,7 +103,21 @@ void WINAPI D3DResource_Register(D3DResource *resource, void *base)
 	/* D3DResource is opaque in C; every resource starts Common, Data, Lock */
 	DWORD *fields = (DWORD *)resource;
 
-	fields[1] = PLATFORM_VIRTUAL_TO_PHYSICAL((unsigned long)base + fields[1]);
+	if (base)
+	{
+		/* a resource the game built: base is where it really is */
+		fields[1] = PLATFORM_VIRTUAL_TO_PHYSICAL((unsigned long)base + fields[1]);
+	}
+	else
+	{
+		/* a resource out of a map file, which names its data as the window
+		was linked, not as this process has it. Data has to become the
+		offset within the window, which is what the rest of this file
+		keeps, and resource_data() puts the window back. Masking with the
+		window's address here would work only where the window is where the
+		game expects it. */
+		fields[1] = PORT_WINDOW_PHYSICAL_ADDRESS((unsigned long)base + fields[1]);
+	}
 }
 
 ULONG WINAPI D3DResource_Release(D3DResource *resource)

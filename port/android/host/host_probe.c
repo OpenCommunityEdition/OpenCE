@@ -92,6 +92,10 @@ int host_probe_skip_fault(uintptr_t address)
 
 static int probe_collect_ranges(void)
 {
+	/* the window is wherever the host put it, which is not necessarily where
+	the game expects it */
+	const unsigned long long window = host_memory_window_base();
+	const unsigned long long window_end = window + HALO_GUEST_WINDOW_SIZE;
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
 
@@ -108,13 +112,11 @@ static int probe_collect_ranges(void)
 			continue;
 		if (permissions[0] != 'r')
 			continue; /* the guest leaves the rest of the window reserved */
-		if (last <= HALO_GUEST_WINDOW_BASE || first >= (uintptr_t)host_memory_window_base() + HALO_GUEST_WINDOW_SIZE)
+		if (last <= window || first >= window_end)
 			continue;
 		range = &probe_ranges[probe_range_count++];
-		range->start = (unsigned long)first < HALO_GUEST_WINDOW_BASE
-			? HALO_GUEST_WINDOW_BASE : (unsigned long)first;
-		range->end = (unsigned long)last > (uintptr_t)host_memory_window_base() + HALO_GUEST_WINDOW_SIZE
-			? (uintptr_t)host_memory_window_base() + HALO_GUEST_WINDOW_SIZE : (unsigned long)last;
+		range->start = (unsigned long)(first < window ? window : first);
+		range->end = (unsigned long)(last > window_end ? window_end : last);
 		range->permissions[0] = permissions[0];
 		sscanf(line, "%*s %*s %*s %*s %*s %95[^\n]", name);
 		snprintf(range->name, sizeof(range->name), "%s", name[0] ? name : "(anonymous)");
@@ -137,8 +139,7 @@ static const char *probe_range_name(unsigned long address)
 
 /* the values of one page, the first few of them; 0 if the page was
 unmapped as it was read */
-static unsigned long page_pointers(unsigned long address, uint32_t *values, unsigned long capacity)
-{
+static unsigned long page_pointers(unsigned long address, uint32_t *values, unsigned long capacity){
 	const uint32_t *words = (const uint32_t *)(uintptr_t)address;
 	unsigned long found = 0, kept = 0;
 	int index;
@@ -201,7 +202,7 @@ static void probe_tag_directory(void)
 	/* the guest is 32-bit, so its longs and pointers are four bytes even
 	though this is a 64-bit process: everything read here is a 32-bit word */
 	const uint32_t *globals;
-	uint32_t instances, header, count, index;
+	uint32_t instances, header, count, index, bsp;
 
 	if (host_image.end == 0 || !host_image.cache_file_globals || !host_image.global_tag_instances)
 		return;
@@ -214,6 +215,12 @@ static void probe_tag_directory(void)
 	host_logf(HOST_LOG_INFO, "tag directory: header %08x, loaded %d, instances %08x",
 		header, *(const int *)globals,
 		*(const uint32_t *)(image + (host_image.global_tag_instances - HALO_GUEST_IMAGE_BASE)));
+	/* where the level's own data is, so a page of pointers that were not
+	moved can be placed against it */
+	bsp = globals[0x808 / sizeof(uint32_t)];
+	if (bsp >= host_memory_window_base() && bsp < host_memory_window_base() + HALO_GUEST_WINDOW_SIZE)
+		host_logf(HOST_LOG_INFO, "  structure bsp header at %08x, window offset %08lx",
+			bsp, (unsigned long)(bsp - host_memory_window_base()));
 	/* the window is not necessarily at its preferred address, so the range it
 	can hold a pointer into starts where the host put it */
 	if (!header || header < host_memory_window_base())
@@ -232,19 +239,75 @@ static void probe_tag_directory(void)
 	}
 }
 
+/* the values of one page that still name the window as the game was linked,
+which is how a pointer the port has not moved yet shows up */
+static unsigned long page_stale(unsigned long address)
+{
+	const uint32_t *words = (const uint32_t *)(uintptr_t)address;
+	unsigned long found = 0;
+	int index;
+
+	probe_fault_armed = 1;
+	if (sigsetjmp(probe_fault_jump, 1) == 0)
+	{
+		for (index = 0; index < PROBE_PAGE / 4; index++)
+		{
+			uint32_t value = words[index];
+
+			if (value & 3)
+				continue;
+			if (value >= HALO_GUEST_WINDOW_BASE && value < HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+				found++;
+		}
+	}
+	probe_fault_armed = 0;
+	return found;
+}
+
+/* the first few of one page's stale values, and how many it has */
+static unsigned long page_stale_values(unsigned long address, uint32_t *values, unsigned long capacity)
+{
+	const uint32_t *words = (const uint32_t *)(uintptr_t)address;
+	unsigned long found = 0, kept = 0;
+	int index;
+
+	probe_fault_armed = 1;
+	if (sigsetjmp(probe_fault_jump, 1) == 0)
+	{
+		for (index = 0; index < PROBE_PAGE / 4; index++)
+		{
+			uint32_t value = words[index];
+
+			if (value & 3)
+				continue;
+			if (value < HALO_GUEST_WINDOW_BASE || value >= HALO_GUEST_WINDOW_BASE + HALO_GUEST_WINDOW_SIZE)
+				continue;
+			if (kept < capacity)
+				values[kept++] = value;
+			found++;
+		}
+	}
+	probe_fault_armed = 0;
+	return found;
+}
+
 static void probe_once(void)
 {
 	struct probe_page top[PROBE_TOP_PAGES];
-	unsigned long total = 0, scanned = 0;
+	struct probe_page stale_top[PROBE_TOP_PAGES];
+	unsigned long total = 0, scanned = 0, total_stale = 0;
 	int count = 0, index, range, window_first = 1;
+	int stale_count = 0;
 
 	probe_tag_directory();
+	total_stale = 0;
 	if (!probe_collect_ranges())
 		return;
 	for (range = 0; range < probe_range_count; range++)
 	{
 		unsigned long address;
 		unsigned long range_total = 0;
+		unsigned long range_stale = 0;
 
 		for (address = probe_ranges[range].start; address + PROBE_PAGE <= probe_ranges[range].end;
 			address += PROBE_PAGE)
@@ -252,6 +315,14 @@ static void probe_once(void)
 			unsigned long pointers = page_pointers(address, NULL, 0);
 
 			scanned += PROBE_PAGE;
+			{
+				unsigned long stale = page_stale(address);
+
+				range_stale += stale;
+				total_stale += stale;
+				if (stale)
+					page_remember(stale_top, &stale_count, address, stale, probe_ranges[range].name);
+			}
 			if (!pointers)
 				continue;
 			range_total += pointers;
@@ -267,15 +338,27 @@ static void probe_once(void)
 				probe_ranges[range].name);
 		}
 		window_first = 0;
-		if (range_total)
+		if (range_total || range_stale)
 		{
-			host_logf(HOST_LOG_INFO, "  %s: %lu values point into the window (%lu KB mapped here)",
-				probe_ranges[range].name, range_total,
+			host_logf(HOST_LOG_INFO, "  %s: %lu values point into the window, %lu still name the old one (%lu KB mapped here)",
+				probe_ranges[range].name, range_total, range_stale,
 				(probe_ranges[range].end - probe_ranges[range].start) / 1024);
 		}
 	}
-	host_logf(HOST_LOG_INFO, "window: %lu values point into it, in %d busiest pages of %lu KB readable",
-		total, count, scanned / 1024);
+	host_logf(HOST_LOG_INFO, "window: %lu values point into it, %lu still name the old one, in %d busiest pages of %lu KB readable",
+		total, total_stale, count, scanned / 1024);
+	for (index = 0; index < stale_count; index++)
+	{
+		uint32_t values[PROBE_VALUES];
+		unsigned long kept = page_stale_values(stale_top[index].address, values, PROBE_VALUES);
+
+		host_logf(HOST_LOG_INFO, "    stale %08lx (+%08lx in the window) [%s]: %lu values  %08lx %08lx %08lx %08lx",
+			stale_top[index].address,
+			(unsigned long)(stale_top[index].address - host_memory_window_base()),
+			stale_top[index].range, stale_top[index].pointers,
+			(unsigned long)(kept > 0 ? values[0] : 0), (unsigned long)(kept > 1 ? values[1] : 0),
+			(unsigned long)(kept > 2 ? values[2] : 0), (unsigned long)(kept > 3 ? values[3] : 0));
+	}
 	for (index = 0; index < count; index++)
 	{
 		uint32_t values[PROBE_VALUES];
