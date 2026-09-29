@@ -17,6 +17,7 @@ addToLibrary({
     streamBatch: null,
     flushContext: null,
     pendingFrames: null,
+    emptyBitmapReported: false,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -110,6 +111,19 @@ addToLibrary({
       return;
     }
     var bitmap = canvas.transferToImageBitmap();
+    // Chrome 153's serializer dereferences the backing image even when an
+    // allocation failure returned an empty, non-detached ImageBitmap. Its
+    // width/height getters safely report zero; never pass that object to
+    // postMessage's transfer list. Retry a later frame without blocking Halo.
+    if (!bitmap || !bitmap.width || !bitmap.height) {
+      bitmap?.close();
+      webHalo.flushContext?.();
+      if (!webHalo.emptyBitmapReported) {
+        webHalo.emptyBitmapReported = true;
+        webHalo.post('haloMessage', [0, 'Skipped an empty browser frame before transfer.']);
+      }
+      return;
+    }
     if (pending) Atomics.add(pending, 0, 1);
     try {
       webHalo.post('haloPresent', pending ? [bitmap, pending.buffer] : [bitmap], [bitmap]);

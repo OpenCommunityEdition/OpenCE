@@ -17,7 +17,8 @@ function runtime(batching, options = {}) {
       transferToImageBitmap() {
         events.push('bitmap');
         if (options.failTransfer) throw new Error('bitmap allocation failed');
-        const bitmap = { width: 640, height: 480, closed: false,
+        const size = options.bitmapSizes?.[bitmaps.length] || [640, 480];
+        const bitmap = { width: size[0], height: size[1], closed: false,
           close() { this.closed = true; } };
         bitmaps.push(bitmap);
         return bitmap;
@@ -32,7 +33,7 @@ function runtime(batching, options = {}) {
     postMessage(message, transfer) {
       events.push('post');
       if (options.failPost) throw new Error('post failed');
-      assert.equal(transfer[0], message.args[0], 'the bitmap is transferred');
+      if (message.handler === 'haloPresent') assert.equal(transfer[0], message.args[0], 'the bitmap is transferred');
       messages.push(message);
     },
   });
@@ -132,6 +133,24 @@ test('bitmap transfer failures do not leave occupied queue slots', () => {
     assert.throws(() => worker.library.web_js_gl_present(), /failed/);
     assert.equal(worker.pending(), 0);
     if (failure === 'failPost') assert.equal(worker.bitmaps[0].closed, true);
+  }
+});
+
+test('empty browser bitmaps are closed before serialization and later frames recover', () => {
+  for (const presentAck of [false, true]) {
+    const worker = runtime(true, { presentAck, bitmapSizes: [[0, 480], [640, 0], [640, 480]] });
+    worker.library.web_js_gl_present();
+    worker.library.web_js_gl_present();
+    assert.equal(worker.pending(), presentAck ? 0 : null, 'discarded bitmaps never occupy a queue slot');
+    assert.equal(worker.bitmaps[0].closed, true);
+    assert.equal(worker.bitmaps[1].closed, true);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 0);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloMessage').length, 1,
+      'the diagnostic is logged once without transferring an empty bitmap');
+    worker.library.web_js_gl_present();
+    assert.equal(worker.pending(), presentAck ? 1 : null);
+    assert.equal(worker.messages.filter(message => message.handler === 'haloPresent').length, 1);
+    assert.equal(worker.bitmaps[2].closed, false);
   }
 });
 
