@@ -55,6 +55,7 @@ can run the game, copies the game data out of the player's disc image
     quickPhase: null,
     interactionUnlocked: false,
     audioStarted: false,
+    roomSettingsOpen: false,
   };
 
   // ---------- settings (this browser's; nothing else depends on them)
@@ -451,6 +452,15 @@ can run the game, copies the game data out of the player's disc image
     HaloNet.cancelQuickPlay();
   }
 
+  function showRoomSettings(open) {
+    state.roomSettingsOpen = open;
+    document.body.classList[open ? 'add' : 'remove']('room-settings');
+    $('room-toggle').hidden = open || !state.started || !!state.invite;
+    $('room-close').hidden = !open;
+    HaloInput.setUIActive(open);
+    if (open && document.pointerLockElement) document.exitPointerLock();
+  }
+
   async function maybeQuickPlay() {
     if (!state.checksReady || state.started || state.dataBusy || !state.maps) return;
     if (state.manualMode) {
@@ -494,6 +504,7 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function openMainMenu() {
+    if (state.roomSettingsOpen) showRoomSettings(false);
     const unrecoverable = !$('fatal').hidden;
     state.inviteAttempt++;
     state.pendingInviteConnect = null;
@@ -720,6 +731,7 @@ can run the game, copies the game data out of the player's disc image
     }
     updatePlayButton();
     document.body.classList.add('playing');
+    $('room-toggle').hidden = !!state.invite;
     $('interaction-prompt').hidden = state.interactionUnlocked && (!state.audio || state.audio.state === 'running');
     $('quick-panel').hidden = !role;
     requestWakeLock();
@@ -932,12 +944,13 @@ can run the game, copies the game data out of the player's disc image
 
   function showOnline(status) {
     const inRoom = !!status.room;
-    $('online-join').hidden = inRoom;
+    $('online-join').hidden = false;
     $('online-room').hidden = !inRoom;
     $('online-default').disabled = !DEFAULT_ROOM || status.room === DEFAULT_ROOM;
     maybeQuickPlay();
     if (!inRoom) return;
     $('online-code').textContent = status.room;
+    $('room-toggle').textContent = 'Room ' + status.room;
     const players = status.players === 1 ? '1 other player' : `${status.players} other players`;
     $('online-status').textContent = status.brokers ? `Connected: ${players} in the room.` :
       'Looking for the room… (checking the connection)';
@@ -957,9 +970,38 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function joinRoom(code, { remember = true, updateURL = true } = {}) {
+    code = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 4 || code.length > 16) {
+      toast('Use a room code with 4–16 letters or digits.');
+      return Promise.resolve();
+    }
+    if (code === state.selectedRoom && code === HaloNet.status().room && !state.manualMode && !state.quickFailed)
+      return state.roomTask;
+    // Quick play is configured once when the engine starts. Changing only
+    // WebRTC rooms would leave its old host/client session running on a new LAN.
+    if (state.started) {
+      try {
+        if (remember) localStorage.setItem('halo-web-room', code);
+        localStorage.removeItem('halo-web-room-left');
+      } catch { /* not kept */ }
+      const url = new URL(location.href);
+      url.searchParams.set('room', code);
+      url.searchParams.delete('menu');
+      url.hash = '';
+      location.href = url.toString();
+      return Promise.resolve();
+    }
     cancelQuickPlay();
     state.quickFailed = false;
-    state.selectedRoom = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    state.selectedRoom = code;
+    if (updateURL) {
+      state.manualMode = false;
+      state.manualRequested = false;
+      const url = new URL(location.href);
+      url.searchParams.delete('menu');
+      history.replaceState(history.state, '', url);
+    }
+    $('online-share').disabled = true;
     return roomAction(async () => {
       const joined = await HaloNet.join(code, onlineOptions());
       try {
@@ -967,6 +1009,7 @@ can run the game, copies the game data out of the player's disc image
         localStorage.removeItem('halo-web-room-left');
       } catch { /* not kept */ }
       if (updateURL) setRoomURL(joined);
+      $('online-share').disabled = joined !== state.selectedRoom;
       updatePlayButton();
       maybeQuickPlay();
     });
@@ -991,6 +1034,18 @@ can run the game, copies the game data out of the player's disc image
     $('online-enter').onclick = () => joinRoom($('online-input').value);
     $('online-input').onkeydown = (event) => { if (event.key === 'Enter') joinRoom(event.target.value); };
     $('online-leave').onclick = () => {
+      if (state.started) {
+        try {
+          localStorage.removeItem('halo-web-room');
+          localStorage.setItem('halo-web-room-left', '1');
+        } catch { /* not kept */ }
+        const url = new URL(location.href);
+        url.searchParams.delete('room');
+        url.searchParams.set('menu', '1');
+        url.hash = '';
+        location.href = url.toString();
+        return Promise.resolve();
+      }
       cancelQuickPlay();
       state.selectedRoom = null;
       quickStatus('menu', 'Room left. Choose a room or open the main menu.');
@@ -1005,7 +1060,9 @@ can run the game, copies the game data out of the player's disc image
       });
     };
     $('online-share').onclick = async () => {
-      const link = roomLink(HaloNet.status().room);
+      const room = HaloNet.status().room;
+      if (!room || room !== state.selectedRoom || $('online-share').disabled) return;
+      const link = roomLink(room);
       try {
         if (navigator.share) await navigator.share({ title: 'Halo CE room', text: 'Join my Halo game', url: link });
         else {
@@ -1094,6 +1151,8 @@ can run the game, copies the game data out of the player's disc image
       return play({ userGesture: true });
     };
     $('main-menu').onclick = openMainMenu;
+    $('room-toggle').onclick = () => showRoomSettings(true);
+    $('room-close').onclick = () => showRoomSettings(false);
     $('quick-menu').onclick = openMainMenu;
     $('interaction-menu').onclick = openMainMenu;
     $('fatal-menu').onclick = openMainMenu;

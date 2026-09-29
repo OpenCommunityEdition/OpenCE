@@ -102,7 +102,7 @@ test('invalid identity and insecure relay fail closed', async () => {
 async function launcher(useTransport = async () => {}, options = {}) {
   const elements = new Map();
   const storage = options.storage || new Map(), joins = [], listeners = [];
-  const quickCalls = [], phases = [], windowEvents = new Map();
+  const quickCalls = [], phases = [], windowEvents = new Map(), uiActive = [];
   let room = null;
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -116,6 +116,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
     console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException,
     setTimeout: options.setTimeout || setTimeout, clearTimeout: options.clearTimeout || clearTimeout,
     navigator: { userAgent: 'Test', platform: 'Test', storage: options.gameStorage || { getDirectory() {} },
+      ...(options.share ? { share: options.share } : {}),
       ...(options.serviceWorker ? { serviceWorker: options.serviceWorker } : {}) },
     location: new URL(options.url || 'http://localhost:8780/'),
     document: { getElementById: element, createElement: () => element(Symbol()),
@@ -134,6 +135,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
     HALO_BROWSER_CONFIG: { relayUrl: options.relayUrl ?? 'ws://localhost:8781/join',
       ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
+    HaloInput: { setUIActive: active => uiActive.push(active) },
     HaloNet: {
       on(listener) { listeners.push(listener); }, addressText: address => [address & 255,
         (address >>> 8) & 255, (address >>> 16) & 255, address >>> 24].join('.'),
@@ -144,7 +146,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
         return new Promise((_resolve, reject) => request.signal.addEventListener('abort',
           () => reject(new DOMException('Aborted', 'AbortError')), { once: true }));
       },
-      cancelQuickPlay() {}, quickPlayStarted() {},
+      cancelQuickPlay() {}, quickPlayStarted() {}, newRoomCode: () => 'PRIVATE7',
       quickPlayPhase(phase) { phases.push(phase); },
       async join(code) {
         joins.push(code);
@@ -165,7 +167,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
   if (!options.mapsState) assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
-  return { element, context, storage, joins, quickCalls, phases, windowEvents,
+  return { element, context, storage, joins, quickCalls, phases, windowEvents, uiActive,
     emitNetwork: (type, detail) => listeners.forEach(listener => listener(type, detail)) };
 }
 
@@ -405,6 +407,103 @@ test('existing host selection joins its exact address without a menu click', asy
     quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
+});
+
+test('switching an active match restarts in the selected room and preserves cached game data', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FQLX01&batch_streams=0',
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  const firstModule = page.context.Module;
+  page.element('online-input').value = ' friends-9 ';
+  await page.element('online-enter').onclick();
+  assert.equal(page.context.location.search, '?room=FRIENDS9&batch_streams=0');
+  assert.equal(page.storage.get('halo-web-room'), 'FRIENDS9');
+  assert.deepEqual(page.joins, ['FQLX01'], 'do not attach the running engine to a different room');
+  assert.equal(page.context.Module, firstModule, 'the new document starts its own runtime');
+  const reloaded = await launcher(undefined, { url: page.context.location.href, storage: page.storage,
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
+  assert.deepEqual(reloaded.joins, ['FRIENDS9']);
+  assert.ok(reloaded.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
+});
+
+test('New room and Join default room restart an active game into the requested room', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  assert.equal(page.element('online-join').hidden, false, 'room controls stay visible');
+  await page.element('online-create').onclick();
+  assert.equal(page.context.location.search, '?room=PRIVATE7');
+  assert.equal(page.storage.get('halo-web-room'), 'PRIVATE7');
+  const next = await launcher(undefined, { url: page.context.location.href, storage: page.storage,
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  await next.element('online-default').onclick();
+  assert.equal(next.context.location.search, '?room=FQLX01');
+  assert.deepEqual(next.joins, ['PRIVATE7']);
+});
+
+test('room controls can be opened during a game without sending typing to Halo', async () => {
+  const page = await launcher(undefined, {
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  assert.equal(page.element('room-toggle').hidden, false);
+  page.element('room-toggle').onclick();
+  assert.equal(page.element('room-close').hidden, false);
+  assert.equal(page.element('room-toggle').hidden, true);
+  assert.deepEqual(page.uiActive, [true]);
+  page.element('room-close').onclick();
+  assert.equal(page.element('room-close').hidden, true);
+  assert.equal(page.element('room-toggle').hidden, false);
+  assert.deepEqual(page.uiActive, [true, false]);
+});
+
+test('Leave closes an active session and remains out after restarting the launcher', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  await page.element('online-leave').onclick();
+  assert.equal(page.context.location.search, '?menu=1');
+  assert.equal(page.storage.get('halo-web-room-left'), '1');
+  assert.equal(page.storage.has('halo-web-room'), false);
+  const next = await launcher(undefined, { url: page.context.location.href, storage: page.storage });
+  assert.deepEqual(next.joins, []);
+  assert.equal(next.context.Module, undefined);
+});
+
+test('choosing a room from the main-menu launcher enables automatic multiplayer', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?menu=1&room=FQLX01',
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  assert.equal(page.context.Module, undefined);
+  page.element('online-input').value = 'FQLX01';
+  await page.element('online-enter').onclick();
+  await new Promise(setImmediate);
+  assert.equal(page.context.location.search, '?room=FQLX01');
+  assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
+});
+
+test('invalid room selection does not cancel the current match or overwrite its link', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  for (const value of ['abc', 'a'.repeat(17)]) {
+    page.element('online-input').value = value;
+    await page.element('online-enter').onclick();
+    assert.equal(page.context.location.search, '?room=FRIENDS9');
+    assert.deepEqual(page.joins, ['FRIENDS9']);
+  }
+});
+
+test('Share link always names the joined room and waits for room switching to finish', async () => {
+  const shared = [];
+  let finishJoin;
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?menu=1&room=FQLX01&fps=1',
+    share: async value => shared.push(value) });
+  await page.element('online-share').onclick();
+  assert.equal(shared[0].url, 'http://localhost:8780/?room=FQLX01');
+  const delayed = await launcher(undefined, { url: 'http://localhost:8780/?menu=1&room=FRIENDS9',
+    share: async value => shared.push(value),
+    beforeJoin: () => new Promise(resolve => { finishJoin = resolve; }) });
+  assert.equal(delayed.element('online-share').disabled, true);
+  await delayed.element('online-share').onclick();
+  assert.equal(shared.length, 1);
+  finishJoin();
+  await new Promise(setImmediate);
+  await delayed.element('online-share').onclick();
+  assert.equal(shared[1].url, 'http://localhost:8780/?room=FRIENDS9');
 });
 
 test('connection-panel Show log opens the same current runtime and saved diagnostic log as Settings', async () => {

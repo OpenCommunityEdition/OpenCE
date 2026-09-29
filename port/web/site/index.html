@@ -91,6 +91,7 @@
     </section>
 
     <section class="online" id="browser-rooms" aria-labelledby="online-title">
+      <button id="room-close" class="button small-button" type="button" hidden>Back to game</button>
       <h2 id="online-title">Browser rooms</h2>
       <p class="small">The room opens a multiplayer match automatically when your game data is ready.
         One player hosts; keep that game open so others can play. Your address: <code id="online-address"></code></p>
@@ -99,7 +100,7 @@
       <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
       <div id="online-join" class="row">
         <button type="button" class="button" id="online-create">New room</button>
-        <input id="online-input" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
+        <input id="online-input" aria-label="Room code" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
         <button type="button" class="button" id="online-enter">Join</button>
       </div>
       <div id="online-room" hidden>
@@ -135,6 +136,7 @@
   </section>
 </main>
 
+<button id="room-toggle" class="button small-button room-toggle" type="button" hidden>Room</button>
 <section id="quick-panel" class="quick-panel" hidden aria-label="Multiplayer connection">
   <p id="quick-game-status" role="status" aria-live="polite"></p>
   <button id="quick-menu" class="button small-button" type="button">Main menu</button>

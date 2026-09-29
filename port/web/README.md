@@ -116,6 +116,9 @@ play; `?menu=1` opens the normal launcher and game menu instead.
 
 For a separate group, choose *New room*, then *Share link*. Opening that
 link joins its browser room, and the launcher remembers the chosen room.
+The room controls remain available during a match. Choosing another room
+restarts Halo into that room using the cached maps; *Leave* closes the session
+and returns to the launcher. A link joins only the room named in `?room=`.
 *Leave* stays out across reloads; *Join default room* returns to FQLX01.
 Manual System Link also allows a one-player start with distributed networking,
 including hosting a non-team game while waiting for other players. The host
