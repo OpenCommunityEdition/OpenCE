@@ -115,7 +115,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
   const context = {
     console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException,
     setTimeout: options.setTimeout || setTimeout, clearTimeout: options.clearTimeout || clearTimeout,
-    navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} },
+    navigator: { userAgent: 'Test', platform: 'Test', storage: options.gameStorage || { getDirectory() {} },
       ...(options.serviceWorker ? { serviceWorker: options.serviceWorker } : {}) },
     location: new URL(options.url || 'http://localhost:8780/'),
     document: { getElementById: element, createElement: () => element(Symbol()),
@@ -130,7 +130,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
     screen: {}, history: { pushState() {}, replaceState(_state, _title, url) { context.location.href = String(url); } },
     crossOriginIsolated: true,
     OffscreenCanvas: class { getContext() { return {}; } },
-    WebAssembly: { Memory: class {} }, fetch: options.fetch || (async () => { throw new Error('Offline'); }),
+    WebAssembly: { Memory: options.Memory || class {} }, fetch: options.fetch || (async () => { throw new Error('Offline'); }),
     HALO_BROWSER_CONFIG: { relayUrl: options.relayUrl ?? 'ws://localhost:8781/join',
       ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
@@ -168,6 +168,57 @@ async function launcher(useTransport = async () => {}, options = {}) {
   return { element, context, storage, joins, quickCalls, phases, windowEvents,
     emitNetwork: (type, detail) => listeners.forEach(listener => listener(type, detail)) };
 }
+
+test('Safari storage rejection gives recovery guidance before memory allocation and still offers updates', async () => {
+  let allocations = 0, inspections = 0;
+  const messages = [];
+  const { element, context } = await launcher(undefined, {
+    defaultRoom: '',
+    gameStorage: { async getDirectory() {
+      throw new DOMException('The operation failed for an unknown transient reason (e.g. out of memory).', 'UnknownError');
+    } },
+    Memory: class { constructor() { allocations++; } },
+    mapsState: async () => { inspections++; return null; },
+    fetch: async url => ({ json: async () => ({ version: url.includes('latest') ? 'new' : 'old' }) }),
+    serviceWorker: { register: async () => {}, addEventListener() {},
+      controller: { postMessage: message => messages.push(message) } },
+  });
+  assert.equal(allocations, 0, 'unavailable storage must not leave a 2.1 GB memory reservation');
+  assert.equal(inspections, 0, 'stop before attempting to read the blocked map cache');
+  assert.equal(context.Module, undefined);
+  const checks = element('checks').children;
+  assert.ok(checks.some(check => check.className === 'check bad' && /regular tab.*Private Browsing/.test(check.textContent)));
+  assert.ok(!checks.some(check => /page could not start|Memory \(/.test(check.textContent)));
+  assert.ok(!checks.some(check => check.className === 'check' && /storage/i.test(check.textContent)));
+  assert.equal(element('update-notice').hidden, false, 'repairs remain reachable after a failed check');
+  element('update-button').onclick();
+  assert.deepEqual(messages, ['update']);
+});
+
+test('missing storage API fails cleanly without inspecting data or allocating memory', async () => {
+  const { element } = await launcher(undefined, {
+    defaultRoom: '', gameStorage: {},
+    Memory: class { constructor() { assert.fail('unexpected memory allocation'); } },
+    mapsState: async () => { assert.fail('unexpected cache inspection'); },
+  });
+  assert.ok(element('checks').children.some(check => check.className === 'check bad' && /storage is unavailable/.test(check.textContent)));
+});
+
+test('usable storage is opened before memory allocation and normal cached startup remains available', async () => {
+  const order = [];
+  const { element } = await launcher(undefined, {
+    defaultRoom: '',
+    gameStorage: { async getDirectory() { order.push('storage'); return {}; } },
+    Memory: class { constructor() { order.push('memory'); } },
+    mapsState: async () => {
+      order.push('maps');
+      return { files: ['ui.map'], bytes: 2048, dataRoot: '/data', saveRoot: '/data/save' };
+    },
+  });
+  assert.deepEqual(order, ['storage', 'memory', 'maps']);
+  assert.equal(element('step-play').hidden, false);
+  assert.ok(element('checks').children.some(check => check.className === 'check' && /Game file storage/.test(check.textContent)));
+});
 
 for (const autoLaunch of [false, true]) {
   test(`update notice survives room notifications and remains retryable ${autoLaunch ? 'after auto-launch' : 'in the launcher'}`, async () => {

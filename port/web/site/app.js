@@ -153,13 +153,29 @@ can run the game, copies the game data out of the player's disc image
     }
   }
 
+  async function checkGameStorage() {
+    if (!navigator.storage?.getDirectory) {
+      return addCheck(false, 'Game storage is unavailable in this browser. Open this page in an up-to-date Safari or Chrome.');
+    }
+    try {
+      // Safari exposes this API even when it refuses OPFS access (for
+      // example in Private Browsing). Test access before reserving memory.
+      await navigator.storage.getDirectory();
+      return addCheck(true, 'Game file storage (OPFS)');
+    } catch (error) {
+      log('game storage: ' + (error?.stack || error));
+      return addCheck(false, 'Game storage could not be opened. In Safari, open this link in a regular tab ' +
+        'instead of Private Browsing. If you are already in a regular tab, close other Halo tabs and restart Safari.');
+    }
+  }
+
   async function runChecks() {
     let ok = true;
     ok = addCheck(window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined',
       window.crossOriginIsolated ? 'Threads (SharedArrayBuffer)' :
         'Threads: this page is not cross-origin isolated. Reload it; if this stays, the browser is too old.') && ok;
     ok = addCheck(webgl2InWorkers(), 'WebGL 2 from a worker (OffscreenCanvas; iOS 17 or later)') && ok;
-    ok = addCheck(!!(navigator.storage && navigator.storage.getDirectory), 'Private file storage (OPFS)') && ok;
+    ok = await checkGameStorage() && ok;
     if (ok) {
       try {
         state.memory = new WebAssembly.Memory({ initial: MEMORY_PAGES, maximum: MEMORY_PAGES, shared: true });
@@ -1144,6 +1160,8 @@ can run the game, copies the game data out of the player's disc image
     window.addEventListener('appinstalled', () => { $('install-android').hidden = true; });
 
     await ensureIsolation();
+    // A failed capability or data check must not hide an available repair.
+    checkForUpdate();
     setUpOnline();
     setUpInvites();
     const ok = await runChecks();
@@ -1157,7 +1175,6 @@ can run the game, copies the game data out of the player's disc image
     } else {
       downloadMaps();
     }
-    checkForUpdate();
   }
 
   main().catch((error) => {
