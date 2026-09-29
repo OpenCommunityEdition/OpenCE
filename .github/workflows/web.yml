@@ -1,11 +1,8 @@
 name: Web
 
 # The web port (port/web/README.md): builds it with Emscripten for every
-# pushed commit, and publishes the build of main to GitHub Pages, where it
-# installs on an iPhone or iPad as a home-screen web app.
-#
-# To publish from a fork: Settings > Pages > Build and deployment > Source:
-# GitHub Actions.
+# pushed commit. Production Pages uses the separate reviewed static branch;
+# an engine build alone must not replace the deployed launcher.
 on:
   push:
     paths-ignore:
@@ -50,20 +47,32 @@ jobs:
           python3 configure.py --release
           ninja web
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Check browser invitation and cache handling
+        run: |
+          node --test tools/tests/*.test.cjs
+          node tools/test_source_cache.mjs
+          clang -std=c11 -pthread -fsanitize=address -g -Iport/linux/src tools/test_web_net.c -o build/test_web_net
+          build/test_web_net
+
+      - uses: actions/upload-artifact@v4
         with:
+          name: web-runtime
           path: build/web/site
 
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    needs: build
+  relay:
     runs-on: ubuntu-24.04
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 10
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - name: Test native P2P bridge with local host fixture
+        run: make -C port/relay test
+      - name: Test WebSocket session handling
+        working-directory: tools/browser-relay
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          NATIVE_WORKER=../../port/relay/halo-relay-worker-test npm run test:native

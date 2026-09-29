@@ -19,7 +19,11 @@ invite's token, and goes to topics that are hashes of it, so the brokers
 A joiner repeats its JOIN until the tunnel reaches the host.
 */
 
+#ifdef HALO_RELAY
+#include "relay_platform.h"
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"

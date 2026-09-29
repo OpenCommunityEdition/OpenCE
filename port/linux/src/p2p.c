@@ -39,7 +39,11 @@ The work happens on a thread of its own, under p2p_lock; the game's
 threads only look up and create stand-ins.
 */
 
+#ifdef HALO_RELAY
+#include "relay_platform.h"
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"
@@ -527,6 +531,12 @@ static void add_candidates(struct peer *peer, const struct p2p_candidate *candid
 	for (index = 0; index < count; index++)
 	{
 		int known;
+
+#ifdef HALO_RELAY
+		/* An internet-facing relay must not punch into its private network. */
+		if (!relay_candidate_allowed(candidates[index].address, candidates[index].port))
+			continue;
+#endif
 
 		for (known = 0; known < peer->candidate_count; known++)
 		{
@@ -2037,7 +2047,7 @@ void p2p_initialize(unsigned long local_address)
 		posix_socket_setsockopt(p2p.tunnel_socket, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
 		posix_socket_setsockopt(p2p.tunnel_socket, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
 	}
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_RELAY)
 	/* the first copy of the game takes the invites later ones are opened
 	with */
 	p2p.handoff_socket = open_socket(SOCK_DGRAM, network_long(0x7F000001), network_short(HANDOFF_PORT), NULL);
@@ -2052,6 +2062,8 @@ void p2p_initialize(unsigned long local_address)
 	}
 	pthread_detach(thread);
 	p2p.running = 1;
+#ifndef HALO_RELAY
 	if (command_line_invite(invite, sizeof(invite)))
 		p2p_join_invite(invite);
+#endif
 }

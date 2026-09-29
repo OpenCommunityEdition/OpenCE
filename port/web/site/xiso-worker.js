@@ -5,7 +5,7 @@ Copies the maps folder out of an Xbox disc image of Halo: Combat Evolved
 (an "xiso", .iso or .xiso) into the site's Origin Private File System, as
 port/linux/src/xiso.c does for the desktop ports. It runs in a Worker so
 that it can use the synchronous OPFS access handles, which every browser
-with OPFS has (Safari has no writable streams before 17.4).
+with OPFS has (Safari has no writable streams before version 26).
 
 The file system is XDVDFS: 2048-byte sectors; a volume descriptor at 0x10000
 that starts and ends with "MICROSOFT*XBOX*MEDIA" and gives the root
@@ -158,11 +158,25 @@ async function extract(file) {
   return { files: files.length, bytes: total };
 }
 
+importScripts('cache.js');
+let cacheAbort = null;
+
 onmessage = async (event) => {
+  if (event.data.type === 'cancel-cache') {
+    cacheAbort?.abort();
+    return;
+  }
   try {
+    if (event.data.type === 'cache') {
+      cacheAbort = new AbortController();
+      const maps = await HaloCache.ensure({ signal: cacheAbort.signal,
+        onProgress: progress => postMessage({ type: 'cache-progress', progress }) });
+      postMessage({ type: 'cache-done', maps });
+      return;
+    }
     const result = await extract(event.data.file);
     postMessage({ type: 'done', ...result });
   } catch (error) {
-    postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
+    postMessage({ type: 'error', name: error.name, message: error && error.message ? error.message : String(error) });
   }
 };
