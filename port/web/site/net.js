@@ -109,6 +109,8 @@ const HaloNet = (() => {
   const HELLO_INTERVAL = 3000;
   const PEER_TIMEOUT = 20000;
   const PACKET_HEADER = 24;
+  const MAX_RELIABLE_QUEUE = 8 * 1024 * 1024;
+  const MAX_CHANNEL_BUFFER = 1024 * 1024;
   const KIND = { DATAGRAM: 1, OPEN: 2, DATA: 3, CLOSE: 4, REFUSE: 5 };
 
   const state = {
@@ -358,10 +360,34 @@ const HaloNet = (() => {
     peer.connectingSince = Date.now();
     peer.reliable = pc.createDataChannel('reliable', { negotiated: true, id: 0, ordered: true });
     peer.unreliable = pc.createDataChannel('unreliable', { negotiated: true, id: 1, ordered: false, maxRetransmits: 0 });
+    peer.received = [];
+    peer.receivedHead = 0;
+    peer.receivedBytes = 0;
     for (const channel of [peer.reliable, peer.unreliable]) {
       channel.binaryType = 'arraybuffer';
-      channel.onmessage = (event) => incoming(new Uint8Array(event.data));
     }
+    peer.reliable.onmessage = (event) => {
+      if (peer.pc !== pc || !state.shared) return;
+      const packet = new Uint8Array(event.data);
+      if (packet.length < PACKET_HEADER || packet.length > state.shared.offsets.netInBytes ||
+          new DataView(packet.buffer).getUint32(0, true) !== packet.length ||
+          peer.receivedBytes + packet.length > MAX_RELIABLE_QUEUE) {
+        // Disconnect on overflow instead of silently corrupting the byte stream.
+        dropPeer(peer);
+        return;
+      }
+      peer.received.push(packet);
+      peer.receivedBytes += packet.length;
+      pump();
+    };
+    peer.unreliable.onmessage = (event) => {
+      if (peer.pc !== pc) return;
+      incoming(new Uint8Array(event.data));
+      // Network events also drain output while background timers are throttled.
+      pump();
+    };
+    peer.reliable.bufferedAmountLowThreshold = MAX_CHANNEL_BUFFER / 2;
+    peer.reliable.onbufferedamountlow = () => { if (peer.pc === pc) pump(); };
     peer.reliable.onopen = () => {
       peer.open = true;
       emit('joined', { name: peer.name, address: addressText(peer.address) });
@@ -494,13 +520,27 @@ const HaloNet = (() => {
 
   function send(channel, packet) {
     if (channel && channel.readyState === 'open') {
-      try { channel.send(packet); } catch { /* closing */ }
+      if (channel.bufferedAmount + packet.length > MAX_CHANNEL_BUFFER) return false;
+      try { channel.send(packet); return true; } catch { /* closing */ }
     }
+    return false;
   }
 
   function pump() {
     if (!state.shared) return;
     if (state.transport) state.transport.flush(incoming);
+    for (const peer of state.peers.values()) {
+      if (!peer.received) continue;
+      while (peer.receivedHead < peer.received.length && incoming(peer.received[peer.receivedHead]))
+        peer.receivedBytes -= peer.received[peer.receivedHead++].length;
+      if (peer.receivedHead === peer.received.length) {
+        peer.received.length = 0;
+        peer.receivedHead = 0;
+      } else if (peer.receivedHead > 1024) {
+        peer.received.splice(0, peer.receivedHead);
+        peer.receivedHead = 0;
+      }
+    }
     const i32 = words();
     const memory = new Uint8Array(state.shared.memory.buffer);
     const capacity = state.shared.offsets.netOutBytes;
@@ -540,7 +580,8 @@ const HaloNet = (() => {
         }
       } else {
         const peer = state.byAddress.get(header.destination);
-        if (peer && peer.open) send(peer.reliable, packet);
+        // WebRTC backpressure must not consume bytes the channel did not take.
+        if (peer && peer.open) { if (!send(peer.reliable, packet)) break; }
         else if (header.kind === KIND.OPEN) refuse(header);
       }
       read = (read + size) >>> 0;
