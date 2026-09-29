@@ -16,6 +16,7 @@ addToLibrary({
     canvas: null,
     streamBatch: null,
     flushContext: null,
+    pendingFrames: null,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -29,7 +30,7 @@ addToLibrary({
   },
 
   web_js_gl_create__deps: ['$GL', '$webHalo'],
-  web_js_gl_create: (width, height, batchStreams) => {
+  web_js_gl_create: (width, height, batchStreams, presentAck) => {
     if (typeof OffscreenCanvas == 'undefined') {
       webHalo.post('haloMessage', [3, 'This browser cannot draw from a worker (OffscreenCanvas). iOS 17 or later is needed.']);
       return 0;
@@ -54,6 +55,11 @@ addToLibrary({
     // the pthread runtime. Native state caches already suppress redundant
     // setters; this merges append-only streamed uploads before their draws.
     webHalo.flushContext = context.flush.bind(context);
+    // A separate shared counter lets the page release transferred bitmaps
+    // even though this worker cannot service acknowledgement messages. Only
+    // enable it when the launcher advertises support: an already open old
+    // page can load a newer runtime after a service-worker update.
+    webHalo.pendingFrames = presentAck ? new Int32Array(new SharedArrayBuffer(4)) : null;
     webHalo.streamBatch = batchStreams ? globalThis.HaloStreamBatch.install(context) : null;
     canvas.addEventListener?.('webglcontextlost', (event) => {
       event.preventDefault();
@@ -96,8 +102,22 @@ addToLibrary({
     // Explicitly flush even when a frame has no final blit. Timers and RAF
     // cannot provide this barrier on the continuously running game worker.
     webHalo.streamBatch?.flush();
+    var pending = webHalo.pendingFrames;
+    if (pending && Atomics.load(pending, 0) >= 2) {
+      // The page is busy or suspended. Keep submitting rendered commands,
+      // without allocating more GPU-backed bitmaps or blocking simulation.
+      webHalo.flushContext?.();
+      return;
+    }
     var bitmap = canvas.transferToImageBitmap();
-    webHalo.post('haloPresent', [bitmap], [bitmap]);
+    if (pending) Atomics.add(pending, 0, 1);
+    try {
+      webHalo.post('haloPresent', pending ? [bitmap, pending.buffer] : [bitmap], [bitmap]);
+    } catch (error) {
+      if (pending) Atomics.sub(pending, 0, 1);
+      bitmap.close();
+      throw error;
+    }
   },
 
   // kind: 0 status, 1 notice, 2 clipboard text, 3 fatal error

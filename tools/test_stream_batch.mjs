@@ -23,6 +23,7 @@ class MockGL {
         this.trace = [];
         this.drawFramebuffer = null;
         this.presented = [];
+        this.submissions = [];
         this.feedback = null;
         this.feedbackActive = false;
     }
@@ -31,6 +32,7 @@ class MockGL {
     bindFramebuffer(target, framebuffer) { if (target === this.FRAMEBUFFER || target === this.DRAW_FRAMEBUFFER) this.drawFramebuffer = framebuffer; }
     deleteFramebuffer(framebuffer) { if (framebuffer && this.drawFramebuffer === framebuffer) this.drawFramebuffer = null; }
     blitFramebuffer() { if (this.drawFramebuffer === null) this.presented.push(this.draws.slice()); }
+    flush() { this.submissions.push(this.draws.length); }
     bindBufferRange(target, index, buffer, offset, size) {
         this.bindings.set(target, buffer);
         if (target === this.TRANSFORM_FEEDBACK_BUFFER) this.feedback = { buffer, offset };
@@ -281,16 +283,16 @@ process.stdout.write("PASS fixed queue bound and complete large-frame replay\n")
 const workerLibrary = readFileSync(new URL("../port/web/src/web_library.js", import.meta.url), "utf8");
 for (const enabled of [0, 1]) {
     const gl = new MockGL(), messages = [];
-    let library, bitmapTransfers = 0;
+    let library, bitmapTransfers = 0, expectedDrawsAtTransfer = 2;
     const context = vm.createContext({
-        Uint8Array, ArrayBuffer,
+        Uint8Array, ArrayBuffer, SharedArrayBuffer,
         WebGLRenderingContext: { prototype: MockGL.prototype }, WebGL2RenderingContext: { prototype: {} },
         OffscreenCanvas: class {
             constructor(width, height) { this.width = width; this.height = height; }
             getContext(type) { assert.equal(type, "webgl2"); return gl; }
             transferToImageBitmap() {
                 bitmapTransfers++;
-                assert.equal(gl.draws.length, 2, "all draws must execute before bitmap transfer");
+                assert.equal(gl.draws.length, expectedDrawsAtTransfer, "all draws must execute before bitmap transfer");
                 return { width: this.width, height: this.height, draws: gl.draws.slice() };
             }
         },
@@ -302,7 +304,7 @@ for (const enabled of [0, 1]) {
     vm.runInContext(source, context);
     vm.runInContext(workerLibrary, context);
     context.webHalo = library.$webHalo;
-    assert.equal(library.web_js_gl_create(640, 480, enabled), 7);
+    assert.equal(library.web_js_gl_create(640, 480, enabled, true), 7);
     const controller = context.webHalo.streamBatch;
     if (enabled) assert.equal(context.HaloStreamBatch.install(gl), controller, "install must be idempotent");
     else assert.equal(controller, null);
@@ -321,6 +323,10 @@ for (const enabled of [0, 1]) {
     assert.deepEqual(gl.draws.map(draw => draw.vertices), [[1, 2, 3], [4, 5, 6]]);
     assert.equal(messages[0].message.handler, "haloPresent");
     assert.equal(messages[0].message.args[0], messages[0].transfer[0]);
+    const pending = new Int32Array(messages[0].message.args[1]);
+    assert.equal(pending.buffer.byteLength, 4, "presentation acknowledgement uses a separate shared word");
+    assert.equal(Atomics.load(pending, 0), 1);
+    assert.equal(messages[0].transfer.length, 1, "shared counters must be shared, not transferred");
     if (enabled) {
         assert.equal(controller.snapshot().uploadsSaved, 1);
         controller.resetStats();
@@ -338,8 +344,31 @@ for (const enabled of [0, 1]) {
     }
     assert.equal(bitmapTransfers, 1, "hidden frame barriers must not transfer bitmaps");
     assert.equal(messages.length, 1, "hidden frames must not queue page presentation messages");
+    assert.deepEqual(gl.submissions, Array.from({ length: 10 }, (_, frame) => frame + 3),
+        "every hidden frame must submit native GPU work after replaying its draw");
+
+    // Leave both visible transfers unconsumed, then render another frame.
+    // Backpressure must replay and submit its draw without retaining another
+    // bitmap; a shared acknowledgement makes the next handoff possible.
+    expectedDrawsAtTransfer = 12;
+    library.web_js_gl_present();
+    assert.equal(Atomics.load(pending, 0), 2);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 4, new Uint8Array([10, 11, 12]));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    library.web_js_gl_present();
+    assert.equal(gl.draws.length, 13);
+    assert.deepEqual(gl.draws.at(-1).vertices, [10, 11, 12]);
+    assert.equal(gl.submissions.at(-1), 13, "a full handoff queue must still submit the new draw");
+    assert.equal(gl.submissions.length, 11);
+    assert.equal(bitmapTransfers, 2, "a blocked consumer must bound GPU bitmap allocations");
+    assert.equal(messages.length, 2);
+    Atomics.sub(pending, 0, 1);
+    expectedDrawsAtTransfer = 13;
+    library.web_js_gl_present();
+    assert.equal(bitmapTransfers, 3, "acknowledgement releases a handoff slot");
+    assert.equal(Atomics.load(pending, 0), 2);
 }
-process.stdout.write("PASS worker source runtime flushes visible and hidden frames and supports opt-out\n");
+process.stdout.write("PASS worker source runtime submits visible, hidden and backpressured frames and supports opt-out\n");
 
 // Optional CPU-only comparison of recorder overhead. This uses no-op native GL
 // methods; it cannot predict GPU time or game FPS. Pin a checked-in baseline:
