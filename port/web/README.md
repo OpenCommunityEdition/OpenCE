@@ -7,9 +7,9 @@ Safari, tap Share, then *Add to Home Screen*. On Android, open it in Chrome
 *Install app* in the browser's menu. The installed app runs full screen and
 works offline.
 
-The GitHub Actions workflow `.github/workflows/web.yml` builds the site for
-each commit and publishes the build of `main` on GitHub Pages (in the
-repository's settings: Pages > Source: GitHub Actions).
+The GitHub Actions workflow `.github/workflows/web.yml` builds and tests the
+site for each pushed commit. The public game is packaged and deployed
+separately; see [GITHUB_PAGES.md](../../GITHUB_PAGES.md).
 
 The web build uses the platform layer of the Linux build (`port/linux/src`)
 and the code paths of the Android build (OpenGL ES 3, the display's shape).
@@ -73,14 +73,20 @@ without use: install the app to keep it.
 
 ## Online play
 
-Players who install the app can play together over the internet, with the
-game's own system link:
+Browser players can play together over the internet, with the game's own
+system link. The launcher joins the public **FQLX01** room on a first visit.
+Both hosted domains use that same room. Share a link ending in
+`?room=FQLX01` to enter it directly.
 
-1. Each player opens *Play online* on the launcher page. One pushes *New
-   room*, then *Share link*; the others open the link (or type the room's
-   code and push *Join*). The page shows who is in the room.
-2. In the game, one player hosts from *Multiplayer* > *System Link Play*
-   (A or Y to start a game); the others see the game in that list and join.
+1. Wait for the maps to finish downloading, then press *Play*.
+2. One player hosts from *Multiplayer* > *System Link Play* (A or Y to start
+   a game); the others see the game in that list and join. The host must
+   keep the game open. The public room does not run a permanent game server.
+
+For a separate group, choose *New room*, then *Share link*. Opening that
+link joins its browser room, and the launcher remembers the chosen room.
+*Leave* stays out across reloads; *Join default room* returns to FQLX01.
+Joining a room does not automatically launch the engine or enter a match.
 
 Everyone in a room is on one network, as on a LAN: up to the game's limits
 of machines and players, split screen on each machine included.
@@ -104,8 +110,9 @@ How it works (`site/net.js`, `src/web_net.c`):
   public servers). Some networks, mobile carriers' especially, need a TURN
   relay: *Settings and data* can name one.
 
-The web build does not play with the desktop and Android builds' internet
-play, which uses UDP.
+Desktop and Android invitations use a separate UDP protocol. Joining those
+hosts requires the [native relay](../../BROWSER_NATIVE_INVITES.md), which is
+not configured on the public sites. Browser rooms do not use that relay.
 
 ## How the port operates
 

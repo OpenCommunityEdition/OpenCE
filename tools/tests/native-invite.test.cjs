@@ -95,8 +95,10 @@ test('invalid identity and insecure relay fail closed', async () => {
 
 // Exercise the real launcher's public button handlers and gateway events;
 // stub browser capabilities without starting a game or reserving 2.1 GB.
-async function launcher(useTransport = async () => {}) {
+async function launcher(useTransport = async () => {}, options = {}) {
   const elements = new Map();
+  const storage = options.storage || new Map(), joins = [], listeners = [];
+  let room = null;
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
       value: '', disabled: false, hidden: true, dataset: {}, children: [],
@@ -108,25 +110,42 @@ async function launcher(useTransport = async () => {}) {
   const context = {
     console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, setTimeout, clearTimeout,
     navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} } },
-    location: { href: 'http://localhost:8780/', search: '', hash: '' },
+    location: new URL(options.url || 'http://localhost:8780/'),
     document: { getElementById: element, createElement: () => element(Symbol()),
       body: element('body'), documentElement: {}, addEventListener() {} },
-    localStorage: { getItem: () => null, setItem() {} },
+    localStorage: { getItem: key => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
     matchMedia: () => ({ matches: false }), addEventListener() {},
-    screen: {}, history: { pushState() {} }, crossOriginIsolated: true,
+    screen: {}, history: { pushState() {}, replaceState(_state, _title, url) { context.location.href = String(url); } },
+    crossOriginIsolated: true,
     OffscreenCanvas: class { getContext() { return {}; } },
     WebAssembly: { Memory: class {} }, fetch: async () => { throw new Error('Offline'); },
-    HALO_BROWSER_CONFIG: { relayUrl: 'ws://localhost:8781/join' },
+    HALO_BROWSER_CONFIG: { relayUrl: options.relayUrl ?? 'ws://localhost:8781/join',
+      ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
-    HaloNet: { on() {}, addressText: () => '100.64.2.1', status: () => ({}), useTransport },
+    HaloNet: {
+      on(listener) { listeners.push(listener); }, addressText: () => '100.64.2.1',
+      status: () => ({ room, players: 0, brokers: 1, names: [] }), useTransport,
+      async join(code) {
+        joins.push(code);
+        await options.beforeJoin?.();
+        room = code.trim().toUpperCase();
+        listeners.forEach(listener => listener('status', this.status()));
+        return room;
+      },
+      async leave() {
+        room = null;
+        listeners.forEach(listener => listener('status', this.status()));
+      },
+    },
     HaloCache: { mapsState: async () => ({ files: ['ui.map'], bytes: 2048,
       dataRoot: '/data', saveRoot: '/data/save' }) },
   };
   context.window = context;
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
-  assert.equal(element('play').disabled, false, 'launcher reached the cached-data ready state');
-  return { element, context };
+  assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
+  return { element, context, storage, joins };
 }
 
 test('an offline host after relay ready allows a fresh invite; in-game disconnect still requires reload', async () => {
@@ -180,4 +199,72 @@ test('failure while installing relay transport cannot relock the pre-game invite
   assert.equal(element('invite-connect').disabled, false);
   assert.equal(element('invite-input').disabled, false);
   assert.equal(element('play').disabled, true);
+});
+
+test('normal startup joins the public default room without launching the game', async () => {
+  const { joins, element, context, storage } = await launcher();
+  assert.deepEqual(joins, ['FQLX01']);
+  assert.equal(element('online-default-code').textContent, 'FQLX01');
+  assert.equal(element('online-code').textContent, 'FQLX01');
+  assert.equal(element('online-default').disabled, true);
+  assert.equal(context.Module, undefined);
+  assert.equal(context.location.search, '');
+  assert.equal(storage.has('halo-web-room'), false, 'automatic fallback is not remembered as a private choice');
+  const configured = await launcher(undefined, { defaultRoom: 'CUSTOM01' });
+  assert.deepEqual(configured.joins, ['CUSTOM01']);
+  assert.equal(configured.element('online-default-code').textContent, 'CUSTOM01');
+  const disabled = await launcher(undefined, { defaultRoom: '' });
+  assert.deepEqual(disabled.joins, []);
+  assert.equal(disabled.element('online-default-room').hidden, true);
+});
+
+test('explicit room wins over remembered choice and leave flag; private choice wins over default', async () => {
+  const storage = new Map([['halo-web-room', 'PRIVATE7']]);
+  const remembered = await launcher(undefined, { storage });
+  assert.deepEqual(remembered.joins, ['PRIVATE7']);
+  assert.equal(remembered.element('online-default').disabled, false);
+  storage.set('halo-web-room-left', '1');
+  const linked = await launcher(undefined, { storage, url: 'http://localhost:8780/?room=FRIENDS9' });
+  assert.deepEqual(linked.joins, ['FRIENDS9']);
+  assert.equal(storage.get('halo-web-room'), 'FRIENDS9');
+  assert.equal(storage.has('halo-web-room-left'), false);
+});
+
+test('native invite suppresses explicit, remembered, and default browser rooms', async () => {
+  const storage = new Map([['halo-web-room', 'PRIVATE7']]);
+  const native = await launcher(undefined, { storage, relayUrl: '',
+    url: 'http://localhost:8780/?room=FRIENDS9#join=' + TOKEN });
+  assert.deepEqual(native.joins, []);
+  assert.equal(native.element('browser-rooms').hidden, true);
+  assert.equal(storage.get('halo-web-room'), 'PRIVATE7');
+  assert.equal(native.context.Module, undefined);
+});
+
+test('Leave survives reload from a room link and Join default room restores automatic joining', async () => {
+  const first = await launcher(undefined, { url: 'http://localhost:8780/?room=PRIVATE7' });
+  await first.element('online-leave').onclick();
+  assert.equal(first.context.location.search, '');
+  assert.equal(first.storage.get('halo-web-room-left'), '1');
+  assert.equal(first.element('online-room').hidden, true);
+  const reloaded = await launcher(undefined, { storage: first.storage, url: first.context.location.href });
+  assert.deepEqual(reloaded.joins, []);
+  assert.equal(reloaded.element('online-default').disabled, false);
+  await reloaded.element('online-default').onclick();
+  assert.deepEqual(reloaded.joins, ['FQLX01']);
+  assert.equal(first.storage.has('halo-web-room-left'), false);
+  assert.equal(first.storage.get('halo-web-room'), 'FQLX01');
+  assert.equal(reloaded.context.location.search, '?room=FQLX01');
+  const returned = await launcher(undefined, { storage: first.storage });
+  assert.deepEqual(returned.joins, ['FQLX01']);
+});
+
+test('leaving while automatic room setup is pending remains outside the room', async () => {
+  let finishJoin;
+  const pending = await launcher(undefined, { beforeJoin: () => new Promise(resolve => { finishJoin = resolve; }) });
+  const leaving = pending.element('online-leave').onclick();
+  finishJoin();
+  await leaving;
+  assert.equal(pending.element('online-room').hidden, true);
+  assert.equal(pending.storage.get('halo-web-room-left'), '1');
+  assert.equal(pending.storage.has('halo-web-room'), false);
 });

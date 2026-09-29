@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 from urllib.parse import urlsplit
@@ -22,9 +23,17 @@ def relay_url(value):
     return value
 
 
+def room_code(value):
+    value = value.strip().upper()
+    if value and not re.fullmatch(r'[A-Z0-9]{4,16}', value):
+        raise argparse.ArgumentTypeError('Use 4–16 letters or digits, or an empty value to disable the default room.')
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--relay', type=relay_url, default='', help='Native multiplayer WSS endpoint; blank leaves desktop joining unavailable')
+    parser.add_argument('--default-room', type=room_code, default='FQLX01', help='Shared browser room joined on a first visit; empty disables automatic room entry')
     args = parser.parse_args()
     source = ROOT / 'build/web/site'
     output = ROOT / 'dist/browser-multiplayer'
@@ -42,8 +51,8 @@ def main():
     for name in names:
         (output / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, output / name)
-    (output / 'site-config.js').write_text('window.HALO_BROWSER_CONFIG = Object.freeze(' + json.dumps({'relayUrl': args.relay}) + ');\n')
-    # The relay endpoint participates in the offline cache version.
+    (output / 'site-config.js').write_text('window.HALO_BROWSER_CONFIG = Object.freeze(' + json.dumps({'relayUrl': args.relay, 'defaultRoom': args.default_room}) + ');\n')
+    # Connection configuration participates in the offline cache version.
     subprocess.run(['python3', str(ROOT / 'port/web/stamp_version.py'), str(output / 'version.json'),
                     *map(str, sorted(path for path in output.rglob('*') if path.is_file() and path.name not in {'version.json', 'deployment.json', '.nojekyll'}))], check=True)
     (output / '.nojekyll').touch()
@@ -53,6 +62,7 @@ def main():
         'runtime': 'source-built Emscripten 6.0.10',
         'native_network_version': 4,
         'relay_configured': bool(args.relay),
+        'default_browser_room': args.default_room,
         'game_assets_included': False,
         'files': {str(path.relative_to(output)): {'bytes': path.stat().st_size,
                   'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}

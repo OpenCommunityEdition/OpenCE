@@ -14,6 +14,25 @@ Existing Apollo maps and saves are reused in place under `halo/data` and
 `halo/save`. Each browser and domain has a separate cache. Browser storage
 can be cleared or evicted. Manual disc import remains available.
 
+## Default browser room
+
+The launcher automatically joins the public browser room **FQLX01** on a
+first visit. Share <https://fqlx.github.io/halo-ce-universal/?room=FQLX01>
+to enter that room directly. The mirror uses the same room, so players on
+both domains can meet. An explicit room link or a previously chosen room
+takes precedence; choosing **Leave** keeps the browser out across reloads
+until the player opens a room link or chooses **Join default room**.
+
+After the maps are ready, press **Play**, then **Multiplayer → System Link**.
+One player hosts a match and keeps the game open; other players join that
+match. The public room is a meeting place, not a persistent game server.
+The launcher does not automatically start the game or choose a match.
+
+Browser rooms use the existing public signaling and STUN services. Some
+networks still require a TURN relay in Settings; no TURN account or native
+relay is configured by the default room. The room code is public, so use
+**New room** for a separate group.
+
 Native desktop invitations require a separately hosted WSS relay. The
 public sites currently leave that endpoint unset. Chrome has joined a
 native match through a local test relay, but the public link cannot yet
@@ -36,6 +55,8 @@ and service worker, with no ISO or maps. `deployment.json` records the
 source commit, build state and each packaged file's SHA-256. Commit source
 before packaging. Add `--relay wss://YOUR-RELAY-HOST/join` only when that
 relay is ready; an unset relay leaves desktop joining unavailable.
+Use `--default-room CODE` to choose a different public room or
+`--default-room ''` to disable automatic room entry.
 
 The downloader uses a commit-pinned manifest on the fork's separate
 `fqlx/game-data` branch. It streams chunks into browser storage, verifies

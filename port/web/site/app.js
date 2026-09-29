@@ -21,6 +21,7 @@ can run the game, copies the game data out of the player's disc image
   // WEB_MEMORY_BYTES): the Xbox memory window ends at 0x88000000
   const MEMORY_PAGES = 0x88000000 / 65536;
   const REQUIRED_BYTES = 2.1e9;
+  const DEFAULT_ROOM = window.HALO_BROWSER_CONFIG?.defaultRoom ?? 'FQLX01';
 
   const state = {
     memory: null,
@@ -36,6 +37,7 @@ can run the game, copies the game data out of the player's disc image
     gatewayInstalled: false,
     inviteConnecting: false,
     pendingInviteConnect: null,
+    roomTask: Promise.resolve(),
     maps: null,
     cacheAbort: null,
     dataBusy: false,
@@ -649,6 +651,7 @@ can run the game, copies the game data out of the player's disc image
             updatePlayButton();
           },
         });
+        await state.roomTask;
         await HaloNet.useTransport(transport);
         // A host failure can arrive while leaving the previous browser room.
         if (transport.closed) throw new Error('The relay session ended. Try connecting again.');
@@ -706,6 +709,7 @@ can run the game, copies the game data out of the player's disc image
     const inRoom = !!status.room;
     $('online-join').hidden = inRoom;
     $('online-room').hidden = !inRoom;
+    $('online-default').disabled = !DEFAULT_ROOM || status.room === DEFAULT_ROOM;
     if (!inRoom) return;
     $('online-code').textContent = status.room;
     const players = status.players === 1 ? '1 other player' : `${status.players} other players`;
@@ -714,13 +718,27 @@ can run the game, copies the game data out of the player's disc image
     $('online-names').textContent = status.names.length ? status.names.join(', ') : '';
   }
 
-  async function joinRoom(code) {
-    try {
+  function roomAction(action) {
+    state.roomTask = state.roomTask.then(action).catch(error => toast(error.message));
+    return state.roomTask;
+  }
+
+  function setRoomURL(code) {
+    const url = new URL(location.href);
+    if (code) url.searchParams.set('room', code);
+    else url.searchParams.delete('room');
+    history.replaceState(history.state, '', url);
+  }
+
+  function joinRoom(code, { remember = true, updateURL = true } = {}) {
+    return roomAction(async () => {
       const joined = await HaloNet.join(code, onlineOptions());
-      try { localStorage.setItem('halo-web-room', joined); } catch { /* not kept */ }
-    } catch (error) {
-      toast(error.message);
-    }
+      try {
+        if (remember) localStorage.setItem('halo-web-room', joined);
+        localStorage.removeItem('halo-web-room-left');
+      } catch { /* not kept */ }
+      if (updateURL) setRoomURL(joined);
+    });
   }
 
   function setUpOnline() {
@@ -736,12 +754,19 @@ can run the game, copies the game data out of the player's disc image
       try { localStorage.setItem('halo-web-player-name', event.target.value.trim().slice(0, 24)); } catch { /* none */ }
     };
     $('online-create').onclick = () => joinRoom(HaloNet.newRoomCode());
+    $('online-default-room').hidden = !DEFAULT_ROOM;
+    $('online-default-code').textContent = DEFAULT_ROOM;
+    $('online-default').onclick = () => { if (DEFAULT_ROOM) return joinRoom(DEFAULT_ROOM); };
     $('online-enter').onclick = () => joinRoom($('online-input').value);
     $('online-input').onkeydown = (event) => { if (event.key === 'Enter') joinRoom(event.target.value); };
-    $('online-leave').onclick = async () => {
+    $('online-leave').onclick = () => roomAction(async () => {
       await HaloNet.leave();
-      try { localStorage.removeItem('halo-web-room'); } catch { /* none */ }
-    };
+      try {
+        localStorage.removeItem('halo-web-room');
+        localStorage.setItem('halo-web-room-left', '1');
+      } catch { /* none */ }
+      setRoomURL(null);
+    });
     $('online-share').onclick = async () => {
       const link = roomLink(HaloNet.status().room);
       try {
@@ -759,11 +784,18 @@ can run the game, copies the game data out of the player's disc image
     for (const [id, key] of [['opt-turn-url', 'turnUrl'], ['opt-turn-user', 'turnUser'], ['opt-turn-password', 'turnPassword']]) {
       $(id).onchange = (event) => { settings[key] = event.target.value.trim(); saveSettings(); };
     }
-    // a room link, or the room of last time
+    // An explicit link wins. Otherwise remember a chosen room or a decision
+    // to leave; new visitors gather in the default public room.
     const linked = new URLSearchParams(location.search).get('room');
-    let last = null;
-    try { last = localStorage.getItem('halo-web-room'); } catch { /* none */ }
-    if (!new URLSearchParams(location.hash.slice(1)).has('join') && (linked || last)) joinRoom(linked || last);
+    let last = null, left = false;
+    try {
+      last = localStorage.getItem('halo-web-room');
+      left = localStorage.getItem('halo-web-room-left') === '1';
+    } catch { /* none */ }
+    if (!new URLSearchParams(location.hash.slice(1)).has('join')) {
+      if (linked) joinRoom(linked, { updateURL: false });
+      else if (!left && (last || DEFAULT_ROOM)) joinRoom(last || DEFAULT_ROOM, { remember: !!last, updateURL: false });
+    }
     showOnline(HaloNet.status());
   }
 
