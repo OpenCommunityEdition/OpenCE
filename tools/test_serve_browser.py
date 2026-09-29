@@ -76,6 +76,7 @@ class BrowserServerTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertEqual(response.read(), b"local launcher")
             self.assertEqual(response.getheader("Cross-Origin-Opener-Policy"), "same-origin")
+            self.assertEqual(response.getheader("Cache-Control"), "no-cache")
             self.assertEqual(response.getheader("Cross-Origin-Embedder-Policy"), "require-corp")
             connection.request("GET", "/assets/manifest.json")
             response = connection.getresponse()

@@ -10,6 +10,7 @@
 // the queue. Use ?batch_streams=0 to compare with the unmodified GL call path.
 (() => {
     if (new URLSearchParams(location.search).get("batch_streams") === "0") return;
+    const commandLimit = 40000;
     const canvas = document.getElementById("canvas");
     const getContext = canvas.getContext.bind(canvas);
     let wrapped = false;
@@ -20,7 +21,7 @@
         const native = {};
         const methodNames = new Set([...Object.getOwnPropertyNames(WebGLRenderingContext.prototype), ...Object.getOwnPropertyNames(WebGL2RenderingContext.prototype)]);
         for (const name of methodNames) if (name !== "constructor" && typeof gl[name] === "function") native[name] = gl[name].bind(gl);
-        let commands = [], bytes = 0, flushing = false;
+        let commands = [], bufferCommands = [], bytes = 0, flushing = false;
         const buffers = new Map(), elementBuffers = new Map(), storage = new WeakMap();
         let vao = null, drawFramebuffer = null;
         const bound = target => target === gl.ELEMENT_ARRAY_BUFFER ? elementBuffers.get(vao) : buffers.get(target);
@@ -35,16 +36,17 @@
         const countKind = (map, key) => { if (map.size < 32 || map.has(key)) map.set(key, (map.get(key) || 0) + 1); };
         const publish = () => {
             const output = document.getElementById("performance-stats");
-            if (output) output.dataset.streamBatch = JSON.stringify({ ...stats, allocationKinds: Object.fromEntries(allocationKinds), uploadTargets: Object.fromEntries(uploadTargets) });
+            if (output) output.dataset.streamBatch = JSON.stringify({ ...stats, commandLimit, allocationKinds: Object.fromEntries(allocationKinds), uploadTargets: Object.fromEntries(uploadTargets) });
         };
         const flush = () => {
             if (flushing || !commands.length) return;
             flushing = true;
-            const work = commands;
+            const work = commands, bufferWork = bufferCommands;
             commands = [];
+            bufferCommands = [];
             bytes = 0;
             const candidates = new Map();
-            for (const command of work) {
+            for (const command of bufferWork) {
                 const [name, args, buffer, info] = command;
                 if (name === "bufferData") {
                     // Match Halo's streaming allocations only. Arbitrary persistent
@@ -66,7 +68,7 @@
                     if (group) {
                         const first = args[1], last = first + args[2].byteLength;
                         if (first < 0 || last > group.size) { if (group.valid) stats.outOfRangeGroups++; group.valid = false; }
-                        if (first < group.last || group.writes.some(other => first < other[1][1] + other[1][2].byteLength && last > other[1][1])) { if (group.valid) stats.overlappingGroups++; group.valid = false; }
+                        if (first < group.last) { if (group.valid) stats.overlappingGroups++; group.valid = false; }
                         group.writes.push(command);
                         group.first = Math.min(group.first, first);
                         group.last = Math.max(group.last, last);
@@ -74,19 +76,18 @@
                     } else stats.uploadsWithoutOrphan++;
                 }
             }
-            const skipped = new Set();
             for (const command of work) {
-                if (skipped.has(command)) continue;
+                if (command.skip) continue;
                 const [name, args] = command;
                 const group = command.batch;
                 const merge = group?.valid && group.writes.length > 1 && group.last - group.first <= 16 * 1024 * 1024;
                 if (!merge || !group.persistent) native[name](...args);
                 if (merge) {
-                    const merged = group.info?.shadow ? group.info.shadow.slice(group.first, group.last) : new Uint8Array(group.last - group.first);
-                    for (const write of group.writes) {
-                        merged.set(write[1][2], write[1][1] - group.first);
-                        skipped.add(write);
-                    }
+                    // Each recorded upload already updated this shadow. GL consumes the
+                    // source synchronously, so the existing span can be submitted
+                    // without allocating and filling another merged byte buffer.
+                    const merged = group.info.shadow.subarray(group.first, group.last);
+                    for (const write of group.writes) write.skip = true;
                     native.bufferSubData(args[0], group.first, merged);
                     stats.batches++;
                     stats.uploadsSaved += group.writes.length - 1;
@@ -96,12 +97,12 @@
             stats.flushes++;
             stats.commands += work.length;
             flushing = false;
-            publish();
         };
         const record = (name, args, buffer, info) => {
-            if (name.startsWith("uniform") && args[0] === null) return;
-            commands.push([name, args, buffer, info]);
-            if (commands.length > 40000 || bytes > 16 * 1024 * 1024) flush();
+            const command = [name, args, buffer, info];
+            commands.push(command);
+            if (buffer) bufferCommands.push(command);
+            if (commands.length > commandLimit || bytes > 16 * 1024 * 1024) flush();
         };
         const simple = [
             "activeTexture", "bindTexture", "bindFramebuffer", "bindRenderbuffer", "bindSampler", "bindBufferBase", "bindBufferRange",
@@ -116,7 +117,11 @@
             "uniform1f", "uniform2f", "uniform3f", "uniform4f", "uniform1i", "uniform2i", "uniform3i", "uniform4i", "uniform1ui", "uniform2ui", "uniform3ui", "uniform4ui",
             "vertexAttrib1f", "vertexAttrib2f", "vertexAttrib3f", "vertexAttrib4f", "vertexAttribI4i", "vertexAttribI4ui",
         ];
-        for (const name of simple) if (native[name]) gl[name] = (...args) => record(name, args);
+        for (const name of simple) if (native[name]) {
+            gl[name] = name.startsWith("uniform")
+                ? (...args) => { if (args[0] !== null) record(name, args); }
+                : (...args) => record(name, args);
+        }
         for (const name of ["bindBufferBase", "bindBufferRange"]) if (native[name]) {
             gl[name] = (target, index, buffer, ...rest) => {
                 if (target === gl.TRANSFORM_FEEDBACK_BUFFER && buffer) {
