@@ -820,7 +820,7 @@ void posix_discord_close(int handle)
 `tailscale status --json` names this machine ("Self") and the tailnet's
 other machines ("Peer", each with "Online"), each with its "TailscaleIPs".
 A thread asks every 15 seconds, so the game's thread never waits for the
-command; the first call waits up to three seconds for the first answer. */
+command. */
 
 #ifdef __ANDROID__
 int posix_tailscale_addresses(posix_ulong *self, posix_ulong *peers, int capacity)
@@ -849,6 +849,14 @@ static struct
 	int peer_count;
 	unsigned long peers[TAILSCALE_PEERS];
 } tailscale = { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
+
+/* the refresh thread's result as it parses */
+static struct
+{
+	unsigned long self;
+	int peer_count;
+	unsigned long peers[TAILSCALE_PEERS];
+} parsed;
 
 extern char **environ;
 
@@ -886,6 +894,9 @@ static char *tailscale_run(void)
 
 	if (!command || pipe(pipe_ends) != 0)
 		return NULL;
+	/* not for other programs the game starts meanwhile */
+	fcntl(pipe_ends[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pipe_ends[1], F_SETFD, FD_CLOEXEC);
 	arguments[0] = (char *)command;
 	arguments[1] = "status";
 	arguments[2] = "--json";
@@ -1042,11 +1053,11 @@ static void json_object(struct json *json, enum tailscale_role role, int depth)
 	json->cursor++;
 	if (role == _role_self)
 	{
-		tailscale.self = node.address;
+		parsed.self = node.address;
 	}
-	else if (role == _role_peer && node.online && node.address && tailscale.peer_count < TAILSCALE_PEERS)
+	else if (role == _role_peer && node.online && node.address && parsed.peer_count < TAILSCALE_PEERS)
 	{
-		tailscale.peers[tailscale.peer_count++] = node.address;
+		parsed.peers[parsed.peer_count++] = node.address;
 	}
 }
 
@@ -1099,12 +1110,19 @@ static void json_value(struct json *json, enum tailscale_role role, int depth, c
 		json_string(json, NULL, 0);
 		break;
 	default:
+	{
 		/* a number, true, false or null */
+		const char *start = json->cursor;
+
 		if (node && !strcmp(key, "Online"))
 			node->online = !strncmp(json->cursor, "true", 4);
 		while (*json->cursor && *json->cursor != ',' && *json->cursor != '}' && *json->cursor != ']')
 			json->cursor++;
+		/* nothing read (a stray bracket, the end): malformed */
+		if (json->cursor == start)
+			json->error = 1;
 		break;
+	}
 	}
 }
 
@@ -1112,11 +1130,10 @@ static void tailscale_refresh(void)
 {
 	char *output = tailscale_run();
 	struct json json;
+	int running = 0;
 
-	pthread_mutex_lock(&tailscale.lock);
-	tailscale.self = 0;
-	tailscale.peer_count = 0;
-	tailscale.running = 0;
+	/* parsed outside the lock (only this thread parses) */
+	memset(&parsed, 0, sizeof(parsed));
 	if (output && strstr(output, "\"BackendState\"") && strstr(output, "\"Running\""))
 	{
 		json.cursor = output;
@@ -1124,13 +1141,13 @@ static void tailscale_refresh(void)
 		json_space(&json);
 		if (*json.cursor == '{')
 			json_object(&json, _role_other, 0);
-		tailscale.running = !json.error && tailscale.self != 0;
-		if (!tailscale.running)
-		{
-			tailscale.self = 0;
-			tailscale.peer_count = 0;
-		}
+		running = !json.error && parsed.self != 0;
 	}
+	pthread_mutex_lock(&tailscale.lock);
+	tailscale.running = running;
+	tailscale.self = running ? parsed.self : 0;
+	tailscale.peer_count = running ? parsed.peer_count : 0;
+	memcpy(tailscale.peers, parsed.peers, (size_t)tailscale.peer_count * sizeof(tailscale.peers[0]));
 	tailscale.answered_once = 1;
 	pthread_cond_broadcast(&tailscale.answered);
 	pthread_mutex_unlock(&tailscale.lock);
@@ -1163,18 +1180,7 @@ int posix_tailscale_addresses(posix_ulong *self, posix_ulong *peers, int capacit
 		else
 			tailscale.answered_once = 1;
 	}
-	if (!tailscale.answered_once)
-	{
-		struct timespec until;
-
-		clock_gettime(CLOCK_REALTIME, &until);
-		until.tv_sec += 3;
-		while (!tailscale.answered_once)
-		{
-			if (pthread_cond_timedwait(&tailscale.answered, &tailscale.lock, &until) != 0)
-				break;
-		}
-	}
+	/* (the first answer comes a moment later: announcements repeat) */
 	*self = 0;
 	count = -1;
 	if (tailscale.running)

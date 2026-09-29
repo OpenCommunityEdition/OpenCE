@@ -379,7 +379,15 @@ static void test_sockets(void)
 	posix_socket_close(sender);
 	{
 		posix_ulong self = 0, peers[16];
-		int count = posix_tailscale_addresses(&self, peers, 16);
+		int count = posix_tailscale_addresses(&self, peers, 16), tries;
+		struct timespec pause = { 0, 100 * 1000000L };
+
+		/* the lookup answers in the background: up to 10 seconds */
+		for (tries = 0; count < 0 && tries < 100; tries++)
+		{
+			nanosleep(&pause, NULL);
+			count = posix_tailscale_addresses(&self, peers, 16);
+		}
 
 		check(1, "tailscale: %d peer(s) online, this machine %u.%u.%u.%u", count, (unsigned)(self & 255),
 			(unsigned)((self >> 8) & 255), (unsigned)((self >> 16) & 255), (unsigned)(self >> 24));

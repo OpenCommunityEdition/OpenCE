@@ -340,7 +340,36 @@ static int is_private_address(unsigned long address)
 		(host & 0xffff0000UL) == 0xc0a80000UL;
 }
 
-static void remote_searcher_heard(const struct sockaddr *address, const int *address_length)
+/* the game server's port, where searches for games arrive
+(source/networking/network_game_protocol.h), in network byte order */
+#define SEARCH_PORT_NETWORK_ORDER 0x1e14
+
+/* the socket the last datagram came in on, and whether it is the server's
+(one getsockname for each socket, not each datagram) */
+static int search_socket_cached = -1, search_socket_is_server;
+
+static void remote_searcher_socket_closed(int socket)
+{
+	if (socket == search_socket_cached)
+		search_socket_cached = -1;
+}
+
+/* this machine's address, looked up again every 10 seconds */
+static unsigned long cached_title_address(void)
+{
+	static unsigned long address;
+	static time_t looked_up;
+	time_t now = time(NULL);
+
+	if (!looked_up || now - looked_up >= 10)
+	{
+		address = title_address();
+		looked_up = now;
+	}
+	return address;
+}
+
+static void remote_searcher_heard(int socket, const struct sockaddr *address, const int *address_length)
 {
 	unsigned long ip, host;
 	time_t now = time(NULL);
@@ -351,12 +380,24 @@ static void remote_searcher_heard(const struct sockaddr *address, const int *add
 	{
 		return;
 	}
+	/* only searches: datagrams to the game server's port */
+	if (socket != search_socket_cached)
+	{
+		struct sockaddr_in bound;
+		int length = sizeof(bound);
+
+		search_socket_cached = socket;
+		search_socket_is_server = posix_socket_getsockname(socket, &bound, &length) == 0 &&
+			bound.sin_port == SEARCH_PORT_NETWORK_ORDER;
+	}
+	if (!search_socket_is_server)
+		return;
 	ip = ((const struct sockaddr_in *)address)->sin_addr.s_addr;
 	host = halo_ws_ntohl(ip);
 	/* not this machine, nor the local network's (they get the broadcasts),
 	nor the tailnet (tailscale_addresses) */
 	if (!ip || (host >> 24) == 127 || ip == INADDR_BROADCAST || is_private_address(ip) ||
-		is_tailnet_address(ip) || ip == title_address())
+		is_tailnet_address(ip) || ip == cached_title_address())
 	{
 		return;
 	}
@@ -557,6 +598,7 @@ SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 int WSAAPI halo_ws_closesocket(SOCKET socket)
 {
 	game_socket_remove((int)socket);
+	remote_searcher_socket_closed((int)socket);
 	p2p_socket_closed((int)socket);
 	return winsock_result(posix_socket_close((int)socket));
 }
@@ -860,7 +902,7 @@ int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 	result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
 	if (result >= 0)
 	{
-		remote_searcher_heard(address, address_length);
+		remote_searcher_heard((int)socket, address, address_length);
 		peer_incoming_address(0, address, address_length);
 	}
 	return winsock_result(result);

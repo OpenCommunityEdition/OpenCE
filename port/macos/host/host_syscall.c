@@ -214,7 +214,7 @@ static int timespec_in(uint64_t address, struct timespec *result)
 {
 	const struct guest_timespec *value = GUEST(const struct guest_timespec *, address);
 
-	if (!address)
+	if (!(uint32_t)address)
 		return 0;
 	result->tv_sec = value->seconds;
 	result->tv_nsec = value->nanoseconds;
@@ -225,7 +225,7 @@ static void timespec_out(uint64_t address, const struct timespec *value)
 {
 	struct guest_timespec *result = GUEST(struct guest_timespec *, address);
 
-	if (!address)
+	if (!(uint32_t)address)
 		return;
 	result->seconds = (int32_t)value->tv_sec;
 	result->nanoseconds = (int32_t)value->tv_nsec;
@@ -374,6 +374,27 @@ static long guest_getdents64(int fd, uint64_t buffer, uint32_t size)
 	return used;
 }
 
+/* a seek on a descriptor being read as a directory: musl's rewinddir
+(offset 0) and seekdir (an earlier d_off, which is macOS's telldir) */
+static int directory_seek(int fd, int64_t offset, int whence)
+{
+	int handled = 0;
+
+	if (fd < 0 || fd >= DIRECTORY_SLOTS || whence != SEEK_SET)
+		return 0;
+	pthread_mutex_lock(&directories_lock);
+	if (directories[fd])
+	{
+		if (offset == 0)
+			rewinddir(directories[fd]);
+		else
+			seekdir(directories[fd], (long)offset);
+		handled = 1;
+	}
+	pthread_mutex_unlock(&directories_lock);
+	return handled;
+}
+
 static void forget_directory(int fd)
 {
 	if (fd < 0 || fd >= DIRECTORY_SLOTS)
@@ -419,7 +440,16 @@ static long futex_wait(uint32_t *address, uint32_t value, const struct timespec 
 		result = os_sync_wait_on_address(address, value, sizeof(*address), OS_SYNC_WAIT_ON_ADDRESS_NONE);
 	}
 	if (result < 0)
-		return errno == ETIMEDOUT ? -110 : errno == EINTR ? -4 : -11;
+	{
+		switch (errno)
+		{
+		case ETIMEDOUT: return -110;
+		case EINTR: return -4;
+		case EFAULT: return -14;
+		case EINVAL: return -22;
+		default: return -11;
+		}
+	}
 	return 0;
 }
 
@@ -570,7 +600,7 @@ static long guest_prlimit(int resource, uint64_t old_limit)
 {
 	uint64_t *result = GUEST(uint64_t *, old_limit);
 
-	if (!result)
+	if (!(uint32_t)old_limit)
 		return 0;
 	result[0] = result[1] = ~0ULL;
 	if (resource == 7) /* RLIMIT_NOFILE */
@@ -592,7 +622,8 @@ static long guest_prlimit(int resource, uint64_t old_limit)
 
 static long guest_utimensat(long directory, uint64_t path, uint64_t times_address, int flags)
 {
-	const struct guest_timespec *guest_times = GUEST(const struct guest_timespec *, times_address);
+	const struct guest_timespec *guest_times = (uint32_t)times_address ?
+		GUEST(const struct guest_timespec *, times_address) : NULL;
 	struct timespec times[2];
 	int index;
 
@@ -605,7 +636,7 @@ static long guest_utimensat(long directory, uint64_t path, uint64_t times_addres
 		else if (guest_times[index].nanoseconds == (1 << 30) - 2)
 			times[index].tv_nsec = UTIME_OMIT;
 	}
-	if (!path)
+	if (!(uint32_t)path)
 		return result_of(futimens((int)directory, guest_times ? times : NULL));
 	return result_of(utimensat(directory_descriptor(directory), GUEST(const char *, path), guest_times ? times : NULL,
 		(flags & LINUX_AT_SYMLINK_NOFOLLOW) ? AT_SYMLINK_NOFOLLOW : 0));
@@ -640,7 +671,8 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		forget_directory((int)a);
 		return result_of(close((int)a));
 	case __NR_lseek:
-		forget_directory((int)a);
+		if (directory_seek((int)a, (int64_t)b, (int)c))
+			return b;
 		return result_of((long)lseek((int)a, (off_t)b, (int)c));
 	case __NR_getdents64:
 		return guest_getdents64((int)a, (uint64_t)b, (uint32_t)c);
@@ -656,7 +688,7 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case __NR_newfstatat:
 	{
 		struct stat information;
-		const char *path = GUEST(const char *, b);
+		const char *path = (uint32_t)b ? GUEST(const char *, b) : NULL;
 		long result;
 
 		if ((d & LINUX_AT_EMPTY_PATH) && (!path || !*path))
@@ -711,7 +743,10 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		return result_of(dup((int)a));
 	case __NR_dup3:
 	{
-		long result = result_of(dup2((int)a, (int)b));
+		long result;
+
+		forget_directory((int)b);
+		result = result_of(dup2((int)a, (int)b));
 
 		if (result >= 0 && (c & LINUX_O_CLOEXEC))
 			fcntl((int)result, F_SETFD, FD_CLOEXEC);
@@ -758,7 +793,7 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case __NR_gettimeofday:
 	{
 		struct timespec value;
-		struct guest_timespec *result = GUEST(struct guest_timespec *, a);
+		struct guest_timespec *result = (uint32_t)a ? GUEST(struct guest_timespec *, a) : NULL;
 
 		clock_gettime(CLOCK_REALTIME, &value);
 		if (result)
@@ -815,7 +850,11 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		int milliseconds = -1;
 
 		if (timespec_in((uint64_t)c, &timeout))
-			milliseconds = (int)(timeout.tv_sec * 1000 + timeout.tv_nsec / 1000000);
+		{
+			long long total = (long long)timeout.tv_sec * 1000 + timeout.tv_nsec / 1000000;
+
+			milliseconds = total < 0 ? 0 : total > 0x7fffffff ? 0x7fffffff : (int)total;
+		}
 		return result_of(poll(GUEST(struct pollfd *, a), (nfds_t)(uint32_t)b, milliseconds));
 	}
 	case __NR_sched_yield:
@@ -880,7 +919,7 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		raise_signal(c);
 		return 0;
 	case __NR_rt_sigprocmask:
-		if (c)
+		if ((uint32_t)c)
 			memset(GUEST(void *, c), 0, (size_t)(uint32_t)d);
 		return 0;
 	case __NR_rt_sigaction:

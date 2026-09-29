@@ -24,6 +24,8 @@ x27:
     ldr x0, [x1, #8]!        ->  add x1, x1, #8 ; add x27, x28, w1, uxtw ; ldr x0, [x27]
     ldr x0, [x1], #8         ->  add x27, x28, w1, uxtw ; ldr x0, [x27] ; add x1, x1, #8
     blr x8                   ->  add x27, x28, w8, uxtw ; blr x27
+    ldrb w0, [x1, w2, sxtw]  ->  add x27, x1, w2, sxtw ; add x27, x28, w27, uxtw
+                                 ldrb w0, [x27]
 
 Accesses through sp and x29 (the frame pointer) are left alone: guest stacks
 live inside the region, so those registers always hold real addresses.
@@ -127,6 +129,16 @@ def rewrite(line):
         out += immediate_add(register, inside, indent)
         out.append(f"{indent}add\t{SCRATCH}, {BASE}, w{number}, uxtw")
         out.append(f"{indent}{mnemonic}\t{before}[{SCRATCH}]")
+        return out
+    if inside and re.match(r"^[wx]\d+\b", inside.strip()):
+        # register offset: LLVM puts the pointer in either register (and an
+        # index may be negative), so the two are added first, as arm64_32
+        # adds them, then the sum's low 32 bits rebased
+        out.append(f"{indent}add\t{SCRATCH}, {register}, {inside.strip()}")
+        out.append(f"{indent}add\t{SCRATCH}, {BASE}, w{SCRATCH[1:]}, uxtw")
+        out.append(f"{indent}{mnemonic}\t{before}[{SCRATCH}]")
+        if post is not None:
+            out += immediate_add(register, post, indent)
         return out
     out.append(f"{indent}add\t{SCRATCH}, {BASE}, w{number}, uxtw")
     address = f"[{SCRATCH}, {inside}]" if inside else f"[{SCRATCH}]"

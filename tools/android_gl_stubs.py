@@ -22,9 +22,9 @@ The macOS port's x32 guest passes 6 integer arguments in registers
 (x86-64), not 8 (--integer-registers 6). Its host sees the guest's memory at
 host_guest_base (tools/macos_host_thunks.py): --host-thunks writes a host
 thunk for each function that turns its pointer arguments into host
-addresses. A value below 16 MB is left alone, being a buffer offset (as
+addresses. A value below 256 MB is left alone, being a buffer offset (as
 glVertexAttribPointer's and glDrawElements' are with a buffer bound): no
-guest memory lies there.
+guest memory lies there (port/macos/host/host_memory.c).
 """
 
 import re
@@ -32,6 +32,8 @@ import sys
 
 INTEGER_REGISTER_COUNT = 8
 WIDE_TYPES = {"GLsizeiptr", "GLintptr", "GLint64", "GLuint64", "GLint64EXT", "GLuint64EXT"}
+# pointers under a typedef's name
+OPAQUE_POINTER_TYPES = {"GLsync", "GLeglImageOES", "GLDEBUGPROC", "GLDEBUGPROCKHR"}
 FLOAT_TYPES = {"GLfloat", "GLclampf", "GLdouble", "GLclampd", "float", "double"}
 
 
@@ -96,8 +98,8 @@ def main():
         "",
         "extern uint64_t host_guest_base;",
         "",
-        "/* a guest address, or a buffer offset (below 16 MB), or NULL */",
-        "#define GL_POINTER(value) ((uint32_t)(value) >= 0x01000000u ? "
+        "/* a guest address, or a buffer offset (below 256 MB), or NULL */",
+        "#define GL_POINTER(value) ((uint32_t)(value) >= 0x10000000u ? "
         "(void *)(uintptr_t)(host_guest_base + (uint32_t)(value)) : (void *)(uintptr_t)(uint32_t)(value))",
         "#define GUEST_POINTER(value) ((uint32_t)(value) ? "
         "(void *)(uintptr_t)(host_guest_base + (uint32_t)(value)) : NULL)",
@@ -166,7 +168,7 @@ def main():
             thunk_table.append(name)
             table.append(name)
             continue
-        if "*" in ret:
+        if "*" in ret or ret in OPAQUE_POINTER_TYPES:
             raise SystemExit(f"{name}: returns a pointer; add a special case")
         if any(p.count("*") > 1 for p, _ in plist):
             raise SystemExit(f"{name}: takes an array of pointers; add a special case")
@@ -204,7 +206,7 @@ def main():
         real_params = [p for p, _ in plist]
         thunk_params, thunk_args = [], []
         for index, (ptype, pname) in enumerate(plist):
-            if "*" in ptype:
+            if "*" in ptype or ptype.replace("const", "").strip() in OPAQUE_POINTER_TYPES:
                 thunk_params.append(f"uint64_t a{index}")
                 thunk_args.append(f"({ptype})GL_POINTER(a{index})")
             else:

@@ -17,7 +17,7 @@ SDL), without access. Everything the guest uses is carved from its range
 - pages for the guest's other mappings (malloc arenas, thread stacks), from
   a page map over the rest.
 
-No guest memory lies below GUEST_LOW (16 MB at least): the OpenGL thunks
+No guest memory lies below GUEST_LOW (256 MB at least): the OpenGL thunks
 tell buffer offsets from pointers by that (tools/android_gl_stubs.py).
 Memory the guest gives back is returned to the system but the address space
 stays reserved.
@@ -654,6 +654,10 @@ void host_memory_watch_forget(uint32_t address, uint32_t size)
 		last = WATCH_PAGE_COUNT - 1;
 	for (page = first; page <= last; page++)
 	{
+		/* writable again: the host page may hold other blocks too, which
+		an operation on part of it would find read-only */
+		if (page_protected[page])
+			mprotect(GUEST(void *, HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ | PROT_WRITE);
 		page_protected[page] = 0;
 		page_generation[page] = __sync_add_and_fetch(&current_generation, 1);
 	}
