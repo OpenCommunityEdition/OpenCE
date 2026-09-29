@@ -105,15 +105,26 @@ void host_gl_wait_frame(uint32_t slot)
 	frame_fences[slot] = NULL;
 }
 
-/* writes data into the buffer bound to target without waiting for the
-GPU: the renderer only streams into ranges no queued draw uses. (Mali
-copies the whole buffer for a glBufferSubData into a buffer that queued
-draws still reference; with hundreds of small uploads per frame that
-exhausts memory within seconds.) */
+/* writes data into the buffer bound to target. The renderer streams a
+range per draw, so a frame makes hundreds of these, and the cost per call
+rather than per byte is what a frame is made of.
+
+GL_MAP_INVALIDATE_RANGE_BIT was what made that cost ruinous. It tells the
+driver the range's previous contents are undefined and must be discarded,
+which is the very work GL_MAP_UNSYNCHRONIZED_BIT exists to avoid: that one
+promises the caller that no queued draw is reading the range. Asked to do
+both, Adreno pays for the discard - about 0.85 ms a call on a Galaxy Z
+Flip 4, whatever the range written - and with a few hundred calls a frame
+that came to 96% of a 550 ms frame at 1.8 fps, with the GPU idle throughout.
+
+Without the invalidation the same call is well under a microsecond and the
+same game runs at the display's refresh rate. The promise unsynchronized
+makes still holds: the renderer only writes ranges that no queued draw reads,
+because host_gl_wait_frame releases the ring slot first. */
 void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const void *data)
 {
 	void *mapping = glMapBufferRange(target, offset, size,
-		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 
 	if (!mapping)
 	{
