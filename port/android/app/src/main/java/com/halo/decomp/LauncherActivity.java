@@ -2,10 +2,12 @@ package com.halo.decomp;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,6 +24,8 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -74,6 +78,7 @@ public class LauncherActivity extends Activity {
     private final List<Candidate> haloImages = new ArrayList<>();
     private final List<Candidate> otherImages = new ArrayList<>();
     private File currentImage;
+    private Uri currentUri;
     private boolean archiveAccess;
     private volatile boolean extracting;
     private volatile boolean scanning;
@@ -620,6 +625,7 @@ public class LauncherActivity extends Activity {
         extracting = true;
         cancelled = false;
         currentImage = file;
+        currentUri = uri;
         lastLoggedPercent = -1;
         buttons.removeAllViews();
         seal.setText("LIVE");
@@ -681,13 +687,125 @@ public class LauncherActivity extends Activity {
         seal.setTextColor(HaloUi.CYAN);
         if (haveData()) {
             setStatus("Archive restored");
-            log("> maps/ui.map verified — starting game");
+            log("> maps/ui.map verified");
             Log.i(TAG, "maps/ui.map verified; starting the game");
             rememberDisc(currentImage);
-            handler.postDelayed(this::startGame, 650);
+            offerReclaim(this::startGame);
         } else {
             reset("The copy finished but maps/ui.map is missing.");
         }
+    }
+
+    /**
+     * Once the maps are safe, offers to remove the disc image: it is the
+     * biggest thing the player just spent space on, and it is no longer
+     * needed. Only worth asking when it is large.
+     */
+    private void offerReclaim(Runnable then) {
+        final long bytes = sourceBytes();
+        if (bytes < (1L << 30) || (currentImage == null && currentUri == null)) {
+            then.run();
+            return;
+        }
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setBackground(HaloUi.panel(this));
+        int pad = HaloUi.dp(this, 24);
+        panel.setPadding(pad, pad, pad, pad);
+        panel.addView(HaloUi.heading(this, "Archive secured", HaloUi.CYAN, 17));
+        panel.addView(HaloUi.readout(this, "maps/ is installed. Delete " + sourceName()
+            + " to reclaim " + human(bytes) + "? The game data stays.", HaloUi.TEXT, 13), margins(0, 12, 0, 0));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.END);
+        Button keep = new Button(this);
+        keep.setText("Keep image");
+        HaloUi.styleButton(this, keep);
+        keep.setOnClickListener(view -> {
+            dialog.dismiss();
+            then.run();
+        });
+        Button delete = new Button(this);
+        delete.setText("Delete image");
+        HaloUi.styleButton(this, delete);
+        delete.setOnClickListener(view -> {
+            deleteSource();
+            dialog.dismiss();
+            then.run();
+        });
+        actions.addView(keep, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        deleteParams.leftMargin = HaloUi.dp(this, 12);
+        actions.addView(delete, deleteParams);
+        panel.addView(actions, margins(0, 18, 0, 0));
+
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(0));
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.82f),
+                WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setCancelable(false);
+        dialog.show();
+    }
+
+    private void deleteSource() {
+        String name = sourceName();
+        try {
+            boolean deleted;
+            if (currentImage != null)
+                deleted = currentImage.delete();
+            else
+                deleted = DocumentsContract.deleteDocument(getContentResolver(), currentUri);
+            Log.i(TAG, "delete " + name + ": " + deleted);
+            if (deleted) {
+                getSharedPreferences("halo-import", MODE_PRIVATE).edit().remove("disc").apply();
+                log("> disc image deleted; the maps are safe");
+            } else {
+                log("! could not delete " + name);
+            }
+        } catch (Exception exception) {
+            Log.w(TAG, "delete failed", exception);
+            log("! could not delete " + name);
+        }
+    }
+
+    private long sourceBytes() {
+        if (currentImage != null)
+            return currentImage.length();
+        if (currentUri != null) {
+            try (Cursor cursor = getContentResolver().query(currentUri,
+                new String[] { OpenableColumns.SIZE }, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0))
+                    return cursor.getLong(0);
+            } catch (Exception exception) {
+                // fall through to zero
+            }
+        }
+        return 0;
+    }
+
+    private String sourceName() {
+        if (currentImage != null)
+            return currentImage.getName();
+        if (currentUri != null)
+            return displayName(currentUri);
+        return "the disc image";
+    }
+
+    private static String human(long bytes) {
+        if (bytes >= 1L << 30)
+            return String.format(Locale.US, "%.1f GB", bytes / (double) (1L << 30));
+        if (bytes >= 1L << 20)
+            return String.format(Locale.US, "%.0f MB", bytes / (double) (1L << 20));
+        return bytes + " B";
     }
 
     private void reset(String message) {

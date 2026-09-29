@@ -63,13 +63,13 @@ final class DiscImage {
         boolean halo;
         int mapCount;
         long dataBytes;
+        long fileBytes;
         boolean complete;
 
         String summary() {
-            String size = human(dataBytes);
             if (!halo)
-                return "NOT A HALO DISC  ·  " + size;
-            return mapCount + " MAPS  ·  " + size + (complete ? "  ·  READY" : "  ·  INCOMPLETE");
+                return "NOT A HALO DISC  ·  " + human(fileBytes);
+            return mapCount + " MAPS  ·  " + human(dataBytes) + (complete ? "  ·  READY" : "  ·  INCOMPLETE");
         }
 
         private static String human(long bytes) {
@@ -86,6 +86,7 @@ final class DiscImage {
     static Info probe(FileChannel channel) {
         Info info = new Info();
         try {
+            info.fileBytes = channel.size();
             long[] volume = findVolume(channel);
             if (volume == null)
                 return info;
