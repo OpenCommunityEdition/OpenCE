@@ -1021,6 +1021,8 @@ static void unit_drop_item(long unit_index, long item_index);
 #ifdef HALO_LINUX
 /* port/linux/game/network_objects.c's */
 boolean network_objects_creating_host_object(void);
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
 #endif
 static void unit_drop_grenades(
 	long unit_index);
@@ -7663,8 +7665,22 @@ static void unit_throw_grenade_move_to_hand(
 		!actor_has_unlimited_grenades(unit->unit.actor_index)))
 	{
 		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7966, unit->unit.current_grenade_index>=0 && unit->unit.current_grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES);
+#ifdef HALO_LINUX
+		/* port: a distributed client's grenade counts are the host's (what
+		every unit carries, network_objects.c), which can arrive between a
+		throw starting and the grenade reaching the hand, the throw already
+		counted there: the host's count stands */
+		if (network_game_distributed_client())
+		{
+			if (unit->unit.grenade_counts[unit->unit.current_grenade_index] > 0)
+				--unit->unit.grenade_counts[unit->unit.current_grenade_index];
+		}
+		else
+#endif
+		{
 		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7967, unit->unit.grenade_counts[unit->unit.current_grenade_index]>0);
 		--unit->unit.grenade_counts[unit->unit.current_grenade_index];
+		}
 	}
 
 	object_get_marker_by_name(unit_index, "left hand", &marker, 1);
