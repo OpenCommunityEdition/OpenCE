@@ -231,22 +231,24 @@ const HaloInput = (() => {
   // ---------- touch controls
 
   function buildTouchControls(root) {
-    // an Xbox-style layout: the face buttons in a diamond with their colours,
-    // bumpers and triggers above each side, view and menu in the middle
+    // the original Xbox controller's layout (the Controller S): gem-coloured
+    // A, B, X and Y in a diamond with the white and black buttons below
+    // them, the L and R triggers above each side, back and start between
+    // the thumbs, and the d-pad under the left thumb
     const layout = [
       // [id, label, button bit or trigger axis, class, caption]
       ['a', 'A', { bit: BUTTON.SOUTH }, 'face face-a', 'Jump'],
       ['b', 'B', { bit: BUTTON.EAST }, 'face face-b', 'Melee'],
       ['x', 'X', { bit: BUTTON.WEST }, 'face face-x', 'Reload'],
       ['y', 'Y', { bit: BUTTON.NORTH }, 'face face-y', 'Swap'],
-      ['fire', 'RT', { axis: 5 }, 'shoulder trigger right-side', 'Fire'],
-      ['rb', 'RB', { bit: BUTTON.RIGHT_SHOULDER }, 'shoulder bumper right-side', 'Grenade'],
-      ['lt', 'LT', { axis: 4 }, 'shoulder trigger left-side', 'Throw'],
-      ['lb', 'LB', { bit: BUTTON.LEFT_SHOULDER }, 'shoulder bumper left-side', 'Light'],
-      ['ls', 'LS', { bit: BUTTON.LEFT_STICK }, 'stick-click left-click', 'Crouch'],
-      ['rs', 'RS', { bit: BUTTON.RIGHT_STICK }, 'stick-click right-click', 'Zoom'],
-      ['back', '', { bit: BUTTON.BACK }, 'system view', ''],
-      ['start', '', { bit: BUTTON.START }, 'system menu', ''],
+      ['white', '', { bit: BUTTON.LEFT_SHOULDER }, 'duo duo-white', 'Light'],
+      ['black', '', { bit: BUTTON.RIGHT_SHOULDER }, 'duo duo-black', 'Grenade'],
+      ['fire', 'R', { axis: 5 }, 'trigger right-side', 'Fire'],
+      ['lt', 'L', { axis: 4 }, 'trigger left-side', 'Throw'],
+      ['ls', '', { bit: BUTTON.LEFT_STICK }, 'stick-click left-click', 'Crouch'],
+      ['rs', '', { bit: BUTTON.RIGHT_STICK }, 'stick-click right-click', 'Zoom'],
+      ['back', 'BACK', { bit: BUTTON.BACK }, 'system back', ''],
+      ['start', 'START', { bit: BUTTON.START }, 'system start', ''],
       ['up', '', { bit: BUTTON.DPAD_UP }, 'dpad up', ''],
       ['down', '', { bit: BUTTON.DPAD_DOWN }, 'dpad down', ''],
       ['left', '', { bit: BUTTON.DPAD_LEFT }, 'dpad left', ''],
