@@ -29,6 +29,9 @@ so the layout is the same on both sides.
 #define WEB_EVENT_CAPACITY 256
 #define WEB_GAMEPAD_COUNT 5
 #define WEB_AUDIO_RING_FRAMES 8192 /* a power of two */
+/* the rings of packets to and from the other players (web_net.c, net.js) */
+#define WEB_NET_OUT_BYTES (1024 * 1024) /* powers of two */
+#define WEB_NET_IN_BYTES (2 * 1024 * 1024)
 
 enum
 {
@@ -100,8 +103,41 @@ struct web_shared_state
 	volatile int32_t page_hidden;
 	/* the game's state for the page: 1 once the game's window opened */
 	volatile int32_t game_started;
-	/* touch controls: the pointer (menus) and the look sensitivity */
 	volatile int32_t reserved[16];
+
+	/* online play (web_net.c, port/web/site/net.js): this machine's address
+	on the players' network (network byte order, from the page), and the
+	packets the game sends to other machines and receives from them; each
+	ring counts bytes without wrapping */
+	volatile int32_t net_local_address;
+	volatile int32_t net_out_write;
+	volatile int32_t net_out_read;
+	volatile int32_t net_in_write;
+	volatile int32_t net_in_read;
+	unsigned char net_out[WEB_NET_OUT_BYTES];
+	unsigned char net_in[WEB_NET_IN_BYTES];
+};
+
+/* a packet in the rings: this header, then the payload, padded to 4 bytes;
+addresses and ports in network byte order */
+enum
+{
+	WEB_PACKET_DATAGRAM = 1,
+	WEB_PACKET_OPEN,    /* a stream connects */
+	WEB_PACKET_DATA,    /* a stream's bytes */
+	WEB_PACKET_CLOSE,   /* a stream's end closed */
+	WEB_PACKET_REFUSE,  /* nothing listens where a stream connected */
+};
+
+struct web_packet_header
+{
+	uint32_t size;      /* the whole packet, padded */
+	uint32_t kind;
+	uint32_t source_ip;
+	uint32_t destination_ip;
+	uint16_t source_port;
+	uint16_t destination_port;
+	uint32_t length;    /* of the payload */
 };
 
 struct web_shared_state *web_shared_state(void);

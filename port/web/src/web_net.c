@@ -8,9 +8,17 @@ Browsers have no UDP or plain TCP, but the game needs sockets even when it
 plays alone: a split screen game is a network game whose host and clients
 are the same machine, connected through Winsock (transport_endpoint_winsock.c).
 Here every socket belongs to one machine with two addresses, loopback and
-WEB_LOCAL_ADDRESS. Datagrams sent to either, or to a broadcast address, go
-to the socket bound to their port; stream sockets connect to the listening
-socket of their port and exchange bytes through queues.
+its address on the players' network (10.x.y.z, which the page chooses).
+Datagrams sent to either, or to a broadcast address, go to the socket bound
+to their port; stream sockets connect to the listening socket of their port
+and exchange bytes through queues.
+
+Online, the other players' machines have addresses on the same network.
+Datagrams to them (and broadcasts) and streams connected to them become
+packets in a ring the page reads (web_shared.h); the page carries them over
+WebRTC to the other players' pages (port/web/site/net.js), which put them in
+their games' incoming rings, from which the socket calls here take them.
+System link's own discovery and connections then work between the players.
 
 As with Winsock, each call returns -1 on failure with the error code in
 posix_socket_last_error().
@@ -24,6 +32,7 @@ posix_socket_last_error().
 #include <time.h>
 
 #include "posix.h"
+#include "web_shared.h"
 
 /* Winsock error codes (winerror.h) */
 #define WSAEBADF 10009
@@ -47,9 +56,15 @@ posix_socket_last_error().
 #define SOCK_STREAM_VALUE 1
 #define SOCK_DGRAM_VALUE 2
 
-/* 10.0.2.15, in network byte order: the machine's "LAN" address */
-#define WEB_LOCAL_ADDRESS 0x0F02000AUL
+/* 10.0.2.15, in network byte order: the machine's address until the page
+gives it one */
+#define WEB_DEFAULT_ADDRESS 0x0F02000AUL
+#define WEB_LOCAL_ADDRESS local_address()
 #define LOOPBACK_ADDRESS 0x0100007FUL
+/* the largest payload of one packet to another machine */
+#define MAXIMUM_LINK_PAYLOAD 16000
+/* waits look at the incoming packets this often */
+#define LINK_POLL_NANOSECONDS 4000000L
 
 #define SOCKET_BASE 1000 /* descriptors apart from the file system's */
 #define MAXIMUM_SOCKETS 256
@@ -90,6 +105,7 @@ struct web_socket
 	unsigned char *stream;
 	int stream_head, stream_count;
 	int peer;                   /* the connected socket's index, or -1 */
+	int remote_link;            /* a stream to another machine (through the page) */
 	/* a listener's connections waiting to be accepted */
 	int backlog[MAXIMUM_BACKLOG];
 	int backlog_count;
@@ -141,17 +157,28 @@ static struct web_socket *socket_get(int descriptor)
 	if (index < 0 || index >= MAXIMUM_SOCKETS || !sockets[index].used)
 	{
 		last_error = WSAENOTSOCK;
+		TRACE("no socket %d\n", descriptor);
 		return NULL;
 	}
 	return &sockets[index];
 }
 
+static unsigned int local_address(void)
+{
+	unsigned int address = (unsigned int)web_shared_state()->net_local_address;
+
+	return address ? address : WEB_DEFAULT_ADDRESS;
+}
+
+static int is_broadcast(unsigned int ip)
+{
+	return ip == 0xFFFFFFFFu || (unsigned char)(ip >> 24) == 255;
+}
+
+/* this machine's addresses (a broadcast reaches it too) */
 static int is_local(unsigned int ip)
 {
-	unsigned char last = (unsigned char)(ip >> 24);
-
-	return ip == 0 || ip == LOOPBACK_ADDRESS || ip == WEB_LOCAL_ADDRESS || ip == 0xFFFFFFFFu || last == 255 ||
-		(ip & 0xFF) == 127;
+	return ip == 0 || ip == LOOPBACK_ADDRESS || ip == WEB_LOCAL_ADDRESS || is_broadcast(ip) || (ip & 0xFF) == 127;
 }
 
 static int port_in_use(int type, unsigned short port)
@@ -227,6 +254,209 @@ static void datagrams_free(struct web_socket *socket)
 	socket->datagram_count = 0;
 }
 
+/* ---------- packets to and from other machines (web_shared.h) */
+
+static void ring_copy_in(unsigned char *ring, unsigned int capacity, unsigned int position, const void *data,
+	unsigned int length)
+{
+	unsigned int start = position & (capacity - 1);
+	unsigned int first = capacity - start < length ? capacity - start : length;
+
+	memcpy(ring + start, data, first);
+	memcpy(ring, (const unsigned char *)data + first, length - first);
+}
+
+static void ring_copy_out(const unsigned char *ring, unsigned int capacity, unsigned int position, void *data,
+	unsigned int length)
+{
+	unsigned int start = position & (capacity - 1);
+	unsigned int first = capacity - start < length ? capacity - start : length;
+
+	memcpy(data, ring + start, first);
+	memcpy((unsigned char *)data + first, ring, length - first);
+}
+
+/* queues a packet for the page to send; 0 if the ring is full */
+static int link_send(unsigned int kind, const struct address *from, const struct address *to, const void *payload,
+	unsigned int length)
+{
+	struct web_shared_state *shared = web_shared_state();
+	struct web_packet_header header;
+	unsigned int write = (unsigned int)__atomic_load_n(&shared->net_out_write, __ATOMIC_SEQ_CST);
+	unsigned int read = (unsigned int)__atomic_load_n(&shared->net_out_read, __ATOMIC_SEQ_CST);
+	unsigned int size = (unsigned int)(sizeof(header) + length + 3) & ~3u;
+
+	if (WEB_NET_OUT_BYTES - (write - read) < size)
+		return 0;
+	header.size = size;
+	header.kind = kind;
+	header.source_ip = from->ip;
+	header.destination_ip = to->ip;
+	header.source_port = from->port;
+	header.destination_port = to->port;
+	header.length = length;
+	ring_copy_in(shared->net_out, WEB_NET_OUT_BYTES, write, &header, sizeof(header));
+	if (length)
+		ring_copy_in(shared->net_out, WEB_NET_OUT_BYTES, write + (unsigned int)sizeof(header), payload, length);
+	__atomic_store_n(&shared->net_out_write, (int32_t)(write + size), __ATOMIC_SEQ_CST);
+	return 1;
+}
+
+static int free_slot(void)
+{
+	int index;
+
+	for (index = 0; index < MAXIMUM_SOCKETS && sockets[index].used; index++)
+		;
+	return index < MAXIMUM_SOCKETS ? index : -1;
+}
+
+static int find_listener(unsigned short port);
+static void deliver_local_datagram(const struct address *from, const struct address *to, const void *buffer,
+	int length);
+
+/* the stream socket for a connection with another machine */
+static struct web_socket *remote_stream(unsigned int local_port, unsigned int remote_ip, unsigned int remote_port)
+{
+	int index;
+
+	for (index = 0; index < MAXIMUM_SOCKETS; index++)
+	{
+		struct web_socket *socket = &sockets[index];
+
+		if (socket->used && socket->remote_link && socket->local.port == local_port && socket->remote.ip == remote_ip &&
+			socket->remote.port == remote_port)
+		{
+			return socket;
+		}
+	}
+	return NULL;
+}
+
+static void link_receive(const struct web_packet_header *header, const unsigned char *payload)
+{
+	struct address from, to;
+	struct web_socket *socket;
+
+	memset(&from, 0, sizeof(from));
+	memset(&to, 0, sizeof(to));
+	from.family = to.family = AF_INET_VALUE;
+	from.ip = header->source_ip;
+	from.port = header->source_port;
+	to.ip = header->destination_ip;
+	to.port = header->destination_port;
+	switch (header->kind)
+	{
+	case WEB_PACKET_DATAGRAM:
+		deliver_local_datagram(&from, &to, payload, (int)header->length);
+		break;
+	case WEB_PACKET_OPEN:
+	{
+		int listener = find_listener(to.port);
+		int server = free_slot();
+
+		if (listener < 0 || server < 0 || sockets[listener].backlog_count == MAXIMUM_BACKLOG)
+		{
+			struct address local = to;
+
+			local.ip = WEB_LOCAL_ADDRESS;
+			link_send(WEB_PACKET_REFUSE, &local, &from, NULL, 0);
+			TRACE("refused a connection from %08x:%u to port %u\n", from.ip, swap16(from.port), swap16(to.port));
+			break;
+		}
+		socket = &sockets[server];
+		memset(socket, 0, sizeof(*socket));
+		socket->used = 1;
+		socket->type = SOCK_STREAM_VALUE;
+		socket->bound = 1;
+		socket->connected = 1;
+		socket->remote_link = 1;
+		socket->peer = -1;
+		socket->local = to;
+		socket->local.ip = WEB_LOCAL_ADDRESS;
+		socket->remote = from;
+		socket->stream = malloc(STREAM_CAPACITY);
+		sockets[listener].backlog[sockets[listener].backlog_count++] = server;
+		TRACE("connection from %08x:%u to port %u\n", from.ip, swap16(from.port), swap16(to.port));
+		break;
+	}
+	case WEB_PACKET_DATA:
+		socket = remote_stream(to.port, from.ip, from.port);
+		if (socket && socket->stream)
+		{
+			unsigned int index;
+
+			for (index = 0; index < header->length && socket->stream_count < STREAM_CAPACITY; index++)
+			{
+				socket->stream[(socket->stream_head + socket->stream_count) % STREAM_CAPACITY] = payload[index];
+				socket->stream_count++;
+			}
+		}
+		break;
+	case WEB_PACKET_CLOSE:
+	case WEB_PACKET_REFUSE:
+		socket = remote_stream(to.port, from.ip, from.port);
+		if (socket)
+			socket->peer_closed = 1;
+		break;
+	default:
+		break;
+	}
+}
+
+/* takes the packets the page received from other machines; with the lock
+held */
+static void link_pump(void)
+{
+	static unsigned char *payload;
+	struct web_shared_state *shared = web_shared_state();
+	unsigned int read = (unsigned int)__atomic_load_n(&shared->net_in_read, __ATOMIC_SEQ_CST);
+	unsigned int write = (unsigned int)__atomic_load_n(&shared->net_in_write, __ATOMIC_SEQ_CST);
+	int any = 0;
+
+	if (read == write)
+		return;
+	if (!payload)
+		payload = malloc(MAXIMUM_DATAGRAM + 16);
+	while (read != write && payload)
+	{
+		struct web_packet_header header;
+
+		ring_copy_out(shared->net_in, WEB_NET_IN_BYTES, read, &header, sizeof(header));
+		if (header.size < sizeof(header) || header.size > WEB_NET_IN_BYTES || header.length > MAXIMUM_DATAGRAM)
+		{
+			/* a damaged ring: start over */
+			read = write;
+			break;
+		}
+		if (header.length)
+			ring_copy_out(shared->net_in, WEB_NET_IN_BYTES, read + (unsigned int)sizeof(header), payload, header.length);
+		link_receive(&header, payload);
+		read += header.size;
+		any = 1;
+	}
+	__atomic_store_n(&shared->net_in_read, (int32_t)read, __ATOMIC_SEQ_CST);
+	if (any)
+		pthread_cond_broadcast(&network_changed);
+}
+
+/* waits for a change here or a packet from another machine; with the lock
+held */
+static void wait_briefly(void)
+{
+	struct timespec deadline;
+
+	clock_gettime(CLOCK_REALTIME, &deadline);
+	deadline.tv_nsec += LINK_POLL_NANOSECONDS;
+	if (deadline.tv_nsec >= 1000000000L)
+	{
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+	pthread_cond_timedwait(&network_changed, &network_lock, &deadline);
+	link_pump();
+}
+
 static void socket_release(int index)
 {
 	struct web_socket *socket = &sockets[index];
@@ -234,6 +464,8 @@ static void socket_release(int index)
 
 	datagrams_free(socket);
 	free(socket->stream);
+	if (socket->remote_link && !socket->peer_closed)
+		link_send(WEB_PACKET_CLOSE, &socket->local, &socket->remote, NULL, 0);
 	if (socket->peer >= 0 && sockets[socket->peer].used && sockets[socket->peer].peer == index)
 	{
 		sockets[socket->peer].peer_closed = 1;
@@ -389,6 +621,19 @@ int posix_socket_connect(int descriptor, const void *address, int address_length
 		{
 			result = fail(WSAEISCONN);
 		}
+		else if (!is_local(target.ip))
+		{
+			/* another machine's: through the page */
+			socket->stream = malloc(STREAM_CAPACITY);
+			socket->remote_link = 1;
+			socket->connected = 1;
+			if (!socket->stream || !link_send(WEB_PACKET_OPEN, &socket->local, &socket->remote, NULL, 0))
+				result = fail(WSAENOBUFS);
+			else if (socket->nonblocking)
+				result = fail(WSAEWOULDBLOCK);
+			else
+				result = succeed(0);
+		}
 		else
 		{
 			int listener = is_local(target.ip) ? find_listener(target.port) : -1;
@@ -437,7 +682,7 @@ static int wait_changed(struct web_socket *socket)
 {
 	if (socket->nonblocking)
 		return 0;
-	pthread_cond_wait(&network_changed, &network_lock);
+	wait_briefly();
 	return 1;
 }
 
@@ -447,6 +692,7 @@ int posix_socket_accept(int descriptor, void *address, int *address_length)
 	int result = -1;
 
 	pthread_mutex_lock(&network_lock);
+	link_pump();
 	for (;;)
 	{
 		socket = socket_get(descriptor);
@@ -490,6 +736,26 @@ static int stream_send(struct web_socket *socket, const unsigned char *buffer, i
 		socket->connected, socket->peer, socket->peer_closed);
 	if (!socket->connected)
 		return fail(WSAENOTCONN);
+	if (socket->remote_link)
+	{
+		for (;;)
+		{
+			if (socket->peer_closed)
+				return fail(WSAECONNRESET);
+			while (written < length)
+			{
+				int chunk = length - written > MAXIMUM_LINK_PAYLOAD ? MAXIMUM_LINK_PAYLOAD : length - written;
+
+				if (!link_send(WEB_PACKET_DATA, &socket->local, &socket->remote, buffer + written, (unsigned int)chunk))
+					break;
+				written += chunk;
+			}
+			if (written == length || (written && socket->nonblocking))
+				return succeed(written);
+			if (!wait_changed(socket))
+				return fail(WSAEWOULDBLOCK);
+		}
+	}
 	for (;;)
 	{
 		if (socket->peer < 0 || socket->peer_closed)
@@ -508,14 +774,13 @@ static int stream_send(struct web_socket *socket, const unsigned char *buffer, i
 	}
 }
 
-static int deliver_datagram(struct web_socket *from, const void *buffer, int length, const struct address *to)
+/* puts a datagram in the queue of each socket of this machine bound to its
+port */
+static void deliver_local_datagram(const struct address *from, const struct address *to, const void *buffer,
+	int length)
 {
 	int index, delivered = 0;
 
-	if (length > MAXIMUM_DATAGRAM)
-		return fail(WSAEMSGSIZE);
-	if (!is_local(to->ip))
-		return succeed(length); /* nowhere else to go: lost, as on a network */
 	for (index = 0; index < MAXIMUM_SOCKETS; index++)
 	{
 		struct web_socket *target = &sockets[index];
@@ -529,7 +794,7 @@ static int deliver_datagram(struct web_socket *from, const void *buffer, int len
 		if (!datagram)
 			continue;
 		datagram->next = NULL;
-		datagram->from = source_address(from, to->ip);
+		datagram->from = *from;
 		datagram->length = length;
 		memcpy(datagram->data, buffer, (size_t)length);
 		if (target->last)
@@ -540,10 +805,24 @@ static int deliver_datagram(struct web_socket *from, const void *buffer, int len
 		target->datagram_count++;
 		delivered = 1;
 	}
-	TRACE("datagram %d bytes from %d to %08x:%u: %s\n", length, (int)(from - sockets) + SOCKET_BASE, to->ip,
-		swap16(to->port), delivered ? "delivered" : "lost");
 	if (delivered)
 		pthread_cond_broadcast(&network_changed);
+}
+
+static int deliver_datagram(struct web_socket *from, const void *buffer, int length, const struct address *to)
+{
+	struct address source = source_address(from, to->ip);
+
+	if (length > MAXIMUM_DATAGRAM)
+		return fail(WSAEMSGSIZE);
+	TRACE("datagram %d bytes from %08x:%u to %08x:%u\n", length, source.ip, swap16(source.port), to->ip,
+		swap16(to->port));
+	/* this machine's sockets, and through the page the other machines':
+	a broadcast goes to both */
+	if (is_local(to->ip))
+		deliver_local_datagram(&source, to, buffer, length);
+	if (!is_local(to->ip) || (is_broadcast(to->ip) && !is_loopback(to->ip)))
+		link_send(WEB_PACKET_DATAGRAM, &source, to, buffer, (unsigned int)length);
 	return succeed(length);
 }
 
@@ -601,6 +880,7 @@ static int receive(int descriptor, void *buffer, int length, int flags, void *ad
 	int result = -1;
 
 	pthread_mutex_lock(&network_lock);
+	link_pump();
 	for (;;)
 	{
 		socket = socket_get(descriptor);
@@ -701,6 +981,8 @@ int posix_socket_shutdown(int descriptor, int how)
 		socket->shut_down = 1;
 		if (socket->peer >= 0)
 			sockets[socket->peer].peer_closed = 1;
+		if (socket->remote_link && !socket->peer_closed)
+			link_send(WEB_PACKET_CLOSE, &socket->local, &socket->remote, NULL, 0);
 		pthread_cond_broadcast(&network_changed);
 	}
 	pthread_mutex_unlock(&network_lock);
@@ -730,6 +1012,7 @@ int posix_socket_bytes_available(int descriptor, posix_ulong *count)
 	struct web_socket *socket;
 
 	pthread_mutex_lock(&network_lock);
+	link_pump();
 	socket = socket_get(descriptor);
 	if (socket)
 		*count = (posix_ulong)(socket->type == SOCK_DGRAM_VALUE ?
@@ -850,6 +1133,8 @@ static int writeable(int descriptor)
 		return 0;
 	if (socket->type == SOCK_DGRAM_VALUE)
 		return 1;
+	if (socket->remote_link)
+		return socket->connected && !socket->peer_closed;
 	return socket->connected && !socket->peer_closed && socket->peer >= 0 &&
 		sockets[socket->peer].stream_count < STREAM_CAPACITY;
 }
@@ -896,17 +1181,22 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 		deadline.tv_nsec -= 1000000000L;
 	}
 	pthread_mutex_lock(&network_lock);
+	link_pump();
 	for (;;)
 	{
+		struct timespec now;
+
 		if (any_ready(read, read ? *read_count : 0, readable) ||
 			any_ready(write, write ? *write_count : 0, writeable))
 			break;
 		if (!infinite && timeout_seconds <= 0 && timeout_microseconds <= 0)
 			break;
-		if (infinite)
-			pthread_cond_wait(&network_changed, &network_lock);
-		else if (pthread_cond_timedwait(&network_changed, &network_lock, &deadline) == ETIMEDOUT)
+		clock_gettime(CLOCK_REALTIME, &now);
+		if (!infinite && (now.tv_sec > deadline.tv_sec ||
+			(now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec)))
 			break;
+		/* (packets from other machines arrive without a signal: look often) */
+		wait_briefly();
 	}
 	result = keep(read, read_count, readable) + keep(write, write_count, writeable);
 	if (error && error_count)

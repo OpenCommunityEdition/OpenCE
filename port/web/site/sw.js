@@ -22,6 +22,7 @@ const SHELL = [
   'index.html',
   'app.js',
   'input.js',
+  'net.js',
   'style.css',
   'xiso-worker.js',
   'audio-worklet.js',

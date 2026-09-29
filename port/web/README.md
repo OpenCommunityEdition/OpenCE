@@ -1,9 +1,11 @@
-# Web (iPhone, iPad and desktop browsers)
+# Web (iPhone, iPad, Android and desktop browsers)
 
 `ninja web` builds the game as WebAssembly, with a page that installs as a
 home-screen web app: `build/web/site`. On an iPhone or iPad, open the page in
-Safari, tap Share, then *Add to Home Screen*. The installed app runs full
-screen and works offline.
+Safari, tap Share, then *Add to Home Screen*. On Android, open it in Chrome
+(or Edge, or Samsung Internet) and push *Install app* on the page, or choose
+*Install app* in the browser's menu. The installed app runs full screen and
+works offline.
 
 The GitHub Actions workflow `.github/workflows/web.yml` builds the site for
 each commit and publishes the build of `main` on GitHub Pages (in the
@@ -18,8 +20,8 @@ Refer to [port/linux/README.md](../linux/README.md) and
 
 To play:
 
-- iOS or iPadOS 17 or later (Safari, or the installed web app), or a recent
-  Chrome, Edge or Firefox. The browser needs WebGL 2 in a worker
+- iOS or iPadOS 17 or later (Safari, or the installed web app), Android with
+  a recent Chrome, or a recent Chrome, Edge or Firefox on a computer. The browser needs WebGL 2 in a worker
   (OffscreenCanvas), SharedArrayBuffer and the Origin Private File System.
 - About 2 GB of free storage for the game data.
 - An Xbox disc image (`.iso` or `.xiso`) of Halo: Combat Evolved, any version.
@@ -68,6 +70,42 @@ without use: install the app to keep it.
   sensitivity, or turns the touch controls off.
 - A keyboard and mouse (iPad or computer): as on Linux. Click the game to lock
   the pointer; Esc releases it.
+
+## Online play
+
+Players who install the app can play together over the internet, with the
+game's own system link:
+
+1. Each player opens *Play online* on the launcher page. One pushes *New
+   room*, then *Share link*; the others open the link (or type the room's
+   code and push *Join*). The page shows who is in the room.
+2. In the game, one player hosts from *Multiplayer* > *System Link Play*
+   (A or Y to start a game); the others see the game in that list and join.
+
+Everyone in a room is on one network, as on a LAN: up to the game's limits
+of machines and players, split screen on each machine included.
+
+How it works (`site/net.js`, `src/web_net.c`):
+
+- Each copy of the game has an address on the room's network, 10.x.y.z, kept
+  in the browser. The game's sockets put what they send to other addresses
+  in a ring in the shared memory, and take what arrives from another ring.
+- The page carries those packets over WebRTC to each other player: a
+  reliable, ordered data channel for the game's connections and an
+  unreliable one for its datagrams. Broadcasts (system link's discovery) go
+  to every player. The connections are direct between the players; no server
+  carries the game.
+- Players find each other through public MQTT brokers over secure WebSockets
+  (broker.emqx.io, broker.hivemq.com and test.mosquitto.org, all at once), in
+  a topic derived from the room's code. Everything sent there is encrypted
+  (AES-GCM) with a key derived from the code, so only those who have the code
+  can read the room's messages.
+- WebRTC crosses most home networks with STUN (Google's and Cloudflare's
+  public servers). Some networks, mobile carriers' especially, need a TURN
+  relay: *Settings and data* can name one.
+
+The web build does not play with the desktop and Android builds' internet
+play, which uses UDP.
 
 ## How the port operates
 
@@ -177,9 +215,9 @@ the game only when it is there.
 
 - The WebAssembly memory needs 2.1 GB of address space. If the browser does
   not give it, the page says so. Close other apps and tabs.
-- There is no system link or internet play: browsers have no UDP. Split
-  screen works: its host and clients meet through a network inside the page
-  (`src/web_net.c`).
+- System link is between copies of the web build in one room ("Online
+  play"), not with Xboxes or the other ports on the local network: browsers
+  have no UDP.
 - Bink video is not available. The game skips the movies.
 - Lens flares show through walls (see "WebGL 2").
 - Performance depends on the device. The game draws 480 lines at the shape of

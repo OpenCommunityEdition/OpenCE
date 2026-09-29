@@ -31,6 +31,12 @@
       <strong>Install it:</strong> tap <span class="share-glyph" aria-hidden="true">⬆︎</span> Share, then
       <em>Add to Home Screen</em>. The installed app runs full screen and keeps its data.
     </div>
+    <div id="install-android" class="hint" hidden>
+      <strong>Install it</strong> to play full screen and keep the game data:
+      <button type="button" class="button small-button" id="install-button" hidden>Install app</button>
+      <span id="install-android-menu">open the browser's menu <span aria-hidden="true">⋮</span>, then <em>Install app</em>
+        (or <em>Add to Home screen</em>).</span>
+    </div>
 
     <div id="step-data" class="step" hidden>
       <h2>Game data</h2>
@@ -50,12 +56,35 @@
       <p class="small" id="data-summary"></p>
     </div>
 
+    <section class="online" aria-labelledby="online-title">
+      <h2 id="online-title">Play online</h2>
+      <p class="small">Everyone in a room is on one system link network: host a game from Multiplayer &gt;
+        System Link, and the others see it there. Your address: <code id="online-address"></code></p>
+      <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
+      <div id="online-join" class="row">
+        <button type="button" class="button" id="online-create">New room</button>
+        <input id="online-input" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
+        <button type="button" class="button" id="online-enter">Join</button>
+      </div>
+      <div id="online-room" hidden>
+        <p class="room-line">Room <strong id="online-code"></strong>
+          <button type="button" class="button small-button" id="online-share">Share link</button>
+          <button type="button" class="button small-button" id="online-leave">Leave</button></p>
+        <p class="small" id="online-status"></p>
+        <p class="small" id="online-names"></p>
+      </div>
+    </section>
+
     <details class="settings">
       <summary>Settings and data</summary>
       <label class="row"><input type="checkbox" id="opt-touch"> Touch controls</label>
       <label class="row">Aim sensitivity <input type="range" id="opt-look" min="0.4" max="3" step="0.1"></label>
       <label class="row"><input type="checkbox" id="opt-vsync" checked> Wait for the display (smoother, saves battery)</label>
       <label class="row"><input type="checkbox" id="opt-gldebug"> Log graphics errors (for bug reports)</label>
+      <p class="small">Online play: a TURN relay, for networks that WebRTC cannot cross directly (some mobile networks).</p>
+      <label class="row">TURN server <input type="text" id="opt-turn-url" placeholder="turn:host:3478"></label>
+      <label class="row">TURN user <input type="text" id="opt-turn-user" autocomplete="off"></label>
+      <label class="row">TURN password <input type="password" id="opt-turn-password" autocomplete="off"></label>
       <div class="row buttons">
         <button type="button" class="button" id="export-saves">Export saved games</button>
         <button type="button" class="button" id="show-log">Show log</button>
@@ -93,6 +122,7 @@
 </div>
 
 <script src="input.js"></script>
+<script src="net.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -346,11 +346,12 @@ can run the game, copies the game data out of the player's disc image
 
   function readOffsets(module) {
     const pointer = module._web_shared_offsets();
-    const words = new Int32Array(state.memory.buffer, pointer, 23);
+    const words = new Int32Array(state.memory.buffer, pointer, 32);
     const names = ['size', 'eventWrite', 'eventRead', 'events', 'eventSize', 'gamepads', 'gamepadSize',
       'displayWidth', 'displayHeight', 'frameCounter', 'framesPresented', 'vsync', 'audioRate', 'audioOpen',
       'audioWrite', 'audioRead', 'audioUnderruns', 'audioRing', 'audioRingFrames', 'pageHidden', 'gameStarted',
-      'eventCapacity', 'gamepadCount'];
+      'eventCapacity', 'gamepadCount', 'netLocalAddress', 'netOutWrite', 'netOutRead', 'netInWrite', 'netInRead',
+      'netOut', 'netOutBytes', 'netIn', 'netInBytes'];
     const offsets = {};
     names.forEach((name, index) => { offsets[name] = words[index]; });
     return offsets;
@@ -437,6 +438,13 @@ can run the game, copies the game data out of the player's disc image
     if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
     if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
     requestWakeLock();
+    // the system's back gesture or button (Android) backs out of menus, as
+    // the controller's B does, instead of leaving the game
+    history.pushState({ playing: true }, '');
+    window.addEventListener('popstate', () => {
+      HaloInput.pressBack();
+      history.pushState({ playing: true }, '');
+    });
 
     const canvas = $('screen');
     const context = canvas.getContext('bitmaprenderer');
@@ -484,6 +492,7 @@ can run the game, copies the game data out of the player's disc image
           touch: settings.touch,
         });
         HaloInput.setLookSensitivity(settings.look);
+        HaloNet.attach({ memory: state.memory, base: state.shared, offsets: state.offsets });
         $('touch').hidden = !settings.touch;
         requestAnimationFrame(animationFrame);
         startAudio();
@@ -495,6 +504,92 @@ can run the game, copies the game data out of the player's disc image
     script.src = 'halo.js';
     script.onerror = () => fatal('Could not load halo.js.');
     document.body.appendChild(script);
+  }
+
+  // ---------- online play (net.js)
+
+  function onlineOptions() {
+    const options = {};
+    if (settings.turnUrl) {
+      options.turn = { urls: settings.turnUrl, username: settings.turnUser || '', credential: settings.turnPassword || '' };
+    }
+    // (tests name their own broker: ?signal=ws://...)
+    const signal = new URLSearchParams(location.search).get('signal');
+    if (signal) options.brokers = [signal];
+    return options;
+  }
+
+  function roomLink(code) {
+    const url = new URL(location.href);
+    url.search = '';
+    url.hash = '';
+    url.searchParams.set('room', code);
+    return url.toString();
+  }
+
+  function showOnline(status) {
+    const inRoom = !!status.room;
+    $('online-join').hidden = inRoom;
+    $('online-room').hidden = !inRoom;
+    if (!inRoom) return;
+    $('online-code').textContent = status.room;
+    const players = status.players === 1 ? '1 other player' : `${status.players} other players`;
+    $('online-status').textContent = status.brokers ? `Connected: ${players} in the room.` :
+      'Looking for the room… (checking the connection)';
+    $('online-names').textContent = status.names.length ? status.names.join(', ') : '';
+  }
+
+  async function joinRoom(code) {
+    try {
+      const joined = await HaloNet.join(code, onlineOptions());
+      try { localStorage.setItem('halo-web-room', joined); } catch { /* not kept */ }
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+
+  function setUpOnline() {
+    HaloNet.on((type, detail) => {
+      if (type === 'status') showOnline(detail);
+      if (type === 'joined') toast(`${detail.name} joined the room.`);
+      if (type === 'left') toast(`${detail.name} left the room.`);
+    });
+    let name = '';
+    try { name = localStorage.getItem('halo-web-player-name') || ''; } catch { /* none */ }
+    $('online-name').value = name;
+    $('online-name').onchange = (event) => {
+      try { localStorage.setItem('halo-web-player-name', event.target.value.trim().slice(0, 24)); } catch { /* none */ }
+    };
+    $('online-create').onclick = () => joinRoom(HaloNet.newRoomCode());
+    $('online-enter').onclick = () => joinRoom($('online-input').value);
+    $('online-input').onkeydown = (event) => { if (event.key === 'Enter') joinRoom(event.target.value); };
+    $('online-leave').onclick = async () => {
+      await HaloNet.leave();
+      try { localStorage.removeItem('halo-web-room'); } catch { /* none */ }
+    };
+    $('online-share').onclick = async () => {
+      const link = roomLink(HaloNet.status().room);
+      try {
+        if (navigator.share) await navigator.share({ title: 'Halo CE room', text: 'Join my Halo game', url: link });
+        else {
+          await navigator.clipboard.writeText(link);
+          toast('The room link is copied.');
+        }
+      } catch { /* cancelled */ }
+    };
+    $('online-address').textContent = HaloNet.addressText(HaloNet.address);
+    $('opt-turn-url').value = settings.turnUrl || '';
+    $('opt-turn-user').value = settings.turnUser || '';
+    $('opt-turn-password').value = settings.turnPassword || '';
+    for (const [id, key] of [['opt-turn-url', 'turnUrl'], ['opt-turn-user', 'turnUser'], ['opt-turn-password', 'turnPassword']]) {
+      $(id).onchange = (event) => { settings[key] = event.target.value.trim(); saveSettings(); };
+    }
+    // a room link, or the room of last time
+    const linked = new URLSearchParams(location.search).get('room');
+    let last = null;
+    try { last = localStorage.getItem('halo-web-room'); } catch { /* none */ }
+    if (linked || last) joinRoom(linked || last);
+    showOnline(HaloNet.status());
   }
 
   // ---------- updates
@@ -575,8 +670,28 @@ can run the game, copies the game data out of the player's disc image
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     $('install-hint').hidden = standalone || !ios;
+    // Android (Chrome, Edge, Samsung Internet): the browser's own install
+    // prompt when it offers one, otherwise where to find it
+    const android = /Android/i.test(navigator.userAgent);
+    $('install-android').hidden = standalone || !android;
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      state.installPrompt = event;
+      $('install-android').hidden = standalone;
+      $('install-button').hidden = false;
+      $('install-android-menu').hidden = true;
+    });
+    $('install-button').onclick = async () => {
+      if (!state.installPrompt) return;
+      state.installPrompt.prompt();
+      const choice = await state.installPrompt.userChoice.catch(() => null);
+      state.installPrompt = null;
+      if (choice && choice.outcome === 'accepted') $('install-android').hidden = true;
+    };
+    window.addEventListener('appinstalled', () => { $('install-android').hidden = true; });
 
     await ensureIsolation();
+    setUpOnline();
     const ok = await runChecks();
     if (!ok) return;
     showSteps(await mapsState());

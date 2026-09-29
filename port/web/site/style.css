@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body {
   margin: 0;
@@ -116,6 +117,32 @@ code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
 .bar { height: 8px; background: #0e1117; border-radius: 4px; overflow: hidden; }
 #progress-fill { height: 100%; width: 0; background: var(--accent-strong); transition: width 0.2s; }
 
+.online { margin-top: 18px; border-top: 1px solid var(--panel-edge); padding-top: 4px; }
+.online input[type=text] {
+  flex: 1;
+  min-width: 120px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: #0e1117;
+  color: var(--text);
+  font: inherit;
+}
+.room-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
+.room-line strong { font-size: 20px; letter-spacing: 0.12em; color: var(--accent); }
+.small-button { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.settings input[type=text], .settings input[type=password] {
+  flex: 1;
+  min-width: 120px;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-edge);
+  background: #0e1117;
+  color: var(--text);
+  font: inherit;
+}
 .settings { margin-top: 16px; border-top: 1px solid var(--panel-edge); padding-top: 10px; }
 .settings summary { cursor: pointer; color: var(--muted); min-height: 32px; }
 .row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }

@@ -420,5 +420,12 @@ const HaloInput = (() => {
     lookSensitivity = value;
   }
 
-  return { attach, pollGamepads, setLookSensitivity };
+  // the controller's B for a moment (the system's back gesture): the
+  // keyboard's Backspace, which the controller emulation reads as B
+  function pressBack() {
+    pushEvent(EVENT.KEY, 42, 1, 0, 8);
+    setTimeout(() => pushEvent(EVENT.KEY, 42, 0, 0, 8), 120);
+  }
+
+  return { attach, pollGamepads, setLookSensitivity, pressBack };
 })();
