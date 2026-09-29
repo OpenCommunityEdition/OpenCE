@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const Invite = require('../../port/web/site/native-invite.js');
 const Gateway = require('../../port/web/site/gateway.js');
 const TOKEN = '0123456789ab' + 'c'.repeat(32);
@@ -89,4 +91,93 @@ test('invalid identity and insecure relay fail closed', async () => {
   FakeSocket.latest.json({ type: 'ready', identifier: 'bad', address: ADDRESS });
   await assert.rejects(promise, /identity/);
   assert.equal(FakeSocket.latest.readyState, 3);
+});
+
+// Exercise the real launcher's public button handlers and gateway events;
+// stub browser capabilities without starting a game or reserving 2.1 GB.
+async function launcher(useTransport = async () => {}) {
+  const elements = new Map();
+  function element(id) {
+    if (!elements.has(id)) elements.set(id, {
+      value: '', disabled: false, hidden: true, dataset: {}, children: [],
+      appendChild(child) { this.children.push(child); },
+      classList: { add() {}, remove() {} }, getContext() { return {}; },
+    });
+    return elements.get(id);
+  }
+  const context = {
+    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, setTimeout, clearTimeout,
+    navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} } },
+    location: { href: 'http://localhost:8780/', search: '', hash: '' },
+    document: { getElementById: element, createElement: () => element(Symbol()),
+      body: element('body'), documentElement: {}, addEventListener() {} },
+    localStorage: { getItem: () => null, setItem() {} },
+    matchMedia: () => ({ matches: false }), addEventListener() {},
+    screen: {}, history: { pushState() {} }, crossOriginIsolated: true,
+    OffscreenCanvas: class { getContext() { return {}; } },
+    WebAssembly: { Memory: class {} }, fetch: async () => { throw new Error('Offline'); },
+    HALO_BROWSER_CONFIG: { relayUrl: 'ws://localhost:8781/join' },
+    HaloInvite: Invite, HaloGateway: Gateway,
+    HaloNet: { on() {}, addressText: () => '100.64.2.1', status: () => ({}), useTransport },
+    HaloCache: { mapsState: async () => ({ files: ['ui.map'], bytes: 2048,
+      dataRoot: '/data', saveRoot: '/data/save' }) },
+  };
+  context.window = context;
+  vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
+  await new Promise(setImmediate);
+  assert.equal(element('play').disabled, false, 'launcher reached the cached-data ready state');
+  return { element, context };
+}
+
+test('an offline host after relay ready allows a fresh invite; in-game disconnect still requires reload', async () => {
+  const { element, context } = await launcher();
+  element('invite-input').value = TOKEN;
+  const first = element('invite-connect').onclick();
+  const failed = FakeSocket.latest;
+  failed.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
+  await first;
+  assert.equal(element('invite-input').disabled, true);
+  failed.json({ type: 'error', message: 'Native host did not connect' });
+  assert.equal(element('invite-connect').disabled, false);
+  assert.equal(element('invite-input').disabled, false);
+  assert.equal(element('play').disabled, true);
+  assert.equal(element('fatal').hidden, true);
+
+  const fresh = 'abcdefabcdef' + 'd'.repeat(32);
+  element('invite-input').value = fresh;
+  const second = element('invite-connect').onclick();
+  const live = FakeSocket.latest;
+  assert.notEqual(live, failed);
+  live.onopen();
+  assert.equal(JSON.parse(live.sent[0]).invite, fresh);
+  live.json({ type: 'ready', identifier: '112233445566', address: ADDRESS });
+  await second;
+  live.json({ type: 'peer', identifier: fresh.slice(0, 12), address: ADDRESS + 0x1000000, connected: true });
+  assert.equal(element('play').disabled, false);
+  await element('play').onclick();
+  assert.ok(context.Module, 'game launch began');
+  live.json({ type: 'error', message: 'Native session ended' });
+  assert.equal(element('fatal').hidden, false);
+  assert.match(element('fatal-text').textContent, /Reload/);
+  assert.equal(element('invite-connect').disabled, true);
+  assert.equal(element('invite-input').disabled, true);
+  assert.equal(element('play').disabled, true);
+  await element('invite-connect').onclick();
+  assert.equal(FakeSocket.latest, live, 'running game cannot change identity');
+});
+
+test('failure while installing relay transport cannot relock the pre-game invite form', async () => {
+  let finishInstall;
+  const { element } = await launcher(() => new Promise(resolve => { finishInstall = resolve; }));
+  element('invite-input').value = TOKEN;
+  const attempt = element('invite-connect').onclick();
+  const socket = FakeSocket.latest;
+  socket.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
+  await new Promise(setImmediate);
+  socket.json({ type: 'error', message: 'Native session ended' });
+  finishInstall();
+  await attempt;
+  assert.equal(element('invite-connect').disabled, false);
+  assert.equal(element('invite-input').disabled, false);
+  assert.equal(element('play').disabled, true);
 });

@@ -4,8 +4,8 @@ XISO-WORKER.JS
 Copies the maps folder out of an Xbox disc image of Halo: Combat Evolved
 (an "xiso", .iso or .xiso) into the site's Origin Private File System, as
 port/linux/src/xiso.c does for the desktop ports. It runs in a Worker so
-that it can use the synchronous OPFS access handles, which every browser
-with OPFS has (Safari has no writable streams before 17.4).
+that it can use synchronous OPFS access handles, including in browsers
+that do not support OPFS writable streams.
 
 The file system is XDVDFS: 2048-byte sectors; a volume descriptor at 0x10000
 that starts and ends with "MICROSOFT*XBOX*MEDIA" and gives the root

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the source-built multiplayer preview without changing the Apollo deployment."""
+"""Package the source-built browser runtime for the game site and its mirror."""
 import argparse
 import hashlib
 import json

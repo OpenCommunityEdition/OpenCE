@@ -637,11 +637,21 @@ can run the game, copies the game data out of the player's disc image
           accessToken: $('relay-access').value,
           onStatus(status) {
             $('invite-status').textContent = status.message;
+            if (status.state === 'error') {
+              if (state.started) fatal(status.message + ' Reload to start a new session.');
+              else {
+                state.gateway = null;
+                state.gatewayInstalled = false;
+                $('invite-connect').disabled = false;
+                $('invite-input').disabled = false;
+              }
+            }
             updatePlayButton();
-            if (status.state === 'error' && state.started) fatal(status.message + ' Reload to start a new session.');
           },
         });
         await HaloNet.useTransport(transport);
+        // A host failure can arrive while leaving the previous browser room.
+        if (transport.closed) throw new Error('The relay session ended. Try connecting again.');
         state.gateway = transport;
         state.gatewayInstalled = true;
         $('online-address').textContent = HaloNet.addressText(state.gateway.address);

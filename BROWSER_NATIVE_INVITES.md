@@ -8,7 +8,7 @@ https://fqlx.github.io/halo-ce-universal/#join=<44 hexadecimal characters>
 
 The launcher can paste native invites and copy browser links. The fragment is not included in HTTP requests or referrer headers. An invite grants access to its host's current session; it stops working after that host exits. A Discord channel URL or an expired Discord rich invitation is not itself a game token.
 
-**Deployment status:** the existing public Apollo launcher remains separate from this source-built preview. Chrome has joined an actual release33 desktop host through the local relay and entered a two-machine Blood Gulch match. A public native relay still must be configured before this URL can join desktop games. The existing public launcher has not been replaced by this preview.
+**Deployment status:** both public sites now serve the source-built runtime with the relay endpoint unset. Chrome has joined an actual release33 desktop host through a local relay and entered a two-machine Blood Gulch match. A public native relay still must be configured and tested before the public URL can join desktop games.
 
 ## Why the relay is required
 
@@ -37,7 +37,7 @@ The source-built engine includes current native network version 4. The existing 
 
 See [tools/browser-relay/README.md](tools/browser-relay/README.md) for build/run configuration and required limits. The relay needs a Linux host with outbound MQTT/STUN and UDP connectivity, and WSS termination. GitHub Pages serves static files and cannot run this process. Public deployments require an access capability and exact allowed browser origins. Private/reserved peer destinations are rejected by the production worker.
 
-Keep the existing production game and personal website intact until the new build has passed browser-to-native gameplay checks. When publishing a verified replacement, update both the game's static branch and the game subdirectory in the personal-site mirror, preserving the personal site's root files and CNAME.
+Runtime-only updates can ship with the relay unset. Before enabling a public relay, verify browser-to-native gameplay through that deployed endpoint. Update both the game's static branch and the game subdirectory in the personal-site mirror, preserving the personal site's root files and CNAME.
 
 ## Validation
 
@@ -50,4 +50,4 @@ make -C port/relay test
 
 The native fixture exercises the real encrypted P2P path with a local broker and echo host. The frontend tests exercise framing, session permissions, worker lifetime and backpressure. These are transport tests, not a Halo match: launch a compatible native host, open a fresh invitation in the browser, discover it under System Link, join the lobby, and play together before marking crossplay verified.
 
-Verified locally on 2026-09-29: Chrome downloaded and cached all 24 maps, followed an HTTPS-style fragment invitation on loopback, authenticated the native host through the relay, joined System Link, and loaded Blood Gulch. The native host recorded two players on two machines, all machines loaded, and continuing game messages; the browser rendered the match and reported live player updates. The native host was the official `build-33` Linux release (source `0ef2ed7`). This was a local, automated join test using `HALO_NETWORK_TEST=join`, not a public Internet/NAT test or a sustained gameplay/performance benchmark. Test arguments, game assets, native runtime packages and private invitations are excluded from source.
+Verified locally on 2026-09-29: Chrome downloaded and cached all 24 maps, followed an HTTPS-style fragment invitation on loopback, authenticated the native host through the relay, joined System Link, and loaded Blood Gulch. The native host recorded two players on two machines, all machines loaded, and about 85 seconds of bidirectional gameplay packets; the browser rendered the match and reported live player updates. The tab subsequently disappeared and the host recorded connection loss; the cause of the tab disappearance is unknown. The native host was the official `build-33` Linux release (source `0ef2ed7`). This was a local, automated join test using `HALO_NETWORK_TEST=join`, not a public Internet/NAT test or a sustained gameplay/performance benchmark. Test arguments, game assets, native runtime packages and private invitations are excluded from source.

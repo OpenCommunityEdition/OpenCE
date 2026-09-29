@@ -77,6 +77,7 @@ const HaloGateway = (() => {
     const transport = {
       get address() { return identity.address; },
       get connected() { return !ended && peers.size > 0; },
+      get closed() { return ended; },
       attach(value) { shared = value; sync(); },
       flush(receive) {
         if (ended) return;

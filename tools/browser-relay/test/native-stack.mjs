@@ -20,12 +20,25 @@ const args = loader ? ['--library-path', process.env.NATIVE_LIBRARY_PATH, execut
 class Inbox {
   items = [];
   waiting = [];
-  push(value) { const next = this.waiting.shift(); if (next) next(value); else this.items.push(value); }
-  take() {
+  error = null;
+  push(value) { const next = this.waiting.shift(); if (next) next.resolve(value); else this.items.push(value); }
+  fail(error) {
+    this.error = error;
+    for (const waiter of this.waiting.splice(0)) waiter.reject(error);
+  }
+  take(context = 'native event') {
+    if (this.error) return Promise.reject(this.error);
     if (this.items.length) return Promise.resolve(this.items.shift());
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Local native fixture timed out')), 20000);
-      this.waiting.push((value) => { clearTimeout(timer); resolve(value); });
+      const waiter = {
+        resolve: (value) => { clearTimeout(timer); resolve(value); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      };
+      const timer = setTimeout(() => {
+        this.waiting.splice(this.waiting.indexOf(waiter), 1);
+        reject(new Error(`Local native fixture timed out waiting for ${context}`));
+      }, 20000);
+      this.waiting.push(waiter);
     });
   }
 }
@@ -55,7 +68,8 @@ native.stdout.on('data', (bytes) => decoder.push(bytes, (type, data) => {
   assert.ok(type === 2 || type === 3);
   if (type === 3) events.push(JSON.parse(data.toString()));
 }));
-native.on('error', (error) => events.push({ type: 'error', message: error.message }));
+native.on('error', (error) => events.fail(error));
+native.on('exit', (code, signal) => events.fail(new Error(`Native fixture exited (${signal || code})`)));
 try {
   assert.equal((await events.take()).type, 'ready');
   const invitation = await events.take();
@@ -68,6 +82,8 @@ try {
   browser = new WebSocket(`ws://127.0.0.1:${endpoint.port}/join`, { origin: 'http://localhost:8780' });
   const inbox = new Inbox();
   browser.on('message', (bytes, binary) => inbox.push(binary ? Buffer.from(bytes) : JSON.parse(bytes.toString())));
+  browser.on('error', (error) => inbox.fail(error));
+  browser.on('close', (code) => inbox.fail(new Error(`Fixture WebSocket closed (${code})`)));
   await once(browser, 'open');
   browser.send(JSON.stringify({ type: 'join', invite, accessToken }));
   const ready = await inbox.take(), peer = await inbox.take();
@@ -87,20 +103,30 @@ try {
   console.log('PASS: WebSocket frontend -> native encrypted UDP unicast and discovery broadcast');
   for (let connection = 0; connection < 20; connection++) {
     const port = 49157 + connection;
-    const expected = Buffer.from(Array.from({ length: connection ? 64 : 25600 }, (_, i) => i & 255));
+    // The native fixture echoes its first stream only. Later streams are sinks
+    // that report bytes/checksum on close, exercising DATA+CLOSE drain without
+    // waiting for a response before closing the browser side.
+    const expected = Buffer.from(Array.from({ length: connection === 0 ? 25600 : connection === 1 ? 65536 : 64 },
+      (_, i) => (i + connection) & 255));
     browser.send(packet(2, source, destination, port, 5150));
     for (let offset = 0; offset < expected.length; offset += 8000)
       browser.send(packet(3, source, destination, port, 5150, expected.subarray(offset, offset + 8000)));
-    let received = Buffer.alloc(0);
-    while (received.length < expected.length) {
-      const response = await inbox.take();
-      assert.ok(Buffer.isBuffer(response)); assert.equal(response.readUInt32LE(4), 3);
-      received = Buffer.concat([received, response.subarray(24, 24 + response.readUInt32LE(20))]);
+    if (connection === 0) {
+      let received = Buffer.alloc(0);
+      while (received.length < expected.length) {
+        const response = await inbox.take(`stream 1 echo (${received.length}/${expected.length} bytes)`);
+        assert.ok(Buffer.isBuffer(response)); assert.equal(response.readUInt32LE(4), 3);
+        received = Buffer.concat([received, response.subarray(24, 24 + response.readUInt32LE(20))]);
+      }
+      assert.deepEqual(received, expected);
     }
-    assert.deepEqual(received, expected);
     browser.send(packet(4, source, destination, port, 5150));
+    const closed = await events.take(`native stream ${connection + 1} close receipt`);
+    let checksum = 0;
+    for (const byte of expected) checksum = (Math.imul(checksum, 16777619) ^ byte) >>> 0;
+    assert.deepEqual(closed, { type: 'test_stream_closed', bytes: expected.length, checksum });
   }
-  console.log('PASS: WebSocket/native KCP stream byte ordering and 20 connect/close cycles');
+  console.log('PASS: WebSocket/native KCP echo, immediate CLOSE drains 65,536 bytes, and 20 connect/close cycles');
   const close = once(browser, 'close');
   browser.send(packet(1, source, 0x0100007f, 5151, 5150, Buffer.from('blocked')));
   assert.equal((await close)[0], 1008);
