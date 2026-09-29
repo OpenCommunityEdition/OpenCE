@@ -197,6 +197,45 @@ memory both share (`src/web_shared.h`):
 `src/web_sdl.c` gives the platform layer the SDL3 functions it calls (the
 Android guest's list, `port/android/guest/runtime/guest_sdl.c`).
 
+### Browser performance and diagnostics
+
+The source worker now uses the same append-only stream upload batching as the
+Apollo runner. The shared recorder is embedded in `halo.js`, installed on the
+worker's WebGL context, and flushed before each image is sent to the page.
+This avoids repeatedly updating the large vertex/index rings between draws.
+It adds about 54 MiB of CPU shadow storage for the existing triple-buffer ring;
+shader code, scene resolution, and draw order are unchanged. The source
+renderer already caches render state, so the Apollo state-cache wrappers are
+not installed a second time.
+
+Add `?fps=1` to show actual frames received from the game worker. The HUD keeps
+up to 120 visible measurement windows in its `data-samples` attribute, including
+elapsed time and canvas size; animation callbacks do not count as game frames.
+Hidden time is excluded, while visible stalls count toward the measured FPS.
+Compare `?fps=1&batch_streams=0` to disable batching (or pass
+`--HALO_WEB_BATCH_STREAMS=0` to the runtime). Reload between comparisons.
+`?fps=1&render_height=720` optionally caps presentation height for diagnostics;
+the default remains at most 1440 lines, and the engine still renders 480 lines.
+
+On September 29, 2026, a local Apple Silicon/Chrome comparison used the
+Silent Cartographer opening and the same 1960 × 1044 presentation size.
+The updated source binary with `batch_streams=0` returned to roughly 2–4 FPS
+in its early opening samples. With batching enabled, two launches measured
+about 46–52 and 48–50 FPS in their first two sampling windows; later beach
+combat in those runs was around 59–79 FPS. The brief Pelican ride reached the
+120 Hz display limit. These are scene-specific local observations, not a
+sustained or physical-iPhone performance guarantee. Each launch reused the
+same assets and saves; rendering remained at the original quality settings.
+
+Validation covers the DOM-free worker installer, opt-out, explicit flush before
+bitmap transfer, existing upload/readback/VAO/uniform snapshot cases, bounded
+measurement history, hidden intervals, and visible stalls. Run:
+
+```sh
+node tools/test_stream_batch.mjs
+node --test tools/tests/*.test.cjs
+```
+
 ### WebGL 2
 
 The renderer takes its OpenGL ES 3.0 path (port/android/README.md), with

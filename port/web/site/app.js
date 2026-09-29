@@ -22,6 +22,7 @@ can run the game, copies the game data out of the player's disc image
   const MEMORY_PAGES = 0x88000000 / 65536;
   const REQUIRED_BYTES = 2.1e9;
   const DEFAULT_ROOM = window.HALO_BROWSER_CONFIG?.defaultRoom ?? 'FQLX01';
+  const diagnosticOptions = new URLSearchParams(location.search);
 
   const state = {
     memory: null,
@@ -406,12 +407,57 @@ can run the game, copies the game data out of the player's disc image
     const short = Math.min(window.innerWidth, window.innerHeight);
     let width = Math.round(long * scale);
     let height = Math.round(short * scale);
-    // no larger than 1440 lines: the game draws 480 and scales them up
-    if (height > 1440) {
-      width = Math.round(width * 1440 / height);
-      height = 1440;
+    // The game draws 480 lines and scales them up. An optional cap makes
+    // presentation costs comparable without changing the game's rendering.
+    const requestedHeight = Number(diagnosticOptions.get('render_height'));
+    const maximumHeight = Number.isFinite(requestedHeight) && requestedHeight > 0 ?
+      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : 1440;
+    if (height > maximumHeight) {
+      width = Math.round(width * maximumHeight / height);
+      height = maximumHeight;
     }
     return { width: width & ~1, height: height & ~1 };
+  }
+
+  function presentationStats(canvas) {
+    if (diagnosticOptions.get('fps') !== '1') return null;
+    const output = document.createElement('output');
+    output.id = 'performance-stats';
+    output.style.cssText = 'position:fixed;top:max(8px,env(safe-area-inset-top));' +
+      'left:max(8px,env(safe-area-inset-left));z-index:20;padding:4px 8px;' +
+      'font:13px monospace;background:#11161ddd;border-radius:6px;pointer-events:none';
+    output.textContent = 'FPS —';
+    output.title = 'Frames received from the game worker';
+    output.dataset.samples = '[]';
+    document.body.appendChild(output);
+    const samples = [];
+    let frames = 0, previousFrames = 0, previousTime = performance.now();
+    const resetWindow = () => {
+      previousFrames = frames;
+      previousTime = performance.now();
+    };
+    // Neither hidden time nor queued frames delivered while hidden belong
+    // in a visible FPS sample.
+    document.addEventListener('visibilitychange', resetWindow);
+    setInterval(() => {
+      if (document.hidden || !frames) { resetWindow(); return; }
+      const now = performance.now();
+      const windowMs = now - previousTime;
+      if (windowMs < 1000) return;
+      const fps = (frames - previousFrames) * 1000 / windowMs;
+      output.textContent = `${fps.toFixed(1)} FPS`;
+      output.title = `${canvas.width} × ${canvas.height}; frames received from the game worker`;
+      samples.push({ fps: +fps.toFixed(2), frames, ms: Math.round(now),
+        windowMs: +windowMs.toFixed(2), width: canvas.width, height: canvas.height });
+      if (samples.length > 120) samples.shift();
+      output.dataset.samples = JSON.stringify(samples);
+      previousFrames = frames;
+      previousTime = now;
+    }, 1000);
+    return () => {
+      if (!frames) previousTime = performance.now();
+      frames++;
+    };
   }
 
   function sharedWord(name) {
@@ -545,9 +591,11 @@ can run the game, copies the game data out of the player's disc image
 
     const canvas = $('screen');
     const context = canvas.getContext('bitmaprenderer');
+    const countPresent = presentationStats(canvas);
     // (tests pass extra --NAME=value settings in window.__haloArgs)
     const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
     argumentsList.push('--HALO_DATA_ROOT=' + state.maps.dataRoot, '--HALO_SAVE_ROOT=' + state.maps.saveRoot);
+    if (diagnosticOptions.get('batch_streams') === '0') argumentsList.push('--HALO_WEB_BATCH_STREAMS=0');
     if (!settings.vsync) argumentsList.push('--HALO_NO_VSYNC=1');
     if (settings.glDebug) argumentsList.push('--HALO_GL_DEBUG=1');
 
@@ -562,6 +610,7 @@ can run the game, copies the game data out of the player's disc image
           canvas.height = bitmap.height;
         }
         context.transferFromImageBitmap(bitmap);
+        countPresent?.();
       },
       haloMessage: (kind, text) => {
         if (kind === 0) log('game: ' + text);
