@@ -26,7 +26,7 @@ long verify_tag_reference(
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3055, reference);
 #ifdef HALO_ANDROID
 	/* the map data names this string as the window was linked */
-	index = tag_loaded(reference->group_tag, (char const *)PORT_WINDOW_REBASE(reference->name));
+	index = tag_loaded(reference->group_tag, TAG_REFERENCE_NAME(*reference));
 #else
 	index = tag_loaded(reference->group_tag, reference->name);
 #endif
@@ -43,6 +43,12 @@ long verify_tag_reference(
 }
 
 #ifdef HALO_ANDROID
+char const *tag_reference_name(
+	struct tag_reference const *reference)
+{
+	return (char const *)PORT_WINDOW_REBASE(reference->name);
+}
+
 void *tag_data_address(
 	struct tag_data const *data)
 {

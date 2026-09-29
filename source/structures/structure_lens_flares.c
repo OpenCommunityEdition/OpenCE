@@ -304,7 +304,7 @@ boolean build_structure_lens_flares(
 					tag_reference_set(
 						&lens_flare->lens_flare,
 						lens_flare_reference->group_tag,
-						lens_flare_reference->name);
+						TAG_REFERENCE_NAME(*lens_flare_reference));
 					lens_flare->lens_flare.index = lens_flare_reference->index;
 				}
 				else

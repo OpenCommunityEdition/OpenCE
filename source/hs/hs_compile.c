@@ -1456,7 +1456,7 @@ static boolean hs_parse_tag_reference(
 			reference_index,
 			struct hs_reference);
 		if (csstrcmp(
-			reference->reference.name,
+			TAG_REFERENCE_NAME(reference->reference),
 			hs_compile_globals.compiled_source + expression->source_offset) == 0 &&
 			reference->reference.group_tag == group_tag)
 		{

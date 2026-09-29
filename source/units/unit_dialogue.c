@@ -588,7 +588,7 @@ static void unit_lose_speech(
 		console_printf(
 			FALSE,
 			"%s: lost %s speech %s",
-			definition->object.model.name,
+			TAG_REFERENCE_NAME(definition->object.model),
 			play_type == _unit_play_speech_immediate ? "waiting" : "queued",
 			speech_name);
 	}

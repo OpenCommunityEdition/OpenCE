@@ -1815,7 +1815,7 @@ static void effect_generate_part(
 					temporary,
 					"effect %s has a bad part %s",
 					tag_get_name(effect->definition_index),
-					part->reference.name));
+					TAG_REFERENCE_NAME(part->reference)));
 			break;
 	}
 

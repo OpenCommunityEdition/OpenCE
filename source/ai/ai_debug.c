@@ -4553,7 +4553,7 @@ char *ai_debug_describe_actor(
 		struct unit_datum *unit = unit_get(unit_index);
 
 		model_name = tag_name_strip_path(
-			unit_definition_get(unit->definition_index)->object.model.name);
+			TAG_REFERENCE_NAME(unit_definition_get(unit->definition_index)->object.model));
 
 		if (unit->object.name_index!=NONE)
 		{

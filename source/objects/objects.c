@@ -2940,11 +2940,11 @@ void object_render_debug(
 		real_vector3d velocity;
 		real_matrix4x3 world_matrix;
 		
-		char* model_name = strrchr(object_definition->object.model.name, '\\');
+		char* model_name = strrchr(TAG_REFERENCE_NAME(object_definition->object.model), '\\');
 		object_get_world_matrix(object_index, &world_matrix);
 		object_get_velocities(object_index, &velocity, NULL);
 
-		model_name = model_name ? &model_name[1] : object_definition->object.model.name;
+		model_name = model_name ? &model_name[1] : TAG_REFERENCE_NAME(object_definition->object.model);
 		
 		render_debug_string_at_point(0, &world_matrix.position, model_name, global_real_argb_orange);
 		render_debug_matrix(TRUE, &world_matrix, object->object.bounding_sphere_radius);
