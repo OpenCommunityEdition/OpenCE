@@ -37,7 +37,7 @@ android {
         main {
             java.srcDirs += new File(staged, "third_party/SDL3/android-project/app/src/main/java")
             jniLibs.srcDirs = [new File(staged, "jniLibs")]
-            assets.srcDirs = [new File(staged, "assets")]
+            assets.srcDirs = [new File(staged, "assets"), new File(projectDir, "src/main/assets")]
         }
     }
 
