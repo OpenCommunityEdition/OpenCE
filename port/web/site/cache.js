@@ -50,24 +50,55 @@ globalThis.HaloCache = (() => {
     return maps;
   }
 
-  function mapState(maps, legacy) {
-    if (maps.size !== EXPECTED.length) return null;
+  function validateRequired(required) {
+    if (!Array.isArray(required) || !required.length || new Set(required).size !== required.length ||
+        required.some(name => !EXPECTED.includes(name))) {
+      throw new TypeError('Required maps must be a nonempty list of unique supported .map names');
+    }
+    return required.slice();
+  }
+
+  function mapState(maps, legacy, required) {
+    if (!required.every(name => maps.has(name))) return null;
     return {
       files: [...maps.keys()], bytes: [...maps.values()].reduce((sum, size) => sum + size, 0),
+      requiredBytes: required.reduce((sum, name) => sum + maps.get(name), 0),
       dataRoot: legacy ? '/data/halo/data' : '/data',
       saveRoot: legacy ? '/data/halo/save' : '/data/save', cached: true,
     };
   }
 
-  async function mapsState() {
+  async function nativeMaps() {
+    const marker = await readJSON(['maps'], '.complete');
+    // Disc extraction commits this marker only after the entire copy finishes.
+    // Unmarked maps may be leftovers from an interrupted import.
+    if (!marker || !Array.isArray(marker.files) || !marker.files.length ||
+        new Set(marker.files).size !== marker.files.length ||
+        marker.files.some(name => !EXPECTED.includes(name)) ||
+        !Number.isSafeInteger(marker.bytes) || marker.bytes < 2048) return new Map();
+    const folder = await directory(['maps']);
+    let bytes = 0;
+    for (const name of marker.files) {
+      try { bytes += (await (await folder.getFileHandle(name)).getFile()).size; }
+      catch (error) { if (error.name === 'NotFoundError') return new Map(); throw error; }
+    }
+    if (bytes !== marker.bytes) return new Map();
+    const maps = await inspect(['maps']);
+    return new Map([...maps].filter(([name]) => marker.files.includes(name)));
+  }
+
+  async function mapsState({ required = EXPECTED } = {}) {
+    required = validateRequired(required);
     // The production launcher wrote maps.json only after each copy completed.
     // Its oldest imports predate that marker and were checked by map header.
-    const legacy = mapState(await inspect([...DATA_PATH, 'maps'], await readJSON(DATA_PATH, 'maps.json')), true);
+    const manifest = await readJSON(DATA_PATH, 'maps.json');
+    const legacyMaps = await inspect([...DATA_PATH, 'maps'], manifest);
+    // Before maps.json existed, the production importer copied all 24 maps.
+    // Keep that complete-cache compatibility without treating interrupted,
+    // unmarked imports as a committed room subset.
+    const legacy = manifest || legacyMaps.size === EXPECTED.length ? mapState(legacyMaps, true, required) : null;
     if (legacy) return legacy;
-    const marker = await readJSON(['maps'], '.complete');
-    if (!marker || !Array.isArray(marker.files) || !EXPECTED.every(name => marker.files.includes(name))) return null;
-    const native = mapState(await inspect(['maps']), false);
-    return native && native.bytes === marker.bytes ? native : null;
+    return mapState(await nativeMaps(), false, required);
   }
 
   async function withLock(task, signal) {
@@ -96,16 +127,23 @@ globalThis.HaloCache = (() => {
     } finally { access.close(); }
   }
 
-  async function folderBytes(path) {
+  async function runtimeCacheBytes(legacy) {
+    // Z: holds the game's six preallocated runtime map caches. Campaign
+    // downloads and saved games already occupy storage; they do not reduce
+    // the additional room needed by these files or a new requested map.
+    const limits = [0x11600000, 0x11600000, 0x02300000, 0x02f00000, 0x02f00000, 0x02f00000];
     let bytes = 0;
-    const walk = async folder => {
-      for await (const [, handle] of folder.entries()) {
-        if (handle.kind === 'file') bytes += (await handle.getFile()).size;
-        else await walk(handle);
+    let folder;
+    try { folder = await directory(legacy ? ['halo', 'save', 'z'] : ['save', 'z']); }
+    catch (error) { if (error.name === 'NotFoundError') return 0; throw error; }
+    for (let index = 0; index < limits.length; index++) {
+      try {
+        const file = await (await folder.getFileHandle(`cache${String(index).padStart(3, '0')}.map`)).getFile();
+        bytes += Math.min(file.size, limits[index]);
+      } catch (error) {
+        if (error.name !== 'NotFoundError') throw error;
       }
-    };
-    try { await walk(await directory(path)); }
-    catch (error) { if (error.name !== 'NotFoundError') throw error; }
+    }
     return bytes;
   }
 
@@ -171,17 +209,19 @@ globalThis.HaloCache = (() => {
     }
   }
 
-  async function ensure({ signal = new AbortController().signal, onProgress = () => {} } = {}) {
+  async function ensure({ required = EXPECTED, signal = new AbortController().signal, onProgress = () => {} } = {}) {
+    required = validateRequired(required);
+    signal.throwIfAborted();
     let done = 0, total = 0;
     const report = (state, title, detail, count = done) => onProgress({ state, title, detail, done: count, total,
       fraction: total ? Math.min(state === 'ready' ? 1 : 0.99, count / total) : 0 });
     const ready = state => {
-      total = done = state.bytes;
-      report('ready', 'Already downloaded', `${(total / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`);
+      total = done = state.requiredBytes;
+      report('ready', 'Maps ready', `${(total / 1e6).toFixed(1)} MB ready to play, saved in this browser.`);
       return state;
     };
     report('checking', 'Checking game download', 'Looking for game data saved in this browser…');
-    const existing = await mapsState();
+    const existing = await mapsState({ required });
     if (existing) return ready(existing); // Never request or copy an existing complete cache.
     const retry = async task => {
       for (let attempt = 0; ; attempt++) {
@@ -196,23 +236,41 @@ globalThis.HaloCache = (() => {
     };
     try {
       return await withLock(async () => {
-        const state = await mapsState();
+        const state = await mapsState({ required });
         if (state) return ready(state);
         const remote = await retry(() => withResponse(new URL('manifest.json', BASE), signal, response => response.json()));
-        const files = validateManifest(remote);
-        const manifest = await readJSON(DATA_PATH, 'maps.json') || Object.fromEntries(await inspect([...DATA_PATH, 'maps']));
-        const stored = await inspect([...DATA_PATH, 'maps'], manifest);
+        const allFiles = validateManifest(remote);
+        // Validate the pinned manifest in full, but fetch only the requested set,
+        // in launch order (the UI first, followed by the selected room's map).
+        const files = required.map(name => allFiles.find(file => file.name === 'maps/' + name));
+        // An interrupted old import has no per-map commit metadata. Fetch its
+        // requested maps through the normal SHA-256 checks before recording
+        // them as complete, even if the leftover headers and sizes look right.
+        let manifest = await readJSON(DATA_PATH, 'maps.json') || {};
+        let stored = await inspect([...DATA_PATH, 'maps'], manifest);
+        const native = await nativeMaps();
+        const useNative = required.filter(name => native.has(name)).length > required.filter(name => stored.has(name)).length;
+        const mapPath = useNative ? ['maps'] : [...DATA_PATH, 'maps'];
+        if (useNative) { stored = native; manifest = Object.fromEntries(native); }
+        // A completion marker cannot vouch for a size that differs from the
+        // pinned download. Only reuse maps matching the complete manifest.
+        stored = new Map([...stored].filter(([name, size]) => allFiles.some(file => file.name === 'maps/' + name && file.size === size)));
+        manifest = Object.fromEntries(stored);
+        const commit = () => useNative
+          ? writeJSON(['maps'], '.complete', { files: Object.keys(manifest), bytes: Object.values(manifest).reduce((sum, size) => sum + size, 0) })
+          : writeJSON(DATA_PATH, 'maps.json', manifest);
         const wanted = files.filter(file => stored.get(file.name.slice(5)) !== file.size);
         total = files.reduce((sum, file) => sum + file.size, 0);
         done = total - wanted.reduce((sum, file) => sum + file.size, 0);
-        await reserve(total + CACHE_BYTES - await folderBytes(['halo']));
+        const missingBytes = wanted.reduce((sum, file) => sum + file.size, 0);
+        await reserve(missingBytes + CACHE_BYTES - await runtimeCacheBytes(!useNative));
         navigator.storage.persist?.().catch(() => {});
-        const folder = await directory([...DATA_PATH, 'maps'], true);
+        const folder = await directory(mapPath, true);
         for (const file of wanted) {
           const name = file.name.slice(5);
           await retry(async () => {
             delete manifest[name];
-            await writeJSON(DATA_PATH, 'maps.json', manifest);
+            await commit();
             const handle = await folder.getFileHandle(name, { create: true });
             let access, written = 0, lastReport = 0;
             try {
@@ -239,7 +297,7 @@ globalThis.HaloCache = (() => {
                       const now = Date.now();
                       if (now - lastReport > 100 || written === file.size) {
                         report('downloading', 'Downloading game data',
-                          `${((done + written) / 1e9).toFixed(2)} of ${(total / 1e9).toFixed(2)} GB · Keep this tab open.`, done + written);
+                          `${((done + written) / 1e6).toFixed(1)} of ${(total / 1e6).toFixed(1)} MB · Keep this tab open.`, done + written);
                         lastReport = now;
                       }
                     }
@@ -260,7 +318,7 @@ globalThis.HaloCache = (() => {
               }
               signal.throwIfAborted();
               manifest[name] = file.size;
-              await writeJSON(DATA_PATH, 'maps.json', manifest);
+              await commit();
             } catch (error) {
               if (access) access.close();
               delete manifest[name];
@@ -270,7 +328,7 @@ globalThis.HaloCache = (() => {
           });
           done += file.size;
         }
-        const complete = await mapsState();
+        const complete = await mapsState({ required });
         if (!complete) throw new Error('The downloaded maps are incomplete');
         return ready(complete);
       }, signal);
@@ -281,7 +339,9 @@ globalThis.HaloCache = (() => {
     }
   }
 
-  function download({ signal, onProgress = () => {} } = {}) {
+  function download({ required = EXPECTED, signal, onProgress = () => {} } = {}) {
+    required = validateRequired(required);
+    signal?.throwIfAborted();
     return new Promise((resolve, reject) => {
       const worker = new Worker('xiso-worker.js');
       const stop = () => worker.postMessage({ type: 'cancel-cache' });
@@ -296,7 +356,7 @@ globalThis.HaloCache = (() => {
         }
       };
       worker.onerror = event => { finish(); reject(new Error(event.message || 'The download stopped.')); };
-      worker.postMessage({ type: 'cache' });
+      worker.postMessage({ type: 'cache', required });
       if (signal?.aborted) stop();
     });
   }

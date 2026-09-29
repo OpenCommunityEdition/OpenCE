@@ -40,9 +40,17 @@ with the same UI map in the September 29, 2026 test. Touch controls are
 available; startup and gameplay on a physical iPhone remain unverified.
 See [port/web/README.md](port/web/README.md) for requirements and controls.
 
-The first visit downloads about 1.9 GB of maps automatically; keep the tab
-open until it finishes. The launcher shows a progress bar, percentage,
-and downloaded size. Completed maps survive cancellation and reloads.
+Browser rooms download only `ui.map` and `bloodgulch.map` before starting:
+36,716,544 bytes (about 37 MB), instead of all 1.86 GB of maps. The progress
+bar measures that required download. Other maps wait until **Main menu** or
+`?menu=1` is selected, when only the missing maps are downloaded before the
+full menu opens. Desktop invites also prepare all maps, because their host
+may choose any supported map. Returning visitors reuse completed maps.
+Completed maps survive cancellation and reloads.
+The September 29 local Chrome check started a host and joined its running
+Blood Gulch match from a second fresh origin, with only those two maps in
+each browser's storage. Each player downloaded 36,716,544 map bytes. This
+verifies the smaller startup set, not a measured Internet join time.
 Existing Apollo maps and saves are reused in place under `halo/data` and
 `halo/save`. Each browser and domain has a separate cache. Browser storage
 can be cleared or evicted. Manual disc import remains available.
@@ -56,7 +64,7 @@ both domains can meet. An explicit room link or a previously chosen room
 takes precedence; choosing **Leave** keeps the browser out across reloads
 until the player opens a room link or chooses **Join default room**.
 
-After the maps are ready, the launcher starts multiplayer automatically.
+After the UI and Blood Gulch maps are ready, the launcher starts multiplayer automatically.
 The first ready participant hosts **Blood Gulch Slayer**; later participants
 join that host, including while the match is running. Only players preparing
 to launch participate in host selection, so an idle tab or a download does
@@ -76,7 +84,9 @@ needed. Manual browser System Link also allows a single player to start a
 non-team game with distributed networking; the game stays open for later
 players. Team readiness and the two-machine requirement for lockstep remain.
 **Main menu** opts out of quick play; `?menu=1` opens the normal
-launcher and game menu. A failed attempt shows an error instead of repeatedly
+launcher and prepares the remaining maps before the game menu. Leaving a
+quick-play match for the menu also prepares those maps, so other scenarios
+cannot be selected before their data is available. A failed attempt shows an error instead of repeatedly
 restarting the game. Private room links use the same quick-play flow.
 
 Use the in-game **Room** button to open the room controls, then choose

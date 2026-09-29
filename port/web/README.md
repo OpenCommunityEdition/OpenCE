@@ -139,7 +139,10 @@ system link. The launcher joins the public **FQLX01** room on a first visit.
 Both hosted domains use that same room. Share a link ending in
 `?room=FQLX01` to enter it directly.
 
-Once the maps are ready, the launcher enters multiplayer automatically.
+Browser rooms prepare only the UI and Blood Gulch maps (about 37 MB) before
+entering multiplayer automatically. The remaining maps download only when
+the full main menu is selected; existing completed maps are reused. Desktop
+invites retain the full-map download because they can join other scenarios.
 The first ready player hosts Blood Gulch Slayer; the others join that host
 without navigating the game's System Link menus. The public room does not
 run a permanent game server.

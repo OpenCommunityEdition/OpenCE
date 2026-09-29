@@ -32,7 +32,12 @@ void dispose_global_network_game_client(void) { client = NULL; }
 void dispose_global_network_game_server(void) { server = NULL; }
 boolean create_global_network_game_client(void) { created++; client = &mock_client; return TRUE; }
 void player_ui_fast_setup_network_server(void)
-{ created++; client = &mock_client; server = &mock_server; connection = _game_connection_network_server; }
+{
+	/* The real helper initializes its playlist immediately. A blank initial
+	map makes it try unavailable Carousel before the pregame map change. */
+	assert(!strcmp(web_quick_play_initial_map(), "levels\\test\\bloodgulch\\bloodgulch"));
+	created++; client = &mock_client; server = &mock_server; connection = _game_connection_network_server;
+}
 void main_goto_main_menu(void) { menus++; }
 void game_connection_set(short value) { connection = value; }
 short game_connection(void) { return connection; }
@@ -98,6 +103,12 @@ int main(void)
 
 	reset(""); step(1000000, TRUE); assert(!created && !reports);
 	assert(!web_quick_play_pistol_starts());
+	assert(!web_quick_play_initial_map()[0]);
+	reset("host"); step(0, TRUE);
+	assert(!web_quick_play_initial_map()[0]); /* settling, but no owned session */
+	step(2000, TRUE); assert(created == 1);
+	assert(!web_quick_play_initial_map()[0]); /* initial playlist already selected */
+	reset("");
 	/* Manual System Link has no quick-play mode, but must keep simulating
 	while hidden so later players can discover and join its host. */
 	assert(!web_multiplayer_active()); client = &mock_client;
@@ -138,9 +149,11 @@ int main(void)
 	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	assert(!strcmp(last_phase, "playing")); step(1000000, FALSE);
 	assert(web_quick_play_pistol_starts());
+	assert(!web_quick_play_initial_map()[0]);
 	assert(starts == 2 && !aborts); web_quick_play_cancel(); step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
 	assert(!web_quick_play_pistol_starts());
+	assert(!web_quick_play_initial_map()[0]);
 
 	launch("host"); quick_policy = FALSE; mock_client.state = _network_game_client_state_pregame;
 	step(500, TRUE); assert(!strcmp(last_phase, "error") && !starts && aborts == 1);
@@ -169,6 +182,7 @@ int main(void)
 	assert(!strcmp(last_phase, "loading") && quick_play.host);
 	step(1, TRUE); step(2000, TRUE);
 	assert(created == 2 && connection == _game_connection_network_server);
+	assert(!web_quick_play_initial_map()[0]);
 
 	/* Another survivor restarts as a client of the exact new host address. */
 	launch("join"); mock_client.state = _network_game_client_state_ingame;

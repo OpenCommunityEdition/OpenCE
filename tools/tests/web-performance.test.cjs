@@ -2,6 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const EXPECTED_MAPS = [
+  'ui', 'a10', 'a30', 'a50', 'b30', 'b40', 'c10', 'c20', 'c40', 'd20', 'd40',
+  'beavercreek', 'bloodgulch', 'boardingaction', 'carousel', 'chillout', 'damnation',
+  'hangemhigh', 'longest', 'prisoner', 'putput', 'ratrace', 'sidewinder', 'wizard',
+].map(name => name + '.map');
 
 // Run the real launcher and its public Play/Module/visibility callbacks.
 // As in native-invite.test.cjs, browser services are stubbed; only 64 KB of
@@ -48,7 +53,7 @@ async function launch(query = '', viewport = {}, initiallyHidden = false) {
       attached = value;
       hiddenAtAttach = new Int32Array(value.memory.buffer)[(value.base + value.offsets.pageHidden) >> 2];
     }, setLookSensitivity() {}, pollGamepads() {} },
-    HaloCache: { mapsState: async () => ({ files: ['ui.map'], bytes: 2048,
+    HaloCache: { expected: EXPECTED_MAPS.slice(), mapsState: async () => ({ files: EXPECTED_MAPS.slice(), bytes: 1_856_530_432,
       dataRoot: '/data', saveRoot: '/data/save' }) },
   };
   context.window = context;

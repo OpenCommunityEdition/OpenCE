@@ -22,6 +22,7 @@ can run the game, copies the game data out of the player's disc image
   const MEMORY_PAGES = 0x88000000 / 65536;
   const REQUIRED_BYTES = 2.1e9;
   const DEFAULT_ROOM = window.HALO_BROWSER_CONFIG?.defaultRoom ?? 'FQLX01';
+  const QUICK_MAPS = ['ui.map', 'bloodgulch.map'];
   const diagnosticOptions = new URLSearchParams(location.search);
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -49,6 +50,7 @@ can run the game, copies the game data out of the player's disc image
     maps: null,
     cacheAbort: null,
     dataBusy: false,
+    dataTransition: false,
     releaseGameLock: null,
     checksReady: false,
     manualMode: new URLSearchParams(location.search).get('menu') === '1',
@@ -204,8 +206,24 @@ can run the game, copies the game data out of the player's disc image
 
   // ---------- game data
 
+  function requiredMaps() {
+    // Desktop invites can name any map. Only browser quick play fixes the
+    // match to Blood Gulch; the full menu retains all supported scenarios.
+    return !state.manualMode && state.selectedRoom && !state.invite ? QUICK_MAPS : HaloCache.expected;
+  }
+
+  function hasFullMaps() {
+    return !!state.maps && HaloCache.expected.every(name => state.maps.files.includes(name));
+  }
+
+  function downloadedDetail(maps) {
+    const bytes = maps.requiredBytes ?? maps.bytes;
+    return bytes < 1e9 ? `${(bytes / 1e6).toFixed(1)} MB saved in this browser. Ready to play.` :
+      `${(bytes / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`;
+  }
+
   async function mapsState() {
-    return HaloCache.mapsState();
+    return HaloCache.mapsState({ required: requiredMaps() });
   }
 
   function updatePlayButton() {
@@ -228,10 +246,12 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function connectPendingInvite() {
-    if (state.maps && !state.dataBusy && state.pendingInviteConnect) {
+    if (hasFullMaps() && !state.dataBusy && state.pendingInviteConnect && !state.dataTransition) {
       const connect = state.pendingInviteConnect;
       state.pendingInviteConnect = null;
       connect();
+    } else if (state.checksReady && state.maps && !state.dataBusy && state.pendingInviteConnect && !state.dataTransition) {
+      downloadMaps();
     }
   }
 
@@ -260,7 +280,8 @@ can run the game, copies the game data out of the player's disc image
     state.cacheAbort = new AbortController();
     setDataBusy(true);
     try {
-      const maps = await HaloCache.download({ signal: state.cacheAbort.signal, onProgress: showDownload });
+      const maps = await HaloCache.download({ required: requiredMaps(),
+        signal: state.cacheAbort.signal, onProgress: showDownload });
       showSteps(maps);
     } catch (error) {
       log('game data: ' + error.message);
@@ -324,7 +345,7 @@ can run the game, copies the game data out of the player's disc image
       $('progress-text').textContent = 'Done.';
       showSteps(await mapsState());
       if (state.maps) showDownload({ state: 'ready', title: 'Already downloaded',
-        detail: `${(state.maps.bytes / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`, fraction: 1 });
+        detail: downloadedDetail(state.maps), fraction: 1 });
     } catch (error) {
       $('progress-text').textContent = error.message;
       log('extraction failed: ' + error.message);
@@ -467,7 +488,7 @@ can run the game, copies the game data out of the player's disc image
   }
 
   async function maybeQuickPlay() {
-    if (!state.checksReady || state.started || state.dataBusy || !state.maps) return;
+    if (!state.checksReady || state.started || state.dataBusy || state.dataTransition || !state.maps) return;
     if (state.manualMode) {
       if (state.manualRequested) {
         state.manualRequested = false;
@@ -477,6 +498,7 @@ can run the game, copies the game data out of the player's disc image
     }
     if (state.quickController || state.quickFailed) return;
     if (state.invite) {
+      if (!hasFullMaps()) return;
       if (!state.gatewayInstalled || !state.gateway?.connected) {
         quickStatus('waiting', 'Waiting for the invited host…');
         return;
@@ -535,9 +557,21 @@ can run the game, copies the game data out of the player's disc image
     quickStatus('menu', 'Main menu selected.');
     updatePlayButton();
     unlockInteraction();
+    if (!hasFullMaps()) {
+      // The running engine owns the OPFS game lock. Reload before preparing
+      // more maps, and keep the old page from launching a completed download.
+      state.dataTransition = true;
+      state.cacheAbort?.abort();
+      const url = new URL(location.href);
+      url.searchParams.set('menu', '1');
+      url.hash = '';
+      location.href = url.toString();
+      return;
+    }
     if (state.started || state.nativeInstalling) {
       if (!unrecoverable && !state.nativeInstalling && window.Module?._web_quick_play_cancel) window.Module._web_quick_play_cancel();
       else {
+        state.dataTransition = true;
         const url = new URL(location.href);
         url.searchParams.set('menu', '1');
         location.href = url.toString();
@@ -716,7 +750,7 @@ can run the game, copies the game data out of the player's disc image
   }
 
   async function play({ role = null, target = null, userGesture = false } = {}) {
-    if (state.started || state.dataBusy || !state.maps) return;
+    if (state.started || state.dataBusy || state.dataTransition || !state.maps) return;
     if (role && state.invite && (!state.gatewayInstalled || !state.gateway?.connected)) {
       quickStatus('waiting', 'Waiting for the invited host…');
       return;
@@ -741,6 +775,12 @@ can run the game, copies the game data out of the player's disc image
       cancelQuickPlay();
       quickStatus('error', error.message);
       updatePlayButton();
+      return;
+    }
+    if (state.dataTransition) {
+      state.releaseGameLock?.();
+      state.releaseGameLock = null;
+      state.started = false;
       return;
     }
     updatePlayButton();
@@ -823,6 +863,10 @@ can run the game, copies the game data out of the player's disc image
               state.quickFailed = status.phase === 'error';
               state.manualMode = true;
               cancelQuickPlay();
+              if (!hasFullMaps()) {
+                if (status.phase === 'menu') openMainMenu();
+                else fatal(status.message + ' Reload to retry multiplayer, or choose Main menu to download the remaining maps.');
+              }
             }
           } catch (error) { log('quick play status: ' + error); }
         }
@@ -890,9 +934,10 @@ can run the game, copies the game data out of the player's disc image
         $('invite-status').textContent = 'The browser link is valid, but this site needs a relay before it can join desktop games.';
         return;
       }
-      if (!state.maps || state.dataBusy) {
+      if (!hasFullMaps() || state.dataBusy) {
         state.pendingInviteConnect = connect;
         $('invite-status').textContent = 'Preparing game data. The invite will connect when the download finishes.';
+        connectPendingInvite();
         return;
       }
       $('invite-connect').disabled = true;
@@ -1021,7 +1066,9 @@ can run the game, copies the game data out of the player's disc image
       return state.roomTask;
     // Quick play is configured once when the engine starts. Changing only
     // WebRTC rooms would leave its old host/client session running on a new LAN.
-    if (state.started) {
+    if (state.started || (state.dataBusy && state.manualMode)) {
+      state.dataTransition = true;
+      state.cacheAbort?.abort();
       try {
         if (remember) localStorage.setItem('halo-web-room', code);
         localStorage.removeItem('halo-web-room-left');
@@ -1076,7 +1123,9 @@ can run the game, copies the game data out of the player's disc image
     $('online-enter').onclick = () => joinRoom($('online-input').value);
     $('online-input').onkeydown = (event) => { if (event.key === 'Enter') joinRoom(event.target.value); };
     $('online-leave').onclick = () => {
-      if (state.started) {
+      if (state.started || !hasFullMaps()) {
+        state.dataTransition = true;
+        state.cacheAbort?.abort();
         try {
           localStorage.removeItem('halo-web-room');
           localStorage.setItem('halo-web-room-left', '1');
@@ -1271,7 +1320,7 @@ can run the game, copies the game data out of the player's disc image
     showSteps(await mapsState());
     if (state.maps) {
       showDownload({ state: 'ready', title: 'Already downloaded',
-        detail: `${(state.maps.bytes / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`, fraction: 1 });
+        detail: downloadedDetail(state.maps), fraction: 1 });
       setDataBusy(false);
     } else {
       downloadMaps();

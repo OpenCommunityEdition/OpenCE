@@ -169,7 +169,7 @@ onmessage = async (event) => {
   try {
     if (event.data.type === 'cache') {
       cacheAbort = new AbortController();
-      const maps = await HaloCache.ensure({ signal: cacheAbort.signal,
+      const maps = await HaloCache.ensure({ required: event.data.required, signal: cacheAbort.signal,
         onProgress: progress => postMessage({ type: 'cache-progress', progress }) });
       postMessage({ type: 'cache-done', maps });
       return;
