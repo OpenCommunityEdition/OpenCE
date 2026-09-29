@@ -182,6 +182,7 @@ public class LauncherActivity extends Activity {
     }
 
     private void importImage(Uri image) {
+        android.util.Log.i("halo", "importing " + image);
         try (ParcelFileDescriptor descriptor = getContentResolver().openFileDescriptor(image, "r")) {
             if (descriptor == null)
                 throw new java.io.IOException("the file could not be opened");
@@ -200,9 +201,16 @@ public class LauncherActivity extends Activity {
                 }
             });
         } catch (XisoExtractor.ExtractException exception) {
+            /* the whole stack, so that a report is enough to work it out */
+            android.util.Log.e("halo", "the extraction failed", exception);
             fail(exception.getMessage());
-        } catch (Exception exception) {
-            fail("Extracting failed: " + exception.getMessage());
+        } catch (Throwable failure) {
+            /* an Error (a failed allocation, say) would otherwise take the
+            app down and leave nothing behind to look at */
+            android.util.Log.e("halo", "the extraction failed", failure);
+            String message = failure.getMessage();
+
+            fail("Extracting failed: " + (message != null ? message : failure.getClass().getName()));
         }
     }
 }

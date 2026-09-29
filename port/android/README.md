@@ -208,8 +208,7 @@ and supplies the thread pointer and TLS.
   `0x80000000`, the image, and pools for the memory of the guest
   (`host/host_memory.c`). The two fixed ranges are claimed first, before
   the pools and SDL map anything; when a reservation fails, the log names
-  the mappings that are in the way, and the Java runtime's large object
-  space is moved out of the way (see Limits).
+  the mappings that are in the way.
 - Loads the image and fills its import table (`host/host_loader.c`).
 - Starts the `main` of the game and each guest thread on a stack in guest
   memory, because ILP32 code keeps stack addresses in 32-bit registers
@@ -340,10 +339,12 @@ reads per draw when on, so turn them off once the question is answered.
   `0x80000000` to approximately `0x89000000`. The game data is linked to
   them (the tag cache of a map file sits at `0x803a6000`, and its tag
   directory holds thousands more such addresses), so they cannot move.
-  Where the Java runtime has mapped its large object space across that
-  range, the app collects garbage and moves the space, which is one
-  anonymous mapping, elsewhere; it only does so when a collection left
-  less than a megabyte in it, and writes both numbers to the log.
+  A device whose Java runtime has mapped its large object space across
+  that range cannot run the game. That space cannot be taken: the runtime
+  hands out memory from the address it remembers, so moving the mapping
+  only moves the crash to the next large allocation (an app importing its
+  data from a disc image, for one). Such a device needs the game's window
+  to be relocatable, which the data is not.
 - The game does not accept touch input. Use a controller or a keyboard.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.

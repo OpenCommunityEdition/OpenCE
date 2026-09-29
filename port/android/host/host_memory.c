@@ -22,9 +22,6 @@ passed on to the previous handler.
 
 #include "host.h"
 
-#include <SDL3/SDL_system.h>
-#include <jni.h>
-
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
@@ -37,12 +34,6 @@ passed on to the previous handler.
 
 #ifndef MAP_FIXED_NOREPLACE
 #define MAP_FIXED_NOREPLACE 0x100000
-#endif
-#ifndef MREMAP_MAYMOVE
-#define MREMAP_MAYMOVE 1
-#endif
-#ifndef MREMAP_FIXED
-#define MREMAP_FIXED 2
 #endif
 
 #define PAGE 0x1000ULL
@@ -64,7 +55,6 @@ static int pool_count;
 static pthread_mutex_t memory_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static uint64_t window_base, window_end;
-static int reserved;
 static uint64_t image_base, image_end;
 
 static uint64_t round_up(uint64_t value)
@@ -80,8 +70,8 @@ static int in_range(uint64_t address, uint64_t size, uint64_t base, uint64_t end
 /* ---------- reserving address space below 4 GB */
 
 /* the lowest free gap of at least size bytes at or above minimum, from
-/proc/self/maps, at a multiple of alignment; 0 if none */
-static uint64_t find_gap(uint64_t size, uint64_t minimum, uint64_t alignment)
+/proc/self/maps; 0 if none */
+static uint64_t find_gap(uint64_t size, uint64_t minimum)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
@@ -105,7 +95,7 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum, uint64_t alignment)
 			break;
 	}
 	fclose(maps);
-	previous_end = (round_up(previous_end) + alignment - 1) & ~(alignment - 1);
+	previous_end = round_up(previous_end);
 	if (previous_end + size <= LOW_LIMIT)
 		result = previous_end;
 	return result;
@@ -127,141 +117,6 @@ static void log_conflicts(uint64_t address, uint64_t size)
 	}
 	if (maps)
 		fclose(maps);
-}
-
-/* ---------- moving the Java runtime's heap out of the way
-
-The game data is linked to 0x80000000, so the window cannot move. On some
-devices the runtime has already mapped its large object space across it,
-which is one anonymous mapping the kernel can move whole. The app does not
-write to that space itself, and a collection beforehand gives the runtime
-the chance to give back whatever it had in it; how much of it was in use
-is written to the log, since a space that was in use would have objects
-pointing into the address the runtime still remembers. */
-
-#define RUNTIME_HEAP_NAME "dalvik-free list large object space"
-
-/* how much of that space may be in use for moving it to be safe: whatever
-the runtime still has in it is reachable by pointers it kept, and those
-pointers are not moved with it, so a space with anything live in it is
-left alone. Moving one with a live object in it takes the runtime down
-within milliseconds (seen on a device that had 984 kB in it) */
-#define RUNTIME_HEAP_RESIDENT_LIMIT (64UL * 1024UL)
-
-static int find_runtime_heap(uint64_t address, uint64_t size, uint64_t *start, uint64_t *end)
-{
-	FILE *maps = fopen("/proc/self/maps", "r");
-	char line[512];
-	int found = 0;
-
-	while (maps && !found && fgets(line, sizeof(line), maps))
-	{
-		unsigned long long first, last;
-		char name[128];
-
-		if (sscanf(line, "%llx-%llx", &first, &last) != 2)
-			continue;
-		name[0] = 0;
-		sscanf(line, "%*s %*s %*s %*s %*s %127[^\n]", name);
-		if (strstr(name, RUNTIME_HEAP_NAME) && last > address && first < address + size)
-		{
-			*start = first;
-			*end = last;
-			found = 1;
-		}
-	}
-	if (maps)
-		fclose(maps);
-	return found;
-}
-
-/* the resident size of a mapping, from /proc/self/smaps; 0 if unknown */
-static unsigned long mapping_resident_kilobytes(uint64_t start, uint64_t end)
-{
-	FILE *smaps = fopen("/proc/self/smaps", "r");
-	char line[512];
-	unsigned long resident = 0;
-	int inside = 0;
-
-	while (smaps && fgets(line, sizeof(line), smaps))
-	{
-		unsigned long long first, last;
-
-		if (sscanf(line, "%llx-%llx", &first, &last) == 2)
-		{
-			inside = first == start && last == end;
-			continue;
-		}
-		if (inside && sscanf(line, "Rss: %lu kB", &resident) == 1)
-			break;
-	}
-	if (smaps)
-		fclose(smaps);
-	return resident;
-}
-
-/* a collection, so the runtime gives back what it has in the space */
-static void collect_runtime_memory(void)
-{
-	JNIEnv *environment = (JNIEnv *)SDL_GetAndroidJNIEnv();
-	jclass system;
-	jmethodID collect;
-
-	if (!environment)
-		return;
-	system = (*environment)->FindClass(environment, "java/lang/System");
-	if (!system)
-		return;
-	collect = (*environment)->GetStaticMethodID(environment, system, "gc", "()V");
-	if (!collect)
-		return;
-	(*environment)->CallStaticVoidMethod(environment, system, collect);
-	(*environment)->ExceptionClear(environment);
-}
-
-static int move_runtime_heap(uint64_t address, uint64_t size)
-{
-	uint64_t start, end, length, destination;
-	unsigned long resident;
-	int moved = 0;
-
-	if (!find_runtime_heap(address, size, &start, &end))
-		return 0;
-	length = end - start;
-	collect_runtime_memory();
-	resident = mapping_resident_kilobytes(start, end) * 1024UL;
-	host_logf(HOST_LOG_INFO, "the runtime's large object space %llx-%llx holds %lu kB",
-		(unsigned long long)start, (unsigned long long)end, resident / 1024UL);
-	if (resident > RUNTIME_HEAP_RESIDENT_LIMIT)
-	{
-		host_logf(HOST_LOG_ERROR,
-			"the runtime still has %lu kB in it; moving it would lose them",
-			resident / 1024UL);
-		return 0;
-	}
-	destination = find_gap(length, LOW_START, HALO_GUEST_WINDOW_ALIGNMENT);
-	if (!destination)
-		destination = find_gap(length, 0, HALO_GUEST_WINDOW_ALIGNMENT);
-	if (!destination)
-	{
-		host_logf(HOST_LOG_ERROR, "no free range for the runtime's large object space");
-		return 0;
-	}
-	/* MREMAP_FIXED puts the mapping where the search above says is free */
-	if (mremap((void *)start, length, length, MREMAP_MAYMOVE | MREMAP_FIXED,
-		(void *)destination) == (void *)destination)
-	{
-		host_logf(HOST_LOG_INFO, "moved the runtime's large object space %llx-%llx to %llx",
-			(unsigned long long)start, (unsigned long long)end,
-			(unsigned long long)destination);
-		moved = 1;
-	}
-	else
-	{
-		host_logf(HOST_LOG_ERROR, "cannot move the runtime's large object space %llx-%llx (%s)",
-			(unsigned long long)start, (unsigned long long)end, strerror(errno));
-	}
-	return moved;
 }
 
 /* address space the guest will have to itself; the mappings that are in
@@ -290,12 +145,12 @@ static struct pool *pool_new(void)
 		return NULL;
 	for (attempt = 0; attempt < 64; attempt++)
 	{
-		uint64_t address = find_gap(POOL_SIZE, minimum, PAGE);
+		uint64_t address = find_gap(POOL_SIZE, minimum);
 
 		if (!address && minimum != LOW_START)
 		{
 			minimum = LOW_START;
-			address = find_gap(POOL_SIZE, minimum, PAGE);
+			address = find_gap(POOL_SIZE, minimum);
 		}
 		if (!address)
 			return NULL;
@@ -320,24 +175,18 @@ Java runtime maps a large part of the low 4 GB for its own heaps, so both
 are claimed here, before the first pool and before SDL maps anything. */
 int host_memory_reserve_guest(void)
 {
-	/* called once when the library is loaded, which the app does before
-	anything else in the process, and again when the game starts */
-	if (reserved)
-		return 0;
-	/* the window comes first: where it sits decides whether the image's
-	range is free */
+	/* the game data is linked to the addresses of the window (the tag cache
+	of a map file sits at 0x803a6000), so it must be where the game was
+	built for. Android's Java runtime has usually mapped its large object
+	space across that range by then, and that space cannot be given up: the
+	runtime goes on handing memory out of the address it remembers, so a
+	device that holds the range cannot run the game. */
 	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
 	{
-		host_logf(HOST_LOG_INFO, "the runtime's heaps cover the window:");
+		host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx:",
+			(unsigned long long)HALO_GUEST_WINDOW_BASE);
 		log_conflicts(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
-		move_runtime_heap(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
-		if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE) != 0)
-		{
-			host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx:",
-				(unsigned long long)HALO_GUEST_WINDOW_BASE);
-			log_conflicts(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
-			return -1;
-		}
+		return -1;
 	}
 	window_base = HALO_GUEST_WINDOW_BASE;
 	window_end = window_base + HALO_GUEST_WINDOW_SIZE;
@@ -350,7 +199,6 @@ int host_memory_reserve_guest(void)
 		log_conflicts(image_base, HALO_GUEST_IMAGE_RESERVE);
 		return -1;
 	}
-	reserved = 1;
 	return 0;
 }
 

@@ -1,5 +1,7 @@
 package com.halo.decomp;
 
+import android.util.Log;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -67,6 +69,7 @@ import java.util.List;
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 final class XisoExtractor {
+    private static final String TAG = "halo";
     private static final int SECTOR_SIZE = 2048;
     private static final long VOLUME_DESCRIPTOR_OFFSET = 0x10000;
     private static final int ENTRY_HEADER_SIZE = 14;
@@ -80,6 +83,9 @@ final class XisoExtractor {
     /* where the game partition starts: a plain image, and whole-disc images
     (extract-xiso's GLOBAL, XGD3 and XGD1 offsets) */
     private static final long[] PARTITION_OFFSETS = { 0, 0x0FD90000L, 0x02080000L, 0x18300000L };
+    /* the maps folders of a disc of one language (cache_files.c) */
+    private static final java.util.Set<String> KNOWN_MAPS_FOLDERS = new java.util.HashSet<>(
+        java.util.Arrays.asList("maps_de", "maps_fr", "maps_es", "maps_it"));
 
     interface Progress {
         void report(String file, long done, long total);
@@ -116,6 +122,10 @@ final class XisoExtractor {
         new XisoExtractor(image).extract(destination, progress);
     }
 
+    private static void log(String message) {
+        Log.i(TAG, "maps: " + message);
+    }
+
     private void readAt(long offset, ByteBuffer buffer) throws IOException {
         while (buffer.hasRemaining()) {
             int count = image.read(buffer, offset);
@@ -148,6 +158,7 @@ final class XisoExtractor {
             if (!magicAt(descriptor, 0) || !magicAt(descriptor, 0x7EC))
                 continue;
             partition = offset;
+            log("volume descriptor at partition " + offset);
             return new long[] {
                 descriptor.getInt(20) & 0xFFFFFFFFL, descriptor.getInt(24) & 0xFFFFFFFFL,
             };
@@ -205,13 +216,24 @@ final class XisoExtractor {
         ByteBuffer table = readDirectory(root[0], root[1], "The disc image's file system is damaged.");
         List<Entry> directories = new ArrayList<>();
         walk(table, 0, 0, true, directories, new int[1]);
+        /* a disc of one language keeps its maps in a folder named for it
+        (the game looks for maps_de, maps_fr, maps_es, maps_it and maps, in
+        that order, cache_files.c); the plain one is preferred, as there */
         Entry maps = null;
+        List<String> found = new ArrayList<>();
         for (Entry entry : directories) {
-            if (entry.name.equalsIgnoreCase("maps"))
+            String name = entry.name.toLowerCase(java.util.Locale.ROOT);
+
+            found.add(entry.name);
+            if (maps == null && (name.equals("maps") || KNOWN_MAPS_FOLDERS.contains(name)))
                 maps = entry;
         }
-        if (maps == null)
-            throw new ExtractException("The disc image has no maps folder: it is not a Halo disc.");
+        if (maps == null) {
+            log("no maps folder among " + found);
+            throw new ExtractException("The disc image has no maps folder: it is not a Halo disc. "
+                + "It holds " + (found.isEmpty() ? "no folders" : found.toString()) + ".");
+        }
+        log("maps folder: " + maps.name + " (of " + found + ")");
 
         /* its files */
         table = readDirectory(maps.sector, maps.size, "The disc image's maps folder is damaged.");
@@ -223,6 +245,8 @@ final class XisoExtractor {
             total += file.size;
             hasUi |= file.name.equalsIgnoreCase("ui.map");
         }
+        log(files.size() + " files, " + (total >> 20) + " MB"
+            + (hasUi ? "" : ", no ui.map"));
         if (!hasUi)
             throw new ExtractException("The disc image's maps folder has no ui.map: it is not a Halo disc.");
 
@@ -235,6 +259,8 @@ final class XisoExtractor {
         for (Entry file : files) {
             File path = new File(partial, file.name);
             long offset = partition + file.sector * SECTOR_SIZE;
+
+            log("extracting " + file.name + " (" + (file.size >> 20) + " MB) from " + offset);
             long remaining = file.size;
 
             try (FileOutputStream out = new FileOutputStream(path)) {
@@ -271,5 +297,6 @@ final class XisoExtractor {
                 throw new ExtractException("Could not move " + file.name + " into " + finished + ".");
         }
         partial.delete();
+        log("done");
     }
 }
