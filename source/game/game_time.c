@@ -192,6 +192,20 @@ void game_time_end(
 	return;
 }
 
+#ifdef HALO_LINUX
+void game_time_set_distributed(
+	long time)
+{
+	match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 0, game_time_globals && game_time_globals->initialized);
+
+	game_time_globals->local_time = time;
+	game_time_globals->server_time = time;
+	game_time_globals->leftover_dt = 0.f;
+
+	return;
+}
+
+#endif
 long game_time_get(
 	void)
 {

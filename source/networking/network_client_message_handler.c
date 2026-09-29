@@ -1205,6 +1205,10 @@ static boolean network_game_client_handle_message_server_begin_game(
 			short packet_type = _message_server_begin_game;
 			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
 
+#ifdef HALO_LINUX
+			/* (it decodes 16 bits of its long: the rest zero) */
+			csmemset(&begin_game, 0, sizeof(begin_game));
+#endif
 			message_size -= sizeof(word);
 			if (decode_network_game_message(
 				&begin_game,
@@ -1214,6 +1218,14 @@ static boolean network_game_client_handle_message_server_begin_game(
 				&packet_version,
 				_network_game_packet_class_pregame))
 			{
+#ifdef HALO_LINUX
+				/* (a game in progress: the host's time, network_client_manager.c) */
+				extern long network_game_client_late_join_time;
+
+				/* (the message carries 16 bits of it: the rest from the first
+				game update, network_game_client_handle_game_update) */
+				network_game_client_late_join_time = (long)((unsigned long)begin_game.unused & 0xFFFF);
+#endif
 				result = network_game_client_game_has_started(client);
 				if (!result)
 				{

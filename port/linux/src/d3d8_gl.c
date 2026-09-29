@@ -434,8 +434,10 @@ static struct
 	GLuint program;
 	GLuint framebuffer;
 	GLint viewport[4];
+	GLint scissor[4];
 	float depth_range[2];
 	unsigned char depth_test, stencil_test, blend, cull_face, offset_fill, offset_line;
+	unsigned char scissor_test;
 	GLenum depth_function;
 	unsigned char depth_mask;
 	GLenum stencil_function;
@@ -1378,6 +1380,10 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
+	/* the target's pixels to a game pixel: the result is a count of the
+	game's pixels (visibility_unscaled), which the game divides by its own
+	test's area (lens flares, rasterizer_lights.c), a split-screen window's
+	or the screen's alike */
 	device.query_area[index] = target_scale[0] * target_scale[1];
 	/* swap the scratch query into the requested slot */
 	scratch = device.queries[0];
@@ -2072,6 +2078,8 @@ static void copy_level_by_blit(GLuint source, GLuint destination, GLint level, G
 	glDisable(GL_SCISSOR_TEST);
 	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	/* the blit bypasses the cached state, so the next draw must re-apply it */
+	xgpu_gl_state_invalidate();
 }
 #endif
 
@@ -2226,6 +2234,7 @@ static void apply_raster_state(BOOL has_depth)
 	DWORD *rs = D3D__RenderState;
 	DWORD write = rs[D3DRS_COLORWRITEENABLE];
 	GLint viewport[4];
+	GLint scissor[4];
 	float depth_range[2];
 	unsigned char color_mask;
 	BOOL depth_test = has_depth && rs[D3DRS_ZENABLE];
@@ -2239,6 +2248,17 @@ static void apply_raster_state(BOOL has_depth)
 		memcpy(gl_state.viewport, viewport, sizeof(viewport));
 		glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 	}
+	/* the game never issues a scissor rectangle, and the NV2A scissor register
+	defaults to the viewport, so fragment clipping follows the viewport: this is
+	what keeps a split-screen window's geometry from bleeding across the divider */
+	/* (glScissor takes the corner and the size, as glViewport does) */
+	memcpy(scissor, viewport, sizeof(scissor));
+	if (memcmp(gl_state.scissor, scissor, sizeof(scissor)))
+	{
+		memcpy(gl_state.scissor, scissor, sizeof(scissor));
+		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+	}
+	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
 	depth_range[0] = device.viewport.MinZ;
 	depth_range[1] = device.viewport.MaxZ;
 	if (memcmp(gl_state.depth_range, depth_range, sizeof(depth_range)))
@@ -3489,19 +3509,36 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 		return;
 	if (!count || !rectangles)
 	{
-		glDisable(GL_SCISSOR_TEST);
+		/* the NV2A clips a viewport-less clear to the viewport, which is what
+		keeps a split-screen window's clear from wiping the other window */
+		GLint x0 = target_pixel((float)device.viewport.X, 0);
+		GLint y0 = target_pixel((float)device.viewport.Y, 1);
+
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(x0, y0, target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0,
+			target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0);
 		glClear(mask);
+		glDisable(GL_SCISSOR_TEST);
 		xgpu_gl_state_invalidate();
 		return;
 	}
 	glEnable(GL_SCISSOR_TEST);
 	for (index = 0; index < count; index++)
 	{
-		GLint x0 = target_pixel((float)(rectangles[index].x1 + UI_OFFSET), 0);
-		GLint y0 = target_pixel((float)rectangles[index].y1, 1);
+		INT left = rectangles[index].x1 > device.viewport.X ? rectangles[index].x1 : device.viewport.X;
+		INT top = rectangles[index].y1 > device.viewport.Y ? rectangles[index].y1 : device.viewport.Y;
+		INT right = rectangles[index].x2 < device.viewport.X + device.viewport.Width ?
+			rectangles[index].x2 : device.viewport.X + device.viewport.Width;
+		INT bottom = rectangles[index].y2 < device.viewport.Y + device.viewport.Height ?
+			rectangles[index].y2 : device.viewport.Y + device.viewport.Height;
+		GLint x0, y0;
 
-		glScissor(x0, y0, target_pixel((float)(rectangles[index].x2 + UI_OFFSET), 0) - x0,
-			target_pixel((float)rectangles[index].y2, 1) - y0);
+		if (left >= right || top >= bottom)
+			continue;
+		x0 = target_pixel((float)(left + UI_OFFSET), 0);
+		y0 = target_pixel((float)top, 1);
+		glScissor(x0, y0, target_pixel((float)(right + UI_OFFSET), 0) - x0,
+			target_pixel((float)bottom, 1) - y0);
 		glClear(mask);
 	}
 	glDisable(GL_SCISSOR_TEST);

@@ -27,8 +27,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import (LINUX_PROFILE, MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher, musl_math_sources, pgo_mode,
-                          pgo_profile, profile_use_flags, xdk_headers)
+from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
+                          compile_launcher, miniupnpc_sources, musl_math_sources, pgo_mode, pgo_profile,
+                          profile_use_flags, xdk_headers)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -526,6 +527,16 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     for source in host_sources:
         obj = host_obj_dir / (source.name + ".o")
         n.build(outputs=obj, rule="android_host_cc", inputs=source, variables={"cflags": host_cflags})
+        host_objects.append(obj)
+    # internet play's UPnP (posix_upnp.c, with port/third_party/miniupnpc),
+    # as the other posix_*.c in the host
+    miniupnpc_cflags = " ".join([host_cflags, f"-I{MINIUPNPC_DIR / 'include'}", f"-I{MINIUPNPC_DIR / 'src'}",
+                                 *MINIUPNPC_DEFINES])
+    for source in [LINUX_DIR / "src" / "posix_upnp.c", *miniupnpc_sources()]:
+        obj = host_obj_dir / ("miniupnpc_" + source.name + ".o" if source.parent.parent == MINIUPNPC_DIR
+                              else source.name + ".o")
+        n.build(outputs=obj, rule="android_host_cc", inputs=source,
+                variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")})
         host_objects.append(obj)
     table_obj = host_obj_dir / "host_import_table.c.o"
     n.build(outputs=table_obj, rule="android_host_cc", inputs=host_table_c, variables={"cflags": host_cflags})

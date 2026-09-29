@@ -125,6 +125,11 @@ static const struct config_setting config_settings[] =
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"
 		"forwarded on the router, for networks whose NAT stops connections." },
+	{ "network.allow_upnp", _config_boolean, "true", "HALO_NET_ALLOW_UPNP", _environment_value, _platform_all,
+		"Let internet play ask the router (UPnP) to forward its port, for\n"
+		"networks whose NAT stops connections: when a player joins this\n"
+		"machine's game, and when joining a game takes too long. False never\n"
+		"asks." },
 	{ "network.signalling_brokers", _config_string,
 		"\"broker.emqx.io:1883,broker.hivemq.com:1883,test.mosquitto.org:1883\"",
 		"HALO_NET_BROKERS", _environment_value, _platform_all,

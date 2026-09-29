@@ -19,9 +19,9 @@ import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import (LINUX_PROFILE, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode, march_flag, pgo_mode,
-                          compile_launcher, musl_math_cflags, musl_math_sources, pgo_profile, profile_use_flags,
-                          xdk_headers)
+from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode,
+                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, musl_math_cflags,
+                          musl_math_sources, pgo_profile, profile_use_flags, xdk_headers)
 from .ninja_syntax import Writer
 
 LINUX_DIR = Path("port/linux")
@@ -389,8 +389,17 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
                 add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
+        miniupnpc_include = f"-I{MINIUPNPC_DIR / 'include'} -DMINIUPNP_STATICLIB"
         for source in sorted((PORT_DIR / "src").glob("*.c")):
-            add_object(source, win32_cflags if source.name.startswith("win32_") else platform_cflags)
+            if source.name == "win32_upnp.c":
+                add_object(source, f"{win32_cflags} {miniupnpc_include}")
+            else:
+                add_object(source, win32_cflags if source.name.startswith("win32_") else platform_cflags)
+        # internet play's UPnP (port/third_party/miniupnpc), on Winsock, as
+        # its own build has it
+        for source in miniupnpc_sources():
+            add_object(source, " ".join([abi, *WIN32_FLAGS, miniupnpc_include, f"-I{MINIUPNPC_DIR / 'src'}",
+                                         "-D_CRT_SECURE_NO_WARNINGS", "-D_WINSOCK_DEPRECATED_NO_WARNINGS", "-w"]))
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))

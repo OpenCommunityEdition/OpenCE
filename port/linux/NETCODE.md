@@ -43,7 +43,29 @@ in its game's advertisement (reserved bytes that hosts built before there
 was a version send as zeros, so they are version 0). A client does not join
 a host of another version: it shows a message box that says which of the
 two is newer, with both versions ("update the game" or "ask the host to
-update"), and stays in the list of games. Version 1 is this netcode.
+update"), and stays in the list of games. Version 1 was the first of this
+netcode; version 2 lets a machine join a game in progress.
+
+## Joining a game in progress
+
+A distributed game stays open when it starts (a lockstep one closes, as on
+the Xbox, since every machine must simulate it from its first tick), and
+the game list shows it. A machine that joins it is accepted as in the
+pregame, and its players are added as the game adds a player in game:
+every machine in the game spawns them, told by the game's own
+`_message_server_add_player_ingame`. Then the host sends that machine alone
+the game's settings and its start, with the host's game time (the start
+message carries 16 bits of it); the machine loads the game, sets its clock
+to that time and the ticks it spent loading, and takes the rest of the time
+from the first game update if it is ahead (so that the game's timers read
+as the host's). It takes up the host's count of updates where it is. When it has loaded, the distributed netcode
+gives it the host's objects (network_objects.c), every player's statistics
+and the game type's state, and it plays on as any other client.
+
+Until it has loaded, the machine hears none of the game's messages (which a
+machine in the pregame refuses, and which the others no longer need), only
+a pregame keep-alive every five seconds from the host
+(`network_server_manager.c`, `network_server_message_handler.c`).
 
 ## Stages
 

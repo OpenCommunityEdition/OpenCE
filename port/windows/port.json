@@ -6,7 +6,8 @@
     "memory_watch.c",
     "msvc_crt.c",
     "msvc_wide.c",
-    "posix_update.c"
+    "posix_update.c",
+    "posix_upnp.c"
   ],
   "libraries": [
     "ws2_32",
