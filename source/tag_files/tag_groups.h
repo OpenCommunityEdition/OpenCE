@@ -142,6 +142,14 @@ void *tag_block_address(struct tag_block const *block);
 #define TAG_BLOCK_ADDRESS(block) ((block).address)
 #endif
 
+/* the same, where the block is already a pointer: a macro that took the
+structure by value cannot be used on one */
+#ifdef HALO_ANDROID
+#define TAG_BLOCK_ADDRESS_AT(block) tag_block_address(block)
+#else
+#define TAG_BLOCK_ADDRESS_AT(block) ((block)->address)
+#endif
+
 /* A tag reference names the tag it points at, with a pointer to a string
 held in the tag data, which the map wrote as an address in the window the
 game was linked for. A read of that name has to go through here for the

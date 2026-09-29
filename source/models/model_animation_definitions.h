@@ -57,7 +57,7 @@ enum
 
 #define animation_graph_definition_get(index) ((struct animation_graph *)tag_get(ANIMATION_GRAPH_TAG, index))
 
-#define animation_graph_animation_index_get(block)	((struct animation_graph_animation_index *)((block)->address))
+#define animation_graph_animation_index_get(block)	((struct animation_graph_animation_index *)TAG_BLOCK_ADDRESS_AT(block))
 
 #define animation_get_default_data(animation) (TAG_DATA_ADDRESS((animation)->default_data))
 

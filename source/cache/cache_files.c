@@ -805,9 +805,11 @@ boolean scenario_structure_bsp_load(
 	struct cache_file_tag_instance *tag_instance;
 	byte *tag_cache_base_address;
 
+#ifdef HALO_ANDROID
 	/* the scenario's own tag data names where the level is read to, in an
 	address the map was written with */
 	reference->base_address = cache_file_rebase_address(reference->base_address);
+#endif
 	tag_cache_base_address = physical_memory_get_tag_cache_base_address();
 	csmemset(
 		tag_cache_base_address + cache_file_globals.header.tag_data_size,
