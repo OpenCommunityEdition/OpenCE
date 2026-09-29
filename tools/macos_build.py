@@ -236,6 +236,9 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     )
     n.build(outputs=libsdl, rule="macos_sdl3", implicit=[SDL_DIR / "CMakeLists.txt"])
     n.rule(name="macos_copy", command="mkdir -p $$(dirname $out) && cp $in $out", description="MACOS STAGE $out")
+    # the bundle's icon, from the Android app's artwork (port/android/art)
+    n.rule(name="macos_icon", command="mkdir -p $$(dirname $out) && $python tools/macos_icon.py $out",
+           description="MACOS ICON $out")
     n.rule(
         name="macos_guest_cc",
         command=f"{compile_launcher(sln)}clang -MMD -MF $out.d $cflags -c $in -o $out",
@@ -538,6 +541,27 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         n.build(outputs=stage / name, rule="macos_copy", inputs=angle / name)
         staged.append(stage / name)
     n.build(outputs=target, rule="phony", inputs=[host_executable, image, *staged])
+
+    # ---------- the application bundle (ninja macos_app): the same files in
+    # Halo.app/Contents/MacOS, with an Info.plist; the game's own folder is
+    # then ~/Library/Application Support/Halo (host_main.c)
+
+    if native:
+        bundle = build / "Halo.app" / "Contents"
+        bundle_files = []
+        for built in (host_executable, image, *staged):
+            n.build(outputs=bundle / "MacOS" / built.name, rule="macos_copy", inputs=built)
+            bundle_files.append(bundle / "MacOS" / built.name)
+        n.build(outputs=bundle / "Info.plist", rule="macos_copy", inputs=PORT_DIR / "Info.plist")
+        n.build(outputs=bundle / "Resources" / "halo.icns", rule="macos_icon", inputs=PORT_DIR / "Info.plist",
+                implicit=[Path("port/android/art")])
+        n.rule(name="macos_sign", command="codesign --force --deep --sign - $bundle > /dev/null 2>&1 && touch $out",
+               description="MACOS SIGN $bundle")
+        signed = build / "Halo.app.signed"
+        n.build(outputs=signed, rule="macos_sign",
+                inputs=[*bundle_files, bundle / "Info.plist", bundle / "Resources" / "halo.icns"],
+                variables={"bundle": str(build / "Halo.app")})
+        n.build(outputs="macos_app", rule="phony", inputs=[signed])
 
     # ---------- the runtime test (port/macos/tests): its own guest image,
     # staged with the same host

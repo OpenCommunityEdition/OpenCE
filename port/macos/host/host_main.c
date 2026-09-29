@@ -10,10 +10,13 @@ executable) and runs the game's main() on the process's main thread, on a
 stack in guest memory (host_thread.c): Cocoa wants the window and its events
 there.
 
-The folder holding the executable is the game's folder, as in the Linux
-build: maps/ (extracted there on first start from the player's disc image),
-config.toml, the saved games and the logs (debug.txt, the game's; host.txt,
-this file's).
+The game's folder holds maps/ (extracted there on first start from the
+player's disc image), config.toml and the logs (debug.txt, the game's;
+host.txt, this file's). It is the folder holding the executable, as in the
+Linux build, except in the application bundle (Halo.app), whose own folder
+is read-only once signed: there it is ~/Library/Application Support/Halo.
+The saved games go to ~/Library/Application Support/Halo either way
+(port/linux/src/xbox_files.c).
 */
 
 #include "host.h"
@@ -38,6 +41,8 @@ int host_gl_load(void);
 
 char host_data_root[1024];
 char host_executable_path[1024];
+/* the folder holding the executable, the guest image and ANGLE */
+static char image_folder[1024];
 
 /* ---------- logging and termination */
 
@@ -273,10 +278,20 @@ static void find_folders(void)
 
 	if (_NSGetExecutablePath(path, &size) != 0 || !realpath(path, resolved))
 		host_fatal("cannot find the executable's folder");
-	snprintf(host_data_root, sizeof(host_data_root), "%s", resolved);
-	slash = strrchr(host_data_root, '/');
+	snprintf(image_folder, sizeof(image_folder), "%s", resolved);
+	slash = strrchr(image_folder, '/');
 	if (slash)
 		*slash = 0;
+	snprintf(host_data_root, sizeof(host_data_root), "%s", image_folder);
+	if (strstr(image_folder, ".app/Contents/MacOS") && getenv("HOME"))
+	{
+		char folder[1024];
+
+		snprintf(folder, sizeof(folder), "%s/Library/Application Support", getenv("HOME"));
+		mkdir(folder, 0755);
+		snprintf(host_data_root, sizeof(host_data_root), "%s/Halo", folder);
+		mkdir(host_data_root, 0755);
+	}
 	/* the guest's platform layer looks for its folder through
 	/proc/self/exe (host_syscall.c) */
 	snprintf(host_executable_path, sizeof(host_executable_path), "%s/halo", host_data_root);
@@ -311,8 +326,8 @@ static void load_angle(void)
 {
 	char egl[1200], gles[1200];
 
-	snprintf(egl, sizeof(egl), "%s/libEGL.dylib", host_data_root);
-	snprintf(gles, sizeof(gles), "%s/libGLESv2.dylib", host_data_root);
+	snprintf(egl, sizeof(egl), "%s/libEGL.dylib", image_folder);
+	snprintf(gles, sizeof(gles), "%s/libGLESv2.dylib", image_folder);
 	host_gles_library = dlopen(gles, RTLD_NOW | RTLD_GLOBAL);
 	if (!host_gles_library)
 		host_fatal("cannot load OpenGL ES (ANGLE) from %s: %s", gles, dlerror());
@@ -372,7 +387,7 @@ int main(int argc, char *argv[])
 	time_zone(zone, sizeof(zone));
 	environment_set(&environment, "TZ", zone);
 
-	snprintf(path, sizeof(path), "%s/halo_guest.elf", host_data_root);
+	snprintf(path, sizeof(path), "%s/halo_guest.elf", image_folder);
 	image = read_file(path, &image_size);
 	if (!image)
 		host_fatal("cannot read the game image %s", path);
