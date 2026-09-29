@@ -7,6 +7,12 @@ Both sites serve the source-built browser port in `port/web`. The game runs
 in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
+This replaces the pinned Apollo runtime, which froze during game startup
+in desktop WebKit 26.4. The worker-based port reached the Halo main menu
+with the same UI map in the September 29, 2026 test. Touch controls are
+available; startup and gameplay on a physical iPhone remain unverified.
+See [port/web/README.md](port/web/README.md) for requirements and controls.
+
 The first visit downloads about 1.9 GB of maps automatically; keep the tab
 open, then click **Play**. The launcher shows a progress bar, percentage,
 and downloaded size. Completed maps survive cancellation and reloads.
