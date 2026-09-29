@@ -333,7 +333,8 @@ static struct web_socket *remote_stream(unsigned int local_port, unsigned int re
 	return NULL;
 }
 
-static void link_receive(const struct web_packet_header *header, const unsigned char *payload)
+/* 0 leaves the complete packet in the shared ring until recv makes room. */
+static int link_receive(const struct web_packet_header *header, const unsigned char *payload)
 {
 	struct address from, to;
 	struct web_socket *socket;
@@ -386,7 +387,9 @@ static void link_receive(const struct web_packet_header *header, const unsigned 
 		{
 			unsigned int index;
 
-			for (index = 0; index < header->length && socket->stream_count < STREAM_CAPACITY; index++)
+			if (header->length > (unsigned int)(STREAM_CAPACITY - socket->stream_count))
+				return 0;
+			for (index = 0; index < header->length; index++)
 			{
 				socket->stream[(socket->stream_head + socket->stream_count) % STREAM_CAPACITY] = payload[index];
 				socket->stream_count++;
@@ -402,6 +405,7 @@ static void link_receive(const struct web_packet_header *header, const unsigned 
 	default:
 		break;
 	}
+	return 1;
 }
 
 /* takes the packets the page received from other machines; with the lock
@@ -431,7 +435,8 @@ static void link_pump(void)
 		}
 		if (header.length)
 			ring_copy_out(shared->net_in, WEB_NET_IN_BYTES, read + (unsigned int)sizeof(header), payload, header.length);
-		link_receive(&header, payload);
+		if (!link_receive(&header, payload))
+			break;
 		read += header.size;
 		any = 1;
 	}
@@ -891,7 +896,8 @@ static int receive(int descriptor, void *buffer, int length, int flags, void *ad
 			if (socket->first)
 			{
 				struct datagram *datagram = socket->first;
-				int count = datagram->length < length ? datagram->length : length;
+				int datagram_length = datagram->length;
+				int count = datagram_length < length ? datagram_length : length;
 
 				memcpy(buffer, datagram->data, (size_t)count);
 				if (address && address_length && *address_length >= (int)sizeof(struct address))
@@ -907,7 +913,7 @@ static int receive(int descriptor, void *buffer, int length, int flags, void *ad
 					socket->datagram_count--;
 					free(datagram);
 				}
-				result = count < datagram->length && !peek ? fail(WSAEMSGSIZE) : succeed(count);
+				result = count < datagram_length && !peek ? fail(WSAEMSGSIZE) : succeed(count);
 				break;
 			}
 		}

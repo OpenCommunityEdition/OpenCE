@@ -158,11 +158,25 @@ async function extract(file) {
   return { files: files.length, bytes: total };
 }
 
+importScripts('cache.js');
+let cacheAbort = null;
+
 onmessage = async (event) => {
+  if (event.data.type === 'cancel-cache') {
+    cacheAbort?.abort();
+    return;
+  }
   try {
+    if (event.data.type === 'cache') {
+      cacheAbort = new AbortController();
+      const maps = await HaloCache.ensure({ signal: cacheAbort.signal,
+        onProgress: progress => postMessage({ type: 'cache-progress', progress }) });
+      postMessage({ type: 'cache-done', maps });
+      return;
+    }
     const result = await extract(event.data.file);
     postMessage({ type: 'done', ...result });
   } catch (error) {
-    postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
+    postMessage({ type: 'error', name: error.name, message: error && error.message ? error.message : String(error) });
   }
 };

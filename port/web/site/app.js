@@ -31,6 +31,15 @@ can run the game, copies the game data out of the player's disc image
     log: [],
     wakeLock: null,
     version: null,
+    invite: null,
+    gateway: null,
+    gatewayInstalled: false,
+    inviteConnecting: false,
+    pendingInviteConnect: null,
+    maps: null,
+    cacheAbort: null,
+    dataBusy: false,
+    releaseGameLock: null,
   };
 
   // ---------- settings (this browser's; nothing else depends on them)
@@ -156,21 +165,68 @@ can run the game, copies the game data out of the player's disc image
   // ---------- game data
 
   async function mapsState() {
-    try {
-      const root = await navigator.storage.getDirectory();
-      const maps = await root.getDirectoryHandle('maps');
-      const marker = await (await maps.getFileHandle('.complete')).getFile();
-      return JSON.parse(await marker.text());
-    } catch {
-      return null;
-    }
+    return HaloCache.mapsState();
+  }
+
+  function updatePlayButton() {
+    $('play').disabled = !state.maps || state.dataBusy || state.started ||
+      !!(state.invite && (!state.gatewayInstalled || !state.gateway?.connected));
   }
 
   function showSteps(maps) {
+    state.maps = maps;
     $('step-data').hidden = !!maps;
     $('step-play').hidden = !maps;
     if (maps) {
       $('data-summary').textContent = `Game data: ${maps.files.length} maps, ${(maps.bytes / 1e9).toFixed(2)} GB.`;
+    }
+    updatePlayButton();
+    connectPendingInvite();
+  }
+
+  function connectPendingInvite() {
+    if (state.maps && !state.dataBusy && state.pendingInviteConnect) {
+      const connect = state.pendingInviteConnect;
+      state.pendingInviteConnect = null;
+      connect();
+    }
+  }
+
+  function showDownload(progress) {
+    $('download-panel').hidden = false;
+    $('download-panel').dataset.state = progress.state;
+    $('download-title').textContent = progress.title;
+    $('download-detail').textContent = progress.detail;
+    $('download-progress').value = progress.fraction;
+    $('download-percent').textContent = `${Math.floor(progress.fraction * 100)}%`;
+  }
+
+  function setDataBusy(busy) {
+    state.dataBusy = busy;
+    $('iso-file').disabled = busy;
+    $('delete-data').disabled = busy;
+    $('download-retry').hidden = busy || !!state.maps;
+    $('download-cancel').hidden = !state.cacheAbort;
+    updatePlayButton();
+    connectPendingInvite();
+  }
+
+  async function downloadMaps() {
+    if (state.dataBusy || state.started) return;
+    state.cacheAbort = new AbortController();
+    setDataBusy(true);
+    try {
+      const maps = await HaloCache.download({ signal: state.cacheAbort.signal, onProgress: showDownload });
+      showSteps(maps);
+    } catch (error) {
+      log('game data: ' + error.message);
+      if (!state.cacheAbort.signal.aborted && $('download-panel').dataset.state !== 'error') {
+        showDownload({ state: 'error', title: 'Download interrupted', detail: error.message, fraction: 0 });
+      }
+      showSteps(await mapsState());
+    } finally {
+      state.cacheAbort = null;
+      setDataBusy(false);
     }
   }
 
@@ -217,17 +273,19 @@ can run the game, copies the game data out of the player's disc image
       // keep the data when the device runs low on space
       navigator.storage.persist().catch(() => {});
     }
-    $('iso-file').disabled = true;
+    setDataBusy(true);
     try {
-      const result = await extract(file);
+      const result = await HaloCache.withLock(() => extract(file));
       log(`extracted ${result.files} files, ${result.bytes} bytes`);
       $('progress-text').textContent = 'Done.';
       showSteps(await mapsState());
+      if (state.maps) showDownload({ state: 'ready', title: 'Already downloaded',
+        detail: `${(state.maps.bytes / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`, fraction: 1 });
     } catch (error) {
       $('progress-text').textContent = error.message;
       log('extraction failed: ' + error.message);
     } finally {
-      $('iso-file').disabled = false;
+      setDataBusy(false);
     }
   }
 
@@ -296,10 +354,12 @@ can run the game, copies the game data out of the player's disc image
       }
     }
     try {
-      const root = await navigator.storage.getDirectory();
-      await walk(await root.getDirectoryHandle('save'), 'save/');
+      const maps = state.maps || await mapsState();
+      const savePath = (maps?.saveRoot || '/data/save').split('/').slice(2);
+      await walk(await HaloCache.directory(savePath), 'save/');
       try {
-        const config = await (await root.getFileHandle('config.toml')).getFile();
+        const dataPath = (maps?.dataRoot || '/data').split('/').slice(2);
+        const config = await (await (await HaloCache.directory(dataPath)).getFileHandle('config.toml')).getFile();
         files.push({ name: 'config.toml', bytes: new Uint8Array(await config.arrayBuffer()) });
       } catch { /* none yet */ }
     } catch {
@@ -316,12 +376,24 @@ can run the game, copies the game data out of the player's disc image
   }
 
   async function deleteData() {
+    if (state.dataBusy || state.started) return;
     if (!confirm('Delete the game data (the maps folder)? Saved games are kept.')) return;
     try {
-      const root = await navigator.storage.getDirectory();
-      await root.removeEntry('maps', { recursive: true });
-    } catch { /* already gone */ }
+      await HaloCache.withLock(async () => {
+        for (const path of [[], ['halo', 'data']]) {
+          let folder;
+          try { folder = await HaloCache.directory(path); }
+          catch (error) { if (error.name === 'NotFoundError') continue; throw error; }
+          for (const name of ['maps', 'maps.json']) {
+            try { await folder.removeEntry(name, { recursive: true }); }
+            catch (error) { if (error.name !== 'NotFoundError') throw error; }
+          }
+        }
+      });
+    } catch (error) { toast(error.message, 6000); return; }
     showSteps(await mapsState());
+    showDownload({ state: 'paused', title: 'Download needed', detail: 'Download the game again or choose your disc image.', fraction: 0 });
+    setDataBusy(false);
   }
 
   // ---------- the running game
@@ -346,12 +418,13 @@ can run the game, copies the game data out of the player's disc image
 
   function readOffsets(module) {
     const pointer = module._web_shared_offsets();
-    const words = new Int32Array(state.memory.buffer, pointer, 32);
+    const words = new Int32Array(state.memory.buffer, pointer, 36);
     const names = ['size', 'eventWrite', 'eventRead', 'events', 'eventSize', 'gamepads', 'gamepadSize',
       'displayWidth', 'displayHeight', 'frameCounter', 'framesPresented', 'vsync', 'audioRate', 'audioOpen',
       'audioWrite', 'audioRead', 'audioUnderruns', 'audioRing', 'audioRingFrames', 'pageHidden', 'gameStarted',
       'eventCapacity', 'gamepadCount', 'netLocalAddress', 'netOutWrite', 'netOutRead', 'netInWrite', 'netInRead',
-      'netOut', 'netOutBytes', 'netIn', 'netInBytes'];
+      'netOut', 'netOutBytes', 'netIn', 'netInBytes', 'gatewayEnabled', 'gatewayIdentifier',
+      'gatewayPeers', 'gatewayPeerCount'];
     const offsets = {};
     names.forEach((name, index) => { offsets[name] = words[index]; });
     return offsets;
@@ -421,8 +494,12 @@ can run the game, copies the game data out of the player's disc image
     }
   }
 
-  function play() {
-    if (state.started) return;
+  async function play() {
+    if (state.started || state.dataBusy || !state.maps) return;
+    if (state.invite && (!state.gatewayInstalled || !state.gateway?.connected)) {
+      toast('Wait for the invited host to connect before starting.');
+      return;
+    }
     state.started = true;
 
     // in the tap: browsers start sound only then
@@ -433,6 +510,24 @@ can run the game, copies the game data out of the player's disc image
     } catch (error) {
       log('audio context: ' + error);
     }
+    try {
+      if (navigator.locks) {
+        await new Promise((resolve, reject) => {
+          navigator.locks.request('halo-game', { ifAvailable: true }, lock => {
+            if (!lock) { reject(new Error('Halo is open in another tab. Close it, then press Play.')); return; }
+            resolve();
+            return new Promise(release => { state.releaseGameLock = release; });
+          }).catch(reject);
+        });
+      }
+    } catch (error) {
+      state.started = false;
+      state.audio?.close().catch(() => {});
+      toast(error.message, 6000);
+      updatePlayButton();
+      return;
+    }
+    updatePlayButton();
     document.body.classList.add('playing');
     const root = document.documentElement;
     if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
@@ -450,6 +545,7 @@ can run the game, copies the game data out of the player's disc image
     const context = canvas.getContext('bitmaprenderer');
     // (tests pass extra --NAME=value settings in window.__haloArgs)
     const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
+    argumentsList.push('--HALO_DATA_ROOT=' + state.maps.dataRoot, '--HALO_SAVE_ROOT=' + state.maps.saveRoot);
     if (!settings.vsync) argumentsList.push('--HALO_NO_VSYNC=1');
     if (settings.glDebug) argumentsList.push('--HALO_GL_DEBUG=1');
 
@@ -507,6 +603,75 @@ can run the game, copies the game data out of the player's disc image
   }
 
   // ---------- online play (net.js)
+
+  function setUpInvites() {
+    const relay = window.HALO_BROWSER_CONFIG?.relayUrl || '';
+    const linked = new URLSearchParams(location.hash.slice(1)).get('join');
+    state.invite = linked ? HaloInvite.parse(linked) : null;
+    if (state.invite) $('invite-input').value = 'halo://join/' + state.invite;
+    $('invite-status').textContent = linked && !state.invite ? 'This invite is incomplete or invalid.' :
+      relay ? 'Ready for a desktop invite.' : 'Desktop invites need a relay. This preview does not have a relay configured yet.';
+    $('relay-access-row').hidden = !relay;
+    const connect = async () => {
+      if (state.inviteConnecting || state.gatewayInstalled || state.started) return;
+      const token = HaloInvite.parse($('invite-input').value);
+      if (!token) { $('invite-status').textContent = 'Paste a complete halo://join/ invite.'; return; }
+      state.invite = token;
+      $('play').disabled = true;
+      $('browser-rooms').hidden = true;
+      if (!relay) {
+        $('invite-status').textContent = 'The browser link is valid, but this site needs a relay before it can join desktop games.';
+        return;
+      }
+      if (!state.maps || state.dataBusy) {
+        state.pendingInviteConnect = connect;
+        $('invite-status').textContent = 'Preparing game data. The invite will connect when the download finishes.';
+        return;
+      }
+      $('invite-connect').disabled = true;
+      $('invite-input').disabled = true;
+      state.inviteConnecting = true;
+      let transport = null;
+      try {
+        transport = await HaloGateway.connect(relay, token, {
+          accessToken: $('relay-access').value,
+          onStatus(status) {
+            $('invite-status').textContent = status.message;
+            updatePlayButton();
+            if (status.state === 'error' && state.started) fatal(status.message + ' Reload to start a new session.');
+          },
+        });
+        await HaloNet.useTransport(transport);
+        state.gateway = transport;
+        state.gatewayInstalled = true;
+        $('online-address').textContent = HaloNet.addressText(state.gateway.address);
+        $('invite-input').disabled = true;
+        $('relay-access').value = '';
+        updatePlayButton();
+      } catch (error) {
+        transport?.close();
+        $('invite-status').textContent = error.message;
+        $('invite-connect').disabled = false;
+        $('invite-input').disabled = false;
+      } finally {
+        state.inviteConnecting = false;
+        updatePlayButton();
+      }
+    };
+    $('invite-connect').onclick = connect;
+    $('invite-input').onkeydown = (event) => { if (event.key === 'Enter') connect(); };
+    $('invite-share').onclick = async () => {
+      try {
+        const link = HaloInvite.link(location.href, $('invite-input').value);
+        await navigator.clipboard.writeText(link);
+        toast('Browser invite copied.');
+      } catch (error) { $('invite-status').textContent = error.message; }
+    };
+    if (state.invite) {
+      $('browser-rooms').hidden = true;
+      if (relay) connect();
+    }
+  }
 
   function onlineOptions() {
     const options = {};
@@ -588,7 +753,7 @@ can run the game, copies the game data out of the player's disc image
     const linked = new URLSearchParams(location.search).get('room');
     let last = null;
     try { last = localStorage.getItem('halo-web-room'); } catch { /* none */ }
-    if (linked || last) joinRoom(linked || last);
+    if (!new URLSearchParams(location.hash.slice(1)).has('join') && (linked || last)) joinRoom(linked || last);
     showOnline(HaloNet.status());
   }
 
@@ -652,6 +817,8 @@ can run the game, copies the game data out of the player's disc image
     $('play').onclick = play;
     $('export-saves').onclick = exportSaves;
     $('delete-data').onclick = deleteData;
+    $('download-retry').onclick = downloadMaps;
+    $('download-cancel').onclick = () => state.cacheAbort?.abort();
     $('show-log').onclick = async () => {
       $('log-text').textContent = await fullLog();
       $('log-view').hidden = false;
@@ -692,9 +859,17 @@ can run the game, copies the game data out of the player's disc image
 
     await ensureIsolation();
     setUpOnline();
+    setUpInvites();
     const ok = await runChecks();
     if (!ok) return;
     showSteps(await mapsState());
+    if (state.maps) {
+      showDownload({ state: 'ready', title: 'Already downloaded',
+        detail: `${(state.maps.bytes / 1e9).toFixed(2)} GB saved in this browser. Ready to play.`, fraction: 1 });
+      setDataBusy(false);
+    } else {
+      downloadMaps();
+    }
     checkForUpdate();
   }
 

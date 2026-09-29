@@ -61,6 +61,7 @@ Each platform has its own instructions:
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
 | Browser (local runner for the published Apollo WASM beta) | [BROWSER_LOCAL.md](BROWSER_LOCAL.md) |
 | Browser (static hosting / GitHub Pages) | [GITHUB_PAGES.md](GITHUB_PAGES.md) |
+| Browser invitations for native multiplayer (relay preview) | [BROWSER_NATIVE_INVITES.md](BROWSER_NATIVE_INVITES.md) |
 | Web: iPhone, iPad and browsers (WebAssembly, WebGL 2, installable web app) | [port/web/README.md](port/web/README.md) |
 
 The Linux README also gives the controls, the settings and the multiplayer

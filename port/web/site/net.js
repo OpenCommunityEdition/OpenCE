@@ -51,6 +51,7 @@ const HaloNet = (() => {
     iceServers: STUN,
     pumpTimer: null,
     helloTimer: null,
+    transport: null,     // native invite gateway, when selected
   };
 
   function randomId() {
@@ -367,7 +368,7 @@ const HaloNet = (() => {
   }
 
   function incoming(packet) {
-    if (!state.shared || packet.length < PACKET_HEADER) return;
+    if (!state.shared || packet.length < PACKET_HEADER) return false;
     const i32 = words();
     const bytes = new Uint8Array(state.shared.memory.buffer);
     const capacity = state.shared.offsets.netInBytes;
@@ -375,12 +376,13 @@ const HaloNet = (() => {
     const write = Atomics.load(i32, field('netInWrite')) >>> 0;
     const read = Atomics.load(i32, field('netInRead')) >>> 0;
     const size = new DataView(packet.buffer, packet.byteOffset, packet.byteLength).getUint32(0, true);
-    if (size !== packet.length || capacity - ((write - read) >>> 0) < size) return; // full: lost
+    if (size !== packet.length || capacity - ((write - read) >>> 0) < size) return false;
     const start = write & (capacity - 1);
     const first = Math.min(capacity - start, size);
     bytes.set(packet.subarray(0, first), ring + start);
     if (first < size) bytes.set(packet.subarray(first), ring);
     Atomics.store(i32, field('netInWrite'), (write + size) | 0);
+    return true;
   }
 
   function refuse(header) {
@@ -409,6 +411,7 @@ const HaloNet = (() => {
 
   function pump() {
     if (!state.shared) return;
+    if (state.transport) state.transport.flush(incoming);
     const i32 = words();
     const memory = new Uint8Array(state.shared.memory.buffer);
     const capacity = state.shared.offsets.netOutBytes;
@@ -436,7 +439,10 @@ const HaloNet = (() => {
         sourcePort: view.getUint16(16, true),
         destinationPort: view.getUint16(18, true),
       };
-      if (header.kind === KIND.DATAGRAM) {
+      if (state.transport) {
+        // Leave reliable bytes in the ring until the socket can accept them.
+        if (!state.transport.send(packet)) break;
+      } else if (header.kind === KIND.DATAGRAM) {
         if (isBroadcast(header.destination)) {
           for (const peer of state.peers.values()) if (peer.open) send(peer.unreliable, packet);
         } else {
@@ -459,12 +465,14 @@ const HaloNet = (() => {
     state.shared = { memory, base, offsets };
     const i32 = words();
     Atomics.store(i32, field('netLocalAddress'), state.address | 0);
+    if (state.transport) state.transport.attach(state.shared);
     // (the game's sockets look at the incoming ring every few milliseconds;
     // this looks at the outgoing one as often)
     state.pumpTimer = setInterval(pump, 4);
   }
 
   async function join(code, options = {}) {
+    if (state.transport) throw new Error('Reload to switch from a desktop invite to a browser room.');
     code = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4) throw new Error('A room code has at least 4 letters or digits.');
     await leave();
@@ -507,5 +515,14 @@ const HaloNet = (() => {
 
   state.address = localAddress();
 
-  return { attach, join, leave, newRoomCode, on, status, addressText, get address() { return state.address; } };
+  async function useTransport(transport) {
+    if (state.shared) throw new Error('Reload before joining another desktop invite.');
+    await leave();
+    if (state.transport) state.transport.close();
+    state.transport = transport;
+    state.address = transport.address;
+  }
+
+  return { attach, join, leave, newRoomCode, on, status, addressText, useTransport,
+    get address() { return state.address; } };
 })();

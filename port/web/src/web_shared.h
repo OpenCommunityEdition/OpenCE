@@ -32,6 +32,7 @@ so the layout is the same on both sides.
 /* the rings of packets to and from the other players (web_net.c, net.js) */
 #define WEB_NET_OUT_BYTES (1024 * 1024) /* powers of two */
 #define WEB_NET_IN_BYTES (2 * 1024 * 1024)
+#define WEB_GATEWAY_PEERS 32
 
 enum
 {
@@ -116,6 +117,11 @@ struct web_shared_state
 	volatile int32_t net_in_read;
 	unsigned char net_out[WEB_NET_OUT_BYTES];
 	unsigned char net_in[WEB_NET_IN_BYTES];
+	/* Native invite relay identity. Peer address is published last; zero
+	means an unused slot. Identifiers are two little-endian words (6 bytes). */
+	volatile int32_t gateway_enabled;
+	volatile int32_t gateway_identifier[2];
+	volatile int32_t gateway_peers[WEB_GATEWAY_PEERS][3];
 };
 
 /* a packet in the rings: this header, then the payload, padded to 4 bytes;

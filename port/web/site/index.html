@@ -38,11 +38,19 @@
         (or <em>Add to Home screen</em>).</span>
     </div>
 
+    <section id="download-panel" class="download-panel" aria-label="Game download" hidden>
+      <div class="download-heading"><strong id="download-title">Checking game download</strong>
+        <strong id="download-percent">0%</strong></div>
+      <progress id="download-progress" max="1" value="0" aria-label="Game download progress"></progress>
+      <p id="download-detail" class="small" role="status"></p>
+      <button id="download-cancel" type="button" class="button small-button" hidden>Pause download</button>
+      <button id="download-retry" type="button" class="button small-button" hidden>Resume download</button>
+    </section>
+
     <div id="step-data" class="step" hidden>
       <h2>Game data</h2>
-      <p>The game needs the <code>maps</code> folder of your own Xbox disc image of Halo: Combat Evolved
-        (<code>.iso</code> or <code>.xiso</code>, any version). It is copied into this app's private storage
-        (about 1.8 GB); the disc image itself can be deleted afterwards. Nothing is uploaded anywhere.</p>
+      <p>The game downloads about 1.9 GB from GitHub once and saves it in this browser. You can also
+        choose your Halo: Combat Evolved Xbox disc image (<code>.iso</code> or <code>.xiso</code>).</p>
       <label class="button primary" for="iso-file">Choose disc image…</label>
       <input id="iso-file" type="file" accept=".iso,.xiso,application/octet-stream,application/x-iso9660-image" hidden>
       <div id="progress" class="progress" hidden>
@@ -56,8 +64,21 @@
       <p class="small" id="data-summary"></p>
     </div>
 
-    <section class="online" aria-labelledby="online-title">
-      <h2 id="online-title">Play online</h2>
+    <section class="online" aria-labelledby="invite-title">
+      <h2 id="invite-title">Join a desktop game</h2>
+      <p class="small">Paste a <code>halo://join/</code> invite from Discord, or open its browser link.</p>
+      <div class="row">
+        <input id="invite-input" type="text" aria-label="Desktop game invite" placeholder="halo://join/…" autocomplete="off" spellcheck="false">
+        <button type="button" class="button" id="invite-connect">Connect</button>
+        <button type="button" class="button" id="invite-share">Copy browser link</button>
+      </div>
+      <p id="invite-status" class="small" role="status" aria-live="polite"></p>
+      <label class="row" id="relay-access-row" hidden>Relay access key
+        <input id="relay-access" type="password" autocomplete="off"></label>
+    </section>
+
+    <section class="online" id="browser-rooms" aria-labelledby="online-title">
+      <h2 id="online-title">Browser rooms</h2>
       <p class="small">Everyone in a room is on one system link network: host a game from Multiplayer &gt;
         System Link, and the others see it there. Your address: <code id="online-address"></code></p>
       <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
@@ -95,7 +116,7 @@
     </details>
 
     <p class="legal">An unofficial fan project, not affiliated with or endorsed by Microsoft, Xbox Game Studios
-      or Bungie. It includes no game data: you need your own copy of the game.</p>
+      or Bungie.</p>
   </section>
 </main>
 
@@ -122,7 +143,11 @@
 </div>
 
 <script src="input.js"></script>
+<script src="site-config.js"></script>
+<script src="native-invite.js"></script>
+<script src="gateway.js"></script>
 <script src="net.js"></script>
+<script src="cache.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
