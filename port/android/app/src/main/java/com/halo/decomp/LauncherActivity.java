@@ -298,7 +298,10 @@ public class LauncherActivity extends Activity {
         content.addView(readout, margins(0, 12, 0, 0));
 
         progress = new HaloProgressView(this);
-        content.addView(progress, margins(0, 16, 0, 0));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, HaloUi.dp(this, 20));
+        progressParams.topMargin = HaloUi.dp(this, 16);
+        content.addView(progress, progressParams);
         progress.setVisibility(View.GONE);
 
         percent = HaloUi.text(this, "", COLOR_ACTIVE, 12, HaloUi.MONO);
@@ -315,6 +318,50 @@ public class LauncherActivity extends Activity {
         params.setMargins(HaloUi.dp(this, left), HaloUi.dp(this, top), HaloUi.dp(this, right),
             HaloUi.dp(this, bottom));
         return params;
+    }
+
+    /** the one thing a player came here for: big, filled, first */
+    private void addPrimaryButton(String label, Runnable action) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTypeface(HaloUi.DISPLAY_BOLD);
+        button.setLetterSpacing(0.12f);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 21);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setMinimumWidth(0);
+        button.setTextColor(HaloUi.VOID);
+        button.setStateListAnimator(null);
+        button.setPadding(HaloUi.dp(this, 24), HaloUi.dp(this, 22), HaloUi.dp(this, 24), HaloUi.dp(this, 22));
+        button.setBackground(HaloUi.primaryBackground(this));
+        button.setOnClickListener(view -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = HaloUi.dp(this, 10);
+        buttons.addView(button, params);
+    }
+
+    /** a small icon button, for the things a player rarely needs */
+    private void addIconButton(LinearLayout row, String glyph, String label, Runnable action) {
+        Button button = new Button(this);
+        button.setText(glyph + " " + label);
+        button.setAllCaps(false);
+        button.setTypeface(HaloUi.MONO);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setMinimumWidth(0);
+        button.setTextColor(HaloUi.CYAN);
+        button.setStateListAnimator(null);
+        button.setPadding(HaloUi.dp(this, 6), HaloUi.dp(this, 12), HaloUi.dp(this, 6), HaloUi.dp(this, 12));
+        button.setBackground(HaloUi.entryBackground(this));
+        button.setOnClickListener(view -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        params.rightMargin = HaloUi.dp(this, 8);
+        row.addView(button, params);
     }
 
     private void addButton(String label, Runnable action) {
@@ -486,15 +533,20 @@ public class LauncherActivity extends Activity {
         }
 
         sectionLabel("ACTIONS");
-        if (!access)
-            addButton("Grant archive access", this::requestArchiveAccess);
-        addButton("Select disc image", this::pickImage);
-        addButton("Download game data", this::downloadGameData);
         File shipped = builtInTorrent();
         if (shipped != null)
-            addButton("Download Halo", () -> startDownload(download -> download.runFile(shipped)));
-        addButton("Select game data folder", this::pickFolder);
-        addButton("Scan again", this::scanForImages);
+            addPrimaryButton("Download Halo", () -> startDownload(download -> download.runFile(shipped)));
+        else
+            addPrimaryButton("Download game data", this::downloadGameData);
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.addView(row, margins(0, 2, 0, 0));
+        if (!access)
+            addIconButton(row, "\u2302", "ACCESS", this::requestArchiveAccess);
+        addIconButton(row, "\u25CE", "IMAGE", this::pickImage);
+        addIconButton(row, "\u25A4", "FOLDER", this::pickFolder);
+        addIconButton(row, "\u21BB", "SCAN", this::scanForImages);
     }
 
     /** the badge a candidate pane carries, if any */
@@ -1046,17 +1098,29 @@ public class LauncherActivity extends Activity {
         if (total > 0) {
             float fraction = (float) done / total;
             progress.setProgress(fraction);
-            percent.setText((int) (fraction * 100) + "%");
+            percent.setText(human(done) + " / " + human(total) + "  ·  " + (int) (fraction * 100) + "%");
         } else {
             progress.setIndeterminate(true);
             percent.setText(human(done));
         }
-        setStatus(state.equals("downloading") ? "Downloading  " + human(rate) + "/s" : "Finding peers");
+        String left = "";
+        if (total > done && rate > 0)
+            left = "  ·  " + humanTime((total - done) / rate) + " left";
+        setStatus(state.equals("downloading") ? "Downloading  " + human(rate) + "/s" + left : "Finding peers");
         int current = total > 0 ? (int) (done * 100 / total) : -1;
         if (current >= 0 && current / 10 != lastLoggedPercent / 10) {
             lastLoggedPercent = current;
             log("> " + human(done) + " of " + human(total) + "  " + current + "%");
         }
+    }
+
+    /** a rough "1h 04m" for the time left */
+    private static String humanTime(long seconds) {
+        if (seconds < 60)
+            return seconds + "s";
+        if (seconds < 3600)
+            return (seconds / 60) + "m " + (seconds % 60) + "s";
+        return (seconds / 3600) + "h " + ((seconds % 3600) / 60) + "m";
     }
 
     private void finishDownload(String error, File directory) {

@@ -104,6 +104,17 @@ final class HaloUi {
         return states;
     }
 
+    /** the filled variant for the one primary action on a screen */
+    static Drawable primaryBackground(Context context) {
+        int cut = dp(context, 14);
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] { android.R.attr.state_pressed },
+            new Chamfer(0xFFFFFFFF, 0xFFFFFFFF, dp(context, 1), cut));
+        states.addState(new int[] {},
+            new Chamfer(0xFF7EE7FF, 0xFFFFFFFF, dp(context, 1), cut));
+        return states;
+    }
+
     /** a tappable candidate pane, brighter while pressed */
     static Drawable entryBackground(Context context) {
         int cut = dp(context, 12);

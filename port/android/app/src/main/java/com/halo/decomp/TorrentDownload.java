@@ -39,6 +39,7 @@ final class TorrentDownload {
     private final Progress progress;
     private final SessionManager manager = new SessionManager();
     private volatile long total;
+    private volatile Priority[] priorities;
     private volatile boolean metadata;
     private volatile String error;
     private volatile boolean finished;
@@ -75,12 +76,10 @@ final class TorrentDownload {
         }
         if (!info.isValid())
             return "that torrent file is not valid";
-        total = info.totalSize();
-        metadata = true;
+        select(info);
         prepare();
         try {
-            manager.download(info, saveDirectory, null, discImagePriorities(info), null,
-                new torrent_flags_t());
+            manager.download(info, saveDirectory, null, priorities, null, new torrent_flags_t());
         } catch (RuntimeException exception) {
             manager.stop();
             return message(exception, "that torrent file is not usable");
@@ -132,8 +131,7 @@ final class TorrentDownload {
             TorrentHandle handle = alert.handle();
             TorrentInfo info = handle.torrentFile();
             if (info != null && info.isValid()) {
-                total = info.totalSize();
-                Priority[] priorities = discImagePriorities(info);
+                select(info);
                 if (priorities != null)
                     handle.prioritizeFiles(priorities);
             }
@@ -148,17 +146,22 @@ final class TorrentDownload {
      * has none (then nothing is filtered). A "rev N" in the torrent's name
      * picks that revision; otherwise the largest image wins.
      */
-    private static Priority[] discImagePriorities(TorrentInfo info) {
+    private void select(TorrentInfo info) {
         FileStorage files = info.files();
-        int count = files.numFiles();
         int chosen = bestDiscImage(files, info.name());
         android.util.Log.i("halo-import", "torrent \"" + info.name() + "\" -> "
             + (chosen >= 0 ? files.fileName(chosen) : "no disc image"));
-        if (chosen < 0)
-            return null;
-        Priority[] priorities = Priority.array(Priority.IGNORE, count);
-        priorities[chosen] = Priority.DEFAULT;
-        return priorities;
+        if (chosen < 0) {
+            total = info.totalSize();
+            priorities = null;
+        } else {
+            /* the selected image's size, not the whole torrent's: the rest is
+               ignored, so the bar would otherwise never fill */
+            total = files.fileSize(chosen);
+            priorities = Priority.array(Priority.IGNORE, files.numFiles());
+            priorities[chosen] = Priority.DEFAULT;
+        }
+        metadata = true;
     }
 
     private static int bestDiscImage(FileStorage files, String torrentName) {
