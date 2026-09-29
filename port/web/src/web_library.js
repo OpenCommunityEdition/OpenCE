@@ -8,7 +8,9 @@ The game's WebGL 2 context draws into an OffscreenCanvas of this thread.
 The game never returns to the worker's event loop, so frames cannot be
 committed to a canvas on the page the usual way: each frame is taken out as
 an ImageBitmap (transferToImageBitmap needs no event loop) and posted to the
-page, which shows it (Module.haloPresent in port/web/site/app.js).
+page, which shows it (Module.haloPresent in port/web/site/app.js). Chrome on
+macOS instead receives owned RGBA pixel buffers: its native ImageBitmap
+transfer path can crash the renderer when a GPU backing image is missing.
 */
 
 addToLibrary({
@@ -17,6 +19,7 @@ addToLibrary({
     streamBatch: null,
     flushContext: null,
     pendingFrames: null,
+    readFrame: null,
     // the number the main thread's pthread message handler uses for
     // Module[handler](...args) (Emscripten's CMD_CALL_HANDLER)
     callHandler: 9,
@@ -30,7 +33,7 @@ addToLibrary({
   },
 
   web_js_gl_create__deps: ['$GL', '$webHalo'],
-  web_js_gl_create: (width, height, batchStreams, presentAck) => {
+  web_js_gl_create: (width, height, batchStreams, presentAck, pixelFrames) => {
     if (typeof OffscreenCanvas == 'undefined') {
       webHalo.post('haloMessage', [3, 'This browser cannot draw from a worker (OffscreenCanvas). iOS 17 or later is needed.']);
       return 0;
@@ -60,6 +63,49 @@ addToLibrary({
     // enable it when the launcher advertises support: an already open old
     // page can load a newer runtime after a service-worker update.
     webHalo.pendingFrames = presentAck ? new Int32Array(new SharedArrayBuffer(4)) : null;
+    var readback = {};
+    if (pixelFrames) {
+      for (var name of ['getParameter', 'bindFramebuffer', 'bindBuffer', 'pixelStorei', 'readBuffer', 'readPixels'])
+        readback[name] = context[name].bind(context);
+    }
+    // Chrome on macOS can crash its renderer while serializing a GPU-backed
+    // ImageBitmap from this continuously running worker. Transfer owned RGBA
+    // bytes instead. Capture the real methods before the stream recorder wraps
+    // them, and restore every readback state the renderer can observe.
+    webHalo.readFrame = pixelFrames ? () => {
+      var width = canvas.width, height = canvas.height;
+      var pixels = new Uint8Array(width * height * 4);
+      var framebuffer = readback.getParameter(context.READ_FRAMEBUFFER_BINDING);
+      var packBuffer = readback.getParameter(context.PIXEL_PACK_BUFFER_BINDING);
+      var parameters = [context.PACK_ALIGNMENT, context.PACK_ROW_LENGTH,
+        context.PACK_SKIP_PIXELS, context.PACK_SKIP_ROWS];
+      var values = parameters.map(parameter => readback.getParameter(parameter));
+      var readBuffer;
+      try {
+        readback.bindFramebuffer(context.READ_FRAMEBUFFER, null);
+        readBuffer = readback.getParameter(context.READ_BUFFER);
+        readback.readBuffer(context.BACK);
+        readback.bindBuffer(context.PIXEL_PACK_BUFFER, null);
+        parameters.forEach((parameter, index) => readback.pixelStorei(parameter, index ? 0 : 1));
+        readback.readPixels(0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, pixels);
+      } finally {
+        parameters.forEach((parameter, index) => readback.pixelStorei(parameter, values[index]));
+        readback.bindBuffer(context.PIXEL_PACK_BUFFER, packBuffer);
+        if (readBuffer !== undefined) readback.readBuffer(readBuffer);
+        readback.bindFramebuffer(context.READ_FRAMEBUFFER, framebuffer);
+      }
+      // WebGL's default framebuffer starts at the bottom; ImageData starts at
+      // the top. Reverse rows without allocating another full-sized frame.
+      var stride = width * 4, row = new Uint8Array(stride);
+      for (var top = 0, bottom = height - 1; top < bottom; top++, bottom--) {
+        var first = top * stride, last = bottom * stride;
+        row.set(pixels.subarray(first, first + stride));
+        pixels.copyWithin(first, last, last + stride);
+        pixels.set(row, last);
+      }
+      for (var alpha = 3; alpha < pixels.length; alpha += 4) pixels[alpha] = 255;
+      return { width, height, pixels: pixels.buffer };
+    } : null;
     webHalo.streamBatch = batchStreams ? globalThis.HaloStreamBatch.install(context) : null;
     canvas.addEventListener?.('webglcontextlost', (event) => {
       event.preventDefault();
@@ -109,13 +155,21 @@ addToLibrary({
       webHalo.flushContext?.();
       return;
     }
-    var bitmap = canvas.transferToImageBitmap();
+    var bitmap = webHalo.readFrame ? webHalo.readFrame() : canvas.transferToImageBitmap();
+    // Chrome can return an empty ImageBitmap when the GPU surface allocation
+    // fails. Its native serializer dereferences that missing surface before
+    // JavaScript can catch an error, so never send an empty frame.
+    if (!bitmap.width || !bitmap.height) {
+      bitmap.close?.();
+      webHalo.flushContext?.();
+      return;
+    }
     if (pending) Atomics.add(pending, 0, 1);
     try {
-      webHalo.post('haloPresent', pending ? [bitmap, pending.buffer] : [bitmap], [bitmap]);
+      webHalo.post('haloPresent', pending ? [bitmap, pending.buffer] : [bitmap], [bitmap.pixels || bitmap]);
     } catch (error) {
       if (pending) Atomics.sub(pending, 0, 1);
-      bitmap.close();
+      bitmap.close?.();
       throw error;
     }
   },

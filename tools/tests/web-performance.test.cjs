@@ -138,6 +138,25 @@ test('reference geometry path is opt-in for controlled comparisons', async () =>
   }
 });
 
+test('Chrome on Mac negotiates pixel frames and caps readback height without changing other browsers', async () => {
+  for (const [userAgent, enabled] of [
+    ['Mozilla/5.0 (Macintosh) Chrome/153.0.0.0 Safari/537.36', true],
+    ['Mozilla/5.0 (Macintosh) Chrome/153.0.0.0 Edg/153.0.0.0', true],
+    ['Mozilla/5.0 (Macintosh) Version/26.4 Safari/605.1.15', false],
+    ['Mozilla/5.0 (Windows NT 10.0) Chrome/153.0.0.0', false],
+  ]) {
+    const page = await launch('', { navigator: { userAgent, platform: 'Test', storage: { getDirectory() {} } } });
+    assert.equal(page.context.Module.arguments.includes('--HALO_WEB_PIXEL_FRAMES=1'), enabled);
+    assert.equal(page.displaySize()[1], enabled ? 480 : 1440);
+  }
+  const forced = await launch('?frame_transport=rgba');
+  assert.equal(forced.context.Module.arguments.includes('--HALO_WEB_PIXEL_FRAMES=1'), true);
+  const bitmap = await launch('?frame_transport=bitmap', {
+    navigator: { userAgent: 'Macintosh Chrome/153.0.0.0', platform: 'Test', storage: { getDirectory() {} } },
+  });
+  assert.equal(bitmap.context.Module.arguments.includes('--HALO_WEB_PIXEL_FRAMES=1'), false);
+});
+
 test('hidden frames and elapsed hidden time are excluded after a visibility reset', async () => {
   const page = await launch('?fps=1');
   page.present(30);

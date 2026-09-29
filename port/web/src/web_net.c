@@ -312,6 +312,7 @@ static int free_slot(void)
 }
 
 static int find_listener(unsigned short port);
+static void socket_release(int index);
 static void deliver_local_datagram(const struct address *from, const struct address *to, const void *buffer,
 	int length);
 
@@ -324,8 +325,8 @@ static struct web_socket *remote_stream(unsigned int local_port, unsigned int re
 	{
 		struct web_socket *socket = &sockets[index];
 
-		if (socket->used && socket->remote_link && socket->local.port == local_port && socket->remote.ip == remote_ip &&
-			socket->remote.port == remote_port)
+		if (socket->used && socket->remote_link && !socket->peer_closed && socket->local.port == local_port &&
+			socket->remote.ip == remote_ip && socket->remote.port == remote_port)
 		{
 			return socket;
 		}
@@ -333,7 +334,48 @@ static struct web_socket *remote_stream(unsigned int local_port, unsigned int re
 	return NULL;
 }
 
-/* 0 leaves the complete packet in the shared ring until recv makes room. */
+/* A reloaded page keeps its address but can reuse the same ephemeral port.
+   Its OPEN replaces that connection; the game's old descriptor must see EOF
+   without routing bytes or a later CLOSE to the replacement. */
+static int replace_remote_stream(int listener, const struct address *from, const struct address *to)
+{
+	int index, waiting_for_release = 0;
+
+	for (index = 0; index < MAXIMUM_SOCKETS; index++)
+	{
+		struct web_socket *socket = &sockets[index];
+		int entry;
+
+		if (!socket->used || !socket->remote_link || socket->local.port != to->port ||
+			socket->remote.ip != from->ip || socket->remote.port != from->port)
+			continue;
+		socket->peer_closed = 1;
+		socket->stream_head = socket->stream_count = 0;
+		free(socket->stream);
+		socket->stream = NULL;
+		/* An unaccepted connection has no game-owned descriptor to retain. */
+		for (entry = 0; entry < sockets[listener].backlog_count; entry++)
+		{
+			if (sockets[listener].backlog[entry] == index)
+			{
+				memmove(sockets[listener].backlog + entry, sockets[listener].backlog + entry + 1,
+					(size_t)(--sockets[listener].backlog_count - entry) * sizeof(int));
+				socket_release(index);
+				break;
+			}
+		}
+		if (socket->used)
+			waiting_for_release = 1;
+	}
+	/* The game must remove the old endpoint before it can accept the new one.
+	   Keep OPEN queued until the descriptor owner observes EOF and closes it. */
+	if (waiting_for_release)
+		pthread_cond_broadcast(&network_changed);
+	return !waiting_for_release;
+}
+
+/* 0 leaves the complete packet in the shared ring until recv makes room or
+   the game releases a replaced stream's old descriptor. */
 static int link_receive(const struct web_packet_header *header, const unsigned char *payload)
 {
 	struct address from, to;
@@ -354,7 +396,11 @@ static int link_receive(const struct web_packet_header *header, const unsigned c
 	case WEB_PACKET_OPEN:
 	{
 		int listener = find_listener(to.port);
-		int server = free_slot();
+		int server;
+
+		if (listener >= 0 && !replace_remote_stream(listener, &from, &to))
+			return 0;
+		server = free_slot();
 
 		if (listener < 0 || server < 0 || sockets[listener].backlog_count == MAXIMUM_BACKLOG)
 		{

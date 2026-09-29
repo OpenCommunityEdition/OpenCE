@@ -52,11 +52,15 @@ jobs:
           node --test tools/tests/*.test.cjs
           node --test tools/test_web_quick_play.mjs
           node tools/test_source_cache.mjs
-          clang -std=c11 -pthread -fsanitize=address -g -Iport/linux/src tools/test_web_net.c -o build/test_web_net
+          clang -std=c11 -pthread -fsanitize=address,undefined -g -Iport/linux/src tools/test_web_net.c -o build/test_web_net
           build/test_web_net
           clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Itools -Isource tools/test_quick_play.c -o build/test_quick_play
           build/test_quick_play
           python3 tools/test_web_server_policy.py
+          python3 tools/test_network_player_rejoin.py
+          python3 tools/test_web_solo_host.py
+          python3 tools/test_network_pending_rejoin.py
+          python3 tools/test_network_client_update_lifecycle.py
 
       - uses: actions/upload-artifact@v4
         with:

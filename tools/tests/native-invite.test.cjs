@@ -392,9 +392,13 @@ test('stable host selection automatically loads multiplayer and first gesture un
   assert.ok(launched.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
   assert.equal(launched.context.Module.arguments.some(value => value.includes('NETWORK_TEST')), false);
   assert.equal(launched.element('quick-panel').hidden, false);
-  assert.equal(launched.element('interaction-prompt').hidden, false);
-  launched.windowEvents.get('pointerdown').forEach(listener => listener({}));
-  assert.equal(launched.element('interaction-prompt').hidden, true);
+  let fullscreenRequests = 0;
+  launched.context.document.documentElement.requestFullscreen = () => {
+    fullscreenRequests++;
+    return Promise.resolve();
+  };
+  launched.windowEvents.get('pointerdown').forEach(listener => listener({ target: launched.element('screen') }));
+  assert.equal(fullscreenRequests, 1, 'a normal game gesture unlocks controls without a separate prompt');
   launched.context.Module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Blood Gulch.' }));
   assert.equal(launched.element('quick-panel').hidden, true);
   assert.deepEqual(launched.phases, ['playing']);

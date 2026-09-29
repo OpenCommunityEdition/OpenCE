@@ -196,6 +196,11 @@ void players_initialize_for_new_map(
 long *machine_get_player_list(
 	long machine_index);
 
+#ifdef HALO_LINUX
+/* Stop accepting input for a departed player while retaining its game datum. */
+void network_player_remove_from_machine(long machine_index, long player_index);
+#endif
+
 long player_new(
 	long machine_index,
 	long player_index,

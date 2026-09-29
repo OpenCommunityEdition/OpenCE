@@ -123,6 +123,8 @@ const HaloNet = (() => {
     brokers: [],
     peers: new Map(),    // id -> peer
     byAddress: new Map(),// address -> peer
+    replacedPeers: new Set(), // obsolete peer ids from reloads at an existing address
+    pendingCloses: new Map(), // native EOF packets must precede a replacement's OPEN
     seen: new Set(),     // message ids already handled (several brokers)
     listeners: new Set(),
     iceServers: STUN,
@@ -339,6 +341,7 @@ const HaloNet = (() => {
   }
 
   function peerFor(id, address, name) {
+    if (state.replacedPeers.has(id)) return null;
     let peer = state.peers.get(id);
     if (!peer) {
       peer = { id, address, name: name || 'Player', pc: null, reliable: null, unreliable: null, open: false,
@@ -346,7 +349,15 @@ const HaloNet = (() => {
       state.peers.set(id, peer);
     }
     if (address) {
+      if (state.byAddress.get(peer.address) === peer) state.byAddress.delete(peer.address);
       peer.address = address >>> 0;
+      const previous = state.byAddress.get(peer.address);
+      if (previous && previous !== peer) {
+        // A reload keeps its virtual LAN address but gets a new peer id. Retire
+        // the old channels before they can mix packets with the new runtime.
+        state.replacedPeers.add(previous.id);
+        dropPeer(previous);
+      }
       state.byAddress.set(peer.address, peer);
     }
     if (name) peer.name = name;
@@ -354,7 +365,16 @@ const HaloNet = (() => {
     return peer;
   }
 
+  function connectionCurrent(peer, pc) {
+    return state.peers.get(peer.id) === peer && peer.pc === pc;
+  }
+
   function createConnection(peer) {
+    const previous = peer.pc;
+    peer.pc = null;
+    peer.open = false;
+    retireStreams(peer);
+    try { previous?.close(); } catch { /* closed */ }
     const pc = new RTCPeerConnection({ iceServers: state.iceServers });
     peer.pc = pc;
     peer.connectingSince = Date.now();
@@ -363,11 +383,12 @@ const HaloNet = (() => {
     peer.received = [];
     peer.receivedHead = 0;
     peer.receivedBytes = 0;
+    peer.nativeStreams = new Map();
     for (const channel of [peer.reliable, peer.unreliable]) {
       channel.binaryType = 'arraybuffer';
     }
     peer.reliable.onmessage = (event) => {
-      if (peer.pc !== pc || !state.shared) return;
+      if (!connectionCurrent(peer, pc) || !state.shared) return;
       const packet = new Uint8Array(event.data);
       if (packet.length < PACKET_HEADER || packet.length > state.shared.offsets.netInBytes ||
           new DataView(packet.buffer).getUint32(0, true) !== packet.length ||
@@ -381,40 +402,50 @@ const HaloNet = (() => {
       pump();
     };
     peer.unreliable.onmessage = (event) => {
-      if (peer.pc !== pc) return;
-      incoming(new Uint8Array(event.data));
+      if (!connectionCurrent(peer, pc)) return;
       // Network events also drain output while background timers are throttled.
       pump();
+      if (!state.pendingCloses.size) incoming(new Uint8Array(event.data));
     };
     peer.reliable.bufferedAmountLowThreshold = MAX_CHANNEL_BUFFER / 2;
-    peer.reliable.onbufferedamountlow = () => { if (peer.pc === pc) pump(); };
+    peer.reliable.onbufferedamountlow = () => { if (connectionCurrent(peer, pc)) pump(); };
     peer.reliable.onopen = () => {
+      if (!connectionCurrent(peer, pc)) return;
       peer.open = true;
       emit('joined', { name: peer.name, address: addressText(peer.address) });
       emit('status', status());
     };
-    peer.reliable.onclose = () => { if (peer.pc === pc) dropPeer(peer); };
+    peer.reliable.onclose = () => { if (connectionCurrent(peer, pc)) dropPeer(peer); };
     pc.onicecandidate = (event) => {
-      if (event.candidate) publish({ type: 'candidate', to: peer.id, candidate: event.candidate.toJSON() });
+      if (connectionCurrent(peer, pc) && event.candidate)
+        publish({ type: 'candidate', to: peer.id, candidate: event.candidate.toJSON() });
     };
     pc.onconnectionstatechange = () => {
-      if (peer.pc !== pc) return;
+      if (!connectionCurrent(peer, pc)) return;
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peer);
     };
     return pc;
   }
 
   function dropPeer(peer) {
-    if (!state.peers.has(peer.id)) return;
+    if (state.peers.get(peer.id) !== peer) return;
     state.peers.delete(peer.id);
     if (state.byAddress.get(peer.address) === peer) state.byAddress.delete(peer.address);
-    try { peer.pc && peer.pc.close(); } catch { /* closed */ }
-    if (peer.open) emit('left', { name: peer.name });
+    const pc = peer.pc, wasOpen = peer.open;
+    peer.pc = null;
     peer.open = false;
+    peer.received = [];
+    peer.receivedHead = peer.receivedBytes = 0;
+    retireStreams(peer);
+    try { pc?.close(); } catch { /* closed */ }
+    if (wasOpen) emit('left', { name: peer.name });
     emit('status', status());
+    pump();
   }
 
   async function handleSignal(message) {
+    if (state.replacedPeers.has(message.from)) return;
+    const generation = state.roomGeneration;
     if (message.type === 'hello') {
       const known = state.peers.get(message.from);
       const peer = peerFor(message.from, message.address, message.name);
@@ -427,25 +458,35 @@ const HaloNet = (() => {
       if (!peer.pc && state.id < message.from) {
         const pc = createConnection(peer);
         const offer = await pc.createOffer();
+        if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
         await pc.setLocalDescription(offer);
+        if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
         publish({ type: 'offer', to: peer.id, sdp: pc.localDescription.sdp, address: state.address, name: playerName() });
       }
     } else if (message.type === 'offer') {
       const peer = peerFor(message.from, message.address, message.name);
-      if (peer.pc) {
-        try { peer.pc.close(); } catch { /* closed */ }
-      }
       const pc = createConnection(peer);
       await pc.setRemoteDescription({ type: 'offer', sdp: message.sdp });
-      for (const candidate of peer.pendingCandidates.splice(0)) await pc.addIceCandidate(candidate).catch(() => {});
+      if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
+      for (const candidate of peer.pendingCandidates.splice(0)) {
+        await pc.addIceCandidate(candidate).catch(() => {});
+        if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
+      }
       const answer = await pc.createAnswer();
+      if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
       await pc.setLocalDescription(answer);
+      if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
       publish({ type: 'answer', to: peer.id, sdp: pc.localDescription.sdp });
     } else if (message.type === 'answer') {
       const peer = state.peers.get(message.from);
       if (peer && peer.pc && peer.pc.signalingState === 'have-local-offer') {
-        await peer.pc.setRemoteDescription({ type: 'answer', sdp: message.sdp });
-        for (const candidate of peer.pendingCandidates.splice(0)) await peer.pc.addIceCandidate(candidate).catch(() => {});
+        const pc = peer.pc;
+        await pc.setRemoteDescription({ type: 'answer', sdp: message.sdp });
+        if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
+        for (const candidate of peer.pendingCandidates.splice(0)) {
+          await pc.addIceCandidate(candidate).catch(() => {});
+          if (!connectionCurrent(peer, pc) || generation !== state.roomGeneration) return;
+        }
       }
     } else if (message.type === 'candidate') {
       const peer = state.peers.get(message.from);
@@ -518,6 +559,32 @@ const HaloNet = (() => {
     return address === 0xFFFFFFFF || (address >>> 24) === 255;
   }
 
+  function trackStream(peer, packet, outgoing = false) {
+    const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+    const kind = view.getUint32(4, true);
+    if (kind !== KIND.OPEN && kind !== KIND.CLOSE && kind !== KIND.REFUSE) return;
+    // Normalize to the incoming direction: remote address/port, local address/port.
+    const source = view.getUint32(outgoing ? 12 : 8, true);
+    const destination = view.getUint32(outgoing ? 8 : 12, true);
+    const sourcePort = view.getUint16(outgoing ? 18 : 16, true);
+    const destinationPort = view.getUint16(outgoing ? 16 : 18, true);
+    const key = `${source}:${sourcePort}:${destination}:${destinationPort}`;
+    if (kind !== KIND.OPEN) { peer.nativeStreams.delete(key); return; }
+    const close = new Uint8Array(PACKET_HEADER), header = new DataView(close.buffer);
+    header.setUint32(0, PACKET_HEADER, true);
+    header.setUint32(4, KIND.CLOSE, true);
+    header.setUint32(8, source, true);
+    header.setUint32(12, destination, true);
+    header.setUint16(16, sourcePort, true);
+    header.setUint16(18, destinationPort, true);
+    peer.nativeStreams.set(key, close);
+  }
+
+  function retireStreams(peer) {
+    for (const [key, close] of peer.nativeStreams || []) state.pendingCloses.set(key, close);
+    peer.nativeStreams?.clear();
+  }
+
   function send(channel, packet) {
     if (channel && channel.readyState === 'open') {
       if (channel.bufferedAmount + packet.length > MAX_CHANNEL_BUFFER) return false;
@@ -529,10 +596,19 @@ const HaloNet = (() => {
   function pump() {
     if (!state.shared) return;
     if (state.transport) state.transport.flush(incoming);
-    for (const peer of state.peers.values()) {
+    for (const [key, close] of state.pendingCloses) {
+      if (!incoming(close)) break;
+      state.pendingCloses.delete(key);
+    }
+    // A full native ring retains EOF until it fits. Do not admit a new OPEN
+    // first: the same tuple may already belong to that replacement by then.
+    for (const peer of state.pendingCloses.size ? [] : state.peers.values()) {
       if (!peer.received) continue;
-      while (peer.receivedHead < peer.received.length && incoming(peer.received[peer.receivedHead]))
-        peer.receivedBytes -= peer.received[peer.receivedHead++].length;
+      while (peer.receivedHead < peer.received.length && incoming(peer.received[peer.receivedHead])) {
+        const packet = peer.received[peer.receivedHead++];
+        trackStream(peer, packet);
+        peer.receivedBytes -= packet.length;
+      }
       if (peer.receivedHead === peer.received.length) {
         peer.received.length = 0;
         peer.receivedHead = 0;
@@ -581,7 +657,15 @@ const HaloNet = (() => {
       } else {
         const peer = state.byAddress.get(header.destination);
         // WebRTC backpressure must not consume bytes the channel did not take.
-        if (peer && peer.open) { if (!send(peer.reliable, packet)) break; }
+        if (peer && peer.open) {
+          const tuple = `${header.destination}:${header.destinationPort}:${header.source}:${header.sourcePort}`;
+          // Native output for a departed endpoint can arrive after the fresh
+          // RTC channel opens. That generation has not opened this stream yet.
+          if (header.kind !== KIND.DATA || peer.nativeStreams.has(tuple)) {
+            if (!send(peer.reliable, packet)) break;
+            trackStream(peer, packet, true);
+          }
+        }
         else if (header.kind === KIND.OPEN) refuse(header);
       }
       read = (read + size) >>> 0;
@@ -621,6 +705,7 @@ const HaloNet = (() => {
   async function leave() {
     cancelQuickPlay();
     state.roomGeneration++;
+    state.replacedPeers.clear();
     if (!state.room) return;
     await publish({ type: 'bye' }).catch(() => {});
     clearInterval(state.helloTimer);

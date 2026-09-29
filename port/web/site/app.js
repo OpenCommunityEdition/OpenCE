@@ -6,8 +6,8 @@ can run the game, copies the game data out of the player's disc image
 (xiso-worker.js), then starts the game (halo.js and halo.wasm, built by
 `ninja web`) and serves it on the main thread:
 
-- each frame the game's thread posts as an ImageBitmap goes onto the
-  canvas (Module.haloPresent);
+- each frame the game's thread posts as an ImageBitmap or RGBA pixel buffer
+  goes onto the canvas (Module.haloPresent);
 - each animation frame advances a counter the game waits on, polls the
   controllers (input.js) and gives the game the canvas's size;
 - the game's sound plays through an AudioWorklet (audio-worklet.js).
@@ -25,6 +25,9 @@ can run the game, copies the game data out of the player's disc image
   const diagnosticOptions = new URLSearchParams(location.search);
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const pixelFrames = diagnosticOptions.get('frame_transport') === 'rgba' ||
+    (diagnosticOptions.get('frame_transport') !== 'bitmap' &&
+      /Macintosh/.test(navigator.userAgent) && /Chrome|Chromium|Edg\//.test(navigator.userAgent));
 
   const state = {
     memory: null,
@@ -55,7 +58,6 @@ can run the game, copies the game data out of the player's disc image
     quickFailed: false,
     quickRole: null,
     quickPhase: null,
-    interactionUnlocked: false,
     audioStarted: false,
   };
 
@@ -207,7 +209,8 @@ can run the game, copies the game data out of the player's disc image
 
   function updatePlayButton() {
     const automatic = !state.manualMode && !!(state.invite || state.selectedRoom);
-    $('play').textContent = automatic ? 'Enable sound & controls' : 'Play main menu';
+    $('play').hidden = automatic;
+    $('play').textContent = 'Play main menu';
     $('play').disabled = state.started || (!automatic && (!state.maps || state.dataBusy));
   }
 
@@ -525,17 +528,13 @@ can run the game, copies the game data out of the player's disc image
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       state.audio = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
-      state.audio.onstatechange = () => {
-        $('interaction-prompt').hidden = !state.started || (state.interactionUnlocked && state.audio.state === 'running');
-      };
     } catch (error) { log('audio context: ' + error); }
   }
 
-  function unlockInteraction() {
-    state.interactionUnlocked = true;
+  function unlockInteraction(userGesture = true) {
     makeAudioContext();
     state.audio?.resume().catch(() => {});
-    if (state.started) {
+    if (state.started && userGesture) {
       const root = document.documentElement;
       if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
       if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => {});
@@ -543,9 +542,8 @@ can run the game, copies the game data out of the player's disc image
       if (canvas.requestPointerLock && matchMedia('(pointer: fine)').matches) {
         try { canvas.requestPointerLock()?.catch(() => {}); } catch { /* unsupported */ }
       }
-      if (state.shared && !state.audioStarted) startAudio();
     }
-    $('interaction-prompt').hidden = true;
+    if (state.shared && !state.audioStarted) startAudio();
   }
 
   function landscapeSize() {
@@ -554,12 +552,12 @@ can run the game, copies the game data out of the player's disc image
     const short = Math.min(window.innerWidth, window.innerHeight);
     let width = Math.round(long * scale);
     let height = Math.round(short * scale);
-    // The game draws 480 lines. Keep iOS bitmap handoffs at that size instead
-    // of upscaling on the worker and copying a Retina-sized frame each time.
+    // The game draws 480 lines. Keep iOS bitmap handoffs and Chrome/macOS
+    // pixel readbacks at that size rather than copying a Retina-sized frame.
     // CSS scales the canvas to the screen; diagnostics can override the cap.
     const requestedHeight = Number(diagnosticOptions.get('render_height'));
     const maximumHeight = Number.isFinite(requestedHeight) && requestedHeight > 0 ?
-      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : (ios ? 480 : 1440);
+      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : (ios || pixelFrames ? 480 : 1440);
     if (height > maximumHeight) {
       width = Math.round(width * maximumHeight / height);
       height = maximumHeight;
@@ -699,8 +697,7 @@ can run the game, copies the game data out of the player's disc image
       return;
     }
     state.started = true;
-    makeAudioContext();
-    if (userGesture) unlockInteraction();
+    unlockInteraction(userGesture);
     try {
       if (navigator.locks) {
         await new Promise((resolve, reject) => {
@@ -723,7 +720,6 @@ can run the game, copies the game data out of the player's disc image
     }
     updatePlayButton();
     document.body.classList.add('playing');
-    $('interaction-prompt').hidden = state.interactionUnlocked && (!state.audio || state.audio.state === 'running');
     $('quick-panel').hidden = !role;
     requestWakeLock();
     // the system's back gesture or button (Android) backs out of menus, as
@@ -735,12 +731,13 @@ can run the game, copies the game data out of the player's disc image
     });
 
     const canvas = $('screen');
-    const context = canvas.getContext('bitmaprenderer');
+    const context = canvas.getContext(pixelFrames ? '2d' : 'bitmaprenderer', { alpha: false });
     const countPresent = presentationStats(canvas);
     // (tests pass extra --NAME=value settings in window.__haloArgs)
     const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
     argumentsList.push('--HALO_DATA_ROOT=' + state.maps.dataRoot, '--HALO_SAVE_ROOT=' + state.maps.saveRoot);
     argumentsList.push('--HALO_WEB_PRESENT_ACK=1');
+    if (pixelFrames) argumentsList.push('--HALO_WEB_PIXEL_FRAMES=1');
     if (role) {
       argumentsList.push('--HALO_QUICK_PLAY=' + role);
       if (role === 'join' && target) argumentsList.push('--HALO_QUICK_PLAY_TARGET=' + HaloNet.addressText(target));
@@ -764,7 +761,13 @@ can run the game, copies the game data out of the player's disc image
             canvas.width = bitmap.width;
             canvas.height = bitmap.height;
           }
-          context.transferFromImageBitmap(bitmap);
+          if (bitmap.pixels) {
+            context.putImageData(new ImageData(new Uint8ClampedArray(bitmap.pixels), bitmap.width, bitmap.height), 0, 0);
+          } else if (pixelFrames) {
+            // An older cached runtime can still send ImageBitmaps to a newer
+            // launcher until its offered update is applied.
+            context.drawImage(bitmap, 0, 0);
+          } else context.transferFromImageBitmap(bitmap);
           countPresent?.();
         } finally {
           try { bitmap.close?.(); }
@@ -1112,7 +1115,6 @@ can run the game, copies the game data out of the player's disc image
     };
     $('main-menu').onclick = openMainMenu;
     $('quick-menu').onclick = openMainMenu;
-    $('interaction-menu').onclick = openMainMenu;
     $('fatal-menu').onclick = openMainMenu;
     $('update-button').onclick = () => {
       if ($('update-button').disabled) return;
@@ -1123,11 +1125,14 @@ can run the game, copies the game data out of the player's disc image
         navigator.serviceWorker.controller.postMessage('update');
       } catch { updateFailed(); }
     };
-    $('interaction-enable').onclick = unlockInteraction;
     $('quick-retry').onclick = () => { state.quickFailed = false; state.manualMode = false; return maybeQuickPlay(); };
     for (const type of ['pointerdown', 'keydown', 'touchstart']) {
-      window.addEventListener(type, () => {
-        if (state.started && !state.interactionUnlocked) unlockInteraction();
+      window.addEventListener(type, (event) => {
+        // Browser autoplay and pointer lock may require a normal game interaction.
+        if (state.started && (state.audio?.state !== 'running' ||
+            (type === 'pointerdown' && event.target === $('screen') && !document.pointerLockElement))) {
+          unlockInteraction();
+        }
       }, { passive: true });
     }
     $('export-saves').onclick = exportSaves;

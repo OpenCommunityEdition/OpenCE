@@ -1966,6 +1966,14 @@ boolean network_game_client_remove_player(
 				player_datum->quit_out_of_game_time = reason;
 			}
 
+#ifdef HALO_LINUX
+			/* A distributed machine slot may be reused before the old player's
+			datum is retired (it remains for the scoreboard). Its new players
+			must not inherit that datum's input ownership or fill its four slots. */
+			if (network_game_distributed())
+				network_player_remove_from_machine(player_datum->network_player_data.machine_index, player_index);
+#endif
+
 			for (network_player_index = 0;
 				network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
 				network_player_index++)

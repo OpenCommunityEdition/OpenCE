@@ -17,7 +17,8 @@ function runtime(batching, options = {}) {
       transferToImageBitmap() {
         events.push('bitmap');
         if (options.failTransfer) throw new Error('bitmap allocation failed');
-        const bitmap = { width: 640, height: 480, closed: false,
+        const bitmap = { width: options.emptyBitmap ? 0 : 640,
+          height: options.emptyBitmap ? 0 : 480, closed: false,
           close() { this.closed = true; } };
         bitmaps.push(bitmap);
         return bitmap;
@@ -48,6 +49,7 @@ function page(options = {}) {
   let presented = 0, consumed = 0;
   const globals = {
     canvas, document: { hidden: Boolean(options.hidden) },
+    pixelFrames: false,
     context: { transferFromImageBitmap() {
       if (options.failConsume) throw new Error('bitmap renderer failed');
       consumed++;
@@ -80,6 +82,32 @@ test('visible frames replay before transferring and posting their bitmap', () =>
   const { library, events } = runtime(true);
   library.web_js_gl_present();
   assert.deepEqual(events, ['replay', 'bitmap', 'post']);
+});
+
+test('empty GPU surface frames close before posting and the next valid frame can recover', () => {
+  for (const batching of [false, true]) {
+    for (const presentAck of [false, true]) {
+      const options = { emptyBitmap: true, presentAck };
+      const worker = runtime(batching, options);
+      worker.library.web_js_gl_present();
+      assert.equal(worker.bitmaps.length, 1);
+      assert.equal(worker.bitmaps[0].closed, true, 'the unusable bitmap is released');
+      assert.equal(worker.messages.length, 0, 'the native serializer never receives an empty surface');
+      assert.equal(worker.pending(), presentAck ? 0 : null, 'no queue slot is occupied');
+      assert.deepEqual(worker.events, batching ? ['replay', 'bitmap', 'submit'] : ['bitmap', 'submit']);
+
+      options.emptyBitmap = false;
+      worker.library.web_js_gl_present();
+      assert.equal(worker.messages.length, 1, 'an empty frame does not stop future presentation');
+      assert.equal(worker.bitmaps[1].closed, false);
+      assert.equal(worker.pending(), presentAck ? 1 : null);
+      const consumer = page();
+      consumer.present(...worker.messages[0].args);
+      assert.equal(worker.bitmaps[1].closed, true);
+      assert.equal(worker.pending(), presentAck ? 0 : null);
+      assert.equal(consumer.presented(), 1);
+    }
+  }
 });
 
 test('a blocked page retains at most two bitmaps while rendering keeps submitting', () => {

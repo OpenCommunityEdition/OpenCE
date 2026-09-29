@@ -495,6 +495,20 @@ static boolean network_game_client_handle_message_server_graceful_game_exit_post
 
 /* ---------- globals */
 
+#ifdef HALO_LINUX
+/* A reconnect at the same address can receive gameplay packets queued for
+the previous connection. Until acceptance and loading finish, the new settings
+snapshot supplies membership and there is no local simulation to advance. */
+static boolean network_game_client_ignores_early_ingame_messages(
+	struct network_game_client *client)
+{
+	short state = network_game_client_get_state(client, NULL);
+
+	return network_game_distributed() &&
+		(state == _network_game_client_state_joining || state == _network_game_client_state_pregame);
+}
+#endif
+
 /* ---------- public code */
 
 boolean network_game_client_handle_message(
@@ -1320,6 +1334,13 @@ static boolean network_game_client_handle_message_server_game_update(
 				network_event("failed to decode a message_server_game_update packet");
 			}
 		}
+#ifdef HALO_LINUX
+		else if (network_game_client_ignores_early_ingame_messages(client))
+		{
+			network_event("ignoring a message_server_game_update message before loading the game");
+			result = TRUE;
+		}
+#endif
 		else
 		{
 			network_event("failed to handle a message_server_game_update message; we are not in game");
@@ -1375,6 +1396,13 @@ static boolean network_game_client_handle_message_server_add_player_ingame(
 				network_event("failed to decode a message_server_add_player_ingame packet");
 			}
 		}
+#ifdef HALO_LINUX
+		else if (network_game_client_ignores_early_ingame_messages(client))
+		{
+			network_event("ignoring a message_server_add_player_ingame message before loading the game");
+			result = TRUE;
+		}
+#endif
 		else
 		{
 			network_event("failed to handle a message_server_add_player_ingame message; we are not in game");
@@ -1430,6 +1458,13 @@ static boolean network_game_client_handle_message_server_remove_player_ingame(
 				network_event("failed to decode a message_server_remove_player_ingame packet");
 			}
 		}
+#ifdef HALO_LINUX
+		else if (network_game_client_ignores_early_ingame_messages(client))
+		{
+			network_event("ignoring a message_server_remove_player_ingame message before loading the game");
+			result = TRUE;
+		}
+#endif
 		else
 		{
 			network_event("failed to handle a message_server_remove_player_ingame message; we are not in game");

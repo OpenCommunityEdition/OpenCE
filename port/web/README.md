@@ -98,7 +98,34 @@ start and a second player joining the running match (two players on two
 machines). Both tabs later suffered renderer crashes with error 11.
 Reliable-channel backpressure and explicit hidden-frame GPU submission
 have regression coverage, but neither establishes a fix for those crashes.
-Sustained multiplayer remains unverified.
+Sustained multiplayer on that published runtime remains unverified.
+
+The local crash fix adds a separate frame path for Chrome on macOS. It reads
+the completed default framebuffer into owned RGBA bytes and transfers those
+bytes to a 2D page canvas, avoiding Chrome's crashing ImageBitmap serializer.
+Readback preserves GL state, reverses rows, and limits queued frames to two.
+The presentation height defaults to 480 lines to bound readback cost. Other
+browsers retain ImageBitmap presentation, with an empty-frame guard before
+transfer. `?frame_transport=rgba` and `?frame_transport=bitmap` select a path
+for controlled diagnostics; `?render_height=...` overrides presentation size.
+This change is local until separately packaged and published. A new launcher
+can display frames from an older cached runtime, but apply its offered update
+to use the new worker frame path.
+
+Reloads also retire the old RTC peer at its virtual address and replace its
+native stream only after the game releases the old endpoint. Departed players
+leave their machine's input slots while their scores remain available. A
+browser host in distributed Free-for-All Slayer with unlimited lives keeps
+waiting when an opponent leaves; score limits and other game modes retain
+their own end conditions. These changes have socket and player lifecycle
+regressions alongside the browser transport tests.
+
+The local build passed an initial late join followed by five consecutive
+same-address reload/rejoin cycles in Chrome on macOS. The same host match
+remained playable for over six minutes, including over two minutes after the
+final rejoin. All 85 browser/quick-play tests and native lifecycle regressions
+passed. These are local results; the fixes have not been published, and other
+browsers and public Internet/NAT conditions still need live verification.
 
 Browser players can play together over the internet, with the game's own
 system link. The launcher joins the public **FQLX01** room on a first visit.

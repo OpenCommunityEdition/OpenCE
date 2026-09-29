@@ -101,10 +101,97 @@ static void test_datagram_peek_and_truncation(void)
 	assert(posix_socket_close(descriptor) == 0);
 }
 
+static int stream_listener(unsigned short port)
+{
+	int descriptor = posix_socket(AF_INET_VALUE, SOCK_STREAM_VALUE, 0);
+	struct address local = { .family = AF_INET_VALUE, .port = swap16(port), .ip = WEB_DEFAULT_ADDRESS };
+
+	assert(descriptor >= SOCKET_BASE);
+	assert(posix_socket_bind(descriptor, &local, sizeof(local)) == 0);
+	assert(posix_socket_listen(descriptor, MAXIMUM_BACKLOG) == 0);
+	assert(posix_socket_set_nonblocking(descriptor, 1) == 0);
+	return descriptor;
+}
+
+static void test_reloaded_stream_waits_for_old_endpoint_release(void)
+{
+	int listener = stream_listener(5152), old_descriptor, fresh_descriptor;
+	unsigned short port = swap16(5152);
+	const char old_payload[] = "old session bytes", fresh_payload[] = "new session bytes";
+	char received[64];
+	posix_ulong available;
+	unsigned int replacement_read, outgoing_write;
+
+	incoming(WEB_PACKET_OPEN, port, NULL, 0);
+	incoming(WEB_PACKET_DATA, port, old_payload, sizeof(old_payload));
+	old_descriptor = posix_socket_accept(listener, NULL, NULL);
+	assert(old_descriptor >= SOCKET_BASE);
+	assert(posix_socket_set_nonblocking(old_descriptor, 1) == 0);
+	assert(posix_socket_bytes_available(old_descriptor, &available) == 0 && available == sizeof(old_payload));
+	replacement_read = (unsigned int)shared.net_in_read;
+	incoming(WEB_PACKET_OPEN, port, NULL, 0);
+	incoming(WEB_PACKET_DATA, port, fresh_payload, sizeof(fresh_payload));
+	/* A reload must not be accepted until the game has removed the old endpoint. */
+	assert(posix_socket_accept(listener, NULL, NULL) == -1);
+	assert(posix_socket_last_error() == WSAEWOULDBLOCK);
+	assert((unsigned int)shared.net_in_read == replacement_read);
+	assert(posix_socket_recv(old_descriptor, received, sizeof(received), 0) == 0);
+	assert(posix_socket_send(old_descriptor, old_payload, sizeof(old_payload), 0) == -1);
+	assert(posix_socket_last_error() == WSAECONNRESET);
+	/* Closing that descriptor must not close the replacement at the peer. */
+	outgoing_write = (unsigned int)shared.net_out_write;
+	assert(posix_socket_shutdown(old_descriptor, 2) == 0);
+	assert(posix_socket_close(old_descriptor) == 0);
+	assert((unsigned int)shared.net_out_write == outgoing_write);
+	fresh_descriptor = posix_socket_accept(listener, NULL, NULL);
+	assert(fresh_descriptor >= SOCKET_BASE);
+	assert(posix_socket_set_nonblocking(fresh_descriptor, 1) == 0);
+	assert(shared.net_in_read == shared.net_in_write);
+	assert(posix_socket_recv(fresh_descriptor, received, sizeof(received), 0) == sizeof(fresh_payload));
+	assert(memcmp(received, fresh_payload, sizeof(fresh_payload)) == 0);
+	assert(posix_socket_recv(fresh_descriptor, received, sizeof(received), 0) == -1);
+	assert(posix_socket_last_error() == WSAEWOULDBLOCK);
+	assert(posix_socket_send(fresh_descriptor, fresh_payload, sizeof(fresh_payload), 0) == sizeof(fresh_payload));
+	incoming(WEB_PACKET_CLOSE, port, NULL, 0);
+	assert(posix_socket_recv(fresh_descriptor, received, sizeof(received), 0) == 0);
+	assert(posix_socket_close(fresh_descriptor) == 0);
+	assert(posix_socket_close(listener) == 0);
+}
+
+static void test_reloaded_pending_stream_replaces_backlog_entry(void)
+{
+	int listener = stream_listener(5153), descriptor;
+	unsigned short port = swap16(5153);
+	posix_ulong available;
+	int received = -1;
+	unsigned int outgoing_write = (unsigned int)shared.net_out_write;
+
+	/* Repeated reloads before accept must not fill the listener's backlog. */
+	for (int attempt = 0; attempt < MAXIMUM_BACKLOG * 3; attempt++)
+	{
+		incoming(WEB_PACKET_OPEN, port, NULL, 0);
+		incoming(WEB_PACKET_DATA, port, &attempt, sizeof(attempt));
+		assert(posix_socket_bytes_available(listener, &available) == 0);
+		assert(socket_get(listener)->backlog_count == 1);
+		assert(shared.net_in_read == shared.net_in_write);
+		assert((unsigned int)shared.net_out_write == outgoing_write);
+	}
+	descriptor = posix_socket_accept(listener, NULL, NULL);
+	assert(descriptor >= SOCKET_BASE);
+	assert(posix_socket_recv(descriptor, &received, sizeof(received), 0) == sizeof(received));
+	assert(received == MAXIMUM_BACKLOG * 3 - 1);
+	assert(posix_socket_accept(listener, NULL, NULL) == -1);
+	assert(posix_socket_last_error() == WSAEWOULDBLOCK);
+	assert(posix_socket_close(descriptor) == 0);
+	assert(posix_socket_close(listener) == 0);
+}
+
 int main(void)
 {
 	test_stream_backpressure();
 	test_datagram_peek_and_truncation();
-	puts("web_net stream backpressure and datagram regression tests passed");
+	test_reloaded_stream_waits_for_old_endpoint_release();
+	test_reloaded_pending_stream_replaces_backlog_entry();
+	puts("web_net backpressure, datagram, and stream reload regression tests passed");
 	return 0;
 }

@@ -3336,6 +3336,19 @@ static boolean network_game_server_handle_public_endpoint(
 	return success;
 }
 
+static boolean network_game_server_remove_disconnected_client(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *client)
+{
+#ifdef HALO_LINUX
+	/* Accept assigns a client slot before its join request validates the game
+	machine. A reload during that interval still owns an endpoint to close. */
+	if (!network_machine_is_valid(&server->game.machines[client->machine_index]))
+		return network_game_server_remove_client_machine_from_game(server, client);
+#endif
+	return network_game_server_remove_machine_from_game(server, &server->game.machines[client->machine_index]);
+}
+
 static boolean network_game_server_handle_client_machines(
 	struct network_game_server *server)
 {
@@ -3350,9 +3363,7 @@ static boolean network_game_server_handle_client_machines(
 		{
 			if (!network_connection_active(server->client_machines[i].connection))
 			{
-				if (network_game_server_remove_machine_from_game(
-					server,
-					&server->game.machines[server->client_machines[i].machine_index]))
+				if (network_game_server_remove_disconnected_client(server, &server->client_machines[i]))
 				{
 					network_event(
 						"client machine %x removed from game",
@@ -3422,9 +3433,7 @@ static boolean network_game_server_handle_client_machines(
 			}
 			else
 			{
-				if (network_game_server_remove_machine_from_game(
-					server,
-					&server->game.machines[server->client_machines[i].machine_index]))
+				if (network_game_server_remove_disconnected_client(server, &server->client_machines[i]))
 				{
 					network_event(
 						"client machine removed from game",
