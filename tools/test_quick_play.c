@@ -83,7 +83,10 @@ static void launch(const char *setting)
 int main(void)
 {
 	unsigned long address;
-	assert(quick_play_parse_address("100.86.56.19", &address) && address == 0x13385664UL);
+	/* Must match transport_client_start's SWAP4(socket address), not the
+	JS ring's little-endian socket word; otherwise every elected host is skipped. */
+	assert(quick_play_parse_address("100.86.56.19", &address) && address == 0x64563813UL);
+	assert(quick_play_parse_address("10.1.2.3", &address) && address == 0x0A010203UL);
 	assert(!quick_play_parse_address("100.86.56.19 trailing", &address));
 	assert(!quick_play_parse_address("999999999999999999.1.1.1", &address));
 	assert(!quick_play_parse_address("224.0.0.1", &address));
@@ -102,7 +105,7 @@ int main(void)
 	step(60001, TRUE); assert(!strcmp(last_phase, "error") && aborts == 1);
 	step(1000000, TRUE); assert(searches == 1 && created == 1 && aborts == 1);
 	reset("join"); target = "100.86.56.19"; step(0, TRUE); step(2000, TRUE); step(500, TRUE);
-	assert(last_target == 0x13385664UL);
+	assert(last_target == 0x64563813UL);
 
 	launch("join"); join_result = -1; step(500, TRUE);
 	assert(!strcmp(last_phase, "error") && aborts == 1 && searches == 1);

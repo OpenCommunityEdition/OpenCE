@@ -50,7 +50,8 @@ boolean network_game_client_join_first_available_game(
 	void);
 #ifdef HALO_WEB
 /* 0: still searching; 1: joining; -1: incompatible; -2: closed; -3: failed.
-The optional address is the elected host's IPv4 address in network order. */
+The optional address uses transport_address order, as transport_client_start
+writes it (IPv4 octets from the most significant to least significant byte). */
 short network_game_client_quick_join(unsigned long target_address);
 boolean network_game_client_has_local_player(struct network_game_client *client, short controller_index);
 #endif

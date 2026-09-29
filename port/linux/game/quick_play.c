@@ -34,8 +34,9 @@ static struct
 	boolean menu_seen;
 } quick_play;
 
-/* Avoid a platform socket dependency in game code. The browser and all
-supported native transports store IPv4 bytes in little-endian words. */
+/* transport_client_start converts the socket's network-order word with
+SWAP4 before writing transport_address. Parse into that engine address order
+(100.86.56.19 -> 0x64563813), not the browser ring/socket order. */
 static boolean quick_play_parse_address(const char *text, unsigned long *address)
 {
 	unsigned int octet;
@@ -55,7 +56,7 @@ static boolean quick_play_parse_address(const char *text, unsigned long *address
 		}
 		if (!digits || octet > 255 || (!index && (!octet || octet >= 224)))
 			return FALSE;
-		*address |= (unsigned long)octet << (index * 8);
+		*address = (*address << 8) | octet;
 		if (index < 3 ? *text++ != '.' : *text != 0)
 			return FALSE;
 	}
