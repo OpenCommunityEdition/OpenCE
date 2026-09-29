@@ -132,7 +132,12 @@ struct network_game_server;
 extern struct network_game_server *global_network_game_server_get(void);
 extern long network_game_server_get_oldest_client_update_received(struct network_game_server *server);
 extern void network_game_server_stalled_on_client(struct network_game_server *server, boolean stalled);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+extern void network_game_server_update_ticks(struct network_game_server *server, short ticks);
+#else
 extern void network_game_server_update_ticks(struct network_game_server *server, long ticks);
+#endif
 /* ---------- globals */
 
 static struct game_time_statistics game_time_statistics;

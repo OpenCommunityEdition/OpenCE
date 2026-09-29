@@ -241,8 +241,14 @@ void custom_render_nav_point(
 	short nav_index,
 	short render_type);
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void game_engine_render_nav_points(
+	long local_player_index);
+#else
 void game_engine_render_nav_points(
 	short local_player_index);
+#endif
 
 void unit_get_head_position(
 	long unit_index,

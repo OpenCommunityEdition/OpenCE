@@ -440,7 +440,8 @@ can run the game, copies the game data out of the player's disc image
 
     const canvas = $('screen');
     const context = canvas.getContext('bitmaprenderer');
-    const argumentsList = [];
+    // (tests pass extra --NAME=value settings in window.__haloArgs)
+    const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
     if (!settings.vsync) argumentsList.push('--HALO_NO_VSYNC=1');
     if (settings.glDebug) argumentsList.push('--HALO_GL_DEBUG=1');
 
@@ -460,6 +461,12 @@ can run the game, copies the game data out of the player's disc image
         if (kind === 0) log('game: ' + text);
         else if (kind === 1) toast(text, 5000);
         else if (kind === 2) log('clipboard: ' + text);
+        else if (kind === 4) log('thread error: ' + text);
+        else if (kind === 5) {
+          log('game: ' + text);
+          $('fatal').querySelector('h2').textContent = 'The game quit';
+          fatal(text + ' Reload to start it again.');
+        }
         else fatal(text);
       },
       onAbort: (what) => fatal('The game stopped: ' + what),

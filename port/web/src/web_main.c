@@ -41,6 +41,7 @@ size_t emscripten_get_heap_size(void)
 
 /* ---------- start */
 
+
 static void set_environment(const char *name, const char *value)
 {
 	/* the page's choice (Module.arguments) wins */

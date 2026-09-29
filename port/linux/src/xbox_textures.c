@@ -692,6 +692,9 @@ static struct
 	unsigned long drop_serial;
 } recent_textures[RECENT_TEXTURE_COUNT];
 static unsigned long texture_drop_serial = 1;
+#ifdef HALO_WEB
+#define WEB_CHECKED_TEXTURE_BYTES 0x20000
+#endif
 static unsigned long texture_frame = 0;
 
 static unsigned long bucket_index(DWORD data, DWORD format_word, DWORD size_word)
@@ -731,7 +734,16 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	if (!palettized && recent_textures[recent].entry && recent_textures[recent].data == data &&
 		recent_textures[recent].format_word == format_word && recent_textures[recent].size_word == size_word &&
 		recent_textures[recent].watch_serial == watch_serial &&
-		recent_textures[recent].drop_serial == texture_drop_serial)
+		recent_textures[recent].drop_serial == texture_drop_serial
+#ifdef HALO_WEB
+		/* without page protection a write is only seen by hashing
+		(port/web/src/web_memory_watch.c): small textures, which the game
+		rewrites between draws (the text renderer's character cache), are
+		checked at every lookup; large ones change through file reads, which
+		announce themselves */
+		&& recent_textures[recent].entry->size > WEB_CHECKED_TEXTURE_BYTES
+#endif
+		)
 	{
 		entry = recent_textures[recent].entry;
 		entry->last_used_frame = texture_frame;

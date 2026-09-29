@@ -2040,7 +2040,13 @@ static boolean weapon_state_interruptable(
 }
 
 void weapon_preprocess_node_orientations(
-	long weapon_index)
+	long weapon_index
+#ifdef HALO_WEB
+	/* (unused) the object type's callback signature, which a WebAssembly call
+	through object_type_definition must match */
+	, struct real_orientation *node_orientations
+#endif
+	)
 {
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);

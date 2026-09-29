@@ -90,11 +90,18 @@ game's data formats need, and the game runs as it does on the other ports.
   returning `long`.
 - `-mnontrapping-fptoint`: a float that does not fit an integer converts as
   on x86 instead of trapping.
-- A few calls had signatures that only x86 tolerates. They are repaired in
-  `#ifdef HALO_WEB`: the cache thread's start routine
-  (`cache_files_windows.c`), the stub game engine's callbacks
-  (`game_engine_stub.c`), a `va_list` (`terminal.c`), and two globals defined
-  in a header (`object_lists.h`; WebAssembly has no common symbols).
+- Calls whose declarations disagree with the definition in a way LLVM cannot
+  adapt (integer widths, since its wrappers only bitcast), and function
+  pointers called with another signature, are repaired in `#ifdef HALO_WEB`:
+  local prototypes that now match their definitions (`hs.c`, `rasterizer.c`,
+  `ui_widget_event_handler_functions.c` and others), the cache thread's start
+  routine (`cache_files_windows.c`), the stub game engine's callbacks
+  (`game_engine_stub.c`), `weapon_preprocess_node_orientations`, a `va_list`
+  (`terminal.c`), and two globals defined in a header (`object_lists.h`;
+  WebAssembly has no common symbols). An unoptimised link
+  (`-Wl,--lto-O0`) names any call LLVM could not adapt
+  `<function>_bitcast_invalid`; only libtiff's remain, which the game does not
+  use.
 
 ### Threads and the page
 
@@ -113,6 +120,15 @@ memory both share (`src/web_shared.h`):
   the touch controls as one more controller).
 - Sound: a thread of the game fills a ring of 48 kHz samples with the mixer of
   `dsound_sdl.c`; an AudioWorklet (`site/audio-worklet.js`) plays it.
+- Network: split screen is a network game whose host and clients are the
+  same machine. `src/web_net.c` gives the Winsock layer (`port/linux/src/xnet.c`)
+  sockets that reach each other inside the page: datagrams to the loopback,
+  local or a broadcast address go to the socket bound to their port, and
+  stream sockets connect through queues. `HALO_NET_DEBUG=1` logs the traffic.
+- Time: `GetTickCount` and `QueryPerformanceCounter` count from the start, as
+  an Xbox counts from its boot. A browser's monotonic clock counts from 1970,
+  past 2^31 milliseconds, and the network code compares tick counts as
+  signed longs.
 - Files: WasmFS mounts the Origin Private File System at `/data`, the data
   root (`HALO_DATA_ROOT`); the saved games go to `/data/save`.
 
@@ -132,10 +148,14 @@ these differences for WebGL 2 (`#ifdef HALO_WEB` in `xbox_textures.c` and
 - The visibility tests (lens flares) report every sample visible: WebGL gives
   query results only between tasks, which the game's thread never reaches.
 - Buffer writes are `glBufferSubData`, which copies: there are no fences.
+- Strides are at most 255 bytes: the immediate mode's vertices (16
+  attributes of 4 floats) go up as one array per attribute.
 
 The Xbox memory cannot be write-protected in WebAssembly. The memory watch
 (`src/web_memory_watch.c`) keeps a hash of each page the renderer caches, and
-a changed hash counts as a write.
+a changed hash counts as a write. Textures of 128 KB or less, which the game
+rewrites between draws (the text renderer's character cache), are checked at
+every use; larger ones change through file reads, which announce themselves.
 
 ### Cross-origin isolation
 
@@ -157,7 +177,9 @@ the game only when it is there.
 
 - The WebAssembly memory needs 2.1 GB of address space. If the browser does
   not give it, the page says so. Close other apps and tabs.
-- There is no system link or internet play: browsers have no UDP.
+- There is no system link or internet play: browsers have no UDP. Split
+  screen works: its host and clients meet through a network inside the page
+  (`src/web_net.c`).
 - Bink video is not available. The game skips the movies.
 - Lens flares show through walls (see "WebGL 2").
 - Performance depends on the device. The game draws 480 lines at the shape of

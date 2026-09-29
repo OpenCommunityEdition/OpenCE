@@ -701,6 +701,20 @@ typedef char verify_item_permutation_definition_size[
 
 /* ---------- prototypes */
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+short hud_get_nav_point_render_type(
+	short local_player_index,
+	real_point3d const *position,
+	struct game_engine_goal const *goal,
+	long object_index);
+
+void custom_render_nav_point(
+	short local_player_index,
+	struct game_engine_goal const *goal,
+	word nav_point_index,
+	short render_type);
+#else
 long hud_get_nav_point_render_type(
 	long local_player_index,
 	real_point3d const *position,
@@ -712,6 +726,7 @@ void custom_render_nav_point(
 	struct game_engine_goal const *goal,
 	word nav_point_index,
 	long render_type);
+#endif
 
 void game_engine_playlist_next(
 	long parameter0,
@@ -802,12 +817,22 @@ void game_engine_intialize_queued_sounds(
 void game_engine_post_rasterize_post_game(
 	void);
 
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void rasterizer_draw_unicode_string(
+	rectangle2d const *bounds,
+	rectangle2d const *parameter1,
+	point2d *parameter2,
+	short parameter3,
+	wchar_t const *string);
+#else
 void rasterizer_draw_unicode_string(
 	rectangle2d const *bounds,
 	short parameter1,
 	short parameter2,
 	short parameter3,
 	wchar_t const *string);
+#endif
 
 struct bitmap_data *bitmap_group_try_and_get_bitmap(
 	long bitmap_group_index,

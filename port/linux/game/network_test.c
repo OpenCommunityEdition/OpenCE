@@ -50,6 +50,12 @@ Called from the main loop every frame (main.c).
 #include <stdio.h>
 #include <string.h>
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+boolean player_handle_powerup(long player_index, short powerup_type, short duration);
+#endif
+
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(char const *name);
 double config_real(char const *name);

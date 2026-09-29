@@ -388,6 +388,13 @@ symbols in this file:
 #include "text/font_group.h"
 #include "tag_files/files.h"
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+boolean cache_files_give_time_to_precache(char const *map_name);
+short player_ui_get_single_player_local_player_controller(short local_player_index);
+#endif
+
 /* ---------- constants */
 
 enum

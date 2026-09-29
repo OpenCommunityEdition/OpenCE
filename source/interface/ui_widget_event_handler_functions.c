@@ -914,6 +914,13 @@ symbols in this file:
 #include "saved games/player_profile.h"
 #include "interface/ui_widget_definitions.h"
 
+#ifdef HALO_WEB
+/* called without a prototype in scope; a WebAssembly call must match the
+definition's signature */
+boolean game_state_test_persistent_storage(char *map_name, short *difficulty, boolean *corrupted);
+struct widget_instance *ui_widget_load_by_name_or_tag(char const *name, long tag_index, struct widget_instance *parent, short local_player_index, long invoking_widget_tag, long focused_child_parent_widget_tag, short focused_child_index);
+#endif
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -1031,8 +1038,14 @@ void game_engine_playlist_next(
 	long);
 void network_game_set_quickstart_local(
 	void);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void game_connection_set(
+	short);
+#else
 void game_connection_set(
 	long);
+#endif
 void main_menu_switch_to_single_player(
 	void);
 void network_game_server_open_game(
@@ -1068,10 +1081,18 @@ void network_game_accept_remote_connections(
 	boolean accept);
 void ui_start_main_menu_music(
 	void);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void error(
+	short priority,
+	const char *format,
+	...);
+#else
 void error(
 	long priority,
 	char *format,
 	...);
+#endif
 void playlist_profile_delete(
 	long profile_index);
 void ui_play_audio_feedback_sound(
@@ -1081,10 +1102,18 @@ void display_error_deferred(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+boolean virtual_keyboard_launch(
+	void *text,
+	word maximum_length,
+	short keyboard_type);
+#else
 boolean virtual_keyboard_launch(
 	void *text,
 	long maximum_length,
 	long keyboard_type);
+#endif
 void network_game_client_local_player_quit(
 	word controller_index);
 struct widget_instance *widget_instance_get_topmost_parent(
@@ -1107,9 +1136,16 @@ short network_game_client_get_machine_index(
 	void *client);
 boolean network_player_is_valid(
 	void *player);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+boolean network_game_client_request_start_time_change(
+	void *client,
+	short start);
+#else
 boolean network_game_client_request_start_time_change(
 	void *client,
 	boolean start);
+#endif
 boolean network_game_client_request_remove_player(
 	void *client,
 	void *player);

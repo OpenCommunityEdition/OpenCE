@@ -287,7 +287,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
             continue
         add_object(source, posix_cflags if source.name.startswith("posix_") else platform_cflags)
     for source in sorted((PORT_DIR / "src").glob("*.c")):
-        add_object(source, posix_cflags if source.name == "web_stubs.c" else platform_cflags)
+        add_object(source, posix_cflags if source.name in ("web_stubs.c", "web_net.c") else platform_cflags)
     add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
     add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
     musl_math_cflags = " ".join([
@@ -299,9 +299,10 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     # ---------- the link
 
     library_js = PORT_DIR / "src" / "web_library.js"
+    pre_js = PORT_DIR / "src" / "web_pre.js"
     halo_js = site_dir / "halo.js"
     halo_wasm = site_dir / "halo.wasm"
-    link_flags = " ".join(LINK_FLAGS + [f"--js-library {library_js}"])
+    link_flags = " ".join(LINK_FLAGS + [f"--js-library {library_js}", f"--pre-js {pre_js}"])
     n.rule(
         name="web_link",
         command=f"$web_emcc $ldflags -o $out @$out.rsp",
@@ -310,7 +311,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         rspfile_content="$in_newline",
     )
     n.build(outputs=halo_js, implicit_outputs=[halo_wasm], rule="web_link", inputs=objects,
-            implicit=[library_js], variables={"ldflags": link_flags})
+            implicit=[library_js, pre_js], variables={"ldflags": link_flags})
 
     # ---------- the site: the page, the service worker and the app manifest
 

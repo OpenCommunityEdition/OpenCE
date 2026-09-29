@@ -3701,8 +3701,14 @@ short object_list_count(
 	long object_list_index);
 short numeric_countdown_timer_get(
 	short digit_index);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+long recorded_animation_get_time_left(
+	long unit_index);
+#else
 short recorded_animation_get_time_left(
 	long unit_index);
+#endif
 short scenery_get_animation_time(
 	long scenery_index);
 short unit_get_custom_animation_time(
@@ -3828,8 +3834,14 @@ boolean unit_get_current_flashlight_state(
 	long unit_index);
 boolean ai_scripting_is_attacking(
 	long encounter_index);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+boolean ai_scripting_conversation(
+	long conversation_index);
+#else
 boolean ai_scripting_conversation(
 	word conversation_index);
+#endif
 boolean scripted_player_control_set_camera_control(
 	boolean enabled);
 boolean scripted_show_hud(
@@ -4202,12 +4214,26 @@ void ai_scripting_playfight(
 void ai_scripting_vehicle_encounter(
 	long vehicle_index,
 	long encounter_index);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void ai_scripting_vehicle_enterable_team(
+	long object_list_index,
+	long team);
+#else
 void ai_scripting_vehicle_enterable_team(
 	long object_list_index,
 	unsigned short team);
+#endif
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void ai_scripting_vehicle_enterable_actor_type(
+	long object_list_index,
+	long actor_type);
+#else
 void ai_scripting_vehicle_enterable_actor_type(
 	long object_list_index,
 	unsigned short actor_type);
+#endif
 void ai_scripting_vehicle_enterable_actors(
 	long vehicle_index,
 	long actor_list_index);
@@ -4231,10 +4257,18 @@ void ai_scripting_follow_target_unit(
 void ai_scripting_follow_target_ai(
 	long ai_index,
 	long target_ai_index);
+#ifdef HALO_WEB
+/* the definition's parameter types: a WebAssembly call must match them */
+void ai_scripting_conversation_stop(
+	long conversation_index);
+void ai_scripting_conversation_advance(
+	long conversation_index);
+#else
 void ai_scripting_conversation_stop(
 	unsigned short conversation_index);
 void ai_scripting_conversation_advance(
 	unsigned short conversation_index);
+#endif
 void ai_scripting_link_activation(
 	long source_ai_index,
 	long target_ai_index);
