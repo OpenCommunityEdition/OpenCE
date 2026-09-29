@@ -184,6 +184,11 @@ void game_time_set_paused(boolean paused);
 real game_time_get_speed(void);
 void game_time_set_speed(real speed);
 void game_time_start(void);
+#ifdef HALO_LINUX
+/* the game time set, before the first tick (a distributed game joined in
+progress: the host's) */
+void game_time_set_distributed(long time);
+#endif
 void game_time_update(real time_delta_sec);
 
 /* ---------- prototypes/MAIN.C */

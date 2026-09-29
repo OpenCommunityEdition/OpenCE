@@ -657,6 +657,60 @@ boolean network_game_server_send_message_to_machine(
 }
 
 #ifdef HALO_LINUX
+/* a machine that joined a distributed game in progress and has not loaded
+it yet (it hears none of the game's messages until it has) */
+static boolean network_game_server_machine_is_loading_late(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	return network_game_distributed() &&
+		network_game_server_get_state(server, NULL) == _network_game_server_state_ingame &&
+		!network_game_server_client_machine_is_loaded(server, machine);
+}
+
+boolean network_game_server_send_message_to_client_machine(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine,
+	void *message)
+{
+	byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
+	word size = GET_MESSAGE_SIZE(((struct network_message *)message)->header);
+	struct network_connection *connection = network_game_server_get_client_connection(machine);
+
+	(void)server;
+	if (!connection || !network_connection_active(connection) || size > sizeof(buffer))
+		return FALSE;
+	/* (the write swaps the header in place) */
+	csmemcpy(buffer, message, size);
+	return network_game_server_write(connection, buffer, size, NULL, 1);
+}
+
+boolean network_game_server_send_game_settings_to_client_machine(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine,
+	void const *game,
+	long game_size)
+{
+	struct message_server_game_settings_update message;
+	long offset;
+
+	for (offset = 0; offset < game_size; offset += sizeof(message.data))
+	{
+		void *encoded_message;
+
+		message.total_size = (word)game_size;
+		message.offset = (word)offset;
+		message.length = (word)MIN((long)sizeof(message.data), game_size - offset);
+		message.pad = 0;
+		csmemset(message.data, 0, sizeof(message.data));
+		csmemcpy(message.data, (byte const *)game + offset, message.length);
+		encoded_message = create_network_game_message(_message_server_game_settings_update, &message, sizeof(message));
+		if (!encoded_message || !network_game_server_send_message_to_client_machine(server, machine, encoded_message))
+			return FALSE;
+	}
+	return TRUE;
+}
+
 /* the client machines in the game, as the message handlers number them
 (the distributed netcode sends each its own datagram); their count */
 short network_distributed_server_machines(
@@ -676,8 +730,11 @@ short network_distributed_server_machines(
 		struct network_connection *connection;
 		long game_machine_index;
 
-		if (!network_game_server_client_machine_is_joined_to_game(server, machine))
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine) ||
+			network_game_server_machine_is_loading_late(server, machine))
+		{
 			continue;
+		}
 		connection = network_game_server_get_client_connection(machine);
 		if (!connection || !network_connection_active(connection))
 			continue;
@@ -780,7 +837,8 @@ boolean network_distributed_server_send_to_all_reliably(
 		struct network_game_server_client_machine *machine =
 			network_game_server_get_client_machine_at_index(server, machine_index);
 
-		if (network_game_server_client_machine_is_joined_to_game(server, machine))
+		if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+			!network_game_server_machine_is_loading_late(server, machine))
 		{
 			struct network_connection *connection = network_game_server_get_client_connection(machine);
 			byte buffer[NETWORK_MESSAGE_BUFFER_SIZE];
@@ -816,7 +874,13 @@ boolean network_game_server_send_message_to_all_machines(
 		struct network_game_server_client_machine *machine =
 			network_game_server_get_client_machine_at_index(server, machine_index);
 
-		if (network_game_server_client_machine_is_joined_to_game(server, machine))
+		if (network_game_server_client_machine_is_joined_to_game(server, machine)
+#ifdef HALO_LINUX
+			/* (not a machine still loading the game in progress: it takes
+			none of the game's messages until it has) */
+			&& !network_game_server_machine_is_loading_late(server, machine)
+#endif
+			)
 		{
 			struct network_connection *connection =
 				network_game_server_get_client_connection(machine);
@@ -1639,8 +1703,14 @@ static boolean network_game_server_handle_message_client_join_game_request(
 	short message_size)
 {
 	boolean result = TRUE;
+#ifdef HALO_LINUX
+	/* (or a distributed game in progress: network_game_server_accepts_late_joins) */
+	boolean late_join = network_game_server_accepts_late_joins(server);
+#else
+	boolean late_join = FALSE;
+#endif
 
-	if (network_game_server_get_state(server, NULL) == _network_game_server_state_pregame)
+	if (network_game_server_get_state(server, NULL) == _network_game_server_state_pregame || late_join)
 	{
 		struct message_client_join_game_request join_game_request;
 		short packet_type = _message_client_join_game_request;
@@ -1665,7 +1735,7 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				network_game_server_get_client_connection(server_client_machine),
 				&source_address,
 				FALSE);
-			if (network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
+			if ((network_game_server_get_state(server, NULL) == _network_game_server_state_pregame || late_join) &&
 				network_game_server_game_is_open(server))
 			{
 				byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
@@ -1785,6 +1855,17 @@ static boolean network_game_server_handle_message_client_join_game_request(
 
 								if (result == TRUE)
 								{
+#ifdef HALO_LINUX
+									/* (a machine joining the game in progress: to it alone,
+									the others are in game) */
+									if (late_join)
+									{
+										result = network_game_server_send_game_settings_to_client_machine(server,
+											server_client_machine, network_game_server_get_game(server),
+											sizeof(struct network_game));
+									}
+									else
+#endif
 									result = network_game_server_send_game_data_pregame(server);
 									if (!result)
 									{
@@ -1962,6 +2043,33 @@ static boolean network_game_server_handle_message_client_add_player_request_preg
 			network_event("server failed to decode a message_client_add_player_request_pregame packet");
 		}
 	}
+#ifdef HALO_LINUX
+	/* a machine joining the game in progress: its players are added as in
+	game (network_game_server_start_late_joiner then starts it) */
+	else if (network_game_server_accepts_late_joins(server) &&
+		!network_game_server_client_machine_is_loaded(server, client_machine))
+	{
+		struct network_player player;
+		short packet_type = _message_client_add_player_request_pregame;
+		short packet_version = NETWORK_GAME_MESSAGE_VERSION;
+
+		message_size -= sizeof(word);
+		if (decode_network_game_message(
+			&player,
+			message + 1,
+			&message_size,
+			&packet_type,
+			&packet_version,
+			_network_game_packet_class_client_pregame))
+		{
+			network_game_server_queue_player_for_addition(server, &player);
+		}
+		else
+		{
+			network_event("server failed to decode a message_client_add_player_request_pregame packet");
+		}
+	}
+#endif
 	else
 	{
 		network_event(
@@ -2285,6 +2393,14 @@ static boolean network_game_server_handle_message_client_loaded(
 			result = FALSE;
 		}
 	}
+#ifdef HALO_LINUX
+	/* a machine that joined the game in progress has loaded it */
+	else if (network_game_server_accepts_late_joins(server) &&
+		!network_game_server_client_machine_is_loaded(server, client_machine))
+	{
+		network_game_server_late_joiner_loaded(server, client_machine);
+	}
+#endif
 	else
 	{
 		network_event(

@@ -763,6 +763,16 @@ void countdown_timer_increment(
 
 static boolean network_game_server_setup_game_from_playlist(
 	struct network_game_server *server);
+#ifdef HALO_LINUX
+static boolean network_game_server_machine_has_waiting_players(
+	struct network_game_server *server,
+	long machine_index);
+static void network_game_server_start_late_joiner(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine);
+static void network_game_server_keep_late_joiners_alive(
+	struct network_game_server *server);
+#endif
 static boolean network_game_server_add_new_client(
 	struct network_game_server *server,
 	struct network_connection *new_connection);
@@ -1041,6 +1051,9 @@ boolean network_game_server_idle(
 						break;
 
 					case _network_game_server_state_ingame:
+#ifdef HALO_LINUX
+						network_game_server_keep_late_joiners_alive(server);
+#endif
 						break;
 
 					case _network_game_server_state_postgame:
@@ -1857,6 +1870,15 @@ void network_game_server_update_ticks(
 						network_event(
 							"network_game_server_send_player_joined_info_ingame() failed in network_game_server_handle_message_client_add_player_request_ingame()");
 					}
+#ifdef HALO_LINUX
+					/* a machine joining the game in progress, its players all in:
+					it loads the game now */
+					if (!TEST_FLAG(client_machine->flags, _network_client_machine_level_loaded_bit) &&
+						!network_game_server_machine_has_waiting_players(server, client_machine->machine_index))
+					{
+						network_game_server_start_late_joiner(server, client_machine);
+					}
+#endif
 				}
 				else
 				{
@@ -1876,6 +1898,114 @@ void network_game_server_update_ticks(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* ---------- joining a game in progress (the distributed netcode's)
+
+A machine may join a distributed game in progress: the host keeps the game
+open, accepts the machine's join as in the pregame, and adds its players as
+it adds a player in game (every machine in the game spawns them, told by
+_message_server_add_player_ingame). Then the host sends the machine alone
+the settings and the start, with its game time, and the machine loads the
+game and runs its clock from there; the distributed netcode gives it the
+host's objects when it has loaded (network_objects.c). Until then the
+machine hears none of the game's messages (network_game_server_send_message_to_all_machines),
+which a machine in the pregame would refuse. */
+
+boolean network_game_server_accepts_late_joins(
+	struct network_game_server *server)
+{
+	return network_game_distributed() && server->state == _network_game_server_state_ingame &&
+		network_game_server_game_is_open(server);
+}
+
+boolean network_game_server_client_machine_is_loaded(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	(void)server;
+	return TEST_FLAG(machine->flags, _network_client_machine_level_loaded_bit);
+}
+
+/* whether players of the machine are still waiting to be added (after the
+one being added) */
+static boolean network_game_server_machine_has_waiting_players(
+	struct network_game_server *server,
+	long machine_index)
+{
+	long index;
+
+	for (index = 0; index < server->waiting_player_count; index++)
+	{
+		if (server->waiting_players[index].machine_index == machine_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+/* the settings (with the machine's players) and the start, to the machine
+alone, the start with the host's game time */
+static void network_game_server_start_late_joiner(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	struct message_server_begin_game begin_game = { 0 };
+	struct network_message *message;
+
+	/* (the message carries 16 bits: the client has the rest from its first
+	game update; never 0, which is a game starting) */
+	begin_game.unused = MAX(game_time_get() & 0xFFFF, 1);
+	if (!network_game_server_send_game_settings_to_client_machine(server, machine, &server->game, sizeof(server->game)) ||
+		!(message = create_network_game_message(_message_server_begin_game, &begin_game, sizeof(begin_game))) ||
+		!network_game_server_send_message_to_client_machine(server, machine, message))
+	{
+		network_event("failed to start machine #%d in the game in progress", machine->machine_index);
+		return;
+	}
+	network_event("machine #%d joins the game in progress at game tick #%ld", machine->machine_index,
+		begin_game.unused);
+}
+
+/* the machines joining the game in progress (in the pregame, or loading)
+hear none of the game's messages, and drop a connection they hear nothing on
+for 15 seconds: a pregame keep-alive every 5 */
+static void network_game_server_keep_late_joiners_alive(
+	struct network_game_server *server)
+{
+	unsigned long now = system_milliseconds();
+	struct message_server_pregame_keep_alive message_packet = { 0 };
+	long client_machine_index;
+
+	if (!network_game_distributed() || now - server->time_of_last_keep_alive <= 5UL * MILLISECONDS_PER_SECOND)
+		return;
+	server->time_of_last_keep_alive = now;
+	for (client_machine_index = 0; client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; client_machine_index++)
+	{
+		struct network_game_server_client_machine *machine = &server->client_machines[client_machine_index];
+		struct network_message *message;
+
+		if (!network_game_server_client_machine_is_joined_to_game(server, machine) ||
+			TEST_FLAG(machine->flags, _network_client_machine_level_loaded_bit))
+		{
+			continue;
+		}
+		message = create_network_game_message(_message_server_pregame_keep_alive, &message_packet,
+			sizeof(message_packet));
+		if (message)
+			network_game_server_send_message_to_client_machine(server, machine, message);
+	}
+}
+
+/* a machine that joined the game in progress has loaded it */
+void network_game_server_late_joiner_loaded(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	(void)server;
+	SET_FLAG(machine->flags, _network_client_machine_level_loaded_bit, TRUE);
+	network_event("machine #%d has loaded the game in progress", machine->machine_index);
+}
+
+#endif
 void network_game_server_queue_player_for_addition(
 	struct network_game_server *server,
 	struct network_player *player)
@@ -3407,6 +3537,11 @@ static boolean network_game_server_idle_pregame_tasks(
 				network_game_server_have_all_machines_have_precached(server) &&
 				server->countdown_state.paused == FALSE)
 			{
+#ifdef HALO_LINUX
+				/* (the distributed netcode's games stay open: a machine may join
+				one in progress, network_game_server_start_late_joiner) */
+				if (!network_game_distributed())
+#endif
 				network_game_server_close_game(server);
 				if ((success = network_game_server_start_network_game(server)) != TRUE)
 					network_event("network_game_server_start_network_game() failed");

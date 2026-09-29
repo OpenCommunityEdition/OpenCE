@@ -1788,6 +1788,10 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_client_ready:
 		network_objects_client_ready(machine_index);
+		/* (every player's statistics with the next, for a machine that
+		joined the game in progress) */
+		csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
+		distributed_statistics_due = TRUE;
 		break;
 	case _distributed_message_damage_events:
 		network_damage_handle_events(entries, header.count);

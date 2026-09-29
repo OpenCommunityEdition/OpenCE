@@ -879,6 +879,12 @@ static boolean network_game_client_idle_postgame(
 /* ---------- globals */
 
 #ifdef HALO_LINUX
+/* the host's game time when it told this client to start a game in
+progress, 16 bits of it (0 for a game starting); and whether the first game
+update is to bring the rest */
+long network_game_client_late_join_time;
+static boolean network_game_client_late_join_clock_pending;
+
 /* each advertised game's host's network version and netcode, by its place
 in the client's available_games (HALO_PORT_NETWORK_VERSION) */
 static struct
@@ -1727,6 +1733,25 @@ boolean network_game_client_handle_game_update(
 		message_packet->local_player_count = client->game.player_count;
 	}
 
+#ifdef HALO_LINUX
+	/* (the distributed netcode's machines keep their own clocks: a machine
+	that joined the game in progress takes up the host's count where it is) */
+	if (network_game_distributed() && message_packet->update_number != client->next_update_number)
+	{
+		client->next_update_number = message_packet->update_number;
+	}
+	/* (a game in progress past 16 bits of ticks: the host's whole time, if
+	it is ahead; never back, which the host would take for old messages) */
+	if (network_game_client_late_join_clock_pending)
+	{
+		network_game_client_late_join_clock_pending = FALSE;
+		if (message_packet->game_time > game_time_get())
+		{
+			game_time_set_distributed(message_packet->game_time);
+			network_event("the game in progress is at game tick #%ld", message_packet->game_time);
+		}
+	}
+#endif
 	if (message_packet->update_number != client->next_update_number)
 	{
 		network_event(
@@ -1794,6 +1819,11 @@ boolean network_game_client_handle_game_update(
 boolean network_game_client_game_has_started(
 	struct network_game_client *client)
 {
+#ifdef HALO_LINUX
+	/* (the host's time came with the start: the loading below is counted) */
+	unsigned long loading_started = system_milliseconds();
+#endif
+
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x3B0,
@@ -1854,6 +1884,22 @@ boolean network_game_client_game_has_started(
 
 					ui_widgets_close_all();
 					game_time_start();
+#ifdef HALO_LINUX
+					/* (a game in progress: the host's time when it said to start,
+					and the ticks this machine spent loading it) */
+					if (network_game_distributed() && network_game_client_late_join_time > 0)
+					{
+						unsigned long elapsed = system_milliseconds() - loading_started;
+						/* (no longer than a minute: a stalled clock counts nothing) */
+						long ticks = elapsed < 60000UL ? (long)(elapsed * TICKS_PER_SECOND / 1000) : 0;
+
+						game_time_set_distributed(network_game_client_late_join_time + ticks);
+						network_game_client_late_join_clock_pending = TRUE;
+						network_event("joined the game in progress at game tick #%ld",
+							network_game_client_late_join_time + ticks);
+					}
+					network_game_client_late_join_time = 0;
+#endif
 					game_initial_pulse();
 				}
 				else
