@@ -8,9 +8,11 @@ in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
 **Release status (September 29, 2026):** both sites publish automatic match
-startup, one-player System Link and room switching in runtime `15b24f343ed9109d`, packaged
-from source `64813ac0`. The Pages commits are `3c7a7fe` for the GitHub site
-and `8ca5a86` for the mirror. Existing visitors can reload and choose
+startup, one-player System Link and room switching in runtime `be34d552e3965228`, packaged
+from source `7e66a846`. The Pages commits are `e59200a` for the GitHub site
+and `ce678dc` for the mirror. Cached launchers remain compatible with the
+prompt-free page; hidden compatibility elements prevent startup errors while
+the service worker updates. Existing visitors can reload and choose
 **Update**; downloaded maps and saves are retained.
 
 **Known issue:** local Chrome tests started a solo match and joined it with

@@ -90,9 +90,9 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 
 ## Online play
 
-The automatic startup and solo System Link behavior described below is
-published on both public sites as runtime `3217cbdfcc8f02a7` (source
-`1fbb8730`, September 29, 2026).
+Automatic startup, solo System Link, room switching and cached-launcher
+compatibility are published on both public sites as runtime
+`be34d552e3965228` (source `7e66a846`, September 29, 2026).
 Chrome testing on September 29, 2026 confirmed a one-player Blood Gulch
 start and a second player joining the running match (two players on two
 machines). Both tabs later suffered renderer crashes with error 11.
@@ -110,8 +110,9 @@ The first ready player hosts Blood Gulch Slayer; the others join that host
 without navigating the game's System Link menus. The host must keep the
 game open. The public room does not run a permanent game server.
 
-Connection, hosting and map-loading progress are shown on the page. Tap
-when prompted to enable sound and mouse controls. *Main menu* cancels quick
+Connection, hosting and map-loading progress are shown on the page. Sound
+starts automatically where allowed; normal game input unlocks it and mouse
+controls when browser permissions require a gesture. *Main menu* cancels quick
 play; `?menu=1` opens the normal launcher and game menu instead.
 
 For a separate group, choose *New room*, then *Share link*. Opening that
