@@ -8,15 +8,16 @@ in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
 **Release status (September 29, 2026):** both sites publish automatic match
-startup and one-player System Link in runtime `3217cbdfcc8f02a7`, packaged
-from source `1fbb8730`. The Pages commits are `f5c1f05` for the GitHub site
-and `a7fec88` for the mirror. Existing visitors can reload and choose
+startup, one-player System Link and room switching in runtime `15b24f343ed9109d`, packaged
+from source `64813ac0`. The Pages commits are `3c7a7fe` for the GitHub site
+and `8ca5a86` for the mirror. Existing visitors can reload and choose
 **Update**; downloaded maps and saves are retained.
 
 **Known issue:** local Chrome tests started a solo match and joined it with
 a second player, but later hit renderer crashes ("Aw, Snap", error 11).
-The cause remains unresolved; this release does not establish sustained
-multiplayer stability.
+Crash dumps point to Chrome 153's ImageBitmap serialization. The runtime
+now bounds queued frames and skips empty bitmaps before transfer. Those
+guards do not establish a complete fix; sustained multiplayer remains unverified.
 
 This replaces the pinned Apollo runtime, which froze during game startup
 in desktop WebKit 26.4. The worker-based port reached the Halo main menu
@@ -55,6 +56,12 @@ players. Team readiness and the two-machine requirement for lockstep remain.
 **Main menu** opts out of quick play; `?menu=1` opens the normal
 launcher and game menu. A failed attempt shows an error instead of repeatedly
 restarting the game. Private room links use the same quick-play flow.
+
+Use the in-game **Room** button to open the room controls, then choose
+**New room** or enter another code. Switching rooms restarts Halo into the
+selected room using cached maps. **Share link** includes the currently
+joined room; a `?room=FQLX01` link always selects FQLX01. **Leave** closes
+the current game and returns to the launcher without automatically rejoining.
 
 Browser rooms use the existing public signaling and STUN services. Some
 networks still require a TURN relay in Settings; no TURN account or native
