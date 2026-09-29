@@ -49,6 +49,7 @@ every peer.
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ---------- address settings */
 
@@ -254,11 +255,10 @@ static void peer_incoming_address(int stream, struct sockaddr *address, const in
 
 A tailnet carries no broadcasts, so system link's announcements also go to
 each of the tailnet's online machines (broadcast_targets), which the host
-side asks the tailscale command for (posix_tailscale_addresses). A game's
-announcement names its host by the host's XNADDR, whose address is the one
-on the local network: in announcements sent to a tailnet address it becomes
-this machine's Tailscale address (tailnet_payload), which the other machine
-can reach. */
+side asks the tailscale command for (posix_tailscale_addresses). A machine
+that hears a game's announcement reaches the host at the address it came
+from (source/networking/network_client_message_handler.c): across the
+tailnet, the host's Tailscale address. */
 
 #define TAILSCALE_PEERS 128
 
@@ -311,40 +311,94 @@ static int is_tailnet_address(unsigned long address)
 	return (halo_ws_ntohl(address) & 0xffc00000UL) == 0x64400000UL;
 }
 
+/* ---------- remote searchers
+
+A game's advertisements, like the searches for games, are broadcasts. A
+machine searching from elsewhere (on the internet, through the host's
+forwarded ports: network.broadcast names the host there) is not on this
+network, so the broadcasts also go to every such machine the game's sockets
+heard from in the last minute (broadcast_targets). */
+
+#define REMOTE_SEARCHERS 64
+#define REMOTE_SEARCHER_SECONDS 60
+
+static struct
+{
+	unsigned long address;
+	time_t heard;
+} remote_searchers[REMOTE_SEARCHERS];
+static pthread_mutex_t remote_searchers_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static unsigned long title_address(void);
 
-/* the datagram to send to destination: buffer, or a copy in scratch whose
-XNADDR of this machine (its identifier, then its address) names its
-Tailscale address instead, for a destination on the tailnet */
-static const char *tailnet_payload(const char *buffer, int length, unsigned long destination, char *scratch,
-	int scratch_size)
+/* 10/8, 172.16/12, 192.168/16: another machine on a local network */
+static int is_private_address(unsigned long address)
 {
-	unsigned long self, lan, peers[1];
-	unsigned char pattern[10];
-	int index, copied = 0;
+	unsigned long host = halo_ws_ntohl(address);
 
-	if (!tailscale_enabled() || !is_tailnet_address(destination) || length < (int)sizeof(pattern) ||
-		length > scratch_size || tailscale_addresses(&self, peers, 0) < 0 || !self)
+	return (host & 0xff000000UL) == 0x0a000000UL || (host & 0xfff00000UL) == 0xac100000UL ||
+		(host & 0xffff0000UL) == 0xc0a80000UL;
+}
+
+static void remote_searcher_heard(const struct sockaddr *address, const int *address_length)
+{
+	unsigned long ip, host;
+	time_t now = time(NULL);
+	int index, slot = -1;
+
+	if (!address || !address_length || *address_length < (int)sizeof(struct sockaddr_in) ||
+		address->sa_family != AF_INET)
 	{
-		return buffer;
+		return;
 	}
-	lan = title_address();
-	if (!lan || lan == self)
-		return buffer;
-	memcpy(pattern, p2p_identifier(), 6);
-	memcpy(pattern + 6, &lan, 4);
-	for (index = 0; index + (int)sizeof(pattern) <= length; index++)
+	ip = ((const struct sockaddr_in *)address)->sin_addr.s_addr;
+	host = halo_ws_ntohl(ip);
+	/* not this machine, nor the local network's (they get the broadcasts),
+	nor the tailnet (tailscale_addresses) */
+	if (!ip || (host >> 24) == 127 || ip == INADDR_BROADCAST || is_private_address(ip) ||
+		is_tailnet_address(ip) || ip == title_address())
 	{
-		if (memcmp(buffer + index, pattern, sizeof(pattern)))
-			continue;
-		if (!copied)
+		return;
+	}
+	pthread_mutex_lock(&remote_searchers_lock);
+	for (index = 0; index < REMOTE_SEARCHERS; index++)
+	{
+		if (remote_searchers[index].address == ip)
 		{
-			memcpy(scratch, buffer, (size_t)length);
-			copied = 1;
+			slot = index;
+			break;
 		}
-		memcpy(scratch + index + 6, &self, 4);
+		if (slot < 0 && (!remote_searchers[index].address ||
+			now - remote_searchers[index].heard > REMOTE_SEARCHER_SECONDS))
+		{
+			slot = index;
+		}
 	}
-	return copied ? scratch : buffer;
+	if (slot >= 0)
+	{
+		if (remote_searchers[slot].address != ip)
+			platform_log("system link: heard from %lu.%lu.%lu.%lu (outside this network); broadcasts go to it too",
+				host >> 24, (host >> 16) & 255, (host >> 8) & 255, host & 255);
+		remote_searchers[slot].address = ip;
+		remote_searchers[slot].heard = now;
+	}
+	pthread_mutex_unlock(&remote_searchers_lock);
+}
+
+/* the remote searchers heard from lately; returns their count */
+static int remote_searcher_targets(unsigned long *targets, int maximum_count)
+{
+	time_t now = time(NULL);
+	int index, count = 0;
+
+	pthread_mutex_lock(&remote_searchers_lock);
+	for (index = 0; index < REMOTE_SEARCHERS && count < maximum_count; index++)
+	{
+		if (remote_searchers[index].address && now - remote_searchers[index].heard <= REMOTE_SEARCHER_SECONDS)
+			targets[count++] = remote_searchers[index].address;
+	}
+	pthread_mutex_unlock(&remote_searchers_lock);
+	return count;
 }
 
 /* the addresses to send broadcasts to instead, if network.broadcast is
@@ -352,13 +406,16 @@ set (255.255.255.255 among them sends a real broadcast too), and the
 tailnet's online machines; returns their count */
 static int broadcast_targets(unsigned long *targets, int maximum_count)
 {
-	unsigned long self, peers[TAILSCALE_PEERS];
+	unsigned long self, peers[TAILSCALE_PEERS + REMOTE_SEARCHERS];
 	int count, peer_count, index;
 
 	net_settings_read();
 	count = net_settings.broadcast_count < maximum_count ? net_settings.broadcast_count : maximum_count;
 	memcpy(targets, net_settings.broadcast_targets, (size_t)count * sizeof(*targets));
 	peer_count = tailscale_addresses(&self, peers, TAILSCALE_PEERS);
+	if (peer_count < 0)
+		peer_count = 0;
+	peer_count += remote_searcher_targets(peers + peer_count, TAILSCALE_PEERS - peer_count);
 	if (peer_count > 0)
 	{
 		/* the local network's broadcast as well, unless network.broadcast
@@ -610,11 +667,8 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 			{
 				int sent;
 
-				char scratch[2048];
-				const char *data = tailnet_payload(buffer, length, targets[index], scratch, sizeof(scratch));
-
 				target.sin_addr.s_addr = targets[index];
-				sent = posix_socket_sendto((int)socket, data, length, flags, &target, sizeof(target));
+				sent = posix_socket_sendto((int)socket, buffer, length, flags, &target, sizeof(target));
 				if (sent >= 0 || index == 0)
 					result = sent;
 			}
@@ -641,16 +695,10 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	}
 	{
 		const struct sockaddr *peer = peer_outgoing_address(0, address, address_length, &target);
-		char scratch[2048];
 
 		address = peer ? peer : outgoing_address(address, address_length, &target);
-		if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in))
-		{
-			buffer = tailnet_payload(buffer, length, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
-				scratch, sizeof(scratch));
-		}
-		return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 	}
+	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
 }
 
 /* debug.network_latency and debug.network_loss: what this machine receives
@@ -811,7 +859,10 @@ int WSAAPI halo_ws_recvfrom(SOCKET socket, char *buffer, int length, int flags,
 		return delayed_receive(socket, buffer, length, flags, address, address_length, 1);
 	result = posix_socket_recvfrom((int)socket, buffer, length, flags, address, address_length);
 	if (result >= 0)
+	{
+		remote_searcher_heard(address, address_length);
 		peer_incoming_address(0, address, address_length);
+	}
 	return winsock_result(result);
 }
 

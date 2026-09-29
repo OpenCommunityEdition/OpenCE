@@ -97,13 +97,31 @@ were on one local network, from any location:
 
 When Tailscale operates, the game gets the tailnet's online machines from
 the `tailscale` command every 15 seconds. It sends the game's
-announcements to them, and to the local network. In the announcements that
-go to the tailnet, the host gives its Tailscale address. Linux machines
-also do this. On Windows, put the Tailscale addresses of the other machines
-in `network.broadcast`.
+announcements to them, and to the local network. A machine that hears a
+game connects to the address that the announcement came from, so a game
+found across the tailnet is joined through the tailnet. Linux machines also
+do this. On Windows, put the Tailscale addresses of the other machines in
+`network.broadcast`.
 
 macOS asks one time for permission to use the local network. Select
 "Allow".
+
+### The internet, with forwarded ports
+
+A machine can join a game on the internet without Tailscale when the host
+forwards ports on its router:
+
+1. The host forwards TCP port 5150 and UDP port 5150 to its computer, and
+   creates a system link game.
+2. The other machine sets `network.broadcast = "<host's internet address>"`
+   in `config.toml`, starts the game and opens the list of system link
+   games.
+
+The search goes to the host. The host answers each machine outside its
+local network that searched in the last minute, and the other machine
+connects to the address that the answer came from. If the other machine's
+router changes the ports of its connections, that machine also forwards UDP
+port 5151.
 
 ### Internet play
 
