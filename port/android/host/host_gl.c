@@ -106,23 +106,20 @@ void host_gl_wait_frame(uint32_t slot)
 }
 
 /* writes data into the buffer bound to target without waiting for the
-GPU: the renderer only streams into ranges no queued draw uses.
-
-Mapping unsynchronised, but without invalidating the range: with an
-invalidate the Adreno driver allocates a fresh kgsl buffer for the range
-and frees it again, which costs more than the copy. (On Mali a
-glBufferSubData into a buffer queued draws reference copies the whole
-buffer, which is why the mapped write is here at all.) */
+GPU: the renderer only streams into ranges no queued draw uses. (Mali
+copies the whole buffer for a glBufferSubData into a buffer that queued
+draws still reference; with hundreds of small uploads per frame that
+exhausts memory within seconds.) */
 void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const void *data)
 {
 	void *mapping = glMapBufferRange(target, offset, size,
-		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
 
-	if (mapping)
+	if (!mapping)
 	{
-		memcpy(mapping, data, size);
-		glUnmapBuffer(target);
+		glBufferSubData(target, offset, size, data);
 		return;
 	}
-	glBufferSubData(target, offset, size, data);
+	memcpy(mapping, data, size);
+	glUnmapBuffer(target);
 }
