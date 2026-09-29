@@ -66,7 +66,7 @@ static pthread_mutex_t memory_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint64_t window_base, window_end;
 static uint64_t image_base, image_end;
 
-size_t host_page_size(void)
+size_t host_guest_page_size(void)
 {
 	return PAGE;
 }

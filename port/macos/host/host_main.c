@@ -99,6 +99,7 @@ void host_abort(const char *reason)
 void host_exit(int code)
 {
 	host_logf(HOST_LOG_INFO, "the game exited (%d)", code);
+	host_profile_write();
 	SDL_Quit();
 	_exit(code);
 }
@@ -395,5 +396,6 @@ int main(int argc, char *argv[])
 		host_fatal("cannot load the game image; see %s/host.txt for details", host_data_root);
 	free(image);
 
+	host_profile_start();
 	host_run_guest_main(make_boot(argc, argv, &environment));
 }

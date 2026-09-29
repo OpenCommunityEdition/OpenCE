@@ -81,7 +81,7 @@ int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 void *host_low_map(size_t size, int protection);
 void host_low_unmap(void *address, size_t size);
 /* the host's page size (16 KB on Apple silicon, 4 KB on x86-64) */
-size_t host_page_size(void);
+size_t host_guest_page_size(void);
 /* 1 if the guest range [address, address + size) was handed out or is one
 of the fixed ranges */
 int host_low_owns(uint64_t address, uint64_t size);
@@ -115,6 +115,12 @@ void host_run_guest_main(uint32_t boot) __attribute__((noreturn));
 
 void host_debug_thread_started(void);
 void host_debug_thread_exited(void);
+
+/* ---------- profiling (host_profile.c, HALO_PROFILE=1) */
+
+void host_profile_load_symbols(const void *elf, size_t size);
+void host_profile_start(void);
+void host_profile_write(void);
 
 /* ---------- import table (generated host_import_table.c) */
 

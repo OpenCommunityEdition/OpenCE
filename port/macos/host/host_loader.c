@@ -161,7 +161,7 @@ int host_load_image(const void *file, size_t size)
 {
 	struct segment segments[MAXIMUM_SEGMENTS];
 	int count = image_segments(file, size, segments);
-	size_t page = host_page_size();
+	size_t page = host_guest_page_size();
 	uint64_t low = ~0ULL, high = 0;
 	const struct halo_guest_header *header;
 	uint64_t *table;
@@ -208,6 +208,7 @@ int host_load_image(const void *file, size_t size)
 	host_image.header = header;
 	host_image.base = (uint32_t)low;
 	host_image.end = (uint32_t)high;
+	host_profile_load_symbols(file, size);
 
 	table = GUEST(uint64_t *, header->import_table);
 	name = GUEST(const char *, header->import_names);

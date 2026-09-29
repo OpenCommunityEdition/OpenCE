@@ -244,6 +244,20 @@ code for the window, the mouse, the keyboard and the first start.
   directory handles, time, the rebased code, sockets and the Tailscale
   lookup. `port/macos/tests/run_guest_tests.sh` does both steps.
 - `port/macos/tests/run_raytrace_test.sh`: refer to "Ray-traced lighting".
+- `port/macos/tests/run_determinism_test.sh` runs the game's matrix maths
+  and `halo_` functions over 1.4 million inputs on the native and the
+  x86-64 builds and compares hashes of the results. Machines in a system
+  link game must compute alike, so an optimisation (compiler flags, SIMD)
+  must keep these hashes.
+
+## Performance
+
+- The native guest is compiled for the M1 (`-mcpu=apple-m1`), without
+  fused multiply-add and without `-ffast-math`, so the results are those
+  of the other builds (refer to "Tests").
+- `HALO_PROFILE=1 build/macos/Halo/halo` samples every thread 1000 times a
+  second, and writes `profile.txt` to the game's folder at exit: the game
+  functions and the host functions (SDL, ANGLE) where the time goes.
 
 ## Find problems
 
