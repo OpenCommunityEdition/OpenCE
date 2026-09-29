@@ -7,6 +7,12 @@ Both sites serve the source-built browser port in `port/web`. The game runs
 in a Web Worker and uses WebAssembly threads and WebGL 2. The GitHub URL
 does not redirect to the personal domain.
 
+**Release status (September 29, 2026):** the automatic match startup and
+one-player System Link changes below are in the PR branch, not the public
+Pages release. Local Chrome tests started a solo match and joined it with
+a second player, but later hit renderer crashes ("Aw, Snap", error 11).
+The cause is unresolved, so this update has not replaced the public build.
+
 This replaces the pinned Apollo runtime, which froze during game startup
 in desktop WebKit 26.4. The worker-based port reached the Halo main menu
 with the same UI map in the September 29, 2026 test. Touch controls are
@@ -14,7 +20,7 @@ available; startup and gameplay on a physical iPhone remain unverified.
 See [port/web/README.md](port/web/README.md) for requirements and controls.
 
 The first visit downloads about 1.9 GB of maps automatically; keep the tab
-open and multiplayer starts when the download finishes. The launcher shows a progress bar, percentage,
+open until it finishes. The launcher shows a progress bar, percentage,
 and downloaded size. Completed maps survive cancellation and reloads.
 Existing Apollo maps and saves are reused in place under `halo/data` and
 `halo/save`. Each browser and domain has a separate cache. Browser storage

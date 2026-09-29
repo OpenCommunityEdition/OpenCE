@@ -90,6 +90,15 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 
 ## Online play
 
+The automatic startup and solo System Link behavior described below is
+implemented in the PR branch and is not yet deployed to the public sites.
+Chrome testing on September 29, 2026 confirmed a one-player Blood Gulch
+start and a second player joining the running match (two players on two
+machines). Both tabs later suffered renderer crashes with error 11.
+Reliable-channel backpressure and explicit hidden-frame GPU submission
+have regression coverage, but neither establishes a fix for those crashes.
+Sustained multiplayer remains unverified.
+
 Browser players can play together over the internet, with the game's own
 system link. The launcher joins the public **FQLX01** room on a first visit.
 Both hosted domains use that same room. Share a link ending in
