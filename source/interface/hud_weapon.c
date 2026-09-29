@@ -469,6 +469,21 @@ void hud_initialize_weapon_interface_for_new_map(
 		weapon_hud_globals,
 		NONE,
 		sizeof(*weapon_hud_globals));
+#ifdef HALO_LINUX
+	/* port: no crosshair drawn until hud_update_weapon has worked out its
+	states (each tick). Drawn from the states above, all NONE, the default
+	weapon HUD's aim crosshair has frame NONE (crosshairs_draw's assertion,
+	and a sprite before the first in a release build): a distributed client's
+	player takes its unit when the host's word of it arrives, between ticks,
+	and without its weapons until the next word of what it carries, so a
+	frame could draw that crosshair before the next tick updated it. */
+	{
+		short local_player_index;
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+			weapon_hud_globals->crosshair_states[local_player_index].render_flags = 0;
+	}
+#endif
 
 	return;
 }
@@ -1176,6 +1191,12 @@ static void crosshairs_draw(
 								}
 
 							draw_crosshair:
+#ifdef HALO_LINUX
+								/* port: a state not yet worked out has no frame: nothing
+								drawn, rather than a sprite before the first */
+								if (frame_index == NONE)
+									continue;
+#endif
 								match_vassert(
 									"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 									0x4A5,
