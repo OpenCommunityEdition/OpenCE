@@ -304,7 +304,7 @@ for (const enabled of [0, 1]) {
     vm.runInContext(source, context);
     vm.runInContext(workerLibrary, context);
     context.webHalo = library.$webHalo;
-    assert.equal(library.web_js_gl_create(640, 480, enabled), 7);
+    assert.equal(library.web_js_gl_create(640, 480, enabled, true), 7);
     const controller = context.webHalo.streamBatch;
     if (enabled) assert.equal(context.HaloStreamBatch.install(gl), controller, "install must be idempotent");
     else assert.equal(controller, null);

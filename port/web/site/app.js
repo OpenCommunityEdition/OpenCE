@@ -740,6 +740,7 @@ can run the game, copies the game data out of the player's disc image
     // (tests pass extra --NAME=value settings in window.__haloArgs)
     const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
     argumentsList.push('--HALO_DATA_ROOT=' + state.maps.dataRoot, '--HALO_SAVE_ROOT=' + state.maps.saveRoot);
+    argumentsList.push('--HALO_WEB_PRESENT_ACK=1');
     if (role) {
       argumentsList.push('--HALO_QUICK_PLAY=' + role);
       if (role === 'join' && target) argumentsList.push('--HALO_QUICK_PLAY_TARGET=' + HaloNet.addressText(target));

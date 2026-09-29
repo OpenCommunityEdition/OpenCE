@@ -30,7 +30,7 @@ addToLibrary({
   },
 
   web_js_gl_create__deps: ['$GL', '$webHalo'],
-  web_js_gl_create: (width, height, batchStreams) => {
+  web_js_gl_create: (width, height, batchStreams, presentAck) => {
     if (typeof OffscreenCanvas == 'undefined') {
       webHalo.post('haloMessage', [3, 'This browser cannot draw from a worker (OffscreenCanvas). iOS 17 or later is needed.']);
       return 0;
@@ -56,8 +56,10 @@ addToLibrary({
     // setters; this merges append-only streamed uploads before their draws.
     webHalo.flushContext = context.flush.bind(context);
     // A separate shared counter lets the page release transferred bitmaps
-    // even though this worker cannot service acknowledgement messages.
-    webHalo.pendingFrames = new Int32Array(new SharedArrayBuffer(4));
+    // even though this worker cannot service acknowledgement messages. Only
+    // enable it when the launcher advertises support: an already open old
+    // page can load a newer runtime after a service-worker update.
+    webHalo.pendingFrames = presentAck ? new Int32Array(new SharedArrayBuffer(4)) : null;
     webHalo.streamBatch = batchStreams ? globalThis.HaloStreamBatch.install(context) : null;
     canvas.addEventListener?.('webglcontextlost', (event) => {
       event.preventDefault();
@@ -101,18 +103,18 @@ addToLibrary({
     // cannot provide this barrier on the continuously running game worker.
     webHalo.streamBatch?.flush();
     var pending = webHalo.pendingFrames;
-    if (Atomics.load(pending, 0) >= 2) {
+    if (pending && Atomics.load(pending, 0) >= 2) {
       // The page is busy or suspended. Keep submitting rendered commands,
       // without allocating more GPU-backed bitmaps or blocking simulation.
       webHalo.flushContext?.();
       return;
     }
     var bitmap = canvas.transferToImageBitmap();
-    Atomics.add(pending, 0, 1);
+    if (pending) Atomics.add(pending, 0, 1);
     try {
-      webHalo.post('haloPresent', [bitmap, pending.buffer], [bitmap]);
+      webHalo.post('haloPresent', pending ? [bitmap, pending.buffer] : [bitmap], [bitmap]);
     } catch (error) {
-      Atomics.sub(pending, 0, 1);
+      if (pending) Atomics.sub(pending, 0, 1);
       bitmap.close();
       throw error;
     }

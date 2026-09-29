@@ -38,9 +38,9 @@ function runtime(batching, options = {}) {
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../../port/web/src/web_library.js'), 'utf8'), context);
   context.webHalo = library.$webHalo;
-  library.web_js_gl_create(640, 480, batching);
+  library.web_js_gl_create(640, 480, batching, options.presentAck !== false);
   return { library, events, messages, bitmaps,
-    pending: () => Atomics.load(library.$webHalo.pendingFrames, 0) };
+    pending: () => library.$webHalo.pendingFrames && Atomics.load(library.$webHalo.pendingFrames, 0) };
 }
 
 function page(options = {}) {
@@ -135,10 +135,24 @@ test('bitmap transfer failures do not leave occupied queue slots', () => {
   }
 });
 
-test('the page still accepts a one-argument bitmap from an older runtime', () => {
+test('a new launcher using an old runtime keeps accepting one-argument bitmaps', () => {
   const consumer = page();
-  const bitmap = { width: 800, height: 480, closed: false, close() { this.closed = true; } };
-  consumer.present(bitmap);
-  assert.equal(consumer.presented(), 1);
-  assert.equal(bitmap.closed, true);
+  for (let frame = 0; frame < 12; frame++) {
+    const bitmap = { width: 800, height: 480, closed: false, close() { this.closed = true; } };
+    consumer.present(bitmap);
+    assert.equal(bitmap.closed, true);
+  }
+  assert.equal(consumer.presented(), 12);
+});
+
+test('an old launcher using a new runtime keeps receiving frames without acknowledgements', () => {
+  for (const batching of [false, true]) {
+    const worker = runtime(batching, { presentAck: false });
+    for (let frame = 0; frame < 12; frame++) worker.library.web_js_gl_present();
+    assert.equal(worker.pending(), null, 'unsupported acknowledgements must not allocate a counter');
+    assert.equal(worker.messages.length, 12, 'an older page cannot release queue slots');
+    assert.equal(worker.bitmaps.length, 12);
+    for (const message of worker.messages) assert.equal(message.args.length, 1);
+    assert.equal(worker.events.filter(event => event === 'submit').length, 0);
+  }
 });
