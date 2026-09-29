@@ -1,6 +1,6 @@
-/* Browser quick play uses the normal session and player APIs. It runs once
-per launch, never generates player input, and leaves the menus in control
-after cancellation, failure, or the match ending. */
+/* Browser quick play uses the normal session and player APIs. A host recovery
+request restarts the session on this thread; it never generates player input.
+Cancellation and ordinary match endings leave the menus in control. */
 #ifdef HALO_WEB
 
 #ifdef HALO_QUICK_PLAY_TEST
@@ -21,6 +21,7 @@ after cancellation, failure, or the match ending. */
 
 const char *config_string(const char *name);
 int web_quick_play_take_cancel(void);
+int web_quick_play_take_restart(int *host, unsigned long *target);
 void web_quick_play_report(const char *phase, const char *message);
 
 enum { QUICK_OFF, QUICK_SETTLING, QUICK_SEARCHING, QUICK_JOINING, QUICK_PREGAME,
@@ -103,6 +104,20 @@ void quick_play_update(boolean main_menu_loaded)
 	unsigned long now = system_milliseconds();
 	struct network_game_client *client;
 	short state;
+	int restart_host;
+	unsigned long restart_target;
+
+	if (web_quick_play_take_restart(&restart_host, &restart_target))
+	{
+		if (quick_play.owned && global_network_game_client_get())
+			network_game_abort();
+		main_goto_main_menu();
+		memset(&quick_play, 0, sizeof(quick_play));
+		quick_play.checked = TRUE;
+		quick_play.host = restart_host;
+		quick_play.target = restart_target;
+		quick_play_phase(QUICK_SETTLING, now, "loading", "Restarting multiplayer with the replacement host...");
+	}
 
 	if (!quick_play.checked)
 	{
@@ -178,12 +193,14 @@ void quick_play_update(boolean main_menu_loaded)
 	if (!client || game_connection() != (quick_play.host ? _game_connection_network_server : _game_connection_network_client))
 	{
 		/* The player or normal engine error handling already left this session. */
-		quick_play_finish("menu", "Multiplayer closed. Use the game menus or reload to play again.", FALSE);
+		quick_play_finish(!quick_play.host && quick_play.phase == QUICK_PLAYING ? "disconnected" : "menu",
+			"Multiplayer closed. Use the game menus or reload to play again.", FALSE);
 		return;
 	}
 	if (network_game_client_get_error(client))
 	{
-		quick_play_finish("error", "The multiplayer connection failed. Use the game menus or reload to try again.", TRUE);
+		quick_play_finish(!quick_play.host && quick_play.phase == QUICK_PLAYING ? "disconnected" : "error",
+			"The multiplayer connection failed. Use the game menus or reload to try again.", TRUE);
 		return;
 	}
 	state = network_game_client_get_state(client, NULL);

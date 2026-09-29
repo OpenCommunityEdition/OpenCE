@@ -147,7 +147,8 @@ async function launcher(useTransport = async () => {}, options = {}) {
           () => reject(new DOMException('Aborted', 'AbortError')), { once: true }));
       },
       cancelQuickPlay() {}, quickPlayStarted() {}, newRoomCode: () => 'PRIVATE7',
-      quickPlayPhase(phase) { phases.push(phase); },
+      quickPlayLost: () => options.hostLost ?? true,
+      quickPlayPhase(phase) { phases.push(phase); return options.recovering ?? false; },
       async join(code) {
         joins.push(code);
         await options.beforeJoin?.();
@@ -420,6 +421,33 @@ test('existing host selection joins its exact address without a menu click', asy
     quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
+});
+
+test('host failover restarts the real launcher into the selected role without reloading', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
+  const restarts = [];
+  page.context.Module._web_quick_play_restart = (...args) => restarts.push(args);
+  const request = page.quickCalls[0];
+  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS });
+  assert.deepEqual(restarts, [[1, ADDRESS]]);
+  request.onFailover({ role: 'join', room: 'FRIENDS9', hostAddress: 0x0302010a });
+  assert.deepEqual(restarts[1], [2, 0x0302010a]);
+  assert.equal(page.context.location.search, '?room=FRIENDS9');
+  assert.match(page.element('quick-game-status').textContent, /replacement host/);
+  page.element('main-menu').onclick();
+  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS });
+  assert.equal(restarts.length, 2, 'Main menu cancels automatic recovery');
+});
+
+test('a lost host report preserves room recovery instead of returning to manual play', async () => {
+  const page = await launcher(undefined, { recovering: true,
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: ADDRESS }) });
+  page.context.Module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Host lost.' }));
+  assert.match(page.element('quick-game-status').textContent, /replacement host/);
+  page.context.Module.haloMessage(6, JSON.stringify({ phase: 'menu', message: 'Old session closed.' }));
+  assert.match(page.element('quick-game-status').textContent, /replacement host/);
+  assert.equal(page.quickCalls[0].signal.aborted, false);
 });
 
 test('switching an active match restarts in the selected room and preserves cached game data', async () => {

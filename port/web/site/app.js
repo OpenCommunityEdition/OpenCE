@@ -490,7 +490,21 @@ can run the game, copies the game data out of the player's disc image
     quickStatus('waiting', 'Connecting to the room and finding a match…');
     try {
       const selection = await HaloNet.quickPlay({ signal: controller.signal, onStatus(status) {
-        if (!controller.signal.aborted && !state.started) quickStatus(status.state, status.message);
+        if (!controller.signal.aborted && (!state.started || ['recovering', 'reconnecting', 'error'].includes(status.state)))
+          quickStatus(status.state, status.message);
+      }, onFailover(selection) {
+        if (controller.signal.aborted || state.manualMode || state.invite ||
+            !state.started || selection.room !== state.selectedRoom) return;
+        const restart = window.Module?._web_quick_play_restart;
+        if (!restart) {
+          quickStatus('error', 'Host recovery needs the latest game build. Reload and choose Update.');
+          cancelQuickPlay();
+          return;
+        }
+        state.quickRole = selection.role;
+        quickStatus('recovering', selection.role === 'host' ?
+          'You are the replacement host. Restarting the match…' : 'Joining the replacement host. Restarting the match…');
+        restart(selection.role === 'host' ? 1 : 2, selection.hostAddress);
       } });
       if (controller.signal.aborted || state.manualMode || state.started || state.selectedRoom !== selection.room) return;
       state.quickRole = selection.role;
@@ -785,9 +799,17 @@ can run the game, copies the game data out of the player's disc image
         else if (kind === 6) {
           try {
             const status = JSON.parse(text);
+            if (status.phase === 'disconnected' && !state.invite && !state.manualMode && HaloNet.quickPlayLost()) {
+              quickStatus('recovering', 'The host disconnected. Choosing a replacement host; the match will restart…');
+              return;
+            }
+            const recovering = HaloNet.quickPlayPhase(status.phase);
+            if (recovering) {
+              quickStatus('recovering', 'Choosing a replacement host. The match will restart…');
+              return;
+            }
             quickStatus(status.phase, status.message);
-            HaloNet.quickPlayPhase(status.phase);
-            if (status.phase === 'menu' || status.phase === 'error') {
+            if (status.phase === 'menu' || status.phase === 'error' || status.phase === 'disconnected') {
               state.quickFailed = status.phase === 'error';
               state.manualMode = true;
               cancelQuickPlay();

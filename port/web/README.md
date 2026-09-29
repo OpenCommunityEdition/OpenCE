@@ -107,8 +107,19 @@ Both hosted domains use that same room. Share a link ending in
 
 Once the maps are ready, the launcher enters multiplayer automatically.
 The first ready player hosts Blood Gulch Slayer; the others join that host
-without navigating the game's System Link menus. The host must keep the
-game open. The public room does not run a permanent game server.
+without navigating the game's System Link menus. The public room does not
+run a permanent game server.
+
+When the host disconnects, surviving quick-play participants automatically
+elect a replacement and restart Blood Gulch Slayer in the same room. The
+engine does not migrate a running match's state: scores, positions and the
+match timer reset. Everyone needs the updated browser build. A brief lost
+connection has a 10-second grace period; silent WebRTC channels are detected
+after 25 seconds. Election and map loading add time after detection. Players
+who choose *Main menu* or *Leave*, idle launchers, and native invites do not
+participate. An older returning host yields to the room's newer election
+epoch. Disconnected network partitions can temporarily form separate matches;
+the public brokers are not a consensus service and this is not seamless HA.
 
 Connection, hosting and map-loading progress are shown on the page. Sound
 starts automatically where allowed; normal game input unlocks it and mouse

@@ -47,8 +47,15 @@ After the maps are ready, the launcher starts multiplayer automatically.
 The first ready participant hosts **Blood Gulch Slayer**; later participants
 join that host, including while the match is running. Only players preparing
 to launch participate in host selection, so an idle tab or a download does
-not become the host. The hosting player must keep the game open; the public
-room is not a persistent game server.
+not become the host. The public room is not a persistent game server.
+
+Surviving players automatically elect a replacement when the host disconnects
+and restart the same room's Blood Gulch Slayer match. Scores, positions and
+the match timer reset; all players need the updated browser build. A brief
+connection loss has a 10-second grace period, and silent channels are detected
+after 25 seconds, followed by election and map loading. Returning hosts join
+the newer room epoch. Network partitions can temporarily create separate
+matches; this is recovery by restarting the match, not seamless state migration.
 
 The page shows connection and loading progress. A browser may require a tap
 to enable sound and pointer capture, but no System Link menu navigation is

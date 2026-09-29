@@ -32,6 +32,8 @@ class HaloQuickCoordinator {
   static SETTLE_MS = 2000;
   static RESERVE_MS = 1500;
   static TIMEOUT_MS = 35000;
+  static HOST_GRACE_MS = 10000;
+  static HEARTBEAT_TIMEOUT_MS = 25000;
   constructor(id, address, now) {
     this.id = id;
     this.address = address;
@@ -41,7 +43,22 @@ class HaloQuickCoordinator {
     this.selected = null;
     this.reservedSince = null;
     this.result = null;
-    this.presence = { role: 'candidate', hostId: null, phase: 'electing', gamePhase: '' };
+    this.epoch = 0;
+    this.recovering = false;
+    this.missingSince = null;
+    this.presence = { role: 'candidate', hostId: null, phase: 'electing', gamePhase: '', epoch: 0, failover: true };
+  }
+  recover(now, epoch = this.epoch + 1) {
+    this.epoch = epoch;
+    this.recovering = true;
+    this.started = now;
+    this.brokerSince = null;
+    this.selectedSince = now;
+    this.selected = null;
+    this.reservedSince = null;
+    this.result = null;
+    this.missingSince = null;
+    this.presence = { role: 'candidate', hostId: null, phase: 'electing', gamePhase: '', epoch, failover: true };
   }
   select(id, now) {
     if (id !== this.selected) {
@@ -51,11 +68,27 @@ class HaloQuickCoordinator {
     this.presence.hostId = id;
   }
   tick(now, peers, brokerReady) {
+    const newest = Math.max(this.epoch, ...peers.filter(peer => peer.open && peer.quick)
+      .map(peer => peer.quick.epoch || 0));
+    if (newest > this.epoch) this.recover(now, newest);
+    if (this.result?.role === 'join') {
+      const host = peers.find(peer => peer.id === this.result.hostId);
+      const healthy = host?.open && host.quick?.role === 'host' &&
+        (host.quick.epoch || 0) === this.epoch && (!host.quick.failover ||
+          !Number.isFinite(host.lastPacketAt) || now - host.lastPacketAt < HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS);
+      if (healthy) this.missingSince = null;
+      else {
+        if (this.missingSince === null) this.missingSince = now;
+        if (now - this.missingSince < HaloQuickCoordinator.HOST_GRACE_MS)
+          return { state: 'reconnecting', message: 'The host connection was lost. Waiting briefly for it to return…' };
+        this.recover(now);
+      }
+    }
     if (this.result) return { result: this.result };
     if (now - this.started >= HaloQuickCoordinator.TIMEOUT_MS)
       return { error: 'The room could not agree on a reachable host. Check the connection, then try again.' };
     if (brokerReady && this.brokerSince === null) this.brokerSince = now;
-    const active = peers.filter(peer => peer.quick && Number.isInteger(peer.address) &&
+    const active = peers.filter(peer => peer.quick && (peer.quick.epoch || 0) === this.epoch && Number.isInteger(peer.address) &&
       peer.address > 0 && peer.address <= 0xffffffff);
     const hosts = active.filter(peer => peer.quick.role === 'host');
     if (this.presence.role === 'host') hosts.push({ id: this.id, address: this.address, open: true, quick: this.presence });
@@ -65,7 +98,7 @@ class HaloQuickCoordinator {
       this.select(host.id, now);
       if (!host.open) return { state: 'connecting', message: 'Connecting to the room’s host…' };
       if (host.id !== this.id && this.presence.role !== 'join') {
-        this.presence = { role: 'join', hostId: host.id, phase: 'reserved', gamePhase: '' };
+        this.presence = { role: 'join', hostId: host.id, phase: 'reserved', gamePhase: '', epoch: this.epoch, failover: true };
         this.reservedSince = now;
       }
       if (now - this.reservedSince < HaloQuickCoordinator.RESERVE_MS)
@@ -88,7 +121,7 @@ class HaloQuickCoordinator {
     // winner before it can reserve the host role. Idle room members do not vote.
     const acknowledged = candidates.every(peer => peer.quick.hostId === selected);
     if (selected === this.id && settled && acknowledged) {
-      this.presence = { role: 'host', hostId: this.id, phase: 'reserved', gamePhase: '' };
+      this.presence = { role: 'host', hostId: this.id, phase: 'reserved', gamePhase: '', epoch: this.epoch, failover: true };
       this.reservedSince = now;
       return { state: 'coordinating', message: 'Preparing to host the room…' };
     }
@@ -368,6 +401,7 @@ const HaloNet = (() => {
     }
     peer.reliable.onmessage = (event) => {
       if (peer.pc !== pc || !state.shared) return;
+      peer.lastPacketAt = Date.now();
       const packet = new Uint8Array(event.data);
       if (packet.length < PACKET_HEADER || packet.length > state.shared.offsets.netInBytes ||
           new DataView(packet.buffer).getUint32(0, true) !== packet.length ||
@@ -382,6 +416,14 @@ const HaloNet = (() => {
     };
     peer.unreliable.onmessage = (event) => {
       if (peer.pc !== pc) return;
+      peer.lastPacketAt = Date.now();
+      // Heartbeats use the room's established channel, independently of MQTT.
+      // Older launchers ignore these strings and still send normal game packets.
+      if (typeof event.data === 'string') {
+        if (event.data === 'halo-room-ping-v1' && peer.unreliable.readyState === 'open')
+          peer.unreliable.send('halo-room-pong-v1');
+        return;
+      }
       incoming(new Uint8Array(event.data));
       // Network events also drain output while background timers are throttled.
       pump();
@@ -389,7 +431,9 @@ const HaloNet = (() => {
     peer.reliable.bufferedAmountLowThreshold = MAX_CHANNEL_BUFFER / 2;
     peer.reliable.onbufferedamountlow = () => { if (peer.pc === pc) pump(); };
     peer.reliable.onopen = () => {
+      if (peer.pc !== pc) return;
       peer.open = true;
+      peer.lastPacketAt = Date.now();
       emit('joined', { name: peer.name, address: addressText(peer.address) });
       emit('status', status());
     };
@@ -461,7 +505,9 @@ const HaloNet = (() => {
   function sweep() {
     const now = Date.now();
     for (const peer of [...state.peers.values()]) {
-      if (!peer.open && now - peer.lastSeen > PEER_TIMEOUT) {
+      if (peer.open && peer.quick?.failover && now - peer.lastPacketAt > HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS) {
+        dropPeer(peer);
+      } else if (!peer.open && now - peer.lastSeen > PEER_TIMEOUT) {
         dropPeer(peer);
       } else if (!peer.open && peer.pc && now - peer.connectingSince > 15000) {
         // a connection that never opened (a lost offer): start again at the
@@ -469,6 +515,8 @@ const HaloNet = (() => {
         try { peer.pc.close(); } catch { /* closed */ }
         peer.pc = null;
       }
+      if (peer.open && peer.unreliable?.readyState === 'open' && peer.unreliable.bufferedAmount < MAX_CHANNEL_BUFFER)
+        peer.unreliable.send('halo-room-ping-v1');
     }
   }
 
@@ -663,6 +711,8 @@ const HaloNet = (() => {
     if (value.role === 'host' && value.hostId !== id) return null;
     if (value.role === 'join' && (!value.hostId || value.hostId === id)) return null;
     return { role: value.role, hostId: value.hostId, phase: value.phase,
+      epoch: Number.isSafeInteger(value.epoch) && value.epoch >= 0 && value.epoch <= 0x7fffffff ? value.epoch : 0,
+      failover: value.failover === true,
       gamePhase: ['hosting', 'searching', 'joining', 'waiting', 'loading', 'playing'].includes(value.gamePhase) ? value.gamePhase : '' };
   }
 
@@ -678,7 +728,7 @@ const HaloNet = (() => {
     publishQuick();
   }
 
-  async function quickPlay({ signal, onStatus = () => {} } = {}) {
+  async function quickPlay({ signal, onStatus = () => {}, onFailover = () => {} } = {}) {
     if (signal?.aborted) throw new DOMException('Quick play cancelled.', 'AbortError');
     if (state.transport) {
       if (!state.transport.connected || !state.transport.hostAddress) throw new Error('The invited host is not connected.');
@@ -688,7 +738,7 @@ const HaloNet = (() => {
     if (state.quick) return state.quick.promise;
     const coordinator = new HaloQuickCoordinator(state.id, state.address, Date.now());
     const attempt = { coordinator, room: state.room, signal, timer: null, resolved: false,
-      previous: JSON.stringify(coordinator.presence), lastStatus: '', abort: cancelQuickPlay };
+      previous: JSON.stringify(coordinator.presence), lastStatus: '', abort: cancelQuickPlay, lastResult: null };
     attempt.promise = new Promise((resolve, reject) => { attempt.resolve = resolve; attempt.reject = reject; });
     state.quick = attempt;
     signal?.addEventListener('abort', attempt.abort, { once: true });
@@ -698,16 +748,23 @@ const HaloNet = (() => {
       const presence = JSON.stringify(coordinator.presence);
       if (presence !== attempt.previous) { attempt.previous = presence; publishQuick(); }
       if (result.error) {
+        if (attempt.resolved) onStatus({ state: 'error', message: result.error });
         attempt.resolved = true; // report this failure, rather than an AbortError
         attempt.reject(new Error(result.error));
         cancelQuickPlay();
       } else if (result.result) {
-        clearInterval(attempt.timer);
-        attempt.resolved = true;
-        attempt.resolve({ ...result.result, room: attempt.room });
+        const selection = { ...result.result, room: attempt.room };
+        const signature = JSON.stringify(result.result) + ':' + coordinator.epoch;
+        if (signature !== attempt.lastResult) {
+          attempt.lastResult = signature;
+          if (!attempt.resolved) { attempt.resolved = true; attempt.resolve(selection); }
+          else onFailover(selection);
+        }
+        coordinator.recovering = false;
       } else if (result.message !== attempt.lastStatus) {
         attempt.lastStatus = result.message;
-        onStatus({ state: result.state, message: result.message });
+        onStatus({ state: coordinator.recovering ? 'recovering' : result.state,
+          message: coordinator.recovering ? 'Choosing a replacement host. The match will restart…' : result.message });
       }
     };
     publishQuick();
@@ -717,15 +774,27 @@ const HaloNet = (() => {
   }
 
   function quickPlayPhase(phase) {
-    if (phase === 'menu' || phase === 'error') { cancelQuickPlay(); return; }
+    if (phase === 'menu' || phase === 'error') {
+      const coordinator = state.quick?.coordinator;
+      if (coordinator && (coordinator.recovering || coordinator.missingSince !== null))
+        return true;
+      cancelQuickPlay(); return false;
+    }
     if (!state.quick || !state.quick.resolved) return;
     if (!['hosting', 'searching', 'joining', 'waiting', 'loading', 'playing'].includes(phase)) return;
     state.quick.coordinator.launched(phase);
     publishQuick();
   }
 
+  function quickPlayLost() {
+    if (!state.quick?.resolved || state.quick.coordinator.result?.role !== 'join') return false;
+    state.quick.coordinator.recover(Date.now());
+    publishQuick();
+    return true;
+  }
+
   return { attach, join, leave, newRoomCode, on, status, addressText, useTransport,
-    quickPlay, cancelQuickPlay, quickPlayPhase, quickPlayStarted: () => quickPlayPhase('loading'),
+    quickPlay, cancelQuickPlay, quickPlayLost, quickPlayPhase, quickPlayStarted: () => quickPlayPhase('loading'),
     get address() { return state.address; } };
 })();
 if (typeof module !== 'undefined') module.exports = { HaloQuickCoordinator };

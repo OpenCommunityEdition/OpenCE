@@ -8,6 +8,7 @@ confirmation; multiplayer transport is covered by the separate relay tests. */
 #include <stdio.h>
 #include <string.h>
 #include "../port/linux/game/quick_play.c"
+#include "../port/web/src/web_quick_play.c"
 
 static struct network_game_client mock_client;
 static struct network_game_server mock_server;
@@ -16,15 +17,15 @@ static struct network_game_server *server;
 static unsigned long clock_ms, last_target;
 static const char *mode, *target;
 static short connection, join_result;
-static int cancel, created, aborts, menus, add_requests, starts, searches, reports, maps;
+static int created, aborts, menus, add_requests, starts, searches, reports, maps;
 static int quick_policy, policy_requests, countdown;
 static char last_phase[32];
 
 unsigned long system_milliseconds(void) { return clock_ms; }
 const char *config_string(const char *name) { return !strcmp(name, "network.quick_play") ? mode : target; }
-int web_quick_play_take_cancel(void) { int result = cancel; cancel = 0; return result; }
-void web_quick_play_report(const char *phase, const char *message)
-{ assert(message && *message); reports++; snprintf(last_phase, sizeof(last_phase), "%s", phase); }
+double emscripten_get_now(void) { return (double)clock_ms; }
+void web_js_post(int kind, const char *message)
+{ assert(kind == 6); assert(sscanf(message, "{\"phase\":\"%31[^\"]", last_phase) == 1); reports++; }
 struct network_game_client *global_network_game_client_get(void) { return client; }
 struct network_game_server *global_network_game_server_get(void) { return server; }
 void dispose_global_network_game_client(void) { client = NULL; }
@@ -71,7 +72,8 @@ static void reset(const char *setting)
 	memset(&mock_client, 0, sizeof(mock_client));
 	client = NULL; server = NULL; mode = setting; target = "";
 	clock_ms = 1000; last_target = 0; connection = 0; join_result = 0;
-	cancel = created = aborts = menus = add_requests = starts = searches = reports = maps = 0;
+	cancel_requested = 0; restart_requested = 0; background_active = 0; background_drain_until = 0;
+	created = aborts = menus = add_requests = starts = searches = reports = maps = 0;
 	quick_policy = TRUE; policy_requests = 0; countdown = NONE;
 	last_phase[0] = 0;
 }
@@ -103,7 +105,7 @@ int main(void)
 	assert(web_multiplayer_active()); client = NULL; assert(!web_multiplayer_active());
 	reset("invalid"); step(0, TRUE); assert(!strcmp(last_phase, "error") && !created);
 	reset("join"); target = "invalid"; step(0, TRUE); assert(!strcmp(last_phase, "error") && !created);
-	reset("join"); step(0, FALSE); cancel = 1; step(1, FALSE);
+	reset("join"); step(0, FALSE); web_quick_play_cancel(); step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && !created); step(1000000, TRUE); assert(!created);
 
 	launch("join"); target = "100.86.56.19"; /* Target is captured only at launch. */
@@ -115,7 +117,7 @@ int main(void)
 
 	launch("join"); join_result = -1; step(500, TRUE);
 	assert(!strcmp(last_phase, "error") && aborts == 1 && searches == 1);
-	launch("join"); cancel = 1; step(1, TRUE);
+	launch("join"); web_quick_play_cancel(); step(1, TRUE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1 && !searches);
 	launch("join"); connection = _game_connection_local; step(1, TRUE);
 	assert(!strcmp(last_phase, "menu") && !aborts); step(1000000, TRUE); assert(created == 1);
@@ -133,7 +135,7 @@ int main(void)
 	countdown = 0; step(10000, TRUE); assert(starts == 2 && maps == 1 && policy_requests == 1);
 	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	assert(!strcmp(last_phase, "playing")); step(1000000, FALSE);
-	assert(starts == 2 && !aborts); cancel = 1; step(1, FALSE);
+	assert(starts == 2 && !aborts); web_quick_play_cancel(); step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
 
 	launch("host"); quick_policy = FALSE; mock_client.state = _network_game_client_state_pregame;
@@ -153,6 +155,35 @@ int main(void)
 	mock_client.state = _network_game_client_state_postgame; step(1, FALSE);
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
 	step(1000000, TRUE); assert(created == 1 && searches == 1 && !starts);
+
+	/* A lost running host permits a subsequent page-elected restart. */
+	launch("join"); mock_client.state = _network_game_client_state_ingame;
+	step(1, FALSE); mock_client.error = 8; step(1, FALSE);
+	assert(!strcmp(last_phase, "disconnected") && aborts == 1);
+	web_quick_play_restart(1, 0); step(1, FALSE);
+	assert(!strcmp(last_phase, "loading") && quick_play.host);
+	step(1, TRUE); step(2000, TRUE);
+	assert(created == 2 && connection == _game_connection_network_server);
+
+	/* Another survivor restarts as a client of the exact new host address. */
+	launch("join"); mock_client.state = _network_game_client_state_ingame;
+	step(1, FALSE); client = NULL; step(1, FALSE);
+	assert(!strcmp(last_phase, "disconnected"));
+	web_quick_play_restart(2, 0x0302010aU); step(1, FALSE);
+	assert(quick_play.target == 0x0a010203UL && !quick_play.host);
+	step(1, TRUE); step(2000, TRUE); step(500, TRUE);
+	assert(created == 2 && last_target == 0x0a010203UL);
+
+	/* Cancel wins over a queued recovery, even while the page is hidden. */
+	web_quick_play_restart(1, 0); web_quick_play_cancel(); step(1, FALSE);
+	assert(!strcmp(last_phase, "menu") && !restart_requested);
+	assert(!web_quick_play_take_cancel());
+	web_quick_play_restart(0, 123); assert(!restart_requested);
+	web_quick_play_restart(2, 0x0403020aU); assert(web_quick_play_background_active());
+	{ int host; unsigned long next_target;
+	  assert(web_quick_play_take_restart(&host, &next_target));
+	  assert(!host && next_target == 0x0a020304UL);
+	  assert(!web_quick_play_take_restart(&host, &next_target)); }
 	puts("Quick-play lifecycle, confirmation, targeting, timeout, cancellation and late-join tests passed.");
 	return 0;
 }

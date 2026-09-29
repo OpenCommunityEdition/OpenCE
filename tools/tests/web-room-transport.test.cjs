@@ -5,6 +5,7 @@ const vm = require('node:vm');
 
 function fixture() {
   const intervals = [];
+  let now = 0;
   class RTC {
     createDataChannel() {
       return { readyState: 'open', bufferedAmount: 0, sent: [],
@@ -13,6 +14,7 @@ function fixture() {
     close() { this.closed = true; }
   }
   const context = { RTCPeerConnection: RTC, Uint8Array, Int32Array, DataView, Atomics,
+    Date: class extends Date { static now() { return now; } },
     crypto: { getRandomValues(bytes) { bytes.fill(1); return bytes; } },
     localStorage: { getItem() { return null; }, setItem() {} },
     setInterval(fn) { intervals.push(fn); }, clearInterval() {}, clearTimeout() {},
@@ -22,7 +24,7 @@ function fixture() {
   let source = fs.readFileSync(require.resolve('../../port/web/site/net.js'), 'utf8');
   assert.ok(source.includes('return { attach, join, leave,'));
   source = source.replace('return { attach, join, leave,',
-    'return { peerFor, createConnection, pump, attach, join, leave,');
+    'return { peerFor, createConnection, pump, sweep, attach, join, leave,');
   vm.runInNewContext(source + '\nglobalThis.net = HaloNet;', context);
   const net = context.net;
   const memory = { buffer: new SharedArrayBuffer(1024) };
@@ -34,6 +36,7 @@ function fixture() {
   peer.reliable.onopen();
   const words = new Int32Array(memory.buffer), bytes = new Uint8Array(memory.buffer);
   return { net, peer, pc, words, bytes, intervals,
+    tick(time) { now = time; net.sweep(); },
     receive(packet) { peer.reliable.onmessage({ data: packet.buffer }); },
     consume() {
       const result = [];
@@ -99,4 +102,15 @@ test('failed send retains stream bytes and malformed input disconnects', () => {
   f.receive(malformed);
   assert.equal(f.pc.closed, true);
   assert.equal(f.net.status().players, 0);
+});
+
+test('room heartbeats acknowledge liveness without entering the game packet ring', () => {
+  const f = fixture(); f.peer.quick = { failover: true };
+  f.tick(3000);
+  assert.equal(f.peer.unreliable.sent.at(-1), 'halo-room-ping-v1');
+  f.peer.unreliable.onmessage({ data: 'halo-room-ping-v1' });
+  assert.equal(f.peer.unreliable.sent.at(-1), 'halo-room-pong-v1');
+  assert.equal(f.peer.lastPacketAt, 3000); assert.equal(f.words[0], 0);
+  f.tick(27000); assert.equal(f.net.status().players, 1);
+  f.tick(28001); assert.equal(f.net.status().players, 0);
 });
