@@ -1,4 +1,4 @@
-# Halo: Combat Evolved for Linux, Windows and Android
+# Halo: Combat Evolved for Linux, Windows, Android and the web (iOS)
 
 This project is a port of the Halo: Combat Evolved decompilation to Linux,
 Windows and Android. The decompilation is of the Xbox build 2342
@@ -61,6 +61,7 @@ Each platform has its own instructions:
 | Android (arm64 app, OpenGL ES 3, SDL3) | [port/android/README.md](port/android/README.md) |
 | Browser (local runner for the published Apollo WASM beta) | [BROWSER_LOCAL.md](BROWSER_LOCAL.md) |
 | Browser (static hosting / GitHub Pages) | [GITHUB_PAGES.md](GITHUB_PAGES.md) |
+| Web: iPhone, iPad and browsers (WebAssembly, WebGL 2, installable web app) | [port/web/README.md](port/web/README.md) |
 
 The Linux README also gives the controls, the settings and the multiplayer
 functions. These are almost the same on all platforms.
@@ -95,6 +96,7 @@ To build the game:
 | `ninja linux` | `build/linux/halo` |
 | `ninja windows` (on Windows) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
+| `ninja web` (with Emscripten) | `build/web/site` |
 
 If you enter `ninja` without a target, ninja builds the game for the
 computer that you use.

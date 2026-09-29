@@ -1,0 +1,69 @@
+name: Web
+
+# The web port (port/web/README.md): builds it with Emscripten for every
+# pushed commit, and publishes the build of main to GitHub Pages, where it
+# installs on an iPhone or iPad as a home-screen web app.
+#
+# To publish from a fork: Settings > Pages > Build and deployment > Source:
+# GitHub Actions.
+on:
+  push:
+    paths-ignore:
+      - "docs/**"
+      - "research/**"
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  EMSDK_VERSION: 6.0.10
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}
+
+      - name: Install Emscripten
+        run: |
+          if [ ! -x ~/emsdk/upstream/emscripten/emcc ]; then
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+            ~/emsdk/emsdk install "$EMSDK_VERSION"
+          fi
+          ~/emsdk/emsdk activate "$EMSDK_VERSION"
+          sudo apt-get install -y ninja-build
+
+      - name: Build
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          python3 configure.py --release
+          ninja web
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web/site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

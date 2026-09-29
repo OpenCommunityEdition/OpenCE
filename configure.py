@@ -121,6 +121,11 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument(
+    "--web-emcc",
+    type=str,
+    help="Emscripten's emcc for `ninja web` (default: emcc on the PATH, or ~/emsdk)",
+)
 if not is_windows():
     parser.add_argument(
         "--wrapper",
@@ -187,6 +192,7 @@ sln.port_pgo = args.pgo
 sln.port_pgo_profile = args.pgo_profile
 sln.android_ndk = args.android_ndk
 sln.android_guest_cc = args.android_guest_cc
+sln.web_emcc = args.web_emcc
 if not is_windows():
     sln.wrapper = args.wrapper
 

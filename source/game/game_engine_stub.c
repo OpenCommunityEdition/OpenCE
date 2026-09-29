@@ -85,6 +85,64 @@ void code_000a47f0(void);
 
 /* ---------- globals */
 
+#ifdef HALO_WEB
+/* WebAssembly calls must match the callee's signature: the engine's
+callbacks (struct game_engine) take arguments the stubs above ignore */
+static void stub_player_added(long player_index) { code_000a4740(); }
+static void stub_statistics_append(long statistic) { code_000a4770(); }
+static void stub_handle_client_message(void *message) { code_000a4780(); }
+static void stub_handle_server_message(void *message) { code_000a4790(); }
+static boolean stub_allow_pick_up(long unit_index, long weapon_index) { return code_000a47d0(); }
+static void stub_player_damaged_player(long damaging_player_index, long dead_player_index, boolean damage_type)
+{
+	code_000a47e0();
+}
+static void stub_player_killed_player(long killing_player_index, long killing_object_index, long dead_player_index,
+	boolean friendly_fire)
+{
+	code_000a47f0();
+}
+
+struct stub_game_engine stub_engine =
+{
+	"stub",
+	_game_engine_type_stub,
+	{
+		code_000a4710,
+		(stub_game_engine_callback) code_000a4720,
+		code_000a4730,
+		(stub_game_engine_callback) stub_player_added,
+		code_000a4750,
+		code_000a4760,
+		(stub_game_engine_callback) stub_statistics_append,
+		(stub_game_engine_callback) stub_handle_client_message,
+		(stub_game_engine_callback) stub_handle_server_message,
+		code_000a47a0,
+		code_000a47b0,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		code_000a47c0,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		(stub_game_engine_callback) stub_allow_pick_up,
+		(stub_game_engine_callback) stub_player_damaged_player,
+		(stub_game_engine_callback) stub_player_killed_player,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+	},
+};
+#else
 struct stub_game_engine stub_engine =
 {
 	"stub",
@@ -124,6 +182,7 @@ struct stub_game_engine stub_engine =
 		NULL,
 	},
 };
+#endif
 
 /* ---------- public code */
 
