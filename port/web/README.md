@@ -95,15 +95,20 @@ system link. The launcher joins the public **FQLX01** room on a first visit.
 Both hosted domains use that same room. Share a link ending in
 `?room=FQLX01` to enter it directly.
 
-1. Wait for the maps to finish downloading, then press *Play*.
-2. One player hosts from *Multiplayer* > *System Link Play* (A or Y to start
-   a game); the others see the game in that list and join. The host must
-   keep the game open. The public room does not run a permanent game server.
+Once the maps are ready, the launcher enters multiplayer automatically.
+The first ready player hosts Blood Gulch Slayer; the others join that host
+without navigating the game's System Link menus. The host must keep the
+game open. The public room does not run a permanent game server.
+
+Connection, hosting and map-loading progress are shown on the page. Tap
+when prompted to enable sound and mouse controls. *Main menu* cancels quick
+play; `?menu=1` opens the normal launcher and game menu instead.
 
 For a separate group, choose *New room*, then *Share link*. Opening that
 link joins its browser room, and the launcher remembers the chosen room.
 *Leave* stays out across reloads; *Join default room* returns to FQLX01.
-Joining a room does not automatically launch the engine or enter a match.
+Quick play starts only when the maps and room are ready. Idle or downloading
+tabs do not participate in host selection.
 
 Everyone in a room is on one network, as on a LAN: up to the game's limits
 of machines and players, split screen on each machine included.

@@ -76,6 +76,7 @@ const HaloGateway = (() => {
     }
     const transport = {
       get address() { return identity.address; },
+      get hostAddress() { return ended ? 0 : (peers.get(invite.slice(0, 12))?.address || 0) >>> 0; },
       get connected() { return !ended && peers.size > 0; },
       get closed() { return ended; },
       attach(value) { shared = value; sync(); },
@@ -118,7 +119,7 @@ const HaloGateway = (() => {
             if (peers.size > 32) throw new Error('Too many relay peers.');
             sync();
             report(peers.size ? 'connected' : 'waiting', peers.size ?
-              'Host connected. Press Play, then Multiplayer → System Link to find the match.' :
+              'Host connected. Preparing to join the match…' :
               'Waiting for the host. An old invite stops working when its host closes the game.');
           } else if (message.type === 'error') {
             fail(message.message === 'Native host did not connect' ?

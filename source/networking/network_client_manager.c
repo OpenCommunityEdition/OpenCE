@@ -420,16 +420,6 @@ enum
 #endif
 };
 
-enum network_game_client_state
-{
-	_network_game_client_state_searching,
-	_network_game_client_state_joining,
-	_network_game_client_state_pregame,
-	_network_game_client_state_ingame,
-	_network_game_client_state_postgame,
-	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
-};
-
 enum
 {
 	_network_game_client_error_none = 0,
@@ -3192,6 +3182,56 @@ boolean network_game_client_join_first_available_game(
 	}
 	return FALSE;
 }
+
+#ifdef HALO_WEB
+short network_game_client_quick_join(unsigned long target_address)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	long index;
+
+	if (!client || client->state != _network_game_client_state_searching || client->join_in_progress ||
+		!client->connection || network_connection_connected(client->connection))
+		return 0;
+	for (index = 0; index < MAXIMUM_NETWORK_ADVERTISED_GAMES; index++)
+	{
+		struct network_advertised_game *game = &client->available_games[index];
+		struct transport_address address = { { { 0 } } };
+		struct network_join_parameters parameters;
+
+		if (!network_game_client_advertised_game_is_valid(game) ||
+			game->platform != network_game_get_local_platform())
+			continue;
+		transport_client_start((XNADDR const *)&game->xnaddr, (XNKEY const *)&game->key,
+			(XNKID const *)&game->key_id, NETWORK_GAME_SERVER_PORT, &address);
+		if (!address.address.long_words[0] || !address.port ||
+			(target_address && address.address.long_words[0] != target_address))
+			continue;
+		if (!network_game_client_advertised_game_compatible(client, game, FALSE))
+			return -1;
+		if (!game->open)
+			return -2;
+		csmemset(&parameters, 0, sizeof(parameters));
+		network_game_generate_join_game_token(parameters.join_token);
+		return network_game_client_initiate_join_game(client, game, &parameters, &address) ? 1 : -3;
+	}
+	return 0;
+}
+
+boolean network_game_client_has_local_player(struct network_game_client *client, short controller_index)
+{
+	long index;
+	if (!client || client->machine_index == NONE)
+		return FALSE;
+	for (index = 0; index < MAXIMUM_NUMBER_OF_PLAYERS; index++)
+	{
+		struct network_player *player = &client->game.players[index];
+		if (network_player_is_valid(player) && player->machine_index == client->machine_index &&
+			player->controller_index == controller_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+#endif
 
 /* ... and puts this machine's players on a team (a team game needs both
 teams), as the pregame screen's team choice does */

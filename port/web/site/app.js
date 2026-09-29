@@ -36,12 +36,24 @@ can run the game, copies the game data out of the player's disc image
     gateway: null,
     gatewayInstalled: false,
     inviteConnecting: false,
+    inviteAttempt: 0,
+    nativeInstalling: false,
     pendingInviteConnect: null,
     roomTask: Promise.resolve(),
     maps: null,
     cacheAbort: null,
     dataBusy: false,
     releaseGameLock: null,
+    checksReady: false,
+    manualMode: new URLSearchParams(location.search).get('menu') === '1',
+    manualRequested: false,
+    selectedRoom: null,
+    quickController: null,
+    quickFailed: false,
+    quickRole: null,
+    quickPhase: null,
+    interactionUnlocked: false,
+    audioStarted: false,
   };
 
   // ---------- settings (this browser's; nothing else depends on them)
@@ -171,8 +183,9 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function updatePlayButton() {
-    $('play').disabled = !state.maps || state.dataBusy || state.started ||
-      !!(state.invite && (!state.gatewayInstalled || !state.gateway?.connected));
+    const automatic = !state.manualMode && !!(state.invite || state.selectedRoom);
+    $('play').textContent = automatic ? 'Enable sound & controls' : 'Play main menu';
+    $('play').disabled = state.started || (!automatic && (!state.maps || state.dataBusy));
   }
 
   function showSteps(maps) {
@@ -184,6 +197,7 @@ can run the game, copies the game data out of the player's disc image
     }
     updatePlayButton();
     connectPendingInvite();
+    maybeQuickPlay();
   }
 
   function connectPendingInvite() {
@@ -211,6 +225,7 @@ can run the game, copies the game data out of the player's disc image
     $('download-cancel').hidden = !state.cacheAbort;
     updatePlayButton();
     connectPendingInvite();
+    maybeQuickPlay();
   }
 
   async function downloadMaps() {
@@ -400,6 +415,116 @@ can run the game, copies the game data out of the player's disc image
 
   // ---------- the running game
 
+  function quickStatus(phase, message) {
+    state.quickPhase = phase;
+    $('quick-status').textContent = message;
+    $('quick-game-status').textContent = message;
+    $('quick-panel').dataset.state = phase;
+    $('quick-panel').hidden = !state.started || phase === 'playing' || phase === 'menu';
+    $('quick-retry').hidden = phase !== 'error' || state.started;
+  }
+
+  function cancelQuickPlay() {
+    state.quickController?.abort();
+    state.quickController = null;
+    HaloNet.cancelQuickPlay();
+  }
+
+  async function maybeQuickPlay() {
+    if (!state.checksReady || state.started || state.dataBusy || !state.maps) return;
+    if (state.manualMode) {
+      if (state.manualRequested) {
+        state.manualRequested = false;
+        await play({ userGesture: false });
+      }
+      return;
+    }
+    if (state.quickController || state.quickFailed) return;
+    if (state.invite) {
+      if (!state.gatewayInstalled || !state.gateway?.connected) {
+        quickStatus('waiting', 'Waiting for the invited host…');
+        return;
+      }
+      state.quickRole = 'join';
+      quickStatus('joining', 'Joining the invited match…');
+      await play({ role: 'join', target: state.gateway.hostAddress });
+      return;
+    }
+    const room = HaloNet.status().room;
+    if (!room || room !== state.selectedRoom) return;
+    const controller = new AbortController();
+    state.quickController = controller;
+    quickStatus('waiting', 'Connecting to the room and finding a match…');
+    try {
+      const selection = await HaloNet.quickPlay({ signal: controller.signal, onStatus(status) {
+        if (!controller.signal.aborted && !state.started) quickStatus(status.state, status.message);
+      } });
+      if (controller.signal.aborted || state.manualMode || state.started || state.selectedRoom !== selection.room) return;
+      state.quickRole = selection.role;
+      quickStatus(selection.role === 'host' ? 'hosting' : 'joining', selection.role === 'host' ?
+        'Starting a match. Keep this game open so others can join.' : 'Joining the room’s match…');
+      await play({ role: selection.role, target: selection.hostAddress });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      state.quickFailed = true;
+      cancelQuickPlay();
+      quickStatus('error', error.message || 'Could not connect to a match. Retry or open the main menu.');
+    }
+  }
+
+  function openMainMenu() {
+    const unrecoverable = !$('fatal').hidden;
+    state.inviteAttempt++;
+    state.pendingInviteConnect = null;
+    state.inviteConnecting = false;
+    state.manualMode = true;
+    state.manualRequested = true;
+    state.quickFailed = false;
+    cancelQuickPlay();
+    quickStatus('menu', 'Main menu selected.');
+    updatePlayButton();
+    unlockInteraction();
+    if (state.started || state.nativeInstalling) {
+      if (!unrecoverable && !state.nativeInstalling && window.Module?._web_quick_play_cancel) window.Module._web_quick_play_cancel();
+      else {
+        const url = new URL(location.href);
+        url.searchParams.set('menu', '1');
+        location.href = url.toString();
+      }
+    } else if (state.maps && !state.dataBusy) {
+      state.manualRequested = false;
+      return play({ userGesture: true });
+    } else maybeQuickPlay();
+  }
+
+  function makeAudioContext() {
+    if (state.audio) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      state.audio = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
+      state.audio.onstatechange = () => {
+        $('interaction-prompt').hidden = !state.started || (state.interactionUnlocked && state.audio.state === 'running');
+      };
+    } catch (error) { log('audio context: ' + error); }
+  }
+
+  function unlockInteraction() {
+    state.interactionUnlocked = true;
+    makeAudioContext();
+    state.audio?.resume().catch(() => {});
+    if (state.started) {
+      const root = document.documentElement;
+      if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+      if (screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => {});
+      const canvas = $('screen');
+      if (canvas.requestPointerLock && matchMedia('(pointer: fine)').matches) {
+        try { canvas.requestPointerLock()?.catch(() => {}); } catch { /* unsupported */ }
+      }
+      if (state.shared && !state.audioStarted) startAudio();
+    }
+    $('interaction-prompt').hidden = true;
+  }
+
   function landscapeSize() {
     const scale = Math.min(window.devicePixelRatio || 1, 2);
     const long = Math.max(window.innerWidth, window.innerHeight);
@@ -469,7 +594,8 @@ can run the game, copies the game data out of the player's disc image
 
   async function startAudio() {
     const context = state.audio;
-    if (!context) return;
+    if (!context || state.audioStarted) return;
+    state.audioStarted = true;
     try {
       await context.audioWorklet.addModule('audio-worklet.js');
       const i32 = new Int32Array(state.memory.buffer);
@@ -491,27 +617,21 @@ can run the game, copies the game data out of the player's disc image
       Atomics.store(i32, sharedWord('audioOpen'), 1);
       log(`audio: ${context.sampleRate} Hz`);
     } catch (error) {
+      state.audioStarted = false;
       log('audio: ' + error);
       toast('Sound is not available: ' + error.message);
     }
   }
 
-  async function play() {
+  async function play({ role = null, target = null, userGesture = false } = {}) {
     if (state.started || state.dataBusy || !state.maps) return;
-    if (state.invite && (!state.gatewayInstalled || !state.gateway?.connected)) {
-      toast('Wait for the invited host to connect before starting.');
+    if (role && state.invite && (!state.gatewayInstalled || !state.gateway?.connected)) {
+      quickStatus('waiting', 'Waiting for the invited host…');
       return;
     }
     state.started = true;
-
-    // in the tap: browsers start sound only then
-    try {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      state.audio = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
-      state.audio.resume().catch(() => {});
-    } catch (error) {
-      log('audio context: ' + error);
-    }
+    makeAudioContext();
+    if (userGesture) unlockInteraction();
     try {
       if (navigator.locks) {
         await new Promise((resolve, reject) => {
@@ -525,15 +645,17 @@ can run the game, copies the game data out of the player's disc image
     } catch (error) {
       state.started = false;
       state.audio?.close().catch(() => {});
-      toast(error.message, 6000);
+      state.audio = null;
+      state.quickFailed = true;
+      cancelQuickPlay();
+      quickStatus('error', error.message);
       updatePlayButton();
       return;
     }
     updatePlayButton();
     document.body.classList.add('playing');
-    const root = document.documentElement;
-    if (root.requestFullscreen && !navigator.standalone) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
-    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+    $('interaction-prompt').hidden = state.interactionUnlocked && (!state.audio || state.audio.state === 'running');
+    $('quick-panel').hidden = !role;
     requestWakeLock();
     // the system's back gesture or button (Android) backs out of menus, as
     // the controller's B does, instead of leaving the game
@@ -548,6 +670,10 @@ can run the game, copies the game data out of the player's disc image
     // (tests pass extra --NAME=value settings in window.__haloArgs)
     const argumentsList = Array.isArray(window.__haloArgs) ? window.__haloArgs.slice() : [];
     argumentsList.push('--HALO_DATA_ROOT=' + state.maps.dataRoot, '--HALO_SAVE_ROOT=' + state.maps.saveRoot);
+    if (role) {
+      argumentsList.push('--HALO_QUICK_PLAY=' + role);
+      if (role === 'join' && target) argumentsList.push('--HALO_QUICK_PLAY_TARGET=' + HaloNet.addressText(target));
+    }
     if (!settings.vsync) argumentsList.push('--HALO_NO_VSYNC=1');
     if (settings.glDebug) argumentsList.push('--HALO_GL_DEBUG=1');
 
@@ -565,6 +691,18 @@ can run the game, copies the game data out of the player's disc image
       },
       haloMessage: (kind, text) => {
         if (kind === 0) log('game: ' + text);
+        else if (kind === 6) {
+          try {
+            const status = JSON.parse(text);
+            quickStatus(status.phase, status.message);
+            HaloNet.quickPlayPhase(status.phase);
+            if (status.phase === 'menu' || status.phase === 'error') {
+              state.quickFailed = status.phase === 'error';
+              state.manualMode = true;
+              cancelQuickPlay();
+            }
+          } catch (error) { log('quick play status: ' + error); }
+        }
         else if (kind === 1) toast(text, 5000);
         else if (kind === 2) log('clipboard: ' + text);
         else if (kind === 4) log('thread error: ' + text);
@@ -591,6 +729,7 @@ can run the game, copies the game data out of the player's disc image
         });
         HaloInput.setLookSensitivity(settings.look);
         HaloNet.attach({ memory: state.memory, base: state.shared, offsets: state.offsets });
+        if (role && !state.invite) HaloNet.quickPlayStarted();
         $('touch').hidden = !settings.touch;
         requestAnimationFrame(animationFrame);
         startAudio();
@@ -618,6 +757,8 @@ can run the game, copies the game data out of the player's disc image
       if (state.inviteConnecting || state.gatewayInstalled || state.started) return;
       const token = HaloInvite.parse($('invite-input').value);
       if (!token) { $('invite-status').textContent = 'Paste a complete halo://join/ invite.'; return; }
+      cancelQuickPlay();
+      state.quickFailed = false;
       state.invite = token;
       $('play').disabled = true;
       $('browser-rooms').hidden = true;
@@ -633,26 +774,36 @@ can run the game, copies the game data out of the player's disc image
       $('invite-connect').disabled = true;
       $('invite-input').disabled = true;
       state.inviteConnecting = true;
+      const attempt = ++state.inviteAttempt;
       let transport = null;
       try {
         transport = await HaloGateway.connect(relay, token, {
           accessToken: $('relay-access').value,
           onStatus(status) {
+            if (attempt !== state.inviteAttempt) return;
             $('invite-status').textContent = status.message;
             if (status.state === 'error') {
-              if (state.started) fatal(status.message + ' Reload to start a new session.');
+              if (state.started && !state.manualMode) fatal(status.message + ' Reload to start a new session.');
               else {
+                state.quickFailed = true;
                 state.gateway = null;
                 state.gatewayInstalled = false;
                 $('invite-connect').disabled = false;
                 $('invite-input').disabled = false;
+                quickStatus('error', status.message);
               }
             }
             updatePlayButton();
+            maybeQuickPlay();
           },
         });
+        if (attempt !== state.inviteAttempt) { transport.close(); return; }
         await state.roomTask;
-        await HaloNet.useTransport(transport);
+        if (attempt !== state.inviteAttempt) { transport.close(); return; }
+        state.nativeInstalling = true;
+        try { await HaloNet.useTransport(transport); }
+        finally { state.nativeInstalling = false; }
+        if (attempt !== state.inviteAttempt) { transport.close(); return; }
         // A host failure can arrive while leaving the previous browser room.
         if (transport.closed) throw new Error('The relay session ended. Try connecting again.');
         state.gateway = transport;
@@ -661,14 +812,18 @@ can run the game, copies the game data out of the player's disc image
         $('invite-input').disabled = true;
         $('relay-access').value = '';
         updatePlayButton();
+        maybeQuickPlay();
       } catch (error) {
         transport?.close();
+        if (attempt !== state.inviteAttempt) return;
         $('invite-status').textContent = error.message;
         $('invite-connect').disabled = false;
         $('invite-input').disabled = false;
       } finally {
-        state.inviteConnecting = false;
-        updatePlayButton();
+        if (attempt === state.inviteAttempt) {
+          state.inviteConnecting = false;
+          updatePlayButton();
+        }
       }
     };
     $('invite-connect').onclick = connect;
@@ -682,7 +837,7 @@ can run the game, copies the game data out of the player's disc image
     };
     if (state.invite) {
       $('browser-rooms').hidden = true;
-      if (relay) connect();
+      if (relay && !state.manualMode) connect();
     }
   }
 
@@ -710,6 +865,7 @@ can run the game, copies the game data out of the player's disc image
     $('online-join').hidden = inRoom;
     $('online-room').hidden = !inRoom;
     $('online-default').disabled = !DEFAULT_ROOM || status.room === DEFAULT_ROOM;
+    maybeQuickPlay();
     if (!inRoom) return;
     $('online-code').textContent = status.room;
     const players = status.players === 1 ? '1 other player' : `${status.players} other players`;
@@ -731,6 +887,9 @@ can run the game, copies the game data out of the player's disc image
   }
 
   function joinRoom(code, { remember = true, updateURL = true } = {}) {
+    cancelQuickPlay();
+    state.quickFailed = false;
+    state.selectedRoom = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     return roomAction(async () => {
       const joined = await HaloNet.join(code, onlineOptions());
       try {
@@ -738,6 +897,8 @@ can run the game, copies the game data out of the player's disc image
         localStorage.removeItem('halo-web-room-left');
       } catch { /* not kept */ }
       if (updateURL) setRoomURL(joined);
+      updatePlayButton();
+      maybeQuickPlay();
     });
   }
 
@@ -759,14 +920,20 @@ can run the game, copies the game data out of the player's disc image
     $('online-default').onclick = () => { if (DEFAULT_ROOM) return joinRoom(DEFAULT_ROOM); };
     $('online-enter').onclick = () => joinRoom($('online-input').value);
     $('online-input').onkeydown = (event) => { if (event.key === 'Enter') joinRoom(event.target.value); };
-    $('online-leave').onclick = () => roomAction(async () => {
-      await HaloNet.leave();
-      try {
-        localStorage.removeItem('halo-web-room');
-        localStorage.setItem('halo-web-room-left', '1');
-      } catch { /* none */ }
-      setRoomURL(null);
-    });
+    $('online-leave').onclick = () => {
+      cancelQuickPlay();
+      state.selectedRoom = null;
+      quickStatus('menu', 'Room left. Choose a room or open the main menu.');
+      updatePlayButton();
+      return roomAction(async () => {
+        await HaloNet.leave();
+        try {
+          localStorage.removeItem('halo-web-room');
+          localStorage.setItem('halo-web-room-left', '1');
+        } catch { /* none */ }
+        setRoomURL(null);
+      });
+    };
     $('online-share').onclick = async () => {
       const link = roomLink(HaloNet.status().room);
       try {
@@ -856,7 +1023,22 @@ can run the game, copies the game data out of the player's disc image
     $('opt-gldebug').checked = settings.glDebug;
     $('opt-gldebug').onchange = (event) => { settings.glDebug = event.target.checked; saveSettings(); };
     $('iso-file').onchange = onImageChosen;
-    $('play').onclick = play;
+    $('play').onclick = () => {
+      unlockInteraction();
+      if (!state.manualMode && (state.invite || state.selectedRoom)) return maybeQuickPlay();
+      return play({ userGesture: true });
+    };
+    $('main-menu').onclick = openMainMenu;
+    $('quick-menu').onclick = openMainMenu;
+    $('interaction-menu').onclick = openMainMenu;
+    $('fatal-menu').onclick = openMainMenu;
+    $('interaction-enable').onclick = unlockInteraction;
+    $('quick-retry').onclick = () => { state.quickFailed = false; state.manualMode = false; return maybeQuickPlay(); };
+    for (const type of ['pointerdown', 'keydown', 'touchstart']) {
+      window.addEventListener(type, () => {
+        if (state.started && !state.interactionUnlocked) unlockInteraction();
+      }, { passive: true });
+    }
     $('export-saves').onclick = exportSaves;
     $('delete-data').onclick = deleteData;
     $('download-retry').onclick = downloadMaps;
@@ -906,6 +1088,7 @@ can run the game, copies the game data out of the player's disc image
     setUpInvites();
     const ok = await runChecks();
     if (!ok) return;
+    state.checksReady = true;
     showSteps(await mapsState());
     if (state.maps) {
       showDownload({ state: 'ready', title: 'Already downloaded',

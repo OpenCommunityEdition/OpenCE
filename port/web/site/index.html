@@ -68,7 +68,12 @@
     </div>
 
     <div id="step-play" class="step" hidden>
-      <button id="play" class="button primary" type="button">Play</button>
+      <p id="quick-status" class="small" role="status" aria-live="polite"></p>
+      <button id="play" class="button primary" type="button">Enable sound &amp; controls</button>
+      <div class="row">
+        <button id="main-menu" class="button" type="button">Main menu</button>
+        <button id="quick-retry" class="button" type="button" hidden>Retry multiplayer</button>
+      </div>
       <p class="small" id="data-summary"></p>
     </div>
 
@@ -87,8 +92,8 @@
 
     <section class="online" id="browser-rooms" aria-labelledby="online-title">
       <h2 id="online-title">Browser rooms</h2>
-      <p class="small">After Play, one player hosts a match under Multiplayer &gt; System Link and keeps
-        their game open. Others join that match there. Your address: <code id="online-address"></code></p>
+      <p class="small">The room opens a multiplayer match automatically when your game data is ready.
+        One player hosts; keep that game open so others can play. Your address: <code id="online-address"></code></p>
       <p class="room-line" id="online-default-room">Default public room <strong id="online-default-code">FQLX01</strong>
         <button type="button" class="button small-button" id="online-default">Join default room</button></p>
       <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
@@ -130,6 +135,18 @@
   </section>
 </main>
 
+<section id="quick-panel" class="quick-panel" hidden aria-label="Multiplayer connection">
+  <p id="quick-game-status" role="status" aria-live="polite"></p>
+  <button id="quick-menu" class="button small-button" type="button">Main menu</button>
+</section>
+<div id="interaction-prompt" class="interaction-prompt" hidden>
+  <p>Click or tap to enable sound and controls.</p>
+  <div class="row">
+    <button id="interaction-enable" class="button primary" type="button">Enable sound &amp; controls</button>
+    <button id="interaction-menu" class="button" type="button">Main menu</button>
+  </div>
+</div>
+
 <div id="rotate" class="overlay" hidden>
   <div class="panel">
     <p>Turn your device sideways to play.</p>
@@ -149,6 +166,7 @@
     <pre id="fatal-text"></pre>
     <div class="row buttons">
       <button type="button" class="button primary" id="fatal-reload">Reload</button>
+      <button type="button" class="button" id="fatal-menu">Main menu</button>
       <button type="button" class="button" id="fatal-log">Copy log</button>
     </div>
   </div>

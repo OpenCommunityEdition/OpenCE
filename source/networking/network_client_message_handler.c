@@ -239,16 +239,6 @@ enum
 	_message_type_data = 2,
 };
 
-enum network_game_client_state
-{
-	_network_game_client_state_searching,
-	_network_game_client_state_joining,
-	_network_game_client_state_pregame,
-	_network_game_client_state_ingame,
-	_network_game_client_state_postgame,
-	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
-};
-
 enum network_game_packet_class
 {
 	_network_game_packet_class_advertisement = 1,

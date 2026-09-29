@@ -114,16 +114,6 @@ symbols in this file:
 
 /* ---------- constants */
 
-enum network_game_client_state
-{
-	_network_game_client_state_searching,
-	_network_game_client_state_joining,
-	_network_game_client_state_pregame,
-	_network_game_client_state_ingame,
-	_network_game_client_state_postgame,
-	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
-};
-
 /* ---------- macros */
 
 #define global_network_game_client bss_004566dc.client

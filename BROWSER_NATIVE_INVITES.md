@@ -14,7 +14,7 @@ The launcher can paste native invites and copy browser links. The fragment is no
 
 Browsers cannot use the desktop build's raw UDP sockets. `port/web/site/gateway.js` carries the browser's virtual game sockets over a secure WebSocket. A session-specific worker in `port/relay` runs the existing native MQTT, encrypted P2P and KCP networking. It joins only the invited host and forwards game traffic; it does not run game simulation or need the ISO/maps.
 
-The browser receives the worker's native identity and peer address mapping before starting its network stack. Game discovery and the actual match continue through Halo's **Multiplayer → System Link** menu. The launcher enables Play once the invited host connects. A host being offline or unreachable is shown separately from a relay connection.
+The browser receives the worker's native identity and peer address mapping before starting its network stack. Once the maps and invited host are ready, the launcher automatically discovers and joins that host's game. This uses the production `HALO_QUICK_PLAY=join` path with the authenticated host's virtual address, without navigating System Link menus. A host being offline or unreachable is shown separately from a relay connection. **Main menu** cancels quick play.
 
 Browser-only WebRTC rooms are also available in the source port. They have a different protocol and room code; putting a native invite into a browser room does not join the native host.
 

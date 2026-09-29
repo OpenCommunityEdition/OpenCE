@@ -10,6 +10,16 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum network_game_client_state
+{
+	_network_game_client_state_searching,
+	_network_game_client_state_joining,
+	_network_game_client_state_pregame,
+	_network_game_client_state_ingame,
+	_network_game_client_state_postgame,
+	NUMBER_OF_NETWORK_GAME_CLIENT_STATES,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -38,6 +48,12 @@ short network_game_client_get_state(
 #ifdef HALO_LINUX
 boolean network_game_client_join_first_available_game(
 	void);
+#ifdef HALO_WEB
+/* 0: still searching; 1: joining; -1: incompatible; -2: closed; -3: failed.
+The optional address is the elected host's IPv4 address in network order. */
+short network_game_client_quick_join(unsigned long target_address);
+boolean network_game_client_has_local_player(struct network_game_client *client, short controller_index);
+#endif
 boolean network_game_client_set_team(
 	char team_index);
 /* whether the advertised game's host has this machine's network version

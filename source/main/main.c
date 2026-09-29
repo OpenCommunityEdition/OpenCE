@@ -664,6 +664,9 @@ typedef char screenshot_and_framerate_globals_size_assert[
 #ifdef HALO_LINUX
 void network_test_update(boolean main_menu_loaded, real seconds);
 #endif
+#ifdef HALO_WEB
+void quick_play_update(boolean main_menu_loaded);
+#endif
 
 /* ---------- prototypes */
 
@@ -3210,6 +3213,11 @@ void main_loop(
 		shell_idle();
 		event_manager_update();
 		telnet_console_process();
+
+#ifdef HALO_WEB
+		/* Production quick play owns only session setup, never player input. */
+		quick_play_update(main_globals.main_menu_scenario_loaded);
+#endif
 
 		if (!shell_application_is_paused())
 		{

@@ -14,7 +14,7 @@ available; startup and gameplay on a physical iPhone remain unverified.
 See [port/web/README.md](port/web/README.md) for requirements and controls.
 
 The first visit downloads about 1.9 GB of maps automatically; keep the tab
-open, then click **Play**. The launcher shows a progress bar, percentage,
+open and multiplayer starts when the download finishes. The launcher shows a progress bar, percentage,
 and downloaded size. Completed maps survive cancellation and reloads.
 Existing Apollo maps and saves are reused in place under `halo/data` and
 `halo/save`. Each browser and domain has a separate cache. Browser storage
@@ -29,10 +29,18 @@ both domains can meet. An explicit room link or a previously chosen room
 takes precedence; choosing **Leave** keeps the browser out across reloads
 until the player opens a room link or chooses **Join default room**.
 
-After the maps are ready, press **Play**, then **Multiplayer → System Link**.
-One player hosts a match and keeps the game open; other players join that
-match. The public room is a meeting place, not a persistent game server.
-The launcher does not automatically start the game or choose a match.
+After the maps are ready, the launcher starts multiplayer automatically.
+The first ready participant hosts **Blood Gulch Slayer**; later participants
+join that host, including while the match is running. Only players preparing
+to launch participate in host selection, so an idle tab or a download does
+not become the host. The hosting player must keep the game open; the public
+room is not a persistent game server.
+
+The page shows connection and loading progress. A browser may require a tap
+to enable sound and pointer capture, but no System Link menu navigation is
+needed. **Main menu** opts out of quick play; `?menu=1` opens the normal
+launcher and game menu. A failed attempt shows an error instead of repeatedly
+restarting the game. Private room links use the same quick-play flow.
 
 Browser rooms use the existing public signaling and STUN services. Some
 networks still require a TURN relay in Settings; no TURN account or native

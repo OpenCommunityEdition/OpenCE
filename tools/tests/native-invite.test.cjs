@@ -59,8 +59,10 @@ test('relay handshake publishes identity and peer map, queues reliable bytes unt
   socket.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
   const gateway = await promise;
   assert.equal(gateway.connected, false);
+  assert.equal(gateway.hostAddress, 0);
   socket.json({ type: 'peer', identifier: TOKEN.slice(0, 12), address: ADDRESS + 0x1000000, connected: true });
   assert.equal(gateway.connected, true);
+  assert.equal(gateway.hostAddress, ADDRESS + 0x1000000);
   const memory = { buffer: new SharedArrayBuffer(512) };
   gateway.attach({ memory, base: 0, offsets: { gatewayEnabled: 0, gatewayIdentifier: 4,
     netLocalAddress: 12, gatewayPeers: 16, gatewayPeerCount: 32 } });
@@ -78,7 +80,9 @@ test('relay handshake publishes identity and peer map, queues reliable bytes unt
   assert.equal(gateway.send(frame), true);
   socket.json({ type: 'peer', identifier: TOKEN.slice(0, 12), address: ADDRESS + 0x1000000, connected: false });
   assert.equal(words[6], 0); assert.equal(gateway.connected, false);
+  assert.equal(gateway.hostAddress, 0);
   gateway.close();
+  assert.equal(gateway.hostAddress, 0);
   assert.equal(words[3], 0);
   socket.json({ type: 'peer', identifier: TOKEN.slice(0, 12), address: ADDRESS + 0x1000000, connected: true });
   assert.equal(gateway.connected, false);
@@ -98,6 +102,7 @@ test('invalid identity and insecure relay fail closed', async () => {
 async function launcher(useTransport = async () => {}, options = {}) {
   const elements = new Map();
   const storage = options.storage || new Map(), joins = [], listeners = [];
+  const quickCalls = [], phases = [], windowEvents = new Map();
   let room = null;
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -108,14 +113,18 @@ async function launcher(useTransport = async () => {}, options = {}) {
     return elements.get(id);
   }
   const context = {
-    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, setTimeout, clearTimeout,
+    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException, setTimeout, clearTimeout,
     navigator: { userAgent: 'Test', platform: 'Test', storage: { getDirectory() {} } },
     location: new URL(options.url || 'http://localhost:8780/'),
     document: { getElementById: element, createElement: () => element(Symbol()),
       body: element('body'), documentElement: {}, addEventListener() {} },
     localStorage: { getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
-    matchMedia: () => ({ matches: false }), addEventListener() {},
+    matchMedia: () => ({ matches: false }),
+    addEventListener(type, listener) {
+      if (!windowEvents.has(type)) windowEvents.set(type, []);
+      windowEvents.get(type).push(listener);
+    },
     screen: {}, history: { pushState() {}, replaceState(_state, _title, url) { context.location.href = String(url); } },
     crossOriginIsolated: true,
     OffscreenCanvas: class { getContext() { return {}; } },
@@ -124,8 +133,17 @@ async function launcher(useTransport = async () => {}, options = {}) {
       ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
     HaloNet: {
-      on(listener) { listeners.push(listener); }, addressText: () => '100.64.2.1',
+      on(listener) { listeners.push(listener); }, addressText: address => [address & 255,
+        (address >>> 8) & 255, (address >>> 16) & 255, address >>> 24].join('.'),
       status: () => ({ room, players: 0, brokers: 1, names: [] }), useTransport,
+      quickPlay(request) {
+        quickCalls.push(request);
+        if (options.quickPlay) return options.quickPlay({ ...request, room });
+        return new Promise((_resolve, reject) => request.signal.addEventListener('abort',
+          () => reject(new DOMException('Aborted', 'AbortError')), { once: true }));
+      },
+      cancelQuickPlay() {}, quickPlayStarted() {},
+      quickPlayPhase(phase) { phases.push(phase); },
       async join(code) {
         joins.push(code);
         await options.beforeJoin?.();
@@ -138,14 +156,14 @@ async function launcher(useTransport = async () => {}, options = {}) {
         listeners.forEach(listener => listener('status', this.status()));
       },
     },
-    HaloCache: { mapsState: async () => ({ files: ['ui.map'], bytes: 2048,
-      dataRoot: '/data', saveRoot: '/data/save' }) },
+    HaloCache: { mapsState: options.mapsState || (async () => ({ files: ['ui.map'], bytes: 2048,
+      dataRoot: '/data', saveRoot: '/data/save' })), download: options.download },
   };
   context.window = context;
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
-  assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
-  return { element, context, storage, joins };
+  if (!options.mapsState) assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
+  return { element, context, storage, joins, quickCalls, phases, windowEvents };
 }
 
 test('an offline host after relay ready allows a fresh invite; in-game disconnect still requires reload', async () => {
@@ -159,7 +177,7 @@ test('an offline host after relay ready allows a fresh invite; in-game disconnec
   failed.json({ type: 'error', message: 'Native host did not connect' });
   assert.equal(element('invite-connect').disabled, false);
   assert.equal(element('invite-input').disabled, false);
-  assert.equal(element('play').disabled, true);
+  assert.equal(context.Module, undefined, 'offline host does not launch the engine');
   assert.equal(element('fatal').hidden, true);
 
   const fresh = 'abcdefabcdef' + 'd'.repeat(32);
@@ -172,9 +190,9 @@ test('an offline host after relay ready allows a fresh invite; in-game disconnec
   live.json({ type: 'ready', identifier: '112233445566', address: ADDRESS });
   await second;
   live.json({ type: 'peer', identifier: fresh.slice(0, 12), address: ADDRESS + 0x1000000, connected: true });
-  assert.equal(element('play').disabled, false);
-  await element('play').onclick();
-  assert.ok(context.Module, 'game launch began');
+  assert.ok(context.Module, 'native host availability automatically launches the game');
+  assert.ok(context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
+  assert.ok(context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=100.64.2.2'));
   live.json({ type: 'error', message: 'Native session ended' });
   assert.equal(element('fatal').hidden, false);
   assert.match(element('fatal-text').textContent, /Reload/);
@@ -187,7 +205,7 @@ test('an offline host after relay ready allows a fresh invite; in-game disconnec
 
 test('failure while installing relay transport cannot relock the pre-game invite form', async () => {
   let finishInstall;
-  const { element } = await launcher(() => new Promise(resolve => { finishInstall = resolve; }));
+  const { element, context } = await launcher(() => new Promise(resolve => { finishInstall = resolve; }));
   element('invite-input').value = TOKEN;
   const attempt = element('invite-connect').onclick();
   const socket = FakeSocket.latest;
@@ -198,16 +216,17 @@ test('failure while installing relay transport cannot relock the pre-game invite
   await attempt;
   assert.equal(element('invite-connect').disabled, false);
   assert.equal(element('invite-input').disabled, false);
-  assert.equal(element('play').disabled, true);
+  assert.equal(context.Module, undefined);
 });
 
-test('normal startup joins the public default room without launching the game', async () => {
+test('normal startup joins the public default room and waits for a ready multiplayer role', async () => {
   const { joins, element, context, storage } = await launcher();
   assert.deepEqual(joins, ['FQLX01']);
   assert.equal(element('online-default-code').textContent, 'FQLX01');
   assert.equal(element('online-code').textContent, 'FQLX01');
   assert.equal(element('online-default').disabled, true);
   assert.equal(context.Module, undefined);
+  assert.equal((await launcher(undefined, { url: 'http://localhost:8780/?menu=1' })).quickCalls.length, 0);
   assert.equal(context.location.search, '');
   assert.equal(storage.has('halo-web-room'), false, 'automatic fallback is not remembered as a private choice');
   const configured = await launcher(undefined, { defaultRoom: 'CUSTOM01' });
@@ -267,4 +286,135 @@ test('leaving while automatic room setup is pending remains outside the room', a
   assert.equal(pending.element('online-room').hidden, true);
   assert.equal(pending.storage.get('halo-web-room-left'), '1');
   assert.equal(pending.storage.has('halo-web-room'), false);
+});
+
+test('stable host selection automatically loads multiplayer and first gesture unlocks controls', async () => {
+  const launched = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  assert.ok(launched.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
+  assert.equal(launched.context.Module.arguments.some(value => value.includes('NETWORK_TEST')), false);
+  assert.equal(launched.element('quick-panel').hidden, false);
+  assert.equal(launched.element('interaction-prompt').hidden, false);
+  launched.windowEvents.get('pointerdown').forEach(listener => listener({}));
+  assert.equal(launched.element('interaction-prompt').hidden, true);
+  launched.context.Module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Blood Gulch.' }));
+  assert.equal(launched.element('quick-panel').hidden, true);
+  assert.deepEqual(launched.phases, ['playing']);
+});
+
+test('existing host selection joins its exact address without a menu click', async () => {
+  const joined = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
+  assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
+  assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
+});
+
+test('map downloaders remain ineligible until complete, then launch automatically', async () => {
+  let finishMaps;
+  const loading = await launcher(undefined, {
+    mapsState: async () => null,
+    download: () => new Promise(resolve => { finishMaps = resolve; }),
+    quickPlay: async ({ room }) => ({ role: 'host', room }),
+  });
+  assert.equal(loading.quickCalls.length, 0);
+  assert.equal(loading.context.Module, undefined);
+  finishMaps({ files: ['ui.map'], bytes: 2048, dataRoot: '/data', saveRoot: '/data/save' });
+  await new Promise(setImmediate);
+  assert.equal(loading.quickCalls.length, 1);
+  assert.ok(loading.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
+});
+
+test('Main menu cancels pending election and ignores its stale host result', async () => {
+  let choose;
+  const waiting = await launcher(undefined, { quickPlay: ({ room }) =>
+    new Promise(resolve => { choose = () => resolve({ role: 'host', room }); }) });
+  waiting.element('main-menu').onclick();
+  assert.equal(waiting.quickCalls[0].signal.aborted, true);
+  assert.ok(waiting.context.Module);
+  assert.equal(waiting.context.Module.arguments.some(value => value.startsWith('--HALO_QUICK_PLAY')), false);
+  choose();
+  await new Promise(setImmediate);
+  assert.equal(waiting.context.Module.arguments.some(value => value.startsWith('--HALO_QUICK_PLAY')), false);
+});
+
+test('Main menu cancels a running quick session through the native export', async () => {
+  const active = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'host', room }) });
+  let canceled = 0;
+  active.context.Module._web_quick_play_cancel = () => canceled++;
+  active.element('quick-menu').onclick();
+  assert.equal(canceled, 1);
+  assert.equal(active.quickCalls[0].signal.aborted, true);
+  assert.equal(active.element('quick-panel').hidden, true);
+});
+
+test('room failure requires an explicit retry and does not repeatedly launch', async () => {
+  let attempts = 0;
+  const failed = await launcher(undefined, { quickPlay: async ({ room }) => {
+    if (++attempts === 1) throw new Error('No host can connect.');
+    return { role: 'host', room };
+  } });
+  assert.equal(attempts, 1);
+  assert.equal(failed.context.Module, undefined);
+  assert.equal(failed.element('quick-retry').hidden, false);
+  assert.match(failed.element('quick-status').textContent, /No host can connect/);
+  await new Promise(setImmediate);
+  assert.equal(attempts, 1);
+  await failed.element('quick-retry').onclick();
+  assert.equal(attempts, 2);
+  assert.ok(failed.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
+  failed.context.Module.haloMessage(6, JSON.stringify({ phase: 'error', message: 'Match failed.' }));
+  assert.equal(failed.element('quick-panel').dataset.state, 'error');
+  assert.equal(failed.quickCalls[1].signal.aborted, true);
+  assert.equal(attempts, 2);
+});
+
+test('Main menu supersedes a pending native handshake without installing it or reopening errors', async () => {
+  let installs = 0;
+  const manual = await launcher(async () => { installs++; });
+  manual.element('invite-input').value = TOKEN;
+  const pending = manual.element('invite-connect').onclick();
+  const socket = FakeSocket.latest;
+  manual.element('main-menu').onclick();
+  assert.ok(manual.context.Module);
+  assert.equal(manual.context.Module.arguments.some(value => value.startsWith('--HALO_QUICK_PLAY')), false);
+  socket.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
+  await pending;
+  assert.equal(installs, 0);
+  assert.equal(socket.readyState, 3);
+  assert.equal(manual.element('quick-panel').hidden, true);
+  assert.equal(manual.element('quick-status').textContent, 'Main menu selected.');
+});
+
+test('Main menu during native transport installation reloads manual mode before engine launch', async () => {
+  let finishInstall;
+  const manual = await launcher(() => new Promise(resolve => { finishInstall = resolve; }));
+  manual.element('invite-input').value = TOKEN;
+  const pending = manual.element('invite-connect').onclick();
+  const socket = FakeSocket.latest;
+  socket.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
+  await new Promise(setImmediate);
+  manual.element('main-menu').onclick();
+  assert.equal(manual.context.location.searchParams.get('menu'), '1');
+  assert.equal(manual.context.Module, undefined, 'old page cannot launch with a partially installed transport');
+  finishInstall();
+  await pending;
+  assert.equal(socket.readyState, 3);
+  assert.equal(manual.element('quick-panel').hidden, true);
+  assert.equal(manual.element('quick-status').textContent, 'Main menu selected.');
+});
+
+test('Main menu clears an invite queued behind the map download', async () => {
+  let finishMaps;
+  const before = FakeSocket.latest;
+  const manual = await launcher(undefined, {
+    mapsState: async () => null,
+    download: () => new Promise(resolve => { finishMaps = resolve; }),
+  });
+  manual.element('invite-input').value = TOKEN;
+  await manual.element('invite-connect').onclick();
+  manual.element('main-menu').onclick();
+  finishMaps({ files: ['ui.map'], bytes: 2048, dataRoot: '/data', saveRoot: '/data/save' });
+  await new Promise(setImmediate);
+  assert.equal(FakeSocket.latest, before);
+  assert.ok(manual.context.Module);
+  assert.equal(manual.context.Module.arguments.some(value => value.startsWith('--HALO_QUICK_PLAY')), false);
 });

@@ -33,6 +33,7 @@ int web_js_gl_create(int width, int height);
 void web_js_gl_resize(int width, int height);
 void web_js_gl_present(void);
 void web_js_post(int kind, const char *text);
+int web_quick_play_background_active(void);
 
 /* ---------- the shared state */
 
@@ -306,17 +307,35 @@ bool SDL_GL_SetSwapInterval(int interval)
 bool SDL_GL_SwapWindow(SDL_Window *window)
 {
 	int width, height;
+	static double last_swap_time;
 
 	(void)window;
 	if (!gl_context)
 		return false;
-	web_js_gl_present();
-	__atomic_add_fetch(&shared_state.frames_presented, 1, __ATOMIC_SEQ_CST);
+	/* Hidden multiplayer still simulates, but never queues ImageBitmaps for
+	a page whose rendering callbacks are suspended. */
+	if (!shared_state.page_hidden)
+	{
+		web_js_gl_present();
+		__atomic_add_fetch(&shared_state.frames_presented, 1, __ATOMIC_SEQ_CST);
+	}
 
 	/* the next frame waits for the page's next animation frame, as a swap
-	interval of one waits for the display (and, while the page is hidden,
-	for it to come back) */
-	if (swap_interval || shared_state.page_hidden)
+	interval of one waits for the display. Quick play keeps a bounded 30Hz
+	worker cadence while hidden; requestAnimationFrame stops in hidden tabs. */
+	if (shared_state.page_hidden && web_quick_play_background_active())
+	{
+		double now = emscripten_get_now();
+		double deadline = last_swap_time + 1000.0 / 30.0;
+		while (shared_state.page_hidden && web_quick_play_background_active() &&
+			now < deadline && deadline - now <= 1000.0 / 30.0)
+		{
+			int counter = __atomic_load_n(&shared_state.frame_counter, __ATOMIC_SEQ_CST);
+			emscripten_futex_wait((void *)&shared_state.frame_counter, (uint32_t)counter, deadline - now);
+			now = emscripten_get_now();
+		}
+	}
+	else if (swap_interval || shared_state.page_hidden)
 	{
 		int counter = __atomic_load_n(&shared_state.frame_counter, __ATOMIC_SEQ_CST);
 
@@ -325,11 +344,12 @@ bool SDL_GL_SwapWindow(SDL_Window *window)
 			emscripten_futex_wait((void *)&shared_state.frame_counter, (uint32_t)counter,
 				shared_state.page_hidden ? 250.0 : 100.0);
 			counter = __atomic_load_n(&shared_state.frame_counter, __ATOMIC_SEQ_CST);
-			if (!shared_state.page_hidden)
+			if (!shared_state.page_hidden || web_quick_play_background_active())
 				break;
 		}
 		last_frame_counter = counter;
 	}
+	last_swap_time = emscripten_get_now();
 
 	/* the page's canvas changed size (rotation, resizing): so does the
 	drawing buffer, between frames */

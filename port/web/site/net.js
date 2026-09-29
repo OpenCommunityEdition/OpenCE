@@ -24,6 +24,81 @@ server, which the settings can name.
 
 'use strict';
 
+// Election is deliberately limited to visible, connected quick-play players.
+// A room is not a consensus service: disconnected network partitions can each
+// form a game. Once a host is reserved, later participants join that host.
+class HaloQuickCoordinator {
+  static DISCOVERY_MS = 6000;
+  static SETTLE_MS = 2000;
+  static RESERVE_MS = 1500;
+  static TIMEOUT_MS = 35000;
+  constructor(id, address, now) {
+    this.id = id;
+    this.address = address;
+    this.started = now;
+    this.brokerSince = null;
+    this.selectedSince = now;
+    this.selected = null;
+    this.reservedSince = null;
+    this.result = null;
+    this.presence = { role: 'candidate', hostId: null, phase: 'electing', gamePhase: '' };
+  }
+  select(id, now) {
+    if (id !== this.selected) {
+      this.selected = id; this.selectedSince = now;
+      if (this.presence.role === 'join') this.reservedSince = now;
+    }
+    this.presence.hostId = id;
+  }
+  tick(now, peers, brokerReady) {
+    if (this.result) return { result: this.result };
+    if (now - this.started >= HaloQuickCoordinator.TIMEOUT_MS)
+      return { error: 'The room could not agree on a reachable host. Check the connection, then try again.' };
+    if (brokerReady && this.brokerSince === null) this.brokerSince = now;
+    const active = peers.filter(peer => peer.quick && Number.isInteger(peer.address) &&
+      peer.address > 0 && peer.address <= 0xffffffff);
+    const hosts = active.filter(peer => peer.quick.role === 'host');
+    if (this.presence.role === 'host') hosts.push({ id: this.id, address: this.address, open: true, quick: this.presence });
+    hosts.sort((a, b) => Number(b.quick.phase === 'launched') - Number(a.quick.phase === 'launched') || a.id.localeCompare(b.id));
+    if (hosts.length) {
+      const host = hosts[0];
+      this.select(host.id, now);
+      if (!host.open) return { state: 'connecting', message: 'Connecting to the room’s host…' };
+      if (host.id !== this.id && this.presence.role !== 'join') {
+        this.presence = { role: 'join', hostId: host.id, phase: 'reserved', gamePhase: '' };
+        this.reservedSince = now;
+      }
+      if (now - this.reservedSince < HaloQuickCoordinator.RESERVE_MS)
+        return { state: 'coordinating', message: 'Confirming the multiplayer host…' };
+      this.result = { role: host.id === this.id ? 'host' : 'join', hostId: host.id, hostAddress: host.address };
+      return { result: this.result };
+    }
+    if (this.presence.role === 'join') return { error: 'The selected host left before the game started. Try again.' };
+    if (active.some(peer => peer.quick.role === 'join'))
+      return { state: 'connecting', message: 'Waiting for the room’s existing host…' };
+    if (!brokerReady) return { state: 'connecting', message: 'Connecting to the multiplayer room…' };
+    const candidates = active.filter(peer => peer.quick.role === 'candidate');
+    const selected = [this.id, ...candidates.map(peer => peer.id)].sort()[0];
+    this.select(selected, now);
+    if (candidates.some(peer => !peer.open))
+      return { state: 'connecting', message: 'Connecting the players before choosing a host…' };
+    const settled = now - this.brokerSince >= HaloQuickCoordinator.DISCOVERY_MS &&
+      now - this.selectedSince >= HaloQuickCoordinator.SETTLE_MS;
+    // Each connected candidate must have observed and acknowledged the same
+    // winner before it can reserve the host role. Idle room members do not vote.
+    const acknowledged = candidates.every(peer => peer.quick.hostId === selected);
+    if (selected === this.id && settled && acknowledged) {
+      this.presence = { role: 'host', hostId: this.id, phase: 'reserved', gamePhase: '' };
+      this.reservedSince = now;
+      return { state: 'coordinating', message: 'Preparing to host the room…' };
+    }
+    return { state: 'coordinating', message: 'Choosing a multiplayer host…' };
+  }
+  launched(phase = 'loading') {
+    if (this.result) { this.presence.phase = 'launched'; this.presence.gamePhase = phase; }
+  }
+}
+
 const HaloNet = (() => {
   const BROKERS = [
     'wss://broker.emqx.io:8084/mqtt',
@@ -52,6 +127,9 @@ const HaloNet = (() => {
     pumpTimer: null,
     helloTimer: null,
     transport: null,     // native invite gateway, when selected
+    quick: null,
+    quickSequence: 0,
+    roomGeneration: 0,
   };
 
   function randomId() {
@@ -153,6 +231,7 @@ const HaloNet = (() => {
   function connectBroker(url) {
     const broker = { url, socket: null, ready: false, buffer: new Uint8Array(0), ping: null, retry: null };
     const start = () => {
+      broker.buffer = new Uint8Array(0);
       let socket;
       try {
         socket = new WebSocket(url, 'mqtt');
@@ -202,6 +281,7 @@ const HaloNet = (() => {
       const body = bytes.slice(index, index + length);
       broker.buffer = bytes.slice(index + length);
       if (type === 0x20) {
+        if (body.length !== 2 || body[1] !== 0) { broker.socket.close(); return; }
         // CONNACK: subscribe to the room
         const body2 = [0, 1, ...mqttString(state.topic), 0];
         broker.socket.send(mqttPacket(0x82, body2));
@@ -222,9 +302,11 @@ const HaloNet = (() => {
 
   async function publish(message) {
     if (!state.room) return;
+    const generation = state.roomGeneration;
     message.from = state.id;
     message.mid = randomId();
     const payload = await seal(message);
+    if (generation !== state.roomGeneration || !state.room) return;
     const body = [...mqttString(state.topic), ...payload];
     const packet = mqttPacket(0x30, body);
     for (const broker of state.brokers) {
@@ -233,7 +315,9 @@ const HaloNet = (() => {
   }
 
   async function receiveSignal(bytes) {
+    const generation = state.roomGeneration;
     const message = await open(bytes);
+    if (generation !== state.roomGeneration || !state.room) return;
     if (!message || message.from === state.id || state.seen.has(message.mid)) return;
     state.seen.add(message.mid);
     if (state.seen.size > 5000) state.seen = new Set([...state.seen].slice(-2000));
@@ -244,7 +328,8 @@ const HaloNet = (() => {
   // ---------- peers
 
   function hello() {
-    publish({ type: 'hello', address: state.address, name: playerName() });
+    publish({ type: 'hello', address: state.address, name: playerName(),
+      quick: state.quick ? { ...state.quick.coordinator.presence } : null, quickSequence: state.quickSequence });
   }
 
   function playerName() {
@@ -255,7 +340,7 @@ const HaloNet = (() => {
     let peer = state.peers.get(id);
     if (!peer) {
       peer = { id, address, name: name || 'Player', pc: null, reliable: null, unreliable: null, open: false,
-        lastSeen: Date.now(), pendingCandidates: [] };
+        lastSeen: Date.now(), pendingCandidates: [], quick: null, quickSequence: -1 };
       state.peers.set(id, peer);
     }
     if (address) {
@@ -307,6 +392,10 @@ const HaloNet = (() => {
     if (message.type === 'hello') {
       const known = state.peers.get(message.from);
       const peer = peerFor(message.from, message.address, message.name);
+      if (Number.isSafeInteger(message.quickSequence) && message.quickSequence > peer.quickSequence) {
+        peer.quickSequence = message.quickSequence;
+        peer.quick = quickPresence(message.quick, message.from);
+      }
       if (!known) hello(); // (so that it knows this machine without waiting)
       // the smaller id makes the offer
       if (!peer.pc && state.id < message.from) {
@@ -489,6 +578,8 @@ const HaloNet = (() => {
   }
 
   async function leave() {
+    cancelQuickPlay();
+    state.roomGeneration++;
     if (!state.room) return;
     await publish({ type: 'bye' }).catch(() => {});
     clearInterval(state.helloTimer);
@@ -523,6 +614,77 @@ const HaloNet = (() => {
     state.address = transport.address;
   }
 
+  function quickPresence(value, id) {
+    if (!value || !/^[a-f0-9]{16}$/.test(id || '') || !['candidate', 'host', 'join'].includes(value.role)) return null;
+    if (value.hostId !== null && !/^[a-f0-9]{16}$/.test(value.hostId || '')) return null;
+    if (!['electing', 'reserved', 'launched'].includes(value.phase)) return null;
+    if ((value.role === 'candidate') !== (value.phase === 'electing')) return null;
+    if (value.role === 'host' && value.hostId !== id) return null;
+    if (value.role === 'join' && (!value.hostId || value.hostId === id)) return null;
+    return { role: value.role, hostId: value.hostId, phase: value.phase,
+      gamePhase: ['hosting', 'searching', 'joining', 'waiting', 'loading', 'playing'].includes(value.gamePhase) ? value.gamePhase : '' };
+  }
+
+  function publishQuick() { state.quickSequence++; hello(); }
+
+  function cancelQuickPlay() {
+    const attempt = state.quick;
+    if (!attempt) return;
+    state.quick = null;
+    clearInterval(attempt.timer);
+    attempt.signal?.removeEventListener('abort', attempt.abort);
+    if (!attempt.resolved) attempt.reject(new DOMException('Quick play cancelled.', 'AbortError'));
+    publishQuick();
+  }
+
+  async function quickPlay({ signal, onStatus = () => {} } = {}) {
+    if (signal?.aborted) throw new DOMException('Quick play cancelled.', 'AbortError');
+    if (state.transport) {
+      if (!state.transport.connected || !state.transport.hostAddress) throw new Error('The invited host is not connected.');
+      return { role: 'join', room: null, hostId: null, hostAddress: state.transport.hostAddress };
+    }
+    if (!state.room) throw new Error('Join a browser room before starting multiplayer.');
+    if (state.quick) return state.quick.promise;
+    const coordinator = new HaloQuickCoordinator(state.id, state.address, Date.now());
+    const attempt = { coordinator, room: state.room, signal, timer: null, resolved: false,
+      previous: JSON.stringify(coordinator.presence), lastStatus: '', abort: cancelQuickPlay };
+    attempt.promise = new Promise((resolve, reject) => { attempt.resolve = resolve; attempt.reject = reject; });
+    state.quick = attempt;
+    signal?.addEventListener('abort', attempt.abort, { once: true });
+    const tick = () => {
+      if (state.quick !== attempt) return;
+      const result = coordinator.tick(Date.now(), [...state.peers.values()], state.brokers.some(broker => broker.ready));
+      const presence = JSON.stringify(coordinator.presence);
+      if (presence !== attempt.previous) { attempt.previous = presence; publishQuick(); }
+      if (result.error) {
+        attempt.resolved = true; // report this failure, rather than an AbortError
+        attempt.reject(new Error(result.error));
+        cancelQuickPlay();
+      } else if (result.result) {
+        clearInterval(attempt.timer);
+        attempt.resolved = true;
+        attempt.resolve({ ...result.result, room: attempt.room });
+      } else if (result.message !== attempt.lastStatus) {
+        attempt.lastStatus = result.message;
+        onStatus({ state: result.state, message: result.message });
+      }
+    };
+    publishQuick();
+    attempt.timer = setInterval(tick, 100);
+    tick();
+    return attempt.promise;
+  }
+
+  function quickPlayPhase(phase) {
+    if (phase === 'menu' || phase === 'error') { cancelQuickPlay(); return; }
+    if (!state.quick || !state.quick.resolved) return;
+    if (!['hosting', 'searching', 'joining', 'waiting', 'loading', 'playing'].includes(phase)) return;
+    state.quick.coordinator.launched(phase);
+    publishQuick();
+  }
+
   return { attach, join, leave, newRoomCode, on, status, addressText, useTransport,
+    quickPlay, cancelQuickPlay, quickPlayPhase, quickPlayStarted: () => quickPlayPhase('loading'),
     get address() { return state.address; } };
 })();
+if (typeof module !== 'undefined') module.exports = { HaloQuickCoordinator };
