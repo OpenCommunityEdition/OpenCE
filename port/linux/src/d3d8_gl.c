@@ -2196,7 +2196,10 @@ static GLuint framebuffer_get(GLuint color, GLuint depth);
 static void copy_level_by_blit(GLuint source, GLuint destination, GLint level, GLsizei width, GLsizei height)
 {
 	static GLuint draw_framebuffer;
+	GLint read_binding = 0, draw_binding = 0;
 
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_binding);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_binding);
 	if (!draw_framebuffer)
 		glGenFramebuffers(1, &draw_framebuffer);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(source, 0));
@@ -2204,7 +2207,9 @@ static void copy_level_by_blit(GLuint source, GLuint destination, GLint level, G
 	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, destination, level);
 	glDisable(GL_SCISSOR_TEST);
 	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	/* (the framebuffers bound before, not 0) */
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)read_binding);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)draw_binding);
 	/* the blit bypasses the cached state, so the next draw must re-apply it */
 	xgpu_gl_state_invalidate();
 }
@@ -2609,13 +2614,6 @@ static struct program_entry *prepare_draw(BOOL immediate)
 				skip++;
 		}
 	}
-	if (!bind_targets(&has_depth))
-	{
-		stats.skipped_no_target++;
-		return NULL;
-	}
-	apply_raster_state(has_depth);
-
 	memset(&key, 0, sizeof(key));
 	memcpy(key.combiner_state, D3D__RenderState, sizeof(key.combiner_state));
 	/* constants are uniforms, not part of the program */
@@ -2623,7 +2621,18 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT0] = 0;
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
 	key.texture_modes = D3D__RenderState[D3DRS_PSTEXTUREMODES];
+	/* the textures before the target: binding one can copy a render target's
+	levels into a mipmapped texture by blits (ES without copy image: ANGLE
+	on Metal), which bind framebuffers of their own and turn the scissor off
+	- after the target, the draw went to the wrong framebuffer (the water's
+	reflection, drawn with its ripple map's levels, never showed) */
 	bind_textures(&key, uniforms.texture_scale);
+	if (!bind_targets(&has_depth))
+	{
+		stats.skipped_no_target++;
+		return NULL;
+	}
+	apply_raster_state(has_depth);
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		key.alpha_kill[stage] = D3D__TextureState[stage][D3DTSS_ALPHAKILL] == D3DTALPHAKILL_ENABLE;
