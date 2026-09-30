@@ -40,15 +40,15 @@ with the same UI map in the September 29, 2026 test. Touch controls are
 available; startup and gameplay on a physical iPhone remain unverified.
 See [port/web/README.md](port/web/README.md) for requirements and controls.
 
-Browser rooms download only `ui.map` and `bloodgulch.map` before starting:
-36,716,544 bytes (about 37 MB), instead of all 1.86 GB of maps. The progress
+Browser rooms download only `ui.map` and `beavercreek.map` before starting:
+36,268,032 bytes (about 36 MB), instead of all 1.86 GB of maps. The progress
 bar measures that required download. Other maps wait until **Main menu** or
 `?menu=1` is selected, when only the missing maps are downloaded before the
 full menu opens. Desktop invites also prepare all maps, because their host
 may choose any supported map. Returning visitors reuse completed maps.
 Completed maps survive cancellation and reloads.
 The September 29 local Chrome check started a host and joined its running
-Blood Gulch match from a second fresh origin, with only those two maps in
+Blood Gulch match from a second fresh origin, with only `ui.map` and `bloodgulch.map` in
 each browser's storage. Each player downloaded 36,716,544 map bytes. This
 verifies the smaller startup set, not a measured Internet join time.
 Existing Apollo maps and saves are reused in place under `halo/data` and
@@ -64,14 +64,14 @@ both domains can meet. An explicit room link or a previously chosen room
 takes precedence; choosing **Leave** keeps the browser out across reloads
 until the player opens a room link or chooses **Join default room**.
 
-After the UI and Blood Gulch maps are ready, the launcher starts multiplayer automatically.
-The first ready participant hosts **Blood Gulch Slayer**; later participants
+After the UI and Beaver Creek maps are ready, the launcher starts multiplayer automatically.
+The first ready participant hosts **Beaver Creek Slayer**; later participants
 join that host, including while the match is running. Only players preparing
 to launch participate in host selection, so an idle tab or a download does
 not become the host. The public room is not a persistent game server.
 
 Surviving players automatically elect a replacement when the host disconnects
-and restart the same room's Blood Gulch Slayer match. Scores, positions and
+and restart the same room's Beaver Creek Slayer match. Scores, positions and
 the match timer reset; all players need the updated browser build. A brief
 connection loss has a 10-second grace period, and silent channels are detected
 after 25 seconds, followed by election and map loading. Returning hosts join

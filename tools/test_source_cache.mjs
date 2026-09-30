@@ -206,7 +206,7 @@ r = await scenario({ cached: 'partial', locked: true });
 assert.match(r.error.message, /another tab/); assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
 console.log('PASS running production game prevents competing writes');
 
-const roomMaps = ['ui.map', 'bloodgulch.map'];
+const roomMaps = ['ui.map', 'beavercreek.map'];
 const runtimeBytes = 2 * 0x11600000 + 0x02300000 + 3 * 0x02f00000 + (64 << 20);
 r = await scenario({ required: roomMaps });
 assert.equal(r.error, undefined);
@@ -214,7 +214,7 @@ assert.deepEqual(Array.from(r.result.files), roomMaps);
 assert.equal(r.result.requiredBytes, bytes.length * 2);
 assert.equal(r.requests.length, 5);
 assert.deepEqual(r.requests.slice(1).map(url => url.split('/').at(-1)), [
-  'ui.map.part000', 'ui.map.part001', 'bloodgulch.map.part000', 'bloodgulch.map.part001',
+  'ui.map.part000', 'ui.map.part001', 'beavercreek.map.part000', 'beavercreek.map.part001',
 ]);
 assert.equal(r.reservations[0], runtimeBytes + bytes.length * 2);
 assert.equal(r.progress.at(-1).total, bytes.length * 2);
@@ -244,7 +244,7 @@ const full = await r.context.HaloCache.ensure();
 assert.equal(full.files.length, 24);
 assert.equal(r.requests.length - requestCount, 1 + 22 * 2);
 assert.equal(r.writes.filter(path => path === 'halo/data/maps/ui.map').length, 1);
-assert.equal(r.writes.filter(path => path === 'halo/data/maps/bloodgulch.map').length, 1);
+assert.equal(r.writes.filter(path => path === 'halo/data/maps/beavercreek.map').length, 1);
 assert.equal((await r.context.HaloCache.mapsState()).files.length, 24);
 console.log('PASS upgrading a room subset to the full game downloads remaining 22 maps without rewriting completed room maps');
 
@@ -275,7 +275,7 @@ assert.equal(r.initialState, null);
 assert.equal(r.requests.length, 5);
 assert.equal(r.result.requiredBytes, bytes.length * 2);
 assert.equal(r.files.get('halo/data/maps/ui.map').length, bytes.length);
-assert.equal(r.writes.includes('halo/data/maps/bloodgulch.map'), true);
+assert.equal(r.writes.includes('halo/data/maps/beavercreek.map'), true);
 console.log('PASS unmarked legacy partial with valid header and wrong size is repaired through verified downloads');
 
 const corruptUnmarked = bytes.slice();
@@ -295,7 +295,7 @@ assert.equal(nativeFull.dataRoot, '/data');
 assert.equal(nativeFull.files.length, 24);
 assert.equal(r.requests.length, 1 + 22 * 2);
 assert.equal(r.writes.includes('maps/ui.map'), false);
-assert.equal(r.writes.includes('maps/bloodgulch.map'), false);
+assert.equal(r.writes.includes('maps/beavercreek.map'), false);
 assert.equal(JSON.parse(new TextDecoder().decode(r.files.get('maps/.complete'))).files.length, 24);
 console.log('PASS completed native subset grows in place and preserves original maps and native completion marker');
 
@@ -315,7 +315,7 @@ console.log('PASS subset requests validate the entire pinned manifest including 
 r = await scenario({ required: roomMaps, cached: roomMaps, corruptCached: true });
 assert.equal(r.error, undefined);
 assert.equal(r.requests.length, 3);
-assert.equal(r.writes.includes('halo/data/maps/bloodgulch.map'), false);
+assert.equal(r.writes.includes('halo/data/maps/beavercreek.map'), false);
 console.log('PASS damaged requested map is repaired without fetching or rewriting the other completed room map');
 
 r = await scenario({ required: roomMaps, corrupt: true });
@@ -325,11 +325,11 @@ assert.equal(r.files.has('halo/data/maps/ui.map'), false);
 assert.equal(await r.context.HaloCache.mapsState({ required: roomMaps }), null);
 console.log('PASS subset integrity failures retry twice and never become launch-ready');
 
-r = await scenario({ required: roomMaps, cancelMap: 'bloodgulch.map' });
+r = await scenario({ required: roomMaps, cancelMap: 'beavercreek.map' });
 assert.equal(r.error.name, 'AbortError');
 assert.equal(r.progress.at(-1).state, 'paused');
 assert.equal(r.files.has('halo/data/maps/ui.map'), true);
-assert.equal(r.files.has('halo/data/maps/bloodgulch.map'), false);
+assert.equal(r.files.has('halo/data/maps/beavercreek.map'), false);
 const cancelledRequests = r.requests.length;
 const resumed = await r.context.HaloCache.ensure({ required: roomMaps });
 assert.equal(resumed.requiredBytes, bytes.length * 2);

@@ -35,7 +35,7 @@ void player_ui_fast_setup_network_server(void)
 {
 	/* The real helper initializes its playlist immediately. A blank initial
 	map makes it try unavailable Carousel before the pregame map change. */
-	assert(!strcmp(web_quick_play_initial_map(), "levels\\test\\bloodgulch\\bloodgulch"));
+	assert(!strcmp(web_quick_play_initial_map(), "levels\\test\\beavercreek\\beavercreek"));
 	created++; client = &mock_client; server = &mock_server; connection = _game_connection_network_server;
 }
 void main_goto_main_menu(void) { menus++; }
@@ -44,7 +44,7 @@ short game_connection(void) { return connection; }
 void network_game_abort(void) { aborts++; }
 void network_game_client_request_immediate_start(void) { starts++; }
 void network_game_server_change_map_name(struct network_game_server *value, const char *path)
-{ assert(value == server); assert(!strcmp(path, "levels\\test\\bloodgulch\\bloodgulch")); maps++; }
+{ assert(value == server); assert(!strcmp(path, "levels\\test\\beavercreek\\beavercreek")); maps++; }
 void network_game_server_change_game_variant(struct network_game_server *value, struct game_variant *variant)
 { assert(value == server && variant); }
 boolean network_game_server_enable_quick_play(struct network_game_server *value)

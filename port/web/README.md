@@ -139,18 +139,18 @@ system link. The launcher joins the public **FQLX01** room on a first visit.
 Both hosted domains use that same room. Share a link ending in
 `?room=FQLX01` to enter it directly.
 
-Browser rooms prepare only the UI and Blood Gulch maps (about 37 MB) before
+Browser rooms prepare only the UI and Beaver Creek maps (about 36 MB) before
 entering multiplayer automatically. The remaining maps download only when
 the full main menu is selected; existing completed maps are reused. Desktop
 invites retain the full-map download because they can join other scenarios.
-The first ready player hosts Blood Gulch Slayer; the others join that host
+The first ready player hosts Beaver Creek Slayer; the others join that host
 without navigating the game's System Link menus. The public room does not
 run a permanent game server.
 Players spawn with the human pistol in place of the map's plasma pistol,
 including late joins and respawns.
 
 When the host disconnects, surviving quick-play participants automatically
-elect a replacement and restart Blood Gulch Slayer in the same room. The
+elect a replacement and restart Beaver Creek Slayer in the same room. The
 engine does not migrate a running match's state: scores, positions and the
 match timer reset. Everyone needs the updated browser build. A brief lost
 connection has a 10-second grace period; silent WebRTC channels are detected

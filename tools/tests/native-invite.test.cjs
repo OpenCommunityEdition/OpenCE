@@ -11,13 +11,13 @@ const EXPECTED_MAPS = [
   'beavercreek', 'bloodgulch', 'boardingaction', 'carousel', 'chillout', 'damnation',
   'hangemhigh', 'longest', 'prisoner', 'putput', 'ratrace', 'sidewinder', 'wizard',
 ].map(name => name + '.map');
-const QUICK_MAPS = ['ui.map', 'bloodgulch.map'];
+const QUICK_MAPS = ['ui.map', 'beavercreek.map'];
 function fullMaps(overrides = {}) {
   return { files: EXPECTED_MAPS.slice(), bytes: 1_856_530_432,
     dataRoot: '/data', saveRoot: '/data/save', ...overrides };
 }
 function quickMaps(overrides = {}) {
-  return { files: QUICK_MAPS.slice(), bytes: 36_716_544, requiredBytes: 36_716_544,
+  return { files: QUICK_MAPS.slice(), bytes: 36_268_032, requiredBytes: 36_268_032,
     dataRoot: '/data', saveRoot: '/data/save', ...overrides };
 }
 function packet(kind = 3, length = 4) {
@@ -461,7 +461,7 @@ test('stable host selection loads multiplayer without an enable prompt', async (
   launched.windowEvents.get('pointerdown').forEach(listener => listener({ target: launched.element('screen') }));
   assert.equal(fullscreenRequests, 1, 'a normal game gesture unlocks controls without a separate prompt');
   assert.equal(launched.element('interaction-prompt').hidden, true);
-  launched.context.Module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Blood Gulch.' }));
+  launched.context.Module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Beaver Creek.' }));
   assert.equal(launched.element('quick-panel').hidden, true);
   assert.deepEqual(launched.phases, ['playing']);
 });
@@ -682,7 +682,7 @@ test('an unavailable legacy log does not display an unrelated stale root log', a
 
 test('browser room downloads remain ineligible until both bootstrap maps are ready, then launch automatically', async () => {
   let finishMaps;
-  const cached = new Set(['ui.map']);
+  const cached = new Set(['ui.map', 'bloodgulch.map']);
   const loading = await launcher(undefined, {
     mapsState: async ({ required }) => required.every(name => cached.has(name)) ? quickMaps() : null,
     download: () => new Promise(resolve => { finishMaps = resolve; }),
@@ -692,7 +692,7 @@ test('browser room downloads remain ineligible until both bootstrap maps are rea
   assert.deepEqual(Array.from(loading.downloads[0].required), QUICK_MAPS);
   assert.equal(loading.quickCalls.length, 0);
   assert.equal(loading.context.Module, undefined);
-  cached.add('bloodgulch.map');
+  cached.add('beavercreek.map');
   finishMaps(quickMaps());
   await new Promise(setImmediate);
   assert.equal(loading.quickCalls.length, 1);
@@ -723,7 +723,7 @@ test('a cached bootstrap pair opens a room without downloading unrelated maps', 
   assert.deepEqual(page.inspections, [QUICK_MAPS]);
   assert.equal(page.downloads.length, 0);
   assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
-  assert.match(page.element('download-detail').textContent, /36\.7 MB/);
+  assert.match(page.element('download-detail').textContent, /36\.3 MB/);
 });
 
 test('pasting a native invite into a bootstrap cache prepares full maps before opening the relay', async () => {

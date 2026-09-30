@@ -22,7 +22,7 @@ can run the game, copies the game data out of the player's disc image
   const MEMORY_PAGES = 0x88000000 / 65536;
   const REQUIRED_BYTES = 2.1e9;
   const DEFAULT_ROOM = window.HALO_BROWSER_CONFIG?.defaultRoom ?? 'FQLX01';
-  const QUICK_MAPS = ['ui.map', 'bloodgulch.map'];
+  const QUICK_MAPS = ['ui.map', 'beavercreek.map'];
   const diagnosticOptions = new URLSearchParams(location.search);
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -203,7 +203,7 @@ can run the game, copies the game data out of the player's disc image
 
   function requiredMaps() {
     // Desktop invites can name any map. Only browser quick play fixes the
-    // match to Blood Gulch; the full menu retains all supported scenarios.
+    // match to Beaver Creek; the full menu retains all supported scenarios.
     return !state.manualMode && state.selectedRoom && !state.invite ? QUICK_MAPS : HaloCache.expected;
   }
 
