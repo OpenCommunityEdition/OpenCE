@@ -376,10 +376,10 @@ Only machines with the invite can find the game:
 - The host tries to reach at most 8 new players at the same time. The
   other players ask again.
 - The host answers a request that is not proven at most one time each
-  second. It answers at most 20 of these requests each second,
-  after a first 32. Each answer goes only through the broker that brought
-  the request. Thus a flood of requests does not use much of the bandwidth
-  of the host.
+  second through each broker. It answers at most 20 of these requests each
+  second, after a first 32. Each answer goes only through the broker that
+  brought the request. Thus a flood of requests does not use much of the
+  bandwidth of the host.
 - The host does the key work of at most 20 requests each second from keys
   that it does not know, after a first 32. It keeps the key work of the
   last 256 keys. Thus the proof of a player does not need more key work. A

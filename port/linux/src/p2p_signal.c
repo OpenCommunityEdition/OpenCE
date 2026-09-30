@@ -4,7 +4,8 @@ P2P_SIGNAL.C
 Internet play's signalling (p2p.c): how a joiner and the host of an invite
 tell each other where they can be reached, through public MQTT brokers
 (network.signalling_brokers; MQTT 3.1.1 over TCP). Every broker is used at
-once, so any one of them working is enough.
+once, so any one of them working is enough (an answer goes back through
+each broker a request came through).
 
 Everything that passes through them is sealed with a key derived from the
 invite's token, and goes to topics that are hashes of it, so the brokers
@@ -37,10 +38,11 @@ what it answered: anyone with the invite can ask in a machine's name as
 often as it likes, pushing out whatever the host remembered. What it does
 keep of requests not proven yet (the work of their keys) only saves work.
 It answers them sparingly, as anyone with the invite can send them from as
-many keys as it likes: a key once each ANSWER_INTERVAL whatever its nonce,
-and 20 a second in all (MAXIMUM_UNPROVEN_ANSWERS), each through the broker
-the request came through only (the joiner asks through them all, again
-every JOIN_INTERVAL).
+many keys as it likes: a request once each ANSWER_INTERVAL through each
+broker, and 20 a second in all (MAXIMUM_UNPROVEN_ANSWERS), each through the
+broker the request came through only (the joiner asks through them all,
+again every JOIN_INTERVAL, so a broker that loses the answers keeps no
+other's out).
 
 A joiner repeats its JOIN until the tunnel reaches the host. The host makes
 one session of a request (a public key and nonce) at most: anyone watching
@@ -170,7 +172,11 @@ struct joiner
 	unsigned char base[P2P_SHA256_SIZE];
 	unsigned char secret[P2P_SHA256_SIZE];
 	unsigned long answered_time;
+	/* (a joiner's) when it was answered through each broker */
+	unsigned long answered_broker_times[MAXIMUM_BROKERS];
+	/* (an asker's) its latest nonces answered, through which broker, when */
 	unsigned char answered_nonces[ASKER_NONCES][NONCE_SIZE];
+	signed char answered_nonce_brokers[ASKER_NONCES];
 	unsigned long answered_nonce_times[ASKER_NONCES];
 	int used;
 };
@@ -742,6 +748,7 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 	const unsigned char *public_key = message + 2;
 	const unsigned char *nonce = public_key + P2P_KEY_SIZE;
 	int fixed = 2 + P2P_KEY_SIZE + NONCE_SIZE;
+	int broker_index = (int)(broker - signalling.brokers);
 	struct joiner *joiner;
 	struct used_request *used;
 	int proven;
@@ -768,7 +775,7 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 		{
 			return;
 		}
-		if (!elapsed(joiner->answered_time, ANSWER_INTERVAL) ||
+		if (!elapsed(joiner->answered_broker_times[broker_index], ANSWER_INTERVAL) ||
 			!p2p_peer_reoffered(identifier, joiner->secret, candidates, proven ? count : 0) ||
 			(!proven && !budget_left(&signalling.unproven_answers, MAXIMUM_UNPROVEN_ANSWERS,
 			UNPROVEN_ANSWER_INTERVAL, 1)))
@@ -776,6 +783,7 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 			return;
 		}
 		joiner->answered_time = p2p_now();
+		joiner->answered_broker_times[broker_index] = joiner->answered_time;
 		send_accept(broker, identifier, joiner->nonce, joiner->host_nonce, joiner->base);
 		return;
 	}
@@ -799,7 +807,8 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 
 			for (index = 0; index < ASKER_NONCES; index++)
 			{
-				if (!memcmp(asker->answered_nonces[index], nonce, NONCE_SIZE))
+				if (!memcmp(asker->answered_nonces[index], nonce, NONCE_SIZE) &&
+					asker->answered_nonce_brokers[index] == broker_index)
 				{
 					slot = index;
 					break;
@@ -833,6 +842,7 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 		memcpy(asker->nonce, nonce, NONCE_SIZE);
 		asker->answered_time = p2p_now();
 		memcpy(asker->answered_nonces[slot], nonce, NONCE_SIZE);
+		asker->answered_nonce_brokers[slot] = (signed char)broker_index;
 		asker->answered_nonce_times[slot] = asker->answered_time;
 		host_nonce_for(public_key, nonce, p2p_now() / HOST_NONCE_PERIOD, host_nonce);
 		send_accept(broker, identifier, nonce, host_nonce, asker->base);
@@ -869,6 +879,8 @@ static void join_received(struct broker *broker, const unsigned char *message, i
 	memcpy(joiner->base, base, P2P_SHA256_SIZE);
 	memcpy(joiner->secret, secret, P2P_SHA256_SIZE);
 	joiner->answered_time = p2p_now();
+	memset(joiner->answered_broker_times, 0, sizeof(joiner->answered_broker_times));
+	joiner->answered_broker_times[broker_index] = joiner->answered_time;
 	joiner->used = 1;
 	send_accept(broker, identifier, nonce, host_nonce, base);
 }

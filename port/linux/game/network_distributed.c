@@ -125,6 +125,9 @@ enum
 	/* ... and the client's ticks it takes as run since the anchor beyond
 	the host's (its messages delayed, then bunched) */
 	PREDICTION_JITTER_TICKS = 6,
+	/* ... and the most of a client's round trip it takes a client's player
+	in the air to be ahead of its copy by (distributed_on_foot_ceiling) */
+	PREDICTION_CEILING_LEAD_TICKS = 15,
 	/* ... how long it measures predictions from one it took, the anchor,
 	before it takes a newer as the anchor (the jitter and the blend granted
 	once a second, not once a tick) */
@@ -444,6 +447,8 @@ static struct distributed_host_speed
 	boolean grounded;
 	real ground_height;
 	real top_height;
+	/* the last tick it had the unit on the ground (or where it started) */
+	long ground_time;
 } distributed_host_speeds[MAXIMUM_TRACKED_PLAYERS];
 /* a client: where each of its own players' units was at its last ticks,
 and how long the host takes to have them (ticks) */
@@ -1593,6 +1598,13 @@ struct distributed_on_foot_bound
 	and how far above where it had it then it may be (world units) */
 	real top_height;
 	real rise;
+	/* ... in the air, the speed up it may have left the ground at and the
+	height it may have had then, and the ticks the host's copy has been in
+	the air (none on the ground): as high as a thing thrown up so, falling
+	since (distributed_on_foot_ceiling) */
+	real rise_speed;
+	real rise_base;
+	long airborne_ticks;
 };
 
 /* (the host) how fast a client's player's unit on foot may go, a tick, and
@@ -1645,6 +1657,7 @@ static void distributed_on_foot_bound(
 		noted->flight_rise = 0.0f;
 		noted->ground_height = object->object.position.z;
 		noted->top_height = object->object.position.z;
+		noted->ground_time = now;
 		taken_speed = 0.0f;
 	}
 	/* (the most of each span) */
@@ -1708,7 +1721,10 @@ static void distributed_on_foot_bound(
 	the air, a throw's speeds kept till it lands, a few seconds at most) */
 	noted->grounded = !biped || !TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
 	if (noted->grounded)
+	{
 		noted->ground_height = object->object.position.z;
+		noted->ground_time = now;
+	}
 	if (noted->grounded || object->object.position.z > noted->top_height)
 		noted->top_height = object->object.position.z;
 	if (noted->grounded || biped->biped.airborne_ticks >= SCHAR_MAX)
@@ -1737,6 +1753,9 @@ static void distributed_on_foot_bound(
 	bound->rise = UNIT_WORLD_BOUND;
 	if (biped && global_gravity > 0.0f)
 		bound->rise = rise_speed * rise_speed / (2.0f * global_gravity) + crouch_rise + PREDICTED_RISE_TOLERANCE;
+	bound->rise_speed = rise_speed;
+	bound->rise_base = crouch_rise + PREDICTED_RISE_TOLERANCE;
+	bound->airborne_ticks = noted->grounded ? 0 : now - noted->ground_time;
 	if (!(bound->rise >= 0.0f))
 		bound->rise = UNIT_WORLD_BOUND;
 }
@@ -1755,6 +1774,33 @@ static real distributed_on_foot_fall_speed(
 	if (drop > 0.0f && global_gravity > 0.0f)
 		speed += (real)sqrt(2.0f * global_gravity * drop);
 	return MIN(speed, MAXIMUM_PREDICTED_SPEED);
+}
+
+/* (the host) how far above where the host last had a client's player's
+unit on the ground it may be: a jump's height (or a throw's), and in the
+air no higher than a thing thrown up at that speed falls to since (the
+ticks its copy has been in the air, less the client's round trip and
+jitter, which are the client's ahead): no hovering in the air, nor coming
+down slowly */
+static real distributed_on_foot_ceiling(
+	short player_index,
+	struct distributed_on_foot_bound const *bound)
+{
+	real rise = bound->rise;
+	/* (a round trip a client makes long gains it no more than this) */
+	real ticks = (real)bound->airborne_ticks -
+		MIN(distributed_machine_round_trip_ticks(distributed_player_machine(player_index)),
+			(real)PREDICTION_CEILING_LEAD_TICKS) -
+		(real)PREDICTION_JITTER_TICKS;
+
+	if (bound->airborne_ticks > 0 && ticks > 0.0f && global_gravity > 0.0f)
+	{
+		real ceiling = bound->rise_base + bound->rise_speed * ticks - 0.5f * global_gravity * ticks * ticks;
+
+		if (ceiling < rise)
+			rise = ceiling;
+	}
+	return rise;
 }
 
 /* (the host) whether a client's player's unit on foot goes from one point
@@ -1809,6 +1855,7 @@ static void distributed_take_prediction(
 			distributed_accepted[player_index].valid = FALSE;
 			distributed_host_speeds[player_index].ground_height = object->object.position.z;
 			distributed_host_speeds[player_index].top_height = object->object.position.z;
+			distributed_host_speeds[player_index].ground_time = now;
 		}
 		else if (ticks <= 0 || !distributed_on_foot_move_valid(bound, &distributed_accepted[player_index].position,
 			&state->position, ticks))
@@ -1817,9 +1864,13 @@ static void distributed_take_prediction(
 		}
 	}
 	/* (no higher above where the host last had it on the ground than a
-	jump, or a throw its ticks gave it, takes it) */
-	if (!(state->position.z - distributed_host_speeds[player_index].ground_height <= bound->rise))
+	jump, or a throw its ticks gave it, takes it, and in the air falling:
+	past that the host's copy falls as its ticks have it) */
+	if (!(state->position.z - distributed_host_speeds[player_index].ground_height <=
+		distributed_on_foot_ceiling(player_index, bound)))
+	{
 		return;
+	}
 	/* (the client told which of its ticks the host has it at) */
 	if (distributed_apply_state(unit_index, state, &state->position, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
 		distributed_on_foot_fall_speed(bound, state->position.z)))

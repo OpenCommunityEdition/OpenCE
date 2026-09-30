@@ -588,6 +588,26 @@ BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
 bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset);
 #endif
 
+/* whether the text has an invite link in it (its prefix, in any case) */
+static BOOL platform_text_has_invite_link(const char *text)
+{
+	static const char prefix[] = "halo://join/";
+	size_t length = sizeof(prefix) - 1;
+
+	for (; *text; text++)
+	{
+		size_t index;
+
+		for (index = 0; index < length && text[index] &&
+			(text[index] | 0x20) == prefix[index]; index++)
+		{
+		}
+		if (index == length)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /* puts a new invite on the clipboard, and joins one found there when the
 game comes to the front */
 static void platform_invite_clipboard(BOOL look)
@@ -612,7 +632,9 @@ static void platform_invite_clipboard(BOOL look)
 		if (text && strcmp(text, seen) && strlen(text) < sizeof(seen))
 		{
 			snprintf(seen, sizeof(seen), "%s", text);
-			if (p2p_join_invite(text))
+			/* (a link, not a bare code: 64 hex digits alone are as often a
+			checksum copied for something else) */
+			if (platform_text_has_invite_link(text) && p2p_join_invite(text))
 			{
 #ifdef HALO_ANDROID
 				SDL_ShowAndroidToast("Joining the invite on the clipboard", 1, -1, 0, 0);
