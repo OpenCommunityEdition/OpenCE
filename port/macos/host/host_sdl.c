@@ -17,6 +17,7 @@ callback is handed to a thread that has one.
 #include <SDL3/SDL.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define HANDLE_COUNT 256
@@ -157,10 +158,44 @@ int host_sdl_gl_set_swap_interval(int interval)
 	return SDL_GL_SetSwapInterval(interval);
 }
 
+/* HALO_FPS=1 (or HALO_PROFILE=1): the frames a second and their times,
+logged every 5 seconds */
+static void frame_statistics(void)
+{
+	static int enabled = -1;
+	static uint64_t window_start, last, frames, slowest;
+	uint64_t now = SDL_GetTicksNS();
+
+	if (enabled < 0)
+		enabled = getenv("HALO_FPS") || getenv("HALO_PROFILE");
+	if (!enabled)
+		return;
+	if (!window_start)
+	{
+		window_start = last = now;
+		return;
+	}
+	frames++;
+	if (now - last > slowest)
+		slowest = now - last;
+	last = now;
+	if (now - window_start >= 5000000000ull)
+	{
+		double seconds = (double)(now - window_start) / 1e9;
+
+		host_logf(HOST_LOG_INFO, "fps %.1f (frame %.2f ms average, %.2f ms slowest)", (double)frames / seconds,
+			seconds * 1000.0 / (double)frames, (double)slowest / 1e6);
+		window_start = now;
+		frames = 0;
+		slowest = 0;
+	}
+}
+
 int host_sdl_gl_swap_window(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
+	frame_statistics();
 	return object ? SDL_GL_SwapWindow(object) : 0;
 }
 
