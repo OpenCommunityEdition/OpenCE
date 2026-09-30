@@ -243,9 +243,8 @@ world, each frame: their drawn models, skinned as the renderer skins them
 their collision models - the meshes the game tests its
 bullets against, a mesh for each node's region as it now is (its damage
 permutation), placed by the node's matrix as the animation poses it (between
-the last two ticks, as the frame draws it). A unit without them is its
-skeleton's bones, each an ellipsoid from its node to its parent's (bipeds),
-or its bounding sphere flattened along its axes. Each triangle's group: its
+the last two ticks, as the frame draws it). One without either is left
+out. Each triangle's group: its
 object (0 to 31, the player's first) above, its kind below (2 an object, 4
 the local player's body: the first person does not draw it, so only the
 rays show its shadow). */
@@ -446,115 +445,12 @@ static const struct mesh_triangles *mesh_get(const struct collision_bsp *bsp)
 	return mesh->count > 0 ? mesh : NULL;
 }
 
-/* a unit sphere (an icosahedron: 20 triangles, wound as the level's) */
-static const float icosahedron[20][9] = {
-#define ICO_T 1.6180340f
-#define ICO_V(x, y, z) (x) * 0.5257311f * 1.12f, (y) * 0.5257311f * 1.12f, (z) * 0.5257311f * 1.12f
-	{ ICO_V(-1, ICO_T, 0), ICO_V(0, 1, ICO_T), ICO_V(-ICO_T, 0, 1) },
-	{ ICO_V(-1, ICO_T, 0), ICO_V(1, ICO_T, 0), ICO_V(0, 1, ICO_T) },
-	{ ICO_V(-1, ICO_T, 0), ICO_V(0, 1, -ICO_T), ICO_V(1, ICO_T, 0) },
-	{ ICO_V(-1, ICO_T, 0), ICO_V(-ICO_T, 0, -1), ICO_V(0, 1, -ICO_T) },
-	{ ICO_V(-1, ICO_T, 0), ICO_V(-ICO_T, 0, 1), ICO_V(-ICO_T, 0, -1) },
-	{ ICO_V(1, ICO_T, 0), ICO_V(ICO_T, 0, 1), ICO_V(0, 1, ICO_T) },
-	{ ICO_V(0, 1, ICO_T), ICO_V(0, -1, ICO_T), ICO_V(-ICO_T, 0, 1) },
-	{ ICO_V(-ICO_T, 0, 1), ICO_V(-1, -ICO_T, 0), ICO_V(-ICO_T, 0, -1) },
-	{ ICO_V(-ICO_T, 0, -1), ICO_V(0, -1, -ICO_T), ICO_V(0, 1, -ICO_T) },
-	{ ICO_V(0, 1, -ICO_T), ICO_V(ICO_T, 0, -1), ICO_V(1, ICO_T, 0) },
-	{ ICO_V(1, -ICO_T, 0), ICO_V(0, -1, ICO_T), ICO_V(ICO_T, 0, 1) },
-	{ ICO_V(1, -ICO_T, 0), ICO_V(-1, -ICO_T, 0), ICO_V(0, -1, ICO_T) },
-	{ ICO_V(1, -ICO_T, 0), ICO_V(0, -1, -ICO_T), ICO_V(-1, -ICO_T, 0) },
-	{ ICO_V(1, -ICO_T, 0), ICO_V(ICO_T, 0, -1), ICO_V(0, -1, -ICO_T) },
-	{ ICO_V(1, -ICO_T, 0), ICO_V(ICO_T, 0, 1), ICO_V(ICO_T, 0, -1) },
-	{ ICO_V(0, -1, ICO_T), ICO_V(0, 1, ICO_T), ICO_V(ICO_T, 0, 1) },
-	{ ICO_V(-1, -ICO_T, 0), ICO_V(-ICO_T, 0, 1), ICO_V(0, -1, ICO_T) },
-	{ ICO_V(0, -1, -ICO_T), ICO_V(-ICO_T, 0, -1), ICO_V(-1, -ICO_T, 0) },
-	{ ICO_V(ICO_T, 0, -1), ICO_V(0, 1, -ICO_T), ICO_V(0, -1, -ICO_T) },
-	{ ICO_V(ICO_T, 0, 1), ICO_V(1, ICO_T, 0), ICO_V(ICO_T, 0, -1) },
-#undef ICO_V
-#undef ICO_T
-};
-
-/* an ellipsoid (a unit sphere under axes u, v, w about center) as
-triangles into out; returns how many (20, or 0 without room) */
-static long ellipsoid_triangles(float *out, long room, const float *center, const float *u, const float *v,
-	const float *w)
-{
-	long triangle, corner;
-
-	if (room < 20)
-		return 0;
-	for (triangle = 0; triangle < 20; triangle++)
-	{
-		for (corner = 0; corner < 3; corner++)
-		{
-			const float *p = &icosahedron[triangle][corner * 3];
-			float *q = out + triangle * 9 + corner * 3;
-			int axis;
-
-			/* (the table's winding checked: each face's normal points out) */
-			for (axis = 0; axis < 3; axis++)
-				q[axis] = center[axis] + u[axis] * p[0] + v[axis] * p[1] + w[axis] * p[2];
-		}
-	}
-	return 20;
-}
-
-/* a bone from a to b, r thick each way, ending in round caps */
-static long bone_triangles(float *out, long room, const real_point3d *a, const real_point3d *b, float r)
-{
-	float center[3] = { (a->x + b->x) * 0.5f, (a->y + b->y) * 0.5f, (a->z + b->z) * 0.5f };
-	float d[3] = { b->x - a->x, b->y - a->y, b->z - a->z };
-	float length = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-	float u[3], v[3], w[3], half, l;
-
-	if (length < 1e-4f)
-	{
-		float x[3] = { r, 0, 0 }, y[3] = { 0, r, 0 }, z[3] = { 0, 0, r };
-
-		return ellipsoid_triangles(out, room, center, x, y, z);
-	}
-	d[0] /= length;
-	d[1] /= length;
-	d[2] /= length;
-	if (fabsf(d[2]) < 0.9f)
-	{
-		v[0] = -d[1];
-		v[1] = d[0];
-		v[2] = 0.0f;
-	}
-	else
-	{
-		v[0] = 0.0f;
-		v[1] = -d[2];
-		v[2] = d[1];
-	}
-	l = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-	v[0] /= l;
-	v[1] /= l;
-	v[2] /= l;
-	w[0] = d[1] * v[2] - d[2] * v[1];
-	w[1] = d[2] * v[0] - d[0] * v[2];
-	w[2] = d[0] * v[1] - d[1] * v[0];
-	half = length * 0.5f + r * 0.6f;
-	u[0] = d[0] * half;
-	u[1] = d[1] * half;
-	u[2] = d[2] * half;
-	v[0] *= r;
-	v[1] *= r;
-	v[2] *= r;
-	w[0] *= r;
-	w[1] *= r;
-	w[2] *= r;
-	return ellipsoid_triangles(out, room, center, u, v, w);
-}
-
-/* the shapes for the rays: the drawn models, the collision models, or
-ellipsoids (display.ray_tracing_shapes) */
+/* the shapes for the rays: the drawn models or the collision models
+(display.ray_tracing_shapes) */
 enum
 {
 	_ray_shapes_model,
 	_ray_shapes_collision,
-	_ray_shapes_simple,
 };
 
 /* the model's level of detail in the rays: high (of super low to super high) */
@@ -576,7 +472,8 @@ static float *triangle_cutout(const float *triangle)
 	return ray_cutouts && ray_triangles_base ? ray_cutouts + (triangle - ray_triangles_base) / 9 * 8 : NULL;
 }
 
-static long model_triangles(struct object_datum *object, const real_matrix4x3 *matrices, float *out, long room)
+static long model_triangles(struct object_datum *object, const real_matrix4x3 *matrices, float *out, long room,
+	const real_matrix4x3 *rigid)
 {
 	const struct object_definition *definition = object_definition_get(object->definition_index);
 	const struct model *model;
@@ -591,8 +488,16 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 	if (model->nodes.count <= 0 || model->nodes.count > RAY_TRACED_MAXIMUM_NODES)
 		return 0;
 	nodes = (const struct model_node *)model->nodes.address;
+	/* (each node's pose over its rest pose; or, rigid, the model at rest,
+	placed where the object is) */
 	for (node_index = 0; node_index < model->nodes.count; node_index++)
-		matrix4x3_multiply(&matrices[node_index], &nodes[node_index].runtime_default_inverse_matrix, &relative[node_index]);
+	{
+		if (rigid)
+			relative[node_index] = *rigid;
+		else
+			matrix4x3_multiply(&matrices[node_index], &nodes[node_index].runtime_default_inverse_matrix,
+				&relative[node_index]);
+	}
 	for (region_index = 0; region_index < model->regions.count && count < room; region_index++)
 	{
 		const struct model_region *region = (const struct model_region *)model->regions.address + region_index;
@@ -882,7 +787,7 @@ static long object_triangles_sane(long object_index, const struct object_datum *
 				if (!logged[slot])
 				{
 					logged[slot] = object->definition_index;
-					platform_log("ray tracing: %s's shape reaches %.1f from it (its radius %.1f); left out",
+					platform_log("ray tracing: %s's shape reaches %.1f from it (its radius %.1f): posed from nodes not placed",
 						tag_get_name(object->definition_index), sqrtf(dx * dx + dy * dy + dz * dz),
 						object->object.bounding_sphere_radius);
 					break;
@@ -911,18 +816,31 @@ static long object_shapes(long object_index, struct object_datum *object, float 
 	/* the drawn model */
 	if (shapes == _ray_shapes_model)
 	{
-		count = model_triangles(object, matrices, out, room);
-		/* (a drawn model read wrong - its vertices far off: its collision
-		model instead) */
+		count = model_triangles(object, matrices, out, room, NULL);
 		if (count > 0 && object_triangles_sane(object_index, object, out, count))
 		{
 			ray_model_made = TRUE;
 			return count;
 		}
+		/* (posed from nodes the game has not placed - a turret's, at the
+		world's origin: the model at rest where the object is, exact for
+		what does not bend) */
+		if (count > 0)
+		{
+			real_matrix4x3 placed;
+
+			object_get_world_matrix(object_index, &placed);
+			count = model_triangles(object, matrices, out, room, &placed);
+			if (count > 0 && object_triangles_sane(object_index, object, out, count))
+			{
+				ray_model_made = TRUE;
+				return count;
+			}
+		}
 		count = 0;
 	}
 	/* the collision model: its meshes, where the game's bullets hit */
-	if (shapes != _ray_shapes_simple && matrices && definition->object.collision_model.index != NONE)
+	if (matrices && definition->object.collision_model.index != NONE)
 	{
 		const struct collision_model *model = collision_model_definition_get(definition->object.collision_model.index);
 		const struct collision_node *nodes = (const struct collision_node *)model->nodes.address;
@@ -963,38 +881,8 @@ static long object_shapes(long object_index, struct object_datum *object, float 
 		if (count > 0)
 			return count;
 	}
-	/* without (or simple shapes): a biped's bones */
-	if (object->object.type == _object_type_biped && matrices && definition->object.model.index != NONE)
-	{
-		const struct model *model = model_definition_get(definition->object.model.index);
-		const struct model_node *nodes = (const struct model_node *)model->nodes.address;
-		long node_index;
-		float r = PIN(radius * 0.13f, 0.02f, 0.12f);
-
-		for (node_index = 0; node_index < model->nodes.count; node_index++)
-		{
-			short parent = nodes[node_index].parent_node_index;
-
-			if (parent < 0 || parent >= model->nodes.count)
-				continue;
-			count += bone_triangles(out + count * 9, room - count, &matrices[parent].position,
-				&matrices[node_index].position, r);
-		}
-		return count;
-	}
-	/* or its bounding sphere along its axes */
-	{
-		const real_vector3d *forward = &object->object.forward, *up = &object->object.up;
-		float center[3] = { object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y,
-			object->object.bounding_sphere_center.z };
-		float u[3] = { forward->i * radius * 0.85f, forward->j * radius * 0.85f, forward->k * radius * 0.85f };
-		float w[3] = { up->i * radius * 0.35f, up->j * radius * 0.35f, up->k * radius * 0.35f };
-		float v[3] = { (up->j * forward->k - up->k * forward->j) * radius * 0.45f,
-			(up->k * forward->i - up->i * forward->k) * radius * 0.45f,
-			(up->i * forward->j - up->j * forward->i) * radius * 0.45f };
-
-		return ellipsoid_triangles(out, room, center, u, v, w);
-	}
+	/* (without either: none - left out of the rays, not guessed at) */
+	return 0;
 }
 
 /* one object's triangles, and their cutouts (none but a drawn model's) */

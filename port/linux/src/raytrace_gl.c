@@ -99,7 +99,7 @@ static struct
 	float occlusion_strength, reflection_strength, bounce_strength, shadow_strength, radius;
 	int objects;
 	/* the objects' shapes in the rays: 0 the drawn models, 1 the collision
-	models, 2 ellipsoids */
+	models */
 	int shapes;
 	/* display.ray_tracing_lights: every light traced, in place of the game's */
 	int traced_lights;
@@ -776,14 +776,14 @@ static struct
 static void initialize(void);
 
 /* F4: the objects' shapes in the rays next - the drawn models, the
-collision models, ellipsoids; returns their name */
+collision models; returns their name */
 const char *halo_ray_tracing_shapes_next(void)
 {
-	static const char *const names[] = { "the drawn models", "the collision models", "ellipsoids" };
+	static const char *const names[] = { "the drawn models", "the collision models" };
 
 	if (!ray.initialized)
 		initialize();
-	ray.shapes = (ray.shapes + 1) % 3;
+	ray.shapes = (ray.shapes + 1) % 2;
 	return names[ray.shapes];
 }
 
@@ -906,7 +906,7 @@ static void initialize(void)
 	{
 		const char *shapes = config_string("display.ray_tracing_shapes");
 
-		ray.shapes = !strcmp(shapes, "collision") ? 1 : !strcmp(shapes, "simple") ? 2 : 0;
+		ray.shapes = !strcmp(shapes, "collision") ? 1 : 0;
 	}
 	ray.traced_lights = strcmp(config_string("display.ray_tracing_lights"), "game") != 0;
 	ray.drawn_level = strcmp(config_string("display.ray_tracing_level"), "collision") != 0;

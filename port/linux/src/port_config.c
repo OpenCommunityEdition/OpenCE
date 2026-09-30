@@ -140,8 +140,8 @@ static const struct config_setting config_settings[] =
 	{ "display.ray_tracing_shapes", _config_string, "\"model\"", "HALO_RAY_TRACING_SHAPES", _environment_value,
 		_platform_all,
 		"The characters' and vehicles' shapes in Metal's rays: \"model\" (their drawn\n"
-		"models, skinned as drawn), \"collision\" (the meshes their bullets hit) or\n"
-		"\"simple\" (ellipsoids); F4 steps through them (macOS)." },
+		"models, skinned as drawn) or \"collision\" (the meshes their bullets hit);\n"
+		"F4 switches them (macOS)." },
 	{ "display.ray_tracing_lights", _config_string, "\"traced\"", "HALO_RAY_TRACING_LIGHTS", _environment_value,
 		_platform_all,
 		"The lights on the level in Metal's rays: \"traced\" (every light the game has,\n"

@@ -75,7 +75,7 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
-| F4 | ⌘J | The characters' and vehicles' shapes in the rays: their drawn models, their collision models, ellipsoids. |
+| F4 | ⌘J | The characters' and vehicles' shapes in the rays: their drawn models or their collision models. |
 | F5 | ⌘L | The ray probe: draw the rays the lighting sends from the surface at the crosshair; again to freeze them in place (walk round them); again for off. |
 | F6 | ⌘B | Step through what the ray tracing shows: the lighting, the ray view, split, the occlusion (refer to "Ray-traced lighting"). |
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
@@ -209,9 +209,8 @@ and traced from both sides; F4 / ⌘J (or `display.ray_tracing_shapes`)
 switches to their collision models - the meshes the game tests its bullets
 against, a
 mesh for each node's region as it is now (its damage permutation), placed
-each frame by the node's matrix as the animation poses it. A unit without
-them is its skeleton's bones, each an ellipsoid (bipeds), or its bounding
-sphere flattened along its axes. Each object is a mesh of its own beside the
+each frame by the node's matrix as the animation poses it. A drawn model
+that cannot be read is its collision model; one with neither is left out. Each object is a mesh of its own beside the
 level's, in a scene rebuilt each frame, and the rays choose what they see
 by the instances' masks:
 
@@ -231,7 +230,7 @@ you see your own shadow, which the game never drew in the first person.
 | Thing | In the rays as | Casts shadows | Lights |
 | --- | --- | --- | --- |
 | The level | its drawn triangles, with each surface's colour, the light it gives off and its lightmap (`display.ray_tracing_level`: or its collision mesh) | yes | its glowing surfaces (lamps, panels) |
-| Characters, vehicles, weapons, items, scenery, devices | their drawn models (or collision models, or ellipsoids: F4) | yes | their light volumes |
+| Characters, vehicles, weapons, items, scenery, devices | their drawn models (or collision models: F4) | yes | their light volumes |
 | Projectiles and grenades | their drawn models | yes | their glows (a needle's pink) |
 | Your body | its drawn model | the sun's only (the flashlight is in it) | - |
 | The sun and the sky | the sky tag's lights: the sun far away, its wide lights (the sky's dome) | - | traced, with their shadows |
