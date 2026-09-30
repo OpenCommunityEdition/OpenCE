@@ -159,7 +159,6 @@ the setting for one start of the game. It has priority over the file.
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
-| `network.netcode` | `"distributed"` | `HALO_NETCODE` | `"distributed"`: each machine moves its own player at once, and the host makes the decisions (refer to `NETCODE.md`). `"lockstep"`: as on the Xbox. The host's setting applies: a machine that joins a game uses the netcode of the host. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -269,9 +268,10 @@ These are the differences from the Xbox:
   The other machines are also in the game.
 - In free-for-all games, each player is a team.
 
-Linux, Windows and Android machines can play in the same game. With the
-netcode `"lockstep"`, each machine must calculate the same floating-point
-results. Thus all the ports:
+Linux, Windows and Android machines can play in the same game. Each machine
+simulates the players from the same inputs, and the host does not correct
+all of the game. Thus each machine must calculate the same floating-point
+results, and all the ports:
 
 - Compile without fused multiply-add (`-ffp-contract=off`).
 - Use the math functions of musl (`port/include/halo_math.h`,
@@ -298,8 +298,8 @@ interface.
 ### Test with many machines
 
 `tools/system_link_bots.py` adds simple machines to a game. Each machine has
-one player. The machines obey the system link protocol and send input, but
-they do not calculate the game.
+one player. The machines obey the system link protocol, but they do not
+calculate the game or move their players.
 
 1. Start a game on the host.
 2. Enter `python tools/system_link_bots.py --host 127.0.0.200 --machines 127 --start`.

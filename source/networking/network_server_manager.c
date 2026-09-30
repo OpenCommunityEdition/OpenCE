@@ -494,7 +494,6 @@ enum
 	MAXIMUM_MACHINE_NAME_LENGTH = 32,
 	NUMBER_OF_MULTIPLAYER_TEAMS = 2,
 	NETWORK_GAME_PLAYER_QUIT_DELAY = 33,
-	NETWORK_GAME_CLIENT_STALL_TIMEOUT = 2000,
 	/* the time the other machines have to load the map once the first has
 	finished, allowing for many machines of mixed speed */
 	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING =
@@ -1201,18 +1200,6 @@ void network_game_server_open_game(
 	return;
 }
 
-void network_game_server_close_game(
-	struct network_game_server *server)
-{
-	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x208, server);
-
-	SET_FLAG(server->flags, _network_game_server_game_open_bit, FALSE);
-	network_server_allow_client_connections(server->connection, FALSE);
-	network_event("closing game");
-
-	return;
-}
-
 boolean network_game_server_start_network_game(
 	struct network_game_server *server)
 {
@@ -1669,10 +1656,9 @@ boolean network_game_server_add_player_to_game(
 		if (player->primary_color_index == NONE)
 			get_unique_random_color(server, player);
 
-		/* (the host chooses the player's slot, which in the distributed
-		netcode's games is its datum on every machine: network_game_add_player) */
-		if (network_game_distributed())
-			player->player_list_index = NONE;
+		/* (the host chooses the player's slot, which is its datum on every
+		machine: network_game_add_player) */
+		player->player_list_index = NONE;
 		success = network_game_add_player(&server->game, player);
 		if (success == TRUE)
 		{
@@ -1721,20 +1707,14 @@ void network_game_server_update_ticks(
 				update_server_next_update();
 				update_server_build_server_update(NONE, &update, &update_number);
 
-				game_update.update_number = update_number;
-				game_update.random_seed = get_random_seed();
-				game_update.game_time = game_time_get();
-				game_update.player_count = update.player_count;
 				/* (the distributed netcode relays the actions unreliably, each
 				tick's buttons with the next ticks', network_distributed.c: this
 				update only keeps the clients' count of the host's ticks) */
-				if (network_game_distributed())
-					game_update.player_count = 0;
-
-				csmemcpy(
-					game_update.player_updates,
-					update.player_updates,
-					update.player_count * PLAYER_UPDATE_SIZE);
+				csmemset(&game_update, 0, sizeof(game_update));
+				game_update.update_number = update_number;
+				game_update.random_seed = get_random_seed();
+				game_update.game_time = game_time_get();
+				game_update.player_count = 0;
 
 				message = create_network_game_message(
 					_message_server_game_update,
@@ -1826,7 +1806,7 @@ which a machine in the pregame would refuse. */
 boolean network_game_server_accepts_late_joins(
 	struct network_game_server *server)
 {
-	return network_game_distributed() && server->state == _network_game_server_state_ingame &&
+	return server->state == _network_game_server_state_ingame &&
 		network_game_server_game_is_open(server);
 }
 
@@ -1922,7 +1902,7 @@ static void network_game_server_keep_late_joiners_alive(
 	struct message_server_pregame_keep_alive message_packet = { 0 };
 	long client_machine_index;
 
-	if (!network_game_distributed() || now - server->time_of_last_keep_alive <= 5UL * MILLISECONDS_PER_SECOND)
+	if (now - server->time_of_last_keep_alive <= 5UL * MILLISECONDS_PER_SECOND)
 		return;
 	server->time_of_last_keep_alive = now;
 	for (client_machine_index = 0; client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; client_machine_index++)
@@ -2404,29 +2384,6 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	return client_machine;
 }
 
-long network_game_server_get_oldest_client_update_received(
-	struct network_game_server *server)
-{
-	unsigned long oldest_update = (unsigned long)NONE;
-	long index;
-
-	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
-	{
-		struct network_game_server_client_machine *client_machine =
-			&server->client_machines[index];
-
-		if (client_machine->machine_index >= 0 &&
-			client_machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
-		{
-			oldest_update = MIN(
-				oldest_update,
-				client_machine->last_received_update_sequence_number);
-		}
-	}
-
-	return oldest_update;
-}
-
 boolean network_game_server_game_can_start(
 	struct network_game_server *server)
 {
@@ -2775,89 +2732,6 @@ static void network_game_server_dump(
 		server->time_of_first_client_loading_completion);
 	network_event("*************END*************");
 #endif
-
-	return;
-}
-
-void network_game_server_stalled_on_client(
-	struct network_game_server *server,
-	boolean stalled)
-{
-	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x59E, server);
-
-	if (stalled)
-	{
-		unsigned long oldest_update = (unsigned long)NONE;
-		long culprit = NONE;
-		long client_machine_index;
-
-		for (client_machine_index = 0;
-			client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
-			client_machine_index++)
-		{
-			if (server->client_machines[client_machine_index].machine_index >= 0 &&
-				server->client_machines[client_machine_index].machine_index <
-					MAXIMUM_NETWORK_MACHINE_COUNT &&
-				server->client_machines[client_machine_index].last_received_update_sequence_number <
-					oldest_update)
-			{
-				oldest_update =
-					server->client_machines[client_machine_index].last_received_update_sequence_number;
-				culprit = client_machine_index;
-			}
-		}
-
-		match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5B1, culprit != NONE);
-
-		if (server->client_machines[culprit].stall_start_time)
-		{
-			if (system_milliseconds() - server->client_machines[culprit].stall_start_time >=
-				NETWORK_GAME_CLIENT_STALL_TIMEOUT)
-			{
-				char machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
-				boolean removed;
-
-				network_event(
-					"forcibly removing client system '%s' due to timeout in-game",
-					wide_to_ascii(
-						server->game.machines[
-							server->client_machines[culprit].machine_index].name,
-						machine_name,
-						MAXIMUM_MACHINE_NAME_LENGTH)
-						? machine_name
-						: "<unknown name>");
-
-				removed = network_game_server_remove_client_machine_from_game(
-					server,
-					&server->client_machines[culprit]);
-
-				match_assert(NETWORK_SERVER_MANAGER_FILE, 0x5C1, removed);
-			}
-		}
-		else
-		{
-			server->client_machines[culprit].stall_start_time = system_milliseconds();
-		}
-
-		for (client_machine_index = 0;
-			client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
-			client_machine_index++)
-		{
-			if (client_machine_index != culprit)
-				server->client_machines[client_machine_index].stall_start_time = 0;
-		}
-	}
-	else
-	{
-		long client_machine_index;
-
-		for (client_machine_index = 0;
-			client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
-			client_machine_index++)
-		{
-			server->client_machines[client_machine_index].stall_start_time = 0;
-		}
-	}
 
 	return;
 }
@@ -3512,10 +3386,8 @@ static boolean network_game_server_idle_pregame_tasks(
 				network_game_server_have_all_machines_have_precached(server) &&
 				server->countdown_state.paused == FALSE)
 			{
-				/* (the distributed netcode's games stay open: a machine may join
-				one in progress, network_game_server_start_late_joiner) */
-				if (!network_game_distributed())
-				network_game_server_close_game(server);
+				/* (the game stays open: a machine may join it in progress,
+				network_game_server_start_late_joiner) */
 				if ((success = network_game_server_start_network_game(server)) != TRUE)
 					network_event("network_game_server_start_network_game() failed");
 			}

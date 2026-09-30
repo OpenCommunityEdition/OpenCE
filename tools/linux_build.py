@@ -80,8 +80,8 @@ LINUX_ABI_FLAGS = [
     # the game keeps EBP frames (MSVC /Oy-): get_return_eip and the stack
     # walker follow the frame chain
     "-fno-omit-frame-pointer",
-    # the same floating point results on every port (system link games run
-    # in lockstep, and a machine whose results differ goes out of sync): no
+    # the same floating point results on every port (every machine in a
+    # system link game simulates it from the same inputs): no
     # fused multiply-adds, which -march=native and ARM64 would otherwise
     # emit (port/include/halo_math.h)
     "-ffp-contract=off",

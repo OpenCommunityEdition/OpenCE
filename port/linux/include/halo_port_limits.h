@@ -69,7 +69,8 @@ Raise it with any change to what the machines send each other. */
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0
 #define HALO_PORT_ADVERTISED_FLAGS_OFFSET 2
-/* ... the host plays the distributed netcode (else lockstep) */
+/* ... the host plays the distributed netcode (always, since the lockstep
+netcode was removed; hosts of version 4 built before then may not) */
 #define HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG 0x01
 
 /* a message header's 12-bit length allows messages of up to 0xFFF bytes,

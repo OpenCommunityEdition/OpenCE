@@ -12,10 +12,11 @@ addresses are yours).
 
 joins 127 machines to the host at 127.0.0.1, marks the map precached, asks
 the host to start once everyone is in, then plays: every machine
-acknowledges each tick's update and sends its player's input (standing
-still and slowly turning), the way a real client keeps a lockstep game
-running. The bots do not simulate the game; they only keep up with the
-host's update stream. Ctrl+C leaves.
+acknowledges each tick's update and sends the client's game update message
+(standing still and slowly turning), which keeps its connection alive. The
+bots do not simulate the game, nor send the distributed netcode's input
+(port/linux/NETCODE.md), so their players stand where they spawn. Ctrl+C
+leaves.
 
 The protocol (network_messages.c): a message is a 2-byte big-endian header
 (length << 4 | type << 2, length including the header), then a packet: a

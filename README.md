@@ -73,7 +73,7 @@ The game can play system link games on a local network and on the internet:
 - Linux, Windows and Android machines can play in the same game.
 - An invite link lets a machine join a game on the internet. No server of
   this project is necessary.
-- The default netcode is new. Each machine moves its own player at once,
+- The netcode is new. Each machine moves its own player at once,
   and the host makes the decisions for the game. Refer to
   [port/linux/NETCODE.md](port/linux/NETCODE.md).
 

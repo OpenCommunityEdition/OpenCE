@@ -591,8 +591,7 @@ static boolean network_game_server_machine_is_loading_late(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine)
 {
-	return network_game_distributed() &&
-		network_game_server_get_state(server, NULL) == _network_game_server_state_ingame &&
+	return network_game_server_get_state(server, NULL) == _network_game_server_state_ingame &&
 		!network_game_server_client_machine_is_loaded(server, machine);
 }
 
@@ -1474,12 +1473,12 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			}
 
 			/* the native builds' network version and netcode (a client
-			refuses a host of another version, and plays the host's netcode:
-			network_client_manager.c) */
+			refuses a host of another version, or of the lockstep netcode
+			older builds had: network_client_manager.c) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(HALO_PORT_NETWORK_VERSION & 0xFF);
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
-				network_game_distributed() ? HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG : 0;
+				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG;
 			if (network_game_server_game_is_open(server))
 			{
 				advertisement.flags |= FLAG(_game_advertisement_open_bit);

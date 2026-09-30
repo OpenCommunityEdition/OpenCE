@@ -141,10 +141,6 @@ typedef char network_game_size_assert[
 
 /* ---------- prototypes */
 
-static long compare_network_players(
-	struct network_player *p1,
-	struct network_player *p2);
-
 /* ---------- globals */
 
 /* ---------- public code */
@@ -342,8 +338,8 @@ boolean network_game_add_player(
 			if (player_index == NETWORK_GAME_PLAYER_SLOTS && network_player_is_valid(player))
 			{
 				new_player_index = NONE;
-				/* (the distributed netcode's: the host's slot, as it chose it) */
-				if (network_game_distributed() && player->player_list_index != NONE)
+				/* (the host's slot, as it chose it) */
+				if (player->player_list_index != NONE)
 				{
 					if (VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS) &&
 						game->players[player->player_list_index].player_list_index == NONE)
@@ -356,7 +352,7 @@ boolean network_game_add_player(
 				{
 					if (game->players[player_index].player_list_index == NONE
 						/* (not the slot of a player who left the game in progress) */
-						&& !(network_game_distributed() && network_game_player_slot_held(player_index))
+						&& !network_game_player_slot_held(player_index)
 						)
 					{
 						new_player_index = player_index;
@@ -435,9 +431,9 @@ boolean network_game_spawn_player(
 		network_player_is_valid(player));
 
 	controller_index = network_game_player_is_local(player) ? player->controller_index : NONE;
-	/* (the distributed netcode's: the datum at the player's slot, with the
-	identifier datum_new would give it) */
-	if (network_game_distributed() && VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS))
+	/* (the datum at the player's slot, with the identifier datum_new would
+	give it) */
+	if (VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS))
 	{
 		player_index = player_new(player->machine_index,
 			((long)(word)player_data->next_identifier << 16) | player->player_list_index, controller_index, player);
@@ -692,26 +688,16 @@ boolean network_game_create_game_objects(
 		game->local_data.game_objects_loaded = TRUE;
 		game_initialize_for_new_map();
 
-		/* (the distributed netcode's players stay in their slots, which are
-		their datums: network_game_spawn_player) */
-		if (!network_game_distributed())
-		qsort(
-			game->players,
-			NETWORK_GAME_PLAYER_SLOTS,
-			sizeof(struct network_player),
-			(int(__cdecl *)(const void *, const void *))compare_network_players);
-
+		/* (the players stay in their slots, which are their datums:
+		network_game_spawn_player) */
 		for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
 		{
 			if (!network_player_is_valid(&game->players[player_index]))
 			{
-				/* (unsorted, the slots of players who left are among them) */
-				if (network_game_distributed())
-					continue;
-				break;
+				/* (the slots of players who left are among them) */
+				continue;
 			}
-			if (network_game_distributed())
-				game->players[player_index].player_list_index = (char)player_index;
+			game->players[player_index].player_list_index = (char)player_index;
 
 			if (!network_game_spawn_player(&game->players[player_index]))
 			{
@@ -729,38 +715,3 @@ boolean network_game_create_game_objects(
 }
 
 /* ---------- private code */
-
-static long compare_network_players(
-	struct network_player *p1,
-	struct network_player *p2)
-{
-	long result = 0;
-
-	match_assert(
-		"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
-		0x142,
-		p1 && p2);
-
-	if (!network_player_is_valid(p1) && !network_player_is_valid(p2))
-		result = 0;
-	else if (!network_player_is_valid(p1) && network_player_is_valid(p2))
-		result = 1;
-	else if (network_player_is_valid(p1) && !network_player_is_valid(p2))
-		result = -1;
-	else if (p1->machine_index > p2->machine_index)
-		result = 1;
-	else if (p1->machine_index < p2->machine_index)
-		result = -1;
-	else if (p1->controller_index > p2->controller_index)
-		result = 1;
-	else if (p1->controller_index < p2->controller_index)
-		result = -1;
-	else
-		match_vassert(
-			"c:\\halo\\SOURCE\\networking\\network_game_manager.c",
-			0x165,
-			FALSE,
-			"multiple players on the same machine cannot have the same controller index");
-
-	return result;
-}

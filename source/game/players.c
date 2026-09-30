@@ -300,7 +300,6 @@ enum
 		network_distributed_player_picked_up(player_index, kind, definition_index, count)
 
 static void network_player_log_idle_action(long player_index, unsigned long control_flags);
-boolean network_game_distributed(void);
 
 /* whether this machine decides pickups: not a client of the distributed
 netcode, whose players' weapons, grenades and power-ups are the host's
@@ -1495,7 +1494,7 @@ static void network_player_log_idle_action(
 	long nearest_index = NONE;
 	real nearest_distance = 0.0f;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		player->local_player_index != NONE || player->action_result != _player_action_result_reload ||
 		!(control_flags & (FLAG(_unit_control_action_bit) | FLAG(_unit_control_swap_weapons_bit))) ||
 		absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
