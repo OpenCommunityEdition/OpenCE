@@ -59,6 +59,13 @@ long halo_ray_tracing_lights(float *lights, long maximum, long all);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere, long shapes);
+/* the drawn level, its materials and lightmap pages, and the sky's light
+(port/linux/game/raytrace_world.c) */
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
+	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count);
+unsigned char halo_ray_tracing_level_materials(const float **materials, long *count);
+unsigned char halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height);
+unsigned char halo_ray_tracing_sky(float *sky);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -89,6 +96,22 @@ static struct
 	int shapes;
 	/* display.ray_tracing_lights: every light traced, in place of the game's */
 	int traced_lights;
+	/* display.ray_tracing_level: the drawn level in the rays (else its
+	collision surfaces); display.ray_tracing_gi: the traced light in place of
+	the lightmaps' (1; 2 without the lightmaps' light where the rays land),
+	its parts' strengths, and the light buffer's pass */
+	int drawn_level, gi;
+	float gi_sun, gi_bounce, gi_glow, gi_lights;
+	unsigned long level_generation;
+	GLuint inject_program;
+	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split;
+	int gi_split;
+	GLuint irradiance_texture, gbuffer_texture;
+	/* this frame's rays, traced for the light buffer (then the lighting
+	pass takes them), and the last frame's camera (13 values) */
+	int gi_traced;
+	GLuint gi_results;
+	float previous_camera[13];
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -168,6 +191,46 @@ way), and the composite blends them back up across edges by depth */
 	"	vec2 ndc = vec2(v.x / (v.z * u[0].z * u[0].w), v.y / (v.z * u[0].z));\n" \
 	"	return u[1].xy + (ndc * 0.5 + 0.5) * u[1].zw;\n" \
 	"}\n"
+
+/* the traced light into the light buffer, in place of the lightmaps', on
+the level's pixels (not the objects', drawn before, whole): blurred over
+5x5 of the rays' pixels of like depth and facing */
+static const char inject_source[] =
+	SHADER_HEADER
+	COMMON_SOURCE
+	"uniform sampler2D irradiance_texture;\n"
+	"uniform sampler2D gbuffer_texture;\n"
+	"uniform int split;\n"
+	"out vec4 result;\n"
+	"void main()\n"
+	"{\n"
+	"	ivec2 p = ivec2(gl_FragCoord.xy);\n"
+	/* (split: the game's light on the left half, the traced on the right) */
+	"	if (split != 0 && float(p.x) < u[1].x + u[1].z * 0.5) discard;\n"
+	"	float d = depth_at(p);\n"
+	"	if (d >= 0.99999) discard;\n"
+	"	float z = linear_depth(d);\n"
+	"	ivec2 lo = ivec2(u[1].xy) / TRACE_SCALE;\n"
+	"	ivec2 hi = max(lo, (ivec2(u[1].xy + u[1].zw) + TRACE_SCALE - 1) / TRACE_SCALE - 1);\n"
+	"	ivec2 q0 = clamp(p / TRACE_SCALE, lo, hi);\n"
+	"	vec4 g0 = texelFetch(gbuffer_texture, q0, 0);\n"
+	"	if (g0.x < 0.0) discard;\n"
+	"	vec3 sum = vec3(0.0);\n"
+	"	float total = 0.0;\n"
+	"	for (int y = -2; y <= 2; y++)\n"
+	"		for (int x = -2; x <= 2; x++)\n"
+	"		{\n"
+	"			ivec2 q = clamp(q0 + ivec2(x, y), lo, hi);\n"
+	"			vec4 g = texelFetch(gbuffer_texture, q, 0);\n"
+	"			if (g.x <= 0.0) continue;\n"
+	"			float w = 1.0 / (1.0 + abs(g.x - z) / z * 40.0);\n"
+	"			w *= pow(max(dot(g.yzw, g0.yzw), 0.0), 8.0) * exp(-float(x * x + y * y) * 0.3);\n"
+	"			sum += texelFetch(irradiance_texture, q, 0).rgb * w;\n"
+	"			total += w;\n"
+	"		}\n"
+	"	if (total <= 0.0) discard;\n"
+	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
+	"}\n";
 
 static const char trace_source[] =
 	SHADER_HEADER
@@ -360,7 +423,13 @@ static const char composite_source[] =
 	"			float v = e.a;\n"
 	/* the world's occlusion (Metal's rays) with the screen's (which also
 	   finds the objects) */
-	"			if (rt_enabled != 0) v *= mix(1.0, texelFetch(rt_texture, q / TRACE_SCALE, 0).r, u[2].y);\n"
+	"			if (rt_enabled != 0)\n"
+	/* (2: a level pixel the traced light was put in the light buffer of,
+	   whose occlusion that light has) */
+	"			{\n"
+	"				float traced = texelFetch(rt_texture, q / TRACE_SCALE, 0).r;\n"
+	"				v = traced > 1.5 ? 1.0 : v * mix(1.0, traced, u[2].y);\n"
+	"			}\n"
 	"			visibility += v * w;\n"
 	"			vec4 lit_here = rt_enabled != 0 ? texelFetch(lit_rt, q / TRACE_SCALE, 0) : vec4(1.0, 0.0, 0.0, 0.0);\n"
 	"			dynamic_visibility += lit_here.r * w;\n"
@@ -673,6 +742,17 @@ static void initialize(void)
 		ray.shapes = !strcmp(shapes, "collision") ? 1 : !strcmp(shapes, "simple") ? 2 : 0;
 	}
 	ray.traced_lights = strcmp(config_string("display.ray_tracing_lights"), "game") != 0;
+	ray.drawn_level = strcmp(config_string("display.ray_tracing_level"), "collision") != 0;
+	{
+		const char *gi = config_string("display.ray_tracing_gi");
+
+		ray.gi = !strcmp(gi, "traced") ? 1 : !strcmp(gi, "black") ? 2 : 0;
+	}
+	ray.gi_sun = (float)config_real("display.ray_tracing_gi_sun");
+	ray.gi_bounce = (float)config_real("display.ray_tracing_gi_bounce");
+	ray.gi_glow = (float)config_real("display.ray_tracing_gi_glow");
+	ray.gi_lights = (float)config_real("display.ray_tracing_gi_lights");
+	ray.gi_split = config_boolean("display.ray_tracing_gi_split");
 	/* no drawing (debug.null_renderer: headless tests, bots) has no GL */
 	if (config_boolean("debug.null_renderer") || !glCreateShader)
 	{
@@ -715,6 +795,15 @@ static void initialize(void)
 			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
 			ray.gbuffer_objects = glGetUniformLocation(ray.gbuffer_program, "objects_texture");
 			ray.gbuffer_objects_known = glGetUniformLocation(ray.gbuffer_program, "objects_known");
+			ray.inject_program = link(inject_source, "ray tracing light buffer");
+			if (ray.inject_program)
+			{
+				ray.inject_uniforms = glGetUniformLocation(ray.inject_program, "u");
+				ray.inject_depth = glGetUniformLocation(ray.inject_program, "depth_texture");
+				ray.inject_irradiance = glGetUniformLocation(ray.inject_program, "irradiance_texture");
+				ray.inject_gbuffer = glGetUniformLocation(ray.inject_program, "gbuffer_texture");
+				ray.inject_split = glGetUniformLocation(ray.inject_program, "split");
+			}
 			ray.objects_program = link(objects_source, "ray tracing objects' depth");
 			if (ray.objects_program)
 			{
@@ -838,7 +927,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[36], right[3], length;
+	float camera[80], right[3], length;
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -848,8 +937,41 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		ray.world_generation = generation;
 		host_rt_set_world(generation, vertices, (int)vertex_count, (const unsigned int *)indices, (int)triangle_count);
 	}
+	/* the drawn level, its materials as their colours are read, and its
+	lightmap pages as the texture cache loads them (two a frame) */
+	if (ray.drawn_level)
+	{
+		const float *level_vertices, *texcoords, *materials;
+		const unsigned long *level_indices, *triangle_materials;
+		long level_vertex_count, level_triangle_count, material_count, page, page_width, page_height, step;
+		const unsigned char *pixels;
+		unsigned long level_generation = halo_ray_tracing_level(&level_vertices, &texcoords, &level_vertex_count,
+			&level_indices, &triangle_materials, &level_triangle_count);
+
+		if (level_generation && level_generation != ray.level_generation)
+		{
+			ray.level_generation = level_generation;
+			host_rt_set_level(level_generation, level_vertices, texcoords, (int)level_vertex_count,
+				(const unsigned int *)level_indices, (const unsigned int *)triangle_materials, (int)level_triangle_count);
+		}
+		if (level_generation)
+		{
+			if (halo_ray_tracing_level_materials(&materials, &material_count))
+				host_rt_set_level_materials(materials, (int)material_count);
+			for (step = 0; step < 2 && halo_ray_tracing_level_page(&page, &pixels, &page_width, &page_height); step++)
+			{
+				static int pages;
+
+				host_rt_set_level_page((int)page, (int)page_width, (int)page_height, pixels);
+				pages++;
+				if (pages <= 3 || (pages & 15) == 0)
+					platform_log("ray tracing: lightmap page %ld (%ldx%ld), %d so far", page, page_width, page_height, pages);
+			}
+		}
+	}
 	width = (width + TRACE_SCALE - 1) / TRACE_SCALE;
 	height = (height + TRACE_SCALE - 1) / TRACE_SCALE;
+	ray.irradiance_texture = ray.gi ? host_rt_texture(3, width, height) : 0;
 	input = host_rt_texture(0, width, height);
 	output = host_rt_texture(1, width, height);
 	ray.lights_texture = host_rt_texture(2, width, height);
@@ -858,6 +980,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	glBindTexture(GL_TEXTURE_2D, depth);
 	if (!input || !output || !ray.lights_texture)
 		return 0;
+	ray.gbuffer_texture = input;
 	glBindFramebuffer(GL_FRAMEBUFFER, ray.gbuffer_framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, input, 0);
 	glDrawBuffers(1, &draw_buffer);
@@ -911,6 +1034,36 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[33] = probe.mode == 1 ? 1.0f : 0.0f;
 	camera[34] = ray.traced_lights ? 1.0f : 0.0f;
 	camera[35] = 0.0f;
+	/* the traced light (host_metal_rt.m): the sun's and the sky's colours
+	and powers, the mode, the parts' strengths, the frame, the drawn level,
+	the last frame's camera */
+	memset(camera + 36, 0, 44 * sizeof(float));
+	{
+		float sky[25];
+
+		if (halo_ray_tracing_sky(sky))
+		{
+			static int logged;
+
+			memcpy(camera + 36, sky + 3, 6 * sizeof(float));
+			/* the sky's wide lights: 64-79 */
+			memcpy(camera + 64, sky + 9, 16 * sizeof(float));
+			if (!logged)
+			{
+				logged = 1;
+				platform_log("ray tracing: the sky's sun %.2f %.2f %.2f, ambient %.2f %.2f %.2f",
+					sky[3], sky[4], sky[5], sky[6], sky[7], sky[8]);
+			}
+		}
+	}
+	camera[42] = (float)ray.gi;
+	camera[43] = ray.gi_bounce;
+	camera[44] = (float)(ray.frame & 65535);
+	camera[45] = ray.gi_sun;
+	camera[46] = ray.drawn_level ? 1.0f : 0.0f;
+	camera[47] = ray.gi_glow;
+	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
+	camera[61] = ray.gi_lights;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */
@@ -976,6 +1129,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	}
 	if (!host_rt_trace(camera, width, height))
 		return 0;
+	/* (this camera, for the next frame's) */
+	memcpy(ray.previous_camera, camera, 12 * sizeof(float));
+	ray.previous_camera[12] = 1.0f;
 	/* (the probe's rays: the last frame's, which the GPU has written) */
 	if (probe.mode == 1)
 		probe.count = host_rt_probe(probe.segments, PROBE_SEGMENTS);
@@ -1050,6 +1206,115 @@ void halo_ray_traced_light_stage(int stage)
 	xgpu_gl_state_invalidate();
 }
 
+/* the lighting pass's uniforms (the composite's and the rays') */
+static void lighting_uniforms(float *uniforms, float z_near, float z_far, float vertical_field_of_view,
+	const int *viewport, int width, int height)
+{
+	uniforms[0] = z_near;
+	uniforms[1] = z_far;
+	uniforms[2] = tanf(vertical_field_of_view * 0.5f);
+	uniforms[3] = (float)viewport[2] / (float)viewport[3];
+	uniforms[4] = (float)viewport[0];
+	uniforms[5] = (float)viewport[1];
+	uniforms[6] = (float)viewport[2];
+	uniforms[7] = (float)viewport[3];
+	uniforms[8] = ray.radius;
+	uniforms[9] = ray.occlusion_strength;
+	uniforms[10] = ray.reflection_strength;
+	uniforms[11] = ray.bounce_strength;
+	uniforms[12] = (float)(ray.frame & 63);
+	uniforms[13] = (float)width;
+	uniforms[14] = (float)height;
+	/* the reflections' strength for the composite; the screen's rays
+	trace none when Metal's do */
+	uniforms[15] = ray.reflection_strength;
+	if (ray.hardware)
+		uniforms[10] = 0.0f;
+}
+
+/* after the game's lightmaps and dynamic lights, before the textures
+multiply them in (render.c): with display.ray_tracing_gi, the rays traced
+now, and their light put in the light buffer in place of the game's on the
+level's pixels, for the textures to multiply as the lightmaps' */
+void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_field_of_view, const float *position,
+	const float *forward, const float *up)
+{
+#ifdef HALO_MACOS
+	GLuint color, depth, results;
+	int width, height, viewport[4];
+	float uniforms[16];
+	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+
+	ray.gi_traced = 0;
+	if (!ray.initialized)
+		initialize();
+	if (!ray.enabled || ray.failed || !ray.gi || !ray.hardware || !ray.inject_program || !ray.drawn_level ||
+		!(z_near > 0.0f) || !(z_far > z_near) || !(vertical_field_of_view > 0.0f) || !position || !forward || !up)
+	{
+		return;
+	}
+	if (!xgpu_current_targets(&color, &depth, &width, &height, viewport) || !color || !depth ||
+		viewport[2] < 16 || viewport[3] < 16)
+	{
+		return;
+	}
+	size_textures(width, height);
+	lighting_uniforms(uniforms, z_near, z_far, vertical_field_of_view, viewport, width, height);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_SCISSOR_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	glScissor(viewport[0] / TRACE_SCALE, viewport[1] / TRACE_SCALE, (viewport[2] + TRACE_SCALE - 1) / TRACE_SCALE,
+		(viewport[3] + TRACE_SCALE - 1) / TRACE_SCALE);
+	glBindVertexArray(ray.vertex_array);
+	results = world_rays(uniforms, position, forward, up, width, height, depth);
+	if (results && ray.irradiance_texture && ray.gbuffer_texture)
+	{
+		ray.gi_traced = 1;
+		ray.gi_results = results;
+		/* the light buffer's colour (not its alpha, the game's) */
+		glViewport(0, 0, width, height);
+		glScissor(viewport[0], viewport[1], viewport[2], viewport[3]);
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.output_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+		glDrawBuffers(1, &draw_buffer);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+		glUseProgram(ray.inject_program);
+		glUniform4fv(ray.inject_uniforms, 4, uniforms);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depth);
+		glBindSampler(1, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glUniform1i(ray.inject_depth, 1);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, ray.irradiance_texture);
+		glBindSampler(2, 0);
+		glUniform1i(ray.inject_irradiance, 2);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
+		glBindSampler(3, 0);
+		glUniform1i(ray.inject_gbuffer, 3);
+		glUniform1i(ray.inject_split, ray.gi_split);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	}
+	glActiveTexture(GL_TEXTURE0);
+	xgpu_gl_bind_device_vertex_array();
+	xgpu_gl_state_invalidate();
+#else
+	(void)z_near;
+	(void)z_far;
+	(void)vertical_field_of_view;
+	(void)position;
+	(void)forward;
+	(void)up;
+#endif
+}
+
 void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up)
 {
@@ -1078,26 +1343,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 		viewport[0], viewport[1], viewport[0] + viewport[2], viewport[1] + viewport[3],
 		GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-	uniforms[0] = z_near;
-	uniforms[1] = z_far;
-	uniforms[2] = tanf(vertical_field_of_view * 0.5f);
-	uniforms[3] = (float)viewport[2] / (float)viewport[3];
-	uniforms[4] = (float)viewport[0];
-	uniforms[5] = (float)viewport[1];
-	uniforms[6] = (float)viewport[2];
-	uniforms[7] = (float)viewport[3];
-	uniforms[8] = ray.radius;
-	uniforms[9] = ray.occlusion_strength;
-	uniforms[10] = ray.reflection_strength;
-	uniforms[11] = ray.bounce_strength;
-	uniforms[12] = (float)(ray.frame & 63);
-	uniforms[13] = (float)width;
-	uniforms[14] = (float)height;
-	/* the reflections' strength for the composite; the screen's rays
-	trace none when Metal's do */
-	uniforms[15] = ray.reflection_strength;
-	if (ray.hardware)
-		uniforms[10] = 0.0f;
+	lighting_uniforms(uniforms, z_near, z_far, vertical_field_of_view, viewport, width, height);
 
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
@@ -1129,8 +1375,12 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 #ifdef HALO_MACOS
-	if (ray.hardware && position && forward && up)
+	/* (traced already this frame, for the light buffer) */
+	if (ray.gi_traced)
+		world_results = ray.gi_results;
+	else if (ray.hardware && position && forward && up)
 		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
+	ray.gi_traced = 0;
 #else
 	(void)position;
 	(void)forward;

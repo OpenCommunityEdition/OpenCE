@@ -478,6 +478,42 @@ long halo_ray_tracing_lights(float *lights, long maximum, long all)
 	return count;
 }
 
+/* the drawn level, its materials and pages, and the sky: none here (the
+collision level stands in) */
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
+	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count)
+{
+	(void)vertices;
+	(void)texcoords;
+	(void)vertex_count;
+	(void)indices;
+	(void)triangle_materials;
+	(void)triangle_count;
+	return 0;
+}
+
+unsigned char halo_ray_tracing_level_materials(const float **materials, long *count)
+{
+	(void)materials;
+	(void)count;
+	return 0;
+}
+
+unsigned char halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height)
+{
+	(void)page;
+	(void)pixels;
+	(void)width;
+	(void)height;
+	return 0;
+}
+
+unsigned char halo_ray_tracing_sky(float *sky)
+{
+	(void)sky;
+	return 0;
+}
+
 /* the emitters: a needle's pink glow by the crate (world: the view's x, z, y) */
 long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera)
 {

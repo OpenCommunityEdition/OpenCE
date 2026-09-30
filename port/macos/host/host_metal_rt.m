@@ -75,6 +75,22 @@ static struct
 	id<MTLComputePipelineState> pipeline;
 	id<MTLAccelerationStructure> world;
 	unsigned int world_generation;
+	/* the drawn level (host_rt_set_level): its structure, its triangles'
+	indices, its vertices' lightmap coordinates and each triangle's material;
+	the materials (host_rt_set_level_materials: 2 float4 each); the lightmap
+	pages, packed into one texture (host_rt_set_level_page), and where each
+	is in it (a float4 each: its corner and size in the texture's units);
+	whether the rays use it this frame (the camera's 46) */
+	id<MTLAccelerationStructure> drawn;
+	unsigned int drawn_generation;
+	int use_drawn;
+	id<MTLBuffer> drawn_indices, drawn_texcoords, drawn_triangle_materials, drawn_materials, drawn_pages;
+	id<MTLTexture> atlas;
+	int atlas_x, atlas_y, atlas_row;
+	/* the traced light, accumulated over frames: the last frame's and this
+	one's, in turn */
+	id<MTLTexture> history[2];
+	int history_index;
 	/* the objects (host_rt_set_objects): a mesh for each, rebuilt each
 	frame, and the scene of the level and them. The buffers the frame writes
 	are in rings of three: the GPU may still read the last ones. */
@@ -91,10 +107,10 @@ static struct
 	float *object_triangles;
 	unsigned char *object_groups;
 	int object_count, objects_two_sided;
-	id<MTLTexture> textures[3];
-	unsigned int gl_textures[3];
-	EGLImage_ images[3];
-	int widths[3], heights[3];
+	id<MTLTexture> textures[4];
+	unsigned int gl_textures[4];
+	EGLImage_ images[4];
+	int widths[4], heights[4];
 	/* the lights (host_rt_set_lights): 12 floats each */
 	float lights[HOST_RT_MAXIMUM_LIGHTS * 12];
 	unsigned int light_count;
@@ -152,9 +168,14 @@ static NSString *const kernel_source = @
 	"	n++;\n"
 	"	probe[0] = float4(float(n), 0.0, 0.0, 0.0);\n"
 	"}\n"
+	"constexpr sampler linear_clamp(filter::linear, address::clamp_to_edge);\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	texture2d<float, access::write> lit [[texture(2)]],\n"
+	"	texture2d<float, access::sample> atlas [[texture(3)]],\n"
+	"	texture2d<float, access::write> irradiance [[texture(4)]],\n"
+	"	texture2d<float, access::read> history_in [[texture(5)]],\n"
+	"	texture2d<float, access::write> history_out [[texture(6)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
 	"	constant float *c [[buffer(1)]],\n"
 	"	primitive_acceleration_structure level [[buffer(2)]],\n"
@@ -165,6 +186,12 @@ static NSString *const kernel_source = @
 	"	constant uint &light_count [[buffer(7)]],\n"
 	"	constant float4 *emitters [[buffer(8)]],\n"
 	"	constant uint &emitter_count [[buffer(9)]],\n"
+	"	device const uint *indices [[buffer(10)]],\n"
+	"	device const float2 *texcoords [[buffer(11)]],\n"
+	"	device const uint *triangle_materials [[buffer(12)]],\n"
+	"	device const float4 *materials [[buffer(13)]],\n"
+	"	device const float4 *pages [[buffer(14)]],\n"
+	"	constant uint &gi_ready [[buffer(15)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -201,7 +228,25 @@ static NSString *const kernel_source = @
 	"		else\n"
 	"		{\n"
 	"			float3 base;\n"
-	"			if (h.instance_id == 0)\n"
+	"			if (h.instance_id == 0 && gi_ready != 0u)\n"
+	/* (with the drawn level: the light on it, as the rays find it - its
+	   lightmap times its colour, and what it gives off; magenta: no page) */
+	"			{\n"
+	"				uint m = triangle_materials[h.primitive_id];\n"
+	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
+	"				base = glow.rgb * c[47] + float3(1.0, 0.0, 1.0) * 0.3;\n"
+	"				if (glow.w >= 0.0 && pages[uint(glow.w)].z > 0.0)\n"
+	"				{\n"
+	"					float4 page = pages[uint(glow.w)];\n"
+	"					uint base_index = h.primitive_id * 3u;\n"
+	"					float2 b = h.triangle_barycentric_coord;\n"
+	"					float2 uv = texcoords[indices[base_index]] * (1.0 - b.x - b.y) + texcoords[indices[base_index + 1u]] * b.x +\n"
+	"						texcoords[indices[base_index + 2u]] * b.y;\n"
+	"					float2 inset = float2(0.5 / 4096.0);\n"
+	"					base = glow.rgb * c[47] + surface.rgb * atlas.sample(linear_clamp, page.xy + clamp(uv * page.zw, inset, page.zw - inset), metal::level(0.0)).rgb;\n"
+	"				}\n"
+	"			}\n"
+	"			else if (h.instance_id == 0)\n"
 	"			{\n"
 	"				uint k = h.primitive_id * 2654435761u;\n"
 	"				base = 0.3 + 0.6 * float3(float(k & 255u), float((k >> 8) & 255u), float((k >> 16) & 255u)) / 255.0;\n"
@@ -214,8 +259,8 @@ static NSString *const kernel_source = @
 	"				bool player = body.type != intersection_type::none && abs(body.distance - h.distance) < 1e-3;\n"
 	"				base = player ? float3(0.2, 0.9, 1.0) : float3(1.0, 0.55, 0.15);\n"
 	"			}\n"
-	"			base *= 1.0 / (1.0 + h.distance * 0.015);\n"
-	"			if (c[27] > 0.0)\n"
+	"			if (gi_ready == 0u) base *= 1.0 / (1.0 + h.distance * 0.015);\n"
+	"			if (c[27] > 0.0 && gi_ready == 0u)\n"
 	"			{\n"
 	"				intersector<triangle_data, instancing> sun_hit;\n"
 	"				sun_hit.accept_any_intersection(true);\n"
@@ -402,6 +447,128 @@ static NSString *const kernel_source = @
 	"		if (is_probe) probe_segment(probe, probe_count, P + N * bias, at, 5.0, blocked);\n"
 	"	}\n"
 	"	lit.write(float4(lights_arriving, emitted), id);\n"
+	/* the traced light (c[42]: 1 with the lightmaps' light where the rays
+	   land, 2 without - only what the rays find lit: the sun, the sky, the
+	   glowing surfaces, the lights), in the light buffer's units, for the
+	   guest to put in place of the lightmaps':
+	   - the sun, where its ray is not blocked (c[36-38] its colour and
+	     power, times c[45]);
+	   - two rays across the half sphere, cosine-weighted, new each frame:
+	     the sky's light where one leaves the level (c[39-41]); where one
+	     lands on the level, the light given off there (c[47]) and, with the
+	     lightmaps, the light on it (its lightmap) times its colour (c[43]);
+	     accumulated over the frames, followed as the camera moves (the last
+	     frame's camera, c[48-59]; c[60] whether there is one);
+	   - the traced lights' and the glows' (c[61]). */
+	"	if (gi_ready != 0u && c[42] > 0.5)\n"
+	"	{\n"
+	"		float3 direct = emitted * c[61];\n"
+	"		float3 sun_dir = float3(c[24], c[25], c[26]);\n"
+	"		float3 sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
+	"		float ndl = dot(N, sun_dir);\n"
+	"		if (c[27] > 0.0 && ndl > 0.0)\n"
+	"		{\n"
+	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
+	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
+	"			ray to_sun(P + N * bias, normalize(sun_dir + spread), 0.0, 2000.0);\n"
+	"			if (any_hit.intersect(to_sun, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"				direct += sun_color * ndl;\n"
+	"		}\n"
+	"		intersector<triangle_data, instancing> nearest;\n"
+	"		nearest.assume_geometry_type(geometry_type::triangle);\n"
+	"		nearest.force_opacity(forced_opacity::opaque);\n"
+	"		nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"		nearest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
+	"		uint seed = (id.x * 1973u + id.y * 9277u + uint(c[44]) * 26699u) | 1u;\n"
+	"		float3 indirect = float3(0.0);\n"
+	/* the sky's wide lights (c[64-79]: each its direction, its colour and
+	   power, the cosine of its half width, whether there is one): a ray
+	   toward a point of each, new each frame, accumulated with the bounces */
+	"		for (uint s = 0; s < 2u; s++)\n"
+	"		{\n"
+	"			uint o = 64u + s * 8u;\n"
+	"			if (c[o + 7u] < 0.5) continue;\n"
+	"			float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
+	"			float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
+	"			float3 ax_b = cross(axis, ax_t);\n"
+	"			seed = seed * 747796405u + 2891336453u;\n"
+	"			float v1 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			seed = seed * 747796405u + 2891336453u;\n"
+	"			float v2 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			float cos_t = mix(1.0, c[o + 6u], v1), sin_t = sqrt(max(0.0, 1.0 - cos_t * cos_t)), phi = 6.2831853 * v2;\n"
+	"			float3 d = normalize(axis * cos_t + ax_t * (sin_t * cos(phi)) + ax_b * (sin_t * sin(phi)));\n"
+	"			float facing = dot(N, d);\n"
+	"			if (facing <= 0.0) continue;\n"
+	"			ray to_sky(P + N * bias, d, 0.0, 2000.0);\n"
+	"			if (any_hit.intersect(to_sky, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"				indirect += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45];\n"
+	"		}\n"
+	"		for (uint i = 0; i < 2u; i++)\n"
+	"		{\n"
+	"			seed = seed * 747796405u + 2891336453u;\n"
+	"			float u1 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			seed = seed * 747796405u + 2891336453u;\n"
+	"			float u2 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			float r = sqrt(u1), a = 6.2831853 * u2;\n"
+	"			float3 d = normalize(tangent * (r * cos(a)) + bitangent * (r * sin(a)) + N * sqrt(max(0.0, 1.0 - u1)));\n"
+	"			ray bounce(P + N * bias, d, 0.0, 600.0);\n"
+	"			auto h = nearest.intersect(bounce, world, 3u);\n"
+	"			float3 L = float3(0.0);\n"
+	"			if (h.type == intersection_type::none)\n"
+	"				L = float3(c[39], c[40], c[41]);\n"
+	"			else if (h.instance_id == 0u)\n"
+	"			{\n"
+	"				uint m = triangle_materials[h.primitive_id];\n"
+	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
+	"				L = glow.rgb * c[47];\n"
+	"				if (c[42] < 1.5 && glow.w >= 0.0)\n"
+	"				{\n"
+	"					float4 page = pages[uint(glow.w)];\n"
+	"					if (page.z > 0.0)\n"
+	"					{\n"
+	"						uint base = h.primitive_id * 3u;\n"
+	"						float2 b = h.triangle_barycentric_coord;\n"
+	"						float2 uv = texcoords[indices[base]] * (1.0 - b.x - b.y) + texcoords[indices[base + 1u]] * b.x +\n"
+	"							texcoords[indices[base + 2u]] * b.y;\n"
+	"						float2 inset = float2(0.5 / 4096.0);\n"
+	"						float2 at = page.xy + clamp(uv * page.zw, inset, page.zw - inset);\n"
+	"						L += surface.rgb * atlas.sample(linear_clamp, at, metal::level(0.0)).rgb * c[43];\n"
+	"					}\n"
+	"				}\n"
+	"			}\n"
+	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, P + N * bias + d * (h.type == intersection_type::none ? 3.0 : h.distance), 5.0, h.type != intersection_type::none);\n"
+	"			indirect += L * 0.5;\n"
+	"		}\n"
+	"		float4 before = float4(0.0);\n"
+	"		float weight = 1.0;\n"
+	"		if (c[60] > 0.5)\n"
+	"		{\n"
+	"			float3 pp = float3(c[48], c[49], c[50]), pf = float3(c[51], c[52], c[53]);\n"
+	"			float3 pu = float3(c[54], c[55], c[56]), pr = float3(c[57], c[58], c[59]);\n"
+	"			float3 rel = P - pp;\n"
+	"			float pz = dot(rel, pf);\n"
+	"			if (pz > c[12])\n"
+	"			{\n"
+	"				float2 pn = float2(dot(rel, pr) / (pz * t * aspect), -dot(rel, pu) / (pz * t));\n"
+	"				float2 ps = origin + (pn * 0.5 + 0.5) * size;\n"
+	"				if (all(ps >= origin) && all(ps < origin + size))\n"
+	"				{\n"
+	"					float4 was = history_in.read(uint2(ps));\n"
+	"					if (was.a > 0.0 && abs(was.a - pz) < pz * 0.04 + 0.03) { before = was; weight = 0.1; }\n"
+	"				}\n"
+	"			}\n"
+	"		}\n"
+	"		float3 accumulated = mix(before.rgb, indirect, weight);\n"
+	"		history_out.write(float4(accumulated, z), id);\n"
+	"		irradiance.write(float4(direct + accumulated, 1.0), id);\n"
+	/* (a level pixel: its light is in the light buffer now, occlusion and
+	   all - the composite takes 2 for that, and its lights' light none) */
+	"		if (!object)\n"
+	"		{\n"
+	"			visibility = 2.0;\n"
+	"			lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
+	"		}\n"
+	"	}\n"
 	/* (the probe's ray to the sun: always, against everything, to its first hit) */
 	"	if (is_probe && c[27] > 0.0)\n"
 	"	{\n"
@@ -608,6 +775,125 @@ void host_rt_set_objects(const float *triangles, const unsigned char *groups, in
 	rt.object_count = count;
 }
 
+/* the level the rays see: the drawn one when there is one and it is asked
+for, else the collision one */
+static id<MTLAccelerationStructure> level_structure(void)
+{
+	return rt.use_drawn && rt.drawn ? rt.drawn : rt.world;
+}
+
+/* the drawn level's triangles (vertices: x, y, z; texcoords: the lightmap's
+u, v; indices: three a triangle; each triangle's material) */
+int host_rt_set_level(uint32_t generation, const float *vertices, const float *texcoords, int vertex_count,
+	const uint32_t *indices, const uint32_t *triangle_materials, int triangle_count)
+{
+	MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
+	MTLPrimitiveAccelerationStructureDescriptor *descriptor;
+	MTLAccelerationStructureSizes sizes;
+	id<MTLBuffer> vertex_buffer, scratch;
+	id<MTLCommandBuffer> commands;
+	id<MTLAccelerationStructureCommandEncoder> encoder;
+
+	if (!rt.available || generation == rt.drawn_generation)
+		return rt.drawn != nil;
+	rt.drawn = nil;
+	rt.drawn_generation = generation;
+	/* (a new level: its pages anew) */
+	rt.atlas_x = rt.atlas_y = rt.atlas_row = 0;
+	if (vertex_count <= 0 || triangle_count <= 0)
+		return 0;
+	vertex_buffer = [rt.device newBufferWithBytes:vertices length:(NSUInteger)vertex_count * 12
+		options:MTLResourceStorageModeShared];
+	rt.drawn_indices = [rt.device newBufferWithBytes:indices length:(NSUInteger)triangle_count * 12
+		options:MTLResourceStorageModeShared];
+	rt.drawn_texcoords = [rt.device newBufferWithBytes:texcoords length:(NSUInteger)vertex_count * 8
+		options:MTLResourceStorageModeShared];
+	rt.drawn_triangle_materials = [rt.device newBufferWithBytes:triangle_materials
+		length:(NSUInteger)triangle_count * 4 options:MTLResourceStorageModeShared];
+	geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+	geometry.vertexBuffer = vertex_buffer;
+	geometry.vertexStride = 12;
+	geometry.indexBuffer = rt.drawn_indices;
+	geometry.indexType = MTLIndexTypeUInt32;
+	geometry.triangleCount = (NSUInteger)triangle_count;
+	geometry.opaque = YES;
+	descriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+	descriptor.geometryDescriptors = @[ geometry ];
+	sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
+	rt.drawn = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+	scratch = [rt.device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+	commands = [rt.queue commandBuffer];
+	encoder = [commands accelerationStructureCommandEncoder];
+	[encoder buildAccelerationStructure:rt.drawn descriptor:descriptor scratchBuffer:scratch scratchBufferOffset:0];
+	[encoder endEncoding];
+	[commands commit];
+	[commands waitUntilCompleted];
+	host_logf(HOST_LOG_INFO, "ray tracing: the drawn level, %d triangles, %d vertices", triangle_count, vertex_count);
+	return 1;
+}
+
+/* the drawn level's materials: 8 floats each (the colour, the flags; the
+light given off, the lightmap page or -1) */
+void host_rt_set_level_materials(const float *materials, int count)
+{
+	if (!rt.available || count <= 0)
+		return;
+	rt.drawn_materials = [rt.device newBufferWithBytes:materials length:(NSUInteger)count * 32
+		options:MTLResourceStorageModeShared];
+}
+
+#define HOST_RT_ATLAS_SIZE 4096
+#define HOST_RT_PAGES 256
+
+/* a lightmap page (RGBA bytes), into the pages' texture: rows of pages,
+each row as tall as its tallest; 0 if it does not fit */
+int host_rt_set_level_page(int page, int width, int height, const unsigned char *pixels)
+{
+	float *table;
+
+	if (!rt.available || page < 0 || page >= HOST_RT_PAGES || width <= 0 || height <= 0 ||
+		width > HOST_RT_ATLAS_SIZE || height > HOST_RT_ATLAS_SIZE)
+	{
+		return 0;
+	}
+	if (!rt.atlas)
+	{
+		MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
+			texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:HOST_RT_ATLAS_SIZE
+			height:HOST_RT_ATLAS_SIZE mipmapped:NO];
+
+		descriptor.usage = MTLTextureUsageShaderRead;
+		descriptor.storageMode = MTLStorageModeShared;
+		rt.atlas = [rt.device newTextureWithDescriptor:descriptor];
+		rt.drawn_pages = [rt.device newBufferWithLength:HOST_RT_PAGES * 16 options:MTLResourceStorageModeShared];
+		memset(rt.drawn_pages.contents, 0, HOST_RT_PAGES * 16);
+		if (!rt.atlas || !rt.drawn_pages)
+			return 0;
+	}
+	if (rt.atlas_x + width > HOST_RT_ATLAS_SIZE)
+	{
+		rt.atlas_x = 0;
+		rt.atlas_y += rt.atlas_row;
+		rt.atlas_row = 0;
+	}
+	if (rt.atlas_y + height > HOST_RT_ATLAS_SIZE)
+	{
+		host_logf(HOST_LOG_ERROR, "ray tracing: lightmap page %d (%dx%d) does not fit", page, width, height);
+		return 0;
+	}
+	[rt.atlas replaceRegion:MTLRegionMake2D((NSUInteger)rt.atlas_x, (NSUInteger)rt.atlas_y, (NSUInteger)width,
+		(NSUInteger)height) mipmapLevel:0 withBytes:pixels bytesPerRow:(NSUInteger)width * 4];
+	table = (float *)rt.drawn_pages.contents + page * 4;
+	table[0] = (float)rt.atlas_x / HOST_RT_ATLAS_SIZE;
+	table[1] = (float)rt.atlas_y / HOST_RT_ATLAS_SIZE;
+	table[2] = (float)width / HOST_RT_ATLAS_SIZE;
+	table[3] = (float)height / HOST_RT_ATLAS_SIZE;
+	rt.atlas_x += width;
+	if (height > rt.atlas_row)
+		rt.atlas_row = height;
+	return 1;
+}
+
 /* the scene for this frame's rays: each object's mesh, and the level and
 them, built in the command buffer before the rays */
 static int encode_scene(id<MTLCommandBuffer> commands)
@@ -648,7 +934,7 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		group_triangles[group]++;
 	}
 	encoder = [commands accelerationStructureCommandEncoder];
-	structures = [NSMutableArray arrayWithObject:rt.world];
+	structures = [NSMutableArray arrayWithObject:level_structure()];
 	buffer = rt.instance_buffers[ring];
 	instances = (MTLAccelerationStructureInstanceDescriptor *)buffer.contents;
 	memset(instances, 0, (HOST_RT_GROUPS + 1) * sizeof(*instances));
@@ -764,7 +1050,7 @@ uint32_t host_rt_texture(int which, int width, int height)
 	MTLTextureDescriptor *descriptor;
 	const EGLint_ attributes[] = { EGL_NONE_ };
 
-	if (!rt.available || which < 0 || which > 2 || width <= 0 || height <= 0)
+	if (!rt.available || which < 0 || which > 3 || width <= 0 || height <= 0)
 		return 0;
 	if (rt.textures[which] && rt.widths[which] == width && rt.heights[which] == height)
 		return rt.gl_textures[which];
@@ -812,7 +1098,8 @@ int host_rt_trace(const float *camera, int width, int height)
 	id<MTLComputeCommandEncoder> encoder;
 	MTLSize group, groups;
 
-	if (!rt.available || !rt.world || !rt.textures[0] || !rt.textures[1] || !rt.textures[2] ||
+	rt.use_drawn = camera[46] > 0.5f;
+	if (!rt.available || !level_structure() || !rt.textures[0] || !rt.textures[1] || !rt.textures[2] ||
 		rt.widths[0] != width || rt.widths[1] != width || rt.heights[0] != height || rt.heights[1] != height ||
 		rt.widths[2] != width || rt.heights[2] != height)
 	{
@@ -891,7 +1178,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setAccelerationStructure:rt.scene atBufferIndex:0];
 	for (id<MTLAccelerationStructure> structure in rt.scene_structures)
 		[encoder useResource:structure usage:MTLResourceUsageRead];
-	[encoder setAccelerationStructure:rt.world atBufferIndex:2];
+	[encoder setAccelerationStructure:level_structure() atBufferIndex:2];
 	[encoder setBytes:rt.spheres length:sizeof(rt.spheres) atIndex:3];
 	[encoder setBytes:&rt.sphere_count length:sizeof(rt.sphere_count) atIndex:4];
 	if (!rt.probe)
@@ -908,7 +1195,45 @@ int host_rt_trace(const float *camera, int width, int height)
 		[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
 		[encoder setBytes:&emitter_count length:sizeof(emitter_count) atIndex:9];
 	}
-	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
+	/* the drawn level's surfaces and the traced light's textures (in their
+	place, anything bound: the kernel reads them only when gi_ready) */
+	{
+		float constants[80];
+		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas &&
+			rt.textures[3] && rt.widths[3] == width && rt.heights[3] == height;
+		id<MTLBuffer> any = rt.probe;
+
+		memcpy(constants, camera, sizeof(constants));
+		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||
+			rt.history[0].height != (NSUInteger)height))
+		{
+			MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
+				texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:(NSUInteger)width
+				height:(NSUInteger)height mipmapped:NO];
+			int index;
+
+			descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+			descriptor.storageMode = MTLStorageModePrivate;
+			for (index = 0; index < 2; index++)
+				rt.history[index] = [rt.device newTextureWithDescriptor:descriptor];
+			/* (the first frame has no history: its last camera is not taken) */
+			constants[60] = 0.0f;
+		}
+		gi_ready = gi_ready && rt.history[0] && rt.history[1];
+		[encoder setBuffer:gi_ready ? rt.drawn_indices : any offset:0 atIndex:10];
+		[encoder setBuffer:gi_ready ? rt.drawn_texcoords : any offset:0 atIndex:11];
+		[encoder setBuffer:gi_ready ? rt.drawn_triangle_materials : any offset:0 atIndex:12];
+		[encoder setBuffer:gi_ready ? rt.drawn_materials : any offset:0 atIndex:13];
+		[encoder setBuffer:gi_ready ? rt.drawn_pages : any offset:0 atIndex:14];
+		[encoder setBytes:&gi_ready length:sizeof(gi_ready) atIndex:15];
+		[encoder setTexture:gi_ready ? rt.atlas : rt.textures[1] atIndex:3];
+		[encoder setTexture:gi_ready ? rt.textures[3] : rt.textures[1] atIndex:4];
+		[encoder setTexture:gi_ready ? rt.history[rt.history_index] : rt.textures[1] atIndex:5];
+		[encoder setTexture:gi_ready ? rt.history[rt.history_index ^ 1] : rt.textures[2] atIndex:6];
+		if (gi_ready)
+			rt.history_index ^= 1;
+		[encoder setBytes:constants length:sizeof(constants) atIndex:1];
+	}
 	[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
 		if (done.GPUEndTime > done.GPUStartTime)
 			rt.gpu_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;

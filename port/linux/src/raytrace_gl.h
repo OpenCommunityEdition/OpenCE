@@ -17,6 +17,11 @@ lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
 lights): the occlusion darkens only the lightmaps' share; 2: the objects
 drawn, before the level (their pixels take the sun's traced shadows) */
 void halo_ray_traced_light_stage(int stage);
+/* after the dynamic lights, before the textures (render.c): the traced light
+in place of the lightmaps' (display.ray_tracing_gi); the camera as for
+halo_ray_traced_lighting */
+void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_field_of_view, const float *position,
+	const float *forward, const float *up);
 /* F9 (sdl_platform.c) */
 /* returns what it is now, as text */
 const char *halo_ray_tracing_toggle(void);

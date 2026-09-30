@@ -15,6 +15,7 @@ is split into a fan of triangles.
 */
 
 #include "cseries.h"
+#include <math.h>
 #include "physics/collision_bsp_definitions.h"
 #include "scenario/scenario.h"
 #include "render/render.h"
@@ -202,6 +203,7 @@ typedef char sky_light_view_size_assert[sizeof(struct sky_light_view) == 0x74 ? 
 typedef char sky_view_lights_offset_assert[offsetof(struct sky_view, lights) == 0xC4 ? 1 : -1];
 
 struct sky *scenario_get_sky(short sky_index);
+void platform_log(const char *format, ...);
 
 /* the direction towards the sun in the world (unit length); FALSE if the
 visible sky has none */
@@ -614,6 +616,11 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 			long index, strip_count = part->triangle_buffer.count + 2, vertex_count = part->vertex_buffer.count;
 			long vertex_size = compressed ? (long)sizeof(struct model_vertex_view) : 68;
 
+			/* (where the GPU reads them: the vertex buffer resource's data -
+			Common, Data, Lock - a physical address; base_address is where the
+			cache file's vertices were read to, whose memory the game reuses) */
+			if (part->vertex_buffer.hardware_format && ((const unsigned long *)part->vertex_buffer.hardware_format)[1])
+				vertex_address = ((const unsigned long *)part->vertex_buffer.hardware_format)[1];
 			if (vertex_address && vertex_address < 0x80000000UL)
 				vertex_address |= 0x80000000UL;
 			vertex_data = (const byte *)vertex_address + part->vertex_buffer.offset * vertex_size;
@@ -654,6 +661,39 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 				(part->vertex_buffer.type != 4 && part->vertex_buffer.type != 5 && part->vertex_buffer.base_address))
 			{
 				continue;
+			}
+			/* (HALO_RT_LOG_SHAPES: a part whose model-space vertices are far
+			off, with its buffers, once each) */
+			if (getenv("HALO_RT_LOG_SHAPES"))
+			{
+				extern void platform_log(const char *format, ...);
+				static long logged[128];
+				static int logged_count;
+				long key = definition->object.model.index * 4096 + geometry_index * 64 + part_index, bad = 0, v;
+				int seen = 0, k;
+
+				for (v = 0; v < vertex_count; v++)
+				{
+					const float *position = (const float *)(vertex_data + v * vertex_size);
+
+					if (!(position[0] * position[0] + position[1] * position[1] + position[2] * position[2] < 1e4f))
+						bad++;
+				}
+				for (k = 0; k < logged_count; k++)
+					seen |= logged[k] == key;
+				if (bad && !seen && logged_count < 128)
+				{
+					const unsigned long *hardware = (const unsigned long *)part->vertex_buffer.hardware_format;
+
+					logged[logged_count++] = key;
+					platform_log("ray tracing: %s geometry %d part %d: %ld of %ld vertices far off; vertex buffer type %d "
+						"count %ld offset %ld at %p, hardware %p (%08lx %08lx %08lx); strip %ld at %p; part flags %lx",
+						tag_get_name(definition->object.model.index), geometry_index, part_index, bad, vertex_count,
+						part->vertex_buffer.type, part->vertex_buffer.count, part->vertex_buffer.offset,
+						part->vertex_buffer.base_address, hardware, hardware ? hardware[0] : 0, hardware ? hardware[1] : 0,
+						hardware ? hardware[2] : 0, part->triangle_buffer.count, part->triangle_buffer.base_address,
+						(unsigned long)part->flags);
+				}
 			}
 			for (index = 0; index + 2 < strip_count && count < room; index++)
 			{
@@ -709,6 +749,45 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 	return count;
 }
 
+/* the object's triangles, if they are about where the object is (within
+three times its bounding sphere, and more: what it carries too); none if any
+is not - a model posed from nodes the game has not placed yet reaches
+across the level, and wraps the camera */
+static long object_triangles_sane(long object_index, const struct object_datum *object, const float *triangles,
+	long count)
+{
+	float reach = object->object.bounding_sphere_radius * 3.0f + 3.0f;
+	long index;
+
+	for (index = 0; index < count * 3; index++)
+	{
+		float dx = triangles[index * 3 + 0] - object->object.bounding_sphere_center.x;
+		float dy = triangles[index * 3 + 1] - object->object.bounding_sphere_center.y;
+		float dz = triangles[index * 3 + 2] - object->object.bounding_sphere_center.z;
+
+		if (!(dx * dx + dy * dy + dz * dz <= reach * reach))
+		{
+			static long logged[8];
+			long slot;
+
+			for (slot = 0; slot < 8 && logged[slot] != object->definition_index; slot++)
+			{
+				if (!logged[slot])
+				{
+					logged[slot] = object->definition_index;
+					platform_log("ray tracing: %s's shape reaches %.1f from it (its radius %.1f); left out",
+						tag_get_name(object->definition_index), sqrtf(dx * dx + dy * dy + dz * dz),
+						object->object.bounding_sphere_radius);
+					break;
+				}
+			}
+			(void)object_index;
+			return 0;
+		}
+	}
+	return count;
+}
+
 /* one object's triangles into out (at most room), of the shapes; returns
 how many */
 static long object_triangles(long object_index, struct object_datum *object, float *out, long room, long shapes)
@@ -722,8 +801,11 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 	if (shapes == _ray_shapes_model)
 	{
 		count = model_triangles(object, matrices, out, room);
-		if (count > 0)
+		/* (a drawn model read wrong - its vertices far off: its collision
+		model instead) */
+		if (count > 0 && object_triangles_sane(object_index, object, out, count))
 			return count;
+		count = 0;
 	}
 	/* the collision model: its meshes, where the game's bullets hit */
 	if (shapes != _ray_shapes_simple && matrices && definition->object.collision_model.index != NONE)
@@ -855,7 +937,8 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		player_sphere[1] = object->object.bounding_sphere_center.y;
 		player_sphere[2] = object->object.bounding_sphere_center.z;
 		player_sphere[3] = object->object.bounding_sphere_radius;
-		count += object_family_triangles(player_unit, object, triangles, maximum, shapes, _ray_mask_player, groups);
+		count += object_triangles_sane(player_unit, object, triangles,
+			object_family_triangles(player_unit, object, triangles, maximum, shapes, _ray_mask_player, groups));
 	}
 	object_iterator_new(&iterator, RAY_TRACED_OBJECT_TYPES, 0);
 	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
@@ -878,6 +961,7 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		{
 			added = object_family_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes,
 				(unsigned char)(group << 3 | _ray_mask_object), groups + count);
+			added = object_triangles_sane(iterator.index, object, triangles + count * 9, added);
 			if (added > 0)
 				group++;
 		}
@@ -885,6 +969,7 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		{
 			added = object_family_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes,
 				loose, groups + count);
+			added = object_triangles_sane(iterator.index, object, triangles + count * 9, added);
 		}
 		count += added;
 	}
@@ -998,4 +1083,506 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		count++;
 	}
 	return count;
+}
+
+/* ---------- the drawn level
+
+The level as the game draws it, for the traced lighting's rays
+(display.ray_tracing_level "render"): each lightmap's materials' triangles
+(structure_bsp.lightmaps, .surfaces), in the world, with their lightmap
+coordinates, and each material's surface as the rays need it - its colour
+(its base map's average, once the texture cache has it), the light it gives
+off (its shader's radiosity: the level's lamps and glowing panels, from
+which the lightmaps were baked), and its lightmap page. The pages (the
+lightmaps' bitmaps, decoded as the texture cache loads them) are the
+light already on every surface: where a ray lands, the light it finds.
+
+Only the environment shaders' materials shade the rays; the transparent
+ones (water, glass) are flagged, and the rays pass through them. */
+
+#include "structures/structure_bsp_definitions.h"
+#include "shaders/shader_definitions.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_group_lookup.h"
+#include "bitmaps/bitmaps_sampling.h"
+#include "cache/texture_cache.h"
+#include "rasterizer/rasterizer_geometry_environment.h"
+
+enum
+{
+	_ray_level_shader_type_environment = 3,
+	_ray_level_material_transparent = 1,
+	/* the environment vertex (position, packed normal, binormal, tangent,
+	texcoord) and the lightmap vertex (packed incident direction, u, v) as
+	the cache files keep them, the lightmap vertices after the material's
+	vertices */
+	_ray_level_vertex_size = 32,
+	_ray_level_lightmap_vertex_size = 8,
+	RAY_LEVEL_MATERIAL_FLOATS = 8,
+};
+
+/* a shader_environment's base map (object_lights.c's view of it) */
+struct ray_level_shader_environment
+{
+	struct shader shader;
+	byte reserved28[0x60];
+	struct tag_reference base_map;
+};
+
+static struct
+{
+	const struct structure_bsp *bsp;
+	unsigned long generation;
+	float *vertices;
+	float *texcoords;
+	unsigned long *indices;
+	unsigned long *triangle_materials;
+	long vertex_count, triangle_count;
+	/* RAY_LEVEL_MATERIAL_FLOATS each: the colour, the flags; the light
+	given off, the lightmap page (-1 none) */
+	float *materials;
+	long material_count;
+	/* each material's base map, until its colour is known */
+	struct bitmap_data **base_maps;
+	boolean materials_changed;
+	/* each page's bitmap (the lightmap's), and whether it is decoded */
+	struct bitmap_data **pages;
+	boolean *pages_done;
+	long page_count;
+	unsigned char *page_pixels;
+	long page_pixels_size;
+	long next_material;
+} level;
+
+/* whether bitmap_2d_get_pixel can read the bitmap (a 2D one, not linear, in
+a format it decodes: bitmaps.c), and the texture cache has it (asked for,
+without waiting) */
+static boolean level_bitmap_readable(struct bitmap_data *bitmap)
+{
+	/* a8 y8 ay8 a8y8, r5g6b5, a1r5g5b5 a4r4g4b4 x8r8g8b8 a8r8g8b8, dxt1 dxt3 dxt5 */
+	static const unsigned long formats = 0xF | (1 << 6) | (0xF << 8) | (0x7 << 14);
+
+	return bitmap->type == 0 && !(bitmap->flags & (1 << 4)) && bitmap->format >= 0 && bitmap->format < 32 &&
+		(formats & (1UL << bitmap->format)) && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE) &&
+		bitmap->base_address;
+}
+
+static void level_free(void)
+{
+	void **blocks[] = { (void **)&level.vertices, (void **)&level.texcoords, (void **)&level.indices,
+		(void **)&level.triangle_materials, (void **)&level.materials, (void **)&level.base_maps,
+		(void **)&level.pages, (void **)&level.pages_done };
+	long index;
+
+	for (index = 0; index < (long)(sizeof(blocks) / sizeof(blocks[0])); index++)
+	{
+		if (*blocks[index])
+			free(*blocks[index]);
+		*blocks[index] = NULL;
+	}
+	level.vertex_count = level.triangle_count = level.material_count = level.page_count = 0;
+	level.next_material = 0;
+}
+
+static void level_build(const struct structure_bsp *bsp)
+{
+	long lightmap_index, material_count = 0, vertex_count = 0, triangle_count = 0;
+
+	level_free();
+	level.bsp = bsp;
+	level.generation++;
+	if (!bsp)
+		return;
+	/* the sizes */
+	for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
+	{
+		const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
+			struct structure_lightmap);
+		long material_index;
+
+		for (material_index = 0; material_index < lightmap->materials.count; material_index++)
+		{
+			const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials,
+				material_index, struct structure_material);
+
+			material_count++;
+			if (material->compressed_vertex_data.address && material->vertices.count > 0)
+			{
+				vertex_count += material->vertices.count;
+				triangle_count += material->surface_count;
+			}
+		}
+	}
+	if (!material_count || !vertex_count || !triangle_count)
+		return;
+	level.vertices = malloc((size_t)vertex_count * 3 * sizeof(float));
+	level.texcoords = malloc((size_t)vertex_count * 2 * sizeof(float));
+	level.indices = malloc((size_t)triangle_count * 3 * sizeof(unsigned long));
+	level.triangle_materials = malloc((size_t)triangle_count * sizeof(unsigned long));
+	level.materials = malloc((size_t)material_count * RAY_LEVEL_MATERIAL_FLOATS * sizeof(float));
+	level.base_maps = malloc((size_t)material_count * sizeof(struct bitmap_data *));
+	level.pages = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(struct bitmap_data *));
+	level.pages_done = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(boolean));
+	if (!level.vertices || !level.texcoords || !level.indices || !level.triangle_materials || !level.materials ||
+		!level.base_maps || !level.pages || !level.pages_done)
+	{
+		level_free();
+		return;
+	}
+	level.page_count = bsp->lightmaps.count;
+	for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
+	{
+		const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
+			struct structure_lightmap);
+		long material_index;
+
+		level.pages[lightmap_index] = bsp->lightmap_group.index != NONE && lightmap->bitmap_index != NONE ?
+			bitmap_group_try_and_get_bitmap(bsp->lightmap_group.index, lightmap->bitmap_index) : NULL;
+		level.pages_done[lightmap_index] = FALSE;
+		for (material_index = 0; material_index < lightmap->materials.count; material_index++)
+		{
+			const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials,
+				material_index, struct structure_material);
+			const struct shader *shader = material->shader.index != NONE ?
+				shader_definition_get(material->shader.index) : NULL;
+			float *out = level.materials + level.material_count * RAY_LEVEL_MATERIAL_FLOATS;
+			const byte *vertices = (const byte *)material->compressed_vertex_data.address;
+			long first_vertex = level.vertex_count, vertex_index, surface_offset;
+			boolean opaque = shader && shader->base.type == _ray_level_shader_type_environment;
+
+			/* (a grey until the base map is read) */
+			out[0] = out[1] = out[2] = 0.5f;
+			out[3] = opaque ? 0.0f : (float)_ray_level_material_transparent;
+			out[4] = out[5] = out[6] = 0.0f;
+			if (shader && shader->base.radiosity.power > 0.0f)
+			{
+				out[4] = shader->base.radiosity.color_of_emitted_light.red * shader->base.radiosity.power;
+				out[5] = shader->base.radiosity.color_of_emitted_light.green * shader->base.radiosity.power;
+				out[6] = shader->base.radiosity.color_of_emitted_light.blue * shader->base.radiosity.power;
+			}
+			out[7] = level.pages[lightmap_index] ? (float)lightmap_index : -1.0f;
+			level.base_maps[level.material_count] = NULL;
+			if (opaque)
+			{
+				const struct ray_level_shader_environment *environment =
+					(const struct ray_level_shader_environment *)shader;
+
+				if (environment->base_map.index != NONE)
+				{
+					const struct bitmap_group *group = bitmap_group_get(environment->base_map.index);
+
+					if (group && group->bitmaps.count > 0)
+					{
+						level.base_maps[level.material_count] = bitmap_group_try_and_get_bitmap(
+							environment->base_map.index,
+							(short)(material->permutation_index % group->bitmaps.count));
+					}
+				}
+			}
+			if (!vertices || material->vertices.count <= 0)
+			{
+				level.material_count++;
+				continue;
+			}
+			for (vertex_index = 0; vertex_index < material->vertices.count; vertex_index++)
+			{
+				real_point3d point;
+				real_point2d texcoord;
+
+				environment_vertex_compressed_get_point(
+					(const struct environment_vertex_compressed *)(vertices + vertex_index * _ray_level_vertex_size),
+					&point);
+				level.vertices[level.vertex_count * 3 + 0] = point.x;
+				level.vertices[level.vertex_count * 3 + 1] = point.y;
+				level.vertices[level.vertex_count * 3 + 2] = point.z;
+				texcoord.x = texcoord.y = 0.0f;
+				if (level.pages[lightmap_index])
+				{
+					environment_lightmap_vertex_compressed_get_texcoord(
+						(const struct environment_lightmap_vertex_compressed *)(vertices +
+							material->vertices.count * _ray_level_vertex_size +
+							vertex_index * _ray_level_lightmap_vertex_size),
+						&texcoord);
+				}
+				level.texcoords[level.vertex_count * 2 + 0] = texcoord.x;
+				level.texcoords[level.vertex_count * 2 + 1] = texcoord.y;
+				level.vertex_count++;
+			}
+			for (surface_offset = 0; surface_offset < material->surface_count; surface_offset++)
+			{
+				long surface_index = material->first_surface_index + surface_offset;
+				const struct structure_surface *surface;
+				long a, b, c;
+
+				if (surface_index < 0 || surface_index >= bsp->surfaces.count)
+					break;
+				surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct structure_surface);
+				a = surface->vertex_indices[0];
+				b = surface->vertex_indices[1];
+				c = surface->vertex_indices[2];
+				if (a >= material->vertices.count || b >= material->vertices.count || c >= material->vertices.count)
+					continue;
+				/* wound counterclockwise around the side the vertices' normals
+				face, as the collision surfaces are (the rays see that side as
+				the front) */
+				{
+					const float *pa = &level.vertices[(first_vertex + a) * 3];
+					const float *pb = &level.vertices[(first_vertex + b) * 3];
+					const float *pc = &level.vertices[(first_vertex + c) * 3];
+					float u[3] = { pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2] };
+					float v[3] = { pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2] };
+					real_vector3d normal;
+
+					environment_vertex_compressed_get_normal(
+						(const struct environment_vertex_compressed *)(vertices + a * _ray_level_vertex_size), &normal);
+					if ((u[1] * v[2] - u[2] * v[1]) * normal.i + (u[2] * v[0] - u[0] * v[2]) * normal.j +
+						(u[0] * v[1] - u[1] * v[0]) * normal.k < 0.0f)
+					{
+						long swap = b;
+
+						b = c;
+						c = swap;
+					}
+				}
+				level.indices[level.triangle_count * 3 + 0] = (unsigned long)(first_vertex + a);
+				level.indices[level.triangle_count * 3 + 1] = (unsigned long)(first_vertex + b);
+				level.indices[level.triangle_count * 3 + 2] = (unsigned long)(first_vertex + c);
+				level.triangle_materials[level.triangle_count] = (unsigned long)level.material_count;
+				level.triangle_count++;
+			}
+			level.material_count++;
+		}
+	}
+	level.materials_changed = TRUE;
+}
+
+/* the active BSP's drawn triangles: returns its generation, which changes
+when the BSP does; 0 while there is none */
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
+	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count)
+{
+	const struct structure_bsp *bsp = global_structure_bsp_index != NONE ? global_structure_bsp_get() : NULL;
+
+	if (bsp != level.bsp)
+		level_build(bsp);
+	if (!bsp || !level.triangle_count)
+		return 0;
+	*vertices = level.vertices;
+	*texcoords = level.texcoords;
+	*vertex_count = level.vertex_count;
+	*indices = level.indices;
+	*triangle_materials = level.triangle_materials;
+	*triangle_count = level.triangle_count;
+	return level.generation;
+}
+
+/* the materials (RAY_LEVEL_MATERIAL_FLOATS each); TRUE when they changed
+since the last call. Each call reads a few more base maps' colours, as the
+texture cache loads them. */
+boolean halo_ray_tracing_level_materials(const float **materials, long *count)
+{
+	long step;
+	boolean changed;
+
+	for (step = 0; step < 8 && level.material_count > 0; step++)
+	{
+		long index = level.next_material;
+		struct bitmap_data *bitmap = level.base_maps[index];
+
+		level.next_material = (index + 1) % level.material_count;
+		if (!bitmap)
+			continue;
+		/* (asks the cache for it, without waiting) */
+		if (level_bitmap_readable(bitmap))
+		{
+			float sum[3] = { 0.0f, 0.0f, 0.0f }, lod = 1.0f;
+			long sample, mipmap = 0;
+
+			/* a small mipmap's colour, at 16 points: the smallest at least 8
+			pixels across (a compressed one's blocks are 4) - bitmap_2d_get_pixel
+			takes it as a fraction of the mipmaps, rounded down */
+			while (mipmap < bitmap->mipmap_count && (bitmap->width >> (mipmap + 1)) >= 8 &&
+				(bitmap->height >> (mipmap + 1)) >= 8)
+			{
+				mipmap++;
+			}
+			if (bitmap->mipmap_count > 0)
+				lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
+			for (sample = 0; sample < 16; sample++)
+			{
+				real_point2d point;
+				pixel32 pixel;
+
+				point.x = ((float)(sample & 3) + 0.5f) / 4.0f;
+				point.y = ((float)(sample >> 2) + 0.5f) / 4.0f;
+				pixel = bitmap_2d_get_pixel(bitmap, &point, lod);
+				sum[0] += (float)((pixel >> 16) & 0xff) / 255.0f;
+				sum[1] += (float)((pixel >> 8) & 0xff) / 255.0f;
+				sum[2] += (float)(pixel & 0xff) / 255.0f;
+			}
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 0] = sum[0] / 16.0f;
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 1] = sum[1] / 16.0f;
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 2] = sum[2] / 16.0f;
+			level.base_maps[index] = NULL;
+			level.materials_changed = TRUE;
+		}
+	}
+	*materials = level.materials;
+	*count = level.material_count;
+	changed = level.materials_changed;
+	level.materials_changed = FALSE;
+	return changed;
+}
+
+/* the next lightmap page the texture cache has loaded, decoded to RGBA
+bytes; FALSE when none is ready */
+boolean halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height)
+{
+	long index;
+
+	for (index = 0; index < level.page_count; index++)
+	{
+		struct bitmap_data *bitmap = level.pages[index];
+		long x, y, size;
+
+		if (level.pages_done[index] || !bitmap)
+			continue;
+		if (!level_bitmap_readable(bitmap))
+			continue;
+		size = (long)bitmap->width * bitmap->height * 4;
+		if (size > level.page_pixels_size)
+		{
+			if (level.page_pixels)
+				free(level.page_pixels);
+			level.page_pixels = malloc((size_t)size);
+			level.page_pixels_size = level.page_pixels ? size : 0;
+			if (!level.page_pixels)
+				return FALSE;
+		}
+		for (y = 0; y < bitmap->height; y++)
+		{
+			for (x = 0; x < bitmap->width; x++)
+			{
+				real_point2d point;
+				pixel32 pixel;
+				unsigned char *out = level.page_pixels + (y * bitmap->width + x) * 4;
+
+				point.x = ((float)x + 0.5f) / (float)bitmap->width;
+				point.y = ((float)y + 0.5f) / (float)bitmap->height;
+				pixel = bitmap_2d_get_pixel(bitmap, &point, 1.0f);
+				out[0] = (unsigned char)(pixel >> 16);
+				out[1] = (unsigned char)(pixel >> 8);
+				out[2] = (unsigned char)pixel;
+				out[3] = 255;
+			}
+		}
+		level.pages_done[index] = TRUE;
+		*page = index;
+		*pixels = level.page_pixels;
+		*width = bitmap->width;
+		*height = bitmap->height;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/* the sky's light: the sun's direction (towards it), its colour times its
+power, and the outdoor ambient light's colour times its power (the sky
+tag's), then its other lights - the wide ones the lightmaps were lit by, as
+the sky's dome - at most two: each its direction, its colour times its
+power, the cosine of its half width, and 1 (25 floats); FALSE if the
+visible sky has none */
+boolean halo_ray_tracing_sky(float *sky)
+{
+	const struct sky_view *view;
+	const byte *raw;
+	long index;
+
+	if (render.visible_sky_index == NONE)
+		return FALSE;
+	view = (const struct sky_view *)scenario_get_sky(render.visible_sky_index);
+	if (!view)
+		return FALSE;
+	raw = (const byte *)view;
+	/* (the outdoor ambient radiosity: its colour at 0x48, its power at 0x54) */
+	{
+		const float *color = (const float *)(raw + 0x48);
+		float power = *(const float *)(raw + 0x54);
+
+		sky[6] = color[0] * power;
+		sky[7] = color[1] * power;
+		sky[8] = color[2] * power;
+	}
+	sky[0] = sky[1] = sky[2] = sky[3] = sky[4] = sky[5] = 0.0f;
+	{
+		long fill = 0;
+
+		for (index = 9; index < 25; index++)
+			sky[index] = 0.0f;
+		for (index = 0; index < view->lights.count && fill < 2; index++)
+		{
+			const struct sky_light_view *light = (const struct sky_light_view *)view->lights.address + index;
+			const float *color = (const float *)((const byte *)light + 0x50);
+			float power = *(const float *)((const byte *)light + 0x5C);
+			float diameter = *(const float *)((const byte *)light + 0x70);
+			float *out = sky + 9 + fill * 8;
+			real_vector3d vector;
+
+			if (light->lens_flare.index != NONE)
+				continue;
+			vector3d_from_euler_angles2d(&vector, &light->direction);
+			out[0] = vector.i;
+			out[1] = vector.j;
+			out[2] = vector.k;
+			out[3] = color[0] * power;
+			out[4] = color[1] * power;
+			out[5] = color[2] * power;
+			out[6] = cosf(PIN(diameter, 0.0f, 3.0f) * 0.5f);
+			out[7] = 1.0f;
+			fill++;
+		}
+	}
+	{
+		static const void *logged;
+
+		if (logged != view)
+		{
+			logged = view;
+			for (index = 0; index < view->lights.count; index++)
+			{
+				const struct sky_light_view *light = (const struct sky_light_view *)view->lights.address + index;
+				const float *color = (const float *)((const byte *)light + 0x50);
+				real_vector3d vector;
+
+				vector3d_from_euler_angles2d(&vector, &light->direction);
+				platform_log("sky light %ld: flags %08lx colour %.2f %.2f %.2f power %.2f dir %.2f %.2f %.2f diameter %.3f flare %d",
+					index, *(const unsigned long *)((const byte *)light + 0x4C), color[0], color[1], color[2],
+					*(const float *)((const byte *)light + 0x5C), vector.i, vector.j, vector.k,
+					*(const float *)((const byte *)light + 0x70), light->lens_flare.index != NONE);
+			}
+			platform_log("sky: indoor ambient %.2f %.2f %.2f x %.2f, outdoor %.2f %.2f %.2f x %.2f",
+				((const float *)(raw + 0x38))[0], ((const float *)(raw + 0x38))[1], ((const float *)(raw + 0x38))[2],
+				*(const float *)(raw + 0x44), ((const float *)(raw + 0x48))[0], ((const float *)(raw + 0x48))[1],
+				((const float *)(raw + 0x48))[2], *(const float *)(raw + 0x54));
+		}
+	}
+	for (index = 0; index < view->lights.count; index++)
+	{
+		const struct sky_light_view *light = (const struct sky_light_view *)view->lights.address + index;
+		const float *color = (const float *)((const byte *)light + 0x50);
+		float power = *(const float *)((const byte *)light + 0x5C);
+		real_vector3d vector;
+
+		if (light->lens_flare.index == NONE)
+			continue;
+		vector3d_from_euler_angles2d(&vector, &light->direction);
+		sky[0] = vector.i;
+		sky[1] = vector.j;
+		sky[2] = vector.k;
+		sky[3] = color[0] * power;
+		sky[4] = color[1] * power;
+		sky[5] = color[2] * power;
+		break;
+	}
+	return TRUE;
 }

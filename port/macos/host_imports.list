@@ -80,3 +80,6 @@ host_rt_set_objects
 host_rt_probe
 host_rt_set_lights
 host_rt_set_emitters
+host_rt_set_level
+host_rt_set_level_materials
+host_rt_set_level_page

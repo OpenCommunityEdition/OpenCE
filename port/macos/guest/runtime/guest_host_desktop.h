@@ -44,5 +44,9 @@ void host_rt_set_objects(const float *triangles, const unsigned char *groups, in
 int host_rt_probe(float *segments, int maximum);
 void host_rt_set_lights(const float *lights, int count);
 void host_rt_set_emitters(const float *emitters, int count);
+int host_rt_set_level(unsigned int generation, const float *vertices, const float *texcoords, int vertex_count,
+	const unsigned int *indices, const unsigned int *triangle_materials, int triangle_count);
+void host_rt_set_level_materials(const float *materials, int count);
+int host_rt_set_level_page(int page, int width, int height, const unsigned char *pixels);
 
 #endif

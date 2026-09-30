@@ -148,6 +148,26 @@ static const struct config_setting config_settings[] =
 		"its own lights too - Guilty Spark's, the glows' - traced in its colour, with\n"
 		"its shadows, in place of the game's) or \"game\" (the game's dynamic lights as\n"
 		"it draws them, only their shadows traced) (macOS)." },
+	{ "display.ray_tracing_level", _config_string, "\"render\"", "HALO_RAY_TRACING_LEVEL", _environment_value,
+		_platform_all,
+		"The level in Metal's rays: \"render\" (its drawn triangles, as you see them)\n"
+		"or \"collision\" (the surfaces the game collides with) (macOS)." },
+	{ "display.ray_tracing_gi", _config_string, "\"off\"", "HALO_RAY_TRACING_GI", _environment_value,
+		_platform_all,
+		"The level's light traced in place of its lightmaps (macOS): \"traced\" (the\n"
+		"sun, the sky, the glowing surfaces and the lights, with the lightmaps' light\n"
+		"where the rays land as the light that bounced), \"black\" (without the\n"
+		"lightmaps at all: only what the rays find lit) or \"off\"." },
+	{ "display.ray_tracing_gi_sun", _config_real, "1.0", "HALO_RAY_TRACING_GI_SUN", _environment_value,
+		_platform_all, "The traced sun's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_bounce", _config_real, "1.0", "HALO_RAY_TRACING_GI_BOUNCE", _environment_value,
+		_platform_all, "The traced bounced light's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_glow", _config_real, "1.0", "HALO_RAY_TRACING_GI_GLOW", _environment_value,
+		_platform_all, "The glowing surfaces' traced light's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_split", _config_boolean, "false", "HALO_RAY_TRACING_GI_SPLIT", _environment_set_is_true,
+		_platform_all, "The game's light on the screen's left half, the traced on its right (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_gi_lights", _config_real, "0.5", "HALO_RAY_TRACING_GI_LIGHTS", _environment_value,
+		_platform_all, "The traced lights' and glows' strength in the light buffer (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
 		_platform_all,
 		"The characters and vehicles in Metal's rays too: their contact shadows on\n"

@@ -353,6 +353,9 @@ static void render_window(
 		}
 		rasterizer_decals_end();
 		halo_ray_traced_light_stage(1);
+		halo_ray_traced_light_buffer(rasterizer_camera->z_near, rasterizer_camera->z_far,
+			rasterizer_camera->vertical_field_of_view, &rasterizer_camera->position.x,
+			&rasterizer_camera->forward.i, &rasterizer_camera->up.i);
 
 		rasterizer_decals_begin(_decal_layer_alpha_tested);
 		for (rendered_cluster_index = 0;
