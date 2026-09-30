@@ -144,11 +144,10 @@ port 5151.
 Invite links (`halo://join/...`) operate as on Linux. Refer to "Internet
 play" in [port/linux/README.md](../linux/README.md). The host's game puts
 its link on the clipboard and in `debug.txt`. To join on macOS, give the
-link on the command line:
-`build/macos/Halo/halo 'halo://join/...'`. Or set
-`network.join_from_clipboard = true`, copy the link, and switch to the
-game. (macOS does not open `halo://` links with the game: the application
-does not register the scheme.) Tailscale needs no invite.
+link to the other player. Clicking it opens `Halo.app` (which registers
+`halo://`) and joins the game, whether the game runs already or not. Or
+set `network.join_from_clipboard = true`, copy the link, and switch to the
+game. Tailscale needs no invite.
 
 ## Ray-traced lighting
 

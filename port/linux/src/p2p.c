@@ -1862,8 +1862,9 @@ static void handoff_readable(void)
 	p2p_invite_received(message + 12);
 }
 
-#ifdef HALO_ANDROID
-/* the app's activity writes a link it was opened with here */
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
+/* the app writes a link it was opened with here (Android's activity; the
+macOS host, from the system's open-URL event) */
 static void poll_invite_file(void)
 {
 	static unsigned long checked_time;
@@ -2007,7 +2008,7 @@ static void *p2p_thread(void *unused)
 		update_joining();
 		update_upnp();
 		p2p_discord_update();
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
 		poll_invite_file();
 #endif
 	}

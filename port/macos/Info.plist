@@ -22,6 +22,17 @@
 	<string>14.4</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.action-games</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Halo invite link</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>halo</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>GCSupportsControllerUserInteraction</key>

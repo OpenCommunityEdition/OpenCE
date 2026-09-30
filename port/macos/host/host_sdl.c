@@ -16,6 +16,7 @@ callback is handed to a thread that has one.
 
 #include <SDL3/SDL.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <string.h>
 
 #define HANDLE_COUNT 256
@@ -165,12 +166,37 @@ int host_sdl_gl_swap_window(uint32_t window)
 
 /* ---------- events */
 
+/* a halo:// link macOS opened the game with (SDL passes the open-URL event
+as a drop): written where the game looks for one (p2p.c poll_invite_file);
+1 if the event was one */
+static int invite_link(const SDL_Event *event)
+{
+	char path[1200];
+	FILE *file;
+
+	if (event->type != SDL_EVENT_DROP_FILE || !event->drop.data || strncmp(event->drop.data, "halo://", 7))
+		return 0;
+	snprintf(path, sizeof(path), "%s/join_link.txt", host_data_root);
+	file = fopen(path, "wb");
+	if (file)
+	{
+		fputs(event->drop.data, file);
+		fclose(file);
+		host_logf(HOST_LOG_INFO, "opened with an invite link");
+	}
+	return 1;
+}
+
 int host_sdl_poll_event(void *event)
 {
 	SDL_Event host_event;
 
-	if (!SDL_PollEvent(&host_event))
-		return 0;
+	do
+	{
+		if (!SDL_PollEvent(&host_event))
+			return 0;
+	}
+	while (invite_link(&host_event));
 	/* the layouts agree except for the pointers of text, drop and user
 	events, which the guest does not read */
 	memcpy(event, &host_event, sizeof(host_event));
@@ -481,6 +507,8 @@ int host_sdl_wait_event_timeout(void *event, int milliseconds)
 	SDL_Event host_event;
 
 	if (!SDL_WaitEventTimeout(event ? &host_event : NULL, milliseconds))
+		return 0;
+	if (event && invite_link(&host_event))
 		return 0;
 	if (event)
 		memcpy(event, &host_event, sizeof(host_event));
