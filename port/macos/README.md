@@ -75,6 +75,7 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
+| F7 | ⌘P | Show or hide the frames-a-second counter. |
 | F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
 | F9 | ⌘T | Switch the ray-traced lighting on or off. |
 | F11 | ⌘F | Switch between fullscreen and a window. |
@@ -97,6 +98,7 @@ These settings are new, or have a different default on macOS:
 | Setting | Default on macOS | Function |
 | --- | --- | --- |
 | `display.resolution` | `"native"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
+| `display.show_fps` | `false` | Start with the frames-a-second counter shown (F7 / ⌘P). |
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
 | `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |

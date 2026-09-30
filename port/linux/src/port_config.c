@@ -101,6 +101,10 @@ static const struct config_setting config_settings[] =
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
 
+	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_value, _platform_desktop,
+		"Show the game's frames-a-second counter (F7, or Command-P on a Mac,\n"
+		"shows or hides it)." },
+
 	{ "display.ray_tracing", _config_string, HALO_CONFIG_RAY_TRACING, "HALO_RAY_TRACING", _environment_value,
 		_platform_all,
 		"Ray-traced lighting on the 3D world (port/linux/src/raytrace_gl.c): \"on\"\n"

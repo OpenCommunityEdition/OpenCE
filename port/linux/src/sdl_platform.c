@@ -57,6 +57,9 @@ void terminal_printf(const void *color, const char *format, ...);
 shows the game's error screen */
 void write_to_error_file(char *string, unsigned char date);
 
+/* the game's frames-a-second counter (source/main/main.c) */
+extern unsigned char display_framerate;
+
 /* what the port's keys did: on the screen and in the log */
 static void notice(const char *format, ...)
 {
@@ -80,6 +83,7 @@ BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+	display_framerate = config_boolean("display.show_fps") ? 1 : 0;
 	/* a copy of the game started to open an invite link hands it to the
 	one already running, and goes */
 	if (p2p_hand_off_invite())
@@ -765,7 +769,7 @@ void platform_pump_events(void)
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
 		{
-			/* the port's keys: F8 to F12, or on macOS, whose own keys F11 and
+			/* the port's keys: F7 to F12, or on macOS, whose own keys F11 and
 			the media keys are, Command with a letter (the letter then does
 			nothing in the game) */
 			SDL_Scancode action = event.key.scancode;
@@ -779,6 +783,7 @@ void platform_pump_events(void)
 				case SDL_SCANCODE_R: action = SDL_SCANCODE_F8; break;
 				case SDL_SCANCODE_T: action = SDL_SCANCODE_F9; break;
 				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
+				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
 				default: break;
 				}
 			}
@@ -799,6 +804,13 @@ void platform_pump_events(void)
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
+			}
+			/* F7 shows or hides the game's frames-a-second counter (its own
+			display_framerate: source/main/main.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F7)
+			{
+				display_framerate = !display_framerate;
+				notice("frame rate counter: %s", display_framerate ? "on" : "off");
 			}
 			/* F8 steps through the resolutions (d3d8_gl.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F8)
