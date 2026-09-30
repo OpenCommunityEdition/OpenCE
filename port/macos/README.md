@@ -80,6 +80,9 @@ build adds:
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
 
+⌘Q quits on a second press within two seconds (Q is the flashlight, and ⌘
+is held for the keys above); the window's close button quits at once.
+
 On a Mac keyboard, F11 shows the desktop and F8 to F12 are media keys
 unless fn is held, so the Command shortcuts do the same. Each key shows
 what it did in the game's console at the top of the screen (for example
