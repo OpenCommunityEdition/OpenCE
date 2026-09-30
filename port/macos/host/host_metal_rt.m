@@ -59,6 +59,13 @@ typedef int EGLint_;
 #define GL_NEAREST_ 0x2600
 
 #define HOST_RT_MAXIMUM_OBJECTS 511
+/* the objects' sphere: an icosahedron (enough for soft shadows and
+occlusion, and quick to trace) */
+#define HOST_RT_SPHERE_TRIANGLES 20
+/* the objects, each its own mesh (its bounds its own, so that a ray far
+from them all walks none), and their shapes each at most */
+#define HOST_RT_GROUPS 32
+#define HOST_RT_GROUP_SHAPES 64
 
 static struct
 {
@@ -68,12 +75,18 @@ static struct
 	id<MTLComputePipelineState> pipeline;
 	id<MTLAccelerationStructure> world;
 	unsigned int world_generation;
-	/* the objects (host_rt_set_objects): a unit sphere, stretched and placed
-	by each instance's transform, and the scene of the level and them,
-	rebuilt each frame (its instance lists in a ring: the GPU may still read
-	the last ones) */
-	id<MTLAccelerationStructure> blob, scene;
-	id<MTLBuffer> instance_buffers[3], scene_scratch;
+	/* the objects (host_rt_set_objects): a unit sphere's triangles under each
+	one's transform, in two meshes rebuilt each frame (the objects', the
+	player's body's), and the scene of the level and the two. The buffers
+	the frame writes are in rings of three: the GPU may still read the last
+	ones. */
+	float sphere[HOST_RT_SPHERE_TRIANGLES * 3 * 3];
+	int sphere_ready;
+	id<MTLAccelerationStructure> bodies[HOST_RT_GROUPS], scene;
+	NSArray<id<MTLAccelerationStructure>> *scene_structures;
+	float spheres[HOST_RT_GROUPS + 1][4];
+	unsigned int sphere_count;
+	id<MTLBuffer> body_vertices[3][HOST_RT_GROUPS], body_scratch[HOST_RT_GROUPS], instance_buffers[3], scene_scratch;
 	int instance_ring;
 	float object_transforms[HOST_RT_MAXIMUM_OBJECTS * 12];
 	unsigned char object_masks[HOST_RT_MAXIMUM_OBJECTS];
@@ -113,11 +126,15 @@ static NSString *const kernel_source = @
 	   tan of half the vertical field of view 14, aspect 15, viewport 16-19,
 	   frame 20, occlusion radius 21, reflection distance 22, whether the
 	   objects' pixels are known 23 (then their depth is negative), the
-	   direction to the sun 24-26 and whether there is one 27 */
+	   direction to the sun 24-26 and whether there is one 27, the player's
+	   body's bounding sphere 28-31 (radius 0: none) */
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
 	"	constant float *c [[buffer(1)]],\n"
+	"	primitive_acceleration_structure level [[buffer(2)]],\n"
+	"	constant float4 *spheres [[buffer(3)]],\n"
+	"	constant uint &sphere_count [[buffer(4)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -142,6 +159,14 @@ static NSString *const kernel_source = @
 	"	any_hit.accept_any_intersection(true);\n"
 	"	any_hit.assume_geometry_type(geometry_type::triangle);\n"
 	"	any_hit.force_opacity(forced_opacity::opaque);\n"
+	/* rays that can find only the level go through its own structure, not
+	   the scene's instances (in compute, a walk through them costs every ray) */
+	"	intersector<triangle_data> level_hit;\n"
+	"	level_hit.accept_any_intersection(true);\n"
+	"	level_hit.assume_geometry_type(geometry_type::triangle);\n"
+	"	level_hit.force_opacity(forced_opacity::opaque);\n"
+	"	level_hit.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"	level_hit.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	/* the level's triangles face outwards, wound counterclockwise around
 	   their normal (raytrace_world.c), which Metal's rays see from the front
 	   as clockwise (tested: port/macos/tests/run_raytrace_test.sh): a ray
@@ -150,6 +175,10 @@ static NSString *const kernel_source = @
 	"	any_hit.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	float radius = c[21];\n"
 	"	float bias = 0.02 + z * 0.002;\n"
+	/* near an object (its bounding sphere): the occlusion can find it */
+	"	bool near_objects = object;\n"
+	"	for (uint s = 0; s < sphere_count && !near_objects; s++)\n"
+	"		near_objects = distance(P, spheres[s].xyz) < spheres[s].w + radius;\n"
 	"	float occlusion = 0.0;\n"
 	"	for (uint i = 0; i < 4; i++)\n"
 	"	{\n"
@@ -165,9 +194,19 @@ static NSString *const kernel_source = @
 	"		ray occlusion_ray(P + N * bias, d, 0.0, radius);\n"
 	/* (an object's occlusion: the level's and the other objects'; the
 	   level's: everything's, the player's body too) */
-	"		auto hit = any_hit.intersect(occlusion_ray, world, object ? 3u : 7u);\n"
-	"		if (hit.type != intersection_type::none)\n"
-	"			occlusion += 1.0 - hit.distance / radius;\n"
+	"		float distance_hit = -1.0;\n"
+	"		if (near_objects)\n"
+	"		{\n"
+	"			auto hit = any_hit.intersect(occlusion_ray, world, object ? 3u : 7u);\n"
+	"			if (hit.type != intersection_type::none) distance_hit = hit.distance;\n"
+	"		}\n"
+	"		else\n"
+	"		{\n"
+	"			auto hit = level_hit.intersect(occlusion_ray, level);\n"
+	"			if (hit.type != intersection_type::none) distance_hit = hit.distance;\n"
+	"		}\n"
+	"		if (distance_hit >= 0.0)\n"
+	"			occlusion += 1.0 - distance_hit / radius;\n"
 	"	}\n"
 	"	float visibility = 1.0 - occlusion / 4.0;\n"
 	/* the sun's shadow, on what the level's lightmaps do not shade: an
@@ -182,11 +221,11 @@ static NSString *const kernel_source = @
 	"		if (c[23] > 0.5) on_level = g.x > 0.0;\n"
 	"		else\n"
 	"		{\n"
-	"			intersector<triangle_data, instancing> surface_probe;\n"
+	"			intersector<triangle_data> surface_probe;\n"
 	"			surface_probe.accept_any_intersection(true);\n"
 	"			surface_probe.force_opacity(forced_opacity::opaque);\n"
 	"			ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
-	"			on_level = surface_probe.intersect(probe, world, 1u).type != intersection_type::none;\n"
+	"			on_level = surface_probe.intersect(probe, level).type != intersection_type::none;\n"
 	"		}\n"
 	/* an object's pixel: the level's and the other objects' shadows; the
 	   level's: the player's body's only (the lightmaps have the level's,
@@ -196,7 +235,10 @@ static NSString *const kernel_source = @
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
 	"			ray shadow_ray(P + N * bias, normalize(sun + spread), 0.0, 2000.0);\n"
-	"			if (any_hit.intersect(shadow_ray, world, on_level ? 4u : 3u).type != intersection_type::none)\n"
+	/* (the level's: only where the body's shadow can fall, near it) */
+	"			bool near_body = c[31] > 0.0 && distance(P, float3(c[28], c[29], c[30])) < c[31] * 8.0;\n"
+	"			if ((!on_level || near_body) &&\n"
+	"				any_hit.intersect(shadow_ray, world, on_level ? 4u : 3u).type != intersection_type::none)\n"
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
 	"	}\n"
@@ -209,13 +251,13 @@ static NSString *const kernel_source = @
 	"	float fresnel = mix(0.04, 1.0, pow(1.0 - clamp(dot(-V, N), 0.0, 1.0), 5.0));\n"
 	"	float fade = smoothstep(0.05, 0.1, fresnel);\n"
 	"	if (fade <= 0.0) { result.write(float4(visibility, 0.0, 0.0, 0.0), id); return; }\n"
-	"	intersector<triangle_data, instancing> closest;\n"
+	"	intersector<triangle_data> closest;\n"
 	"	closest.assume_geometry_type(geometry_type::triangle);\n"
 	"	closest.force_opacity(forced_opacity::opaque);\n"
 	"	closest.set_triangle_front_facing_winding(winding::clockwise);\n"
 	"	closest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	ray reflection_ray(P + N * bias, R, 0.0, c[22]);\n"
-	"	auto hit = closest.intersect(reflection_ray, world, 1u);\n"
+	"	auto hit = closest.intersect(reflection_ray, level);\n"
 	"	float4 out = float4(visibility, 0.0, 0.0, 0.0);\n"
 	"	if (hit.type != intersection_type::none)\n"
 	"	{\n"
@@ -366,9 +408,9 @@ int host_rt_set_world(uint32_t generation, const float *vertices, int vertex_cou
 	return 1;
 }
 
-/* a unit sphere (an icosahedron split once: 80 triangles), wound as the
+/* a unit sphere (an icosahedron, 20 triangles, or split once, 80), wound as the
 level's are, counterclockwise seen from outside */
-static id<MTLAccelerationStructure> build_blob(void)
+static void make_sphere(void)
 {
 	static const float t = 1.6180340f;
 	float corners[12][3] = { { -1, t, 0 }, { 1, t, 0 }, { -1, -t, 0 }, { 1, -t, 0 }, { 0, -1, t }, { 0, 1, t },
@@ -376,15 +418,8 @@ static id<MTLAccelerationStructure> build_blob(void)
 	static const int faces[20][3] = { { 0, 11, 5 }, { 0, 5, 1 }, { 0, 1, 7 }, { 0, 7, 10 }, { 0, 10, 11 }, { 1, 5, 9 },
 		{ 5, 11, 4 }, { 11, 10, 2 }, { 10, 7, 6 }, { 7, 1, 8 }, { 3, 9, 4 }, { 3, 4, 2 }, { 3, 2, 6 }, { 3, 6, 8 },
 		{ 3, 8, 9 }, { 4, 9, 5 }, { 2, 4, 11 }, { 6, 2, 10 }, { 8, 6, 7 }, { 9, 8, 1 } };
-	float vertices[80 * 3 * 3];
+	float *vertices = rt.sphere;
 	int face, corner, count = 0;
-	MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
-	MTLPrimitiveAccelerationStructureDescriptor *descriptor;
-	MTLAccelerationStructureSizes sizes;
-	id<MTLAccelerationStructure> blob;
-	id<MTLBuffer> scratch;
-	id<MTLCommandBuffer> commands;
-	id<MTLAccelerationStructureCommandEncoder> encoder;
 
 	for (corner = 0; corner < 12; corner++)
 	{
@@ -395,7 +430,25 @@ static id<MTLAccelerationStructure> build_blob(void)
 		corners[corner][1] /= length;
 		corners[corner][2] /= length;
 	}
-	for (face = 0; face < 20; face++)
+	for (face = 0; face < 20 && HOST_RT_SPHERE_TRIANGLES == 20; face++)
+	{
+		const float *a = corners[faces[face][0]], *b = corners[faces[face][1]], *c = corners[faces[face][2]];
+		float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+		float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+		int flip = n[0] * a[0] + n[1] * a[1] + n[2] * a[2] < 0.0f, k;
+
+		/* (the corners a little out, the faces a little in: about the sphere) */
+		for (k = 0; k < 3; k++)
+		{
+			const float *vertex = (const float *[]){ a, b, c }[flip && k ? 3 - k : k];
+
+			vertices[count * 3 + 0] = vertex[0] * 1.12f;
+			vertices[count * 3 + 1] = vertex[1] * 1.12f;
+			vertices[count * 3 + 2] = vertex[2] * 1.12f;
+			count++;
+		}
+	}
+	for (face = 0; face < 20 && HOST_RT_SPHERE_TRIANGLES == 80; face++)
 	{
 		const float *a = corners[faces[face][0]], *b = corners[faces[face][1]], *c = corners[faces[face][2]];
 		float ab[3], bc[3], ca[3];
@@ -435,24 +488,7 @@ static id<MTLAccelerationStructure> build_blob(void)
 			}
 		}
 	}
-	geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
-	geometry.vertexBuffer = [rt.device newBufferWithBytes:vertices length:sizeof(vertices)
-		options:MTLResourceStorageModeShared];
-	geometry.vertexStride = 12;
-	geometry.triangleCount = 80;
-	geometry.opaque = YES;
-	descriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
-	descriptor.geometryDescriptors = @[ geometry ];
-	sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
-	blob = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
-	scratch = [rt.device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
-	commands = [rt.queue commandBuffer];
-	encoder = [commands accelerationStructureCommandEncoder];
-	[encoder buildAccelerationStructure:blob descriptor:descriptor scratchBuffer:scratch scratchBufferOffset:0];
-	[encoder endEncoding];
-	[commands commit];
-	[commands waitUntilCompleted];
-	return blob;
+	rt.sphere_ready = 1;
 }
 
 /* this frame's objects: each a unit sphere under a 3x4 transform (rows, 12
@@ -469,67 +505,119 @@ void host_rt_set_objects(const float *transforms, const unsigned char *masks, in
 	rt.object_count = count;
 }
 
-/* the scene for this frame's rays: the level, and the objects, built in the
-command buffer before the rays */
+/* the scene for this frame's rays: each object's mesh, and the level and
+them, built in the command buffer before the rays */
 static int encode_scene(id<MTLCommandBuffer> commands)
 {
 	MTLInstanceAccelerationStructureDescriptor *descriptor;
 	MTLAccelerationStructureInstanceDescriptor *instances;
+	NSMutableArray<id<MTLAccelerationStructure>> *structures;
 	id<MTLBuffer> buffer;
 	id<MTLAccelerationStructureCommandEncoder> encoder;
-	int index, count = 1 + rt.object_count;
+	int index, group, ring = rt.instance_ring, count;
+	int group_shapes[HOST_RT_GROUPS] = { 0 };
+	unsigned char group_masks[HOST_RT_GROUPS] = { 0 };
 
-	if (!rt.blob)
-		rt.blob = build_blob();
-	if (!rt.blob)
-		return 0;
+	if (!rt.sphere_ready)
+		make_sphere();
 	if (!rt.instance_buffers[0])
 	{
 		for (index = 0; index < 3; index++)
-			rt.instance_buffers[index] = [rt.device newBufferWithLength:(HOST_RT_MAXIMUM_OBJECTS + 1) *
+		{
+			rt.instance_buffers[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) *
 				sizeof(MTLAccelerationStructureInstanceDescriptor) options:MTLResourceStorageModeShared];
+			for (group = 0; group < HOST_RT_GROUPS; group++)
+				rt.body_vertices[index][group] = [rt.device newBufferWithLength:HOST_RT_GROUP_SHAPES *
+					sizeof(rt.sphere) options:MTLResourceStorageModeShared];
+		}
 	}
-	buffer = rt.instance_buffers[rt.instance_ring];
-	rt.instance_ring = (rt.instance_ring + 1) % 3;
-	instances = (MTLAccelerationStructureInstanceDescriptor *)buffer.contents;
-	memset(instances, 0, (size_t)count * sizeof(*instances));
-	for (index = 0; index < count; index++)
+	rt.instance_ring = (ring + 1) % 3;
+	/* each object's shapes, placed */
+	for (index = 0; index < rt.object_count; index++)
 	{
-		MTLAccelerationStructureInstanceDescriptor *instance = &instances[index];
-		int column;
+		unsigned char mask = rt.object_masks[index];
+		int shape, vertex;
+		float *vertices;
+		const float *m = &rt.object_transforms[index * 12];
 
-		instance->options = MTLAccelerationStructureInstanceOptionOpaque;
-		if (!index)
-		{
-			instance->transformationMatrix.columns[0] = (MTLPackedFloat3){ { 1, 0, 0 } };
-			instance->transformationMatrix.columns[1] = (MTLPackedFloat3){ { 0, 1, 0 } };
-			instance->transformationMatrix.columns[2] = (MTLPackedFloat3){ { 0, 0, 1 } };
-			instance->transformationMatrix.columns[3] = (MTLPackedFloat3){ { 0, 0, 0 } };
-			instance->mask = 1;
-			instance->accelerationStructureIndex = 0;
+		group = mask >> 3;
+		if (group >= HOST_RT_GROUPS || group_shapes[group] >= HOST_RT_GROUP_SHAPES)
 			continue;
-		}
-		for (column = 0; column < 4; column++)
+		group_masks[group] = mask & 7;
+		shape = group_shapes[group]++;
+		vertices = (float *)rt.body_vertices[ring][group].contents + shape * HOST_RT_SPHERE_TRIANGLES * 9;
+		for (vertex = 0; vertex < HOST_RT_SPHERE_TRIANGLES * 3; vertex++)
 		{
-			const float *m = &rt.object_transforms[(index - 1) * 12];
+			const float *v = &rt.sphere[vertex * 3];
 
-			instance->transformationMatrix.columns[column] =
-				(MTLPackedFloat3){ { m[column], m[4 + column], m[8 + column] } };
+			vertices[vertex * 3 + 0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
+			vertices[vertex * 3 + 1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
+			vertices[vertex * 3 + 2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
 		}
-		instance->mask = rt.object_masks[index - 1];
-		instance->accelerationStructureIndex = 1;
 	}
+	encoder = [commands accelerationStructureCommandEncoder];
+	structures = [NSMutableArray arrayWithObject:rt.world];
+	buffer = rt.instance_buffers[ring];
+	instances = (MTLAccelerationStructureInstanceDescriptor *)buffer.contents;
+	memset(instances, 0, (HOST_RT_GROUPS + 1) * sizeof(*instances));
+	for (index = 0; index <= HOST_RT_GROUPS; index++)
+	{
+		instances[index].options = MTLAccelerationStructureInstanceOptionOpaque;
+		instances[index].transformationMatrix.columns[0] = (MTLPackedFloat3){ { 1, 0, 0 } };
+		instances[index].transformationMatrix.columns[1] = (MTLPackedFloat3){ { 0, 1, 0 } };
+		instances[index].transformationMatrix.columns[2] = (MTLPackedFloat3){ { 0, 0, 1 } };
+	}
+	instances[0].mask = 1;
+	count = 1;
+	for (group = 0; group < HOST_RT_GROUPS; group++)
+	{
+		MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
+		MTLPrimitiveAccelerationStructureDescriptor *mesh;
+
+		if (!group_shapes[group])
+			continue;
+		geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+		geometry.vertexBuffer = rt.body_vertices[ring][group];
+		geometry.vertexStride = 12;
+		geometry.opaque = YES;
+		mesh = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+		mesh.geometryDescriptors = @[ geometry ];
+		if (!rt.bodies[group])
+		{
+			/* sized for the most shapes, once */
+			MTLAccelerationStructureSizes sizes;
+
+			geometry.triangleCount = HOST_RT_GROUP_SHAPES * HOST_RT_SPHERE_TRIANGLES;
+			sizes = [rt.device accelerationStructureSizesWithDescriptor:mesh];
+			rt.bodies[group] = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+			rt.body_scratch[group] = [rt.device newBufferWithLength:sizes.buildScratchBufferSize
+				options:MTLResourceStorageModePrivate];
+			if (!rt.bodies[group] || !rt.body_scratch[group])
+			{
+				[encoder endEncoding];
+				return 0;
+			}
+		}
+		geometry.triangleCount = (NSUInteger)(group_shapes[group] * HOST_RT_SPHERE_TRIANGLES);
+		[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
+			scratchBufferOffset:0];
+		instances[count].mask = group_masks[group];
+		instances[count].accelerationStructureIndex = (uint32_t)structures.count;
+		[structures addObject:rt.bodies[group]];
+		count++;
+	}
+	/* (after the meshes: a new pass sees them built) */
+	[encoder endEncoding];
 	descriptor = [MTLInstanceAccelerationStructureDescriptor descriptor];
-	descriptor.instancedAccelerationStructures = @[ rt.world, rt.blob ];
+	descriptor.instancedAccelerationStructures = structures;
 	descriptor.instanceCount = (NSUInteger)count;
 	descriptor.instanceDescriptorBuffer = buffer;
 	descriptor.instanceDescriptorType = MTLAccelerationStructureInstanceDescriptorTypeDefault;
 	if (!rt.scene)
 	{
-		/* sized for the most objects, once */
 		MTLAccelerationStructureSizes sizes;
 
-		descriptor.instanceCount = HOST_RT_MAXIMUM_OBJECTS + 1;
+		descriptor.instanceCount = HOST_RT_GROUPS + 1;
 		sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
 		descriptor.instanceCount = (NSUInteger)count;
 		rt.scene = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
@@ -542,6 +630,36 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	[encoder buildAccelerationStructure:rt.scene descriptor:descriptor scratchBuffer:rt.scene_scratch
 		scratchBufferOffset:0];
 	[encoder endEncoding];
+	rt.scene_structures = structures;
+	/* each object's bounding sphere, for the rays that can find only the
+	level */
+	rt.sphere_count = 0;
+	for (group = 0; group < HOST_RT_GROUPS; group++)
+	{
+		const float *vertices = (const float *)rt.body_vertices[ring][group].contents;
+		float low[3] = { 1e30f, 1e30f, 1e30f }, high[3] = { -1e30f, -1e30f, -1e30f };
+		int vertex, axis;
+
+		if (!group_shapes[group])
+			continue;
+		for (vertex = 0; vertex < group_shapes[group] * HOST_RT_SPHERE_TRIANGLES * 3; vertex++)
+		{
+			for (axis = 0; axis < 3; axis++)
+			{
+				float value = vertices[vertex * 3 + axis];
+
+				if (value < low[axis])
+					low[axis] = value;
+				if (value > high[axis])
+					high[axis] = value;
+			}
+		}
+		for (axis = 0; axis < 3; axis++)
+			rt.spheres[rt.sphere_count][axis] = (low[axis] + high[axis]) * 0.5f;
+		rt.spheres[rt.sphere_count][3] = 0.5f * sqrtf((high[0] - low[0]) * (high[0] - low[0]) +
+			(high[1] - low[1]) * (high[1] - low[1]) + (high[2] - low[2]) * (high[2] - low[2]));
+		rt.sphere_count++;
+	}
 	return 1;
 }
 
@@ -588,7 +706,7 @@ uint32_t host_rt_texture(int which, int width, int height)
 	return rt.gl_textures[which];
 }
 
-/* the rays, for the camera (the 28 values the kernel names); 1 if done */
+/* the rays, for the camera (the 32 values the kernel names); 1 if done */
 /* the time waited on GL (glFinish) and on the rays, for the frame
 statistics (host_sdl.c) */
 uint64_t host_rt_finish_ns, host_rt_trace_ns, host_rt_traces;
@@ -645,9 +763,12 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setTexture:rt.textures[0] atIndex:0];
 	[encoder setTexture:rt.textures[1] atIndex:1];
 	[encoder setAccelerationStructure:rt.scene atBufferIndex:0];
-	[encoder useResource:rt.world usage:MTLResourceUsageRead];
-	[encoder useResource:rt.blob usage:MTLResourceUsageRead];
-	[encoder setBytes:camera length:28 * sizeof(float) atIndex:1];
+	for (id<MTLAccelerationStructure> structure in rt.scene_structures)
+		[encoder useResource:structure usage:MTLResourceUsageRead];
+	[encoder setAccelerationStructure:rt.world atBufferIndex:2];
+	[encoder setBytes:rt.spheres length:sizeof(rt.spheres) atIndex:3];
+	[encoder setBytes:&rt.sphere_count length:sizeof(rt.sphere_count) atIndex:4];
+	[encoder setBytes:camera length:32 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];

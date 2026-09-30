@@ -396,13 +396,20 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 /* the objects as shapes for the rays: the marines, each an ellipsoid a
 little larger than its box (the one in the open as the player's body,
 whose shadow only the rays draw) */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum)
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+	float *player_sphere)
 {
 	/* view space: x, y (up), z (forward); the world's x, y, z are the
 	view's x, z, y */
 	static const float boxes[2][6] = { { 3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f }, { -2.4f, -1.0f, 8.8f, -1.8f, 0.8f, 9.4f } };
 	long count = 0, index;
 
+	(void)camera;
+	/* the player's body: the marine in the open (world x, y, z) */
+	player_sphere[0] = -2.1f;
+	player_sphere[1] = 9.1f;
+	player_sphere[2] = -0.1f;
+	player_sphere[3] = 1.0f;
 	if (getenv("RT_NO_OBJECTS"))
 		return 0;
 	for (index = 0; index < 2 && count < maximum; index++)
@@ -420,7 +427,7 @@ long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maxi
 			m[row * 4 + 2] = row == 2 ? half[2] : 0.0f;
 			m[row * 4 + 3] = center[row];
 		}
-		masks[count++] = index == 1 ? 4 : 2;
+		masks[count++] = index == 1 ? 4 : (1 << 3 | 2);
 	}
 	return count;
 }

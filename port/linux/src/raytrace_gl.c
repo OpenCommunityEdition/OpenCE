@@ -53,7 +53,8 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 /* the direction towards the sky's sun; 0 if none */
 unsigned char halo_ray_tracing_sun(float *direction);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum);
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+	float *player_sphere);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -567,7 +568,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[28], right[3], length;
+	float camera[32], right[3], length;
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -640,7 +641,10 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	{
 		static float transforms[511 * 12];
 		static unsigned char masks[511];
-		long count = ray.objects ? halo_ray_tracing_objects(transforms, masks, 511) : 0;
+		long count = ray.objects ? halo_ray_tracing_objects(transforms, masks, 511, position, camera + 28) : 0;
+
+		if (!ray.objects)
+			camera[31] = 0.0f;
 
 		host_rt_set_objects(transforms, masks, (int)count);
 	}

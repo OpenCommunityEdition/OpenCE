@@ -206,6 +206,16 @@ instances' masks:
 So the ground darkens under the marines and the vehicles, and in the sun
 you see your own shadow, which the game never drew in the first person.
 
+Each object is its own small mesh (its bone shapes, 20 triangles each,
+placed on the CPU), rebuilt each frame, and only the objects within 25
+world units of the camera (at most 32) are in. Rays that can find only the
+level (the reflections, and the occlusion away from every object's bounding
+sphere) go through the level's own structure, not the scene's instances: on
+M1 and M2 the rays walk the instances in compute, and it costs every ray. On
+The Silent Cartographer's beach, with a dozen units near, the objects cost
+about 4.5 ms a frame at 2560x1920 on an M2 Pro; `display.ray_tracing_objects
+= false` leaves them out.
+
 The occlusion and the sun's shadows darken the level's baked light (its
 lightmaps), not the flashlight's, the plasma's or the other dynamic
 lights': the game draws the lightmaps' light, adds the dynamic lights, then

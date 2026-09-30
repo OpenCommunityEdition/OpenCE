@@ -316,68 +316,110 @@ static void bone(float *m, const real_point3d *a, const real_point3d *b, float r
 	ellipsoid(m, center, u, v, w);
 }
 
-/* this frame's shapes, at most maximum: their transforms (12 floats each)
-and masks; returns how many */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum)
+/* the objects nearer the camera than this (world units) are in the rays */
+#define RAY_TRACED_OBJECT_DISTANCE 25.0f
+
+/* one object's shapes (its mask: the group in the high bits, below the
+kind); returns how many */
+static long object_shapes(long object_index, struct object_datum *object, unsigned char mask, float *transforms,
+	unsigned char *masks, long maximum)
+{
+	long count = 0;
+	float radius = object->object.bounding_sphere_radius;
+
+	if (object->object.type == _object_type_biped)
+	{
+		const struct object_definition *definition = object_definition_get(object->definition_index);
+		const struct model *model = definition->object.model.index != NONE ?
+			model_definition_get(definition->object.model.index) : NULL;
+		const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
+		const struct model_node *nodes;
+		long node_index;
+		/* a limb's thickness, from the biped's size */
+		float r = radius * 0.13f;
+
+		if (!model || !matrices || model->nodes.count <= 0)
+			return 0;
+		if (r < 0.02f)
+			r = 0.02f;
+		if (r > 0.12f)
+			r = 0.12f;
+		nodes = (const struct model_node *)model->nodes.address;
+		for (node_index = 0; node_index < model->nodes.count && count < maximum; node_index++)
+		{
+			short parent = nodes[node_index].parent_node_index;
+
+			if (parent < 0 || parent >= model->nodes.count)
+				continue;
+			bone(transforms + count * 12, &matrices[parent].position, &matrices[node_index].position, r);
+			masks[count++] = mask;
+		}
+	}
+	else if (maximum > 0)
+	{
+		const real_vector3d *forward = &object->object.forward, *up = &object->object.up;
+		float center[3] = { object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y,
+			object->object.bounding_sphere_center.z };
+		float u[3] = { forward->i * radius * 0.85f, forward->j * radius * 0.85f, forward->k * radius * 0.85f };
+		float w[3] = { up->i * radius * 0.35f, up->j * radius * 0.35f, up->k * radius * 0.35f };
+		float v[3] = { (up->j * forward->k - up->k * forward->j) * radius * 0.45f,
+			(up->k * forward->i - up->i * forward->k) * radius * 0.45f,
+			(up->i * forward->j - up->j * forward->i) * radius * 0.45f };
+
+		ellipsoid(transforms, center, u, v, w);
+		masks[count++] = mask;
+	}
+	return count;
+}
+
+/* this frame's shapes near the camera, at most maximum: their transforms
+(12 floats each) and masks (the kind, 2 an object or 4 the player's body,
+in the low 3 bits; the object, 0 to 31, above: the player's first), and the
+player's body's bounding sphere (center, radius; radius 0 if none); returns
+how many */
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+	float *player_sphere)
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
-	long count = 0, player_unit = NONE, player_index;
+	long count = 0, player_unit = NONE, player_index, group = 1;
 
+	player_sphere[0] = player_sphere[1] = player_sphere[2] = player_sphere[3] = 0.0f;
 	if (global_structure_bsp_index == NONE || !object_header_data)
 		return 0;
 	player_index = local_player_get_player_index(0);
 	if (player_index != NONE)
 		player_unit = player_get(player_index)->unit_index;
-	object_iterator_new(&iterator, _object_mask_unit, 0);
-	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
+	if (player_unit != NONE && (object = object_try_and_get_and_verify_type(player_unit, _object_mask_unit)) != NULL &&
+		object->object.bounding_sphere_radius > 0.0f)
 	{
-		unsigned char mask = iterator.index == player_unit ? _ray_mask_player : _ray_mask_object;
+		player_sphere[0] = object->object.bounding_sphere_center.x;
+		player_sphere[1] = object->object.bounding_sphere_center.y;
+		player_sphere[2] = object->object.bounding_sphere_center.z;
+		player_sphere[3] = object->object.bounding_sphere_radius;
+		count += object_shapes(player_unit, object, _ray_mask_player, transforms, masks, maximum);
+	}
+	object_iterator_new(&iterator, _object_mask_unit, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum && group < 32)
+	{
 		float radius = object->object.bounding_sphere_radius;
+		float dx = object->object.bounding_sphere_center.x - camera[0];
+		float dy = object->object.bounding_sphere_center.y - camera[1];
+		float dz = object->object.bounding_sphere_center.z - camera[2];
+		float reach = RAY_TRACED_OBJECT_DISTANCE + radius;
+		long added;
 
-		if (!(radius > 0.0f) || radius > 20.0f)
+		if (iterator.index == player_unit || !(radius > 0.0f) || radius > 20.0f ||
+			dx * dx + dy * dy + dz * dz > reach * reach)
+		{
 			continue;
-		if (object->object.type == _object_type_biped)
-		{
-			const struct object_definition *definition = object_definition_get(object->definition_index);
-			const struct model *model = definition->object.model.index != NONE ?
-				model_definition_get(definition->object.model.index) : NULL;
-			const real_matrix4x3 *matrices = object_get_node_matrices(iterator.index);
-			const struct model_node *nodes;
-			long node_index;
-			/* a limb's thickness, from the biped's size */
-			float r = radius * 0.13f;
-
-			if (!model || !matrices || model->nodes.count <= 0)
-				continue;
-			if (r < 0.02f)
-				r = 0.02f;
-			if (r > 0.12f)
-				r = 0.12f;
-			nodes = (const struct model_node *)model->nodes.address;
-			for (node_index = 0; node_index < model->nodes.count && count < maximum; node_index++)
-			{
-				short parent = nodes[node_index].parent_node_index;
-
-				if (parent < 0 || parent >= model->nodes.count)
-					continue;
-				bone(transforms + count * 12, &matrices[parent].position, &matrices[node_index].position, r);
-				masks[count++] = mask;
-			}
 		}
-		else
+		added = object_shapes(iterator.index, object, (unsigned char)(group << 3 | _ray_mask_object),
+			transforms + count * 12, masks + count, maximum - count);
+		if (added > 0)
 		{
-			const real_vector3d *forward = &object->object.forward, *up = &object->object.up;
-			float center[3] = { object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y,
-				object->object.bounding_sphere_center.z };
-			float u[3] = { forward->i * radius * 0.85f, forward->j * radius * 0.85f, forward->k * radius * 0.85f };
-			float w[3] = { up->i * radius * 0.35f, up->j * radius * 0.35f, up->k * radius * 0.35f };
-			float v[3] = { (up->j * forward->k - up->k * forward->j) * radius * 0.45f,
-				(up->k * forward->i - up->i * forward->k) * radius * 0.45f,
-				(up->i * forward->j - up->j * forward->i) * radius * 0.45f };
-
-			ellipsoid(transforms + count * 12, center, u, v, w);
-			masks[count++] = mask;
+			count += added;
+			group++;
 		}
 	}
 	return count;
