@@ -139,11 +139,8 @@ static struct
 	int gi_previous;
 	int gi_split;
 	GLuint irradiance_texture, gbuffer_texture;
-	/* the last frame's camera (13 values); whether this frame's rays were
-	traced for the light buffer already, and their results */
+	/* the last frame's camera (13 values) */
 	float previous_camera[13];
-	int gi_traced;
-	GLuint gi_traced_results;
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -359,7 +356,6 @@ static const char inject_source[] =
 	"			sum += light.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
-	/* (split 2, HALO_RT_INJECT_DEBUG: green where there is traced light) */
 	/* (none there - a place the last frame did not see, beside an edge: the
 	   nearest like it, 5x5 about, less strictly by depth) */
 	"	for (int y = -2; y <= 2 && total <= 0.0; y++)\n"
@@ -385,7 +381,6 @@ static const char inject_source[] =
 	"			sum += light.rgb;\n"
 	"			total += 1.0;\n"
 	"		}\n"
-	"	if (split == 2) { result = vec4(0.0, total > 0.0 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
 	"	if (total <= 0.0) { result = vec4(fallback.rgb, 1.0); applied = vec4(fallback.rgb + 1.0, 1.0); return; }\n"
 	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
 	/* (plus 1: a pixel it took nothing for stays 0, the alpha being masked) */
@@ -1083,7 +1078,6 @@ void halo_ray_tracing_set(const struct halo_ray_tracing_settings *settings)
 		a frame) */
 		ray.previous_camera[12] = 0.0f;
 		ray.gi_previous = 0;
-		ray.gi_traced = 0;
 		ray.light_stages = 0;
 		platform_log("ray tracing: %s, traced light %d, lights %s, shapes %s, objects %s (the traced light starts again)",
 			!ray.enabled ? "off" : ray.hardware ? "on" : "the screen's rays", ray.gi,
@@ -1299,12 +1293,6 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[93] = (float)ray.gi_samples;
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
-	/* (how much of each new sample the accumulated light takes, at least:
-	the average of the last 33 or so) */
-	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.03f;
-	/* (the traced light's new samples every this many frames a pixel: 0,
-	the host's governor chooses) */
-	camera[63] = getenv("HALO_RT_GI_PERIOD") ? (float)atof(getenv("HALO_RT_GI_PERIOD")) : 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* (whether there is a sun, apart from how dark its shadows on the
@@ -1318,7 +1306,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		/* (and their cutouts: 8 floats each) */
 		static float cutouts[65536 * 8];
 		long count = ray.objects ?
-			halo_ray_tracing_objects(triangles, groups, cutouts, getenv("HALO_RT_OBJECT_TRIANGLES") ? atol(getenv("HALO_RT_OBJECT_TRIANGLES")) : 65536, position, camera + 28, ray.shapes) : 0;
+			halo_ray_tracing_objects(triangles, groups, cutouts, 65536, position, camera + 28, ray.shapes) : 0;
 
 		if (!ray.objects)
 			camera[31] = 0.0f;
@@ -1615,11 +1603,9 @@ level's pixels, for the textures to multiply as the lightmaps' */
 int halo_ray_traced_lightmaps_hidden(void)
 {
 #ifdef HALO_MACOS
-	/* (HALO_RT_KEEP_LIGHTMAPS: the traced light in their place, as before;
-	and the split and its debugging keep them, for the left half) */
+	/* (the split keeps them, for the left half) */
 	return ray.initialized && ray.enabled && !ray.failed && ray.gi && ray.hardware && ray.inject_program &&
-		ray.drawn_level && ray.gi_previous && (ray.light_stages & 4) && !ray.gi_split &&
-		!getenv("HALO_RT_INJECT_DEBUG") && !getenv("HALO_RT_KEEP_LIGHTMAPS");
+		ray.drawn_level && ray.gi_previous && (ray.light_stages & 4) && !ray.gi_split;
 #else
 	return 0;
 #endif
@@ -1638,7 +1624,6 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 
 	if (!ray.initialized)
 		initialize();
-	ray.gi_traced = 0;
 	if (!ray.enabled || ray.failed || !ray.gi || !ray.hardware || !ray.inject_program || !ray.drawn_level ||
 		!(ray.light_stages & 4) || !(z_near > 0.0f) || !(z_far > z_near) ||
 		!(vertical_field_of_view > 0.0f) || !position || !forward || !up)
@@ -1658,30 +1643,6 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 		return;
 	size_textures(width, height);
 	lighting_uniforms(uniforms, z_near, z_far, vertical_field_of_view, viewport, width, height);
-	/* (HALO_RT_GI_SAME_FRAME: the rays traced now, for this frame's light
-	buffer - but GL does not see Metal's writes this early in the frame, so
-	the last frame's are taken, and the composite puts this frame's right) */
-	if (getenv("HALO_RT_GI_SAME_FRAME"))
-	{
-		GLuint results;
-
-		glDisable(GL_DEPTH_TEST);
-		glDisable(GL_STENCIL_TEST);
-		glDisable(GL_BLEND);
-		glDisable(GL_CULL_FACE);
-		glEnable(GL_SCISSOR_TEST);
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
-		glScissor(viewport[0] / TRACE_SCALE, viewport[1] / TRACE_SCALE, (viewport[2] + TRACE_SCALE - 1) / TRACE_SCALE,
-			(viewport[3] + TRACE_SCALE - 1) / TRACE_SCALE);
-		glBindVertexArray(ray.vertex_array);
-		results = world_rays(uniforms, position, forward, up, width, height, depth);
-		if (results && denoise_traced_light(results, uniforms, width, height))
-		{
-			ray.gi_traced = 1;
-			ray.gi_traced_results = results;
-		}
-	}
 	if (!ray.gi_previous)
 	{
 		xgpu_gl_bind_device_vertex_array();
@@ -1755,7 +1716,7 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glBindTexture(GL_TEXTURE_2D, ray.objects_texture);
 	glBindSampler(5, 0);
 	glUniform1i(ray.inject_objects, 5);
-	glUniform1i(ray.inject_split, getenv("HALO_RT_INJECT_DEBUG") ? 2 : ray.gi_split);
+	glUniform1i(ray.inject_split, ray.gi_split);
 	{
 		float fallback[4] = { ray.lightmap_average[0], ray.lightmap_average[1], ray.lightmap_average[2], 0.0f };
 
@@ -1849,16 +1810,11 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 #ifdef HALO_MACOS
-	/* (traced already this frame, for the light buffer) */
-	if (ray.gi_traced)
-		world_results = ray.gi_traced_results;
-	else if (ray.hardware && position && forward && up)
+	if (ray.hardware && position && forward && up)
 		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
 	/* (for the next frame's light buffer: these rays, the grid they were
 	traced on, the camera's lens) */
-	if (!ray.gi_traced)
-		denoise_traced_light(world_results, uniforms, width, height);
-	ray.gi_traced = 0;
+	denoise_traced_light(world_results, uniforms, width, height);
 #else
 	(void)position;
 	(void)forward;
@@ -1925,7 +1881,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 		glBindTexture(GL_TEXTURE_2D, correct ? ray.gbuffer_texture : 0);
 		glBindSampler(10, 0);
 		glUniform1i(ray.composite_gbuffer, 10);
-		glUniform1i(ray.composite_correct, correct && !getenv("HALO_RT_GI_NO_CORRECT"));
+		glUniform1i(ray.composite_correct, correct);
 		ray.gi_applied = 0;
 	}
 	glDrawArrays(GL_TRIANGLES, 0, 3);

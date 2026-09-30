@@ -994,15 +994,15 @@ static NSString *const kernel_source = @
 	"				if (all(ps >= origin) && all(ps < origin + size))\n"
 	"				{\n"
 	/* (its alpha: its depth, in 64ths, and how many samples it holds, below:
-	   each new sample takes 1 / that many - their average - down to c[62],
-	   the most samples it keeps) */
+	   each new sample takes 1 / that many - their average - down to 0.03,
+	   about the last 33) */
 	"					float4 was = history_in.read(uint2(ps));\n"
 	"					float was_frames = fmod(was.a, 256.0), was_z = floor(was.a / 256.0) / 64.0;\n"
 	"					if (was_z > 0.0 && abs(was_z - pz) < pz * 0.04 + 0.03)\n"
 	"					{\n"
 	"						before = was;\n"
 	"						frames = min(was_frames + 1.0, 255.0);\n"
-	"						weight = max(1.0 / frames, c[62] > 0.0 ? c[62] : 0.03);\n"
+	"						weight = max(1.0 / frames, 0.03);\n"
 	"					}\n"
 	"				}\n"
 	"			}\n"
@@ -2508,23 +2508,16 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* (the settings' bounces and rays a pixel, 92 and 93) */
 		constants[92] = camera[92];
 		constants[93] = shed_rays;
-		/* (the exposure: HALO_RT_EXPOSURE, a number, holds it) */
+		/* (the exposure and the white balance, 1 until they are measured) */
 		if (!(rt.exposure > 0.0f))
 			rt.exposure = 1.0f;
-		constants[84] = getenv("HALO_RT_EXPOSURE") ? (float)atof(getenv("HALO_RT_EXPOSURE")) : rt.exposure;
-		/* (the white balance: HALO_RT_WHITE_BALANCE=0 holds it at 1) */
+		constants[84] = rt.exposure;
 		if (!(rt.balance[0] > 0.0f))
 			rt.balance[0] = rt.balance[1] = rt.balance[2] = 1.0f;
-		{
-			int k, balanced = !getenv("HALO_RT_WHITE_BALANCE") || atoi(getenv("HALO_RT_WHITE_BALANCE")) != 0;
-
-			for (k = 0; k < 3; k++)
-				constants[88 + k] = balanced ? rt.balance[k] : 1.0f;
-		}
+		memcpy(constants + 88, rt.balance, 3 * sizeof(float));
 		/* (the traced light's new samples: every 4th frame a pixel, every
 		8th or 16th as the governor sheds) */
-		if (!(camera[63] > 0.0f))
-			constants[63] = (float)(4 << (shed_rest < 2 ? shed_rest : 2));
+		constants[63] = (float)(4 << (shed_rest < 2 ? shed_rest : 2));
 		/* (the path tracer's bounces: 3, 2 once the governor sheds, 1 from
 		its third step) */
 		{
@@ -2534,8 +2527,8 @@ int host_rt_trace(const float *camera, int width, int height)
 
 			constants[85] = shed_rest >= 3 ? 1.0f : shed_rest >= 1 && bounces > 1.0f ? bounces - 1.0f : bounces;
 		}
-		/* (the most one ray to a glowing triangle brings: HALO_RT_GLOW_CLAMP) */
-		constants[86] = getenv("HALO_RT_GLOW_CLAMP") ? (float)atof(getenv("HALO_RT_GLOW_CLAMP")) : 4.0f;
+		/* (the most one ray to a glowing triangle brings) */
+		constants[86] = 4.0f;
 		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||
 			rt.history[0].height != (NSUInteger)height))
 		{
@@ -2568,7 +2561,7 @@ int host_rt_trace(const float *camera, int width, int height)
 			/* (the leaves' holes whatever the traced light: with it off, they
 			were solid squares to the rays) */
 			uint32_t cutouts_ready = drawn_ready && rt.mask_atlas && rt.mask_rects && rt.drawn_base_texcoords &&
-				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring] && !getenv("HALO_RT_NO_CUTOUTS");
+				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring];
 
 			[encoder setBuffer:cutouts_ready ? rt.drawn_base_texcoords : any offset:0 atIndex:21];
 			[encoder setBuffer:cutouts_ready ? rt.mask_rects : any offset:0 atIndex:22];
@@ -2631,7 +2624,7 @@ int host_rt_trace(const float *camera, int width, int height)
 			/* (the light grid, when it is of these glowing triangles) */
 			@synchronized (rt.queue)
 			{
-				BOOL gridded = glowing_count && rt.grid_info && rt.grid_glowing == rt.glowing && !getenv("HALO_RT_NO_GRID");
+				BOOL gridded = glowing_count && rt.grid_info && rt.grid_glowing == rt.glowing;
 				static const float none[8] = { 0 };
 
 				if (gridded)
@@ -2659,7 +2652,7 @@ int host_rt_trace(const float *camera, int width, int height)
 			builds += rt.build_ms;
 			/* (every 600 frames: the rays' average time on the GPU) */
 			total += rt.gpu_ms;
-			if (++frames == (getenv("HALO_RT_LOG_FRAMES") ? atoi(getenv("HALO_RT_LOG_FRAMES")) : 600))
+			if (++frames == 600)
 			{
 				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (the objects' shapes %.2f; shed %d, "
 					"exposure %.2f, white balance %.2f %.2f %.2f)", total / frames, builds / frames, rt.shed, rt.exposure,
