@@ -14094,6 +14094,13 @@ boolean hs_compile_and_evaluate(
 	char buffer[1024];
 	char expanded[1024];
 
+	/* port: the console, telnet, init.txt and cheats.txt all come here
+	(scripts do not), so no typed command gets past this */
+	if (console_commands_disabled())
+	{
+		console_warning("Console commands are disabled in multiplayer");
+		return FALSE;
+	}
 	/* port: playing in another's game, the host decides the game: no
 	cheats, no game speed, nothing else a command changes of the game (the
 	game run each tick also puts back what was changed before joining,

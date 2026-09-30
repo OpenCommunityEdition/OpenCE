@@ -57,10 +57,14 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "editor/editor_stubs.h"
+#include "game/cheats.h"
+#include "game/game.h"
+#include "game/game_engine.h"
 #include "hs/hs.h"
 #include "input/input.h"
 #include "interface/terminal.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
 
@@ -118,6 +122,15 @@ void console_initialize(
 void console_initialize_for_new_map(
 	void)
 {
+	/* port: a multiplayer game starts without the cheats or the wireframe
+	set before it (by init.txt, a campaign or the main menu), since its
+	console cannot change them */
+	if (console_commands_disabled())
+	{
+		csmemset(&cheat, 0, sizeof(cheat));
+		rasterizer_debug_options.wireframe_enabled = FALSE;
+	}
+
 	return;
 }
 
@@ -150,6 +163,19 @@ boolean console_is_active(
 	void)
 {
 	return console_globals.active;
+}
+
+/* port: typed commands (the console's, telnet's, cheats.txt's) do not run in
+a multiplayer game, as host, client (from the network lobby on) or split
+screen */
+boolean console_commands_disabled(
+	void)
+{
+	short connection = game_connection();
+
+	return game_engine_running() ||
+		connection==_game_connection_network_client ||
+		connection==_game_connection_network_server;
 }
 
 void console_printf(

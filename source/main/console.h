@@ -26,6 +26,7 @@ void console_warning(const char *format, ...);
 void console_startup(void);
 void console_dispose(void);
 boolean console_update(void);
+boolean console_commands_disabled(void);
 
 /* ---------- globals */
 
