@@ -520,6 +520,23 @@ test('host failover migrates the existing engine with its authority epoch and ho
   assert.equal(holds.length, holdCount, 'late recovery cannot pause a canceled match');
 });
 
+test('one player reattaches to the current authority without restarting or migrating the room', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
+  const module = page.context.Module, repairs = [];
+  module._web_quick_play_reconnect = (...args) => repairs.push(args);
+  module._web_quick_play_migrate = () => assert.fail('a player repair cannot change authority');
+  module._web_quick_play_restart = () => assert.fail('a player repair cannot reset the match');
+  const request = page.quickCalls[0];
+  request.onReconnect({ role: 'join', room: 'FRIENDS9', hostAddress: 0x0403020a, epoch: 0 });
+  assert.deepEqual(repairs, [[0x0403020a, 0]]);
+  assert.equal(page.context.Module, module);
+  assert.match(page.element('quick-game-status').textContent, /current host/);
+  page.element('main-menu').onclick();
+  request.onReconnect({ role: 'join', room: 'FRIENDS9', hostAddress: 0x0403020a, epoch: 0 });
+  assert.equal(repairs.length, 1, 'cancellation fences late client repairs');
+});
+
 test('engine checkpoint receipts update recovery eligibility without changing the playing screen', async () => {
   const page = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'host', room, epoch: 0 }) });
   const module = page.context.Module;
@@ -551,7 +568,7 @@ test('a lost host report preserves room recovery instead of returning to manual 
   const page = await launcher(undefined, { recovering: true,
     quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: ADDRESS }) });
   page.context.Module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Host lost.' }));
-  assert.match(page.element('quick-game-status').textContent, /replacement host/);
+  assert.match(page.element('quick-game-status').textContent, /preserving the match/);
   page.context.Module.haloMessage(6, JSON.stringify({ phase: 'menu', message: 'Old session closed.' }));
   assert.match(page.element('quick-game-status').textContent, /replacement host/);
   assert.equal(page.quickCalls[0].signal.aborted, false);

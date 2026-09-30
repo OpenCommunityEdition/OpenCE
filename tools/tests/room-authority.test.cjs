@@ -75,7 +75,7 @@ test('a known replacement that is unreachable reports connection progress instea
     replacement.connectionState = 'failed'; replacement.onconnectionstatechange();
     fixture.net.quickPlayLost();
     await fixture.peerPresence({ id: REPLACEMENT, address: ADDRESS, sequence: 2, quick: presence() });
-    fixture.tick(2000); fixture.tick(7000);
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(17000);
     assert.equal(replacements.length, 0, 'an unopened RTC connection cannot become the native target');
     assert.equal(statuses.at(-1).hold, true);
     assert.match(statuses.at(-1).message, /Connecting to the replacement host/);

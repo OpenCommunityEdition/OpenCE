@@ -3471,7 +3471,7 @@ void network_game_client_migration_remove_machine(struct network_game_client *cl
 
 boolean network_game_client_begin_migration(struct network_game_client *client, unsigned long target, unsigned long epoch)
 {
-	if (!client || client->state != _network_game_client_state_ingame || !target || !epoch ||
+	if (!client || client->state != _network_game_client_state_ingame || !target ||
 		epoch < client_migration.epoch)
 		return FALSE;
 	if (target != IPV4_LOOPBACK_ADDRESS && global_network_game_server_get())

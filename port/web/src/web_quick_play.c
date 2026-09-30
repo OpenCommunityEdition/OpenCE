@@ -13,6 +13,7 @@ void web_js_post(int kind, const char *text);
 int web_multiplayer_active(void);
 static int cancel_requested;
 static uint64_t migration_requested;
+static uint64_t reconnect_requested;
 static unsigned int local_address;
 static unsigned int initial_epoch;
 static int hold_requested;
@@ -23,6 +24,7 @@ static double background_drain_until;
 EMSCRIPTEN_KEEPALIVE void web_quick_play_cancel(void)
 {
 	__atomic_store_n(&migration_requested, 0, __ATOMIC_RELEASE);
+	__atomic_store_n(&reconnect_requested, 0, __ATOMIC_RELEASE);
 	__atomic_store_n(&hold_requested, 0, __ATOMIC_RELEASE);
 	__atomic_store_n(&cancel_requested, 1, __ATOMIC_RELEASE);
 }
@@ -35,6 +37,14 @@ EMSCRIPTEN_KEEPALIVE void web_quick_play_migrate(int mode, unsigned int target, 
 		return;
 	__atomic_store_n(&migration_requested,
 		((uint64_t)((epoch << 1) | (mode == 1)) << 32) | target, __ATOMIC_RELEASE);
+}
+
+/* Repair one client's transport within the current authority, including epoch 0. */
+EMSCRIPTEN_KEEPALIVE void web_quick_play_reconnect(unsigned int target, unsigned int epoch)
+{
+	if (!target || epoch > 0x7fffffffU) return;
+	__atomic_store_n(&reconnect_requested,
+		((uint64_t)(epoch + 1U) << 32) | target, __ATOMIC_RELEASE);
 }
 
 static unsigned int quick_play_engine_address(unsigned int address)
@@ -92,6 +102,15 @@ int web_quick_play_take_cancel(void)
 	return __atomic_exchange_n(&cancel_requested, 0, __ATOMIC_ACQ_REL);
 }
 
+int web_quick_play_take_reconnect(unsigned long *target, unsigned int *epoch)
+{
+	uint64_t request = __atomic_exchange_n(&reconnect_requested, 0, __ATOMIC_ACQ_REL);
+	if (!request) return 0;
+	*target = quick_play_engine_address((unsigned int)request);
+	*epoch = (unsigned int)(request >> 32) - 1U;
+	return 1;
+}
+
 int web_quick_play_background_active(void)
 {
 	/* A cancel must also wake a game that was waiting for a hidden page. */
@@ -99,6 +118,7 @@ int web_quick_play_background_active(void)
 		__atomic_load_n(&background_active, __ATOMIC_ACQUIRE) ||
 		__atomic_load_n(&cancel_requested, __ATOMIC_ACQUIRE) ||
 		__atomic_load_n(&migration_requested, __ATOMIC_ACQUIRE) ||
+		__atomic_load_n(&reconnect_requested, __ATOMIC_ACQUIRE) ||
 		__atomic_load_n(&hold_requested, __ATOMIC_ACQUIRE) ||
 		emscripten_get_now() < background_drain_until;
 }

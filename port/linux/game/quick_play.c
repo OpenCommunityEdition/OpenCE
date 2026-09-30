@@ -23,12 +23,13 @@ Cancellation and ordinary match endings leave the menus in control. */
 const char *config_string(const char *name);
 int web_quick_play_take_cancel(void);
 int web_quick_play_take_migrate(int *host, unsigned long *target, unsigned int *epoch);
+int web_quick_play_take_reconnect(unsigned long *target, unsigned int *epoch);
 int web_quick_play_take_hold(void);
 unsigned long web_quick_play_initial_epoch(void);
 void web_quick_play_report(const char *phase, const char *message);
 
 enum { QUICK_OFF, QUICK_SETTLING, QUICK_SEARCHING, QUICK_JOINING, QUICK_PREGAME,
-	QUICK_STARTING, QUICK_PLAYING, QUICK_HOLD, QUICK_MIGRATING, QUICK_BLOCKED, QUICK_DONE };
+	QUICK_STARTING, QUICK_PLAYING, QUICK_HOLD, QUICK_RECONNECTING, QUICK_MIGRATING, QUICK_BLOCKED, QUICK_DONE };
 
 static struct
 {
@@ -78,7 +79,7 @@ static void quick_play_phase(short phase, unsigned long now, const char *name, c
 
 static void quick_play_finish(const char *phase, const char *message, boolean leave)
 {
-	if ((quick_play.phase == QUICK_HOLD || quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED) &&
+	if ((quick_play.phase == QUICK_HOLD || quick_play.phase == QUICK_RECONNECTING || quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED) &&
 		game_time_initialized())
 		game_time_set_paused(quick_play.was_paused);
 	quick_play.phase = QUICK_DONE;
@@ -125,7 +126,7 @@ boolean web_quick_play_pistol_starts(void)
 boolean web_match_migration_enabled(void)
 {
 	return quick_play.owned && (quick_play.phase == QUICK_PLAYING || quick_play.phase == QUICK_HOLD ||
-		quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED);
+		quick_play.phase == QUICK_RECONNECTING || quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED);
 }
 
 boolean web_match_migration_lost(void)
@@ -182,6 +183,14 @@ void quick_play_update(boolean main_menu_loaded)
 		}
 		quick_play_phase(QUICK_MIGRATING, now, "migrating", "Reconnecting players to the same match...");
 	}
+	if (web_quick_play_take_reconnect(&migration_target, &migration_epoch) &&
+		web_match_migration_enabled() && !quick_play.host && quick_play.phase != QUICK_MIGRATING &&
+		migration_epoch == quick_play.epoch && migration_target == quick_play.target)
+	{
+		web_match_migration_lost();
+		if (network_game_client_begin_migration(global_network_game_client_get(), migration_target, migration_epoch))
+			quick_play_phase(QUICK_RECONNECTING, now, "reconnecting", "Reconnecting your player to the current host...");
+	}
 
 	if (!quick_play.checked)
 	{
@@ -205,7 +214,7 @@ void quick_play_update(boolean main_menu_loaded)
 	}
 	if (quick_play.phase == QUICK_HOLD || quick_play.phase == QUICK_BLOCKED)
 		return;
-	if (quick_play.phase == QUICK_MIGRATING)
+	if (quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_RECONNECTING)
 	{
 		struct network_game_server *server = global_network_game_server_get();
 		client = global_network_game_client_get();
@@ -218,7 +227,8 @@ void quick_play_update(boolean main_menu_loaded)
 		if (client && network_game_client_migration_ready(client))
 		{
 			game_time_set_paused(quick_play.was_paused);
-			quick_play_phase(QUICK_PLAYING, now, "playing", "The match continues with the replacement host.");
+			quick_play_phase(QUICK_PLAYING, now, "playing", quick_play.phase == QUICK_RECONNECTING ?
+				"Reconnected to the current host. The match continues." : "The match continues with the replacement host.");
 		}
 		/* A slow transport is still retryable. Keep checking its ACK rather
 		   than permanently blocking a preserved match after 45 seconds. */

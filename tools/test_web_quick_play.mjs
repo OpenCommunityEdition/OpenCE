@@ -153,6 +153,54 @@ test('an older match in the same public room cannot migrate a healthy loaded coh
   }
 });
 
+test('one client election cannot interrupt a healthy host or another healthy client', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
+  const isolated = new Coordinator('3333333333333333', ADDRESS_C, 0);
+  runTogether([host, b, isolated]);
+  for (const c of [host, b, isolated]) { c.launched('playing'); checkpoint(c, 125); }
+  b.recover(11000);
+  for (const c of [host, isolated]) {
+    const other = c === host ? isolated : host;
+    const status = c.tick(11000, [peer(other), peer(b)], true);
+    assert.equal(c.epoch, 0); assert.equal(c.recovering, false);
+    assert.equal(status.result.hostId, A, 'the running authority remains in place');
+  }
+});
+
+test('a suspected host returning before replacement commitment repairs only the isolated client', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), client = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, client]);
+  for (const c of [host, client]) { c.launched('playing'); checkpoint(c); }
+  client.tick(11000, [], true); client.tick(21000, [], true);
+  assert.equal(client.epoch, 1); assert.equal(client.presence.role, 'candidate');
+  const result = client.tick(22000, [peer(host)], true);
+  assert.equal(result.reconnect, true); assert.equal(result.result.hostId, A);
+  assert.equal(client.epoch, 0); assert.equal(client.presence.matchId, 500);
+  assert.equal(host.tick(22000, [peer(client)], true).result.role, 'host');
+});
+
+test('RTC control activity cannot hide a host whose match checkpoints stopped advancing', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), client = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, client]);
+  for (const c of [host, client]) { c.launched('playing'); checkpoint(c); }
+  const stalled = { ...peer(host), lastProgressAt: 10000, lastPacketAt: 35000 };
+  assert.equal(client.tick(35000, [stalled], true).state, 'reconnecting');
+  stalled.lastPacketAt = 45000;
+  client.tick(45000, [stalled], true);
+  assert.equal(client.epoch, 1); assert.equal(client.recovering, true);
+});
+
+test('a healthy old host still yields to a launched and checkpointed replacement authority', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), replacement = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, replacement]);
+  for (const c of [host, replacement]) { c.launched('playing'); checkpoint(c); }
+  replacement.recover(11000);
+  replacement.tick(11000, [], true); replacement.tick(17000, [], true); replacement.tick(18500, [], true);
+  replacement.launched('playing'); checkpoint(replacement, 150);
+  host.tick(19000, [peer(replacement)], true);
+  assert.equal(host.epoch, 1); assert.equal(host.tick(20500, [peer(replacement)], true).result.hostId, B);
+});
+
 test('an unrelated joiner at the same epoch cannot block a preserved match election', () => {
   const a = new Coordinator(A, ADDRESS_A, 0); runTogether([a]);
   a.launched('playing'); checkpoint(a); a.recover(11000);
@@ -317,12 +365,12 @@ test('public API monitors after launch and calls failover once with the new host
   } finally { await fixture.close(); }
 });
 
-test('public API releases a brief reconnect hold without migrating or changing epoch', async () => {
-  const fixture = await network(), replacements = [], statuses = [];
+test('public API repairs a brief reconnect on the same epoch and waits for the native ACK', async () => {
+  const fixture = await network(), replacements = [], statuses = [], repairs = [];
   try {
     const host = await fixture.hostPresence(); host.channels[0].onopen();
     const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
-      onStatus: value => statuses.push(value) });
+      onStatus: value => statuses.push(value), onReconnect: value => repairs.push(value) });
     fixture.tick(1500); const selected = await attempt;
     fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing');
     fixture.checkpoint();
@@ -331,6 +379,9 @@ test('public API releases a brief reconnect hold without migrating or changing e
     assert.equal(statuses.at(-1).state, 'reconnecting'); assert.equal(statuses.at(-1).hold, true);
     const returned = await fixture.hostPresence(); returned.channels[0].onopen();
     fixture.tick(2100);
+    assert.equal(repairs.length, 1); assert.equal(repairs[0].epoch, 0);
+    assert.equal(statuses.at(-1).hold, true, 'RTC opening alone cannot resume a retired native stream');
+    fixture.net.quickPlayPhase('playing'); fixture.tick(2200);
     assert.equal(statuses.at(-1).state, 'playing'); assert.equal(statuses.at(-1).hold, false);
     assert.equal(replacements.length, 0, 'the original match keeps its authority after a short outage');
     assert.equal(selected.epoch, 0); assert.equal(fixture.latest().quick.epoch, 0);
@@ -357,16 +408,17 @@ test('native loss receipts during a loaded match election are consumed without a
   } finally { await fixture.close(); }
 });
 
-test('the first native loss starts recovery once and consumes repeated receipts for a loaded match', async () => {
-  const fixture = await network();
+test('the first native client loss repairs its player once without changing host authority', async () => {
+  const fixture = await network(), repairs = [];
   try {
     const host = await fixture.hostPresence(); host.channels[0].onopen();
-    const attempt = fixture.net.quickPlay(); fixture.tick(1500); await attempt;
+    const attempt = fixture.net.quickPlay({ onReconnect: value => repairs.push(value) }); fixture.tick(1500); await attempt;
     fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
     assert.equal(fixture.net.quickPlayLost(), true);
-    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(fixture.latest().quick.epoch, 0);
     assert.equal(fixture.net.quickPlayLost(), true);
-    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(fixture.latest().quick.epoch, 0);
+    assert.equal(repairs.length, 1); assert.equal(repairs[0].hostAddress, ADDRESS_B);
   } finally { await fixture.close(); }
 });
 

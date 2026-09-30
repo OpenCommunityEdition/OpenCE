@@ -32,7 +32,7 @@ cannot become a replacement host.
 The new server copies the same network roster and adopts the player's loaded
 world instead of invoking normal server creation, map selection or countdown.
 Survivors reconnect their existing machine/player slots; no player is added a
-second time. Only transport/input queues are rebuilt. The replacement removes
+second time. Only transport/input queues are rebuilt. The replacement fences
 the departed host, waits for the remaining machines to reattach, and broadcasts
 a final resume acknowledgement at the retained authority tick. After 12 seconds,
 reachable machines may resume while missing player slots and their recorded
@@ -70,8 +70,22 @@ path is not a deterministic copy of the authoritative simulation. Existing
 replication reconciles the resumed world, while sequenced checkpoints recover
 host-only state. Short checkpoint rollback and reconciliation are possible;
 zero interruption or exact historic collision replay is not claimed.
-An old host returning after a network partition is kept paused after losing
-authority. Automatic reintegration of that former host is not implemented.
+A partitioned former host can reattach as its original player, using the recorded
+owner address, within the same 120-second grace. It follows the new host's epoch
+and cannot reclaim authority. The departed host does not delay the survivor cohort's
+resume; a truly absent former player expires after the grace.
+
+A client's native connection failure first repairs that player's stream to the
+current host in the same epoch, including epoch zero. The original slot, score,
+inventory and loaded world remain; other players keep running. A repaired stream
+replaces a half-open connection only after session, epoch, slot and recorded-owner
+validation. Admission and failed unvalidated attempts never invalidate a retained
+roster slot. The client stays paused until its native acknowledgement arrives.
+If the host disappears or its checkpoints stop advancing, bounded loss detection
+still permits failover. A candidate's higher proposed epoch cannot interrupt a
+healthy host or healthy clients. A launched, checkpointed replacement authority
+still fences older hosts after a real takeover. If the current host returns before
+a replacement commits, the isolated client retracts its proposal and reattaches.
 
 ## Verification
 
@@ -100,3 +114,13 @@ joiner entered that match; closing player 2 then resumed both survivors at epoch
 Regression checks also cover elections with all brokers unavailable, isolation,
 foreign-match joiners and a replacement dropping during reservation. The public
 package excludes the local fault injector and observe-mode launch arguments.
+
+The same-epoch repair check resumed one client at epoch zero while the host and
+third player kept playing and checkpoints kept advancing. It first reproduced
+admission invalidating the retained machine; the corrected admission and pending
+cleanup paths pass manager regressions whose original-code controls fail.
+In the final three-player Chrome run, match 21315 survived a single-client repair,
+then a native host failure: all three resumed at epoch one, including the former
+host's original player. Closing the replacement host then resumed both remaining
+players at epoch two, retaining original slots, accumulated scores and the loaded
+world. This release uses network version 6; older loaded runtimes are not hot-patched.

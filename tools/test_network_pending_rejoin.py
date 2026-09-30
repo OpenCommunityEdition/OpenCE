@@ -124,12 +124,59 @@ int main(void) {
 }
 '''
 
+WEB_BOUNDARY = BOUNDARY.replace(
+    "int machine_index;\n    struct network_connection *connection;",
+    "int machine_index; unsigned long flags;\n    struct network_connection *connection;",
+).replace("struct network_game_server {", "struct network_game_server { int state;") + r'''
+#define HALO_WEB 1
+#define _network_game_server_state_ingame 1
+#define _network_client_machine_validated_bit 1
+#define TEST_FLAG(flags,bit) ((flags)&(1UL<<(bit)))
+static struct { unsigned long epoch; } server_migration;
+boolean web_match_migration_enabled(void) { return TRUE; }
+static void network_game_server_migration_detach(struct network_game_server *server,
+    struct network_game_server_client_machine *client) {
+    assert(network_game_server_remove_client_machine_from_game(server, client));
+}
+'''
+
+WEB_CASES = r'''
+int main(void) {
+    for (int epoch = 0; epoch < 2; epoch++) {
+        for (int validated = 0; validated < 2; validated++) {
+            for (int previously_closed = 0; previously_closed < 2; previously_closed++) {
+                struct network_game_server server = {0};
+                struct network_connection connection = {!previously_closed, FALSE};
+                for (int i = 0; i < 128; i++) {
+                    server.game.machines[i].machine_index = NONE;
+                    server.client_machines[i].machine_index = NONE;
+                }
+                server.state = _network_game_server_state_ingame;
+                server_migration.epoch = epoch;
+                /* A provisional stream index collides with a retained roster
+                slot until the original owner validates its reattach request. */
+                server.game.machines[1].machine_index = 1;
+                server.client_machines[1].machine_index = 1;
+                server.client_machines[1].flags = validated ? 2 : 0;
+                server.client_machines[1].connection = &connection;
+                closed_endpoints = removed_machines = 0;
+                assert(network_game_server_handle_client_machines(&server));
+                assert(closed_endpoints == 1 && removed_machines == 0);
+                assert(server.client_machines[1].connection == NULL);
+                assert(server.game.machines[1].machine_index == 1);
+            }
+        }
+    }
+    puts("Live-match pending reattach cleanup preserves roster at epochs zero and one.");
+}
+'''
+
 with tempfile.TemporaryDirectory(prefix="halo-pending-rejoin-") as directory:
     path = Path(directory)
 
-    def run(name, functions):
+    def run(name, functions, boundary=BOUNDARY, cases=CASES):
         source = path / f"{name}.c"
-        source.write_text(BOUNDARY + functions + CASES)
+        source.write_text(boundary + functions + cases)
         output = path / name
         subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", str(source), "-o", str(output)], check=True)
@@ -145,3 +192,11 @@ with tempfile.TemporaryDirectory(prefix="halo-pending-rejoin-") as directory:
     assert control.returncode != 0, "Original accepted-peer leak must fail the regression"
     assert "Assertion" in control.stderr, control.stderr
     print("Original-defect control rejected: missing unvalidated endpoint cleanup")
+    fixed = run("live-match", FUNCTIONS, WEB_BOUNDARY, WEB_CASES)
+    assert fixed.returncode == 0, fixed.stderr
+    print(fixed.stdout.strip())
+    condition = "server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())"
+    assert condition in FUNCTIONS
+    control = run("missing-epoch-zero-pending-cleanup", FUNCTIONS.replace(condition, "server_migration.epoch"), WEB_BOUNDARY, WEB_CASES)
+    assert control.returncode != 0 and "Assertion" in control.stderr, control.stderr
+    print("Original-defect control rejected: epoch-zero pending cleanup removes retained machine")

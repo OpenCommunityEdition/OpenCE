@@ -2719,7 +2719,8 @@ boolean network_game_server_remove_client_machine_from_game(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
 
 #ifdef HALO_WEB
-	if (server_migration.epoch && !TEST_FLAG(client->flags, _network_client_machine_validated_bit))
+	if ((server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())) &&
+		!TEST_FLAG(client->flags, _network_client_machine_validated_bit))
 	{
 		if (client->connection)
 			network_server_close_client_connection(server->connection, client->connection);
@@ -2820,7 +2821,7 @@ boolean network_game_server_remove_machine_from_game(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x299, server);
 
 #ifdef HALO_WEB
-	if (server_migration.epoch)
+	if (server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
 	{
 		int pending;
 		for (pending = 0; pending < MAXIMUM_NETWORK_MACHINE_COUNT; pending++)
@@ -3447,7 +3448,7 @@ static boolean network_game_server_add_new_client(
 						server->client_machines[i].connection = new_connection;
 #ifdef HALO_WEB
 						/* Reattach transports reserve no new roster/player slot. */
-						if (!server_migration.epoch)
+						if (!server_migration.epoch && !(server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
 #endif
 						network_game_invalidate_machine(&server->game, i);
 						server->client_machines[i].machine_index = (short)i;
@@ -3529,11 +3530,14 @@ static boolean network_game_server_remove_disconnected_client(
 #ifdef HALO_WEB
 	/* A quick-play transport can disappear before the first migration epoch
 	   reaches the native host. Retain its roster and owner for reattachment. */
-	if ((server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())) &&
-		TEST_FLAG(client->flags, _network_client_machine_validated_bit))
+	if (server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))
 	{
-		network_game_server_migration_detach(server, client);
-		return TRUE;
+		if (TEST_FLAG(client->flags, _network_client_machine_validated_bit))
+		{
+			network_game_server_migration_detach(server, client);
+			return TRUE;
+		}
+		return network_game_server_remove_client_machine_from_game(server, client);
 	}
 #endif
 #ifdef HALO_LINUX
@@ -3559,15 +3563,6 @@ static boolean network_game_server_handle_client_machines(
 		{
 			if (!network_connection_active(server->client_machines[i].connection))
 			{
-#ifdef HALO_WEB
-				if (server_migration.epoch && !TEST_FLAG(server->client_machines[i].flags, _network_client_machine_validated_bit))
-				{
-					network_server_close_client_connection(server->connection, server->client_machines[i].connection);
-					csmemset(&server->client_machines[i], 0, sizeof(server->client_machines[i]));
-					server->client_machines[i].machine_index = NONE;
-					continue;
-				}
-#endif
 				if (network_game_server_remove_disconnected_client(server, &server->client_machines[i]))
 				{
 					network_event(
@@ -4117,7 +4112,8 @@ struct network_game_server *network_game_server_adopt_match(struct network_game_
 	server_migration.departed_machine = network_game_client_migration_host_machine(client);
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 		server_migration.owner_addresses[index] = network_game_client_migration_owner_address((short)index);
-	network_game_client_migration_remove_machine(client, server_migration.departed_machine);
+	/* A missing host can be partitioned rather than gone. Fence its authority,
+	   retaining its player and recorded owner through the normal rejoin grace. */
 	csmemcpy(&server->game, network_game_client_get_game(client), sizeof(server->game));
 	server->state = _network_game_server_state_ingame;
 	server->flags = FLAG(_network_game_server_game_valid_bit);
@@ -4257,13 +4253,26 @@ boolean network_game_server_handle_migration(struct network_game_server *server,
 	if (size != sizeof(attach))
 		return TRUE;
 	csmemcpy(&attach, message, sizeof(attach));
-	if (!server_migration.epoch || server->state != _network_game_server_state_ingame || GET_MESSAGE_FLAGS(attach.header) ||
+	if ((!server_migration.epoch && !web_match_migration_enabled()) ||
+		server->state != _network_game_server_state_ingame || GET_MESSAGE_FLAGS(attach.header) ||
 		GET_MESSAGE_TYPE(attach.header) != 2 || attach.version != NETWORK_MIGRATION_VERSION ||
 		attach.kind != NETWORK_MIGRATION_ATTACH || attach.epoch != server_migration.epoch ||
 		attach.session_seed != (unsigned long)server->game.random_seed || attach.machine_index < 0 ||
 		attach.machine_index >= MAXIMUM_NETWORK_MACHINE_COUNT ||
 		!network_machine_is_valid(&server->game.machines[attach.machine_index]))
 		return TRUE;
+	if (!server_migration.epoch)
+	{
+		/* Initial authority also admits an existing player's repaired stream.
+		   Routes come only from validated connections and retained owner records. */
+		unsigned long owners[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+		struct network_game_client *local = global_network_game_client_get();
+		if (!local) return TRUE;
+		network_game_server_migration_routes(owners, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
+		csmemcpy(server_migration.owner_addresses, owners, sizeof(owners));
+		server_migration.host_machine = network_game_client_get_machine_index(local);
+		server_migration.departed_machine = NONE;
+	}
 	network_connection_get_address(machine->connection, &address, NULL);
 	expected_address = attach.machine_index == server_migration.host_machine ? IPV4_LOOPBACK_ADDRESS :
 		server_migration.owner_addresses[attach.machine_index];
@@ -4277,7 +4286,13 @@ boolean network_game_server_handle_migration(struct network_game_server *server,
 		struct network_game_server_client_machine *other = &server->client_machines[index];
 		if (other != machine && other->connection && other->machine_index == attach.machine_index &&
 			TEST_FLAG(other->flags, _network_client_machine_validated_bit))
-			return TRUE;
+		{
+			/* The same recorded owner may replace a half-open old stream.
+			   Retire its transport, without deleting its machine or player. */
+			network_server_close_client_connection(server->connection, other->connection);
+			csmemset(other, 0, sizeof(*other));
+			other->machine_index = NONE;
+		}
 	}
 	machine->machine_index = attach.machine_index;
 	server_migration.disconnected_at[attach.machine_index] = 0;
@@ -4299,7 +4314,7 @@ boolean network_game_server_migration_ready(struct network_game_server *server)
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 	{
 		boolean attached = FALSE;
-		if (!network_machine_is_valid(&server->game.machines[index]))
+		if (!network_machine_is_valid(&server->game.machines[index]) || index == server_migration.departed_machine)
 			continue;
 		for (connection_index = 0; connection_index < MAXIMUM_NETWORK_MACHINE_COUNT; connection_index++)
 		{

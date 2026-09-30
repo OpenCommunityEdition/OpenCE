@@ -269,6 +269,50 @@ static void preserved(void) {
  assert(local_client.game.players[1].player_list_index==1 && local_client.game.players[2].player_list_index==2);
 }
 int main(void) {
+ /* Repair a single client at epoch zero, replacing its half-open stream
+ only after matching its recorded owner. Other players and the host continue. */
+ setup();
+ {
+  struct network_game_server original={0}; original.game=local_client.game;
+  original.state=_network_game_server_state_ingame;
+  original.connection=&transports[next_transport++]; global_server=&original;
+  for(int i=0;i<128;i++) original.client_machines[i].machine_index=NONE;
+  for(int i=0;i<3;i++) {
+   struct network_game_server_client_machine *c=&original.client_machines[i];
+   c->machine_index=i; c->flags=FLAG(_network_client_machine_validated_bit);
+   c->connection=&transports[next_transport++]; c->connection->address=0x64563810UL+i;
+  }
+  original.client_machines[1].connection->address=IPV4_LOOPBACK_ADDRESS;
+  /* Exercise stream admission after the old endpoint detached: its free
+  transport index still names a valid retained machine in the roster. */
+  assert(network_game_server_remove_disconnected_client(&original,&original.client_machines[2]));
+  network_game_server_open_game(&original); network_game_accept_remote_connections(TRUE);
+  struct network_connection *repair_stream=&transports[next_transport++]; repair_stream->address=0x64563899UL;
+  assert(network_game_server_add_new_client(&original,repair_stream));
+  struct network_game_server_client_machine *repaired=&original.client_machines[2];
+  assert(original.game.machine_count==3 && original.game.machines[2].machine_index==2);
+  struct network_migration_message repair=attach(2); repair.epoch=0;
+  network_game_server_handle_migration(&original,repaired,&repair,sizeof(repair));
+  assert(!writes && !TEST_FLAG(repaired->flags,_network_client_machine_validated_bit));
+  repaired->connection->address=0x64563812UL;
+  network_game_server_handle_migration(&original,repaired,&repair,sizeof(repair));
+  assert(writes==3 && repaired->connection==repair_stream && repaired->machine_index==2);
+  assert(original.game.machine_count==3 && original.game.player_count==3 && tick==900);
+  assert(sent[2].epoch==0 && sent[2].machine_index==2 && sent[2].host_machine_index==1); preserved();
+  struct network_connection *half_open=repaired->connection;
+  struct network_connection *retry=&transports[next_transport++]; retry->address=0x64563812UL;
+  assert(network_game_server_add_new_client(&original,retry));
+  repaired=&original.client_machines[3]; writes=0;
+  network_game_server_handle_migration(&original,repaired,&repair,sizeof(repair));
+  assert(writes==3 && !half_open->connected && !original.client_machines[2].connection && repaired->machine_index==2);
+  assert(original.game.machine_count==3 && original.game.player_count==3); preserved();
+  global_server=NULL; local_client.machine_index=2;
+  assert(network_game_client_begin_migration(&local_client,0x64563811UL,0));
+  struct transport_address owner={0}; owner.address.long_words[0]=0x64563811UL;
+  network_game_client_handle_migration(&local_client,&sent[2],sizeof(sent[2]),&owner);
+  assert(network_game_client_migration_ready(&local_client) && !demotions && network_game_migration_epoch()==0);
+  assert(datums[2].identifier==102 && datums[2].score==19 && machine_to_player_table[2][0]==2); preserved();
+ }
  /* The original host is still playing when a client reports an outage.
  Re-electing it must renew connections without promoting a stale snapshot,
  removing its own player, or creating another game. */
@@ -308,9 +352,9 @@ int main(void) {
  assert(!network_game_server_add_new_client(&closed_to_remotes,remote) && admissions==0);
  struct network_game_server *s=network_game_server_adopt_match(&local_client,1); assert(s);
  assert(network_game_should_accept_remote_connections() && s->connection->allow_clients);
- assert(s->state==_network_game_server_state_ingame && s->game.machine_count==2 && s->game.player_count==2);
- assert(s->game.machines[0].machine_index==NONE && s->game.machines[1].machine_index==1 && s->game.machines[2].machine_index==2);
- assert(s->next_update_number==900 && s->sent_start_game_message && datums[0].quit_out_of_game_time==901); preserved();
+ assert(s->state==_network_game_server_state_ingame && s->game.machine_count==3 && s->game.player_count==3);
+ assert(s->game.machines[0].machine_index==0 && s->game.machines[1].machine_index==1 && s->game.machines[2].machine_index==2);
+ assert(s->next_update_number==900 && s->sent_start_game_message && datums[0].quit_out_of_game_time==NONE); preserved();
  assert(network_game_client_begin_migration(&local_client,IPV4_LOOPBACK_ADDRESS,1)); preserved();
  assert(!network_game_client_migration_ready(&local_client) && network_game_migration_epoch()==1);
  struct network_game_server_client_machine *a=&s->client_machines[0], *b=&s->client_machines[1];
@@ -319,7 +363,7 @@ int main(void) {
  enables separately. Promotion must enable it for the healthy cohort. */
  assert(network_game_server_add_new_client(s,local) && a->connection==local && admissions==1);
  assert(network_game_server_add_new_client(s,remote) && b->connection==remote && admissions==2);
- assert(s->game.machine_count==2 && s->game.machines[1].machine_index==1 && s->game.machines[2].machine_index==2);
+ assert(s->game.machine_count==3 && s->game.machines[1].machine_index==1 && s->game.machines[2].machine_index==2);
  struct network_migration_message m=attach(1), bad=m;
  bad.epoch=0; assert(network_game_server_handle_migration(s,a,&bad,sizeof(bad))); assert(!TEST_FLAG(a->flags,_network_client_machine_validated_bit) && !writes);
  bad=m; bad.header|=1; network_game_server_handle_migration(s,a,&bad,sizeof(bad)); assert(!TEST_FLAG(a->flags,_network_client_machine_validated_bit) && !writes);
@@ -332,7 +376,7 @@ int main(void) {
  network_game_server_handle_migration(s,b,&m,sizeof(m)); assert(b->machine_index==2 && !writes);
  assert(network_game_server_migration_ready(s)); preserved();
  network_game_server_migration_finish(s); assert(writes==2 && sent[0].machine_index==1 && sent[1].machine_index==2);
- assert(sent[0].game_tick==900 && sent[0].host_machine_index==1 && sent[0].machine_present[0]==6);
+ assert(sent[0].game_tick==900 && sent[0].host_machine_index==1 && sent[0].machine_present[0]==7);
  struct transport_address host={0}; host.address.long_words[0]=IPV4_LOOPBACK_ADDRESS;
  bad=sent[0]; bad.epoch=0; network_game_client_handle_migration(&local_client,&bad,sizeof(bad),&host);
  assert(!network_game_client_migration_ready(&local_client));
@@ -372,17 +416,32 @@ int main(void) {
  a=&s->client_machines[0]; local=&transports[next_transport++]; local->address=IPV4_LOOPBACK_ADDRESS;
  assert(network_game_server_add_new_client(s,local) && a->connection==local);
  m=attach(1); network_game_server_handle_migration(s,a,&m,sizeof(m)); assert(!network_game_server_migration_ready(s));
- network_game_server_migration_finish(s); assert(writes==1 && sent[0].machine_present[0]==6);
+ network_game_server_migration_finish(s); assert(writes==1 && sent[0].machine_present[0]==7);
  unsigned long routes[128]; global_server=s; network_game_server_migration_routes(routes,128);
  assert(routes[2]==0x64563812UL);
  now+=60000; network_game_server_migration_expire_disconnected(s);
- assert(s->game.machine_count==2 && local_client.game.machine_count==2 && datums[2].quit_out_of_game_time==NONE);
+ assert(s->game.machine_count==3 && local_client.game.machine_count==3 && datums[2].quit_out_of_game_time==NONE);
  remote=&transports[next_transport++]; remote->address=0x64563812UL;
  assert(network_game_server_add_new_client(s,remote)); b=&s->client_machines[1];
  m=attach(2); network_game_server_handle_migration(s,b,&m,sizeof(m));
  assert(b->machine_index==2 && TEST_FLAG(b->flags,_network_client_machine_validated_bit) && writes==3); preserved();
  network_game_server_migration_detach(s,b); now+=120000; network_game_server_migration_expire_disconnected(s);
  assert(s->game.machine_count==1 && datums[2].quit_out_of_game_time==901);
+ /* A partitioned former host rejoins as its original player after the new
+ authority commits. It cannot reclaim the listener or a different owner slot. */
+ setup(); s=network_game_server_adopt_match(&local_client,1); assert(s); global_server=s;
+ a=&s->client_machines[0]; local=&transports[next_transport++]; local->address=IPV4_LOOPBACK_ADDRESS;
+ assert(network_game_server_add_new_client(s,local));
+ m=attach(1); network_game_server_handle_migration(s,a,&m,sizeof(m));
+ network_game_server_migration_finish(s); assert(server_migration.disconnected_at[0] && !server_migration.adopting);
+ remote=&transports[next_transport++]; remote->address=0x64563899UL;
+ assert(network_game_server_add_new_client(s,remote)); b=&s->client_machines[1];
+ m=attach(0); network_game_server_handle_migration(s,b,&m,sizeof(m));
+ assert(!TEST_FLAG(b->flags,_network_client_machine_validated_bit));
+ remote->address=0x64563810UL; network_game_server_handle_migration(s,b,&m,sizeof(m));
+ assert(b->machine_index==0 && !server_migration.disconnected_at[0] && writes==3);
+ assert(datums[0].identifier==100 && datums[0].score==17 && datums[0].quit_out_of_game_time==NONE);
+ assert(machine_to_player_table[0][0]==0 && s->game.machine_count==3 && tick==900); preserved();
  /* Retire the old host, reuse its machine ID for a late join, then migrate
  again. Historical score data stays, while the new machine owns only its
  new player's inputs and must be eligible to reattach. */
@@ -397,7 +456,7 @@ int main(void) {
  global_server=s;
  struct network_migration_membership membership;
  assert(network_game_server_migration_machines(&membership,sizeof(membership)));
- assert(membership.machine_count==2 && membership.machines[0].machine_index==0 && membership.machines[2].machine_index==NONE);
+ assert(membership.machine_count==3 && membership.machines[0].machine_index==0 && membership.machines[2].machine_index==2);
  /* Negative control: the pre-fix promoted roster rejects the reused m0
  despite its current owner's correct source address and original session. */
  s->game.machines[0].machine_index=NONE; s->game.machine_count--;
@@ -409,7 +468,7 @@ int main(void) {
  any live player datum, score, input binding, or clock. */
  local_client.game.machines[0].machine_index=NONE; local_client.game.machine_count--;
  assert(network_game_client_migration_set_machines(&membership,sizeof(membership)));
- assert(local_client.game.machines[0].machine_index==0 && local_client.game.machine_count==2);
+ assert(local_client.game.machines[0].machine_index==0 && local_client.game.machine_count==3);
  memcpy(s->game.machines,local_client.game.machines,sizeof(s->game.machines)); s->game.machine_count=local_client.game.machine_count;
  network_game_server_handle_migration(s,b,&m,sizeof(m));
  assert(TEST_FLAG(b->flags,_network_client_machine_validated_bit) && b->machine_index==0);
@@ -417,7 +476,7 @@ int main(void) {
  membership.machines[0].machine_index=1;
  assert(!network_game_client_migration_validate_machines(&membership,sizeof(membership)));
  assert(!network_game_client_migration_set_machines(&membership,sizeof(membership)) && local_client.game.machines[0].machine_index==0);
- membership.machines[0].machine_index=0; membership.machine_count=3;
+ membership.machines[0].machine_index=0; membership.machine_count=4;
  assert(!network_game_client_migration_validate_machines(&membership,sizeof(membership)));
  puts("migration managers: remote admission, identity/epoch gates, ACK framing, cohort resume, reused late-join roster and input ownership passed");
  return 0;
@@ -445,7 +504,7 @@ def main():
         # the still-running original host must retain the original roster.
         original = function(SERVER, "network_game_server_remove_disconnected_client")
         control = original.replace(
-            "(server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))",
+            "server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())",
             "server_migration.epoch",
         )
         assert control != original
@@ -454,6 +513,30 @@ def main():
         result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
         print("Original epoch-zero roster removal failed the regression as expected")
+        # Restore initial-authority reattach rejection. A client must be able
+        # to repair epoch zero without making the whole room change hosts.
+        original = function(SERVER, "network_game_server_handle_migration")
+        control = original.replace(
+            "(!server_migration.epoch && !web_match_migration_enabled())",
+            "!server_migration.epoch",
+        )
+        assert control != original
+        source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS.replace(original, control) + TESTS)
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
+        result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
+        print("Original epoch-zero reattach rejection failed the regression as expected")
+        original = function(SERVER, "network_game_server_add_new_client")
+        control = original.replace(
+            "if (!server_migration.epoch && !(server->state == _network_game_server_state_ingame && web_match_migration_enabled()))",
+            "if (!server_migration.epoch)",
+        )
+        assert control != original
+        source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS.replace(original, control) + TESTS)
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
+        result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
+        print("Original epoch-zero admission invalidation failed the regression as expected")
 
 
 if __name__ == "__main__":

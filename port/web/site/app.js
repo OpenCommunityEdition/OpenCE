@@ -550,6 +550,17 @@ can run the game, copies the game data out of the player's disc image
         if (typeof status.hold === 'boolean') window.Module?._web_quick_play_hold?.(status.hold ? 1 : 0);
         if (!controller.signal.aborted && (!state.started || ['recovering', 'reconnecting', 'error'].includes(status.state)))
           quickStatus(status.state, status.message);
+      }, onReconnect(selection) {
+        if (controller.signal.aborted || state.manualMode || state.invite || !state.started ||
+            selection.room !== state.selectedRoom) return;
+        const reconnect = window.Module?._web_quick_play_reconnect;
+        if (!reconnect) {
+          quickStatus('error', 'Player reconnection needs the latest game build. Reload and choose Update.');
+          return;
+        }
+        log(`network ${new Date().toISOString()}: client reattach, epoch ${selection.epoch}, host ${HaloNet.addressText(selection.hostAddress)}`);
+        quickStatus('reconnecting', 'Reconnecting your player. The match continues on the current host…');
+        reconnect(selection.hostAddress, selection.epoch);
       }, onFailover(selection) {
         if (controller.signal.aborted || state.manualMode || state.invite ||
             !state.started || selection.room !== state.selectedRoom) return;
@@ -912,7 +923,7 @@ can run the game, copies the game data out of the player's disc image
             }
             log(`network ${new Date().toISOString()}: native ${status.phase}: ${status.message}`);
             if (status.phase === 'disconnected' && !state.invite && !state.manualMode && HaloNet.quickPlayLost()) {
-              quickStatus('recovering', 'The host disconnected. Choosing a replacement host and preserving the match…');
+              quickStatus('recovering', 'Restoring the connection while preserving the match…');
               return;
             }
             const recovering = HaloNet.quickPlayPhase(status.phase);

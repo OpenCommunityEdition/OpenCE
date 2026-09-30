@@ -93,7 +93,7 @@ static void reset(const char *setting)
 	memset(&mock_client, 0, sizeof(mock_client));
 	client = NULL; server = NULL; mode = setting; target = "";
 	clock_ms = 1000; last_target = 0; connection = 0; join_result = 0;
-	cancel_requested = 0; migration_requested = 0; hold_requested = 0; initial_epoch = 0;
+	cancel_requested = 0; migration_requested = 0; reconnect_requested = 0; hold_requested = 0; initial_epoch = 0;
 	background_active = 0; background_drain_until = 0;
 	created = aborts = menus = add_requests = starts = searches = reports = maps = 0;
 	quick_policy = TRUE; policy_requests = 0; countdown = NONE;
@@ -234,6 +234,20 @@ int main(void)
 	web_quick_play_hold(1); step(1, FALSE); assert(paused);
 	web_quick_play_hold(0); step(1, FALSE);
 	assert(!paused && !adopted && !reattached && !aborts && !menus);
+
+	/* A single client repairs its original stream at epoch zero. The loaded
+	   player/world remain; neither the host listener nor another player resets. */
+	launch("join"); quick_play.target = 0x0a010203UL;
+	mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
+	web_quick_play_reconnect(0x0302010aU, 0); step(1, FALSE);
+	assert(quick_play.phase == QUICK_RECONNECTING && paused && reattached == 1 && engine_epoch == 0);
+	assert(last_target == 0x0a010203UL && !adopted && !maps && !starts && !aborts && !menus);
+	web_quick_play_hold(0); step(1, FALSE); assert(paused);
+	migration_ready = TRUE; step(1, FALSE); assert(!paused && !strcmp(last_phase, "playing"));
+	web_quick_play_reconnect(0x0403020aU, 0); step(1, FALSE); assert(reattached == 1);
+	web_quick_play_reconnect(0x0302010aU, 1); step(1, FALSE); assert(reattached == 1);
+	web_quick_play_reconnect(0x0302010aU, 0); web_quick_play_cancel(); step(1, FALSE);
+	assert(!reconnect_requested && reattached == 1 && aborts == 1);
 
 	/* Failure leaves the world paused. It must never silently reset the match. */
 	launch("join"); mock_client.state = _network_game_client_state_ingame; step(1, FALSE);

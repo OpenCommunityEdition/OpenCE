@@ -51,6 +51,7 @@ class HaloQuickCoordinator {
       migration: true, matchId: null, checkpointTick: -1 };
   }
   recover(now, epoch = this.epoch + 1) {
+    if (this.result) this.previousAuthority = { ...this.result, epoch: this.epoch };
     this.freshJoin = !this.result && this.presence.matchId === null;
     this.epoch = epoch;
     this.recovering = true;
@@ -70,16 +71,43 @@ class HaloQuickCoordinator {
     }
     this.presence.hostId = id;
   }
+  hostHealthy(host, now, epoch = this.epoch) {
+    return host?.open && host.quick?.role === 'host' && host.quick.gamePhase !== 'migration-failed' &&
+      (host.quick.epoch || 0) === epoch && (!host.quick.failover ||
+        ((!Number.isFinite(host.lastPacketAt) || now - host.lastPacketAt < HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS) &&
+         (host.quick.gamePhase !== 'playing' || host.quick.checkpointTick < 0 ||
+          !Number.isFinite(host.lastProgressAt) || now - host.lastProgressAt < HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS)));
+  }
   tick(now, peers, brokerReady) {
-    const newest = Math.max(this.epoch, ...peers.filter(peer => peer.open && peer.quick &&
-      (this.presence.matchId === null || peer.quick.matchId === this.presence.matchId))
-      .map(peer => peer.quick.epoch || 0));
+    const sameMatch = peers.filter(peer => peer.open && peer.quick &&
+      (this.presence.matchId === null || peer.quick.matchId === this.presence.matchId));
+    const currentHost = peers.find(peer => peer.id === this.result?.hostId);
+    const healthyAuthority = this.result?.role === 'host' ? this.presence.gamePhase === 'playing' :
+      this.result?.role === 'join' && this.hostHealthy(currentHost, now);
+    // A client's suspicion is not a transfer of authority. Keep the live host
+    // and healthy clients playing; a verified, launched replacement still fences
+    // the old authority after an actual partition or host failure.
+    const newest = Math.max(this.epoch, ...sameMatch.filter(peer => !healthyAuthority ||
+      (peer.quick.role === 'host' && peer.quick.phase === 'launched' && peer.quick.gamePhase === 'playing' &&
+        peer.quick.migration && peer.quick.checkpointTick >= 0)).map(peer => peer.quick.epoch || 0));
     if (newest > this.epoch) this.recover(now, newest);
+    const previousHost = peers.find(peer => peer.id === this.previousAuthority?.hostId);
+    if (this.recovering && this.presence.role === 'candidate' && this.previousAuthority?.role === 'join' &&
+        this.hostHealthy(previousHost, now, this.previousAuthority.epoch) &&
+        !sameMatch.some(peer => peer.quick.role === 'host' && peer.quick.phase === 'launched' &&
+          peer.quick.gamePhase === 'playing' && (peer.quick.epoch || 0) > this.previousAuthority.epoch)) {
+      // The suspected host returned before a replacement committed. Its native
+      // authority never changed: retract the proposal and reattach only this client.
+      this.epoch = this.previousAuthority.epoch;
+      this.result = { role: 'join', hostId: previousHost.id, hostAddress: previousHost.address };
+      this.recovering = false;
+      this.missingSince = null;
+      this.presence = { ...this.presence, role: 'join', hostId: previousHost.id, phase: 'launched', epoch: this.epoch };
+      return { result: this.result, reconnect: true };
+    }
     if (this.result?.role === 'join') {
       const host = peers.find(peer => peer.id === this.result.hostId);
-      const healthy = host?.open && host.quick?.role === 'host' &&
-        (host.quick.epoch || 0) === this.epoch && (!host.quick.failover ||
-          !Number.isFinite(host.lastPacketAt) || now - host.lastPacketAt < HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS);
+      const healthy = this.hostHealthy(host, now);
       if (healthy) this.missingSince = null;
       else {
         if (this.missingSince === null) this.missingSince = now;
@@ -441,6 +469,8 @@ const HaloNet = (() => {
     const previous = peer.quick;
     peer.quickSequence = sequence;
     peer.quick = presence;
+    if (presence && (!previous || presence.epoch !== previous.epoch || presence.matchId !== previous.matchId ||
+        presence.checkpointTick > previous.checkpointTick)) peer.lastProgressAt = Date.now();
     if (presence && (!previous || previous.epoch !== presence.epoch || previous.role !== presence.role ||
         previous.hostId !== presence.hostId || previous.matchId !== presence.matchId))
       emit('diagnostic', { event: 'authority-presence', source, address: addressText(peer.address),
@@ -1109,7 +1139,7 @@ const HaloNet = (() => {
     publishQuick();
   }
 
-  async function quickPlay({ signal, onStatus = () => {}, onFailover = () => {} } = {}) {
+  async function quickPlay({ signal, onStatus = () => {}, onFailover = () => {}, onReconnect = () => {} } = {}) {
     if (signal?.aborted) throw new DOMException('Quick play cancelled.', 'AbortError');
     if (state.transport) {
       if (!state.transport.connected || !state.transport.hostAddress) throw new Error('The invited host is not connected.');
@@ -1120,7 +1150,7 @@ const HaloNet = (() => {
     const coordinator = new HaloQuickCoordinator(state.id, state.address, Date.now());
     const attempt = { coordinator, room: state.room, signal, timer: null, resolved: false,
       previous: JSON.stringify(coordinator.presence), lastStatus: '', abort: cancelQuickPlay, lastResult: null,
-      held: false, migrationPending: false, wireEpoch: 0 };
+      held: false, migrationPending: false, wireEpoch: 0, onReconnect };
     attempt.promise = new Promise((resolve, reject) => { attempt.resolve = resolve; attempt.reject = reject; });
     state.quick = attempt;
     signal?.addEventListener('abort', attempt.abort, { once: true });
@@ -1149,6 +1179,10 @@ const HaloNet = (() => {
       } else if (result.result) {
         const selection = { ...result.result, room: attempt.room, epoch: coordinator.epoch };
         const signature = JSON.stringify(result.result) + ':' + coordinator.epoch;
+        if (result.reconnect) {
+          attempt.migrationPending = false;
+          reconnectQuickClient(attempt);
+        }
         if (signature !== attempt.lastResult) {
           attempt.lastResult = signature;
           if (!attempt.resolved) { attempt.resolved = true; attempt.resolve(selection); }
@@ -1163,6 +1197,7 @@ const HaloNet = (() => {
         attempt.lastStatus = result.message;
         const hold = attempt.resolved && (coordinator.recovering || result.state === 'reconnecting');
         if (hold) attempt.held = true;
+        if (result.state === 'reconnecting' && coordinator.hasMatch) reconnectQuickClient(attempt);
         onStatus({ state: coordinator.recovering ? 'recovering' : result.state,
           message: result.message,
           ...(hold ? { hold: true } : {}) });
@@ -1205,6 +1240,14 @@ const HaloNet = (() => {
     if (state.quick?.coordinator.checkpoint(epoch, tick, matchId)) publishQuick();
   }
 
+  function reconnectQuickClient(attempt) {
+    const coordinator = attempt.coordinator;
+    if (attempt.migrationPending || coordinator.result?.role !== 'join') return;
+    attempt.held = true;
+    attempt.migrationPending = true;
+    attempt.onReconnect({ ...coordinator.result, room: attempt.room, epoch: coordinator.epoch });
+  }
+
   function quickPlayLost() {
     const attempt = state.quick;
     if (!attempt?.resolved) return false;
@@ -1222,6 +1265,10 @@ const HaloNet = (() => {
       coordinator.presence.gamePhase = 'migration-failed';
       coordinator.presence.checkpointTick = -1;
     } else if (coordinator.result?.role !== 'join') return false;
+    else {
+      reconnectQuickClient(attempt);
+      return true;
+    }
     attempt.held = true;
     coordinator.recover(Date.now());
     publishQuick();
