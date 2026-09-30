@@ -232,7 +232,7 @@ by the instances' masks:
 
 | Rays | See |
 | --- | --- |
-| Occlusion from the level | the level, the objects, your body |
+| Occlusion from the level | the objects only, near them (the lightmaps have the level's own, baked) |
 | Occlusion from an object | the level, the objects |
 | The sun from an object | the level, the objects |
 | The sun from the level | your body only: the lightmaps have the level's shadows, and the game draws the other objects' |
@@ -252,7 +252,7 @@ you see your own shadow, which the game never drew in the first person.
 | The sun | a light far away | - | the objects' shadows, your body's on the level |
 | The game's lights (flashlight, plasma, explosions, Guilty Spark, lamps) | point lights and spots, 16 nearest | - | yes, traced, in their colour |
 | Glows (light volumes) with no light | point lights, 16 nearest | - | yes |
-| The lightmaps (the level's baked light) | kept: the game's, darkened by the occlusion | - | - |
+| The lightmaps (the level's baked light) | kept: the game's, darkened only by what they never saw (the objects' occlusion, your shadow) | - | - |
 | Water | not yet: the level's render mesh is not traced | no | no |
 | Particles, decals, contrails, the sky | no | no | no |
 | Shaders' own glow (shields, panels' self-illumination) without a light volume | no | - | no |

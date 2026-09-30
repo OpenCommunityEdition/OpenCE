@@ -263,8 +263,12 @@ static NSString *const kernel_source = @
 	"	bool near_objects = object;\n"
 	"	for (uint s = 0; s < sphere_count && !near_objects; s++)\n"
 	"		near_objects = distance(P, spheres[s].xyz) < spheres[s].w + radius;\n"
+	/* the level's pixels (marked by the guest): the lightmaps have the
+	   level's own occlusion, baked, so their rays find only the objects,
+	   which the lightmaps never saw - and none, away from the objects */
+	"	bool level_pixel = c[23] > 0.5 && !object;\n"
 	"	float occlusion = 0.0;\n"
-	"	for (uint i = 0; i < 4; i++)\n"
+	"	for (uint i = 0; i < (level_pixel && !near_objects ? 0u : 4u); i++)\n"
 	"	{\n"
 	/* stratified, in a pattern that repeats every 4x4 pixels: the guest's
 	   4x4 blur takes in all 16 of its sets of directions (64 in all), so the
@@ -277,11 +281,11 @@ static NSString *const kernel_source = @
 	"		float3 d = normalize(tangent * (r * cos(angle)) + bitangent * (r * sin(angle)) + N * sqrt(max(0.0, 1.0 - u)));\n"
 	"		ray occlusion_ray(P + N * bias, d, 0.0, radius);\n"
 	/* (an object's occlusion: the level's and the other objects'; the
-	   level's: everything's but the player's body, inside which the camera is) */
+	   level's: the objects' but the player's body, inside which the camera is) */
 	"		float distance_hit = -1.0;\n"
 	"		if (near_objects)\n"
 	"		{\n"
-	"			auto hit = any_hit.intersect(occlusion_ray, world, 3u);\n"
+	"			auto hit = any_hit.intersect(occlusion_ray, world, level_pixel ? 2u : 3u);\n"
 	"			if (hit.type != intersection_type::none) distance_hit = hit.distance;\n"
 	"		}\n"
 	"		else\n"
