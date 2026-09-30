@@ -914,6 +914,11 @@ extern struct game_engine_globals game_engine_globals;
 extern struct game_engine_stage global_stage;
 extern long timeout_for_endgame_sound;
 
+/* whether a client has had the host's game type state this game (what
+changes in the first, from this machine's own start, it only takes: the
+game types show what changes in the next) */
+static boolean game_engine_network_state_read = FALSE;
+
 /* ---------- public code */
 
 long game_globals_get_weapon(
@@ -3067,7 +3072,8 @@ long game_engine_player_get_team_index(
 	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xC11, game_engine);
 
 	if (!game_engine->team_index_override)
-		team_index = player_get(player_index)->local_player_index%2;
+		/* port: 0 or 1 (another machine's player has no local player: -1) */
+		team_index = PIN(player_get(player_index)->local_player_index % 2, 0, 1);
 
 	return team_index;
 }
@@ -3153,6 +3159,14 @@ boolean game_engine_running(
 	boolean running = game_engine!=NULL;
 
 	return running;
+}
+
+/* port: whether the game is over and its scores are shown (where the
+host's button starts the next, game_engine_update) */
+boolean game_engine_showing_postgame(
+	void)
+{
+	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
 }
 
 boolean game_engine_force_single_screen(
@@ -3648,23 +3662,16 @@ void game_engine_update(
 				game_engine_update_player_always_invis(player_iterator.datum_index);
 				game_engine_update_teleporter(player_iterator.datum_index);
 
-				/* (a client of the distributed netcode has the host's scores,
-				flags, balls and hills: game_engine_read_network_state) */
-				if (game_engine->player_update_each_tick
-					&& !network_game_distributed_client()
-					)
-				{
+				/* (on a client of the distributed netcode each game type
+				skips what the host decides, whose scores, flags, balls and
+				hills it has: game_engine_read_network_state) */
+				if (game_engine->player_update_each_tick)
 					game_engine->player_update_each_tick(player_iterator.datum_index);
-				}
 			}
 		}
 
-		if (game_engine->update
-			&& !network_game_distributed_client()
-			)
-		{
+		if (game_engine->update)
 			game_engine->update();
-		}
 
 		switch (game_engine_globals.postgame_state)
 		{
@@ -4319,6 +4326,9 @@ boolean game_engine_should_end_game(
 void game_engine_clear_goal_position(
 	short goal_index)
 {
+	/* port: a goal of the table only */
+	if (!VALID_INDEX(goal_index, NUMBEROF(global_goal)))
+		return;
 	csmemset(&global_goal[goal_index], 0, sizeof(struct netgame_goal));
 
 	return;
@@ -4680,7 +4690,8 @@ void game_engine_prespawn_player_update(
 		else
 		{
 			struct player_datum *player = player_get(player_index);
-			player->team_index = player->local_player_index % 2;
+			/* port: 0 or 1 (another machine's player has no local player: -1) */
+			player->team_index = PIN(player->local_player_index % 2, 0, 1);
 		}
 	}
 
@@ -5849,6 +5860,9 @@ void game_engine_set_goal_position(
 	short team_index,
 	long ignore_player_index)
 {
+	/* port: a goal of the table only */
+	if (!VALID_INDEX(goal_index, NUMBEROF(global_goal)))
+		return;
 	global_goal[goal_index].ignore_player_index = ignore_player_index;
 	global_goal[goal_index].nav_index = find_nav_point(name);
 	global_goal[goal_index].in_use = TRUE;
@@ -5972,6 +5986,12 @@ void game_engine_variant_cleanup(
 		variant->game_engine_variant.slayer.no_kill_penalty = !!variant->game_engine_variant.slayer.no_kill_penalty;
 		variant->game_engine_variant.slayer.kill_in_order = !!variant->game_engine_variant.slayer.kill_in_order;
 		break;
+
+	case game_engine_oddball:
+		/* port: the balls' arrays and goals hold no more */
+		variant->game_engine_variant.oddball.ball_spawn_count =
+			PIN(variant->game_engine_variant.oddball.ball_spawn_count, 0, MAXIMUM_ODDBALLS);
+		break;
 	}
 
 	if (csmemcmp(&original, variant, sizeof(original)) != 0)
@@ -6091,7 +6111,8 @@ void game_engine_initialize(
 	{
 		global_variant = *variant;
 		game_engine_variant_cleanup(&global_variant);
-		game_engine = game_engines[variant->game_engine_index];
+		/* port: the cleaned variant's (the one given may be any number) */
+		game_engine = game_engines[global_variant.game_engine_index];
 	}
 
 	return;
@@ -6107,6 +6128,7 @@ void game_engine_initialize_for_new_map(
 		csmemset(global_goal, 0, sizeof(global_goal));
 		game_engine_globals.next_team_index = 0;
 		timeout_for_endgame_sound = 0;
+		game_engine_network_state_read = FALSE;
 
 		if (game_engine->initialize_for_new_map &&
 			!game_engine->initialize_for_new_map())
@@ -6145,7 +6167,7 @@ void game_engine_player_added(
 			if (global_network_game_client_get())
 			{
 				player->team_index =
-					(signed char)player->network_player_data.team_index % 2;
+					PIN((signed char)player->network_player_data.team_index % 2, 0, 1);
 			}
 			else
 			{
@@ -7960,15 +7982,15 @@ static void netgame_verify_spawn_points(
 }
 
 long game_engine_slayer_write_network_state(byte *buffer, long size);
-void game_engine_slayer_read_network_state(byte const *buffer, long size);
+void game_engine_slayer_read_network_state(byte const *buffer, long size, boolean first);
 long game_engine_ctf_write_network_state(byte *buffer, long size);
-void game_engine_ctf_read_network_state(byte const *buffer, long size);
+void game_engine_ctf_read_network_state(byte const *buffer, long size, boolean first);
 long game_engine_oddball_write_network_state(byte *buffer, long size);
-void game_engine_oddball_read_network_state(byte const *buffer, long size);
+void game_engine_oddball_read_network_state(byte const *buffer, long size, boolean first);
 long game_engine_king_write_network_state(byte *buffer, long size);
-void game_engine_king_read_network_state(byte const *buffer, long size);
+void game_engine_king_read_network_state(byte const *buffer, long size, boolean first);
 long game_engine_race_write_network_state(byte *buffer, long size);
-void game_engine_race_read_network_state(byte const *buffer, long size);
+void game_engine_race_read_network_state(byte const *buffer, long size, boolean first);
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the
 current game type's state (scores, and what else every machine must agree
@@ -8005,22 +8027,26 @@ void game_engine_read_network_state(
 	long size)
 {
 	long postgame_state;
+	boolean first;
 
 	if (!game_engine || size < (long)sizeof(postgame_state))
 		return;
 	csmemcpy(&postgame_state, buffer, sizeof(postgame_state));
 	buffer += sizeof(postgame_state);
 	size -= sizeof(postgame_state);
-	/* the game ended on the host */
-	if (postgame_state != 0 && game_engine_globals.postgame_state == 0)
-		game_engine_end_game();
+	first = !game_engine_network_state_read;
+	game_engine_network_state_read = TRUE;
 	switch (game_engine_get_type())
 	{
-	case game_engine_ctf: game_engine_ctf_read_network_state(buffer, size); break;
-	case game_engine_slayer: game_engine_slayer_read_network_state(buffer, size); break;
-	case game_engine_oddball: game_engine_oddball_read_network_state(buffer, size); break;
-	case game_engine_king: game_engine_king_read_network_state(buffer, size); break;
-	case game_engine_race: game_engine_race_read_network_state(buffer, size); break;
+	case game_engine_ctf: game_engine_ctf_read_network_state(buffer, size, first); break;
+	case game_engine_slayer: game_engine_slayer_read_network_state(buffer, size, first); break;
+	case game_engine_oddball: game_engine_oddball_read_network_state(buffer, size, first); break;
+	case game_engine_king: game_engine_king_read_network_state(buffer, size, first); break;
+	case game_engine_race: game_engine_race_read_network_state(buffer, size, first); break;
 	default: break;
 	}
+	/* the game ended on the host (after what ended it is shown, as the host
+	shows it) */
+	if (postgame_state != 0 && game_engine_globals.postgame_state == 0)
+		game_engine_end_game();
 }

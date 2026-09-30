@@ -13,7 +13,10 @@ MonkeyNuts/Ares source)
 with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
 
 - **Every machine ticks on its own clock.** Nobody waits for anybody: a
-  client no longer runs only the ticks the host has sent.
+  client no longer runs only the ticks the host has sent. A client's clock
+  starts with the host's first game update and takes the host's time from
+  it (at a game's start as at a late join), so every machine reads the
+  game's timers alike.
 - **Own player predicted.** A client drives its own player (and the
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
@@ -26,7 +29,10 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   copies toward it, a small error half of the way each tick, a larger one
   at once, drawn gliding from where they were. A client's own unit and
   vehicle are only corrected past a tolerance, so prediction does not
-  rubber-band.
+  rubber-band: the host tells the client which of the client's ticks it
+  has its player at (its prediction come back), and the client compares
+  that with where it had the player at that tick, not now, and moves the
+  player by the difference, keeping what they did since.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, the target where
   the host had it when the shooter saw it, no faster than weapons fire) and
@@ -49,7 +55,9 @@ update"), and stays in the list of games. Version 1 was the first of this
 netcode; version 2 lets a machine join a game in progress; version 3 puts
 each player in its slot of the host's player list on every machine;
 version 4 plays the European (PAL) maps as the North American ones
-(`port/linux/game/pal_tags.c`).
+(`port/linux/game/pal_tags.c`); version 5 corrects a client's own player
+against where it had them at the tick the host has them at, and checks
+what the machines send each other more closely.
 
 ## Joining a game in progress
 
@@ -77,6 +85,11 @@ free (`network_game_manager.c`). A player added to the game in progress
 also gets its team and the game type's data, as the players at the start
 do (in free for all, a team of its own).
 
+The game is closed to joins while its machines load and after it ends.
+A machine must join within 10 seconds of connecting; in a game, the host
+drops a machine it has heard nothing from for 15 seconds, and one that
+joined the game in progress and has not loaded in two minutes.
+
 Until it has loaded, the machine hears none of the game's messages (which a
 machine in the pregame refuses, and which the others no longer need), only
 a pregame keep-alive every five seconds from the host
@@ -102,7 +115,12 @@ a pregame keep-alive every five seconds from the host
      shows it (the HUD's message, the sound, a powerup's screen flash);
    - twice a second and with every kill, the players' statistics; five
      times a second, the game type's state (scores, the flags, the balls
-     and their carriers, the king's hill) and whether the game is over.
+     and their carriers, the king's hill, the players' speeds) and whether
+     the game is over. It counts the game type's events (captures, grabs
+     and returns of the flags, laps, the balls reset), and a client
+     announces those it has not had, as the host does its own; a client
+     runs the rest of the game type's update that only shows the game
+     (waypoints, messages, sounds, a carrier's speed).
 
    The messages are a kind of their own (the game's unused "data" message
    type), unreliable per tick, reliable for what must not be lost.
@@ -138,12 +156,18 @@ a pregame keep-alive every five seconds from the host
      melee and vehicles hit, it reports to the host (reliably).
    - The host deals a report once it has checked it: from that machine's
      player; damage one of their weapons (now or in the last ten seconds),
-     their grenades or their vehicle can deal (its projectiles' impacts and
-     detonations, followed through the tags); the target within a few
-     world units of where the shooter saw it (more for a fast one); the
-     impact at the target (an explosion within its reach); and no more
-     reports than any weapon fires. Its own copies of a client's
-     projectiles deal nothing (the report does).
+     their grenades (while they have them, and for a while after) or
+     their vehicle (a driver's or gunner's) can deal (its projectiles'
+     impacts and detonations, followed through the tags); the target
+     within a few world units of where the shooter saw it (more for a
+     fast one); the impact at the target (an explosion within its
+     reach); and no more reports than the weapon that deals them fires
+     (its rate of fire and projectiles a shot, with a margin; an
+     explosion's hits count as one). The damage is dealt as a client's
+     own hit can be: only the flags such a hit has, and the host's
+     multiplier, team and owner, not the report's, and a report with a number that is not finite, or a node,
+     region or material the target does not have, is refused. Its own
+     copies of a client's projectiles deal nothing (the report does).
    - The host sends its clients the damage it dealt to units, and a client
      replays what it does besides the harm (which the units' states
      bring): the player's screen flash and shake, the unit's flinch, pain
@@ -173,10 +197,11 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   own per-tick update, reliable and so held up by any loss, now carries no
   input). The host's clock still reaches the clients in it, and the game's
   own client update, whose input the host no longer takes, goes ten times
-  a second instead of sixty.
+  a second instead of sixty; the host takes its own players' input at
+  each of its ticks.
 - **One datagram a tick.** The unreliable messages of a tick to a machine
   go together (`_distributed_message_batch`), saving each one's headers
-  (internet play's tunnel adds 35 bytes to every datagram).
+  (internet play's tunnel adds 31 bytes to every datagram).
 - **Stamped with their tick.** Every message carries the sender's tick
   (its header's game time); an unreliable one that arrives after a newer of
   its kind is dropped, so a late datagram never puts anything back.
@@ -210,8 +235,8 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   host tick the client has had, which gives the host each client's round
   trip (smoothed as TCP smooths its own). The host keeps a second of where
   players' units and vehicles were, and checks a client's hit against where
-  the target was as far back as that round trip, instead of against where
-  it is now with a wide margin.
+  the target was as far back as that round trip (half a second at most),
+  instead of against where it is now with a wide margin.
 
 ## Testing
 
@@ -227,7 +252,9 @@ two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach, and `debug.network_test_score`
-shortens the game, to test the next. `debug.network_latency` and
+shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
+plays the variants in turn, the next once a game is over, as the host's
+button on the scores does). `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet.
 

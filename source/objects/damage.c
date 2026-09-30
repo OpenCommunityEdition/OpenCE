@@ -1102,11 +1102,16 @@ static void object_damage_aftermath(
 	{
 		long player_index = player_index_from_unit_index(object_index);
 
-		game_engine_player_killed(
-			player_index,
-			object_index,
-			player_index,
-			TRUE);
+		/* port: a player's unit only (a body the host has dead, killed with
+		no statistics on a machine that joined after, is no player's) */
+		if (player_index != NONE)
+		{
+			game_engine_player_killed(
+				player_index,
+				object_index,
+				player_index,
+				TRUE);
+		}
 	}
 
 	if (TEST_FLAG(_object_mask_unit, object->object.type))
@@ -2604,8 +2609,9 @@ void damage_replay_aftermath(
 	real body_damage_multiplier,
 	short body_part)
 {
-	/* (no statistics, which object_damage_aftermath otherwise keeps: the
-	host's come as they are) */
+	/* (not the no-statistics bit, with which object_damage_aftermath counts
+	the player's suicide: the damage it records the host's statistics
+	overwrite, and no kill, without the body depleted) */
 	SET_FLAG(damage->flags, _damage_no_statistics_bit, FALSE);
 	object_damage_aftermath(object_index, damage, being_damaged_flags & ~FLAG(_object_being_damaged_body_depleted_bit),
 		shield_damage, body_damage, body_damage_multiplier, body_part);

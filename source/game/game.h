@@ -180,6 +180,8 @@ short local_time_get_elapsed(void);
 boolean game_predicting(void);
 boolean game_in_progress(void);
 boolean game_time_get_paused(void);
+/* whether a client's clock waits for the host's first game update */
+boolean game_time_held(void);
 void game_time_set_paused(boolean paused);
 real game_time_get_speed(void);
 void game_time_set_speed(real speed);

@@ -29,12 +29,15 @@ int p2p_join_invite(const char *text);
 /* this machine's identifier, which its XNADDR carries (6 bytes) */
 const unsigned char *p2p_identifier(void);
 /* the address the game reaches the machine with this identifier at, if it
-is an internet play peer */
+is an internet play peer (reached yet or not) */
 int p2p_peer_address(const unsigned char *identifier, unsigned long *address);
 
-/* a destination the game sends to or connects to (stream: a TCP socket):
-if it is a peer's address, the local address standing in for it */
-int p2p_outgoing(int stream, unsigned long *address, unsigned short *port);
+/* a destination the game sends to or connects to (stream: a TCP socket;
+socket: the game's UDP socket connected to it, else -1): 1 if it is a peer's
+address, rewritten to the local address standing in for it; -1 if it is a
+peer's (or was) but the peer cannot be reached now (the game's traffic must
+not go to the address itself); 0 if it is not a peer's */
+int p2p_outgoing(int stream, int socket, unsigned long *address, unsigned short *port);
 /* a source the game received from, accepted from or is connected to: if
 it is one standing in for a peer, the peer's address */
 int p2p_incoming(int stream, unsigned long *address, unsigned short *port);
@@ -42,13 +45,11 @@ int p2p_incoming(int stream, unsigned long *address, unsigned short *port);
 peer; returns their count */
 int p2p_broadcast_targets(unsigned short port, unsigned long *addresses, unsigned short *ports, int maximum_count);
 
-/* nonzero if one of the game's own sockets (xnet.c) is bound to port: a
-peer's datagrams and connections may only reach those, not whatever else
-listens on this machine */
-int xnet_is_game_port(unsigned short port);
-
-/* the game listens (it is hosting) on socket, or closes a socket */
-void p2p_socket_listening(int socket);
+/* the game's socket has this local port: bound, given one, or listening
+(stream and listening: it is hosting). Peers reach only these ports (a
+stream's only while it listens), and datagram ports it sent them from */
+void p2p_socket_port(int socket, int stream, int listening, unsigned short port);
+/* the game closes a socket */
 void p2p_socket_closed(int socket);
 
 /* text for the clipboard (a new invite link), once; NULL if none. Called
