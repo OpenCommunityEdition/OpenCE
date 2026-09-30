@@ -1127,6 +1127,37 @@ static void machine_add_player(
 	return;
 }
 
+/* port: a player who left the game in progress is no longer its machine's
+(its datum stays until the game ends): a machine that joins at the same index
+fills the list from its first free entry, and the old players' entries left
+it full, or its players taken for the old ones */
+void machine_remove_player(
+	long player_index)
+{
+	long machine_index;
+	long machine_player_index;
+
+	if (player_index == NONE)
+		return;
+	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	{
+		for (machine_player_index = 0;
+			machine_player_index < MAXIMUM_LOCAL_PLAYERS;
+			machine_player_index++)
+		{
+			/* (by its absolute index: a datum's slot is one player's) */
+			if (machine_to_player_table[machine_index][machine_player_index] != NONE &&
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(machine_to_player_table[machine_index][machine_player_index]) ==
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index))
+			{
+				machine_to_player_table[machine_index][machine_player_index] = NONE;
+			}
+		}
+	}
+
+	return;
+}
+
 long player_new(
 	long machine_index,
 	long player_index,
@@ -1526,6 +1557,52 @@ static void network_player_log_idle_action(
 		absolute_index, player->unit_index, unit->object.position.x, unit->object.position.y, unit->object.position.z,
 		nearest_index, nearest_index != NONE ? tag_get_name(object_get(nearest_index)->definition_index) : "",
 		nearest_distance);
+	/* ... and the nearest vehicle: how far its nearest seat's entrance is
+	(within 1.0 to get in), and whether the unit moves or the vehicle turns
+	too fast (player_examine_nearby_vehicle) */
+	{
+		struct object_iterator vehicles;
+		long vehicle_index = NONE;
+		real vehicle_distance = 0.0f;
+
+		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+		while (object_iterator_next(&vehicles))
+		{
+			real distance = distance3d(&unit->object.position, &object_get(vehicles.index)->object.position);
+
+			if (vehicle_index == NONE || distance < vehicle_distance)
+			{
+				vehicle_index = vehicles.index;
+				vehicle_distance = distance;
+			}
+		}
+		if (vehicle_index != NONE && vehicle_distance < 10.0f)
+		{
+			struct unit_datum *vehicle = unit_get(vehicle_index);
+			short seat_count = unit_definition_get(vehicle->definition_index)->unit.seats.count;
+			short seat_index;
+			real entrance_distance = REAL_MAX;
+
+			for (seat_index = 0; seat_index < seat_count; seat_index++)
+			{
+				real_point3d entrance;
+				real_point3d seat;
+
+				if (unit_get_seat_entrance_point(player->unit_index, vehicle_index, seat_index, &entrance, &seat, NULL))
+				{
+					entrance_distance = MIN(entrance_distance,
+						MIN(distance3d(&entrance, &unit->object.bounding_sphere_center),
+							distance3d(&seat, &unit->object.bounding_sphere_center)));
+				}
+			}
+			error(2, "distributed: ... nearest vehicle %lx %s at %.2f %.2f %.2f (%.2f away), seat entrance %.2f away, "
+				"unit speed %.3f, vehicle turning %.3f, up %.2f",
+				vehicle_index, tag_get_name(vehicle->definition_index), vehicle->object.position.x,
+				vehicle->object.position.y, vehicle->object.position.z, vehicle_distance, entrance_distance,
+				magnitude3d(&unit->object.translational_velocity), magnitude3d(&vehicle->object.angular_velocity),
+				vehicle->object.up.k);
+		}
+	}
 }
 
 /* ... and gives up the one it has (the host's unit for it is another) */
@@ -1713,6 +1790,14 @@ static boolean player_handle_action(
 		break;
 
 	case _player_action_result_swap_for_powerup:
+		/* port: a distributed client's inventories are the host's (the
+		powerup is swapped where the host decides pickups, and the relayed
+		action of a remote player reaches here too): it swaps nothing */
+		if (!players_decide_pickups())
+		{
+			result = TRUE;
+			break;
+		}
 		unit_drop_current_equipment(player->unit_index);
 		if (unit_add_equipment_to_inventory(
 			player->unit_index,

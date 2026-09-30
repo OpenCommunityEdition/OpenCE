@@ -105,11 +105,14 @@ joined the game in progress too, which has neither the players who left
 (their datums stay until the game ends) nor the order the others added
 players in. So there each player's datum is its slot in the host's player
 list: every machine makes it there (network_game_spawn_player), and the host
-gives a player added to the game in progress a slot whose datum is free. */
+gives a player added to the game in progress a slot whose datum is free.
+(Only in a game: in the lobby the host runs the user interface's scenario,
+whose local player holds datum 0, and a full lobby could not use slot 0.) */
 static boolean network_game_player_slot_held(
 	long slot)
 {
-	return game_in_progress() && player_data && player_data->valid && slot < player_data->maximum_count &&
+	return game_in_progress() && game_engine_running() &&
+		player_data && player_data->valid && slot < player_data->maximum_count &&
 		((struct datum_header *)((byte *)player_data->data + player_data->size * slot))->identifier != 0;
 }
 

@@ -698,9 +698,20 @@ boolean network_game_client_handle_message(
 				}
 				else
 				{
-					network_event(
-						"ignoring a distributed message from a system that is not the host @ %s",
-						transport_address_to_string(source_address));
+					/* (port: once a second at most: anyone can send them,
+					one a tick) */
+					static unsigned long last_logged_time;
+					static boolean logged;
+					unsigned long now = system_milliseconds();
+
+					if (!logged || now - last_logged_time >= 1000)
+					{
+						network_event(
+							"ignoring a distributed message from a system that is not the host @ %s",
+							transport_address_to_string(source_address));
+						last_logged_time = now;
+						logged = TRUE;
+					}
 				}
 				break;
 

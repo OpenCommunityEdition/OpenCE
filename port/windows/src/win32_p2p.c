@@ -185,7 +185,8 @@ int posix_discord_read(int handle, void *buffer, int length)
 
 	if (handle < 0 || handle >= MAXIMUM_DISCORD_PIPES || !discord_pipes[handle])
 		return -1;
-	/* the pipe is blocking: read only what is already there */
+	/* only what is already there: a pipe that does not wait fails a read
+	of nothing (ERROR_NO_DATA) as if it had closed */
 	if (!PeekNamedPipe(discord_pipes[handle], NULL, 0, NULL, &available, NULL))
 		return -1;
 	if (!available)

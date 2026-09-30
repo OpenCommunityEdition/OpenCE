@@ -57,6 +57,12 @@ char const *cache_files_build_region(
 	char const *build);
 char const *cache_files_multiplayer_region(
 	char build[0x20]);
+boolean cache_files_map_plays_multiplayer(
+	char const *map_name,
+	char build[0x20]);
+void cache_files_show_multiplayer_unavailable(
+	char const *map_name,
+	char const *build);
 
 unsigned long cache_files_get_checksum(
 	void);

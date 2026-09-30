@@ -625,6 +625,79 @@ char const *cache_files_multiplayer_region(
 	return cache_files_build_region(cache_file_globals.header.build);
 }
 
+/* whether the named map plays multiplayer with the others: FALSE only for
+a map whose header is of a build not listed above (a map whose header cannot
+be read is left to precaching, which tells of a missing map); build gets the
+map's build, empty if unread. The multiplayer menus check the loaded map's
+(ui.map's) build; this checks a multiplayer map's own, which may be of
+another build: the object and damage messages name definitions by tag
+index, which differs between builds */
+boolean cache_files_map_plays_multiplayer(
+	char const *map_name,
+	char build[0x20])
+{
+	struct cache_file_header header;
+	char path[256];
+	HANDLE file;
+	boolean result = TRUE;
+
+	build[0] = 0;
+	if (!map_name || !map_name[0])
+		return TRUE;
+	snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), tag_name_strip_path(map_name));
+	file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+	if (file != INVALID_HANDLE_VALUE)
+	{
+		unsigned long bytes_read;
+
+		if (ReadFile(file, &header, sizeof(header), &bytes_read, NULL) &&
+			bytes_read == sizeof(header) &&
+			cache_file_header_verify(&header, path, FALSE))
+		{
+			csstrncpy(build, header.build, 0x20);
+			build[0x1F] = 0;
+			result = cache_files_build_region(header.build) != NULL;
+		}
+		CloseHandle(file);
+	}
+
+	return result;
+}
+
+/* tells the player that maps of a build (a cache file header's) do not play
+multiplayer: map_name the map's, or NULL for the player's maps */
+void cache_files_show_multiplayer_unavailable(
+	char const *map_name,
+	char const *build)
+{
+	void platform_log(char const *format, ...);
+	void platform_show_message(char const *title, char const *message);
+	char message[320];
+
+	if (map_name)
+	{
+		platform_log("multiplayer is unavailable: the map %s is of build %s, which is not supported", map_name, build);
+		snprintf(
+			message,
+			sizeof(message),
+			"The map %s (build %s) isn't supported for multiplayer yet.\n\nAsk in the Discord to get it added.",
+			tag_name_strip_path(map_name),
+			build);
+	}
+	else
+	{
+		platform_log("multiplayer is unavailable: maps of build %s are not supported", build);
+		snprintf(
+			message,
+			sizeof(message),
+			"Your maps (build %s) aren't supported for multiplayer yet.\n\nAsk in the Discord to get them added.",
+			build);
+	}
+	platform_show_message("Halo: multiplayer unavailable", message);
+
+	return;
+}
+
 boolean cache_files_give_time_to_precache(
 	char const *map_name)
 {

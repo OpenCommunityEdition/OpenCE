@@ -112,12 +112,13 @@ int posix_socket_getsockname(int socket, void *address, int *address_length);
 int posix_socket_getpeername(int socket, void *address, int *address_length);
 /* select over explicit descriptor lists (any descriptor numbers: poll on
 Linux); each list is rewritten in place to hold only the ready descriptors,
-and its count updated */
+in the order given, and its count updated */
 int posix_socket_select(int *read, int *read_count, int *write, int *write_count,
 	int *error, int *error_count, posix_long timeout_seconds, posix_long timeout_microseconds, int infinite);
 /* this machine's IPv4 address on its local network (network byte order):
-the one its default route leaves from, else the first of an interface that
-is up and not loopback; or 0 */
+the one its default route leaves from (on Android, first that of an
+interface with broadcasts: Wi-Fi, not mobile data), else the first of an
+interface that is up and not loopback; or 0 */
 posix_ulong posix_local_ipv4_address(void);
 /* fills buffer with cryptographically random bytes; aborts the process if
 the system has none to give */

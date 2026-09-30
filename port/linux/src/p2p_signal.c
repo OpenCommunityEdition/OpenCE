@@ -25,7 +25,12 @@ hash to the identifier in the invite). It can send a JOIN in another
 machine's name, which gets it nothing: the tunnel takes that machine's key,
 and a session with a machine is not replaced while it lives (p2p.c).
 
-A joiner repeats its JOIN until the tunnel reaches the host.
+A joiner repeats its JOIN until the tunnel reaches the host. The host makes
+one session of a JOIN (its public key and nonce) at most: anyone watching
+the brokers could send it again after the session ended, and have the host
+reach for the joiner's old addresses in its name, keeping it out. So a
+joiner asks with a new nonce when its session with the host ends before the
+tunnel reached it, or when the host has not answered it in a while.
 */
 
 #include "platform.h"
@@ -43,6 +48,9 @@ enum
 	/* the joiners a host remembers, so a repeated request gets the same
 	session: as many as it takes */
 	MAXIMUM_JOINERS = P2P_MAXIMUM_PEERS + 1,
+	/* the requests a session was made from, which make none again (a
+	host takes at most a few new players a minute: this is hours of them) */
+	MAXIMUM_USED_REQUESTS = 1024,
 	TOPIC_SIZE = 7 + 32 + 1,
 	NONCE_SIZE = 8,
 	/* an ACCEPT's tag: the first half of an HMAC-SHA256 */
@@ -58,6 +66,10 @@ enum
 	SILENCE_TIMEOUT = 90000,
 	JOIN_INTERVAL = 2000,
 	ANSWER_INTERVAL = 1000,
+	/* a joiner the host has not answered in this long asks anew, with a
+	new nonce (the host may have made a session from its request whose
+	answer was lost, and makes no other from it) */
+	UNANSWERED_TIME = 20000,
 };
 
 enum
@@ -125,6 +137,11 @@ static struct
 	char host_topic[TOPIC_SIZE];
 	struct joiner joiners[MAXIMUM_JOINERS];
 	int next_joiner;
+	/* the joiner's identifier and nonce of each request a session was made
+	from (kept while hosting stops and starts: an invite lasts the run) */
+	unsigned char used_requests[MAXIMUM_USED_REQUESTS][P2P_IDENTIFIER_SIZE + NONCE_SIZE];
+	int used_request_count;
+	int used_request_next;
 
 	/* joining */
 	int joining;
@@ -138,11 +155,15 @@ static struct
 	char join_host_topic[TOPIC_SIZE];
 	char join_topic[TOPIC_SIZE];
 	unsigned long join_sent_time;
+	/* when join_nonce was made, and whether the host answered it */
+	unsigned long join_nonce_time;
+	int join_answered;
 } signalling;
 
 static int elapsed(unsigned long since, unsigned long time)
 {
-	return (long)(p2p_now() - since) >= (long)time;
+	/* (unsigned, as the clock wraps) */
+	return (unsigned int)(p2p_now() - since) >= (unsigned int)time;
 }
 
 static unsigned short network_short(unsigned short value)
@@ -509,23 +530,41 @@ static void join_received(const unsigned char *message, int size)
 	if (joiner && !memcmp(joiner->public_key, public_key, P2P_KEY_SIZE) && !memcmp(joiner->nonce, nonce, NONCE_SIZE))
 	{
 		/* the same request again, through another broker or repeated: the
-		same session, while it lasts */
-		if (!elapsed(joiner->answered_time, ANSWER_INTERVAL))
+		same session, while it lasts; never another (anyone watching the
+		brokers can send it again once the session ends, and a session in
+		the joiner's name would keep the joiner out while it lasts: a joiner
+		asks again with a new nonce) */
+		if (!elapsed(joiner->answered_time, ANSWER_INTERVAL) ||
+			!p2p_peer_reoffered(identifier, joiner->secret, candidates, count))
 			return;
-		answered = p2p_peer_reoffered(identifier, joiner->secret, candidates, count);
+		answered = 1;
 	}
 	if (!answered)
 	{
 		/* a new session (p2p.c turns it away while another with that machine
-		lives) */
+		lives), from a request no session was made from */
 		unsigned char base[P2P_SHA256_SIZE], host_nonce[NONCE_SIZE], secret[P2P_SHA256_SIZE];
+		unsigned char request[P2P_IDENTIFIER_SIZE + NONCE_SIZE];
 
-		if (!pair_base(public_key, p2p_public_key(), public_key, base))
+		memcpy(request, identifier, P2P_IDENTIFIER_SIZE);
+		memcpy(request + P2P_IDENTIFIER_SIZE, nonce, NONCE_SIZE);
+		for (index = 0; index < signalling.used_request_count; index++)
+		{
+			if (!memcmp(signalling.used_requests[index], request, sizeof(request)))
+				return;
+		}
+		/* (checked before the work of the keys, which anyone with the invite
+		can ask for as often as they like) */
+		if (p2p_peer_turned_away(identifier, 0) || !pair_base(public_key, p2p_public_key(), public_key, base))
 			return;
 		posix_random_bytes(host_nonce, NONCE_SIZE);
 		session_secret(base, nonce, host_nonce, secret);
 		if (!p2p_peer_offered(identifier, secret, candidates, count, 0))
 			return;
+		memcpy(signalling.used_requests[signalling.used_request_next], request, sizeof(request));
+		signalling.used_request_next = (signalling.used_request_next + 1) % MAXIMUM_USED_REQUESTS;
+		if (signalling.used_request_count < MAXIMUM_USED_REQUESTS)
+			signalling.used_request_count++;
 		if (!joiner)
 			joiner = &signalling.joiners[signalling.next_joiner++ % MAXIMUM_JOINERS];
 		memcpy(joiner->identifier, identifier, P2P_IDENTIFIER_SIZE);
@@ -587,6 +626,7 @@ static void accept_received(const unsigned char *message, int size)
 	count = get_candidates(message + fixed, size - TAG_SIZE - fixed, candidates);
 	if (count < 0)
 		return;
+	signalling.join_answered = 1;
 	session_secret(signalling.join_base, nonce, host_nonce, secret);
 	p2p_peer_offered(signalling.join_host, secret, candidates, count, 1);
 }
@@ -837,6 +877,12 @@ void p2p_signal_update(const int *read, int read_count, const int *write, int wr
 		if (elapsed(broker->sent_time, PING_INTERVAL))
 			broker_send(broker, 0xC0, NULL, 0);
 	}
+	if (signalling.joining && !signalling.join_answered && elapsed(signalling.join_nonce_time, UNANSWERED_TIME))
+	{
+		posix_random_bytes(signalling.join_nonce, NONCE_SIZE);
+		signalling.join_nonce_time = p2p_now();
+		send_join();
+	}
 	if (signalling.joining && elapsed(signalling.join_sent_time, JOIN_INTERVAL))
 		send_join();
 }
@@ -883,7 +929,10 @@ void p2p_signal_join(const unsigned char *host_identifier, const unsigned char *
 	derive(token, "seal", NULL, signalling.join_key);
 	make_topic(token, "host", host_identifier, signalling.join_host_topic);
 	make_topic(token, "joiner", p2p_identifier(), signalling.join_topic);
+	/* (new each time: the host makes one session of a request) */
 	posix_random_bytes(signalling.join_nonce, NONCE_SIZE);
+	signalling.join_nonce_time = p2p_now();
+	signalling.join_answered = 0;
 	signalling.joining = 1;
 	sync_all_topics();
 	send_join();

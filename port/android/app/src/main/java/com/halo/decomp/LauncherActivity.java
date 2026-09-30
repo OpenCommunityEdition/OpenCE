@@ -66,11 +66,18 @@ public class LauncherActivity extends Activity {
         if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null
             || dataRoot == null)
             return;
-        try (OutputStream out = new FileOutputStream(new File(dataRoot, "join_link.txt"))) {
+        // written whole under another name, then renamed: the game never
+        // reads it half written
+        File partial = new File(dataRoot, "join_link.txt.tmp");
+        try (OutputStream out = new FileOutputStream(partial)) {
             out.write(intent.getData().toString().getBytes("UTF-8"));
         } catch (java.io.IOException e) {
             // the link is lost; the player can copy it instead
+            partial.delete();
+            return;
         }
+        if (!partial.renameTo(new File(dataRoot, "join_link.txt")))
+            partial.delete();
     }
 
     private boolean haveData() {

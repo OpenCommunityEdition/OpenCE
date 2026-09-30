@@ -290,7 +290,8 @@ void p2p_discord_update(void)
 		char handshake[128];
 		int size;
 
-		if (discord.attempted && (long)(p2p_now() - discord.attempt_time) < RETRY_INTERVAL)
+		/* (unsigned, as the clock wraps) */
+		if (discord.attempted && (unsigned int)(p2p_now() - discord.attempt_time) < (unsigned int)RETRY_INTERVAL)
 			return;
 		discord.attempted = 1;
 		discord.attempt_time = p2p_now();

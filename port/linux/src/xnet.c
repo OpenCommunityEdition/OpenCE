@@ -39,9 +39,10 @@ Internet play (p2p.c) adds machines that shared an invite to this LAN: an
 XNADDR's abEnet carries its machine's identifier, which XNetXnAddrToInAddr
 maps to the peer's virtual address, and traffic to and from those addresses
 is rewritten to and from p2p.c's local stand-ins here (or fails, with
-WSAEHOSTUNREACH, while the peer is not reached). Broadcasts also go to every
-peer. p2p.c is told the ports of the game's sockets, which alone peers
-reach.
+WSAEHOSTUNREACH, while the peer is not reached); datagrams to a peer, and
+broadcasts, which also go to every peer, go onto the tunnel at once
+(p2p_send_datagram). p2p.c is told the ports of the game's sockets, which
+alone peers reach.
 */
 
 #include "platform.h"
@@ -280,6 +281,18 @@ static void peer_incoming_address(int stream, struct sockaddr *address, const in
 	incoming_address(address, address_length);
 }
 
+/* the local port the game's socket is bound to (network byte order), or 0
+if it is not yet */
+static unsigned short socket_port(SOCKET socket)
+{
+	struct sockaddr_in bound;
+	int length = sizeof(bound);
+
+	if (posix_socket_getsockname((int)socket, &bound, &length) < 0 || bound.sin_family != AF_INET)
+		return 0;
+	return bound.sin_port;
+}
+
 /* the addresses to send broadcasts to instead, if network.broadcast is
 set (255.255.255.255 among them sends a real broadcast too); returns their
 count */
@@ -468,7 +481,9 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		unsigned long targets[MAXIMUM_BROADCAST_TARGETS];
 		unsigned short ports[P2P_BROADCAST_PEERS];
 		int target_count = broadcast_targets(targets, MAXIMUM_BROADCAST_TARGETS);
+		unsigned short source_port;
 		int peer_count;
+		int send_error;
 		int index;
 		int result;
 
@@ -491,8 +506,26 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		{
 			result = posix_socket_sendto((int)socket, buffer, length, flags, address, address_length);
 		}
+		/* (the broadcast's own error, which what follows would overwrite) */
+		send_error = result < 0 ? posix_socket_last_error() : 0;
 		/* and to every internet play peer (after the send above, which binds
-		the socket if it was not) */
+		the socket if it was not): onto the tunnel at once, else through the
+		stand-ins */
+		source_port = socket_port(socket);
+		if (source_port)
+		{
+			if (p2p_broadcast_datagram(source_port, ((const struct sockaddr_in *)address)->sin_port, buffer,
+				length) > 0 && result < 0)
+			{
+				result = length;
+			}
+			if (result < 0)
+			{
+				WSASetLastError(send_error);
+				return SOCKET_ERROR;
+			}
+			return result;
+		}
 		peer_count = p2p_broadcast_targets(((const struct sockaddr_in *)address)->sin_port, targets, ports,
 			P2P_BROADCAST_PEERS);
 		for (index = 0; index < peer_count; index++)
@@ -505,7 +538,30 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 			if (result < 0 && sent >= 0)
 				result = sent;
 		}
-		return winsock_result(result);
+		if (result < 0)
+		{
+			WSASetLastError(send_error);
+			return SOCKET_ERROR;
+		}
+		return result;
+	}
+	/* an internet play peer's: onto the tunnel at once, from the socket's
+	port (one not bound yet goes through a stand-in, which the system's send
+	binds it for) */
+	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
+		(halo_ws_ntohl(((const struct sockaddr_in *)address)->sin_addr.s_addr) & 0xFFC00000) == 0x64400000)
+	{
+		unsigned short source_port = socket_port(socket);
+
+		switch (source_port ? p2p_send_datagram(source_port, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
+			((const struct sockaddr_in *)address)->sin_port, buffer, length) : 0)
+		{
+		case 1:
+			return length;
+		case -1:
+			WSASetLastError(WSAEHOSTUNREACH);
+			return SOCKET_ERROR;
+		}
 	}
 	switch (peer_outgoing_address(0, -1, &address, address_length, &target))
 	{

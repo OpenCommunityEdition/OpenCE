@@ -55,7 +55,10 @@ enum
 {
 	MAXIMUM_TELNET_CLIENTS = 1,
 	TELNET_CLIENT_BUFFER_SIZE = 128,
-	TELNET_CONSOLE_PORT = 23,
+	/* the Xbox's was 23 (telnet), which a program that is not the
+	administrator cannot listen on (Linux, Android): the native builds' is
+	debug.telnet_console_port */
+	TELNET_CONSOLE_DEFAULT_PORT = 2323,
 	_transport_endpoint_type_telnet = 0x12
 };
 
@@ -80,7 +83,14 @@ struct telnet_console_globals
 
 /* the platform layer's (port/linux/src/port_config.c) */
 int config_boolean(const char *name);
+long config_integer(const char *name);
 
+static boolean telnet_client_write(
+	struct telnet_client *client,
+	char const *string,
+	long length);
+static void telnet_client_disconnect(
+	struct telnet_client *client);
 static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
@@ -110,7 +120,9 @@ void telnet_console_initialize(
 
 		address.address_length = IPV4_ADDRESS_LENGTH;
 		address.address.long_words[0] = IPV4_LOOPBACK_ADDRESS;
-		address.port = TELNET_CONSOLE_PORT;
+		address.port = (word)config_integer("debug.telnet_console_port");
+		if (!address.port)
+			address.port = TELNET_CONSOLE_DEFAULT_PORT;
 
 		if (bind_endpoint(telnet_console_globals.listening_endpoint, &address)==_transport_error_none)
 		{
@@ -147,8 +159,7 @@ void telnet_console_dispose(
 	{
 		if (telnet_console_globals.listening_endpoint)
 			delete_transport_endpoint(telnet_console_globals.listening_endpoint);
-		if (telnet_console_globals.clients[0].endpoint)
-			delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
+		telnet_client_disconnect(telnet_console_globals.clients);
 	}
 
 	csmemset(&telnet_console_globals, 0, sizeof(telnet_console_globals));
@@ -159,35 +170,18 @@ void telnet_console_dispose(
 void telnet_console_print(
 	char *string)
 {
-	if (telnet_console_globals.initialized && string && string[0])
+	struct telnet_client *client = &telnet_console_globals.clients[0];
+
+	/* (port: a failed write drops the client before it says so, since
+	error() prints here again; a client that is not reading loses the line:
+	telnet_client_write) */
+	if (telnet_console_globals.initialized && string && string[0] && client->endpoint)
 	{
-		long length = csstrlen(string);
-
-		if (telnet_console_globals.clients[0].endpoint)
+		if (telnet_client_write(client, "\r\n", 2) &&
+			telnet_client_write(client, string, csstrlen(string)) &&
+			client->buffer[0])
 		{
-			long result = write_endpoint(telnet_console_globals.clients[0].endpoint, "\r\n", 2);
-
-			if (result>0)
-			{
-				result = write_endpoint(telnet_console_globals.clients[0].endpoint, string, length);
-				if (result>0)
-				{
-					if (telnet_console_globals.clients[0].buffer[0])
-					{
-						result = write_endpoint(
-							telnet_console_globals.clients[0].endpoint,
-							telnet_console_globals.clients[0].buffer,
-							csstrlen(telnet_console_globals.clients[0].buffer));
-					}
-
-					if (result>0)
-						return;
-				}
-			}
-
-			error(2, "connection lost to telnet client");
-			delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
-			telnet_console_globals.clients[0].endpoint = NULL;
+			telnet_client_write(client, client->buffer, csstrlen(client->buffer));
 		}
 	}
 
@@ -254,20 +248,17 @@ void telnet_console_process(
 			count = read_endpoint(telnet_console_globals.clients[0].endpoint, buffer, sizeof(buffer));
 			if (count>0)
 			{
-				if (process_telnet_client_buffer(buffer, count, telnet_console_globals.clients))
-					return;
-
-				error(2, "error processing telnet client");
+				if (!process_telnet_client_buffer(buffer, count, telnet_console_globals.clients))
+				{
+					telnet_client_disconnect(telnet_console_globals.clients);
+					error(2, "error processing telnet client");
+				}
 			}
-			else
+			else if (count!=_transport_result_operation_would_block)
 			{
+				/* (the client is dropped before error() prints to it) */
+				telnet_client_disconnect(telnet_console_globals.clients);
 				error(2, "connection lost to telnet client ('%s')", transport_error_to_string((short)count));
-			}
-
-			if (telnet_console_globals.clients[0].endpoint)
-			{
-				delete_transport_endpoint(telnet_console_globals.clients[0].endpoint);
-				telnet_console_globals.clients[0].endpoint = NULL;
 			}
 		}
 	}
@@ -277,15 +268,67 @@ void telnet_console_process(
 
 /* ---------- private code */
 
+/* port: the client's socket does not block (a client that stops reading
+does not stall the game). What it cannot take now is dropped (a line of
+text), a write sent in part goes on with the rest, and a failed write drops
+the client before error() says so: error() prints to the console, and so
+here again. TRUE when all of it was sent. */
+static boolean telnet_client_write(
+	struct telnet_client *client,
+	char const *string,
+	long length)
+{
+	long written = 0;
+
+	while (client->endpoint && written<length)
+	{
+		long result = write_endpoint(client->endpoint, string+written, length-written);
+
+		if (result>0)
+		{
+			written += result;
+		}
+		else if (result==_transport_result_operation_would_block)
+		{
+			return FALSE;
+		}
+		else
+		{
+			telnet_client_disconnect(client);
+			error(2, "failed to write to telnet client ('%s')",
+				transport_error_to_string((short)result));
+			return FALSE;
+		}
+	}
+
+	return client->endpoint && written==length;
+}
+
+/* (the endpoint is let go of before it is deleted: anything the deletion
+prints finds no client) */
+static void telnet_client_disconnect(
+	struct telnet_client *client)
+{
+	struct transport_endpoint *endpoint = client->endpoint;
+
+	client->endpoint = NULL;
+	client->buffer[0] = 0;
+	if (endpoint)
+		delete_transport_endpoint(endpoint);
+
+	return;
+}
+
+/* FALSE when the client was lost (it is then dropped) */
 static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
 	struct telnet_client *client)
 {
-	boolean result = TRUE;
 	long index;
 
-	for (index = 0; result && index<size; index++)
+	/* (a script run, or an error, prints to the client, which may lose it) */
+	for (index = 0; client->endpoint && index<size; index++)
 	{
 		char *character = buffer+index;
 		long length;
@@ -299,18 +342,12 @@ static boolean process_telnet_client_buffer(
 			if (length>=TELNET_CLIENT_BUFFER_SIZE)
 			{
 				client->buffer[0] = 0;
-				length = write_endpoint(
-					client->endpoint,
+				telnet_client_write(
+					client,
 					"\r\noverflowed client buffer; resetting buffer\r\n",
 					csstrlen("\r\noverflowed client buffer; resetting buffer\r\n"));
-				if (length<=0)
-				{
-					error(2, "failed to write to telnet client ('%s')",
-						transport_error_to_string((short)length));
-					return FALSE;
-				}
 
-				return result;
+				return client->endpoint!=NULL;
 			}
 
 			client->buffer[length-1] = *character;
@@ -332,8 +369,7 @@ static boolean process_telnet_client_buffer(
 
 					if (hs_compile_and_evaluate(expression))
 					{
-						if (write_endpoint(client->endpoint, "\r\n", 2)<=0)
-							result = FALSE;
+						telnet_client_write(client, "\r\n", 2);
 					}
 				}
 				continue;
@@ -348,28 +384,21 @@ static boolean process_telnet_client_buffer(
 				break;
 
 			case 4:
-				write_endpoint(
-					client->endpoint,
+				telnet_client_write(
+					client,
 					"\r\ngoodbye!\r\n",
 					csstrlen("\r\ngoodbye!\r\n"));
-				delete_transport_endpoint(client->endpoint);
-				client->endpoint = NULL;
-				index = size;
-				continue;
+				telnet_client_disconnect(client);
+
+				return TRUE;
 
 			default:
 				continue;
 			}
 		}
 
-		length = write_endpoint(client->endpoint, character, 1);
-		if (length<=0)
-		{
-			error(2, "failed to write to telnet client ('%s')",
-				transport_error_to_string((short)length));
-			result = FALSE;
-		}
+		telnet_client_write(client, character, 1);
 	}
 
-	return result;
+	return client->endpoint!=NULL;
 }

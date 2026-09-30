@@ -129,6 +129,17 @@ To join a game, do one of these steps:
   `files/join_link.txt`, and the game reads it.
 - Copy the link and go to the game.
 
+On the local network:
+
+- The game uses the address of the Wi-Fi (or of the hotspot of the
+  phone), not the address of the mobile data.
+- The app holds a Wi-Fi multicast lock while the game operates. Some
+  phones otherwise drop the broadcasts that find system link games.
+
+Keep the game in the front during a network game. When the app goes to the
+background, Android stops the game. After 15 seconds the other machines
+drop it, and when it hosts, its players leave.
+
 ## Updates
 
 The app from GitHub Actions can update itself, as on Linux (refer to

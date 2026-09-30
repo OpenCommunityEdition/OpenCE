@@ -179,7 +179,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
-| `debug.telnet_console` | `false` | `HALO_TELNET_CONSOLE` | The game listens on 127.0.0.1, port 23 (telnet), for a script console. The console has no password, so only this computer can reach it. |
+| `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
@@ -361,6 +361,11 @@ Only machines with the invite can find the game:
 - Each packet is encrypted and authenticated, with a different key in each
   direction. A machine ignores a packet that it already received.
 - A machine can send only to the ports of the game on the other machine.
+- The host makes one session from each request of a player. If a person
+  sends a copy of an old request again, the host ignores it. A player that
+  must ask again sends a new request.
+- The host tries to reach at most 8 new players at the same time. The
+  other players ask again.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection
@@ -383,7 +388,12 @@ The game can ask the router to forward the port (UPnP,
 - The forwarded port is one more address that the machine gives to the
   other machine.
 - The forward has a duration of one hour. The game makes it longer while
-  it operates, and removes it when the game stops.
+  it operates. When the game stops normally, it removes the forward. It
+  does not remove the forward after a crash, or if a request to the router
+  is still under way 3 seconds after the game starts to stop. Some routers only make forwards without a duration.
+- When the game finds the router, it removes the forwards to this machine
+  that have the description "Halo internet play" and that no copy of the
+  game uses now (forwards that a copy of the game did not remove).
 - UPnP does not help behind a second NAT, for example the NAT of a mobile
   network provider. Then the router has a private address, and the game
   does not ask.
@@ -392,8 +402,12 @@ To stop all UPnP requests, set `network.allow_upnp` to `false`.
 
 In the game, each machine has an address in 100.64.0.0/10:
 
-- `src/xnet.c` sends the traffic of the game to such an address through
-  local sockets on 127.0.0.1 (or `network.address`).
+- `src/xnet.c` gives the datagrams that the bound UDP sockets of the game
+  send to such an address to `src/p2p.c`. Other datagrams (of sockets that
+  are not bound yet, or that are connected to the address) and the TCP
+  connections of the game go through local sockets on 127.0.0.1 (or
+  `network.address`). The traffic from the other machines comes to the
+  game from local sockets too.
 - `src/p2p.c` sends that traffic through one UDP socket. UDP datagrams go
   as they are. TCP connections go as KCP streams (`port/third_party/kcp`).
 - The broadcasts of the game go to all the machines. Thus the game of the

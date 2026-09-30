@@ -2324,16 +2324,7 @@ static struct widget_instance *ui_widget_launch_widget(
 			!csstrncmp(name, multiplayer_menus, sizeof(multiplayer_menus) - 1) &&
 			!cache_files_multiplayer_region(build))
 		{
-			void platform_log(char const *format, ...);
-			void platform_show_message(char const *title, char const *message);
-			char message[256];
-
-			platform_log("multiplayer is unavailable: maps of build %s are not supported", build);
-			csprintf(
-				message,
-				"Your maps (build %s) aren't supported for multiplayer yet.\n\nAsk in the Discord to get them added.",
-				build);
-			platform_show_message("Halo: multiplayer unavailable", message);
+			cache_files_show_multiplayer_unavailable(NULL, build);
 
 			return NULL;
 		}

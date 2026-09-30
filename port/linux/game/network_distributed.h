@@ -38,13 +38,15 @@ enum
 	_distributed_message_objects_synchronized,
 	/* a client has loaded the game: it wants the host's objects (reliable) */
 	_distributed_message_client_ready,
-	/* damage the host dealt, for its clients' effects (unreliable) */
+	/* damage the host dealt, for its clients' effects (unreliable: to the
+	machines of the players it concerns, a kill to all) */
 	_distributed_message_damage_events,
 	/* a client's own players' hits (reliable) */
 	_distributed_message_hit_reports,
 	/* the vehicle a client's own player drives, every tick (unreliable) */
 	_distributed_message_vehicle_prediction,
-	/* what players picked up, for their clients to show (reliable) */
+	/* what players picked up, for their clients to show (reliable, to
+	each player's machine) */
 	_distributed_message_pickups,
 	/* a client's own players' input, every tick, each tick's buttons with
 	the next ticks' (unreliable) */
@@ -105,10 +107,18 @@ struct distributed_vector
 	short k;
 };
 
+/* (what goes on the wire, as it is on every machine) */
+typedef char distributed_message_header_size_assert[
+	sizeof(struct distributed_message_header) == 8 ? 1 : -1];
+typedef char distributed_message_header_game_time_offset_assert[
+	offsetof(struct distributed_message_header, game_time) == 4 ? 1 : -1];
+typedef char distributed_vector_size_assert[sizeof(struct distributed_vector) == 6 ? 1 : -1];
+
 /* ---------- macros */
 
 /* the entries of a type that fit one unreliable message, in a tick's batch
-(its header, and the message's size and header but for its message header) */
+(its header, and the message's size and header but for its message header);
+a longer message is split where a batch is full */
 #define DATAGRAM_ENTRIES(type) \
 	((short)((DATAGRAM_MAXIMUM_SIZE - 2 * sizeof(struct distributed_message_header) - sizeof(word) + \
 		sizeof(message_header)) / sizeof(type)))
@@ -142,6 +152,17 @@ short distributed_client_machines(long *machine_indices, short maximum);
 /* (the host) how long a message takes that client and its answer back, in
 ticks (and its jitter), as its players' input messages tell */
 real distributed_machine_round_trip_ticks(long machine_index);
+/* (a client) the host's latest tick it has had a message of, NONE for none */
+long distributed_latest_host_time(void);
+/* (a client) how long the host takes to have this machine's players and
+tell it back, in ticks (0 before it is measured) */
+real distributed_own_round_trip_ticks(void);
+/* (the host, in its tick) the client machine a player is on, NONE for none
+(the host's own players') */
+long distributed_player_machine(short player_index);
+/* (the host, in its tick) whether the client's players can see the player
+(or the player is its own, or it has none alive to see with) */
+boolean distributed_machine_sees_player(long machine_index, short player_index);
 /* what a message says, checked: a number finite; a point's parts finite
 and within bound of the origin; an object's index whole (its identifier
 never 0, which any object at the index matches) */
@@ -165,7 +186,9 @@ void network_objects_new_game(void);
 /* after each tick */
 void network_objects_host_tick(void);
 void network_objects_client_tick(void);
-void network_objects_client_ready(long machine_index);
+/* (the host) a client has loaded the game and asks for the host's objects:
+again, having failed to make one of them */
+void network_objects_client_asked(long machine_index, boolean again);
 void network_objects_handle_changes(void const *entries, short count);
 void network_objects_handle_synchronized(void);
 void network_objects_handle_states(void const *entries, short count);

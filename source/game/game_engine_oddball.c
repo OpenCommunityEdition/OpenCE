@@ -659,7 +659,10 @@ static void update_ball_ownership(
 				{
 					struct weapon_datum *weapon = weapon_get(weapon_index);
 
-					oddball_globals.current_ball_owner[weapon->object.owner_team_index] = player_index;
+					/* port: (a client's ball has the team the host's word
+					gives it, which may be none) */
+					if (VALID_INDEX(weapon->object.owner_team_index, MAXIMUM_ODDBALLS))
+						oddball_globals.current_ball_owner[weapon->object.owner_team_index] = player_index;
 				}
 			}
 		}
@@ -727,9 +730,15 @@ static void oddball_engine_player_update(
 
 	game_engine_state_message(player_index, NONE, NONE);
 	/* (a client of the distributed netcode has the host's carriers and
-	scores, game_engine_oddball_read_network_state, and shows the rest) */
-	if (!network_game_distributed_client())
+	scores, game_engine_oddball_read_network_state, and shows the rest;
+	its own players' carrying it takes from the weapon in their hands,
+	which the host sends more often than its state, so the speed the ball
+	gives them follows a pickup or drop at once) */
+	if (!network_game_distributed_client() ||
+		player->local_player_index != NONE)
+	{
 		update_ball_ownership(player_index);
+	}
 	ball_count = player_ball_count(player_index);
 
 	player->speed_multiplier = 1.0f;
@@ -1451,7 +1460,7 @@ long game_engine_oddball_write_network_state(
 	return sizeof(state);
 }
 
-void game_engine_oddball_read_network_state(
+boolean game_engine_oddball_read_network_state(
 	byte const *buffer,
 	long size,
 	boolean first)
@@ -1460,7 +1469,7 @@ void game_engine_oddball_read_network_state(
 	short ball_index;
 
 	if (size != (long)sizeof(state))
-		return;
+		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
 	for (ball_index = 0; ball_index < MAXIMUM_ODDBALLS; ball_index++)
 		oddball_globals.current_ball_owner[ball_index] = distributed_player_from_byte(state.current_ball_owner[ball_index]);
@@ -1491,4 +1500,5 @@ void game_engine_oddball_read_network_state(
 	csmemcpy(oddball_globals.ball_spawn_timer, state.ball_spawn_timer, sizeof(state.ball_spawn_timer));
 	oddball_events.resets = state.resets;
 	oddball_events.touched_resets = state.touched_resets;
+	return TRUE;
 }

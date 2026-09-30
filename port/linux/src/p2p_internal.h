@@ -56,7 +56,8 @@ const unsigned char *p2p_public_key(void);
 /* the identifier of the machine with this public key */
 void p2p_identifier_for(const unsigned char *public_key, unsigned char *identifier);
 /* the X25519 secret this machine shares with the one with that public key;
-0 if the key is unusable (one giving a known secret) */
+0 if the key is unusable (one giving a known secret). The p2p thread's: it
+lets go of the p2p lock while it works it out */
 int p2p_shared_secret(const unsigned char *public_key, unsigned char *shared);
 /* a joiner (on the host) or the host (on a joiner) offered its addresses
 through signalling, with the secret of a session (P2P_SHA256_SIZE bytes) its
@@ -65,6 +66,11 @@ turned away: another session with that machine lives (it must lapse first),
 this one has ended, or there is no room */
 int p2p_peer_offered(const unsigned char *identifier, const unsigned char *secret,
 	const struct p2p_candidate *candidates, int count, int is_host);
+/* whether p2p_peer_offered would turn a new session with that machine away
+now (it is this machine, a session with it lives, there is no room, or, as
+a host, too many players are being reached): checked before its secret is
+worked out */
+int p2p_peer_turned_away(const unsigned char *identifier, int is_host);
 /* ... more addresses of a machine whose session (that secret's) lives: 0 if
 none does (a session that has ended is never taken up again: its keys'
 packet numbers would start again) */
@@ -86,7 +92,9 @@ void p2p_signal_update(const int *read, int read_count, const int *write, int wr
 void p2p_signal_host(const unsigned char *token);
 void p2p_signal_stop_hosting(void);
 /* joining: ask the host with this identifier, holding this token, until it
-answers (or p2p_signal_stop_joining) */
+answers (or p2p_signal_stop_joining); each call asks anew, with a new
+nonce (as after the session with the host ended before the tunnel reached
+it: the host makes one session of a request) */
 void p2p_signal_join(const unsigned char *host_identifier, const unsigned char *token);
 void p2p_signal_stop_joining(void);
 /* whether any broker is connected */

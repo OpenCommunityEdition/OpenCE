@@ -1173,7 +1173,7 @@ static void king_client_score_sounds(
 hill's points itself (not the host's count of them, which the hill's
 drawing indexes by), and who is on the hill and the hill's state (which
 king_calculate_hill_state keeps from what it sees, sounding as it changes) */
-void game_engine_king_read_network_state(
+boolean game_engine_king_read_network_state(
 	byte const *buffer,
 	long size,
 	boolean first)
@@ -1182,7 +1182,7 @@ void game_engine_king_read_network_state(
 	long team_index;
 
 	if (size != (long)sizeof(state))
-		return;
+		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
 	for (team_index = 0; team_index < (long)NUMBEROF(state.score); team_index++)
 	{
@@ -1199,4 +1199,5 @@ void game_engine_king_read_network_state(
 		if (!first)
 			game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 	}
+	return TRUE;
 }

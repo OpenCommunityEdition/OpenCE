@@ -127,6 +127,11 @@ enum
 	MAXIMUM_SERVER_UPDATES = 32,
 	MAXIMUM_CLIENT_UPDATES = 128,
 
+	/* the host's ticks after a client machine's player's last input that
+	the player's input is held: after them it stands still
+	(update_server_next_update) */
+	DISTRIBUTED_INPUT_SILENCE_TICKS = 10,
+
 	/* the one-shot buttons: they fire on the tick they are first seen and stay latched until released */
 	LATCHED_CONTROL_FLAGS =
 		FLAG(_unit_control_integrated_light_bit) |
@@ -253,11 +258,13 @@ static struct
 } update_client_relayed_actions[MAXIMUM_NUMBER_OF_PLAYERS];
 
 /* ... the host: the last tick of each client machine's player's it has
-had (their buttons of that tick and before it are in) */
+had (their buttons of that tick and before it are in), and the host's game
+time when it had it (update_server_next_update: a machine gone silent) */
 static struct
 {
 	boolean valid;
 	long tick;
+	long received_time;
 } update_server_distributed_inputs[MAXIMUM_NUMBER_OF_PLAYERS];
 
 /* ... a client: each local player's last tick, its action, and the buttons
@@ -411,6 +418,23 @@ void update_server_next_update(
 			sizeof(struct player_action));
 		update->update.actions[queue_index].control_flags |= update_server_pending_control_flags[queue_index];
 		update_server_pending_control_flags[queue_index] = 0;
+		/* port: a client machine's player whose input has stopped coming
+		(its network lost, until the host drops it) stands still, its
+		buttons and trigger let go, where it faces: its last input held
+		would walk it off a ledge, or empty its weapon. (A datagram or two
+		lost is not that: the last input is held a third of a second.) */
+		if (update_server_distributed_inputs[queue_index].valid &&
+			game_time_initialized() &&
+			game_time_get() - update_server_distributed_inputs[queue_index].received_time >
+				DISTRIBUTED_INPUT_SILENCE_TICKS)
+		{
+			struct player_action *action = &update->update.actions[queue_index];
+
+			action->throttle.i = 0.f;
+			action->throttle.j = 0.f;
+			action->primary_trigger = 0.f;
+			action->control_flags = 0;
+		}
 		update->update.action_count += 1;
 	}
 	update_client_handle_server_update(&update->update, update_number);
@@ -1079,6 +1103,8 @@ void update_server_handle_distributed_input(
 	{
 		return;
 	}
+	update_server_distributed_inputs[absolute_index].received_time =
+		game_time_initialized() ? game_time_get() : 0;
 	queue->current_action = *action;
 }
 

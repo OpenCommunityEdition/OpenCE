@@ -908,6 +908,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cache/cache_files.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "cseries/errors.h"
@@ -5544,6 +5545,17 @@ static boolean multiplayer_level_select(
 		strtok(automation_map_name, "\n\r \t");
 		map_name = automation_map_name;
 		fclose(file);
+	}
+	/* port: a map of a build this version does not play with others (its
+	objects would not be the same as theirs): said, and the list stays */
+	{
+		char build[0x20];
+
+		if (global_network_game_server_get() && !cache_files_map_plays_multiplayer(map_name, build))
+		{
+			cache_files_show_multiplayer_unavailable(map_name, build);
+			return FALSE;
+		}
 	}
 	main_set_multiplayer_map_name(map_name);
 	game_engine_override_map_name(map_name);

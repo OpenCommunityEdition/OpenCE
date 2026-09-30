@@ -1,5 +1,7 @@
 package com.halo.decomp;
 
+import android.content.Context;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.view.Display;
 import android.view.WindowManager;
@@ -11,6 +13,9 @@ import org.libsdl.app.SDLActivity;
  * loads the game image from the APK's assets.
  */
 public class HaloActivity extends SDLActivity {
+    /** lets system link's broadcasts in over Wi-Fi while the game runs */
+    private WifiManager.MulticastLock multicastLock;
+
     @Override
     protected String[] getLibraries() {
         return new String[] { "SDL3", "main" };
@@ -21,8 +26,36 @@ public class HaloActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         preferHighestRefreshRate();
+        acquireMulticastLock();
         // a new version looked for while the game starts
         Updater.start(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (multicastLock != null && multicastLock.isHeld())
+            multicastLock.release();
+        multicastLock = null;
+        super.onDestroy();
+    }
+
+    /**
+     * Many phones drop the Wi-Fi's broadcast and multicast datagrams to
+     * save power unless an app holds this: without it they would not see
+     * system link games on the local network, nor be seen hosting one.
+     */
+    private void acquireMulticastLock() {
+        try {
+            WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifi == null)
+                return;
+            multicastLock = wifi.createMulticastLock("halo-system-link");
+            multicastLock.setReferenceCounted(false);
+            multicastLock.acquire();
+        } catch (RuntimeException e) {
+            // (no Wi-Fi, or not allowed: the local network may miss games)
+            multicastLock = null;
+        }
     }
 
     /**

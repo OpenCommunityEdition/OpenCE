@@ -32,7 +32,11 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   rubber-band: the host tells the client which of the client's ticks it
   has its player at (its prediction come back), and the client compares
   that with where it had the player at that tick, not now, and moves the
-  player by the difference, keeping what they did since.
+  player by the difference, keeping what they did since. The host takes a
+  client's player where the client says within a tolerance of its own,
+  and no further from where it last took them than a player moves in the
+  client's ticks since (so the tolerance is not gained again each tick);
+  a teleporter, which moves the host's own copy too, starts afresh.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, the target where
   the host had it when the shooter saw it, no faster than weapons fire) and
@@ -57,7 +61,11 @@ each player in its slot of the host's player list on every machine;
 version 4 plays the European (PAL) maps as the North American ones
 (`port/linux/game/pal_tags.c`); version 5 corrects a client's own player
 against where it had them at the tick the host has them at, and checks
-what the machines send each other more closely.
+what the machines send each other more closely; version 6 sends a unit's
+state and a player's input without the parts that are their defaults, fills
+each datagram, sends damage and pickups only to the machines they concern,
+stamps a hit with the host's tick the client had heard of, and checks hits
+and a client's own player's moves more closely.
 
 ## Joining a game in progress
 
@@ -113,14 +121,18 @@ a pregame keep-alive every five seconds from the host
      host takes it), and when dead who killed it;
    - what a client's players pick up, which the host decides: the client
      shows it (the HUD's message, the sound, a powerup's screen flash);
-   - twice a second and with every kill, the players' statistics; five
-     times a second, the game type's state (scores, the flags, the balls
-     and their carriers, the king's hill, the players' speeds) and whether
-     the game is over. It counts the game type's events (captures, grabs
-     and returns of the flags, laps, the balls reset), and a client
-     announces those it has not had, as the host does its own; a client
-     runs the rest of the game type's update that only shows the game
-     (waypoints, messages, sounds, a carrier's speed).
+     only that client is told;
+   - twice a second and with every kill, the players' statistics that
+     changed (once a second a few more, round them all, as the message is
+     unreliable); when it changes (looked at five times a second) and once a
+     second, the game type's state (scores, the flags, the balls and their
+     carriers, the king's hill, the players' speeds) and whether the game is
+     over. A machine that has loaded is sent all of both at once. It counts
+     the game type's events (captures, grabs and returns of the flags,
+     laps, the balls reset), and a client announces those it has not had,
+     as the host does its own; a client runs the rest of the game type's
+     update that only shows the game (waypoints, messages, sounds, a
+     carrier's speed).
 
    The messages are a kind of their own (the game's unused "data" message
    type), unreliable per tick, reliable for what must not be lost.
@@ -140,41 +152,74 @@ a pregame keep-alive every five seconds from the host
      indices from the upper half of the object array, clear of the host's.
    - Ten times a second, what every unit carries (the host's weapons, slot
      for slot, their ammunition, the weapon in hand, the grenades); a
-     client moves the same weapon objects in and out of its units.
+     client moves the same weapon objects in and out of its units. A
+     change of weapons or grenades goes to every client at once; one of
+     ammunition only to the unit's player's machine at once, and to the
+     others as often as they are sent that player. A client takes its own
+     players' ammunition and grenade counts from the host only once a
+     round trip has passed since it last fired, reloaded or threw (what
+     the host says before then is from before). How old what a unit
+     carries is travels in 16 bits.
    - Players take the units the host spawns them with, seats are the
      host's (a client's own player's once it has ridden otherwise for
      longer than a round trip), and the CTF flags and oddballs are the same
      objects everywhere.
-4. (Done) Corrections: every tick the host sends where its moving objects
-   are (vehicles, items, bodies) and a few of those at rest, round them
-   all. A client puts its copies there, and the difference is drawn fading
-   over a few ticks (`render_interpolation.c`) instead of a jump. A client
-   drives its own player's vehicle and sends where it is, which the host
-   takes within a tolerance, as it does its own player's unit.
+4. (Done) Corrections: the host sends each client where its moving objects
+   are (vehicles, items, bodies) as often as they are near that client's
+   nearest player (every tick within 25 world units, every second within
+   60, every third within 120, every fourth further off), once more to
+   every client as an object comes to rest, and a few of those at rest,
+   round them all. A client puts its copies there, and the difference is
+   drawn fading over a few ticks (`render_interpolation.c`) instead of a
+   jump. A client drives its own player's vehicle and sends where it is,
+   which the host takes within a tolerance, as it does its own player's
+   unit, and no further from where it last took it than the vehicle moves
+   in the client's ticks since (its speed, the host's copy's or twice the
+   tag's top speed, whichever is more, no more than 3 world units a tick,
+   and a tenth more a tick, with the blend distance; a teleporter falls
+   back to the tolerance). The host sends the client its own vehicle
+   every third tick, with the client's tick it took the vehicle at
+   (`_distributed_object_predicted_bit` and a 16-bit time in the object's
+   state); the client compares that with where it had the vehicle at that
+   tick, and past 4 world units moves it by the difference, as it does
+   its own player's unit.
 5. (Done) Hits (`port/linux/game/network_damage.c`):
    - A client deals no damage. What its own players' shots, grenades,
-     melee and vehicles hit, it reports to the host (reliably).
+     melee and vehicles hit, it reports to the host (reliably), with the
+     host's latest tick it had heard of when it made the report.
    - The host deals a report once it has checked it: from that machine's
      player; damage one of their weapons (now or in the last ten seconds),
      their grenades (while they have them, and for a while after) or
      their vehicle (a driver's or gunner's) can deal (its projectiles'
-     impacts and detonations, followed through the tags); the target
-     within a few world units of where the shooter saw it (more for a
-     fast one); the impact at the target (an explosion within its
-     reach); and no more reports than the weapon that deals them fires
-     (its rate of fire and projectiles a shot, with a margin; an
-     explosion's hits count as one). The damage is dealt as a client's
-     own hit can be: only the flags such a hit has, and the host's
-     multiplier, team and owner, not the report's, and a report with a number that is not finite, or a node,
-     region or material the target does not have, is refused. Its own
-     copies of a client's projectiles deal nothing (the report does).
+     impacts and detonations, followed through the tags), no harder than
+     it can be (all of it, but an airborne melee blow's half again); the
+     target within a few world units of where the host had it at the tick
+     the report was made at (a player's unit or vehicle: the host keeps a
+     second of where they were) or of where it is (more for a fast one);
+     a melee blow from where the host had the player; the impact at the
+     target (an explosion within its reach); and no more reports than the
+     weapon that deals them fires (its rate of fire and projectiles a
+     shot, with a margin; an explosion's hits count as one, when its
+     damage has a reach, and no object is hit twice by one). A report made
+     more than three seconds ago (a burst of them held back while the
+     network was out) is refused. A report is paid for before the host
+     looks through its history, so a flood of them costs the sender its
+     hits. The damage is dealt as a client's own hit can be: only the
+     flags such a hit has, and the host's multiplier and team, not the
+     report's, its owner the player's unit (or the vehicle it rides, or
+     a unit of theirs); a report with a number that is not finite, or a
+     node, region or material the target does not have, is refused. Its
+     own copies of a client's projectiles deal nothing (the report does).
    - The host sends its clients the damage it dealt to units, and a client
      replays what it does besides the harm (which the units' states
      bring): the player's screen flash and shake, the unit's flinch, pain
      sound, knockback and stun, the scope it knocks the player out of, and
      who the HUD shows hit them. A killing blow it replays whole, so the
      body falls as the shot had it and the kill is announced with the
-     host's killer.
+     host's killer. A killing blow goes to every client; other damage to
+     the machines of the unit's player, its riders and the damage's owner,
+     and of the clients sent that player this tick (who can see them); a
+     player's screen effects to that player's machine alone.
 
 ## Transport
 
@@ -199,27 +244,45 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   own client update, whose input the host no longer takes, goes ten times
   a second instead of sixty; the host takes its own players' input at
   each of its ticks.
-- **One datagram a tick.** The unreliable messages of a tick to a machine
-  go together (`_distributed_message_batch`), saving each one's headers
-  (internet play's tunnel adds 31 bytes to every datagram).
+- **As few datagrams a tick as they fill.** The unreliable messages of a
+  tick to a machine go together (`_distributed_message_batch`), saving each
+  one's headers (internet play's tunnel adds 36 bytes to every datagram: 15
+  of its header, 16 of its tag and 5 of its own inside), each message split
+  between two where one is full, so none goes out part empty; the machines'
+  datagrams go in a turn that starts one further each tick.
 - **Stamped with their tick.** Every message carries the sender's tick
-  (its header's game time); an unreliable one that arrives after a newer of
-  its kind is dropped, so a late datagram never puts anything back.
+  (its header's game time); an unreliable one (the units, the input, the
+  objects, the statistics, what units carry, the damage) that arrives after
+  a newer of its kind is dropped, so a late datagram never puts anything
+  back.
 - **Taken at the tick.** The host takes a client's players' and vehicles'
   positions (the latest of each) at its next tick, not as each arrives.
 - **Fewer bytes.** Vectors travel in 16 bits a part, shields and health in
-  16 bits; what a unit carries is sent when it changes (and once a second);
-  the objects at rest are sent round all of them, four a tick; the players'
-  statistics when they change (with every kill, twice a second), with
-  sixteen more players' each time round them all.
+  16 bits; a unit's state goes without the parts that are their defaults
+  (the vehicle and seat of one that rides nothing, the position of one that
+  rides, its up when straight up, the damage its shields and body show,
+  powerups and camouflage when it has none, the tick its own client
+  predicted it at to any other client), 35 bytes for a player on foot
+  instead of 64; a player's input goes with its tick's update once a
+  message, and the buttons of the three ticks before only where they
+  differ from the tick after (14 to 20 bytes instead of 24); what a unit
+  carries is sent when it changes (and once a second); the moving objects
+  as often as they are near the client's players, the objects at rest
+  round all of them, four a tick; the players' statistics when
+  they change (with every kill, twice a second), with sixteen more
+  players' once a second round them all; the game type's state when it
+  changes, and once a second.
 - **The players each client needs, when it needs them.** The host sends a
   client every player's unit and input every tick when they are within 25
   world units of the client's own players, every second tick within 60,
   every third within 120, every fourth further off, and every sixth when no
   cluster of the client's players' can see theirs (the map's potentially
   visible set, which errs on the side of seeing: Halo's are coarse, and
-  most of a map sees most of it). None is ever left out. Whatever changes
-  what a client sees goes at once:
+  most of a map sees most of it) or they are dead. A client whose players
+  are dead is sent the others as from where its players last were alive.
+  None is ever left out, but a player who has left the game, whose unit
+  goes only when it changes, and a dead player's input, which drives
+  nothing. Whatever changes what a client sees goes at once:
   - a player's death, spawn or seat, and a player coming into sight;
   - a player's input every tick while their buttons or weapon choices
     change (the ticks it carries), so no jump, grenade or melee of theirs
@@ -233,10 +296,14 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   has its own).
 - **The round trip.** A client's input messages tell the host the latest
   host tick the client has had, which gives the host each client's round
-  trip (smoothed as TCP smooths its own). The host keeps a second of where
-  players' units and vehicles were, and checks a client's hit against where
-  the target was as far back as that round trip (half a second at most),
-  instead of against where it is now with a wide margin.
+  trip (smoothed as TCP smooths its own, once a message). The host keeps a
+  second (32 ticks) of where players' units and vehicles were, and checks a
+  client's hit against where the target was from the host tick the client
+  had last heard of when it made the report (three ticks more), instead of
+  against where it is now with a wide margin: however long the report
+  took to come (the reliable channel's resending holds it up), that is
+  when the shooter saw the target (as far back as the host keeps). A
+  report made more than three seconds ago is refused.
 
 ## Testing
 

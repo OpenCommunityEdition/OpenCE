@@ -20,6 +20,9 @@ and the debug keyboard that the game's console reads.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_WIN32) && !defined(HALO_ANDROID)
+#include <signal.h>
+#endif
 
 static SDL_Window *platform_window;
 static SDL_GLContext platform_gl_context;
@@ -52,6 +55,12 @@ BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+#if !defined(_WIN32) && !defined(HALO_ANDROID)
+	/* a write to a connection the other end closed fails instead of ending
+	the game (the game's sockets and Discord's pass MSG_NOSIGNAL, but UPnP's
+	miniupnpc does not, nor does a write to a closed pipe's standard error) */
+	signal(SIGPIPE, SIG_IGN);
+#endif
 	/* a copy of the game started to open an invite link hands it to the
 	one already running, and goes */
 	if (p2p_hand_off_invite())

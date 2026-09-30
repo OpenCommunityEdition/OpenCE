@@ -298,6 +298,7 @@ static struct
 
 static void ctf_show_capture(long player_index, long team_index);
 static void ctf_show_grab(long player_index);
+static void ctf_client_flag_failure_update(long player_index);
 static void ctf_show_touch_return(long player_index);
 static void ctf_show_untouched_return(long team_index);
 
@@ -576,9 +577,13 @@ static void ctf_engine_player_update(
 		game_engine_player_depower_active_camo(player_index);
 
 	/* (a client of the distributed netcode has the host's captures and
-	scores: game_engine_ctf_read_network_state) */
+	scores: game_engine_ctf_read_network_state; it sounds the failure
+	its own players hear) */
 	if (network_game_distributed_client())
+	{
+		ctf_client_flag_failure_update(player_index);
 		return;
+	}
 
 	unit_index = player->unit_index;
 	if (unit_index != NONE)
@@ -1319,6 +1324,49 @@ static void ctf_flag_failure_sound(
 	return;
 }
 
+/* port: a client of the distributed netcode: the failure its own player
+hears who brings the enemy flag home while their own is away, as
+ctf_engine_player_update sounds it on the host (from the flag warning the host
+sends, its record of the flag taken). The failure
+of touching one's own flag away from home when it must be reset
+(ctf_weapon_pickup) is not sounded: the pickup is the host's */
+static void ctf_client_flag_failure_update(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	struct unit_datum *unit;
+	long weapon_index;
+	long team_index = player->team_index;
+
+	if (player->local_player_index == NONE ||
+		player->unit_index == NONE ||
+		!VALID_INDEX(team_index, NUMBER_OF_CTF_TEAMS) ||
+		!game_engine_can_score() ||
+		!game_engine_get_variant()->game_engine_variant.ctf.flag_at_home_to_score ||
+		game_engine_get_variant()->game_engine_variant.ctf.single_flag_time != 0)
+	{
+		return;
+	}
+	unit = unit_get(player->unit_index);
+	if (unit->unit.current_weapon_index == NONE)
+		return;
+	weapon_index = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
+	if (weapon_index == NONE ||
+		!weapon_is_flag(weapon_index) ||
+		weapon_get(weapon_index)->object.owner_team_index == team_index ||
+		!ctf_position_near_flag(team_index, &unit->object.position, 1.0f))
+	{
+		return;
+	}
+	/* the player's own flag taken and not yet back: the host's word, its
+	warning (set by the enemy's grab, cleared by the flag's return, as its
+	handled bit), in the same state as the captures */
+	if (ctf_globals.flag_warnings[team_index])
+		ctf_flag_failure_sound(player_index);
+
+	return;
+}
+
 static long ctf_find_flag_carrier(
 	long weapon_index)
 {
@@ -1542,7 +1590,7 @@ long game_engine_ctf_write_network_state(
 	return sizeof(state);
 }
 
-void game_engine_ctf_read_network_state(
+boolean game_engine_ctf_read_network_state(
 	byte const *buffer,
 	long size,
 	boolean first)
@@ -1551,8 +1599,12 @@ void game_engine_ctf_read_network_state(
 	short flag_index;
 
 	if (size != (long)sizeof(state))
-		return;
+		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	/* the scores first: a capture's message shows them (ctf_show_capture) */
+	csmemcpy(ctf_globals.weapon_indices, state.weapon_indices, sizeof(state.weapon_indices));
+	csmemcpy(ctf_globals.scores, state.scores, sizeof(state.scores));
+	ctf_globals.flag_swap_timer = state.flag_swap_timer;
 	/* the flags' teams: a single flag the host swapped shows as the host's
 	swap did (ctf_engine_weapon_update) */
 	for (flag_index = 0; flag_index < NUMBER_OF_CTF_TEAMS; flag_index++)
@@ -1623,7 +1675,5 @@ void game_engine_ctf_read_network_state(
 		if (warning != ctf_globals.flag_warnings[flag_index])
 			ctf_set_flag_warning(flag_index, warning);
 	}
-	csmemcpy(ctf_globals.weapon_indices, state.weapon_indices, sizeof(state.weapon_indices));
-	csmemcpy(ctf_globals.scores, state.scores, sizeof(state.scores));
-	ctf_globals.flag_swap_timer = state.flag_swap_timer;
+	return TRUE;
 }

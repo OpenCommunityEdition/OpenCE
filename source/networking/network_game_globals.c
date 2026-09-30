@@ -266,16 +266,16 @@ boolean network_distributed_client_send(
 	void *message,
 	word size)
 {
-	struct transport_address remote_server_address;
 	byte buffer[0x1000];
 
 	if (!global_network_game_client || size > sizeof(buffer))
 		return FALSE;
 	/* (the write swaps the header in place) */
 	csmemcpy(buffer, message, size);
-	network_game_client_get_remote_server_address(global_network_game_client, &remote_server_address);
+	/* (no address: the client's datagram socket is connected to the host,
+	network_connection_connect, and sends there) */
 	return network_game_client_write(network_game_client_get_connection(global_network_game_client),
-		(message_header *)buffer, size, &remote_server_address, 0);
+		(message_header *)buffer, size, NULL, 0);
 }
 
 /* ... reliably (a client's players' hits, network_damage.c) */
@@ -580,7 +580,6 @@ boolean network_game_client_end_frame(
 {
 	struct player_action_collection update;
 	struct client_game_update_message message;
-	struct transport_address remote_server_address;
 	unsigned long now;
 	message_header *encoded_message;
 	boolean result;
@@ -618,14 +617,13 @@ boolean network_game_client_end_frame(
 				sizeof(message));
 			if (encoded_message)
 			{
-				network_game_client_get_remote_server_address(
-					global_network_game_client,
-					&remote_server_address);
+				/* (to the host: the client's datagram socket is connected to
+				it, network_distributed_client_send) */
 				result = network_game_client_write(
 					network_game_client_get_connection(global_network_game_client),
 					encoded_message,
 					GET_MESSAGE_SIZE(*encoded_message),
-					&remote_server_address,
+					NULL,
 					0);
 				if (!result)
 					network_event("failed to send a game update to the server");

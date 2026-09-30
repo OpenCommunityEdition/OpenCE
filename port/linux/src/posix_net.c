@@ -336,6 +336,10 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	urgent data */
 	static const short events[3] = { POLLIN, POLLOUT, POLLPRI };
 	static const short ready[3] = { POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI };
+	/* (larger sets, as internet play's thread waits on, in a buffer each
+	thread keeps: not one allocation each time) */
+	static __thread struct pollfd *buffer;
+	static __thread int buffer_size;
 	int *lists[3] = { read, write, error };
 	int *counts[3] = { read_count, write_count, error_count };
 	struct pollfd stack[256];
@@ -354,12 +358,19 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	}
 	if (total > (int)(sizeof(stack) / sizeof(*stack)))
 	{
-		descriptors = malloc(sizeof(*descriptors) * (size_t)total);
-		if (!descriptors)
+		if (total > buffer_size)
 		{
-			errno = ENOMEM;
-			return fail();
+			struct pollfd *larger = realloc(buffer, sizeof(*buffer) * (size_t)total);
+
+			if (!larger)
+			{
+				errno = ENOMEM;
+				return fail();
+			}
+			buffer = larger;
+			buffer_size = total;
 		}
+		descriptors = buffer;
 	}
 	total = 0;
 	for (list = 0; list < 3; list++)
@@ -383,12 +394,7 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 		}
 	}
 	if (result < 0)
-	{
-		fail();
-		if (descriptors != stack)
-			free(descriptors);
-		return -1;
-	}
+		return fail();
 	result = 0;
 	total = 0;
 	for (list = 0; list < 3; list++)
@@ -420,8 +426,6 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 			*counts[list] = kept;
 		result += kept;
 	}
-	if (descriptors != stack)
-		free(descriptors);
 	/* like Winsock, a select with nothing ready leaves the last error as it
 	was: after a connect under way, still WSAEWOULDBLOCK, which the game
 	reads as not connected yet */
@@ -430,16 +434,53 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	return result;
 }
 
-posix_ulong posix_local_ipv4_address(void)
+/* the first IPv4 address of an interface that is up, running, not
+loopback and has these flags; or 0 */
+static posix_ulong interface_address(unsigned int flags)
 {
 	struct ifaddrs *addresses, *entry;
+	posix_ulong result = 0;
+
+	if (getifaddrs(&addresses) != 0)
+		return 0;
+	for (entry = addresses; entry; entry = entry->ifa_next)
+	{
+		if (entry->ifa_addr && entry->ifa_addr->sa_family == AF_INET &&
+			(entry->ifa_flags & (IFF_UP | IFF_RUNNING | flags)) == (IFF_UP | IFF_RUNNING | flags) &&
+			!(entry->ifa_flags & IFF_LOOPBACK))
+		{
+			struct sockaddr_in *address = (struct sockaddr_in *)entry->ifa_addr;
+
+			if ((ntohl(address->sin_addr.s_addr) >> 24) != 127)
+			{
+				result = address->sin_addr.s_addr;
+				break;
+			}
+		}
+	}
+	freeifaddrs(addresses);
+	return result;
+}
+
+posix_ulong posix_local_ipv4_address(void)
+{
 	struct sockaddr_in route;
 	socklen_t length = sizeof(route);
 	posix_ulong result = 0;
-	int probe = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	int probe;
 
+#ifdef __ANDROID__
+	/* a phone's default route may be its mobile data (on Wi-Fi without the
+	internet, or sharing its connection), which the local network cannot
+	reach: first the local network's interface (Wi-Fi, or the one it
+	shares its connection on), which alone of them has broadcasts */
+	result = interface_address(IFF_BROADCAST);
+	if (result)
+		return result;
+#endif
 	/* the address the default route leaves from: a UDP socket "connected"
 	to an internet address (a documentation one; nothing is sent) has it */
+	probe = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 	if (probe >= 0)
 	{
 		memset(&route, 0, sizeof(route));
@@ -454,27 +495,9 @@ posix_ulong posix_local_ipv4_address(void)
 		}
 		close(probe);
 	}
-	if (result || getifaddrs(&addresses) != 0)
-		return result;
 	/* no route out (a network without the internet): the first interface
 	that is up, running and not loopback */
-	for (entry = addresses; entry; entry = entry->ifa_next)
-	{
-		if (entry->ifa_addr && entry->ifa_addr->sa_family == AF_INET &&
-			(entry->ifa_flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP | IFF_RUNNING) &&
-			!(entry->ifa_flags & IFF_LOOPBACK))
-		{
-			struct sockaddr_in *address = (struct sockaddr_in *)entry->ifa_addr;
-
-			if ((ntohl(address->sin_addr.s_addr) >> 24) != 127)
-			{
-				result = address->sin_addr.s_addr;
-				break;
-			}
-		}
-	}
-	freeifaddrs(addresses);
-	return result;
+	return result ? result : interface_address(0);
 }
 
 void posix_random_bytes(void *buffer, posix_ulong size)
