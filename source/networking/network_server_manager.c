@@ -1000,9 +1000,12 @@ void network_game_server_dispose(
 	}
 
 	/* port: no longer waiting for the machines to load: a machine dropped
-	below, the last the others waited for, would start the game, whose local
-	client (and its loaded game) is gone */
+	below, the last the others waited for, or the last to say it has loaded,
+	would start the game, whose local client (and its loaded game) is gone;
+	and no longer open */
 	server->time_of_first_client_loading_completion = 0;
+	server->sent_start_game_message = FALSE;
+	SET_FLAG(server->flags, _network_game_server_game_open_bit, FALSE);
 	if (!network_game_server_handle_client_machines(server))
 	{
 		error(

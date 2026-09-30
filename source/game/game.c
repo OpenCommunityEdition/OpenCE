@@ -312,6 +312,9 @@ void game_tick(
 		0x28D,
 		game_globals->active);
 
+	/* port: a client of another's game, the host's rules (its own cheats and
+	game speed, set before it joined too, put back) */
+	cheats_network_client_enforce();
 	remove_quitting_players_from_game();
 	game_allegiance_update();
 	units_update();

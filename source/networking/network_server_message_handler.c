@@ -286,6 +286,9 @@ enum
 	NETWORK_GAME_NAME_LENGTH = 16,
 	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	NUMBER_OF_MULTIPLAYER_TEAMS = 2,
+	/* port: the least time between two advertisements of the game
+	(milliseconds: network_game_server_handle_message_client_broadcast_game_search) */
+	GAME_ADVERTISEMENT_INTERVAL = 250,
 };
 
 enum
@@ -1501,16 +1504,23 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 	struct message_client_broadcast_game_search *client_message)
 {
 	boolean result = TRUE;
+	/* port: the advertisement is broadcast (to every internet play peer
+	too): one each so often answers every machine searching, and a flood of
+	searches no more */
+	static unsigned long last_advertised_time = 0;
+	unsigned long now = system_milliseconds();
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
 		0x21F,
 		server && source_address && client_message);
-
 	if (client_message->version == NETWORK_GAME_MESSAGE_VERSION)
 	{
 		struct network_game *game = network_game_server_get_game(server);
 
+		/* (the time taken only by a search answered) */
+		if (game && last_advertised_time && now - last_advertised_time < GAME_ADVERTISEMENT_INTERVAL)
+			return TRUE;
 		if (game)
 		{
 			struct message_server_game_advertise advertisement = {0};
@@ -1584,6 +1594,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 				struct network_connection *connection =
 					network_game_server_get_connection(server);
 
+				last_advertised_time = now ? now : 1;
 				result = network_game_server_write(
 					connection,
 					reply,

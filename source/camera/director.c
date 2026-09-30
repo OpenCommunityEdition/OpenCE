@@ -137,6 +137,9 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -700,7 +703,10 @@ static void director_choose_camera_game(
 		struct player_datum *player = player_get(local_player_get_player_index(local_player_index));
 		boolean use_dead_camera = player->unit_index == NONE && player->statistics.deaths > 0;
 
-		if (key)
+		/* (port: not a client in another's game, the host's rules: a flying
+		camera would see all of it, and one behind the player round its
+		corners) */
+		if (key && !network_game_distributed_client())
 			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
 		if (!*director_camera_scripted)
 		{

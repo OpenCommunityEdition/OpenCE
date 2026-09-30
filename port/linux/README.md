@@ -242,6 +242,11 @@ To see the frame rate:
 1. Push \` to open the developer console.
 2. Enter `display_framerate true`.
 
+In the game of another host, the console runs only the commands that change
+nothing of the game (such as `display_framerate`), and the game puts back
+cheats, the game speed and the settings of the drawing that show more of
+the world (such as `rasterizer_wireframe`). Refer to `NETCODE.md`.
+
 The frame rate shows at the bottom right of the screen. It is the mean over
 half a second.
 
