@@ -241,6 +241,8 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     )
     n.build(outputs=libsdl, rule="macos_sdl3", implicit=[SDL_DIR / "CMakeLists.txt"])
     n.rule(name="macos_copy", command="mkdir -p $$(dirname $out) && cp $in $out", description="MACOS STAGE $out")
+    n.rule(name="macos_thin", command="mkdir -p $$(dirname $out) && lipo $in -thin $arch -output $out",
+           description="MACOS STAGE $out")
     # the bundle's icon, from the Android app's artwork (port/android/art)
     n.rule(name="macos_icon", command="mkdir -p $$(dirname $out) && $python tools/macos_icon.py $out",
            description="MACOS ICON $out")
@@ -543,8 +545,10 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
 
     # ---------- staging: SDL3 and ANGLE next to the executable
 
+    # SDL3 is built for both; each build stages its own architecture only
+    # (the native one has no Intel code, which Rosetta would run)
     staged = [stage / "libSDL3.0.dylib"]
-    n.build(outputs=staged[0], rule="macos_copy", inputs=libsdl)
+    n.build(outputs=staged[0], rule="macos_thin", inputs=libsdl, variables={"arch": host_arch})
     for name in ("libEGL.dylib", "libGLESv2.dylib"):
         n.build(outputs=stage / name, rule="macos_copy", inputs=angle / name)
         staged.append(stage / name)
