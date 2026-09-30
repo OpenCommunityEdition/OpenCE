@@ -4,10 +4,12 @@ NETWORK_TEST.C
 Automated system link sessions for testing the netcode without the menus
 (debug.network_test in config.toml, HALO_NETWORK_TEST):
 
-- "host:<map>[:<variant>]" hosts a game on that multiplayer map
-  (bloodgulch, ...) with one of the built-in game variants (slayer by
-  default; game_engine_get_variant_by_name), as the pregame screen's fast
-  setup does, and starts it debug.network_test_start seconds later;
+- "host:<map>[:<variant>[,<variant>...]]" hosts a game on that
+  multiplayer map (bloodgulch, ...) with one of the built-in game variants
+  (slayer by default; game_engine_get_variant_by_name), as the pregame
+  screen's fast setup does, and starts it debug.network_test_start seconds
+  later; with more variants, once a game is over (debug.network_test_score
+  makes it short) the next, as the host's button on the scores does;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
 
@@ -49,6 +51,7 @@ Called from the main loop every frame (main.c).
 #include "camera/observer.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -79,6 +82,11 @@ static struct
 	short mode;
 	char map_name[64];
 	char variant_name[64];
+	/* ... the variant of this game, of variant_name's list; and the seconds
+	the last game's scores have been shown */
+	short variant_index;
+	real postgame_seconds;
+	boolean game_over;
 	real start_delay;
 	real menu_seconds;
 	boolean set_up;
@@ -96,6 +104,31 @@ static struct
 	long score_to_win;
 	long logged_time;
 } network_test;
+
+/* the variant at the index of the list (copied to name), FALSE past its end */
+static boolean network_test_variant(
+	short index,
+	char *name,
+	size_t size)
+{
+	char const *variant = network_test.variant_name;
+
+	for (; index > 0 && variant; index--)
+	{
+		variant = strchr(variant, ',');
+		if (variant)
+			variant++;
+	}
+	if (!variant || !*variant)
+		return FALSE;
+	if (name)
+	{
+		size_t length = strcspn(variant, ",");
+
+		snprintf(name, size, "%.*s", (int)length, variant);
+	}
+	return TRUE;
+}
 
 static void network_test_read_settings(
 	void)
@@ -131,6 +164,26 @@ static void network_test_read_settings(
 		platform_log("network test: %s", setting);
 }
 
+/* appends to a line, cut short when it is full */
+static void network_test_append(
+	char *line,
+	int size,
+	int *length,
+	char const *format,
+	...)
+{
+	va_list arguments;
+	int written;
+
+	if (*length >= size - 1)
+		return;
+	va_start(arguments, format);
+	written = vsnprintf(line + *length, (size_t)(size - *length), format, arguments);
+	va_end(arguments);
+	if (written > 0)
+		*length = MIN(*length + written, size - 1);
+}
+
 /* every player's unit, as this machine sees it */
 static void network_test_log_players(
 	void)
@@ -140,8 +193,9 @@ static void network_test_log_players(
 	char line[4096];
 	int length = 0;
 
+	line[0] = 0;
 	data_iterator_new(&iterator, player_data);
-	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL && length < (int)sizeof(line) - 96)
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
 		if (player->unit_index != NONE)
 		{
@@ -153,7 +207,7 @@ static void network_test_log_players(
 			struct object_datum *placed = object->object.parent_object_index != NONE ?
 				object_get(object->object.parent_object_index) : object;
 
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s%s g%d/%d w",
+			network_test_append(line, (int)sizeof(line), &length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s%s g%d/%d w",
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), placed->object.position.x,
 				placed->object.position.y, placed->object.position.z, object->object.body_vitality,
 				object->object.shield_vitality, placed != object ? " riding" : "",
@@ -161,7 +215,7 @@ static void network_test_log_players(
 				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
 			/* where it aims (yaw and pitch, degrees), its animation state and
 			how hard it is moving */
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
+			network_test_append(line, (int)sizeof(line), &length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
 				atan2(unit->unit.aiming_vector.j, unit->unit.aiming_vector.i) * 57.29578,
 				asin(PIN(unit->unit.aiming_vector.k, -1.0f, 1.0f)) * 57.29578,
 				atan2(object->object.forward.j, object->object.forward.i) * 57.29578,
@@ -178,7 +232,7 @@ static void network_test_log_players(
 				{
 					struct weapon_datum *weapon = weapon_get(weapon_index);
 
-					length += snprintf(line + length, sizeof(line) - (size_t)length, " %lx:%d",
+					network_test_append(line, (int)sizeof(line), &length, " %lx:%d",
 						(unsigned long)weapon->definition_index & 0xFFFF, weapon->weapon.magazines[0].rounds_total +
 						weapon->weapon.magazines[0].rounds_loaded);
 				}
@@ -186,11 +240,11 @@ static void network_test_log_players(
 		}
 		else
 		{
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: dead",
+			network_test_append(line, (int)sizeof(line), &length, " player %ld: dead",
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index));
 		}
 		/* the game type's score and the kills and deaths */
-		length += snprintf(line + length, sizeof(line) - (size_t)length, " s%ld k%d d%d f%d t%ld m%d",
+		network_test_append(line, (int)sizeof(line), &length, " s%ld k%d d%d f%d t%ld m%d",
 			game_engine && game_engine->get_player_score ?
 				game_engine->get_player_score(iterator.datum_index, _get_score_individual) : -1L,
 			player->statistics.kills[0], player->statistics.deaths, player->statistics.friendly_fire_kills, (long)player->team_index,
@@ -226,10 +280,12 @@ static void network_test_log_players(
 		long local_player_index = local_player_get_player_index(0);
 		struct observer_result const *camera = observer_get_camera(0);
 
-		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s | sent %ld received %ld corrected %ld"
+		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
 			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
-			game_engine_can_score() ? "playing" : "game over", sent, received, corrections,
+			game_engine_can_score() ? "playing" : "game over",
+			game_engine_running() ? (long)game_engine_get_variant()->universal_variant.score_to_win : 0L,
+			sent, received, corrections,
 			sent_reports, dealt_reports, rejected_reports, replayed_events,
 			local_player_index == NONE ? -1L : (long)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player_index),
 			camera ? camera->position.x : 0.0f, camera ? camera->position.y : 0.0f, camera ? camera->position.z : 0.0f,
@@ -479,7 +535,7 @@ void network_test_update(
 		network_test.logged_time = game_time_get();
 		network_test_log_players();
 		if (network_test.shoot_interval > 0.0f &&
-			game_time_get() % (long)(network_test.shoot_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+			game_time_get() % MAX(1, (long)(network_test.shoot_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{
 			network_test_shoot();
 		}
@@ -523,7 +579,7 @@ void network_test_update(
 		/* debug.network_test_kill: the host kills the last player every so
 		often, to test deaths and respawns reaching the clients */
 		if (network_test.mode == _network_test_host && network_test.kill_interval > 0.0f &&
-			game_time_get() % (long)(network_test.kill_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+			game_time_get() % MAX(1, (long)(network_test.kill_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{
 			struct data_iterator iterator;
 			struct player_datum *player;
@@ -551,6 +607,8 @@ void network_test_update(
 				{
 					struct object_iterator objects;
 					struct unit_datum *unit = unit_get(first->unit_index);
+					long held_index = unit->unit.weapon_object_indices[0];
+					long held_definition_index = held_index != NONE ? weapon_get(held_index)->definition_index : NONE;
 
 					object_iterator_new(&objects, _object_mask_weapon, 0);
 					while (object_iterator_next(&objects))
@@ -558,7 +616,7 @@ void network_test_update(
 						struct weapon_datum *weapon = weapon_get(objects.index);
 
 						if (weapon->object.parent_object_index == NONE &&
-							weapon->definition_index != weapon_get(unit->unit.weapon_object_indices[0])->definition_index)
+							weapon->definition_index != held_definition_index)
 						{
 							if (unit_add_weapon_to_inventory(first->unit_index, objects.index, TRUE))
 								platform_log("network test: the first player picks up a weapon");
@@ -569,6 +627,55 @@ void network_test_update(
 					unit->unit.grenade_counts[1] = 2;
 				}
 			}
+		}
+	}
+
+	/* the next game of the list: once the scores have been shown a while,
+	the host's button (the bots may press it first) */
+	if (network_test.mode == _network_test_host && network_test.started && game_engine_running() &&
+		!main_menu_loaded && !game_engine_can_score())
+	{
+		network_test.game_over = TRUE;
+		if (game_engine_showing_postgame() && global_network_game_server_get())
+		{
+			network_test.postgame_seconds += seconds;
+			if (network_test.postgame_seconds >= 3.0f && network_test_variant(network_test.variant_index + 1, NULL, 0))
+			{
+				network_test.postgame_seconds = 0.0f;
+				network_game_server_reset_to_pregame(global_network_game_server_get());
+			}
+		}
+	}
+	/* (a joining machine's player: the other team again in the next game's
+	lobby, whose variant may have teams where the last had none) */
+	if (network_test.mode == _network_test_join && network_test.team_set && game_engine_running() &&
+		!main_menu_loaded && !game_engine_can_score())
+	{
+		network_test.game_over = TRUE;
+	}
+	if (network_test.mode == _network_test_join && network_test.game_over && main_menu_loaded)
+	{
+		network_test.game_over = FALSE;
+		network_test.team_set = FALSE;
+		network_test.joined_seconds = 0.0f;
+	}
+	/* ... back in the lobby, set up as the first was */
+	if (network_test.mode == _network_test_host && network_test.game_over && main_menu_loaded)
+	{
+		network_test.game_over = FALSE;
+		network_test.postgame_seconds = 0.0f;
+		if (network_test_variant(network_test.variant_index + 1, NULL, 0))
+		{
+			network_test.variant_index++;
+			network_test.started = FALSE;
+			network_test.map_set = FALSE;
+			network_test.setup_seconds = 0.0f;
+			network_test.menu_seconds = 0.0f;
+			/* (as picking the next game's map does: the scores' map choice
+			holds the countdown) */
+			if (global_network_game_server_get())
+				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+			platform_log("network test: the next game");
 		}
 	}
 
@@ -603,7 +710,13 @@ void network_test_update(
 				snprintf(path, sizeof(path), "levels\\test\\%s\\%s", network_test.map_name, network_test.map_name);
 				network_game_server_change_map_name(global_network_game_server_get(), path);
 				/* the variant, as picking the game settings does */
-				variant = *game_engine_get_variant_by_name(&variant, network_test.variant_name);
+				{
+					char variant_name[64];
+
+					network_test_variant(network_test.variant_index, variant_name, sizeof(variant_name));
+					variant = *game_engine_get_variant_by_name(&variant, variant_name);
+					platform_log("network test: game %d, %s", network_test.variant_index + 1, variant_name);
+				}
 				/* debug.network_test_score: a short game, to test the next */
 				if (network_test.score_to_win > 0)
 					variant.universal_variant.score_to_win = network_test.score_to_win;
@@ -657,7 +770,7 @@ void network_test_update(
 		{
 			network_test.joined_seconds += seconds;
 			if (network_test.joined_seconds >= 5.0f)
-				network_test.team_set = network_game_client_set_team(1);
+				network_test.team_set = network_game_client_set_team(NONE);
 		}
 		break;
 	}

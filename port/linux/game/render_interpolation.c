@@ -46,7 +46,8 @@ int config_boolean(const char *name);
 
 /* ---------- constants */
 
-#define MAXIMUM_INTERPOLATED_OBJECTS (MAXIMUM_OBJECTS_PER_MAP * 5)
+/* (by absolute index: the object array's all) */
+#define MAXIMUM_INTERPOLATED_OBJECTS MAXIMUM_OBJECTS_PER_MAP
 #define MAXIMUM_INTERPOLATED_NODES 64
 
 /* world units (10 feet each) a node may move in one tick before it snaps:
@@ -342,7 +343,8 @@ void render_interpolation_tick(void)
 			record->correction.i *= CORRECTION_DECAY;
 			record->correction.j *= CORRECTION_DECAY;
 			record->correction.k *= CORRECTION_DECAY;
-			if (fabs(record->correction.i) + fabs(record->correction.j) + fabs(record->correction.k) < CORRECTION_NEGLIGIBLE)
+			/* (so written that one not a number goes too) */
+			if (!(fabs(record->correction.i) + fabs(record->correction.j) + fabs(record->correction.k) >= CORRECTION_NEGLIGIBLE))
 				record->correction = *global_zero_vector3d;
 		}
 		else
@@ -358,6 +360,25 @@ void render_interpolation_tick(void)
 		record->tick = interpolation_tick;
 		record->has_previous = continuing;
 		record->blended_frame = NONE;
+	}
+}
+
+/* a new map (game.c): its objects take the indices of the last one's, and
+nothing of theirs is drawn from */
+void render_interpolation_reset(void)
+{
+	long index;
+
+	if (interpolated_objects)
+	{
+		for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
+			interpolated_objects[index].object_index = NONE;
+	}
+	memset(interpolated_cameras, 0, sizeof(interpolated_cameras));
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	{
+		interpolated_first_person[index].node_count = 0;
+		interpolated_first_person[index].has_previous = FALSE;
 	}
 }
 
@@ -437,8 +458,9 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 	long child_index;
 	long absolute_index;
 
+	/* (so written that an offset not a number is none) */
 	if (!interpolated_objects || object_index == NONE ||
-		offset->i * offset->i + offset->j * offset->j + offset->k * offset->k > OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE)
+		!(offset->i * offset->i + offset->j * offset->j + offset->k * offset->k <= OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE))
 	{
 		return;
 	}

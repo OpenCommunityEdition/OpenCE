@@ -107,9 +107,11 @@ struct distributed_vector
 
 /* ---------- macros */
 
-/* the entries of a type that fit one unreliable message */
+/* the entries of a type that fit one unreliable message, in a tick's batch
+(its header, and the message's size and header but for its message header) */
 #define DATAGRAM_ENTRIES(type) \
-	((short)((DATAGRAM_MAXIMUM_SIZE - sizeof(struct distributed_message_header)) / sizeof(type)))
+	((short)((DATAGRAM_MAXIMUM_SIZE - 2 * sizeof(struct distributed_message_header) - sizeof(word) + \
+		sizeof(message_header)) / sizeof(type)))
 /* ... and one reliable message (its count a byte) */
 #define RELIABLE_ENTRIES(type) \
 	((short)MIN(255, (MAXIMUM_MESSAGE_SIZE - sizeof(struct distributed_message_header)) / sizeof(type)))
@@ -134,13 +136,21 @@ boolean distributed_player_is_local(long player_index);
 long distributed_living_unit(struct player_datum const *player);
 /* whether the player is one of that client machine's (the host) */
 boolean distributed_machine_has_player(long machine_index, short player_index);
-void distributed_count_sent(void);
 void distributed_count_correction(void);
 /* (the host) the client machines in the game, but for its own; their count */
 short distributed_client_machines(long *machine_indices, short maximum);
 /* (the host) how long a message takes that client and its answer back, in
 ticks (and its jitter), as its players' input messages tell */
 real distributed_machine_round_trip_ticks(long machine_index);
+/* what a message says, checked: a number finite; a point's parts finite
+and within bound of the origin; an object's index whole (its identifier
+never 0, which any object at the index matches) */
+boolean distributed_real_valid(real value);
+boolean distributed_point_valid(real_point3d const *point, real bound);
+boolean distributed_object_index_valid(long object_index);
+/* ... an orientation's two axes (unpacked): TRUE when they are one long
+and about square, then made exactly so */
+boolean distributed_axes_make_valid(real_vector3d *forward, real_vector3d *up);
 /* the vectors in 16 bits a part (struct distributed_vector) */
 void distributed_vector_pack(real_vector3d const *vector, real scale, struct distributed_vector *result);
 void distributed_vector_unpack(struct distributed_vector const *vector, real scale, real_vector3d *result);

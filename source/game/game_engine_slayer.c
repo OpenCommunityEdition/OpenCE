@@ -144,6 +144,9 @@ static void find_next_target(
 
 static struct slayer_globals slayer_globals = { 0 };
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
 /* ---------- code */
 
 static void slayer_engine_dispose(
@@ -468,13 +471,19 @@ static void slayer_engine_player_killed_player(
 
 		if (!friendly_fire)
 		{
-			update_speed_for_score(dead_player_index, killing_player_index);
+			/* (a client of the distributed netcode has the host's speeds,
+			game_engine_slayer_read_network_state: its copy of a kill may
+			come before or after the state with it, and would count twice) */
+			if (!network_game_distributed_client())
+				update_speed_for_score(dead_player_index, killing_player_index);
 
 			if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
 			{
 				if (killing_player->multiplayer_special != dead_player_index)
 					return;
-				find_next_target(killing_player_index);
+				/* (a client has the host's targets) */
+				if (!network_game_distributed_client())
+					find_next_target(killing_player_index);
 			}
 
 			slayer_engine_adjust_score(killing_player_index, 1);
@@ -630,20 +639,27 @@ static void slayer_player_update(
 			}
 		}
 
-		if (player->unit_index != NONE &&
-			player->multiplayer_special == NONE)
+		/* (a client of the distributed netcode has the host's targets:
+		game_engine_slayer_read_network_state) */
+		if (!network_game_distributed_client())
 		{
-			find_next_target(index);
-		}
+			if (player->unit_index != NONE &&
+				player->multiplayer_special == NONE)
+			{
+				find_next_target(index);
+			}
 
-		if (player->multiplayer_special != NONE &&
-			game_engine_man_out(player->multiplayer_special))
-		{
-			find_next_target(index);
+			if (player->multiplayer_special != NONE &&
+				game_engine_man_out(player->multiplayer_special))
+			{
+				find_next_target(index);
+			}
 		}
 	}
 
-	if (slayer_get_score(index, _get_score_team) >=
+	/* (a client ends the game when the host has) */
+	if (!network_game_distributed_client() &&
+		slayer_get_score(index, _get_score_team) >=
 		game_engine_get_variant()->universal_variant.score_to_win)
 	{
 		game_engine_end_game();
@@ -692,22 +708,90 @@ struct game_engine slayer_engine =
 	NULL,
 };
 
+struct slayer_network_state
+{
+	struct slayer_globals globals;
+	/* kill in order: each player's target (player_datum.multiplayer_special,
+	chosen at random), by absolute index (their datum identifiers are each
+	machine's own) */
+	byte targets[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	/* each player's speed_multiplier (update_speed_for_score, which
+	slayer_player_update brings back to 1 each tick), in units of
+	1/SLAYER_SPEED_UNITS, by absolute index, 0 for no player */
+	word speeds[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+};
+
+#define SLAYER_SPEED_UNITS 16384.0f
+
+typedef char verify_slayer_network_state_size[
+	sizeof(struct slayer_network_state) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
+
+/* port/linux/game/network_distributed.c's */
+byte distributed_player_to_byte(long player_index);
+long distributed_player_from_byte(byte player_index);
+
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is */
 long game_engine_slayer_write_network_state(
 	byte *buffer,
 	long size)
 {
-	if (size < (long)sizeof(slayer_globals))
+	struct slayer_network_state state;
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (size < (long)sizeof(state))
 		return 0;
-	csmemcpy(buffer, &slayer_globals, sizeof(slayer_globals));
-	return sizeof(slayer_globals);
+	csmemset(&state, 0, sizeof(state));
+	state.globals = slayer_globals;
+	csmemset(state.targets, distributed_player_to_byte(NONE), sizeof(state.targets));
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)))
+	{
+		long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (absolute_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		{
+			state.targets[absolute_index] = distributed_player_to_byte(player->multiplayer_special);
+			state.speeds[absolute_index] = (word)PIN(player->speed_multiplier * SLAYER_SPEED_UNITS + 0.5f, 0.0f, 65535.0f);
+		}
+	}
+	csmemcpy(buffer, &state, sizeof(state));
+	return sizeof(state);
 }
 
 void game_engine_slayer_read_network_state(
 	byte const *buffer,
-	long size)
+	long size,
+	boolean first)
 {
-	if (size == (long)sizeof(slayer_globals))
-		csmemcpy(&slayer_globals, buffer, sizeof(slayer_globals));
+	struct slayer_network_state state;
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (size != (long)sizeof(state))
+		return;
+	csmemcpy(&state, buffer, sizeof(state));
+	slayer_globals = state.globals;
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)))
+	{
+		long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		long target;
+
+		if (absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+			continue;
+		/* (a player the host has not yet: its own start's) */
+		if (state.speeds[absolute_index])
+			player->speed_multiplier = state.speeds[absolute_index] / SLAYER_SPEED_UNITS;
+		if (!game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
+			continue;
+		target = distributed_player_from_byte(state.targets[absolute_index]);
+		if (target == player->multiplayer_special)
+			continue;
+		player->multiplayer_special = target;
+		/* (as find_next_target shows it) */
+		if (!first && target != NONE)
+			game_show_score_extended(iterator.datum_index, _slayer_message_new_target, target);
+	}
 }

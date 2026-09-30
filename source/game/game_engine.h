@@ -104,6 +104,12 @@ struct king_variant
 	boolean moving_hill;
 };
 
+/* the balls of an oddball game */
+enum
+{
+	MAXIMUM_ODDBALLS = 16,
+};
+
 struct oddball_variant
 {
 	boolean random_start;
@@ -232,6 +238,11 @@ typedef char verify_game_engine_format_message_offset[
 typedef char verify_game_engine_player_update_offset[
 	offsetof(struct game_engine, player_update) == 0x70 ? 1 : -1];
 
+/* port: the most a game type's state for the distributed netcode's clients
+may take (port/linux/game/network_distributed.c's MAXIMUM_GAME_STATE_SIZE,
+less the postgame state game_engine_write_network_state puts first) */
+#define GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE (0xF00 - 4)
+
 /* ---------- prototypes/GAME_ENGINE.C */
 
 void game_engine_playlist_initialize(
@@ -290,6 +301,8 @@ void get_postgame_hilite_colors(
 	union real_argb_color *hilite_color);
 
 boolean game_engine_running(
+	void);
+boolean game_engine_showing_postgame(
 	void);
 
 boolean game_engine_get_state_message(

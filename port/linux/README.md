@@ -179,6 +179,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
+| `debug.telnet_console` | `false` | `HALO_TELNET_CONSOLE` | The game listens on 127.0.0.1, port 23 (telnet), for a script console. The console has no password, so only this computer can reach it. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
@@ -328,7 +329,11 @@ to the standard error and puts it on the clipboard.
 To join a game, do one of these steps:
 
 - Open the link. The game is the handler of `halo://` links. If the game
-  already operates, the new copy gives the link to it and stops.
+  already operates, the new copy gives the link to it and stops. A key in a
+  file that only the user can read (`halo-ce-universal.key` in
+  `$XDG_RUNTIME_DIR`, else `~/.halo-ce-universal.key`; on Windows in
+  `%LOCALAPPDATA%`) encrypts the link, so the programs of other users cannot
+  read it.
 - Copy the link (or the 44 digits) and go to the game.
 - Enter `halo <link>`.
 - Accept a Discord invite. Refer to "Discord".
@@ -341,13 +346,21 @@ network does not need an invite.
 
 Only machines with the invite can find the game:
 
+- Each copy of the game makes an X25519 key pair when it starts. Its
+  identifier is from the hash of its public key.
 - The link contains the identifier of the host and a random 16-byte token.
-- The machines exchange their addresses through public MQTT brokers
-  (`network.signalling_brokers`). The topics are HMACs of the token. A key
-  from the token encrypts and authenticates the messages
-  (`src/p2p_signal.c`, `src/p2p_crypto.c`).
-- A key from the host encrypts and authenticates each packet between two
-  machines.
+- The machines exchange their public keys and addresses through public MQTT
+  brokers (`network.signalling_brokers`). The topics are HMACs of the token.
+  A key from the token encrypts and authenticates the messages
+  (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
+  with a key that only it and the player can calculate. Its public key must
+  agree with the identifier in the link.
+- Each two machines get the keys of their packets from their key pairs and
+  a random number from each. The keys do not go through the brokers. Thus
+  other machines with the invite cannot read or change the packets.
+- Each packet is encrypted and authenticated, with a different key in each
+  direction. A machine ignores a packet that it already received.
+- A machine can send only to the ports of the game on the other machine.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection

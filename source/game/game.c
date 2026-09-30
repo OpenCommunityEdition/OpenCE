@@ -180,6 +180,9 @@ struct game_options;
 #include "units/units.h"
 #include "units/vehicles.h"
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -312,7 +315,11 @@ void game_tick(
 	remove_quitting_players_from_game();
 	game_allegiance_update();
 	units_update();
-	ai_update();
+	/* (the host's actors drive the host's units, which a client of the
+	distributed netcode has from the host: its own would fight the host's
+	positions, and could place objects of their own) */
+	if (!network_game_distributed_client())
+		ai_update();
 	players_update_before_game();
 
 	seconds_per_tick = game_globals->players_are_double_speed
@@ -576,6 +583,13 @@ void game_initialize_for_new_map(
 	players_initialize_for_new_map();
 	scenario_initialize_for_new_map();
 	objects_initialize_for_new_map();
+	/* nothing of the distributed netcode's carried into the new game
+	(port/linux/game/network_distributed.c), before anything of the map
+	makes an object: a client makes the map's objects, and the game type's
+	(the flags of capture the flag, game_engine_initialize_for_new_map), at
+	the host's indices, not its own objects' of the last game's */
+	network_distributed_new_game();
+	render_interpolation_reset();
 	render_initialize_for_new_map();
 	structures_initialize_for_new_map();
 	breakable_surfaces_initialize_for_new_map();
@@ -592,9 +606,6 @@ void game_initialize_for_new_map(
 	weather_particle_systems_initialize_for_new_map();
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
-	/* nothing of the distributed netcode's carried into the new game
-	(port/linux/game/network_distributed.c) */
-	network_distributed_new_game();
 	game_statistics_start();
 	update_server_new();
 	player_control_initialize_for_new_map();

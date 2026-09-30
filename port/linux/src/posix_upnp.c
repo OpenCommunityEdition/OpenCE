@@ -7,10 +7,11 @@ UDP port of its internet address to the tunnel's socket here, so that a
 peer whose NAT is too strict for hole punching can still reach this
 machine there.
 
-The router is found once (an SSDP search on the local network, two seconds)
-and kept; each forwarding asks for a lease of an hour, which p2p.c renews,
-and falls back to a permanent one where the router supports no other (it is
-removed when the game exits). A router whose own internet address is a
+The router is looked for (an SSDP search on the local network, two seconds)
+until one is found, and then kept; each forwarding asks for a lease of an
+hour, which p2p.c renews (asking for the port it had), and falls back to a
+permanent one where the router supports no other (it is removed when the
+game exits). A router whose own internet address is a
 private one (behind another NAT, such as a carrier's) cannot help, and is
 not asked.
 
@@ -43,7 +44,6 @@ enum
 
 static struct
 {
-	int searched;
 	int found;
 	struct UPNPUrls urls;
 	struct IGDdatas data;
@@ -57,7 +57,8 @@ static unsigned short swap_short(unsigned short value)
 	return (unsigned short)(value << 8 | value >> 8);
 }
 
-/* the router, looked for the first time only; 1 if there is one */
+/* the router, looked for until it is found (the machine may have moved to
+another network since); 1 if there is one */
 static int upnp_find_router(char *error, int error_size)
 {
 	struct UPNPDev *devices;
@@ -65,13 +66,8 @@ static int upnp_find_router(char *error, int error_size)
 	int discover_error = 0;
 	int result;
 
-	if (upnp.searched)
-	{
-		if (!upnp.found)
-			snprintf(error, (size_t)error_size, "no UPnP router on this network");
-		return upnp.found;
-	}
-	upnp.searched = 1;
+	if (upnp.found)
+		return 1;
 	devices = upnpDiscover(DISCOVERY_DELAY, NULL, NULL, 0, 0, 2, &discover_error);
 	if (!devices)
 	{
@@ -119,14 +115,14 @@ static int upnp_add(const char *external_port, const char *internal_port)
 		upnp.lan_address, FORWARDING_DESCRIPTION, "UDP", NULL, "0");
 }
 
-int posix_upnp_forward_udp(unsigned short port, posix_ulong *external_address, unsigned short *external_port,
-	char *error, int error_size)
+int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, posix_ulong *external_address,
+	unsigned short *external_port, char *error, int error_size)
 {
 	char internal_text[8];
 	char external_text[8];
 	char address_text[64];
 	unsigned int parts[4];
-	unsigned short try_port = swap_short(port);
+	unsigned short try_port = swap_short(preferred_port ? preferred_port : port);
 	int attempt;
 	int result = 0;
 

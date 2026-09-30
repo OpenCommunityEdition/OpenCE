@@ -215,7 +215,12 @@ static boolean console_process_command(
 	short newest_previous_command_index = (console_globals.newest_previous_command_index + 1) % MAXIMUM_NUMBER_OF_PREVIOUS_COMMANDS;
 
 	console_globals.newest_previous_command_index = newest_previous_command_index;
-	strcpy(console_globals.previous_commands[newest_previous_command_index], command);
+	/* port: no longer than the slot (a command can come from the telnet
+	console) */
+	csstrncpy(console_globals.previous_commands[newest_previous_command_index], command,
+		NUMBEROF(console_globals.previous_commands[newest_previous_command_index]) - 1);
+	console_globals.previous_commands[newest_previous_command_index][
+		NUMBEROF(console_globals.previous_commands[newest_previous_command_index]) - 1] = 0;
 
 
 	console_globals.previous_command_count = MIN(console_globals.previous_command_count + 1, MAXIMUM_NUMBER_OF_PREVIOUS_COMMANDS);

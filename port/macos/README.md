@@ -305,7 +305,8 @@ macOS port:
 - does not ask the router to forward a port, and does not join games from
   the clipboard, unless `config.toml` says so;
 - lets the internet play tunnel give a remote machine's traffic only to the
-  ports of the game's own sockets (`xnet_is_game_port`), not to other
+  ports of the game's own sockets (`p2p_socket_port` in
+  `port/linux/src/p2p.c`), not to other
   programs on the Mac;
 - runs the `tailscale` command only from its usual locations, with no
   arguments other than `status --json`.

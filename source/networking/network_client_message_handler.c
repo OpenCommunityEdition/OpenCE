@@ -461,6 +461,15 @@ boolean network_game_client_handle_message(
 	word message_type;
 	byte packet_type;
 
+	/* (a header and at least the packet type after it, of the size the
+	header says: else the stream is broken) */
+	if (message && (message_size < (short)(sizeof(message_header) + sizeof(byte)) ||
+		message_size != GET_MESSAGE_SIZE(*message)))
+	{
+		network_event("client received a message of a bad size (%d)", message_size);
+		return FALSE;
+	}
+
 	match_assert(
 		NETWORK_CLIENT_MESSAGE_HANDLER_FILE,
 		0x2F,
@@ -680,8 +689,19 @@ boolean network_game_client_handle_message(
 				break;
 
 			case _message_type_data:
-				/* the distributed netcode's messages (port/linux/NETCODE.md) */
-				network_distributed_handle_message(NONE, message, message_size);
+				/* the distributed netcode's messages (port/linux/NETCODE.md),
+				the host's alone: over its connection, or datagrams from its
+				address */
+				if (network_game_client_address_matches_server(client, source_address))
+				{
+					network_distributed_handle_message(NONE, message, message_size);
+				}
+				else
+				{
+					network_event(
+						"ignoring a distributed message from a system that is not the host @ %s",
+						transport_address_to_string(source_address));
+				}
 				break;
 
 			case _message_type_error:
@@ -690,9 +710,10 @@ boolean network_game_client_handle_message(
 					byte *error_message = (byte *)(message + 1);
 
 					network_event(
-						"client received low-level error message: error= #%d (%s)",
+						"client received low-level error message: error= #%d (%.*s)",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						error_message);
+						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
+						(char const *)error_message);
 				}
 				else
 				{
@@ -854,8 +875,11 @@ static boolean network_game_client_handle_message_server_machine_rejected(
 {
 	boolean result = TRUE;
 
+	/* (joining, or accepted into a game in progress that filled up before
+	its players were added: network_game_server_refuse_late_joiner) */
 	if (network_game_client_address_matches_server(client, source_address) &&
-		network_game_client_get_state(client, NULL) == _network_game_client_state_joining)
+		(network_game_client_get_state(client, NULL) == _network_game_client_state_joining ||
+			network_game_client_get_state(client, NULL) == _network_game_client_state_pregame))
 	{
 		struct message_server_machine_rejected rejection;
 		short packet_type = _message_server_machine_rejected;
@@ -1147,10 +1171,8 @@ static boolean network_game_client_handle_message_server_begin_game(
 				&packet_version,
 				_network_game_packet_class_pregame))
 			{
-				/* (a game in progress: the host's time, network_client_manager.c) */
-				extern long network_game_client_late_join_time;
-
-				/* (the message carries 16 bits of it: the rest from the first
+				/* (a game in progress: the host's time, network_client_manager.c;
+				the message carries 16 bits of it: the rest from the first
 				game update, network_game_client_handle_game_update) */
 				network_game_client_late_join_time = (long)((unsigned long)begin_game.unused & 0xFFFF);
 				result = network_game_client_game_has_started(client);
@@ -1260,17 +1282,13 @@ static boolean network_game_client_handle_message_server_game_update(
 		else
 		{
 			network_event("failed to handle a message_server_game_update message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_game_update message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;
@@ -1301,11 +1319,13 @@ static boolean network_game_client_handle_message_server_add_player_ingame(
 				&packet_version,
 				_network_game_packet_class_ingame))
 			{
-				result = network_game_client_add_player_to_game(client, &player);
-				if (!result)
+				/* (the distributed netcode: a player this machine cannot add
+				does not end its game) */
+				if (!network_game_client_add_player_to_game(client, &player))
 				{
 					network_event("network_game_client_add_player_to_game() failed");
 				}
+				result = TRUE;
 			}
 			else
 			{
@@ -1315,17 +1335,13 @@ static boolean network_game_client_handle_message_server_add_player_ingame(
 		else
 		{
 			network_event("failed to handle a message_server_add_player_ingame message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_add_player_ingame message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;
@@ -1356,11 +1372,12 @@ static boolean network_game_client_handle_message_server_remove_player_ingame(
 				&packet_version,
 				_network_game_packet_class_ingame))
 			{
-				result = network_game_client_remove_player(client, &removal.player, removal.reason);
-				if (!result)
+				/* (nor one it cannot remove) */
+				if (!network_game_client_remove_player(client, &removal.player, removal.reason))
 				{
 					network_event("network_game_client_remove_player() failed");
 				}
+				result = TRUE;
 			}
 			else
 			{
@@ -1370,17 +1387,13 @@ static boolean network_game_client_handle_message_server_remove_player_ingame(
 		else
 		{
 			network_event("failed to handle a message_server_remove_player_ingame message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_remove_player_ingame message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;
