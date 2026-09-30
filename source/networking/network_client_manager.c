@@ -1994,6 +1994,9 @@ boolean network_game_client_initiate_join_game(
 
 	if (success == TRUE)
 	{
+		/* port: the join's wait counted from the connection made, not from
+		before a connect that took seconds (idle_joining) */
+		network_connection_keep_alive(client->connection);
 		client->state = _network_game_client_state_joining;
 		network_event(
 			"attempting to connect to game @ %s",
@@ -2798,6 +2801,11 @@ static boolean network_game_client_idle_ingame(
 	struct network_game_client *client)
 {
 	boolean success = TRUE;
+	/* port: until the host's first update the host may still be loading the
+	map (its main thread, which sends nothing meanwhile), as long as it waits
+	for the other machines to load (network_server_manager.c's
+	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING) */
+	boolean started = network_game_client_server_has_started_game(client);
 
 	if (!network_connection_active(client->connection) ||
 		!network_connection_connected(client->connection))
@@ -2817,7 +2825,7 @@ static boolean network_game_client_idle_ingame(
 			network_event("network connection went down (idle in game)!");
 			success = FALSE;
 		}
-		else if (connection_stale && !client->connection_silent)
+		else if (connection_stale && !client->connection_silent && started)
 		{
 			short local_player_index;
 
@@ -2840,7 +2848,7 @@ static boolean network_game_client_idle_ingame(
 
 	if (success == TRUE)
 	{
-		success = network_connection_idle(client->connection, 15000, NULL);
+		success = network_connection_idle(client->connection, started ? 15000 : 75000, NULL);
 
 		if (success)
 		{

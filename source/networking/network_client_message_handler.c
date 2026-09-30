@@ -853,7 +853,9 @@ static boolean network_game_client_handle_message_server_machine_accepted(
 	else
 	{
 		network_event("ignoring a message_server_machine_accepted message; either a bad machine or we aren't joining");
-		result = FALSE;
+		/* port: ignored, not failed (anyone may send a searching client a
+		datagram, and a failure ends its search) */
+		result = TRUE;
 	}
 
 	return result;
@@ -897,7 +899,9 @@ static boolean network_game_client_handle_message_server_machine_rejected(
 	else
 	{
 		network_event("ignoring a message_server_machine_rejected message; either a bad machine or we aren't joining");
-		result = FALSE;
+		/* port: ignored, not failed (anyone may send a searching client a
+		datagram, and a failure ends its search) */
+		result = TRUE;
 	}
 
 	return result;

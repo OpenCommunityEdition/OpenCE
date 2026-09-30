@@ -378,7 +378,11 @@ SOCKET WSAAPI halo_ws_socket(int family, int type, int protocol)
 
 int WSAAPI halo_ws_closesocket(SOCKET socket)
 {
-	p2p_socket_closed((int)socket);
+	int type = SOCK_STREAM;
+	int type_length = sizeof(type);
+
+	posix_socket_getsockopt((int)socket, SOL_SOCKET, SO_TYPE, &type, &type_length);
+	p2p_socket_closed((int)socket, type == SOCK_DGRAM ? socket_port(socket) : 0);
 	delayed_closed((int)socket);
 	return winsock_result(posix_socket_close((int)socket));
 }

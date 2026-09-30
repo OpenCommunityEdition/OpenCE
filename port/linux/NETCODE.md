@@ -37,8 +37,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   and no further from an anchor (one it took, a newer once a second) than
   a player moves in the client's ticks since, those no more than its own
   since and a little jitter (so the tolerance and the jitter are not gained
-  again each tick); a teleporter, which moves the host's own copy too,
-  starts afresh.
+  again each tick); a player on foot moves (and the host takes their
+  velocity) no faster than twice as fast as they run and jump, or as fast
+  as the host's own copy of them went in the last few seconds (a fall, an
+  explosion's throw, which the client learns of a round trip late),
+  whichever is more, and no more than 2 world units a tick, with a
+  twentieth of a world unit a tick more for where they are; a teleporter,
+  which moves the host's own copy too, starts afresh.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, the target where
   the host had it when the shooter saw it, no faster than weapons fire) and
@@ -192,35 +197,49 @@ a pregame keep-alive every five seconds from the host
      melee and vehicles hit, it reports to the host (reliably), with the
      host's latest tick it had heard of when it made the report.
    - The host deals a report once it has checked it: from that machine's
-     player; damage one of their weapons (now or in the last ten seconds),
-     their grenades (while they have them, and for a while after) or
-     their vehicle (a driver's or gunner's) can deal (its projectiles'
-     impacts and detonations, followed through the tags), no harder than
-     it can be (all of it, but an airborne melee blow's half again); the
-     target within a few world units of where the host had it at the tick
-     the report was made at (a player's unit or vehicle: the host keeps a
+     player; damage one of their weapons (a vehicle's a driver's or
+     gunner's; now or in the last ten seconds), their grenades (while they
+     have them, and for a while after) or the vehicle they drove (in the
+     last ten seconds: its collisions) can deal (its projectiles' impacts
+     and detonations, followed through the tags), no harder than it can be
+     (all of it, but an airborne melee blow's half again); of the shape the
+     game gives that damage: what hits at a point (a projectile's impact,
+     or its detonation on what it sticks to, and an explosion) there, its
+     origin its epicenter; a melee blow from the striker's head (its
+     origin) and body (its epicenter), both within a few world units of
+     where the host had the player; a collision from the vehicle (its
+     epicenter) within a few world units and the vehicle's size of where
+     the host had the vehicle the player rode; the origin at the target in
+     each (an explosion's and a melee blow's within its reach); the target
+     within a few world units of where the host had it at the tick the
+     report was made at (a player's unit or vehicle: the host keeps a
      second of where they were) or of where it is (more for a fast one);
-     a melee blow from where the host had the player; the impact at the
-     target (an explosion within its reach); and no more reports than the
-     weapon that deals them fires (its rate of fire and projectiles a
-     shot, with a margin; an explosion's hits count as one, when its
-     damage has a reach, and no object is hit twice by one). A report made
-     more than three seconds ago (a burst of them held back while the
-     network was out) is refused. A report is paid for before the host
-     looks through its history, so a flood of them costs the sender its
-     hits. The damage is dealt as a client's own hit can be: only the
-     flags such a hit has, and the host's multiplier and team, not the
-     report's, its owner the player's unit (or the vehicle it rides, or
-     a unit of theirs); a report with a number that is not finite, or a
-     node, region or material the target does not have, is refused. Its
-     own copies of a client's projectiles deal nothing (the report does).
+     and no more reports than the weapon that deals them fires (its rate of
+     fire and projectiles a shot, with a margin; an explosion's hits count
+     as one, when its damage has a reach, and no object is hit twice by
+     one, the explosions of each player's reports told apart on their
+     own). A report made more than three seconds ago (a burst of them held
+     back while the network was out) is refused. A report is paid for
+     before the host looks through its history, so a flood of them costs
+     the sender its hits. The damage is dealt as a client's own hit can
+     be: only the flags such a hit has, area damage as the game deals that
+     damage (the report's only for damage dealt both ways), and the host's
+     multiplier and team, not the report's, its owner the player's unit
+     (or the vehicle it rides, or a unit of theirs); a report with a
+     number that is not finite, or a node, region or material the target
+     does not have, is refused. Its own copies of a client's projectiles
+     deal nothing (the report does), but once that client has left the
+     game they deal what they hit, as its own do (a hit the client
+     reported just before it left may so be dealt twice).
    - The host sends its clients the damage it dealt to units, and a client
      replays what it does besides the harm (which the units' states
      bring): the player's screen flash and shake, the unit's flinch, pain
      sound, knockback and stun, the scope it knocks the player out of, and
      who the HUD shows hit them. A killing blow it replays whole, so the
      body falls as the shot had it and the kill is announced with the
-     host's killer. A killing blow goes to every client; other damage to
+     host's killer; an actor's (a biped no player's, alive until then)
+     too, counted by no one there (the host's statistics come as they
+     are). A killing blow goes to every client; other damage to
      the machines of the unit's player, its riders and the damage's owner,
      and of the clients sent that player this tick (who can see them); a
      player's screen effects to that player's machine alone.

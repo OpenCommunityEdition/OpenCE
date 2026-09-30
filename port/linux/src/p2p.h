@@ -63,8 +63,9 @@ void p2p_socket_port(int socket, int stream, int listening, unsigned short port)
 /* a socket that peers are not to reach (bound to 127.0.0.1 alone) has this
 local port: traffic from it is not a peer's whose stand-in had the port */
 void p2p_port_taken(int stream, unsigned short port);
-/* the game closes a socket */
-void p2p_socket_closed(int socket);
+/* the game closes a socket, a datagram one of this local port (0: none, or
+a stream's) */
+void p2p_socket_closed(int socket, unsigned short datagram_port);
 
 /* text for the clipboard (a new invite link), once; NULL if none. Called
 from the main thread */

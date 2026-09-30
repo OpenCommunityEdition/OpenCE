@@ -465,25 +465,23 @@ static void slayer_engine_player_killed_player(
 {
 	struct player_datum *dead_player = player_get(dead_player_index);
 
-	if (!dead_player->quit_out_of_game && killing_player_index != NONE)
+	/* (a client of the distributed netcode has the host's scores,
+	game_engine_slayer_read_network_state: its copy of a kill may come before
+	or after the state with it, and would count twice) */
+	if (!dead_player->quit_out_of_game && killing_player_index != NONE &&
+		!network_game_distributed_client())
 	{
 		struct player_datum *killing_player = player_get(killing_player_index);
 
 		if (!friendly_fire)
 		{
-			/* (a client of the distributed netcode has the host's speeds,
-			game_engine_slayer_read_network_state: its copy of a kill may
-			come before or after the state with it, and would count twice) */
-			if (!network_game_distributed_client())
-				update_speed_for_score(dead_player_index, killing_player_index);
+			update_speed_for_score(dead_player_index, killing_player_index);
 
 			if (game_engine_get_variant()->game_engine_variant.slayer.kill_in_order)
 			{
 				if (killing_player->multiplayer_special != dead_player_index)
 					return;
-				/* (a client has the host's targets) */
-				if (!network_game_distributed_client())
-					find_next_target(killing_player_index);
+				find_next_target(killing_player_index);
 			}
 
 			slayer_engine_adjust_score(killing_player_index, 1);

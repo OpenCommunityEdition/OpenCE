@@ -92,6 +92,14 @@ enum
 	/* a host nonce is taken in the period it is made in and the next */
 	HOST_NONCE_PERIOD = 30000,
 	USED_REQUEST_TIME = 2 * HOST_NONCE_PERIOD,
+	/* a host's work of the keys of requests from keys it has not met (a
+	millisecond or more each, on the thread the tunnels run on): this many
+	at once, and one more each this often */
+	MAXIMUM_KEY_WORK = 32,
+	KEY_WORK_INTERVAL = 50,
+	/* the reads of a broker's messages in one pass of the thread, whose
+	tunnels a flood of them would otherwise starve */
+	MAXIMUM_BROKER_READS = 8,
 };
 
 enum
@@ -179,6 +187,9 @@ static struct
 	struct used_request used_requests[MAXIMUM_USED_REQUESTS];
 	int used_request_count;
 	int used_request_next;
+	/* the key work it may do now (MAXIMUM_KEY_WORK), as of when */
+	int key_work;
+	unsigned long key_work_time;
 
 	/* joining */
 	int joining;
@@ -620,6 +631,25 @@ static int joiner_base(const unsigned char *public_key, unsigned char *base)
 			return 1;
 		}
 	}
+	/* (none left: the request is not answered, and asked again) */
+	{
+		unsigned long now = p2p_now();
+		unsigned long earned = (now - signalling.key_work_time) / KEY_WORK_INTERVAL;
+
+		if (earned >= MAXIMUM_KEY_WORK || signalling.key_work + (int)earned >= MAXIMUM_KEY_WORK)
+		{
+			signalling.key_work = MAXIMUM_KEY_WORK;
+			signalling.key_work_time = now;
+		}
+		else if (earned)
+		{
+			signalling.key_work += (int)earned;
+			signalling.key_work_time += earned * KEY_WORK_INTERVAL;
+		}
+		if (signalling.key_work <= 0)
+			return 0;
+		signalling.key_work--;
+	}
 	return pair_base(public_key, p2p_public_key(), public_key, base);
 }
 
@@ -925,7 +955,10 @@ static void broker_parse(struct broker *broker)
 
 static void broker_readable(struct broker *broker)
 {
-	for (;;)
+	int reads;
+
+	/* (the rest in the next pass) */
+	for (reads = 0; reads < MAXIMUM_BROKER_READS; reads++)
 	{
 		int size = posix_socket_recv(broker->socket, broker->input + broker->input_size,
 			BUFFER_SIZE - broker->input_size, 0);

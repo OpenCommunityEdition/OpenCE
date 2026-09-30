@@ -354,11 +354,21 @@ static void network_test_shoot(
 		if (damage_index == NONE)
 			continue;
 		target_object = object_get(target->unit_index);
+		/* (a blow reaches only a target at hand, as the host checks) */
+		if (melee)
+		{
+			real dx = target_object->object.position.x - unit->object.position.x;
+			real dy = target_object->object.position.y - unit->object.position.y;
+			real dz = target_object->object.position.z - unit->object.position.z;
+
+			if (dx * dx + dy * dy + dz * dz > 1.5f * 1.5f)
+				continue;
+		}
 		damage_data_new(&damage, damage_index);
 		damage.owner_player_index = iterator.datum_index;
 		damage.owner_object_index = player->unit_index;
 		damage.owner_team_index = unit->object.owner_team_index;
-		damage.origin = target_object->object.position;
+		damage.origin = melee ? unit->object.bounding_sphere_center : target_object->object.position;
 		damage.epicenter = melee ? unit->object.bounding_sphere_center : target_object->object.position;
 		direction.i = target_object->object.position.x - unit->object.position.x;
 		direction.j = target_object->object.position.y - unit->object.position.y;

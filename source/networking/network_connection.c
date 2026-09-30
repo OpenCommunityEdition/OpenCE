@@ -233,6 +233,9 @@ enum
 	overflows it is dropped at once) */
 	NETWORK_CONNECTION_WRITE_TIMEOUT = 15000,
 	MAXIMUM_RESERVED_NETWORK_PORT = 1023,
+	/* datagrams that could not be read (too large, or empty) skipped in a
+	frame before the rest wait for the next */
+	MAXIMUM_SKIPPED_DATAGRAMS_PER_IDLE = 64,
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
 	_connection_closed_bit = 4,
@@ -966,7 +969,13 @@ static struct network_connection *network_connection_create_client_from_endpoint
 		TRUE,
 		"c:\\halo\\SOURCE\\networking\\network_connection.c",
 		0x347);
-	if (connection)
+	/* port: the endpoint deleted with a connection not made (as it is when
+	its queue is not) */
+	if (!connection)
+	{
+		delete_transport_endpoint(reliable_endpoint);
+	}
+	else
 	{
 		connection->flags = FLAG(_connection_create_serverside_client_bit);
 		connection->reliable_endpoint = reliable_endpoint;
@@ -1497,34 +1506,35 @@ static boolean network_connection_idle_server_reliable_endpoint(
 			{
 				if (endpoint == connection->connection.reliable_endpoint)
 				{
+					/* port: a client's place in the list (a client whose
+					stream failed is out of the set, and in the list until the
+					game closes it): with none free, one more is refused, not
+					accepted and let go with its socket */
+					long free_index;
+
+					for (free_index = 0;
+						free_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS && connection->client_list[free_index];
+						free_index++);
 					if (connection->allow_client_connections &&
+						free_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS &&
 						count_endpoints_in_set(connection->endpoint_set) < NETWORK_CONNECTION_MAXIMUM_CLIENTS + 1)
 					{
 						struct transport_endpoint *accepted_endpoint = accept_endpoint(endpoint);
 						struct network_connection *client_connection = NULL;
 
 						if (accepted_endpoint &&
-							set_endpoint_blocking(accepted_endpoint, FALSE) == _transport_error_none)
+							set_endpoint_blocking(accepted_endpoint, FALSE) != _transport_error_none)
 						{
-							client_connection = network_connection_create_client_from_endpoint(accepted_endpoint);
+							delete_transport_endpoint(accepted_endpoint);
+							accepted_endpoint = NULL;
 						}
+						/* (which deletes the endpoint if it fails) */
+						if (accepted_endpoint)
+							client_connection = network_connection_create_client_from_endpoint(accepted_endpoint);
 						if (client_connection)
 						{
-							long client_index;
-
-							for (client_index = 0; client_index < NETWORK_CONNECTION_MAXIMUM_CLIENTS; client_index++)
-							{
-								if (!connection->client_list[client_index])
-								{
-									*new_client_connection = client_connection;
-									connection->client_list[client_index] = client_connection;
-									break;
-								}
-							}
-							if (client_index >= NETWORK_CONNECTION_MAXIMUM_CLIENTS)
-							{
-								error(_error_silent, "error adding new client");
-							}
+							*new_client_connection = client_connection;
+							connection->client_list[free_index] = client_connection;
 						}
 						else
 						{
@@ -1680,6 +1690,9 @@ boolean network_connection_idle(
 	if (success && connection->unreliable_endpoint)
 	{
 		long free_space = circular_queue_free_space(connection->unreliable_incoming_queue);
+		/* port: the datagrams that could not be read, skipped (one too large,
+		or empty, which anyone may send), up to this many a frame */
+		long skipped = 0;
 
 		while (success &&
 			free_space >= DATAGRAM_MAXIMUM_SIZE + sizeof(unsigned long))
@@ -1726,6 +1739,11 @@ boolean network_connection_idle(
 				"endpoint read buffer overflowed");
 			if (buffer_size <= 0)
 			{
+				if ((buffer_size == 0 || buffer_size == _transport_error_endpoint_io) &&
+					++skipped < MAXIMUM_SKIPPED_DATAGRAMS_PER_IDLE)
+				{
+					continue;
+				}
 				return success;
 			}
 

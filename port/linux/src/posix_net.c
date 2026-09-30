@@ -784,7 +784,22 @@ int posix_discord_connect(void)
 				if (socket_descriptor < 0)
 					return -1;
 				if (connect(socket_descriptor, (struct sockaddr *)&address, sizeof(address)) == 0)
+				{
+#ifdef SO_PEERCRED
+					/* only this user's Discord (in /tmp another user may make
+					the socket, and would be given the invite) */
+					struct ucred credentials;
+					socklen_t length = sizeof(credentials);
+
+					if (getsockopt(socket_descriptor, SOL_SOCKET, SO_PEERCRED, &credentials, &length) == 0 &&
+						credentials.uid == getuid())
+					{
+						return socket_descriptor;
+					}
+#else
 					return socket_descriptor;
+#endif
+				}
 				close(socket_descriptor);
 			}
 		}

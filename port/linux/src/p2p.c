@@ -96,8 +96,11 @@ enum
 	MAXIMUM_OPENING_PEERS = 8,
 	/* stand-ins closed lately, whose traffic the game may not have read yet
 	(p2p_incoming) */
-	MAXIMUM_CLOSED_PORTS = 32,
+	MAXIMUM_CLOSED_PORTS = 128,
 	CLOSED_PORT_TIME = 5000,
+	/* a peer's stand-in used this lately is not closed for another: a peer
+	sending from ever new ports has a few a second, not one a datagram */
+	PROXY_REPLACE_TIME = 1000,
 	MAXIMUM_STUN_SERVERS = 4,
 	STREAM_BUFFER_SIZE = 16384,
 	STREAM_CHUNK_SIZE = 1024,
@@ -1281,7 +1284,7 @@ static struct proxy *find_proxy(int peer_index, unsigned short remote_port, int 
 	/* past a peer's few, its least used goes: no peer takes them all */
 	if (peer->proxy_count >= MAXIMUM_PEER_PROXIES)
 	{
-		if (!oldest)
+		if (!oldest || !elapsed(oldest->used_time, PROXY_REPLACE_TIME))
 			return NULL;
 		proxy_close(oldest);
 		free_proxy = oldest;
@@ -1586,13 +1589,19 @@ void p2p_port_taken(int stream, unsigned short port)
 	pthread_mutex_unlock(&p2p_lock);
 }
 
-void p2p_socket_closed(int socket)
+void p2p_socket_closed(int socket, unsigned short datagram_port)
 {
 	int index;
 
 	if (!p2p.running)
 		return;
 	pthread_mutex_lock(&p2p_lock);
+	/* (a port it sent peers datagrams from, which the system gives again) */
+	for (index = 0; index < MAXIMUM_SENT_PORTS && datagram_port; index++)
+	{
+		if (p2p.sent_ports[index] == datagram_port)
+			p2p.sent_ports[index] = 0;
+	}
 	for (index = 0; index < MAXIMUM_GAME_PORTS; index++)
 	{
 		if (p2p.game_ports[index].port && p2p.game_ports[index].socket == socket)
@@ -1624,7 +1633,7 @@ static int game_port_open(int stream, unsigned short port)
 	}
 	for (index = 0; index < MAXIMUM_SENT_PORTS && !stream; index++)
 	{
-		if (p2p.sent_ports[index] == port)
+		if (port && p2p.sent_ports[index] == port)
 			return 1;
 	}
 	return 0;
@@ -1761,6 +1770,14 @@ static void stream_message(struct stream *stream, unsigned char type, const void
 static void stream_local_closed(struct stream *stream)
 {
 	close_socket(&stream->socket);
+	/* (its port the system gives again now, not when the stream is let go
+	once the peer has all it sent: remembered from now, and no longer the
+	peer's while the stream lingers) */
+	if (stream->local_port)
+	{
+		remember_closed(1, stream->local_port, stream->peer, stream->remote_port);
+		stream->local_port = 0;
+	}
 	if (!stream->local_closed)
 	{
 		stream->local_closed = 1;

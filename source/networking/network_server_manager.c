@@ -2180,7 +2180,7 @@ static void network_game_server_refuse_late_joiner(
 	struct message_server_machine_rejected rejection = { _rejection_code_game_is_full };
 	struct network_message *message;
 
-	network_event("refusing machine #%d: no player of it can join the game in progress", machine->machine_index);
+	network_event("refusing machine #%d: no player of it can join the game", machine->machine_index);
 	message = create_network_game_message(_message_server_machine_rejected, &rejection, sizeof(rejection));
 	if (message)
 		network_game_server_send_message_to_client_machine(server, machine, message);
@@ -3857,6 +3857,15 @@ static boolean network_game_server_idle_pregame_tasks(
 				network_game_server_remove_client_machine_from_game(
 					server,
 					client_machine);
+			}
+			/* port: a machine that joined and can add no player (the lobby
+			filled after it joined) holds the countdown for ever: refused */
+			else if (network_game_server_client_machine_is_joined_to_game(server, client_machine) &&
+				!network_game_server_client_machine_is_local(server, client_machine) &&
+				!network_game_server_machine_has_players(server, client_machine->machine_index) &&
+				!network_game_has_free_player_slot(&server->game))
+			{
+				network_game_server_refuse_late_joiner(server, client_machine);
 			}
 		}
 

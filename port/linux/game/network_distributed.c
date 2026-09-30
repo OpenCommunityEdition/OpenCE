@@ -54,6 +54,7 @@ machine (their datum identifiers need not be).
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_globals.h"
 #include "game/players.h"
 #include "game/player_queues_new.h"
 #include "networking/network_game_globals.h"
@@ -62,6 +63,7 @@ machine (their datum identifiers need not be).
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+#include "units/biped_definitions.h"
 #include "network_distributed.h"
 
 #include <math.h>
@@ -123,6 +125,10 @@ enum
 	before it takes a newer as the anchor (the jitter and the blend granted
 	once a second, not once a tick) */
 	PREDICTION_ANCHOR_TICKS = TICKS_PER_SECOND,
+	/* ... and how long it remembers how fast its own copy of a client's
+	player went (an anchor's second, and the client's round trip: a client
+	learns of an explosion that throws its player a round trip late) */
+	PREDICTION_SPEED_TICKS = PREDICTION_ANCHOR_TICKS + MAXIMUM_ROUND_TRIP_TICKS,
 };
 
 /* struct distributed_unit_state flags */
@@ -178,9 +184,15 @@ good, the host's player somewhere its own is not) */
 #define REMOTE_CORRECTION_TOLERANCE 0.05f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
 /* how far from the origin a unit is (world units), and how fast a client's
-own player's unit moves (world units a tick) */
+own player's unit moves at most (world units a tick) */
 #define UNIT_WORLD_BOUND 32768.0f
 #define MAXIMUM_PREDICTED_SPEED 2.0f
+/* ... on foot: this many times as fast as a player runs and jumps, or as
+fast as the host's copy went lately (falling, thrown by an explosion),
+whichever is more; and how much further a tick than that it may be (world
+units a tick) */
+#define PREDICTED_ON_FOOT_SPEED_SCALE 2.0f
+#define PREDICTED_ON_FOOT_SPEED_MARGIN 0.05f
 
 /* how far players are from a client's own (world units) before the host
 sends them to it (their units and their input) every second tick, every
@@ -404,6 +416,14 @@ static struct
 	long taken_host_time;
 	real_point3d taken_host_position;
 } distributed_accepted[MAXIMUM_TRACKED_PLAYERS];
+/* ... how fast its own copy of each client's player's unit went on foot
+before it took their word (what its own tick did: a fall, an explosion),
+the most of this span of PREDICTION_SPEED_TICKS and of the one before */
+static struct
+{
+	long time;
+	real speeds[2];
+} distributed_host_speeds[MAXIMUM_TRACKED_PLAYERS];
 /* a client: where each of its own players' units was at its last ticks,
 and how long the host takes to have them (ticks) */
 static struct distributed_own_position
@@ -1536,16 +1556,82 @@ static void distributed_handle_predictions(
 	}
 }
 
+/* (the host) how fast a client's player's unit on foot may go (world units
+a tick): twice as fast as the player runs and jumps (their speed in the
+game, double speed), or as fast as the host's own copy went lately, before
+it took the client's word (its own tick's fall, or an explosion's throw,
+which the client learns of a round trip late), whichever is more; no more
+than MAXIMUM_PREDICTED_SPEED. The copy's speed is the client's word a tick
+before and what the host's tick did to it, so a client gains no speed from
+it that the game does not give. */
+static real distributed_on_foot_speed(
+	short player_index,
+	long unit_index)
+{
+	struct object_datum *object = object_get(unit_index);
+	struct player_datum *player = distributed_player(player_index);
+	struct game_globals *globals = scenario_get_game_globals();
+	long now = game_time_get();
+	real_vector3d const *velocity = &object->object.translational_velocity;
+	real host_speed = (real)sqrt(velocity->i * velocity->i + velocity->j * velocity->j + velocity->k * velocity->k);
+	real run_speed = 0.0f;
+	real jump_speed = 0.0f;
+	real speed;
+
+	/* (the host's copy's speed, noted: the most of each span) */
+	if (now < distributed_host_speeds[player_index].time ||
+		now - distributed_host_speeds[player_index].time >= 2 * PREDICTION_SPEED_TICKS)
+	{
+		distributed_host_speeds[player_index].time = now;
+		distributed_host_speeds[player_index].speeds[0] = 0.0f;
+		distributed_host_speeds[player_index].speeds[1] = 0.0f;
+	}
+	else if (now - distributed_host_speeds[player_index].time >= PREDICTION_SPEED_TICKS)
+	{
+		distributed_host_speeds[player_index].time = now;
+		distributed_host_speeds[player_index].speeds[1] = distributed_host_speeds[player_index].speeds[0];
+		distributed_host_speeds[player_index].speeds[0] = 0.0f;
+	}
+	/* (so written that a speed not a number is none) */
+	if (host_speed > distributed_host_speeds[player_index].speeds[0])
+		distributed_host_speeds[player_index].speeds[0] = host_speed;
+	/* (as bipeds.c moves a player: forward or back and sideways at once) */
+	if (globals && globals->player_information.count > 0)
+	{
+		struct game_globals_player_information *information = TAG_BLOCK_GET_ELEMENT(&globals->player_information, 0,
+			struct game_globals_player_information);
+		real forward = MAX(information->run_forward_speed, information->run_backward_speed);
+		real sideways = information->run_sideways_speed;
+
+		run_speed = (real)sqrt(forward * forward + sideways * sideways) / TICKS_PER_SECOND;
+		if (game_players_are_double_speed() && information->double_speed_multiplier > 1.0f)
+			run_speed *= information->double_speed_multiplier;
+	}
+	if (player && player->speed_multiplier > 1.0f)
+		run_speed *= player->speed_multiplier;
+	if (object->object.type == _object_type_biped)
+		jump_speed = biped_definition_get(object->definition_index)->biped.jump_velocity;
+	speed = PREDICTED_ON_FOOT_SPEED_SCALE * (real)sqrt(run_speed * run_speed + jump_speed * jump_speed);
+	/* (so written that a tag's speed not a number is none) */
+	if (!(speed >= 0.0f))
+		speed = 0.0f;
+	speed = MAX(speed, MAX(distributed_host_speeds[player_index].speeds[0],
+		distributed_host_speeds[player_index].speeds[1]));
+	/* (some: none is no bound, distributed_apply_state) */
+	speed = MAX(speed, PREDICTED_ON_FOOT_SPEED_MARGIN);
+	return MIN(speed, MAXIMUM_PREDICTED_SPEED);
+}
+
 /* (the host) the clients' players where they say, within a tolerance: a
 little off closed by half, more put there. Each accepted moves the host's
 unit, and the next is measured from there, so a client could take its
 player HOST_ACCEPT_TOLERANCE further each tick: a prediction is also no
 further from the anchor (one taken, a newer once a second) than the player
-moves in the client's ticks since (MAXIMUM_PREDICTED_SPEED), those no more
-than the host's since and a little jitter. A teleporter moves the host's
-own unit too, further than it moves since the last taken: it is measured
-from where the host has it only, a new anchor (as it is after a new life,
-or a ride). */
+moves in the client's ticks since (distributed_on_foot_speed, and a
+little more), those no more than the host's since and a little jitter; its
+velocity is no faster. A teleporter moves the host's own unit too, further
+than it moves since the last taken: it is measured from where the host has
+it only, a new anchor (as it is after a new life, or a ride). */
 static void distributed_apply_predictions(
 	void)
 {
@@ -1556,6 +1642,8 @@ static void distributed_apply_predictions(
 	{
 		struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
 		long unit_index = NONE;
+		real speed;
+		real reach_speed;
 
 		if (!distributed_predictions[player_index].valid && !distributed_accepted[player_index].valid)
 			continue;
@@ -1564,6 +1652,10 @@ static void distributed_apply_predictions(
 			unit_index = NONE;
 		if (distributed_accepted[player_index].valid && distributed_accepted[player_index].unit_index != unit_index)
 			distributed_accepted[player_index].valid = FALSE;
+		/* (how fast it may go, a tick, its own copy's speed noted before the
+		client's word is taken) */
+		speed = unit_index != NONE ? distributed_on_foot_speed(player_index, unit_index) : 0.0f;
+		reach_speed = MIN(speed + PREDICTED_ON_FOOT_SPEED_MARGIN, MAXIMUM_PREDICTED_SPEED);
 		if (!distributed_predictions[player_index].valid)
 			continue;
 		distributed_predictions[player_index].valid = FALSE;
@@ -1582,7 +1674,7 @@ static void distributed_apply_predictions(
 			{
 				long ticks = MIN(distributed_predictions[player_index].time - distributed_accepted[player_index].time,
 					now - distributed_accepted[player_index].host_time + PREDICTION_JITTER_TICKS);
-				real reach = MAXIMUM_PREDICTED_SPEED * (real)(now - distributed_accepted[player_index].taken_host_time) +
+				real reach = reach_speed * (real)(now - distributed_accepted[player_index].taken_host_time) +
 					HOST_BLEND_DISTANCE;
 
 				dx = object->object.position.x - distributed_accepted[player_index].taken_host_position.x;
@@ -1595,7 +1687,7 @@ static void distributed_apply_predictions(
 					distributed_accepted[player_index].valid = FALSE;
 				else
 				{
-					reach = MAXIMUM_PREDICTED_SPEED * (real)ticks + HOST_BLEND_DISTANCE;
+					reach = reach_speed * (real)ticks + HOST_BLEND_DISTANCE;
 					dx = state->position.x - distributed_accepted[player_index].position.x;
 					dy = state->position.y - distributed_accepted[player_index].position.y;
 					dz = state->position.z - distributed_accepted[player_index].position.z;
@@ -1604,8 +1696,7 @@ static void distributed_apply_predictions(
 				}
 			}
 			/* (the client told which of its ticks the host has it at) */
-			if (distributed_apply_state(unit_index, state, &state->position, 0.0f, HOST_BLEND_DISTANCE,
-				MAXIMUM_PREDICTED_SPEED))
+			if (distributed_apply_state(unit_index, state, &state->position, 0.0f, HOST_BLEND_DISTANCE, speed))
 			{
 				distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 				distributed_predictions[player_index].taken_host_time = now;

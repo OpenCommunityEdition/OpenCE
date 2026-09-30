@@ -133,6 +133,47 @@ enum
 
 static HANDLE discord_pipes[MAXIMUM_DISCORD_PIPES];
 
+/* a token's user, into buffer; NULL if not had */
+static PSID token_user(HANDLE token, BYTE *buffer, DWORD size)
+{
+	DWORD length = 0;
+
+	if (!GetTokenInformation(token, TokenUser, buffer, size, &length))
+		return NULL;
+	return ((TOKEN_USER *)buffer)->User.Sid;
+}
+
+/* whether the pipe's server runs as this process's user (pipe names are
+the whole machine's: another user may make one, and would be given the
+invite) */
+static int pipe_server_is_this_user(HANDLE pipe)
+{
+	BYTE ours[256], theirs[256];
+	ULONG process_id = 0;
+	HANDLE process, token;
+	PSID our_user = NULL, their_user = NULL;
+	int result;
+
+	if (!GetNamedPipeServerProcessId(pipe, &process_id))
+		return 0;
+	if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+	{
+		our_user = token_user(token, ours, sizeof(ours));
+		CloseHandle(token);
+	}
+	process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+	if (!process)
+		return 0;
+	if (OpenProcessToken(process, TOKEN_QUERY, &token))
+	{
+		their_user = token_user(token, theirs, sizeof(theirs));
+		CloseHandle(token);
+	}
+	CloseHandle(process);
+	result = our_user && their_user && EqualSid(our_user, their_user);
+	return result;
+}
+
 int posix_discord_connect(void)
 {
 	int slot;
@@ -155,7 +196,7 @@ int posix_discord_connect(void)
 			what fits in the pipe */
 			DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
 
-			if (!SetNamedPipeHandleState(pipe, &mode, NULL, NULL))
+			if (!pipe_server_is_this_user(pipe) || !SetNamedPipeHandleState(pipe, &mode, NULL, NULL))
 			{
 				CloseHandle(pipe);
 				continue;

@@ -370,6 +370,9 @@ Only machines with the invite can find the game:
   must ask again sends a new request.
 - The host tries to reach at most 8 new players at the same time. The
   other players ask again.
+- The host does the key work of at most 20 requests each second from keys
+  that it does not know, after a first 32. Thus a flood of requests does
+  not stop the connections of the players.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection
@@ -424,6 +427,7 @@ Discord (through the application of `discord.application_id`). The activity
 has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
+The game sends the activity only to a Discord client of the same user.
 
 ## What operates
 
