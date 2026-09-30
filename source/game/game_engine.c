@@ -561,6 +561,9 @@ symbols in this file:
 #include "math/integer_math.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#ifdef HALO_WEB
+#include "networking/network_migration.h"
+#endif
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
 #include "physics/collision_features.h"
@@ -1456,6 +1459,11 @@ static void rasterize_in_game_score_draw_line(
 	wide_tab_stops[0] = 130;
 	wide_tab_stops[1] = 195;
 	wide_tab_stops[2] = 315;
+#ifdef HALO_WEB
+	/* Leave room for the host label beside a full-length player name. */
+	narrow_tab_stops[2] += 50;
+	wide_tab_stops[2] += 50;
+#endif
 
 	if (bounds.x1 - bounds.x0 > 320)
 		tab_stops = wide_tab_stops;
@@ -1675,6 +1683,32 @@ long populate_statistic_buffer(
 
 
 
+#ifdef HALO_WEB
+static long game_engine_score_host_player(void)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	short host_machine, index;
+	long *players;
+
+	if (!client || !network_game_is_active())
+		return NONE;
+	host_machine = network_game_client_migration_host_machine(client);
+	if (host_machine < 0 || host_machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return NONE;
+	players = machine_get_player_list(host_machine);
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	{
+		struct player_datum *player = player_try_and_get(players[index]);
+		/* Departed score datums can share a reused machine ID. Only the
+		current input owner is eligible for the host label. */
+		if (player && !player->quit_out_of_game &&
+			player->network_player_data.machine_index == host_machine)
+			return players[index];
+	}
+	return NONE;
+}
+#endif
+
 static long select_players_to_display(
 	long statistic,
 	long player_index,
@@ -1685,6 +1719,9 @@ static long select_players_to_display(
 	long player_count;
 	boolean debug;
 	long entry_index;
+#ifdef HALO_WEB
+	long host_player_index = game_engine_score_host_player();
+#endif
 
 	player_count = populate_statistic_buffer(entries, statistic, 0);
 	debug = rasterizer_debug_options.postgame_player_list_debug == 'E';
@@ -1704,7 +1741,11 @@ static long select_players_to_display(
 
 	if (player_count > maximum_count)
 	{
-		struct postgame_statistic_entry local_entries[MAXIMUM_LOCAL_PLAYERS];
+		struct postgame_statistic_entry local_entries[MAXIMUM_LOCAL_PLAYERS
+#ifdef HALO_WEB
+			+ 1 /* Keep the host visible alongside this machine's local players. */
+#endif
+		];
 		long local_player_count = 0;
 		long local_index;
 
@@ -1712,7 +1753,11 @@ static long select_players_to_display(
 		{
 			struct player_datum *player = player_get(entries[entry_index].values[0]);
 
-			if (player && player->local_player_index != NONE)
+			if (player && (player->local_player_index != NONE
+#ifdef HALO_WEB
+				|| entries[entry_index].values[0] == host_player_index
+#endif
+				))
 			{
 				if (debug)
 				{
@@ -1734,7 +1779,11 @@ static long select_players_to_display(
 			{
 				struct player_datum *player = player_get(entries[insertion_index].values[0]);
 
-				if (player->local_player_index == NONE)
+				if (player->local_player_index == NONE
+#ifdef HALO_WEB
+					&& entries[insertion_index].values[0] != host_player_index
+#endif
+					)
 				{
 					csmemmove(
 						&entries[insertion_index],
@@ -1775,6 +1824,9 @@ static void game_engine_rasterize_in_game_score(
 	long string_list_index;
 	wchar_t *column_name;
 	wchar_t *score_name;
+#ifdef HALO_WEB
+	long host_player_index = game_engine_score_host_player();
+#endif
 
 	if (game_engine)
 		has_teams = global_variant.universal_variant.teams;
@@ -1895,12 +1947,24 @@ static void game_engine_rasterize_in_game_score(
 					place_string = place_ordinal_string(raw_place, FALSE);
 #endif
 
+#ifdef HALO_WEB
+				usnprintf(
+					row_string,
+					NUMBEROF(row_string),
+					L"\t%s\t%s%s\t%s",
+					place_string,
+					player->name,
+					entry_player_index == host_player_index ? L" (HOST)" : L"",
+					status_string);
+				row_string[NUMBEROF(row_string) - 1] = 0;
+#else
 				usprintf(
 					row_string,
 					L"\t%s\t%s\t%s",
 					place_string,
 					player->name,
 					status_string);
+#endif
 
 				if (has_teams)
 					row_color = &team_colors[PIN(player->team_index, 0, 1)];
