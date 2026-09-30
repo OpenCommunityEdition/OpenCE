@@ -6,12 +6,14 @@
 #   port/macos/sign_app.sh                 sign (the first Developer ID Application identity)
 #   SIGN_IDENTITY=<sha1 or name> port/macos/sign_app.sh
 #   NOTARY_PROFILE=<profile> port/macos/sign_app.sh    sign, notarize and staple
+#   APP=build/macos-release/Halo.app port/macos/sign_app.sh   another bundle (the release build)
 #
 # A notarytool profile is made once with
 #   xcrun notarytool store-credentials <profile> --apple-id <id> --team-id <team>
 # (it asks for an app-specific password).
 set -e
-app=build/macos/Halo.app
+app=${APP:-build/macos/Halo.app}
+out=$(dirname "$app")
 identity=${SIGN_IDENTITY:-$(security find-identity -v -p codesigning | awk '/Developer ID Application/ {print $2; exit}')}
 if [ -z "$identity" ]; then
 	echo "no Developer ID Application identity in the keychain" >&2
@@ -24,15 +26,15 @@ codesign --force --timestamp --options runtime --entitlements port/macos/Halo.en
 	--sign "$identity" "$app"
 codesign --verify --deep --strict --verbose=1 "$app"
 if [ -n "$NOTARY_PROFILE" ]; then
-	zip=build/macos/Halo.zip
+	zip="$out/Halo.zip"
 	rm -f "$zip"
 	ditto -c -k --keepParent "$app" "$zip"
 	xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --wait
 	xcrun stapler staple "$app"
 	spctl --assess --type execute --verbose "$app"
 	rm -f "$zip"
-	ditto -c -k --keepParent "$app" build/macos/Halo-macos-arm64.zip
-	echo "notarized: build/macos/Halo-macos-arm64.zip"
+	ditto -c -k --keepParent "$app" "$out/Halo-macos-arm64.zip"
+	echo "notarized: $out/Halo-macos-arm64.zip"
 else
 	echo "signed (not notarized: set NOTARY_PROFILE to notarize)"
 fi

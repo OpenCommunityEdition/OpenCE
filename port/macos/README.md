@@ -251,6 +251,14 @@ code for the window, the mouse, the keyboard and the first start.
 
 ## Performance
 
+- Two builds: `ninja macos_app` makes `build/macos/Halo.app`, with the
+  original's debug checks (assertions: the game stops at the one that
+  fails and says where), for finding bugs; `ninja macos_release_app` makes
+  `build/macos-release/Halo.app` without them (`HALO_RELEASE`), for playing.
+  Both use the same data, saves and settings.
+  `APP=build/macos-release/Halo.app port/macos/sign_app.sh` signs the
+  release build.
+
 - The native guest is compiled for the M1 (`-mcpu=apple-m1`), without
   fused multiply-add and without `-ffast-math`, so the results are those
   of the other builds (refer to "Tests").
