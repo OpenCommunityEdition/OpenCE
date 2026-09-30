@@ -98,11 +98,9 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/sort.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_internal.h"
-#include "bitmaps/bitmaps_mipmap.h"
+#include "bitmaps/bitmaps.h"
 #include "cache/cache_files.h"
 #include "cache/texture_cache.h"
-#include "cache/xbox_texture_cache.h"
 #include "cache/physical_memory_map.h"
 #include "interface/interface.h"
 #include "interface/terminal.h"
@@ -262,6 +260,12 @@ static void texture_cache_delete_block_proc(
 	long block_index);
 static const char *texture_cache_name_block_proc(
 	long block_index);
+long bitmap_format_to_d3d_format(
+	short format,
+	word flags);
+long bitmap_format_to_d3d_linear_format(
+	short format,
+	word flags);
 static boolean compare(
 	struct bitmap_data *first,
 	struct bitmap_data *second);

@@ -1,5 +1,13 @@
 # saved_game_files worker ledger (lane claude/fifty-objects-20260925)
 
+2026-09-27 correction: the historical static-drop experiment below did **not**
+prove external linkage. First-party September map Static symbols records and
+canonical's already-recovered static helpers with real inlined calls refute
+that inference. Preserve the original experiment as history, but do not reuse
+its "provably external" conclusion. See
+`docs/object_matching_logs/storage_reference_research_20260927.md` for the
+primary line references, current-state check and unchanged original-bug holds.
+
 Target: _saved_game_files_enumerate_available_to_local_player_index (368 padded, park unclassified).
 Park reason: prior donor made it exact by moving `number_of_available_profiles = 0` inside the
 successful outer mutex branch (final unconditional store then reads uninitialised local on

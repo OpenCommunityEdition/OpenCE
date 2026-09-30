@@ -136,7 +136,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/profile_rasterizer.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 #include <xtl.h>
 
@@ -243,7 +243,6 @@ static void frame_callback_function(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static LARGE_INTEGER rasterizer_profile_performance_counter_frequency = { 1 };
 static struct rasterizer_profile_globals rasterizer_profile_globals =
@@ -605,8 +604,8 @@ void rasterizer_profile_dispose(
 static boolean rasterizer_profile_enabled(
 	void)
 {
-	return rasterizer_debug_options.stats == 3 ||
-		rasterizer_debug_options.profile_log;
+	return rasterizer_debug_options.statistics_mode == 3 ||
+		rasterizer_debug_options.profile_log_enabled;
 }
 
 static void profile_assert(

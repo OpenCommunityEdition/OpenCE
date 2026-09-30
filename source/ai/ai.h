@@ -97,10 +97,16 @@ struct ai_information_packet
 
 void ai_initialize(
 	void);
+void ai_dispose(
+	void);
+void ai_dispose_from_old_map(
+	void);
 void ai_initialize_for_new_map(
 	void);
 void ai_place(
 	void);
+void ai_globals_ai_active(
+	boolean enabled);
 void ai_update(
 	void);
 void ai_disconnect_from_structure_bsp(
@@ -109,8 +115,16 @@ void ai_reconnect_to_structure_bsp(
 	void);
 void ai_globals_dialogue_triggers_enabled(
 	boolean enabled);
+void ai_globals_grenades_enabled(
+	boolean enabled);
 void ai_update_team_status(
 	void);
+void ai_handle_bump(
+	long unit_index,
+	long object_index,
+	union real_vector3d const *old_velocity);
+void ai_create_mounted_weapons_for_unit(
+	long unit_index);
 long ai_get_race_from_team_index(
 	short team_index);
 void ai_get_major_upgrade_chance(
@@ -118,6 +132,11 @@ void ai_get_major_upgrade_chance(
 	boolean *upgrade_major,
 	boolean *random,
 	real *chance);
+void ai_erase(
+	long encounter_index,
+	long platoon_index,
+	long squad_index,
+	boolean immediate);
 boolean ai_consider_major_upgrade(
 	long encounter_index,
 	short squad_index,
@@ -131,14 +150,33 @@ boolean ai_try_vehicle_eviction(
 	long actor_index,
 	long entering_unit_index,
 	boolean immediate);
+long ai_get_responsible_unit(
+	long object_index,
+	boolean responsible_for_weapon_fire);
+void ai_handle_death(
+	long unit_index,
+	long killer_object_index,
+	short damage_category);
+boolean ai_handle_killing_spree(
+	long unit_index,
+	short killing_spree_count);
+void ai_handle_allegiance_status_changed(
+	short team1_index,
+	short team2_index,
+	boolean currently_broken,
+	boolean permanently_broken);
+void ai_handle_allegiance_broken_notification(
+	short team1_index,
+	short team2_index,
+	boolean broken);
 boolean ai_test_ballistic_line_of_fire(
 	long actor_index,
 	union real_point3d const *origin,
-	real ticks,
-	union real_vector3d const *velocity,
-	real gravity,
+	real arc_time,
+	union real_vector3d const *arc_initial_velocity,
+	real arc_acceleration,
 	long ignore_object_index,
-	boolean in_vehicle);
+	boolean ignore_vehicles);
 boolean ai_test_line_of_fire(
 	long actor_index,
 	long ignore_unit_index,
@@ -184,6 +222,12 @@ void ai_handle_damage(
 	real fraction,
 	union real_vector3d *damage_velocity,
 	boolean delayed);
+void ai_handle_deleted_object(
+	long object_index);
+void ai_handle_unit_effect(
+	long unit_index,
+	short effect_type,
+	short volume);
 void ai_handle_enter_vehicle(
 	long unit_index,
 	long vehicle_index);

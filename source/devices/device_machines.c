@@ -30,6 +30,7 @@ symbols in this file:
 
 #include "device_machines.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "memory/data.h"
 #include "units/bipeds.h"
 #include "units/unit_definitions.h"
@@ -66,9 +67,6 @@ struct device_group_datum
 
 /* ---------- prototypes */
 
-boolean game_team_is_enemy(
-	short team_index0,
-	short team_index1);
 /* ---------- globals */
 
 /* ---------- public code */

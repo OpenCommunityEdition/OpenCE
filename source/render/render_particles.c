@@ -65,7 +65,7 @@ typedef char rendered_particle_size_assert[
 
 /* ---------- globals */
 
-struct profile_section render_particles_section =
+static struct profile_section render_particles_section =
 {
 	"render_particles",
 	NONE,
@@ -109,7 +109,7 @@ boolean local_player_is_first_person(
 	return result;
 }
 
-int __cdecl compare_rendered_particles(
+static int __cdecl compare_rendered_particles(
 	void const *left_pointer,
 	void const *right_pointer)
 {

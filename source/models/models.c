@@ -72,6 +72,7 @@ symbols in this file:
 #include "game/game.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -79,6 +80,8 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
+#include "rasterizer/rasterizer_console_vars.h"
+#include "rasterizer/rasterizer_model_types.h"
 
 /* ---------- constants */
 
@@ -208,13 +211,6 @@ struct shader_model_definition
 	real translucency;
 };
 
-struct rasterizer_model_skinning
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
-};
-
 struct render_sort_filth
 {
 	short *previous_group_presorted_index_reference;
@@ -225,38 +221,8 @@ struct render_sort_filth
 	word pad;
 };
 
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	byte reserved[0x20];
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct rasterizer_model_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct render_model_effect effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
-
 typedef char verify_render_model_effect_size[sizeof(struct render_model_effect) == 0x28 ? 1 : -1];
 typedef char verify_rasterizer_model_begin_parameters_size[sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
-
-struct rasterizer_debug_options
-{
-	byte reserved[8];
-	short debug_model_lod;
-	byte trailing[0x5E];
-};
-
-typedef char verify_rasterizer_debug_options_size[sizeof(struct rasterizer_debug_options) == 0x68 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -265,15 +231,16 @@ typedef char verify_rasterizer_debug_options_size[sizeof(struct rasterizer_debug
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
 	short forced_shader_permutation_index,
 	long flags);
+static void model_geometry_part_build_tangent_matrices(
+	struct model_geometry_part *part);
 
 /* ---------- globals */
 
-extern struct rasterizer_debug_options rasterizer_debug_options;
 extern boolean rasterizer_model_cortana_hack;
 
 extern boolean render_model_nodes;
@@ -287,14 +254,14 @@ static real_rgb_color default_render_model_change_colors[MAXIMUM_CHANGE_COLORS_P
 static struct render_model_effect default_render_model_effect = { 0 };
 static char default_render_model_region_permutation_indices[MAXIMUM_REGIONS_PER_MODEL] = { 0 };
 
-struct profile_section render_model_section = { "render_model", NONE, TRUE };
+static struct profile_section render_model_section = { "render_model", NONE, TRUE };
 
 /* ---------- private code */
 
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
 	short forced_shader_permutation_index,
@@ -740,17 +707,17 @@ void model_build_tangent_matrices(
 
 		for (part_index = 0; part_index < geometry->parts.count; part_index++)
 		{
-			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(
+			model_geometry_part_build_tangent_matrices(TAG_BLOCK_GET_ELEMENT(
 				&geometry->parts,
 				part_index,
-				struct model_geometry_part);
+				struct model_geometry_part));
 		}
 	}
 
 	return;
 }
 
-void model_geometry_part_build_tangent_matrices(
+static void model_geometry_part_build_tangent_matrices(
 	struct model_geometry_part *part)
 {
 	return;

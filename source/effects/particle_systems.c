@@ -132,18 +132,18 @@ static void particle_system_delete(
 	long system_index);
 static boolean particle_system_initialize(
 	long system_index);
-void particle_system_update_default(
+static void particle_system_update_default(
 	struct particle_system_datum *system,
 	real delta_time);
-void particle_system_update_explosion(
+static void particle_system_update_explosion(
 	struct particle_system_datum *system,
 	real delta_time);
-void particle_system_new_particle_default(
+static void particle_system_new_particle_default(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
 	struct object_marker const *marker);
-void particle_system_update(
+static void particle_system_update(
 	real delta_time,
 	long system_index);
 static void particle_system_render(
@@ -155,17 +155,17 @@ static void particle_system_next_type_state_index(
 static void particle_system_next_particle_state_index(
 	struct ps_particle_datum *particle,
 	struct particle_system_type const *type_definition);
-void particle_system_new_particle_explosion(
+static void particle_system_new_particle_explosion(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
 	struct object_marker const *marker);
-void particle_system_update_particle_default(
+static void particle_system_update_particle_default(
 	struct particle_system_datum const *system,
 	short type_index,
 	real delta_time,
 	struct ps_particle_datum *particle);
-void particle_system_new_particle_jet(
+static void particle_system_new_particle_jet(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
@@ -201,6 +201,8 @@ static particle_system_particle_update_proc const particle_update_functions[] =
 
 real const ground_error = 0.05f;
 static real const seconds_per_tick = 1.0f/TICKS_PER_SECOND;
+struct data_array *particle_systems;
+struct data_array *system_particles;
 
 /* ---------- public code */
 
@@ -576,7 +578,7 @@ static boolean particle_system_initialize(
 	return success;
 }
 
-void particle_system_update_default(
+static void particle_system_update_default(
 	struct particle_system_datum *system,
 	real delta_time)
 {
@@ -601,7 +603,7 @@ void particle_system_update_default(
 	return;
 }
 
-void particle_system_new_particle_default(
+static void particle_system_new_particle_default(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
@@ -613,7 +615,7 @@ void particle_system_new_particle_default(
 	return;
 }
 
-void particle_system_update_explosion(
+static void particle_system_update_explosion(
 	struct particle_system_datum *system,
 	real delta_time)
 {
@@ -800,7 +802,7 @@ void particle_systems_update(
 	return;
 }
 
-void particle_system_update_particle_default(
+static void particle_system_update_particle_default(
 	struct particle_system_datum const *system,
 	short type_index,
 	real delta_time,
@@ -901,7 +903,7 @@ void particle_system_update_particle_default(
 	return;
 }
 
-void particle_system_new_particle_explosion(
+static void particle_system_new_particle_explosion(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
@@ -952,7 +954,7 @@ void particle_system_new_particle_explosion(
 	return;
 }
 
-void particle_system_new_particle_jet(
+static void particle_system_new_particle_jet(
 	struct particle_system_datum const *system,
 	short type_index,
 	struct ps_particle_datum *particle,
@@ -1037,7 +1039,7 @@ static void randomize_particle_variables(
 	return;
 }
 
-void particle_system_update(
+static void particle_system_update(
 	real delta_time,
 	long system_index)
 {

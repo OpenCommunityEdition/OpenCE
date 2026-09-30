@@ -61,6 +61,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "hs/hs.h"
 #include "hs/hs_scenario_definitions.h"
 #include "memory/byte_swapping.h"
 #include "memory/data.h"
@@ -73,8 +74,6 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-extern char *hs_script_type_names[];
-extern char *hs_type_names[];
 static void hs_syntax_data_byte_swap(
 	void *owner,
 	void *data,

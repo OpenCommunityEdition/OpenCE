@@ -34,6 +34,15 @@ struct _projectile_datum
 	real detonation_timer;
 	real detonation_timer_delta;
 	real arming_time;
+	real arming_time_delta;
+	real odometer;
+	real deceleration_timer;
+	real deceleration_timer_delta;
+	real deceleration;
+	real maximum_damage_distance;
+	real_vector3d rotation_axis;
+	real rotation_sine;
+	real rotation_cosine;
 };
 
 struct projectile_datum

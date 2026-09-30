@@ -42,6 +42,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint.h"
 #include "hs/hs.h"
@@ -83,7 +84,7 @@ static boolean process_telnet_client_buffer(
 
 /* ---------- globals */
 
-struct telnet_console_globals telnet_console_globals = {0};
+static struct telnet_console_globals telnet_console_globals = {0};
 
 /* ---------- public code */
 

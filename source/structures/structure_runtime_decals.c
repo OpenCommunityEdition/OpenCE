@@ -52,7 +52,7 @@ struct structure_decals_globals
 
 /* ---------- globals */
 
-struct structure_decals_globals *structure_decals_globals = NULL;
+static struct structure_decals_globals *structure_decals_globals = NULL;
 
 /* ---------- public code */
 

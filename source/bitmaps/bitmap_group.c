@@ -302,7 +302,6 @@ symbols in this file:
 
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmaps_internal.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
 #include "tag_files/tag_files.h"
@@ -377,10 +376,10 @@ typedef char tag_group_size_assert[sizeof(struct tag_group) == 0x60 ? 1 : -1];
 
 /* ---------- prototypes */
 
-boolean postprocess_bitmap(
+static boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing);
-void delete_bitmap(
+static void delete_bitmap(
 	struct tag_block *block,
 	long element_index);
 static boolean postprocess_bitmap_group(
@@ -810,30 +809,30 @@ short bitmap_group_add_bitmap(
 	short format,
 	short mipmap_count)
 {
-	struct bitmap_data new_bitmap_data;
+	struct bitmap_data fake_bitmap;
 	long pixels_end = 0;
 	long previous_count;
 	long pixel_data_size;
 
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c", 0x2DB, group);
 
-	new_bitmap_data.type = type;
-	new_bitmap_data.flags = 0;
-	new_bitmap_data.registration_point.y = 0;
-	new_bitmap_data.registration_point.x = 0;
-	new_bitmap_data.mipmap_count = mipmap_count;
-	new_bitmap_data.pixels_offset = 0;
-	new_bitmap_data.hardware_format = NULL;
-	new_bitmap_data.base_address = NULL;
-	new_bitmap_data.signature = BITMAP_GROUP_TAG;
-	new_bitmap_data.width = width;
-	new_bitmap_data.height = height;
-	new_bitmap_data.depth = depth;
-	new_bitmap_data.format = format;
+	fake_bitmap.type = type;
+	fake_bitmap.flags = 0;
+	fake_bitmap.registration_point.y = 0;
+	fake_bitmap.registration_point.x = 0;
+	fake_bitmap.mipmap_count = mipmap_count;
+	fake_bitmap.pixels_offset = 0;
+	fake_bitmap.hardware_format = NULL;
+	fake_bitmap.base_address = NULL;
+	fake_bitmap.signature = BITMAP_GROUP_TAG;
+	fake_bitmap.width = width;
+	fake_bitmap.height = height;
+	fake_bitmap.depth = depth;
+	fake_bitmap.format = format;
 
 	if (group->type == _bitmap_group_type_interface_bitmaps)
 	{
-		SET_FLAG(new_bitmap_data.flags, _bitmap_linear_bit, TRUE);
+		SET_FLAG(fake_bitmap.flags, _bitmap_linear_bit, TRUE);
 	}
 	else if ((width & (width - 1)) ||
 		(height & (height - 1)) ||
@@ -861,18 +860,18 @@ short bitmap_group_add_bitmap(
 	else
 	{
 		SET_FLAG(
-			new_bitmap_data.flags,
+			fake_bitmap.flags,
 			_bitmap_has_power_of_two_dimensions_bit,
 			TRUE);
 	}
 
 	if (format >= _bitmap_format_dxt1 && format <= _bitmap_format_dxt5)
 	{
-		SET_FLAG(new_bitmap_data.flags, _bitmap_compressed_bit, TRUE);
+		SET_FLAG(fake_bitmap.flags, _bitmap_compressed_bit, TRUE);
 	}
 	if (format == _bitmap_format_p8_bump)
 	{
-		SET_FLAG(new_bitmap_data.flags, _bitmap_palettized_bit, TRUE);
+		SET_FLAG(fake_bitmap.flags, _bitmap_palettized_bit, TRUE);
 	}
 
 	/* January repeats these validation guards after assigning format flags. */
@@ -887,7 +886,7 @@ short bitmap_group_add_bitmap(
 		return NONE;
 	}
 	if (!TEST_FLAG(
-		new_bitmap_data.flags,
+		fake_bitmap.flags,
 		_bitmap_has_power_of_two_dimensions_bit) &&
 		group->type != _bitmap_group_type_interface_bitmaps)
 	{
@@ -901,7 +900,7 @@ short bitmap_group_add_bitmap(
 	}
 
 	previous_count = group->bitmaps.count;
-	pixel_data_size = bitmap_get_pixel_data_size(&new_bitmap_data);
+	pixel_data_size = bitmap_get_pixel_data_size(&fake_bitmap);
 	if (tag_block_resize(&group->bitmaps, group->bitmaps.count + 1) &&
 		tag_data_resize(&group->pixel_data, group->pixel_data.size + pixel_data_size))
 	{
@@ -969,7 +968,7 @@ short bitmap_group_add_bitmap(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_group.c",
 				0x371,
 				new_bitmap);
-			csmemcpy(new_bitmap, &new_bitmap_data, sizeof(new_bitmap_data));
+			csmemcpy(new_bitmap, &fake_bitmap, sizeof(fake_bitmap));
 			new_bitmap->pixels_offset = pixels_end;
 			new_bitmap->base_address = (byte *)group->pixel_data.address + pixels_end;
 			csmemset(new_bitmap->base_address, 0, pixel_data_size);
@@ -987,14 +986,14 @@ short bitmap_group_add_bitmap(
 
 /* ---------- private code */
 
-boolean postprocess_bitmap(
+static boolean postprocess_bitmap(
 	struct bitmap_data *bitmap,
 	boolean editing)
 {
 	return TRUE;
 }
 
-void delete_bitmap(
+static void delete_bitmap(
 	struct tag_block *block,
 	long element_index)
 {

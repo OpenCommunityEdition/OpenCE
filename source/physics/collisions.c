@@ -144,22 +144,6 @@ struct collision_usage_times
 
 /* ---------- prototypes */
 
-boolean collision_bsp_test_pill_new(
-	struct collision_bsp const *bsp,
-	short breakable_surface_count,
-	byte const *breakable_surface_flags,
-	real_point3d const *point,
-	real_vector3d const *vector,
-	real radius,
-	real *t,
-	real_vector3d *normal);
-boolean collision_bsp_test_pill(
-	struct collision_bsp const *bsp,
-	real_point3d const *point,
-	real_vector3d const *vector,
-	real radius,
-	real maximum_t,
-	struct collision_bsp_test_pill_result *result);
 static boolean object_test_point(
 	long object_index,
 	unsigned long flags,
@@ -253,18 +237,17 @@ boolean collision_test_point(
 	real_point3d const *point,
 	long ignore_object_index)
 {
-	unsigned long collision_flags = flags;
 	long leaf_index;
 	long reference_index;
 	boolean test_objects;
 
-	if (!(collision_flags & _collision_test_environment_flags))
+	if (!(flags & _collision_test_environment_flags))
 	{
 		goto no_collision;
 	}
 
 	leaf_index = bsp3d_test_point(global_bsp3d_get(), 0, point);
-	test_objects = TEST_FLAG(collision_flags, _collision_test_objects_bit);
+	test_objects = TEST_FLAG(flags, _collision_test_objects_bit);
 	if (debug_collision_skip_objects)
 	{
 		test_objects = FALSE;
@@ -291,7 +274,7 @@ boolean collision_test_point(
 			object_index != NONE;
 			object_index = cluster_get_next_collideable_object(&reference_index))
 		{
-			if (object_test_point(object_index, collision_flags, point, ignore_object_index))
+			if (object_test_point(object_index, flags, point, ignore_object_index))
 			{
 				goto collision;
 			}

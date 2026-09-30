@@ -99,7 +99,7 @@ void disconnect_endpoint(
 	struct transport_endpoint *endpoint);
 short poll_endpoint_set(
 	struct transport_endpoint_set *set,
-	word timeout);
+	word millisec_timeout);
 void rewind_endpoint_set(
 	struct transport_endpoint_set *set);
 struct transport_endpoint *get_next_endpoint_from_set(
@@ -116,9 +116,6 @@ short delete_endpoint_set(
 	struct transport_endpoint_set *set);
 void delete_transport_endpoint(
 	struct transport_endpoint *endpoint);
-void transport_get_nonce(
-	void *nonce,
-	long nonce_length);
 char const *winsock_error_to_string(
 	long error);
 

@@ -492,12 +492,12 @@ real object_light_ambient_scale = 0.4f;
 real object_light_secondary_scale = 1.0f;
 boolean object_light_interpolate = TRUE;
 
-extern boolean debug_lights;
-extern boolean debug_object_lights;
-extern struct data_array *light_data;
-extern struct cluster_partition light_cluster_partition;
+boolean debug_lights;
+boolean debug_object_lights;
+struct data_array *light_data;
+struct cluster_partition light_cluster_partition;
 struct lights_game_globals *lights_game_globals = NULL;
-extern short debug_rasterizer_light_count;
+short debug_rasterizer_light_count;
 struct lights_globals lights_globals;
 
 /* ---------- public code */

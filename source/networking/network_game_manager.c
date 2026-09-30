@@ -17,7 +17,7 @@ symbols in this file:
 0011A410 00b0:
 	_network_game_reset_for_next_round (0000)
 0011A4C0 0010:
-	_network_game_dump (0000)
+	_network_game_assign_players_to_team (0000)
 0011A4D0 0030:
 	_network_player_is_valid (0000)
 0011A500 00b0:
@@ -139,50 +139,6 @@ struct game_options
 	short difficulty;
 	unsigned long random_seed;
 	char map_name[256];
-};
-
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte __padding41[3];
-};
-
-struct network_game_map
-{
-	long __unknown0;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte __padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[16];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte __padding10C;
-	byte game_mode;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte __padding10F;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[NETWORK_GAME_MACHINE_SLOTS];
-	short player_count;
-	struct network_player players[NETWORK_GAME_PLAYER_SLOTS];
-	short __unknown426;
-	unsigned long random_seed;
-	byte __unknown42C[4];
-	struct network_game_local_data local_data;
 };
 
 #ifdef HALO_LINUX
@@ -360,7 +316,7 @@ void network_game_end_and_load_ui(
 	return;
 }
 
-void network_game_dump(
+void network_game_assign_players_to_team(
 	struct network_game *game,
 	char const *prefix)
 {
@@ -380,7 +336,7 @@ boolean network_game_add_player(
 		0xBB,
 		game && player);
 
-	if (game->player_count < game->maximum_player_count)
+	if (game->player_count < game->maximum_players)
 	{
 		if (VALID_INDEX(player->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
 			VALID_INDEX(player->controller_index, MAXIMUM_LOCAL_PLAYERS))
@@ -594,8 +550,9 @@ void network_game_invalidate(
 		network_game_invalidate_machine(game, (short)machine_index);
 
 	csmemset(game->players, NONE, sizeof(game->players));
-	game->game_mode = 2;
-	game->maximum_player_count = NETWORK_GAME_PLAYER_SLOTS;
+	game->minimum_players = 2;
+	/* (port: 128 in the native builds, halo_port_limits.h) */
+	game->maximum_players = NETWORK_GAME_PLAYER_SLOTS;
 	game->local_data.game_objects_loaded = FALSE;
 
 	return;

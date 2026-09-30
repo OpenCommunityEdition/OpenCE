@@ -255,7 +255,8 @@ struct physics_mass_point_definition
 
 struct vehicle_animation
 {
-	byte unused0[0x5c];
+	struct animation_aiming_screen_bounds steering_screen_bounds;
+	long unused[0x11];
 	struct tag_block animations;
 	struct tag_block suspensions;
 };
@@ -284,16 +285,6 @@ struct scenario_vehicle
 };
 
 /* ---------- prototypes */
-
-void aiming_screen_apply(
-	struct animation const *animation,
-	struct vehicle_animation const *vehicle_animation,
-	real yaw,
-	real pitch,
-	struct real_orientation *node_orientations);
-short unit_update_animation(
-	long unit_index,
-	struct unit_animation_update_data *update_data);
 
 /* NOTE: code_001a5e50 and code_001a6290 are file statics in January, but they
 are not reconstructed yet. They are declared here rather than defined so that
@@ -1407,7 +1398,7 @@ void vehicle_preprocess_node_orientations(
 	{
 		aiming_screen_apply(TAG_BLOCK_GET_ELEMENT(&graph->animations,
 			((short *)animation->animations.address)[0], struct animation),
-			animation, vehicle->vehicle.turn, 0.0f, node_orientations);
+			&animation->steering_screen_bounds, vehicle->vehicle.turn, 0.0f, node_orientations);
 	}
 
 	if (animation->animations.count>1
@@ -2108,7 +2099,7 @@ static void update_alien_scout_physics(
 		vehicle->definition_index);
 	struct physics_definition *physics = physics_definition_get(
 		definition->unit.object.physics.index);
-	real_matrix4x3 matrix;
+	real_matrix4x3 vehicle_matrix;
 	real_vector3d local_velocity;
 	real_vector3d magic_force;
 	real_vector3d magic_torque;
@@ -2140,9 +2131,9 @@ static void update_alien_scout_physics(
 		real_vector3d const *object_up = &vehicle->object.up;
 		real_vector3d const *object_angular_velocity =
 			&vehicle->object.angular_velocity;
-		matrix4x3_from_point_and_vectors(&matrix, &vehicle->object.position,
+		matrix4x3_from_point_and_vectors(&vehicle_matrix, &vehicle->object.position,
 			object_forward, object_up);
-		matrix4x3_inverse_transform_vector(&matrix,
+		matrix4x3_inverse_transform_vector(&vehicle_matrix,
 			&vehicle->object.translational_velocity, &local_velocity);
 
 		if (vehicle->vehicle.hover>0.0f)
@@ -2171,7 +2162,7 @@ static void update_alien_scout_physics(
 			}
 
 			limit3d(&acceleration, maximum_acceleration);
-			matrix4x3_transform_vector(&matrix, &acceleration, &acceleration);
+			matrix4x3_transform_vector(&vehicle_matrix, &acceleration, &acceleration);
 
 			scale = physics->mass*vehicle->vehicle.hover;
 			magic_force.i += acceleration.i*scale;
@@ -2695,11 +2686,11 @@ boolean vehicle_update(
 animate:
 	if (definition->unit.object.animation_graph.index!=NONE)
 	{
-		byte animation_update[2];
+		struct unit_animation_update_data data;
 
-		animation_update[0] = 0;
-		animation_update[1] = 0;
-		unit_update_animation(vehicle_index, animation_update);
+		data.state_desired = _unit_state_idle;
+		data.crouching = FALSE;
+		unit_update_animation(vehicle_index, &data);
 	}
 
 	{

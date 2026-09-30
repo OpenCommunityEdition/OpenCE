@@ -108,18 +108,17 @@ symbols in this file:
 #include "effects/effects.h"
 #include "effects/particles.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "items/weapon_datum_flags.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
-#include "models/model_animations.h"
+#include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
 #include "models/models.h"
 #include "networking/network_connection.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "render/render.h"
-#include "render/render_objects.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
@@ -230,19 +229,6 @@ struct animation_graph_node
 
 typedef char verify_animation_graph_node_size[
 	sizeof(struct animation_graph_node) == 0x40 ? 1 : -1];
-
-/* TU-private rendering packet layout, also recovered independently by the rendering owners. */
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	real parameter;
-	long source_object_index;
-	real_point3d source_object_centroid;
-	struct shader const *modifier_shader;
-	byte reserved0020[8];			/* render_animation modifier_animation */
-};
 
 typedef char verify_render_model_effect_size[
 	sizeof(struct render_model_effect) == 0x28 ? 1 : -1];

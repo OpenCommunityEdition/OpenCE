@@ -52,7 +52,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "game/game_allegiance.h"
 #include "saved games/game_state.h"
 

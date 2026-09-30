@@ -22,14 +22,6 @@ struct platoon_datum;
 struct scenario;
 struct squad_datum;
 
-struct ai_script_vehicle_enterable
-{
-	long vehicle_index;
-	real radius;
-	short team_bitmask;
-	short actor_type_bitmask;
-};
-
 struct ai_script_platoon_iterator
 {
 	long encounter_index;
@@ -68,6 +60,12 @@ void ai_script_dispose_from_old_map(
 	void);
 void ai_scripting_reconnect(
 	void);
+short ai_scripting_conversation_line(
+	short conversation_index);
+short ai_scripting_conversation_status(
+	short conversation_index);
+void ai_scripting_retreat(
+	long ai_reference);
 void ai_scripting_erase_all(
 	void);
 void ai_index_to_string(
@@ -91,8 +89,24 @@ struct platoon_datum *ai_index_platoon_iterator_next(
 	struct ai_script_platoon_iterator *iterator);
 long object_list_from_ai_reference(
 	long ai_reference);
-struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
+struct ai_vehicle_enterable *ai_scripting_find_vehicle_enterable(
 	long vehicle_index);
+void ai_scripting_vehicle_enterable_distance(
+	long ai_reference,
+	real distance);
+void ai_scripting_vehicle_enterable_team(
+	long object_list_index,
+	short team);
+void ai_scripting_vehicle_enterable_actor_type(
+	long object_list_index,
+	short actor_type);
+void ai_scripting_vehicle_enterable_actors(
+	long vehicle_index,
+	long actor_list_index);
+void ai_scripting_vehicle_enterable_disable(
+	long vehicle_index);
+void ai_scripting_detach_unit(
+	long unit_index);
 void ai_scripting_attach_unit(
 	long unit_index,
 	long ai_reference);
@@ -126,6 +140,13 @@ void ai_scripting_maneuver_enable(
 void ai_scripting_migrate_by_unit(
 	long object_list_index,
 	long target_ai_reference);
+void ai_scripting_migrate_and_speak(
+	long source_ai_reference,
+	long target_ai_reference,
+	char const *speech_type);
+void ai_scripting_allegiance_remove(
+	short team_a,
+	short team_b);
 void ai_scripting_berserk(
 	long ai_reference,
 	boolean berserk);
@@ -164,8 +185,46 @@ void ai_scripting_follow_target_ai(
 void ai_scripting_force_active(
 	long ai_reference,
 	boolean force);
+void ai_scripting_deselect(
+	void);
+void ai_scripting_attach_units(
+	long ai_reference,
+	long object_list_index);
+void ai_scripting_magically_see_units(
+	long ai_reference,
+	long object_list_index);
+void ai_scripting_set_respawn(
+	long ai_reference,
+	boolean respawn);
+void ai_scripting_set_deaf(
+	long ai_reference,
+	boolean deaf);
+void ai_scripting_set_blind(
+	long ai_reference,
+	boolean blind);
 void ai_scripting_detach_units(
 	long object_list_index);
+void ai_scripting_kill(
+	long ai_reference);
+void ai_scripting_kill_silent(
+	long ai_reference);
+short ai_scripting_swarm_count(
+	long ai_reference);
+short ai_scripting_nonswarm_count(
+	long ai_reference);
+short ai_scripting_living_count(
+	long ai_reference);
+real ai_scripting_living_fraction(
+	long ai_reference);
+real ai_scripting_strength(
+	long ai_reference);
+boolean ai_scripting_is_attacking(
+	long encounter_index);
+short ai_scripting_going_to_vehicle(
+	long ai_reference);
+void ai_scripting_migrate(
+	long source_ai_index,
+	long destination_ai_index);
 void ai_scripting_select(
 	long ai_reference);
 short ai_scripting_status(
@@ -181,6 +240,14 @@ void ai_scripting_allegiance(
 boolean ai_scripting_allegiance_broken(
 	short team1_index,
 	short team2_index);
+boolean ai_scripting_conversation(
+	short conversation_index);
+void ai_scripting_conversation_stop(
+	short conversation_index);
+void ai_scripting_conversation_advance(
+	short conversation_index);
+void ai_scripting_stop_looking(
+	long ai_index);
 void ai_scripting_renew(
 	long ai_reference);
 void ai_scripting_braindead_by_unit(
@@ -247,6 +314,8 @@ void ai_scripting_set_team(
 	short team_index);
 void ai_scripting_command_list_advance_by_unit(
 	long unit_index);
+short ai_scripting_command_list_status(
+	long ai_reference);
 
 /* ---------- globals */
 

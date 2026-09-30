@@ -125,12 +125,11 @@ enum
 
 /* ---------- structures */
 
-struct sound_class_runtime
+struct sound_class_datum
 {
-	real target_gain;
-	real current_gain;
-	short interpolation_ticks;
-	short pad;
+	real desired_gain;
+	real gain;
+	short ticks;
 };
 
 typedef char verify_sound_class_definition_size[
@@ -138,12 +137,9 @@ typedef char verify_sound_class_definition_size[
 
 /* ---------- prototypes */
 
-struct sound_class_definition *sound_class_get(
-	short sound_class);
-
 /* ---------- globals */
 
-extern struct sound_class_runtime *sound_class_data;
+struct sound_class_datum *sound_class_data;
 struct sound_class_definition sound_classes[NUMBER_OF_SOUND_CLASSES] =
 {
 	SOUND_CLASS_DEFINITION(6, 4, 100, 0, 4, 0, 0.5f, 1.4f, 8.f, 1.f, 1.f, 0),
@@ -267,7 +263,7 @@ void sound_classes_dispose(
 	return;
 }
 
-static struct sound_class_runtime *sound_class_datum_get(
+static struct sound_class_datum *sound_class_datum_get(
 	short index)
 {
 	match_assert(
@@ -285,7 +281,7 @@ static struct sound_class_runtime *sound_class_datum_get(
 real sound_class_get_gain(
 	short index)
 {
-	return sound_class_datum_get(index)->current_gain;
+	return sound_class_datum_get(index)->gain;
 }
 
 void debug_sound_classes_enable(
@@ -343,11 +339,11 @@ void sound_classes_initialize_for_new_map(
 
 	for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
 	{
-		struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
+		struct sound_class_datum *sound_class = sound_class_datum_get(class_index);
 
-		sound_class->current_gain = 1.f;
-		sound_class->target_gain = 1.f;
-		sound_class->interpolation_ticks = 0;
+		sound_class->gain = 1.f;
+		sound_class->desired_gain = 1.f;
+		sound_class->ticks = 0;
 	}
 
 	return;
@@ -362,19 +358,19 @@ void sound_classes_update(
 
 		for (class_index = 0; class_index < NUMBER_OF_SOUND_CLASSES; class_index++)
 		{
-			struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
-			if (sound_class->interpolation_ticks > ticks)
+			struct sound_class_datum *sound_class = sound_class_datum_get(class_index);
+			if (sound_class->ticks > ticks)
 			{
-				sound_class->current_gain =
-					(real)ticks / sound_class->interpolation_ticks *
-					(sound_class->target_gain - sound_class->current_gain) +
-					sound_class->current_gain;
-				sound_class->interpolation_ticks -= ticks;
+				sound_class->gain =
+					(real)ticks / sound_class->ticks *
+					(sound_class->desired_gain - sound_class->gain) +
+					sound_class->gain;
+				sound_class->ticks -= ticks;
 			}
 			else
 			{
-				sound_class->current_gain = sound_class->target_gain;
-				sound_class->interpolation_ticks = 0;
+				sound_class->gain = sound_class->desired_gain;
+				sound_class->ticks = 0;
 			}
 		}
 	}
@@ -421,10 +417,10 @@ void sound_class_set_gain(
 	{
 		if ((*sound_class_name)[0] && strstr(*sound_class_name, name))
 		{
-			struct sound_class_runtime *sound_class = sound_class_datum_get(class_index);
+			struct sound_class_datum *sound_class = sound_class_datum_get(class_index);
 
-			sound_class->target_gain = PIN(gain, 0.f, 1.f);
-			sound_class->interpolation_ticks =
+			sound_class->desired_gain = PIN(gain, 0.f, 1.f);
+			sound_class->ticks =
 				interpolation_ticks < 0 ? 0 : interpolation_ticks;
 		}
 		class_index++;

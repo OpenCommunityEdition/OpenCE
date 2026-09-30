@@ -167,11 +167,7 @@ struct file_pointer_totals
 
 /* ---------- prototypes */
 
-unsigned long *get_global_local_random_seed_address(
-	void);
-word seed_random(
-	unsigned long *seed);
-int compare_file_pointer_totals(
+static int compare_file_pointer_totals(
 	const void *a,
 	const void *b);
 static void debug_check_pointer_header(
@@ -194,7 +190,7 @@ static void debug_memory_remove_pointer(
 
 /* ---------- globals */
 
-struct debug_memory_globals debug_memory_globals =
+static struct debug_memory_globals debug_memory_globals =
 {
 	debug_memory_signature,
 	0,
@@ -222,7 +218,7 @@ void debug_memory_manager_initialize(
 	return;
 }
 
-void debug_check_memory_globals(
+static void debug_check_memory_globals(
 	const char *file,
 	long line)
 {
@@ -598,7 +594,7 @@ void *debug_realloc(
 
 /* ---------- private code */
 
-unsigned long debug_memory_header_checksum(
+static unsigned long debug_memory_header_checksum(
 	struct debug_memory_header const *header)
 {
 	unsigned long checksum;
@@ -609,7 +605,7 @@ unsigned long debug_memory_header_checksum(
 	return checksum;
 }
 
-int compare_file_pointer_totals(
+static int compare_file_pointer_totals(
 	const void *a,
 	const void *b)
 {

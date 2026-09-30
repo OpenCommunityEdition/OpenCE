@@ -46,7 +46,7 @@ symbols in this file:
 #include "static_camera.h"
 
 #include "game/game_globals.h"
-#include "game/player_control.h"
+#include "game/players.h"
 #include "objects/objects.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"

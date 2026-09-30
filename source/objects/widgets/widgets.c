@@ -5,7 +5,7 @@ symbols in this file:
 00125770 0030:
 	_tag_group_to_widget_type (0000)
 001257A0 0040:
-	_code_001257a0 (0000)
+	_widget_type_definition_get (0000)
 001257E0 00b0:
 	_widgets_initialize (0000)
 00125890 0060:
@@ -72,12 +72,12 @@ enum
 
 /* ---------- prototypes */
 
-static struct widget_type_definition *code_001257a0(
+static struct widget_type_definition *widget_type_definition_get(
 	short type);
 
 /* ---------- globals */
 
-struct widget_type_definition data_0030b2b0[NUMBER_OF_WIDGET_TYPES] =
+static struct widget_type_definition data_0030b2b0[NUMBER_OF_WIDGET_TYPES] =
 {
 	{
 		'flag',
@@ -145,6 +145,7 @@ struct widget_type_definition data_0030b2b0[NUMBER_OF_WIDGET_TYPES] =
 		lightning_submit
 	}
 };
+struct data_array *widget_data;
 
 /* ---------- public code */
 
@@ -182,7 +183,7 @@ void widgets_initialize(
 
 	for (type = 0; type < NUMBER_OF_WIDGET_TYPES; type++)
 	{
-		struct widget_type_definition *type_definition = code_001257a0(type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(type);
 
 		match_assert(
 			"c:\\halo\\SOURCE\\objects\\widgets\\widgets.c",
@@ -203,7 +204,7 @@ void widgets_initialize_for_new_map(
 	data_make_valid(widget_data);
 	for (type = 0; type < NUMBER_OF_WIDGET_TYPES; type++)
 	{
-		struct widget_type_definition *type_definition = code_001257a0(type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(type);
 
 		if (type_definition->initialize_for_new_map)
 			type_definition->initialize_for_new_map();
@@ -219,7 +220,7 @@ void widgets_dispose_from_old_map(
 
 	for (type = 0; type < NUMBER_OF_WIDGET_TYPES; type++)
 	{
-		struct widget_type_definition *type_definition = code_001257a0(type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(type);
 
 		if (type_definition->dispose_from_old_map)
 			type_definition->dispose_from_old_map();
@@ -236,7 +237,7 @@ void widgets_dispose(
 
 	for (type = 0; type < NUMBER_OF_WIDGET_TYPES; type++)
 	{
-		struct widget_type_definition *type_definition = code_001257a0(type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(type);
 
 		if (type_definition->dispose)
 			type_definition->dispose();
@@ -266,7 +267,7 @@ void widgets_new(
 
 			if (type != NONE && widget_reference->type.index != NONE)
 			{
-				struct widget_type_definition *type_definition = code_001257a0(type);
+				struct widget_type_definition *type_definition = widget_type_definition_get(type);
 				long widget_index = datum_new(widget_data);
 
 				if (widget_index != NONE)
@@ -311,7 +312,7 @@ void widgets_delete(
 	while (widget_index != NONE)
 	{
 		struct widget_datum *widget = widget_get(widget_index);
-		struct widget_type_definition *type_definition = code_001257a0(widget->type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(widget->type);
 		long next_widget_index = widget->next_widget_index;
 
 		if (widget->type_datum_index != NONE)
@@ -339,7 +340,7 @@ boolean widgets_need_lighting(
 	{
 		struct widget_datum *widget = widget_get(widget_index);
 
-		if (code_001257a0(widget->type)->needs_lighting)
+		if (widget_type_definition_get(widget->type)->needs_lighting)
 		{
 			result = TRUE;
 			break;
@@ -361,7 +362,7 @@ void widgets_render(
 	while (widget_index != NONE)
 	{
 		struct widget_datum *widget = widget_get(widget_index);
-		struct widget_type_definition *type_definition = code_001257a0(widget->type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(widget->type);
 
 		if (type_definition->render_proc)
 		{
@@ -388,7 +389,7 @@ void widgets_update(
 
 	for (type = 0; type < NUMBER_OF_WIDGET_TYPES; type++)
 	{
-		struct widget_type_definition *type_definition = code_001257a0(type);
+		struct widget_type_definition *type_definition = widget_type_definition_get(type);
 
 		if (type_definition->update)
 			type_definition->update(delta);
@@ -399,7 +400,7 @@ void widgets_update(
 
 /* ---------- private code */
 
-static struct widget_type_definition *code_001257a0(
+static struct widget_type_definition *widget_type_definition_get(
 	short type)
 {
 	match_assert(

@@ -117,7 +117,7 @@ short convex_polygon2d_clip_to_plane(
 	real_plane2d const *plane,
 	short maximum_count,
 	real_point2d *result,
-	long *clip_flags,
+	unsigned long *clip_flags,
 	boolean *clipped,
 	real epsilon);
 short convex_polygon3d_clip_to_plane(
@@ -128,7 +128,7 @@ short convex_polygon3d_clip_to_plane(
 	real_point3d *result,
 	boolean *clipped,
 	real epsilon,
-	boolean keep_degenerate);
+	boolean keep_coplanar);
 short convex_hull2d_intersect(
 	short p_count,
 	real_point2d const *p,

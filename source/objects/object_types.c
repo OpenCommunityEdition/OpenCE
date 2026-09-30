@@ -127,8 +127,10 @@ symbols in this file:
 
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
+#include "devices/device_light_fixtures.h"
 #include "devices/devices.h"
 #include "editor/editor_stubs.h"
+#include "items/garbage.h"
 #include "items/items.h"
 #include "items/projectiles.h"
 #include "items/projectiles_callbacks.h"
@@ -136,7 +138,10 @@ symbols in this file:
 #include "objects.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "sound/sound_scenery.h"
 #include "units/bipeds.h"
+#include "units/units.h"
+#include "units/vehicles.h"
 
 /* ---------- constants */
 
@@ -159,83 +164,24 @@ void object_types_place_objects(
 	void prefix##_dispose_from_old_map( \
 		void)
 
-DECLARE_OBJECT_TYPE_LIFECYCLE(units);
-DECLARE_OBJECT_TYPE_LIFECYCLE(bipeds);
-DECLARE_OBJECT_TYPE_LIFECYCLE(vehicles);
-DECLARE_OBJECT_TYPE_LIFECYCLE(items);
-DECLARE_OBJECT_TYPE_LIFECYCLE(weapons);
 DECLARE_OBJECT_TYPE_LIFECYCLE(scenery);
-DECLARE_OBJECT_TYPE_LIFECYCLE(devices);
 DECLARE_OBJECT_TYPE_LIFECYCLE(machines);
 DECLARE_OBJECT_TYPE_LIFECYCLE(controls);
-DECLARE_OBJECT_TYPE_LIFECYCLE(light_fixtures);
 DECLARE_OBJECT_TYPE_LIFECYCLE(placeholder);
 
 #undef DECLARE_OBJECT_TYPE_LIFECYCLE
 
-void object_export_function_values(
-	long object_index);
-void object_render_debug(
-	long object_index);
-
-boolean unit_new(
-	long object_index);
-void unit_delete(
-	long object_index);
-boolean unit_update(
-	long object_index);
-void unit_export_function_values(
-	long object_index);
-void unit_handle_deleted_object(
-	long object_index,
-	long deleted_object_index);
-void unit_handle_region_destroyed(
-	long object_index,
-	short region_index,
-	unsigned long damage_flags);
-void unit_postprocess_node_matrices(
-	long object_index,
-	struct real_matrix4x3 *node_matrices);
-void unit_render_debug(
-	long object_index);
-
-boolean vehicle_new(
-	long object_index);
 void vehicle_place(
 	long object_index,
 	struct scenario_object_datum *scenario_object);
-void vehicle_delete(
-	long object_index);
-boolean vehicle_update(
-	long object_index);
-void vehicle_export_function_values(
-	long object_index);
-void vehicle_preprocess_node_orientations(
-	long object_index,
-	struct real_orientation *node_orientations);
-void vehicle_reset(
-	long object_index);
-void vehicle_render_debug(
-	long object_index);
 
 void weapon_place(
 	long object_index,
 	struct scenario_object_datum *scenario_object);
-void weapon_delete(
-	long object_index);
-boolean weapon_update(
-	long object_index);
-void weapon_preprocess_node_orientations(
-	long object_index,
-	struct real_orientation *node_orientations);
 
 void equipment_place(
 	long object_index,
 	struct scenario_object_datum *scenario_object);
-boolean garbage_new(
-	long object_index);
-boolean garbage_update(
-	long object_index);
 
 boolean scenery_new(
 	long object_index);
@@ -245,16 +191,6 @@ void scenery_place(
 void scenery_delete(
 	long object_index);
 boolean scenery_update(
-	long object_index);
-
-boolean sound_scenery_new(
-	long object_index);
-void sound_scenery_delete(
-	long object_index);
-
-boolean device_new(
-	long object_index);
-void device_delete(
 	long object_index);
 
 boolean machine_new(
@@ -277,15 +213,9 @@ void control_delete(
 boolean control_update(
 	long object_index);
 
-boolean light_fixture_new(
-	long object_index);
 void light_fixture_place(
 	long object_index,
 	struct scenario_object_datum *scenario_object);
-void light_fixture_delete(
-	long object_index);
-boolean light_fixture_update(
-	long object_index);
 
 boolean placeholder_new(
 	long object_index);
@@ -540,7 +470,7 @@ struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES] =
 	&sound_scenery_data_definition
 };
 
-extern struct object_type_definition *first_object_type_definition;
+struct object_type_definition *first_object_type_definition;
 /* VC7 otherwise emits this tentative definition as a common symbol. */
 #ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")

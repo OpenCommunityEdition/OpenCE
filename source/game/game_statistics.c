@@ -35,7 +35,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-boolean game_statistics_active = FALSE;
+static boolean game_statistics_active = FALSE;
 
 /* ---------- public code */
 

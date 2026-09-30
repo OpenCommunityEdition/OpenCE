@@ -1,5 +1,6 @@
 /* January frame-statistics layout, linkage, and Models arithmetic contract. */
-#include "rasterizer/rasterizer_frame_statistics.h"
+#include "cseries.h"
+#include "rasterizer/rasterizer.h"
 
 #define FRAME_STATISTICS_FIELD(member) \
 	offsetof(struct rasterizer_frame_statistics_globals, member), \
@@ -14,10 +15,7 @@ unsigned long const rasterizer_frame_statistics_layout[] =
 	FRAME_STATISTICS_FIELD(average_frames_per_second),
 	FRAME_STATISTICS_FIELD(minimum_frames_per_second),
 	FRAME_STATISTICS_FIELD(maximum_frames_per_second),
-	FRAME_STATISTICS_FIELD(fogged_object_count),
-	FRAME_STATISTICS_FIELD(normal_object_count),
-	FRAME_STATISTICS_FIELD(fast_object_count),
-	FRAME_STATISTICS_FIELD(scenery_object_count),
+	FRAME_STATISTICS_FIELD(vertices_by_permutation),
 	FRAME_STATISTICS_FIELD(lightmap_dynamic_vertex_count),
 	FRAME_STATISTICS_FIELD(lightmap_dynamic_triangle_count),
 	FRAME_STATISTICS_FIELD(lightmap_dynamic_draw_count),
@@ -119,10 +117,7 @@ static void frame_statistics_expect_unsigned(
 void rasterizer_frame_statistics_type_contract(
 	struct rasterizer_frame_statistics_globals *statistics)
 {
-	EXPECT_SIGNED(fogged_object_count);
-	EXPECT_SIGNED(normal_object_count);
-	EXPECT_SIGNED(fast_object_count);
-	EXPECT_SIGNED(scenery_object_count);
+	EXPECT_SIGNED(vertices_by_permutation[0]);
 	EXPECT_UNSIGNED(lightmap_dynamic_vertex_count);
 	EXPECT_UNSIGNED(lightmap_dynamic_triangle_count);
 	EXPECT_UNSIGNED(lightmap_dynamic_draw_count);

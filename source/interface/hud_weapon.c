@@ -58,13 +58,13 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud_draw.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_weapon.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -275,35 +275,6 @@ struct grenade_hud_interface_definition
 	long unused0[17];
 	struct tag_reference messaging_icon_bitmap;
 	long unused1[12];
-};
-
-struct weapon_flash_state_definition
-{
-	short flags;
-	short pad;
-	short total_ammo;
-	short loaded_ammo;
-	short heat;
-	short age;
-	long unused[8];
-};
-
-struct weapon_hud_interface_definition
-{
-	struct tag_reference parent_hud;
-	struct weapon_flash_state_definition flash_cutoffs;
-	struct hud_absolute_placement_definition absolute_placement;
-	struct tag_block statics;
-	struct tag_block meters;
-	struct tag_block numbers;
-	struct tag_block crosshairs;
-	struct tag_block overlays;
-	unsigned long valid_crosshair_types_flags;
-	struct tag_block warning_sounds;
-	struct tag_block screen_effects;
-	long unused1[33];
-	byte messaging_icon[0x10];
-	long unused2[12];
 };
 
 struct weapon_hud_element_header
@@ -736,7 +707,7 @@ static void hud_update_weapon_local_player(
 			{ root_definition };
 		long weapon_hud_indices[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { hud_index };
 		unsigned long valid_crosshair_types = weapon_hud_hierarchy[0]->valid_crosshair_types_flags;
-		unsigned long render_flags = 0;
+		long render_flags = 0;
 		short definition_count = 1;
 		short crosshair_index;
 
@@ -998,18 +969,18 @@ static void crosshairs_draw(
 			struct weapon_definition *weapon_definition = weapon_index == NONE ?
 				NULL :
 				weapon_definition_get(weapon_get(weapon_index)->definition_index);
-			struct weapon_hud_interface_definition *definitions[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { root_definition };
+			struct weapon_hud_interface_definition *weapon_hud_hierarchy[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { root_definition };
 			long definition_indices[MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH] = { hud_index };
-			unsigned long render_flags = crosshair->render_flags;
+			long render_flags = crosshair->render_flags;
 			short definition_count = 1;
 			short definition_index;
 
 			do
 			{
-				if (definitions[definition_count - 1]->parent_hud.index == NONE)
+				if (weapon_hud_hierarchy[definition_count - 1]->parent_hud.index == NONE)
 					break;
-				definition_indices[definition_count] = definitions[definition_count - 1]->parent_hud.index;
-				definitions[definition_count] = weapon_hud_interface_definition_get(definition_indices[definition_count]);
+				definition_indices[definition_count] = weapon_hud_hierarchy[definition_count - 1]->parent_hud.index;
+				weapon_hud_hierarchy[definition_count] = weapon_hud_interface_definition_get(definition_indices[definition_count]);
 				definition_count++;
 			}
 			while (definition_count < MAXIMUM_WEAPON_HUD_DEFINITION_DEPTH);
@@ -1025,7 +996,7 @@ static void crosshairs_draw(
 				definition_index < definition_count;
 				definition_index++)
 			{
-				struct weapon_hud_interface_definition *definition = definitions[definition_index];
+				struct weapon_hud_interface_definition *definition = weapon_hud_hierarchy[definition_index];
 				struct hud_absolute_placement_definition absolute_placement = { _hud_anchor_center };
 				boolean in_multiplayer = local_player_count() > 1;
 				short crosshair_index;
@@ -1317,7 +1288,7 @@ static void render_weapon_hud(
 	short state_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
 	short overlay_flags[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
 	short number_values[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0 };
-	real number_fractions[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0.0f };
+	real numbers_real[NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES] = { 0.0f };
 	short state_index;
 	short map_type_flags;
 	short element_index;
@@ -1607,23 +1578,23 @@ static void render_weapon_hud(
 				long unit_index = player_index == NONE ?
 					NONE :
 					player_get(local_player_get_player_index(local_player_index))->unit_index;
-				real_point3d camera_position;
+				real_point3d position;
 				real_point3d target_position;
 				real delta_x;
 				real delta_y;
 				real delta_z;
 
-				unit_get_camera_position(unit_index, &camera_position);
+				unit_get_camera_position(unit_index, &position);
 				object_get_origin(target_object_index, &target_position);
-				delta_x = camera_position.x - target_position.x;
-				delta_y = camera_position.y - target_position.y;
-				delta_z = camera_position.z - target_position.z;
-				number_fractions[6] = square_root(
+				delta_x = position.x - target_position.x;
+				delta_y = position.y - target_position.y;
+				delta_z = position.z - target_position.z;
+				numbers_real[6] = square_root(
 					delta_x * delta_x +
 					delta_y * delta_y +
 					delta_z * delta_z) * 3.0480001f;
-				number_fractions[7] =
-					(target_position.z - camera_position.z) * 3.0480001f;
+				numbers_real[7] =
+					(target_position.z - position.z) * 3.0480001f;
 			}
 			else
 			{
@@ -1634,8 +1605,8 @@ static void render_weapon_hud(
 				} no_target_value;
 
 				no_target_value.bits = 0xFFC00000;
-				number_fractions[6] = no_target_value.value;
-				number_fractions[7] = no_target_value.value;
+				numbers_real[6] = no_target_value.value;
+				numbers_real[7] = no_target_value.value;
 			}
 		}
 	}
@@ -1772,15 +1743,15 @@ static void render_weapon_hud(
 				} fraction;
 				real scale;
 
-				fraction.value = number_fractions[state_index];
+				fraction.value = numbers_real[state_index];
 				if (fraction.bits == 0xFFC00000)
 					continue;
 				scale = power(10.0f, 4.0f);
 				decimal_value = (short)fmod(
-					fabs(number_fractions[state_index] * scale),
+					fabs(numbers_real[state_index] * scale),
 					scale);
 				value = (short)fast_ftol_C(
-					number_fractions[state_index] / magazine_size);
+					numbers_real[state_index] / magazine_size);
 			}
 			else
 			{

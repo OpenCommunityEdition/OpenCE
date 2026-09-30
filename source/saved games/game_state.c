@@ -29,9 +29,9 @@ symbols in this file:
 001AF4D0 0020:
 	_game_state_reverted (0000)
 001AF4F0 0160:
-	_code_001af4f0 (0000)
+	_game_state_header_valid (0000)
 001AF650 0070:
-	_code_001af650 (0000)
+	_game_state_allocation_record (0000)
 001AF6C0 0020:
 	_code_001af6c0 (0000)
 001AF6E0 0110:
@@ -144,10 +144,10 @@ enum
 
 void dummy(
 	void);
-static boolean code_001af4f0(
+static boolean game_state_header_valid(
 	struct game_state_header *header,
 	boolean halt_on_error);
-static void code_001af650(
+static void game_state_allocation_record(
 	const char *name,
 	const char *type,
 	long size,
@@ -161,7 +161,7 @@ boolean recover_saved_games_hack;
 
 static FILE* bss_004d27b0;
 
-struct
+static struct
 {
 	void *base_address; // 0x0
 	long cpu_allocation_size; // 0x4
@@ -212,7 +212,7 @@ void dummy(
 	return;
 }
 
-void game_state_call_before_save_procs(
+static void game_state_call_before_save_procs(
 	void)
 {
 	game_state_before_save_proc *proc = before_save_procs;
@@ -226,7 +226,7 @@ void game_state_call_before_save_procs(
 	return;
 }
 
-void game_state_call_before_load_procs(
+static void game_state_call_before_load_procs(
 	void)
 {
 	game_state_before_load_proc *proc = before_load_procs;
@@ -240,7 +240,7 @@ void game_state_call_before_load_procs(
 	return;
 }
 
-void game_state_call_after_load_procs(
+static void game_state_call_after_load_procs(
 	void)
 {
 	game_state_after_load_proc *proc = after_load_procs;
@@ -404,7 +404,7 @@ boolean game_state_reverted(
 	return (game_state_globals.revert_time==game_time_get());
 }
 
-static boolean code_001af4f0(
+static boolean game_state_header_valid(
 	struct game_state_header *header,
 	boolean halt_on_error)
 {
@@ -480,7 +480,7 @@ static boolean code_001af4f0(
 	return valid;
 }
 
-static void code_001af650(
+static void game_state_allocation_record(
 	const char *name,
 	const char *type,
 	long size,
@@ -525,7 +525,7 @@ void *game_state_malloc(
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 156, !game_state_globals.locked);
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 159, game_state_globals.cpu_allocation_size+size<=GAME_STATE_CPU_SIZE);
 
-	code_001af650(name, type, size, FALSE);
+	game_state_allocation_record(name, type, size, FALSE);
 
 	pointer = (byte *)game_state_globals.base_address+game_state_globals.cpu_allocation_size;
 	game_state_globals.cpu_allocation_size+= size;
@@ -546,7 +546,7 @@ void *game_state_gpu_malloc(
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 185, !game_state_globals.locked);
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 188, game_state_globals.gpu_allocation_size+size<=GAME_STATE_GPU_SIZE);
 
-	code_001af650(name, type, size, TRUE);
+	game_state_allocation_record(name, type, size, TRUE);
 
 	game_state_globals.gpu_allocation_size+= size;
 	pointer = (byte *)game_state_globals.base_address-game_state_globals.gpu_allocation_size+GAME_STATE_SIZE;
@@ -608,7 +608,7 @@ void game_state_try_and_load_from_persistent_storage(
 			sizeof(header),
 			GAME_STATE_SIZE,
 			NULL)
-		&& code_001af4f0(&header, FALSE)
+		&& game_state_header_valid(&header, FALSE)
 		&& main_get_difficulty() == header.difficulty)
 	{
 		game_state_call_before_load_procs();
@@ -629,7 +629,7 @@ void game_state_load_core(
 	struct game_state_header header;
 
 	if (game_state_read_core_header(name, &header, sizeof(header))
-		&& code_001af4f0(&header, TRUE))
+		&& game_state_header_valid(&header, TRUE))
 	{
 		game_state_call_before_load_procs();
 		game_state_read_core(

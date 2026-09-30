@@ -70,8 +70,6 @@ short model_get_marker_by_name(
 	short maximum_marker_count);
 void model_build_tangent_matrices(
 	struct model *model);
-void model_geometry_part_build_tangent_matrices(
-	struct model_geometry_part *part);
 void render_model(
 	long model_index,
 	real level_of_detail_pixels,

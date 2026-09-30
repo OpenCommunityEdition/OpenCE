@@ -806,6 +806,9 @@ void matrix4x3_rotation_from_angles(real_matrix4x3 *matrix, real yaw, real pitch
 void matrix4x3_rotation_to_angles(real_matrix4x3 *matrix, real_euler_angles3d *angles);
 void matrix4x3_rotation_from_quaternion(real_matrix4x3 *matrix, real_quaternion const *quaternion);
 void matrix4x3_rotation_to_quaternion(real_matrix4x3 const *matrix, real_quaternion *quaternion);
+void matrix3x3_rotation_to_quaternion(
+	real_matrix3x3 const *matrix,
+	real_quaternion *quaternion);
 void matrix4x3_from_point_and_vectors(real_matrix4x3 *matrix, real_point3d const *point, real_vector3d const *forward, real_vector3d const *up);
 void matrix4x3_from_point_and_quaternion(real_matrix4x3 *matrix, real_point3d const *point, real_quaternion const *quaternion);
 void matrix4x3_from_orientation(real_matrix4x3 *matrix, real_orientation const *orientation);
@@ -824,6 +827,10 @@ void matrix4x3_multiply(real_matrix4x3 const *a, real_matrix4x3 const *b, real_m
 real_matrix3x3 *matrix3x3_transpose(
 	real_matrix3x3 const *matrix,
 	real_matrix3x3 *result);
+real_matrix3x3 *matrix3x3_multiply(
+	real_matrix3x3 const *a,
+	real_matrix3x3 const *b,
+	real_matrix3x3 *result);
 real_matrix3x3 *matrix3x3_from_forward_and_up(
 	real_matrix3x3 *matrix,
 	real_vector3d const *forward,
@@ -835,9 +842,17 @@ real_vector3d *matrix3x3_transform_vector(real_matrix3x3 const *matrix, real_vec
 
 unsigned long *get_global_random_seed_address(void);
 unsigned long *get_global_local_random_seed_address(void);
+void random_seed_debug_log(
+	boolean log);
+void random_math_initialize(
+	void);
+void random_math_dispose(
+	void);
 void lock_global_random_seed(
 	void);
 void unlock_global_random_seed(
+	void);
+unsigned long get_random_seed(
 	void);
 
 unsigned short seed_random(unsigned long *seed);
@@ -848,6 +863,11 @@ real real_seed_random_range(unsigned long *seed, real lower_bound, real upper_bo
 
 real_vector3d *seed_random_direction3d(unsigned long *seed, real_vector3d *direction);
 real_vector3d *seed_random_vector_in_cone3d(unsigned long *seed, real_vector3d const *axis, real inner_cone_angle, real outer_cone_angle, real_vector3d *result);
+
+/* ---------- prototypes/ACTOR_LOOKING.C */
+
+boolean valid_real_normal2d(
+	union real_vector2d const *normal);
 
 /* ---------- globals */
 
@@ -1452,16 +1472,18 @@ __inline real_plane2d *plane2d_from_points(
 	plane->n.i = point1->y - point0->y;
 	plane->n.j = point0->x - point1->x;
 
-	if (normalize2d(&plane->n) == 0.0f)
+	if (normalize2d(&plane->n) != 0.0f)
+	{
+		plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
+
+		return plane;
+	}
+	else
 	{
 		plane->d = 0.0f;
 
 		return NULL;
 	}
-
-	plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
-
-	return plane;
 }
 
 __inline real plane2d_distance_to_point(

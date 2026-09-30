@@ -6,6 +6,7 @@ REAL_MATH.C
 
 #include "cseries.h"
 #include "real_math.h"
+#include "periodic_functions.h"
 
 /* ---------- constants */
 

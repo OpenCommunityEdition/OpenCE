@@ -198,6 +198,7 @@ symbols in this file:
 #include "game/players.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_client_message_handler.h"
+#include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 
 #ifdef HALO_LINUX
@@ -262,50 +263,6 @@ enum network_game_packet_class
 /* ---------- structures */
 
 struct network_game_client;
-
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte padding41[3];
-};
-
-struct network_game_map
-{
-	long unknown;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte unknown10C;
-	char minimum_player_count;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte team_count;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	word reserved_after_players;
-	unsigned long random_seed;
-	long number_of_games_played;
-	struct network_game_local_data local_data;
-};
 
 #ifdef HALO_LINUX
 typedef char network_game_players_offset_assert[

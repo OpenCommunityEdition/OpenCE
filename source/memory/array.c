@@ -80,7 +80,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-struct profile_section data_00308bc0[3] =
+static struct profile_section data_00308bc0[3] =
 {
 	{ "memory_dynamic_array_resize", NONE, TRUE },
 	{ "memory_dynamic_array_add_element", NONE, TRUE },

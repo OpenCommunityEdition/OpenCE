@@ -351,50 +351,6 @@ struct network_connection;
 struct network_game_server;
 struct network_game_server_client_machine;
 
-struct network_machine
-{
-	wchar_t name[MAXIMUM_MACHINE_NAME_LENGTH];
-	char machine_index;
-	byte padding41[3];
-};
-
-struct network_game_map
-{
-	long unknown;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte padding[3];
-};
-
-struct network_game
-{
-	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte unknown;
-	char minimum_player_count;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte team_count;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	word reserved_after_players;
-	unsigned long random_seed;
-	long number_of_games_played;
-	struct network_game_local_data local_data;
-};
-
 #ifdef HALO_LINUX
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
@@ -1590,7 +1546,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			csmemcpy(&advertisement.map, &game->map, sizeof(game->map));
 			advertisement.machine_count = game->machine_count;
 			advertisement.player_count = game->player_count;
-			advertisement.maximum_player_count = game->maximum_player_count;
+			advertisement.maximum_player_count = game->maximum_players;
 			advertisement.variant_setting = (short)game->variant.universal_variant.score_to_win;
 			advertisement.flags = 0;
 			if (game->variant.universal_variant.teams == TRUE)

@@ -43,7 +43,7 @@ short structure_visibility_find_objects(
 	long (*cluster_get_next)(long *iterator),
 	void (*get_bounding_sphere)(long object_index, real_point3d *center, real *radius),
 	boolean (*unmarked)(long object_index),
-	long (*mark)(long object_index));
+	boolean (*mark)(long object_index));
 boolean structure_visibility_find_mirror(
 	struct render_camera const *camera,
 	struct render_frustum const *frustum,

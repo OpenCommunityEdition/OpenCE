@@ -65,7 +65,6 @@ symbols in this file:
 #include "physics/collisions.h"
 #include "physics/collision_usage.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug.h"
 #include "rasterizer/rasterizer_geometry_environment.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
@@ -228,7 +227,7 @@ typedef char verify_structure_runtime_globals_size[
 
 static struct structure_runtime_globals structure_globals;
 
-extern boolean debug_fog_planes;
+boolean debug_fog_planes;
 
 /* ---------- public code */
 
@@ -328,7 +327,7 @@ boolean structure_cluster_mark(
 boolean sphere_intersects_cluster_portal(
 	struct structure_bsp *structure,
 	short portal_index,
-	real_point3d const *position,
+	real_point3d const *point,
 	real radius)
 {
 	struct structure_cluster_portal *portal = TAG_BLOCK_GET_ELEMENT(
@@ -342,17 +341,17 @@ boolean sphere_intersects_cluster_portal(
 			struct collision_bsp)->bsp3d.planes,
 		portal->plane_index,
 		real_plane3d);
-	real plane_distance = plane3d_distance_to_point(collision_plane, position);
-	real_point2d projected_vertices[MAXIMUM_VERTICES_PER_CLUSTER_PORTAL];
-	real_point3d projected_position;
-	real_point2d projected_position2d;
+	real plane_distance = plane3d_distance_to_point(collision_plane, point);
+	real_point2d projected_points[MAXIMUM_VERTICES_PER_CLUSTER_PORTAL];
+	real_point3d projected_centroid3d;
+	real_point2d projected_centroid2d;
 	real_vector3d const *plane_normal;
 	short projection;
 	boolean projection_sign;
 	short vertex_index;
 
 	if (fabs(plane_distance) < radius &&
-		distance_squared3d(position, &portal->centroid) <
+		distance_squared3d(point, &portal->centroid) <
 			(portal->bounding_radius + radius) * (portal->bounding_radius + radius))
 	{
 		plane_normal = &TAG_BLOCK_GET_ELEMENT(
@@ -362,15 +361,15 @@ boolean sphere_intersects_cluster_portal(
 		projection = projection_from_vector3d(plane_normal);
 		projection_sign = projection_sign_from_vector3d(plane_normal, projection);
 		point_from_line3d(
-			position,
+			point,
 			plane_normal,
 			-plane_distance,
-			&projected_position);
+			&projected_centroid3d);
 		project_point3d(
-			&projected_position,
+			&projected_centroid3d,
 			projection,
 			projection_sign,
-			&projected_position2d);
+			&projected_centroid2d);
 
 		for (vertex_index = 0;
 			vertex_index < portal->vertices.count;
@@ -383,13 +382,13 @@ boolean sphere_intersects_cluster_portal(
 					real_point3d),
 				projection,
 				projection_sign,
-				&projected_vertices[vertex_index]);
+				&projected_points[vertex_index]);
 		}
 
 		if (convex_hull2d_test_circle(
 			(short)portal->vertices.count,
-			projected_vertices,
-			&projected_position2d,
+			projected_points,
+			&projected_centroid2d,
 			square_root(radius * radius - plane_distance * plane_distance)))
 		{
 			return TRUE;

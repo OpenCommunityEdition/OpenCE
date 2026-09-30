@@ -130,6 +130,8 @@ symbols in this file:
 #include "cache_files.h"
 #include "physical_memory_map.h"
 #include "sound_cache.h"
+#include "texture_cache.h"
+#include "interface/ui_widget.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
 
@@ -219,20 +221,12 @@ typedef char verify_cache_file_header_size[
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index);
-void texture_cache_close(
-	void);
-void display_error_damaged_media(
-	void);
-void texture_cache_open(
-	void);
-void sound_idle(
-	void);
 
 /* ---------- globals */
 
-struct cache_file_globals cache_file_globals = { 0 };
+static struct cache_file_globals cache_file_globals = { 0 };
 extern struct cache_file_tag_instance *global_tag_instances;
-char const *data_00316820[] =
+static char const *data_00316820[] =
 {
 	"d:\\maps_de\\",
 	"d:\\maps_fr\\",

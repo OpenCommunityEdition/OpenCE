@@ -155,7 +155,7 @@ static void find_next_target(
 
 /* ---------- globals */
 
-struct slayer_globals slayer_globals = { 0 };
+static struct slayer_globals slayer_globals = { 0 };
 
 /* ---------- code */
 

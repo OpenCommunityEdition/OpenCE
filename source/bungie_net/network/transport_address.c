@@ -107,7 +107,7 @@ symbols in this file:
 #ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
-char transport_address_string[256];
+static char transport_address_string[256];
 #ifndef HALO_ANDROID
 #pragma bss_seg()
 #endif

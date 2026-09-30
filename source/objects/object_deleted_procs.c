@@ -11,7 +11,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/ai.h"
 #include "objects.h"
+#include "game/players.h"
 
 /* ---------- constants */
 
@@ -20,9 +22,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-void ai_handle_deleted_object(long deleted_object_index);
-void players_handle_deleted_object(long deleted_object_index);
 
 /* ---------- globals */
 

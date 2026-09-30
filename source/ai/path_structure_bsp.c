@@ -106,6 +106,17 @@ boolean structure_test_ray2d(
 		direction,
 		&surface_result);
 
+	/* BUG (preserved for exact matching): January loads
+	 * pathfinding_surfaces[surface_result.enter_surface_index] (+0x5d..+0x63) and the exit
+	 * index (+0xe6..+0xec) before any NONE test; the later /Od build does the same (0x4cfe60
+	 * +0x98, +0x168). For a finite distance both indices come from a crossed edge
+	 * (collision_surface_test_line2d starts at REAL_MIN/REAL_MAX), so they are NONE only for an
+	 * edge with no surface on its far side (an open collision BSP). The read then takes the byte
+	 * before the array: zero, or a value adopted as next_surface_index == NONE, stops at the
+	 * edge; with the breakable bit set and broken surfaces not ignored, TAG_BLOCK_GET_ELEMENT
+	 * receives NONE and its index assertion halts. No structure BSP in the shipped
+	 * 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in 82 BSPs).
+	 */
 	while (TRUE)
 	{
 		long next_surface_index = NONE;
@@ -315,6 +326,14 @@ boolean structure_test_line2d(
 				if (cross_product2d(&p0p1, &p0e0) > 0.0f &&
 					cross_product2d(&p0e1, &p0p1) > 0.0f)
 				{
+					/* BUG (preserved for exact matching): January loads
+					 * pathfinding_surfaces[next_surface_index] (+0x207..+0x20b) before any NONE test, as
+					 * does the later /Od build (0x4cee00 +0x330..+0x339). next_surface_index is NONE only
+					 * for an open edge; the byte before the array then decides: walkable bit clear reports
+					 * a collision at this edge; set, NONE reaches TAG_BLOCK_GET_ELEMENT (below, or at the
+					 * top of the surface loop), whose index assertion halts. No structure BSP in the
+					 * shipped 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in 82 BSPs).
+					 */
 					long next_surface_index = edge->surface_indices[!on_right_side];
 					boolean passable = TEST_FLAG(
 						pathfinding_surfaces[next_surface_index],

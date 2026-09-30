@@ -230,8 +230,6 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmaps_internal.h"
-#include "bitmaps/bitmaps_mipmap.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/s3tc/s3tc.h"
 #include "cseries/errors.h"
@@ -243,8 +241,6 @@ symbols in this file:
 
 enum
 {
-	NUMBER_OF_ENTRIES_IN_PALETTE = 256,
-
 	MAXIMUM_BITMAP_WIDTH = 30000,
 	MAXIMUM_BITMAP_HEIGHT = 30000,
 	MAXIMUM_BITMAP_DEPTH = 256,
@@ -303,6 +299,9 @@ enum
 
 /* ---------- prototypes */
 
+long bitmap_mipmap_get_pixel_count(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
 static boolean bitmap_format_type_valid_width(
 	short format,
 	short type,

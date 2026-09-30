@@ -424,13 +424,13 @@ static void update_hold_ticks(
 }
 #endif
 
-void input_unidentified_noop_1(
+static void acquire_input_mutex(
 	void)
 {
 	return;
 }
 
-void input_unidentified_noop_2(
+static void release_input_mutex(
 	void)
 {
 	return;
@@ -706,6 +706,7 @@ void input_frame_begin(
 	void)
 {
 	input_get_device_states();
+	acquire_input_mutex();
 	input_globals.frame_active = TRUE;
 
 	return;
@@ -715,6 +716,7 @@ void input_frame_end(
 	void)
 {
 	input_globals.frame_active = FALSE;
+	release_input_mutex();
 
 	return;
 }
@@ -1189,7 +1191,9 @@ static DWORD WINAPI input_keyboard_thread(
 	for (;;)
 	{
 		WaitForSingleObject(input_globals.update_event_handle, INFINITE);
+		acquire_input_mutex();
 		input_flush_rumble();
+		release_input_mutex();
 	}
 
 	return ERROR_SUCCESS;

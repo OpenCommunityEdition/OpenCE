@@ -103,11 +103,6 @@ struct multiplayer_sound_queue
 	struct queued_multiplayer_sound sounds[MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS];
 };
 
-struct multiplayer_sound_queue_count
-{
-	long count;
-};
-
 struct game_globals_multiplayer_sound_view
 {
 	byte unused[0x164];
@@ -115,7 +110,6 @@ struct game_globals_multiplayer_sound_view
 };
 
 typedef char verify_multiplayer_sound_queue_size[sizeof(struct multiplayer_sound_queue) == 0x2C ? 1 : -1];
-typedef char verify_multiplayer_sound_queue_count_size[sizeof(struct multiplayer_sound_queue_count) == sizeof(long) ? 1 : -1];
 typedef char verify_game_globals_multiplayer_information_offset[
 	offsetof(struct game_globals_multiplayer_sound_view, multiplayer_information) == 0x164 ? 1 : -1];
 
@@ -134,7 +128,7 @@ static long get_sound_length_in_ticks(
 
 /* ---------- globals */
 
-boolean sound_is_queueable[_multiplayer_sound_ting] =
+static boolean sound_is_queueable[_multiplayer_sound_ting] =
 {
 	TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
 	TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
@@ -145,12 +139,9 @@ boolean sound_is_queueable[_multiplayer_sound_ting] =
 	TRUE, TRUE, FALSE,
 };
 
-struct multiplayer_sound_queue_count mp_sound_queue_count = { 0 };
-struct queued_multiplayer_sound mp_sound_queue[
+static long mp_sound_queue_count = 0;
+static struct queued_multiplayer_sound mp_sound_queue[
 	MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS] = { 0 };
-
-#define multiplayer_sound_queue_count mp_sound_queue_count.count
-#define multiplayer_sound_queue_sounds mp_sound_queue
 
 /* ---------- public code */
 
@@ -184,13 +175,11 @@ static void push_queued_sound(
 	long sound_index,
 	long delay_ticks)
 {
-	long queue_index = multiplayer_sound_queue_count;
-
-	if (queue_index < MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS)
+	if (mp_sound_queue_count < MAXIMUM_QUEUED_MULTIPLAYER_SOUNDS)
 	{
-		multiplayer_sound_queue_sounds[queue_index].sound_index = sound_index;
-		multiplayer_sound_queue_sounds[queue_index].delay_ticks = delay_ticks;
-		multiplayer_sound_queue_count++;
+		mp_sound_queue[mp_sound_queue_count].sound_index = sound_index;
+		mp_sound_queue[mp_sound_queue_count].delay_ticks = delay_ticks;
+		mp_sound_queue_count++;
 	}
 
 	return;
@@ -200,17 +189,14 @@ void game_engine_update_multiplayer_sound(
 	void)
 {
 	long i;
-	long queue_count = multiplayer_sound_queue_count;
 
-	if (queue_count && --multiplayer_sound_queue_sounds[0].delay_ticks == 0)
+	if (mp_sound_queue_count && --mp_sound_queue[0].delay_ticks == 0)
 	{
-		for (i = 1; i < queue_count; i++)
-			multiplayer_sound_queue_sounds[i - 1] = multiplayer_sound_queue_sounds[i];
+		for (i = 1; i < mp_sound_queue_count; i++)
+			mp_sound_queue[i - 1] = mp_sound_queue[i];
 
-		queue_count--;
-		multiplayer_sound_queue_count = queue_count;
-		if (queue_count)
-			_game_engine_play_multiplayer_sound(multiplayer_sound_queue_sounds[0].sound_index);
+		if (--mp_sound_queue_count)
+			_game_engine_play_multiplayer_sound(mp_sound_queue[0].sound_index);
 	}
 
 	return;
@@ -254,7 +240,7 @@ void game_engine_play_multiplayer_sound(
 		push_queued_sound(
 			sound_index,
 			get_sound_length_in_ticks(sound_index) + 5);
-		if (multiplayer_sound_queue_count == 1)
+		if (mp_sound_queue_count == 1)
 			_game_engine_play_multiplayer_sound(sound_index);
 	}
 	else
@@ -269,12 +255,12 @@ void game_engine_intialize_queued_sounds(
 	void)
 {
 	csmemset(
-		multiplayer_sound_queue_sounds,
+		mp_sound_queue,
 		0,
-		sizeof(multiplayer_sound_queue_sounds));
-	multiplayer_sound_queue_count = 1;
-	multiplayer_sound_queue_sounds[0].sound_index = NONE;
-	multiplayer_sound_queue_sounds[0].delay_ticks = MULTIPLAYER_SOUND_QUEUE_INITIAL_DELAY_TICKS;
+		sizeof(mp_sound_queue));
+	mp_sound_queue_count = 1;
+	mp_sound_queue[0].sound_index = NONE;
+	mp_sound_queue[0].delay_ticks = MULTIPLAYER_SOUND_QUEUE_INITIAL_DELAY_TICKS;
 
 	return;
 }

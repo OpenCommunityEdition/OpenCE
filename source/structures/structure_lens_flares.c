@@ -131,7 +131,7 @@ struct shader_lens_flare_fields_transparent
 
 /* ---------- prototypes */
 
-long compare_temp_markers(
+static long compare_temp_markers(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b);
 
@@ -702,7 +702,7 @@ boolean build_structure_lens_flares(
 
 /* ---------- private code */
 
-long compare_temp_markers(
+static long compare_temp_markers(
 	struct temporary_lens_flare_marker const *a,
 	struct temporary_lens_flare_marker const *b)
 {

@@ -80,8 +80,8 @@ struct error_suppression_globals
 
 /* ---------- globals */
 
-boolean data_002dcd2c = TRUE;
-struct error_suppression_globals bss_0031df2c = { 0, 0 };
+static boolean data_002dcd2c = TRUE;
+static struct error_suppression_globals bss_0031df2c = { 0, 0 };
 boolean find_all_fucked_up_shit = FALSE;
 long fucked_up_shit_count = 0;
 
@@ -240,7 +240,7 @@ void write_to_error_file(
 	return;
 }
 
-void reset_error_state(
+static void reset_error_state(
 	void)
 {
 	error_globals.delayed = FALSE;
@@ -254,8 +254,7 @@ void errors_initialize(
 {
 	error_globals.output_to_debug_file = TRUE;
 	error_globals.overflow_suppression = TRUE;
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 	stack_walk_initialize();
 
 	return;
@@ -391,8 +390,7 @@ boolean errors_handle(
 {
 	boolean delayed = error_globals.delayed;
 
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 
 	return delayed;
 }
@@ -400,8 +398,7 @@ boolean errors_handle(
 void errors_clear(
 	void)
 {
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 
 	return;
 }

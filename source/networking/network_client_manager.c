@@ -370,7 +370,6 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
-#include "cache/cache_file_precaching.h"
 #include "cache/cache_files.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
@@ -482,50 +481,6 @@ enum
 	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
 
 /* ---------- structures */
-
-struct network_machine
-{
-	byte __unknown0[0x40];
-	char machine_index;
-	byte __padding41[3];
-};
-
-struct network_game_map
-{
-	long __unknown0;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte __padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[16];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte __padding10C;
-	byte game_mode;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte __padding10F;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	short __unknown426;
-	unsigned long random_seed;
-	byte __unknown42C[4];
-	struct network_game_local_data local_data;
-};
 
 struct transport_key_id
 {

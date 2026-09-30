@@ -897,14 +897,17 @@ static void observer_update_positions(
 
 		if (remaining_time > 0.f)
 		{
+			real remaining_time_squared = remaining_time*remaining_time;
+			real remaining_time_cubed = remaining_time_squared*remaining_time;
+			real remaining_time_fourth = remaining_time_cubed*remaining_time;
+			real remaining_time_fifth = remaining_time_fourth*remaining_time;
+
 			for (value_index = 0; value_index < derivative_count; value_index++)
 			{
-				real remaining_time_squared = remaining_time*remaining_time;
-
 				delta[value_index] =
-					a[value_index]*remaining_time_squared*remaining_time_squared*remaining_time +
-					b[value_index]*remaining_time_squared*remaining_time_squared +
-					c[value_index]*remaining_time_squared*remaining_time +
+					a[value_index]*remaining_time_fifth +
+					b[value_index]*remaining_time_fourth +
+					c[value_index]*remaining_time_cubed +
 					d[value_index]*remaining_time_squared +
 					e[value_index]*remaining_time +
 					f[value_index];

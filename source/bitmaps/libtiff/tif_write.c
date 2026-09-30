@@ -9,7 +9,7 @@ struct tif_write_data
 	char append_to_strip[18];
 };
 
-struct tif_write_data data_002db570 = {
+static struct tif_write_data data_002db570 = {
 	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_write.c,v 1.41 92/02/10 19:06:47 sam Exp $",
 	"TIFFWriteScanline",
 	"TIFFWriteEncodedStrip",

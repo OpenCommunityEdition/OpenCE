@@ -339,15 +339,15 @@ symbols in this file:
 #include "real_math.h"
 #include "game.h"
 #include "game_engine.h"
+#include "camera/camera_scripting.h"
 #include "game/cheats.h"
-#include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "game/players.h"
 #include "game/local_players.h"
 #include "game/player_queues_new.h"
 #include "integer_math.h"
-#include "main/main_runtime.h"
 #include "input.h"
+#include "input/input_abstraction.h"
 #include "shell.h"
 #include "event_manager.h"
 #include "telnet_console.h"
@@ -360,19 +360,20 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "cache/predicted_resources.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/tiff_file.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "interface/attract_mode.h"
 #include "interface/interface.h"
+#include "interface/marketing_and_strategic_business_development.h"
+#include "interface/player_ui.h"
 #include "interface/terminal.h"
 #include "saved games/player_profile.h"
 #include "saved games/game_state.h"
 #include "sound/sound_manager.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "bink/bink_playback.h"
 #include "main/d3d_intimacy.h"
 #include "networking/network_game_globals.h"
@@ -676,10 +677,8 @@ static void main_frame_rate_debug(
 
 static void main_new_map(
 	struct game_options *options);
-extern void scripted_camera_set(
-	word camera_point_index0,
-	word camera_point_index1,
-	long transition_time);
+static void main_game_render(
+	double time_delta_since_tick_sec);
 
 /* ---------- globals */
 
@@ -711,6 +710,7 @@ boolean display_framerate = FALSE;
 boolean display_vblank_deltas = FALSE;
 boolean display_precache_progress = FALSE;
 struct _screenshot_and_framerate_globals global_screenshot_count = { 0 };
+boolean debug_render_freeze;
 
 /* ---------- public code */
 
@@ -1650,6 +1650,16 @@ void main_movie_stop(
 		bitmap_delete(main_globals.movie);
 		main_globals.movie = NULL;
 	}
+	return;
+}
+
+void main_crash(
+	char const *str)
+{
+	/* BUG (original, deliberate): the "crash" script command ("crashes (for debugging).")
+	 * faults on purpose by storing this literal through the null pointer; the August and
+	 * September 2001 builds (debug and retail) and January all emit this one store. */
+	*(char **)NULL = "chucky was here!  NULL belongs to me!!!!!";
 	return;
 }
 
@@ -2985,7 +2995,7 @@ void main_loop_of_death(
 	return;
 }
 
-void main_game_render(
+static void main_game_render(
 	double time_delta_since_tick_sec)
 {
 	boolean force_single_screen;
