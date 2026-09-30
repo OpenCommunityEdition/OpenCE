@@ -401,7 +401,7 @@ unit's collision model is its shape), wound counterclockwise seen from
 outside; the one in the open as the player's body, whose shadow only the
 rays draw */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
-	float *player_sphere)
+	float *player_sphere, long shapes)
 {
 	/* view space: x, y (up), z (forward); the world's x, y, z are the
 	view's x, z, y */
@@ -411,6 +411,7 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 	long count = 0, index;
 
 	(void)camera;
+	(void)shapes;
 	/* the player's body: the marine in the open (world x, y, z) */
 	player_sphere[0] = -2.1f;
 	player_sphere[1] = 9.1f;

@@ -89,7 +89,7 @@ static struct
 	(its object above, its kind - 2 an object, 4 the player's body - below) */
 	float *object_triangles;
 	unsigned char *object_groups;
-	int object_count;
+	int object_count, objects_two_sided;
 	id<MTLTexture> textures[3];
 	unsigned int gl_textures[3];
 	EGLImage_ images[3];
@@ -537,8 +537,9 @@ int host_rt_set_world(uint32_t generation, const float *vertices, int vertex_cou
 /* this frame's objects: their triangles in the world (9 floats each) and
 each one's group (its object, 0 to 31, above 3 bits of its kind: 2 an
 object, 4 the player's body) */
-void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count)
+void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count, int two_sided)
 {
+	rt.objects_two_sided = two_sided;
 	if (!rt.object_triangles)
 	{
 		rt.object_triangles = malloc(HOST_RT_OBJECT_TRIANGLES * 9 * sizeof(float));
@@ -641,6 +642,8 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
 			scratchBufferOffset:0];
 		instances[count].mask = group_masks[group];
+		if (rt.objects_two_sided)
+			instances[count].options |= MTLAccelerationStructureInstanceOptionDisableTriangleCulling;
 		instances[count].accelerationStructureIndex = (uint32_t)structures.count;
 		[structures addObject:rt.bodies[group]];
 		count++;

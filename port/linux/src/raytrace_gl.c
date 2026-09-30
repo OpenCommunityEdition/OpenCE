@@ -56,7 +56,7 @@ unsigned char halo_ray_tracing_sun(float *direction);
 long halo_ray_tracing_lights(float *lights, long maximum);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
-	float *player_sphere);
+	float *player_sphere, long shapes);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -82,6 +82,9 @@ static struct
 	int enabled;
 	float occlusion_strength, reflection_strength, bounce_strength, shadow_strength, radius;
 	int objects;
+	/* the objects' shapes in the rays: 0 the drawn models, 1 the collision
+	models, 2 ellipsoids */
+	int shapes;
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -523,6 +526,20 @@ static struct
 	int count;
 } probe;
 
+static void initialize(void);
+
+/* F4: the objects' shapes in the rays next - the drawn models, the
+collision models, ellipsoids; returns their name */
+const char *halo_ray_tracing_shapes_next(void)
+{
+	static const char *const names[] = { "the drawn models", "the collision models", "ellipsoids" };
+
+	if (!ray.initialized)
+		initialize();
+	ray.shapes = (ray.shapes + 1) % 3;
+	return names[ray.shapes];
+}
+
 /* F5: the ray probe off, live (the crosshair's rays), frozen (where they
 were); returns what it is now */
 const char *halo_ray_tracing_probe_next(void)
@@ -639,6 +656,11 @@ static void initialize(void)
 	ray.bounce_strength = (float)config_real("display.ray_tracing_bounce");
 	ray.shadow_strength = (float)config_real("display.ray_tracing_shadows");
 	ray.objects = config_boolean("display.ray_tracing_objects");
+	{
+		const char *shapes = config_string("display.ray_tracing_shapes");
+
+		ray.shapes = !strcmp(shapes, "collision") ? 1 : !strcmp(shapes, "simple") ? 2 : 0;
+	}
 	/* world units (a world unit is about 3 m) */
 	ray.radius = 0.35f;
 	ray.trace_program = link(trace_source, "ray tracing");
@@ -876,12 +898,15 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		/* (their triangles, at most the host's 65536) */
 		static float triangles[65536 * 9];
 		static unsigned char groups[65536];
-		long count = ray.objects ? halo_ray_tracing_objects(triangles, groups, 65536, position, camera + 28) : 0;
+		long count = ray.objects ?
+			halo_ray_tracing_objects(triangles, groups, 65536, position, camera + 28, ray.shapes) : 0;
 
 		if (!ray.objects)
 			camera[31] = 0.0f;
 
-		host_rt_set_objects(triangles, groups, (int)count);
+		/* (the drawn models are traced from both sides: their winding is not
+		kept to their outsides as the collision models' is) */
+		host_rt_set_objects(triangles, groups, (int)count, ray.shapes == 0);
 	}
 	/* the dynamic lights, for their shadows */
 	{

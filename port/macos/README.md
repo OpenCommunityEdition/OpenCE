@@ -75,6 +75,7 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
+| F4 | ⌘J | The characters' and vehicles' shapes in the rays: their drawn models, their collision models, ellipsoids. |
 | F5 | ⌘L | The ray probe: draw the rays the lighting sends from the surface at the crosshair; again to freeze them in place (walk round them); again for off. |
 | F6 | ⌘B | Step through what the ray tracing shows: the lighting, the ray view, split, the occlusion (refer to "Ray-traced lighting"). |
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
@@ -200,8 +201,12 @@ added onto the lightmaps' light; the lighting darkens only their share of a
 pixel's light (the stages above), by the share of their rays that arrive.
 
 The characters and the vehicles are in Metal's rays too
-(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`), as
-their collision models: the meshes the game tests its bullets against, a
+(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): by
+default as their drawn models, skinned each frame as the renderer skins
+them (each vertex by its two nodes' poses), at the high level of detail,
+and traced from both sides; F4 / ⌘J (or `display.ray_tracing_shapes`)
+switches to their collision models - the meshes the game tests its bullets
+against, a
 mesh for each node's region as it is now (its damage permutation), placed
 each frame by the node's matrix as the animation poses it. A unit without
 them is its skeleton's bones, each an ellipsoid (bipeds), or its bounding

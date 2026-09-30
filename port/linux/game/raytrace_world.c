@@ -234,7 +234,9 @@ boolean halo_ray_tracing_sun(float *direction)
 /* ---------- the objects
 
 The units (the bipeds and the vehicles) as triangles for the rays, in the
-world, each frame: their collision models - the meshes the game tests its
+world, each frame: their drawn models, skinned as the renderer skins them
+(display.ray_tracing_shapes "model", at the high level of detail), or
+their collision models - the meshes the game tests its
 bullets against, a mesh for each node's region as it now is (its damage
 permutation), placed by the node's matrix as the animation poses it (between
 the last two ticks, as the frame draws it). A unit without them is its
@@ -255,6 +257,61 @@ enum
 /* the objects nearer the camera than this (world units) are in the rays */
 #define RAY_TRACED_OBJECT_DISTANCE 25.0f
 #define RAY_TRACED_OBJECT_GROUPS 32
+
+/* the model geometry's layout (models.c keeps it private) */
+struct model_geometry_view
+{
+	byte reserved[0x24];
+	struct tag_block parts;
+};
+
+struct model_geometry_part_view
+{
+	unsigned long flags;
+	short shader_index;
+	char previous_part_index;
+	char next_part_index;
+	short centroid_primary_node_index;
+	short centroid_secondary_node_index;
+	real centroid_primary_node_weight;
+	real centroid_secondary_node_weight;
+	real_point3d centroid;
+	struct tag_block uncompressed_vertices;
+	struct tag_block compressed_vertices;
+	struct tag_block triangles;
+	struct
+	{
+		short type;
+		word pad;
+		long count;
+		void *base_address;
+		void *hardware_format;
+	} triangle_buffer;
+	struct
+	{
+		short type;
+		word pad;
+		long count;
+		long offset;
+		void *base_address;
+		void *hardware_format;
+	} vertex_buffer;
+};
+
+/* a compressed model vertex, as the renderer reads it (rasterizer.c) */
+struct model_vertex_view
+{
+	real_point3d position;
+	unsigned long normal;
+	unsigned long binormal;
+	unsigned long tangent;
+	short texture_coordinates[2];
+	char node_indices[2];
+	short node_weight;
+};
+
+typedef char model_geometry_part_view_size[sizeof(struct model_geometry_part_view) == 0x68 ? 1 : -1];
+typedef char model_vertex_view_size[sizeof(struct model_vertex_view) == 32 ? 1 : -1];
 
 /* a collision mesh's triangles, in its node's space (9 floats each), made
 once for each mesh while its map is loaded */
@@ -487,16 +544,118 @@ static long bone_triangles(float *out, long room, const real_point3d *a, const r
 	return ellipsoid_triangles(out, room, center, u, v, w);
 }
 
-/* one object's triangles into out (at most room); returns how many */
-static long object_triangles(long object_index, struct object_datum *object, float *out, long room)
+/* the shapes for the rays: the drawn models, the collision models, or
+ellipsoids (display.ray_tracing_shapes) */
+enum
+{
+	_ray_shapes_model,
+	_ray_shapes_collision,
+	_ray_shapes_simple,
+};
+
+/* the model's level of detail in the rays: high (of super low to super high) */
+#define RAY_TRACED_MODEL_DETAIL_LEVEL 3
+#define RAY_TRACED_MAXIMUM_NODES 128
+
+/* the object's drawn model, skinned as the renderer skins it (each vertex
+by its two nodes' matrices, each the node's pose times its inverse default
+pose: models.c), its regions as they are now; returns how many triangles */
+static long model_triangles(struct object_datum *object, const real_matrix4x3 *matrices, float *out, long room)
+{
+	const struct object_definition *definition = object_definition_get(object->definition_index);
+	const struct model *model;
+	const struct model_node *nodes;
+	static real_matrix4x3 relative[RAY_TRACED_MAXIMUM_NODES];
+	long count = 0, node_index, region_index;
+
+	if (!matrices || definition->object.model.index == NONE)
+		return 0;
+	model = model_definition_get(definition->object.model.index);
+	if (model->nodes.count <= 0 || model->nodes.count > RAY_TRACED_MAXIMUM_NODES)
+		return 0;
+	nodes = (const struct model_node *)model->nodes.address;
+	for (node_index = 0; node_index < model->nodes.count; node_index++)
+		matrix4x3_multiply(&matrices[node_index], &nodes[node_index].runtime_default_inverse_matrix, &relative[node_index]);
+	for (region_index = 0; region_index < model->regions.count && count < room; region_index++)
+	{
+		const struct model_region *region = (const struct model_region *)model->regions.address + region_index;
+		const struct model_region_permutation *permutation;
+		const struct model_geometry_view *geometry;
+		char permutation_index = object->object.region_permutations[region_index];
+		short geometry_index, part_index;
+
+		if (permutation_index == NONE || permutation_index >= region->permutations.count)
+			continue;
+		permutation = (const struct model_region_permutation *)region->permutations.address + permutation_index;
+		geometry_index = permutation->geometry_indices[RAY_TRACED_MODEL_DETAIL_LEVEL];
+		if (geometry_index == NONE || geometry_index >= model->geometries.count)
+			continue;
+		geometry = (const struct model_geometry_view *)model->geometries.address + geometry_index;
+		for (part_index = 0; part_index < geometry->parts.count && count < room; part_index++)
+		{
+			const struct model_geometry_part_view *part = (const struct model_geometry_part_view *)geometry->parts.address +
+				part_index;
+			const unsigned short *strip = (const unsigned short *)part->triangles.address;
+			const struct model_vertex_view *vertices = (const struct model_vertex_view *)part->compressed_vertices.address;
+			long index, strip_count = part->triangle_buffer.count + 2, vertex_count = part->compressed_vertices.count;
+
+			if ((part->flags & 1) || !strip || !vertices || vertex_count <= 0 || part->triangle_buffer.type != 1)
+				continue;
+			for (index = 0; index + 2 < strip_count && count < room; index++)
+			{
+				unsigned short corners[3] = { strip[index], strip[index + 1], strip[index + 2] };
+				int corner;
+
+				if (corners[0] == corners[1] || corners[1] == corners[2] || corners[0] == corners[2] ||
+					corners[0] >= vertex_count || corners[1] >= vertex_count || corners[2] >= vertex_count)
+				{
+					continue;
+				}
+				for (corner = 0; corner < 3; corner++)
+				{
+					const struct model_vertex_view *vertex = &vertices[corners[corner]];
+					/* (three times the node's index, a byte: past 42 nodes, over 127) */
+					short node0 = (short)((unsigned char)vertex->node_indices[0] / 3);
+					short node1 = (short)((unsigned char)vertex->node_indices[1] / 3);
+					float weight0 = (float)vertex->node_weight * (1.0f / 32767.0f);
+					real_point3d point0 = vertex->position, point1 = vertex->position;
+					float *q = out + count * 9 + corner * 3;
+
+					if (node0 >= 0 && node0 < model->nodes.count)
+						matrix4x3_transform_point(&relative[node0], &vertex->position, &point0);
+					if (node1 >= 0 && node1 < model->nodes.count)
+						matrix4x3_transform_point(&relative[node1], &vertex->position, &point1);
+					else
+						point1 = point0;
+					q[0] = point0.x * weight0 + point1.x * (1.0f - weight0);
+					q[1] = point0.y * weight0 + point1.y * (1.0f - weight0);
+					q[2] = point0.z * weight0 + point1.z * (1.0f - weight0);
+				}
+				count++;
+			}
+		}
+	}
+	return count;
+}
+
+/* one object's triangles into out (at most room), of the shapes; returns
+how many */
+static long object_triangles(long object_index, struct object_datum *object, float *out, long room, long shapes)
 {
 	const struct object_definition *definition = object_definition_get(object->definition_index);
 	const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
 	float radius = object->object.bounding_sphere_radius;
 	long count = 0;
 
+	/* the drawn model */
+	if (shapes == _ray_shapes_model)
+	{
+		count = model_triangles(object, matrices, out, room);
+		if (count > 0)
+			return count;
+	}
 	/* the collision model: its meshes, where the game's bullets hit */
-	if (matrices && definition->object.collision_model.index != NONE)
+	if (shapes != _ray_shapes_simple && matrices && definition->object.collision_model.index != NONE)
 	{
 		const struct collision_model *model = collision_model_definition_get(definition->object.collision_model.index);
 		const struct collision_node *nodes = (const struct collision_node *)model->nodes.address;
@@ -537,7 +696,7 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 		if (count > 0)
 			return count;
 	}
-	/* without: a biped's bones */
+	/* without (or simple shapes): a biped's bones */
 	if (object->object.type == _object_type_biped && matrices && definition->object.model.index != NONE)
 	{
 		const struct model *model = model_definition_get(definition->object.model.index);
@@ -575,7 +734,7 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 maximum) and each triangle's group, and the player's body's bounding sphere
 (center, radius; radius 0 if none); returns how many triangles */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
-	float *player_sphere)
+	float *player_sphere, long shapes)
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
@@ -594,7 +753,7 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		player_sphere[1] = object->object.bounding_sphere_center.y;
 		player_sphere[2] = object->object.bounding_sphere_center.z;
 		player_sphere[3] = object->object.bounding_sphere_radius;
-		added = object_triangles(player_unit, object, triangles, maximum);
+		added = object_triangles(player_unit, object, triangles, maximum, shapes);
 		for (index = 0; index < added; index++)
 			groups[index] = _ray_mask_player;
 		count += added;
@@ -614,7 +773,7 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		{
 			continue;
 		}
-		added = object_triangles(iterator.index, object, triangles + count * 9, maximum - count);
+		added = object_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes);
 		for (index = 0; index < added; index++)
 			groups[count + index] = (unsigned char)(group << 3 | _ray_mask_object);
 		if (added > 0)

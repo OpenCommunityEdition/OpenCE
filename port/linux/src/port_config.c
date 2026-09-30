@@ -125,6 +125,11 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"How dark the sun's traced shadows on characters, vehicles and items are,\n"
 		"0.0 to 1.0 (macOS, with Metal's rays)." },
+	{ "display.ray_tracing_shapes", _config_string, "\"model\"", "HALO_RAY_TRACING_SHAPES", _environment_value,
+		_platform_all,
+		"The characters' and vehicles' shapes in Metal's rays: \"model\" (their drawn\n"
+		"models, skinned as drawn), \"collision\" (the meshes their bullets hit) or\n"
+		"\"simple\" (ellipsoids); F4 steps through them (macOS)." },
 	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
 		_platform_all,
 		"The characters and vehicles in Metal's rays too: their contact shadows on\n"
