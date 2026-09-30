@@ -468,7 +468,7 @@ static NSString *const kernel_source = @
 	"		if (ch > 0.0 && ct > 0.0 && choice.probability > 0.0 && gd > 1e-3 &&\n"
 	"			!blocked(to_glow, world, 3u, cutout_start, indices, base_texcoords, triangle_materials, materials, object_cutouts,\n"
 	"				instance_offsets, mask_rects, masks, cutouts_ready))\n"
-	"			E += min(materials[uint(gc.w) * 2u + 1u].rgb * c[47] * ch * ct * 0.5 * length(gcross) / (max(gd2, 0.01) * choice.probability) * 0.3183099, float3(4.0));\n"
+	"			E += min(materials[uint(gc.w) * 2u + 1u].rgb * c[47] * ch * ct * 0.5 * length(gcross) / (max(gd2, 0.01) * choice.probability) * 0.3183099, float3(c[86]));\n"
 	"	}\n"
 	"	return E;\n"
 	"}\n"
@@ -598,7 +598,7 @@ static NSString *const kernel_source = @
 	"		if (cos_there <= 0.0 || a.w <= 0.0 || d < 1e-3) continue;\n"
 	"		ray to_glow(P, L, 0.05, max(d - 0.01, 0.0));\n"
 	"		if (blocked(to_glow, world, 1u, CUT_ARGS)) continue;\n"
-	"		float3 given = min(materials[uint(cc.w) * 2u + 1u].rgb * c[47] * cos_there * 0.5 * length(cross_ab) / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0)) / 8.0;\n"
+	"		float3 given = min(materials[uint(cc.w) * 2u + 1u].rgb * c[47] * cos_there * 0.5 * length(cross_ab) / (max(d2, 0.01) * a.w) * 0.3183099, float3(c[86])) / 8.0;\n"
 	"		glow_light += given;\n"
 	"		glow_toward += L * dot(given, float3(0.3, 0.59, 0.11));\n"
 	"	}\n"
@@ -1144,7 +1144,7 @@ static NSString *const kernel_source = @
 	"				if (!blocked(to_glow, world, 3u, CUT_ARGS))\n"
 	"				{\n"
 	"					float3 given = materials[uint(cc.w) * 2u + 1u].rgb * c[47];\n"
-	"					indirect += min(given * cos_here * cos_there * area / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0));\n"
+	"					indirect += min(given * cos_here * cos_there * area / (max(d2, 0.01) * a.w) * 0.3183099, float3(c[86]));\n"
 	"				}\n"
 	"			}\n"
 	"		}\n"
@@ -2440,6 +2440,8 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* (the path tracer's bounces: 3, 2 once the governor sheds, 1 from
 		its third step) */
 		constants[85] = rt.shed >= 3 ? 1.0f : rt.shed >= 1 ? 2.0f : 3.0f;
+		/* (the most one ray to a glowing triangle brings: HALO_RT_GLOW_CLAMP) */
+		constants[86] = getenv("HALO_RT_GLOW_CLAMP") ? (float)atof(getenv("HALO_RT_GLOW_CLAMP")) : 4.0f;
 		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||
 			rt.history[0].height != (NSUInteger)height))
 		{

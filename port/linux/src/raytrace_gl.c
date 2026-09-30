@@ -1061,7 +1061,7 @@ static void initialize(void)
 	glGenFramebuffers(1, &ray.source_framebuffer);
 	glGenFramebuffers(1, &ray.light_framebuffer);
 	platform_log("ray tracing: %s, %s (F9 switches it; occlusion %.2f, reflections %.2f, bounce %.2f)",
-		ray.enabled ? "on" : "off", ray.hardware ? "world-space rays (Metal) with the screen's" : "the screen's rays",
+		ray.enabled ? "on" : "off", ray.hardware ? "full (rays through the whole level, on Metal)" : "lite (screen-space rays only)",
 		ray.occlusion_strength, ray.reflection_strength, ray.bounce_strength);
 }
 
@@ -1137,7 +1137,7 @@ const char *halo_ray_tracing_toggle(void)
 		return "off";
 	if (ray.failed)
 		return "unavailable";
-	return ray.hardware ? "on (Metal: level rays, sun shadows, screen rays)" : "on (screen rays)";
+	return ray.hardware ? "on (full: rays through the whole level)" : "on (lite: screen-space rays only)";
 }
 
 /* F6: what it shows next - the lighting, the ray view, the lighting and the
@@ -1146,7 +1146,7 @@ const char *halo_ray_tracing_next_view(void)
 {
 	static const int order[] = { _ray_tracing_on, _ray_tracing_debug_rays, _ray_tracing_debug_split,
 		_ray_tracing_debug_occlusion };
-	static const char *const names[] = { "lighting", "ray view (what Metal's rays hit)",
+	static const char *const names[] = { "lighting", "ray view (what the rays hit)",
 		"split (lighting | ray view)", "occlusion" };
 	int index, next = 0;
 
@@ -1160,7 +1160,7 @@ const char *halo_ray_tracing_next_view(void)
 	ray.mode = order[next];
 	ray.enabled = 1;
 	if (!ray.hardware && (ray.mode == _ray_tracing_debug_rays || ray.mode == _ray_tracing_debug_split))
-		return "ray view needs Metal's rays";
+		return "ray view needs full ray tracing (lite is on)";
 	return names[next];
 }
 

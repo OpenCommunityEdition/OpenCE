@@ -128,7 +128,7 @@ static const char *const resolution_values[] = { "native", "2160p", "1440p", "10
 static const char *const resolution_labels[] = { "Native", "2160p", "1440p", "1080p", "720p", "Xbox 640x480", "" };
 static char resolution_custom[64];
 
-static const char *const tracing_labels[] = { "On", "Screen rays", "Off" };
+static const char *const tracing_labels[] = { "Full", "Lite (screen only)", "Off" };
 static const char *const tracing_values[] = { "on", "screen", "off" };
 static const char *const view_labels[] = { "Lighting", "Ray view", "Split", "Occlusion", "Depth" };
 static const char *const gi_labels[] = { "Traced", "Black", "Path", "Off" };
@@ -189,7 +189,7 @@ static const struct row rows[] =
 	{ _row_choice, _row_ray_tracing, "Ray tracing", "display.ray_tracing", tracing_labels, 3 },
 	{ _row_choice, _row_ray_view, "View", NULL, view_labels, 5, 0, 0, 0, 0, 0,
 		"What the ray tracing shows (F6 steps through it): the lighting; the ray view (what\n"
-		"Metal's rays hit, from the camera); the lighting and the ray view side by side; the\n"
+		"the rays hit, from the camera); the lighting and the ray view side by side; the\n"
 		"traced occlusion; the depth. For looking, not saved." },
 	{ _row_choice, _row_ray_gi, "Traced light", "display.ray_tracing_gi", gi_labels, 4 },
 	{ _row_choice, _row_ray_lights, "Lights", "display.ray_tracing_lights", lights_labels, 2 },
@@ -418,7 +418,7 @@ static void set_index(const struct row *row, int index)
 		halo_ray_tracing_get(&ray);
 		saved(row, config_write_string(row->setting, tracing_values[index]), tracing_values[index]);
 		if (index == 0 && ray.tracing != 1)
-			status_set("Metal's rays are not available here: the screen's rays only");
+			status_set("Full ray tracing is not available here: lite (screen-space rays) only");
 		return;
 	case _row_ray_view:
 		ray.view = index;
