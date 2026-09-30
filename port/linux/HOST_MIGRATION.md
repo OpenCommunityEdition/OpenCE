@@ -1,6 +1,6 @@
 # Browser match preservation
 
-A quick-play host departure must never call the new-match startup path. The
+A quick-play host departure or transport outage must never call the new-match startup path. The
 map, live player/object datums and game type stay loaded. The game thread pauses
 the simulation while the browser elects a replacement, then reconnects the
 original roster over newly established transports.
@@ -34,12 +34,24 @@ world instead of invoking normal server creation, map selection or countdown.
 Survivors reconnect their existing machine/player slots; no player is added a
 second time. Only transport/input queues are rebuilt. The replacement removes
 the departed host, waits for the remaining machines to reattach, and broadcasts
-a final resume acknowledgement at the retained authority tick. A 12-second
-reattach deadline removes machines which did not return. Clients stay paused
+a final resume acknowledgement at the retained authority tick. After 12 seconds,
+reachable machines may resume while missing player slots and their recorded
+owners remain eligible to reattach for another 120 seconds. Validated disconnects
+also retain this identity during the original host's first, epoch-zero outage;
+transport failure alone must not remove the roster before recovery begins. Clients stay paused
 until that acknowledgement, rather than simulating ahead while the host waits.
 Late joins update roster membership and slot ownership, including when they reuse
 a departed machine's slot. Historical score datums remain on the scoreboard;
 their old machine input ownership is removed.
+
+If the original host is still present and is elected again, it renews its listener
+and client transports around the existing authoritative world. It keeps its own
+player and does not promote a replica or roll the world back. Reliable output
+queues are bounded per peer so one blocked recipient cannot stop every other
+player's keepalives. Queued reliable input is serviced before applying browser
+connection timeouts. A timed-out reconnect retires its stale transport and retries
+the same authority epoch; the former 45-second permanent recovery failure is
+removed. Room epoch synchronization follows the loaded match's identity.
 
 A generic replay of player inputs is not used: the distributed client prediction
 path is not a deterministic copy of the authoritative simulation. Existing
@@ -59,3 +71,10 @@ canceled sessions cannot receive recovery callbacks. A full WebAssembly build
 is required alongside these tests. Live multiplayer evidence must separately
 compare scores, clocks, player slots, positions and inventory across a host
 close; passing these tests alone is not public deployment or sustained play.
+
+The September 30 three-player Chrome check forced a 20-second host output outage
+while keeping that host running, and held one client's output for 60 seconds.
+All three resumed match 58499 with the original host at epoch 1 and retained
+player slots and accumulated scores. Closing that host afterward preserved the
+same match on both survivors at epoch 2. These are local injected-fault checks;
+they do not establish arbitrary WAN partition or browser-eviction recovery.
