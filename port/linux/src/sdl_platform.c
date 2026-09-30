@@ -15,6 +15,7 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "xiso.h"
+#include "raytrace_gl.h"
 
 #include <SDL3/SDL.h>
 #include <stdarg.h>
@@ -771,7 +772,7 @@ void platform_pump_events(void)
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
 		{
-			/* the port's keys: F7 to F12, or on macOS, whose own keys F11 and
+			/* the port's keys: F4 to F12, or on macOS, whose own keys F11 and
 			the media keys are, Command with a letter (the letter then does
 			nothing in the game) */
 			SDL_Scancode action = event.key.scancode;
@@ -783,8 +784,12 @@ void platform_pump_events(void)
 				{
 				case SDL_SCANCODE_F: action = SDL_SCANCODE_F11; break;
 				case SDL_SCANCODE_R: action = SDL_SCANCODE_F8; break;
+				case SDL_SCANCODE_T: action = SDL_SCANCODE_F9; break;
 				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
 				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
+				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
+				case SDL_SCANCODE_L: action = SDL_SCANCODE_F5; break;
+				case SDL_SCANCODE_J: action = SDL_SCANCODE_F4; break;
 				default: break;
 				}
 			}
@@ -806,6 +811,16 @@ void platform_pump_events(void)
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
 			}
+			/* F4: the objects' shapes in the rays (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F4)
+				notice("ray tracing shapes: %s", halo_ray_tracing_shapes_next());
+			/* F5: the ray probe, the rays of the crosshair's surface drawn
+			(raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F5)
+				notice("ray probe: %s", halo_ray_tracing_probe_next());
+			/* F6 steps through what the ray tracing shows (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F6)
+				notice("ray tracing view: %s", halo_ray_tracing_next_view());
 			/* F7 shows or hides the game's frames-a-second counter (its own
 			display_framerate: source/main/main.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F7)
@@ -816,6 +831,9 @@ void platform_pump_events(void)
 			/* F8 steps through the resolutions (d3d8_gl.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F8)
 				notice("resolution: %s", halo_screen_resolution_next());
+			/* F9 switches the ray-traced lighting (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F9)
+				notice("ray tracing: %s", halo_ray_tracing_toggle());
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */

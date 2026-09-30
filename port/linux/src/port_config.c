@@ -63,6 +63,14 @@ struct config_setting
 	const char *comment;
 };
 
+/* the ray-traced lighting's default: on for the macOS port, which it was
+made for; off elsewhere */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_RAY_TRACING "\"on\""
+#else
+#define HALO_CONFIG_RAY_TRACING "\"off\""
+#endif
+
 /* a default the macOS port turns off */
 #ifdef HALO_MACOS
 #define HALO_CONFIG_MACOS_FALSE "false"
@@ -100,6 +108,36 @@ static const struct config_setting config_settings[] =
 	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_value, _platform_desktop,
 		"Show the game's frames-a-second counter (F7, or Command-P on a Mac,\n"
 		"shows or hides it)." },
+
+	{ "display.ray_tracing", _config_string, HALO_CONFIG_RAY_TRACING, "HALO_RAY_TRACING", _environment_value,
+		_platform_all,
+		"Ray-traced lighting on the 3D world (port/linux/src/raytrace_gl.c): \"on\"\n"
+		"(on macOS with Metal's rays through the level), \"screen\" (the screen's rays\n"
+		"only), \"off\", or \"occlusion\" and \"depth\" to see what it works from, or\n"
+		"\"rays\" and \"split\" to see what Metal's rays find. F9 switches it while\n"
+		"playing; F6 steps through the views." },
+	{ "display.ray_tracing_occlusion", _config_real, "0.8", "HALO_RAY_TRACING_OCCLUSION", _environment_value,
+		_platform_all,
+		"How much traced ambient occlusion darkens creases and corners, 0.0 to 1.0." },
+	{ "display.ray_tracing_reflections", _config_real, "0.25", "HALO_RAY_TRACING_REFLECTIONS", _environment_value,
+		_platform_all,
+		"How strongly surfaces reflect the traced scene, 0.0 to 1.0." },
+	{ "display.ray_tracing_bounce", _config_real, "0.25", "HALO_RAY_TRACING_BOUNCE", _environment_value,
+		_platform_all,
+		"How much light one traced bounce carries between surfaces, 0.0 to 1.0." },
+	{ "display.ray_tracing_shadows", _config_real, "1.0", "HALO_RAY_TRACING_SHADOWS", _environment_value,
+		_platform_all,
+		"How dark the sun's traced shadows on characters, vehicles and items are,\n"
+		"0.0 to 1.0 (macOS, with Metal's rays)." },
+	{ "display.ray_tracing_shapes", _config_string, "\"model\"", "HALO_RAY_TRACING_SHAPES", _environment_value,
+		_platform_all,
+		"The characters' and vehicles' shapes in Metal's rays: \"model\" (their drawn\n"
+		"models, skinned as drawn), \"collision\" (the meshes their bullets hit) or\n"
+		"\"simple\" (ellipsoids); F4 steps through them (macOS)." },
+	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
+		_platform_all,
+		"The characters and vehicles in Metal's rays too: their contact shadows on\n"
+		"the level, and your own body's shadow (macOS)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

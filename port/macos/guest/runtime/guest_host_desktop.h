@@ -34,5 +34,14 @@ int host_sdl_show_message_box(unsigned int flags, const char *title, const char 
 	const int *button_flags, const int *button_ids, const char *texts, int *chosen);
 void host_sdl_show_open_file_dialog(const char *filters, int count);
 int host_sdl_file_dialog_result(char *buffer, unsigned int size);
+/* Metal ray tracing (port/macos/host/host_metal_rt.m) */
+int host_rt_available(void);
+int host_rt_set_world(unsigned int generation, const float *vertices, int vertex_count, const unsigned int *indices,
+	int triangle_count);
+unsigned int host_rt_texture(int which, int width, int height);
+int host_rt_trace(const float *camera, int width, int height);
+void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count, int two_sided);
+int host_rt_probe(float *segments, int maximum);
+void host_rt_set_lights(const float *lights, int count);
 
 #endif
