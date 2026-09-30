@@ -604,9 +604,28 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 		{
 			const struct model_geometry_part_view *part = (const struct model_geometry_part_view *)geometry->parts.address +
 				part_index;
-			const unsigned short *strip = (const unsigned short *)part->triangles.address;
-			const struct model_vertex_view *vertices = (const struct model_vertex_view *)part->compressed_vertices.address;
-			long index, strip_count = part->triangle_buffer.count + 2, vertex_count = part->compressed_vertices.count;
+			/* the part's strip and vertices: in a cache file, not in the tag
+			blocks but in its buffers - the strip in memory, the vertices at a
+			physical address, which the CPU sees in the window at 0x80000000 */
+			const unsigned short *strip = (const unsigned short *)part->triangle_buffer.base_address;
+			unsigned long vertex_address = (unsigned long)part->vertex_buffer.base_address;
+			const byte *vertex_data;
+			boolean compressed = part->vertex_buffer.type == 5;
+			long index, strip_count = part->triangle_buffer.count + 2, vertex_count = part->vertex_buffer.count;
+			long vertex_size = compressed ? (long)sizeof(struct model_vertex_view) : 68;
+
+			if (vertex_address && vertex_address < 0x80000000UL)
+				vertex_address |= 0x80000000UL;
+			vertex_data = (const byte *)vertex_address + part->vertex_buffer.offset * vertex_size;
+			/* (or the tag blocks, where they are kept) */
+			if (!strip || !vertex_address)
+			{
+				strip = (const unsigned short *)part->triangles.address;
+				vertex_data = (const byte *)part->compressed_vertices.address;
+				vertex_count = part->compressed_vertices.count;
+				compressed = TRUE;
+				vertex_size = (long)sizeof(struct model_vertex_view);
+			}
 
 			/* (HALO_RT_LOG_SHAPES: each model's parts' data, once) */
 			if (getenv("HALO_RT_LOG_SHAPES") && part_index == 0 && region_index == 0)
@@ -631,8 +650,11 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 						part->vertex_buffer.offset, part->vertex_buffer.base_address);
 				}
 			}
-			if ((part->flags & 1) || !strip || !vertices || vertex_count <= 0 || part->triangle_buffer.type != 1)
+			if ((part->flags & 1) || !strip || !vertex_data || vertex_count <= 0 || part->triangle_buffer.type != 1 ||
+				(part->vertex_buffer.type != 4 && part->vertex_buffer.type != 5 && part->vertex_buffer.base_address))
+			{
 				continue;
+			}
 			for (index = 0; index + 2 < strip_count && count < room; index++)
 			{
 				unsigned short corners[3] = { strip[index], strip[index + 1], strip[index + 2] };
@@ -645,18 +667,35 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 				}
 				for (corner = 0; corner < 3; corner++)
 				{
-					const struct model_vertex_view *vertex = &vertices[corners[corner]];
-					/* (three times the node's index, a byte: past 42 nodes, over 127) */
-					short node0 = (short)((unsigned char)vertex->node_indices[0] / 3);
-					short node1 = (short)((unsigned char)vertex->node_indices[1] / 3);
-					float weight0 = (float)vertex->node_weight * (1.0f / 32767.0f);
-					real_point3d point0 = vertex->position, point1 = vertex->position;
+					const byte *raw = vertex_data + corners[corner] * vertex_size;
+					const real_point3d *position = (const real_point3d *)raw;
+					short node0, node1;
+					float weight0;
+					real_point3d point0 = *position, point1 = *position;
+
+					if (compressed)
+					{
+						const struct model_vertex_view *vertex = (const struct model_vertex_view *)raw;
+
+						/* (three times the node's index, a byte: past 42 nodes, over 127) */
+						node0 = (short)((unsigned char)vertex->node_indices[0] / 3);
+						node1 = (short)((unsigned char)vertex->node_indices[1] / 3);
+						weight0 = (float)vertex->node_weight * (1.0f / 32767.0f);
+					}
+					else
+					{
+						/* model_vertex_uncompressed: position, normal, binormal, tangent,
+						texcoord (56 bytes), then two node indices and their weights */
+						node0 = *(const short *)(raw + 56);
+						node1 = *(const short *)(raw + 58);
+						weight0 = *(const float *)(raw + 60);
+					}
 					float *q = out + count * 9 + corner * 3;
 
 					if (node0 >= 0 && node0 < model->nodes.count)
-						matrix4x3_transform_point(&relative[node0], &vertex->position, &point0);
+						matrix4x3_transform_point(&relative[node0], position, &point0);
 					if (node1 >= 0 && node1 < model->nodes.count)
-						matrix4x3_transform_point(&relative[node1], &vertex->position, &point1);
+						matrix4x3_transform_point(&relative[node1], position, &point1);
 					else
 						point1 = point0;
 					q[0] = point0.x * weight0 + point1.x * (1.0f - weight0);

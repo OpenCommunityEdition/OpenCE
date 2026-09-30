@@ -73,6 +73,9 @@ NATIVE_ABI_FLAGS = [("-mcpu=apple-m1" if flag == "-mcpu=cortex-a53" else flag)
     # the watchOS triple with the macOS SDK's sysroot: the guest takes no
     # headers from it (-nostdinc)
     "-Wno-incompatible-sysroot",
+    # musl's internal headers ask for protected visibility, which the
+    # target lacks (default is the same here: one static image)
+    "-Wno-unsupported-visibility",
 ]
 
 # the x86-64 build: x32, linked below 2 GB (where x86-64 code can use
