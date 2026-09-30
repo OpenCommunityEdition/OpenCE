@@ -826,6 +826,14 @@ void platform_pump_events(void)
 				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
 				case SDL_SCANCODE_L: action = SDL_SCANCODE_F5; break;
 				case SDL_SCANCODE_J: action = SDL_SCANCODE_F4; break;
+				/* the next debug camera, and the flying camera's controls
+				(xinput_sdl.c, source/camera/director.c) */
+				case SDL_SCANCODE_X:
+				case SDL_SCANCODE_Z:
+					action = SDL_SCANCODE_UNKNOWN;
+					if (event.key.down && !event.key.repeat)
+						halo_debug_camera_key(event.key.scancode == SDL_SCANCODE_X);
+					break;
 				default: break;
 				}
 			}

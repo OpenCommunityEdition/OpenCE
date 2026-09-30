@@ -83,6 +83,8 @@ build adds:
 | F9 | ⌘T | Switch the ray-traced lighting on or off. |
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
+| X, held for a second | ⌘X | The next camera: the first person, a flying camera, one following the player, and back (the debug cameras, under "Ray-traced lighting"). |
+| Z | ⌘Z | In the flying camera, take its controls (WASD, the mouse), or let go of them. |
 
 ⌘Q quits on a second press within two seconds (Q is the flashlight, and ⌘
 is held for the keys above); the window's close button quits at once.
@@ -366,13 +368,16 @@ shapes orange; your own body cyan (look down); and, darker, where a second
 ray from the hit to the sun is blocked. It is the scene the lighting's rays
 go through.
 
-The game's own debug cameras fly round the scene too: hold X (the
-controller's black button) for a second to go from the first person to a
-flying camera, then to one following the player, and back. In the flying
-camera, Z (the right stick's button, or the middle mouse button) takes its
-controls: WASD moves, the mouse turns, the left button rises, the right
-button (or G) sinks, the arrows up and down change the speed; Z again lets
-go of them.
+The game's own debug cameras fly round the scene too: ⌘X goes from the
+first person to a flying camera, then to one following the player, and
+back, one camera a press (as X, the controller's black button, held for a
+second). In the flying camera, ⌘Z (or Z, the right stick's button, or the
+middle mouse button) takes its controls: WASD moves, the mouse turns (as it
+aims, with `input.mouse_sensitivity` and `input.invert_mouse`), the left
+button rises, the right button (or G) sinks, the arrows up and down change
+the speed; ⌘Z again lets go of them, and the player moves and aims again
+while the camera stays where it is. ⌘X and ⌘Z do not also change the
+grenade or zoom, as X and Z do.
 
 The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
 at the crosshair, as the kernel traced them: the occlusion rays white, the
@@ -508,7 +513,9 @@ code for the window, the mouse, the keyboard and the first start.
 - `HALO_TEST_INPUT="script:47=switch,50=zoom,52-60=turnright"` plays the
   scripted actions in those seconds since start (forward, back, left, right,
   turnleft, turnright, up, down, fire, grenade, jump, crouch, zoom, action,
-  flashlight, reload, switch, start); with `HALO_SCREENSHOT_DIR` and
+  flashlight, reload, switch, start; `camera` and `cameracontrol` press ⌘X
+  and ⌘Z once, `mouseleft`, `mouseright`, `mouseup` and `mousedown` move the
+  mouse 400 pixels a second); with `HALO_SCREENSHOT_DIR` and
   `HALO_SCREENSHOT_EVERY=<frames>` it records a test drive, and
   `HALO_EXIT_AFTER=<seconds>` ends it.
 - `HALO_COMMANDS="47=cheat_all_weapons;50=cheat_spawn_warthog"` runs
