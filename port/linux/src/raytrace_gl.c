@@ -202,7 +202,8 @@ the last frame's lighting pass hold it (Metal's writes are not yet seen
 this early in the frame): each pixel's point, from its depth and this
 camera, found in the last frame's view (cameras: this one's position,
 forward, up, right, then the last's; tan and aspect in their w), and the
-light there blurred over 5x5 of its rays' pixels of like depth and facing
+light there blurred over 5x5 of its rays' pixels, every other one (9x9),
+of like depth and facing
 (its results r 2 where there is traced light, the lights' texture gba) */
 static const char inject_source[] =
 	SHADER_HEADER
@@ -245,7 +246,7 @@ static const char inject_source[] =
 	"	for (int y = -2; y <= 2; y++)\n"
 	"		for (int x = -2; x <= 2; x++)\n"
 	"		{\n"
-	"			ivec2 k = clamp(q0 + ivec2(x, y), lo, hi);\n"
+	"			ivec2 k = clamp(q0 + ivec2(x, y) * 2, lo, hi);\n"
 	"			vec4 g = texelFetch(gbuffer_texture, k, 0);\n"
 	"			if (g.x <= 0.0 || texelFetch(results_texture, k, 0).r < 1.5) continue;\n"
 	"			float w = 1.0 / (1.0 + abs(g.x - pz) / pz * 40.0);\n"
@@ -1100,6 +1101,8 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[47] = ray.gi_glow;
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
+	/* (how much of each new frame the accumulated light takes, at least) */
+	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.02f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */

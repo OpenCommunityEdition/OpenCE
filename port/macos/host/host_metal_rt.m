@@ -85,6 +85,11 @@ static struct
 	unsigned int drawn_generation;
 	int use_drawn;
 	id<MTLBuffer> drawn_indices, drawn_texcoords, drawn_triangle_materials, drawn_materials, drawn_pages;
+	/* the drawn level's glowing triangles, for the rays to them (3 float4
+	each: the corners; their w, the chance of the triangle, the sum of the
+	chances to it, its material) and how many; the vertices, kept for it */
+	id<MTLBuffer> drawn_vertices, glowing;
+	uint32_t glowing_count;
 	id<MTLTexture> atlas;
 	int atlas_x, atlas_y, atlas_row;
 	/* the traced light, accumulated over frames: the last frame's and this
@@ -169,6 +174,18 @@ static NSString *const kernel_source = @
 	"	probe[0] = float4(float(n), 0.0, 0.0, 0.0);\n"
 	"}\n"
 	"constexpr sampler linear_clamp(filter::linear, address::clamp_to_edge);\n"
+	/* random numbers: the PCG hash, a new one from each */
+	"static uint pcg(uint v)\n"
+	"{\n"
+	"	uint state = v * 747796405u + 2891336453u;\n"
+	"	uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;\n"
+	"	return (word >> 22u) ^ word;\n"
+	"}\n"
+	"static float random01(thread uint &seed)\n"
+	"{\n"
+	"	seed = pcg(seed);\n"
+	"	return float(seed >> 8) / 16777216.0;\n"
+	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	texture2d<float, access::write> lit [[texture(2)]],\n"
@@ -191,6 +208,8 @@ static NSString *const kernel_source = @
 	"	device const float4 *materials [[buffer(13)]],\n"
 	"	device const float4 *pages [[buffer(14)]],\n"
 	"	constant uint &gi_ready [[buffer(15)]],\n"
+	"	device const float4 *glowing [[buffer(16)]],\n"
+	"	constant uint &glowing_count [[buffer(17)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -490,7 +509,7 @@ static NSString *const kernel_source = @
 	"		nearest.assume_geometry_type(geometry_type::triangle);\n"
 	"		nearest.force_opacity(forced_opacity::opaque);\n"
 	"		nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
-	"		uint seed = (id.x * 1973u + id.y * 9277u + uint(c[44]) * 26699u) | 1u;\n"
+	"		uint seed = pcg(id.x + pcg(id.y + pcg(uint(c[44]))));\n"
 	"		float3 indirect = float3(0.0);\n"
 	/* the sky's wide lights (c[64-79]: each its direction, its colour and
 	   power, the cosine of its half width, whether there is one): a ray
@@ -502,10 +521,8 @@ static NSString *const kernel_source = @
 	"			float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
 	"			float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
 	"			float3 ax_b = cross(axis, ax_t);\n"
-	"			seed = seed * 747796405u + 2891336453u;\n"
-	"			float v1 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
-	"			seed = seed * 747796405u + 2891336453u;\n"
-	"			float v2 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			float v1 = random01(seed);\n"
+	"			float v2 = random01(seed);\n"
 	"			float cos_t = mix(1.0, c[o + 6u], v1), sin_t = sqrt(max(0.0, 1.0 - cos_t * cos_t)), phi = 6.2831853 * v2;\n"
 	"			float3 d = normalize(axis * cos_t + ax_t * (sin_t * cos(phi)) + ax_b * (sin_t * sin(phi)));\n"
 	"			float facing = dot(N, d);\n"
@@ -516,10 +533,8 @@ static NSString *const kernel_source = @
 	"		}\n"
 	"		for (uint i = 0; i < 2u; i++)\n"
 	"		{\n"
-	"			seed = seed * 747796405u + 2891336453u;\n"
-	"			float u1 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
-	"			seed = seed * 747796405u + 2891336453u;\n"
-	"			float u2 = float((seed >> 8) & 0xFFFFu) / 65536.0;\n"
+	"			float u1 = random01(seed);\n"
+	"			float u2 = random01(seed);\n"
 	"			float r = sqrt(u1), a = 6.2831853 * u2;\n"
 	"			float3 d = normalize(tangent * (r * cos(a)) + bitangent * (r * sin(a)) + N * sqrt(max(0.0, 1.0 - u1)));\n"
 	"			ray bounce(P + N * bias, d, 0.0, 600.0);\n"
@@ -532,7 +547,8 @@ static NSString *const kernel_source = @
 	"			{\n"
 	"				uint m = triangle_materials[h.primitive_id];\n"
 	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
-	"				L = glow.rgb * c[47];\n"
+	/* (what it gives off is found by the rays to the glowing triangles) */
+	"				L = glowing_count == 0u ? glow.rgb * c[47] : float3(0.0);\n"
 	"				if (c[42] < 1.5 && glow.w >= 0.0)\n"
 	"				{\n"
 	"					float4 page = pages[uint(glow.w)];\n"
@@ -551,8 +567,38 @@ static NSString *const kernel_source = @
 	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, P + N * bias + d * (h.type == intersection_type::none ? 3.0 : h.distance), 5.0, h.type != intersection_type::none);\n"
 	"			indirect += L * 0.5;\n"
 	"		}\n"
+	/* a ray to a point of a glowing triangle, chosen as likely as the light
+	   it gives off: what it gives off where it is not blocked, over the
+	   chance of choosing it (the light's share of the half sphere, as the
+	   bounces', over pi) */
+	"		if (glowing_count > 0u)\n"
+	"		{\n"
+	"			float pick = random01(seed);\n"
+	"			uint lo = 0u, hi = glowing_count - 1u;\n"
+	"			while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"			float4 a = glowing[lo * 3u], b = glowing[lo * 3u + 1u], cc = glowing[lo * 3u + 2u];\n"
+	"			float r1 = sqrt(random01(seed));\n"
+	"			float r2 = random01(seed);\n"
+	"			float3 at = a.xyz * (1.0 - r1) + b.xyz * (r1 * (1.0 - r2)) + cc.xyz * (r1 * r2);\n"
+	"			float3 cross_ab = cross(b.xyz - a.xyz, cc.xyz - a.xyz);\n"
+	"			float area = 0.5 * length(cross_ab);\n"
+	"			float3 L = at - (P + N * bias);\n"
+	"			float d2 = dot(L, L);\n"
+	"			float d = sqrt(d2);\n"
+	"			L /= max(d, 1e-4);\n"
+	"			float cos_here = dot(N, L), cos_there = abs(dot(normalize(cross_ab), L));\n"
+	"			if (cos_here > 0.0 && cos_there > 0.0 && a.w > 0.0 && d > 1e-3)\n"
+	"			{\n"
+	"				ray to_glow(P + N * bias, L, 0.0, max(d - 0.01, 0.0));\n"
+	"				if (blocked_by.intersect(to_glow, world, 3u).type == intersection_type::none)\n"
+	"				{\n"
+	"					float3 given = materials[uint(cc.w) * 2u + 1u].rgb * c[47];\n"
+	"					indirect += min(given * cos_here * cos_there * area / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0));\n"
+	"				}\n"
+	"			}\n"
+	"		}\n"
 	"		float4 before = float4(0.0);\n"
-	"		float weight = 1.0;\n"
+	"		float weight = 1.0, frames = 1.0;\n"
 	"		if (c[60] > 0.5)\n"
 	"		{\n"
 	"			float3 pp = float3(c[48], c[49], c[50]), pf = float3(c[51], c[52], c[53]);\n"
@@ -565,13 +611,21 @@ static NSString *const kernel_source = @
 	"				float2 ps = origin + (pn * 0.5 + 0.5) * size;\n"
 	"				if (all(ps >= origin) && all(ps < origin + size))\n"
 	"				{\n"
+	/* (its alpha: its depth, in 64ths, and how many frames it holds, below:
+	   each new frame takes 1 / that many, down to c[62]) */
 	"					float4 was = history_in.read(uint2(ps));\n"
-	"					if (was.a > 0.0 && abs(was.a - pz) < pz * 0.04 + 0.03) { before = was; weight = 0.1; }\n"
+	"					float was_frames = fmod(was.a, 256.0), was_z = floor(was.a / 256.0) / 64.0;\n"
+	"					if (was_z > 0.0 && abs(was_z - pz) < pz * 0.04 + 0.03)\n"
+	"					{\n"
+	"						before = was;\n"
+	"						frames = min(was_frames + 1.0, 255.0);\n"
+	"						weight = max(1.0 / frames, c[62] > 0.0 ? c[62] : 0.02);\n"
+	"					}\n"
 	"				}\n"
 	"			}\n"
 	"		}\n"
 	"		float3 accumulated = mix(before.rgb, indirect, weight);\n"
-	"		history_out.write(float4(accumulated, z), id);\n"
+	"		history_out.write(float4(accumulated, round(z * 64.0) * 256.0 + frames), id);\n"
 	/* (a level pixel: its light goes in the light buffer, occlusion and
 	   all - the result's 2 says so, to the guest's light buffer pass and the
 	   composite - and the lights' texture carries it: 1, then the light) */
@@ -817,6 +871,9 @@ int host_rt_set_level(uint32_t generation, const float *vertices, const float *t
 		return 0;
 	vertex_buffer = [rt.device newBufferWithBytes:vertices length:(NSUInteger)vertex_count * 12
 		options:MTLResourceStorageModeShared];
+	rt.drawn_vertices = vertex_buffer;
+	rt.glowing = nil;
+	rt.glowing_count = 0;
 	rt.drawn_indices = [rt.device newBufferWithBytes:indices length:(NSUInteger)triangle_count * 12
 		options:MTLResourceStorageModeShared];
 	rt.drawn_texcoords = [rt.device newBufferWithBytes:texcoords length:(NSUInteger)vertex_count * 8
@@ -853,6 +910,77 @@ void host_rt_set_level_materials(const float *materials, int count)
 		return;
 	rt.drawn_materials = [rt.device newBufferWithBytes:materials length:(NSUInteger)count * 32
 		options:MTLResourceStorageModeShared];
+	/* the glowing triangles, each as likely as the light it gives off (its
+	glow's brightness times its area) */
+	if (rt.drawn && rt.drawn_vertices && rt.drawn_indices && rt.drawn_triangle_materials)
+	{
+		const float *vertices = rt.drawn_vertices.contents;
+		const uint32_t *indices = rt.drawn_indices.contents, *triangle_materials = rt.drawn_triangle_materials.contents;
+		NSUInteger triangle_count = rt.drawn_indices.length / 12, index, glowing = 0;
+		double total = 0.0, sum = 0.0;
+		float *out;
+
+		for (index = 0; index < triangle_count; index++)
+		{
+			uint32_t m = triangle_materials[index];
+
+			if ((int)m < count && materials[m * 8 + 4] + materials[m * 8 + 5] + materials[m * 8 + 6] > 0.0f)
+				glowing++;
+		}
+		rt.glowing = nil;
+		rt.glowing_count = 0;
+		if (!glowing)
+			return;
+		rt.glowing = [rt.device newBufferWithLength:glowing * 48 options:MTLResourceStorageModeShared];
+		out = rt.glowing.contents;
+		for (index = 0; index < triangle_count; index++)
+		{
+			uint32_t m = triangle_materials[index];
+			const float *a, *b, *c;
+			float u[3], v[3], n[3], power;
+
+			if ((int)m >= count || !(materials[m * 8 + 4] + materials[m * 8 + 5] + materials[m * 8 + 6] > 0.0f))
+				continue;
+			a = vertices + indices[index * 3] * 3;
+			b = vertices + indices[index * 3 + 1] * 3;
+			c = vertices + indices[index * 3 + 2] * 3;
+			u[0] = b[0] - a[0]; u[1] = b[1] - a[1]; u[2] = b[2] - a[2];
+			v[0] = c[0] - a[0]; v[1] = c[1] - a[1]; v[2] = c[2] - a[2];
+			n[0] = u[1] * v[2] - u[2] * v[1];
+			n[1] = u[2] * v[0] - u[0] * v[2];
+			n[2] = u[0] * v[1] - u[1] * v[0];
+			power = 0.5f * sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]) *
+				(materials[m * 8 + 4] + materials[m * 8 + 5] + materials[m * 8 + 6]);
+			out[rt.glowing_count * 12 + 0] = a[0];
+			out[rt.glowing_count * 12 + 1] = a[1];
+			out[rt.glowing_count * 12 + 2] = a[2];
+			out[rt.glowing_count * 12 + 3] = power;
+			out[rt.glowing_count * 12 + 4] = b[0];
+			out[rt.glowing_count * 12 + 5] = b[1];
+			out[rt.glowing_count * 12 + 6] = b[2];
+			out[rt.glowing_count * 12 + 8] = c[0];
+			out[rt.glowing_count * 12 + 9] = c[1];
+			out[rt.glowing_count * 12 + 10] = c[2];
+			out[rt.glowing_count * 12 + 11] = (float)m;
+			total += power;
+			rt.glowing_count++;
+		}
+		for (index = 0; index < rt.glowing_count; index++)
+		{
+			float chance = total > 0.0 ? (float)(out[index * 12 + 3] / total) : 0.0f;
+
+			sum += chance;
+			out[index * 12 + 3] = chance;
+			out[index * 12 + 7] = (float)sum;
+		}
+		{
+			static uint32_t logged = (uint32_t)-1;
+
+			if (logged != rt.glowing_count)
+				host_logf(HOST_LOG_INFO, "ray tracing: %u glowing triangles", rt.glowing_count);
+			logged = rt.glowing_count;
+		}
+	}
 }
 
 #define HOST_RT_ATLAS_SIZE 4096
@@ -1220,7 +1348,7 @@ int host_rt_trace(const float *camera, int width, int height)
 			rt.history[0].height != (NSUInteger)height))
 		{
 			MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
-				texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:(NSUInteger)width
+				texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float width:(NSUInteger)width
 				height:(NSUInteger)height mipmapped:NO];
 			int index;
 
@@ -1238,6 +1366,12 @@ int host_rt_trace(const float *camera, int width, int height)
 		[encoder setBuffer:gi_ready ? rt.drawn_materials : any offset:0 atIndex:13];
 		[encoder setBuffer:gi_ready ? rt.drawn_pages : any offset:0 atIndex:14];
 		[encoder setBytes:&gi_ready length:sizeof(gi_ready) atIndex:15];
+		{
+			uint32_t glowing_count = gi_ready && rt.glowing ? rt.glowing_count : 0;
+
+			[encoder setBuffer:glowing_count ? rt.glowing : any offset:0 atIndex:16];
+			[encoder setBytes:&glowing_count length:sizeof(glowing_count) atIndex:17];
+		}
 		[encoder setTexture:gi_ready ? rt.atlas : rt.textures[1] atIndex:3];
 		[encoder setTexture:gi_ready ? rt.history[rt.history_index] : rt.textures[1] atIndex:5];
 		[encoder setTexture:gi_ready ? rt.history[rt.history_index ^ 1] : rt.textures[2] atIndex:6];
