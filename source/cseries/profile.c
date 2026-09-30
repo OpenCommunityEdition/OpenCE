@@ -1292,6 +1292,17 @@ static void profile_timesection_inherit(
 	struct profile_timer *parent_timesection,
 	struct profile_timer *child_timesection)
 {
+#ifdef HALO_LINUX
+	/* port: a machine joining a game in progress loads it mid-frame (the
+	host's start, handled in the frame's network update), and the loading
+	screen draws its windows outside the frame's render: the frame's times
+	do not add up, and are only for the profiler */
+	if (parent_timesection->frame_total < child_timesection->total)
+	{
+		parent_timesection->frame_total = 0.0f;
+		return;
+	}
+#endif
 	match_vassert("c:\\halo\\SOURCE\\cseries\\profile.c", 434,
 		parent_timesection->frame_total>=child_timesection->total,
 		"parent_timesection->self_msec >= child_timesection->elapsed_msec");
