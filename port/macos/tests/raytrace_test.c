@@ -98,6 +98,11 @@ const char *config_string(const char *name)
 	return "";
 }
 
+int config_boolean(const char *name)
+{
+	return !strcmp(name, "display.ray_tracing_objects") ? !getenv("RT_NO_OBJECTS") : 0;
+}
+
 double config_real(const char *name)
 {
 	if (!strcmp(name, "display.ray_tracing_occlusion"))
@@ -386,6 +391,38 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 	*indices = (const unsigned long *)world_indices;
 	*triangle_count = world_vertex_count / 3;
 	return generation;
+}
+
+/* the objects as shapes for the rays: the marines, each an ellipsoid a
+little larger than its box (the one in the open as the player's body,
+whose shadow only the rays draw) */
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum)
+{
+	/* view space: x, y (up), z (forward); the world's x, y, z are the
+	view's x, z, y */
+	static const float boxes[2][6] = { { 3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f }, { -2.4f, -1.0f, 8.8f, -1.8f, 0.8f, 9.4f } };
+	long count = 0, index;
+
+	if (getenv("RT_NO_OBJECTS"))
+		return 0;
+	for (index = 0; index < 2 && count < maximum; index++)
+	{
+		const float *b = boxes[index];
+		float *m = transforms + count * 12;
+		float half[3] = { (b[3] - b[0]) * 0.65f, (b[5] - b[2]) * 0.65f, (b[4] - b[1]) * 0.65f };
+		float center[3] = { (b[0] + b[3]) * 0.5f, (b[2] + b[5]) * 0.5f, (b[1] + b[4]) * 0.5f };
+		int row;
+
+		for (row = 0; row < 3; row++)
+		{
+			m[row * 4 + 0] = row == 0 ? half[0] : 0.0f;
+			m[row * 4 + 1] = row == 1 ? half[1] : 0.0f;
+			m[row * 4 + 2] = row == 2 ? half[2] : 0.0f;
+			m[row * 4 + 3] = center[row];
+		}
+		masks[count++] = index == 1 ? 4 : 2;
+	}
+	return count;
 }
 
 static GLuint program, buffer, array;

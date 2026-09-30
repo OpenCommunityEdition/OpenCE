@@ -33,6 +33,7 @@ reads the results.
 #import <Metal/Metal.h>
 #include <SDL3/SDL.h>
 #include <dlfcn.h>
+#include <math.h>
 #include <string.h>
 
 /* EGL and GL, as ANGLE has them (SDL loaded both) */
@@ -57,6 +58,8 @@ typedef int EGLint_;
 #define GL_TEXTURE_MAG_FILTER_ 0x2800
 #define GL_NEAREST_ 0x2600
 
+#define HOST_RT_MAXIMUM_OBJECTS 511
+
 static struct
 {
 	int checked, available;
@@ -65,6 +68,16 @@ static struct
 	id<MTLComputePipelineState> pipeline;
 	id<MTLAccelerationStructure> world;
 	unsigned int world_generation;
+	/* the objects (host_rt_set_objects): a unit sphere, stretched and placed
+	by each instance's transform, and the scene of the level and them,
+	rebuilt each frame (its instance lists in a ring: the GPU may still read
+	the last ones) */
+	id<MTLAccelerationStructure> blob, scene;
+	id<MTLBuffer> instance_buffers[3], scene_scratch;
+	int instance_ring;
+	float object_transforms[HOST_RT_MAXIMUM_OBJECTS * 12];
+	unsigned char object_masks[HOST_RT_MAXIMUM_OBJECTS];
+	int object_count;
 	id<MTLTexture> textures[2];
 	unsigned int gl_textures[2];
 	EGLImage_ images[2];
@@ -103,7 +116,7 @@ static NSString *const kernel_source = @
 	   direction to the sun 24-26 and whether there is one 27 */
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
-	"	primitive_acceleration_structure world [[buffer(0)]],\n"
+	"	instance_acceleration_structure world [[buffer(0)]],\n"
 	"	constant float *c [[buffer(1)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
@@ -122,7 +135,10 @@ static NSString *const kernel_source = @
 	"	float3 N = normalize(right * g.y - up * g.z + forward * g.w);\n"
 	"	float3 tangent = normalize(abs(N.z) < 0.9 ? cross(N, float3(0, 0, 1)) : cross(N, float3(1, 0, 0)));\n"
 	"	float3 bitangent = cross(N, tangent);\n"
-	"	intersector<triangle_data> any_hit;\n"
+	/* the instances' masks: 1 the level, 2 the objects, 4 the player's body
+	   (which the game does not draw in the first person) */
+	"	bool object = c[23] > 0.5 && g.x < 0.0;\n"
+	"	intersector<triangle_data, instancing> any_hit;\n"
 	"	any_hit.accept_any_intersection(true);\n"
 	"	any_hit.assume_geometry_type(geometry_type::triangle);\n"
 	"	any_hit.force_opacity(forced_opacity::opaque);\n"
@@ -147,7 +163,9 @@ static NSString *const kernel_source = @
 	"		float r = sqrt(u), angle = 6.2831853 * v;\n"
 	"		float3 d = normalize(tangent * (r * cos(angle)) + bitangent * (r * sin(angle)) + N * sqrt(max(0.0, 1.0 - u)));\n"
 	"		ray occlusion_ray(P + N * bias, d, 0.0, radius);\n"
-	"		auto hit = any_hit.intersect(occlusion_ray, world);\n"
+	/* (an object's occlusion: the level's and the other objects'; the
+	   level's: everything's, the player's body too) */
+	"		auto hit = any_hit.intersect(occlusion_ray, world, object ? 3u : 7u);\n"
 	"		if (hit.type != intersection_type::none)\n"
 	"			occlusion += 1.0 - hit.distance / radius;\n"
 	"	}\n"
@@ -164,18 +182,21 @@ static NSString *const kernel_source = @
 	"		if (c[23] > 0.5) on_level = g.x > 0.0;\n"
 	"		else\n"
 	"		{\n"
-	"			intersector<triangle_data> surface_probe;\n"
+	"			intersector<triangle_data, instancing> surface_probe;\n"
 	"			surface_probe.accept_any_intersection(true);\n"
 	"			surface_probe.force_opacity(forced_opacity::opaque);\n"
 	"			ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
-	"			on_level = surface_probe.intersect(probe, world).type != intersection_type::none;\n"
+	"			on_level = surface_probe.intersect(probe, world, 1u).type != intersection_type::none;\n"
 	"		}\n"
-	"		if (!on_level && dot(N, sun) > 0.0)\n"
+	/* an object's pixel: the level's and the other objects' shadows; the
+	   level's: the player's body's only (the lightmaps have the level's,
+	   and the game draws the other objects') */
+	"		if (dot(N, sun) > 0.0)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
 	"			ray shadow_ray(P + N * bias, normalize(sun + spread), 0.0, 2000.0);\n"
-	"			if (any_hit.intersect(shadow_ray, world).type != intersection_type::none)\n"
+	"			if (any_hit.intersect(shadow_ray, world, on_level ? 4u : 3u).type != intersection_type::none)\n"
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
 	"	}\n"
@@ -188,13 +209,13 @@ static NSString *const kernel_source = @
 	"	float fresnel = mix(0.04, 1.0, pow(1.0 - clamp(dot(-V, N), 0.0, 1.0), 5.0));\n"
 	"	float fade = smoothstep(0.05, 0.1, fresnel);\n"
 	"	if (fade <= 0.0) { result.write(float4(visibility, 0.0, 0.0, 0.0), id); return; }\n"
-	"	intersector<triangle_data> closest;\n"
+	"	intersector<triangle_data, instancing> closest;\n"
 	"	closest.assume_geometry_type(geometry_type::triangle);\n"
 	"	closest.force_opacity(forced_opacity::opaque);\n"
 	"	closest.set_triangle_front_facing_winding(winding::clockwise);\n"
 	"	closest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	ray reflection_ray(P + N * bias, R, 0.0, c[22]);\n"
-	"	auto hit = closest.intersect(reflection_ray, world);\n"
+	"	auto hit = closest.intersect(reflection_ray, world, 1u);\n"
 	"	float4 out = float4(visibility, 0.0, 0.0, 0.0);\n"
 	"	if (hit.type != intersection_type::none)\n"
 	"	{\n"
@@ -345,6 +366,185 @@ int host_rt_set_world(uint32_t generation, const float *vertices, int vertex_cou
 	return 1;
 }
 
+/* a unit sphere (an icosahedron split once: 80 triangles), wound as the
+level's are, counterclockwise seen from outside */
+static id<MTLAccelerationStructure> build_blob(void)
+{
+	static const float t = 1.6180340f;
+	float corners[12][3] = { { -1, t, 0 }, { 1, t, 0 }, { -1, -t, 0 }, { 1, -t, 0 }, { 0, -1, t }, { 0, 1, t },
+		{ 0, -1, -t }, { 0, 1, -t }, { t, 0, -1 }, { t, 0, 1 }, { -t, 0, -1 }, { -t, 0, 1 } };
+	static const int faces[20][3] = { { 0, 11, 5 }, { 0, 5, 1 }, { 0, 1, 7 }, { 0, 7, 10 }, { 0, 10, 11 }, { 1, 5, 9 },
+		{ 5, 11, 4 }, { 11, 10, 2 }, { 10, 7, 6 }, { 7, 1, 8 }, { 3, 9, 4 }, { 3, 4, 2 }, { 3, 2, 6 }, { 3, 6, 8 },
+		{ 3, 8, 9 }, { 4, 9, 5 }, { 2, 4, 11 }, { 6, 2, 10 }, { 8, 6, 7 }, { 9, 8, 1 } };
+	float vertices[80 * 3 * 3];
+	int face, corner, count = 0;
+	MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
+	MTLPrimitiveAccelerationStructureDescriptor *descriptor;
+	MTLAccelerationStructureSizes sizes;
+	id<MTLAccelerationStructure> blob;
+	id<MTLBuffer> scratch;
+	id<MTLCommandBuffer> commands;
+	id<MTLAccelerationStructureCommandEncoder> encoder;
+
+	for (corner = 0; corner < 12; corner++)
+	{
+		float length = sqrtf(corners[corner][0] * corners[corner][0] + corners[corner][1] * corners[corner][1] +
+			corners[corner][2] * corners[corner][2]);
+
+		corners[corner][0] /= length;
+		corners[corner][1] /= length;
+		corners[corner][2] /= length;
+	}
+	for (face = 0; face < 20; face++)
+	{
+		const float *a = corners[faces[face][0]], *b = corners[faces[face][1]], *c = corners[faces[face][2]];
+		float ab[3], bc[3], ca[3];
+		const float *triangles[4][3] = { { a, ab, ca }, { ab, b, bc }, { ca, bc, c }, { ab, bc, ca } };
+		int i, k;
+
+		for (i = 0; i < 3; i++)
+		{
+			ab[i] = a[i] + b[i];
+			bc[i] = b[i] + c[i];
+			ca[i] = c[i] + a[i];
+		}
+		for (i = 0; i < 3; i++)
+		{
+			float *m = i == 0 ? ab : i == 1 ? bc : ca;
+			float length = sqrtf(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
+
+			m[0] /= length;
+			m[1] /= length;
+			m[2] /= length;
+		}
+		for (i = 0; i < 4; i++)
+		{
+			const float *p = triangles[i][0], *q = triangles[i][1], *r = triangles[i][2];
+			float u[3] = { q[0] - p[0], q[1] - p[1], q[2] - p[2] }, v[3] = { r[0] - p[0], r[1] - p[1], r[2] - p[2] };
+			float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+			int flip = n[0] * p[0] + n[1] * p[1] + n[2] * p[2] < 0.0f;
+
+			for (k = 0; k < 3; k++)
+			{
+				const float *vertex = triangles[i][flip && k ? 3 - k : k];
+
+				vertices[count * 3 + 0] = vertex[0];
+				vertices[count * 3 + 1] = vertex[1];
+				vertices[count * 3 + 2] = vertex[2];
+				count++;
+			}
+		}
+	}
+	geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+	geometry.vertexBuffer = [rt.device newBufferWithBytes:vertices length:sizeof(vertices)
+		options:MTLResourceStorageModeShared];
+	geometry.vertexStride = 12;
+	geometry.triangleCount = 80;
+	geometry.opaque = YES;
+	descriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+	descriptor.geometryDescriptors = @[ geometry ];
+	sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
+	blob = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+	scratch = [rt.device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+	commands = [rt.queue commandBuffer];
+	encoder = [commands accelerationStructureCommandEncoder];
+	[encoder buildAccelerationStructure:blob descriptor:descriptor scratchBuffer:scratch scratchBufferOffset:0];
+	[encoder endEncoding];
+	[commands commit];
+	[commands waitUntilCompleted];
+	return blob;
+}
+
+/* this frame's objects: each a unit sphere under a 3x4 transform (rows, 12
+floats: the ellipsoid's axes as columns, then its center), with its mask (2
+an object, 4 the player's body) */
+void host_rt_set_objects(const float *transforms, const unsigned char *masks, int count)
+{
+	if (count < 0)
+		count = 0;
+	if (count > HOST_RT_MAXIMUM_OBJECTS)
+		count = HOST_RT_MAXIMUM_OBJECTS;
+	memcpy(rt.object_transforms, transforms, (size_t)count * 12 * sizeof(float));
+	memcpy(rt.object_masks, masks, (size_t)count);
+	rt.object_count = count;
+}
+
+/* the scene for this frame's rays: the level, and the objects, built in the
+command buffer before the rays */
+static int encode_scene(id<MTLCommandBuffer> commands)
+{
+	MTLInstanceAccelerationStructureDescriptor *descriptor;
+	MTLAccelerationStructureInstanceDescriptor *instances;
+	id<MTLBuffer> buffer;
+	id<MTLAccelerationStructureCommandEncoder> encoder;
+	int index, count = 1 + rt.object_count;
+
+	if (!rt.blob)
+		rt.blob = build_blob();
+	if (!rt.blob)
+		return 0;
+	if (!rt.instance_buffers[0])
+	{
+		for (index = 0; index < 3; index++)
+			rt.instance_buffers[index] = [rt.device newBufferWithLength:(HOST_RT_MAXIMUM_OBJECTS + 1) *
+				sizeof(MTLAccelerationStructureInstanceDescriptor) options:MTLResourceStorageModeShared];
+	}
+	buffer = rt.instance_buffers[rt.instance_ring];
+	rt.instance_ring = (rt.instance_ring + 1) % 3;
+	instances = (MTLAccelerationStructureInstanceDescriptor *)buffer.contents;
+	memset(instances, 0, (size_t)count * sizeof(*instances));
+	for (index = 0; index < count; index++)
+	{
+		MTLAccelerationStructureInstanceDescriptor *instance = &instances[index];
+		int column;
+
+		instance->options = MTLAccelerationStructureInstanceOptionOpaque;
+		if (!index)
+		{
+			instance->transformationMatrix.columns[0] = (MTLPackedFloat3){ { 1, 0, 0 } };
+			instance->transformationMatrix.columns[1] = (MTLPackedFloat3){ { 0, 1, 0 } };
+			instance->transformationMatrix.columns[2] = (MTLPackedFloat3){ { 0, 0, 1 } };
+			instance->transformationMatrix.columns[3] = (MTLPackedFloat3){ { 0, 0, 0 } };
+			instance->mask = 1;
+			instance->accelerationStructureIndex = 0;
+			continue;
+		}
+		for (column = 0; column < 4; column++)
+		{
+			const float *m = &rt.object_transforms[(index - 1) * 12];
+
+			instance->transformationMatrix.columns[column] =
+				(MTLPackedFloat3){ { m[column], m[4 + column], m[8 + column] } };
+		}
+		instance->mask = rt.object_masks[index - 1];
+		instance->accelerationStructureIndex = 1;
+	}
+	descriptor = [MTLInstanceAccelerationStructureDescriptor descriptor];
+	descriptor.instancedAccelerationStructures = @[ rt.world, rt.blob ];
+	descriptor.instanceCount = (NSUInteger)count;
+	descriptor.instanceDescriptorBuffer = buffer;
+	descriptor.instanceDescriptorType = MTLAccelerationStructureInstanceDescriptorTypeDefault;
+	if (!rt.scene)
+	{
+		/* sized for the most objects, once */
+		MTLAccelerationStructureSizes sizes;
+
+		descriptor.instanceCount = HOST_RT_MAXIMUM_OBJECTS + 1;
+		sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
+		descriptor.instanceCount = (NSUInteger)count;
+		rt.scene = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
+		rt.scene_scratch = [rt.device newBufferWithLength:sizes.buildScratchBufferSize
+			options:MTLResourceStorageModePrivate];
+		if (!rt.scene || !rt.scene_scratch)
+			return 0;
+	}
+	encoder = [commands accelerationStructureCommandEncoder];
+	[encoder buildAccelerationStructure:rt.scene descriptor:descriptor scratchBuffer:rt.scene_scratch
+		scratchBufferOffset:0];
+	[encoder endEncoding];
+	return 1;
+}
+
 /* the GL texture sharing Metal texture `which` (0: the depth and normals,
 32-bit floats; 1: the results, 16-bit floats), at this size */
 uint32_t host_rt_texture(int which, int width, int height)
@@ -435,11 +635,18 @@ int host_rt_trace(const float *camera, int width, int height)
 	commands = [rt.queue commandBuffer];
 	if (rt.event)
 		[commands encodeWaitForEvent:rt.event value:rt.event_value];
+	if (!encode_scene(commands))
+	{
+		[commands commit];
+		return 0;
+	}
 	encoder = [commands computeCommandEncoder];
 	[encoder setComputePipelineState:rt.pipeline];
 	[encoder setTexture:rt.textures[0] atIndex:0];
 	[encoder setTexture:rt.textures[1] atIndex:1];
-	[encoder setAccelerationStructure:rt.world atBufferIndex:0];
+	[encoder setAccelerationStructure:rt.scene atBufferIndex:0];
+	[encoder useResource:rt.world usage:MTLResourceUsageRead];
+	[encoder useResource:rt.blob usage:MTLResourceUsageRead];
 	[encoder setBytes:camera length:28 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);

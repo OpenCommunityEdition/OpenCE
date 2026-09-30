@@ -19,6 +19,11 @@ is split into a fan of triangles.
 #include "scenario/scenario.h"
 #include "render/render.h"
 #include "tag_files/tag_files.h"
+#include "objects/objects.h"
+#include "objects/object_types.h"
+#include "objects/object_definitions.h"
+#include "models/model_definitions.h"
+#include "game/players.h"
 
 enum
 {
@@ -224,4 +229,156 @@ boolean halo_ray_tracing_sun(float *direction)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+/* ---------- the objects
+
+The units (the bipeds and the vehicles) as shapes for the rays: each a unit
+sphere under a transform, an ellipsoid. A biped's are its skeleton's bones,
+each from its node to its parent's, as the animation poses them (the
+nodes' matrices, between the last two ticks as the frame draws them); a
+vehicle's, its bounding sphere flattened along its axes. Masks: 2 an
+object, 4 the local player's body (the first person does not draw it, so
+only the rays show its shadow). */
+
+enum
+{
+	_ray_mask_object = 2,
+	_ray_mask_player = 4,
+};
+
+/* the ellipsoid with these axes (each its half length as its length) about
+this center, as 3x4 rows */
+static void ellipsoid(float *m, const float *center, const float *u, const float *v, const float *w)
+{
+	int row;
+
+	for (row = 0; row < 3; row++)
+	{
+		m[row * 4 + 0] = u[row];
+		m[row * 4 + 1] = v[row];
+		m[row * 4 + 2] = w[row];
+		m[row * 4 + 3] = center[row];
+	}
+}
+
+/* a bone from a to b, r thick each way, ending in round caps */
+static void bone(float *m, const real_point3d *a, const real_point3d *b, float r)
+{
+	float center[3] = { (a->x + b->x) * 0.5f, (a->y + b->y) * 0.5f, (a->z + b->z) * 0.5f };
+	float d[3] = { b->x - a->x, b->y - a->y, b->z - a->z };
+	float length = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+	float u[3], v[3], w[3], half;
+
+	if (length < 1e-4f)
+	{
+		float x[3] = { r, 0, 0 }, y[3] = { 0, r, 0 }, z[3] = { 0, 0, r };
+
+		ellipsoid(m, center, x, y, z);
+		return;
+	}
+	d[0] /= length;
+	d[1] /= length;
+	d[2] /= length;
+	/* two directions across it */
+	if (fabsf(d[2]) < 0.9f)
+	{
+		v[0] = -d[1];
+		v[1] = d[0];
+		v[2] = 0.0f;
+	}
+	else
+	{
+		v[0] = 0.0f;
+		v[1] = -d[2];
+		v[2] = d[1];
+	}
+	{
+		float l = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+
+		v[0] /= l;
+		v[1] /= l;
+		v[2] /= l;
+	}
+	w[0] = d[1] * v[2] - d[2] * v[1];
+	w[1] = d[2] * v[0] - d[0] * v[2];
+	w[2] = d[0] * v[1] - d[1] * v[0];
+	half = length * 0.5f + r * 0.6f;
+	u[0] = d[0] * half;
+	u[1] = d[1] * half;
+	u[2] = d[2] * half;
+	v[0] *= r;
+	v[1] *= r;
+	v[2] *= r;
+	w[0] *= r;
+	w[1] *= r;
+	w[2] *= r;
+	ellipsoid(m, center, u, v, w);
+}
+
+/* this frame's shapes, at most maximum: their transforms (12 floats each)
+and masks; returns how many */
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+	long count = 0, player_unit = NONE, player_index;
+
+	if (global_structure_bsp_index == NONE || !object_header_data)
+		return 0;
+	player_index = local_player_get_player_index(0);
+	if (player_index != NONE)
+		player_unit = player_get(player_index)->unit_index;
+	object_iterator_new(&iterator, _object_mask_unit, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
+	{
+		unsigned char mask = iterator.index == player_unit ? _ray_mask_player : _ray_mask_object;
+		float radius = object->object.bounding_sphere_radius;
+
+		if (!(radius > 0.0f) || radius > 20.0f)
+			continue;
+		if (object->object.type == _object_type_biped)
+		{
+			const struct object_definition *definition = object_definition_get(object->definition_index);
+			const struct model *model = definition->object.model.index != NONE ?
+				model_definition_get(definition->object.model.index) : NULL;
+			const real_matrix4x3 *matrices = object_get_node_matrices(iterator.index);
+			const struct model_node *nodes;
+			long node_index;
+			/* a limb's thickness, from the biped's size */
+			float r = radius * 0.13f;
+
+			if (!model || !matrices || model->nodes.count <= 0)
+				continue;
+			if (r < 0.02f)
+				r = 0.02f;
+			if (r > 0.12f)
+				r = 0.12f;
+			nodes = (const struct model_node *)model->nodes.address;
+			for (node_index = 0; node_index < model->nodes.count && count < maximum; node_index++)
+			{
+				short parent = nodes[node_index].parent_node_index;
+
+				if (parent < 0 || parent >= model->nodes.count)
+					continue;
+				bone(transforms + count * 12, &matrices[parent].position, &matrices[node_index].position, r);
+				masks[count++] = mask;
+			}
+		}
+		else
+		{
+			const real_vector3d *forward = &object->object.forward, *up = &object->object.up;
+			float center[3] = { object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y,
+				object->object.bounding_sphere_center.z };
+			float u[3] = { forward->i * radius * 0.85f, forward->j * radius * 0.85f, forward->k * radius * 0.85f };
+			float w[3] = { up->i * radius * 0.35f, up->j * radius * 0.35f, up->k * radius * 0.35f };
+			float v[3] = { (up->j * forward->k - up->k * forward->j) * radius * 0.45f,
+				(up->k * forward->i - up->i * forward->k) * radius * 0.45f,
+				(up->i * forward->j - up->j * forward->i) * radius * 0.45f };
+
+			ellipsoid(transforms + count * 12, center, u, v, w);
+			masks[count++] = mask;
+		}
+	}
+	return count;
 }

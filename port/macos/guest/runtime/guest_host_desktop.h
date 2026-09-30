@@ -40,5 +40,6 @@ int host_rt_set_world(unsigned int generation, const float *vertices, int vertex
 	int triangle_count);
 unsigned int host_rt_texture(int which, int width, int height);
 int host_rt_trace(const float *camera, int width, int height);
+void host_rt_set_objects(const float *transforms, const unsigned char *masks, int count);
 
 #endif

@@ -103,6 +103,7 @@ These settings are new, or have a different default on macOS:
 | `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
 | `display.ray_tracing_shadows` | `1.0` | How dark the sun's traced shadows are (0.0 to 1.0). |
+| `display.ray_tracing_objects` | `true` | The characters and vehicles in Metal's rays too: their contact shadows, and your own body's shadow. |
 | `network.tailscale` | `true` | System link across a Tailscale network (refer to "Multiplayer"). |
 | `network.allow_upnp` | `false` | Tailscale and the local network do not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
@@ -185,6 +186,25 @@ rays from each pixel:
   lightmaps, so their pixels send no shadow ray. The objects' pixels are
   those whose depth has not changed since the game drew the objects,
   before the level (`halo_ray_traced_light_stage(2)`).
+
+The characters and the vehicles are in Metal's rays too
+(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): a
+biped as its skeleton's bones, each an ellipsoid from its node to its
+parent's as the animation poses it; a vehicle as its bounding sphere
+flattened along its axes. They are instances beside the level's mesh, in a
+scene rebuilt each frame, and the rays choose what they see by the
+instances' masks:
+
+| Rays | See |
+| --- | --- |
+| Occlusion from the level | the level, the objects, your body |
+| Occlusion from an object | the level, the objects |
+| The sun from an object | the level, the objects |
+| The sun from the level | your body only: the lightmaps have the level's shadows, and the game draws the other objects' |
+| Reflections | the level |
+
+So the ground darkens under the marines and the vehicles, and in the sun
+you see your own shadow, which the game never drew in the first person.
 
 The occlusion and the sun's shadows darken the level's baked light (its
 lightmaps), not the flashlight's, the plasma's or the other dynamic

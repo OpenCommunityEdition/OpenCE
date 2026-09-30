@@ -76,3 +76,4 @@ host_rt_available
 host_rt_set_world
 host_rt_texture
 host_rt_trace
+host_rt_set_objects

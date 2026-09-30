@@ -120,6 +120,10 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"How dark the sun's traced shadows on characters, vehicles and items are,\n"
 		"0.0 to 1.0 (macOS, with Metal's rays)." },
+	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
+		_platform_all,
+		"The characters and vehicles in Metal's rays too: their contact shadows on\n"
+		"the level, and your own body's shadow (macOS)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

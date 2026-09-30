@@ -52,6 +52,8 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 	long *triangle_count);
 /* the direction towards the sky's sun; 0 if none */
 unsigned char halo_ray_tracing_sun(float *direction);
+/* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
+long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -73,6 +75,7 @@ static struct
 	int mode;
 	int enabled;
 	float occlusion_strength, reflection_strength, bounce_strength, shadow_strength, radius;
+	int objects;
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -431,6 +434,7 @@ static void initialize(void)
 	ray.reflection_strength = (float)config_real("display.ray_tracing_reflections");
 	ray.bounce_strength = (float)config_real("display.ray_tracing_bounce");
 	ray.shadow_strength = (float)config_real("display.ray_tracing_shadows");
+	ray.objects = config_boolean("display.ray_tracing_objects");
 	/* world units (a world unit is about 3 m) */
 	ray.radius = 0.35f;
 	ray.trace_program = link(trace_source, "ray tracing");
@@ -632,6 +636,14 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[23] = (ray.light_stages & 4) ? 1.0f : 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
+	/* the objects, as shapes for the rays */
+	{
+		static float transforms[511 * 12];
+		static unsigned char masks[511];
+		long count = ray.objects ? halo_ray_tracing_objects(transforms, masks, 511) : 0;
+
+		host_rt_set_objects(transforms, masks, (int)count);
+	}
 	if (!host_rt_trace(camera, width, height))
 		return 0;
 	return output;
