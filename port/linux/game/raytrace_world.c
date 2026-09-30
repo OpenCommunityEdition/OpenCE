@@ -587,7 +587,16 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 		if (permutation_index == NONE || permutation_index >= region->permutations.count)
 			continue;
 		permutation = (const struct model_region_permutation *)region->permutations.address + permutation_index;
-		geometry_index = permutation->geometry_indices[RAY_TRACED_MODEL_DETAIL_LEVEL];
+		/* (high, or the nearest level of detail the model has) */
+		{
+			short level;
+
+			geometry_index = NONE;
+			for (level = RAY_TRACED_MODEL_DETAIL_LEVEL; level >= 0 && geometry_index == NONE; level--)
+				geometry_index = permutation->geometry_indices[level];
+			for (level = RAY_TRACED_MODEL_DETAIL_LEVEL + 1; level < 5 && geometry_index == NONE; level++)
+				geometry_index = permutation->geometry_indices[level];
+		}
 		if (geometry_index == NONE || geometry_index >= model->geometries.count)
 			continue;
 		geometry = (const struct model_geometry_view *)model->geometries.address + geometry_index;
@@ -730,15 +739,46 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 	}
 }
 
+/* the objects in the rays: all that the game draws as models - units,
+items, projectiles, scenery, devices */
+#define RAY_TRACED_OBJECT_TYPES (_object_mask_unit | _object_mask_item | _object_mask_projectile | \
+	_object_mask_scenery | _object_mask_device)
+
+/* an object and what it carries (its children: a unit's weapon), in one
+group; returns how many triangles */
+static long object_family_triangles(long object_index, struct object_datum *object, float *out, long room,
+	long shapes, unsigned char group, unsigned char *groups)
+{
+	long count = object_triangles(object_index, object, out, room, shapes), child_index, index, guard = 0;
+
+	for (child_index = object->object.first_child_object_index; child_index != NONE && count < room && guard < 16;
+		guard++)
+	{
+		struct object_datum *child = object_try_and_get_and_verify_type(child_index, RAY_TRACED_OBJECT_TYPES);
+
+		if (!child)
+			break;
+		count += object_triangles(child_index, child, out + count * 9, room - count, shapes);
+		child_index = child->object.next_object_index;
+	}
+	for (index = 0; index < count; index++)
+		groups[index] = group;
+	return count;
+}
+
 /* this frame's objects near the camera as triangles (9 floats each, at most
 maximum) and each triangle's group, and the player's body's bounding sphere
-(center, radius; radius 0 if none); returns how many triangles */
+(center, radius; radius 0 if none); returns how many triangles. The player
+and what it carries are group 0; the other units (with what they carry)
+each a group; the loose objects (items on the ground, projectiles,
+scenery, devices) share the last. */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere, long shapes)
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
-	long count = 0, player_unit = NONE, player_index, group = 1, added, index;
+	long count = 0, player_unit = NONE, player_index, group = 1, index;
+	const unsigned char loose = (unsigned char)((RAY_TRACED_OBJECT_GROUPS - 1) << 3 | _ray_mask_object);
 
 	player_sphere[0] = player_sphere[1] = player_sphere[2] = player_sphere[3] = 0.0f;
 	if (global_structure_bsp_index == NONE || !object_header_data)
@@ -753,34 +793,39 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 		player_sphere[1] = object->object.bounding_sphere_center.y;
 		player_sphere[2] = object->object.bounding_sphere_center.z;
 		player_sphere[3] = object->object.bounding_sphere_radius;
-		added = object_triangles(player_unit, object, triangles, maximum, shapes);
-		for (index = 0; index < added; index++)
-			groups[index] = _ray_mask_player;
-		count += added;
+		count += object_family_triangles(player_unit, object, triangles, maximum, shapes, _ray_mask_player, groups);
 	}
-	object_iterator_new(&iterator, _object_mask_unit, 0);
-	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum &&
-		group < RAY_TRACED_OBJECT_GROUPS)
+	object_iterator_new(&iterator, RAY_TRACED_OBJECT_TYPES, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
 	{
 		float radius = object->object.bounding_sphere_radius;
 		float dx = object->object.bounding_sphere_center.x - camera[0];
 		float dy = object->object.bounding_sphere_center.y - camera[1];
 		float dz = object->object.bounding_sphere_center.z - camera[2];
 		float reach = RAY_TRACED_OBJECT_DISTANCE + radius;
+		boolean unit = ((1UL << object->object.type) & _object_mask_unit) != 0;
+		long added;
 
-		if (iterator.index == player_unit || !(radius > 0.0f) || radius > 20.0f ||
-			dx * dx + dy * dy + dz * dz > reach * reach)
+		/* (what something carries goes with it) */
+		if (iterator.index == player_unit || object->object.parent_object_index != NONE || !(radius > 0.0f) ||
+			radius > 20.0f || dx * dx + dy * dy + dz * dz > reach * reach)
 		{
 			continue;
 		}
-		added = object_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes);
-		for (index = 0; index < added; index++)
-			groups[count + index] = (unsigned char)(group << 3 | _ray_mask_object);
-		if (added > 0)
+		if (unit && group < RAY_TRACED_OBJECT_GROUPS - 1)
 		{
-			count += added;
-			group++;
+			added = object_family_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes,
+				(unsigned char)(group << 3 | _ray_mask_object), groups + count);
+			if (added > 0)
+				group++;
 		}
+		else
+		{
+			added = object_family_triangles(iterator.index, object, triangles + count * 9, maximum - count, shapes,
+				loose, groups + count);
+		}
+		count += added;
 	}
+	(void)index;
 	return count;
 }
