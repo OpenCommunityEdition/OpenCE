@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Halo CE">
+<meta name="theme-color" content="#0b0d12">
+<title>Halo CE Web</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="screen" aria-label="Game"></canvas>
+<div id="touch" class="touch-layer" hidden></div>
+
+<main id="launcher">
+  <section class="panel">
+    <header>
+      <h1>Halo CE <span>Web</span></h1>
+      <p class="subtitle">The Halo: Combat Evolved decompilation, running in your browser.</p>
+    </header>
+
+    <div id="checks" class="checks" aria-live="polite"></div>
+
+    <div id="install-hint" class="hint" hidden>
+      <strong>Install it:</strong> tap <span class="share-glyph" aria-hidden="true">⬆︎</span> Share, then
+      <em>Add to Home Screen</em>. The installed app runs full screen and keeps its data.
+    </div>
+    <div id="install-android" class="hint" hidden>
+      <strong>Install it</strong> to play full screen and keep the game data:
+      <button type="button" class="button small-button" id="install-button" hidden>Install app</button>
+      <span id="install-android-menu">open the browser's menu <span aria-hidden="true">⋮</span>, then <em>Install app</em>
+        (or <em>Add to Home screen</em>).</span>
+    </div>
+
+    <section id="download-panel" class="download-panel" aria-label="Game download" hidden>
+      <div class="download-heading"><strong id="download-title">Checking game download</strong>
+        <strong id="download-percent">0%</strong></div>
+      <progress id="download-progress" max="1" value="0" aria-label="Game download progress"></progress>
+      <p id="download-detail" class="small" role="status"></p>
+      <button id="download-cancel" type="button" class="button small-button" hidden>Pause download</button>
+      <button id="download-retry" type="button" class="button small-button" hidden>Resume download</button>
+    </section>
+
+    <div id="step-data" class="step" hidden>
+      <h2>Game data</h2>
+      <p>The game downloads about 1.9 GB from GitHub once and saves it in this browser. You can also
+        choose your Halo: Combat Evolved Xbox disc image (<code>.iso</code> or <code>.xiso</code>).</p>
+      <label class="button primary" for="iso-file">Choose disc image…</label>
+      <input id="iso-file" type="file" accept=".iso,.xiso,application/octet-stream,application/x-iso9660-image" hidden>
+      <div id="progress" class="progress" hidden>
+        <div class="bar"><div id="progress-fill"></div></div>
+        <p id="progress-text"></p>
+      </div>
+    </div>
+
+    <div id="step-play" class="step" hidden>
+      <button id="play" class="button primary" type="button">Play</button>
+      <p class="small" id="data-summary"></p>
+    </div>
+
+    <section class="online" aria-labelledby="invite-title">
+      <h2 id="invite-title">Join a desktop game</h2>
+      <p class="small">Paste a <code>halo://join/</code> invite from Discord, or open its browser link.</p>
+      <div class="row">
+        <input id="invite-input" type="text" aria-label="Desktop game invite" placeholder="halo://join/…" autocomplete="off" spellcheck="false">
+        <button type="button" class="button" id="invite-connect">Connect</button>
+        <button type="button" class="button" id="invite-share">Copy browser link</button>
+      </div>
+      <p id="invite-status" class="small" role="status" aria-live="polite"></p>
+      <label class="row" id="relay-access-row" hidden>Relay access key
+        <input id="relay-access" type="password" autocomplete="off"></label>
+    </section>
+
+    <section class="online" id="browser-rooms" aria-labelledby="online-title">
+      <h2 id="online-title">Browser rooms</h2>
+      <p class="small">Everyone in a room is on one system link network: host a game from Multiplayer &gt;
+        System Link, and the others see it there. Your address: <code id="online-address"></code></p>
+      <label class="row">Your name <input id="online-name" type="text" maxlength="24" placeholder="Player" autocomplete="nickname"></label>
+      <div id="online-join" class="row">
+        <button type="button" class="button" id="online-create">New room</button>
+        <input id="online-input" type="text" inputmode="latin" autocapitalize="characters" placeholder="Room code" maxlength="16">
+        <button type="button" class="button" id="online-enter">Join</button>
+      </div>
+      <div id="online-room" hidden>
+        <p class="room-line">Room <strong id="online-code"></strong>
+          <button type="button" class="button small-button" id="online-share">Share link</button>
+          <button type="button" class="button small-button" id="online-leave">Leave</button></p>
+        <p class="small" id="online-status"></p>
+        <p class="small" id="online-names"></p>
+      </div>
+    </section>
+
+    <details class="settings">
+      <summary>Settings and data</summary>
+      <label class="row"><input type="checkbox" id="opt-touch"> Touch controls</label>
+      <label class="row"><input type="checkbox" id="opt-touch-fps"> Compact FPS touch controls (gameplay)</label>
+      <p class="small">Choose before starting. The controller layout includes menu buttons; the compact layout focuses on gameplay.</p>
+      <label class="row">Aim sensitivity <input type="range" id="opt-look" min="0.4" max="3" step="0.1"></label>
+      <label class="row"><input type="checkbox" id="opt-vsync" checked> Wait for the display (smoother, saves battery)</label>
+      <label class="row"><input type="checkbox" id="opt-gldebug"> Log graphics errors (for bug reports)</label>
+      <p class="small">Online play: a TURN relay, for networks that WebRTC cannot cross directly (some mobile networks).</p>
+      <label class="row">TURN server <input type="text" id="opt-turn-url" placeholder="turn:host:3478"></label>
+      <label class="row">TURN user <input type="text" id="opt-turn-user" autocomplete="off"></label>
+      <label class="row">TURN password <input type="password" id="opt-turn-password" autocomplete="off"></label>
+      <div class="row buttons">
+        <button type="button" class="button" id="export-saves">Export saved games</button>
+        <button type="button" class="button" id="show-log">Show log</button>
+        <button type="button" class="button danger" id="delete-data">Delete game data</button>
+      </div>
+      <p class="small" id="storage-summary"></p>
+      <p class="small" id="version"></p>
+    </details>
+
+    <p class="legal">An unofficial fan project, not affiliated with or endorsed by Microsoft, Xbox Game Studios
+      or Bungie.</p>
+  </section>
+</main>
+
+<div id="rotate" class="overlay" hidden><p>Turn your device sideways to play.</p></div>
+<div id="toast" class="toast" hidden></div>
+<div id="fatal" class="overlay fatal" hidden>
+  <div class="panel">
+    <h2>The game stopped</h2>
+    <pre id="fatal-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button primary" id="fatal-reload">Reload</button>
+      <button type="button" class="button" id="fatal-log">Copy log</button>
+    </div>
+  </div>
+</div>
+<div id="log-view" class="overlay" hidden>
+  <div class="panel wide">
+    <pre id="log-text"></pre>
+    <div class="row buttons">
+      <button type="button" class="button" id="log-copy">Copy</button>
+      <button type="button" class="button primary" id="log-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="input.js"></script>
+<script src="site-config.js"></script>
+<script src="native-invite.js"></script>
+<script src="gateway.js"></script>
+<script src="net.js"></script>
+<script src="cache.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
