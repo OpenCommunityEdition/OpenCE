@@ -605,37 +605,47 @@ boolean cache_file_header_verify(
 }
 
 #ifdef HALO_LINUX
-/* port: the builds of the released maps that play multiplayer together (a
-PAL map as the NTSC maps, port/linux/game/pal_tags.c). A map of another
-build may differ in what machines send each other, so its players cannot
-open the multiplayer menu (ui_widget.c, ui_widget_launch_widget) */
+/* port: the builds of the released maps, by region. Any build here plays
+multiplayer with the others; a map of another build may differ in what
+machines send each other, so its players cannot open the multiplayer menu
+(ui_widget.c, ui_widget_launch_widget). A PAL build's maps are played as the
+NTSC maps are (port/linux/game/pal_tags.c) */
 static struct
 {
 	char const *build;
 	char const *region;
-} const cache_file_multiplayer_builds[] =
+} const cache_file_builds[] =
 {
 	{ "01.01.14.2342", "PAL" },
 	{ "01.10.12.2276", "NTSC" },
 	{ "01.08.15.1749", "NTSC" },
 };
 
-/* the region of the loaded map's build if it plays multiplayer, else NULL;
-build gets the build (a cache file's header need not end it) */
-char const *cache_files_multiplayer_region(
-	char build[0x20])
+/* the region of a build's maps ("PAL" or "NTSC") if it is listed above, else
+NULL; build is a cache file header's (which need not end it) */
+char const *cache_files_build_region(
+	char const *build)
 {
 	short index;
 
-	csstrncpy(build, cache_file_globals.header.build, 0x20);
-	build[0x1F] = 0;
-	for (index = 0; index < NUMBEROF(cache_file_multiplayer_builds); index++)
+	for (index = 0; index < NUMBEROF(cache_file_builds); index++)
 	{
-		if (!csstrcmp(build, cache_file_multiplayer_builds[index].build))
-			return cache_file_multiplayer_builds[index].region;
+		if (!csstrncmp(build, cache_file_builds[index].build, sizeof(cache_file_globals.header.build)))
+			return cache_file_builds[index].region;
 	}
 
 	return NULL;
+}
+
+/* the region of the loaded map's build if it plays multiplayer, else NULL;
+build gets the build */
+char const *cache_files_multiplayer_region(
+	char build[0x20])
+{
+	csstrncpy(build, cache_file_globals.header.build, 0x20);
+	build[0x1F] = 0;
+
+	return cache_files_build_region(cache_file_globals.header.build);
 }
 #endif
 

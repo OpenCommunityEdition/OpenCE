@@ -54,6 +54,8 @@ boolean cache_file_header_verify(
 boolean cache_files_give_time_to_precache(
 	char const *map_name);
 #ifdef HALO_LINUX
+char const *cache_files_build_region(
+	char const *build);
 char const *cache_files_multiplayer_region(
 	char build[0x20]);
 #endif

@@ -15,9 +15,11 @@ corrected.
 So when the tags of a PAL map load (scenario_tags_load), each such value is
 put back to the NTSC maps' (01.10.12.2276, the same in all three NTSC
 releases): the same values in every map, multiplayer and campaign, found by
-comparing the two releases' maps tag by tag. A value is set only where it
-has exactly the PAL map's value, so that a map built otherwise stays as it
-is.
+comparing the two releases' maps tag by tag. A PAL map is one of any build
+cache_files.c lists as PAL (cache_files_build_region), where other PAL
+releases' builds go too. A value is set, and a first-person animation paced,
+only where it has exactly the 01.01.14.2342 maps' value or frame count, so
+that a map built otherwise stays as it is.
 
 The PAL maps' first-person weapon animations have fewer frames too
 (resampled for 25 ticks a second), and a weapon's readying, reloading and
@@ -52,9 +54,6 @@ the files: nothing played or sent between machines.
 void platform_log(char const *format, ...);
 
 /* ---------- constants */
-
-/* the build of the PAL release's maps (a cache file's header) */
-#define PAL_MAPS_BUILD "01.01.14.2342"
 
 /* the sizes and fields of records that their own units keep to themselves
 (bipeds.c's struct game_globals_falling_damage, vehicles.c's struct
@@ -362,11 +361,13 @@ static short pal_tags_first_person_entry(
 
 /* ---------- public code */
 
-/* the tags of the map just loaded, built by build: a PAL map's as the NTSC
+/* the tags of the map just loaded, built by build: a PAL map's (one of a
+build the cache files list as PAL, cache_files_build_region) as the NTSC
 maps' (cache_files.c, scenario_tags_load) */
 void pal_tags_loaded(
 	char const *build)
 {
+	char const *region;
 	short index;
 
 	csmemset(&pal_tags, 0, sizeof(pal_tags));
@@ -374,7 +375,8 @@ void pal_tags_loaded(
 		pal_tags.first_person_graphs[index] = NONE;
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
 		pal_tags.advancing[index].graph_index = NONE;
-	if (strcmp(build, PAL_MAPS_BUILD))
+	region = cache_files_build_region(build);
+	if (!region || strcmp(region, "PAL"))
 		return;
 	pal_tags_find_first_person_animations();
 	pal_tags_restore_bipeds();
@@ -382,7 +384,7 @@ void pal_tags_loaded(
 	pal_tags_restore_weapons();
 	pal_tags_restore_projectiles();
 	pal_tags_restore_warthog();
-	platform_log("PAL map: %d of %d values and first-person animations as the NTSC maps'", pal_tags.restored, pal_tags.checked);
+	platform_log("PAL map (%.32s): %d of %d values and first-person animations as the NTSC maps'", build, pal_tags.restored, pal_tags.checked);
 }
 
 /* the frames a first-person animation lasts for the game's timing: a PAL
