@@ -130,8 +130,8 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 }
 
 /* whether the player on the gamepad aims with the mouse (it moved after the
-right stick last did) and input.mouse_aim_assist is off: then the game's aim
-assist leaves them be (player_control.c, aim_assist.c) */
+right stick last did) and input.mouse_aim_assist is off: then the view's
+magnetism leaves them be (player_control.c); the bullets' autoaim stays */
 int halo_linux_mouse_aiming(short gamepad_index)
 {
 	static int aim_assist = -1;

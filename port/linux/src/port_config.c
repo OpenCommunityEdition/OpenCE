@@ -93,11 +93,10 @@ static const struct config_setting config_settings[] =
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
-		"Aim assist while aiming with the mouse, as with a controller: the view\n"
-		"slowed and dragged along by a target (magnetism) and bullets bent\n"
-		"toward it (autoaim). The last of the mouse and the right stick to move\n"
-		"decides. In lockstep games the bullets' autoaim stays, since every\n"
-		"machine simulates every shot alike." },
+		"Magnetism while aiming with the mouse, as with a controller: the view\n"
+		"slowed and dragged along by a target. The last of the mouse and the\n"
+		"right stick to move decides. The bullets' autoaim (bent toward the\n"
+		"target) stays either way." },
 
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
