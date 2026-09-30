@@ -1228,30 +1228,35 @@ short connect_endpoint(
 				do
 				{
 					fd_set writeable;
+					fd_set failed;
 
 					writeable.fd_array[0] = ep->socket;
 					writeable.fd_count = 1;
+					failed.fd_array[0] = ep->socket;
+					failed.fd_count = 1;
 
-					if (select(1, NULL, &writeable, NULL, &timeval) == 1)
+					/* port: a connect that failed is in the error set (not
+					writeable, and its would-block left as it was) */
+					if (select(1, NULL, &writeable, &failed, &timeval) > 0)
 					{
-						error = 0;
+						error = failed.fd_count ? WSAECONNREFUSED : 0;
 					}
 					else
 					{
 						error = WSAGetLastError();
 					}
 
-					if (system_milliseconds() > timeout)
+					/* port: a select that ends with the connection still being
+					made leaves the connect's would-block: waited on, as in
+					progress is, until the timeout (a connection made after a
+					SYN sent again takes a second or three) */
+					if ((error == WSAEINPROGRESS || error == WSAEWOULDBLOCK) &&
+						(long)(system_milliseconds() - timeout) > 0)
 					{
-						error = WSAEINPROGRESS;
-						closesocket(ep->socket);
-						/* port: closed here, not again when the endpoint is (its
-						number may be another socket's by then) */
-						ep->socket = INVALID_SOCKET;
 						break;
 					}
 				}
-				while (error == WSAEINPROGRESS);
+				while (error == WSAEINPROGRESS || error == WSAEWOULDBLOCK);
 			}
 		}
 
@@ -1259,6 +1264,12 @@ short connect_endpoint(
 		{
 			winsock_error_to_string(error);
 			result = _transport_error_connect_failed;
+			/* port: none of the attempt kept (its socket half made and not
+			blocking, which the next would reuse): the next makes a new one,
+			and its number is not closed again when the endpoint is */
+			closesocket(ep->socket);
+			ep->socket = INVALID_SOCKET;
+			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
 		}
 		else
 		{

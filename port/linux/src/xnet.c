@@ -240,8 +240,8 @@ static int peer_outgoing_address(int stream, int connecting, const struct sockad
 	return 1;
 }
 
-/* tells internet play the local port the game's socket has (bound, or
-listening) */
+/* tells internet play the local port the game's socket has (bound, given
+one by a connection or a send, or listening) */
 static void note_socket_port(SOCKET socket, int listening)
 {
 	struct sockaddr_in bound;
@@ -249,15 +249,18 @@ static void note_socket_port(SOCKET socket, int listening)
 	int type = SOCK_DGRAM;
 	int type_length = sizeof(type);
 
-	/* (not one bound to this machine alone: the telnet console's, which no
-	peer is to reach, and which is not hosting) */
 	if (posix_socket_getsockname((int)socket, &bound, &length) < 0 || bound.sin_family != AF_INET ||
-		bound.sin_addr.s_addr == loopback_address())
+		!bound.sin_port)
 	{
 		return;
 	}
 	posix_socket_getsockopt((int)socket, SOL_SOCKET, SO_TYPE, &type, &type_length);
-	p2p_socket_port((int)socket, type == SOCK_STREAM, listening, bound.sin_port);
+	/* (one bound to this machine alone, as the telnet console's, is not for
+	peers to reach, and is not hosting; its port is still no stand-in's) */
+	if (bound.sin_addr.s_addr == loopback_address())
+		p2p_port_taken(type == SOCK_STREAM, bound.sin_port);
+	else
+		p2p_socket_port((int)socket, type == SOCK_STREAM, listening, bound.sin_port);
 }
 
 /* traffic from an internet play peer's stand-in comes from the peer, and
@@ -406,6 +409,8 @@ int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int ad
 	unsigned long override;
 	int type = SOCK_STREAM;
 	int type_length = sizeof(type);
+	int result;
+	int error;
 
 	/* an internet play peer's TCP or UDP port */
 	if (address && address->sa_family == AF_INET &&
@@ -437,7 +442,18 @@ int WSAAPI halo_ws_connect(SOCKET socket, const struct sockaddr *address, int ad
 			posix_socket_bind((int)socket, &bound, sizeof(bound));
 		}
 	}
-	return winsock_result(posix_socket_connect((int)socket, address, address_length));
+	result = posix_socket_connect((int)socket, address, address_length);
+	error = result < 0 ? posix_socket_last_error() : 0;
+	/* the port the system gave it (a connection under way has one too, and
+	a datagram socket's that failed keeps its: a stream socket's that failed
+	has none) */
+	note_socket_port(socket, 0);
+	if (result < 0)
+	{
+		WSASetLastError(error);
+		return SOCKET_ERROR;
+	}
+	return result;
 }
 
 int WSAAPI halo_ws_listen(SOCKET socket, int backlog)
@@ -474,6 +490,10 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 {
 	/* the rewritten destination: it must outlive the send */
 	struct sockaddr_in target;
+	/* 0: not bound yet, which the first send binds it */
+	unsigned short source_port = socket_port(socket);
+	int result;
+	int send_error;
 
 	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
 		((const struct sockaddr_in *)address)->sin_addr.s_addr == INADDR_BROADCAST)
@@ -481,11 +501,8 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		unsigned long targets[MAXIMUM_BROADCAST_TARGETS];
 		unsigned short ports[P2P_BROADCAST_PEERS];
 		int target_count = broadcast_targets(targets, MAXIMUM_BROADCAST_TARGETS);
-		unsigned short source_port;
 		int peer_count;
-		int send_error;
 		int index;
-		int result;
 
 		/* one datagram per target; the broadcast counts as sent if any is */
 		memcpy(&target, address, sizeof(target));
@@ -511,7 +528,12 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		/* and to every internet play peer (after the send above, which binds
 		the socket if it was not): onto the tunnel at once, else through the
 		stand-ins */
-		source_port = socket_port(socket);
+		if (!source_port)
+		{
+			source_port = socket_port(socket);
+			if (source_port)
+				note_socket_port(socket, 0);
+		}
 		if (source_port)
 		{
 			if (p2p_broadcast_datagram(source_port, ((const struct sockaddr_in *)address)->sin_port, buffer,
@@ -551,8 +573,6 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 	if (address && address->sa_family == AF_INET && address_length >= (int)sizeof(struct sockaddr_in) &&
 		(halo_ws_ntohl(((const struct sockaddr_in *)address)->sin_addr.s_addr) & 0xFFC00000) == 0x64400000)
 	{
-		unsigned short source_port = socket_port(socket);
-
 		switch (source_port ? p2p_send_datagram(source_port, ((const struct sockaddr_in *)address)->sin_addr.s_addr,
 			((const struct sockaddr_in *)address)->sin_port, buffer, length) : 0)
 		{
@@ -571,7 +591,17 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 		address = outgoing_address(address, address_length, &target);
 		break;
 	}
-	return winsock_result(posix_socket_sendto((int)socket, buffer, length, flags, address, address_length));
+	result = posix_socket_sendto((int)socket, buffer, length, flags, address, address_length);
+	send_error = result < 0 ? posix_socket_last_error() : 0;
+	/* the port the send gave it (one that failed binds it too) */
+	if (!source_port)
+		note_socket_port(socket, 0);
+	if (result < 0)
+	{
+		WSASetLastError(send_error);
+		return SOCKET_ERROR;
+	}
+	return result;
 }
 
 /* debug.network_latency and debug.network_loss: what this machine receives

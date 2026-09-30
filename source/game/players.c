@@ -3850,10 +3850,15 @@ void players_update_after_game(
 			telefrag_ticks = player->telefrag_timeout;
 			if (telefrag_ticks >= 90)
 			{
+				/* a client's view of who blocks is a latency late: the
+				host's kill arrives with its damage events (the message
+				shown once) */
+				boolean client = network_game_distributed_client();
+
 				if (player->unit_index != NONE)
 				{
 					unit = unit_get(player->unit_index);
-					if (!TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
+					if (client ? telefrag_ticks == 90 : !TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
 					{
 						if (player->local_player_index != NONE)
 						{
@@ -3870,9 +3875,12 @@ void players_update_after_game(
 						}
 
 						player_telefrag_effect_stop(iterator.datum_index);
-						unit_kill(player->unit_index);
+						if (!client)
+							unit_kill(player->unit_index);
 					}
 				}
+				if (client)
+					player_telefrag_effect_stop(iterator.datum_index);
 			}
 			else
 			{

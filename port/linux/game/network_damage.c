@@ -452,7 +452,8 @@ void network_damage_aftermath(
 	short body_part,
 	short node_index,
 	short region_index,
-	short material_index)
+	short material_index,
+	long victim_player_index)
 {
 	struct distributed_damage_event *event;
 	struct unit_datum *unit;
@@ -464,8 +465,9 @@ void network_damage_aftermath(
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_unit);
 	if (!unit)
 		return;
-	/* (the last events kept for killing blows) */
-	kill = TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) && unit->unit.player_index != NONE;
+	/* (the last events kept for killing blows: of a player's unit, whose
+	player the blow's aftermath has already taken from it, unit_died) */
+	kill = TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) && victim_player_index != NONE;
 	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
 		return;
 	event = &damage_events[damage_event_count++];
@@ -490,7 +492,7 @@ void network_damage_aftermath(
 
 		event->kind = _damage_event_kill;
 		/* (no killer when the game noted none: a death it did not score) */
-		if (!distributed_get_death((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index),
+		if (!distributed_get_death((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(victim_player_index),
 			&event->player_index, &friendly_fire, &killed_by_vehicle))
 		{
 			event->player_index = NO_PLAYER;
@@ -1234,8 +1236,30 @@ static void distributed_note_event_destinations(
 		}
 		/* (a player's body, living or dead) */
 		unit = (struct unit_datum *)object_try_and_get_and_verify_type(event->object_index, _object_mask_unit);
-		if (unit && unit->unit.player_index != NONE)
-			player_indices[(*count)++] = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index);
+		if (unit)
+		{
+			long unit_player_index = unit->unit.player_index;
+
+			/* (a body's player is no longer its unit's, but has it as their
+			dead one, player_died) */
+			if (unit_player_index == NONE)
+			{
+				struct data_iterator iterator;
+				struct player_datum *player;
+
+				data_iterator_new(&iterator, player_data);
+				while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+				{
+					if (player->dead_unit_index == event->object_index)
+					{
+						unit_player_index = iterator.datum_index;
+						break;
+					}
+				}
+			}
+			if (unit_player_index != NONE)
+				player_indices[(*count)++] = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_player_index);
+		}
 		if (tick->time != game_time_get())
 			continue;
 		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)

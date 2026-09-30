@@ -13,9 +13,10 @@ link games as if they were on one LAN, without a server of this project's.
 - Signalling (p2p_signal.c) goes through public MQTT brokers, on topics
   that are hashes of the token, with messages sealed with a key derived
   from it (p2p_crypto.c). A joiner offers its public key and the addresses
-  it can be reached at; the host answers with its own. The secret of their
-  session comes from the two keys (X25519) and a nonce of each, and never
-  travels.
+  it can be reached at; the host answers with its own, and makes the
+  session once the joiner, answered, proves that it holds its key. The
+  secret of their session comes from the two keys (X25519) and a nonce of
+  each, and never travels.
 - The tunnel is one UDP socket. Each machine learns its public address from
   public STUN servers, and both then send to each other's addresses until
   packets get through (hole punching). There is no relay: two machines whose
@@ -1213,7 +1214,8 @@ static int find_closed(int stream, unsigned long *address, unsigned short *port)
 	return 0;
 }
 
-/* a stand-in that opens has a port no closed one stands for now */
+/* a stand-in, or a socket of the game's, that has the port now: no closed
+stand-in stands for it */
 static void forget_closed(int stream, unsigned short local_port)
 {
 	int index;
@@ -1570,6 +1572,17 @@ void p2p_socket_port(int socket, int stream, int listening, unsigned short port)
 	/* the game listens for connections while it hosts */
 	if (stream && listening)
 		p2p.hosting_socket = socket;
+	/* (and no stand-in that closed has the port now) */
+	forget_closed(stream != 0, port);
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+void p2p_port_taken(int stream, unsigned short port)
+{
+	if (!p2p.running || !port)
+		return;
+	pthread_mutex_lock(&p2p_lock);
+	forget_closed(stream != 0, port);
 	pthread_mutex_unlock(&p2p_lock);
 }
 

@@ -10,27 +10,40 @@ Everything that passes through them is sealed with a key derived from the
 invite's token, and goes to topics that are hashes of it, so the brokers
 (and anyone watching them) learn nothing and can join nothing:
 
-- the host listens on hceu/2/<HMAC(token, "host" | host)>, where a joiner
+- the host listens on hceu/3/<HMAC(token, "host" | host)>, where a joiner
   sends JOIN: its public key (its identifier is the key's hash), a nonce,
   and its addresses;
-- the joiner listens on hceu/2/<HMAC(token, "joiner" | joiner)>, where the
+- the joiner listens on hceu/3/<HMAC(token, "joiner" | joiner)>, where the
   host answers ACCEPT: its public key, the joiner's nonce, one of its own,
   its addresses, and a tag that only the two of them can make (from their
-  keys).
+  keys);
+- the joiner then repeats its JOIN with the host's nonce and a tag of its
+  own, made the same way, which shows that it holds the key it gave. Only
+  then does the host make a session.
 
 Their tunnel's keys come from their X25519 shared secret and the two
 nonces, and never travel: another holder of the invite reads the messages
 but cannot work them out, and cannot answer as the host (whose key must
 hash to the identifier in the invite). It can send a JOIN in another
-machine's name, which gets it nothing: the tunnel takes that machine's key,
-and a session with a machine is not replaced while it lives (p2p.c).
+machine's name, but cannot prove it: the host answers it (to that machine)
+and makes no session of it. A session no one could complete would keep that
+machine out while it lived (a session with a machine is not replaced while
+it lives, p2p.c), and a JOIN every so often would keep it out for good.
+
+The host's nonce is a hash of the request with a key of the host's and the
+time (it changes every HOST_NONCE_PERIOD), so the host need not remember
+what it answered: anyone with the invite can ask in a machine's name as
+often as it likes, pushing out whatever the host remembered. What it does
+keep of requests not proven yet (the work of their keys) only saves work.
 
 A joiner repeats its JOIN until the tunnel reaches the host. The host makes
-one session of a JOIN (its public key and nonce) at most: anyone watching
-the brokers could send it again after the session ended, and have the host
-reach for the joiner's old addresses in its name, keeping it out. So a
-joiner asks with a new nonce when its session with the host ends before the
-tunnel reached it, or when the host has not answered it in a while.
+one session of a request (a public key and nonce) at most: anyone watching
+the brokers could send the proven JOIN again after the session ended, and
+have the host reach for the joiner's old addresses in its name, keeping it
+out (with the same keys again). It remembers the request at least while its
+host nonce lasts. So a joiner asks with a new nonce when its session with
+the host ends before the tunnel reached it, or when the host has not
+answered it in a while.
 */
 
 #include "platform.h"
@@ -45,16 +58,22 @@ tunnel reached it, or when the host has not answered it in a while.
 enum
 {
 	MAXIMUM_BROKERS = 4,
-	/* the joiners a host remembers, so a repeated request gets the same
-	session: as many as it takes */
+	/* the joiners a host made sessions for, so a repeated request gets the
+	same session: as many as it takes */
 	MAXIMUM_JOINERS = P2P_MAXIMUM_PEERS + 1,
+	/* the requests not proven yet whose keys' work a host keeps; only to
+	save work (a flood of requests pushes them out) */
+	MAXIMUM_ASKERS = 16,
 	/* the requests a session was made from, which make none again (a
-	host takes at most a few new players a minute: this is hours of them) */
+	host takes at most a few new players a minute: this is hours of them;
+	one is not forgotten while its host nonce lasts: USED_REQUEST_TIME) */
 	MAXIMUM_USED_REQUESTS = 1024,
 	TOPIC_SIZE = 7 + 32 + 1,
 	NONCE_SIZE = 8,
-	/* an ACCEPT's tag: the first half of an HMAC-SHA256 */
+	/* an ACCEPT's or a proven JOIN's tag: the first half of an HMAC-SHA256 */
 	TAG_SIZE = 16,
+	/* a proven JOIN's end: the host's nonce, and the tag */
+	PROOF_SIZE = NONCE_SIZE + TAG_SIZE,
 	BUFFER_SIZE = 4096,
 	MAXIMUM_MESSAGE_SIZE = 256,
 
@@ -67,9 +86,12 @@ enum
 	JOIN_INTERVAL = 2000,
 	ANSWER_INTERVAL = 1000,
 	/* a joiner the host has not answered in this long asks anew, with a
-	new nonce (the host may have made a session from its request whose
-	answer was lost, and makes no other from it) */
+	new nonce (a fresh start: the host makes nothing of a request it did
+	not answer, as it makes a session only of a proven one) */
 	UNANSWERED_TIME = 20000,
+	/* a host nonce is taken in the period it is made in and the next */
+	HOST_NONCE_PERIOD = 30000,
+	USED_REQUEST_TIME = 2 * HOST_NONCE_PERIOD,
 };
 
 enum
@@ -84,7 +106,8 @@ enum
 {
 	_message_join = 'J',
 	_message_accept = 'A',
-	MESSAGE_VERSION = 2,
+	/* 3: a JOIN proves its key before the host makes a session */
+	MESSAGE_VERSION = 3,
 };
 
 struct broker
@@ -109,6 +132,8 @@ struct broker
 	int output_size;
 };
 
+/* a request: of a session made (joiners), or not proven yet (askers, which
+have no host nonce or secret) */
 struct joiner
 {
 	unsigned char identifier[P2P_IDENTIFIER_SIZE];
@@ -121,6 +146,13 @@ struct joiner
 	unsigned char secret[P2P_SHA256_SIZE];
 	unsigned long answered_time;
 	int used;
+};
+
+struct used_request
+{
+	/* the joiner's identifier and nonce */
+	unsigned char request[P2P_IDENTIFIER_SIZE + NONCE_SIZE];
+	unsigned long time;
 };
 
 static struct
@@ -137,9 +169,14 @@ static struct
 	char host_topic[TOPIC_SIZE];
 	struct joiner joiners[MAXIMUM_JOINERS];
 	int next_joiner;
-	/* the joiner's identifier and nonce of each request a session was made
-	from (kept while hosting stops and starts: an invite lasts the run) */
-	unsigned char used_requests[MAXIMUM_USED_REQUESTS][P2P_IDENTIFIER_SIZE + NONCE_SIZE];
+	struct joiner askers[MAXIMUM_ASKERS];
+	int next_asker;
+	/* the key of the host's nonces (host_nonce_for), for the run */
+	int has_nonce_key;
+	unsigned char nonce_key[P2P_SHA256_SIZE];
+	/* each request a session was made from (kept while hosting stops and
+	starts: an invite lasts the run) */
+	struct used_request used_requests[MAXIMUM_USED_REQUESTS];
 	int used_request_count;
 	int used_request_next;
 
@@ -155,9 +192,11 @@ static struct
 	char join_host_topic[TOPIC_SIZE];
 	char join_topic[TOPIC_SIZE];
 	unsigned long join_sent_time;
-	/* when join_nonce was made, and whether the host answered it */
+	/* when join_nonce was made, and whether the host answered it (with
+	join_host_nonce, which its proof carries) */
 	unsigned long join_nonce_time;
 	int join_answered;
+	unsigned char join_host_nonce[NONCE_SIZE];
 } signalling;
 
 static int elapsed(unsigned long since, unsigned long time)
@@ -196,7 +235,7 @@ static void make_topic(const unsigned char *token, const char *label, const unsi
 
 	derive(token, label, identifier, digest);
 	p2p_hex(digest, 16, text);
-	snprintf(topic, TOPIC_SIZE, "hceu/2/%s", text);
+	snprintf(topic, TOPIC_SIZE, "hceu/3/%s", text);
 }
 
 /* ---------- MQTT */
@@ -463,16 +502,61 @@ static void session_secret(const unsigned char *base, const unsigned char *nonce
 	p2p_hmac_sha256(base, P2P_SHA256_SIZE, data, sizeof(data), secret);
 }
 
-/* an ACCEPT's tag, over what precedes it */
-static void accept_tag(const unsigned char *base, const unsigned char *message, int size, unsigned char *tag)
+/* an ACCEPT's tag (label "accept") or a proven JOIN's ("join"), over what
+precedes it */
+static void message_tag(const unsigned char *base, const char *label, const unsigned char *message, int size,
+	unsigned char *tag)
 {
 	unsigned char data[6 + MAXIMUM_MESSAGE_SIZE];
 	unsigned char digest[P2P_SHA256_SIZE];
+	int label_size = (int)strlen(label);
 
-	memcpy(data, "accept", 6);
-	memcpy(data + 6, message, (size_t)size);
-	p2p_hmac_sha256(base, P2P_SHA256_SIZE, data, 6 + size, digest);
+	memcpy(data, label, (size_t)label_size);
+	memcpy(data + label_size, message, (size_t)size);
+	p2p_hmac_sha256(base, P2P_SHA256_SIZE, data, label_size + size, digest);
 	memcpy(tag, digest, TAG_SIZE);
+}
+
+/* whether a message's tag (its last TAG_SIZE bytes) is right */
+static int tag_right(const unsigned char *base, const char *label, const unsigned char *message, int size)
+{
+	unsigned char tag[TAG_SIZE];
+
+	message_tag(base, label, message, size - TAG_SIZE, tag);
+	return p2p_equal(tag, message + size - TAG_SIZE, TAG_SIZE);
+}
+
+/* the host's nonce for a request (a joiner's public key and nonce) in a
+period of HOST_NONCE_PERIOD */
+static void host_nonce_for(const unsigned char *public_key, const unsigned char *nonce, unsigned long period,
+	unsigned char *host_nonce)
+{
+	unsigned char data[4 + P2P_KEY_SIZE + NONCE_SIZE];
+	unsigned char digest[P2P_SHA256_SIZE];
+	int index;
+
+	for (index = 0; index < 4; index++)
+		data[index] = (unsigned char)(period >> (index * 8));
+	memcpy(data + 4, public_key, P2P_KEY_SIZE);
+	memcpy(data + 4 + P2P_KEY_SIZE, nonce, NONCE_SIZE);
+	p2p_hmac_sha256(signalling.nonce_key, P2P_SHA256_SIZE, data, sizeof(data), digest);
+	memcpy(host_nonce, digest, NONCE_SIZE);
+}
+
+/* whether the host answered a request with this nonce lately: in this
+period, or the last */
+static int host_nonce_current(const unsigned char *public_key, const unsigned char *nonce,
+	const unsigned char *host_nonce)
+{
+	unsigned long period = p2p_now() / HOST_NONCE_PERIOD;
+	unsigned char expected[NONCE_SIZE];
+
+	host_nonce_for(public_key, nonce, period, expected);
+	if (p2p_equal(expected, host_nonce, NONCE_SIZE))
+		return 1;
+	/* (the last before the clock wraps, before the first) */
+	host_nonce_for(public_key, nonce, period ? period - 1 : 0xFFFFFFFFUL / HOST_NONCE_PERIOD, expected);
+	return p2p_equal(expected, host_nonce, NONCE_SIZE);
 }
 
 /* ---------- the messages */
@@ -490,107 +574,208 @@ static void send_join(void)
 	memcpy(message + size, signalling.join_nonce, NONCE_SIZE);
 	size += NONCE_SIZE;
 	size += put_candidates(message + size);
+	/* answered: the proof that this machine holds its key, of which the host
+	makes the session */
+	if (signalling.join_answered)
+	{
+		memcpy(message + size, signalling.join_host_nonce, NONCE_SIZE);
+		size += NONCE_SIZE;
+		message_tag(signalling.join_base, "join", message, size, message + size);
+		size += TAG_SIZE;
+	}
 	size = p2p_seal(signalling.join_key, message, size, sealed);
 	publish_everywhere(signalling.join_host_topic, sealed, size);
 	signalling.join_sent_time = p2p_now();
 }
 
-/* the host: a joiner asked */
+static struct joiner *find_joiner(struct joiner *list, int count, const unsigned char *public_key,
+	const unsigned char *nonce)
+{
+	int index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (list[index].used && !memcmp(list[index].public_key, public_key, P2P_KEY_SIZE) &&
+			!memcmp(list[index].nonce, nonce, NONCE_SIZE))
+		{
+			return &list[index];
+		}
+	}
+	return NULL;
+}
+
+/* pair_base with a joiner: kept from a request of its, else worked out */
+static int joiner_base(const unsigned char *public_key, unsigned char *base)
+{
+	int index;
+
+	for (index = 0; index < MAXIMUM_JOINERS + MAXIMUM_ASKERS; index++)
+	{
+		struct joiner const *joiner = index < MAXIMUM_JOINERS ? &signalling.joiners[index] :
+			&signalling.askers[index - MAXIMUM_JOINERS];
+
+		if (joiner->used && !memcmp(joiner->public_key, public_key, P2P_KEY_SIZE))
+		{
+			memcpy(base, joiner->base, P2P_SHA256_SIZE);
+			return 1;
+		}
+	}
+	return pair_base(public_key, p2p_public_key(), public_key, base);
+}
+
+static int request_used(const unsigned char *request)
+{
+	int index;
+
+	for (index = 0; index < signalling.used_request_count; index++)
+	{
+		if (!memcmp(signalling.used_requests[index].request, request, P2P_IDENTIFIER_SIZE + NONCE_SIZE))
+			return 1;
+	}
+	return 0;
+}
+
+/* the host's answer to a request */
+static void send_accept(const unsigned char *identifier, const unsigned char *nonce, const unsigned char *host_nonce,
+	const unsigned char *base)
+{
+	unsigned char answer[MAXIMUM_MESSAGE_SIZE];
+	unsigned char sealed[MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD];
+	char topic[TOPIC_SIZE];
+	int size = 0;
+
+	answer[size++] = _message_accept;
+	answer[size++] = MESSAGE_VERSION;
+	memcpy(answer + size, p2p_public_key(), P2P_KEY_SIZE);
+	size += P2P_KEY_SIZE;
+	memcpy(answer + size, nonce, NONCE_SIZE);
+	size += NONCE_SIZE;
+	memcpy(answer + size, host_nonce, NONCE_SIZE);
+	size += NONCE_SIZE;
+	size += put_candidates(answer + size);
+	message_tag(base, "accept", answer, size, answer + size);
+	size += TAG_SIZE;
+	size = p2p_seal(signalling.host_key, answer, size, sealed);
+	make_topic(signalling.host_token, "joiner", identifier, topic);
+	publish_everywhere(topic, sealed, size);
+}
+
+/* the host: a joiner asked; with a proof (the host's nonce, and a tag) once
+the host answered it */
 static void join_received(const unsigned char *message, int size)
 {
 	struct p2p_candidate candidates[P2P_MAXIMUM_CANDIDATES];
-	unsigned char answer[MAXIMUM_MESSAGE_SIZE];
-	unsigned char sealed[MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD];
 	unsigned char identifier[P2P_IDENTIFIER_SIZE];
+	unsigned char request[P2P_IDENTIFIER_SIZE + NONCE_SIZE];
+	unsigned char host_nonce[NONCE_SIZE];
+	unsigned char base[P2P_SHA256_SIZE];
+	unsigned char secret[P2P_SHA256_SIZE];
 	const unsigned char *public_key = message + 2;
 	const unsigned char *nonce = public_key + P2P_KEY_SIZE;
 	int fixed = 2 + P2P_KEY_SIZE + NONCE_SIZE;
-	struct joiner *joiner = NULL;
-	char topic[TOPIC_SIZE];
-	int answered = 0;
+	struct joiner *joiner;
+	struct used_request *used;
+	int proven;
 	int count;
-	int index;
-	int answer_size = 0;
 
 	if (size < fixed + 1)
 		return;
 	count = get_candidates(message + fixed, size - fixed, candidates);
 	if (count < 0)
 		return;
+	proven = size - fixed - 1 - count * 6;
+	if (proven != 0 && proven != PROOF_SIZE)
+		return;
 	p2p_identifier_for(public_key, identifier);
-	for (index = 0; index < MAXIMUM_JOINERS; index++)
+	joiner = find_joiner(signalling.joiners, MAXIMUM_JOINERS, public_key, nonce);
+	if (joiner)
 	{
-		if (signalling.joiners[index].used &&
-			!memcmp(signalling.joiners[index].identifier, identifier, P2P_IDENTIFIER_SIZE))
+		/* a request a session was made from, again (through another broker,
+		or repeated until the tunnel reaches the host): that session's
+		answer, while it lasts; never another. The addresses only from a
+		proof (anyone can send the rest) */
+		if (proven && (memcmp(message + size - PROOF_SIZE, joiner->host_nonce, NONCE_SIZE) ||
+			!tag_right(joiner->base, "join", message, size)))
 		{
-			joiner = &signalling.joiners[index];
-			break;
-		}
-	}
-	if (joiner && !memcmp(joiner->public_key, public_key, P2P_KEY_SIZE) && !memcmp(joiner->nonce, nonce, NONCE_SIZE))
-	{
-		/* the same request again, through another broker or repeated: the
-		same session, while it lasts; never another (anyone watching the
-		brokers can send it again once the session ends, and a session in
-		the joiner's name would keep the joiner out while it lasts: a joiner
-		asks again with a new nonce) */
-		if (!elapsed(joiner->answered_time, ANSWER_INTERVAL) ||
-			!p2p_peer_reoffered(identifier, joiner->secret, candidates, count))
 			return;
-		answered = 1;
-	}
-	if (!answered)
-	{
-		/* a new session (p2p.c turns it away while another with that machine
-		lives), from a request no session was made from */
-		unsigned char base[P2P_SHA256_SIZE], host_nonce[NONCE_SIZE], secret[P2P_SHA256_SIZE];
-		unsigned char request[P2P_IDENTIFIER_SIZE + NONCE_SIZE];
-
-		memcpy(request, identifier, P2P_IDENTIFIER_SIZE);
-		memcpy(request + P2P_IDENTIFIER_SIZE, nonce, NONCE_SIZE);
-		for (index = 0; index < signalling.used_request_count; index++)
-		{
-			if (!memcmp(signalling.used_requests[index], request, sizeof(request)))
-				return;
 		}
+		if (!elapsed(joiner->answered_time, ANSWER_INTERVAL) ||
+			!p2p_peer_reoffered(identifier, joiner->secret, candidates, proven ? count : 0))
+		{
+			return;
+		}
+		joiner->answered_time = p2p_now();
+		send_accept(identifier, joiner->nonce, joiner->host_nonce, joiner->base);
+		return;
+	}
+	memcpy(request, identifier, P2P_IDENTIFIER_SIZE);
+	memcpy(request + P2P_IDENTIFIER_SIZE, nonce, NONCE_SIZE);
+	if (request_used(request))
+		return;
+	if (!proven)
+	{
+		/* an answer (to the machine whose key it is, which alone can prove
+		the request), and nothing else: the host keeps nothing of it that it
+		needs */
+		struct joiner *asker = find_joiner(signalling.askers, MAXIMUM_ASKERS, public_key, nonce);
+
+		if (asker && !elapsed(asker->answered_time, ANSWER_INTERVAL))
+			return;
 		/* (checked before the work of the keys, which anyone with the invite
 		can ask for as often as they like) */
-		if (p2p_peer_turned_away(identifier, 0) || !pair_base(public_key, p2p_public_key(), public_key, base))
+		if (p2p_peer_turned_away(identifier, 0))
 			return;
-		posix_random_bytes(host_nonce, NONCE_SIZE);
-		session_secret(base, nonce, host_nonce, secret);
-		if (!p2p_peer_offered(identifier, secret, candidates, count, 0))
-			return;
-		memcpy(signalling.used_requests[signalling.used_request_next], request, sizeof(request));
-		signalling.used_request_next = (signalling.used_request_next + 1) % MAXIMUM_USED_REQUESTS;
-		if (signalling.used_request_count < MAXIMUM_USED_REQUESTS)
-			signalling.used_request_count++;
-		if (!joiner)
-			joiner = &signalling.joiners[signalling.next_joiner++ % MAXIMUM_JOINERS];
-		memcpy(joiner->identifier, identifier, P2P_IDENTIFIER_SIZE);
-		memcpy(joiner->public_key, public_key, P2P_KEY_SIZE);
-		memcpy(joiner->nonce, nonce, NONCE_SIZE);
-		memcpy(joiner->host_nonce, host_nonce, NONCE_SIZE);
-		memcpy(joiner->base, base, P2P_SHA256_SIZE);
-		memcpy(joiner->secret, secret, P2P_SHA256_SIZE);
-		joiner->used = 1;
+		if (!asker)
+		{
+			if (!joiner_base(public_key, base))
+				return;
+			asker = &signalling.askers[signalling.next_asker];
+			signalling.next_asker = (signalling.next_asker + 1) % MAXIMUM_ASKERS;
+			memset(asker, 0, sizeof(*asker));
+			memcpy(asker->identifier, identifier, P2P_IDENTIFIER_SIZE);
+			memcpy(asker->public_key, public_key, P2P_KEY_SIZE);
+			memcpy(asker->nonce, nonce, NONCE_SIZE);
+			memcpy(asker->base, base, P2P_SHA256_SIZE);
+			asker->used = 1;
+		}
+		asker->answered_time = p2p_now();
+		host_nonce_for(public_key, nonce, p2p_now() / HOST_NONCE_PERIOD, host_nonce);
+		send_accept(identifier, nonce, host_nonce, asker->base);
+		return;
 	}
+	/* proven: with a nonce the host answered the request with lately, and a
+	tag only the key's holder can make. A new session (p2p.c turns it away
+	while another with that machine lives) */
+	memcpy(host_nonce, message + size - PROOF_SIZE, NONCE_SIZE);
+	if (!host_nonce_current(public_key, nonce, host_nonce) || p2p_peer_turned_away(identifier, 0) ||
+		!joiner_base(public_key, base) || !tag_right(base, "join", message, size))
+	{
+		return;
+	}
+	/* (a request is remembered while its proof lasts, at least: a copy of it
+	would make the session again, with the same keys) */
+	used = &signalling.used_requests[signalling.used_request_next];
+	if (signalling.used_request_count == MAXIMUM_USED_REQUESTS && !elapsed(used->time, USED_REQUEST_TIME))
+		return;
+	session_secret(base, nonce, host_nonce, secret);
+	if (!p2p_peer_offered(identifier, secret, candidates, count, 0))
+		return;
+	memcpy(used->request, request, sizeof(request));
+	used->time = p2p_now();
+	signalling.used_request_next = (signalling.used_request_next + 1) % MAXIMUM_USED_REQUESTS;
+	if (signalling.used_request_count < MAXIMUM_USED_REQUESTS)
+		signalling.used_request_count++;
+	joiner = &signalling.joiners[signalling.next_joiner];
+	signalling.next_joiner = (signalling.next_joiner + 1) % MAXIMUM_JOINERS;
+	memcpy(joiner->identifier, identifier, P2P_IDENTIFIER_SIZE);
+	memcpy(joiner->public_key, public_key, P2P_KEY_SIZE);
+	memcpy(joiner->nonce, nonce, NONCE_SIZE);
+	memcpy(joiner->host_nonce, host_nonce, NONCE_SIZE);
+	memcpy(joiner->base, base, P2P_SHA256_SIZE);
+	memcpy(joiner->secret, secret, P2P_SHA256_SIZE);
 	joiner->answered_time = p2p_now();
-
-	answer[answer_size++] = _message_accept;
-	answer[answer_size++] = MESSAGE_VERSION;
-	memcpy(answer + answer_size, p2p_public_key(), P2P_KEY_SIZE);
-	answer_size += P2P_KEY_SIZE;
-	memcpy(answer + answer_size, joiner->nonce, NONCE_SIZE);
-	answer_size += NONCE_SIZE;
-	memcpy(answer + answer_size, joiner->host_nonce, NONCE_SIZE);
-	answer_size += NONCE_SIZE;
-	answer_size += put_candidates(answer + answer_size);
-	accept_tag(joiner->base, answer, answer_size, answer + answer_size);
-	answer_size += TAG_SIZE;
-	answer_size = p2p_seal(signalling.host_key, answer, answer_size, sealed);
-	make_topic(signalling.host_token, "joiner", identifier, topic);
-	publish_everywhere(topic, sealed, answer_size);
+	joiner->used = 1;
+	send_accept(identifier, nonce, host_nonce, base);
 }
 
 /* the joiner: the host answered */
@@ -598,7 +783,6 @@ static void accept_received(const unsigned char *message, int size)
 {
 	struct p2p_candidate candidates[P2P_MAXIMUM_CANDIDATES];
 	unsigned char identifier[P2P_IDENTIFIER_SIZE];
-	unsigned char tag[TAG_SIZE];
 	unsigned char secret[P2P_SHA256_SIZE];
 	const unsigned char *host_public = message + 2;
 	const unsigned char *nonce = host_public + P2P_KEY_SIZE;
@@ -608,6 +792,13 @@ static void accept_received(const unsigned char *message, int size)
 
 	if (size < fixed + 1 + TAG_SIZE || memcmp(nonce, signalling.join_nonce, NONCE_SIZE))
 		return;
+	/* the first answer to the request holds: the proof carries its host
+	nonce (the host's changes every HOST_NONCE_PERIOD) */
+	if (signalling.join_answered && (memcmp(host_public, signalling.join_host_public, P2P_KEY_SIZE) ||
+		memcmp(host_nonce, signalling.join_host_nonce, NONCE_SIZE)))
+	{
+		return;
+	}
 	/* the invite's host: its key hashes to the identifier in the invite */
 	p2p_identifier_for(host_public, identifier);
 	if (memcmp(identifier, signalling.join_host, P2P_IDENTIFIER_SIZE))
@@ -620,15 +811,18 @@ static void accept_received(const unsigned char *message, int size)
 		signalling.join_has_base = 1;
 	}
 	/* and the answer is its */
-	accept_tag(signalling.join_base, message, size - TAG_SIZE, tag);
-	if (!p2p_equal(tag, message + size - TAG_SIZE, TAG_SIZE))
+	if (!tag_right(signalling.join_base, "accept", message, size))
 		return;
 	count = get_candidates(message + fixed, size - TAG_SIZE - fixed, candidates);
 	if (count < 0)
 		return;
-	signalling.join_answered = 1;
 	session_secret(signalling.join_base, nonce, host_nonce, secret);
-	p2p_peer_offered(signalling.join_host, secret, candidates, count, 1);
+	if (!p2p_peer_offered(signalling.join_host, secret, candidates, count, 1) || signalling.join_answered)
+		return;
+	memcpy(signalling.join_host_nonce, host_nonce, NONCE_SIZE);
+	signalling.join_answered = 1;
+	/* the proof, at once */
+	send_join();
 }
 
 static void publish_received(const char *topic, const unsigned char *payload, int size)
@@ -721,10 +915,11 @@ static void broker_parse(struct broker *broker)
 				publish_received(topic, body + offset, remaining - offset);
 			}
 		}
-		memmove(broker->input, broker->input + total, (size_t)(broker->input_size - total));
-		broker->input_size -= total;
+		/* (what it sent in answer may have closed it, emptying input) */
 		if (broker->socket < 0)
 			return;
+		memmove(broker->input, broker->input + total, (size_t)(broker->input_size - total));
+		broker->input_size -= total;
 	}
 }
 
@@ -909,6 +1104,11 @@ static void sync_all_topics(void)
 
 void p2p_signal_host(const unsigned char *token)
 {
+	if (!signalling.has_nonce_key)
+	{
+		posix_random_bytes(signalling.nonce_key, P2P_SHA256_SIZE);
+		signalling.has_nonce_key = 1;
+	}
 	memcpy(signalling.host_token, token, P2P_TOKEN_SIZE);
 	derive(token, "seal", NULL, signalling.host_key);
 	make_topic(token, "host", p2p_identifier(), signalling.host_topic);
@@ -920,6 +1120,7 @@ void p2p_signal_stop_hosting(void)
 {
 	signalling.hosting = 0;
 	memset(signalling.joiners, 0, sizeof(signalling.joiners));
+	memset(signalling.askers, 0, sizeof(signalling.askers));
 	sync_all_topics();
 }
 

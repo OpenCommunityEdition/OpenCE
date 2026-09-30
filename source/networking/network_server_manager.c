@@ -779,6 +779,71 @@ static long network_game_server_frequent_updates_until[MAXIMUM_NETWORK_MACHINE_C
 network_game_server_client_machine_may_slow_countdown) */
 static boolean network_game_server_countdown_slowed[MAXIMUM_NETWORK_MACHINE_COUNT];
 
+/* port: the players added to the game in progress from each client
+machine's address (a machine joins from one address, and joining again
+drops the old: network_game_server_accept_client_machine_into_game), no
+more than MAXIMUM_INGAME_ADDITIONS_PER_ADDRESS a game, so that players
+added and removed, or a machine joining again and again, do not take
+every player of the game (a player gone stays for its scores) */
+enum
+{
+	MAXIMUM_INGAME_ADDITIONS_PER_ADDRESS = 2 * MAXIMUM_PLAYERS_PER_MACHINE,
+};
+static struct
+{
+	unsigned long address;
+	short count;
+} network_game_server_ingame_additions[MAXIMUM_NETWORK_PLAYER_COUNT];
+
+static short *network_game_server_ingame_addition_count(
+	unsigned long address,
+	boolean create)
+{
+	long index;
+
+	if (!address)
+		return NULL;
+	for (index = 0; index < (long)NUMBEROF(network_game_server_ingame_additions); index++)
+	{
+		if (network_game_server_ingame_additions[index].address == address)
+			return &network_game_server_ingame_additions[index].count;
+	}
+	/* (more addresses than players: the game is full anyway) */
+	for (index = 0; create && index < (long)NUMBEROF(network_game_server_ingame_additions); index++)
+	{
+		if (!network_game_server_ingame_additions[index].address)
+		{
+			network_game_server_ingame_additions[index].address = address;
+			network_game_server_ingame_additions[index].count = 0;
+			return &network_game_server_ingame_additions[index].count;
+		}
+	}
+	return NULL;
+}
+
+/* (a client machine's player queued to add in game: one refused is as one
+the game has no room for) */
+static boolean network_game_server_machine_may_add_player_ingame(
+	struct network_game_server *server,
+	long machine_index)
+{
+	short *count;
+
+	if (!VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) ||
+		network_game_server_client_machine_is_local(server, &server->client_machines[machine_index]))
+	{
+		return TRUE;
+	}
+	count = network_game_server_ingame_addition_count(network_game_server_client_machine_addresses[machine_index], FALSE);
+	if (count && *count >= MAXIMUM_INGAME_ADDITIONS_PER_ADDRESS)
+	{
+		network_event("client machine #%ld added too many players in game", machine_index);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
 /* ---------- public code */
 
 struct network_game_server *network_game_server_create(
@@ -963,11 +1028,23 @@ static boolean network_game_server_network_lost(
 {
 	static unsigned long down_time;
 	static unsigned long checked_time;
+	static boolean asked;
+	static boolean available_asked;
+	static unsigned long asked_time;
 	unsigned long now = system_milliseconds();
 	boolean in_game = server->state == _network_game_server_state_ingame ||
 		server->state == _network_game_server_state_postgame;
-	boolean available = transport_network_available();
 	boolean recent = checked_time && now - checked_time <= 2000;
+	boolean available;
+
+	/* (asked once a second: each asking lists the machine's interfaces) */
+	if (!asked || now - asked_time >= 1000)
+	{
+		available_asked = transport_network_available();
+		asked_time = now;
+		asked = TRUE;
+	}
+	available = available_asked;
 
 	checked_time = now;
 	if (available)
@@ -1969,11 +2046,20 @@ void network_game_server_update_ticks(
 				}
 
 				if (client_machine &&
+					network_game_server_machine_may_add_player_ingame(server, client_machine_index) &&
 					network_game_server_add_player_to_game(
 						server,
 						client_machine,
 						&server->queued_player))
 				{
+					if (!network_game_server_client_machine_is_local(server, client_machine))
+					{
+						short *count = network_game_server_ingame_addition_count(
+							network_game_server_client_machine_addresses[client_machine_index], TRUE);
+
+						if (count)
+							(*count)++;
+					}
 					if (!network_game_server_send_player_joined_info_ingame(
 						server,
 						&server->queued_player))
@@ -3941,6 +4027,7 @@ boolean network_game_server_reset_to_pregame(
 	server->sent_start_game_message = FALSE;
 	server->queued_player_valid = FALSE;
 	server->waiting_player_count = 0;
+	csmemset(network_game_server_ingame_additions, 0, sizeof(network_game_server_ingame_additions));
 	/* Preserve January's 32-bit wrap without overflowing signed arithmetic.
 	 * VC7 converts the unsigned result back to the same signed bit pattern.
 	 */

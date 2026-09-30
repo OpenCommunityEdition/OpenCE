@@ -355,6 +355,10 @@ Only machines with the invite can find the game:
   (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
   with a key that only it and the player can calculate. Its public key must
   agree with the identifier in the link.
+- Then the player shows in the same way that it has the private key of its
+  public key. Only then does the host make a session for the player. Thus
+  other machines with the invite cannot make sessions in the name of a
+  player (such a session would keep the player out).
 - Each two machines get the keys of their packets from their key pairs and
   a random number from each. The keys do not go through the brokers. Thus
   other machines with the invite cannot read or change the packets.

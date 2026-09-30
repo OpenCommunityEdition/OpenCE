@@ -100,9 +100,9 @@ enum
 	up to the most */
 	CLIENT_READY_INTERVAL_TICKS = TICKS_PER_SECOND,
 	CLIENT_READY_MAXIMUM_INTERVAL_TICKS = 4 * TICKS_PER_SECOND,
-	/* (a machine that does not say whether it asks again: network_objects_
-	client_ready) the host tells it all its objects at most once in this
-	long (asked again sooner, they are on their way) */
+	/* the host tells a machine all its objects again at most once in this
+	long, asked again (a client that failed to make one: asked again sooner,
+	they are on their way; a flood of asking is not answered in full) */
 	HOST_OBJECTS_RESEND_TICKS = 10 * TICKS_PER_SECOND,
 	/* a client that failed to make one of the host's objects asks for them
 	all again this long after, twice as long each time it fails again up to
@@ -126,15 +126,17 @@ enum
 	/* a client: where the vehicles its own players drive were, the last
 	ticks (a power of two, more than the longest round trip) */
 	OWN_VEHICLE_POSITION_TICKS = 64,
-	/* the host: the ticks after it took a client's vehicle that it still
-	tells the client which of its ticks it has it at */
-	VEHICLE_PREDICTION_ECHO_TICKS = 3,
-	/* ... and the client's ticks it takes as run between two it took beyond
-	the host's (its messages delayed, then bunched) */
+	/* the host: the client's ticks it takes as run since a client's vehicle's
+	anchor beyond its own (its messages delayed, then bunched) */
 	VEHICLE_PREDICTION_JITTER_TICKS = 6,
-	/* ... and how long it measures the next from the last it took (longer,
-	from where it has the vehicle only: a ride begun again) */
-	VEHICLE_PREDICTION_REFERENCE_TICKS = TICKS_PER_SECOND,
+	/* ... how long it measures predictions from one it took, the anchor,
+	before it takes a newer as the anchor (the jitter and the blend granted
+	once a second, not once a tick) */
+	VEHICLE_PREDICTION_ANCHOR_TICKS = TICKS_PER_SECOND,
+	/* ... and how long, with none taken, it keeps the anchor, and tells the
+	client which of its ticks it has the vehicle at (longer: from where it
+	has the vehicle only, a ride begun again) */
+	VEHICLE_PREDICTION_REFERENCE_TICKS = 2 * TICKS_PER_SECOND,
 	/* a client: its own player's ammunition and grenades are the host's once
 	the host has had this long past a round trip to see what it did with
 	them (the host's inventories go every INVENTORY_INTERVAL_TICKS) */
@@ -312,20 +314,22 @@ static struct
 	long player_indices[MAXIMUM_LOCAL_PLAYERS];
 } objects_host_machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 /* ... each client's player's latest vehicle prediction, taken at the next
-tick; whether it took the latest it had; the vehicle it last took (NONE:
-none), at which of the client's ticks and its own, where the client had it
-and where that left the host's */
+tick; the vehicle it last took (NONE: none), at which of the client's ticks
+and its own, and where that left the host's copy; and the anchor
+predictions are measured from: one it took, at which of the client's ticks
+and its own, and where the client had it */
 static struct
 {
 	boolean valid;
-	boolean echo;
 	long machine_index;
 	struct distributed_object_state state;
 	long accepted_vehicle_index;
 	word accepted_time;
 	long accepted_host_time;
-	real_point3d accepted_position;
 	real_point3d accepted_host_position;
+	word anchor_time;
+	long anchor_host_time;
+	real_point3d anchor_position;
 } objects_host_vehicle_predictions[MAXIMUM_TRACKED_PLAYERS];
 /* a client: the host's objects it has, by absolute index */
 static long objects_client_has[MAXIMUM_TRACKED_OBJECTS];
@@ -820,7 +824,8 @@ void network_objects_client_asked(
 		return;
 	player_list = machine_get_player_list(machine_index);
 	/* (another machine in its place has other players) */
-	if (again || objects_host_machines[machine_index].time == NONE ||
+	if ((again && game_time_get() - objects_host_machines[machine_index].time >= HOST_OBJECTS_RESEND_TICKS) ||
+		objects_host_machines[machine_index].time == NONE ||
 		csmemcmp(objects_host_machines[machine_index].player_indices, player_list,
 			sizeof(objects_host_machines[machine_index].player_indices)) != 0)
 	{
@@ -1050,11 +1055,12 @@ static void distributed_host_send_states(
 			{
 				short player_index = objects_host_viewers.machines[machine_number].vehicle_player_indices[own_vehicle];
 
+				/* (the client's clock against the host's, which a gap or a
+				prediction refused since leaves as it was) */
 				if (player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS &&
-					objects_host_vehicle_predictions[player_index].echo &&
 					objects_host_vehicle_predictions[player_index].accepted_vehicle_index == state->object_index &&
 					game_time_get() - objects_host_vehicle_predictions[player_index].accepted_host_time <
-						VEHICLE_PREDICTION_ECHO_TICKS)
+						VEHICLE_PREDICTION_REFERENCE_TICKS)
 				{
 					SET_FLAG(state->flags, _distributed_object_predicted_bit, TRUE);
 					state->time = (short)(word)(objects_host_vehicle_predictions[player_index].accepted_time +
@@ -1307,13 +1313,14 @@ void network_objects_handle_vehicle_prediction(
 still drives it: a little off closed by half, more put there. Each taken
 moves the host's copy, and the next is measured from there, so a client
 could take its vehicle HOST_VEHICLE_ACCEPT_TOLERANCE further each tick: a
-prediction is also no further from the last one taken than the vehicle goes
-in the client's ticks since (those no more than the host's since and a
-little jitter), and no faster: as fast as twice its tag's top speed, or as
-the host's copy goes (falling, thrown), whichever is faster, with a margin.
-A teleporter moves the host's copy too, further than that since the last one
-taken: it is measured from where the host has it only. Which of the
-client's ticks the host has it at is noted, to tell the client. */
+prediction is also no further from the anchor (one taken, a newer once a
+second) than the vehicle goes in the client's ticks since (after it, and no
+more than the host's since and a little jitter), and no faster: as fast as
+twice its tag's top speed, or as the host's copy goes (falling, thrown),
+whichever is faster, with a margin. A teleporter moves the host's copy too,
+further than it goes since the last taken: it is measured from where the
+host has it only, a new anchor. Which of the client's ticks the host has it at is noted, to tell
+the client. */
 void network_objects_apply_vehicle_predictions(
 	void)
 {
@@ -1328,11 +1335,11 @@ void network_objects_apply_vehicle_predictions(
 		real_vector3d forward, up, velocity, angular_velocity;
 		real dx, dy, dz;
 		real speed;
+		boolean anchored;
 
 		if (!objects_host_vehicle_predictions[player_index].valid)
 			continue;
 		objects_host_vehicle_predictions[player_index].valid = FALSE;
-		objects_host_vehicle_predictions[player_index].echo = FALSE;
 		vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(state->object_index, _object_mask_vehicle);
 		if (!vehicle || vehicle->unit.driver_object_index == NONE || vehicle->object.parent_object_index != NONE)
 			continue;
@@ -1363,27 +1370,36 @@ void network_objects_apply_vehicle_predictions(
 				speed = top_speed;
 			speed = MIN(speed, MAXIMUM_PREDICTED_VEHICLE_SPEED);
 		}
-		if (objects_host_vehicle_predictions[player_index].accepted_vehicle_index == state->object_index &&
-			now - objects_host_vehicle_predictions[player_index].accepted_host_time < VEHICLE_PREDICTION_REFERENCE_TICKS)
+		anchored = objects_host_vehicle_predictions[player_index].accepted_vehicle_index == state->object_index &&
+			now - objects_host_vehicle_predictions[player_index].anchor_host_time < VEHICLE_PREDICTION_REFERENCE_TICKS;
+		if (anchored)
 		{
 			long host_ticks = now - objects_host_vehicle_predictions[player_index].accepted_host_time;
-			long ticks = MIN((long)(short)(word)((word)state->time - objects_host_vehicle_predictions[player_index].accepted_time),
-				host_ticks + VEHICLE_PREDICTION_JITTER_TICKS);
 			real reach = (speed + PREDICTED_VEHICLE_SPEED_MARGIN) * (real)host_ticks + HOST_VEHICLE_BLEND_DISTANCE;
-			real_point3d const *accepted = &objects_host_vehicle_predictions[player_index].accepted_host_position;
+			real_point3d const *from = &objects_host_vehicle_predictions[player_index].accepted_host_position;
 
-			dx = vehicle->object.position.x - accepted->x;
-			dy = vehicle->object.position.y - accepted->y;
-			dz = vehicle->object.position.z - accepted->z;
-			/* (the host's copy moved further than it goes: taken from where
-			it is) */
-			if (dx * dx + dy * dy + dz * dz <= reach * reach)
+			dx = vehicle->object.position.x - from->x;
+			dy = vehicle->object.position.y - from->y;
+			dz = vehicle->object.position.z - from->z;
+			/* (the host's copy moved further than it goes since the last
+			taken, which only the host moves it by: taken from where it is,
+			a new anchor) */
+			if (!(dx * dx + dy * dy + dz * dz <= reach * reach))
 			{
+				anchored = FALSE;
+			}
+			else
+			{
+				/* (a client's clock that jumped counts no more than the
+				host's ticks since and the jitter) */
+				long ticks = MIN((long)(short)(word)((word)state->time - objects_host_vehicle_predictions[player_index].anchor_time),
+					now - objects_host_vehicle_predictions[player_index].anchor_host_time + VEHICLE_PREDICTION_JITTER_TICKS);
+
 				reach = (speed + PREDICTED_VEHICLE_SPEED_MARGIN) * (real)ticks + HOST_VEHICLE_BLEND_DISTANCE;
-				accepted = &objects_host_vehicle_predictions[player_index].accepted_position;
-				dx = state->position.x - accepted->x;
-				dy = state->position.y - accepted->y;
-				dz = state->position.z - accepted->z;
+				from = &objects_host_vehicle_predictions[player_index].anchor_position;
+				dx = state->position.x - from->x;
+				dy = state->position.y - from->y;
+				dz = state->position.z - from->z;
 				if (ticks <= 0 || !(dx * dx + dy * dy + dz * dz <= reach * reach))
 					continue;
 			}
@@ -1396,12 +1412,18 @@ void network_objects_apply_vehicle_predictions(
 			continue;
 		network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity, &angular_velocity,
 			HOST_VEHICLE_BLEND_DISTANCE);
-		objects_host_vehicle_predictions[player_index].echo = TRUE;
 		objects_host_vehicle_predictions[player_index].accepted_vehicle_index = state->object_index;
 		objects_host_vehicle_predictions[player_index].accepted_time = (word)state->time;
 		objects_host_vehicle_predictions[player_index].accepted_host_time = now;
-		objects_host_vehicle_predictions[player_index].accepted_position = state->position;
 		objects_host_vehicle_predictions[player_index].accepted_host_position = vehicle->object.position;
+		/* (a new anchor: the first, one a second on, or after a jump) */
+		if (!anchored ||
+			now - objects_host_vehicle_predictions[player_index].anchor_host_time >= VEHICLE_PREDICTION_ANCHOR_TICKS)
+		{
+			objects_host_vehicle_predictions[player_index].anchor_time = (word)state->time;
+			objects_host_vehicle_predictions[player_index].anchor_host_time = now;
+			objects_host_vehicle_predictions[player_index].anchor_position = state->position;
+		}
 	}
 }
 

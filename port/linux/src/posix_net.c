@@ -333,9 +333,9 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	/* poll, which takes any descriptor (select none from FD_SETSIZE on,
 	which a process allowed more files has), with select's readiness: read
 	for data, the end or an error, write for room or an error, error for
-	urgent data */
+	urgent data or (as Winsock's) a connect that failed */
 	static const short events[3] = { POLLIN, POLLOUT, POLLPRI };
-	static const short ready[3] = { POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI };
+	static const short ready[3] = { POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI | POLLERR };
 	/* (larger sets, as internet play's thread waits on, in a buffer each
 	thread keeps: not one allocation each time) */
 	static __thread struct pollfd *buffer;

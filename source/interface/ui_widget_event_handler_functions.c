@@ -5551,7 +5551,8 @@ static boolean multiplayer_level_select(
 	{
 		char build[0x20];
 
-		if (global_network_game_server_get() && !cache_files_map_plays_multiplayer(map_name, build))
+		if (global_network_game_server_get() && !network_game_is_splitscreen_local() &&
+			!cache_files_map_plays_multiplayer(map_name, build))
 		{
 			cache_files_show_multiplayer_unavailable(map_name, build);
 			return FALSE;

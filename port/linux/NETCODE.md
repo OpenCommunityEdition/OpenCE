@@ -34,9 +34,11 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   that with where it had the player at that tick, not now, and moves the
   player by the difference, keeping what they did since. The host takes a
   client's player where the client says within a tolerance of its own,
-  and no further from where it last took them than a player moves in the
-  client's ticks since (so the tolerance is not gained again each tick);
-  a teleporter, which moves the host's own copy too, starts afresh.
+  and no further from an anchor (one it took, a newer once a second) than
+  a player moves in the client's ticks since, those no more than its own
+  since and a little jitter (so the tolerance and the jitter are not gained
+  again each tick); a teleporter, which moves the host's own copy too,
+  starts afresh.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, the target where
   the host had it when the shooter saw it, no faster than weapons fire) and
@@ -124,10 +126,11 @@ a pregame keep-alive every five seconds from the host
      only that client is told;
    - twice a second and with every kill, the players' statistics that
      changed (once a second a few more, round them all, as the message is
-     unreliable); when it changes (looked at five times a second) and once a
-     second, the game type's state (scores, the flags, the balls and their
-     carriers, the king's hill, the players' speeds) and whether the game is
-     over. A machine that has loaded is sent all of both at once. It counts
+     unreliable); when it changes (looked at five times a second, sent at
+     most every other look unless the game ended; reliably, so never
+     again unchanged), the game type's state (scores, the flags, the balls
+     and their carriers, the king's hill, the players' speeds) and whether
+     the game is over. A machine that has loaded is sent all of both at once. It counts
      the game type's events (captures, grabs and returns of the flags,
      laps, the balls reset), and a client announces those it has not had,
      as the host does its own; a client runs the rest of the game type's
@@ -173,11 +176,12 @@ a pregame keep-alive every five seconds from the host
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
    jump. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's
-   unit, and no further from where it last took it than the vehicle moves
-   in the client's ticks since (its speed, the host's copy's or twice the
-   tag's top speed, whichever is more, no more than 3 world units a tick,
-   and a tenth more a tick, with the blend distance; a teleporter falls
-   back to the tolerance). The host sends the client its own vehicle
+   unit, and no further from an anchor (one it took, a newer once a
+   second) than the vehicle moves in the client's ticks since, those no
+   more than its own since and a little jitter (its speed, the host's
+   copy's or twice the tag's top speed, whichever is more, no more than 3
+   world units a tick, and a tenth more a tick, with the blend distance; a
+   teleporter falls back to the tolerance). The host sends the client its own vehicle
    every third tick, with the client's tick it took the vehicle at
    (`_distributed_object_predicted_bit` and a 16-bit time in the object's
    state); the client compares that with where it had the vehicle at that
@@ -271,7 +275,7 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   round all of them, four a tick; the players' statistics when
   they change (with every kill, twice a second), with sixteen more
   players' once a second round them all; the game type's state when it
-  changes, and once a second.
+  changes, at most two and a half times a second.
 - **The players each client needs, when it needs them.** The host sends a
   client every player's unit and input every tick when they are within 25
   world units of the client's own players, every second tick within 60,

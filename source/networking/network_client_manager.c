@@ -1261,9 +1261,13 @@ boolean network_game_client_game_settings_updated(
 
 			/* port: a map of a build this version does not play with others
 			(its objects would not be the host's): said, and the game left */
-			if (!cache_files_map_plays_multiplayer(message_packet->map.name, build))
+			if (!network_game_is_splitscreen_local() &&
+				!cache_files_map_plays_multiplayer(message_packet->map.name, build))
 			{
 				cache_files_show_multiplayer_unavailable(message_packet->map.name, build);
+				/* (the menu's error the join's, not the connection lost that
+				the failure would otherwise give) */
+				display_error_when_main_menu_loaded(_error_network_failed_to_join_game);
 				return FALSE;
 			}
 			network_event("precaching map '%s'...", message_packet->map.name);

@@ -2312,11 +2312,12 @@ static struct widget_instance *ui_widget_launch_widget(
 	struct widget_instance *new_widget;
 	short local_player_index;
 
-	/* port: the multiplayer menus open only on maps of a build that plays
-	multiplayer with the others (cache_files.c, cache_files_multiplayer_region);
-	otherwise the player is told why, and the main menu stays */
+	/* port: the menus of multiplayer with other machines (not split screen's
+	or co-op's) open only on maps of a build that plays multiplayer with the
+	others (cache_files.c, cache_files_multiplayer_region); otherwise the
+	player is told why, and the menu stays */
 	{
-		static char const multiplayer_menus[] = "ui\\shell\\main_menu\\multiplayer_type_select\\";
+		static char const multiplayer_menus[] = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\";
 		char const *name = tag_get_name(new_widget_tag_index);
 		char build[0x20];
 

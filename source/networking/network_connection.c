@@ -1896,10 +1896,13 @@ static void network_connection_flush_reliable_last(
 {
 	unsigned long start_time = system_milliseconds();
 
+	/* (and not at all for a peer that has taken nothing lately: gone, its
+	connection dropped for it) */
 	while (connection->reliable_outgoing_queue && circular_queue_size(connection->reliable_outgoing_queue) > 0 &&
 		network_connection_flush_reliable(connection) &&
 		circular_queue_size(connection->reliable_outgoing_queue) > 0 &&
-		system_milliseconds() - start_time < 500)
+		system_milliseconds() - start_time < 500 &&
+		system_milliseconds() - connection->reliable_outgoing_time < 100)
 	{
 		Sleep(5);
 	}

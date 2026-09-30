@@ -60,6 +60,9 @@ int p2p_broadcast_datagram(unsigned short source_port, unsigned short port, cons
 (stream and listening: it is hosting). Peers reach only these ports (a
 stream's only while it listens), and datagram ports it sent them from */
 void p2p_socket_port(int socket, int stream, int listening, unsigned short port);
+/* a socket that peers are not to reach (bound to 127.0.0.1 alone) has this
+local port: traffic from it is not a peer's whose stand-in had the port */
+void p2p_port_taken(int stream, unsigned short port);
 /* the game closes a socket */
 void p2p_socket_closed(int socket);
 

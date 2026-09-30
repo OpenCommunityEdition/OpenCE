@@ -147,7 +147,7 @@ boolean network_damage_replaying_kill(void);
 void network_damage_player_effect(long player_index, struct damage_data const *damage, real total_damage);
 void network_damage_aftermath(long object_index, struct damage_data const *damage, unsigned long being_damaged_flags,
 	real shield_damage, real body_damage, real body_damage_multiplier, short body_part, short node_index,
-	short region_index, short material_index);
+	short region_index, short material_index, long victim_player_index);
 
 /* set while a distributed client carries out a kill it does not decide (an
 act of god: the host's word, network_distributed.c, or the world's) */
@@ -1373,6 +1373,7 @@ void object_cause_damage(
 	struct object_datum *current_object;
 	struct damage_resistance_material const *damage_material;
 	long current_object_index;
+	long victim_player_index;
 	unsigned long being_damaged_flags;
 	real shield_damage;
 	real body_damage;
@@ -1790,6 +1791,13 @@ void object_cause_damage(
 				}
 			}
 
+			/* (the player of the unit, which a killing blow's aftermath
+			takes from it, unit_died) */
+			{
+				struct unit_datum *victim = unit_try_and_get(current_object_index);
+
+				victim_player_index = victim ? victim->unit.player_index : NONE;
+			}
 			object_damage_aftermath(
 				current_object_index,
 				damage,
@@ -1809,7 +1817,8 @@ void object_cause_damage(
 				body_part,
 				current_object_index == object_index ? node_index : NONE,
 				current_object_index == object_index ? region_index : NONE,
-				current_object_index == object_index ? material_index : NONE);
+				current_object_index == object_index ? material_index : NONE,
+				victim_player_index);
 			if (TEST_FLAG(
 				being_damaged_flags,
 				_object_being_damaged_body_destroyed_bit))

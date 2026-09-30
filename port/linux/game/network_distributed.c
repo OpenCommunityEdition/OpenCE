@@ -90,7 +90,10 @@ enum
 	STATISTICS_REFRESH_PLAYERS = 16,
 	/* the game type's state looked at, and sent unchanged */
 	GAME_STATE_INTERVAL_TICKS = 6,
-	GAME_STATE_REFRESH_TICKS = TICKS_PER_SECOND,
+	/* ... when it changes (reliably: no refresh), no more often than this
+	(the king's and the ball's scores change every tick), but the game's end
+	at once */
+	GAME_STATE_MINIMUM_TICKS = 2 * GAME_STATE_INTERVAL_TICKS,
 	MAXIMUM_GAME_STATE_SIZE = 0xF00,
 	MAXIMUM_STATISTICS_PER_MESSAGE = 64,
 	MAXIMUM_PICKUPS_PER_TICK = 64,
@@ -113,9 +116,13 @@ enum
 	/* the host: the ticks after it took a client's player's position that it
 	still tells the client which of its ticks it has them at */
 	PREDICTION_ECHO_TICKS = 3,
-	/* ... and the client's ticks it takes as run between two of its own
-	beyond the host's (its messages delayed, then bunched) */
+	/* ... and the client's ticks it takes as run since the anchor beyond
+	the host's (its messages delayed, then bunched) */
 	PREDICTION_JITTER_TICKS = 6,
+	/* ... how long it measures predictions from one it took, the anchor,
+	before it takes a newer as the anchor (the jitter and the blend granted
+	once a second, not once a tick) */
+	PREDICTION_ANCHOR_TICKS = TICKS_PER_SECOND,
 };
 
 /* struct distributed_unit_state flags */
@@ -383,9 +390,10 @@ static struct
 	long taken_time;
 	long taken_host_time;
 } distributed_predictions[MAXIMUM_TRACKED_PLAYERS];
-/* the host: where it last took each client's player to be (the next may
-be no further from it than the player moves in the client's ticks since),
-at which of the client's ticks and its own, and where that left its unit */
+/* the host: the anchor, where it took each client's player to be (one
+taken, a newer once a second: the next may be no further from it than the
+player moves in the client's ticks since), at which of the client's ticks
+and its own; and when it last took one, and where that left its unit */
 static struct
 {
 	boolean valid;
@@ -393,7 +401,8 @@ static struct
 	long time;
 	long host_time;
 	real_point3d position;
-	real_point3d host_position;
+	long taken_host_time;
+	real_point3d taken_host_position;
 } distributed_accepted[MAXIMUM_TRACKED_PLAYERS];
 /* a client: where each of its own players' units was at its last ticks,
 and how long the host takes to have them (ticks) */
@@ -450,8 +459,10 @@ static long distributed_player_machines[MAXIMUM_TRACKED_PLAYERS];
 and once a second a few players' whatever they are, round them all) */
 static unsigned long distributed_sent_statistics[MAXIMUM_TRACKED_PLAYERS];
 static short distributed_statistics_cursor;
-/* the host: the game type's state as last sent, and when */
+/* the host: the game type's state as last sent (its checksum and its
+leading postgame state), and when */
 static unsigned long distributed_game_state_checksum;
+static long distributed_game_state_postgame;
 static long distributed_game_state_time;
 
 /* the latest tick of each kind of unreliable message had from each sender
@@ -1529,11 +1540,12 @@ static void distributed_handle_predictions(
 little off closed by half, more put there. Each accepted moves the host's
 unit, and the next is measured from there, so a client could take its
 player HOST_ACCEPT_TOLERANCE further each tick: a prediction is also no
-further from the last one taken than the player moves in the client's
-ticks since (MAXIMUM_PREDICTED_SPEED), those no more than the host's since
-and a little jitter. A teleporter moves the host's own unit too, further
-than that since the last one taken: it is measured from where the host has
-it only (as it is after a new life, or a ride). */
+further from the anchor (one taken, a newer once a second) than the player
+moves in the client's ticks since (MAXIMUM_PREDICTED_SPEED), those no more
+than the host's since and a little jitter. A teleporter moves the host's
+own unit too, further than it moves since the last taken: it is measured
+from where the host has it only, a new anchor (as it is after a new life,
+or a ride). */
 static void distributed_apply_predictions(
 	void)
 {
@@ -1568,16 +1580,17 @@ static void distributed_apply_predictions(
 				continue;
 			if (distributed_accepted[player_index].valid)
 			{
-				long host_ticks = now - distributed_accepted[player_index].host_time;
 				long ticks = MIN(distributed_predictions[player_index].time - distributed_accepted[player_index].time,
-					host_ticks + PREDICTION_JITTER_TICKS);
-				real reach = MAXIMUM_PREDICTED_SPEED * (real)host_ticks + HOST_BLEND_DISTANCE;
+					now - distributed_accepted[player_index].host_time + PREDICTION_JITTER_TICKS);
+				real reach = MAXIMUM_PREDICTED_SPEED * (real)(now - distributed_accepted[player_index].taken_host_time) +
+					HOST_BLEND_DISTANCE;
 
-				dx = object->object.position.x - distributed_accepted[player_index].host_position.x;
-				dy = object->object.position.y - distributed_accepted[player_index].host_position.y;
-				dz = object->object.position.z - distributed_accepted[player_index].host_position.z;
-				/* (the host's own unit moved further than a unit moves: taken
-				from where it is) */
+				dx = object->object.position.x - distributed_accepted[player_index].taken_host_position.x;
+				dy = object->object.position.y - distributed_accepted[player_index].taken_host_position.y;
+				dz = object->object.position.z - distributed_accepted[player_index].taken_host_position.z;
+				/* (the host's own unit moved further than a unit moves since
+				the last taken, which only the host moves it by: taken from
+				where it is, a new anchor) */
 				if (!(dx * dx + dy * dy + dz * dz <= reach * reach))
 					distributed_accepted[player_index].valid = FALSE;
 				else
@@ -1596,12 +1609,18 @@ static void distributed_apply_predictions(
 			{
 				distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 				distributed_predictions[player_index].taken_host_time = now;
-				distributed_accepted[player_index].valid = TRUE;
-				distributed_accepted[player_index].unit_index = unit_index;
-				distributed_accepted[player_index].time = distributed_predictions[player_index].time;
-				distributed_accepted[player_index].host_time = now;
-				distributed_accepted[player_index].position = state->position;
-				distributed_accepted[player_index].host_position = object->object.position;
+				/* (a new anchor: the first, one a second on, or after a jump) */
+				if (!distributed_accepted[player_index].valid ||
+					now - distributed_accepted[player_index].host_time >= PREDICTION_ANCHOR_TICKS)
+				{
+					distributed_accepted[player_index].valid = TRUE;
+					distributed_accepted[player_index].unit_index = unit_index;
+					distributed_accepted[player_index].time = distributed_predictions[player_index].time;
+					distributed_accepted[player_index].host_time = now;
+					distributed_accepted[player_index].position = state->position;
+				}
+				distributed_accepted[player_index].taken_host_time = now;
+				distributed_accepted[player_index].taken_host_position = object->object.position;
 			}
 		}
 	}
@@ -2527,8 +2546,8 @@ static void distributed_send_all_statistics(
 /* ---------- the game type's state */
 
 /* the game type's state (larger than a datagram: reliably) to a machine
-that has loaded, or (NONE) to every client when it changed or it has not
-been sent for a second */
+that has loaded, or (NONE) to every client when it changed (at most every
+other look, unless the game ended) */
 static void distributed_send_game_state(
 	long machine_index)
 {
@@ -2549,11 +2568,16 @@ static void distributed_send_game_state(
 		return;
 	}
 	checksum = distributed_checksum(message.data, size);
-	if (checksum == distributed_game_state_checksum && distributed_game_state_time != NONE &&
-		game_time_get() - distributed_game_state_time < GAME_STATE_REFRESH_TICKS)
+	if (distributed_game_state_time != NONE &&
+		(checksum == distributed_game_state_checksum ||
+			(game_time_get() - distributed_game_state_time < GAME_STATE_MINIMUM_TICKS &&
+				(size < (long)sizeof(long) ||
+					csmemcmp(message.data, &distributed_game_state_postgame, sizeof(long)) == 0))))
 	{
 		return;
 	}
+	if (size >= (long)sizeof(long))
+		csmemcpy(&distributed_game_state_postgame, message.data, sizeof(long));
 	distributed_game_state_checksum = checksum;
 	distributed_game_state_time = game_time_get();
 	distributed_send(&message, _distributed_message_game_state, 0, (word)(sizeof(message.header) + size),
@@ -2584,6 +2608,7 @@ void network_distributed_new_game(
 	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
 	distributed_statistics_cursor = 0;
 	distributed_game_state_checksum = 0;
+	distributed_game_state_postgame = 0;
 	distributed_game_state_time = NONE;
 	distributed_host_update_number = NONE;
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
