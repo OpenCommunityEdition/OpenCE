@@ -71,7 +71,8 @@ class HaloQuickCoordinator {
     this.presence.hostId = id;
   }
   tick(now, peers, brokerReady) {
-    const newest = Math.max(this.epoch, ...peers.filter(peer => peer.open && peer.quick)
+    const newest = Math.max(this.epoch, ...peers.filter(peer => peer.open && peer.quick &&
+      (this.presence.matchId === null || peer.quick.matchId === this.presence.matchId))
       .map(peer => peer.quick.epoch || 0));
     if (newest > this.epoch) this.recover(now, newest);
     if (this.result?.role === 'join') {
@@ -456,6 +457,8 @@ const HaloNet = (() => {
     peer.received = [];
     peer.receivedHead = 0;
     peer.receivedBytes = 0;
+    peer.outgoing = [];
+    peer.outgoingHead = peer.outgoingBytes = 0;
     peer.nativeStreams = new Map();
     for (const channel of [peer.reliable, peer.unreliable]) {
       channel.binaryType = 'arraybuffer';
@@ -469,7 +472,7 @@ const HaloNet = (() => {
           new DataView(packet.buffer).getUint32(0, true) !== packet.length ||
           peer.receivedBytes + packet.length > MAX_RELIABLE_QUEUE) {
         // Disconnect on overflow instead of silently corrupting the byte stream.
-        dropPeer(peer);
+        dropPeer(peer, 'invalid packet or receive queue overflow');
         return;
       }
       peer.received.push(packet);
@@ -501,19 +504,19 @@ const HaloNet = (() => {
       emit('joined', { name: peer.name, address: addressText(peer.address) });
       emit('status', status());
     };
-    peer.reliable.onclose = () => { if (connectionCurrent(peer, pc)) dropPeer(peer); };
+    peer.reliable.onclose = () => { if (connectionCurrent(peer, pc)) dropPeer(peer, 'reliable channel closed'); };
     pc.onicecandidate = (event) => {
       if (connectionCurrent(peer, pc) && event.candidate)
         publish({ type: 'candidate', to: peer.id, candidate: event.candidate.toJSON() });
     };
     pc.onconnectionstatechange = () => {
       if (!connectionCurrent(peer, pc)) return;
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peer);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peer, 'RTC ' + pc.connectionState);
     };
     return pc;
   }
 
-  function dropPeer(peer) {
+  function dropPeer(peer, reason = 'peer left') {
     if (state.peers.get(peer.id) !== peer) return;
     state.peers.delete(peer.id);
     if (state.byAddress.get(peer.address) === peer) state.byAddress.delete(peer.address);
@@ -524,6 +527,10 @@ const HaloNet = (() => {
     invalidatePeerPing(peer);
     peer.received = [];
     peer.receivedHead = peer.receivedBytes = 0;
+    peer.outgoing = [];
+    peer.outgoingHead = peer.outgoingBytes = 0;
+    emit('diagnostic', { event: 'peer-disconnected', address: addressText(peer.address), reason,
+      epoch: state.quick?.coordinator.epoch, matchId: state.quick?.coordinator.presence.matchId });
     retireStreams(peer);
     try { pc?.close(); } catch { /* closed */ }
     if (wasOpen) emit('left', { name: peer.name });
@@ -591,7 +598,7 @@ const HaloNet = (() => {
     const now = Date.now();
     for (const peer of [...state.peers.values()]) {
       if (peer.open && peer.quick?.failover && now - peer.lastPacketAt > HaloQuickCoordinator.HEARTBEAT_TIMEOUT_MS) {
-        dropPeer(peer);
+        dropPeer(peer, 'gameplay heartbeat timeout');
       } else if (!peer.open && now - peer.lastSeen > PEER_TIMEOUT) {
         dropPeer(peer);
       } else if (!peer.open && peer.pc && now - peer.connectingSince > 15000) {
@@ -827,10 +834,47 @@ const HaloNet = (() => {
     return packet;
   }
 
+  function flushPeerOutput(peer) {
+    while (peer.outgoingHead < peer.outgoing.length) {
+      const queued = peer.outgoing[peer.outgoingHead];
+      if (queued.epoch === state.quick?.coordinator.epoch && !send(peer.reliable, queued.packet)) break;
+      peer.outgoingHead++;
+      peer.outgoingBytes -= queued.packet.length;
+    }
+    if (peer.outgoingHead === peer.outgoing.length) {
+      peer.outgoing.length = 0;
+      peer.outgoingHead = 0;
+    } else if (peer.outgoingHead > 1024) {
+      peer.outgoing.splice(0, peer.outgoingHead);
+      peer.outgoingHead = 0;
+    }
+  }
+
+  function queuePeerOutput(peer, packet) {
+    flushPeerOutput(peer);
+    if (!peer.outgoingBytes && send(peer.reliable, packet)) return true;
+    // Keep stream order within this peer, while other players continue to
+    // receive gameplay and keepalives from the shared native output ring.
+    if (peer.outgoingBytes + packet.length > MAX_CHANNEL_BUFFER) {
+      dropPeer(peer, 'send queue overflow');
+      return false;
+    }
+    peer.outgoing.push({ packet, epoch: state.quick?.coordinator.epoch });
+    peer.outgoingBytes += packet.length;
+    return true;
+  }
+
   function pump() {
+    if (state.pumping) return;
+    state.pumping = true;
+    try { pumpOnce(); } finally { state.pumping = false; }
+  }
+
+  function pumpOnce() {
     syncPingAuthority();
     if (!state.shared) return;
     if (state.transport) state.transport.flush(incoming);
+    for (const peer of state.peers.values()) if (peer.open) flushPeerOutput(peer);
     for (const [key, close] of state.pendingCloses) {
       if (!incoming(close)) break;
       state.pendingCloses.delete(key);
@@ -904,8 +948,7 @@ const HaloNet = (() => {
           // Native output for a departed endpoint can arrive after the fresh
           // RTC channel opens. That generation has not opened this stream yet.
           if (header.kind !== KIND.DATA || peer.nativeStreams.has(tuple)) {
-            if (!send(peer.reliable, packet)) break;
-            trackStream(peer, packet, true);
+            if (queuePeerOutput(peer, packet)) trackStream(peer, packet, true);
           }
         }
         else if (header.kind === KIND.OPEN) refuse(header);

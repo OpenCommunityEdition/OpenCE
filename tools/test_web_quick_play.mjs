@@ -137,6 +137,22 @@ test('a brief lost host connection recovers without restarting the match', () =>
   assert.equal(joiner.epoch, 0); assert.equal(joiner.recovering, false);
 });
 
+test('an older match in the same public room cannot migrate a healthy loaded cohort', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, joiner]);
+  for (const coordinator of [host, joiner]) { coordinator.launched('playing'); checkpoint(coordinator); }
+  const unrelated = new Coordinator(C, ADDRESS_C, 0);
+  unrelated.epoch = unrelated.presence.epoch = 7;
+  unrelated.launched('playing'); checkpoint(unrelated, 500, 999);
+  for (const coordinator of [host, joiner]) {
+    const other = coordinator === host ? joiner : host;
+    const status = coordinator.tick(11000, [peer(other), peer(unrelated)], true);
+    assert.equal(coordinator.epoch, 0, 'epochs belong to the preserved match');
+    assert.equal(coordinator.recovering, false);
+    assert.equal(status.result.hostId, A);
+  }
+});
+
 test('replacement election prefers the newest checkpoint and preserves the same match', () => {
   const host = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
   const d = new Coordinator('3333333333333333', ADDRESS_C, 0);

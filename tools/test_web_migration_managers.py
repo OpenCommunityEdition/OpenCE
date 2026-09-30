@@ -70,6 +70,9 @@ void byte_swap_message_header(word *header, enum message_header_byte_order byte_
 #define network_player_is_valid(p) ((p)->machine_index>=0 && (p)->machine_index<128)
 #define IPV4_LOOPBACK_ADDRESS 0x7f000001UL
 #define NETWORK_GAME_SERVER_PORT 2302
+#define NETWORK_GAME_CLIENT_PORT 2303
+#define IPV4_ADDRESS_LENGTH 4
+#define _network_connection_type_client 1
 #define _connection_create_server_bit 0
 #define _network_game_server_state_ingame 1
 #define _network_game_client_state_ingame 3
@@ -80,8 +83,8 @@ void byte_swap_message_header(word *header, enum message_header_byte_order byte_
 #define _network_client_machine_validated_bit 1
 #define _network_client_machine_level_loaded_bit 2
 #define _network_client_machine_precached_bit 3
-struct transport_address { union { unsigned long long_words[1], ipv4_address; } address; word port; };
-struct network_connection { unsigned long address; int connected; boolean allow_clients; };
+struct transport_address { union { unsigned long long_words[1], ipv4_address; } address; word port; short address_length; };
+struct network_connection { unsigned long address; int connected, active; boolean allow_clients; };
 struct network_machine { byte name[0x40]; char machine_index; byte pad[3]; };
 struct network_player { short machine_index, player_list_index, controller_index, team_index; };
 struct player_datum { unsigned short identifier; long quit_out_of_game_time; int score; float position[3]; };
@@ -103,21 +106,41 @@ static struct { boolean adopting; unsigned long epoch; short host_machine,depart
  unsigned long owner_addresses[128], disconnected_at[128]; } server_migration;
 static struct network_game_client local_client;
 static struct network_game_server *global_server;
-static struct { boolean accept_remote_connections; } bss_004566dc;
+static struct { boolean accept_remote_connections, client_started; } bss_004566dc;
+static struct network_game_client *global_network_game_client;
+#define global_network_game_server global_server
+#define _game_connection_network_server 2
+static int promotions;
 static struct network_connection transports[260];
 static struct player_datum datums[128];
 static long machine_to_player_table[128][4];
 static long tick=900;
 static unsigned long now=10000;
 static int next_transport, writes, deletes, resets, queue_rebases, demotions, admissions;
+static boolean idle_success=TRUE;
+static boolean fail_connection_allocation;
 '''
 HEADER = (ROOT / "source/networking/network_migration.h").read_text()
 WIRE = HEADER[HEADER.index("enum { NETWORK_MIGRATION_MESSAGE"):HEADER.index("#ifdef HALO_WEB")]
 STUBS = r'''
 static struct network_migration_message sent[260];
+static boolean network_connection_active(struct network_connection *c) { return c && c->active; }
+static boolean network_connection_connected(struct network_connection *c) { return c && c->connected; }
+static boolean network_connection_idle(struct network_connection *c, long timeout, void *unused) {
+ (void)c; (void)unused; assert(timeout==15000); return idle_success; }
+static void network_connection_connect(struct network_connection *c, struct transport_address *a, void *unused) {
+ (void)unused; c->address=a->address.long_words[0]; c->connected=c->active=TRUE; }
+static boolean network_game_client_process_incoming_messages(struct network_game_client *c) { (void)c; return TRUE; }
 static long game_time_get(void) { return tick; }
 static void game_time_set_distributed(long t) { tick=t; }
 static unsigned long system_milliseconds(void) { return now; }
+static unsigned long web_quick_play_address(void) { return 0x64563811UL; }
+static boolean network_distributed_migration_ready(void) { return TRUE; }
+static boolean network_distributed_migration_promote(void) { promotions++; return TRUE; }
+static void network_game_follow_host_netcode(boolean enabled) { assert(enabled); }
+static void game_connection_set(short connection) { assert(connection==_game_connection_network_server); }
+static void network_game_server_send_player_quit_messages_ingame(struct network_game_server *s,
+ struct network_game_server_client_machine *m) { (void)s; datums[m->machine_index].quit_out_of_game_time=tick+1; }
 static short network_game_client_get_state(struct network_game_client *c, void *unused) { (void)unused; return c->state; }
 static short network_game_client_get_machine_index(struct network_game_client *c) { return c->machine_index; }
 static struct network_game *network_game_client_get_game(struct network_game_client *c) { return &c->game; }
@@ -125,7 +148,7 @@ static struct network_game_client *global_network_game_client_get(void) { return
 static struct network_game_server *global_network_game_server_get(void) { return global_server; }
 static void network_game_demote_migration_host(void) { demotions++; global_server=NULL; }
 static struct network_connection *network_connection_new(unsigned long flags, word port) {
- (void)flags; (void)port; return &transports[next_transport++]; }
+ (void)flags; (void)port; return fail_connection_allocation?NULL:&transports[next_transport++]; }
 static void network_connection_delete(struct network_connection *c) { (void)c; deletes++; }
 static boolean network_server_close_client_connection(struct network_connection *s, struct network_connection *c) {
  (void)s; c->connected=FALSE; deletes++; return TRUE; }
@@ -193,6 +216,7 @@ FUNCTIONS = "\n".join((
     function(CLIENT, "network_game_client_migration_host_machine"),
     function(CLIENT, "network_game_client_migration_remove_machine"),
     function(CLIENT, "network_game_client_begin_migration"),
+    function(CLIENT, "network_game_client_idle_migration"),
     function(CLIENT, "network_game_client_migration_ready"),
     function(CLIENT, "network_game_client_handle_migration"),
     function(SERVER, "network_game_server_open_game"),
@@ -201,10 +225,14 @@ FUNCTIONS = "\n".join((
     function(SERVER, "network_game_server_adopt_match"),
     function(SERVER, "network_game_server_migration_machines"),
     function(SERVER, "network_game_server_migration_detach"),
+    function(SERVER, "network_game_server_migration_expire_disconnected"),
+    function(SERVER, "network_game_server_migration_routes"),
+    function(SERVER, "network_game_server_recover_match"),
     function(SERVER, "network_game_server_migration_acknowledge"),
     function(SERVER, "network_game_server_handle_migration"),
     function(SERVER, "network_game_server_migration_ready"),
     function(SERVER, "network_game_server_migration_finish"),
+    function(GLOBALS, "create_global_network_game_server_from_migration"),
 ))
 TESTS = r'''
 static void setup(void) {
@@ -212,6 +240,7 @@ static void setup(void) {
  memset(&server_migration,0,sizeof(server_migration)); memset(datums,0,sizeof(datums));
  memset(machine_to_player_table,0xff,sizeof(machine_to_player_table));
  network_game_server_memory_do_not_use_directly_in_use=FALSE; global_server=NULL; writes=0; tick=900;
+ global_network_game_client=&local_client; promotions=0; demotions=0;
  bss_004566dc.accept_remote_connections=FALSE; admissions=0;
  local_client.machine_index=1; local_client.state=_network_game_client_state_ingame;
  local_client.game.random_seed=42; local_client.game.machine_count=3; local_client.game.player_count=3;
@@ -236,6 +265,30 @@ static void preserved(void) {
  assert(local_client.game.players[1].player_list_index==1 && local_client.game.players[2].player_list_index==2);
 }
 int main(void) {
+ /* The original host is still playing when a client reports an outage.
+ Re-electing it must renew connections without promoting a stale snapshot,
+ removing its own player, or creating another game. */
+ setup();
+ struct network_game_server existing={0}; existing.game=local_client.game;
+ existing.state=_network_game_server_state_ingame; existing.sent_start_game_message=TRUE;
+ existing.connection=&transports[next_transport++]; global_server=&existing;
+ for(int i=0;i<128;i++) existing.client_machines[i].machine_index=NONE;
+ for(int i=0;i<3;i++) {
+  struct network_game_server_client_machine *c=&existing.client_machines[i];
+  c->machine_index=i; c->flags=FLAG(_network_client_machine_validated_bit);
+  c->connection=&transports[next_transport++]; c->connection->address=0x64563810UL+i;
+ }
+ existing.client_machines[1].connection->address=IPV4_LOOPBACK_ADDRESS;
+ assert(create_global_network_game_server_from_migration(1));
+ assert(global_server==&existing && !promotions && tick==900 && existing.game.random_seed==42);
+ assert(existing.game.machine_count==3 && existing.game.player_count==3 && datums[0].quit_out_of_game_time==NONE);
+ assert(server_migration.host_machine==1 && server_migration.departed_machine==NONE && server_migration.adopting);
+ assert(server_migration.owner_addresses[2]==0x64563812UL && existing.next_update_number==900);
+ assert(!create_global_network_game_server_from_migration(1)); preserved();
+ fail_connection_allocation=TRUE;
+ assert(!create_global_network_game_server_from_migration(2) && !global_server);
+ assert(!promotions && tick==900 && datums[0].quit_out_of_game_time==NONE); preserved();
+ fail_connection_allocation=FALSE;
  setup();
  struct network_connection *remote=&transports[next_transport++]; remote->address=0x64563812UL;
  struct network_game_server closed_to_remotes={0}; closed_to_remotes.connection=&transports[next_transport++];
@@ -294,13 +347,32 @@ int main(void) {
  assert(network_game_client_migration_ready(&local_client) && client_migration.host_machine==2); preserved();
  assert(!network_game_client_begin_migration(&local_client,IPV4_LOOPBACK_ADDRESS,1));
  assert(network_game_client_migration_ready(&local_client) && network_game_migration_epoch()==2);
- /* A deadline removes the missing survivor consistently in the final ACK roster. */
+ /* An active/connected transport can still time out. It must be retired,
+ then retried on the same epoch without replacing player or world state. */
+ setup(); assert(network_game_client_begin_migration(&local_client,0x64563812UL,1));
+ network_game_client_idle_migration(&local_client); assert(local_client.connection && local_client.connection->connected);
+ idle_success=FALSE; now+=15001; network_game_client_idle_migration(&local_client);
+ assert(!local_client.connection); preserved();
+ idle_success=TRUE; now+=1000; network_game_client_idle_migration(&local_client);
+ assert(local_client.connection && local_client.connection->connected && local_client.connection->address==0x64563812UL);
+ assert(client_migration.epoch==1 && client_migration.reconnecting && !client_migration.acknowledged); preserved();
+ /* A delayed survivor retains its identity after the 12s cohort release,
+ and still reattaches after the former 45s client deadline. */
  setup(); s=network_game_server_adopt_match(&local_client,1); assert(s);
  a=&s->client_machines[0]; local=&transports[next_transport++]; local->address=IPV4_LOOPBACK_ADDRESS;
  assert(network_game_server_add_new_client(s,local) && a->connection==local);
  m=attach(1); network_game_server_handle_migration(s,a,&m,sizeof(m)); assert(!network_game_server_migration_ready(s));
- network_game_server_migration_finish(s); assert(writes==1 && sent[0].machine_present[0]==2);
- assert(s->game.machine_count==1 && local_client.game.machine_count==1 && datums[2].quit_out_of_game_time==901);
+ network_game_server_migration_finish(s); assert(writes==1 && sent[0].machine_present[0]==6);
+ unsigned long routes[128]; global_server=s; network_game_server_migration_routes(routes,128);
+ assert(routes[2]==0x64563812UL);
+ now+=60000; network_game_server_migration_expire_disconnected(s);
+ assert(s->game.machine_count==2 && local_client.game.machine_count==2 && datums[2].quit_out_of_game_time==NONE);
+ remote=&transports[next_transport++]; remote->address=0x64563812UL;
+ assert(network_game_server_add_new_client(s,remote)); b=&s->client_machines[1];
+ m=attach(2); network_game_server_handle_migration(s,b,&m,sizeof(m));
+ assert(b->machine_index==2 && TEST_FLAG(b->flags,_network_client_machine_validated_bit) && writes==3); preserved();
+ network_game_server_migration_detach(s,b); now+=120000; network_game_server_migration_expire_disconnected(s);
+ assert(s->game.machine_count==1 && datums[2].quit_out_of_game_time==901);
  /* Retire the old host, reuse its machine ID for a late join, then migrate
  again. Historical score data stays, while the new machine owns only its
  new player's inputs and must be eligible to reattach. */
@@ -350,6 +422,15 @@ def main():
         source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS + TESTS)
         subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
+        # Reintroduce the original existing-server rejection. The retained
+        # host case above must fail even when all other migration code works.
+        original = function(GLOBALS, "create_global_network_game_server_from_migration")
+        control = original.replace("{", "{\n\tif (global_network_game_server) return FALSE;", 1)
+        source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS.replace(original, control) + TESTS)
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
+        result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
+        print("Original existing-host recovery rejection failed the regression as expected")
 
 
 if __name__ == "__main__":

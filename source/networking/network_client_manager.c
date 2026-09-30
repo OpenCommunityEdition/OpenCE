@@ -3014,54 +3014,66 @@ static boolean network_game_client_idle_pregame(
 	return success;
 }
 
+#ifdef HALO_WEB
+static boolean network_game_client_idle_migration(struct network_game_client *client)
+{		unsigned long now = system_milliseconds();
+	if (!client->connection || !network_connection_active(client->connection) ||
+		(!network_connection_connected(client->connection) && now - client_migration.retry_at >= 1000UL))
+	{
+		if (now - client_migration.retry_at < 1000UL)
+			return TRUE;
+		client_migration.retry_at = now;
+		if (client->connection)
+			network_connection_delete(client->connection);
+		client->connection = network_connection_new(_network_connection_type_client, NETWORK_GAME_CLIENT_PORT);
+		if (!client->connection)
+			return TRUE;
+		{
+			struct transport_address address = { 0 };
+			address.address_length = IPV4_ADDRESS_LENGTH;
+			address.address.long_words[0] = client_migration.target;
+			address.port = NETWORK_GAME_SERVER_PORT;
+			network_connection_connect(client->connection, &address, NULL);
+		}
+	}
+	if (!network_connection_idle(client->connection, 15000, NULL))
+	{
+		/* Timeout leaves the old connection marked active/connected. Retire
+		   it explicitly so the next bounded retry can open a fresh stream. */
+		network_connection_delete(client->connection);
+		client->connection = NULL;
+		network_event("migration connection timed out; retrying machine #%d, epoch #%lu",
+			client->machine_index, client_migration.epoch);
+		return TRUE;
+	}
+	if (network_connection_connected(client->connection))
+	{
+		if (!client_migration.acknowledged && now - client_migration.attach_at >= 500UL)
+		{
+			struct network_migration_message attach = { 0 };
+			attach.type = NETWORK_MIGRATION_MESSAGE;
+			attach.version = NETWORK_MIGRATION_VERSION;
+			attach.epoch = client_migration.epoch;
+			attach.session_seed = client->game.random_seed;
+			attach.machine_index = client->machine_index;
+			attach.kind = NETWORK_MIGRATION_ATTACH;
+			build_message_header(&attach.header, sizeof(attach), 2, 0);
+			network_connection_write(client->connection, &attach, sizeof(attach), NULL, TRUE);
+			client_migration.attach_at = now;
+		}
+		network_game_client_process_incoming_messages(client);
+	}
+	return TRUE;
+}
+#endif
+
 static boolean network_game_client_idle_ingame(
 	struct network_game_client *client)
 {
 	boolean success = TRUE;
 #ifdef HALO_WEB
 	if (client_migration.reconnecting)
-	{
-		unsigned long now = system_milliseconds();
-		if (!client->connection || !network_connection_active(client->connection) ||
-			(!network_connection_connected(client->connection) && now - client_migration.retry_at >= 1000UL))
-		{
-			if (now - client_migration.retry_at < 1000UL)
-				return TRUE;
-			client_migration.retry_at = now;
-			if (client->connection)
-				network_connection_delete(client->connection);
-			client->connection = network_connection_new(_network_connection_type_client, NETWORK_GAME_CLIENT_PORT);
-			if (!client->connection)
-				return TRUE;
-			{
-				struct transport_address address = { 0 };
-				address.address_length = IPV4_ADDRESS_LENGTH;
-				address.address.long_words[0] = client_migration.target;
-				address.port = NETWORK_GAME_SERVER_PORT;
-				network_connection_connect(client->connection, &address, NULL);
-			}
-		}
-		if (!network_connection_idle(client->connection, 15000, NULL))
-			return TRUE;
-		if (network_connection_connected(client->connection))
-		{
-			if (!client_migration.acknowledged && now - client_migration.attach_at >= 500UL)
-			{
-				struct network_migration_message attach = { 0 };
-				attach.type = NETWORK_MIGRATION_MESSAGE;
-				attach.version = NETWORK_MIGRATION_VERSION;
-				attach.epoch = client_migration.epoch;
-				attach.session_seed = client->game.random_seed;
-				attach.machine_index = client->machine_index;
-				attach.kind = NETWORK_MIGRATION_ATTACH;
-				build_message_header(&attach.header, sizeof(attach), 2, 0);
-				network_connection_write(client->connection, &attach, sizeof(attach), NULL, TRUE);
-				client_migration.attach_at = now;
-			}
-			network_game_client_process_incoming_messages(client);
-		}
-		return TRUE;
-	}
+		return network_game_client_idle_migration(client);
 #endif
 
 	if (!client->connection || !network_connection_active(client->connection) ||

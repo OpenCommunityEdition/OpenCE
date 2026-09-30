@@ -845,7 +845,7 @@ static void network_game_server_migration_expire_disconnected(struct network_gam
 		return;
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 	{
-		if (server_migration.disconnected_at[index] && now - server_migration.disconnected_at[index] >= 12000UL &&
+		if (server_migration.disconnected_at[index] && now - server_migration.disconnected_at[index] >= 120000UL &&
 			network_machine_is_valid(&server->game.machines[index]))
 		{
 			struct network_game_server_client_machine departing = { 0 };
@@ -4132,6 +4132,10 @@ void network_game_server_migration_routes(unsigned long *addresses, short count)
 	if (!server || count != HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		return;
 	csmemset(addresses, 0, count * sizeof(*addresses));
+	if (server_migration.epoch)
+		for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+			if (network_machine_is_valid(&server->game.machines[index]))
+				addresses[index] = server_migration.owner_addresses[index];
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 	{
 		struct network_game_server_client_machine *machine = &server->client_machines[index];
@@ -4144,6 +4148,46 @@ void network_game_server_migration_routes(unsigned long *addresses, short count)
 				web_quick_play_address() : address.address.long_words[0];
 		}
 	}
+}
+
+boolean network_game_server_recover_match(struct network_game_server *server, unsigned long epoch)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	unsigned long owners[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	short index;
+	if (!server || !client || !epoch || epoch <= server_migration.epoch ||
+		server->state != _network_game_server_state_ingame)
+		return FALSE;
+	network_game_server_migration_routes(owners, HALO_PORT_MAXIMUM_NETWORK_MACHINES);
+	if (server->connection)
+		network_connection_delete(server->connection);
+	server->connection = network_connection_new(FLAG(_connection_create_server_bit), NETWORK_GAME_SERVER_PORT);
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+	{
+		csmemset(&server->client_machines[index], 0, sizeof(server->client_machines[index]));
+		server->client_machines[index].machine_index = NONE;
+	}
+	if (!server->connection)
+	{
+		/* Retire only the failed listener, preserving the loaded client and
+		   world while another survivor can take over. */
+		network_game_demote_migration_host();
+		return FALSE;
+	}
+	csmemset(&server_migration, 0, sizeof(server_migration));
+	server_migration.adopting = TRUE;
+	server_migration.epoch = epoch;
+	server_migration.host_machine = network_game_client_get_machine_index(client);
+	server_migration.departed_machine = NONE;
+	csmemcpy(server_migration.owner_addresses, owners, sizeof(owners));
+	server->next_update_number = MAX(game_time_get(), 1);
+	server->time_of_last_keep_alive = system_milliseconds();
+	network_connection_set_connection_rejection_procedure(server->connection, network_game_server_reject_connection_game_is_full);
+	network_game_accept_remote_connections(TRUE);
+	network_game_server_open_game(server);
+	network_event("existing host #%d renewed live-match transport at tick #%ld, epoch #%lu",
+		server_migration.host_machine, game_time_get(), epoch);
+	return TRUE;
 }
 
 boolean network_game_server_migration_machines(void *buffer, long size)
@@ -4265,7 +4309,6 @@ boolean network_game_server_migration_ready(struct network_game_server *server)
 void network_game_server_migration_finish(struct network_game_server *server)
 {
 	long index, connection_index;
-	struct network_game_client *client = global_network_game_client_get();
 	if (!server || !server_migration.adopting)
 		return;
 	for (connection_index = 0; connection_index < MAXIMUM_NETWORK_MACHINE_COUNT; connection_index++)
@@ -4288,10 +4331,9 @@ void network_game_server_migration_finish(struct network_game_server *server)
 		}
 		if (!attached)
 		{
-			server_migration.disconnected_at[index] = 0;
-			if (client)
-				network_game_client_migration_remove_machine(client, (short)index);
-			network_game_remove_machine(&server->game, &server->game.machines[index]);
+			/* Resume reachable players, retaining missing owners for bounded
+			   retries instead of invalidating their identity after 12 seconds. */
+			server_migration.disconnected_at[index] = MAX(system_milliseconds(), 1);
 		}
 	}
 	network_game_server_migration_acknowledge(server);

@@ -220,9 +220,8 @@ void quick_play_update(boolean main_menu_loaded)
 			game_time_set_paused(quick_play.was_paused);
 			quick_play_phase(QUICK_PLAYING, now, "playing", "The match continues with the replacement host.");
 		}
-		else if (now - quick_play.phase_at >= 45000UL)
-			quick_play_phase(QUICK_BLOCKED, now, "migration-failed",
-				"The replacement host could not reconnect. The match is preserved and paused.");
+		/* A slow transport is still retryable. Keep checking its ACK rather
+		   than permanently blocking a preserved match after 45 seconds. */
 		return;
 	}
 	if (quick_play.phase == QUICK_OFF || quick_play.phase == QUICK_DONE)

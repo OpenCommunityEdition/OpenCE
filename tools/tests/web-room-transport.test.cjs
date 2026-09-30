@@ -187,18 +187,67 @@ test('reliable OPEN, DATA and CLOSE survive a full receive ring in order', () =>
   assert.equal(f.peer.received.length, 0);
 });
 
-test('outbound reliable bytes remain in the ring under WebRTC backpressure', () => {
+test('outbound reliable bytes stay ordered in a bounded peer queue under WebRTC backpressure', () => {
   const f = fixture(), p = packet(3, 180, 7);
   establishOutgoing(f);
   f.bytes.set(p, 320); f.words[2] = p.length;
   f.peer.reliable.bufferedAmount = 1024 * 1024;
   f.net.pump();
-  assert.equal(f.words[3], 0);
+  assert.equal(f.words[3], p.length);
+  assert.equal(f.peer.outgoingBytes, p.length);
   assert.equal(f.peer.reliable.sent.length, 0);
   f.peer.reliable.bufferedAmount = 0;
   f.peer.reliable.onbufferedamountlow();
   assert.equal(f.words[3], p.length);
   assert.deepEqual(Array.from(f.peer.reliable.sent[0]), Array.from(p));
+  assert.equal(f.peer.outgoingBytes, 0);
+});
+
+test('a stalled player cannot block the host from sending keepalives to healthy players', () => {
+  const f = fixture(); establishOutgoing(f);
+  const healthy = f.net.peerFor('3333333333333333', 0x0301010a, 'Healthy');
+  f.net.createConnection(healthy); healthy.reliable.onopen();
+  f.peer.reliable.bufferedAmount = 1024 * 1024;
+  const slow = packet(3, 80, 7), fast = packet(2);
+  new DataView(fast.buffer).setUint32(12, healthy.address, true);
+  f.bytes.set(slow, 320); f.bytes.set(fast, 320 + slow.length);
+  f.words[2] = slow.length + fast.length;
+  f.net.pump();
+  assert.equal(healthy.reliable.sent.length, 1, 'healthy traffic passes the stalled peer');
+  assert.deepEqual(Array.from(healthy.reliable.sent[0]), Array.from(fast));
+  assert.equal(f.peer.outgoingBytes, slow.length);
+  assert.equal(f.words[3], f.words[2]);
+});
+
+test('queued outgoing traffic from an older authority never reaches a replacement host', () => {
+  const f = fixture(), coordinator = f.authority(0);
+  const open = streamPacket(f, 2, true);
+  f.peer.reliable.bufferedAmount = 1024 * 1024;
+  f.bytes.set(open, 320); f.words[2] = open.length; f.net.pump();
+  coordinator.epoch = coordinator.presence.epoch = 1;
+  f.peer.reliable.bufferedAmount = 0; f.net.pump();
+  assert.equal(f.peer.reliable.sent.length, 0);
+  assert.equal(f.peer.outgoingBytes, 0);
+});
+
+test('send queue overflow disconnects only the stalled player and continues healthy traffic', () => {
+  const f = fixture(); establishOutgoing(f);
+  const healthy = f.net.peerFor('3333333333333333', 0x0301010a, 'Healthy');
+  f.net.createConnection(healthy); healthy.reliable.onopen();
+  f.peer.reliable.bufferedAmount = 1024 * 1024;
+  const slow = packet(3, 256, 9);
+  for (let i = 0; i <= 4096; i++) {
+    f.words[2] = f.words[3] = 0; f.bytes.set(slow, 320); f.words[2] = slow.length;
+    f.net.pump();
+  }
+  assert.equal(f.pc.closed, true);
+  assert.equal(f.peer.outgoingBytes, 0);
+  assert.equal(f.net.status().players, 1);
+  const fast = packet(2); new DataView(fast.buffer).setUint32(12, healthy.address, true);
+  f.words[2] = f.words[3] = 0; f.bytes.set(fast, 320); f.words[2] = fast.length;
+  f.net.pump();
+  assert.deepEqual(Array.from(healthy.reliable.sent[0]), Array.from(fast));
+  assert.equal(f.words[3], fast.length);
 });
 
 test('incoming network events flush output even without timer callbacks', () => {
@@ -216,7 +265,8 @@ test('failed send retains stream bytes and malformed input disconnects', () => {
   f.bytes.set(p, 320); f.words[2] = p.length;
   f.peer.reliable.send = () => { throw new Error('buffer full'); };
   f.net.pump();
-  assert.equal(f.words[3], 0);
+  assert.equal(f.words[3], p.length);
+  assert.equal(f.peer.outgoingBytes, p.length);
   const malformed = packet(3, 40);
   new DataView(malformed.buffer).setUint32(0, 80, true);
   f.receive(malformed);

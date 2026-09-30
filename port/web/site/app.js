@@ -86,19 +86,54 @@ can run the game, copies the game data out of the player's disc image
     console.log(text);
   }
 
-  async function debugText() {
+  async function debugFile() {
     try {
       // WasmFS mounts OPFS at /data; reused Apollo maps run from /data/halo/data.
       const directories = (state.maps?.dataRoot || '/data').split('/').filter(Boolean);
       if (directories.shift() !== 'data') return '';
       let root = await navigator.storage.getDirectory();
       for (const directory of directories) root = await root.getDirectoryHandle(directory);
-      const file = await (await root.getFileHandle('debug.txt')).getFile();
-      const text = await file.text();
-      return text.length > 200000 ? text.slice(-200000) : text;
+      return await (await root.getFileHandle('debug.txt')).getFile();
     } catch {
-      return '';
+      return null;
     }
+  }
+
+  async function debugText() {
+    const file = await debugFile();
+    if (!file) return '';
+    if (!file.stream || file.size <= 200000 || file.size === undefined) return file.text();
+    // Scan the entire file in bounded chunks. Timeout spam must not erase
+    // the earlier disconnect/adoption receipts needed to diagnose a match.
+    const reader = file.stream().getReader(), decoder = new TextDecoder();
+    let carry = '', head = '', tail = '', important = '', timeouts = 0, firstTimeout = '', lastTimeout = '';
+    const collect = line => {
+      if (head.length < 5000) head = (head + line + '\n').slice(0, 5000);
+      tail = (tail + line + '\n').slice(-50000);
+      if (line.includes('timeout in network_connection_idle')) {
+        if (!timeouts) firstTimeout = line;
+        lastTimeout = line; timeouts++;
+      } else if (!line.includes('network_connection_idle() failed in network_game_client_idle_ingame()') &&
+          /migration|reattach|adopted the live match|checkpoint|epoch|out.of.sync|connection.*(?:fail|lost|timed|went)|machine.*(?:remov|accept|connect)/i.test(line)) {
+        important = (important + line + '\n').slice(-140000);
+      }
+    };
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        carry += decoder.decode(value, { stream: true });
+        let end;
+        while ((end = carry.indexOf('\n')) >= 0) { collect(carry.slice(0, end)); carry = carry.slice(end + 1); }
+        if (carry.length > 200000) carry = carry.slice(-200000);
+      }
+      carry += decoder.decode();
+      if (carry) collect(carry);
+    } finally { reader.releaseLock(); }
+    return `Scanned ${file.size} bytes; selected connection events and recent tail below.\n` +
+      `--- start ---\n${head}\n--- connection events ---\n${important}` +
+      (timeouts ? `\nConnection idle timeouts: ${timeouts}\nFirst: ${firstTimeout}\nLast: ${lastTimeout}\n` : '') +
+      `\n--- recent tail ---\n${tail}`;
   }
 
   async function fullLog() {
@@ -511,12 +546,14 @@ can run the game, copies the game data out of the player's disc image
     try {
       const selection = await HaloNet.quickPlay({ signal: controller.signal, onStatus(status) {
         if (controller.signal.aborted) return;
+        log(`network ${new Date().toISOString()}: ${status.state}: ${status.message}`);
         if (typeof status.hold === 'boolean') window.Module?._web_quick_play_hold?.(status.hold ? 1 : 0);
         if (!controller.signal.aborted && (!state.started || ['recovering', 'reconnecting', 'error'].includes(status.state)))
           quickStatus(status.state, status.message);
       }, onFailover(selection) {
         if (controller.signal.aborted || state.manualMode || state.invite ||
             !state.started || selection.room !== state.selectedRoom) return;
+        log(`network ${new Date().toISOString()}: replacement ${selection.role}, epoch ${selection.epoch}, host ${HaloNet.addressText(selection.hostAddress)}`);
         const migrate = window.Module?._web_quick_play_migrate;
         if (!migrate) {
           quickStatus('error', 'Host recovery needs the latest game build. Reload and choose Update.');
@@ -873,6 +910,7 @@ can run the game, copies the game data out of the player's disc image
               HaloNet.quickPlayCheckpoint(status);
               return;
             }
+            log(`network ${new Date().toISOString()}: native ${status.phase}: ${status.message}`);
             if (status.phase === 'disconnected' && !state.invite && !state.manualMode && HaloNet.quickPlayLost()) {
               quickStatus('recovering', 'The host disconnected. Choosing a replacement host and preserving the match…');
               return;
@@ -1134,6 +1172,7 @@ can run the game, copies the game data out of the player's disc image
 
   function setUpOnline() {
     HaloNet.on((type, detail) => {
+      if (type === 'diagnostic') log(`network ${new Date().toISOString()}: ${JSON.stringify(detail)}`);
       if (type === 'status') showOnline(detail);
       if (type === 'joined') toast(`${detail.name} joined the room.`);
       if (type === 'left') toast(`${detail.name} left the room.`);
@@ -1314,6 +1353,15 @@ can run the game, copies the game data out of the player's disc image
     $('show-log').onclick = showLog;
     $('quick-log').onclick = showLog;
     $('log-close').onclick = () => { $('log-view').hidden = true; };
+    $('log-download').onclick = async () => {
+      const file = await debugFile();
+      const contents = [`${navigator.userAgent}\nBuild ${state.version || 'unknown'}\n\n--- page and console ---\n${state.log.join('\n')}\n\n--- debug.txt ---\n`];
+      if (file) contents.push(file);
+      const url = URL.createObjectURL(new Blob(contents, { type: 'text/plain;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = 'halo-log-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+    };
     $('log-copy').onclick = async () => {
       try { await navigator.clipboard.writeText(await fullLog()); toast('Copied.'); } catch { toast('Could not copy.'); }
     };

@@ -46,6 +46,7 @@ boolean network_game_client_begin_migration(struct network_game_client *client,
 boolean network_game_client_migration_ready(struct network_game_client *client);
 boolean network_game_client_migration_waiting(struct network_game_client *client);
 boolean network_game_server_migration_ready(struct network_game_server *server);
+boolean network_game_server_recover_match(struct network_game_server *server, unsigned long epoch);
 void network_game_server_migration_finish(struct network_game_server *server);
 struct network_game_server *network_game_server_adopt_match(struct network_game_client *client,
 	unsigned long epoch);

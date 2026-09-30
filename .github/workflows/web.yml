@@ -60,6 +60,7 @@ jobs:
           clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tools/tests/network-checkpoint-test.c -o build/test_network_checkpoint
           build/test_network_checkpoint
           python3 tools/test_web_migration_managers.py
+          python3 tools/test_web_connection_idle.py
           python3 tools/test_network_migration_checkpoint_runtime.py
           python3 tools/test_web_server_policy.py
           python3 tools/test_network_player_rejoin.py

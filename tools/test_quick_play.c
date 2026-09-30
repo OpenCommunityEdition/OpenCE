@@ -236,6 +236,15 @@ int main(void)
 	assert(!paused && !adopted && !reattached && !aborts && !menus);
 
 	/* Failure leaves the world paused. It must never silently reset the match. */
+	launch("join"); mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
+	web_quick_play_hold(1); step(1, FALSE);
+	web_quick_play_migrate(2, 0x0302010aU, 1); step(1, FALSE);
+	step(45001, FALSE);
+	assert(paused && !aborts && !menus);
+	migration_ready = TRUE; step(1000, FALSE);
+	assert(!paused && !strcmp(last_phase, "playing") && reattached == 1 && created == 1);
+
+	launch("join"); mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
 	web_quick_play_hold(1); step(1, FALSE); migration_supported = FALSE;
 	web_quick_play_migrate(2, 0x0302010aU, 1); step(1, FALSE);
 	assert(paused && !aborts && !menus && !strcmp(last_phase, "migration-failed"));

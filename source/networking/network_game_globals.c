@@ -863,12 +863,23 @@ boolean create_global_network_game_server(
 #ifdef HALO_WEB
 boolean create_global_network_game_server_from_migration(unsigned long epoch)
 {
-	if (global_network_game_server || !global_network_game_client || !epoch ||
-		!network_distributed_migration_ready() || !network_distributed_migration_promote())
+	if (!global_network_game_client || !epoch || !network_distributed_migration_ready())
 		return FALSE;
-	global_network_game_server = network_game_server_adopt_match(global_network_game_client, epoch);
-	if (!global_network_game_server)
-		return FALSE;
+	if (global_network_game_server)
+	{
+		/* A client outage can elect the current healthy host again. Its
+		   authoritative world is already current; renew only the transport. */
+		if (!network_game_server_recover_match(global_network_game_server, epoch))
+			return FALSE;
+	}
+	else
+	{
+		if (!network_distributed_migration_promote())
+			return FALSE;
+		global_network_game_server = network_game_server_adopt_match(global_network_game_client, epoch);
+		if (!global_network_game_server)
+			return FALSE;
+	}
 	bss_004566dc.client_started = FALSE;
 	network_game_follow_host_netcode(TRUE);
 	game_connection_set(_game_connection_network_server);

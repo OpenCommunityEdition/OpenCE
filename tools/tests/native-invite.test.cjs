@@ -129,7 +129,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
     return elements.get(id);
   }
   const context = {
-    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException,
+    console: { log() {} }, URL, URLSearchParams, SharedArrayBuffer, AbortController, DOMException, TextDecoder,
     setTimeout: options.setTimeout || setTimeout, clearTimeout: options.clearTimeout || clearTimeout,
     setInterval() {}, clearInterval() {}, performance: { now: () => 0 },
     navigator: { userAgent: 'Test', platform: 'Test', storage: options.gameStorage || { getDirectory() {} },
@@ -768,6 +768,22 @@ test('connection-panel Show log opens the same current runtime and saved diagnos
   await page.element('quick-log').onclick();
   assert.match(page.element('log-text').textContent, /runtime: no game response/);
   assert.match(page.element('log-text').textContent, /native search timed out/);
+});
+
+test('timeout spam cannot hide the original disconnect and reattachment events in Show log', async () => {
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?menu=1' });
+  const text = '11:00:00 connection lost\n11:00:01 machine #2 adopted the live match, epoch #1\n' +
+    '11:01:00 timeout in network_connection_idle\n'.repeat(20000);
+  const file = new Blob([text]);
+  page.context.navigator.storage.getDirectory = async () => ({
+    getFileHandle: async () => ({ getFile: async () => file }),
+  });
+  await page.element('show-log').onclick();
+  const shown = page.element('log-text').textContent;
+  assert.match(shown, /11:00:00 connection lost/);
+  assert.match(shown, /machine #2 adopted the live match, epoch #1/);
+  assert.match(shown, /Connection idle timeouts: 20000/);
+  assert.ok(shown.length < 200000, 'reading the full file does not create an unbounded viewer');
 });
 
 for (const dataRoot of ['/data', '/data/halo/data']) {
