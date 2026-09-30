@@ -94,7 +94,8 @@ class HaloQuickCoordinator {
       return { error: 'The room could not agree on a reachable host. Check the connection, then try again.' };
     if (brokerReady && this.brokerSince === null) this.brokerSince = now;
     const active = peers.filter(peer => peer.quick && (peer.quick.epoch || 0) === this.epoch && Number.isInteger(peer.address) &&
-      peer.address > 0 && peer.address <= 0xffffffff);
+      peer.address > 0 && peer.address <= 0xffffffff &&
+      (this.presence.matchId === null || peer.quick.matchId === this.presence.matchId));
     const hosts = active.filter(peer => peer.quick.role === 'host' && peer.quick.gamePhase !== 'migration-failed' && (!this.recovering ||
       (peer.quick.migration && peer.quick.checkpointTick >= 0 && (this.freshJoin || peer.quick.matchId === this.presence.matchId))));
     if (this.presence.role === 'host') hosts.push({ id: this.id, address: this.address, open: true, quick: this.presence });
@@ -103,7 +104,8 @@ class HaloQuickCoordinator {
       const host = hosts[0];
       if (this.freshJoin) this.presence.matchId = host.quick.matchId;
       this.select(host.id, now);
-      if (!host.open) return { state: 'connecting', message: 'Connecting to the room’s host…' };
+      if (!host.open) return { state: 'connecting', message: this.recovering ?
+        'Connecting to the replacement host…' : 'Connecting to the room’s host…' };
       if (host.id !== this.id && this.presence.role !== 'join') {
         this.presence = { ...this.presence, role: 'join', hostId: host.id, phase: 'reserved', epoch: this.epoch, failover: true };
         this.reservedSince = now;
@@ -113,14 +115,27 @@ class HaloQuickCoordinator {
       this.result = { role: host.id === this.id ? 'host' : 'join', hostId: host.id, hostAddress: host.address };
       return { result: this.result };
     }
-    if (this.presence.role === 'join') return { error: 'The selected host left before the game started. Try again.' };
+    if (this.presence.role === 'join') {
+      if (preservingMatch) {
+        // A transport can vanish during the replacement reservation. Keep the
+        // loaded match and its epoch while that host or another survivor returns.
+        this.recover(now, this.epoch);
+        return { state: 'recovering', message: 'The replacement host connection was lost. Preserving the match…' };
+      }
+      return { error: 'The selected host left before the game started. Try again.' };
+    }
     if (active.some(peer => peer.quick.role === 'join'))
       return { state: 'connecting', message: 'Waiting for the room’s existing host…' };
-    if (!brokerReady) return { state: 'connecting', message: 'Connecting to the multiplayer room…' };
     const candidates = active.filter(peer => peer.quick.role === 'candidate');
     const eligible = candidate => candidate.quick.gamePhase !== 'migration-failed' && (!this.recovering ||
       (candidate.quick.migration && candidate.quick.checkpointTick >= 0 &&
         candidate.quick.matchId !== null && candidate.quick.matchId === this.presence.matchId));
+    // Connected checkpoint owners can discover and acknowledge the same election
+    // over RTC. An isolated survivor or a new room still needs broker discovery.
+    const directRecovery = preservingMatch && candidates.some(peer => peer.open && eligible(peer));
+    if (!brokerReady && !directRecovery) return { state: 'connecting', message: this.recovering ?
+      'Reconnecting room signaling while preserving the match…' : 'Connecting to the multiplayer room…' };
+    if (this.brokerSince === null) this.brokerSince = now;
     const choices = [...candidates, { id: this.id, quick: this.presence }].filter(eligible);
     choices.sort((a, b) => (this.recovering ? b.quick.checkpointTick - a.quick.checkpointTick : 0) || a.id.localeCompare(b.id));
     const selected = choices[0]?.id;
@@ -173,6 +188,8 @@ const HaloNet = (() => {
   const MAX_RELIABLE_QUEUE = 8 * 1024 * 1024;
   const MAX_CHANNEL_BUFFER = 1024 * 1024;
   const PING_CONTROL = 'halo-host-rtt-v1:';
+  const QUICK_CONTROL = 'halo-room-quick-v1:';
+  const MAX_QUICK_CONTROL = 1024;
   const PING_STALE_MS = 10000;
   const PING_PEERS = 128;
   const KIND = { DATAGRAM: 1, OPEN: 2, DATA: 3, CLOSE: 4, REFUSE: 5 };
@@ -400,8 +417,45 @@ const HaloNet = (() => {
   // ---------- peers
 
   function hello() {
+    // Once peers are connected, authority announcements must not depend on
+    // their public broker subscriptions staying available through a handover.
+    for (const peer of state.peers.values()) sendQuickPresence(peer);
     publish({ type: 'hello', address: state.address, name: playerName(),
       quick: state.quick ? { ...state.quick.coordinator.presence } : null, quickSequence: state.quickSequence });
+  }
+
+  function sendQuickPresence(peer) {
+    if (!state.quick && state.quickSequence === 0) return;
+    const channel = peer.unreliable;
+    if (!peer.open || channel?.readyState !== 'open') return;
+    const message = QUICK_CONTROL + JSON.stringify({ sequence: state.quickSequence,
+      quick: state.quick ? { ...state.quick.coordinator.presence } : null });
+    if (message.length > MAX_QUICK_CONTROL || channel.bufferedAmount + message.length > MAX_CHANNEL_BUFFER) return;
+    try { channel.send(message); } catch { /* closing; the next beacon retries */ }
+  }
+
+  function updateQuickPresence(peer, value, sequence, source) {
+    if (!Number.isSafeInteger(sequence) || sequence < 0 || sequence <= peer.quickSequence) return;
+    const presence = value === null ? null : quickPresence(value, peer.id);
+    if (value !== null && !presence) return;
+    const previous = peer.quick;
+    peer.quickSequence = sequence;
+    peer.quick = presence;
+    if (presence && (!previous || previous.epoch !== presence.epoch || previous.role !== presence.role ||
+        previous.hostId !== presence.hostId || previous.matchId !== presence.matchId))
+      emit('diagnostic', { event: 'authority-presence', source, address: addressText(peer.address),
+        role: presence.role, epoch: presence.epoch, matchId: presence.matchId, sequence });
+  }
+
+  function receiveQuickPresence(peer, text) {
+    if (text.length > MAX_QUICK_CONTROL) return;
+    try {
+      const message = JSON.parse(text.slice(QUICK_CONTROL.length));
+      if (!message || typeof message !== 'object' || !Object.hasOwn(message, 'quick')) return;
+      // The current RTC connection supplies the identity. A payload cannot
+      // announce another player's host claim, and MQTT shares this sequence gate.
+      updateQuickPresence(peer, message.quick, message.sequence, 'rtc');
+    } catch { /* malformed control packet */ }
   }
 
   function playerName() {
@@ -488,6 +542,7 @@ const HaloNet = (() => {
         if (event.data === 'halo-room-ping-v1' && peer.unreliable.readyState === 'open')
           peer.unreliable.send('halo-room-pong-v1');
         else if (event.data.startsWith(PING_CONTROL)) receivePing(peer, event.data);
+        else if (event.data.startsWith(QUICK_CONTROL)) receiveQuickPresence(peer, event.data);
         return;
       }
       // Network events also drain output while background timers are throttled.
@@ -501,9 +556,11 @@ const HaloNet = (() => {
       if (!connectionCurrent(peer, pc)) return;
       peer.open = true;
       peer.lastPacketAt = Date.now();
+      sendQuickPresence(peer);
       emit('joined', { name: peer.name, address: addressText(peer.address) });
       emit('status', status());
     };
+    peer.unreliable.onopen = () => { if (connectionCurrent(peer, pc)) sendQuickPresence(peer); };
     peer.reliable.onclose = () => { if (connectionCurrent(peer, pc)) dropPeer(peer, 'reliable channel closed'); };
     pc.onicecandidate = (event) => {
       if (connectionCurrent(peer, pc) && event.candidate)
@@ -544,10 +601,7 @@ const HaloNet = (() => {
     if (message.type === 'hello') {
       const known = state.peers.get(message.from);
       const peer = peerFor(message.from, message.address, message.name);
-      if (Number.isSafeInteger(message.quickSequence) && message.quickSequence > peer.quickSequence) {
-        peer.quickSequence = message.quickSequence;
-        peer.quick = quickPresence(message.quick, message.from);
-      }
+      updateQuickPresence(peer, message.quick, message.quickSequence, 'broker');
       if (!known) hello(); // (so that it knows this machine without waiting)
       // the smaller id makes the offer
       if (!peer.pc && state.id < message.from) {
@@ -1110,7 +1164,7 @@ const HaloNet = (() => {
         const hold = attempt.resolved && (coordinator.recovering || result.state === 'reconnecting');
         if (hold) attempt.held = true;
         onStatus({ state: coordinator.recovering ? 'recovering' : result.state,
-          message: coordinator.recovering ? 'Choosing a replacement host and preserving the match…' : result.message,
+          message: result.message,
           ...(hold ? { hold: true } : {}) });
       }
     };

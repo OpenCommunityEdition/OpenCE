@@ -53,6 +53,18 @@ connection timeouts. A timed-out reconnect retires its stale transport and retri
 the same authority epoch; the former 45-second permanent recovery failure is
 removed. Room epoch synchronization follows the loaded match's identity.
 
+Authority announcements travel over both MQTT and each surviving RTC connection.
+The direct control message is bounded, tied to the current peer identity and
+shares a sequence gate with broker delivery, so delayed announcements cannot
+replace newer authority state. Changes, connection opens and periodic beacons
+repeat the announcement. During recovery, connected checkpoint owners of the
+same match can acknowledge and finish an election even if one or all brokers
+are offline. Initial room creation and an isolated survivor still require broker
+discovery; new or lost RTC connections need signaling for their ICE exchange.
+If a replacement disappears during reservation, recovery returns to candidate
+selection in the same epoch while retaining the loaded world. Progress messages
+distinguish room signaling, host selection and connection to a known replacement.
+
 A generic replay of player inputs is not used: the distributed client prediction
 path is not a deterministic copy of the authoritative simulation. Existing
 replication reconciles the resumed world, while sequenced checkpoints recover
@@ -78,3 +90,13 @@ All three resumed match 58499 with the original host at epoch 1 and retained
 player slots and accumulated scores. Closing that host afterward preserved the
 same match on both survivors at epoch 2. These are local injected-fault checks;
 they do not establish arbitrary WAN partition or browser-eviction recovery.
+
+A further three-player Chrome check disconnected player 3 from all signaling
+brokers before closing player 1's host tab. Player 2 became host; both survivors
+resumed match 26575 at epoch 1 while player 3 still had zero broker connections.
+The replacement announcement was recorded over RTC. Original player slots and
+accumulated scores remained in the same match. After signaling returned, a late
+joiner entered that match; closing player 2 then resumed both survivors at epoch 2.
+Regression checks also cover elections with all brokers unavailable, isolation,
+foreign-match joiners and a replacement dropping during reservation. The public
+package excludes the local fault injector and observe-mode launch arguments.

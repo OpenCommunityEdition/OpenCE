@@ -153,6 +153,18 @@ test('an older match in the same public room cannot migrate a healthy loaded coh
   }
 });
 
+test('an unrelated joiner at the same epoch cannot block a preserved match election', () => {
+  const a = new Coordinator(A, ADDRESS_A, 0); runTogether([a]);
+  a.launched('playing'); checkpoint(a); a.recover(11000);
+  const unrelated = { id: B, address: ADDRESS_B, open: true,
+    quick: { role: 'join', hostId: C, phase: 'launched', gamePhase: 'playing',
+      epoch: 1, migration: true, matchId: 999, checkpointTick: 90 } };
+  a.tick(11000, [unrelated], true); a.tick(17000, [unrelated], true);
+  const status = a.tick(18500, [unrelated], true);
+  assert.equal(status.result?.hostId, A);
+  assert.equal(a.presence.matchId, 500);
+});
+
 test('replacement election prefers the newest checkpoint and preserves the same match', () => {
   const host = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
   const d = new Coordinator('3333333333333333', ADDRESS_C, 0);
@@ -166,6 +178,36 @@ test('replacement election prefers the newest checkpoint and preserves the same 
   assert.equal(d.result.role, 'host'); assert.equal(b.result.hostId, d.id);
   assert.equal(d.presence.matchId, 500); assert.equal(b.presence.matchId, 500);
   assert.equal(d.presence.checkpointTick, 125);
+});
+
+test('connected survivors agree on one preserved host when one or all brokers are offline', () => {
+  for (const brokerAvailability of [[true, false], [false, false]]) {
+    const host = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
+    const d = new Coordinator('3333333333333333', ADDRESS_C, 0);
+    runTogether([host, b, d]);
+    for (const coordinator of [host, b, d]) coordinator.launched('playing');
+    checkpoint(host, 125); checkpoint(b, 125); checkpoint(d, 100);
+    for (let now = 11000; now <= 31000; now += 100) {
+      const snapshot = [b, d].map(coordinator => peer(coordinator));
+      [b, d].forEach((coordinator, index) =>
+        coordinator.tick(now, snapshot.filter(p => p.id !== coordinator.id), brokerAvailability[index]));
+    }
+    assert.equal(b.result?.role, 'host');
+    assert.equal(d.result?.role, 'join');
+    assert.equal(d.result?.hostId, B);
+    for (const coordinator of [b, d]) {
+      assert.equal(coordinator.epoch, 1);
+      assert.equal(coordinator.presence.matchId, 500);
+    }
+  }
+});
+
+test('a broker outage cannot start a fresh room through RTC candidates alone', () => {
+  const a = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
+  for (const now of [0, 6000, 10000, 30000]) {
+    assert.equal(a.tick(now, [peer(b)], false).result, undefined);
+    assert.equal(b.tick(now, [peer(a)], false).result, undefined);
+  }
 });
 
 test('an unsnapshotted loading newcomer cannot replace a loaded survivor', () => {
@@ -237,7 +279,7 @@ test('a silent open host channel eventually fails over despite healthy signallin
   assert.equal(joiner.tick(52500, [silent], true).result.role, 'host');
 });
 
-test('recovery cannot elect a host while all signalling brokers are unavailable', () => {
+test('an isolated survivor cannot elect a host while signalling brokers are unavailable', () => {
   const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
   runTogether([host, joiner]);
   for (const coordinator of [host, joiner]) { coordinator.launched('playing'); checkpoint(coordinator); }

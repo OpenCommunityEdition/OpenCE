@@ -34,8 +34,8 @@ async function network() {
     localStorage: { getItem() { return null; }, setItem() {} }, WebSocket: Socket,
     RTCPeerConnection: class {
       constructor() { connections.push(this); this.channels = []; }
-      createDataChannel() {
-        const channel = { readyState: 'open', bufferedAmount: 0, send() {} };
+      createDataChannel(label) {
+        const channel = { label, readyState: 'open', bufferedAmount: 0, sent: [], send(value) { this.sent.push(value); } };
         this.channels.push(channel); return channel;
       }
       async createOffer() { return { sdp: 'offer' }; }
@@ -49,7 +49,21 @@ async function network() {
     '\nglobalThis.net = HaloNet;', context);
   await context.net.join('TEST42', { brokers: ['wss://test.invalid'] });
   sockets[0].onmessage({ data: new Uint8Array([0x20, 2, 0, 0]).buffer });
+  async function peerPresence({ id = 'ffffffffffffffff', address = HOST_ADDRESS, sequence = 1, quick }) {
+    const iv = webcrypto.getRandomValues(new Uint8Array(12));
+    const plain = new TextEncoder().encode(JSON.stringify({ type: 'hello', from: id,
+      mid: webcrypto.randomUUID(), address, name: 'Host', quickSequence: sequence, quick }));
+    const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, roomKey, plain));
+    const body = [0, 1, 120, ...iv, ...encrypted], length = [];
+    let size = body.length;
+    do { let byte = size % 128; size = Math.floor(size / 128); length.push(size ? byte | 128 : byte); } while (size);
+    sockets[0].onmessage({ data: new Uint8Array([0x30, ...length, ...body]).buffer });
+    await Promise.all(decryption); await new Promise(setImmediate);
+    return connections.at(-1);
+  }
   return { net: context.net, messages,
+    peerPresence,
+    disconnectBrokers() { for (const socket of sockets) { socket.close(); socket.onclose(); } },
     tick(time) { now = time; for (const fn of [...timers.values()]) fn(); },
     async close() { await context.net.leave(); await Promise.all(encryption); },
     latest() { return messages.filter(message => message.type === 'hello').at(-1); },
@@ -57,18 +71,9 @@ async function network() {
       return context.net.quickPlayCheckpoint({ phase: 'checkpoint', epoch, tick, matchId });
     },
     async hostPresence(epoch = 0) {
-      const iv = webcrypto.getRandomValues(new Uint8Array(12));
-      const plain = new TextEncoder().encode(JSON.stringify({ type: 'hello', from: 'ffffffffffffffff',
-        mid: webcrypto.randomUUID(), address: HOST_ADDRESS, name: 'Host', quickSequence: epoch + 1,
+      return peerPresence({ sequence: epoch + 1,
         quick: { role: 'host', hostId: 'ffffffffffffffff', phase: 'launched', gamePhase: 'playing', epoch,
-          failover: true, migration: true, matchId: 500, checkpointTick: 90 } }));
-      const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, roomKey, plain));
-      const body = [0, 1, 120, ...iv, ...encrypted], length = [];
-      let size = body.length;
-      do { let byte = size % 128; size = Math.floor(size / 128); length.push(size ? byte | 128 : byte); } while (size);
-      sockets[0].onmessage({ data: new Uint8Array([0x30, ...length, ...body]).buffer });
-      await Promise.all(decryption); await new Promise(setImmediate);
-      return connections.at(-1);
+          failover: true, migration: true, matchId: 500, checkpointTick: 90 } });
     },
   };
 }
