@@ -125,7 +125,7 @@ build/macos-release/Halo.app/Contents/MacOS/halo --gi path --no-vsync --fps --ma
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
 | `display.ray_tracing_shadows` | `1.0` | How dark the sun's traced shadows are (0.0 to 1.0). |
 | `display.ray_tracing_objects` | `true` | The characters and vehicles in Metal's rays too: their contact shadows, and your own body's shadow. |
-| `display.ray_tracing_gi` | `"traced"` | The level lit by the rays in place of its lightmaps (refer to "The traced light, in place of the lightmaps"). `"black"`: without the lightmaps at all. `"off"`: the lightmaps. |
+| `display.ray_tracing_gi` | `"traced"` | The level lit by the rays in place of its lightmaps (refer to "The traced light, in place of the lightmaps"). `"path"`: without the lightmaps at all, the light traced over its bounces (the slowest; the old `"black"` is this). `"off"`: the lightmaps. |
 | `display.ray_tracing_gi_split` | `false` | The game's light on the left half of the screen, the traced on the right. |
 | `display.ray_tracing_level` | `"render"` | The level in the rays as it is drawn; `"collision"`: its collision surfaces. |
 | `display.ray_tracing_lights` | `"traced"` | Every light traced in its colour; `"game"`: the game's lights, their shadows traced. |
@@ -152,7 +152,7 @@ released; the game itself does not pause.
 | Group | Rows |
 | --- | --- |
 | Display | Resolution (the F8 values), render scale, fullscreen, vertical sync, frame rate counter, frame interpolation (applies at the next start), direct camera |
-| Ray tracing | On, screen rays or off; the view (the F6 values, not saved); the traced light (`traced`, `black`, `path`, `off`); the lights (`traced`, `game`); the object shapes (F4); the objects in the rays; the strengths of the occlusion, reflections, bounce, shadows, sun, bounced light, glowing surfaces and lights; the split view |
+| Ray tracing | On, screen rays or off; the view (the F6 values, not saved); the traced light (`traced`, `path`, `off`); the lights (`traced`, `game`); the object shapes (F4); the objects in the rays; the strengths of the occlusion, reflections, bounce, shadows, sun, bounced light, glowing surfaces and lights; the split view |
 | Sound | Sound on or off (a game started without sound gets it at the next start), volume |
 | Mouse | Sensitivity, invert, aim assist |
 | Game | A map (the campaign levels and multiplayer maps found in `maps/`) and Load, which starts it now; look for updates (applies at the next start) |
@@ -333,9 +333,11 @@ point found in their view: Metal's writes of this frame are not yet seen by
 GL that early.) The objects, drawn before the level, keep the game's light
 with the traced shadows.
 
-"black" leaves the lightmaps out entirely, even where the bounces land:
-only what the rays find lit - the sun, the sky, the lamps, the lights -
-lights the level. `display.ray_tracing_gi_split` shows the game's light on
+"path" leaves the lightmaps out entirely, even where the bounces land:
+the light is traced again at each place it bounces from (the sun, the sky,
+a glowing surface), `display.ray_tracing_bounces` times at most, so only
+what the rays find lit - the sun, the sky, the lamps, the lights - lights
+the level. `display.ray_tracing_gi_split` shows the game's light on
 the left half of the screen and the traced on the right. The parts'
 strengths are `display.ray_tracing_gi_sun`, `_bounce`, `_glow` and
 `_lights`.

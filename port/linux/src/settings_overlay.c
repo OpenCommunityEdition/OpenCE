@@ -133,8 +133,8 @@ static char resolution_custom[64];
 static const char *const tracing_labels[] = { "Full", "Lite (screen only)", "Off" };
 static const char *const tracing_values[] = { "on", "screen", "off" };
 static const char *const view_labels[] = { "Lighting", "Ray view", "Split", "Occlusion", "Depth" };
-static const char *const gi_labels[] = { "Traced", "Black", "Path", "Off" };
-static const char *const gi_values[] = { "traced", "black", "path", "off" };
+static const char *const gi_labels[] = { "Traced", "Path", "Off" };
+static const char *const gi_values[] = { "traced", "path", "off" };
 static const char *const lights_labels[] = { "Traced", "Game" };
 static const char *const lights_values[] = { "traced", "game" };
 static const char *const shapes_labels[] = { "Model", "Collision" };
@@ -193,7 +193,7 @@ static const struct row rows[] =
 		"What the ray tracing shows (F6 steps through it): the lighting; the ray view (what\n"
 		"the rays hit, from the camera); the lighting and the ray view side by side; the\n"
 		"traced occlusion; the depth. For looking, not saved." },
-	{ _row_choice, _row_ray_gi, "Traced light", "display.ray_tracing_gi", gi_labels, 4 },
+	{ _row_choice, _row_ray_gi, "Traced light", "display.ray_tracing_gi", gi_labels, 3 },
 	{ _row_choice, _row_ray_lights, "Lights", "display.ray_tracing_lights", lights_labels, 2 },
 	{ _row_choice, _row_ray_shapes, "Object shapes", "display.ray_tracing_shapes", shapes_labels, 2 },
 	{ _row_boolean, _row_ray_objects, "Objects in the rays", "display.ray_tracing_objects" },
@@ -336,7 +336,7 @@ static int row_index(const struct row *row)
 		return ray.view;
 	case _row_ray_gi:
 		halo_ray_tracing_get(&ray);
-		return ray.gi == 1 ? 0 : ray.gi == 2 ? 1 : ray.gi == 3 ? 2 : 3;
+		return ray.gi == 1 ? 0 : ray.gi == 3 ? 1 : 2;
 	case _row_ray_lights:
 		halo_ray_tracing_get(&ray);
 		return ray.traced_lights ? 0 : 1;
@@ -436,7 +436,7 @@ static void set_index(const struct row *row, int index)
 		status_set("View: %s (not saved)", view_labels[index]);
 		return;
 	case _row_ray_gi:
-		ray.gi = index == 0 ? 1 : index == 1 ? 2 : index == 2 ? 3 : 0;
+		ray.gi = index == 0 ? 1 : index == 1 ? 3 : 0;
 		halo_ray_tracing_set(&ray);
 		saved(row, config_write_string(row->setting, gi_values[index]), gi_values[index]);
 		return;

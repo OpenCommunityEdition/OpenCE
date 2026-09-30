@@ -156,10 +156,10 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The level's light traced in place of its lightmaps (macOS): \"traced\" (the\n"
 		"sun, the sky, the glowing surfaces and the lights, with the lightmaps' light\n"
-		"where the rays land as the light that bounced), \"black\" (without the\n"
-		"lightmaps at all: only what the rays find lit), \"path\" (without the lightmaps,\n"
+		"where the rays land as the light that bounced), \"path\" (without the lightmaps,\n"
 		"traced over 3 bounces: the sun, the sky and the glowing surfaces lighting\n"
-		"each place the light bounces from; the slowest) or \"off\"." },
+		"each place the light bounces from; the slowest) or \"off\". The old \"black\"\n"
+		"is \"path\"." },
 	{ "display.ray_tracing_gi_sun", _config_real, "1.0", "HALO_RAY_TRACING_GI_SUN", _environment_value,
 		_platform_all, "The traced sun's strength (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_gi_bounce", _config_real, "1.0", "HALO_RAY_TRACING_GI_BOUNCE", _environment_value,

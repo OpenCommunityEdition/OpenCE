@@ -105,8 +105,8 @@ static struct
 	int traced_lights;
 	/* display.ray_tracing_level: the drawn level in the rays (else its
 	collision surfaces); display.ray_tracing_gi: the traced light in place of
-	the lightmaps' (1; 2 without the lightmaps' light where the rays land),
-	its parts' strengths, and the light buffer's pass */
+	the lightmaps' (1; 3 the path tracer, without the lightmaps' light where
+	the rays land), its parts' strengths, and the light buffer's pass */
 	int drawn_level, gi;
 	float gi_sun, gi_bounce, gi_glow, gi_lights;
 	/* the path tracer's bounces at most, the traced light's rays a pixel */
@@ -826,7 +826,9 @@ static void initialize(void)
 	{
 		const char *gi = config_string("display.ray_tracing_gi");
 
-		ray.gi = !strcmp(gi, "traced") ? 1 : !strcmp(gi, "black") ? 2 : !strcmp(gi, "path") ? 3 : 0;
+		/* ("black", which left the lightmaps out without tracing the light
+		further, is the path tracer now) */
+		ray.gi = !strcmp(gi, "traced") ? 1 : !strcmp(gi, "path") || !strcmp(gi, "black") ? 3 : 0;
 	}
 	ray.gi_sun = (float)config_real("display.ray_tracing_gi_sun");
 	ray.gi_bounce = (float)config_real("display.ray_tracing_gi_bounce");

@@ -911,9 +911,9 @@ static NSString *const kernel_source = @
 	"	}\n"
 	"	float4 lit_value = float4(lights_arriving, emitted);\n"
 	/* the traced light (c[42]: 1 with the lightmaps' light where the rays
-	   land, 2 without - only what the rays find lit: the sun, the sky, the
-	   glowing surfaces, the lights), in the light buffer's units, for the
-	   guest to put in place of the lightmaps':
+	   land, 3 the path tracer - without them, the light traced at each place
+	   it bounces from), in the light buffer's units, for the guest to put in
+	   place of the lightmaps':
 	   - the sun, where its ray is not blocked (c[36-38] its colour and
 	     power, times c[45]);
 	   - two rays across the half sphere, cosine-weighted, new each frame:
@@ -1009,10 +1009,9 @@ static NSString *const kernel_source = @
 	   lands on the level, the light there - with the lightmaps (c[42] 1),
 	   its lightmap times its colour; the path tracer (c[42] 3), the sun,
 	   the sky's light and a glowing triangle's traced from there, and on
-	   (c[62]... bounces at most 3), its colour taken each time; without
-	   (2), what it gives off only (the rays to the glows). Where it leaves
-	   the level: the sky's light; where it lands on an object: a dim share
-	   of the light around */
+	   (c[85] bounces at most), its colour taken each time. Where it leaves
+	   the level: the sky's light; where it lands on an object: the light
+	   traced there, times its colour */
 	"		{\n"
 	"			float2 u = spread01(id, n, 0.0);\n"
 	"			float u1 = u.x, u2 = u.y;\n"
@@ -1040,7 +1039,7 @@ static NSString *const kernel_source = @
 	"					throughput *= object_albedo(h.instance_id, h.geometry_id, h.primitive_id, object_tris, instance_tris);\n"
 	"					L += throughput * hit_light(Ho, No, seed, c, world, glowing, glowing_count, GRID_ARGS, CUT_ARGS) *\n"
 	"						(c[42] < 1.5 ? c[43] : 1.0);\n"
-	"					if (c[42] < 2.5) break;\n"
+	"					if (c[42] < 1.5) break;\n"
 	"					float o1 = random01(seed), o2 = random01(seed);\n"
 	"					float3 ot = normalize(abs(No.z) < 0.9 ? cross(No, float3(0, 0, 1)) : cross(No, float3(1, 0, 0)));\n"
 	"					float3 ob = cross(No, ot);\n"
@@ -1072,7 +1071,6 @@ static NSString *const kernel_source = @
 	"					}\n"
 	"					break;\n"
 	"				}\n"
-	"				if (c[42] < 2.5) break;\n"
 	/* the path tracer: the light at the hit, from the sun, a wide sky light
 	   and a glowing triangle, traced; then on, from it */
 	"				float3 v0 = float3(level_vertices[indices[base] * 3u], level_vertices[indices[base] * 3u + 1u], level_vertices[indices[base] * 3u + 2u]);\n"

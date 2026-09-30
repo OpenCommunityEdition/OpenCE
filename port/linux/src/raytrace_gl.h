@@ -54,7 +54,7 @@ struct halo_ray_tracing_settings
 	/* what it shows (F6): 0 the lighting, 1 the ray view, 2 split, 3 the
 	occlusion, 4 the depth */
 	int view;
-	/* display.ray_tracing_gi: 0 off, 1 traced, 2 black, 3 path */
+	/* display.ray_tracing_gi: 0 off, 1 traced, 3 path */
 	int gi;
 	/* display.ray_tracing_lights "traced"; display.ray_tracing_shapes (0
 	model, 1 collision); display.ray_tracing_objects; _gi_split */
