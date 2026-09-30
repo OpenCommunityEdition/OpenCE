@@ -146,17 +146,17 @@ symbols in this file:
 
 /* ---------- constants */
 
-#ifdef HALO_LINUX
-/* where the tag cache is in this process (halo_port_window.h) */
-#define TAG_CACHE_ADDRESS PORT_WINDOW_ADDRESS(0x803A6000)
-
-/* how big it is: the Xbox's 22 MB, or the native builds' larger one
-(halo_port_capacity.h) */
+/* how big the tag cache is: the Xbox's 22 MB, or the native builds' larger
+one (halo_port_capacity.h) */
 #ifdef HALO_LINUX
 #define TAG_CACHE_SIZE HALO_PORT_TAG_CACHE_SIZE
 #else
 #define TAG_CACHE_SIZE 0x1600000
 #endif
+
+/* where the tag cache is in this process (halo_port_window.h) */
+#ifdef HALO_LINUX
+#define TAG_CACHE_ADDRESS PORT_WINDOW_ADDRESS(0x803A6000)
 #else
 #define TAG_CACHE_ADDRESS 0x803A6000
 #endif
