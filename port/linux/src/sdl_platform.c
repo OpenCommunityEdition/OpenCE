@@ -733,6 +733,11 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
+#ifdef HALO_MACOS
+/* whether Command is held, from the key events (Command-W's close) */
+static BOOL platform_command_held;
+#endif
+
 void platform_pump_events(void)
 {
 	/* debug.exit_after (seconds) ends the game that long after the window
@@ -765,8 +770,15 @@ void platform_pump_events(void)
 		switch (event.type)
 		{
 #ifdef HALO_MACOS
-		/* the window's close button quits at once */
+		/* the window's close button quits at once; Command-W (the menu's
+		Close, with Command held for the port's keys and W moving you
+		forward) does nothing */
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			if (platform_command_held)
+			{
+				notice("Command-W does not close the game: press Command-Q twice to quit");
+				break;
+			}
 			pthread_mutex_unlock(&input_lock);
 			platform_log("window closed");
 			exit(EXIT_SUCCESS);
@@ -799,6 +811,8 @@ void platform_pump_events(void)
 			SDL_Scancode action = event.key.scancode;
 
 #ifdef HALO_MACOS
+			platform_command_held = event.key.scancode == SDL_SCANCODE_LGUI ||
+				event.key.scancode == SDL_SCANCODE_RGUI ? event.key.down : (event.key.mod & SDL_KMOD_GUI) != 0;
 			if (event.key.mod & SDL_KMOD_GUI)
 			{
 				switch (event.key.scancode)
