@@ -5,19 +5,31 @@ World-space ray tracing for the macOS port's lighting
 (port/linux/src/raytrace_gl.c), with Metal's ray tracing: in compute on
 M1 and M2, in the GPU's ray tracing hardware on M3 and later.
 
-- The level: port/linux/game/raytrace_world.c gives the active BSP's
-  collision surfaces as triangles (host_rt_set_world), and they become a
-  Metal acceleration structure, rebuilt when the BSP changes.
+- The scene: the level (port/linux/game/raytrace_world.c) as drawn
+  (host_rt_set_level, with its materials, lightmap pages and cutouts'
+  masks) or as its collision surfaces (host_rt_set_world), and each frame
+  the objects near the camera (host_rt_set_objects), their meshes kept,
+  refitted or rebuilt as they move; the lights and emitters
+  (host_rt_set_lights, host_rt_set_emitters). The level's glowing
+  triangles, and a grid of those that light each part of it most, are for
+  the rays to the glows.
 - The frame: the guest draws each pixel's linear depth and normal into a
   texture it shares with Metal (host_rt_texture: a Metal texture that
   ANGLE, which draws the game on the same Metal device, takes as a GL
   texture through EGL_ANGLE_metal_texture_client_buffer).
-- The rays (host_rt_trace): from each pixel's point in the world, four rays
-  over the hemisphere around its normal, which find the level's geometry
-  near it wherever it is, on screen or not (ambient occlusion), and one
-  along the view's reflection, whose hit is projected back onto the screen
-  for its colour if the camera sees it there. The results go to a second
-  shared texture, which the guest composites.
+- The rays (host_rt_trace, the kernel "trace"): from each pixel's point,
+  the occlusion (near the objects), the sun's shadow, the dynamic lights'
+  and the emitters' light, the reflection (its hit projected back onto the
+  screen for its colour) and, with the drawn level, the traced light in
+  place of the lightmaps: the sun, the sky, the glowing triangles and a
+  bounce (the lightmap where it lands, or a path traced on), accumulated
+  over the frames. The results go to two more shared textures, which the
+  guest composites; the exposure and white balance follow the lightmaps'.
+- The light probes (host_rt_set_probes, the kernel "probes"): the traced
+  light at points the objects' lighting asks about, read back a frame
+  later (host_rt_probe_results).
+- A governor thins the rays when the GPU takes too long, and stops them
+  when it takes far too long.
 
 GL and Metal take turns on the GPU, through a Metal shared event
 (EGL_ANGLE_metal_shared_event_sync): GL signals it when the depth and

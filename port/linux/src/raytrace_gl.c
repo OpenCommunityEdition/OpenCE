@@ -2,36 +2,27 @@
 RAYTRACE_GL.C
 
 Ray-traced lighting for the native ports (display.ray_tracing): rays
-through the screen's depth on every port, and on macOS also rays through
-the level itself with Metal (port/macos/host/host_metal_rt.m).
+through the screen's depth on every port ("lite"), and on macOS rays
+through the level and the objects with Metal (port/macos/host/host_metal_rt.m,
+the scene from port/linux/game/raytrace_world.c).
 
-Once the game has drawn a window's opaque world, before its transparent
-geometry, fog, effects and HUD (source/render/render.c), rays are marched
-through that window's depth buffer, the scene's geometry as the camera
-sees it:
+The screen's rays, marched through a window's depth buffer, find only what
+the camera sees: ambient occlusion (rays across the hemisphere around each
+pixel's normal), one bounce of the colour they hit, and reflections (faded
+out where they leave the screen).
 
-- ambient occlusion: from each pixel, rays across the hemisphere around the
-  surface's normal (from the depth's neighbours); what they hit close by
-  darkens the pixel, as creases, corners and the ground under objects are
-  in the real world;
-- one bounce of indirect light: the colour a ray hits lights the pixel a
-  little, so a red wall tints the floor beside it;
-- reflections: a ray along the view's mirror direction; where it hits, the
-  surface reflects that colour, by the Fresnel term (glancing angles
-  reflect most), so floors and wet ground pick up the scene.
-
-Rays through the screen's depth find only what the camera sees: rays
-leaving the screen find nothing, and are faded out. On macOS, where Metal
-can trace rays (in compute on M1 and M2, in the ray tracing hardware of the
-M3 and later), the occlusion and reflections are also traced through the
-level's own geometry (its collision surfaces,
-port/linux/game/raytrace_world.c), which finds what the camera does not
-see; the screen's rays still find the objects, which the level does not
-hold. The pass costs a few milliseconds at the display's resolution.
-
-It runs as two draws: rays into an effect texture (occlusion, reflection),
-then the composite back into the window, with a depth-aware blur of the
-occlusion. F9 switches it on and off while playing.
+With Metal, the game's frame (source/render/render.c) calls in at its
+stages: the objects' depth before the level is drawn (to tell their pixels
+from the level's), the light before and after the dynamic lights, and the
+light buffer, where the last frame's traced light, denoised (an a-trous
+filter) and moved to this frame's view, goes in place of the lightmaps'
+(display.ray_tracing_gi). After the opaque world, before its transparent
+geometry, fog, effects and HUD, the lighting pass draws each pixel's depth
+and normal for Metal, has Metal trace its rays (occlusion, the sun's
+shadows, the lights, reflections, the traced light), runs the screen's rays
+where there is no traced light, and composites it all into the window with
+a depth-aware blur, putting the light buffer's traced light right to this
+frame's. F9 switches it on and off, F6 steps through its views.
 */
 
 #include "platform.h"

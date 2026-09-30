@@ -1,17 +1,23 @@
 /*
 RAYTRACE_WORLD.C
 
-The level's geometry for the ray-traced lighting of the macOS port
-(port/linux/src/raytrace_gl.c, port/macos/host/host_metal_rt.m): the active
-structure BSP's collision surfaces as a triangle mesh in world units. The
-collision surfaces are the level's solid shape - its floors, walls and
-ceilings - without the detail of its rendered geometry; the invisible ones
-(player clip) are left out.
+What the ray-traced lighting of the macOS port (port/linux/src/raytrace_gl.c,
+port/macos/host/host_metal_rt.m) reads from the game, in world units:
 
-Each surface is a convex polygon whose edges form a ring: an edge belongs
-to two surfaces, and for each it names the next edge around it
-(collision_edge.edge_indices, by the side the surface is on). The polygon
-is split into a fan of triangles.
+- the level's collision surfaces as triangles (halo_ray_tracing_world): its
+  solid shape, without the invisible ones (player clip). Each surface is a
+  convex polygon whose edges form a ring (collision_edge.edge_indices, by
+  the side the surface is on), split into a fan of triangles;
+- the level as it is drawn (halo_ray_tracing_level): its lightmap
+  materials' triangles, with their lightmap and base map coordinates, the
+  alpha-tested ones last and the transparent ones left out; each
+  material's colour, flags and glow (halo_ray_tracing_level_materials, as
+  their bitmaps are read), its lightmap pages (halo_ray_tracing_level_page)
+  and the cutouts' masks (halo_ray_tracing_mask);
+- the objects near the camera as triangles (halo_ray_tracing_objects):
+  their drawn models, skinned, or their collision models; the glowing
+  things without a light of their own as lights (halo_ray_tracing_emitters);
+- the sky's sun and wide lights (halo_ray_tracing_sun, halo_ray_tracing_sky).
 */
 
 #include "cseries.h"

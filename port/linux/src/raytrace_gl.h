@@ -1,7 +1,8 @@
 /*
 RAYTRACE_GL.H
 
-Screen-space ray-traced lighting (raytrace_gl.c, display.ray_tracing).
+Ray-traced lighting (raytrace_gl.c, display.ray_tracing): the screen's
+rays, and on macOS Metal's through the level and the objects.
 */
 
 #ifndef __HALO_RAYTRACE_GL_H
@@ -39,7 +40,7 @@ const char *halo_ray_tracing_toggle(void);
 returns its name */
 const char *halo_ray_tracing_next_view(void);
 /* F4: the objects' shapes in the rays next (the drawn models, the collision
-models, ellipsoids); returns their name */
+models); returns their name */
 const char *halo_ray_tracing_shapes_next(void);
 /* what it shows: 1 the lighting, 2 the occlusion, 3 the ray view, 4 split
 (tests) */
