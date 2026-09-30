@@ -136,6 +136,7 @@ static void game_time_set_distributed(long t) { tick=t; }
 static unsigned long system_milliseconds(void) { return now; }
 static unsigned long web_quick_play_address(void) { return 0x64563811UL; }
 static boolean network_distributed_migration_ready(void) { return TRUE; }
+static boolean web_match_migration_enabled(void) { return TRUE; }
 static boolean network_distributed_migration_promote(void) { promotions++; return TRUE; }
 static void network_game_follow_host_netcode(boolean enabled) { assert(enabled); }
 static void game_connection_set(short connection) { assert(connection==_game_connection_network_server); }
@@ -195,6 +196,8 @@ static boolean network_game_remove_machine(struct network_game *g, struct networ
  short id=m->machine_index; if(id<0) return FALSE;
  for(int i=0;i<128;i++) if(g->players[i].machine_index==id) { g->players[i].machine_index=NONE; g->player_count--; }
  m->machine_index=NONE; g->machine_count--; return TRUE; }
+static boolean network_game_server_remove_machine_from_game(struct network_game_server *s, struct network_machine *m) {
+ return network_game_remove_machine(&s->game,m); }
 static boolean network_game_server_remove_client_machine_from_game(struct network_game_server *s,
  struct network_game_server_client_machine *m) {
  (void)s; m->connection=NULL; m->machine_index=NONE; m->flags=0; return TRUE; }
@@ -226,6 +229,7 @@ FUNCTIONS = "\n".join((
     function(SERVER, "network_game_server_migration_machines"),
     function(SERVER, "network_game_server_migration_detach"),
     function(SERVER, "network_game_server_migration_expire_disconnected"),
+    function(SERVER, "network_game_server_remove_disconnected_client"),
     function(SERVER, "network_game_server_migration_routes"),
     function(SERVER, "network_game_server_recover_match"),
     function(SERVER, "network_game_server_migration_acknowledge"),
@@ -279,6 +283,12 @@ int main(void) {
   c->connection=&transports[next_transport++]; c->connection->address=0x64563810UL+i;
  }
  existing.client_machines[1].connection->address=IPV4_LOOPBACK_ADDRESS;
+ /* RTC can drop before the original host observes the higher epoch. Its
+ validated players must survive this epoch-zero disconnect path too. */
+ assert(network_game_server_remove_disconnected_client(&existing,&existing.client_machines[0]));
+ assert(network_game_server_remove_disconnected_client(&existing,&existing.client_machines[2]));
+ assert(existing.game.machine_count==3 && datums[0].quit_out_of_game_time==NONE && datums[2].quit_out_of_game_time==NONE);
+ assert(server_migration.owner_addresses[2]==0x64563812UL);
  assert(create_global_network_game_server_from_migration(1));
  assert(global_server==&existing && !promotions && tick==900 && existing.game.random_seed==42);
  assert(existing.game.machine_count==3 && existing.game.player_count==3 && datums[0].quit_out_of_game_time==NONE);
@@ -431,6 +441,19 @@ def main():
         result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
         print("Original existing-host recovery rejection failed the regression as expected")
+        # Restore the old epoch-zero removal guard. A lost RTC connection on
+        # the still-running original host must retain the original roster.
+        original = function(SERVER, "network_game_server_remove_disconnected_client")
+        control = original.replace(
+            "(server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled()))",
+            "server_migration.epoch",
+        )
+        assert control != original
+        source.write_text(BOUNDARY + WIRE + STUBS + FUNCTIONS.replace(original, control) + TESTS)
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror", str(source), "-o", str(binary)], check=True)
+        result = subprocess.run([str(binary)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        assert result.returncode != 0 and "Assertion" in result.stderr, result.stderr
+        print("Original epoch-zero roster removal failed the regression as expected")
 
 
 if __name__ == "__main__":

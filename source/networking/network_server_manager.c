@@ -830,7 +830,15 @@ static void network_game_server_migration_detach(struct network_game_server *ser
 {
 	short original = machine->machine_index;
 	if (original >= 0 && original < MAXIMUM_NETWORK_MACHINE_COUNT)
+	{
+		struct transport_address owner = { 0 };
+		if (machine->connection)
+			network_connection_get_address(machine->connection, &owner, NULL);
+		if (owner.address.long_words[0])
+			server_migration.owner_addresses[original] = owner.address.long_words[0] == IPV4_LOOPBACK_ADDRESS ?
+				web_quick_play_address() : owner.address.long_words[0];
 		server_migration.disconnected_at[original] = MAX(system_milliseconds(), 1);
+	}
 	if (machine->connection)
 		network_server_close_client_connection(server->connection, machine->connection);
 	csmemset(machine, 0, sizeof(*machine));
@@ -841,7 +849,7 @@ static void network_game_server_migration_expire_disconnected(struct network_gam
 {
 	short index;
 	unsigned long now = system_milliseconds();
-	if (!server_migration.epoch || server_migration.adopting)
+	if ((!server_migration.epoch && !web_match_migration_enabled()) || server_migration.adopting)
 		return;
 	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 	{
@@ -3519,7 +3527,10 @@ static boolean network_game_server_remove_disconnected_client(
 	struct network_game_server_client_machine *client)
 {
 #ifdef HALO_WEB
-	if (server_migration.epoch && TEST_FLAG(client->flags, _network_client_machine_validated_bit))
+	/* A quick-play transport can disappear before the first migration epoch
+	   reaches the native host. Retain its roster and owner for reattachment. */
+	if ((server_migration.epoch || (server->state == _network_game_server_state_ingame && web_match_migration_enabled())) &&
+		TEST_FLAG(client->flags, _network_client_machine_validated_bit))
 	{
 		network_game_server_migration_detach(server, client);
 		return TRUE;
@@ -4132,7 +4143,7 @@ void network_game_server_migration_routes(unsigned long *addresses, short count)
 	if (!server || count != HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		return;
 	csmemset(addresses, 0, count * sizeof(*addresses));
-	if (server_migration.epoch)
+	if (server_migration.epoch || web_match_migration_enabled())
 		for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
 			if (network_machine_is_valid(&server->game.machines[index]))
 				addresses[index] = server_migration.owner_addresses[index];
