@@ -488,11 +488,17 @@ static struct observer_result const *render_interpolation_blended_camera(
 turns every frame (player_control.c), but the observer keeps it as of the
 last tick and the blend above draws it a tick later still. On foot, the view
 points where the player aims now (display.direct_camera). In a vehicle's
-seat or a cinematic the view is the seat's or the script's: left as it is. */
+seat or a cinematic the view is the seat's or the script's: left as it is.
+Desktop only: display.direct_camera is not an Android setting, and its
+default would otherwise apply there. */
 static struct observer_result const *render_interpolation_direct_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
+#ifdef HALO_ANDROID
+	(void)local_player_index;
+	return observer;
+#else
 	static int enabled = -1;
 	struct observer_result *direct;
 	long unit_index;
@@ -515,6 +521,7 @@ static struct observer_result const *render_interpolation_direct_camera(
 	player_control_get_facing_direction(local_player_index, &direct->forward);
 	observer_up_from_forward(&direct->forward, &direct->up);
 	return direct;
+#endif
 }
 
 struct observer_result const *render_interpolation_camera(

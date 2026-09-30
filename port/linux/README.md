@@ -152,6 +152,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
+| `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
@@ -227,6 +228,12 @@ Each frame shows the world between the last two ticks
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
+
+The direction of the view is an exception. The game reads the mouse and the
+sticks in each frame. In first person, on foot, each frame points the view
+where the player aims at that time (`display.direct_camera`). Thus the view
+turns in the frame that the mouse moves. In a vehicle and in cinematics, the
+view mixes as the other things do. On Android, the view mixes as before.
 
 To get 30 frames each second, set `display.interpolation = false`.
 
