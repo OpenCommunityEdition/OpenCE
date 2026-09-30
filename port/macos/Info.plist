@@ -38,6 +38,6 @@
 	<key>GCSupportsControllerUserInteraction</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Halo finds and joins system link games on your local network and your Tailscale network.</string>
+	<string>Halo finds and joins system link games on your local network.</string>
 </dict>
 </plist>

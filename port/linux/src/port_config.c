@@ -212,11 +212,6 @@ static const struct config_setting config_settings[] =
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
-	{ "network.tailscale", _config_boolean, "true", "HALO_NET_TAILSCALE", _environment_value, _platform_all,
-		"System link across a Tailscale network: when Tailscale runs here, the\n"
-		"game's announcements also go to the tailnet's online machines, and a\n"
-		"game hosted here is reached through this machine's Tailscale address by\n"
-		"machines on the tailnet. The local network is searched as well." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
@@ -232,7 +227,7 @@ static const struct config_setting config_settings[] =
 	{ "network.tunnel_port", _config_integer, "0", "HALO_NET_TUNNEL_PORT", _environment_value, _platform_all,
 		"The UDP port internet play uses; 0 picks one. A fixed one can be\n"
 		"forwarded on the router, for networks whose NAT stops connections." },
-	/* off on macOS: Tailscale and the local network need no forwarded port */
+	/* off on macOS: the local network needs no forwarded port */
 	{ "network.allow_upnp", _config_boolean, HALO_CONFIG_MACOS_FALSE, "HALO_NET_ALLOW_UPNP", _environment_value,
 		_platform_all,
 		"Let internet play ask the router (UPnP) to forward its port, for\n"

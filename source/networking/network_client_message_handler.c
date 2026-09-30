@@ -757,8 +757,8 @@ static boolean network_game_client_handle_message_server_game_advertise(
 			{
 				/* the host is where its advertisement came from. The host's
 				XNADDR names its address on its own network, which a machine
-				on another one (across Tailscale, or the internet through a
-				forwarded port) cannot reach; the sender's address is the one
+				on another one (on the internet, through a forwarded port)
+				cannot reach; the sender's address is the one
 				that answered. (127.0.0.1 is this machine's own game:
 				port/linux/src/xnet.c) */
 				if (source_address->address_length == IPV4_ADDRESS_LENGTH &&

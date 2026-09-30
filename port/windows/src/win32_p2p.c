@@ -205,13 +205,3 @@ void posix_discord_close(int handle)
 		discord_pipes[handle] = NULL;
 	}
 }
-
-/* Tailscale peers (posix.h): not looked up on Windows, where system link
-over Tailscale needs network.broadcast to list the tailnet's addresses */
-int posix_tailscale_addresses(posix_ulong *self, posix_ulong *peers, int capacity)
-{
-	(void)peers;
-	(void)capacity;
-	*self = 0;
-	return -1;
-}
