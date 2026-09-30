@@ -35,6 +35,7 @@ drive the controller.
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "settings_overlay.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -87,10 +88,21 @@ static Uint64 stick_aimed_ms = 0;
 worn stick's drift */
 #define STICK_AIMING_DEFLECTION 8000
 
+/* the mouse's settings, read when first needed (and again after the settings
+overlay changes them: halo_input_settings_changed) */
+static float sensitivity = -1.0f;
+static int invert = -1;
+static int aim_assist = -1;
+
+void halo_input_settings_changed(void)
+{
+	sensitivity = -1.0f;
+	invert = -1;
+	aim_assist = -1;
+}
+
 static float mouse_sensitivity(void)
 {
-	static float sensitivity = -1.0f;
-
 	if (sensitivity < 0.0f)
 	{
 		sensitivity = (float)config_real("input.mouse_sensitivity");
@@ -106,7 +118,6 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 {
 	/* radians per pixel of relative motion at sensitivity 1 */
 	const float scale = 0.0022f;
-	static int invert = -1;
 	float x, y;
 
 	*yaw = 0.0f;
@@ -134,7 +145,6 @@ right stick last did) and input.mouse_aim_assist is off: then the view's
 magnetism leaves them be (player_control.c); the bullets' autoaim stays */
 int halo_linux_mouse_aiming(short gamepad_index)
 {
-	static int aim_assist = -1;
 	int aiming;
 
 	if (gamepad_index != 0)
@@ -643,6 +653,30 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		sdl_gamepad_state(gamepads[port], &state->Gamepad);
 	}
 
+	/* the settings overlay (F10) takes the controllers while it is open, the
+	first one's pad moving through it, and until their buttons are let go
+	after it closes (the button that closed it does not also act) */
+	{
+		static BOOL held[PORT_COUNT];
+
+		if (settings_overlay_active())
+		{
+			if (port == 0)
+				settings_overlay_gamepad(state->Gamepad.wButtons, state->Gamepad.bAnalogButtons[XINPUT_GAMEPAD_A] > 30,
+					state->Gamepad.bAnalogButtons[XINPUT_GAMEPAD_B] > 30);
+			held[port] = TRUE;
+		}
+		if (held[port])
+		{
+			int button;
+			BOOL any = state->Gamepad.wButtons != 0;
+
+			for (button = 0; button < 8; button++)
+				any |= state->Gamepad.bAnalogButtons[button] > 30;
+			held[port] = any || settings_overlay_active();
+			memset(&state->Gamepad, 0, sizeof(state->Gamepad));
+		}
+	}
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{
 		controllers[port].packet_number++;

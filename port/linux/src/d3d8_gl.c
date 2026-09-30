@@ -25,6 +25,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "settings_overlay.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -113,6 +114,28 @@ const char *halo_screen_resolution_next(void)
 	}
 	platform_log("screen: resolution %s (F8)", resolution_presets[resolution_preset]);
 	return resolution_presets[resolution_preset];
+}
+
+/* the resolution now: F8's choice, else display.resolution */
+const char *halo_screen_resolution_current(void)
+{
+	return resolution_preset >= 0 ? resolution_presets[resolution_preset] : config_string("display.resolution");
+}
+
+/* the settings overlay's choice (settings_overlay.c): one of F8's, or
+display.resolution's text when it is none of them (set it first); taken up
+between frames (halo_screen_commit) */
+void halo_screen_resolution_set(const char *name)
+{
+	int index, count = (int)(sizeof(resolution_presets) / sizeof(resolution_presets[0]));
+
+	resolution_preset = -1;
+	for (index = 0; index < count; index++)
+	{
+		if (!strcmp(name, resolution_presets[index]))
+			resolution_preset = index;
+	}
+	platform_log("screen: resolution %s (settings)", name);
 }
 
 /* the picture's pixels for an output of display_width x display_height;
@@ -3684,11 +3707,12 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 
 /* ---------- presentation */
 
-static void write_screenshot(struct render_target_entry *target)
+/* the framebuffer's pixels to debug.screenshot_directory: a render target's
+(its rows from the top) or the window's (0, from the bottom) */
+static void write_screenshot(GLuint framebuffer, unsigned long width, unsigned long height, BOOL rows_from_top)
 {
 	const char *directory = *config_string("debug.screenshot_directory") ?
 		config_string("debug.screenshot_directory") : NULL;
-	unsigned long width = target->target.gl_width, height = target->target.gl_height;
 	unsigned char *pixels;
 	char path[512];
 	FILE *file;
@@ -3699,7 +3723,7 @@ static void write_screenshot(struct render_target_entry *target)
 	if (!directory)
 		return;
 	pixels = malloc(image_size);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 	/* the display ignores destination alpha, which the game uses as scratch;
 	image viewers would show it as transparency */
@@ -3721,7 +3745,8 @@ static void write_screenshot(struct render_target_entry *target)
 		*(unsigned int *)(header + 10) = 54;
 		*(unsigned int *)(header + 14) = 40;
 		*(int *)(header + 18) = (int)width;
-		*(int *)(header + 22) = -(int)height; /* rows from the top, as read */
+		/* (a negative height: the rows from the top) */
+		*(int *)(header + 22) = rows_from_top ? -(int)height : (int)height;
 		*(unsigned short *)(header + 26) = 1;
 		*(unsigned short *)(header + 28) = 32;
 		*(unsigned int *)(header + 34) = (unsigned int)image_size;
@@ -3749,12 +3774,16 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
 		int window_width, window_height, width, height, x, y;
+		BOOL screenshot = screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0;
+		/* the settings overlay's frames are saved as the window shows them */
+		BOOL overlay = settings_overlay_active();
 
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
-		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
-			write_screenshot(back_buffer);
+		if (screenshot && !overlay)
+			write_screenshot(framebuffer_get(back_buffer->target.texture, 0), back_buffer->target.gl_width,
+				back_buffer->target.gl_height, TRUE);
 
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */
@@ -3776,6 +3805,14 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		/* row 0 of the render target is the top of the picture */
 		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
 			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		/* the settings overlay (F10) over everything, at the window's pixels */
+		if (overlay)
+		{
+			settings_overlay_draw(window_width, window_height);
+			if (screenshot)
+				write_screenshot(0, (unsigned long)window_width, (unsigned long)window_height, FALSE);
+			xgpu_gl_bind_device_vertex_array();
+		}
 		platform_video_swap();
 		xgpu_gl_state_invalidate();
 		xgpu_texture_cache_begin_frame();

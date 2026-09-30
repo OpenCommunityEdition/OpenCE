@@ -16,6 +16,7 @@ and the debug keyboard that the game's console reads.
 #include "p2p.h"
 #include "xiso.h"
 #include "raytrace_gl.h"
+#include "settings_overlay.h"
 
 #include <SDL3/SDL.h>
 #include <stdarg.h>
@@ -487,9 +488,39 @@ void platform_video_swap(void)
 
 void platform_mouse_capture(BOOL capture)
 {
+	/* (never while the settings overlay is open: its pointer is the mouse) */
 	if (platform_window)
-		SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
+		SDL_SetWindowRelativeMouseMode(platform_window, capture && !settings_overlay_active() ? true : false);
 }
+
+#ifndef HALO_ANDROID
+int platform_window_fullscreen(int fullscreen)
+{
+	if (!platform_window)
+		return 0;
+	if (fullscreen >= 0 && !config_boolean("debug.hidden_window"))
+		SDL_SetWindowFullscreen(platform_window, fullscreen != 0);
+	return (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+void platform_video_set_vsync(int vsync)
+{
+	if (platform_window)
+		SDL_GL_SetSwapInterval(vsync ? 1 : 0);
+}
+
+/* a point SDL reports (the window's points) in the window's pixels, as the
+settings overlay is drawn */
+static void overlay_point(float x, float y, float *pixel_x, float *pixel_y)
+{
+	int width = 0, height = 0, pixel_width = 0, pixel_height = 0;
+
+	SDL_GetWindowSize(platform_window, &width, &height);
+	SDL_GetWindowSizeInPixels(platform_window, &pixel_width, &pixel_height);
+	*pixel_x = width > 0 ? x * (float)pixel_width / (float)width : x;
+	*pixel_y = height > 0 ? y * (float)pixel_height / (float)height : y;
+}
+#endif
 
 /* ---------- keyboard translation */
 
@@ -765,6 +796,8 @@ void platform_pump_events(void)
 #ifndef HALO_ANDROID
 	updater_poll(platform_window);
 #endif
+	/* the controller's presses in the settings overlay, and its test script */
+	settings_overlay_update();
 	pthread_mutex_lock(&input_lock);
 	while (SDL_PollEvent(&event))
 	{
@@ -826,11 +859,25 @@ void platform_pump_events(void)
 				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
 				case SDL_SCANCODE_L: action = SDL_SCANCODE_F5; break;
 				case SDL_SCANCODE_J: action = SDL_SCANCODE_F4; break;
+				/* (Command-comma: a Mac's Settings) */
+				case SDL_SCANCODE_COMMA: action = SDL_SCANCODE_F10; break;
 				default: break;
 				}
 			}
-			if (action == event.key.scancode)
 #endif
+			/* F10: the settings overlay, which takes every key while it is
+			open (the port's keys below still act) */
+			if (settings_overlay_active())
+			{
+				if (action == SDL_SCANCODE_F10 || action == event.key.scancode)
+					settings_overlay_key(action, event.key.down, event.key.repeat);
+			}
+			else if (action == SDL_SCANCODE_F10)
+			{
+				if (event.key.down && !event.key.repeat)
+					settings_overlay_set_active(1);
+			}
+			else if (action == event.key.scancode)
 			{
 				if (event.key.scancode < SDL_SCANCODE_COUNT)
 				{
@@ -885,6 +932,15 @@ void platform_pump_events(void)
 		}
 		case SDL_EVENT_MOUSE_MOTION:
 #ifndef HALO_ANDROID
+			/* the settings overlay's pointer */
+			if (settings_overlay_active())
+			{
+				float x, y;
+
+				overlay_point(event.motion.x, event.motion.y, &x, &y);
+				settings_overlay_mouse_motion(x, y);
+				break;
+			}
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
@@ -900,6 +956,14 @@ void platform_pump_events(void)
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 		case SDL_EVENT_MOUSE_BUTTON_UP:
 #ifndef HALO_ANDROID
+			if (settings_overlay_active())
+			{
+				float x, y;
+
+				overlay_point(event.button.x, event.button.y, &x, &y);
+				settings_overlay_mouse_button(event.button.button, event.button.down, x, y);
+				break;
+			}
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
 			that resumes the game does not also fire */
@@ -923,6 +987,26 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
 #ifndef HALO_ANDROID
+			if (settings_overlay_active())
+			{
+				static float overlay_wheel;
+				int steps = 0;
+
+				/* whole notches, as the menus' */
+				overlay_wheel += event.wheel.y;
+				while (overlay_wheel >= 1.0f)
+				{
+					steps++;
+					overlay_wheel -= 1.0f;
+				}
+				while (overlay_wheel <= -1.0f)
+				{
+					steps--;
+					overlay_wheel += 1.0f;
+				}
+				settings_overlay_mouse_wheel(steps);
+				break;
+			}
 			if (input_state.ui_pointer)
 			{
 				/* whole notches: smooth-scrolling wheels send fractions */
@@ -962,6 +1046,37 @@ void platform_pump_events(void)
 			break;
 		}
 	}
+#ifndef HALO_ANDROID
+	/* the settings overlay opened or closed (its key, its script, a map
+	loaded from it): the game's keys and buttons let go; the mouse released
+	while it is open (its pointer in the window's middle) and captured again
+	after, as it was */
+	{
+		static BOOL overlay_was_active;
+		BOOL active = settings_overlay_active() != 0;
+
+		if (active != overlay_was_active)
+		{
+			BOOL captured = !input_state.mouse_released && !input_state.ui_pointer;
+
+			overlay_was_active = active;
+			memset(input_state.keys, 0, sizeof(input_state.keys));
+			memset(keys_pressed, 0, sizeof(keys_pressed));
+			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+			input_state.mouse_dx = 0.0f;
+			input_state.mouse_dy = 0.0f;
+			input_state.mouse_wheel = 0.0f;
+			platform_mouse_capture(!active && captured);
+			if (active && captured)
+			{
+				int width, height;
+
+				SDL_GetWindowSize(platform_window, &width, &height);
+				SDL_WarpMouseInWindow(platform_window, width * 0.5f, height * 0.5f);
+			}
+		}
+	}
+#endif
 	pthread_mutex_unlock(&input_lock);
 	looked_at_clipboard = TRUE;
 	platform_invite_clipboard(look_at_clipboard);

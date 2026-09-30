@@ -81,6 +81,7 @@ build adds:
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
 | F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
 | F9 | ⌘T | Switch the ray-traced lighting on or off. |
+| F10 | ⌘, | Open or close the settings overlay (refer to "The settings overlay"). |
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
 
@@ -129,6 +130,41 @@ build/macos-release/Halo.app/Contents/MacOS/halo --gi path --no-vsync --fps --ma
 | `display.ray_tracing_lights` | `"traced"` | Every light traced in its colour; `"game"`: the game's lights, their shadows traced. |
 | `network.allow_upnp` | `false` | The local network does not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
+
+### The settings overlay
+
+F10 (or ⌘, on a Mac keyboard) opens a panel over the game with the
+settings that are changed while playing. F10, ⌘, or Esc closes it (Esc
+opens the game's pause menu only while the panel is closed). While it is
+open, the game gets no keys, mouse or controller input, and the mouse is
+released; the game itself does not pause.
+
+- Up and Down (or the mouse pointer, the mouse wheel, the D-pad) select a
+  row. Left and Right (or a click, the D-pad) change it. Enter (or Space, a
+  click, A) switches a row that is on or off. A slider can be dragged. B
+  closes the panel.
+- The right side shows the help of the selected row: the comment of its
+  setting in `config.toml`, and its name there.
+- Each change applies at once, and is written to `config.toml`. Only the
+  line of that setting changes; comments and other lines stay.
+
+| Group | Rows |
+| --- | --- |
+| Display | Resolution (the F8 values), render scale, fullscreen, vertical sync, frame rate counter, frame interpolation (applies at the next start), direct camera |
+| Ray tracing | On, screen rays or off; the view (the F6 values, not saved); the traced light (`traced`, `black`, `path`, `off`); the lights (`traced`, `game`); the object shapes (F4); the objects in the rays; the strengths of the occlusion, reflections, bounce, shadows, sun, bounced light, glowing surfaces and lights; the split view |
+| Sound | Sound on or off (a game started without sound gets it at the next start), volume |
+| Mouse | Sensitivity, invert, aim assist |
+| Game | A map (the campaign levels and multiplayer maps found in `maps/`) and Load, which starts it now; look for updates (applies at the next start) |
+
+A change to the traced light, the lights, the object shapes or the objects
+starts the traced light's accumulation again: the picture is noisy for a
+moment, as at the start of a level.
+
+For tests, `debug.settings_script` (`HALO_SETTINGS_SCRIPT`) presses the
+panel's keys at given times, for example
+`--settings-script "5=open;6=down,down,right;8=close"`; with
+`HALO_SCREENSHOT_DIR` and `HALO_SCREENSHOT_EVERY` the saved frames show the
+panel as the window does.
 
 ## Multiplayer
 
