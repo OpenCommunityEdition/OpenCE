@@ -60,6 +60,7 @@ typedef int EGLint_;
 
 #define HOST_RT_MAXIMUM_OBJECTS 511
 #define HOST_RT_MAXIMUM_LIGHTS 8
+#define HOST_RT_MAXIMUM_EMITTERS 16
 /* the objects, each its own mesh (its bounds its own, so that a ray far
 from them all walks none), and its triangles at most; and all of theirs */
 #define HOST_RT_GROUPS 32
@@ -97,6 +98,9 @@ static struct
 	/* the dynamic lights (host_rt_set_lights): 8 floats each */
 	float lights[HOST_RT_MAXIMUM_LIGHTS * 8];
 	unsigned int light_count;
+	/* the emitters (host_rt_set_emitters): 8 floats each */
+	float emitters[HOST_RT_MAXIMUM_EMITTERS * 8];
+	unsigned int emitter_count;
 	EGLDisplay_ display;
 	EGLDisplay_ (*eglGetCurrentDisplay)(void);
 	EGLImage_ (*eglCreateImageKHR)(EGLDisplay_, void *, unsigned int, void *, const EGLint_ *);
@@ -152,6 +156,8 @@ static NSString *const kernel_source = @
 	"	device float4 *probe [[buffer(5)]],\n"
 	"	constant float4 *lights [[buffer(6)]],\n"
 	"	constant uint &light_count [[buffer(7)]],\n"
+	"	constant float4 *emitters [[buffer(8)]],\n"
+	"	constant uint &emitter_count [[buffer(9)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -159,9 +165,9 @@ static NSString *const kernel_source = @
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
 	/* the ray probe (c[33]): the rays of the pixel at the viewport's center */
 	"	bool is_probe = c[33] > 0.5 && all(id == uint2(origin + size * 0.5));\n"
-	/* how much of the dynamic lights' light reaches the pixel: all, unless
-	   traced otherwise below */
-	"	lit.write(float4(1.0), id);\n"
+	/* how much of the dynamic lights' light reaches the pixel (all, unless
+	   traced otherwise below), and the emitters' light (none) */
+	"	lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
 	"	uint probe_count = 0u;\n"
 	"	if (is_probe) probe[0] = float4(0.0);\n"
 	/* the ray view: what a ray from the camera through the pixel finds in
@@ -326,6 +332,8 @@ static NSString *const kernel_source = @
 	   each that reaches the pixel, blocked by the level or the objects (not
 	   the player's body, from which the flashlight shines); the share of
 	   their light that arrives, each weighted by how much it gives */
+	"	float lights_arriving = 1.0;\n"
+	"	float3 emitted = float3(0.0);\n"
 	"	if (light_count > 0u)\n"
 	"	{\n"
 	"		float total = 0.0, arriving = 0.0;\n"
@@ -348,8 +356,27 @@ static NSString *const kernel_source = @
 	"			if (!blocked) arriving += weight;\n"
 	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, blocked ? P + N * bias + L * d : at, 4.0, blocked);\n"
 	"		}\n"
-	"		if (total > 0.0) lit.write(float4(arriving / total), id);\n"
+	"		if (total > 0.0) lights_arriving = arriving / total;\n"
 	"	}\n"
+	/* the emitters (a needle's glow): their light, where their rays arrive
+	   (short of the emitter itself, inside its own model) */
+	"	for (uint e = 0; e < emitter_count; e++)\n"
+	"	{\n"
+	"		float3 at = emitters[e * 2u].xyz;\n"
+	"		float reach = emitters[e * 2u].w;\n"
+	"		float3 L = at - P;\n"
+	"		float d = length(L);\n"
+	"		if (d >= reach || d < 1e-3) continue;\n"
+	"		L /= d;\n"
+	"		float facing = dot(N, L);\n"
+	"		if (facing <= 0.0) continue;\n"
+	"		ray to_emitter(P + N * bias, L, 0.0, max(d - 0.15, 0.0));\n"
+	"		bool blocked = any_hit.intersect(to_emitter, world, 3u).type != intersection_type::none;\n"
+	"		if (!blocked)\n"
+	"			emitted += emitters[e * 2u + 1u].rgb * emitters[e * 2u + 1u].w * facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
+	"		if (is_probe) probe_segment(probe, probe_count, P + N * bias, at, 5.0, blocked);\n"
+	"	}\n"
+	"	lit.write(float4(lights_arriving, emitted), id);\n"
 	/* (the probe's ray to the sun: always, against everything, to its first hit) */
 	"	if (is_probe && c[27] > 0.0)\n"
 	"	{\n"
@@ -820,6 +847,8 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setBuffer:rt.probe offset:0 atIndex:5];
 	[encoder setBytes:rt.lights length:sizeof(rt.lights) atIndex:6];
 	[encoder setBytes:&rt.light_count length:sizeof(rt.light_count) atIndex:7];
+	[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
+	[encoder setBytes:&rt.emitter_count length:sizeof(rt.emitter_count) atIndex:9];
 	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
@@ -871,6 +900,18 @@ void host_rt_set_lights(const float *lights, int count)
 		count = HOST_RT_MAXIMUM_LIGHTS;
 	memcpy(rt.lights, lights, (size_t)count * 8 * sizeof(float));
 	rt.light_count = (unsigned int)count;
+}
+
+/* this frame's emitters, 8 floats each (the position, the radius, the
+colour, the intensity) */
+void host_rt_set_emitters(const float *emitters, int count)
+{
+	if (count < 0)
+		count = 0;
+	if (count > HOST_RT_MAXIMUM_EMITTERS)
+		count = HOST_RT_MAXIMUM_EMITTERS;
+	memcpy(rt.emitters, emitters, (size_t)count * 8 * sizeof(float));
+	rt.emitter_count = (unsigned int)count;
 }
 
 /* the ray probe's last rays: up to maximum segments of 8 floats each (from

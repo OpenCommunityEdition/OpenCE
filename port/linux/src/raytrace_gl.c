@@ -52,6 +52,8 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 	long *triangle_count);
 /* the direction towards the sky's sun; 0 if none */
 unsigned char halo_ray_tracing_sun(float *direction);
+/* the emitters (port/linux/game/raytrace_world.c): 8 floats each */
+long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera);
 /* the dynamic lights (source/objects/object_lights.c): 8 floats each */
 long halo_ray_tracing_lights(float *lights, long maximum);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
@@ -343,6 +345,7 @@ static const char composite_source[] =
 	   of similar depth */
 	"	float z = linear_depth(d);\n"
 	"	float total = 0.0, visibility = 0.0, dynamic_visibility = 0.0;\n"
+	"	vec3 emitted = vec3(0.0);\n"
 	"	vec3 light = vec3(0.0);\n"
 	"	for (int y = -2; y < 2; y++)\n"
 	"		for (int x = -2; x < 2; x++)\n"
@@ -357,12 +360,15 @@ static const char composite_source[] =
 	   finds the objects) */
 	"			if (rt_enabled != 0) v *= mix(1.0, texelFetch(rt_texture, q / TRACE_SCALE, 0).r, u[2].y);\n"
 	"			visibility += v * w;\n"
-	"			dynamic_visibility += (rt_enabled != 0 ? texelFetch(lit_rt, q / TRACE_SCALE, 0).r : 1.0) * w;\n"
+	"			vec4 lit_here = rt_enabled != 0 ? texelFetch(lit_rt, q / TRACE_SCALE, 0) : vec4(1.0, 0.0, 0.0, 0.0);\n"
+	"			dynamic_visibility += lit_here.r * w;\n"
+	"			emitted += lit_here.gba * w;\n"
 	"			light += e.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
 	"	visibility /= total;\n"
 	"	dynamic_visibility /= total;\n"
+	"	emitted /= total;\n"
 	"	light /= total;\n"
 	/* the lightmaps' share of the light: the occlusion and the sun's
 	   shadows darken it, not the flashlight's or the other dynamic lights'
@@ -388,7 +394,9 @@ static const char composite_source[] =
 	"			light += texelFetch(scene_texture, ivec2(hit.gb * u[3].yz), 0).rgb * hit.a * u[3].w;\n"
 	"	}\n"
 	"	if (debug_mode == 2) { result = vec4(vec3(visibility), 1.0); return; }\n"
-	"	result = vec4(scene.rgb * visibility + light * (1.0 - scene.rgb * 0.5), scene.a);\n"
+	/* the emitters' light: tinting the lit surface, and a little of its own
+	   on the dark */
+	"	result = vec4(scene.rgb * visibility + light * (1.0 - scene.rgb * 0.5) + emitted * (scene.rgb * 1.5 + 0.12), scene.a);\n"
 	"}\n";
 
 static GLuint compile(GLenum type, const char *source, const char *what)
@@ -499,7 +507,8 @@ static const char probe_vertex_source[] =
 	"	vec3 color = kind < 0.5 ? (hit > 0.5 ? vec3(1.0, 0.25, 0.2) : vec3(1.0)) :\n"
 	"		kind < 1.5 ? (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.9, 0.2)) :\n"
 	"		kind < 2.5 ? (hit > 0.5 ? vec3(0.2, 1.0, 1.0) : vec3(0.5, 0.75, 0.8)) :\n"
-	"		kind < 3.5 ? vec3(0.3, 1.0, 0.3) : (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.55, 0.1));\n"
+	"		kind < 3.5 ? vec3(0.3, 1.0, 0.3) : kind < 4.5 ? (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.55, 0.1)) :\n"
+	"		(hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.35, 0.9));\n"
 	"	line_color = vec4(color, 1.0);\n"
 	"}\n";
 
@@ -914,6 +923,13 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		long light_count = halo_ray_tracing_lights(lights, 8);
 
 		host_rt_set_lights(lights, (int)light_count);
+	}
+	/* the emitters (glowing projectiles), for their light */
+	{
+		static float emitters[16 * 8];
+		long emitter_count = ray.objects ? halo_ray_tracing_emitters(emitters, 16, position) : 0;
+
+		host_rt_set_emitters(emitters, (int)emitter_count);
 	}
 	if (!host_rt_trace(camera, width, height))
 		return 0;

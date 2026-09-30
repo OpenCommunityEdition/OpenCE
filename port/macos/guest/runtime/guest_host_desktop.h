@@ -43,5 +43,6 @@ int host_rt_trace(const float *camera, int width, int height);
 void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count, int two_sided);
 int host_rt_probe(float *segments, int maximum);
 void host_rt_set_lights(const float *lights, int count);
+void host_rt_set_emitters(const float *emitters, int count);
 
 #endif

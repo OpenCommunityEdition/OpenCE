@@ -200,6 +200,12 @@ level and the objects block it. The game drew these lights without shadows,
 added onto the lightmaps' light; the lighting darkens only their share of a
 pixel's light (the stages above), by the share of their rays that arrive.
 
+The glowing things the game draws without a light of their own - a
+needle, a plasma bolt's glow: a projectile with a light volume attached and
+no light - are lights in the rays (`halo_ray_tracing_emitters` in
+`port/linux/game/raytrace_world.c`): each lights what is near it in its
+glow's colour, with its shadows. The ray probe draws the rays to them pink.
+
 The characters and the vehicles are in Metal's rays too
 (`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): by
 default as their drawn models, skinned each frame as the renderer skins

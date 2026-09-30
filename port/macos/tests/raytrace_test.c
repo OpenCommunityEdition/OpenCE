@@ -473,6 +473,18 @@ long halo_ray_tracing_lights(float *lights, long maximum)
 	return count;
 }
 
+/* the emitters: a needle's pink glow by the crate (world: the view's x, z, y) */
+long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera)
+{
+	static const float needle[8] = { -1.6f, 4.6f, -0.45f, 1.5f, 1.0f, 0.3f, 0.8f, 1.2f };
+
+	(void)camera;
+	if (maximum < 1 || getenv("RT_NO_EMITTERS"))
+		return 0;
+	memcpy(emitters, needle, sizeof(needle));
+	return 1;
+}
+
 static GLuint program, buffer, array;
 
 static void draw_pass(int pass)

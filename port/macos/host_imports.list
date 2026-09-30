@@ -79,3 +79,4 @@ host_rt_trace
 host_rt_set_objects
 host_rt_probe
 host_rt_set_lights
+host_rt_set_emitters
