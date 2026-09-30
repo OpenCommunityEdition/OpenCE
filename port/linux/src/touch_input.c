@@ -12,6 +12,9 @@ display density the app passes (HALO_DISPLAY_DENSITY, host_main.c).
 
 #include <stdlib.h>
 
+/* the game's (port/linux/game/touch_game.c) */
+int touch_game_cinematic_skippable(void);
+
 /* a tap moves at most this far; a drag of this length is one wheel step */
 #define TOUCH_TAP_SLOP_DP 12.0f
 #define TOUCH_SCROLL_STEP_DP 40.0f
@@ -22,6 +25,11 @@ display density the app passes (HALO_DISPLAY_DENSITY, host_main.c).
 static struct touch_menu menu;
 static int menu_ready;
 static int menu_active;
+/* polls left to hold A: a tap is shorter than the game's poll, and the
+game must see the press */
+static int skip_polls;
+#define TOUCH_PRESS_POLLS 2
+
 /**
  * @brief The pixels in a dp: Android's densityDpi / 160, or else a guess
  * from the height.
@@ -116,4 +124,27 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 	pointer->right_clicks = 0;
 	pointer->wheel_steps = output.wheel_steps;
 	pointer->touch = TRUE;
+}
+
+void touch_input_gamepad(XINPUT_GAMEPAD *pad)
+{
+	/* outside the menus the touchscreen only skips a cinematic that can be
+	skipped: a tap there presses A */
+	if (!menu_active)
+	{
+		struct touch_menu_output output;
+
+		menu_setup();
+		touch_menu_read(&menu, &output);
+		if (output.clicks && touch_game_cinematic_skippable())
+		{
+			skip_polls = TOUCH_PRESS_POLLS;
+			platform_log("touch: A pressed to skip a cinematic");
+		}
+	}
+	if (skip_polls > 0)
+	{
+		pad->bAnalogButtons[XINPUT_GAMEPAD_A] = 0xff;
+		skip_polls--;
+	}
 }

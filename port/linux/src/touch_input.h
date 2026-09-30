@@ -3,7 +3,10 @@ TOUCH_INPUT.H
 
 The touchscreen (touch_input.c). Everything here runs on the game's main
 thread. The finger events and touch_input_menu_read run under
-sdl_platform.c's input lock.
+sdl_platform.c's input lock; touch_input_gamepad, called from
+XInputGetState, does not, and reads the same touch_menu state without it.
+That is safe only because platform_pump_events and XInputGetState both run
+on the game's main thread: a call from any other thread needs the lock.
 */
 
 #ifndef TOUCH_INPUT_H
@@ -38,5 +41,12 @@ void touch_input_menu_set_active(int active);
  * @param pointer receives the taps and the wheel steps; marked as touch
  */
 void touch_input_menu_read(struct platform_ui_pointer *pointer);
+
+/**
+ * @brief Adds the touch controls to controller 1's state. Outside the menus
+ * a tap presses A for a few polls when a cinematic can be skipped.
+ * @param pad the state XInputGetState is about to return
+ */
+void touch_input_gamepad(XINPUT_GAMEPAD *pad);
 
 #endif
