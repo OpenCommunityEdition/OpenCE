@@ -104,14 +104,14 @@ to 4.
 | space, enter | A | jump, accept |
 | F, backspace, mouse button 4 | B | melee, back |
 | E, R | X | action, reload |
-| tab, mouse wheel | Y | change the weapon |
+| mouse wheel | Y | change the weapon |
 | Q | white | flashlight |
 | X | black | change the grenade |
 | left ctrl, C | left stick click | crouch |
 | Z, middle mouse button | right stick click | zoom |
 | arrow keys | D-pad | |
 | escape | start | pause menu |
-| F1 | back | |
+| Tab, F1 | back | hold to show the multiplayer scoreboard/player list |
 | \` | | open the developer console |
 | F12 | | release or capture the mouse |
 | F11 | | change between fullscreen and window |
