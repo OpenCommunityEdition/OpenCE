@@ -84,8 +84,8 @@ build adds:
 | F10 | ⌘, | Open or close the settings overlay (refer to "The settings overlay"). |
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
-| X, held for a second | ⌘X | The next camera: the first person, a flying camera, one following the player, and back (the debug cameras, under "Ray-traced lighting"). |
-| Z | ⌘Z | In the flying camera, take its controls (WASD, the mouse), or let go of them. |
+| | ⌘X | The next camera: the first person, a flying camera, one following the player, and back (the debug cameras, under "Ray-traced lighting"). |
+| | ⌘Z | In the flying camera, take its controls or let go of them: WASD moves, the mouse turns, Space rises, left ctrl or C sinks, shift (or Q) goes four times as fast. |
 
 ⌘Q quits on a second press within two seconds (Q is the flashlight, and ⌘
 is held for the keys above); the window's close button quits at once.
@@ -406,14 +406,18 @@ go through.
 
 The game's own debug cameras fly round the scene too: ⌘X goes from the
 first person to a flying camera, then to one following the player, and
-back, one camera a press (as X, the controller's black button, held for a
-second). In the flying camera, ⌘Z (or Z, the right stick's button, or the
-middle mouse button) takes its controls: WASD moves, the mouse turns (as it
-aims, with `input.mouse_sensitivity` and `input.invert_mouse`), the left
-button rises, the right button (or G) sinks, the arrows up and down change
-the speed; ⌘Z again lets go of them, and the player moves and aims again
-while the camera stays where it is. ⌘X and ⌘Z do not also change the
-grenade or zoom, as X and Z do.
+back, one camera a press. In the flying camera, ⌘Z takes its controls:
+WASD moves, the mouse turns (as it aims, with `input.mouse_sensitivity`
+and `input.invert_mouse`), Space (or the left mouse button) rises, left
+ctrl or C (or the right mouse button, or G) sinks, shift or Q held goes four
+times as fast, and the arrows up and down change the speed for good; the
+player neither jumps, crouches nor lights the flashlight meanwhile. ⌘Z
+again lets go of them, and the player moves and aims again while the camera
+stays where it is. On the keyboard only ⌘X and ⌘Z do this: X and Z are the
+grenade and the zoom. A controller does it too: its black button held for a
+second is the next camera, the right stick's click the controls, the
+triggers or A and the left stick's click rise and sink, and the white
+button speeds up.
 
 The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
 at the crosshair, as the kernel traced them: the occlusion rays white, the
@@ -549,9 +553,10 @@ code for the window, the mouse, the keyboard and the first start.
 - `HALO_TEST_INPUT="script:47=switch,50=zoom,52-60=turnright"` plays the
   scripted actions in those seconds since start (forward, back, left, right,
   turnleft, turnright, up, down, fire, grenade, jump, crouch, zoom, action,
-  flashlight, reload, switch, start; `camera` and `cameracontrol` press ⌘X
-  and ⌘Z once, `mouseleft`, `mouseright`, `mouseup` and `mousedown` move the
-  mouse 400 pixels a second); with `HALO_SCREENSHOT_DIR` and
+  flashlight, reload, switch, black, start; `camera` and `cameracontrol`
+  press ⌘X and ⌘Z once, `fast` holds shift, `mouseleft`, `mouseright`,
+  `mouseup` and `mousedown` move the mouse 400 pixels a second); with
+  `HALO_SCREENSHOT_DIR` and
   `HALO_SCREENSHOT_EVERY=<frames>` it records a test drive, and
   `HALO_EXIT_AFTER=<seconds>` ends it.
 - `HALO_COMMANDS="47=cheat_all_weapons;50=cheat_spawn_warthog"` runs
