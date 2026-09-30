@@ -51,6 +51,9 @@ lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
 lights): the occlusion darkens only the lightmaps' share; 2: the objects
 drawn, before the level (their pixels take the sun's traced shadows) */
 void halo_ray_traced_light_stage(int stage);
+/* the console command that starts game.map (HALO_MAP), or NULL
+(port/linux/src/port_config.c) */
+const char *halo_startup_map_command(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

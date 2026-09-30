@@ -344,6 +344,15 @@ code for the window, the mouse, the keyboard and the first start.
 
 ## Find problems
 
+- `HALO_MAP=b30` starts a map without the menus: a campaign level's name
+  (`a10` to `d40`), a multiplayer map's (`bloodgulch`) or a scenario path.
+- `HALO_TEST_INPUT="script:47=switch,50=zoom,52-60=turnright"` plays the
+  scripted actions in those seconds since start (forward, back, left, right,
+  turnleft, turnright, up, down, fire, grenade, jump, crouch, zoom, action,
+  flashlight, reload, switch, start); with `HALO_SCREENSHOT_DIR` and
+  `HALO_SCREENSHOT_EVERY=<frames>` it records a test drive, and
+  `HALO_EXIT_AFTER=<seconds>` ends it.
+
 - `host.txt` in the game's folder is the log of the host, and, when the
   game does not start from a terminal, of the game's port (for one, why
   it quit: `window closed` is ⌘Q or the window's close button). `debug.txt`

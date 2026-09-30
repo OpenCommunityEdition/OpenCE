@@ -131,6 +131,10 @@ static const struct config_setting config_settings[] =
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 
+	{ "game.map", _config_string, "\"\"", "HALO_MAP", _environment_value, _platform_all,
+		"A map to start at start-up, after init.txt: a campaign level's name\n"
+		"(\"a10\", \"b30\"), a multiplayer map's (\"bloodgulch\"), or a scenario\n"
+		"path (\"levels\\\\b30\\\\b30\"); empty for the menu." },
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
@@ -225,7 +229,10 @@ static const struct config_setting config_settings[] =
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
-		"network tests); empty for none." },
+		"network tests); \"script:<from>-<to>=<action>,...\" plays the actions in\n"
+		"those seconds (forward, back, left, right, turnleft, turnright, up, down,\n"
+		"fire, grenade, jump, crouch, zoom, action, flashlight, reload, switch, start);\n"
+		"empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
@@ -922,4 +929,29 @@ const char *config_string(const char *name)
 	const char *string = config_value(name, _config_string)->string;
 
 	return string ? string : "";
+}
+
+/* game.map as a console command: "map_name levels\\<name>\\<name>" for a
+campaign level (a letter and two digits), "levels\\test\\<name>\\<name>" for
+a multiplayer map, or the path as given; NULL for none */
+const char *halo_startup_map_command(void)
+{
+	static char command[256];
+	const char *map = config_string("game.map");
+	size_t length = strlen(map);
+
+	if (!length || length > 120)
+		return NULL;
+	if (strchr(map, '\\') || strchr(map, '/'))
+		snprintf(command, sizeof(command), "map_name %s", map);
+	else if (length == 3 && map[0] >= 'a' && map[0] <= 'd' && map[1] >= '0' && map[1] <= '9' && map[2] >= '0' &&
+		map[2] <= '9')
+		snprintf(command, sizeof(command), "map_name levels\\%s\\%s", map, map);
+	else
+		snprintf(command, sizeof(command), "map_name levels\\test\\%s\\%s", map, map);
+	for (length = 0; command[length]; length++)
+		if (command[length] == '/')
+			command[length] = '\\';
+	platform_log("game.map: %s", command);
+	return command;
 }
