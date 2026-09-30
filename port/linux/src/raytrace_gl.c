@@ -115,6 +115,10 @@ static struct
 	trace grid (origin, size), the camera's tan and aspect; whether there
 	are some */
 	GLuint gi_results_texture, gi_lights_texture, gi_gbuffer_texture;
+	/* the traced light, denoised on the rays' grid (rgb, a: whether there is
+	some), and its pass */
+	GLuint denoised_texture, denoise_program;
+	GLint denoise_uniforms, denoise_lights, denoise_results, denoise_gbuffer;
 	float gi_grid[4], gi_tan, gi_aspect;
 	int gi_previous;
 	int gi_split;
@@ -201,21 +205,52 @@ way), and the composite blends them back up across edges by depth */
 	"	return u[1].xy + (ndc * 0.5 + 0.5) * u[1].zw;\n" \
 	"}\n"
 
+/* the traced light, denoised on the rays' grid, after they are traced: of
+the 9x9 of the rays' pixels around (every other one) those of like depth
+and facing that have traced light (their results' r 2; the light in the
+lights' texture, gba) - out: the light, and 1 where there is some */
+static const char denoise_source[] =
+	SHADER_HEADER
+	"uniform sampler2D lights_texture;\n"
+	"uniform sampler2D results_texture;\n"
+	"uniform sampler2D gbuffer_texture;\n"
+	"uniform vec4 u[4];\n"
+	"out vec4 result;\n"
+	"void main()\n"
+	"{\n"
+	"	ivec2 q0 = ivec2(gl_FragCoord.xy);\n"
+	"	ivec2 lo = ivec2(u[0].xy), hi = max(lo, ivec2(u[0].xy + u[0].zw) - 1);\n"
+	"	vec4 g0 = texelFetch(gbuffer_texture, q0, 0);\n"
+	"	if (g0.x <= 0.0 || texelFetch(results_texture, q0, 0).r < 1.5) { result = vec4(0.0); return; }\n"
+	"	vec3 sum = vec3(0.0);\n"
+	"	float total = 0.0;\n"
+	"	for (int y = -2; y <= 2; y++)\n"
+	"		for (int x = -2; x <= 2; x++)\n"
+	"		{\n"
+	"			ivec2 k = clamp(q0 + ivec2(x, y) * 2, lo, hi);\n"
+	"			vec4 g = texelFetch(gbuffer_texture, k, 0);\n"
+	"			if (g.x <= 0.0 || texelFetch(results_texture, k, 0).r < 1.5) continue;\n"
+	"			float w = 1.0 / (1.0 + abs(g.x - g0.x) / g0.x * 40.0);\n"
+	"			w *= pow(max(dot(g.yzw, g0.yzw), 0.0), 8.0) * exp(-float(x * x + y * y) * 0.3);\n"
+	"			sum += texelFetch(lights_texture, k, 0).gba * w;\n"
+	"			total += w;\n"
+	"		}\n"
+	"	result = total > 0.0 ? vec4(sum / total, 1.0) : vec4(0.0);\n"
+	"}\n";
+
 /* the traced light into the light buffer, in place of the lightmaps', on
-the level's pixels (not the objects', drawn before, whole). The rays of
-the last frame's lighting pass hold it (Metal's writes are not yet seen
-this early in the frame): each pixel's point, from its depth and this
-camera, found in the last frame's view (cameras: this one's position,
-forward, up, right, then the last's; tan and aspect in their w), and the
-light there blurred over 5x5 of its rays' pixels, every other one (9x9),
-of like depth and facing
-(its results r 2 where there is traced light, the lights' texture gba) */
+the level's pixels (not the objects', drawn before, whole: each pixel's
+depth then is its depth now). The last frame's lighting pass traced and
+denoised it (Metal's writes are not yet seen this early in the frame):
+each pixel's point, from its depth and this camera, found in the last
+frame's view (cameras: this one's position, forward, up, right, then the
+last's; tan and aspect in their w), and the light there, between its four
+rays' pixels (bilinear), each taken where its depth is the point's */
 static const char inject_source[] =
 	SHADER_HEADER
 	COMMON_SOURCE
 	"uniform sampler2D irradiance_texture;\n"
 	"uniform sampler2D gbuffer_texture;\n"
-	"uniform sampler2D results_texture;\n"
 	"uniform sampler2D objects_texture;\n"
 	"uniform vec4 cameras[8];\n"
 	"uniform vec4 previous_grid;\n"
@@ -228,11 +263,9 @@ static const char inject_source[] =
 	"	if (split != 0 && float(p.x) < u[1].x + u[1].z * 0.5) discard;\n"
 	"	float d = depth_at(p);\n"
 	"	if (d >= 0.99999) discard;\n"
-	/* (an object's pixel, as the depth and normals pass finds them) */
-	"	ivec2 cell = p / TRACE_SCALE;\n"
-	"	vec4 o = texelFetch(objects_texture, cell, 0);\n"
+	"	vec4 o = texelFetch(objects_texture, p, 0);\n"
 	"	float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
-	"	if (abs(object - depth_at(cell * TRACE_SCALE)) < 4.0 / 16777215.0) discard;\n"
+	"	if (abs(object - d) < 4.0 / 16777215.0) discard;\n"
 	"	float z = linear_depth(d);\n"
 	"	float t = cameras[0].w, aspect = cameras[1].w;\n"
 	"	vec2 grid_origin = u[1].xy / float(TRACE_SCALE), grid_size = u[1].zw / float(TRACE_SCALE);\n"
@@ -242,27 +275,26 @@ static const char inject_source[] =
 	"	float pz = dot(rel, cameras[5].xyz);\n"
 	"	if (pz <= u[0].x) discard;\n"
 	"	vec2 pn = vec2(dot(rel, cameras[7].xyz) / (pz * cameras[4].w * cameras[5].w), -dot(rel, cameras[6].xyz) / (pz * cameras[4].w));\n"
-	"	vec2 q = previous_grid.xy + (pn * 0.5 + 0.5) * previous_grid.zw;\n"
+	"	vec2 q = previous_grid.xy + (pn * 0.5 + 0.5) * previous_grid.zw - 0.5;\n"
 	"	ivec2 lo = ivec2(previous_grid.xy), hi = max(lo, ivec2(previous_grid.xy + previous_grid.zw) - 1);\n"
-	"	ivec2 q0 = clamp(ivec2(floor(q)), lo, hi);\n"
-	"	vec4 g0 = texelFetch(gbuffer_texture, q0, 0);\n"
+	"	ivec2 base = ivec2(floor(q));\n"
+	"	vec2 f = q - floor(q);\n"
 	"	vec3 sum = vec3(0.0);\n"
 	"	float total = 0.0;\n"
-	"	for (int y = -2; y <= 2; y++)\n"
-	"		for (int x = -2; x <= 2; x++)\n"
+	"	for (int y = 0; y <= 1; y++)\n"
+	"		for (int x = 0; x <= 1; x++)\n"
 	"		{\n"
-	"			ivec2 k = clamp(q0 + ivec2(x, y) * 2, lo, hi);\n"
-	"			vec4 g = texelFetch(gbuffer_texture, k, 0);\n"
-	"			if (g.x <= 0.0 || texelFetch(results_texture, k, 0).r < 1.5) continue;\n"
-	"			float w = 1.0 / (1.0 + abs(g.x - pz) / pz * 40.0);\n"
-	"			w *= pow(max(dot(g.yzw, g0.yzw), 0.0), 8.0) * exp(-float(x * x + y * y) * 0.3);\n"
-	"			sum += texelFetch(irradiance_texture, k, 0).gba * w;\n"
+	"			ivec2 k = clamp(base + ivec2(x, y), lo, hi);\n"
+	"			float g = texelFetch(gbuffer_texture, k, 0).x;\n"
+	"			vec4 light = texelFetch(irradiance_texture, k, 0);\n"
+	"			if (g <= 0.0 || light.a < 0.5 || abs(g - pz) > pz * 0.05 + 0.05) continue;\n"
+	"			float w = (x == 0 ? 1.0 - f.x : f.x) * (y == 0 ? 1.0 - f.y : f.y) + 1e-4;\n"
+	"			sum += light.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
-	/* (split 2, HALO_RT_INJECT_DEBUG: red where the last frame saw this
-	   point, green where it had traced light near) */
-	"	if (split == 2) { result = vec4(abs(abs(g0.x) - pz) < pz * 0.05 + 0.05 ? 1.0 : 0.0, total > 0.02 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
-	"	if (total <= 0.02) discard;\n"
+	/* (split 2, HALO_RT_INJECT_DEBUG: green where there is traced light) */
+	"	if (split == 2) { result = vec4(0.0, total > 0.0 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
+	"	if (total <= 0.0) discard;\n"
 	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
 	"}\n";
 
@@ -391,21 +423,22 @@ static const char gbuffer_source[] =
 	   depth now): the depth negative */
 	"	if (objects_known != 0)\n"
 	"	{\n"
-	"		vec4 o = texelFetch(objects_texture, ivec2(gl_FragCoord.xy), 0);\n"
+	"		vec4 o = texelFetch(objects_texture, ivec2(gl_FragCoord.xy) * TRACE_SCALE, 0);\n"
 	"		float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
 	"		if (abs(object - d) < 4.0 / 16777215.0) P.z = -P.z;\n"
 	"	}\n"
 	"	result = vec4(P.z, N);\n"
 	"}\n";
 
-/* the objects' depth, packed in 24 bits */
+/* the objects' depth, packed in 24 bits (at the window's resolution: the
+light buffer tells each pixel's objects from the level's) */
 static const char objects_source[] =
 	SHADER_HEADER
 	COMMON_SOURCE
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
-	"	float d = clamp(depth_at(ivec2(gl_FragCoord.xy) * TRACE_SCALE), 0.0, 1.0);\n"
+	"	float d = clamp(depth_at(ivec2(gl_FragCoord.xy)), 0.0, 1.0);\n"
 	"	uint v = uint(d * 16777215.0 + 0.5);\n"
 	"	result = vec4(float(v & 255u), float((v >> 8) & 255u), float(v >> 16), 255.0) / 255.0;\n"
 	"}\n";
@@ -832,6 +865,14 @@ static void initialize(void)
 			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
 			ray.gbuffer_objects = glGetUniformLocation(ray.gbuffer_program, "objects_texture");
 			ray.gbuffer_objects_known = glGetUniformLocation(ray.gbuffer_program, "objects_known");
+			ray.denoise_program = link_with(vertex_source, denoise_source, "ray tracing light buffer denoise");
+			if (ray.denoise_program)
+			{
+				ray.denoise_uniforms = glGetUniformLocation(ray.denoise_program, "u");
+				ray.denoise_lights = glGetUniformLocation(ray.denoise_program, "lights_texture");
+				ray.denoise_results = glGetUniformLocation(ray.denoise_program, "results_texture");
+				ray.denoise_gbuffer = glGetUniformLocation(ray.denoise_program, "gbuffer_texture");
+			}
 			ray.inject_program = link(inject_source, "ray tracing light buffer");
 			if (ray.inject_program)
 			{
@@ -867,6 +908,20 @@ static void initialize(void)
 		ray.occlusion_strength, ray.reflection_strength, ray.bounce_strength);
 }
 
+/* half floats, drawn to (the traced light, denoised) */
+static GLuint make_float_texture(int width, int height)
+{
+	GLuint texture;
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+	return texture;
+}
+
 static GLuint make_texture(int width, int height)
 {
 	GLuint texture;
@@ -892,12 +947,14 @@ static void size_textures(int width, int height)
 		glDeleteTextures(1, &ray.baked_texture);
 		glDeleteTextures(1, &ray.lit_texture);
 		glDeleteTextures(1, &ray.objects_texture);
+		glDeleteTextures(1, &ray.denoised_texture);
 	}
 	ray.scene_texture = make_texture(width, height);
 	ray.effect_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.baked_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.lit_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
-	ray.objects_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.objects_texture = make_texture(width, height);
+	ray.denoised_texture = make_float_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.light_stages = 0;
 	ray.width = width;
 	ray.height = height;
@@ -1266,7 +1323,7 @@ void halo_ray_traced_light_stage(int stage)
 		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.objects_texture, 0);
 		glDrawBuffers(1, &draw_buffer);
-		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+		glViewport(0, 0, width, height);
 		glBindVertexArray(ray.vertex_array);
 		glUseProgram(ray.objects_program);
 		glUniform4fv(ray.objects_uniforms, 4, uniforms);
@@ -1459,10 +1516,6 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glBindTexture(GL_TEXTURE_2D, ray.gi_gbuffer_texture);
 	glBindSampler(3, 0);
 	glUniform1i(ray.inject_gbuffer, 3);
-	glActiveTexture(GL_TEXTURE4);
-	glBindTexture(GL_TEXTURE_2D, ray.gi_results_texture);
-	glBindSampler(4, 0);
-	glUniform1i(ray.inject_results, 4);
 	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, ray.objects_texture);
 	glBindSampler(5, 0);
@@ -1547,11 +1600,41 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
 	/* (for the next frame's light buffer: these rays, the grid they were
 	traced on, the camera's lens) */
-	ray.gi_previous = world_results && ray.gi && ray.lights_texture && ray.gbuffer_texture;
+	ray.gi_previous = world_results && ray.gi && ray.lights_texture && ray.gbuffer_texture && ray.denoise_program &&
+		ray.denoised_texture;
 	if (ray.gi_previous)
 	{
+		/* the traced light, denoised on the rays' grid, for the next frame */
+		float grid[16] = { 0 };
+		const GLenum denoise_buffer = GL_COLOR_ATTACHMENT0;
+
+		grid[0] = uniforms[4] / TRACE_SCALE;
+		grid[1] = uniforms[5] / TRACE_SCALE;
+		grid[2] = uniforms[6] / TRACE_SCALE;
+		grid[3] = uniforms[7] / TRACE_SCALE;
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.denoised_texture, 0);
+		glDrawBuffers(1, &denoise_buffer);
+		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+		glDisable(GL_SCISSOR_TEST);
+		glUseProgram(ray.denoise_program);
+		glUniform4fv(ray.denoise_uniforms, 4, grid);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, ray.lights_texture);
+		glBindSampler(1, 0);
+		glUniform1i(ray.denoise_lights, 1);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, world_results);
+		glBindSampler(2, 0);
+		glUniform1i(ray.denoise_results, 2);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
+		glBindSampler(3, 0);
+		glUniform1i(ray.denoise_gbuffer, 3);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glEnable(GL_SCISSOR_TEST);
 		ray.gi_results_texture = world_results;
-		ray.gi_lights_texture = ray.lights_texture;
+		ray.gi_lights_texture = ray.denoised_texture;
 		ray.gi_gbuffer_texture = ray.gbuffer_texture;
 		ray.gi_grid[0] = uniforms[4] / TRACE_SCALE;
 		ray.gi_grid[1] = uniforms[5] / TRACE_SCALE;
