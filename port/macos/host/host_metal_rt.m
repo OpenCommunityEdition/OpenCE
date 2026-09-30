@@ -144,6 +144,12 @@ static struct
 	when its triangles are others, and every 60th frame */
 	id<MTLAccelerationStructure> bodies[HOST_RT_GROUPS], scene;
 	int body_counts[HOST_RT_GROUPS][2], body_age[HOST_RT_GROUPS];
+	/* all the frame's object triangles for the kernel, 10 floats each (the
+	corners; the colour's bits), each instance's opaque ones then its
+	cutouts, and where each instance's start (uint4: opaque, cutouts,
+	whether it has opaque ones) */
+	id<MTLBuffer> object_tris[3], instance_tris[3];
+	uint32_t tri_base[HOST_RT_GROUPS][2];
 	NSArray<id<MTLAccelerationStructure>> *scene_structures;
 	float spheres[HOST_RT_GROUPS + 1][4];
 	/* the ray probe's segments (the kernel writes them) */
@@ -352,7 +358,7 @@ static NSString *const kernel_source = @
 	"{\n"
 	"	intersection_type type;\n"
 	"	float distance;\n"
-	"	uint instance_id, primitive_id;\n"
+	"	uint instance_id, primitive_id, geometry_id;\n"
 	"	float2 triangle_barycentric_coord;\n"
 	"	bool triangle_front_facing;\n"
 	"};\n"
@@ -376,12 +382,14 @@ static NSString *const kernel_source = @
 	"	h.distance = 0.0;\n"
 	"	h.instance_id = 0u;\n"
 	"	h.primitive_id = 0u;\n"
+	"	h.geometry_id = 0u;\n"
 	"	h.triangle_barycentric_coord = float2(0.0);\n"
 	"	h.triangle_front_facing = true;\n"
 	"	if (h.type != intersection_type::none)\n"
 	"	{\n"
 	"		h.distance = q.get_committed_distance();\n"
 	"		h.instance_id = q.get_committed_instance_id();\n"
+	"		h.geometry_id = q.get_committed_geometry_id();\n"
 	"		h.primitive_id = q.get_committed_primitive_id() +\n"
 	"			(h.instance_id == 0u && q.get_committed_geometry_id() == 1u ? cutout_start : 0u);\n"
 	"		h.triangle_barycentric_coord = q.get_committed_triangle_barycentric_coord();\n"
@@ -397,6 +405,84 @@ static NSString *const kernel_source = @
 	   the light on a surface facing where most of it comes from (in the
 	   light buffer's units), how much it comes from there (0 all round, 1
 	   all from there), and that direction */
+	/* an object's triangle's facing, toward the ray (d): its corners from the
+	   frame's object triangles (each instance's opaque ones from .x, its
+	   cutouts from .y; .z 0 when it has no opaque ones - its cutouts are then
+	   its first geometry) */
+	"static float3 object_normal(uint instance, uint geometry, uint primitive, float3 d, device const float *object_tris,\n"
+	"	device const uint4 *instance_tris)\n"
+	"{\n"
+	"	uint4 r = instance_tris[instance];\n"
+	"	uint t = (r.z == 0u || geometry == 1u ? r.y : r.x) + primitive;\n"
+	"	device const float *v = object_tris + t * 10u;\n"
+	"	float3 n = cross(float3(v[3], v[4], v[5]) - float3(v[0], v[1], v[2]), float3(v[6], v[7], v[8]) - float3(v[0], v[1], v[2]));\n"
+	"	float l = length(n);\n"
+	"	n = l > 1e-8 ? n / l : -d;\n"
+	"	return dot(n, d) > 0.0 ? -n : n;\n"
+	"}\n"
+	/* the light arriving at H, facing N, traced: the sun (and its shadow),
+	   one of the sky's wide lights, one glowing triangle (the light grid's
+	   choice) - as the path tracer takes it at each place it lands */
+	"static float3 hit_light(float3 H, float3 N, thread uint &seed, constant float *c, instance_acceleration_structure world,\n"
+	"	device const float4 *glowing, uint glowing_count, GRID_PARAMS, CUT_PARAMS)\n"
+	"{\n"
+	"	float3 E = float3(0.0);\n"
+	"	float3 sun_dir = float3(c[24], c[25], c[26]);\n"
+	"	float hs = dot(N, sun_dir);\n"
+	"	if (c[27] > 0.0 && hs > 0.0 && c[45] > 0.0)\n"
+	"	{\n"
+	"		ray to_sun(H, sun_dir, 0.0, 2000.0);\n"
+	"		if (!blocked(to_sun, world, 3u, cutout_start, indices, base_texcoords, triangle_materials, materials, object_cutouts,\n"
+	"			instance_offsets, mask_rects, masks, cutouts_ready))\n"
+	"			E += float3(c[36], c[37], c[38]) * c[45] * hs;\n"
+	"	}\n"
+	"	uint fills = (c[71] > 0.5 ? 1u : 0u) + (c[79] > 0.5 ? 1u : 0u);\n"
+	"	if (fills > 0u)\n"
+	"	{\n"
+	"		uint chosen = fills == 2u ? (random01(seed) < 0.5 ? 0u : 1u) : (c[71] > 0.5 ? 0u : 1u);\n"
+	"		uint o = 64u + chosen * 8u;\n"
+	"		float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
+	"		float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
+	"		float3 ax_b = cross(axis, ax_t);\n"
+	"		float w1 = random01(seed), w2 = random01(seed);\n"
+	"		float cos_t = mix(1.0, c[o + 6u], w1), sin_t = sqrt(max(0.0, 1.0 - cos_t * cos_t)), phi = 6.2831853 * w2;\n"
+	"		float3 sd = normalize(axis * cos_t + ax_t * (sin_t * cos(phi)) + ax_b * (sin_t * sin(phi)));\n"
+	"		float facing = dot(N, sd);\n"
+	"		ray to_sky(H, sd, 0.0, 2000.0);\n"
+	"		if (facing > 0.0 && !blocked(to_sky, world, 3u, cutout_start, indices, base_texcoords, triangle_materials, materials,\n"
+	"			object_cutouts, instance_offsets, mask_rects, masks, cutouts_ready))\n"
+	"			E += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45] * float(fills);\n"
+	"	}\n"
+	"	if (glowing_count > 0u)\n"
+	"	{\n"
+	"		glow_choice choice = glow_pick(H, random01(seed), glowing, glowing_count, GRID_ARGS);\n"
+	"		float4 ga = glowing[choice.index * 3u], gb = glowing[choice.index * 3u + 1u], gc = glowing[choice.index * 3u + 2u];\n"
+	"		float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
+	"		float3 at = ga.xyz * (1.0 - r1) + gb.xyz * (r1 * (1.0 - r2)) + gc.xyz * (r1 * r2);\n"
+	"		float3 gcross = cross(gb.xyz - ga.xyz, gc.xyz - ga.xyz);\n"
+	"		float3 Lg = at - H;\n"
+	"		float gd2 = dot(Lg, Lg), gd = sqrt(gd2);\n"
+	"		Lg /= max(gd, 1e-4);\n"
+	"		float ch = dot(N, Lg), ct = abs(dot(normalize(gcross), Lg));\n"
+	"		ray to_glow(H, Lg, 0.0, max(gd - 0.01, 0.0));\n"
+	"		if (ch > 0.0 && ct > 0.0 && choice.probability > 0.0 && gd > 1e-3 &&\n"
+	"			!blocked(to_glow, world, 3u, cutout_start, indices, base_texcoords, triangle_materials, materials, object_cutouts,\n"
+	"				instance_offsets, mask_rects, masks, cutouts_ready))\n"
+	"			E += min(materials[uint(gc.w) * 2u + 1u].rgb * c[47] * ch * ct * 0.5 * length(gcross) / (max(gd2, 0.01) * choice.probability) * 0.3183099, float3(4.0));\n"
+	"	}\n"
+	"	return E;\n"
+	"}\n"
+	/* an object's triangle's colour: its texture's average (the tenth float's
+	   bits, 8 each of red, green and blue; a mid grey until it is read) */
+	"static float3 object_albedo(uint instance, uint geometry, uint primitive, device const float *object_tris,\n"
+	"	device const uint4 *instance_tris)\n"
+	"{\n"
+	"	uint4 r = instance_tris[instance];\n"
+	"	uint t = (r.z == 0u || geometry == 1u ? r.y : r.x) + primitive;\n"
+	"	uint packed = as_type<uint>(object_tris[t * 10u + 9u]);\n"
+	"	if (packed == 0u) return float3(0.45);\n"
+	"	return float3(float((packed >> 16) & 255u), float((packed >> 8) & 255u), float(packed & 255u)) / 255.0;\n"
+	"}\n"
 	"kernel void probes(instance_acceleration_structure world [[buffer(0)]],\n"
 	"	constant float *c [[buffer(1)]],\n"
 	"	device const uint *indices [[buffer(10)]],\n"
@@ -560,6 +646,8 @@ static NSString *const kernel_source = @
 	"	constant uint &cutouts_ready [[buffer(25)]],\n"
 	"	texture2d<float, access::sample> masks [[texture(7)]],\n"
 	"	device const float *level_vertices [[buffer(26)]],\n"
+	"	device const float *object_tris [[buffer(18)]],\n"
+	"	device const uint4 *instance_tris [[buffer(19)]],\n"
 	"	device atomic_uint *exposure_sums [[buffer(27)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
@@ -627,6 +715,14 @@ static NSString *const kernel_source = @
 	"				auto body = view.intersect(primary, world, 4u);\n"
 	"				bool player = body.type != intersection_type::none && abs(body.distance - h.distance) < 1e-3;\n"
 	"				base = player ? float3(0.2, 0.9, 1.0) : float3(1.0, 0.55, 0.15);\n"
+	/* (with the traced light: as the rays light it, tinted) */
+	"				if (gi_ready != 0u && !player)\n"
+	"				{\n"
+	"					float3 No = object_normal(h.instance_id, h.geometry_id, h.primitive_id, dir, object_tris, instance_tris);\n"
+	"					uint view_seed = pcg(id.x + pcg(id.y + pcg(uint(c[44]))));\n"
+	"					base = object_albedo(h.instance_id, h.geometry_id, h.primitive_id, object_tris, instance_tris) * (hit_light(eye + dir * h.distance + No * 0.03, No, view_seed, c, world, glowing,\n"
+	"						glowing_count, GRID_ARGS, CUT_ARGS) + float3(c[39], c[40], c[41]));\n"
+	"				}\n"
 	"			}\n"
 	"			if (gi_ready == 0u) base *= 1.0 / (1.0 + h.distance * 0.015);\n"
 	"			if (c[27] > 0.0 && gi_ready == 0u)\n"
@@ -954,10 +1050,23 @@ static NSString *const kernel_source = @
 	"					L += throughput * float3(c[39], c[40], c[41]);\n"
 	"					break;\n"
 	"				}\n"
+	/* (an object: lit where it is - the sun, the sky, a glowing triangle -
+	   its colour a mid grey; with the path tracer, on from it) */
 	"				if (h.instance_id != 0u)\n"
 	"				{\n"
-	"					L += throughput * float3(c[80], c[81], c[82]) * 0.35 * (c[42] < 1.5 ? c[43] : 1.0);\n"
-	"					break;\n"
+	"					float3 No = object_normal(h.instance_id, h.geometry_id, h.primitive_id, d, object_tris, instance_tris);\n"
+	"					float3 Ho = origin + d * h.distance + No * bias;\n"
+	"					throughput *= object_albedo(h.instance_id, h.geometry_id, h.primitive_id, object_tris, instance_tris);\n"
+	"					L += throughput * hit_light(Ho, No, seed, c, world, glowing, glowing_count, GRID_ARGS, CUT_ARGS) *\n"
+	"						(c[42] < 1.5 ? c[43] : 1.0);\n"
+	"					if (c[42] < 2.5) break;\n"
+	"					float o1 = random01(seed), o2 = random01(seed);\n"
+	"					float3 ot = normalize(abs(No.z) < 0.9 ? cross(No, float3(0, 0, 1)) : cross(No, float3(1, 0, 0)));\n"
+	"					float3 ob = cross(No, ot);\n"
+	"					float orr = sqrt(o1), oa = 6.2831853 * o2;\n"
+	"					d = normalize(ot * (orr * cos(oa)) + ob * (orr * sin(oa)) + No * sqrt(max(0.0, 1.0 - o1)));\n"
+	"					origin = Ho;\n"
+	"					continue;\n"
 	"				}\n"
 	/* (a surface's back: inside a wall, dark) */
 	"				if (!h.triangle_front_facing) break;\n"
@@ -992,44 +1101,7 @@ static NSString *const kernel_source = @
 	"				if (dot(Nh, d) > 0.0) Nh = -Nh;\n"
 	"				float3 H = origin + d * h.distance + Nh * bias;\n"
 	"				throughput *= surface.rgb;\n"
-	"				float3 E = float3(0.0);\n"
-	"				float hs = dot(Nh, sun_dir);\n"
-	"				if (c[27] > 0.0 && hs > 0.0)\n"
-	"				{\n"
-	"					ray to_sun_h(H, sun_dir, 0.0, 2000.0);\n"
-	"					if (!blocked(to_sun_h, world, 3u, CUT_ARGS)) E += sun_color * hs;\n"
-	"				}\n"
-	"				if (fills > 0u)\n"
-	"				{\n"
-	"					uint o = 64u + chosen * 8u;\n"
-	"					float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
-	"					float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
-	"					float3 ax_b = cross(axis, ax_t);\n"
-	"					float w1 = random01(seed), w2 = random01(seed);\n"
-	"					float cos_t = mix(1.0, c[o + 6u], w1), sin_t = sqrt(max(0.0, 1.0 - cos_t * cos_t)), phi = 6.2831853 * w2;\n"
-	"					float3 sd = normalize(axis * cos_t + ax_t * (sin_t * cos(phi)) + ax_b * (sin_t * sin(phi)));\n"
-	"					float facing = dot(Nh, sd);\n"
-	"					ray to_sky_h(H, sd, 0.0, 2000.0);\n"
-	"					if (facing > 0.0 && !blocked(to_sky_h, world, 3u, CUT_ARGS))\n"
-	"						E += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45] * float(fills);\n"
-	"				}\n"
-	"				if (glowing_count > 0u)\n"
-	"				{\n"
-	"					glow_choice choice = glow_pick(H, random01(seed), glowing, glowing_count, GRID_ARGS);\n"
-	"					uint lo = choice.index;\n"
-	"					float4 ga = glowing[lo * 3u], gb = glowing[lo * 3u + 1u], gc = glowing[lo * 3u + 2u];\n"
-	"					ga.w = choice.probability;\n"
-	"					float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
-	"					float3 at = ga.xyz * (1.0 - r1) + gb.xyz * (r1 * (1.0 - r2)) + gc.xyz * (r1 * r2);\n"
-	"					float3 gcross = cross(gb.xyz - ga.xyz, gc.xyz - ga.xyz);\n"
-	"					float3 Lg = at - H;\n"
-	"					float gd2 = dot(Lg, Lg), gd = sqrt(gd2);\n"
-	"					Lg /= max(gd, 1e-4);\n"
-	"					float ch = dot(Nh, Lg), ct = abs(dot(normalize(gcross), Lg));\n"
-	"					ray to_glow_h(H, Lg, 0.0, max(gd - 0.01, 0.0));\n"
-	"					if (ch > 0.0 && ct > 0.0 && ga.w > 0.0 && gd > 1e-3 && !blocked(to_glow_h, world, 3u, CUT_ARGS))\n"
-	"						E += min(materials[uint(gc.w) * 2u + 1u].rgb * c[47] * ch * ct * 0.5 * length(gcross) / (max(gd2, 0.01) * ga.w) * 0.3183099, float3(4.0));\n"
-	"				}\n"
+	"				float3 E = hit_light(H, Nh, seed, c, world, glowing, glowing_count, GRID_ARGS, CUT_ARGS);\n"
 	"				L += throughput * E;\n"
 	/* (on: cosine-weighted about the hit's facing) */
 	"				float v1r = random01(seed), v2r = random01(seed);\n"
@@ -1913,6 +1985,10 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 				options:MTLResourceStorageModeShared];
 			rt.instance_offsets[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) * 4
 				options:MTLResourceStorageModeShared];
+			rt.object_tris[index] = [rt.device newBufferWithLength:(NSUInteger)HOST_RT_OBJECT_TRIANGLES * 40
+				options:MTLResourceStorageModeShared];
+			rt.instance_tris[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) * 16
+				options:MTLResourceStorageModeShared];
 		}
 	}
 	rt.instance_ring = (ring + 1) % 3;
@@ -1964,8 +2040,49 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		}
 		memcpy(vertices, &rt.object_triangles[index * 9], 9 * sizeof(float));
 	}
+	/* (and all of them, for the kernel: each group's opaque ones, then its
+	cutouts, each with its colour - as they were put in the groups above) */
+	{
+		int opaque_base[HOST_RT_GROUPS], cutout_base[HOST_RT_GROUPS], opaque_at[HOST_RT_GROUPS] = { 0 },
+			cutout_at[HOST_RT_GROUPS] = { 0 }, at = 0;
+		float *all = (float *)rt.object_tris[ring].contents;
+
+		for (group = 0; group < HOST_RT_GROUPS; group++)
+		{
+			opaque_base[group] = at;
+			at += group_triangles[group];
+			cutout_base[group] = at;
+			at += cutout_fill[group];
+			rt.tri_base[group][0] = (uint32_t)opaque_base[group];
+			rt.tri_base[group][1] = (uint32_t)cutout_base[group];
+		}
+		for (index = 0; index < rt.object_count; index++)
+		{
+			const float *cut = &rt.object_cutout_input[index * 8];
+			float *out;
+
+			group = rt.object_groups[index] >> 3;
+			if (group >= HOST_RT_GROUPS)
+				continue;
+			if (cut[6] >= 0.0f)
+			{
+				if (cutout_at[group] >= cutout_fill[group])
+					continue;
+				out = all + (cutout_base[group] + cutout_at[group]++) * 10;
+			}
+			else
+			{
+				if (opaque_at[group] >= group_triangles[group])
+					continue;
+				out = all + (opaque_base[group] + opaque_at[group]++) * 10;
+			}
+			memcpy(out, &rt.object_triangles[index * 9], 9 * sizeof(float));
+			memcpy(out + 9, &cut[7], sizeof(float));
+		}
+	}
 	offsets = (uint32_t *)rt.instance_offsets[ring].contents;
 	memset(offsets, 0, (HOST_RT_GROUPS + 1) * 4);
+	memset(rt.instance_tris[ring].contents, 0, (HOST_RT_GROUPS + 1) * 16);
 	encoder = [commands accelerationStructureCommandEncoder];
 	structures = [NSMutableArray arrayWithObject:level_structure()];
 	buffer = rt.instance_buffers[ring];
@@ -2052,6 +2169,9 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			rt.body_age[group] = 0;
 		}
 		offsets[count] = (uint32_t)cutout_offsets[group];
+		((uint32_t *)rt.instance_tris[ring].contents)[count * 4] = rt.tri_base[group][0];
+		((uint32_t *)rt.instance_tris[ring].contents)[count * 4 + 1] = rt.tri_base[group][1];
+		((uint32_t *)rt.instance_tris[ring].contents)[count * 4 + 2] = group_triangles[group] > 0 ? 1u : 0u;
 		instances[count].mask = group_masks[group];
 		if (rt.objects_two_sided)
 			instances[count].options |= MTLAccelerationStructureInstanceOptionDisableTriangleCulling;
@@ -2349,6 +2469,9 @@ int host_rt_trace(const float *camera, int width, int height)
 			[encoder setBuffer:cutouts_ready ? rt.instance_offsets[rt.scene_ring] : any offset:0 atIndex:24];
 			[encoder setBytes:&cutouts_ready length:sizeof(cutouts_ready) atIndex:25];
 			[encoder setBuffer:gi_ready && rt.drawn_vertices ? rt.drawn_vertices : any offset:0 atIndex:26];
+			/* (18 and 19: the probes' later, after the rays) */
+			[encoder setBuffer:rt.object_tris[rt.scene_ring] ? rt.object_tris[rt.scene_ring] : any offset:0 atIndex:18];
+			[encoder setBuffer:rt.instance_tris[rt.scene_ring] ? rt.instance_tris[rt.scene_ring] : any offset:0 atIndex:19];
 
 			[encoder setTexture:cutouts_ready ? rt.mask_atlas : rt.textures[1] atIndex:7];
 			constants[83] = (float)rt.drawn_cutout_start;

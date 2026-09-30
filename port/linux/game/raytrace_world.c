@@ -472,6 +472,44 @@ static float *triangle_cutout(const float *triangle)
 	return ray_cutouts && ray_triangles_base ? ray_cutouts + (triangle - ray_triangles_base) / 9 * 8 : NULL;
 }
 
+static boolean level_bitmap_readable(struct bitmap_data *bitmap);
+static void level_bitmap_average(struct bitmap_data *bitmap, float *average);
+
+/* a model part's colour in the rays: its base map's average, 8 bits each of
+red, green and blue in a float's bits (0: not read yet - the rays take a
+mid grey), read once for each bitmap as the texture cache has it */
+static float object_albedo(struct bitmap_data *bitmap)
+{
+	static struct
+	{
+		struct bitmap_data *bitmap;
+		unsigned long packed;
+	} known[512];
+	unsigned long slot = ((unsigned long)bitmap >> 4) % 512, tries;
+	float average[3], result;
+
+	if (!bitmap)
+		return 0.0f;
+	for (tries = 0; tries < 8; tries++, slot = (slot + 1) % 512)
+	{
+		if (known[slot].bitmap == bitmap)
+		{
+			memcpy(&result, &known[slot].packed, sizeof(result));
+			return result;
+		}
+		if (!known[slot].bitmap)
+			break;
+	}
+	if (tries == 8 || !level_bitmap_readable(bitmap))
+		return 0.0f;
+	level_bitmap_average(bitmap, average);
+	known[slot].bitmap = bitmap;
+	known[slot].packed = 0x01000000UL | ((unsigned long)(PIN(average[0], 0.0f, 1.0f) * 255.0f) << 16) |
+		((unsigned long)(PIN(average[1], 0.0f, 1.0f) * 255.0f) << 8) | (unsigned long)(PIN(average[2], 0.0f, 1.0f) * 255.0f);
+	memcpy(&result, &known[slot].packed, sizeof(result));
+	return result;
+}
+
 static long model_triangles(struct object_datum *object, const real_matrix4x3 *matrices, float *out, long room,
 	const real_matrix4x3 *rigid)
 {
@@ -480,7 +518,7 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 	const struct model_node *nodes;
 	static real_matrix4x3 relative[RAY_TRACED_MAXIMUM_NODES];
 	long count = 0, node_index, region_index, part_mask = -1;
-	float u_scale = 1.0f, v_scale = 1.0f;
+	float u_scale = 1.0f, v_scale = 1.0f, part_albedo = 0.0f;
 
 	if (!matrices || definition->object.model.index == NONE)
 		return 0;
@@ -609,6 +647,16 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 				}
 				if (shader_type != 3 && shader_type != 4)
 					continue;
+				/* (its colour in the rays: its base map's average) */
+				part_albedo = 0.0f;
+				if (shader)
+				{
+					const struct tag_reference *base_map = (const struct tag_reference *)
+						(shader + (shader_type == 4 ? 0xA4 : 0x88));
+
+					if (base_map->index != NONE)
+						part_albedo = object_albedo(bitmap_group_try_and_get_bitmap(base_map->index, 0));
+				}
 				if (shader && ((shader_type == 4 && !(shader_flags & 4)) || (shader_type == 3 && (shader_flags & 1))))
 				{
 					const struct tag_reference *base_map = (const struct tag_reference *)
@@ -718,7 +766,7 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 						cut[corner * 2 + 0] = u * u_scale;
 						cut[corner * 2 + 1] = v * v_scale;
 						cut[6] = (float)part_mask;
-						cut[7] = 0.0f;
+						cut[7] = part_albedo;
 					}
 					const real_point3d *position = (const real_point3d *)raw;
 					short node0, node1;
@@ -899,7 +947,10 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 			float *cut = triangle_cutout(out + index * 9);
 
 			if (cut)
+			{
 				cut[6] = -1.0f;
+				cut[7] = 0.0f;
+			}
 		}
 	}
 	return count;
@@ -1745,6 +1796,9 @@ static void level_bitmap_average(struct bitmap_data *bitmap, float *average)
 	}
 	if (bitmap->mipmap_count > 0)
 		lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
+	/* (the last mipmap: at most all of them - a model's, some, go that far) */
+	if (lod < 0.0f)
+		lod = 0.0f;
 	for (sample = 0; sample < 16; sample++)
 	{
 		real_point2d point;
