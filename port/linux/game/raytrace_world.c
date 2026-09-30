@@ -40,8 +40,11 @@ static void world_build(const struct collision_bsp *bsp)
 	const struct collision_vertex *vertices = bsp->vertices.address;
 	long surface_index, vertex_index, capacity;
 
-	free(world.vertices);
-	free(world.indices);
+	/* (the game's allocator refuses NULL) */
+	if (world.vertices)
+		free(world.vertices);
+	if (world.indices)
+		free(world.indices);
 	world.vertices = NULL;
 	world.indices = NULL;
 	world.vertex_count = 0;
