@@ -78,6 +78,14 @@ Y is held, and whether a scroll is under way */
 static Uint64 wheel_moved_ms = 0;
 static Uint64 wheel_press_until_ms = 0;
 static BOOL wheel_scrolling = FALSE;
+/* when port 0's aim last moved, by the mouse and by the right stick
+(halo_linux_mouse_aiming) */
+static Uint64 mouse_aimed_ms = 0;
+static Uint64 stick_aimed_ms = 0;
+
+/* the right stick's deflection that counts as aiming with it, clear of a
+worn stick's drift */
+#define STICK_AIMING_DEFLECTION 8000
 
 static float mouse_sensitivity(void)
 {
@@ -121,6 +129,26 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	return TRUE;
 }
 
+/* whether the player on the gamepad aims with the mouse (it moved after the
+right stick last did) and input.mouse_aim_assist is off: then the game's aim
+assist leaves them be (player_control.c, aim_assist.c) */
+int halo_linux_mouse_aiming(short gamepad_index)
+{
+	static int aim_assist = -1;
+	int aiming;
+
+	if (gamepad_index != 0)
+		return FALSE;
+	if (aim_assist < 0)
+		aim_assist = config_boolean("input.mouse_aim_assist");
+	if (aim_assist)
+		return FALSE;
+	pthread_mutex_lock(&mouse_lock);
+	aiming = mouse_aimed_ms != 0 && mouse_aimed_ms >= stick_aimed_ms;
+	pthread_mutex_unlock(&mouse_lock);
+	return aiming;
+}
+
 /* collects the motion the game has not asked for yet; motion that nobody
 consumes for a few polls (menus, cutscenes) is dropped so it cannot jerk
 the view later */
@@ -136,6 +164,8 @@ static void mouse_poll(const struct platform_input_state *input)
 	{
 		mouse_pending_x += input->mouse_dx;
 		mouse_pending_y += input->mouse_dy;
+		if (input->mouse_dx != 0.0f || input->mouse_dy != 0.0f)
+			mouse_aimed_ms = SDL_GetTicks();
 		mouse_wheel_accumulated += input->mouse_wheel;
 		if (input->mouse_wheel != 0.0f)
 			wheel_moved_ms = SDL_GetTicks();
@@ -504,6 +534,13 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		if (count > 0)
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
+		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
+			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
+		{
+			pthread_mutex_lock(&mouse_lock);
+			stick_aimed_ms = SDL_GetTicks();
+			pthread_mutex_unlock(&mouse_lock);
+		}
 	}
 	else if (port < count)
 	{

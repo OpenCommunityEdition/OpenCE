@@ -601,6 +601,22 @@ long player_aim_projectile(
 				target_object_index= target.object_index;
 			}
 		}
+#ifdef HALO_LINUX
+		/* no autoaim for a local player aiming with the mouse
+		(port/linux/src/xinput_sdl.c), but for lockstep games, in which every
+		machine must fire every shot alike; the target is still homed onto */
+		{
+			extern int halo_linux_mouse_aiming(short gamepad_index);
+			extern boolean network_game_distributed(void);
+
+			if (player->local_player_index!=NONE &&
+				halo_linux_mouse_aiming(player->local_player_index) &&
+				(game_connection()==_game_connection_local || network_game_distributed()))
+			{
+				autoaim_level= 0.f;
+			}
+		}
+#endif
 
 		/* Trace from the camera at the aiming unit's distance along the camera direction. */
 		{
