@@ -31,6 +31,19 @@ needs macOS 14.4 or later.
 3. Enter `ninja macos_app`.
 4. Open `build/macos/Halo.app`, or enter `open build/macos/Halo.app`.
 
+### Sign and notarize the application
+
+To give `Halo.app` to other people, sign it with a Developer ID, and
+notarize it so that macOS opens it without a warning:
+
+1. One time: `xcrun notarytool store-credentials halo-notary --apple-id <Apple ID> --team-id <team>`.
+   It asks for an app-specific password (made at appleid.apple.com).
+2. `NOTARY_PROFILE=halo-notary port/macos/sign_app.sh`
+
+The script signs with the hardened runtime and
+`port/macos/Halo.entitlements`, notarizes, staples the ticket and writes
+`build/macos/Halo-macos-arm64.zip`. Without `NOTARY_PROFILE` it only signs.
+
 `ninja macos` builds the same game without the application bundle, in
 `build/macos/Halo`. Start it with `build/macos/Halo/halo`.
 

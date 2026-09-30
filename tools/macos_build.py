@@ -561,9 +561,12 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
     if native:
         bundle = build / "Halo.app" / "Contents"
         bundle_files = []
-        for built in (host_executable, image, *staged):
+        for built in (host_executable, *staged):
             n.build(outputs=bundle / "MacOS" / built.name, rule="macos_copy", inputs=built)
             bundle_files.append(bundle / "MacOS" / built.name)
+        # the guest image is data to macOS: Resources, not MacOS (signing)
+        n.build(outputs=bundle / "Resources" / image.name, rule="macos_copy", inputs=image)
+        bundle_files.append(bundle / "Resources" / image.name)
         n.build(outputs=bundle / "Info.plist", rule="macos_copy", inputs=PORT_DIR / "Info.plist")
         n.build(outputs=bundle / "Resources" / "halo.icns", rule="macos_icon", inputs=PORT_DIR / "Info.plist",
                 implicit=[Path("port/android/art")])

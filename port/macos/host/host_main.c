@@ -388,8 +388,15 @@ int main(int argc, char *argv[])
 	time_zone(zone, sizeof(zone));
 	environment_set(&environment, "TZ", zone);
 
+	/* next to the executable, or in the application bundle's Resources
+	(signed code goes in Contents/MacOS, data in Contents/Resources) */
 	snprintf(path, sizeof(path), "%s/halo_guest.elf", image_folder);
 	image = read_file(path, &image_size);
+	if (!image)
+	{
+		snprintf(path, sizeof(path), "%s/../Resources/halo_guest.elf", image_folder);
+		image = read_file(path, &image_size);
+	}
 	if (!image)
 		host_fatal("cannot read the game image %s", path);
 	if (host_load_image(image, image_size) != 0)
