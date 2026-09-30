@@ -101,7 +101,111 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 	return result;
 }
 
-static int reserve(uint64_t address, uint64_t size)
+/* ART reserves its spaces (notably the free-list large object space) at
+addresses chosen at zygote start; on some devices (for example the Retroid
+Pocket Flip2, kernel 4.19) that reservation covers the fixed Xbox memory
+window. That space commits pages lazily from its bottom, and the Java side
+of this app hardly allocates large objects, so the slice over the window is
+normally idle address space: unmap exactly the intersection (never more)
+and let the caller retry. Only that space, and only a slice with no page in
+use (present or swapped out, from /proc/self/pagemap): ART's other spaces
+(its heap, bitmaps and card tables) are live, and unmapping them would
+corrupt it where failing to start is at least clear. */
+#define ART_LARGE_OBJECT_SPACE "[anon:dalvik-free list large object space]"
+
+/* whether no page from..to (page aligned) is present or swapped out; 0 if
+it cannot tell */
+static int range_unused(uint64_t from, uint64_t to)
+{
+	FILE *pagemap = fopen("/proc/self/pagemap", "rb");
+	uint64_t entries[512];
+	uint64_t page = from / PAGE;
+	int unused = 1;
+
+	if (!pagemap)
+		return 0;
+	if (fseeko(pagemap, (off_t)(page * sizeof(uint64_t)), SEEK_SET) != 0)
+		unused = 0;
+	while (unused && page < to / PAGE)
+	{
+		size_t wanted = (size_t)(to / PAGE - page);
+		size_t count;
+		size_t index;
+
+		if (wanted > sizeof(entries) / sizeof(entries[0]))
+			wanted = sizeof(entries) / sizeof(entries[0]);
+		count = fread(entries, sizeof(entries[0]), wanted, pagemap);
+		if (count != wanted)
+		{
+			unused = 0;
+			break;
+		}
+		/* (bit 63 present, bit 62 swapped) */
+		for (index = 0; index < count; index++)
+		{
+			if (entries[index] & (3ULL << 62))
+			{
+				unused = 0;
+				break;
+			}
+		}
+		page += count;
+	}
+	fclose(pagemap);
+	return unused;
+}
+
+static int reclaim_art_overlap(uint64_t address, uint64_t size)
+{
+	FILE *maps = fopen("/proc/self/maps", "r");
+	char line[512];
+	int reclaimed = 0;
+
+	if (!maps)
+		return 0;
+	while (fgets(line, sizeof(line), maps))
+	{
+		unsigned long long lo, hi;
+		uint64_t from, to;
+		char *name;
+		int name_offset = 0;
+
+		if (sscanf(line, "%llx-%llx %*s %*s %*s %*s %n", &lo, &hi, &name_offset) < 2 || !name_offset)
+			continue;
+		if (hi <= address || lo >= address + size)
+			continue;
+		name = line + name_offset;
+		name[strcspn(name, "\n")] = '\0';
+		from = lo > address ? lo : address;
+		to = hi < address + size ? hi : address + size;
+		if (strcmp(name, ART_LARGE_OBJECT_SPACE))
+		{
+			host_logf(HOST_LOG_ERROR, "a fixed guest range is overlapped by %08llx-%08llx (%s), which is not ART's large object space; left alone",
+				lo, hi, name[0] ? name : "unnamed");
+			continue;
+		}
+		if (!range_unused(from, to))
+		{
+			host_logf(HOST_LOG_ERROR, "ART's large object space over %08llx-%08llx is in use (or its pages cannot be read); left alone",
+				(unsigned long long)from, (unsigned long long)to);
+			continue;
+		}
+		if (munmap((void *)from, to - from) == 0)
+		{
+			host_logf(HOST_LOG_INFO,
+				"reclaimed idle ART range %08llx-%08llx (%s)",
+				(unsigned long long)from, (unsigned long long)to, name);
+			reclaimed = 1;
+		}
+	}
+	fclose(maps);
+	return reclaimed;
+}
+
+/* reclaim_art: the fixed ranges the guest was built for may take ART's
+idle large object space (reclaim_art_overlap); the pools, placed in free
+gaps, never do: a mapping in the way there is one ART just made, maybe live */
+static int reserve(uint64_t address, uint64_t size, int reclaim_art)
 {
 	void *result = mmap((void *)address, size, PROT_NONE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
@@ -109,7 +213,28 @@ static int reserve(uint64_t address, uint64_t size)
 	if (result == (void *)address)
 		return 0;
 	if (result != MAP_FAILED)
+	{
 		munmap(result, size);
+		return -1;
+	}
+	if (reclaim_art && errno == EEXIST)
+	{
+		int error = errno;
+
+		/* (the caller reports the first failure if nothing was reclaimed) */
+		if (!reclaim_art_overlap(address, size))
+		{
+			errno = error;
+			return -1;
+		}
+		result = mmap((void *)address, size, PROT_NONE,
+			MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE,
+			-1, 0);
+		if (result == (void *)address)
+			return 0;
+		if (result != MAP_FAILED)
+			munmap(result, size);
+	}
 	return -1;
 }
 
@@ -134,7 +259,7 @@ static struct pool *pool_new(void)
 		}
 		if (!address)
 			return NULL;
-		if (reserve(address, POOL_SIZE) == 0)
+		if (reserve(address, POOL_SIZE, 0) == 0)
 		{
 			pool = calloc(1, sizeof(*pool));
 			pool->base = address;
@@ -153,7 +278,7 @@ int host_memory_initialize(uint32_t base, uint32_t size)
 {
 	window_base = HALO_GUEST_WINDOW_BASE;
 	window_end = window_base + HALO_GUEST_WINDOW_SIZE;
-	if (reserve(window_base, HALO_GUEST_WINDOW_SIZE) != 0)
+	if (reserve(window_base, HALO_GUEST_WINDOW_SIZE, 1) != 0)
 	{
 		host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx (%s)",
 			(unsigned long long)window_base, strerror(errno));
@@ -161,7 +286,7 @@ int host_memory_initialize(uint32_t base, uint32_t size)
 	}
 	image_base = base;
 	image_end = base + round_up(size);
-	if (reserve(image_base, image_end - image_base) != 0)
+	if (reserve(image_base, image_end - image_base, 1) != 0)
 	{
 		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image range at %08llx (%s)",
 			(unsigned long long)image_base, strerror(errno));

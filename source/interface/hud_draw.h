@@ -50,6 +50,7 @@ struct hud_color_definition;
 struct hud_placement_definition;
 struct meter_hud_element_definition;
 struct number_hud_element_definition;
+struct tag_block;
 struct static_hud_element_definition;
 struct weapon_hud_overlay_definition;
 
@@ -78,6 +79,16 @@ void hud_calculate_point(
 	boolean in_multiplayer,
 	real override_scale,
 	point2d *result);
+#ifdef HALO_LINUX
+boolean hud_multitexture_overlays_follow_zoom(
+	struct tag_block const *multitexture_overlays);
+boolean hud_number_shows_only_when_zoomed(
+	struct number_hud_element_definition const *number);
+void hud_zoomed_layout_begin(
+	rectangle2d *saved_window_bounds);
+void hud_zoomed_layout_end(
+	rectangle2d const *saved_window_bounds);
+#endif
 long get_flash_duration(
 	struct hud_color_definition const *hud_color);
 pixel32 get_flash_color(

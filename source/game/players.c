@@ -3652,6 +3652,10 @@ void players_update_before_game(
 						else
 							player->respawn_timer = 1;
 					}
+#ifdef HALO_LINUX
+					else if (network_game_distributed_client())
+						game_engine_client_respawn_countdown(iterator.datum_index);
+#endif
 				}
 				else if (!main_menu_is_active())
 				{

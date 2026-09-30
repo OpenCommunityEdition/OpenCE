@@ -1279,6 +1279,67 @@ void hud_draw_bitmap(
 	return;
 }
 
+#ifdef HALO_LINUX
+/* port: a screen wider than 640 widens the HUD's window, which the HUD's
+elements keep to by their corners (the ammo counter to the left edge). The
+zoomed view's elements (the sniper rifle's angle ticks and range numbers)
+are placed by a corner too, but where they meet the scope, which is at the
+middle: drawn in a 640 wide window at the middle of the wide one, they meet
+it again. An element is the zoomed view's when its overlays follow the zoom
+level, or a number is shown only when zoomed. */
+boolean hud_multitexture_overlays_follow_zoom(
+	struct tag_block const *multitexture_overlays)
+{
+	long overlay_index;
+
+	for (overlay_index = 0; overlay_index < multitexture_overlays->count; overlay_index++)
+	{
+		struct multitexture_overlay_hud_element_definition const *overlay = TAG_BLOCK_GET_ELEMENT(
+			multitexture_overlays,
+			overlay_index,
+			struct multitexture_overlay_hud_element_definition);
+		long effector_index;
+
+		for (effector_index = 0; effector_index < overlay->functions.count; effector_index++)
+		{
+			struct multitexture_overlay_hud_element_effector_definition const *effector = TAG_BLOCK_GET_ELEMENT(
+				&overlay->functions,
+				effector_index,
+				struct multitexture_overlay_hud_element_effector_definition);
+
+			if (effector->source == _hud_multitexture_overlay_effector_source_zoom_level)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+boolean hud_number_shows_only_when_zoomed(
+	struct number_hud_element_definition const *number)
+{
+	return TEST_FLAG(number->number_flags, _hud_number_show_only_when_zoomed_bit);
+}
+
+/* the window as it would be 640 wide, at the middle of the wide one (each
+split screen window its share) */
+void hud_zoomed_layout_begin(
+	rectangle2d *saved_window_bounds)
+{
+	long width = render.camera.window_bounds.x1 - render.camera.window_bounds.x0;
+	short inset = (short)((width - width * 640 / halo_screen_width()) / 2);
+
+	*saved_window_bounds = render.camera.window_bounds;
+	render.camera.window_bounds.x0 += inset;
+	render.camera.window_bounds.x1 -= inset;
+}
+
+void hud_zoomed_layout_end(
+	rectangle2d const *saved_window_bounds)
+{
+	render.camera.window_bounds = *saved_window_bounds;
+}
+
+#endif
 void hud_draw_static_element(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *absolute_placement,

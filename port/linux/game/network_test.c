@@ -48,6 +48,7 @@ Called from the main loop every frame (main.c).
 #include "items/items.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
+#include "camera/observer.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -219,11 +220,19 @@ static void network_test_log_players(
 
 		network_distributed_item_statistics(&creates, &deletes, &failures, &removed);
 		network_damage_statistics(&sent_reports, &dealt_reports, &rejected_reports, &replayed_events);
+		/* this machine's player and where its camera is (a player that never
+		spawns leaves it where it began) */
+		long local_player_index = local_player_get_player_index(0);
+		struct observer_result const *camera = observer_get_camera(0);
+
 		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s | sent %ld received %ld corrected %ld"
-			" | hits %ld dealt %ld rejected %ld replayed %ld",
+			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
 			game_engine_can_score() ? "playing" : "game over", sent, received, corrections,
-			sent_reports, dealt_reports, rejected_reports, replayed_events);
+			sent_reports, dealt_reports, rejected_reports, replayed_events,
+			local_player_index == NONE ? -1L : (long)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player_index),
+			camera ? camera->position.x : 0.0f, camera ? camera->position.y : 0.0f, camera ? camera->position.z : 0.0f,
+			local_player_index == NONE ? 0L : (long)player_get(local_player_index)->respawn_timer);
 	}
 }
 
@@ -478,7 +487,10 @@ void network_test_update(
 		return;
 	}
 
-	/* the game running: report */
+	/* the game running: report (from the start of each game: the next
+	game's time starts over) */
+	if (game_in_progress() && game_time_get() < network_test.logged_time)
+		network_test.logged_time = 0;
 	if (game_in_progress() && !main_menu_loaded && game_time_get() - network_test.logged_time >= TICKS_PER_SECOND)
 	{
 		network_test.logged_time = game_time_get();
@@ -632,6 +644,10 @@ void network_test_update(
 			if (create_global_network_game_client())
 			{
 				game_connection_set(_game_connection_network_client);
+				/* (the player joined to multiplayer first, as a player picking
+				their profile: the pregame screen then asks for them every
+				frame until they are in the settings) */
+				player_ui_local_player_joined_multiplayer_game(0);
 				platform_log("network test: searching for games");
 			}
 		}
@@ -648,7 +664,7 @@ void network_test_update(
 		{
 			network_test.joined_seconds += seconds;
 			if (network_test.joined_seconds >= 3.0f && global_network_game_client_get())
-				network_test.player_added = network_game_client_add_player(global_network_game_client_get(), 0);
+				network_test.player_added = TRUE;
 		}
 		/* (the other team from the host's player: a team game needs both) */
 		else if (network_test.player_added && !network_test.team_set)

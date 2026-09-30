@@ -2019,6 +2019,36 @@ static boolean network_game_server_machine_has_waiting_players(
 	return FALSE;
 }
 
+/* the players in the settings each machine joining the game in progress
+was started with (by machine index): those added and gone while it loaded
+it, whose messages it did not hear, it is told of once it has */
+static struct network_player late_joiner_players[MAXIMUM_NETWORK_MACHINE_COUNT][NUMBEROF(((struct network_game *)0)->players)];
+
+static boolean network_game_server_same_player(
+	struct network_player const *player0,
+	struct network_player const *player1)
+{
+	return player0->machine_index == player1->machine_index &&
+		player0->controller_index == player1->controller_index &&
+		player0->player_list_index == player1->player_list_index;
+}
+
+/* whether the player is valid and one of the players */
+static boolean network_game_server_player_among(
+	struct network_player const *player,
+	struct network_player *players,
+	long count)
+{
+	long index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (network_player_is_valid(&players[index]) && network_game_server_same_player(&players[index], player))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /* the settings (with the machine's players) and the start, to the machine
 alone, the start with the host's game time */
 static void network_game_server_start_late_joiner(
@@ -2037,6 +2067,11 @@ static void network_game_server_start_late_joiner(
 	{
 		network_event("failed to start machine #%d in the game in progress", machine->machine_index);
 		return;
+	}
+	if (machine->machine_index >= 0 && machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+	{
+		csmemcpy(late_joiner_players[machine->machine_index], server->game.players,
+			sizeof(late_joiner_players[machine->machine_index]));
 	}
 	network_event("machine #%d joins the game in progress at game tick #%ld", machine->machine_index,
 		begin_game.unused);
@@ -2077,9 +2112,52 @@ void network_game_server_late_joiner_loaded(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine)
 {
-	(void)server;
 	SET_FLAG(machine->flags, _network_client_machine_level_loaded_bit, TRUE);
 	network_event("machine #%d has loaded the game in progress", machine->machine_index);
+	if (machine->machine_index >= 0 && machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
+	{
+		struct network_player *started = late_joiner_players[machine->machine_index];
+		long count = (long)NUMBEROF(server->game.players);
+		long index;
+
+		/* the players gone while it loaded (first: a player's machine index
+		may be a new machine's, which a player added is told apart from by
+		that only) */
+		for (index = 0; index < count; index++)
+		{
+			struct network_player *player = &started[index];
+			struct message_server_remove_player_ingame remove_player;
+			void *message;
+
+			if (!network_player_is_valid(player) || network_game_server_player_among(player, server->game.players, count))
+				continue;
+			remove_player.player = *player;
+			remove_player.reason = game_time_get();
+			message = create_network_game_message(_message_server_remove_player_ingame, &remove_player,
+				sizeof(remove_player));
+			if (message)
+				network_game_server_send_message_to_client_machine(server, machine, message);
+			network_event("told machine #%d of a player gone while it loaded (machine #%d / controller #%d)",
+				machine->machine_index, player->machine_index, player->controller_index);
+		}
+		/* and those added */
+		for (index = 0; index < count; index++)
+		{
+			struct network_player *player = &server->game.players[index];
+			struct network_player message_packet;
+			void *message;
+
+			if (!network_player_is_valid(player) || network_game_server_player_among(player, started, count))
+				continue;
+			message_packet = *player;
+			message = create_network_game_message(_message_server_add_player_ingame, &message_packet,
+				sizeof(message_packet));
+			if (message)
+				network_game_server_send_message_to_client_machine(server, machine, message);
+			network_event("told machine #%d of a player added while it loaded (machine #%d / controller #%d)",
+				machine->machine_index, player->machine_index, player->controller_index);
+		}
+	}
 }
 
 #endif
