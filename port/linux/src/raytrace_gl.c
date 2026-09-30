@@ -670,6 +670,13 @@ static void initialize(void)
 
 		ray.shapes = !strcmp(shapes, "collision") ? 1 : !strcmp(shapes, "simple") ? 2 : 0;
 	}
+	/* no drawing (debug.null_renderer: headless tests, bots) has no GL */
+	if (config_boolean("debug.null_renderer") || !glCreateShader)
+	{
+		ray.failed = 1;
+		ray.enabled = 0;
+		return;
+	}
 	/* world units (a world unit is about 3 m) */
 	ray.radius = 0.35f;
 	ray.trace_program = link(trace_source, "ray tracing");
