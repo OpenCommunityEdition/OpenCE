@@ -347,7 +347,7 @@ code for the window, the mouse, the keyboard and the first start.
 - `host.txt` in the game's folder is the log of the host, and, when the
   game does not start from a terminal, of the game's port (for one, why
   it quit: `window closed` is ⌘Q or the window's close button). `debug.txt`
-  is the log of the game. Start `halo` in a terminal to see both.
+  is the log of the game. `host.old.txt` is the run before's `host.txt`. Start `halo` in a terminal to see both.
 - If the guest code stops, `host.txt` shows the registers and the frame
   chain. To find the functions, enter
   `llvm-symbolizer --obj=build/macos/Halo/halo_guest.elf <address>` with

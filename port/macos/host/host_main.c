@@ -361,7 +361,14 @@ int main(int argc, char *argv[])
 	find_folders();
 	if (chdir(host_data_root) != 0)
 		host_fatal("cannot enter %s", host_data_root);
-	snprintf(path, sizeof(path), "%s/host.txt", host_data_root);
+	/* the last run's log kept, as host.old.txt: why it ended */
+	{
+		char old_path[1210];
+
+		snprintf(path, sizeof(path), "%s/host.txt", host_data_root);
+		snprintf(old_path, sizeof(old_path), "%s/host.old.txt", host_data_root);
+		rename(path, old_path);
+	}
 	log_file = fopen(path, "w");
 	/* the game's own messages (platform_log: why it quit, for one) go to
 	stderr, which nothing shows unless a terminal started the game */
