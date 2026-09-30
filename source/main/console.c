@@ -389,6 +389,26 @@ boolean console_update(
 
 	short i;
 
+#ifdef HALO_LINUX
+	/* the port's debug.commands (HALO_COMMANDS): console commands at their
+	times, for tests */
+	{
+		const char *command;
+
+		while ((command = halo_timed_command_next()) != NULL)
+		{
+			char buffer[256];
+
+			strncpy(buffer, command, sizeof(buffer) - 1);
+			buffer[sizeof(buffer) - 1] = 0;
+			if (hs_compile_and_evaluate(buffer))
+			{
+				error(_error_log, "commands: %s", buffer);
+			}
+		}
+	}
+#endif
+
 	if (console_globals.active)
 	{
 		for (i = 0; i < console_globals.input_state.key_count; i++)
