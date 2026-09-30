@@ -102,8 +102,7 @@ These settings are new, or have a different default on macOS:
 | `display.resolution` | `"native"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
 | `display.show_fps` | `false` | Start with the frames-a-second counter shown (F7 / ⌘P). |
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
-| `network.tailscale` | `true` | System link across a Tailscale network (refer to "Multiplayer"). |
-| `network.allow_upnp` | `false` | Tailscale and the local network do not need a forwarded port. |
+| `network.allow_upnp` | `false` | The local network does not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
 
 ## Multiplayer
@@ -113,31 +112,13 @@ These settings are new, or have a different default on macOS:
 Start the game on each machine. One machine creates a system link game. The
 other machines see the game in the list of system link games.
 
-### Tailscale
-
-Machines on one Tailscale network (tailnet) play system link as if they
-were on one local network, from any location:
-
-1. Install Tailscale on each machine, and sign in to the same tailnet.
-2. Start the game on each machine.
-3. One machine creates a system link game. The other machines see the game
-   in the list and join it.
-
-When Tailscale operates, the game gets the tailnet's online machines from
-the `tailscale` command every 15 seconds. It sends the game's
-announcements to them, and to the local network. A machine that hears a
-game connects to the address that the announcement came from, so a game
-found across the tailnet is joined through the tailnet. Linux machines also
-do this. On Windows, put the Tailscale addresses of the other machines in
-`network.broadcast`.
-
 macOS asks one time for permission to use the local network. Select
 "Allow".
 
 ### The internet, with forwarded ports
 
-A machine can join a game on the internet without Tailscale when the host
-forwards ports on its router:
+A machine can join a game on the internet when the host forwards ports on
+its router:
 
 1. The host forwards TCP port 5150 and UDP port 5150 to its computer, and
    creates a system link game.
@@ -159,7 +140,7 @@ its link on the clipboard and in `debug.txt`. To join on macOS, give the
 link to the other player. Clicking it opens `Halo.app` (which registers
 `halo://`) and joins the game, whether the game runs already or not. Or
 set `network.join_from_clipboard = true`, copy the link, and switch to the
-game. Tailscale needs no invite.
+game.
 
 ## How the port operates
 
@@ -241,8 +222,7 @@ code for the window, the mouse, the keyboard and the first start.
   [tests/guest_runtime_test.c](tests/guest_runtime_test.c) as a guest image
   with the host. Start it with `build/macos/test/Halo/halo`. It tests musl,
   threads and futexes, thread-local storage, files and the host's
-  directory handles, time, the rebased code, sockets and the Tailscale
-  lookup. `port/macos/tests/run_guest_tests.sh` does both steps.
+  directory handles, time, the rebased code and sockets. `port/macos/tests/run_guest_tests.sh` does both steps.
 - `port/macos/tests/run_determinism_test.sh` runs the game's matrix maths
   and `halo_` functions over 1.4 million inputs on the native and the
   x86-64 builds and compares hashes of the results. Machines in a system
@@ -307,6 +287,4 @@ macOS port:
 - lets the internet play tunnel give a remote machine's traffic only to the
   ports of the game's own sockets (`p2p_socket_port` in
   `port/linux/src/p2p.c`), not to other
-  programs on the Mac;
-- runs the `tailscale` command only from its usual locations, with no
-  arguments other than `status --json`.
+  programs on the Mac.

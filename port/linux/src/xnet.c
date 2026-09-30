@@ -281,66 +281,6 @@ static void peer_incoming_address(int stream, struct sockaddr *address, const in
 	incoming_address(address, address_length);
 }
 
-/* ---------- Tailscale (network.tailscale)
-
-A tailnet carries no broadcasts, so system link's announcements also go to
-each of the tailnet's online machines (broadcast_targets), which the host
-side asks the tailscale command for (posix_tailscale_addresses). A machine
-that hears a game's announcement reaches the host at the address it came
-from (source/networking/network_client_message_handler.c): across the
-tailnet, the host's Tailscale address. */
-
-#define TAILSCALE_PEERS 128
-
-static int tailscale_enabled(void)
-{
-	static int enabled = -1;
-
-	if (enabled < 0)
-		enabled = config_boolean("network.tailscale") ? 1 : 0;
-	return enabled;
-}
-
-/* this machine's Tailscale address and the online peers'; -1 if none */
-static int tailscale_addresses(unsigned long *self, unsigned long *peers, int capacity)
-{
-	posix_ulong own = 0, list[TAILSCALE_PEERS];
-	int count, index;
-
-	*self = 0;
-	if (!tailscale_enabled())
-		return -1;
-	if (capacity > TAILSCALE_PEERS)
-		capacity = TAILSCALE_PEERS;
-	count = posix_tailscale_addresses(&own, list, capacity);
-	if (count < 0)
-		return -1;
-	*self = (unsigned long)own;
-	for (index = 0; index < count; index++)
-		peers[index] = (unsigned long)list[index];
-	{
-		/* once, so the log tells whether Tailscale was found */
-		static int logged;
-
-		if (!logged)
-		{
-			unsigned long host = halo_ws_ntohl(own);
-
-			logged = 1;
-			platform_log("tailscale: this machine is %lu.%lu.%lu.%lu; %d other machine(s) online; system link "
-				"announcements go to them too", (host >> 24) & 255, (host >> 16) & 255, (host >> 8) & 255,
-				host & 255, count);
-		}
-	}
-	return count;
-}
-
-/* 100.64.0.0/10, the addresses Tailscale gives out */
-static int is_tailnet_address(unsigned long address)
-{
-	return (halo_ws_ntohl(address) & 0xffc00000UL) == 0x64400000UL;
-}
-
 /* ---------- remote searchers
 
 A game's advertisements, like the searches for games, are broadcasts. A
@@ -424,10 +364,9 @@ static void remote_searcher_heard(int socket, const struct sockaddr *address, co
 		return;
 	ip = ((const struct sockaddr_in *)address)->sin_addr.s_addr;
 	host = halo_ws_ntohl(ip);
-	/* not this machine, nor the local network's (they get the broadcasts),
-	nor the tailnet (tailscale_addresses) */
+	/* not this machine, nor the local network's (they get the broadcasts) */
 	if (!ip || (host >> 24) == 127 || ip == INADDR_BROADCAST || is_private_address(ip) ||
-		is_tailnet_address(ip) || ip == cached_title_address())
+		ip == cached_title_address())
 	{
 		return;
 	}
@@ -474,19 +413,16 @@ static int remote_searcher_targets(unsigned long *targets, int maximum_count)
 
 /* the addresses to send broadcasts to instead, if network.broadcast is
 set (255.255.255.255 among them sends a real broadcast too), and the
-tailnet's online machines; returns their count */
+remote searchers; returns their count */
 static int broadcast_targets(unsigned long *targets, int maximum_count)
 {
-	unsigned long self, peers[TAILSCALE_PEERS + REMOTE_SEARCHERS];
+	unsigned long peers[REMOTE_SEARCHERS];
 	int count, peer_count, index;
 
 	net_settings_read();
 	count = net_settings.broadcast_count < maximum_count ? net_settings.broadcast_count : maximum_count;
 	memcpy(targets, net_settings.broadcast_targets, (size_t)count * sizeof(*targets));
-	peer_count = tailscale_addresses(&self, peers, TAILSCALE_PEERS);
-	if (peer_count < 0)
-		peer_count = 0;
-	peer_count += remote_searcher_targets(peers + peer_count, TAILSCALE_PEERS - peer_count);
+	peer_count = remote_searcher_targets(peers, REMOTE_SEARCHERS);
 	if (peer_count > 0)
 	{
 		/* the local network's broadcast as well, unless network.broadcast
