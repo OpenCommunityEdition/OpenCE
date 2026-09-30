@@ -70,6 +70,9 @@ NATIVE_ABI_FLAGS = [("-mcpu=apple-m1" if flag == "-mcpu=cortex-a53" else flag)
     # the rebasing lengthens functions past what byte-sized jump table
     # entries reach
     "-mllvm", "-aarch64-enable-compress-jump-tables=false",
+    # the watchOS triple with the macOS SDK's sysroot: the guest takes no
+    # headers from it (-nostdinc)
+    "-Wno-incompatible-sysroot",
 ]
 
 # the x86-64 build: x32, linked below 2 GB (where x86-64 code can use
