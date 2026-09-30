@@ -35,6 +35,10 @@ def main():
     parser.add_argument('--relay', type=relay_url, default='', help='Native multiplayer WSS endpoint; blank leaves desktop joining unavailable')
     parser.add_argument('--default-room', type=room_code, default='FQLX01', help='Shared browser room joined on a first visit; empty disables automatic room entry')
     args = parser.parse_args()
+    native_version = re.search(r'^#define HALO_PORT_NETWORK_VERSION (\d+)$',
+                              (ROOT / 'port/linux/include/halo_port_limits.h').read_text(), re.MULTILINE)
+    if not native_version:
+        parser.error('Missing native network version in halo_port_limits.h.')
     source = ROOT / 'build/web/site'
     output = ROOT / 'dist/browser-multiplayer'
     names = [path.relative_to(ROOT / 'port/web/site') for path in (ROOT / 'port/web/site').rglob('*') if path.is_file()]
@@ -60,7 +64,7 @@ def main():
         'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'source_dirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True).strip()),
         'runtime': 'source-built Emscripten 6.0.10',
-        'native_network_version': 4,
+        'native_network_version': int(native_version.group(1)),
         'relay_configured': bool(args.relay),
         'default_browser_room': args.default_room,
         'game_assets_included': False,

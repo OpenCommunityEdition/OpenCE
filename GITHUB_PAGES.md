@@ -75,13 +75,20 @@ It pauses gameplay, elects a survivor with a verified checkpoint, and reconnects
 players into their existing slots under the replacement host. Scores, positions,
 inventory and the timer are retained. Recovery failure leaves the match paused;
 it never starts a new match automatically. All participants need the matching
-new launcher and runtime; this source change is not evidence of deployment.
+new launcher and runtime (native network version 5); apply the offered update
+on every participating browser.
 
 A brief connection loss has a 10-second grace period, and silent channels are
 detected after 25 seconds, followed by election and reconnecting. Authority-only
 state may resume from the latest 15-tick checkpoint. Returning hosts yield to
 the newer room epoch. Public signaling does not provide distributed consensus;
 partitions can still create divergent continuations of a match.
+
+Hold **Tab** (or **F1**) to show the scoreboard. **(HOST)** identifies the
+current host, and **Ping** shows each player's round-trip latency to that host
+in milliseconds. Missing or stale samples show `--`; host migration clears
+the previous measurements. Blank or whitespace-only player names receive a
+unique random name, including players joining a match in progress.
 
 The page shows connection and loading progress. A browser may require a tap
 to enable sound and pointer capture, but no System Link menu navigation is
