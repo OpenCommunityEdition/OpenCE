@@ -72,10 +72,3 @@ host_sdl_render_present
 host_sdl_show_message_box
 host_sdl_show_open_file_dialog
 host_sdl_file_dialog_result
-host_rt_available
-host_rt_set_world
-host_rt_texture
-host_rt_trace
-host_rt_set_objects
-host_rt_probe
-host_rt_set_lights

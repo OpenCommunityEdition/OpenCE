@@ -367,16 +367,10 @@ static void render_window(
 		first_person_weapon_render_update();
 		lights_preprocess_scene();
 		render_objects();
-#ifdef HALO_LINUX
-		halo_ray_traced_light_stage(2);
-#endif
 		structure_render_preprocess();
 		structure_render_lightmaps();
 		rasterizer_lens_flares_submit_occlusion_tests();
 		render_object_shadows();
-#ifdef HALO_LINUX
-		halo_ray_traced_light_stage(0);
-#endif
 		lights_render_diffuse();
 
 		rasterizer_decals_begin(_decal_layer_light);
@@ -387,9 +381,6 @@ static void render_window(
 			rasterizer_decals_draw(rendered_cluster_get(rendered_cluster_index)->cluster_index);
 		}
 		rasterizer_decals_end();
-#ifdef HALO_LINUX
-		halo_ray_traced_light_stage(1);
-#endif
 
 		rasterizer_decals_begin(_decal_layer_alpha_tested);
 		for (rendered_cluster_index = 0;
@@ -425,13 +416,6 @@ static void render_window(
 		structure_render_reflection_lightmap_masks();
 		structure_render_reflection_mirrors();
 		structure_render_reflections();
-#ifdef HALO_LINUX
-		/* the native ports' screen-space ray-traced lighting, on the
-		opaque world (port/linux/src/raytrace_gl.c) */
-		halo_ray_traced_lighting(rasterizer_camera->z_near, rasterizer_camera->z_far,
-			rasterizer_camera->vertical_field_of_view, &rasterizer_camera->position.x,
-			&rasterizer_camera->forward.i, &rasterizer_camera->up.i);
-#endif
 		structure_render_transparent_geometry();
 		structure_render_fog();
 		game_engine_post_rasterize_objects();

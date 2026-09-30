@@ -75,19 +75,15 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
-| F4 | ⌘J | The characters' and vehicles' shapes in the rays: their drawn models, their collision models, ellipsoids. |
-| F5 | ⌘L | The ray probe: draw the rays the lighting sends from the surface at the crosshair; again to freeze them in place (walk round them); again for off. |
-| F6 | ⌘B | Step through what the ray tracing shows: the lighting, the ray view, split, the occlusion (refer to "Ray-traced lighting"). |
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
 | F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
-| F9 | ⌘T | Switch the ray-traced lighting on or off. |
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
 
 On a Mac keyboard, F11 shows the desktop and F8 to F12 are media keys
 unless fn is held, so the Command shortcuts do the same. Each key shows
 what it did in the game's console at the top of the screen (for example
-`ray tracing: on`), and writes it to `debug.txt`.
+`resolution: 1080p`), and writes it to `debug.txt`.
 
 `HALO_FULLSCREEN=false` (or `display.fullscreen = false`) starts the game
 in a window:
@@ -103,12 +99,6 @@ These settings are new, or have a different default on macOS:
 | `display.resolution` | `"native"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
 | `display.show_fps` | `false` | Start with the frames-a-second counter shown (F7 / ⌘P). |
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
-| `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
-| `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |
-| `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |
-| `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
-| `display.ray_tracing_shadows` | `1.0` | How dark the sun's traced shadows are (0.0 to 1.0). |
-| `display.ray_tracing_objects` | `true` | The characters and vehicles in Metal's rays too: their contact shadows, and your own body's shadow. |
 | `network.tailscale` | `true` | System link across a Tailscale network (refer to "Multiplayer"). |
 | `network.allow_upnp` | `false` | Tailscale and the local network do not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
@@ -167,137 +157,6 @@ link to the other player. Clicking it opens `Halo.app` (which registers
 `halo://`) and joins the game, whether the game runs already or not. Or
 set `network.join_from_clipboard = true`, copy the link, and switch to the
 game. Tailscale needs no invite.
-
-## Ray-traced lighting
-
-After the game draws the solid parts of the 3D world, and before the
-transparent parts, the fog, the effects and the HUD, the lighting sends
-rays from each pixel:
-
-- Ambient occlusion: rays go across the half sphere above the surface. A
-  ray that hits a surface near it makes the pixel darker. Corners, creases
-  and the ground below objects get darker, as in the real world.
-- Reflections: a ray goes in the mirror direction of the view. The surface
-  reflects the color where the ray hits, more at glancing angles (the
-  Fresnel effect).
-- One bounce of indirect light: the color that a screen ray hits adds a
-  small quantity of light. A red wall makes the floor next to it a little
-  red.
-- Sun shadows (Metal only): the sun is the first light of the level's sky
-  that has a lens flare, taken as a point light very far away. A ray goes
-  towards it from each pixel of an object (the marines, the vehicles, the
-  weapon in your hands); if the level is in the way, the pixel is in
-  shadow. The level's own surfaces already have the sun's shadows in their
-  lightmaps, so their pixels send no shadow ray. The objects' pixels are
-  those whose depth has not changed since the game drew the objects,
-  before the level (`halo_ray_traced_light_stage(2)`).
-
-The dynamic lights - the flashlight, the plasma bolts', the explosions' -
-cast traced shadows too (`halo_ray_tracing_lights` in
-`source/objects/object_lights.c`): from each pixel a ray goes to each light
-that reaches it (inside its cone, for a spot like the flashlight), and the
-level and the objects block it. The game drew these lights without shadows,
-added onto the lightmaps' light; the lighting darkens only their share of a
-pixel's light (the stages above), by the share of their rays that arrive.
-
-The characters and the vehicles are in Metal's rays too
-(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): by
-default as their drawn models, skinned each frame as the renderer skins
-them (each vertex by its two nodes' poses), at the high level of detail,
-and traced from both sides; F4 / ⌘J (or `display.ray_tracing_shapes`)
-switches to their collision models - the meshes the game tests its bullets
-against, a
-mesh for each node's region as it is now (its damage permutation), placed
-each frame by the node's matrix as the animation poses it. A unit without
-them is its skeleton's bones, each an ellipsoid (bipeds), or its bounding
-sphere flattened along its axes. Each object is a mesh of its own beside the
-level's, in a scene rebuilt each frame, and the rays choose what they see
-by the instances' masks:
-
-| Rays | See |
-| --- | --- |
-| Occlusion from the level | the level, the objects, your body |
-| Occlusion from an object | the level, the objects |
-| The sun from an object | the level, the objects |
-| The sun from the level | your body only: the lightmaps have the level's shadows, and the game draws the other objects' |
-| Reflections | the level |
-
-So the ground darkens under the marines and the vehicles, and in the sun
-you see your own shadow, which the game never drew in the first person.
-
-Each object's mesh is rebuilt each frame, and only the objects within 25
-world units of the camera (at most 32) are in. Rays that can find only the
-level (the reflections, and the occlusion away from every object's bounding
-sphere) go through the level's own structure, not the scene's instances: on
-M1 and M2 the rays walk the instances in compute, and it costs every ray. On
-The Silent Cartographer's beach, with a dozen units near, the objects cost
-about 4.5 ms a frame at 2560x1920 on an M2 Pro; `display.ray_tracing_objects
-= false` leaves them out.
-
-The occlusion and the sun's shadows darken the level's baked light (its
-lightmaps), not the flashlight's, the plasma's or the other dynamic
-lights': the game draws the lightmaps' light, adds the dynamic lights, then
-multiplies in the textures, and the lighting takes the light before and
-after the dynamic lights (`halo_ray_traced_light_stage` in
-`source/render/render.c`) to know each pixel's baked share.
-
-The rays are traced at half the resolution (a quarter of the pixels), then
-a blur that stops at edges in depth brings them to the full resolution.
-Metal traces 4 occlusion rays per pixel, on a pattern that changes every
-pixel of a 4x4 block, so the blur averages 64 directions. The reflection
-ray is left out where the surface faces the camera: there it reflects 4%
-of the light (Fresnel's), too little to see.
-
-GL and Metal take turns on the GPU (`EGL_ANGLE_metal_shared_event_sync`):
-the CPU does not wait for either, and prepares the next frame while the GPU
-traces. `HALO_RT_CPU_SYNC=1` makes the CPU wait instead, to compare.
-
-On macOS the rays go through the level itself with Metal's ray tracing
-(`port/macos/host/host_metal_rt.m`): the level's collision surfaces
-(`port/linux/game/raytrace_world.c`) are a Metal acceleration structure,
-built when the level loads. These rays find the level's geometry also where
-the camera does not see it. The triangles face out of the level (the
-collision surface's plane gives the side), and the rays pass through their
-backs: where the drawn surface is a little inside its collision surface, a
-ray that leaves the drawn surface does not hit the collision surface behind
-it and darken the pixel. A reflection takes its color from the screen
-where the camera sees the point that the ray hit. On M1 and M2, Metal traces
-the rays in compute; on M3 and later (the M5 and M6 too), in the GPU's ray
-tracing hardware.
-
-Rays through the screen's depth buffer also operate on every platform. They
-find the objects (the level's surfaces do not include them) and give the
-bounce. Where Metal cannot trace rays, they are the only rays.
-
-| `display.ray_tracing` | Rays |
-| --- | --- |
-| `"on"` | Metal's through the level, and the screen's. |
-| `"screen"` | The screen's only. |
-| `"off"` | None. |
-| `"occlusion"`, `"depth"` | Show what the lighting uses. |
-| `"rays"`, `"split"` | The ray view: what Metal's rays find from the camera (`"split"`: the lighting on the left, the ray view on the right). |
-
-The ray view (F6 / ⌘B) traces a ray from the camera through each pixel
-into Metal's scene and draws what it finds: the level's collision triangles,
-each its own colour with its edges drawn; the characters' and vehicles'
-shapes orange; your own body cyan (look down); and, darker, where a second
-ray from the hit to the sun is blocked. It is the scene the lighting's rays
-go through.
-
-The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
-at the crosshair, as the kernel traced them: the occlusion rays white, the
-ray to the sun yellow, the reflection cyan, the rays to the dynamic lights
-orange, each red where it hit something; the surface's normal green. Pressed again, the rays stay where
-they were, and you can walk round them; lines behind the scene are faint.
-
-`port/macos/tests/run_raytrace_test.sh` draws a test scene through the
-lighting on ANGLE, with Metal's rays, as the game draws its frame (the
-light, the dynamic lights, the textures), and writes the pictures to
-`build/macos/raytrace_test`: bumpy ground, walls, an overhang, a crate, two
-marines (objects, not in the level's rays), a flashlight, a plasma light,
-and the sun from four directions. `RT_BENCH=200` times the frame with and
-without the lighting; `RT_DENSE=1` makes the level about 100,000
-triangles; `RT_MODE=screen` leaves out Metal's rays.
 
 ## How the port operates
 
@@ -372,7 +231,6 @@ macros (`port/linux/include/halo_linux_prefix.h`):
 
 The macOS guest is compiled with `HALO_MACOS`, so it uses the desktop's
 code for the window, the mouse, the keyboard and the first start.
-`source/render/render.c` calls the ray-traced lighting (`HALO_LINUX`).
 
 ## Tests
 
@@ -382,7 +240,6 @@ code for the window, the mouse, the keyboard and the first start.
   threads and futexes, thread-local storage, files and the host's
   directory handles, time, the rebased code, sockets and the Tailscale
   lookup. `port/macos/tests/run_guest_tests.sh` does both steps.
-- `port/macos/tests/run_raytrace_test.sh`: refer to "Ray-traced lighting".
 - `port/macos/tests/run_determinism_test.sh` runs the game's matrix maths
   and `halo_` functions over 1.4 million inputs on the native and the
   x86-64 builds and compares hashes of the results. Machines in a system
@@ -398,11 +255,9 @@ code for the window, the mouse, the keyboard and the first start.
   second, and writes `profile.txt` to the game's folder at exit: the game
   functions and the host functions (SDL, ANGLE) where the time goes.
 - `HALO_FPS=1` writes to `host.txt` every 5 seconds: the frames per
-  second, the time the main thread waits for the GPU to finish the GL
-  frame, and the time Metal's rays take.
-- `display.render_scale = 0.75` (or F8 / ⌘R to 1440p or 1080p) is the
-  largest speed-up with ray tracing on a Retina display: the rays' cost
-  follows the number of pixels.
+  second, and the average and the slowest frame's time.
+- `display.render_scale = 0.75` (or F8 / ⌘R to 1440p or 1080p) draws fewer
+  pixels, the largest speed-up on a Retina display.
 
 ## Find problems
 

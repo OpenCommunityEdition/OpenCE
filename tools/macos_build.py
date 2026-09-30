@@ -57,7 +57,7 @@ KHRONOS_OPENGL = "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry
 KHRONOS_EGL = "https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/main/api"
 SDL_BUILD = BUILD / "sdl3-build"
 MACOS_MINIMUM = "14.4"
-HOST_FRAMEWORKS = ["Cocoa", "Foundation", "Metal", "QuartzCore", "IOKit"]
+HOST_FRAMEWORKS = ["Cocoa", "Metal", "QuartzCore", "IOKit"]
 
 # the native build: the Android port's guest ABI, rebased (x28 the base,
 # x27 the rebasing's scratch register), with the desktop platform layer
@@ -517,13 +517,12 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         f"-I{ANDROID_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
         f"-I{TOML_DIR}", f"-I{KHRONOS_DIR}",
     ])
-    host_sources = sorted((PORT_DIR / "host").glob("*.c")) + sorted((PORT_DIR / "host").glob("*.m")) + [
+    host_sources = sorted((PORT_DIR / "host").glob("*.c")) + [
         LINUX_DIR / "src" / "posix_files.c", LINUX_DIR / "src" / "posix_net.c",
     ]
     for source in host_sources:
         obj = host_obj_dir / (source.name + ".o")
-        cflags = host_cflags + (" -fobjc-arc" if source.suffix == ".m" else "")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": cflags},
+        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": host_cflags},
                 implicit=[libsdl])
         host_objects.append(obj)
     miniupnpc_cflags = " ".join([host_cflags, f"-I{MINIUPNPC_DIR / 'include'}", f"-I{MINIUPNPC_DIR / 'src'}",

@@ -956,40 +956,6 @@ static BOOL bind_targets(BOOL *has_depth)
 	return TRUE;
 }
 
-/* the current colour and depth targets' textures, their size and the
-viewport, in GL pixels (raytrace_gl.c); 0 unless both are bound and match */
-int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4])
-{
-	struct render_target_entry *color_entry = render_target_get(device.render_target);
-	struct render_target_entry *depth_entry = render_target_get(device.depth_stencil);
-	float scale_x, scale_y;
-
-	if (!color_entry || !depth_entry || color_entry->target.depth || !depth_entry->target.depth ||
-		color_entry->target.gl_width != depth_entry->target.gl_width ||
-		color_entry->target.gl_height != depth_entry->target.gl_height)
-	{
-		return 0;
-	}
-	scale_x = color_entry->target.scale[0];
-	scale_y = color_entry->target.scale[1];
-	*color = color_entry->target.texture;
-	*depth = depth_entry->target.texture;
-	*width = (int)color_entry->target.gl_width;
-	*height = (int)color_entry->target.gl_height;
-	viewport[0] = (int)floorf((float)device.viewport.X * scale_x + 0.5f);
-	viewport[1] = (int)floorf((float)device.viewport.Y * scale_y + 0.5f);
-	viewport[2] = (int)floorf((float)(device.viewport.X + device.viewport.Width) * scale_x + 0.5f) - viewport[0];
-	viewport[3] = (int)floorf((float)(device.viewport.Y + device.viewport.Height) * scale_y + 0.5f) - viewport[1];
-	if (viewport[0] < 0 || viewport[1] < 0 || viewport[0] + viewport[2] > *width || viewport[1] + viewport[3] > *height)
-		return 0;
-	return 1;
-}
-
-void xgpu_gl_bind_device_vertex_array(void)
-{
-	glBindVertexArray(device.vertex_array);
-}
-
 /* ---------- device creation */
 
 static void gl_initialize(void)

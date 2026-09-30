@@ -158,9 +158,6 @@ int host_sdl_gl_set_swap_interval(int interval)
 	return SDL_GL_SetSwapInterval(interval);
 }
 
-/* host_metal_rt.m's waits */
-extern uint64_t host_rt_finish_ns, host_rt_trace_ns, host_rt_traces;
-
 /* HALO_FPS=1 (or HALO_PROFILE=1): the frames a second and their times,
 logged every 5 seconds */
 static void frame_statistics(void)
@@ -186,12 +183,8 @@ static void frame_statistics(void)
 	{
 		double seconds = (double)(now - window_start) / 1e9;
 
-		host_logf(HOST_LOG_INFO, "fps %.1f (frame %.2f ms average, %.2f ms slowest; per frame %.2f ms waiting for GL, "
-			"%.2f ms for Metal's rays, %llu traces)", (double)frames / seconds,
-			seconds * 1000.0 / (double)frames, (double)slowest / 1e6,
-			(double)host_rt_finish_ns / 1e6 / (double)frames, (double)host_rt_trace_ns / 1e6 / (double)frames,
-			(unsigned long long)host_rt_traces);
-		host_rt_finish_ns = host_rt_trace_ns = host_rt_traces = 0;
+		host_logf(HOST_LOG_INFO, "fps %.1f (frame %.2f ms average, %.2f ms slowest)", (double)frames / seconds,
+			seconds * 1000.0 / (double)frames, (double)slowest / 1e6);
 		window_start = now;
 		frames = 0;
 		slowest = 0;
