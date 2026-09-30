@@ -293,6 +293,12 @@ static const struct config_setting config_settings[] =
 		"those seconds (forward, back, left, right, turnleft, turnright, up, down,\n"
 		"fire, grenade, jump, crouch, zoom, action, flashlight, reload, switch, start);\n"
 		"empty for none." },
+	{ "debug.settings_script", _config_string, "\"\"", "HALO_SETTINGS_SCRIPT", _environment_value, _platform_desktop,
+		"Keys for the settings overlay (F10) at times, for tests with screenshots:\n"
+		"\"<seconds>=<key>,<key>...;...\" (seconds since the game started); the keys:\n"
+		"open, close, up, down, left, right, enter, escape, pageup, pagedown, home,\n"
+		"end, or move:<x>:<y>, click:<x>:<y>, wheel:<steps> (x and y: 0 to 1 of the\n"
+		"window); empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
@@ -1003,29 +1009,24 @@ static int config_line_section(const char *line, const char *end, char *section,
 	return 1;
 }
 
-/* sets a boolean setting, for now and in config.toml: its line there is
-changed (or added), the rest of the file kept as it is */
-int config_write_boolean(const char *name, int value)
+/* sets a setting's line in config.toml to "key = text", keeping the rest
+of the file as it is: the line changed in place, or added at the end of its
+section (or in a new section at the end); under config_lock */
+static int config_write_line(const char *name, const char *text_value)
 {
 	const char *dot = strchr(name, '.');
-	long index = config_setting_index(name);
-	char section[64], key[64], wanted[80], current[64] = "", line_text[96], path[1024];
+	char section[64], key[64], current[64] = "", line_text[600], path[1024];
 	struct config_text out = { 0 };
 	size_t size = 0;
 	char *text;
 	const char *line;
 	int written = 0, in_section = 0, succeeded;
 
-	if (index < 0 || config_settings[index].type != _config_boolean || !dot || (size_t)(dot - name) >= sizeof(section))
+	if (!dot || (size_t)(dot - name) >= sizeof(section))
 		return 0;
-	/* (the file read first, as the other settings are) */
-	config_boolean(name);
-	pthread_mutex_lock(&config_lock);
-	config_values[index].boolean = value != 0;
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
-	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value ? "true" : "false");
-	snprintf(wanted, sizeof(wanted), "%s", section);
+	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, text_value);
 	config_path(path, sizeof(path));
 	text = config_read_file(path, &size);
 	for (line = text ? text : ""; *line;)
@@ -1041,7 +1042,7 @@ int config_write_boolean(const char *name, int value)
 				config_append(&out, line_text);
 				written = 1;
 			}
-			in_section = !strcmp(current, wanted);
+			in_section = !strcmp(current, section);
 		}
 		else if (in_section && !written && config_line_key(line, end, key))
 		{
@@ -1075,10 +1076,145 @@ int config_write_boolean(const char *name, int value)
 		config_append(&out, line_text);
 	}
 	succeeded = out.buffer && config_write_file(path, out.buffer);
-	pthread_mutex_unlock(&config_lock);
 	free(out.buffer);
 	free(text);
+	if (!succeeded)
+		platform_log("settings: cannot write %s to %s", name, path);
 	return succeeded;
+}
+
+/* the setting's index, if it is one of this type, with the file read */
+static long config_writable(const char *name, enum config_type type)
+{
+	long index = config_setting_index(name);
+
+	if (index < 0 || config_settings[index].type != type)
+	{
+		platform_log("settings: no %s setting %s to write", type == _config_string ? "string" : "such", name);
+		return -1;
+	}
+	/* (the file read first, as the other settings are) */
+	config_value(name, type);
+	return index;
+}
+
+/* sets a boolean setting, for now and in config.toml: its line there is
+changed (or added), the rest of the file kept as it is */
+int config_write_boolean(const char *name, int value)
+{
+	long index = config_writable(name, _config_boolean);
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	pthread_mutex_lock(&config_lock);
+	config_values[index].boolean = value != 0;
+	succeeded = config_write_line(name, value ? "true" : "false");
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+int config_write_integer(const char *name, long value)
+{
+	long index = config_writable(name, _config_integer);
+	char text[32];
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	snprintf(text, sizeof(text), "%ld", value);
+	pthread_mutex_lock(&config_lock);
+	config_values[index].integer = value;
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+int config_write_real(const char *name, double value)
+{
+	long index = config_writable(name, _config_real);
+	char text[48];
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	/* (TOML's floats need their point: 1.00, not 1) */
+	snprintf(text, sizeof(text), "%.2f", value);
+	pthread_mutex_lock(&config_lock);
+	config_values[index].real = value;
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+/* a number setting's value for now only, config.toml left as it is (a
+slider being dragged: the settings overlay) */
+void config_set_real(const char *name, double value)
+{
+	long index = config_writable(name, _config_real);
+
+	if (index < 0)
+		return;
+	pthread_mutex_lock(&config_lock);
+	config_values[index].real = value;
+	pthread_mutex_unlock(&config_lock);
+}
+
+int config_write_string(const char *name, const char *value)
+{
+	long index = config_writable(name, _config_string);
+	char text[520];
+	size_t length = 0;
+	int succeeded;
+
+	if (index < 0)
+		return 0;
+	/* a TOML basic string: its quotes and backslashes escaped, no control
+	characters */
+	text[length++] = '"';
+	for (; *value && length + 3 < sizeof(text); value++)
+	{
+		if ((unsigned char)*value < 0x20)
+			continue;
+		if (*value == '"' || *value == '\\')
+			text[length++] = '\\';
+		text[length++] = *value;
+	}
+	text[length++] = '"';
+	text[length] = 0;
+	pthread_mutex_lock(&config_lock);
+	/* (the old text is not freed: config_string's callers on other threads
+	may still be reading it, and a setting changes by hand a few times a
+	run) */
+	{
+		char *copy = malloc(length);
+		const char *from;
+		size_t used = 0;
+
+		/* (the value itself, unescaped) */
+		for (from = text + 1; copy && from < text + length - 1; from++)
+		{
+			if (*from == '\\')
+				from++;
+			copy[used++] = *from;
+		}
+		if (copy)
+		{
+			copy[used] = 0;
+			config_values[index].string = copy;
+		}
+	}
+	succeeded = config_write_line(name, text);
+	pthread_mutex_unlock(&config_lock);
+	return succeeded;
+}
+
+/* the setting's comment in the table (a line break between its lines) */
+const char *config_comment(const char *name)
+{
+	long index = config_setting_index(name);
+
+	return index >= 0 ? config_settings[index].comment : "";
 }
 
 /* ---------- public code */
@@ -1105,40 +1241,70 @@ const char *config_string(const char *name)
 	return string ? string : "";
 }
 
-/* game.map as a console command: "map_name levels\\<name>\\<name>" for a
-campaign level (a letter and two digits), "levels\\test\\<name>\\<name>" for
-a multiplayer map, or the path as given; NULL for none */
-const char *halo_startup_map_command(void)
+/* a map's console command: "map_name levels\\<name>\\<name>" for a campaign
+level (a letter and two digits), "levels\\test\\<name>\\<name>" for a
+multiplayer map, or the path as given; 0 for none */
+int halo_map_command(const char *map, char *command, unsigned long size)
 {
-	static char command[256];
-	const char *map = config_string("game.map");
 	size_t length = strlen(map);
 
 	if (!length || length > 120)
-		return NULL;
+		return 0;
 	if (strchr(map, '\\') || strchr(map, '/'))
-		snprintf(command, sizeof(command), "map_name %s", map);
+		snprintf(command, size, "map_name %s", map);
 	else if (length == 3 && map[0] >= 'a' && map[0] <= 'd' && map[1] >= '0' && map[1] <= '9' && map[2] >= '0' &&
 		map[2] <= '9')
-		snprintf(command, sizeof(command), "map_name levels\\%s\\%s", map, map);
+		snprintf(command, size, "map_name levels\\%s\\%s", map, map);
 	else
-		snprintf(command, sizeof(command), "map_name levels\\test\\%s\\%s", map, map);
+		snprintf(command, size, "map_name levels\\test\\%s\\%s", map, map);
 	for (length = 0; command[length]; length++)
 		if (command[length] == '/')
 			command[length] = '\\';
+	return 1;
+}
+
+/* game.map as a console command, or NULL for none */
+const char *halo_startup_map_command(void)
+{
+	static char command[256];
+
+	if (!halo_map_command(config_string("game.map"), command, sizeof(command)))
+		return NULL;
 	platform_log("game.map: %s", command);
 	return command;
 }
 
-/* debug.commands: the next command whose time has come, once each, or NULL */
+/* a console command for the game to run on its next update (the settings
+overlay's map list: settings_overlay.c), before debug.commands' */
+static char queued_command[256];
+
+void halo_queue_command(const char *command)
+{
+	pthread_mutex_lock(&config_lock);
+	snprintf(queued_command, sizeof(queued_command), "%s", command);
+	pthread_mutex_unlock(&config_lock);
+}
+
+/* debug.commands: the next command whose time has come, once each, or NULL
+(and halo_queue_command's first) */
 const char *halo_timed_command_next(void)
 {
 	static int loaded;
 	static int count, next;
 	static struct { double at; char command[200]; } commands[32];
-	static char current[200];
+	static char current[256];
 	double now;
 
+	pthread_mutex_lock(&config_lock);
+	if (queued_command[0])
+	{
+		snprintf(current, sizeof(current), "%s", queued_command);
+		queued_command[0] = 0;
+		pthread_mutex_unlock(&config_lock);
+		platform_log("commands: %s", current);
+		return current;
+	}
+	pthread_mutex_unlock(&config_lock);
 	if (!loaded)
 	{
 		const char *text = config_string("debug.commands");
