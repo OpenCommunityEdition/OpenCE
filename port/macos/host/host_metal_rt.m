@@ -101,6 +101,13 @@ static struct
 	/* the emitters (host_rt_set_emitters): 8 floats each */
 	float emitters[HOST_RT_MAXIMUM_EMITTERS * 8];
 	unsigned int emitter_count;
+	/* the governor: the last trace's time on the GPU (its completion
+	handler's), how far the lights and emitters are cut back (each step
+	halves them), the calm frames since the last step, and the frames in a
+	row far over, after which the rays stop - a GPU busy for long enough
+	freezes the whole machine's display */
+	volatile double gpu_ms;
+	int shed, calm, overloaded;
 	EGLDisplay_ display;
 	EGLDisplay_ (*eglGetCurrentDisplay)(void);
 	EGLImage_ (*eglCreateImageKHR)(EGLDisplay_, void *, unsigned int, void *, const EGLint_ *);
@@ -811,6 +818,36 @@ int host_rt_trace(const float *camera, int width, int height)
 	{
 		return 0;
 	}
+	/* the governor (the last trace's time, a frame or so behind): over 20 ms
+	the lights and the emitters are halved, under 10 ms for a second they
+	come back a step; a quarter of a second, ten frames in a row, and the
+	rays stop for good */
+	{
+		double ms = rt.gpu_ms;
+
+		if (ms > 250.0)
+		{
+			if (++rt.overloaded >= 10)
+			{
+				host_logf(HOST_LOG_ERROR, "ray tracing: %.0f ms a frame on the GPU; the rays stop", ms);
+				rt.available = 0;
+				return 0;
+			}
+		}
+		else
+			rt.overloaded = 0;
+		if (ms > 20.0 && rt.shed < 5)
+		{
+			rt.shed++;
+			rt.calm = 0;
+			rt.gpu_ms = 0.0;
+		}
+		else if (ms < 10.0 && rt.shed > 0 && ++rt.calm >= 60)
+		{
+			rt.shed--;
+			rt.calm = 0;
+		}
+	}
 	start = SDL_GetTicksNS();
 	if (rt.event)
 	{
@@ -864,10 +901,18 @@ int host_rt_trace(const float *camera, int width, int height)
 	}
 	[encoder setBuffer:rt.probe offset:0 atIndex:5];
 	[encoder setBytes:rt.lights length:sizeof(rt.lights) atIndex:6];
-	[encoder setBytes:&rt.light_count length:sizeof(rt.light_count) atIndex:7];
-	[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
-	[encoder setBytes:&rt.emitter_count length:sizeof(rt.emitter_count) atIndex:9];
+	{
+		unsigned int light_count = rt.light_count >> rt.shed, emitter_count = rt.emitter_count >> rt.shed;
+
+		[encoder setBytes:&light_count length:sizeof(light_count) atIndex:7];
+		[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
+		[encoder setBytes:&emitter_count length:sizeof(emitter_count) atIndex:9];
+	}
 	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
+	[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
+		if (done.GPUEndTime > done.GPUStartTime)
+			rt.gpu_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+	}];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];

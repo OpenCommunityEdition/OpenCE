@@ -250,14 +250,20 @@ you see your own shadow, which the game never drew in the first person.
 | Projectiles and grenades | their drawn models | yes | their glows (a needle's pink) |
 | Your body | its drawn model | the sun's only (the flashlight is in it) | - |
 | The sun | a light far away | - | the objects' shadows, your body's on the level |
-| The game's lights (flashlight, plasma, explosions, Guilty Spark, lamps) | point lights and spots, 16 nearest | - | yes, traced, in their colour |
-| Glows (light volumes) with no light | point lights, 16 nearest | - | yes |
+| The game's lights (flashlight, plasma, explosions, Guilty Spark, lamps) | point lights and spots, up to 8 | - | yes, traced, in their colour |
+| Glows (light volumes) with no light | point lights, up to 16 | - | yes |
 | The lightmaps (the level's baked light) | kept: the game's, darkened only by what they never saw (the objects' occlusion, your shadow) | - | - |
 | Water | not yet: the level's render mesh is not traced | no | no |
 | Particles, decals, contrails, the sky | no | no | no |
 | Shaders' own glow (shields, panels' self-illumination) without a light volume | no | - | no |
 | Reflections of the objects | no: reflections see the level only | - | - |
 | The objects' lighting | the game's (all its lights, unshadowed), with the sun's and the level's traced shadows | - | - |
+
+A governor keeps the rays off the whole machine's back: a GPU busy for
+long enough freezes the Mac's display, not only the game. It reads each
+frame's time on the GPU; over 20 ms it halves the traced lights and
+emitters, under 10 ms for a second it brings back a step, and after ten
+frames in a row over a quarter of a second it stops the rays and logs why.
 
 Taking over the rest - the lightmaps and the cube maps - needs light that
 bounces: the level's render mesh with its textures in the rays, and paths

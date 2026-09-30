@@ -981,7 +981,8 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		out[0] = at->x;
 		out[1] = at->y;
 		out[2] = at->z;
-		out[3] = MAX(RAY_TRACED_EMITTER_RADIUS, object->object.bounding_sphere_radius * 3.0f);
+		/* (a large object's glow reaches a little farther, not across the level) */
+		out[3] = PIN(object->object.bounding_sphere_radius * 1.5f, RAY_TRACED_EMITTER_RADIUS, 6.0f);
 		out[4] = color[0];
 		out[5] = color[1];
 		out[6] = color[2];

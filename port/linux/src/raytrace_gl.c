@@ -931,8 +931,8 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	/* the lights: traced, all of them, or the game's dynamic ones, for their
 	shadows */
 	{
-		static float lights[16 * 12];
-		long light_count = halo_ray_tracing_lights(lights, 16, ray.traced_lights);
+		static float lights[8 * 12];
+		long light_count = halo_ray_tracing_lights(lights, 8, ray.traced_lights);
 
 		host_rt_set_lights(lights, (int)light_count);
 	}
