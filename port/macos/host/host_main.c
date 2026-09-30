@@ -382,13 +382,14 @@ int main(int argc, char *argv[])
 	load_angle();
 
 	/* the environment: the player's HALO_* settings (port_config.c),
-	HOME, and a TZ musl understands */
+	HOME, TMPDIR (where the Discord app's socket is, for its invites:
+	posix_discord_connect), and a TZ musl understands */
 	for (index = 0; host_environment[index]; index++)
 	{
 		const char *entry = host_environment[index];
 
 		if (!strncmp(entry, "HALO_", 5) || !strncmp(entry, "HOME=", 5) || !strncmp(entry, "USER=", 5) ||
-			!strncmp(entry, "LANG=", 5))
+			!strncmp(entry, "LANG=", 5) || !strncmp(entry, "TMPDIR=", 7))
 		{
 			const char *equals = strchr(entry, '=');
 			char name[256];
