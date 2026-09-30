@@ -2242,6 +2242,10 @@ boolean lights_distant_lighting_at_point(
 								radiosity_accuracy,
 								&color);
 						}
+						/* the native ports' traced light, where there is a
+						probe of it near (port/linux/src/raytrace_gl.c) */
+						halo_ray_traced_object_lighting(&position->x, &lightmap_color.red, &radiosity_normal.i,
+							&radiosity_accuracy);
 						build_distant_lights(
 							flags,
 							&surface_normal,

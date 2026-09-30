@@ -48,5 +48,7 @@ int host_rt_set_level(unsigned int generation, const float *vertices, const floa
 	const unsigned int *indices, const unsigned int *triangle_materials, int triangle_count);
 void host_rt_set_level_materials(const float *materials, int count);
 int host_rt_set_level_page(int page, int width, int height, const unsigned char *pixels);
+void host_rt_set_probes(const float *points, int count);
+int host_rt_probe_results(float *results, int maximum);
 
 #endif

@@ -44,6 +44,7 @@ occlusion. F9 switches it on and off while playing.
 #endif
 
 #include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -66,6 +67,7 @@ unsigned long halo_ray_tracing_level(const float **vertices, const float **texco
 unsigned char halo_ray_tracing_level_materials(const float **materials, long *count);
 unsigned char halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height);
 unsigned char halo_ray_tracing_sky(float *sky);
+void halo_ray_tracing_level_pages(long *done, long *total);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -102,6 +104,9 @@ static struct
 	its parts' strengths, and the light buffer's pass */
 	int drawn_level, gi;
 	float gi_sun, gi_bounce, gi_glow, gi_lights;
+	/* the lightmap pages' average light (sums of a sample of their pixels,
+	and how many), for where a page is missing */
+	double lightmap_sum[3], lightmap_samples;
 	unsigned long level_generation;
 	GLuint inject_program;
 	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split, inject_results;
@@ -954,6 +959,17 @@ void halo_ray_tracing_debug_mode(int mode)
 #ifdef HALO_MACOS
 /* the level's rays with Metal: the depth and normals into the shared
 texture, the rays, and the results' texture; 0 if not */
+/* the light probes: the points the objects' lighting asked about this
+frame (for the rays), and the last probes done (10 floats each: the point,
+the light, how much from one way, that way) */
+static struct
+{
+	float requests[64 * 3];
+	int request_count;
+	float results[64 * 10];
+	int result_count;
+} probes;
+
 static GLuint world_rays(const float *uniforms, const float *position, const float *forward, const float *up,
 	int width, int height, GLuint depth)
 {
@@ -963,7 +979,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[80], right[3], length;
+	float camera[84], right[3], length;
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -987,6 +1003,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		if (level_generation && level_generation != ray.level_generation)
 		{
 			ray.level_generation = level_generation;
+			ray.lightmap_sum[0] = ray.lightmap_sum[1] = ray.lightmap_sum[2] = ray.lightmap_samples = 0.0;
 			host_rt_set_level(level_generation, level_vertices, texcoords, (int)level_vertex_count,
 				(const unsigned int *)level_indices, (const unsigned int *)triangle_materials, (int)level_triangle_count);
 		}
@@ -1000,6 +1017,17 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 
 				host_rt_set_level_page((int)page, (int)page_width, (int)page_height, pixels);
 				pages++;
+				{
+					long texel;
+
+					for (texel = 0; texel < page_width * page_height; texel += 7)
+					{
+						ray.lightmap_sum[0] += pixels[texel * 4 + 0] / 255.0;
+						ray.lightmap_sum[1] += pixels[texel * 4 + 1] / 255.0;
+						ray.lightmap_sum[2] += pixels[texel * 4 + 2] / 255.0;
+						ray.lightmap_samples += 1.0;
+					}
+				}
 				if (pages <= 3 || (pages & 15) == 0)
 					platform_log("ray tracing: lightmap page %ld (%ldx%ld), %d so far", page, page_width, page_height, pages);
 			}
@@ -1074,7 +1102,24 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	/* the traced light (host_metal_rt.m): the sun's and the sky's colours
 	and powers, the mode, the parts' strengths, the frame, the drawn level,
 	the last frame's camera */
-	memset(camera + 36, 0, 44 * sizeof(float));
+	memset(camera + 36, 0, 48 * sizeof(float));
+	/* the lightmaps' average light, for surfaces whose page is missing
+	(80-82; a grey until there are pages) */
+	camera[80] = camera[81] = camera[82] = 0.25f;
+	if (ray.lightmap_samples > 0.0)
+	{
+		camera[80] = (float)(ray.lightmap_sum[0] / ray.lightmap_samples);
+		camera[81] = (float)(ray.lightmap_sum[1] / ray.lightmap_samples);
+		camera[82] = (float)(ray.lightmap_sum[2] / ray.lightmap_samples);
+	}
+	{
+		static int frames;
+		long done, total;
+
+		halo_ray_tracing_level_pages(&done, &total);
+		if (ray.drawn_level && ray.gi && done < total && (frames++ % 1800) == 900)
+			platform_log("ray tracing: lightmap pages %ld of %ld (the rest light as their average)", done, total);
+	}
 	{
 		float sky[25];
 
@@ -1169,8 +1214,12 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 
 		host_rt_set_emitters(emitters, (int)emitter_count);
 	}
+	/* the probes asked for this frame, traced with the rays */
+	host_rt_set_probes(probes.requests, probes.request_count);
+	probes.request_count = 0;
 	if (!host_rt_trace(camera, width, height))
 		return 0;
+	probes.result_count = host_rt_probe_results(probes.results, 64);
 	/* (this camera, for the next frame's) */
 	memcpy(ray.previous_camera, camera, 12 * sizeof(float));
 	ray.previous_camera[12] = 1.0f;
@@ -1246,6 +1295,59 @@ void halo_ray_traced_light_stage(int stage)
 		(viewport[1] + viewport[3]) / TRACE_SCALE, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 	ray.light_stages |= 1 << stage;
 	xgpu_gl_state_invalidate();
+}
+
+void halo_ray_traced_object_lighting(const float *position, float *color, float *normal, float *accuracy)
+{
+#ifdef HALO_MACOS
+	int index, best = -1;
+	float best_distance = 0.75f * 0.75f;
+
+	if (!ray.enabled || ray.failed || !ray.gi || !ray.hardware || !position)
+		return;
+	for (index = 0; index < probes.request_count; index++)
+	{
+		const float *q = probes.requests + index * 3;
+		float dx = q[0] - position[0], dy = q[1] - position[1], dz = q[2] - position[2];
+
+		if (dx * dx + dy * dy + dz * dz < 0.25f * 0.25f)
+			break;
+	}
+	if (index == probes.request_count && probes.request_count < 64)
+	{
+		memcpy(probes.requests + probes.request_count * 3, position, 3 * sizeof(float));
+		probes.request_count++;
+	}
+	for (index = 0; index < probes.result_count; index++)
+	{
+		const float *r = probes.results + index * 10;
+		float dx = r[0] - position[0], dy = r[1] - position[1], dz = r[2] - position[2];
+		float distance = dx * dx + dy * dy + dz * dz;
+
+		if (distance < best_distance)
+		{
+			best_distance = distance;
+			best = index;
+		}
+	}
+	if (best >= 0)
+	{
+		const float *r = probes.results + best * 10;
+
+		color[0] = r[3] < 1.0f ? r[3] : 1.0f;
+		color[1] = r[4] < 1.0f ? r[4] : 1.0f;
+		color[2] = r[5] < 1.0f ? r[5] : 1.0f;
+		*accuracy = r[6];
+		normal[0] = r[7];
+		normal[1] = r[8];
+		normal[2] = r[9];
+	}
+#else
+	(void)position;
+	(void)color;
+	(void)normal;
+	(void)accuracy;
+#endif
 }
 
 /* the lighting pass's uniforms (the composite's and the rays') */

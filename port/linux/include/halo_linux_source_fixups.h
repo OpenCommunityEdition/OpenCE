@@ -53,6 +53,11 @@ lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
 lights): the occlusion darkens only the lightmaps' share; 2: the objects
 drawn, before the level (their pixels take the sun's traced shadows) */
 void halo_ray_traced_light_stage(int stage);
+/* an object's light, as the game samples it from the lightmap under it
+(object_lights.c): the colour, the way it comes from and how much from that
+way, replaced by the traced light's probe near the point, if there is one
+(and a probe asked for there, for the next frame) */
+void halo_ray_traced_object_lighting(const float *position, float *color, float *normal, float *accuracy);
 /* after the dynamic lights, before the textures (render.c): the traced light
 in place of the lightmaps' (display.ray_tracing_gi); the camera as for
 halo_ray_traced_lighting */

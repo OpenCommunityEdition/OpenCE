@@ -1495,6 +1495,22 @@ boolean halo_ray_tracing_level_materials(const float **materials, long *count)
 	return changed;
 }
 
+/* how many of the level's lightmap pages are decoded, of how many */
+void halo_ray_tracing_level_pages(long *done, long *total)
+{
+	long index;
+
+	*done = *total = 0;
+	for (index = 0; index < level.page_count; index++)
+	{
+		if (!level.pages[index])
+			continue;
+		(*total)++;
+		if (level.pages_done[index])
+			(*done)++;
+	}
+}
+
 /* the next lightmap page the texture cache has loaded, decoded to RGBA
 bytes; FALSE when none is ready */
 boolean halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height)

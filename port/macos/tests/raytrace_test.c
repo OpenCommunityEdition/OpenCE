@@ -508,6 +508,11 @@ unsigned char halo_ray_tracing_level_page(long *page, const unsigned char **pixe
 	return 0;
 }
 
+void halo_ray_tracing_level_pages(long *done, long *total)
+{
+	*done = *total = 0;
+}
+
 unsigned char halo_ray_tracing_sky(float *sky)
 {
 	(void)sky;

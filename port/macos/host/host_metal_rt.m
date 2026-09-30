@@ -90,6 +90,17 @@ static struct
 	chances to it, its material) and how many; the vertices, kept for it */
 	id<MTLBuffer> drawn_vertices, glowing;
 	uint32_t glowing_count;
+	/* the light probes: their pipeline, the points asked for this frame,
+	the results' buffers in turn, and the last results read back (7 floats
+	each: the point, the light, how much from one way; then the way in
+	probe_directions) */
+	id<MTLComputePipelineState> probe_pipeline;
+	float probe_points[64 * 4];
+	uint32_t probe_count;
+	id<MTLBuffer> probe_in[3], probe_out[3];
+	int probe_ring;
+	float probe_results[64 * 10];
+	int probe_result_count;
 	id<MTLTexture> atlas;
 	int atlas_x, atlas_y, atlas_row;
 	/* the traced light, accumulated over frames: the last frame's and this
@@ -186,6 +197,134 @@ static NSString *const kernel_source = @
 	"	seed = pcg(seed);\n"
 	"	return float(seed >> 8) / 16777216.0;\n"
 	"}\n"
+	/* light probes (host_rt_set_probes): the light at points in space - the
+	   objects', for the game's lighting of them (object_lights.c) - over
+	   64 directions of the sphere: where a ray lands on the level, its
+	   lightmap times its colour; where it leaves, the sky's light; the sun
+	   where it is not blocked; rays to 8 points of glowing triangles. Out:
+	   the light on a surface facing where most of it comes from (in the
+	   light buffer's units), how much it comes from there (0 all round, 1
+	   all from there), and that direction */
+	"kernel void probes(instance_acceleration_structure world [[buffer(0)]],\n"
+	"	constant float *c [[buffer(1)]],\n"
+	"	device const uint *indices [[buffer(10)]],\n"
+	"	device const float2 *texcoords [[buffer(11)]],\n"
+	"	device const uint *triangle_materials [[buffer(12)]],\n"
+	"	device const float4 *materials [[buffer(13)]],\n"
+	"	device const float4 *pages [[buffer(14)]],\n"
+	"	device const float4 *glowing [[buffer(16)]],\n"
+	"	constant uint &glowing_count [[buffer(17)]],\n"
+	"	device const float4 *probe_in [[buffer(18)]],\n"
+	"	device float4 *probe_out [[buffer(19)]],\n"
+	"	constant uint &probe_count [[buffer(20)]],\n"
+	"	texture2d<float, access::sample> atlas [[texture(3)]],\n"
+	"	uint i [[thread_position_in_grid]])\n"
+	"{\n"
+	"	if (i >= probe_count) return;\n"
+	"	float3 P = probe_in[i].xyz;\n"
+	"	intersector<triangle_data, instancing> nearest;\n"
+	"	nearest.assume_geometry_type(geometry_type::triangle);\n"
+	"	nearest.force_opacity(forced_opacity::opaque);\n"
+	"	nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"	intersector<triangle_data, instancing> blocked_by;\n"
+	"	blocked_by.accept_any_intersection(true);\n"
+	"	blocked_by.assume_geometry_type(geometry_type::triangle);\n"
+	"	blocked_by.force_opacity(forced_opacity::opaque);\n"
+	"	const uint N = 64u;\n"
+	"	float3 radiance[64];\n"
+	"	float3 directions[64];\n"
+	"	float3 toward = float3(0.0);\n"
+	"	float total = 0.0;\n"
+	"	for (uint k = 0; k < N; k++)\n"
+	"	{\n"
+	/* (a Fibonacci sphere) */
+	"		float z = 1.0 - (float(k) + 0.5) * 2.0 / float(N), r = sqrt(max(0.0, 1.0 - z * z));\n"
+	"		float phi = float(k) * 2.39996323;\n"
+	"		float3 d = float3(r * cos(phi), r * sin(phi), z);\n"
+	"		ray probe_ray(P, d, 0.05, 600.0);\n"
+	"		auto h = nearest.intersect(probe_ray, world, 1u);\n"
+	"		float3 L = float3(0.0);\n"
+	"		if (h.type == intersection_type::none)\n"
+	"		{\n"
+	"			L = float3(c[39], c[40], c[41]);\n"
+	"			for (uint s = 0; s < 2u; s++)\n"
+	"			{\n"
+	"				uint o = 64u + s * 8u;\n"
+	"				if (c[o + 7u] > 0.5 && dot(d, float3(c[o], c[o + 1u], c[o + 2u])) > c[o + 6u])\n"
+	/* (a wide light's power spread over its cap: 2 pi (1 - cos) of the sphere) */
+	"					L += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * c[45] * 3.14159265 / max(6.2831853 * (1.0 - c[o + 6u]), 0.05);\n"
+	"			}\n"
+	"		}\n"
+	"		else if (h.instance_id == 0u && h.triangle_front_facing)\n"
+	"		{\n"
+	"			uint m = triangle_materials[h.primitive_id];\n"
+	"			float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
+	"			if ((glow.w < 0.0 || pages[uint(glow.w)].z <= 0.0) && c[42] < 1.5)\n"
+	"				L = surface.rgb * float3(c[80], c[81], c[82]) * c[43];\n"
+	"			else if (c[42] < 1.5)\n"
+	"			{\n"
+	"				float4 page = pages[uint(glow.w)];\n"
+	"				uint base = h.primitive_id * 3u;\n"
+	"				float2 b = h.triangle_barycentric_coord;\n"
+	"				float2 uv = texcoords[indices[base]] * (1.0 - b.x - b.y) + texcoords[indices[base + 1u]] * b.x +\n"
+	"					texcoords[indices[base + 2u]] * b.y;\n"
+	"				float2 inset = float2(0.5 / 4096.0);\n"
+	"				L = surface.rgb * atlas.sample(linear_clamp, page.xy + clamp(uv * page.zw, inset, page.zw - inset), metal::level(0.0)).rgb * c[43];\n"
+	"			}\n"
+	"		}\n"
+	"		radiance[k] = L;\n"
+	"		directions[k] = d;\n"
+	"		float luminance = dot(L, float3(0.3, 0.59, 0.11));\n"
+	"		toward += d * luminance;\n"
+	"		total += luminance;\n"
+	"	}\n"
+	/* the sun, where it reaches */
+	"	float3 sun = float3(c[24], c[25], c[26]);\n"
+	"	float3 sun_color = float3(0.0);\n"
+	"	if (c[27] > 0.0 && c[45] > 0.0)\n"
+	"	{\n"
+	"		ray to_sun(P, sun, 0.05, 2000.0);\n"
+	"		if (blocked_by.intersect(to_sun, world, 1u).type == intersection_type::none)\n"
+	"		{\n"
+	"			sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
+	"			float luminance = dot(sun_color, float3(0.3, 0.59, 0.11)) * float(N) * 0.25;\n"
+	"			toward += sun * luminance;\n"
+	"			total += luminance;\n"
+	"		}\n"
+	"	}\n"
+	/* the glowing triangles: 8 rays */
+	"	float3 glow_light = float3(0.0), glow_toward = float3(0.0);\n"
+	"	uint seed = pcg(i + pcg(uint(c[44])));\n"
+	"	for (uint g = 0; g < 8u && glowing_count > 0u; g++)\n"
+	"	{\n"
+	"		float pick = random01(seed);\n"
+	"		uint lo = 0u, hi = glowing_count - 1u;\n"
+	"		while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"		float4 a = glowing[lo * 3u], b = glowing[lo * 3u + 1u], cc = glowing[lo * 3u + 2u];\n"
+	"		float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
+	"		float3 at = a.xyz * (1.0 - r1) + b.xyz * (r1 * (1.0 - r2)) + cc.xyz * (r1 * r2);\n"
+	"		float3 cross_ab = cross(b.xyz - a.xyz, cc.xyz - a.xyz);\n"
+	"		float3 L = at - P;\n"
+	"		float d2 = dot(L, L), d = sqrt(d2);\n"
+	"		L /= max(d, 1e-4);\n"
+	"		float cos_there = abs(dot(normalize(cross_ab), L));\n"
+	"		if (cos_there <= 0.0 || a.w <= 0.0 || d < 1e-3) continue;\n"
+	"		ray to_glow(P, L, 0.05, max(d - 0.01, 0.0));\n"
+	"		if (blocked_by.intersect(to_glow, world, 1u).type != intersection_type::none) continue;\n"
+	"		float3 given = min(materials[uint(cc.w) * 2u + 1u].rgb * c[47] * cos_there * 0.5 * length(cross_ab) / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0)) / 8.0;\n"
+	"		glow_light += given;\n"
+	"		glow_toward += L * dot(given, float3(0.3, 0.59, 0.11));\n"
+	"	}\n"
+	"	toward += glow_toward * float(N) * 0.25;\n"
+	"	total += dot(glow_light, float3(0.3, 0.59, 0.11)) * float(N) * 0.25;\n"
+	"	float3 D = length(toward) > 1e-5 ? normalize(toward) : float3(0.0, 0.0, 1.0);\n"
+	"	float3 E = float3(0.0);\n"
+	"	for (uint k = 0; k < N; k++)\n"
+	"		E += radiance[k] * max(dot(directions[k], D), 0.0);\n"
+	"	E = E * (4.0 / float(N)) + sun_color * max(dot(sun, D), 0.0) + glow_light;\n"
+	"	probe_out[i * 2u] = float4(E, total > 0.0 ? clamp(length(toward) / total, 0.0, 1.0) : 0.0);\n"
+	"	probe_out[i * 2u + 1u] = float4(D, 1.0);\n"
+	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	texture2d<float, access::write> lit [[texture(2)]],\n"
@@ -247,11 +386,12 @@ static NSString *const kernel_source = @
 	"			float3 base;\n"
 	"			if (h.instance_id == 0 && gi_ready != 0u)\n"
 	/* (with the drawn level: the light on it, as the rays find it - its
-	   lightmap times its colour, and what it gives off; magenta: no page) */
+	   lightmap times its colour, and what it gives off; without a page, the
+	   lightmaps' average light) */
 	"			{\n"
 	"				uint m = triangle_materials[h.primitive_id];\n"
 	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
-	"				base = glow.rgb * c[47] + float3(1.0, 0.0, 1.0) * 0.3;\n"
+	"				base = glow.rgb * c[47] + surface.rgb * float3(c[80], c[81], c[82]);\n"
 	"				if (glow.w >= 0.0 && pages[uint(glow.w)].z > 0.0)\n"
 	"				{\n"
 	"					float4 page = pages[uint(glow.w)];\n"
@@ -587,10 +727,12 @@ static NSString *const kernel_source = @
 	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
 	/* (what it gives off is found by the rays to the glowing triangles) */
 	"				L = glowing_count == 0u ? glow.rgb * c[47] : float3(0.0);\n"
-	"				if (c[42] < 1.5 && glow.w >= 0.0)\n"
+	/* (no page, or none yet: the lightmaps' average light, c[80-82]) */
+	"				if (c[42] < 1.5 && (glow.w < 0.0 || pages[uint(glow.w)].z <= 0.0))\n"
+	"					L += surface.rgb * float3(c[80], c[81], c[82]) * c[43];\n"
+	"				else if (c[42] < 1.5)\n"
 	"				{\n"
 	"					float4 page = pages[uint(glow.w)];\n"
-	"					if (page.z > 0.0)\n"
 	"					{\n"
 	"						uint base = h.primitive_id * 3u;\n"
 	"						float2 b = h.triangle_barycentric_coord;\n"
@@ -766,6 +908,11 @@ int host_rt_available(void)
 	library = [rt.device newLibraryWithSource:kernel_source options:nil error:&error];
 	function = library ? [library newFunctionWithName:@"trace"] : nil;
 	rt.pipeline = function ? [rt.device newComputePipelineStateWithFunction:function error:&error] : nil;
+	{
+		id<MTLFunction> probes = library ? [library newFunctionWithName:@"probes"] : nil;
+
+		rt.probe_pipeline = probes ? [rt.device newComputePipelineStateWithFunction:probes error:nil] : nil;
+	}
 	if (!rt.pipeline)
 	{
 		host_logf(HOST_LOG_ERROR, "ray tracing: the Metal kernel does not build: %s",
@@ -993,6 +1140,39 @@ void host_rt_set_level_materials(const float *materials, int count)
 			logged = rt.glowing_count;
 		}
 	}
+}
+
+/* the points to light probe this frame (x, y, z each; at most 64) */
+void host_rt_set_probes(const float *points, int count)
+{
+	int index;
+
+	if (count > 64)
+		count = 64;
+	for (index = 0; index < count && index < 64; index++)
+	{
+		rt.probe_points[index * 4 + 0] = points[index * 3 + 0];
+		rt.probe_points[index * 4 + 1] = points[index * 3 + 1];
+		rt.probe_points[index * 4 + 2] = points[index * 3 + 2];
+		rt.probe_points[index * 4 + 3] = 0.0f;
+	}
+	rt.probe_count = count > 0 ? (uint32_t)count : 0;
+}
+
+/* the last probes done: 10 floats each (the point; the light; how much of
+it from one way; that way); how many */
+int host_rt_probe_results(float *results, int maximum)
+{
+	int count;
+
+	if (!rt.available)
+		return 0;
+	@synchronized (rt.queue)
+	{
+		count = rt.probe_result_count < maximum ? rt.probe_result_count : maximum;
+		memcpy(results, rt.probe_results, (size_t)count * 10 * sizeof(float));
+	}
+	return count;
 }
 
 #define HOST_RT_ATLAS_SIZE 4096
@@ -1363,7 +1543,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	/* the drawn level's surfaces and the traced light's textures (in their
 	place, anything bound: the kernel reads them only when gi_ready) */
 	{
-		float constants[80];
+		float constants[84];
 		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas;
 		id<MTLBuffer> any = rt.probe;
 
@@ -1427,6 +1607,54 @@ int host_rt_trace(const float *camera, int width, int height)
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];
+	/* the light probes asked for this frame, read back when the rays are
+	done (the next frame's host_rt_probe_results) */
+	if (rt.probe_pipeline && rt.probe_count > 0 && camera[42] > 0.5f && rt.use_drawn && rt.drawn &&
+		rt.drawn_materials && rt.atlas)
+	{
+		int ring = rt.probe_ring;
+		uint32_t count = rt.probe_count;
+		id<MTLBuffer> in, out;
+		float *points;
+
+		if (!rt.probe_in[ring])
+		{
+			rt.probe_in[ring] = [rt.device newBufferWithLength:64 * 16 options:MTLResourceStorageModeShared];
+			rt.probe_out[ring] = [rt.device newBufferWithLength:64 * 32 options:MTLResourceStorageModeShared];
+		}
+		in = rt.probe_in[ring];
+		out = rt.probe_out[ring];
+		memcpy(in.contents, rt.probe_points, count * 16);
+		[encoder setComputePipelineState:rt.probe_pipeline];
+		[encoder setBuffer:in offset:0 atIndex:18];
+		[encoder setBuffer:out offset:0 atIndex:19];
+		[encoder setBytes:&count length:sizeof(count) atIndex:20];
+		[encoder dispatchThreads:MTLSizeMake(count, 1, 1) threadsPerThreadgroup:MTLSizeMake(count < 32 ? count : 32, 1, 1)];
+		rt.probe_ring = (ring + 1) % 3;
+		points = malloc(count * 16);
+		if (points)
+		{
+			memcpy(points, rt.probe_points, count * 16);
+			[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
+				const float *values = out.contents;
+				uint32_t index;
+
+				(void)done;
+				@synchronized (rt.queue)
+				{
+					for (index = 0; index < count; index++)
+					{
+						memcpy(rt.probe_results + index * 10, points + index * 4, 3 * sizeof(float));
+						memcpy(rt.probe_results + index * 10 + 3, values + index * 8, 4 * sizeof(float));
+						memcpy(rt.probe_results + index * 10 + 7, values + index * 8 + 4, 3 * sizeof(float));
+					}
+					rt.probe_result_count = (int)count;
+				}
+				free(points);
+			}];
+		}
+	}
+	rt.probe_count = 0;
 	[encoder endEncoding];
 	if (rt.event)
 	{
