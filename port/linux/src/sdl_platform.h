@@ -64,6 +64,10 @@ struct platform_ui_pointer
 	BOOL moved;
 	int left_clicks, right_clicks;
 	int wheel_steps;
+	/* fingers down since the last read, and where the latest went down
+	(the touchscreen only; the debug view of the menus' targets shows it) */
+	int downs;
+	float down_x, down_y;
 	/* the pointer is the touchscreen (touch_input.c), not a mouse */
 	BOOL touch;
 };

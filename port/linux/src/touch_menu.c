@@ -30,6 +30,9 @@ void touch_menu_down(struct touch_menu *menu, unsigned long long finger, float x
 	menu->finger = finger;
 	menu->down_x = menu->last_x = x;
 	menu->down_y = menu->last_y = y;
+	menu->output.downs++;
+	menu->output.down_x = x;
+	menu->output.down_y = y;
 	menu->scrolling = 0;
 	menu->remainder = 0.0f;
 	/* a finger on the screen stops a list still scrolling, so that a tap
@@ -96,6 +99,7 @@ void touch_menu_cancel(struct touch_menu *menu)
 	menu->scrolling = 0;
 	menu->remainder = 0.0f;
 	menu->pending_steps = 0;
+	menu->output.downs = 0;
 }
 
 void touch_menu_read(struct touch_menu *menu, struct touch_menu_output *output)
@@ -112,4 +116,5 @@ void touch_menu_read(struct touch_menu *menu, struct touch_menu_output *output)
 	menu->pending_steps -= steps;
 	menu->output.moved = 0;
 	menu->output.clicks = 0;
+	menu->output.downs = 0;
 }

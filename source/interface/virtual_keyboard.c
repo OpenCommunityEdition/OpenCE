@@ -1322,17 +1322,40 @@ static rectangle2d const keyboard_back_legend_rect= {412, 368, 438, 462};
 static rectangle2d const keyboard_enter_legend_rect= {412, 468, 438, 572};
 
 /* (virtual_keyboard.h) */
+long virtual_keyboard_target_rectangles(
+	rectangle2d *rectangles,
+	long maximum)
+{
+	long count = 0;
+	short key_index;
+
+	for (key_index = 0; key_index < NUMBER_OF_VIRTUAL_KEYS && count < maximum; key_index++)
+		rectangles[count++] = keyboard_rect[key_index];
+	if (count < maximum)
+		rectangles[count++] = keyboard_back_legend_rect;
+	if (count < maximum)
+		rectangles[count++] = keyboard_enter_legend_rect;
+
+	return count;
+}
+
+/* (virtual_keyboard.h) */
 boolean virtual_keyboard_click(
 	short x,
-	short y)
+	short y,
+	long *hit)
 {
 	short key_index, row, column;
 
+	if (hit)
+		*hit = NONE;
 	if (!virtual_keyboard_globals.active)
 		return FALSE;
 	if (x >= keyboard_back_legend_rect.x0 && x < keyboard_back_legend_rect.x1 &&
 		y >= keyboard_back_legend_rect.y0 && y < keyboard_back_legend_rect.y1)
 	{
+		if (hit)
+			*hit = NUMBER_OF_VIRTUAL_KEYS;
 		if (virtual_keyboard_cancel() == TRUE)
 		{
 			virtual_keyboard_globals.time_of_last_event = system_milliseconds();
@@ -1343,6 +1366,8 @@ boolean virtual_keyboard_click(
 	if (x >= keyboard_enter_legend_rect.x0 && x < keyboard_enter_legend_rect.x1 &&
 		y >= keyboard_enter_legend_rect.y0 && y < keyboard_enter_legend_rect.y1)
 	{
+		if (hit)
+			*hit = NUMBER_OF_VIRTUAL_KEYS + 1;
 		key_index = virtual_keyboard_layout_table[0][0];
 	}
 	else
@@ -1356,6 +1381,8 @@ boolean virtual_keyboard_click(
 		}
 		if (key_index == NUMBER_OF_VIRTUAL_KEYS)
 			return FALSE;
+		if (hit)
+			*hit = key_index;
 	}
 	for (row = 0; row < VIRTUAL_KEYBOARD_ROW_COUNT; row++)
 	{

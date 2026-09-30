@@ -123,6 +123,9 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 	pointer->left_clicks = output.clicks;
 	pointer->right_clicks = 0;
 	pointer->wheel_steps = output.wheel_steps;
+	pointer->downs = output.downs;
+	pointer->down_x = output.down_x;
+	pointer->down_y = output.down_y;
 	pointer->touch = TRUE;
 }
 

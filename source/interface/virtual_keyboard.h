@@ -50,12 +50,28 @@ void virtual_keyboard_render(
  *
  * @param x horizontal position of the click
  * @param y vertical position of the click
+ * @param hit receives which rectangle matched, as its index in
+ * virtual_keyboard_target_rectangles (the keys, then BACK, then ENTER), or
+ * NONE; may be NULL
  * @return TRUE if the click was on a key or on the BACK or ENTER legend,
  * which then acted; FALSE otherwise
  */
 boolean virtual_keyboard_click(
 	short x,
-	short y);
+	short y,
+	long *hit);
+
+/**
+ * @brief Lists the rectangles that virtual_keyboard_click hit-tests, for
+ * the debug view of the touch targets (debug.touch_targets).
+ * @param rectangles receives the keys' rectangles, then the BACK and ENTER
+ * legends'
+ * @param maximum room in rectangles
+ * @return how many were written
+ */
+long virtual_keyboard_target_rectangles(
+	rectangle2d *rectangles,
+	long maximum);
 
 /* ---------- globals */
 

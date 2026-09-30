@@ -5255,6 +5255,163 @@ static short ui_mouse_click_x, ui_mouse_click_y;
 areas are for a finger only, the desktop mouse keeps their original height */
 static boolean ui_mouse_pointer_is_touch = FALSE;
 
+/* ---------- the debug view of the targets (debug.touch_targets)
+
+Drawn by render_ui_widgets in the pass that noted the targets: the list is
+only valid from the render that noted them to the next
+ui_widgets_process_mouse, which clears it. */
+
+#define UI_DEBUG_MARK_MILLISECONDS 3000
+#define UI_DEBUG_KEYBOARD_RECTANGLES 96
+
+struct ui_debug_mark
+{
+	boolean shown;
+	short x, y;
+	unsigned long time;
+};
+
+static struct ui_debug_mark ui_debug_down_mark, ui_debug_tap_mark;
+/* the frames ui_widgets_process_mouse has run, and the one the latest tap arrived in */
+static long ui_debug_frame, ui_debug_click_frame;
+
+void platform_log(char const *format, ...);
+int config_boolean(char const *name);
+
+/**
+ * @brief Whether debug.touch_targets is on. Read once: the settings do not
+ * change while the game runs.
+ */
+static boolean ui_debug_targets_enabled(
+	void)
+{
+	static long enabled = NONE;
+
+	if (enabled == NONE)
+		enabled = config_boolean("debug.touch_targets") != 0;
+
+	return enabled != 0;
+}
+
+/**
+ * @brief Outlines a rectangle, 2 menu pixels thick, with the game's own quad
+ * drawing, in the menus' coordinates (the caller has the menus' centering
+ * offset on).
+ * @param bounds the rectangle to outline, in menu coordinates
+ * @param color the outline's ARGB color
+ */
+static void ui_debug_draw_outline(
+	rectangle2d const *bounds,
+	pixel32 color)
+{
+	rectangle2d edge;
+
+	edge = *bounds;
+	edge.y1 = edge.y0 + 2;
+	draw_quad(&edge, color);
+	edge = *bounds;
+	edge.y0 = edge.y1 - 2;
+	draw_quad(&edge, color);
+	edge = *bounds;
+	edge.x1 = edge.x0 + 2;
+	draw_quad(&edge, color);
+	edge = *bounds;
+	edge.x0 = edge.x1 - 2;
+	draw_quad(&edge, color);
+
+	return;
+}
+
+/**
+ * @brief Draws a cross of about 8 menu pixels at a mark that is still
+ * within its 3 seconds.
+ * @param mark the remembered point and when it happened
+ * @param color the cross's ARGB color
+ */
+static void ui_debug_draw_mark(
+	struct ui_debug_mark const *mark,
+	pixel32 color)
+{
+	rectangle2d arm;
+
+	if (!mark->shown ||
+		system_milliseconds() - mark->time > UI_DEBUG_MARK_MILLISECONDS)
+	{
+		return;
+	}
+	arm.x0 = mark->x - 4;
+	arm.x1 = mark->x + 4;
+	arm.y0 = mark->y - 1;
+	arm.y1 = mark->y + 1;
+	draw_quad(&arm, color);
+	arm.x0 = mark->x - 1;
+	arm.x1 = mark->x + 1;
+	arm.y0 = mark->y - 4;
+	arm.y1 = mark->y + 4;
+	draw_quad(&arm, color);
+
+	return;
+}
+
+/**
+ * @brief Outlines the targets the pointer code collected this frame (or
+ * the virtual keyboard's keys while it is up), and the last finger-down and
+ * tap points. Only for the render that notes the targets (the first
+ * player's): a split-screen viewport that is not hit-tested shows nothing,
+ * or it would show outlines that no tap uses.
+ * @param first_players_render whether this render is the one that notes targets
+ */
+static void ui_debug_draw_targets(
+	boolean first_players_render)
+{
+	long index;
+
+	if (!first_players_render || !ui_debug_targets_enabled())
+		return;
+	if (virtual_keyboard_active())
+	{
+		rectangle2d rectangles[UI_DEBUG_KEYBOARD_RECTANGLES];
+		long count = virtual_keyboard_target_rectangles(rectangles, UI_DEBUG_KEYBOARD_RECTANGLES);
+
+		for (index = 0; index < count; index++)
+			ui_debug_draw_outline(&rectangles[index], 0xc0ffffff);
+	}
+	else
+	{
+		for (index = 0; index < ui_mouse_target_count; index++)
+		{
+			static pixel32 const colors[] = { 0xc000ff00, 0xc04080ff, 0xc0ffff00, 0xc0ff0000 };
+			short kind = ui_mouse_targets[index].kind;
+
+			ui_debug_draw_outline(&ui_mouse_targets[index].bounds, colors[PIN(kind, 0, 3)]);
+		}
+	}
+	ui_debug_draw_mark(&ui_debug_down_mark, 0xffff00ff);
+	ui_debug_draw_mark(&ui_debug_tap_mark, 0xff00ffff);
+
+	return;
+}
+
+/**
+ * @brief Remembers a finger-down or tap point for the debug view, to show
+ * it for 3 seconds.
+ * @param mark receives the point and the time
+ * @param x horizontal position, in menu coordinates
+ * @param y vertical position, in menu coordinates
+ */
+static void ui_debug_set_mark(
+	struct ui_debug_mark *mark,
+	short x,
+	short y)
+{
+	mark->shown = TRUE;
+	mark->x = x;
+	mark->y = y;
+	mark->time = system_milliseconds();
+
+	return;
+}
+
 static void ui_mouse_press(
 	short button_index)
 {
@@ -5848,11 +6005,79 @@ static boolean ui_mouse_menus_active(
 }
 
 /**
+ * @brief Logs a tap the menus resolved: where it was and the target the
+ * click acts on. A click waits for the presses the mouse queued (a list
+ * slot's hover steps the list first), so it is resolved against the
+ * targets of a later frame than the one the tap arrived in; the frames
+ * between are logged so the target can be read against the screen that
+ * showed then.
+ * @param x horizontal position of the tap, in menu coordinates
+ * @param y vertical position of the tap, in menu coordinates
+ * @param target what the click acts on, or NULL for none
+ * @param frames frames between the tap's arrival and its resolution
+ */
+static void ui_debug_log_click(
+	short x,
+	short y,
+	struct ui_mouse_target const *target,
+	long frames)
+{
+	static char const *const kinds[] = { "item", "value", "list slot", "button" };
+
+	if (target)
+	{
+		platform_log("touch targets: tap at %d,%d hit %s %s [%d,%d,%d,%d] after %ld frames", x, y,
+			kinds[PIN(target->kind, 0, 3)],
+			tag_get_name(target->widget->definition_tag_index),
+			target->bounds.x0, target->bounds.y0, target->bounds.x1, target->bounds.y1, frames);
+	}
+	else
+	{
+		platform_log("touch targets: tap at %d,%d hit none after %ld frames", x, y, frames);
+	}
+
+	return;
+}
+
+/**
+ * @brief Logs a tap while the virtual keyboard is up: the key or legend
+ * that took it.
+ * @param x horizontal position of the tap, in menu coordinates
+ * @param y vertical position of the tap, in menu coordinates
+ * @param hit what virtual_keyboard_click matched (an index into
+ * virtual_keyboard_target_rectangles), or NONE
+ */
+static void ui_debug_log_keyboard_tap(
+	short x,
+	short y,
+	long hit)
+{
+	rectangle2d rectangles[UI_DEBUG_KEYBOARD_RECTANGLES];
+	long count = virtual_keyboard_target_rectangles(rectangles, UI_DEBUG_KEYBOARD_RECTANGLES);
+
+	if (hit == NONE || hit >= count)
+	{
+		platform_log("touch targets: tap at %d,%d hit no keyboard key", x, y);
+	}
+	else
+	{
+		platform_log("touch targets: tap at %d,%d hit keyboard %s %ld [%d,%d,%d,%d]", x, y,
+			hit == count - 2 ? "BACK legend" : hit == count - 1 ? "ENTER legend" : "key",
+			hit, rectangles[hit].x0, rectangles[hit].y0, rectangles[hit].x1, rectangles[hit].y1);
+	}
+
+	return;
+}
+
+/**
  * @brief Turns the pointer's motion, clicks and wheel since the last frame
  * into the first player's controller events. While the virtual keyboard is
  * up it gets the clicks and the menu behind gets nothing. A touch drag
  * stops at the list's ends and skips settings (ui_mouse_wheel_widget,
- * ui_mouse_wheel_room); the desktop wheel wraps as the d-pad does.
+ * ui_mouse_wheel_room); the desktop wheel wraps as the d-pad does. With
+ * debug.touch_targets on it also notes the finger-down and tap points for
+ * the debug view, and logs each tap: a menu click where it is resolved, a
+ * keyboard click where it is taken.
  */
 static void ui_widgets_process_mouse(
 	void)
@@ -5863,14 +6088,31 @@ static void ui_widgets_process_mouse(
 	boolean pointer_active;
 	boolean keyboard_active;
 
+	ui_debug_frame++;
 	pointer_active = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) != 0;
 	if (pointer_active)
 		ui_mouse_pointer_is_touch = pointer.touch != 0;
+	if (pointer_active && ui_debug_targets_enabled())
+	{
+		if (pointer.downs)
+			ui_debug_set_mark(&ui_debug_down_mark, pointer.down_x, pointer.down_y);
+		if (pointer.left_clicks)
+		{
+			ui_debug_set_mark(&ui_debug_tap_mark, pointer.click_x, pointer.click_y);
+			ui_debug_click_frame = ui_debug_frame;
+		}
+	}
 	/* the virtual keyboard takes the pointer's clicks itself; a click that
 	closes it (Done) is not also a click on the menu behind */
 	keyboard_active = virtual_keyboard_active();
 	if (pointer_active && keyboard_active && pointer.left_clicks)
-		virtual_keyboard_click(pointer.click_x, pointer.click_y);
+	{
+		long hit;
+
+		virtual_keyboard_click(pointer.click_x, pointer.click_y, &hit);
+		if (ui_debug_targets_enabled())
+			ui_debug_log_keyboard_tap(pointer.click_x, pointer.click_y, hit);
+	}
 	if (!pointer_active || keyboard_active)
 	{
 		ui_mouse_press_count = 0;
@@ -5946,6 +6188,8 @@ static void ui_widgets_process_mouse(
 		{
 			ui_mouse_click_pending = FALSE;
 			target = ui_mouse_target_at(ui_mouse_click_x, ui_mouse_click_y);
+			if (ui_debug_targets_enabled())
+				ui_debug_log_click(ui_mouse_click_x, ui_mouse_click_y, target, ui_debug_frame - ui_debug_click_frame);
 			if (target)
 			{
 				switch (target->kind)
@@ -6273,6 +6517,7 @@ void render_ui_widgets(
 {
 	rectangle2d bounds;
 	long widget_index;
+	boolean first_players_render = local_player_index == NONE || local_player_index == 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
@@ -6385,6 +6630,7 @@ void render_ui_widgets(
 	{
 		virtual_keyboard_render();
 	}
+	ui_debug_draw_targets(first_players_render);
 
 	return;
 }

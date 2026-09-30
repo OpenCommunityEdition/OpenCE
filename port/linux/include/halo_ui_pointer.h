@@ -26,6 +26,10 @@ struct halo_ui_pointer
 	/* nonzero when the pointer is the touchscreen, not a mouse: a drag and a
 	wheel notch are the same steps, but the menus treat them differently */
 	unsigned char touch;
+	/* fingers down since the last read and where the latest went down; only
+	the touchscreen reports them (debug.touch_targets shows them) */
+	unsigned char downs;
+	short down_x, down_y;
 };
 
 /**

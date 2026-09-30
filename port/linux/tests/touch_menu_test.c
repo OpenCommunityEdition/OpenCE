@@ -533,6 +533,81 @@ static void test_one_step_a_read(void)
 	CHECK(out.wheel_steps == 0);
 }
 
+/* the debug view (debug.touch_targets) shows where a drag began, which no
+tap or hover reports */
+static void test_a_drag_reports_where_the_finger_went_down(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 3, 400.0f, 200.0f);
+	touch_menu_move(&menu, 3, 400.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 1);
+	CHECK(out.down_x == 400.0f && out.down_y == 200.0f);
+	CHECK(out.clicks == 0);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 0);
+}
+
+static void test_a_tap_reports_its_down(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 1, 50.0f, 60.0f);
+	touch_menu_up(&menu, 1, 50.0f, 60.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 1);
+	CHECK(out.down_x == 50.0f && out.down_y == 60.0f);
+}
+
+static void test_two_downs_between_reads_count_twice(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 1, 50.0f, 60.0f);
+	touch_menu_up(&menu, 1, 50.0f, 60.0f);
+	touch_menu_down(&menu, 2, 70.0f, 80.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 2);
+	CHECK(out.down_x == 70.0f && out.down_y == 80.0f);
+}
+
+/* an ignored second finger is not a down */
+static void test_a_second_finger_is_no_down(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 1, 50.0f, 60.0f);
+	touch_menu_down(&menu, 2, 70.0f, 80.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 1);
+	CHECK(out.down_x == 50.0f && out.down_y == 60.0f);
+}
+
+static void test_reset_and_cancel_drop_the_unread_downs(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 1, 50.0f, 60.0f);
+	touch_menu_reset(&menu);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 0);
+	touch_menu_down(&menu, 1, 50.0f, 60.0f);
+	touch_menu_cancel(&menu);
+	touch_menu_read(&menu, &out);
+	CHECK(out.downs == 0);
+}
+
 int main(void)
 {
 	test_init_stores_the_settings();
@@ -568,6 +643,11 @@ int main(void)
 	test_reset_keeps_the_settings();
 	test_cancel_keeps_a_finished_tap();
 	test_one_step_a_read();
+	test_a_drag_reports_where_the_finger_went_down();
+	test_a_tap_reports_its_down();
+	test_two_downs_between_reads_count_twice();
+	test_a_second_finger_is_no_down();
+	test_reset_and_cancel_drop_the_unread_downs();
 	if (failures)
 		printf("%d failures\n", failures);
 	else

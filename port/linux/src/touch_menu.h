@@ -40,6 +40,11 @@ struct touch_menu_output
 	int clicks;
 	/* positive: back (the finger moved down or right) */
 	int wheel_steps;
+	/* fingers that went down since the last read, and where the latest
+	did: a drag reports no tap, and the debug view (debug.touch_targets)
+	wants to show where it began */
+	int downs;
+	float down_x, down_y;
 };
 
 struct touch_menu
@@ -76,7 +81,9 @@ void touch_menu_reset(struct touch_menu *menu);
 /**
  * @brief A finger went down. A second finger is ignored while one is
  * down. The steps still waiting are dropped, so that a tap hits what the
- * finger sees on a list still scrolling.
+ * finger sees on a list still scrolling. The down is counted and its point
+ * kept for the next read (downs, down_x, down_y), even when the finger goes
+ * on to scroll.
  * @param menu the state
  * @param finger the finger's id
  * @param x,y where it went down, in pixels
