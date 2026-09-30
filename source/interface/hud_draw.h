@@ -66,7 +66,7 @@ void hud_retrieve_bitmap_and_bounding_rect(
 	struct bitmap_data const **bitmap,
 	real_rectangle2d const **clip);
 long fast_ftol_C(
-	real value);
+	real x);
 pixel32 real_alpha_intensity_to_pixel32(
 	real alpha,
 	real intensity);

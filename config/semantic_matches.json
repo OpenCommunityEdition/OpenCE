@@ -156,12 +156,12 @@
   },
   {
     "unit": "source/devices/device_controls",
-    "function": "_code_00083e30",
+    "function": "_control_toggle",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
     "unit": "source/cseries/cseries_windows",
-    "function": "_code_0007cb70",
+    "function": "_exception_code_get_string",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -186,12 +186,12 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_dir",
-    "function": "_code_00053960",
+    "function": "_TIFFSetField1",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
     "unit": "source/bitmaps/libtiff/tif_dir",
-    "function": "_code_00054160",
+    "function": "_TIFFGetField1",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -236,17 +236,17 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
-    "function": "_code_00058a20",
+    "function": "_makebwmap",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
-    "function": "_code_00058c40",
+    "function": "_makecmap",
     "reason": "hardened COFF comparison proves all 832 padded bytes and all 18 semantic relocations exact; objdiff reports static BSS symbol/relocation ownership false negatives"
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
-    "function": "_code_00059180",
+    "function": "_put1bitcmaptile",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -256,12 +256,12 @@
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
-    "function": "_code_00059df0",
+    "function": "_pickTileContigCase",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
     "unit": "source/bitmaps/libtiff/tif_getimage",
-    "function": "_code_0005a6f0",
+    "function": "_gt",
     "reason": "hardened COFF comparison proves exact bytes and semantic relocations; objdiff reports a local-label/relocation encoding false negative"
   },
   {
@@ -568,11 +568,6 @@
     "unit": "source/interface/first_person_weapons",
     "function": "_first_person_weapon_set_state",
     "reason": "hardened COFF comparison proves all 688 padded bytes and all 26 semantic relocations exact (SHA-256 965964af9115913e36fa06e152828b2e857e7ac59e2cc0e6fdcff29ddebcb91f); objdiff reports a private switch-table/local-label ownership false negative"
-  },
-  {
-    "unit": "source/interface/ui_widget_game_data_input_functions",
-    "function": "_mutliplayer_settings_select_list_update_displayed_items",
-    "reason": "hardened COFF comparison proves all 1424 padded bytes and all 73 semantic relocations exact (SHA-256 adce7f9ab32aee72ec9d542efc297df9295a839a27406848eb8467ffea97594f); objdiff reports compiler-local switch-table labels as a false negative; January's original misspelling of multiplayer in the owner name is preserved"
   },
   {
     "unit": "source/interface/ui_widget_game_data_input_functions",

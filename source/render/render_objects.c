@@ -90,7 +90,9 @@ symbols in this file:
 #include "math/real_math.h"
 #include "bitmaps/bitmaps.h"
 #include "render/render.h"
-#include "render/render_objects.h"
+#include "camera/camera_scripting.h"
+#include "editor/editor_stubs.h"
+#include "rasterizer/rasterizer.h"
 #include "render/render_cameras_internal.h"
 #include "render/render_debug.h"
 #include "objects/objects.h"
@@ -108,6 +110,8 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "tag_files/tag_files.h"
 #include "saved games/game_state.h"
+#include "rasterizer/rasterizer_console_vars.h"
+#include "rasterizer/rasterizer_model_types.h"
 
 /* ---------- constants */
 
@@ -154,18 +158,6 @@ enum
 
 /* ---------- structures */
 
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	real parameter;
-	long source_object_index;
-	real_point3d source_object_centroid;
-	struct shader const *modifier_shader;
-	struct render_animation modifier_animation;
-};
-
 struct object_render_data
 {
 	long object_index;
@@ -195,12 +187,6 @@ struct render_object_globals
 	short rendered_object_count;
 	word pad;
 	long rendered_object_indices[MAXIMUM_RENDERED_OBJECTS];
-};
-
-struct rasterizer_debug_options
-{
-	byte unused00[0xE];
-	boolean draw_first_person_weapon_first;
 };
 
 typedef char render_model_effect_size_assert[
@@ -259,8 +245,6 @@ static void render_object(
 static void process_rendered_objects(
 	struct object_render_data *data);
 
-boolean scripted_camera_object_is_first_person_camera(
-	long object_index);
 short structure_visibility_find_objects(
 	long *object_indices,
 	short maximum_object_count,
@@ -269,27 +253,7 @@ short structure_visibility_find_objects(
 	void (*get_bounding_sphere_function)(long object_index, real_point3d *center, real *radius),
 	boolean (*unmarked_function)(long object_index),
 	boolean (*mark_function)(long object_index));
-void rasterizer_models_begin(
-	boolean sky);
-void rasterizer_models_end(
-	void);
-void rasterizer_environment_shadows_begin(
-	void);
-void rasterizer_environment_shadows_end(
-	void);
-boolean rasterizer_environment_shadow_begin(
-	long object_index,
-	real_matrix4x3 const *shadow_matrix,
-	union real_rgb_color const *shadow_color,
-	real object_bounding_radius,
-	real *shadow_bounding_radius);
-void rasterizer_environment_shadow_end(
-	void);
-boolean editor_preprocess_rendered_object(
-	long object_index,
-	struct render_lighting const *lighting);
 
-extern struct rasterizer_debug_options rasterizer_debug_options;
 extern boolean debug_objects;
 extern short debug_rasterizer_light_count;
 

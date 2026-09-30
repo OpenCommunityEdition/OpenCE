@@ -133,6 +133,7 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
 #include "items/item_definitions.h"
+#include "memory/data.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_debug.h"
@@ -292,17 +293,6 @@ struct hud_state_message_element
 	byte data;
 };
 
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	pixel32 color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
 struct hud_state_message_text_info_definition
 {
 	short string_index;
@@ -342,13 +332,6 @@ struct hud_message_text_definition
 	struct tag_block elements;
 	struct tag_block messages;
 	long unused2C[21];
-};
-
-struct hud_scripted_globals_definition
-{
-	boolean show_hud;
-	boolean show_hud_help_text;
-	byte reserved2[2];
 };
 
 struct hud_timer_data_definition
@@ -490,8 +473,7 @@ static void render_state_bitmap(
 /* ---------- globals */
 
 static struct hud_messaging_globals_definition *hud_messaging_globals;
-extern struct hud_messaging_parameters_definition *hud_msg_def;
-extern struct hud_scripted_globals_definition *hud_scripted_globals;
+struct hud_messaging_parameters_definition *hud_msg_def;
 static char button_mappings[_icon_custom_1 - _icon_action] =
 {
 	2,

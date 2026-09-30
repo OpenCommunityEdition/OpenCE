@@ -97,6 +97,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "math/real_math.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_geometry_compression.h"
 
@@ -135,28 +136,6 @@ struct environment_lightmap_vertex_compressed
 	unsigned long incident_radiosity;
 	short lightmap_u;
 	short lightmap_v;
-};
-
-struct model_vertex_uncompressed
-{
-	real_point3d position;
-	real_vector3d normal;
-	real_vector3d binormal;
-	real_vector3d tangent;
-	real_point2d texcoord;
-	short nodes[2];
-	real node_weights[2];
-};
-
-struct model_vertex_compressed
-{
-	real_point3d position;
-	unsigned long normal;
-	unsigned long binormal;
-	unsigned long tangent;
-	point2d texcoord;
-	byte nodes[2];
-	short node_weight;
 };
 
 /* ---------- globals */

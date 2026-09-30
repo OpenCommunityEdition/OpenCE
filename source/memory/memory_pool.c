@@ -13,13 +13,13 @@ symbols in this file:
 0010DBE0 0030:
 	_memory_pool_get_contiguous_free_size (0000)
 0010DC10 0010:
-	_code_0010dc10 (0000)
+	_memory_pool_block_compute_actual_size (0000)
 0010DC20 0030:
-	_code_0010dc20 (0000)
+	_memory_pool_block_new (0000)
 0010DC50 0170:
-	_code_0010dc50 (0000)
+	_memory_pool_verify (0000)
 0010DDC0 00b0:
-	_code_0010ddc0 (0000)
+	_memory_pool_block_get (0000)
 0010DE70 0040:
 	_memory_pool_new (0000)
 0010DEB0 0030:
@@ -85,14 +85,14 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-static long code_0010dc10(
+static long memory_pool_block_compute_actual_size(
 	long size);
-static void *code_0010dc20(
+static void *memory_pool_block_new(
 	struct memory_pool *pool,
 	long size);
-static void code_0010dc50(
+static void memory_pool_verify(
 	struct memory_pool *pool);
-static struct memory_pool_block *code_0010ddc0(
+static struct memory_pool_block *memory_pool_block_get(
 	struct memory_pool *pool,
 	void **reference);
 
@@ -141,7 +141,7 @@ struct memory_pool *memory_pool_new(
 void memory_pool_delete(
 	struct memory_pool *pool)
 {
-	code_0010dc50(pool);
+	memory_pool_verify(pool);
 	csmemset(pool, 0, sizeof(*pool));
 	match_free("c:\\halo\\SOURCE\\memory\\memory_pool.c", 85, pool);
 	return;
@@ -158,7 +158,7 @@ boolean memory_pool_block_allocate(
 	actual_size = size+sizeof(*block);
 	if (actual_size&3)
 		actual_size = (actual_size|3)+1;
-	code_0010dc50(pool);
+	memory_pool_verify(pool);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 124, size>=0);
 
 	block = pool->last_block
@@ -187,7 +187,7 @@ boolean memory_pool_block_allocate(
 	contains its exact expanded source shape.
 	*/
 	if (FALSE)
-		code_0010dc20(pool, actual_size);
+		memory_pool_block_new(pool, actual_size);
 	return FALSE;
 }
 
@@ -197,7 +197,7 @@ void memory_pool_block_free(
 {
 	struct memory_pool_block *block;
 
-	block = code_0010ddc0(pool, reference);
+	block = memory_pool_block_get(pool, reference);
 	pool->free_size += block->size;
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 230, pool->free_size<=pool->size);
 	if (block->previous_block)
@@ -244,7 +244,7 @@ void memory_pool_compact(
 		previous_block->next_block = NULL;
 		pool->last_block = previous_block;
 	}
-	code_0010dc50(pool);
+	memory_pool_verify(pool);
 	return;
 }
 
@@ -257,8 +257,8 @@ boolean memory_pool_block_reallocate(
 	struct memory_pool_block *block;
 	byte *next_block_address;
 
-	block = code_0010ddc0(pool, reference);
-	actual_new_size = code_0010dc10(new_size);
+	block = memory_pool_block_get(pool, reference);
+	actual_new_size = memory_pool_block_compute_actual_size(new_size);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 174, new_size>=0);
 
 	next_block_address = block->next_block ? (byte *)block->next_block : (byte *)pool->base_address+pool->size;
@@ -282,7 +282,7 @@ boolean memory_pool_block_reallocate(
 			match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 200, actual_new_size>block->size);
 			csmemcpy(new_reference, *reference, block->size-sizeof(*block));
 			memory_pool_block_free(pool, reference);
-			new_block = code_0010ddc0(pool, &new_reference);
+			new_block = memory_pool_block_get(pool, &new_reference);
 			new_block->reference = reference;
 			*reference = new_reference;
 			return TRUE;
@@ -311,7 +311,7 @@ long memory_pool_get_contiguous_free_size(
 
 /* ---------- private code */
 
-static long code_0010dc10(
+static long memory_pool_block_compute_actual_size(
 	long size)
 {
 	size += sizeof(struct memory_pool_block);
@@ -323,7 +323,7 @@ static long code_0010dc10(
 	return size;
 }
 
-static void *code_0010dc20(
+static void *memory_pool_block_new(
 	struct memory_pool *pool,
 	long size)
 {
@@ -338,7 +338,7 @@ static void *code_0010dc20(
 		: NULL;
 }
 
-static void code_0010dc50(
+static void memory_pool_verify(
 	struct memory_pool *pool)
 {
 	struct memory_pool_block *block;
@@ -361,7 +361,7 @@ static void code_0010dc50(
 	return;
 }
 
-static struct memory_pool_block *code_0010ddc0(
+static struct memory_pool_block *memory_pool_block_get(
 	struct memory_pool *pool,
 	void **reference)
 {
@@ -369,7 +369,7 @@ static struct memory_pool_block *code_0010ddc0(
 	struct memory_pool_block *other_block;
 
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 372, reference && (*reference));
-	code_0010dc50(pool);
+	memory_pool_verify(pool);
 	block = (struct memory_pool_block *)((byte *)*reference-sizeof(*block));
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\memory_pool.c",

@@ -84,6 +84,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
+#include "game/game_allegiance.h"
 #include "scenario/scenario.h"
 
 /* ---------- constants */
@@ -93,8 +94,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-boolean game_team_is_enemy(short team_index0, short team_index1);
 
 /* ---------- globals */
 

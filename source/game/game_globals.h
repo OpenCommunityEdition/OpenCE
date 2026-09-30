@@ -13,6 +13,7 @@ header included in hcex build.
 #include "math/integer_math.h"
 #include "math/real_math.h"
 #include "tag_files/tag_groups.h"
+#include "interface/interface.h"
 
 /* ---------- constants */
 
@@ -235,6 +236,12 @@ typedef char game_globals_player_control_flipping_angle_offset_assert[
 
 typedef char verify_game_globals_multiplayer_information_size[sizeof(struct game_globals_multiplayer_information) == 0xA0 ? 1 : -1];
 typedef char verify_game_globals_multiplayer_sounds_offset[offsetof(struct game_globals_multiplayer_information, sounds) == 0x5C ? 1 : -1];
+
+struct game_globals_interface_tag_references
+{
+	struct tag_reference interface_tag_references[NUMBER_OF_INTERFACE_TAGS];
+	long unused0[12];
+};
 
 struct game_globals
 {

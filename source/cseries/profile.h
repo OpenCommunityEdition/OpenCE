@@ -173,6 +173,10 @@ real profile_frame_get_value(
 	struct profile_frame_iterator *iterator,
 	short frame_value,
 	short section_index);
+void profile_sections_activate(
+	char const *section_name);
+void profile_sections_deactivate(
+	char const *section_name);
 void profile_seconds_elapsed(
 	real seconds);
 void profile_texture_start(

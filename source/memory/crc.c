@@ -40,7 +40,7 @@ struct crc_globals
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-struct crc_globals crc_globals;
+static struct crc_globals crc_globals;
 #pragma bss_seg()
 
 /* ---------- public code */

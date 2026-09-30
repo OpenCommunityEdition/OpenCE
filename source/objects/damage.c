@@ -325,10 +325,6 @@ typedef char object_damage_body_body_destroyed_threshold_offset_assert[
 static long get_player_index_from_object_or_parents(
 	long object_index);
 
-boolean unit_unsuspecting(
-	long unit_index,
-	real_point3d const *point);
-
 static void object_permutation_shield_regions(
 	long object_index,
 	boolean active);
@@ -355,7 +351,7 @@ static void object_destroy_region(
 
 /* ---------- globals */
 
-extern boolean debug_damage;
+boolean debug_damage;
 
 /* Name and type from the 2003 PC demo PDB ONLY (file static long); HCEX has no such static, so
    the name is singly attested. January corroborates the storage: .bss +0x48, after
@@ -2210,7 +2206,7 @@ static void area_of_effect_cause_damage_to_object(
 	real_vector3d collision_vector;
 	real_vector3d offset_vector;
 	real_vector3d direct_vector;
-	real_point3d collision_point;
+	real_point3d offset_point;
 	struct collision_result spread_collision;
 	struct collision_result direct_collision;
 	boolean can_damage;
@@ -2288,13 +2284,13 @@ static void area_of_effect_cause_damage_to_object(
 				&collision_vector,
 				object_get_ultimate_parent(object_index),
 				&spread_collision);
-			collision_point = spread_collision.point;
+			offset_point = spread_collision.point;
 			ultimate_parent_index = object_get_ultimate_parent(object_index);
 			if (!collision_test_vector(
 				_damage_area_of_effect_collision_flags,
-				&collision_point,
+				&offset_point,
 				vector_from_points3d(
-					&collision_point,
+					&offset_point,
 					&object->object.bounding_sphere_center,
 					&offset_vector),
 				ultimate_parent_index,

@@ -1,0 +1,794 @@
+{
+  "schema": "astra-reconciliation-receipt-index/1",
+  "date": "2026-09-29",
+  "base": "f3aadeab984b09739d80aacfa877cb5aea51a145",
+  "donor_production": "1940c840afed190756f9f456301c99aed418bab4",
+  "canonical_branch": "jonas/exact-pilots",
+  "published": false,
+  "halo_before": {
+    "code": 1596429,
+    "code_total": 1770166,
+    "functions": 7472,
+    "functions_total": 7574,
+    "data": 2648123,
+    "data_total": 3923451,
+    "objects": 396,
+    "objects_total": 468
+  },
+  "halo_after": {
+    "code": 1597714,
+    "code_total": 1770166,
+    "functions": 7473,
+    "functions_total": 7573,
+    "data": 3311591,
+    "data_total": 3922163,
+    "objects": 396,
+    "objects_total": 468
+  },
+  "delta": {
+    "code_meaningful": 1285,
+    "code_padded": 1296,
+    "functions": 1,
+    "regressions": 0,
+    "data_credit": 663468,
+    "data_raw": 663035,
+    "data_padding": 433,
+    "data_denominator": -1288,
+    "function_denominator": -1,
+    "objects": 0
+  },
+  "gain": "__rasterizer_model_transparent_geometry_submit",
+  "classification": "recovered B3 debit, compiler-numbering dependent; no filler",
+  "gates": {
+    "pytest_passed": 1663,
+    "pytest_skipped": 5,
+    "subtests_passed": 159,
+    "parks": 68,
+    "parks_stale": 0,
+    "parks_invalid": 0,
+    "fake_scan": 26,
+    "admission_candidates": 7,
+    "admission_contradicted": 0,
+    "admission_rejected": 0,
+    "admission_revoked": 0,
+    "W3_before": 4067,
+    "W3_after": 4071,
+    "ext1_independent_checks": "39/39",
+    "cold_467_object_section_common_changes": 0,
+    "provider_pairs": 38,
+    "provider_orders": 76
+  },
+  "common_definition_delta": {
+    "count": 52,
+    "resolved_link_names": [
+      "_antenna_data",
+      "_assertion_count",
+      "_avoidance_directions",
+      "_avoidance_rays",
+      "_blip_player_index",
+      "_build_sprite_globals",
+      "_center_point",
+      "_debug_damage",
+      "_debug_decals",
+      "_debug_fog_planes",
+      "_debug_leaf_portals",
+      "_debug_lights",
+      "_debug_looping_sound",
+      "_debug_object_lights",
+      "_debug_point_physics",
+      "_debug_rasterizer_light_count",
+      "_debug_render_freeze",
+      "_debug_scripting",
+      "_debug_sound",
+      "_debug_sound_cache",
+      "_debug_sound_channels",
+      "_debug_sound_reference_counts",
+      "_debug_sprites",
+      "_debug_trigger_volumes",
+      "_director_camera_scripted",
+      "_effect_location_data",
+      "_first_object_type_definition",
+      "_global_communication_table_indices",
+      "_global_default_animation_colors",
+      "_global_default_animation_values",
+      "_glow_globals",
+      "_hs_debug_data",
+      "_hs_global_data",
+      "_hs_thread_data",
+      "_hud_msg_def",
+      "_light_cluster_partition",
+      "_light_data",
+      "_local_player_index_for_draw_string_and_hack_in_icons",
+      "_looping_sound_data",
+      "_loud_dialog_hack",
+      "_node_count",
+      "_particle_systems",
+      "_sense_rays",
+      "_sound_channels",
+      "_sound_class_data",
+      "_sound_data",
+      "_system_particles",
+      "_temporary_hud",
+      "_ui_plasma_effect_color",
+      "_weather_particle_data",
+      "_widget_data",
+      "_wind_globals"
+    ],
+    "unresolved_before": 471,
+    "unresolved_after": 419,
+    "new_duplicate_names": [],
+    "whole_program_link_success": false
+  },
+  "q10": {
+    "outcome": "CREDITED",
+    "credit": {
+      "records": 93,
+      "raw": 660645,
+      "padding": 367,
+      "total": 661012,
+      "by_tag": {
+        "inferred": {
+          "records": 64,
+          "raw": 11612,
+          "padding": 272,
+          "share": 11884
+        },
+        "probable": {
+          "records": 29,
+          "raw": 649033,
+          "padding": 95,
+          "share": 649128
+        }
+      },
+      "largest_record": {
+        "symbol": "_render",
+        "tag": "probable",
+        "raw": 643732,
+        "padding": 12,
+        "share": 643744
+      },
+      "rows": [
+        [
+          "_debug_looping_sound",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_sound",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_loud_dialog_hack",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_sound_channels",
+          "inferred",
+          6144,
+          6160
+        ],
+        [
+          "_looping_sound_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_sound_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_combined_pas",
+          "inferred",
+          64,
+          92
+        ],
+        [
+          "_game_sound_globals",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_game_looping_sound_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_recover_saved_games_hack",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_stun_enable",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_debug_damage_taken",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_unit_illumination",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_unit_animations",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_unit_all_animations",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_file_location_volume_names",
+          "probable",
+          512,
+          536
+        ],
+        [
+          "_debug_fog_planes",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_structures_use_pvs_for_vs",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_debug_portals",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_leaf_portals",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_global_game_globals",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_bsp3d",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_collision_bsp",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_structure_bsp",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_scenario",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_debug_sprites",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_cached_object_render_states",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_debug_input",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_debug_bsp",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_render",
+          "probable",
+          643732,
+          643744
+        ],
+        [
+          "_debug_point_physics",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_node_count",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_global_object_marker",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_noncollideable_object_cluster_partition",
+          "inferred",
+          12,
+          24
+        ],
+        [
+          "_collideable_object_cluster_partition",
+          "inferred",
+          12,
+          16
+        ],
+        [
+          "_object_header_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_first_object_type_definition",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_debug_lights",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_object_lights",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_rasterizer_light_count",
+          "inferred",
+          2,
+          4
+        ],
+        [
+          "_lights_globals",
+          "inferred",
+          848,
+          872
+        ],
+        [
+          "_light_cluster_partition",
+          "inferred",
+          12,
+          16
+        ],
+        [
+          "_debug_damage",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_widget_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_flag_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_antenna_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_network_game_server_memory_do_not_use_directly",
+          "probable",
+          1212,
+          1232
+        ],
+        [
+          "_network_game_client_dont_use_directly",
+          "probable",
+          3248,
+          3264
+        ],
+        [
+          "_debug_render_freeze",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_local_player_index_for_draw_string_and_hack_in_icons",
+          "inferred",
+          2,
+          4
+        ],
+        [
+          "_ui_plasma_effect_color",
+          "inferred",
+          16,
+          28
+        ],
+        [
+          "_blip_player_index",
+          "inferred",
+          2,
+          4
+        ],
+        [
+          "_center_point",
+          "inferred",
+          8,
+          8
+        ],
+        [
+          "_hud_msg_def",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_temporary_hud",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_object_list_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_object_list_header_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_debug_trigger_volumes",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_debug_scripting",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_hs_global_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_hs_thread_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_hs_syntax_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_players_globals",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_team_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_player_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_default_animation_colors",
+          "inferred",
+          48,
+          72
+        ],
+        [
+          "_global_default_animation_values",
+          "inferred",
+          16,
+          16
+        ],
+        [
+          "_weather_particle_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_system_particles",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_particle_systems",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_effect_location_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_debug_decals",
+          "inferred",
+          1,
+          4
+        ],
+        [
+          "_temporary",
+          "probable",
+          256,
+          256
+        ],
+        [
+          "_pursuit_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_encounter_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_platoon_array",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_squad_array",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_global_communication_table_indices",
+          "inferred",
+          114,
+          124
+        ],
+        [
+          "_swarm_component_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_swarm_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_actor_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_avoidance_rays",
+          "inferred",
+          448,
+          468
+        ],
+        [
+          "_avoidance_directions",
+          "inferred",
+          96,
+          96
+        ],
+        [
+          "_sense_rays",
+          "inferred",
+          252,
+          256
+        ],
+        [
+          "_global_temporary_render_color",
+          "inferred",
+          16,
+          16
+        ],
+        [
+          "_sound_class_data",
+          "inferred",
+          4,
+          4
+        ],
+        [
+          "_debug_sound_cache",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_assertion_count",
+          "probable",
+          2,
+          4
+        ],
+        [
+          "_debug_sound_reference_counts",
+          "probable",
+          1,
+          4
+        ],
+        [
+          "_wind_globals",
+          "inferred",
+          3340,
+          3360
+        ],
+        [
+          "_build_sprite_globals",
+          "inferred",
+          40,
+          64
+        ],
+        [
+          "_light_data",
+          "probable",
+          4,
+          4
+        ],
+        [
+          "_glow_globals",
+          "inferred",
+          8,
+          12
+        ]
+      ],
+      "uncredited": {
+        "halo_pass_owner_unresolved": [
+          24,
+          565443
+        ],
+        "halo_fail": [
+          94,
+          44384
+        ],
+        "halo_pass_not_listed": [
+          2,
+          5
+        ],
+        "vendor": [
+          27,
+          1125
+        ],
+        "linker_excluded": [
+          2,
+          88
+        ]
+      },
+      "not_listed": [
+        "_debug_sound_channels",
+        "_director_camera_scripted"
+      ],
+      "matched_data_before": {
+        "overall": 2656893,
+        "category": 2650579,
+        "unit": 0
+      },
+      "matched_data_after": {
+        "overall": 3317905,
+        "category": 3311591,
+        "unit": 661012
+      }
+    },
+    "scope": "This lifts Q10 only for those 85 records and the 8 records of allowlist extension EXT1 under this verification contract. It does not certify January ownership, complete pool layout, or a matching executable link.",
+    "limitations": "L1: pinning prevents unnoticed changes to reviewed assumptions; it does not prove those assumptions or January ownership.",
+    "environment": "Pins are not protection against a compromised execution environment. The Python interpreter, its module search path and bytecode cache, the unpinned progress code and the generated build outputs are trusted, not pinned (L1 trust root 8).",
+    "linked_libraries_not_in_extract": [
+      "binkxbox.lib",
+      "dsstrmh.lib"
+    ]
+  },
+  "C09_ruling": "Allow ordinary redundant-parentheses cleanup with limitation disclosed; history proves reconstruction origin, not scaffolding intent.",
+  "private_receipts_directory": "scratch/astra_data_reconcile_20260929",
+  "receipts": {
+    "before.json": "19cda0ab95539a0bdacb6a55d3461aafae1c24feed1e4915949a93f375a77b8a",
+    "source.json": "c8696233931220149663c4fda17f4ec267200426a138955d8b781cfccfb33846",
+    "final.json": "c8696233931220149663c4fda17f4ec267200426a138955d8b781cfccfb33846",
+    "cold.json": "c8696233931220149663c4fda17f4ec267200426a138955d8b781cfccfb33846",
+    "source_diff.log": "c8e952998d1003006438cfd554b37a4e5c423e00f5e0a3f7a61947cd04bd92c2",
+    "cold_diff.log": "c8e952998d1003006438cfd554b37a4e5c423e00f5e0a3f7a61947cd04bd92c2",
+    "before_build.log": "1d96e35563fec773b5068bcd7ed3571fca281fae912d145db74fee7a640a8d94",
+    "source_build.log": "ce4920d28fc395a69efe193048d8fcdc6587c1b863374b2080b5edfde97420ad",
+    "final_build.log": "f017ef609cdebe6ee9ca91af05f75d8caf83247b7e22d03adcd4a5adff8f511d",
+    "cold_build.log": "18a2618a479e49d3497b419a1d9715c56f9c9c3f84c7bcc1ffd92f6c56d8e5d4",
+    "cold_pytest.log": "fce1afd6bdd49b8c363e708af5e044eebf217bf7f5d6ab5b9a1a0a3c87b77af6",
+    "cold_parks.json": "b5c475c232ec2895126bc90d26807d815cbfbaadc927d5c5d08f4a032b8aa775",
+    "cold_admission.json": "e4dbf7065fbd4028f5b74b8b82193cb3fc7b3d7c05833e2ab60fead49e6860bd",
+    "cold_fake.log": "bae88b0678f9e172f8e8a8a9134e0648cf7a3b6f53fbcf981d7d27156018d486",
+    "batch_warning_delta.json": "95024ce35d5dff141201809de7cdab21c4ec71d65b6bd86ce5dedab3612334fa",
+    "object_census.json": "78bdd61450407db514a8a00362ac8ec50a7756d7f5683f10487d96c0ea18250d",
+    "cold_object_census.json": "03909eec6b39c17f4f0feb38378ec19034192f9cb421c8164bb43c9895f4c21b",
+    "link_delta.json": "a37f0c9b38373589e95f08c17f851f350e9c7bbce616446eacf33cd84112e547",
+    "control85_progress.txt": "22b51a33385ad8bfdd4ae63ca7137d70754051febdd51d61f9c9bdbb53cb37d6",
+    "control85_credit_receipt.json": "407b3157fdf337c11270581b4410a6eb6c8f2a03e5539e0f8915bbce906b5cbe",
+    "extended_progress.txt": "298f420229fa22780e031bdc4d623283fe1b9890f4fb9c8d6db330de6ea5a69f",
+    "ext1_independent.log": "4ebab428585107a44c8e3ca084340547e5b5e4f1c52d50ecb6c667b9e0d353e4",
+    "review_q10/REVIEW.md": "cbe06f9cf15b395851219efa1b97768d3fa4940a57047da24088e5adebd724e0",
+    "review_q10/SOURCE_SCOPE_REVIEW.md": "6eb67b5b5641550b9be9d1b847fc47c2355b25a84c1d92e70aed5ab042d0397a",
+    "review_q10/HELPER_PROVIDER_REVIEW.md": "a17860c00904262b0f7cd00d383f8cb41fc4fe4413c742f79f2ef1d501eb96c5",
+    "review_q10/helper_audit.json": "34fd09ea3782ddfb332fe0c698d6c8c283859a3fab1ef1d4f1eab5ef32102659"
+  },
+  "production_pins": {
+    "config/common_pool_credit.json": "bf478a7325c46b4cdc7c4a7a91373719bfb6f9e7edbdaa3b6eb9acd02fc50c3c",
+    "config/data_category_reassignments.json": "d19f51fd027b9d9b8f90d3507e81526a2d76589c3024728eeddbc5e9df1ef829",
+    "tools/common_pool_verify.py": "6ca08d007b3a95608e449b4e44a06a5d792a710349c32513a8366a17b044c8be",
+    "tools/coff_compare.py": "df0004d83c548ed82cd4afe66306ccf9dafbc83e6998fafe23047c3a82ecedd7",
+    "tools/semantic_progress.py": "b227a7c8c1c3176a55a5d9b890aaf5f168a3d587ae853fffe70721088ce7b3c7",
+    "research/remaining_frontier_20260926/q10/common_pool_ledger.json": "da1c65de445aac977ed4c14257d929d9c1ada1a1c40e88a573d8688c33300e7f",
+    "research/remaining_frontier_20260926/q10/xdk3911_lib_manifest.json": "1b8a8350bd456bd61efea345970b793ca7ae8b554f9f63d5a0111571a47ebe3b"
+  }
+}

@@ -228,6 +228,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
@@ -261,7 +262,6 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "players.h"
 #include "player_queues_new.h"
-#include "player_control.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
@@ -307,15 +307,6 @@ struct scenario_bsp_switch_trigger_volume
 	short source_structure_bsp_index;
 	short destination_structure_bsp_index;
 	short cutscene_flag_index;
-};
-
-struct scenario_cutscene_flag
-{
-	long runtime_unused;
-	char name[TAG_STRING_LENGTH];
-	real_point3d position;
-	real_euler_angles2d facing;
-	byte unused[0x24];
 };
 
 struct unit_control_data
@@ -2981,18 +2972,18 @@ static void player_examine_nearby_device(
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct device_datum *device;
-	real_point3d camera_position;
+	real_point3d camera;
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	device = device_get(device_index);
-	unit_get_camera_position(player->unit_index, &camera_position);
+	unit_get_camera_position(player->unit_index, &camera);
 	if (fast_vector_intersects_sphere(
-		&camera_position,
+		&camera,
 		&unit->unit.aiming_vector,
 		&device->object.bounding_sphere_center,
 		device->object.bounding_sphere_radius) &&
-		device_frontfacing(device_index, &camera_position, &unit->unit.aiming_vector) &&
+		device_frontfacing(device_index, &camera, &unit->unit.aiming_vector) &&
 		device_can_change_position(device_index))
 	{
 		player_set_action_result(

@@ -269,7 +269,7 @@ enum
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-wchar_t bss_004c1a08[0x100];
+static wchar_t bss_004c1a08[0x100];
 #pragma bss_seg()
 
 /* ---------- public code */

@@ -146,7 +146,7 @@ typedef char collision_bsp_definition_data_size_assert[
  * every internal pointer is emitted as that symbol + 6 + offset.  Restoring
  * ascending order makes the regenerated split .data byte-identical to ours
  * with all 68 relocations equal, and changes no other split object. */
-struct collision_bsp_definition_data global_collision_bsp_definition_data =
+static struct collision_bsp_definition_data global_collision_bsp_definition_data =
 {
 	{
 		{ _tag_field_long_integer, 0, "plane*", NULL },

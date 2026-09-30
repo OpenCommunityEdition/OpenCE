@@ -149,7 +149,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
-#include "models/model_animations.h"
+#include "models/model_animation_definitions.h"
 #include "models/models.h"
 #include "models/model_definitions.h"
 #include "objects/objects.h"

@@ -72,6 +72,7 @@ symbols in this file:
 #include "actors.h"
 #include "cseries/errors.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "memory/data.h"
 #include "saved games/game_state.h"
 #include "units/unit_definitions.h"
@@ -85,22 +86,9 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-boolean game_team_is_enemy(short team_index0, short team_index1);
-boolean game_team_is_ally(short team_index0, short team_index1);
-boolean game_team_ally_status_changed(short team_index0, short team_index1);
-void prop_position_refresh(
-	long actor_index,
-	long prop_index,
-	struct actor_position_data *position,
-	boolean force,
-	boolean update_status);
-void prop_status_refresh(
-	long actor_index,
-	long prop_index,
-	struct actor_position_data *position);
 /* ---------- globals */
 
-long last_prop_data_full_warn_time = NONE;
+static long last_prop_data_full_warn_time = NONE;
 
 /* ---------- public code */
 
@@ -243,7 +231,7 @@ static void prop_add(
 	return;
 }
 
-long prop_new_blank(
+static long prop_new_blank(
 	long actor_index)
 {
 	long prop_index = datum_new(prop_data);
@@ -485,9 +473,8 @@ long prop_orphan_transition(
 	long actor_index,
 	long parent_prop_index)
 {
-	long prop_index = datum_new(prop_data);
+	long prop_index = prop_new_blank(actor_index);
 
-	prop_add(actor_index, NONE, prop_index);
 	if (prop_index != NONE)
 	{
 		struct prop_datum *parent_prop = prop_get(parent_prop_index);
@@ -515,9 +502,8 @@ long prop_orphan_from_friend(
 	long unacknowledged_prop_index,
 	long friend_acknowledged_prop_index)
 {
-	long prop_index = datum_new(prop_data);
+	long prop_index = prop_new_blank(actor_index);
 
-	prop_add(actor_index, NONE, prop_index);
 	if (prop_index != NONE)
 	{
 		struct prop_datum *parent_prop = prop_get(unacknowledged_prop_index);

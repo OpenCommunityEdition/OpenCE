@@ -29,6 +29,7 @@ from .coff_compare import (
     CoffError,
     IMAGE_SCN_CNT_CODE,
     IMAGE_SCN_CNT_UNINITIALIZED_DATA,
+    LINK_ABSOLUTE_ZERO_SYMBOLS,
     RELOC_ENTRY_SIZE,
     SYMBOL_ENTRY_SIZE,
     image_symbol_addresses,
@@ -36,9 +37,13 @@ from .coff_compare import (
     section_info,
     section_info_by_number,
     section_info_resolved,
+    section_info_source_relative,
     section_infos_equal,
 )
-from .semantic_progress import _verify_local_label_continuation
+from .semantic_progress import (
+    _semantic_data_member_snapshot,
+    _verify_local_label_continuation,
+)
 from .audit_semantic_matches import relocation_shape_matches
 
 
@@ -51,6 +56,39 @@ IMAGE_SYM_CLASS_STATIC = 0x03
 SECTION_HEADER_SIZE = 40
 COFF_HEADER_SIZE = 20
 BSS_SENTINEL = "BSS-NO-RAW"
+
+# The production semantic-data ledger (config/semantic_data_matches.json) has
+# exactly the two entry shapes that semantic_progress.apply_semantic_data_matches
+# verifies: a single section named by ``symbol`` and a group whose ``members``
+# name whole sections.  The gate reads the same schema; any other key is
+# rejected rather than ignored, because the gate cannot freeze evidence it does
+# not understand.
+SEMANTIC_DATA_SINGLE_KEYS = frozenset(
+    {"unit", "symbol", "measurements", "reason", "allow_incomplete_unit"}
+)
+SEMANTIC_DATA_SINGLE_REQUIRED = frozenset({"unit", "symbol", "measurements"})
+SEMANTIC_DATA_GROUP_KEYS = frozenset(
+    {"unit", "group", "members", "reason", "allow_incomplete_unit", "credit_raw_size"}
+)
+SEMANTIC_DATA_GROUP_REQUIRED = frozenset({"unit", "members"})
+SEMANTIC_DATA_MEMBER_KEYS = frozenset(
+    {"symbol", "base_symbol", "source_function", "base_source_function", "measurements"}
+)
+SEMANTIC_DATA_MEMBER_REQUIRED = frozenset({"symbol", "measurements"})
+# Grouped entries pinned to an extent model (semantic_progress model path):
+# exact key sets, members named by identity only, declared surplus with its
+# provider.  Nothing here grants credit; the gate freezes the association.
+SEMANTIC_DATA_MODEL_KEYS = frozenset(
+    {"unit", "group", "extent_model", "allow_incomplete_unit", "reason", "members",
+     "surplus"}
+)
+SEMANTIC_DATA_MODEL_REQUIRED = frozenset({"unit", "group", "extent_model", "members", "reason"})
+SEMANTIC_DATA_MODEL_MEMBER_KEYS = frozenset({"symbol", "measurements"})
+SEMANTIC_DATA_SURPLUS_KEYS = frozenset({"symbol", "provider", "measurements"})
+# semantic_progress labels an unnamed group this way; the gate keeps that label.
+SEMANTIC_DATA_DEFAULT_GROUP = "data-section-group"
+SEMANTIC_DATA_GROUP_KIND = "semantic_data_group"
+SEMANTIC_DATA_GROUP_ITEM_PREFIX = "group:"
 
 
 class GateError(RuntimeError):
@@ -238,6 +276,8 @@ def _resolved_relocations(
             f"cannot semantically resolve section {section['index']}: {error}"
         ) from error
     relocations: List[Dict[str, Any]] = []
+    semantic_relocations = semantic_info["relocations"]
+    semantic_index = 0
     for relocation_index in range(int(section["reloc_count"])):
         relocation_offset = int(section["reloc"]) + relocation_index * RELOC_ENTRY_SIZE
         if relocation_offset + RELOC_ENTRY_SIZE > len(obj["data"]):
@@ -259,7 +299,29 @@ def _resolved_relocations(
                 f"address {address:#x} is outside its logical size"
             )
         addend = struct.unpack_from("<i", raw, address)[0]
-        semantic = semantic_info["relocations"][relocation_index]
+        target_section = int(target["section"])
+        if target["name"] in LINK_ABSOLUTE_ZERO_SYMBOLS and target_section == 0:
+            # The strict comparator omits exactly this relocation (the linker
+            # resolves the undefined external to zero; see coff_compare).  The
+            # gate still freezes its raw address, type, addend and owner.
+            relocations.append(
+                {
+                    "address": int(address),
+                    "type": int(relocation_type),
+                    "addend": int(addend),
+                    "resolved_destination": ["link-absolute-zero", target["name"]],
+                    "symbolic_destination": None,
+                    "target_symbol": _symbol_record(target, None),
+                }
+            )
+            continue
+        if semantic_index >= len(semantic_relocations):
+            raise GateError(
+                f"hardened relocation resolver order mismatch in section "
+                f"{section['index']} at relocation {relocation_index}"
+            )
+        semantic = semantic_relocations[semantic_index]
+        semantic_index += 1
         if (
             int(semantic["address"]) != int(address)
             or int(semantic["type"]) != int(relocation_type)
@@ -268,8 +330,6 @@ def _resolved_relocations(
                 f"hardened relocation resolver order mismatch in section "
                 f"{section['index']} at relocation {relocation_index}"
             )
-
-        target_section = int(target["section"])
 
         relocations.append(
             {
@@ -284,6 +344,12 @@ def _resolved_relocations(
                     target, identities.get(target_section)
                 ),
             }
+        )
+    if semantic_index != len(semantic_relocations):
+        raise GateError(
+            f"hardened relocation resolver reported {len(semantic_relocations)} "
+            f"relocations for section {section['index']}, but only "
+            f"{semantic_index} correspond to the object's relocation table"
         )
     return semantic_info["normalized_sha256"], relocations
 
@@ -474,31 +540,177 @@ def _symbol_addresses(entries: Sequence[Mapping[str, Any]]) -> Dict[str, int]:
     return image_symbol_addresses(entries)
 
 
+def _require_string(value: Any, description: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise GateError(f"{description} must be a non-empty string: {value!r}")
+    return value
+
+
+def _check_keys(
+    value: Mapping[str, Any],
+    allowed: frozenset,
+    required: frozenset,
+    description: str,
+) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise GateError(
+            f"{description} has unsupported key(s) {unknown}; the regression "
+            f"gate reads only the production schema"
+        )
+    missing = sorted(required - set(value))
+    if missing:
+        raise GateError(f"{description} is missing required key(s) {missing}")
+
+
+def _semantic_data_group_label(entry: Mapping[str, Any]) -> str:
+    label = entry.get("group", SEMANTIC_DATA_DEFAULT_GROUP)
+    return _require_string(label, f"semantic data group label for {entry.get('unit')!r}")
+
+
+def _validate_semantic_data_entry(entry: Any) -> str:
+    """Return 'single' or 'group' for a production-schema entry, else fail."""
+    if not isinstance(entry, Mapping):
+        raise GateError(f"semantic data entry must be an object: {entry!r}")
+    unit = _require_string(entry.get("unit"), "semantic data entry unit")
+    if "members" in entry and "symbol" in entry:
+        raise GateError(
+            f"semantic data entry {unit} mixes a single 'symbol' with group 'members'"
+        )
+    for flag in ("allow_incomplete_unit", "credit_raw_size"):
+        if flag in entry and not isinstance(entry[flag], bool):
+            raise GateError(f"semantic data entry {unit} has non-boolean {flag!r}")
+    if "members" not in entry:
+        _check_keys(
+            entry,
+            SEMANTIC_DATA_SINGLE_KEYS,
+            SEMANTIC_DATA_SINGLE_REQUIRED,
+            f"semantic data entry {unit}",
+        )
+        _require_string(entry["symbol"], f"semantic data symbol in {unit}")
+        if not isinstance(entry["measurements"], Mapping):
+            raise GateError(f"semantic data measurements must be an object: {unit}")
+        return "single"
+
+    label = _semantic_data_group_label(entry)
+    description = f"semantic data group {unit}:{label}"
+    model = "extent_model" in entry
+    if model:
+        _check_keys(entry, SEMANTIC_DATA_MODEL_KEYS, SEMANTIC_DATA_MODEL_REQUIRED, description)
+        _require_string(entry["extent_model"], f"{description} extent_model")
+        _require_string(entry["reason"], f"{description} reason")
+        surplus = entry.get("surplus", [])
+        if not isinstance(surplus, list):
+            raise GateError(f"{description} surplus must be a list")
+        for index, item in enumerate(surplus):
+            item_description = f"{description} surplus {index}"
+            if not isinstance(item, Mapping):
+                raise GateError(f"{item_description} must be an object")
+            _check_keys(item, SEMANTIC_DATA_SURPLUS_KEYS, SEMANTIC_DATA_SURPLUS_KEYS,
+                        item_description)
+            _require_string(item["symbol"], f"{item_description} symbol")
+            _require_string(item["provider"], f"{item_description} provider")
+            if not isinstance(item["measurements"], Mapping) \
+                    or set(item["measurements"]) != {"base"}:
+                raise GateError(
+                    f"{item_description} measurements must hold exactly a 'base' snapshot"
+                )
+    else:
+        _check_keys(entry, SEMANTIC_DATA_GROUP_KEYS, SEMANTIC_DATA_GROUP_REQUIRED, description)
+    members = entry["members"]
+    if not isinstance(members, list) or not members:
+        raise GateError(f"{description} must list at least one member")
+    for index, member in enumerate(members):
+        member_description = f"{description} member {index}"
+        if not isinstance(member, Mapping):
+            raise GateError(f"{member_description} must be an object")
+        _check_keys(
+            member,
+            SEMANTIC_DATA_MODEL_MEMBER_KEYS if model else SEMANTIC_DATA_MEMBER_KEYS,
+            SEMANTIC_DATA_MEMBER_REQUIRED,
+            member_description,
+        )
+        for key in ("symbol", "base_symbol", "source_function", "base_source_function"):
+            if key in member:
+                _require_string(member[key], f"{member_description} {key}")
+        if "base_source_function" in member and "source_function" not in member:
+            raise GateError(
+                f"{member_description} names a base_source_function without "
+                f"a source_function"
+            )
+        measurements = member["measurements"]
+        if (
+            not isinstance(measurements, Mapping)
+            or set(measurements) != {"target", "base"}
+        ):
+            raise GateError(
+                f"{member_description} measurements must hold exactly "
+                f"'target' and 'base' snapshots"
+            )
+    return "group"
+
+
 def _exception_records(
     units: Iterable[str],
     semantic_matches: Sequence[Mapping[str, Any]],
     semantic_data_matches: Sequence[Mapping[str, Any]],
 ) -> List[Dict[str, Any]]:
+    """Index every selected semantic-ledger entry under its whole-entry identity.
+
+    A single-section data entry keeps its historical record shape (item = the
+    owner symbol).  A grouped entry is one record: item = ``group:<label>``,
+    kind = ``semantic_data_group``, identity = the hash of the complete entry
+    (every member, measurement and flag).  Groups are never flattened into
+    member records, so a member change is a change of the group's identity.
+    Every data entry is validated, selected or not, so a malformed production
+    ledger fails visibly.
+    """
     selected = set(units)
     records: List[Dict[str, Any]] = []
-    for ledger, entries, item_key in (
-        ("semantic_matches", semantic_matches, "function"),
-        ("semantic_data_matches", semantic_data_matches, "symbol"),
-    ):
-        for entry in entries:
-            if entry.get("unit") not in selected:
-                continue
-            canonical = copy.deepcopy(entry)
-            records.append(
-                {
-                    "ledger": ledger,
-                    "unit": entry["unit"],
-                    "item": entry[item_key],
-                    "identity": _json_hash(canonical),
-                    "entry": canonical,
-                }
-            )
+    for entry in semantic_matches:
+        if not isinstance(entry, Mapping):
+            raise GateError(f"semantic match entry must be an object: {entry!r}")
+        unit = _require_string(entry.get("unit"), "semantic match unit")
+        function = _require_string(entry.get("function"), f"semantic match function in {unit}")
+        if unit not in selected:
+            continue
+        canonical = copy.deepcopy(entry)
+        records.append(
+            {
+                "ledger": "semantic_matches",
+                "unit": unit,
+                "item": function,
+                "identity": _json_hash(canonical),
+                "entry": canonical,
+            }
+        )
+    for entry in semantic_data_matches:
+        shape = _validate_semantic_data_entry(entry)
+        if entry["unit"] not in selected:
+            continue
+        canonical = copy.deepcopy(entry)
+        record = {
+            "ledger": "semantic_data_matches",
+            "unit": entry["unit"],
+            "item": entry["symbol"] if shape == "single" else (
+                SEMANTIC_DATA_GROUP_ITEM_PREFIX + _semantic_data_group_label(entry)
+            ),
+            "identity": _json_hash(canonical),
+            "entry": canonical,
+        }
+        if shape == "group":
+            record["kind"] = SEMANTIC_DATA_GROUP_KIND
+        records.append(record)
     records.sort(key=lambda item: (item["unit"], item["ledger"], item["item"]))
+    seen = set()
+    for record in records:
+        key = (record["unit"], record["ledger"], record["item"])
+        if key in seen:
+            raise GateError(
+                f"ambiguous semantic ledger: {record['ledger']} lists "
+                f"{record['unit']}:{record['item']} more than once"
+            )
+        seen.add(key)
     return records
 
 
@@ -532,6 +744,188 @@ def _section_acceptance_view(fingerprint: Mapping[str, Any]) -> Dict[str, Any]:
     for relocation in result.get("relocations", []):
         relocation.get("target_symbol", {}).pop("section", None)
     return result
+
+
+def _unique_section_owner(
+    obj: Mapping[str, Any], name: str, description: str
+) -> Mapping[str, Any]:
+    matches = [
+        item
+        for item in obj["symbols"]
+        if item["name"] == name and int(item["section"]) > 0
+    ]
+    if len(matches) != 1:
+        raise GateError(f"expected one {description} {name!r}, found {len(matches)}")
+    return matches[0]
+
+
+def _capture_semantic_data_groups(
+    unit_name: str,
+    group_records: Sequence[Mapping[str, Any]],
+    target_obj: Mapping[str, Any],
+    base_obj: Mapping[str, Any],
+    target_sections: Mapping[str, Any],
+    base_sections: Mapping[str, Any],
+    claimed_target: Mapping[str, str],
+) -> Tuple[Dict[str, Any], Dict[str, str], Dict[str, str]]:
+    """Re-prove every grouped data entry and freeze each member's sections.
+
+    Each member is verified with the production verifier's own rules
+    (semantic_progress.apply_semantic_data_matches): unique owners, the strict
+    comparator (or its source-function-relative form), equal layout and the
+    pinned target/base snapshots.  The gate then records which frozen
+    non-code section identity every member owns on each side, so a later
+    re-association is a detected change.  A section claimed twice (by two
+    members, two entries, or a member and a single-section entry), a missing
+    or ambiguous owner, and any mismatch fail closed.
+
+    Returns the per-group capture keyed by ledger item, the verified
+    target->rebuilt identity pairs of aliased members (``base_symbol``), and
+    the rebuilt section identities declared as zero-credit surplus by model
+    entries (identity -> owning entry identity).
+    """
+    target_identities = _section_identities(target_obj)
+    base_identities = _section_identities(base_obj)
+    claimed = {"target": dict(claimed_target), "rebuilt": dict(claimed_target)}
+    groups: Dict[str, Any] = {}
+    pairs: Dict[str, str] = {}
+    surplus_sections: Dict[str, str] = {}
+    for record in group_records:
+        entry = record["entry"]
+        label = _semantic_data_group_label(entry)
+        members: List[Dict[str, Any]] = []
+        seen_target_symbols = set()
+        seen_base_symbols = set()
+        for member in entry["members"]:
+            target_symbol = member["symbol"]
+            base_symbol = member.get("base_symbol", target_symbol)
+            source_function = member.get("source_function")
+            base_source_function = member.get("base_source_function", source_function)
+            description = (
+                f"semantic data group {unit_name}:{label} member {target_symbol!r}"
+            )
+            if target_symbol in seen_target_symbols or base_symbol in seen_base_symbols:
+                raise GateError(f"{description} is listed more than once")
+            seen_target_symbols.add(target_symbol)
+            seen_base_symbols.add(base_symbol)
+            target_owner = _unique_section_owner(
+                target_obj, target_symbol, f"target owner for {description}"
+            )
+            base_owner = _unique_section_owner(
+                base_obj, base_symbol, f"rebuilt owner for {description}"
+            )
+            try:
+                if source_function:
+                    target_info = section_info_source_relative(
+                        target_obj, target_symbol, source_function
+                    )
+                    base_info = section_info_source_relative(
+                        base_obj, base_symbol, base_source_function
+                    )
+                else:
+                    target_info = section_info(target_obj, target_symbol)
+                    base_info = section_info(base_obj, base_symbol)
+                target_section = target_obj["sections"][int(target_owner["section"]) - 1]
+                base_section = base_obj["sections"][int(base_owner["section"]) - 1]
+                target_snapshot = _semantic_data_member_snapshot(
+                    target_owner, target_section, target_info
+                )
+                base_snapshot = _semantic_data_member_snapshot(
+                    base_owner, base_section, base_info
+                )
+            except (CoffError, KeyError, IndexError) as error:
+                raise GateError(f"cannot verify {description}: {error}") from error
+            if not section_infos_equal(target_info, base_info):
+                raise GateError(f"{description} is no longer exact")
+            for key in ("section", "size", "padded_size", "flags"):
+                if target_snapshot[key] != base_snapshot[key]:
+                    raise GateError(f"{description} layout differs ({key})")
+            if member["measurements"] != {"target": target_snapshot, "base": base_snapshot}:
+                raise GateError(f"{description} snapshot changed")
+
+            target_identity = target_identities[int(target_owner["section"])]
+            base_identity = base_identities[int(base_owner["section"])]
+            if target_identity not in target_sections or base_identity not in base_sections:
+                raise GateError(f"{description} does not own a frozen non-code section")
+            for side, identity in (("target", target_identity), ("rebuilt", base_identity)):
+                if identity in claimed[side]:
+                    raise GateError(
+                        f"{description} {side} section {identity!r} is already "
+                        f"claimed by {claimed[side][identity]}"
+                    )
+                claimed[side][identity] = description
+            if target_identity != base_identity:
+                # A declared producer-specific alias.  Refuse a pairing that a
+                # same-identity section on the other side would make ambiguous.
+                if base_identity in target_sections or target_identity in base_sections:
+                    raise GateError(
+                        f"{description} pairs {target_identity!r} with "
+                        f"{base_identity!r}, but one of them also exists on the "
+                        f"other side"
+                    )
+                pairs[target_identity] = base_identity
+            members.append(
+                {
+                    "symbol": target_symbol,
+                    "base_symbol": base_symbol,
+                    "source_function": source_function,
+                    "base_source_function": base_source_function,
+                    "target_section": target_identity,
+                    "base_section": base_identity,
+                    "measurements": copy.deepcopy(member["measurements"]),
+                }
+            )
+        capture = {
+            "identity": record["identity"],
+            "group": label,
+            "members": members,
+        }
+        if "extent_model" in entry:
+            # Declared rebuilt-only (surplus) sections: zero credit, frozen with
+            # their provider.  semantic_progress proves the provider; the gate
+            # records the association and the rebuilt section's evidence.
+            capture["extent_model"] = entry["extent_model"]
+            capture["surplus"] = []
+            for item in entry.get("surplus", []):
+                symbol_name = item["symbol"]
+                description = (
+                    f"semantic data group {unit_name}:{label} surplus {symbol_name!r}"
+                )
+                if any(
+                    entry_symbol["name"] == symbol_name and int(entry_symbol["section"]) > 0
+                    for entry_symbol in target_obj["symbols"]
+                ):
+                    raise GateError(f"{description} is defined by the target")
+                owner = _unique_section_owner(base_obj, symbol_name, f"rebuilt owner for {description}")
+                try:
+                    section = base_obj["sections"][int(owner["section"]) - 1]
+                    snapshot = _semantic_data_member_snapshot(
+                        owner, section, section_info(base_obj, symbol_name)
+                    )
+                except (CoffError, KeyError, IndexError) as error:
+                    raise GateError(f"cannot verify {description}: {error}") from error
+                if item["measurements"] != {"base": snapshot}:
+                    raise GateError(f"{description} snapshot changed")
+                identity = base_identities[int(owner["section"])]
+                if identity not in base_sections:
+                    raise GateError(f"{description} does not own a frozen non-code section")
+                if identity in claimed["rebuilt"]:
+                    raise GateError(
+                        f"{description} section {identity!r} is already claimed by "
+                        f"{claimed['rebuilt'][identity]}"
+                    )
+                claimed["rebuilt"][identity] = description
+                surplus_sections[identity] = record["identity"]
+                capture["surplus"].append(
+                    {
+                        "symbol": symbol_name,
+                        "provider": item["provider"],
+                        "base_section": identity,
+                        "measurements": copy.deepcopy(item["measurements"]),
+                    }
+                )
+        groups[record["item"]] = capture
+    return groups, pairs, surplus_sections
 
 
 def _capture_unit(
@@ -569,7 +963,14 @@ def _capture_unit(
         item["item"]: item
         for item in unit_exceptions
         if item["ledger"] == "semantic_data_matches"
+        and item.get("kind") != SEMANTIC_DATA_GROUP_KIND
     }
+    group_exceptions = [
+        item
+        for item in unit_exceptions
+        if item["ledger"] == "semantic_data_matches"
+        and item.get("kind") == SEMANTIC_DATA_GROUP_KIND
+    ]
 
     comparisons: Dict[str, Any] = {}
     ordinary_percentages = ordinary_percentages or {}
@@ -689,6 +1090,11 @@ def _capture_unit(
             raise GateError(
                 f"semantic data target snapshot changed: {unit_name}:{symbol_name}"
             )
+        if target_identity in semantic_sections:
+            raise GateError(
+                f"semantic data section {unit_name}:{target_identity} is claimed "
+                f"by more than one entry"
+            )
         semantic_sections[target_identity] = exception["identity"]
         if target_identity != base_identity:
             # The exception proves relocation aliases, not arbitrary section
@@ -699,12 +1105,52 @@ def _capture_unit(
                 f"{unit_name}:{symbol_name}"
             )
 
+    semantic_data_groups, paired_base_identities, surplus_sections = _capture_semantic_data_groups(
+        unit_name,
+        group_exceptions,
+        target_obj,
+        base_obj,
+        target["non_code_sections"],
+        base["non_code_sections"],
+        claimed_target=dict(semantic_sections),
+    )
+    for group in semantic_data_groups.values():
+        for member in group["members"]:
+            semantic_sections[member["target_section"]] = group["identity"]
+    paired_target_identities = {
+        base_identity: target_identity
+        for target_identity, base_identity in paired_base_identities.items()
+    }
+
     for identity in all_section_ids:
         target_fingerprint = target["non_code_sections"].get(identity)
-        base_fingerprint = base["non_code_sections"].get(identity)
+        # A group member may name its rebuilt section through a declared
+        # base_symbol alias (a producer-specific owner name).  Only such a
+        # verified member pair is compared across different identities.
+        paired_base = paired_base_identities.get(identity)
+        base_fingerprint = base["non_code_sections"].get(paired_base or identity)
+        paired_target = (
+            paired_target_identities.get(identity) if target_fingerprint is None else None
+        )
         state = "TARGET_ONLY" if base_fingerprint is None else "BASE_ONLY"
         accepted = False
         exception_identity = semantic_sections.get(identity)
+        if identity in surplus_sections and target_fingerprint is None:
+            section_comparisons[identity] = {
+                "state": "DECLARED_SURPLUS",
+                "accepted": False,
+                "exception_identity": surplus_sections[identity],
+            }
+            continue
+        if paired_target is not None:
+            # The rebuilt half of a verified aliased group member.
+            section_comparisons[identity] = {
+                "state": "SEMANTIC_EXACT",
+                "accepted": True,
+                "exception_identity": semantic_sections[paired_target],
+                "paired_target_identity": paired_target,
+            }
+            continue
         if target_fingerprint is not None and base_fingerprint is not None:
             # Section numbers are object-local.  Ownership identities, flags,
             # symbols, bytes, and relocations remain strict.
@@ -723,6 +1169,8 @@ def _capture_unit(
             "accepted": accepted,
             "exception_identity": exception_identity,
         }
+        if paired_base is not None:
+            section_comparisons[identity]["paired_base_identity"] = paired_base
 
     return {
         "name": unit_name,
@@ -734,6 +1182,7 @@ def _capture_unit(
         "base": base,
         "functions": comparisons,
         "sections": section_comparisons,
+        "semantic_data_groups": semantic_data_groups,
     }
 
 
@@ -1049,6 +1498,79 @@ def _adjudicate_debug_change(
     )
 
 
+def _exception_index(
+    records: Any,
+) -> Tuple[Dict[Tuple[str, str, str], Mapping[str, Any]], List[Tuple[str, str, str]]]:
+    index: Dict[Tuple[str, str, str], Mapping[str, Any]] = {}
+    duplicates: List[Tuple[str, str, str]] = []
+    for record in records or []:
+        key = (
+            str(record.get("ledger")),
+            str(record.get("unit")),
+            str(record.get("item")),
+        )
+        if key in index:
+            duplicates.append(key)
+        index[key] = record
+    return index, duplicates
+
+
+def _group_changes(
+    before: Optional[Mapping[str, Any]], after: Optional[Mapping[str, Any]]
+) -> Dict[str, Any]:
+    """Describe a grouped entry (or its capture) change member by member.
+
+    Works on a ledger entry and on a captured group alike: both list members
+    with ``symbol`` and optional ``base_symbol``.
+    """
+    before = before or {}
+    after = after or {}
+
+    def index(value: Mapping[str, Any]) -> Tuple[Dict[Tuple[Any, Any], Any], List[Any], List[Any]]:
+        members: Dict[Tuple[Any, Any], Any] = {}
+        order: List[Any] = []
+        duplicates: List[Any] = []
+        for member in value.get("members", []) or []:
+            key = (member.get("symbol"), member.get("base_symbol") or member.get("symbol"))
+            if key in members:
+                duplicates.append(key)
+            members[key] = member
+            order.append(key)
+        return members, order, duplicates
+
+    before_members, before_order, before_duplicates = index(before)
+    after_members, after_order, after_duplicates = index(after)
+    common = set(before_members) & set(after_members)
+    changes = {
+        "added_members": sorted(str(key[0]) for key in set(after_members) - set(before_members)),
+        "removed_members": sorted(str(key[0]) for key in set(before_members) - set(after_members)),
+        "changed_members": sorted(
+            str(key[0]) for key in common if before_members[key] != after_members[key]
+        ),
+        "duplicate_members": sorted({str(key[0]) for key in before_duplicates + after_duplicates}),
+        "member_order_changed": (
+            set(before_order) == set(after_order) and before_order != after_order
+        ),
+        "changed_keys": sorted(
+            key
+            for key in set(before) | set(after)
+            if key not in ("members", "surplus") and before.get(key) != after.get(key)
+        ),
+    }
+    # Declared surplus (model entries): keyed by symbol; a provider or
+    # snapshot change is a changed item.
+    before_surplus = {item.get("symbol"): item for item in before.get("surplus", []) or []}
+    after_surplus = {item.get("symbol"): item for item in after.get("surplus", []) or []}
+    changes["added_surplus"] = sorted(str(name) for name in set(after_surplus) - set(before_surplus))
+    changes["removed_surplus"] = sorted(str(name) for name in set(before_surplus) - set(after_surplus))
+    changes["changed_surplus"] = sorted(
+        str(name)
+        for name in set(before_surplus) & set(after_surplus)
+        if before_surplus[name] != after_surplus[name]
+    )
+    return {key: value for key, value in changes.items() if value}
+
+
 def compare_manifests(
     baseline: Mapping[str, Any],
     current: Mapping[str, Any],
@@ -1086,6 +1608,47 @@ def compare_manifests(
         fail("UNKNOWN", "objdiff configuration changed")
     if baseline.get("semantic_exceptions") != current.get("semantic_exceptions"):
         fail("UNKNOWN", "semantic-exception identities changed")
+    # Name every changed ledger record, including member-level group detail.
+    before_records, before_duplicates = _exception_index(baseline.get("semantic_exceptions"))
+    current_records, current_duplicates = _exception_index(current.get("semantic_exceptions"))
+    for ledger, unit, item in sorted(set(before_duplicates) | set(current_duplicates)):
+        fail(
+            "UNKNOWN",
+            f"ambiguous semantic-exception record: {ledger} {unit}:{item}",
+            ledger=ledger,
+            unit=unit,
+            item=item,
+        )
+    for key in sorted(set(before_records) | set(current_records)):
+        ledger, unit, item = key
+        before_record = before_records.get(key)
+        current_record = current_records.get(key)
+        if before_record == current_record:
+            continue
+        if before_record is None:
+            change = "appeared"
+        elif current_record is None:
+            change = "vanished"
+        else:
+            change = "changed"
+        detail: Dict[str, Any] = {}
+        grouped = any(
+            record is not None and record.get("kind") == SEMANTIC_DATA_GROUP_KIND
+            for record in (before_record, current_record)
+        )
+        if grouped:
+            detail["changes"] = _group_changes(
+                before_record.get("entry") if before_record else None,
+                current_record.get("entry") if current_record else None,
+            )
+        fail(
+            "SEMANTIC_EXCEPTION_CHANGED",
+            f"semantic exception {change}: {ledger} {unit}:{item}",
+            ledger=ledger,
+            unit=unit,
+            item=item,
+            **detail,
+        )
 
     baseline_units = baseline.get("units", {})
     current_units = current.get("units", {})
@@ -1247,6 +1810,19 @@ def compare_manifests(
                 unit=unit_name,
             )
 
+        # Grouped data entries: the verified member -> section association.
+        before_groups = before.get("semantic_data_groups", {})
+        after_groups = after.get("semantic_data_groups", {})
+        vanished, appeared, changed = _diff_maps(before_groups, after_groups)
+        for item in sorted(vanished + appeared + changed):
+            fail(
+                "SEMANTIC_DATA_GROUP_CHANGED",
+                f"semantic data group capture changed: {unit_name}:{item}",
+                unit=unit_name,
+                item=item,
+                changes=_group_changes(before_groups.get(item), after_groups.get(item)),
+            )
+
     unused_functions = sorted(set(function_adjudications) - consumed_functions)
     unused_debug_sections = sorted(
         set(debug_adjudications) - consumed_debug_sections
@@ -1370,6 +1946,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "comparison": unit["functions"][args.item],
                     "target": unit["target"]["functions"].get(args.item),
                     "base": unit["base"]["functions"].get(args.item),
+                }
+            elif args.item in unit.get("semantic_data_groups", {}):
+                payload = {
+                    "kind": "semantic_data_group",
+                    "capture": unit["semantic_data_groups"][args.item],
+                    "sections": {
+                        member["target_section"]: unit["sections"].get(member["target_section"])
+                        for member in unit["semantic_data_groups"][args.item]["members"]
+                    },
                 }
             elif args.item in unit["sections"]:
                 payload = {

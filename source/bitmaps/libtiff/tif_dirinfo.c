@@ -269,7 +269,7 @@ int tiffDataWidth[] = {
     8,	/* TIFF_DOUBLE */
 };
 
-TIFFFieldInfo const *last = NULL;
+static TIFFFieldInfo const *last = NULL;
 
 TIFFFieldInfo const *
 DECLARE2(TIFFFindFieldInfo, u_short, tag, TIFFDataType, dt)

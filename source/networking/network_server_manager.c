@@ -458,12 +458,12 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game/game.h"
-#include "game/game_engine_runtime.h"
+#include "game/game_engine.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
 #include "interface/ui_widget.h"
 #include "main/main.h"
-#include "math/random_math.h"
+#include "math/real_math.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
@@ -628,42 +628,8 @@ struct message_server_game_update
 	byte player_updates[MAXIMUM_NETWORK_PLAYER_COUNT * PLAYER_UPDATE_SIZE];
 };
 
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte padding41[3];
-};
-
 typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
-
-struct network_game_map
-{
-	long version;
-	char name[NETWORK_GAME_MAP_NAME_LENGTH];
-};
-
-struct network_game
-{
-	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte opaque10C;
-	char minimum_players;
-	byte maximum_players;
-	byte maximum_teams;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NETWORK_PLAYER_COUNT];
-	byte opaque426[2];
-	long random_seed;
-	long number_of_games_played;
-	boolean load_ui;
-	byte padding431[3];
-};
 
 struct network_game_server_client_machine
 {
@@ -1265,7 +1231,7 @@ boolean network_game_server_start_network_game(
 	return success;
 }
 
-void network_game_server_send_player_quit_messages_ingame(
+static void network_game_server_send_player_quit_messages_ingame(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine)
 {
@@ -1548,11 +1514,11 @@ void network_game_server_all_machines_have_loaded(
 
 	server->state = _network_game_server_state_ingame;
 	server->time_of_first_client_loading_completion = 0;
-	server->game.load_ui = global_network_game_client_get()
-		? network_game_client_get_game(global_network_game_client_get())->load_ui
+	server->game.local_data.game_objects_loaded = global_network_game_client_get()
+		? network_game_client_get_game(global_network_game_client_get())->local_data.game_objects_loaded
 		: FALSE;
 
-	match_vassert(NETWORK_SERVER_MANAGER_FILE, 0x4E0, server->game.load_ui,
+	match_vassert(NETWORK_SERVER_MANAGER_FILE, 0x4E0, server->game.local_data.game_objects_loaded,
 		"local game data not loaded");
 
 	return;

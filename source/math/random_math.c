@@ -58,7 +58,6 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "real_math.h"
 #include "geometry.h"
-#include "random_math.h"
 #include "game_engine.h"
 
 /* ---------- constants */
@@ -94,7 +93,7 @@ direction3d_from_table(
 /* ---------- globals */
 
 #pragma bss_seg(".bss")
-struct random_math_globals random_math_globals;
+static struct random_math_globals random_math_globals;
 #pragma bss_seg()
 
 /* ---------- public code */

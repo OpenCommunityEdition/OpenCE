@@ -1,5 +1,5 @@
 #ifndef lint
-char tif_print_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_print.c,v 1.43 92/03/17 11:08:58 sam Exp $";
+static char tif_print_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_print.c,v 1.43 92/03/17 11:08:58 sam Exp $";
 #endif
 
 /*
@@ -85,7 +85,7 @@ JPEGPrintCTable(fd, tab)
 }
 #endif
 
-const char *photoNames[] = {
+static const char *photoNames[] = {
     "min-is-white",				/* PHOTOMETRIC_MINISWHITE */
     "min-is-black",				/* PHOTOMETRIC_MINISBLACK */
     "RGB color",				/* PHOTOMETRIC_RGB */
@@ -98,7 +98,7 @@ const char *photoNames[] = {
 };
 #define	NPHOTONAMES	(sizeof (photoNames) / sizeof (photoNames[0]))
 
-const char *orientNames[] = {
+static const char *orientNames[] = {
     "0 (0x0)",
     "row 0 top, col 0 lhs",			/* ORIENTATION_TOPLEFT */
     "row 0 top, col 0 rhs",			/* ORIENTATION_TOPRIGHT */

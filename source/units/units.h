@@ -394,6 +394,15 @@ struct unit_animation
 	struct animation_state external_animation;
 };
 
+struct unit_animation_update_data
+{
+	char state_desired;
+	boolean crouching;
+};
+
+typedef char unit_animation_update_data_size_assert[
+	sizeof(struct unit_animation_update_data) == 0x2 ? 1 : -1];
+
 struct unit_speech_item
 {
 	short priority;
@@ -537,6 +546,9 @@ struct unit_control_data;
 void unit_control(
 	long unit_index,
 	struct unit_control_data const *control_data);
+boolean unit_unsuspecting(
+	long unit_index,
+	real_point3d const *point);
 void units_initialize(
 	void);
 long units_debug_get_next_unit(
@@ -559,9 +571,15 @@ void unit_kill_no_statistics(
 	long unit_index);
 void unit_delete(
 	long unit_index);
+void unit_handle_region_destroyed(
+	long object_index,
+	short region_index,
+	unsigned long damage_flags);
 void unit_exit_seat_end(
 	long unit_index);
 void units_update(void);
+void unit_export_function_values(
+	long object_index);
 
 short unit_get_zoom_level(
 	long unit_index);
@@ -574,6 +592,20 @@ void unit_persistent_control(
 	long unit_index,
 	long control_ticks,
 	unsigned long persistent_control_flags);
+boolean unit_get_seat_entrance_point(
+	long unit_index,
+	long parent_unit_index,
+	short seat_index,
+	real_point3d *entrance_point,
+	real_point3d *seat_point,
+	real_point3d *hint_point);
+boolean unit_get_melee_range_and_ticks(
+	long unit_index,
+	boolean secondary,
+	short *melee_tick,
+	real *attack_time,
+	short *frame_count,
+	real *damage_time);
 boolean unit_can_see_point(
 	long unit_index,
 	real_point3d const *point,
@@ -596,9 +628,16 @@ boolean unit_has_weapon_with_flag(
 	long flag_index);
 long unit_scripting_unit_riders(
 	long unit_index);
+boolean unit_scripting_vehicle_test_seat_list(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index);
 void unit_scripting_set_seat(
 	long unit_index,
 	char const *seat_label);
+void unit_handle_deleted_object(
+	long object_index,
+	long deleted_object_index);
 
 boolean unit_update(long unit_index);
 
@@ -660,6 +699,8 @@ void unit_set_controllable(
 long unit_scripting_unit_driver(
 	long unit_index);
 long unit_scripting_unit_gunner(
+	long unit_index);
+void unit_detach_from_parent(
 	long unit_index);
 boolean unit_scripting_vehicle_test_seat(
 	long vehicle_index,
@@ -727,6 +768,9 @@ void scripting_magic_melee_attack(
 	void);
 boolean unit_try_and_exit_seat(
 	long unit_index);
+short vehicle_scripting_unload(
+	long vehicle_index,
+	char const *seat_name);
 void unit_scripting_exit_vehicle(
 	long unit_index);
 void unit_adjust_projectile_ray(
@@ -736,6 +780,8 @@ void unit_adjust_projectile_ray(
 	real *velocity,
 	boolean adjust_origin,
 	boolean use_aiming_vector);
+void unit_render_debug(
+	long object_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
 short unit_inventory_next_weapon(
@@ -780,6 +826,8 @@ boolean unit_approve_weapon_swap(
 	long weapon_index);
 boolean unit_solo_player_integrated_night_vision_is_active(
 	void);
+boolean unit_new(
+	long object_index);
 short unit_get_animation_frames_remaining(
 	long unit_index,
 	short *animation_state);
@@ -789,6 +837,16 @@ short unit_find_nearby_seat(
 	long unit_index,
 	long target_unit_index,
 	short *seat_index);
+short vehicle_scripting_find_available_seats(
+	long vehicle_index,
+	char const *seat_substring_name,
+	short seat_desire_type,
+	short *seat_indices,
+	short maximum_seat_count);
+short vehicle_scripting_load_magic(
+	long vehicle_index,
+	char const *seat_name,
+	long object_list_index);
 boolean unit_can_enter_seat(
 	long unit_index,
 	long target_unit_index,
@@ -874,9 +932,16 @@ void unit_damage_aftermath(
 void unit_place(
 	long unit_index,
 	struct scenario_unit_datum const *scenario_unit);
+void unit_scripting_enter_vehicle(
+	long unit_index,
+	long vehicle_index,
+	char const *seat_name);
 void unit_preprocess_node_orientations(
 	long unit_index,
 	struct real_orientation *node_orientations);
+void unit_postprocess_node_matrices(
+	long object_index,
+	struct real_matrix4x3 *node_matrices);
 
 
 /* ---------- prototypes/UNIT_DIALOGUE.C */
@@ -911,11 +976,12 @@ boolean unit_make_damage_sound(
 boolean unit_scream(
 	long unit_index,
 	short scream_type);
-struct unit_animation_update_data;
-
 void unit_animation_start_action(
 	long unit_index,
 	short action);
+void unit_handle_weapon_state_change(
+	long object_index,
+	short new_state);
 void unit_cause_player_melee_damage(
 	long unit_index);
 short unit_update_animation(

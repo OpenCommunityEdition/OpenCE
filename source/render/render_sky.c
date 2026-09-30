@@ -24,7 +24,9 @@ symbols in this file:
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
 #include "models/models.h"
+#include "objects/object_lights.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h"
 #include "scenario/scenario.h"
 
 /* ---------- constants */
@@ -73,20 +75,9 @@ typedef char verify_sky_render_lighting_size[sizeof(struct render_lighting) == 0
 
 /* ---------- prototypes */
 
-void lights_queue_lens_flare(
-	long lens_flare_index,
-	real_point3d const *position,
-	real_vector3d const *forward,
-	real_vector3d const *up,
-	real_rgb_color const *color,
-	real scale);
-void rasterizer_models_begin(
-	boolean sky_mode);
-void rasterizer_models_end(
-	void);
 /* ---------- globals */
 
-real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
+static real render_sky_globals[MAXIMUM_SKIES_PER_SCENARIO] = {0.f};
 
 /* ---------- public code */
 

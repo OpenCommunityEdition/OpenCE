@@ -49,6 +49,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cheats.h"
 #include "cache/cache_files.h"
 #include "camera/director.h"
@@ -87,7 +88,7 @@ enum
 
 /* ---------- globals */
 
-char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
+static char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
 /* January emits this otherwise unreferenced byte after cheat_strings.
  * Its original name and purpose are unknown; the name is descriptive only. */
 static boolean cheats_unused_flag = FALSE;

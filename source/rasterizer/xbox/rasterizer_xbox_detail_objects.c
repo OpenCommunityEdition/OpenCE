@@ -75,7 +75,9 @@ symbols in this file:
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
+#include "main/main.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
@@ -83,6 +85,7 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
@@ -101,14 +104,6 @@ enum
 	((struct detail_object_collection_definition *)tag_get('dobc', (index)))
 
 /* ---------- structures */
-
-struct detail_objects_debug_options
-{
-	byte reserved00[0x24];
-	boolean detail_objects;
-	byte reserved25[0x2B];
-	float detail_objects_offset_multiplier;
-};
 
 struct detail_object
 {
@@ -207,32 +202,6 @@ struct detail_object_view_data
 	word pad;
 };
 
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
-typedef char detail_objects_enabled_offset_assert[
-	offsetof(struct detail_objects_debug_options, detail_objects) == 0x24 ? 1 : -1];
-typedef char detail_objects_multiplier_offset_assert[
-	offsetof(struct detail_objects_debug_options, detail_objects_offset_multiplier) == 0x50 ? 1 : -1];
 typedef char detail_objects_pixel_shader_size_assert[
 	sizeof(struct pixel_shader_definition) == 0xF0 ? 1 : -1];
 typedef char detail_object_size_assert[
@@ -260,13 +229,9 @@ typedef char detail_object_view_data_size_assert[
 
 /* ---------- prototypes */
 
-short main_get_window_count(
-	void);
-
 /* ---------- globals */
 
-extern struct detail_objects_debug_options rasterizer_debug_options;
-D3DVertexBuffer *bss_0045e904 = NULL;
+static D3DVertexBuffer *bss_0045e904 = NULL;
 
 #define local_d3d_vertex_buffer bss_0045e904
 
@@ -372,7 +337,7 @@ void _rasterizer_detail_objects_begin(
 	void)
 {
 	rasterizer_profile_begin(_rasterizer_profile_detail_objects);
-	if (!rasterizer_debug_options.detail_objects)
+	if (!rasterizer_debug_options.draw_detail_objects)
 	{
 		return;
 	}
@@ -415,7 +380,7 @@ void _rasterizer_detail_objects_begin(
 			8.0f,
 			8.0f,
 			8.0f,
-			rasterizer_debug_options.detail_objects_offset_multiplier,
+			rasterizer_debug_options.detail_object_screen_facing_offset_multiplier,
 			1.0f,
 			1.0f,
 			0.5f,
@@ -478,7 +443,7 @@ void _rasterizer_detail_objects_rebuild_vertices(
 	long cell_index;
 	boolean warned;
 
-	if (!rasterizer_debug_options.detail_objects)
+	if (!rasterizer_debug_options.draw_detail_objects)
 	{
 		return;
 	}
@@ -619,7 +584,7 @@ void _rasterizer_detail_objects_draw(
 	boolean success;
 
 	success = TRUE;
-	if (!rasterizer_debug_options.detail_objects)
+	if (!rasterizer_debug_options.draw_detail_objects)
 	{
 		return;
 	}

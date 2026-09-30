@@ -549,11 +549,10 @@ symbols in this file:
 #include "ai_profile.h"
 #include "ai_script.h"
 #include "actions.h"
-#include "action_converse.h"
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "actor_types.h"
+#include "ai/ai_globals.h"
 #include "ai_scenario_definitions.h"
 #include "cseries/errors.h"
 #include "encounters.h"
@@ -671,7 +670,7 @@ enum
 
 #define ai_print_conversations (ai_debug.print_conversations)
 #define ai_conversation_driver_get(index) \
-	((struct ai_conversation_driver_datum_view *)datum_get(conversation_data, (index)))
+	((struct conversation_datum *)datum_get(conversation_data, (index)))
 
 /* ---------- structures */
 
@@ -722,78 +721,8 @@ typedef char dialogue_usage_size_assert[
 typedef char reply_usage_size_assert[
 	sizeof(struct reply_usage) == 0x24 ? 1 : -1];
 
-struct ai_conversation_line_view
-{
-	struct ai_conversation_datum_header header;
-	byte __unknown14[0x34];
-	short current_line;
-};
-
 typedef char ai_conversation_line_view_current_line_offset_assert[
-	offsetof(struct ai_conversation_line_view, current_line) == 0x48 ? 1 : -1];
-
-struct ai_conversation_driver_datum_view
-{
-	struct ai_conversation_datum_header header;
-	unsigned long participant_bitmask;
-	short dialogue_indices[MAXIMUM_PARTICIPANTS_PER_CONVERSATION];
-	long actor_indices[MAXIMUM_PARTICIPANTS_PER_CONVERSATION];
-	short current_line;
-	short line_participant_index;
-	short line_delay_timer;
-	word line_flags;
-	long line_actor_index;
-	long line_unit_index;
-	long line_address_unit_index;
-	long line_sound_index;
-	boolean line_unspatialized;
-	boolean line_spoken;
-	boolean line_finished;
-	boolean line_advance;
-};
-
-struct ai_conversation_datum_view
-{
-	short identifier;
-	short scenario_conversation_index;
-	boolean scripted;
-	boolean any_line_spoken;
-	boolean begun;
-	boolean finished;
-	boolean waiting_to_advance;
-	boolean told_to_advance;
-	byte reserved0A[2];
-	long creation_time;
-	long triggering_player_unit_index;
-	unsigned long participant_bitmask;
-	short dialogue_indices[MAXIMUM_PARTICIPANTS_PER_CONVERSATION];
-	long actor_indices[MAXIMUM_PARTICIPANTS_PER_CONVERSATION];
-	short line_index;
-	short line_participant_index;
-	short line_delay_timer;
-	word line_flags;
-	long line_actor_index;
-	long line_unit_index;
-	long line_address_unit_index;
-	long line_sound_index;
-	boolean line_unspatialized;
-	boolean line_spoken;
-	boolean line_finished;
-	boolean line_advance;
-};
-
-struct scenario_conversation_definition_view
-{
-	char name[32];
-	word flags;
-	word pad22;
-	real trigger_distance;
-	real run_to_player_distance;
-	byte __unknown2C[0x24];
-	struct tag_block participants;
-	struct tag_block lines;
-	struct tag_block unused;
-};
+	offsetof(struct conversation_datum, line_index) == 0x48 ? 1 : -1];
 
 struct scenario_conversation_participant_view
 {
@@ -820,15 +749,6 @@ struct scenario_conversation_line_view
 	real delay_time;
 	byte __unknown10[0x0C];
 	struct tag_reference dialogue[MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT];
-};
-
-struct recent_conversation_view
-{
-	short scenario_conversation_index;
-	boolean unable_to_begin;
-	boolean finished_successfully;
-	long finish_time;
-	byte __unknown08[8];
 };
 
 struct dialogue_event_status
@@ -869,20 +789,6 @@ struct ai_communication_possibility
 typedef char ai_communication_possibility_size_assert[
 	sizeof(struct ai_communication_possibility) == 0x38 ? 1 : -1];
 
-struct ai_communication_globals_view
-{
-	byte __unknown00[0x10];
-	boolean dialogue_triggers_enabled;
-	byte __unknown11[3];
-	long last_chatter_time[2];
-	long last_talk_time[2];
-	long last_shout_time[2];
-	short recent_conversation_count;
-	short recent_conversation_next_index;
-	struct recent_conversation_view
-		recent_conversations[MAXIMUM_RECENT_CONVERSATIONS];
-};
-
 struct actor_iterator
 {
 	struct data_iterator encounter_iterator;
@@ -893,46 +799,44 @@ struct actor_iterator
 	long next_index;
 };
 
-typedef char ai_conversation_datum_header_size_assert[
-	sizeof(struct ai_conversation_datum_header) == 0x14 ? 1 : -1];
 typedef char ai_conversation_datum_view_size_assert[
-	sizeof(struct ai_conversation_datum_view) == 0x64 ? 1 : -1];
+	sizeof(struct conversation_datum) == 0x64 ? 1 : -1];
 typedef char ai_conversation_datum_view_line_index_offset_assert[
-	offsetof(struct ai_conversation_datum_view, line_index) == 0x48 ? 1 : -1];
+	offsetof(struct conversation_datum, line_index) == 0x48 ? 1 : -1];
 typedef char ai_conversation_datum_view_line_advance_offset_assert[
-	offsetof(struct ai_conversation_datum_view, line_advance) == 0x63 ? 1 : -1];
+	offsetof(struct conversation_datum, line_advance) == 0x63 ? 1 : -1];
 typedef char ai_conversation_datum_header_any_line_spoken_offset_assert[
-	offsetof(struct ai_conversation_datum_header, any_line_spoken) == 0x5 ? 1 : -1];
+	offsetof(struct conversation_datum, any_line_spoken) == 0x5 ? 1 : -1];
 typedef char ai_conversation_datum_header_begun_offset_assert[
-	offsetof(struct ai_conversation_datum_header, begun) == 0x6 ? 1 : -1];
+	offsetof(struct conversation_datum, begun) == 0x6 ? 1 : -1];
 typedef char ai_conversation_datum_header_waiting_to_advance_offset_assert[
-	offsetof(struct ai_conversation_datum_header, waiting_to_advance) == 0x8 ? 1 : -1];
+	offsetof(struct conversation_datum, waiting_to_advance) == 0x8 ? 1 : -1];
 typedef char ai_conversation_datum_header_told_to_advance_offset_assert[
-	offsetof(struct ai_conversation_datum_header, told_to_advance) == 0x9 ? 1 : -1];
+	offsetof(struct conversation_datum, told_to_advance) == 0x9 ? 1 : -1];
 typedef char scenario_conversation_definition_view_size_assert[
-	sizeof(struct scenario_conversation_definition_view) == 0x74 ? 1 : -1];
+	sizeof(struct ai_conversation) == 0x74 ? 1 : -1];
 typedef char scenario_conversation_definition_participants_offset_assert[
-	offsetof(struct scenario_conversation_definition_view, participants) == 0x50 ? 1 : -1];
+	offsetof(struct ai_conversation, participants) == 0x50 ? 1 : -1];
 typedef char scenario_conversation_definition_lines_offset_assert[
-	offsetof(struct scenario_conversation_definition_view, lines) == 0x5C ? 1 : -1];
+	offsetof(struct ai_conversation, lines) == 0x5C ? 1 : -1];
 typedef char scenario_conversation_participant_view_size_assert[
 	sizeof(struct scenario_conversation_participant_view) == 0x54 ? 1 : -1];
 typedef char scenario_conversation_line_view_size_assert[
 	sizeof(struct scenario_conversation_line_view) == 0x7C ? 1 : -1];
 typedef char ai_conversation_driver_datum_view_size_assert[
-	sizeof(struct ai_conversation_driver_datum_view) == 0x64 ? 1 : -1];
+	sizeof(struct conversation_datum) == 0x64 ? 1 : -1];
 typedef char ai_conversation_driver_participant_bitmask_offset_assert[
-	offsetof(struct ai_conversation_driver_datum_view, participant_bitmask) == 0x14 ? 1 : -1];
+	offsetof(struct conversation_datum, participant_bitmask) == 0x14 ? 1 : -1];
 typedef char ai_conversation_driver_actor_indices_offset_assert[
-	offsetof(struct ai_conversation_driver_datum_view, actor_indices) == 0x28 ? 1 : -1];
+	offsetof(struct conversation_datum, actor_indices) == 0x28 ? 1 : -1];
 typedef char ai_conversation_driver_line_flags_offset_assert[
-	offsetof(struct ai_conversation_driver_datum_view, line_flags) == 0x4E ? 1 : -1];
+	offsetof(struct conversation_datum, line_flags) == 0x4E ? 1 : -1];
 typedef char ai_conversation_driver_line_unit_index_offset_assert[
-	offsetof(struct ai_conversation_driver_datum_view, line_unit_index) == 0x54 ? 1 : -1];
+	offsetof(struct conversation_datum, line_unit_index) == 0x54 ? 1 : -1];
 typedef char ai_conversation_driver_line_address_unit_index_offset_assert[
-	offsetof(struct ai_conversation_driver_datum_view, line_address_unit_index) == 0x58 ? 1 : -1];
+	offsetof(struct conversation_datum, line_address_unit_index) == 0x58 ? 1 : -1];
 typedef char recent_conversation_view_size_assert[
-	sizeof(struct recent_conversation_view) == 0x10 ? 1 : -1];
+	sizeof(struct recent_conversation) == 0x10 ? 1 : -1];
 typedef char ai_print_conversations_offset_assert[
 	offsetof(struct ai_debug_state, print_conversations) == 0x9F ? 1 : -1];
 typedef char ai_communication_unit_speech_item_size_assert[
@@ -1008,9 +912,9 @@ static real ai_communication_actor_talk_weight(
 	long cause_unit_index,
 	real_point3d const *cause_point,
 	real stimulus_range,
-	short communication_type,
-	short communication_priority,
-	short speech_priority,
+	short ai_communication_type,
+	short ai_communication_priority,
+	short unit_speech_priority,
 	short vocalization_type,
 	short animation_type,
 	short flags);
@@ -1054,8 +958,6 @@ static boolean ai_conversation_line_perform(
 	long conversation_index);
 static void ai_conversation_line_end(
 	long conversation_index);
-boolean actor_is_fighting(
-	long actor_index);
 static void actor_reset_idle_vocalization_timer(
 	long actor_index);
 static void ai_communication_handle_received_looking(
@@ -1068,29 +970,8 @@ static void ai_communication_update_speech_timers(
 	short vocalization_type,
 	short dialogue_type_index,
 	short reply_table_index);
-short unit_test_speech(
-	long unit_index,
-	short priority,
-	boolean allow_recursive_lookup,
-	boolean allow_queue,
-	long *unit_last_speech_time,
-	short *vocalization_type_reference,
-	long *sound_definition_index_reference);
-void unit_speak(
-	long unit_index,
-	short play_type,
-	struct unit_speech_item const *speech_item);
 boolean sound_scripted_dialog_is_playing(
 	void);
-void ai_handle_allegiance_broken_notification(
-	short team1_index,
-	short team2_index,
-	boolean broken);
-void actor_iterator_new(
-	struct actor_iterator *iterator,
-	boolean active_only);
-struct actor_datum *actor_iterator_next(
-	struct actor_iterator *iterator);
 static boolean ai_conversation_find_participant(
 	long conversation_index,
 	short participant_index,
@@ -1107,26 +988,10 @@ static long ai_communication_find_actor_to_reply_to_player(
 	short vocalization_type,
 	short damage_category,
 	real *reply_rating_reference);
-void actor_perception_find_sense_position(
-	long actor_index,
-	real_point3d const *position,
-	long prop_index,
-	struct actor_position_data *sense_position);
-short actor_audibility_at_point(
-	long actor_index,
-	struct actor_position_data const *position,
-	real_point3d const *source_position,
-	struct location const *source_location,
-	short source_type,
-	real scale,
-	short line_of_sight);
-void actor_handle_communication(
-	long actor_index,
-	long prop_index,
-	struct ai_information_packet *information);
 
-extern short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
-extern struct ai_communication_globals_view *ai_globals;
+static long ai_conversation_new(
+	short scenario_conversation_index,
+	boolean scripted);
 
 /* ---------- globals */
 
@@ -1664,6 +1529,7 @@ short global_dialogue_event_count = 0;
 struct dialogue_event_status *global_dialogue_events = NULL;
 short global_reply_event_count = 0;
 struct dialogue_event_status *global_reply_events = NULL;
+short global_communication_table_indices[NUMBER_OF_COMMUNICATION_TYPES];
 
 /* ---------- public code */
 
@@ -2185,9 +2051,9 @@ static real ai_communication_actor_talk_weight(
 	long cause_unit_index,
 	real_point3d const *cause_point,
 	real stimulus_range,
-	short communication_type,
-	short communication_priority,
-	short speech_priority,
+	short ai_communication_type,
+	short ai_communication_priority,
+	short unit_speech_priority,
 	short vocalization_type,
 	short animation_type,
 	short flags)
@@ -2290,17 +2156,17 @@ static real ai_communication_actor_talk_weight(
 
 		if (vocalization_type != NONE)
 		{
-			short line_vocalization_type = vocalization_type;
+			short vocalization_lookup_type = vocalization_type;
 			long sound_definition_index = NONE;
 
 			if (ai_communication_consider_speech(
 				actor->meta.unit_index,
-				communication_priority,
-				speech_priority,
+				ai_communication_priority,
+				unit_speech_priority,
 				0,
 				TEST_FLAG(flags, _find_actor_allow_lookup_bit),
 				TRUE,
-				&line_vocalization_type,
+				&vocalization_lookup_type,
 				&weight,
 				&sound_definition_index,
 				NULL) == _unit_play_speech_none)
@@ -2312,10 +2178,11 @@ static real ai_communication_actor_talk_weight(
 
 		if (has_target)
 		{
-			boolean cause_matches;
 			boolean subject_matches;
+			boolean cause_matches;
 
-			cause_matches = subject_matches = FALSE;
+			subject_matches = FALSE;
+			cause_matches = FALSE;
 			if (subject_unit_index != NONE)
 			{
 				if (actor->meta.unit_index == subject_unit_index)
@@ -2347,28 +2214,35 @@ static real ai_communication_actor_talk_weight(
 						{
 							subject_matches = FALSE;
 						}
-						else if ((prop->state >=
-									_prop_state_becoming_unacknowledged &&
-								 prop->state <= _prop_state_acknowledged) ||
-								(!prop->enemy &&
-									(communication_type != 0 ||
-									 prop->audibility >= _ai_sound_volume_loud ||
-									 prop->ineffability >= 2 ||
-									 actor_visibility_at_point(
-										actor_index,
-										&actor->input.position,
-										&prop->head_position,
-										prop->flashlight ?
-											_prop_lighting_bright :
-											prop->lighting,
-										(word)prop->line_of_sight,
-										TRUE,
-										FALSE,
-										actor_get_perception_knowledge(
-											actor_index,
-											prop_index)) >= 2)))
+						else if (prop->state >= _prop_state_becoming_unacknowledged &&
+							prop->state <= _prop_state_acknowledged)
 						{
 							subject_matches = TRUE;
+						}
+						else if (!prop->enemy)
+						{
+							if (ai_communication_type != 0)
+							{
+								subject_matches = TRUE;
+							}
+							else if (prop->audibility >= _ai_sound_volume_loud ||
+								prop->ineffability >= 2 ||
+								actor_visibility_at_point(
+									actor_index,
+									&actor->input.position,
+									&prop->head_position,
+									prop->flashlight ?
+										_prop_lighting_bright :
+										prop->lighting,
+									(word)prop->line_of_sight,
+									TRUE,
+									FALSE,
+									actor_get_perception_knowledge(
+										actor_index,
+										prop_index)) >= 2)
+							{
+								subject_matches = TRUE;
+							}
 						}
 						if (subject_matches)
 						{
@@ -2409,10 +2283,12 @@ static real ai_communication_actor_talk_weight(
 						{
 							cause_matches = FALSE;
 						}
-						else if ((prop->state >=
-									_prop_state_becoming_unacknowledged &&
-								 prop->state <= _prop_state_acknowledged) ||
-								!prop->enemy)
+						else if (prop->state >= _prop_state_becoming_unacknowledged &&
+							prop->state <= _prop_state_acknowledged)
+						{
+							cause_matches = TRUE;
+						}
+						else if (!prop->enemy)
 						{
 							cause_matches = TRUE;
 						}
@@ -2696,11 +2572,11 @@ short ai_conversation_status(
 	short scenario_conversation_index)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_datum_header *conversation;
+	struct conversation_datum *conversation;
 	short status = 0;
 
 	data_iterator_new(&iterator, conversation_data);
-	while ((conversation = (struct ai_conversation_datum_header *)
+	while ((conversation = (struct conversation_datum *)
 		data_iterator_next(&iterator)) != NULL)
 	{
 		if (conversation->scenario_conversation_index == scenario_conversation_index)
@@ -2726,7 +2602,7 @@ short ai_conversation_status(
 
 	if (!status)
 	{
-		struct recent_conversation_view *recent_conversation;
+		struct recent_conversation *recent_conversation;
 		long latest_finish_time = NONE;
 		short latest_index = NONE;
 		short index;
@@ -2817,15 +2693,15 @@ short ai_conversation_line(
 	short scenario_conversation_index)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_line_view *conversation;
+	struct conversation_datum *conversation;
 	short line = 999;
 
 	data_iterator_new(&iterator, conversation_data);
-	while ((conversation = (struct ai_conversation_line_view *)data_iterator_next(&iterator)) != NULL)
+	while ((conversation = (struct conversation_datum *)data_iterator_next(&iterator)) != NULL)
 	{
-		if (conversation->header.scenario_conversation_index == scenario_conversation_index)
+		if (conversation->scenario_conversation_index == scenario_conversation_index)
 		{
-			line = conversation->current_line;
+			line = conversation->line_index;
 			break;
 		}
 	}
@@ -2837,21 +2713,21 @@ void ai_conversation_advance(
 	short scenario_conversation_index)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_datum_header *conversation;
+	struct conversation_datum *conversation;
 
 	data_iterator_new(&iterator, conversation_data);
-	while ((conversation = (struct ai_conversation_datum_header *)
+	while ((conversation = (struct conversation_datum *)
 		data_iterator_next(&iterator)) != NULL)
 	{
 		if (conversation->scenario_conversation_index == scenario_conversation_index)
 		{
 			if (ai_print_conversations)
 			{
-				struct scenario_conversation_definition_view *definition =
+				struct ai_conversation *definition =
 					TAG_BLOCK_GET_ELEMENT(
 						&global_scenario_get()->ai_conversations,
 						scenario_conversation_index,
-						struct scenario_conversation_definition_view);
+						struct ai_conversation);
 
 				console_printf(
 					FALSE,
@@ -2871,9 +2747,9 @@ void ai_conversation_finish(
 	boolean unable_to_begin,
 	boolean success)
 {
-	struct ai_conversation_datum_view *conversation;
-	struct ai_conversation_datum_view *recent_conversation;
-	struct scenario_conversation_definition_view *definition;
+	struct conversation_datum *conversation;
+	struct conversation_datum *recent_conversation;
+	struct ai_conversation *definition;
 	struct actor_datum *actor;
 	short recent_conversation_index;
 	long recent_conversation_count;
@@ -2883,13 +2759,13 @@ void ai_conversation_finish(
 
 	if (conversation_index != NONE)
 	{
-		conversation = (struct ai_conversation_datum_view *)datum_get(
+		conversation = (struct conversation_datum *)datum_get(
 			conversation_data,
 			conversation_index);
 		definition = TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
 			conversation->scenario_conversation_index,
-			struct scenario_conversation_definition_view);
+			struct ai_conversation);
 
 		if (ai_print_conversations)
 		{
@@ -2901,7 +2777,7 @@ void ai_conversation_finish(
 				unable_to_begin ? " (unable to begin)" : "");
 		}
 
-		recent_conversation = (struct ai_conversation_datum_view *)datum_get(
+		recent_conversation = (struct conversation_datum *)datum_get(
 			conversation_data,
 			conversation_index);
 		recent_conversation_index =
@@ -3125,21 +3001,21 @@ void ai_conversation_stop(
 	short scenario_conversation_index)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_datum_header *conversation;
+	struct conversation_datum *conversation;
 
 	data_iterator_new(&iterator, conversation_data);
-	while ((conversation = (struct ai_conversation_datum_header *)
+	while ((conversation = (struct conversation_datum *)
 		data_iterator_next(&iterator)) != NULL)
 	{
 		if (conversation->scenario_conversation_index == scenario_conversation_index)
 		{
 			if (ai_print_conversations)
 			{
-				struct scenario_conversation_definition_view *definition =
+				struct ai_conversation *definition =
 					TAG_BLOCK_GET_ELEMENT(
 						&global_scenario_get()->ai_conversations,
 						scenario_conversation_index,
-						struct scenario_conversation_definition_view);
+						struct ai_conversation);
 
 				console_printf(
 					FALSE,
@@ -3376,13 +3252,13 @@ static boolean ai_conversation_find_participant(
 	boolean *success_with_better_player_rating_reference,
 	real *best_distance_reference)
 {
-	struct ai_conversation_driver_datum_view *conversation =
+	struct conversation_datum *conversation =
 		ai_conversation_driver_get(conversation_index);
-	struct scenario_conversation_definition_view *conversation_definition =
+	struct ai_conversation *conversation_definition =
 		TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
-			conversation->header.scenario_conversation_index,
-			struct scenario_conversation_definition_view);
+			conversation->scenario_conversation_index,
+			struct ai_conversation);
 	struct scenario_conversation_participant_view *participant =
 		TAG_BLOCK_GET_ELEMENT(
 			&conversation_definition->participants,
@@ -3613,7 +3489,7 @@ static boolean ai_conversation_find_participant(
 			if (first_participant &&
 				!player_selection &&
 				player_rating < 2.0f &&
-				conversation_definition->run_to_player_distance == 0.0f)
+				conversation_definition->run_to_player_dist == 0.0f)
 			{
 				rejection_counts[5]++;
 				better_player_rating_found = TRUE;
@@ -4098,13 +3974,13 @@ static boolean ai_conversation_begin(
 	long conversation_index,
 	boolean *continue_trying)
 {
-	struct ai_conversation_driver_datum_view *conversation =
+	struct conversation_datum *conversation =
 		ai_conversation_driver_get(conversation_index);
-	struct scenario_conversation_definition_view *definition =
+	struct ai_conversation *definition =
 		TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
-			conversation->header.scenario_conversation_index,
-			struct scenario_conversation_definition_view);
+			conversation->scenario_conversation_index,
+			struct ai_conversation);
 	unsigned long better_player_rating_mask = 0;
 	boolean try_alternate = FALSE;
 	boolean found_alternate = FALSE;
@@ -4291,7 +4167,7 @@ static boolean ai_conversation_begin(
 		can_begin = FALSE;
 	}
 
-	conversation->header.triggering_player_unit_index = NONE;
+	conversation->triggering_player_unit_index = NONE;
 	if (can_begin &&
 		TEST_FLAG(definition->flags, _ai_conversation_player_must_be_visible_bit))
 	{
@@ -4341,14 +4217,14 @@ static boolean ai_conversation_begin(
 
 					if (nearest_prop_distance < nearest_player_distance)
 					{
-						conversation->header.triggering_player_unit_index =
+						conversation->triggering_player_unit_index =
 							player->unit_index;
 						nearest_player_distance = nearest_prop_distance;
 					}
 				}
 			}
 
-			if (conversation->header.triggering_player_unit_index == NONE)
+			if (conversation->triggering_player_unit_index == NONE)
 			{
 				if (ai_print_conversations)
 				{
@@ -4490,7 +4366,7 @@ static boolean ai_conversation_begin(
 			}
 		}
 
-		conversation->header.begun = TRUE;
+		conversation->begun = TRUE;
 	}
 	else
 	{
@@ -5111,19 +4987,19 @@ void ai_conversation_actor_deleted(
 	long actor_index)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_datum_view *conversation;
-	struct scenario_conversation_definition_view *definition;
+	struct conversation_datum *conversation;
+	struct ai_conversation *definition;
 	short participant_index;
 
 	data_iterator_new(&iterator, conversation_data);
-	conversation = (struct ai_conversation_datum_view *)
+	conversation = (struct conversation_datum *)
 		data_iterator_next(&iterator);
 	while (conversation != NULL)
 	{
 		definition = TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
 			conversation->scenario_conversation_index,
-			struct scenario_conversation_definition_view);
+			struct ai_conversation);
 		participant_index = 0;
 		while ((long)participant_index < definition->participants.count)
 		{
@@ -5150,7 +5026,7 @@ void ai_conversation_actor_deleted(
 			participant_index = (short)(participant_index + 1);
 		}
 
-		conversation = (struct ai_conversation_datum_view *)
+		conversation = (struct conversation_datum *)
 			data_iterator_next(&iterator);
 	}
 
@@ -5163,13 +5039,13 @@ void ai_conversation_unit_died(
 {
 	struct data_iterator iterator;
 	short participant_index;
-	struct ai_conversation_datum_view *conversation;
-	struct scenario_conversation_definition_view *definition;
+	struct conversation_datum *conversation;
+	struct ai_conversation *definition;
 	struct actor_datum *actor;
 	boolean referenced;
 
 	data_iterator_new(&iterator, conversation_data);
-	conversation = (struct ai_conversation_datum_view *)
+	conversation = (struct conversation_datum *)
 		data_iterator_next(&iterator);
 	if (conversation == NULL)
 	{
@@ -5180,7 +5056,7 @@ void ai_conversation_unit_died(
 		definition = TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
 			conversation->scenario_conversation_index,
-			struct scenario_conversation_definition_view);
+			struct ai_conversation);
 		referenced = FALSE;
 
 		if (conversation->line_unit_index == unit_index)
@@ -5247,7 +5123,7 @@ void ai_conversation_unit_died(
 			}
 		}
 
-		conversation = (struct ai_conversation_datum_view *)
+		conversation = (struct conversation_datum *)
 			data_iterator_next(&iterator);
 		if (conversation == NULL)
 		{
@@ -5266,12 +5142,12 @@ void ai_conversation_unit_died(
 	return;
 }
 
-long ai_conversation_new(
+static long ai_conversation_new(
 	short scenario_conversation_index,
 	boolean scripted)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_datum_view *conversation;
+	struct conversation_datum *conversation;
 	long conversation_index = datum_new(conversation_data);
 
 	if (conversation_index == NONE && scripted)
@@ -5281,7 +5157,7 @@ long ai_conversation_new(
 		long overwrite_conversation_index = NONE;
 
 		data_iterator_new(&iterator, conversation_data);
-		while ((conversation = (struct ai_conversation_datum_view *)
+		while ((conversation = (struct conversation_datum *)
 			data_iterator_next(&iterator)) != NULL)
 		{
 			if (conversation->scripted < overwrite_scripted ||
@@ -5297,11 +5173,11 @@ long ai_conversation_new(
 		{
 			if (ai_print_conversations)
 			{
-				struct scenario_conversation_definition_view *definition =
+				struct ai_conversation *definition =
 					TAG_BLOCK_GET_ELEMENT(
 						&global_scenario_get()->ai_conversations,
 						scenario_conversation_index,
-						struct scenario_conversation_definition_view);
+						struct ai_conversation);
 
 				console_printf(
 					FALSE,
@@ -5321,7 +5197,7 @@ long ai_conversation_new(
 
 	if (conversation_index != NONE)
 	{
-		conversation = (struct ai_conversation_datum_view *)datum_get(
+		conversation = (struct conversation_datum *)datum_get(
 			conversation_data,
 			conversation_index);
 		conversation->scenario_conversation_index = scenario_conversation_index;
@@ -5336,8 +5212,8 @@ long ai_conversation_new(
 static boolean ai_conversation_line_begin(
 	long conversation_index)
 {
-	struct ai_conversation_driver_datum_view *conversation;
-	struct scenario_conversation_definition_view *definition;
+	struct conversation_datum *conversation;
+	struct ai_conversation *definition;
 	struct scenario_conversation_participant_view *participant;
 	struct scenario_conversation_line_view *line;
 	struct actor_datum *actor;
@@ -5348,11 +5224,11 @@ static boolean ai_conversation_line_begin(
 	conversation = ai_conversation_driver_get(conversation_index);
 	definition = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_conversations,
-		conversation->header.scenario_conversation_index,
-		struct scenario_conversation_definition_view);
+		conversation->scenario_conversation_index,
+		struct ai_conversation);
 	line = TAG_BLOCK_GET_ELEMENT(
 		&definition->lines,
-		conversation->current_line,
+		conversation->line_index,
 		struct scenario_conversation_line_view);
 	participant_index = line->participant_index;
 	result = FALSE;
@@ -5385,7 +5261,7 @@ static boolean ai_conversation_line_begin(
 			{
 			case _ai_conversation_address_player:
 				conversation->line_address_unit_index =
-					conversation->header.triggering_player_unit_index;
+					conversation->triggering_player_unit_index;
 				break;
 
 			case _ai_conversation_address_participant:
@@ -5428,8 +5304,8 @@ static boolean ai_conversation_line_begin(
 static boolean ai_conversation_line_perform(
 	long conversation_index)
 {
-	struct ai_conversation_driver_datum_view *conversation;
-	struct scenario_conversation_definition_view *definition;
+	struct conversation_datum *conversation;
+	struct ai_conversation *definition;
 	struct actor_datum *actor;
 	struct unit_datum *unit;
 	long sound_definition_index;
@@ -5446,8 +5322,8 @@ static boolean ai_conversation_line_perform(
 	conversation = ai_conversation_driver_get(conversation_index);
 	definition = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_conversations,
-		conversation->header.scenario_conversation_index,
-		struct scenario_conversation_definition_view);
+		conversation->scenario_conversation_index,
+		struct ai_conversation);
 	if (!conversation->line_advance)
 	{
 		if (!conversation->line_spoken)
@@ -5562,7 +5438,7 @@ static boolean ai_conversation_line_perform(
 			if (!busy)
 			{
 				conversation->line_spoken = TRUE;
-				conversation->header.any_line_spoken = TRUE;
+				conversation->any_line_spoken = TRUE;
 			}
 		}
 
@@ -5599,15 +5475,15 @@ static boolean ai_conversation_line_perform(
 				if ((conversation->line_flags & FLAG(
 					_ai_conversation_line_wait_after_until_told_to_advance_bit)) != 0)
 				{
-					if (!conversation->header.waiting_to_advance)
+					if (!conversation->waiting_to_advance)
 					{
-						conversation->header.waiting_to_advance = TRUE;
-						conversation->header.told_to_advance = FALSE;
+						conversation->waiting_to_advance = TRUE;
+						conversation->told_to_advance = FALSE;
 					}
 
-					if (conversation->header.told_to_advance)
+					if (conversation->told_to_advance)
 					{
-						conversation->header.waiting_to_advance = FALSE;
+						conversation->waiting_to_advance = FALSE;
 					}
 					else
 					{
@@ -5624,13 +5500,13 @@ static boolean ai_conversation_line_perform(
 static void ai_conversation_line_end(
 	long conversation_index)
 {
-	struct ai_conversation_driver_datum_view *conversation;
+	struct conversation_datum *conversation;
 
 	conversation = ai_conversation_driver_get(conversation_index);
 	TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_conversations,
-		conversation->header.scenario_conversation_index,
-		struct scenario_conversation_definition_view);
+		conversation->scenario_conversation_index,
+		struct ai_conversation);
 	return;
 }
 
@@ -5658,7 +5534,7 @@ boolean ai_conversation(
 				TAG_BLOCK_GET_ELEMENT(
 					&global_scenario_get()->ai_conversations,
 					scenario_conversation_index,
-					struct scenario_conversation_definition_view)->name);
+					struct ai_conversation)->name);
 		}
 
 		if (conversation_index == NONE)
@@ -5683,7 +5559,7 @@ boolean ai_conversation(
 						TAG_BLOCK_GET_ELEMENT(
 							&global_scenario_get()->ai_conversations,
 							scenario_conversation_index,
-							struct scenario_conversation_definition_view)->name);
+							struct ai_conversation)->name);
 				}
 
 				result = TRUE;
@@ -5698,7 +5574,7 @@ boolean ai_conversation(
 						TAG_BLOCK_GET_ELEMENT(
 							&global_scenario_get()->ai_conversations,
 							scenario_conversation_index,
-							struct scenario_conversation_definition_view)->name);
+							struct ai_conversation)->name);
 				}
 
 				result = TRUE;
@@ -5713,7 +5589,7 @@ boolean ai_conversation(
 						TAG_BLOCK_GET_ELEMENT(
 							&global_scenario_get()->ai_conversations,
 							scenario_conversation_index,
-							struct scenario_conversation_definition_view)->name);
+							struct ai_conversation)->name);
 				}
 
 				ai_conversation_finish(conversation_index, TRUE, FALSE);
@@ -5728,26 +5604,26 @@ void ai_conversation_update(
 	void)
 {
 	struct data_iterator iterator;
-	struct ai_conversation_driver_datum_view *conversation;
+	struct conversation_datum *conversation;
 	long time;
 
 	time = game_time_get();
 	data_iterator_new(&iterator, conversation_data);
-	conversation = (struct ai_conversation_driver_datum_view *)data_iterator_next(&iterator);
+	conversation = (struct conversation_datum *)data_iterator_next(&iterator);
 	while (conversation)
 	{
-		struct scenario_conversation_definition_view *definition;
+		struct ai_conversation *definition;
 
 		definition = TAG_BLOCK_GET_ELEMENT(
 			&global_scenario_get()->ai_conversations,
-			conversation->header.scenario_conversation_index,
-			struct scenario_conversation_definition_view);
-		if (!conversation->header.begun)
+			conversation->scenario_conversation_index,
+			struct ai_conversation);
+		if (!conversation->begun)
 		{
 			boolean continue_trying;
 
 			continue_trying = TRUE;
-			if ((time - conversation->header.creation_time) % 30 == 0)
+			if ((time - conversation->creation_time) % 30 == 0)
 			{
 				if (ai_print_conversations)
 				{
@@ -5760,7 +5636,7 @@ void ai_conversation_update(
 				ai_conversation_begin(iterator.datum_index, &continue_trying);
 			}
 
-			if (!conversation->header.begun && !continue_trying)
+			if (!conversation->begun && !continue_trying)
 			{
 				if (ai_print_conversations)
 				{
@@ -5774,12 +5650,12 @@ void ai_conversation_update(
 			}
 		}
 
-		if (conversation->header.begun && !conversation->header.finished)
+		if (conversation->begun && !conversation->finished)
 		{
 			boolean perform;
 
-			perform = conversation->current_line >= 0 &&
-				conversation->current_line < definition->lines.count;
+			perform = conversation->line_index >= 0 &&
+				conversation->line_index < definition->lines.count;
 			while (!perform || ai_conversation_line_perform(iterator.datum_index))
 			{
 				if (perform)
@@ -5787,8 +5663,8 @@ void ai_conversation_update(
 					ai_conversation_line_end(iterator.datum_index);
 				}
 
-				conversation->current_line++;
-				if (conversation->current_line < definition->lines.count)
+				conversation->line_index++;
+				if (conversation->line_index < definition->lines.count)
 				{
 					perform = ai_conversation_line_begin(iterator.datum_index);
 				}
@@ -5802,17 +5678,17 @@ void ai_conversation_update(
 							definition->name);
 					}
 
-					conversation->header.finished = TRUE;
+					conversation->finished = TRUE;
 					break;
 				}
 			}
 		}
 
-		if (conversation->header.finished)
+		if (conversation->finished)
 		{
 			ai_conversation_finish(iterator.datum_index, FALSE, TRUE);
 		}
-		else if (conversation->header.begun)
+		else if (conversation->begun)
 		{
 			short participant_index;
 
@@ -5869,7 +5745,7 @@ void ai_conversation_update(
 			}
 		}
 
-		conversation = (struct ai_conversation_driver_datum_view *)data_iterator_next(&iterator);
+		conversation = (struct conversation_datum *)data_iterator_next(&iterator);
 	}
 
 	return;
@@ -5909,13 +5785,13 @@ void ai_communication_event(
 	short cause_race = 0;
 	boolean find_friend_actor = TRUE;
 	boolean find_other_actor = TRUE;
-	boolean subject_groups[2];
-	boolean cause_groups[2];
-	boolean enemy_status[6];
-	boolean hostility_matches[NUMBER_OF_AI_COMMUNICATION_HOSTILITIES];
-	short chatter_ticks[NUMBER_OF_AI_COMMUNICATION_TEAMS];
-	short talk_ticks[NUMBER_OF_AI_COMMUNICATION_TEAMS];
-	short shout_ticks[NUMBER_OF_AI_COMMUNICATION_TEAMS];
+	boolean subject_comm_groups_enabled[2];
+	boolean cause_comm_groups_enabled[2];
+	boolean enemy_status_enabled[6];
+	boolean hostility_enabled[NUMBER_OF_AI_COMMUNICATION_HOSTILITIES];
+	short time_since_chatter[NUMBER_OF_AI_COMMUNICATION_TEAMS];
+	short time_since_talk[NUMBER_OF_AI_COMMUNICATION_TEAMS];
+	short time_since_shout[NUMBER_OF_AI_COMMUNICATION_TEAMS];
 	real chatter_seconds[NUMBER_OF_AI_COMMUNICATION_TEAMS];
 	real talk_seconds[NUMBER_OF_AI_COMMUNICATION_TEAMS];
 	real shout_seconds[NUMBER_OF_AI_COMMUNICATION_TEAMS];
@@ -5950,8 +5826,8 @@ void ai_communication_event(
 
 	for (distance_group = 0; distance_group < 2; distance_group++)
 	{
-		subject_groups[distance_group] = FALSE;
-		cause_groups[distance_group] = FALSE;
+		subject_comm_groups_enabled[distance_group] = FALSE;
+		cause_comm_groups_enabled[distance_group] = FALSE;
 	}
 
 	if (subject_unit_index != NONE)
@@ -5968,13 +5844,13 @@ void ai_communication_event(
 			subject_race = actor_type_get_race(subject_actor->meta.type);
 			if (subject_actor->situation.close_friends > 0)
 			{
-				subject_groups[0] = TRUE;
-				subject_groups[1] = TRUE;
+				subject_comm_groups_enabled[0] = TRUE;
+				subject_comm_groups_enabled[1] = TRUE;
 			}
 			else if (subject_actor->situation.area_friends > 0)
 			{
-				subject_groups[0] = TRUE;
-				subject_groups[1] = FALSE;
+				subject_comm_groups_enabled[0] = TRUE;
+				subject_comm_groups_enabled[1] = FALSE;
 			}
 
 			if (subject_encounter_index != NONE)
@@ -6001,13 +5877,13 @@ void ai_communication_event(
 			cause_race = actor_type_get_race(cause_actor->meta.type);
 			if (cause_actor->situation.close_friends > 0)
 			{
-				cause_groups[0] = TRUE;
-				cause_groups[1] = TRUE;
+				cause_comm_groups_enabled[0] = TRUE;
+				cause_comm_groups_enabled[1] = TRUE;
 			}
 			else if (cause_actor->situation.area_friends > 0)
 			{
-				cause_groups[0] = TRUE;
-				cause_groups[1] = FALSE;
+				cause_comm_groups_enabled[0] = TRUE;
+				cause_comm_groups_enabled[1] = FALSE;
 			}
 		}
 		else if (cause_unit->unit.player_index != NONE)
@@ -6152,62 +6028,62 @@ void ai_communication_event(
 	{
 		short index;
 
-		for (index = 0; index < NUMBEROF(enemy_status); index++)
+		for (index = 0; index < NUMBEROF(enemy_status_enabled); index++)
 		{
-			enemy_status[index] = TRUE;
+			enemy_status_enabled[index] = TRUE;
 		}
 	}
 	else if (!subject_encounter)
 	{
-		enemy_status[0] = !subject_actor->target.any_target_ever;
-		enemy_status[1] =
+		enemy_status_enabled[0] = !subject_actor->target.any_target_ever;
+		enemy_status_enabled[1] =
 			!subject_actor->target.target_really_alive &&
 			subject_actor->target.since_any_target_visible_timer != NONE;
-		enemy_status[2] =
+		enemy_status_enabled[2] =
 			subject_actor->target.target_prop_index == NONE ||
 			subject_actor->target.since_any_target_visible_timer == NONE ||
 			subject_actor->target.since_any_target_visible_timer >= 180;
-		enemy_status[3] =
+		enemy_status_enabled[3] =
 			subject_actor->state.combat_status < _actor_combat_status_definite &&
 			(subject_actor->target.since_any_target_visible_timer == NONE ||
 			subject_actor->target.since_any_target_visible_timer >= 75) &&
 			(subject_actor->target.target_really_alive || subject_actor->state.combat_status > 0);
-		enemy_status[4] = subject_actor->state.combat_status < _actor_combat_status_dangerous;
-		enemy_status[5] =
+		enemy_status_enabled[4] = subject_actor->state.combat_status < _actor_combat_status_dangerous;
+		enemy_status_enabled[5] =
 			subject_actor->target.target_type >= _actor_target_visible_enemy &&
 			subject_actor->target.target_really_alive;
 	}
 	else
 	{
-		enemy_status[0] = !subject_actor->target.any_target_ever;
-		enemy_status[1] =
+		enemy_status_enabled[0] = !subject_actor->target.any_target_ever;
+		enemy_status_enabled[1] =
 			subject_encounter->enemy_visible_timer != NONE &&
 			!subject_encounter->enemy_alive;
-		enemy_status[2] =
+		enemy_status_enabled[2] =
 			(subject_encounter->enemy_visible_timer == NONE ||
 			subject_encounter->enemy_visible_timer >= 180) &&
 			subject_encounter->enemy_alive;
-		enemy_status[3] =
+		enemy_status_enabled[3] =
 			subject_actor->state.combat_status < _actor_combat_status_definite &&
 			(subject_encounter->enemy_visible_timer == NONE ||
 			subject_encounter->enemy_visible_timer >= 75) &&
 			(subject_encounter->enemy_alive || subject_actor->state.combat_status > 0);
-		enemy_status[4] =
+		enemy_status_enabled[4] =
 			subject_actor->state.combat_status < _actor_combat_status_dangerous &&
 			(subject_encounter->enemy_visible_timer == NONE ||
 			subject_encounter->enemy_visible_timer >= 75);
-		enemy_status[5] =
+		enemy_status_enabled[5] =
 			subject_encounter->enemy_visible &&
 			subject_encounter->enemy_alive;
 	}
 
-	csmemset(hostility_matches, 0, sizeof(hostility_matches));
+	csmemset(hostility_enabled, 0, sizeof(hostility_enabled));
 	if (hostility != NONE)
 	{
-		hostility_matches[hostility] = TRUE;
+		hostility_enabled[hostility] = TRUE;
 		if (hostility == _comm_hostility_traitor)
 		{
-			hostility_matches[_comm_hostility_enemy] = TRUE;
+			hostility_enabled[_comm_hostility_enemy] = TRUE;
 		}
 	}
 
@@ -6219,18 +6095,18 @@ void ai_communication_event(
 		team_index < NUMBER_OF_AI_COMMUNICATION_TEAMS;
 		team_index++)
 	{
-		shout_ticks[team_index] = (short)MAX(0,
+		time_since_shout[team_index] = (short)MAX(0,
 			event_time - ai_globals->last_shout_time[team_index]);
-		talk_ticks[team_index] = (short)MAX(0,
+		time_since_talk[team_index] = (short)MAX(0,
 			event_time - ai_globals->last_talk_time[team_index]);
-		chatter_ticks[team_index] = (short)MAX(0,
+		time_since_chatter[team_index] = (short)MAX(0,
 			event_time - ai_globals->last_chatter_time[team_index]);
 		shout_seconds[team_index] =
-			shout_ticks[team_index] * (1.0f / TICKS_PER_SECOND);
+			time_since_shout[team_index] * (1.0f / TICKS_PER_SECOND);
 		talk_seconds[team_index] =
-			talk_ticks[team_index] * (1.0f / TICKS_PER_SECOND);
+			time_since_talk[team_index] * (1.0f / TICKS_PER_SECOND);
 		chatter_seconds[team_index] =
-			chatter_ticks[team_index] * (1.0f / TICKS_PER_SECOND);
+			time_since_chatter[team_index] * (1.0f / TICKS_PER_SECOND);
 
 		/* nothing may be spoken at priority none */
 		speech_disabled[team_index][_ai_communication_priority_none][0] = TRUE;
@@ -6248,7 +6124,7 @@ void ai_communication_event(
 				{
 					short remaining = (short)(
 						communication_timer_tolerances[priority][distance_group][0] * TICKS_PER_SECOND -
-						chatter_ticks[team_index]);
+						time_since_chatter[team_index]);
 
 					if (remaining > 0)
 					{
@@ -6261,7 +6137,7 @@ void ai_communication_event(
 				{
 					short remaining = (short)(
 						communication_timer_tolerances[priority][distance_group][1] * TICKS_PER_SECOND -
-						talk_ticks[team_index]);
+						time_since_talk[team_index]);
 
 					if (remaining > 0)
 					{
@@ -6274,7 +6150,7 @@ void ai_communication_event(
 				{
 					short remaining = (short)(
 						communication_timer_tolerances[priority][distance_group][3] * TICKS_PER_SECOND -
-						shout_ticks[team_index]);
+						time_since_shout[team_index]);
 
 					if (remaining > 0)
 					{
@@ -6353,7 +6229,7 @@ void ai_communication_event(
 			}
 
 			if (usage->required_hostility != NONE &&
-				!hostility_matches[usage->required_hostility])
+				!hostility_enabled[usage->required_hostility])
 			{
 				if (ai_debug.print_communication)
 				{
@@ -6386,11 +6262,11 @@ void ai_communication_event(
 				continue;
 			}
 			else if (usage->required_enemy_status != NONE &&
-				!enemy_status[usage->required_enemy_status])
+				!enemy_status_enabled[usage->required_enemy_status])
 			{
 				if (ai_debug.print_communication)
 				{
-					char const *enemy_status_names[NUMBEROF(enemy_status)] =
+					char const *enemy_status_names[NUMBEROF(enemy_status_enabled)] =
 					{
 						"never", "dead", "lost", "notvis", "nodanger", "vis"
 					};
@@ -6484,7 +6360,7 @@ void ai_communication_event(
 				switch (usage->protagonist_type)
 				{
 				case _comm_protagonist_subject:
-					protagonist_groups = subject_groups;
+					protagonist_groups = subject_comm_groups_enabled;
 					protagonist_unit_index = subject_unit_index;
 					protagonist_actor_index = subject_actor_index;
 					protagonist_actor = subject_actor;
@@ -6492,7 +6368,7 @@ void ai_communication_event(
 					break;
 
 				case _comm_protagonist_cause:
-					protagonist_groups = cause_groups;
+					protagonist_groups = cause_comm_groups_enabled;
 					protagonist_unit_index = cause_unit_index;
 					protagonist_actor_index = cause_actor_index;
 					protagonist_actor = cause_actor;
@@ -7115,7 +6991,7 @@ void ai_communication_event(
 
 	if (possibility_count > 0)
 	{
-		struct ai_information_packet information;
+		struct ai_information_packet ai_packet;
 
 		selected_possibility = possibilities;
 		if (any_forced_possibility)
@@ -7188,26 +7064,26 @@ void ai_communication_event(
 			}
 		}
 
-		information.communication_type = communication_type;
-		information.target_unit_index = selected_possibility->recipient_unit_index;
-		information.damage_category = damage_type;
-		information.dialogue_type_index = selected_possibility->dialogue_type_index;
-		information.updated_dialogue_timers = TRUE;
-		information.look_priority = selected_possibility->recipient_look_priority;
-		information.look_type = selected_possibility->look_type;
-		information.look_data.unit.unit_index = selected_possibility->look_unit_index;
-		information.information_type = information_type == NONE ?
+		ai_packet.communication_type = communication_type;
+		ai_packet.target_unit_index = selected_possibility->recipient_unit_index;
+		ai_packet.damage_category = damage_type;
+		ai_packet.dialogue_type_index = selected_possibility->dialogue_type_index;
+		ai_packet.updated_dialogue_timers = TRUE;
+		ai_packet.look_priority = selected_possibility->recipient_look_priority;
+		ai_packet.look_type = selected_possibility->look_type;
+		ai_packet.look_data.unit.unit_index = selected_possibility->look_unit_index;
+		ai_packet.information_type = information_type == NONE ?
 			_ai_information_none : information_type;
 		if (!information_data)
 		{
 			csmemset(
-				&information.information_data,
+				&ai_packet.information_data,
 				0,
-				sizeof(information.information_data));
+				sizeof(ai_packet.information_data));
 		}
 		else
 		{
-			information.information_data = *information_data;
+			ai_packet.information_data = *information_data;
 		}
 
 		if (selected_possibility->is_reply)
@@ -7221,19 +7097,19 @@ void ai_communication_event(
 				selected_possibility->protagonist_unit_index,
 				selected_possibility->priority,
 				selected_possibility->vocalization_type,
-				&information);
+				&ai_packet);
 			ai_communication_notify(
 				selected_possibility->protagonist_unit_index,
 				selected_possibility->priority,
 				selected_possibility->vocalization_type,
-				&information);
+				&ai_packet);
 			ai_communication_finished(
 				selected_possibility->protagonist_unit_index,
 				selected_possibility->priority,
 				selected_possibility->vocalization_type,
 				TRUE,
 				selected_possibility->preselected_reply_actor_index,
-				&information);
+				&ai_packet);
 		}
 		else
 		{
@@ -7245,7 +7121,7 @@ void ai_communication_event(
 			speech.delay_time = selected_possibility->delay_time;
 			speech.ai_notification_delay = selected_possibility->ai_delay_time;
 			speech.pause_time = 24;
-			speech.ai = information;
+			speech.ai = ai_packet;
 			unit_speak(
 				selected_possibility->protagonist_unit_index,
 				selected_possibility->play_type,
@@ -7254,38 +7130,38 @@ void ai_communication_event(
 			if (selected_possibility->animation_type != NONE)
 			{
 				struct unit_datum *speaker_unit = unit_get(selected_possibility->protagonist_unit_index);
-				real_vector2d alignment;
+				real_vector2d alignment_vector;
 
-				alignment.i = speaker_unit->object.forward.i;
-				alignment.j = speaker_unit->object.forward.j;
+				alignment_vector.i = speaker_unit->object.forward.i;
+				alignment_vector.j = speaker_unit->object.forward.j;
 				if (selected_possibility->recipient_unit_index != NONE)
 				{
-					real_point3d speaker_head;
-					real_point3d target_head;
+					real_point3d protagonist_head_position;
+					real_point3d target_head_position;
 					real magnitude;
 
-					unit_get_head_position(selected_possibility->protagonist_unit_index, &speaker_head);
-					unit_get_head_position(selected_possibility->recipient_unit_index, &target_head);
-					alignment.i = target_head.x - speaker_head.x;
-					alignment.j = target_head.y - speaker_head.y;
+					unit_get_head_position(selected_possibility->protagonist_unit_index, &protagonist_head_position);
+					unit_get_head_position(selected_possibility->recipient_unit_index, &target_head_position);
+					alignment_vector.i = target_head_position.x - protagonist_head_position.x;
+					alignment_vector.j = target_head_position.y - protagonist_head_position.y;
 					magnitude = square_root(
-						alignment.i * alignment.i + alignment.j * alignment.j);
+						alignment_vector.i * alignment_vector.i + alignment_vector.j * alignment_vector.j);
 					if (fabs(magnitude) >= _real_epsilon && magnitude != 0.0f)
 					{
-						alignment.i /= magnitude;
-						alignment.j /= magnitude;
+						alignment_vector.i /= magnitude;
+						alignment_vector.j /= magnitude;
 					}
 					else
 					{
-						alignment.i = speaker_unit->object.forward.i;
-						alignment.j = speaker_unit->object.forward.j;
+						alignment_vector.i = speaker_unit->object.forward.i;
+						alignment_vector.j = speaker_unit->object.forward.j;
 					}
 				}
 
 				unit_start_animation_impulse(
 					selected_possibility->protagonist_unit_index,
 					selected_possibility->animation_type,
-					&alignment);
+					&alignment_vector);
 			}
 
 			if (selected_possibility->protagonist_actor_index != NONE)

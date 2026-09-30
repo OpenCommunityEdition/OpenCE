@@ -426,8 +426,20 @@ boolean actor_action_set_default_state(
 
 boolean actor_action_handle_initial_action(
 	long actor_index);
+void action_charge_begin(
+	long actor_index);
+void action_charge_update(
+	long actor_index);
+void action_charge_control(
+	long actor_index);
 boolean action_charge_is_leaping(
 	long actor_index);
+boolean action_charge_perform(
+	long actor_index);
+boolean action_charge_setup(
+	long actor_index,
+	short goal,
+	struct charge_state_data *state_data);
 boolean actor_action_handle_pending_command_list(
 	long actor_index);
 boolean actor_action_handle_surprise(
@@ -467,6 +479,9 @@ boolean actor_action_handle_active_cover_seeking(
 	long actor_index,
 	boolean allow_defensive_cover,
 	boolean allow_active_cover);
+boolean actors_searching_same_position(
+	long actor_index,
+	long other_actor_index);
 boolean actor_action_handle_danger_avoidance(
 	long actor_index);
 boolean actor_action_handle_vehicle_entry(
@@ -534,11 +549,6 @@ void action_alert_flush_structure_indices(
 
 /* ---------- prototypes/ACTION_CHARGE.C */
 
-real normalize2d(
-	real_vector2d *vector);
-real normalize3d(
-	real_vector3d *vector);
-
 /* ---------- prototypes/ACTION_OBEY.C */
 
 boolean action_obey_command_list_setup(
@@ -569,9 +579,18 @@ void action_obey_describe_command(
 
 /* ---------- prototypes/ACTION_FIGHT.C */
 
+boolean action_fight_setup(
+	long actor_index,
+	struct fight_state_data *state_data);
 void action_fight_begin(
 	long actor_index);
 void action_fight_end(
+	long actor_index);
+void action_fight_update(
+	long actor_index);
+void action_fight_control(
+	long actor_index);
+boolean action_fight_perform(
 	long actor_index);
 
 /* ---------- prototypes/ACTION_FLEE.C */
@@ -608,14 +627,174 @@ boolean action_flee_blind_panic(
 
 /* ---------- prototypes/ACTION_CONVERSE.C */
 
+boolean action_converse_setup(
+	long actor_index,
+	long conversation_index,
+	struct converse_state_data *state_data);
+void action_converse_begin(
+	long actor_index);
+boolean action_converse_perform(
+	long actor_index);
+void action_converse_update(
+	long actor_index);
+void action_converse_control(
+	long actor_index);
+void action_converse_replace_prop(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
 void actor_conversation_control(
+	long actor_index);
+void action_converse_end(
 	long actor_index);
 
 /* ---------- prototypes/ACTION_VEHICLE.C */
 
 void action_vehicle_begin(
 	long actor_index);
+void action_vehicle_update(
+	long actor_index);
 void action_vehicle_control(
+	long actor_index);
+boolean action_vehicle_setup_specific(
+	long actor_index,
+	long vehicle_index,
+	short seat_index,
+	struct vehicle_state_data *state_data);
+boolean action_vehicle_perform(
+	long actor_index);
+boolean action_vehicle_setup_impromptu(
+	long actor_index,
+	long vehicle_index,
+	real attempt_distance,
+	real continue_distance,
+	struct vehicle_state_data *state_data);
+
+/* ---------- prototypes/ACTION_GUARD.C */
+
+boolean action_guard_setup_current_position(
+	long actor_index,
+	struct guard_state_data *state_data);
+boolean action_guard_setup_find_position(
+	long actor_index,
+	long wait_ticks,
+	struct guard_state_data *state_data);
+boolean action_guard_setup_postcombat(
+	long actor_index,
+	struct guard_state_data *state_data);
+boolean action_guard_setup_from_combat_transition(
+	long actor_index,
+	struct guard_state_data *state_data);
+boolean action_guard_setup_from_fleeing(
+	long actor_index,
+	struct flee_state_data *flee_state,
+	struct guard_state_data *state_data);
+void action_guard_begin(
+	long actor_index);
+void action_guard_end(
+	long actor_index);
+void action_guard_flush_position_indices(
+	long actor_index);
+void action_guard_flush_structure_indices(
+	long actor_index);
+void action_guard_modify_color(
+	long actor_index,
+	real_argb_color *color);
+void action_guard_replace_prop(
+	long actor_index,
+	long old_prop_index,
+	long new_prop_index);
+void action_guard_update(
+	long actor_index);
+boolean action_guard_perform(
+	long actor_index);
+void action_guard_control(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_UNCOVER.C */
+
+boolean action_uncover_setup_target(
+	long actor_index,
+	boolean able_to_search,
+	struct uncover_state_data *state_data);
+boolean action_uncover_setup_pursuit(
+	long actor_index,
+	short firing_position_index,
+	struct uncover_state_data *state_data);
+boolean action_uncover_perform(
+	long actor_index);
+void action_uncover_control(
+	long actor_index);
+void action_uncover_flush_position_indices(
+	long actor_index);
+void action_uncover_modify_color(
+	long actor_index,
+	real_argb_color *color);
+void action_uncover_begin(
+	long actor_index);
+void action_uncover_update(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_SEARCH.C */
+
+boolean action_search_setup_target(
+	long actor_index,
+	boolean must_charge,
+	struct search_state_data *state_data);
+boolean action_search_setup_pursuit(
+	long actor_index,
+	short firing_position_index,
+	boolean tenacious,
+	struct search_state_data *state_data);
+boolean action_search_setup_undirected(
+	long actor_index,
+	boolean tenacious,
+	struct search_state_data *state_data);
+void action_search_update(
+	long actor_index);
+void action_search_flush_position_indices(
+	long actor_index);
+void action_search_control(
+	long actor_index);
+void action_search_begin(
+	long actor_index);
+boolean action_search_perform(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_WAIT.C */
+
+void action_wait_begin(
+	long actor_index);
+boolean action_wait_perform(
+	long actor_index);
+void action_wait_control(
+	long actor_index);
+boolean action_wait_setup(
+	long actor_index,
+	boolean was_actively_searching,
+	struct wait_state_data *state_data);
+void action_wait_update(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_AVOID.C */
+
+boolean action_avoid_setup(
+	long actor_index,
+	struct avoid_state_data *state_data);
+void action_avoid_begin(
+	long actor_index);
+void action_avoid_end(
+	long actor_index);
+boolean action_avoid_perform(
+	long actor_index);
+void action_avoid_update(
+	long actor_index);
+void action_avoid_control(
+	long actor_index);
+
+/* ---------- prototypes/ACTION_SLEEP.C */
+
+void action_sleep_control(
 	long actor_index);
 
 /* ---------- globals */

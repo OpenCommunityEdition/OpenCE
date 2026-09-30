@@ -39,7 +39,7 @@ void player_effect_dispose_from_old_map(
 	void);
 void player_effect_add_continuous_effect(
 	short local_player_index,
-	long definition_index,
+	long effect_index,
 	real distance);
 void player_effect_update(
 	void);

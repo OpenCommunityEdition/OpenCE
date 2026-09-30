@@ -27,6 +27,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "rasterizer/rasterizer.h"
 #include "real_math.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox_plasma_energy.h"
@@ -37,24 +38,14 @@ symbols in this file:
  * Keep the stock D3DINLINE definition: the real calls below make VC7 emit
  * the target's complete wrapper bodies. */
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct rasterizer_debug_options_plasma
-{
-	byte reserved00[0x43];
-	boolean plasma_energy;
-};
-
-struct rasterizer_frame_begin_parameters
-{
-	real game_time_sec;
-	real dt;
-};
 
 struct plasma_runtime_parameters
 {
@@ -101,28 +92,6 @@ struct shader_transparent_plasma_definition
 	long secondary_noise_map;
 };
 
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 typedef char plasma_group_size_assert[
 	sizeof(struct rasterizer_transparent_geometry_group_plasma) == 0x70 ? 1 : -1];
 typedef char plasma_group_shader_offset_assert[
@@ -142,10 +111,6 @@ typedef char pixel_shader_definition_size_assert[
 
 /* ---------- prototypes */
 
-double pow(
-	double x,
-	double y);
-
 void rasterizer_set_texture(
 	short stage,
 	short bitmap_type,
@@ -164,7 +129,6 @@ void rasterizer_set_pixel_shader(
 /* ---------- globals */
 
 extern void *global_d3d_device;
-extern struct rasterizer_debug_options_plasma rasterizer_debug_options;
 extern struct rasterizer_frame_begin_parameters global_frame_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
@@ -192,7 +156,7 @@ void rasterizer_plasma_energy_draw(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_plasma_energy.c",
 		21,
 		global_d3d_device);
-	if (rasterizer_debug_options.plasma_energy)
+	if (rasterizer_debug_options.plasma_energy_enabled)
 	{
 		plasma = (struct shader_transparent_plasma_definition const *)(
 			(byte *)shader_get_and_verify_type(group->shader, 10) + sizeof(struct shader));

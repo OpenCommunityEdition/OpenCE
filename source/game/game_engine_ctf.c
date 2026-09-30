@@ -122,7 +122,6 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game_engine.h"
-#include "game_engine_runtime.h"
 #include "players.h"
 #include "players_runtime.h"
 #include "items/weapons.h"
@@ -232,6 +231,8 @@ typedef char verify_ctf_globals_size[
 
 /* ---------- prototypes */
 
+void ctf_state_message_update_warning(
+	long team_index);
 static long ctf_create_flag_object(
 	struct scenario_netgame_flag *flag);
 

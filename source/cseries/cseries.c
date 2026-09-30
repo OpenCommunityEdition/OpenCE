@@ -164,7 +164,7 @@ enum
 
 char temporary[256];
 
-const real_argb_color global_real_argb_color_table[17] =
+static const real_argb_color global_real_argb_color_table[17] =
 {
 	{ 1.f, 1.f,		1.f,	1.f  },
 	{ 1.f, .5f,		.5f,	.5f  },

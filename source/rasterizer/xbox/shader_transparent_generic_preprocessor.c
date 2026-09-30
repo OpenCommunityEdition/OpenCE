@@ -10,6 +10,7 @@ SHADER_TRANSPARENT_GENERIC_PREPROCESSOR.C
 #include "bitmaps/bitmap_color_conversion.h"
 #include "shaders/shader_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
@@ -77,28 +78,6 @@ enum
 #define SHADER_STAGE_REGISTER_MASK 0x0f
 
 /* ---------- structures */
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long constant_1[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long alpha_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long rgb_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
 
 struct shader_transparent_generic_map
 {

@@ -18,12 +18,6 @@ header included in hcex build.
 
 /* ---------- structures */
 
-struct glow_globals
-{
-	struct data_array *glow_data;
-	struct data_array *glow_particle_data;
-};
-
 /* ---------- prototypes/EXAMPLE.C */
 
 void glow_initialize(
@@ -45,8 +39,6 @@ void glow_submit(
 	struct render_animation const *animation);
 
 /* ---------- globals */
-
-extern struct glow_globals glow_globals;
 
 /* ---------- public code */
 

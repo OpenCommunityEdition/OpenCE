@@ -1,0 +1,1463 @@
+{
+ "schema": "q10-mutation-catalogue/1",
+ "status": "research only; Q10 held; zero credit",
+ "target": "tools/common_pool_verify.py",
+ "tests": "tools/test_common_pool_verify.py",
+ "rule": "a mutation is KILLED only if every named killer test fails (pytest exit 1, no collection or setup error) with the mutation applied to an isolated copy; each mutation must occur exactly once in the target",
+ "sources": [
+  "RF-DE tools/mutate.py (43)",
+  "RF-DH tools/rfdh_mutate.py (43 re-used + 16), sha256 b263d3bb",
+  "RF-DM integration mutations",
+  "RF-DP tools/rfdp_fix_mutations.py (19 mutations of the RF-DP fixes and own survivors)",
+  "RF-DX review mutations DX01-DX08 (D6 completion: catch-all, report/receipt write, listing; D11)",
+  "RF-DX optional manifest pin mutation DX09 (D2 residual)"
+ ],
+ "mutations": [
+  {
+   "id": "DE01",
+   "origin": "RF-DE",
+   "label": "size-mismatch",
+   "old": "if size != record[\"size\"]:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_wrong_size_fails_with_alignment_class",
+    "test_wrong_size_same_alignment_class_still_fails"
+   ]
+  },
+  {
+   "id": "DE02",
+   "origin": "RF-DE",
+   "label": "alignment-class-differs",
+   "old": "if law_alignment(size) != record[\"alignment\"]:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_wrong_size_fails_with_alignment_class"
+   ]
+  },
+  {
+   "id": "DE03",
+   "origin": "RF-DE",
+   "label": "duplicate-definers",
+   "old": "elif len(definers) > 1:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_duplicate_definers_fail",
+    "test_tree_side_definer_facts_never_move_a_record_out_of_its_segment"
+   ]
+  },
+  {
+   "id": "DE04",
+   "origin": "RF-DE",
+   "label": "no-definer",
+   "old": "if len(definers) == 0:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_initialised_or_real_definition_fails",
+    "test_missing_definer_extern_only_and_absent",
+    "test_static_definition_fails"
+   ]
+  },
+  {
+   "id": "DE05",
+   "origin": "RF-DE",
+   "label": "real-definition",
+   "old": "for obj, obj_category, section in real:",
+   "new": "for obj, obj_category, section in []:",
+   "retarget": null,
+   "killers": [
+    "test_function_or_weak_alias_named_like_a_record_fails",
+    "test_initialised_or_real_definition_fails",
+    "test_real_definition_beside_a_common_still_fails"
+   ]
+  },
+  {
+   "id": "DE06",
+   "origin": "RF-DE",
+   "label": "static-definition",
+   "old": "reasons.append(f\"static-definition: {obj} ({section})\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_static_definition_fails"
+   ]
+  },
+  {
+   "id": "DE07",
+   "origin": "RF-DE",
+   "label": "static scan",
+   "old": "elif storage == IMAGE_SYM_CLASS_STATIC:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_static_definition_fails"
+   ]
+  },
+  {
+   "id": "DE08",
+   "origin": "RF-DE",
+   "label": "missing-provenance-tag",
+   "old": "reasons.append(\"missing-provenance-tag\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_missing_evidence_tag_fails"
+   ]
+  },
+  {
+   "id": "DE09",
+   "origin": "RF-DE",
+   "label": "invalid-provenance-tag",
+   "old": "elif not isinstance(tag, str) or tag not in TAG_RANK:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_proof_vocabulary_is_rejected"
+   ]
+  },
+  {
+   "id": "DE10",
+   "origin": "RF-DE",
+   "label": "tag-exceeds-evidence",
+   "old": "if TAG_RANK[tag] > TAG_RANK[ceiling]:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_containment_cannot_be_smuggled_in_as_a_readout",
+    "test_containment_is_recorded_but_never_raises_a_tag",
+    "test_inferred_needs_two_direct_readout_families",
+    "test_probable_needs_a_readout_and_unresolved_carries_no_owner",
+    "test_vendor_record_supported_only_by_a_library_member_stays_probable"
+   ]
+  },
+  {
+   "id": "DE11",
+   "origin": "RF-DE",
+   "label": "ceiling: families not deduplicated",
+   "old": "family = CHANNEL_FAMILY[channel]",
+   "new": "family = channel",
+   "retarget": null,
+   "killers": [
+    "test_inferred_needs_two_direct_readout_families"
+   ]
+  },
+  {
+   "id": "DE12",
+   "origin": "RF-DE",
+   "label": "ceiling: sibling counts as direct",
+   "old": "if readout.get(\"mapping\") == \"direct\":",
+   "new": "if True:",
+   "retarget": null,
+   "killers": [
+    "test_inferred_needs_two_direct_readout_families"
+   ]
+  },
+  {
+   "id": "DE13",
+   "origin": "RF-DE",
+   "label": "ceiling: uncounted readouts count",
+   "old": "if readout.get(\"counted\") is not True:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_counted_must_be_the_boolean_true",
+    "test_inferred_needs_two_direct_readout_families"
+   ]
+  },
+  {
+   "id": "DE14",
+   "origin": "RF-DE",
+   "label": "ceiling: other owner counts",
+   "old": "if owner is None or readout.get(\"owner\") != owner:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_inferred_needs_two_direct_readout_families"
+   ]
+  },
+  {
+   "id": "DE15",
+   "origin": "RF-DE",
+   "label": "missing-name-evidence",
+   "old": "reasons.append(\"missing-name-evidence\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_missing_owner_and_name_evidence_fail"
+   ]
+  },
+  {
+   "id": "DE16",
+   "origin": "RF-DE",
+   "label": "missing-evidence-owner",
+   "old": "reasons.append(\"missing-evidence-owner\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_missing_owner_and_name_evidence_fail"
+   ]
+  },
+  {
+   "id": "DE17",
+   "origin": "RF-DE",
+   "label": "unresolved-record-carries-owner",
+   "old": "reasons.append(\"unresolved-record-carries-owner\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_probable_needs_a_readout_and_unresolved_carries_no_owner"
+   ]
+  },
+  {
+   "id": "DE18",
+   "origin": "RF-DE",
+   "label": "definer-disagrees-with-evidence-owner",
+   "old": "and definers[0][0] != owner:",
+   "new": "and False:",
+   "retarget": null,
+   "killers": [
+    "test_definer_must_be_the_evidence_owner"
+   ]
+  },
+  {
+   "id": "DE19",
+   "origin": "RF-DE",
+   "label": "owner-violates-pool-order",
+   "old": "if owner_index < last_owner_index:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_owner_pool_order_can_refute"
+   ]
+  },
+  {
+   "id": "DE20",
+   "origin": "RF-DE",
+   "label": "no-ledger-entry",
+   "old": "reasons.append(\"no-ledger-entry\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_record_without_a_ledger_entry_fails_closed"
+   ]
+  },
+  {
+   "id": "DE21",
+   "origin": "RF-DE",
+   "label": "ledger-rva-mismatch",
+   "old": "if rva != record[\"rva\"]:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_ledger_rva_and_unknown_entries"
+   ]
+  },
+  {
+   "id": "DE22",
+   "origin": "RF-DE",
+   "label": "linker-record-in-ledger",
+   "old": "global_failures.append(f\"linker-record-in-ledger: {name}\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_linker_record_in_the_ledger_is_rejected_and_never_counted"
+   ]
+  },
+  {
+   "id": "DE23",
+   "origin": "RF-DE",
+   "label": "ledger-entry-not-in-pool",
+   "old": "global_failures.append(f\"ledger-entry-not-in-pool: {name}\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_ledger_rva_and_unknown_entries"
+   ]
+  },
+  {
+   "id": "DE24",
+   "origin": "RF-DE",
+   "label": "surplus-common",
+   "old": "global_failures.append(f\"surplus-common: {name} in {[w[0] for w in where]}\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_surplus_common_is_a_global_failure"
+   ]
+  },
+  {
+   "id": "DE25",
+   "origin": "RF-DE",
+   "label": "linker rows counted",
+   "old": "if record[\"kind\"] != \"bss\":\n            excluded",
+   "new": "if False:\n            excluded",
+   "retarget": null,
+   "killers": [
+    "test_ambiguous_classification_fails_closed_without_accounting",
+    "test_consistent_world_passes_with_separate_accounting",
+    "test_duplicate_january_name_fails_closed",
+    "test_duplicate_ledger_entry_fails_closed",
+    "test_every_linked_member_kind_is_scanned_for_halo_names",
+    "test_every_run_writes_a_receipt",
+    "test_halo_record_after_vendor_records_conflicts",
+    "test_linker_record_in_the_ledger_is_rejected_and_never_counted",
+    "test_missing_evidence_tag_fails",
+    "test_missing_owner_and_name_evidence_fail",
+    "test_overlapping_january_records_break_conservation",
+    "test_record_without_a_ledger_entry_fails_closed",
+    "test_report_carries_no_credit_and_writes_nothing",
+    "test_surplus_common_is_a_global_failure",
+    "test_tree_side_definer_facts_never_move_a_record_out_of_its_segment",
+    "test_unreadable_member_of_a_linked_library_fails_closed",
+    "test_unreproduced_vendor_readout_fails_closed",
+    "test_vendor_category_needs_a_linked_or_declared_library",
+    "test_vendor_category_outside_config_is_ambiguous",
+    "test_vendor_evidence_is_checked_against_library_and_january",
+    "test_vendor_evidence_must_be_recorded",
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric",
+    "test_vendor_library_refutes_a_halo_label_without_readouts",
+    "test_vendor_readout_must_name_its_category_library",
+    "test_vendor_readout_reverified_against_the_library",
+    "test_vendor_record_cannot_enter_the_halo_tally",
+    "test_writable_pool_contribution_is_not_excluded_as_linker",
+    "test_xdk_libraries_are_required_no_ledger_only_mode"
+   ]
+  },
+  {
+   "id": "DE26",
+   "origin": "RF-DE",
+   "label": "tally accepts linker rows",
+   "old": "raise ValueError(f\"linker record {row['name']} must not enter any tally\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_tally_refuses_mixed_linker_or_unclassified_rows"
+   ]
+  },
+  {
+   "id": "DE27",
+   "origin": "RF-DE",
+   "label": "tally accepts mixed rows",
+   "old": "raise ValueError(f\"{row['name']}: segment {segment!r} and category \"",
+   "new": "print(f\"{row['name']}: segment {segment!r} and category \"",
+   "retarget": null,
+   "killers": [
+    "test_tally_refuses_mixed_linker_or_unclassified_rows"
+   ]
+  },
+  {
+   "id": "DE28",
+   "origin": "RF-DE",
+   "label": "segment conflicts still tallied",
+   "old": "accounted = segment if valid and not conflicted else None",
+   "new": "accounted = segment if valid else None",
+   "retarget": null,
+   "killers": [
+    "test_duplicate_january_name_fails_closed",
+    "test_duplicate_ledger_entry_fails_closed",
+    "test_every_linked_member_kind_is_scanned_for_halo_names",
+    "test_halo_record_after_vendor_records_conflicts",
+    "test_unreproduced_vendor_readout_fails_closed",
+    "test_vendor_evidence_is_checked_against_library_and_january",
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric",
+    "test_vendor_library_refutes_a_halo_label_without_readouts",
+    "test_vendor_readout_must_name_its_category_library",
+    "test_vendor_readout_reverified_against_the_library",
+    "test_vendor_record_cannot_enter_the_halo_tally"
+   ]
+  },
+  {
+   "id": "DE29",
+   "origin": "RF-DE",
+   "label": "readout-channel-not-valid-for-segment",
+   "old": "elif segment in SEGMENTS and channel not in SEGMENT_CHANNELS[segment]:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_cannot_enter_the_halo_tally"
+   ]
+  },
+  {
+   "id": "DE30",
+   "origin": "RF-DE",
+   "label": "owner-category-mismatch",
+   "old": "elif config_objects[owner][\"category\"] != category:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_cannot_enter_the_halo_tally"
+   ]
+  },
+  {
+   "id": "DE31",
+   "origin": "RF-DE",
+   "label": "definer-category-mismatch",
+   "old": "elif category and obj_category != category:",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_tree_side_definer_facts_never_move_a_record_out_of_its_segment",
+    "test_vendor_record_cannot_enter_the_halo_tally"
+   ]
+  },
+  {
+   "id": "DE32",
+   "origin": "RF-DE",
+   "label": "definer-category-unknown",
+   "old": "if obj_category is None:\n                reasons.append(f\"definer-category-unknown",
+   "new": "if False:\n                reasons.append(f\"definer-category-unknown",
+   "retarget": null,
+   "killers": [
+    "test_object_outside_config_fails_closed",
+    "test_tree_side_definer_facts_never_move_a_record_out_of_its_segment"
+   ]
+  },
+  {
+   "id": "DE33",
+   "origin": "RF-DE",
+   "label": "halo-record-defined-by-vendor-library",
+   "old": "elif segment == \"halo\" and library is not None and library.get(name):",
+   "new": "elif False:",
+   "retarget": null,
+   "killers": [
+    "test_every_linked_member_kind_is_scanned_for_halo_names",
+    "test_vendor_library_refutes_a_halo_label_without_readouts"
+   ]
+  },
+  {
+   "id": "DE34",
+   "origin": "RF-DE",
+   "label": "vendor-readout-not-reproduced",
+   "old": "reasons.append(f\"vendor-readout-not-reproduced: {lib} gives {in_lib}\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_unreproduced_vendor_readout_fails_closed",
+    "test_vendor_readout_reverified_against_the_library"
+   ]
+  },
+  {
+   "id": "DE35",
+   "origin": "RF-DE",
+   "label": "vendor-readout-library-not-category",
+   "old": "if lib[:-4] != str(category).lower() or not lib.endswith(\".lib\"):",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_readout_must_name_its_category_library"
+   ]
+  },
+  {
+   "id": "DE36",
+   "origin": "RF-DE",
+   "label": "segment-order-conflict",
+   "old": "if order_conflict and order_conflict[0] <= record[\"pool_index\"]",
+   "new": "if False and order_conflict[0] <= record[\"pool_index\"]",
+   "retarget": null,
+   "killers": [
+    "test_halo_record_after_vendor_records_conflicts",
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric"
+   ]
+  },
+  {
+   "id": "DE37",
+   "origin": "RF-DE",
+   "label": "january-alignment-law",
+   "old": "if alignment != law_alignment(size):",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_january_alignment_that_breaks_the_layout_law_fails"
+   ]
+  },
+  {
+   "id": "DE38",
+   "origin": "RF-DE",
+   "label": "january-misaligned",
+   "old": "if not alignment or rva % alignment:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_misaligned_january_record_fails"
+   ]
+  },
+  {
+   "id": "DE39",
+   "origin": "RF-DE",
+   "label": "january-slot-inconsistent",
+   "old": "if rva != expected:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_january_slot_that_disagrees_with_the_pool_fails",
+    "test_misaligned_january_record_fails",
+    "test_overlapping_january_records_break_conservation"
+   ]
+  },
+  {
+   "id": "DE40",
+   "origin": "RF-DE",
+   "label": "january static flag",
+   "old": "reasons.append(\"symbols.json marks a pooled record static\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_january_static_flag_on_a_pooled_record_fails"
+   ]
+  },
+  {
+   "id": "DE41",
+   "origin": "RF-DE",
+   "label": "split size check",
+   "old": "if section[\"size\"] != size:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_split_pool_that_disagrees_with_contributions_fails"
+   ]
+  },
+  {
+   "id": "DE42",
+   "origin": "RF-DE",
+   "label": "law: no 32 cap",
+   "old": "return min(32, power)",
+   "new": "return power",
+   "retarget": null,
+   "killers": [
+    "test_layout_law_and_flag_alignment"
+   ]
+  },
+  {
+   "id": "DE43",
+   "origin": "RF-DE",
+   "label": "conservation always true",
+   "old": "\"holds\": span == counted,",
+   "new": "\"holds\": True,",
+   "retarget": null,
+   "killers": [
+    "test_overlapping_january_records_break_conservation"
+   ]
+  },
+  {
+   "id": "DH01",
+   "origin": "RF-DH",
+   "label": "F1 tree reasons back in SEGMENT_CONFLICTS",
+   "old": "\"segment-order-conflict\", \"duplicate-january-name\",",
+   "new": "\"segment-order-conflict\", \"duplicate-january-name\", \"definer-category-mismatch\", \"definer-category-unknown\",",
+   "retarget": null,
+   "killers": [
+    "test_tree_side_definer_facts_never_move_a_record_out_of_its_segment"
+   ]
+  },
+  {
+   "id": "DH02",
+   "origin": "RF-DH",
+   "label": "F2 vendor needs library readout",
+   "old": "if segment == \"vendor\" and not any(r.get(\"channel\") == \"XDK\" for r in readouts):",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric"
+   ]
+  },
+  {
+   "id": "DH03",
+   "origin": "RF-DH",
+   "label": "F2 unreproduced readout not a conflict",
+   "old": "\"vendor-readout-library-not-category\", \"vendor-readout-not-reproduced\",",
+   "new": "\"vendor-readout-library-not-category\",",
+   "retarget": null,
+   "killers": [
+    "test_unreproduced_vendor_readout_fails_closed",
+    "test_vendor_readout_reverified_against_the_library"
+   ]
+  },
+  {
+   "id": "DH04",
+   "origin": "RF-DH",
+   "label": "F2 order check one-sided",
+   "old": "order_conflict = (min(vendor_at), max(halo_at))",
+   "new": "order_conflict = (max(halo_at), max(halo_at))",
+   "retarget": null,
+   "killers": [
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric"
+   ]
+  },
+  {
+   "id": "DH05",
+   "origin": "RF-DH",
+   "label": "F2 ledger-only fallback restored",
+   "old": "        raise LibraryVerifyError(\"--xdk-lib-dir is required for every accounting run \"",
+   "new": "        return {}, {\"linked_libraries_not_in_extract\": []}, {}\n        raise LibraryVerifyError(\"--xdk-lib-dir is required for every accounting run \"",
+   "retarget": "RF-DH \"F2 segment evidence silent\" mutated the \"segments are LEDGER-ONLY\" disclosure; the owner ruling removed the ledger-only mode, so the guarantee now lives in the --xdk-lib-dir requirement: the mutant restores a ledger-only run (no libraries) instead of refusing it",
+   "killers": [
+    "test_xdk_libraries_are_required_no_ledger_only_mode",
+    "test_ledger_only_run_refused_even_when_every_vendor_record_is_relabelled"
+   ]
+  },
+  {
+   "id": "DH06",
+   "origin": "RF-DH",
+   "label": "F3 code definitions skipped",
+   "old": "                if storage == IMAGE_SYM_CLASS_EXTERNAL:\n                    reals",
+   "new": "                if False:\n                    reals",
+   "retarget": null,
+   "killers": [
+    "test_function_or_weak_alias_named_like_a_record_fails"
+   ]
+  },
+  {
+   "id": "DH07",
+   "origin": "RF-DH",
+   "label": "F3 weak externals skipped",
+   "old": "if storage == IMAGE_SYM_CLASS_WEAK_EXTERNAL:\n                # an alias",
+   "new": "if False:\n                # an alias",
+   "retarget": "the bare line now also occurs in library_definers; the target keeps its scan_objects context line",
+   "killers": [
+    "test_function_or_weak_alias_named_like_a_record_fails"
+   ]
+  },
+  {
+   "id": "DH08",
+   "origin": "RF-DH",
+   "label": "F4 counted type unchecked",
+   "old": "    if kind == \"bool\":\n        return type(value) is bool",
+   "new": "    if kind == \"bool\":\n        return True",
+   "retarget": "the per-readout isinstance(counted, bool) check moved into the schema (_kind_ok \"bool\"); a non-boolean counted is now a malformed type (exit 4)",
+   "killers": [
+    "test_counted_must_be_the_boolean_true",
+    "test_malformed_ledger_types_fail_closed",
+    "test_malformed_manifest_fails_closed"
+   ]
+  },
+  {
+   "id": "DH09",
+   "origin": "RF-DH",
+   "label": "F5 duplicates tallied",
+   "old": "reasons.append(\"ledger-duplicate-entry: more than one ledger entry names this record\")",
+   "new": "pass",
+   "retarget": null,
+   "killers": [
+    "test_duplicate_ledger_entry_fails_closed"
+   ]
+  },
+  {
+   "id": "DH10",
+   "origin": "RF-DH",
+   "label": "F6 readouts shape unchecked",
+   "old": "            _check_object(f\"{where} readout #{number}\", readout, READOUT, READOUT_OPTIONAL)",
+   "new": "            pass",
+   "retarget": "the ledger-readouts-invalid per-record reason moved into the schema: every readout must be an object with the readout keys and types (exit 4)",
+   "killers": [
+    "test_counted_must_be_the_boolean_true",
+    "test_malformed_ledger_types_fail_closed",
+    "test_malformed_ledger_values_fail_closed"
+   ]
+  },
+  {
+   "id": "DH11",
+   "origin": "RF-DH",
+   "label": "F6 generic malformed input no longer fails closed",
+   "old": "    except (ValueError, TypeError, KeyError, AttributeError, struct.error) as caught:",
+   "new": "    except ZeroDivisionError as caught:",
+   "retarget": "same except clause (variable renamed); it now maps to exit 4 (malformed types), previously exit 2",
+   "killers": [
+    "test_unexpected_type_errors_fail_closed_as_malformed"
+   ]
+  },
+  {
+   "id": "DH12",
+   "origin": "RF-DH",
+   "label": "F6 duplicate January name",
+   "old": "if counts.get(record[\"name\"], 0) > 1:",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_duplicate_january_name_fails_closed"
+   ]
+  },
+  {
+   "id": "DH13",
+   "origin": "RF-DH",
+   "label": "F7 writable data excluded as linker",
+   "old": "kind = \"bss\" if bss else (\"linker\" if read_only_data else \"unexpected\")",
+   "new": "kind = \"bss\" if bss else \"linker\"",
+   "retarget": null,
+   "killers": [
+    "test_writable_pool_contribution_is_not_excluded_as_linker"
+   ]
+  },
+  {
+   "id": "DH14",
+   "origin": "RF-DH",
+   "label": "F8 names unchecked",
+   "old": "if not isinstance(raw, str) or _stem(raw) != _stem(readout[\"owner\"]):",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_direct_readout_must_name_its_owner"
+   ]
+  },
+  {
+   "id": "DH15",
+   "origin": "RF-DH",
+   "label": "F9 caveat ignored",
+   "old": "if tag == \"inferred\" and entry.get(\"caveats\"):",
+   "new": "if False:",
+   "retarget": null,
+   "killers": [
+    "test_inferred_record_carries_no_caveat"
+   ]
+  },
+  {
+   "id": "DH16",
+   "origin": "RF-DH",
+   "label": "F9 referencer ignored",
+   "old": "and owner not in referencers[name]:",
+   "new": "and False:",
+   "retarget": null,
+   "killers": [
+    "test_inferred_owner_must_be_a_january_referencer"
+   ]
+  },
+  {
+   "id": "DM01",
+   "origin": "RF-DM",
+   "label": "manifest not required",
+   "old": "    if manifest_path is None:\n        raise LibraryVerifyError(",
+   "new": "    if False:\n        raise LibraryVerifyError(",
+   "retarget": null,
+   "killers": [
+    "test_xdk_libraries_are_required_no_ledger_only_mode"
+   ]
+  },
+  {
+   "id": "DM02",
+   "origin": "RF-DM",
+   "label": "library sha256/size not compared",
+   "old": "verified=actual == entry[\"sha256\"] and len(data) == entry[\"size\"])",
+   "new": "verified=True)",
+   "retarget": null,
+   "killers": [
+    "test_every_run_writes_a_receipt",
+    "test_library_hash_mismatch_fails_closed_and_is_receipted",
+    "test_library_size_mismatch_fails_closed"
+   ]
+  },
+  {
+   "id": "DM03",
+   "origin": "RF-DM",
+   "label": "library size not compared",
+   "old": "verified=actual == entry[\"sha256\"] and len(data) == entry[\"size\"])",
+   "new": "verified=actual == entry[\"sha256\"])",
+   "retarget": null,
+   "killers": [
+    "test_library_size_mismatch_fails_closed"
+   ]
+  },
+  {
+   "id": "DM04",
+   "origin": "RF-DM",
+   "label": "missing library accepted",
+   "old": "            problems.append(f\"missing library {entry['file']}\")",
+   "new": "            pass",
+   "retarget": null,
+   "killers": [
+    "test_missing_recorded_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DM05",
+   "origin": "RF-DM",
+   "label": "unlisted library accepted",
+   "old": "        problems.append(f\"unlisted library {present[key].name}: no recorded sha256\")",
+   "new": "        pass",
+   "retarget": null,
+   "killers": [
+    "test_unlisted_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DM06",
+   "origin": "RF-DM",
+   "label": "vendor category without library accepted",
+   "old": "        if category.lower() not in linked_stems and category not in absent:",
+   "new": "        if False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_category_needs_a_linked_or_declared_library"
+   ]
+  },
+  {
+   "id": "DM07",
+   "origin": "RF-DM",
+   "label": "vendor records of an absent library accepted",
+   "old": "    if unknown_vendor:\n        raise LibraryVerifyError(",
+   "new": "    if False:\n        raise LibraryVerifyError(",
+   "retarget": null,
+   "killers": [
+    "test_vendor_records_of_a_library_not_in_the_extract_fail_closed"
+   ]
+  },
+  {
+   "id": "DM08",
+   "origin": "RF-DM",
+   "label": "anonymous member skipped",
+   "old": "            raise LibraryVerifyError(f\"{where}: anonymous object version {version}: symbols unreadable\")",
+   "new": "            return \"anonymous\", []",
+   "retarget": null,
+   "killers": [
+    "test_unreadable_member_of_a_linked_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DM09",
+   "origin": "RF-DM",
+   "label": "non-i386 members skipped (the RF-DE/RF-DH reader)",
+   "old": "            kind, symbols = member_symbols(body, f\"{library}({member})\")",
+   "new": "            kind, symbols = member_symbols(body, f\"{library}({member})\") if body[:2] == b\"\\x4c\\x01\" else (\"skipped\", [])",
+   "retarget": null,
+   "killers": [
+    "test_every_linked_member_kind_is_scanned_for_halo_names",
+    "test_unreadable_member_of_a_linked_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DM10",
+   "origin": "RF-DM",
+   "label": "CVTRES zero-length string table rejected",
+   "old": "        elif length != 0:",
+   "new": "        elif True:",
+   "retarget": null,
+   "killers": [
+    "test_every_linked_member_kind_is_scanned_for_halo_names"
+   ]
+  },
+  {
+   "id": "DM11",
+   "origin": "RF-DM",
+   "label": "schema: unknown keys accepted",
+   "old": "    unknown = sorted(set(value) - set(required) - set(optional))",
+   "new": "    unknown = []",
+   "retarget": null,
+   "killers": [
+    "test_malformed_ledger_types_fail_closed"
+   ]
+  },
+  {
+   "id": "DM12",
+   "origin": "RF-DM",
+   "label": "schema: types unchecked",
+   "old": "        if key in value and not _kind_ok(value[key], kind):",
+   "new": "        if False:",
+   "retarget": null,
+   "killers": [
+    "test_counted_must_be_the_boolean_true",
+    "test_malformed_ledger_types_fail_closed",
+    "test_malformed_ledger_values_fail_closed",
+    "test_malformed_manifest_fails_closed"
+   ]
+  },
+  {
+   "id": "DM13",
+   "origin": "RF-DM",
+   "label": "schema: missing keys accepted",
+   "old": "    if missing:\n        raise MalformedInputError",
+   "new": "    if False:\n        raise MalformedInputError",
+   "retarget": null,
+   "killers": [
+    "test_malformed_ledger_types_fail_closed",
+    "test_malformed_manifest_fails_closed"
+   ]
+  },
+  {
+   "id": "DM14",
+   "origin": "RF-DM",
+   "label": "schema: ledger version unchecked",
+   "old": "    if ledger[\"schema\"] != LEDGER_SCHEMA:",
+   "new": "    if False:",
+   "retarget": null,
+   "killers": [
+    "test_malformed_ledger_types_fail_closed"
+   ]
+  },
+  {
+   "id": "DM15",
+   "origin": "RF-DM",
+   "label": "ambiguous classification tallied",
+   "old": "    if ambiguous or unexpected:",
+   "new": "    if unexpected:",
+   "retarget": null,
+   "killers": [
+    "test_ambiguous_classification_fails_closed_without_accounting",
+    "test_duplicate_january_name_fails_closed",
+    "test_duplicate_ledger_entry_fails_closed",
+    "test_every_linked_member_kind_is_scanned_for_halo_names",
+    "test_halo_record_after_vendor_records_conflicts",
+    "test_record_without_a_ledger_entry_fails_closed",
+    "test_unreproduced_vendor_readout_fails_closed",
+    "test_vendor_category_outside_config_is_ambiguous",
+    "test_vendor_evidence_is_checked_against_library_and_january",
+    "test_vendor_label_needs_a_library_readout_and_order_is_symmetric",
+    "test_vendor_library_refutes_a_halo_label_without_readouts",
+    "test_vendor_readout_must_name_its_category_library",
+    "test_vendor_readout_reverified_against_the_library",
+    "test_vendor_record_cannot_enter_the_halo_tally",
+    "test_vendor_record_supported_only_by_a_library_member_stays_probable"
+   ]
+  },
+  {
+   "id": "DM16",
+   "origin": "RF-DM",
+   "label": "unexpected contribution not fail-closed",
+   "old": "    if ambiguous or unexpected:",
+   "new": "    if ambiguous:",
+   "retarget": null,
+   "killers": [
+    "test_writable_pool_contribution_is_not_excluded_as_linker"
+   ]
+  },
+  {
+   "id": "DM17",
+   "origin": "RF-DM",
+   "label": "tally accepts unclassified rows",
+   "old": "            raise ValueError(f\"{row['name']} is unclassified; an ambiguous classification \"",
+   "new": "            print(f\"{row['name']} is unclassified; an ambiguous classification \"",
+   "retarget": null,
+   "killers": [
+    "test_tally_refuses_mixed_linker_or_unclassified_rows"
+   ]
+  },
+  {
+   "id": "DM18",
+   "origin": "RF-DM",
+   "label": "containment counted as a definer readout",
+   "old": "    for readout in _readouts(entry):\n        if readout.get(\"counted\") is not True:",
+   "new": "    for readout in _readouts(entry) + [dict(channel=\"D\", owner=c[\"candidate_owner\"], mapping=\"direct\", counted=True) for c in entry.get(\"containment_evidence\", [])]:\n        if readout.get(\"counted\") is not True:",
+   "retarget": null,
+   "killers": [
+    "test_containment_cannot_be_smuggled_in_as_a_readout",
+    "test_containment_is_recorded_but_never_raises_a_tag",
+    "test_research_ledger_records"
+   ]
+  },
+  {
+   "id": "DM19",
+   "origin": "RF-DM",
+   "label": "candidate owner reported as owner",
+   "old": "\"tag\": tag, \"tag_label\": TAG_LABELS.get(tag), \"owner\": owner,",
+   "new": "\"tag\": tag, \"tag_label\": TAG_LABELS.get(tag), \"owner\": owner or entry.get(\"candidate_owner\"),",
+   "retarget": null,
+   "killers": [
+    "test_containment_is_recorded_but_never_raises_a_tag",
+    "test_unresolved_record_passes_only_as_owner_unresolved"
+   ]
+  },
+  {
+   "id": "DM20",
+   "origin": "RF-DM",
+   "label": "containment candidate unchecked",
+   "old": "        if item[\"candidate_owner\"] != entry.get(\"candidate_owner\"):",
+   "new": "        if False:",
+   "retarget": null,
+   "killers": [
+    "test_containment_evidence_must_name_the_record_candidate"
+   ]
+  },
+  {
+   "id": "DM21",
+   "origin": "RF-DM",
+   "label": "vendor evidence missing accepted",
+   "old": "        return [\"vendor-evidence-missing: the XDK library member evidence must be recorded\"]",
+   "new": "        return []",
+   "retarget": null,
+   "killers": [
+    "test_vendor_evidence_must_be_recorded"
+   ]
+  },
+  {
+   "id": "DM22",
+   "origin": "RF-DM",
+   "label": "vendor evidence hash unchecked",
+   "old": "    if recorded != evidence[\"library_sha256\"]:",
+   "new": "    if False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_evidence_is_checked_against_library_and_january"
+   ]
+  },
+  {
+   "id": "DM23",
+   "origin": "RF-DM",
+   "label": "vendor evidence hash mismatch not a conflict",
+   "old": "    \"vendor-evidence-disagrees-with-readout\", \"vendor-evidence-library-hash-mismatch\",",
+   "new": "    \"vendor-evidence-disagrees-with-readout\",",
+   "retarget": null,
+   "killers": [
+    "test_vendor_evidence_is_checked_against_library_and_january"
+   ]
+  },
+  {
+   "id": "DM24",
+   "origin": "RF-DM",
+   "label": "vendor record raised to inferred",
+   "old": "    elif entry.get(\"tag\") == \"inferred\":",
+   "new": "    elif False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_supported_only_by_a_library_member_stays_probable"
+   ]
+  },
+  {
+   "id": "DM25",
+   "origin": "RF-DM",
+   "label": "vendor evidence on a Halo record accepted",
+   "old": "        return [\"vendor-evidence-on-halo-record: only vendor records carry library evidence\"] \\",
+   "new": "        return [] \\",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_cannot_enter_the_halo_tally"
+   ]
+  },
+  {
+   "id": "DM26",
+   "origin": "RF-DM",
+   "label": "receipt: wrong verifier hash",
+   "old": "    return {\"path\": \"tools/common_pool_verify.py\", \"sha256\": sha256_file(own),",
+   "new": "    return {\"path\": \"tools/common_pool_verify.py\", \"sha256\": sha256_file(reader),",
+   "retarget": null,
+   "killers": [
+    "test_every_run_writes_a_receipt"
+   ]
+  },
+  {
+   "id": "DM27",
+   "origin": "RF-DM",
+   "label": "receipt: not written on fail-closed runs",
+   "old": "    receipt = build_receipt(argv, trace, exit_code, report, error)",
+   "new": "    if report is None:\n        return exit_code\n    receipt = build_receipt(argv, trace, exit_code, report, error)",
+   "retarget": null,
+   "killers": [
+    "test_every_run_writes_a_receipt",
+    "test_library_hash_mismatch_fails_closed_and_is_receipted",
+    "test_malformed_ledger_values_fail_closed",
+    "test_unexpected_type_errors_fail_closed_as_malformed",
+    "test_unusable_january_input_fails_closed"
+   ]
+  },
+  {
+   "id": "DM28",
+   "origin": "RF-DM",
+   "label": "receipt: ledger hash depends on line endings",
+   "old": "            \"sha256_lf\": sha256_bytes(lf_normalised(data)), \"size\": len(data)}",
+   "new": "            \"sha256_lf\": sha256_bytes(data), \"size\": len(data)}",
+   "retarget": null,
+   "killers": [
+    "test_ledger_hash_is_line_ending_independent"
+   ]
+  },
+  {
+   "id": "DM29",
+   "origin": "RF-DM",
+   "label": "receipt: build snapshot not recursive",
+   "old": "    for path in sorted(root.rglob(pattern), key=lambda p: p.relative_to(root).as_posix()):",
+   "new": "    for path in sorted(root.glob(pattern), key=lambda p: p.relative_to(root).as_posix()):",
+   "retarget": null,
+   "killers": [
+    "test_every_run_writes_a_receipt"
+   ]
+  },
+  {
+   "id": "DM30",
+   "origin": "RF-DM",
+   "label": "truncated archive member accepted",
+   "old": "        if offset + 60 + size > len(data):",
+   "new": "        if False:",
+   "retarget": null,
+   "killers": [
+    "test_member_reader_is_strict"
+   ]
+  },
+  {
+   "id": "DM31",
+   "origin": "RF-DM",
+   "label": "manifest duplicate library accepted",
+   "old": "        if key in seen:\n            raise MalformedInputError",
+   "new": "        if False:\n            raise MalformedInputError",
+   "retarget": null,
+   "killers": [
+    "test_malformed_manifest_fails_closed"
+   ]
+  },
+  {
+   "id": "DM32",
+   "origin": "RF-DM",
+   "label": "manifest sha256 format unchecked",
+   "old": "        if not SHA256_RE.match(entry[\"sha256\"]):",
+   "new": "        if False:",
+   "retarget": null,
+   "killers": [
+    "test_malformed_manifest_fails_closed"
+   ]
+  },
+  {
+   "id": "DM33",
+   "origin": "RF-DM",
+   "label": "unlinked library satisfies a category",
+   "old": "    linked_stems = {entry[\"file\"].lower()[:-4] for entry in manifest[\"libraries\"]\n                    if entry[\"linked_by_january\"]}",
+   "new": "    linked_stems = {entry[\"file\"].lower()[:-4] for entry in manifest[\"libraries\"]\n                    if True}",
+   "retarget": null,
+   "killers": [
+    "test_vendor_category_needs_a_linked_or_declared_library"
+   ]
+  },
+  {
+   "id": "DM34",
+   "origin": "RF-DM",
+   "label": "unlinked libraries scanned",
+   "old": "            elif entry[\"linked_by_january\"]:\n                linked[",
+   "new": "            else:\n                linked[",
+   "retarget": null,
+   "killers": [
+    "test_unreadable_member_of_a_linked_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DM35",
+   "origin": "RF-DM",
+   "label": "absent linked libraries not disclosed",
+   "old": "f\"{[e['library'] for e in manifest['linked_libraries_not_in_extract']] or 'none'}\")",
+   "new": "f\"{'none'}\")",
+   "retarget": null,
+   "killers": [
+    "test_vendor_category_needs_a_linked_or_declared_library"
+   ]
+  },
+  {
+   "id": "DM36",
+   "origin": "RF-DM",
+   "label": "malformed generic errors reported as failures",
+   "old": "        error, exit_code = caught, EXIT_MALFORMED",
+   "new": "        error, exit_code = caught, EXIT_FAILURES",
+   "retarget": null,
+   "killers": [
+    "test_unexpected_type_errors_fail_closed_as_malformed"
+   ]
+  },
+  {
+   "id": "DP01",
+   "origin": "RF-DP",
+   "label": "D3 duplicate JSON keys accepted again",
+   "old": "        return json.loads(text, object_pairs_hook=_no_duplicate_keys)",
+   "new": "        return json.loads(text)",
+   "killers": [
+    "test_duplicate_caveats_key_cannot_hide_a_caveat",
+    "test_duplicate_json_keys_fail_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP02",
+   "origin": "RF-DP",
+   "label": "D2 linked flag no longer tied to the January module count",
+   "old": "        if type(linked) is bool and type(modules) is int and (linked != (modules > 0) or modules < 0):",
+   "new": "        if False:",
+   "killers": [
+    "test_manifest_linked_flags_must_match_january_module_counts"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP03",
+   "origin": "RF-DP",
+   "label": "D2 absent library may claim 0 January modules",
+   "old": "        if entry[\"january_pdb_modules\"] <= 0:",
+   "new": "        if False:",
+   "killers": [
+    "test_manifest_linked_flags_must_match_january_module_counts"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP04",
+   "origin": "RF-DP",
+   "label": "D2 config vendor category's listed library may be unlinked",
+   "old": "        if category.lower() in listed_stems and category.lower() not in linked_stems:",
+   "new": "        if False:",
+   "killers": [
+    "test_manifest_cannot_hide_a_present_library"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP05",
+   "origin": "RF-DP",
+   "label": "D2 a present library may be declared absent",
+   "old": "        if entry[\"library\"].lower() in present:\n            problems.append(f\"library {entry['library']} is declared",
+   "new": "        if False:\n            problems.append(f\"library {entry['library']} is declared",
+   "killers": [
+    "test_manifest_cannot_hide_a_present_library"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP06",
+   "origin": "RF-DP",
+   "label": "D2 a listed library's category may be declared absent",
+   "old": "        if entry[\"category\"] and entry[\"category\"].lower() in listed_stems:",
+   "new": "        if False:",
+   "killers": [
+    "test_manifest_cannot_hide_a_present_library"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP07",
+   "origin": "RF-DP",
+   "label": "D10 library names differing only in case accepted",
+   "old": "            if path.name.lower() in present:",
+   "new": "            if False:",
+   "killers": [
+    "test_library_names_differing_only_in_case_fail_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP08",
+   "origin": "RF-DP",
+   "label": "D8 absent object of a built unit skipped again",
+   "old": "            if info[\"status\"] != \"MISSING\":\n                absent.append(name)",
+   "new": "            if False:\n                absent.append(name)",
+   "killers": [
+    "test_absent_object_of_a_built_unit_fails_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP09",
+   "origin": "RF-DP",
+   "label": "D6 section number no longer bounded",
+   "old": "            if section_no > len(obj[\"sections\"]):",
+   "new": "            if False:",
+   "killers": [
+    "test_bad_section_number_in_an_object_is_receipted_not_a_crash"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP10",
+   "origin": "RF-DP",
+   "label": "D7 missing January split object skipped again",
+   "old": "            unreadable.append(f\"{name}: no January split object {path}\")\n            continue",
+   "new": "            continue",
+   "killers": [
+    "test_missing_or_unreadable_january_split_object_fails_closed",
+    "test_split_pool_outside_its_split_tree_fails_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP11",
+   "origin": "RF-DP",
+   "label": "D7 missing/unreadable split objects no longer fail closed",
+   "old": "    if unreadable:\n        raise PoolVerifyError(f\"{len(unreadable)} January split object(s)",
+   "new": "    if False:\n        raise PoolVerifyError(f\"{len(unreadable)} January split object(s)",
+   "killers": [
+    "test_missing_or_unreadable_january_split_object_fails_closed",
+    "test_split_pool_outside_its_split_tree_fails_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP12",
+   "origin": "RF-DP",
+   "label": "D5 inputs changed during the run accepted",
+   "old": "    if changed:\n        raise PoolVerifyError(f\"inputs changed during the run",
+   "new": "    if False:\n        raise PoolVerifyError(f\"inputs changed during the run",
+   "killers": [
+    "test_inputs_changed_during_the_run_fail_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP13",
+   "origin": "RF-DP",
+   "label": "D6 OSError escapes as a traceback (exit 1, no receipt)",
+   "old": "    except OSError as caught:\n        # a file that vanished",
+   "new": "    except ZeroDivisionError as caught:\n        # a file that vanished",
+   "killers": [
+    "test_unreadable_files_are_receipted_not_a_crash"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP14",
+   "origin": "RF-DP",
+   "label": "D6 unreadable recorded library no longer a library failure",
+   "old": "            try:\n                data = path.read_bytes()\n            except OSError as error:\n                raise LibraryVerifyError(f\"cannot read library {path}: {error}\") from error",
+   "new": "            data = path.read_bytes()",
+   "killers": [
+    "test_unreadable_files_are_receipted_not_a_crash"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP15",
+   "origin": "RF-DP",
+   "label": "D9 excluded-record inconsistency ignored again",
+   "old": "        if record[\"kind\"] != \"bss\" and record[\"january_reasons\"]:",
+   "new": "        if False:",
+   "killers": [
+    "test_excluded_record_inconsistency_is_a_global_failure"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP16",
+   "origin": "RF-DP",
+   "label": "P10 vendor readout reproduced from any library",
+   "old": "in_lib = [h for h in hits if h[0] == lib]",
+   "new": "in_lib = [h for h in hits]",
+   "killers": [
+    "test_vendor_readout_is_reproduced_only_from_its_own_library"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP17",
+   "origin": "RF-DP",
+   "label": "P15 manifest may declare a present library absent",
+   "old": "            raise MalformedInputError(f\"XDK manifest: {entry['library']} is both present and absent\")",
+   "new": "            pass",
+   "killers": [
+    "test_manifest_may_not_declare_a_listed_library_absent"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP18",
+   "origin": "RF-DP",
+   "label": "P39 split section count vs contributions unchecked",
+   "old": "    if len(split[\"sections\"]) != len(pool):",
+   "new": "    if False:",
+   "killers": [
+    "test_extra_split_section_is_a_global_failure"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DP19",
+   "origin": "RF-DP",
+   "label": "P47 upper-case .LIB invisible to the unlisted check",
+   "old": "        if path.is_file() and path.suffix.lower() == \".lib\":",
+   "new": "        if path.is_file() and path.suffix == \".lib\":",
+   "killers": [
+    "test_upper_case_unlisted_library_fails_closed"
+   ],
+   "retarget": "RF-DP independent re-review: guards a fail-closed gap found after integration"
+  },
+  {
+   "id": "DX01",
+   "origin": "RF-DX",
+   "label": "D6 unanticipated exception escapes as status 1 again (catch-all narrowed)",
+   "old": "    except Exception as caught:  # deliberately total (RF-DX, D6)",
+   "new": "    except ArithmeticError as caught:  # deliberately total (RF-DX, D6)",
+   "retarget": null,
+   "killers": [
+    "test_unanticipated_exception_is_receipted_never_status_1"
+   ]
+  },
+  {
+   "id": "DX02",
+   "origin": "RF-DX",
+   "label": "D6 a report that cannot be written escapes as status 1 again",
+   "old": "        except Exception as unwritable:  # deliberately total (RF-DX, D6)",
+   "new": "        except ArithmeticError as unwritable:  # deliberately total (RF-DX, D6)",
+   "retarget": null,
+   "killers": [
+    "test_unwritable_report_fails_closed_and_the_receipt_says_so"
+   ]
+  },
+  {
+   "id": "DX03",
+   "origin": "RF-DX",
+   "label": "D6 an exit-2 run leaves the reports it already wrote (accounting) behind",
+   "old": "    for path in paths:\n        try:\n            path.unlink()",
+   "new": "    for path in []:\n        try:\n            path.unlink()",
+   "retarget": null,
+   "killers": [
+    "test_unwritable_receipt_leaves_no_report_behind",
+    "test_unwritable_report_fails_closed_and_the_receipt_says_so"
+   ]
+  },
+  {
+   "id": "DX04",
+   "origin": "RF-DX",
+   "label": "D6 an unlistable library directory is exit 2 instead of a library failure (3)",
+   "old": "    except OSError as error:\n        # listing the library directory",
+   "new": "    except ArithmeticError as error:\n        # listing the library directory",
+   "retarget": null,
+   "killers": [
+    "test_unlistable_library_directory_is_a_library_failure"
+   ]
+  },
+  {
+   "id": "DX05",
+   "origin": "RF-DX",
+   "label": "D11 another linked library defining a vendor name is ignored",
+   "old": "            if others:",
+   "new": "            if False:",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_defined_by_another_linked_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DX06",
+   "origin": "RF-DX",
+   "label": "D11 another linked library defining a vendor name is only a record FAIL (no fail-closed)",
+   "old": "    \"vendor-record-defined-by-another-library\",\n})",
+   "new": "})",
+   "retarget": null,
+   "killers": [
+    "test_vendor_record_defined_by_another_linked_library_fails_closed"
+   ]
+  },
+  {
+   "id": "DX07",
+   "origin": "RF-DX",
+   "label": "D6 IndexError no longer malformed input (falls through to the catch-all, exit 2)",
+   "old": "    except IndexError as caught:",
+   "new": "    except ArithmeticError as caught:",
+   "retarget": null,
+   "killers": [
+    "test_index_error_is_malformed_input_and_receipted"
+   ]
+  },
+  {
+   "id": "DX08",
+   "origin": "RF-DX",
+   "label": "D6 a run whose receipt cannot be written keeps its reports",
+   "old": "        _remove_outputs(written)  # no report outlives a run whose receipt could not be written (RF-DX)",
+   "new": "        pass",
+   "retarget": null,
+   "killers": [
+    "test_unwritable_receipt_leaves_no_report_behind"
+   ]
+  },
+  {
+   "id": "DX09",
+   "origin": "RF-DX",
+   "label": "D2 (optional pin) a manifest other than the reviewed one accepted",
+   "old": "    if pinned is not None and actual != pinned:",
+   "new": "    if False:",
+   "retarget": null,
+   "killers": [
+    "test_manifest_pin_refuses_any_other_manifest"
+   ]
+  }
+ ]
+}

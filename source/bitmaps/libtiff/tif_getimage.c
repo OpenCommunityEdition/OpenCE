@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002dac80[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,v 1.8 92/03/11 09:19:10 sam Exp $";
+static char data_002dac80[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_getimage.c,v 1.8 92/03/11 09:19:10 sam Exp $";
 #endif
 
 /*
@@ -77,27 +77,6 @@ static u_short bitspersample = { 0 };
  * 00059ab0 putRGBContigYCbCrClump
  * 00059c80 putcontig8bitYCbCrtile
  */
-
-/* Preserve the recovered libtiff names in source while emitting the anonymous
- * symbols owned by the January object. */
-#define checkcmap code_00058910
-#define makebwmap code_00058a20
-#define makecmap code_00058c40
-#define put8bitcmaptile code_00058f80
-#define put4bitcmaptile code_00059010
-#define put2bitcmaptile code_000590b0
-#define put1bitcmaptile code_00059180
-#define putgreytile code_000592d0
-#define initYCbCrConversion code_00059a60
-#define putRGBContigYCbCrClump code_00059ab0
-#define putcontig8bitYCbCrtile code_00059c80
-#define pickTileContigCase code_00059df0
-#define pickTileSeparateCase code_00059f10
-#define gtTileContig code_00059f50
-#define gtTileSeparate code_0005a0e0
-#define gtStripContig code_0005a320
-#define gtStripSeparate code_0005a4b0
-#define gt code_0005a6f0
 
 static	int gt();
 static	int makebwmap();

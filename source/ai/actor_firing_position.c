@@ -153,9 +153,9 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "cseries/sort.h"
 
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "ai.h"
 #include "ai_debug.h"

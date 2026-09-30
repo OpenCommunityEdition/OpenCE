@@ -1241,6 +1241,14 @@ static short build_path_edges_for_surface(
 				0x5EE,
 				(edge->adjacent_surface_index >= 0) && (edge->adjacent_surface_index < bsp->surfaces.count));
 		}
+		/* BUG (preserved for exact matching): January tests adjacent_surface_index for NONE only to
+		 * skip the range assertion (+0xb9..+0xbe) and then loads pathfinding_surfaces[adjacent]
+		 * unconditionally (+0xeb..+0xf0); the Aug-15-2001, Sept-25-2001 and later /Od (0x4c3730)
+		 * builds do the same. The index is NONE only for an edge with no surface on its far side (an
+		 * open collision BSP); the byte before the array then becomes the neighbour's flags, which the
+		 * search treats as walkable when bit 0x40 is set. No structure BSP in the shipped
+		 * 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in 82 BSPs).
+		 */
 		edge->adjacent_pathfinding_surface =
 			pathfinding_surfaces[edge->adjacent_surface_index];
 

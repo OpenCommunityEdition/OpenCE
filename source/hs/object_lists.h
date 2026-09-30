@@ -46,12 +46,14 @@ void object_list_remove_reference(
 	long object_list_index);
 void object_list_gc(
 	void);
+short object_list_count(
+	long object_list_index);
 
 
 /* ---------- globals */
 
-struct data_array *object_list_header_data;
-struct data_array *object_list_data;
+extern struct data_array *object_list_header_data;
+extern struct data_array *object_list_data;
 
 /* ---------- public code */
 

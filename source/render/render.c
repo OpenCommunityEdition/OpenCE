@@ -60,12 +60,15 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "render.h"
 #include "render_cameras_internal.h"
 #include "render_particles.h"
 #include "objects.h"
+#include "render_sprite.h"
 #include "scenario.h"
 #include "structure_bsp_definitions.h"
+#include "effects/player_effects.h"
 #include "structures/structure_visibility.h"
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_lights.h"
@@ -76,11 +79,14 @@ symbols in this file:
 #include "game.h"
 #include "game_engine.h"
 #include "interface/first_person_weapons.h"
+#include "interface/interface.h"
 #include "editor_stubs.h"
 #include "render_debug.h"
 #include "objects/object_lights_rendering.h"
 #include "effects/particle_systems.h"
 #include "effects/weather_particle_systems.h"
+#include "main/main.h"
+#include "structures/structures.h"
 
 /* ---------- constants */
 
@@ -128,31 +134,7 @@ static void render_player_frame(
 	struct render_window *window,
 	const point2d *screenshot_combined_index);
 
-void structure_get_planar_fog(
-	short cluster_index,
-	struct render_fog *fog);
-void player_effect_get_screen_flash(
-	short local_player_index,
-	struct render_screen_flash *screen_flash);
-void build_sprite_prepare_for_window(
-	void);
 void render_sky(
-	void);
-void render_objects(
-	void);
-void render_object_shadows(
-	void);
-void rasterizer_transparent_geometry_stop(
-	void);
-void interface_draw_fullscreen_overlays(
-	void);
-void rasterizer_debug_draw(
-	void);
-void render_debug(
-	void);
-void progress_bar_eachframe(
-	void);
-short main_get_window_count(
 	void);
 
 /* ---------- globals */
@@ -162,7 +144,6 @@ struct render_globals render;
 static boolean render_invalid_fog_warning_displayed;
 
 extern short global_screenshot_count;
-extern short global_screenshot_size;
 
 boolean render_contrails_enabled = TRUE;
 boolean render_particles_enabled = TRUE;

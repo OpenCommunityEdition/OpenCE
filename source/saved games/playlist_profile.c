@@ -173,8 +173,8 @@ static void playlist_profile_write(
 
 /* ---------- globals */
 
-struct playlist_profile_runtime_globals_prefix playlist_profile_globals = { 0 };
-struct playlist_profile_data playlist_profile_default_data =
+static struct playlist_profile_runtime_globals_prefix playlist_profile_globals = { 0 };
+static struct playlist_profile_data playlist_profile_default_data =
 {
 	{
 		build_game_variant_slayer,

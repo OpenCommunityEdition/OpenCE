@@ -274,6 +274,43 @@ static struct sound_virtual_channel *virtual_channel_get(
 	short index);
 static short channel_get_state(
 	short index);
+static long dsound_volume_from_gain(
+	real gain,
+	long maximum_volume);
+static short dsound_virtual_get_state(
+	short virtual_channel_index);
+static void dsound_virtual_stop(
+	short virtual_channel_index);
+static void dsound_channel_update(
+	short channel_index);
+static void dsound_begin_scene(
+	void);
+static void dsound_end_scene(
+	void);
+static void dsound_dispose(
+	void);
+static void dsound_set_paused(
+	boolean paused);
+static void dsound_flush(
+	void);
+static void dsound_set_listener_properties(
+	struct platform_sound_listener_properties const *properties);
+static boolean dsound_initialize(
+	struct sound_preferences *preferences);
+static void dsound_virtual_set_location(
+	short virtual_channel_index,
+	boolean spatialized,
+	struct sound_location const *location,
+	real occlusion,
+	real obstruction,
+	boolean attenuate_direct_path);
+static void dsound_virtual_set_properties(
+	short virtual_channel_index,
+	struct platform_sound_channel_properties const *properties,
+	boolean gain_only);
+static void dsound_virtual_queue_sound(
+	short virtual_channel_index,
+	struct sound_permutation *sound);
 
 /* ---------- globals */
 
@@ -281,7 +318,7 @@ extern struct dsound_globals dsound_globals;
 extern unsigned long const sound_sample_rate_samples_per_second[NUMBER_OF_SOUND_SAMPLE_RATES];
 extern HRESULT interrupt_result;
 extern boolean debug_sound_channels;
-byte const dsound_effects_image[0x3A5C]=
+static byte const dsound_effects_image[0x3A5C]=
 {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1254,7 +1291,7 @@ unsigned long sound_samples_per_second(
 	return sound_sample_rate_samples_per_second[sample_rate];
 }
 
-long dsound_volume_from_gain(
+static long dsound_volume_from_gain(
 	real gain,
 	long maximum_volume)
 {
@@ -1328,7 +1365,7 @@ LPDIRECTSOUND dsound_get(
 	return dsound_globals.initialized ? dsound_globals.direct_sound : NULL;
 }
 
-short dsound_virtual_get_state(
+static short dsound_virtual_get_state(
 	short virtual_channel_index)
 {
 	struct sound_virtual_channel *vchannel= virtual_channel_get(virtual_channel_index);
@@ -1351,7 +1388,7 @@ short dsound_virtual_get_state(
 	return state;
 }
 
-void dsound_virtual_stop(
+static void dsound_virtual_stop(
 	short virtual_channel_index)
 {
 	struct sound_virtual_channel *vchannel= virtual_channel_get(virtual_channel_index);
@@ -1372,13 +1409,13 @@ void dsound_virtual_stop(
 	return;
 }
 
-void dsound_channel_update(
+static void dsound_channel_update(
 	short channel_index)
 {
 	return;
 }
 
-void dsound_begin_scene(
+static void dsound_begin_scene(
 	void)
 {
 	DirectSoundDoWork();
@@ -1394,7 +1431,7 @@ void dsound_begin_scene(
 	return;
 }
 
-void dsound_dispose(
+static void dsound_dispose(
 	void)
 {
 	long index;
@@ -1429,7 +1466,7 @@ void dsound_dispose(
 	return;
 }
 
-void dsound_end_scene(
+static void dsound_end_scene(
 	void)
 {
 	HRESULT result= IDirectSound_CommitDeferredSettings(dsound_globals.direct_sound);
@@ -1523,7 +1560,7 @@ void dsound_end_scene(
 	return;
 }
 
-void dsound_set_paused(
+static void dsound_set_paused(
 	boolean paused)
 {
 	short index;
@@ -1596,7 +1633,7 @@ void dsound_set_paused(
 	return;
 }
 
-void dsound_flush(
+static void dsound_flush(
 	void)
 {
 	short index;
@@ -1629,7 +1666,7 @@ void dsound_flush(
 	return;
 }
 
-void dsound_set_listener_properties(
+static void dsound_set_listener_properties(
 	struct platform_sound_listener_properties const *properties)
 {
 	if (!realcmp_epsilon(properties->position.x, dsound_globals.listener_position.x, 0.05f) ||
@@ -1719,7 +1756,7 @@ void dsound_set_listener_properties(
 	return;
 }
 
-boolean dsound_initialize(
+static boolean dsound_initialize(
 	struct sound_preferences *preferences)
 {
 	boolean success= FALSE;
@@ -1866,7 +1903,7 @@ boolean dsound_initialize(
 	return success;
 }
 
-void dsound_virtual_set_location(
+static void dsound_virtual_set_location(
 	short virtual_channel_index,
 	boolean spatialized,
 	struct sound_location const *location,
@@ -1890,7 +1927,7 @@ void dsound_virtual_set_location(
 	return;
 }
 
-void dsound_virtual_set_properties(
+static void dsound_virtual_set_properties(
 	short virtual_channel_index,
 	struct platform_sound_channel_properties const *properties,
 	boolean gain_only)
@@ -1905,7 +1942,7 @@ void dsound_virtual_set_properties(
 	return;
 }
 
-void dsound_virtual_queue_sound(
+static void dsound_virtual_queue_sound(
 	short virtual_channel_index,
 	struct sound_permutation *sound)
 {

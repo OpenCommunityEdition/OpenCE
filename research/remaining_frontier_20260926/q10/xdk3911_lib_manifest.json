@@ -1,0 +1,295 @@
+{
+ "schema": "xdk-lib-manifest/1",
+ "status": "research only; Q10 held; zero credit; library bytes recorded as data, never credit",
+ "recorded_by": "RF-DM 2026-09-28 (research/remaining_frontier_20260926/workers/RF-DM/tools/build_xdk_manifest.py)",
+ "source_dir": "C:/tmp/xdk3911_extract/XDK/xbox/lib",
+ "evidence": [
+  "sha256 and size of every .lib file in source_dir (XDK 3911 extract, read as data)",
+  "linked_by_january / january_pdb_modules: January cachebeta.pdb DBI module table (848 modules) read with RF-DI tools/pdb_mods.py; count of modules whose object path names the library",
+  "RF-DH C09: the release libraries reproduce all 27 vendor pool records (COMMON of January's size, each member a January PDB module); debug variants differ (e.g. xapilibd powerdwn COMMON 88)"
+ ],
+ "libraries": [
+  {
+   "file": "d3d8.lib",
+   "sha256": "41ab837028d00015016040593890c57d54201c4c046835aca500ef7c6e4ac4d7",
+   "size": 1736410,
+   "linked_by_january": true,
+   "january_pdb_modules": 29
+  },
+  {
+   "file": "d3d8d.lib",
+   "sha256": "7e12dfc95d4fc45c818f5756112d3da7b418f0cd0a0e90c37395d91156b317cb",
+   "size": 2894726,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "d3d8i.lib",
+   "sha256": "e64a7cb16e71a057d1bfdc619d7cfcd7b358553a2f3b0d526c6c930522bc10f2",
+   "size": 2144034,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "d3d8ltcg.lib",
+   "sha256": "1083af7aba33eee8d2a5f4c63aa134d1951ccd40a6a0c316540679ffec85b2ba",
+   "size": 16642874,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "d3dx8.lib",
+   "sha256": "2ed9b746e9e169a6b70ef41d48554f492285ed71b749f4c64782a6c5ee9eca64",
+   "size": 5079110,
+   "linked_by_january": true,
+   "january_pdb_modules": 8
+  },
+  {
+   "file": "d3dx8d.lib",
+   "sha256": "7fdc20d92d7257ccb9950e58fbdcb3f031172266c766e5a457bd571eea745f36",
+   "size": 5449862,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "dmusic.lib",
+   "sha256": "fbb30d11953b9853030b84bfbf7eb7d083223d75ab3e73203e6b622892861f58",
+   "size": 16545856,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "dmusicd.lib",
+   "sha256": "d234444be4ed4c2b44703c7f5e7fe33c9ba2b8714a06ab2d3a79d9a505765f59",
+   "size": 18152686,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "dmusici.lib",
+   "sha256": "ce7daeca0537670854c162f735738854e6482f837ff93a010b7b04cef5db52ef",
+   "size": 16627550,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "dsound.lib",
+   "sha256": "0a07e97bdef6f18f5ec3b74aa4996d1bfe5cdbcdf561ceef22c0b671021ea136",
+   "size": 3777324,
+   "linked_by_january": true,
+   "january_pdb_modules": 17
+  },
+  {
+   "file": "dsoundd.lib",
+   "sha256": "44c19396005b5ea8a5c2b5039878dcedadc7676401394df4b2d1ed0d0c7a5213",
+   "size": 4494588,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libc.lib",
+   "sha256": "08c82866294658ce5b670a2dce0a73d9f614bedf6f1e13b73bdbe1bd923afa6a",
+   "size": 4278254,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcd.lib",
+   "sha256": "26c100ce13369ec00c4fb2e0b423b1d5b1524de892d78767138419d06a01be5a",
+   "size": 5629060,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libci.lib",
+   "sha256": "e220066f189cffe7df1e20452b9f261372ea1f16a82fcb3308cffa9a7c6b9878",
+   "size": 960090,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcid.lib",
+   "sha256": "7ebc7c439290e2ae533a1ef531286d537ca369ed1ed6df32dba350aa1af36633",
+   "size": 1011350,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcimt.lib",
+   "sha256": "56b3f89a5c140815047b6b7ca082b95ffcc1071a9d95d060129e2927cc794852",
+   "size": 1080092,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcimtd.lib",
+   "sha256": "a36525115dd6eb9ab05f48752789125c246e9a64fff467382734acdc5798c5a0",
+   "size": 1126694,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcmt.lib",
+   "sha256": "60aa4c87c97eeb6662b31d9d37cf3caba1afabaec72c47b090e7a0ce8b632f55",
+   "size": 4372210,
+   "linked_by_january": true,
+   "january_pdb_modules": 212
+  },
+  {
+   "file": "libcmtd.lib",
+   "sha256": "6248684cd7b1b49918b5ae23967688e2f53ffdc4f01d443796a6f00fee23949d",
+   "size": 5595180,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcp.lib",
+   "sha256": "8e4a362e1d3325357461234cabb20f1545afbcc1ef3d03075eeca1213f80d56a",
+   "size": 5231580,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcpd.lib",
+   "sha256": "db142d1d866c14a65ffd26eaa269a3c855e0aef649a9fa4109b4c87afc721266",
+   "size": 6694966,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcpmt.lib",
+   "sha256": "9bb9462c7ef9fea61d9fe5818551cb5d9adda3ed58545acc3147eb5f3ccd6bd0",
+   "size": 5244330,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "libcpmtd.lib",
+   "sha256": "d58d58d1ec531306116b4faa8b26ad16b7f8c66fde56da38f3db3a2ed15e4453",
+   "size": 6682978,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "oldnames.lib",
+   "sha256": "348a220e94f90bd9f530514ae59ff9b044b76e2056f52b45df406c12d2156afb",
+   "size": 65372,
+   "linked_by_january": true,
+   "january_pdb_modules": 11
+  },
+  {
+   "file": "uuid.lib",
+   "sha256": "96f671edc10e80961473e15b7553f1675e5f3d6d7d2fc7bf5941e525a821ec2b",
+   "size": 158540,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "VTuneAPI_XBOX.lib",
+   "sha256": "e2728298ee7beec4fd1f29bdd92ef714c31d8e9840adbca9360ff70ba897bea9",
+   "size": 11020,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xapilib.lib",
+   "sha256": "56122745988d7d1f031b1cc3a06b1b11347f6bc2f92e53a081a01a59e1e64d53",
+   "size": 2432912,
+   "linked_by_january": true,
+   "january_pdb_modules": 61
+  },
+  {
+   "file": "xapilibd.lib",
+   "sha256": "e16b4c04826f2747a62011a67f85d7765b8fdb96240ecfb03d910dd6b84d42b0",
+   "size": 2751612,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xbdm.lib",
+   "sha256": "34236c2e8007d62a853ea8580896719ec178aa8e2d9bab265205c4334a3a8b7b",
+   "size": 13574,
+   "linked_by_january": true,
+   "january_pdb_modules": 1
+  },
+  {
+   "file": "xboxkrnl.lib",
+   "sha256": "41a8bfa7ab1382c4d18e31c1881c93540d90573b1973f0a4eb3625a750c7df90",
+   "size": 88658,
+   "linked_by_january": true,
+   "january_pdb_modules": 2
+  },
+  {
+   "file": "xgraphics.lib",
+   "sha256": "f700d69d2fc57fd6e85c68804aed20e4f000648b56ec8e17b91e19f04e5f823c",
+   "size": 1674906,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xgraphicsd.lib",
+   "sha256": "dd32bb80e36cf267d1c8374a5b9574a9c64b07982e777477c8f2251d6ca38e84",
+   "size": 1829206,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xkbd.lib",
+   "sha256": "36b3283fc8e84e635a0c541fab056529f5de4fbae3b37adfc76b771e5a45e21b",
+   "size": 92182,
+   "linked_by_january": true,
+   "january_pdb_modules": 1
+  },
+  {
+   "file": "xkbdd.lib",
+   "sha256": "553e241d41e045e4401d997d79b6b4a70b5d85daa47cffafef477e195855f754",
+   "size": 93096,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xnet.lib",
+   "sha256": "368d7a9a7eec6df4d906d946ba2998272374432e93ef5b59ad91de6324a5ebe4",
+   "size": 1009062,
+   "linked_by_january": true,
+   "january_pdb_modules": 13
+  },
+  {
+   "file": "xnetd.lib",
+   "sha256": "823af0fa5bc91f8fd603abccbe650961fc36ca80bf8df19d5ada38c3f59d4a23",
+   "size": 1664632,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xnets.lib",
+   "sha256": "972e3720f3bed795f373719d0add882fa7f109f9b85b6dd55abc3d33240fc94c",
+   "size": 921344,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  },
+  {
+   "file": "xnetsd.lib",
+   "sha256": "2aa08940bdb6ce0f1ec8740ad79445340e959f16c34e8759b7be3d434c77e961",
+   "size": 1474614,
+   "linked_by_january": false,
+   "january_pdb_modules": 0
+  }
+ ],
+ "linked_libraries_not_in_extract": [
+  {
+   "library": "binkxbox.lib",
+   "category": "binkxbox",
+   "january_path": "c:\\binkxbox\\binkxbox.lib",
+   "january_pdb_modules": 24,
+   "reason": "linked by January (cachebeta.pdb module table) but not in the XDK 3911 extract; its members cannot be scanned, so the Halo-record-defined-by-a-library check does not cover it"
+  },
+  {
+   "library": "dsstrmh.lib",
+   "category": "dsstrmh",
+   "january_path": "C:\\Program Files\\Microsoft Xbox SDK\\Xbox\\Lib\\dsstrmh.lib",
+   "january_pdb_modules": 1,
+   "reason": "linked by January (cachebeta.pdb module table) but not in the XDK 3911 extract; its members cannot be scanned, so the Halo-record-defined-by-a-library check does not cover it"
+  }
+ ]
+}

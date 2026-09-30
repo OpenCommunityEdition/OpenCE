@@ -223,8 +223,6 @@ symbols in this file:
 #include "bitmaps/bitmap_group_internal.h"
 #include "bitmaps/bitmap_drawing.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmaps_internal.h"
-#include "bitmaps/bitmaps_mipmap.h"
 #include "bitmaps/bitmaps_quantitize_internal.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "cache/cache_files.h"

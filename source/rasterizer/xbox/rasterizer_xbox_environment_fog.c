@@ -131,9 +131,10 @@ symbols in this file:
 #include "game/game_globals.h"
 #include "interface/hud_draw.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/common/rasterizer_common.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
 #include "shaders/shader_definitions.h"
@@ -144,6 +145,8 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_water.h"
 
 /* ---------- constants */
@@ -235,17 +238,6 @@ struct real_bounds
 	real upper;
 };
 
-struct rasterizer_environment_fog_debug_options
-{
-	byte reserved00[2];
-	short statistics_mode;
-	short drawing_mode;
-	byte reserved06[0x16];
-	boolean draw_environment_fog;
-	boolean draw_environment_fog_screen;
-	boolean draw_water;
-};
-
 struct fog_screen
 {
 	word flags;
@@ -269,28 +261,6 @@ struct fog_screen
 	struct real_bounds wind_period;
 	real wind_acceleration_weight;
 	real wind_perpendicular_weight;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long constant_1[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long alpha_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long rgb_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 struct rasterizer_environment_fog_screen_wind
@@ -330,38 +300,6 @@ struct shader_transparent_chicago_definition
 	struct tag_reference map;
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
-struct rasterizer_model_effect_parameters
-{
-	short type;
-	word pad02;
-	real intensity;
-	byte reserved08[4];
-	long source_object_index;
-	real_point3d centroid;
-	struct shader *shader;
-	struct render_animation animation;
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct rasterizer_model_skinning_parameters skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct rasterizer_model_effect_parameters effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -370,7 +308,7 @@ struct transparent_geometry_group
 	struct shader *shader;
 	short shader_permutation_index;
 	word pad12;
-	struct rasterizer_model_effect_parameters effect;
+	struct render_model_effect effect;
 	real_vector2d model_base_map_scale;
 	long dynamic_triangle_buffer_index;
 	struct triangle_buffer const *triangle_buffer;
@@ -415,7 +353,7 @@ typedef char rasterizer_environment_fog_screen_window_wind_offset_assert[
 typedef char rasterizer_environment_fog_chicago_map_scale_offset_assert[
 	offsetof(struct shader_transparent_chicago_definition, map_u_scale) == 0x9C ? 1 : -1];
 typedef char rasterizer_environment_fog_model_skinning_size_assert[
-	sizeof(struct rasterizer_model_skinning_parameters) == 0x8 ? 1 : -1];
+	sizeof(struct render_skinning) == 0x8 ? 1 : -1];
 typedef char rasterizer_environment_fog_model_map_scale_offset_assert[
 	offsetof(struct rasterizer_model_begin_parameters, base_map_scale) == 0xC4 ? 1 : -1];
 typedef char rasterizer_environment_fog_transparent_group_size_assert[
@@ -447,9 +385,6 @@ static struct render_lighting const *cached_lighting = NULL;
 static struct render_animation const *cached_animation = NULL;
 static boolean reported_too_many_opaque_models = FALSE;
 static boolean local_fog_screen_first_time = TRUE;
-
-extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static boolean rasterizer_environment_fog_screen_is_active(
 	void);
@@ -1457,7 +1392,7 @@ void _rasterizer_environment_fog_screen_begin(
 				{
 					struct transparent_geometry_group *group =
 						&opaque_model_submit_parameters[group_index];
-					struct rasterizer_model_skinning_parameters skinning;
+					struct render_skinning skinning;
 
 					if (group->shader->base.type == _shader_type_transparent_chicago &&
 						!TEST_FLAG(

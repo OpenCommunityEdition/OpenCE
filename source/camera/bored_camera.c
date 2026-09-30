@@ -39,7 +39,7 @@ symbols in this file:
 #include "bored_camera.h"
 #include "camera/static_camera.h"
 #include "cseries/cseries_windows.h"
-#include "game/player_control.h"
+#include "game/players.h"
 #include "math/real_math.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
@@ -66,15 +66,6 @@ typedef char unit_camera_track_size_assert[
 	sizeof(struct unit_camera_track) == 0x1C ? 1 : -1];
 
 /* ---------- prototypes */
-
-unsigned long *get_global_local_random_seed_address(
-	void);
-float real_seed_random_range(
-	unsigned long *seed,
-	float lower_bound,
-	float upper_bound);
-long player_control_get_aiming_unit_index(
-	short local_player_index);
 
 static long bored_camera_shot_threshold_milliseconds(
 	long boredom_count);

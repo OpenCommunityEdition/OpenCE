@@ -184,7 +184,7 @@ static int symbol_sort_proc(
 
 /* ---------- globals */
 
-struct _stack_walk_globals stack_walk_globals =
+static struct _stack_walk_globals stack_walk_globals =
 {
 	NONE,
 	FALSE

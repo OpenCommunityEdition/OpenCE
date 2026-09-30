@@ -198,6 +198,7 @@ symbols in this file:
 #include "game/players.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_client_message_handler.h"
+#include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 
 /* ---------- constants */
@@ -246,45 +247,6 @@ enum network_game_packet_class
 /* ---------- structures */
 
 struct network_game_client;
-
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte padding41[3];
-};
-
-struct network_game_map
-{
-	long unknown;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte unknown10C;
-	char minimum_player_count;
-	char maximum_player_count;
-	byte team_count;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	word reserved_after_players;
-	unsigned long random_seed;
-	long number_of_games_played;
-	struct network_game_local_data local_data;
-};
 
 struct message_server_game_advertise
 {

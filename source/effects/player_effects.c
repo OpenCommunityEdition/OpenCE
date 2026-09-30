@@ -91,11 +91,10 @@ symbols in this file:
 #include "camera/observer.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
 #include "math/periodic_functions.h"
-#include "math/random_math.h"
+#include "math/real_math.h"
 #include "main/console.h"
 #include "networking/network_connection.h"
 #include "objects/damage.h"
@@ -357,11 +356,11 @@ void player_effect_dispose_from_old_map(
 
 void player_effect_add_continuous_effect(
 	short local_player_index,
-	long definition_index,
+	long effect_index,
 	real distance)
 {
 	struct continuous_damage_effect_definition *definition =
-		continuous_damage_effect_definition_get(definition_index);
+		continuous_damage_effect_definition_get(effect_index);
 
 	if (distance < definition->cutoff_radius)
 	{

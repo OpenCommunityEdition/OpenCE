@@ -184,7 +184,6 @@ symbols in this file:
 #define limit2d limit2d_inline
 #include "game/game.h"
 #undef limit2d
-#include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "players.h"
 #include "player_queues_new.h"
@@ -242,6 +241,42 @@ real const MOUSE_YAW_SCALE = 0.0031415927f;
 real const MOUSE_PITCH_SCALE = 0.0031415927f;
 static real const ANALOG_BUTTON_SCALE = 1.f / 255.f;
 
+enum
+{
+	_player_control_action_bit,
+	_player_control_jump_bit,
+	_player_control_accept_bit,
+	_player_control_back_bit,
+	_player_control_primary_trigger_bit,
+	_player_control_grenade_trigger_bit,
+	_player_control_zoom_bit,
+	_player_control_look_relative_up_bit,
+	_player_control_look_relative_down_bit,
+	_player_control_look_relative_left_bit,
+	_player_control_look_relative_right_bit,
+	_player_control_move_relative_forward_bit,
+	_player_control_move_relative_backward_bit,
+	_player_control_move_relative_right_bit,
+	_player_control_move_relative_left_bit,
+};
+
+enum
+{
+	_player_control_camera_control_disabled_bit,
+	_player_control_look_relative_all_directions_flags = 0x780,
+	_player_control_move_relative_all_directions_flags = 0x7800,
+};
+
+enum
+{
+	_player_control_rotate_weapons_bit,
+	_player_control_rotate_grenades_bit,
+	_player_control_input_zoom_bit,
+	_player_control_debug_rotate_units_bit,
+	_player_control_debug_rotate_all_units_bit,
+	_player_control_debug_ninja_rope_bit,
+};
+
 /* ---------- macros */
 
 #define valid_euler_angles2d(angles) ( \
@@ -292,13 +327,32 @@ typedef char mouse_state_size_assert[
 typedef char mouse_state_buttons_offset_assert[
 	offsetof(struct mouse_state, buttons) == 0xC ? 1 : -1];
 
+struct player_control_globals_data
+{
+	unsigned long action_flags;
+	unsigned long action_test_flags;
+	unsigned long suppressed_action_flags;
+	unsigned long flags;
+	struct player_control players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+};
+
+typedef char player_control_globals_size_assert[
+	sizeof(struct player_control_globals_data) == 0x110 ? 1 : -1];
+typedef char player_control_globals_players_offset_assert[
+	offsetof(struct player_control_globals_data, players) == 0x10 ? 1 : -1];
+typedef char player_control_globals_action_test_flags_offset_assert[
+	offsetof(struct player_control_globals_data, action_test_flags) == 0x4 ? 1 : -1];
+typedef char player_control_globals_suppressed_action_flags_offset_assert[
+	offsetof(struct player_control_globals_data, suppressed_action_flags) == 0x8 ? 1 : -1];
+typedef char player_control_globals_flags_offset_assert[
+	offsetof(struct player_control_globals_data, flags) == 0xC ? 1 : -1];
+
 /* ---------- prototypes */
 
-void player_aiming_vector_from_facing(
-	long player_index,
-	real_vector3d *facing_direction,
-	real_euler_angles2d const *facing_angles);
-
+struct player_control *player_control_get(
+	short local_player_index);
+void player_control_dispose_from_old_map(
+	void);
 static void player_control_modify_desired_angles(
 	short local_player_index,
 	real delta_yaw,
@@ -314,6 +368,11 @@ static void get_local_player_input_blob(
 static void handle_one_player_input(
 	short local_player_index,
 	real time_delta_sec);
+long player_control_get_desired_weapon(
+	short local_player_index,
+	long unit_index);
+static boolean player_control_camera_control_is_active(
+	void);
 
 /* ---------- globals */
 
@@ -376,7 +435,7 @@ void player_control_dispose_from_old_map(
 	return;
 }
 
-boolean player_control_camera_control_is_active(
+static boolean player_control_camera_control_is_active(
 	void)
 {
 	return (boolean)(!TEST_FLAG(

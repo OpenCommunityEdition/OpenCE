@@ -17,7 +17,7 @@ symbols in this file:
 00061DE0 00c0:
 	_bitmap_frame_rectangle (0000)
 00251114 0012:
-	_bitmap_bevel_sequence_indices (0000)
+	_tile_rectangle_flag_offsets (0000)
 00251128 0035:
 	??_C@_0DF@JBBFIHJO@bitmap?5?$EA?$CFp?5has?5bad?5encoding?5?$CD?$CFd?5@ (0000)
 00251160 0028:
@@ -37,16 +37,19 @@ symbols in this file:
 00251274 001a:
 	??_C@_0BK@LAJPHKOM@destination?9?$DObase_address?$AA@ (0000)
 002DB678 0a54:
-	_bitmap_copy_translation_table_data (0000)
+	_white (0000)
+	_black (0008)
 	_translation_table (0010)
+	_tile_rectangle_flags (0a30)
 */
 
 /* ---------- headers */
 
 #include "bitmaps/bitmap_drawing.h"
 
-#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_utilities.h"
 #include "cseries/errors.h"
 
 /* ---------- constants */
@@ -173,6 +176,9 @@ boolean bitmap_step_line(
 
 /* ---------- globals */
 
+static union argb_color white = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+static union argb_color black = {0xFFFF, 0, 0, 0};
+
 short translation_table[NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_COPY_FLAG_COMBINATIONS] =
 {
 	{ 0 }, /* a8 */
@@ -241,7 +247,7 @@ short translation_table[NUMBER_OF_BITMAP_FORMATS][NUMBER_OF_BITMAP_FORMATS][NUMB
 	},
 };
 
-word const bitmap_bevel_sequence_indices[NUMBER_OF_BITMAP_BEVEL_PIECES] =
+static word const tile_rectangle_flag_offsets[NUMBER_OF_BITMAP_BEVEL_PIECES] =
 {
 	_bitmap_bevel_part_center,
 	_bitmap_bevel_part_corner,
@@ -254,7 +260,7 @@ word const bitmap_bevel_sequence_indices[NUMBER_OF_BITMAP_BEVEL_PIECES] =
 	_bitmap_bevel_part_edge,
 };
 
-static long bitmap_bevel_translation_flags[NUMBER_OF_BITMAP_BEVEL_PIECES] =
+static long tile_rectangle_flags[NUMBER_OF_BITMAP_BEVEL_PIECES] =
 {
 	FLAG(_bitmap_bevel_center_bit),
 	FLAG(_bitmap_bevel_left_bit) | FLAG(_bitmap_bevel_top_bit) |
@@ -852,7 +858,7 @@ void bitmap_tile_and_bevel_rectangle(
 			if (TEST_FLAG(
 				flags,
 				NUMBER_OF_BITMAP_TILE_FLAGS_PER_PART *
-					bitmap_bevel_sequence_indices[bevel_index] +
+					tile_rectangle_flag_offsets[bevel_index] +
 					_bitmap_tile_part_draw_bit))
 			{
 				bitmap = bitmap_group_get_bitmap_from_sequence(
@@ -867,63 +873,63 @@ void bitmap_tile_and_bevel_rectangle(
 					bevel_bounds = bounds;
 
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_top_bit))
 					{
 						bevel_rectangle.y1 = rectangle->y0 + bitmap->height;
 					}
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_bottom_bit))
 					{
 						bevel_rectangle.y0 = rectangle->y1 - bitmap->height;
 					}
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_left_bit))
 					{
 						bevel_rectangle.x1 = rectangle->x0 + bitmap->width;
 					}
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_right_bit))
 					{
 						bevel_rectangle.x0 = rectangle->x1 - bitmap->width;
 					}
 
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_clip_bit))
 					{
 						clip_bounds = TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_corner_bit) ?
 							&bevel_bounds :
 							&bevel_rectangle;
 
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_top_bit))
 						{
 							clip_bounds->x0 = MAX(minimum[0].x, clip_bounds->x0);
 							clip_bounds->x1 = MIN(maximum[0].x, clip_bounds->x1);
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_bottom_bit))
 						{
 							clip_bounds->x0 = MAX(minimum[1].x, clip_bounds->x0);
 							clip_bounds->x1 = MIN(maximum[1].x, clip_bounds->x1);
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_left_bit))
 						{
 							clip_bounds->y0 = MAX(minimum[0].y, clip_bounds->y0);
 							clip_bounds->y1 = MIN(maximum[0].y, clip_bounds->y1);
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_right_bit))
 						{
 							clip_bounds->y0 = MAX(minimum[1].y, clip_bounds->y0);
@@ -932,44 +938,44 @@ void bitmap_tile_and_bevel_rectangle(
 					}
 
 					if (TEST_FLAG(
-						bitmap_bevel_translation_flags[bevel_index],
+						tile_rectangle_flags[bevel_index],
 						_bitmap_bevel_corner_bit))
 					{
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_top_bit) &&
 							TEST_FLAG(
-								bitmap_bevel_translation_flags[bevel_index],
+								tile_rectangle_flags[bevel_index],
 								_bitmap_bevel_left_bit))
 						{
 							minimum[0].x = bevel_rectangle.x1;
 							minimum[0].y = bevel_rectangle.y1;
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_bottom_bit) &&
 							TEST_FLAG(
-								bitmap_bevel_translation_flags[bevel_index],
+								tile_rectangle_flags[bevel_index],
 								_bitmap_bevel_left_bit))
 						{
 							minimum[1].x = bevel_rectangle.x1;
 							maximum[0].y = bevel_rectangle.y0;
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_top_bit) &&
 							TEST_FLAG(
-								bitmap_bevel_translation_flags[bevel_index],
+								tile_rectangle_flags[bevel_index],
 								_bitmap_bevel_right_bit))
 						{
 							maximum[0].x = bevel_rectangle.x0;
 							minimum[1].y = bevel_rectangle.y1;
 						}
 						if (TEST_FLAG(
-							bitmap_bevel_translation_flags[bevel_index],
+							tile_rectangle_flags[bevel_index],
 							_bitmap_bevel_bottom_bit) &&
 							TEST_FLAG(
-								bitmap_bevel_translation_flags[bevel_index],
+								tile_rectangle_flags[bevel_index],
 								_bitmap_bevel_right_bit))
 						{
 							maximum[1].x = bevel_rectangle.x0;
@@ -994,7 +1000,7 @@ void bitmap_tile_and_bevel_rectangle(
 						if (TEST_FLAG(
 							flags,
 							NUMBER_OF_BITMAP_TILE_FLAGS_PER_PART *
-								bitmap_bevel_sequence_indices[bevel_index] +
+								tile_rectangle_flag_offsets[bevel_index] +
 								_bitmap_tile_part_blend_bit))
 						{
 							SET_FLAG(copy_flags, _bitmap_copy_blend_bit, TRUE);

@@ -34,6 +34,7 @@ struct tag_reference_definition global_point_physics_reference = { 0, POINT_PHYS
 
 static real global_water_mass_over_radius_cubed = 0.0f;
 static real global_air_mass_over_radius_cubed = 0.0f;
+boolean debug_point_physics;
 
 /* ---------- public code */
 

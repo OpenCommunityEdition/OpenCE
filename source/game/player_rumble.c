@@ -44,6 +44,7 @@ symbols in this file:
 #include "input/input.h"
 #include "interface/player_ui.h"
 #include "math/periodic_functions.h"
+#include "memory/data.h"
 #include "saved games/game_state.h"
 
 /* ---------- constants */

@@ -60,6 +60,21 @@ struct light_fixture_datum
 
 /* ---------- prototypes/DEVICE_LIGHT_FIXTURES.C */
 
+void light_fixtures_initialize(
+	void);
+void light_fixtures_dispose(
+	void);
+void light_fixtures_initialize_for_new_map(
+	void);
+void light_fixtures_dispose_from_old_map(
+	void);
+boolean light_fixture_new(
+	long object_index);
+void light_fixture_delete(
+	long object_index);
+boolean light_fixture_update(
+	long object_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

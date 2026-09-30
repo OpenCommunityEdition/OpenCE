@@ -97,13 +97,13 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmaps_inlines.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"
 #include "render/render_cameras.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include <stddef.h>
 #include <xtl.h>
 #include "rasterizer_xbox.h"
@@ -168,9 +168,9 @@ enum
 /* ---------- structures */
 
 typedef char rasterizer_screen_effect_debug_options_flashes_offset_assert[
-	offsetof(struct rasterizer_debug_options_definition, screen_flashes) == 0x47 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options, screen_flash_enabled) == 0x47 ? 1 : -1];
 typedef char rasterizer_screen_effect_debug_options_effects_offset_assert[
-	offsetof(struct rasterizer_debug_options_definition, screen_effects) == 0x48 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options, screen_effects_enabled) == 0x48 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_mask_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, convolution_mask) == 0x08 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_tint_offset_assert[
@@ -192,7 +192,6 @@ typedef char rasterizer_screen_effect_pixel_shader_size_assert[
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- private code */
 
@@ -469,7 +468,7 @@ void _rasterizer_screen_effect(
 		parameters->filter_light_enhancement_intensity > 0.0f ||
 		parameters->filter_desaturation_intensity > 0.0f ||
 		parameters->video_on) &&
-		rasterizer_debug_options.screen_effects &&
+		rasterizer_debug_options.screen_effects_enabled &&
 		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		short pass_count = (parameters->convolution_extra_passes + 1) * 2;
@@ -1182,7 +1181,7 @@ void _rasterizer_screen_flash(
 
 	rasterizer_profile_begin(_rasterizer_profile_screen_flash);
 
-	if (rasterizer_debug_options.screen_flashes &&
+	if (rasterizer_debug_options.screen_flash_enabled &&
 		global_window_parameters.screen_flash.type != _render_screen_flash_type_none)
 	{
 		flash_color.alpha = global_window_parameters.screen_flash.intensity *

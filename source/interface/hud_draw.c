@@ -91,7 +91,6 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "effects/particles.h"
 #include "game/game.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"

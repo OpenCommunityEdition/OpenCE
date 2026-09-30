@@ -249,7 +249,6 @@ symbols in this file:
 enum
 {
 	MAXIMUM_SOUND_CHANNELS = 256,
-	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	MAXIMUM_SOUND_CALLBACK_DATA = 0x30,
 };
 
@@ -706,11 +705,11 @@ static void prioritize_sounds(
 
 /* ---------- globals */
 
-extern struct data_array *looping_sound_data;
-extern struct data_array *sound_data;
-extern struct sound_channel_datum sound_channels[MAXIMUM_SOUND_CHANNELS];
-extern boolean loud_dialog_hack;
-extern boolean debug_looping_sound;
+struct data_array *looping_sound_data;
+struct data_array *sound_data;
+struct sound_channel_datum sound_channels[MAXIMUM_SOUND_CHANNELS];
+boolean loud_dialog_hack;
+boolean debug_looping_sound;
 
 static real const sound_pitch_range_fade_time = 0.5f;
 static real const sound_inaudible_fade_out_time = 2.f;
@@ -730,6 +729,8 @@ static struct profile_section sound_render_section =
 	{"sound_render", NONE, TRUE};
 real sound_fade_exponent = 2.5f;
 static struct sound_manager_globals sound_manager_globals = { 0 };
+boolean debug_sound;
+boolean debug_sound_channels;
 
 /* ---------- public code */
 

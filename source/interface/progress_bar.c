@@ -182,6 +182,8 @@ symbols in this file:
  * ABI and code shape.
  */
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 #include "interface/progress_bar_internal.h"
 
@@ -219,28 +221,6 @@ struct progress_bar_mode
 	IDirect3DTexture8 *texture1;
 	boolean active;
 	unsigned char padding1[3];
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 struct gravy_layer
@@ -285,7 +265,7 @@ static void draw_layer_int(
 	real alpha,
 	real progress);
 
-void draw_layer(
+static void draw_layer(
 	real distance,
 	real alpha,
 	real_rgb_color const *color,
@@ -295,11 +275,11 @@ static void draw_initial_layer(
 	real_rgb_color const *color,
 	real progress);
 
-void do_convoluation_coords(
+static void do_convoluation_coords(
 	real x,
 	real y);
 
-void draw_fade_layer(
+static void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha);
@@ -333,12 +313,11 @@ void tgaLoadImageData(
 
 /* ---------- globals */
 
-extern void *global_d3d_device;
 extern struct pixel_shader_definition blur_shader;
 extern struct pixel_shader_definition regular_shader;
 extern unsigned long current_time;
 
-boolean progress_bar_rendering_enabled= TRUE;
+static boolean progress_bar_rendering_enabled= TRUE;
 
 /* the compressed monk chant played behind the loading screen */
 byte compressed_monk_tone[18396]=
@@ -1915,7 +1894,7 @@ static void draw_layer_int(
 	return;
 }
 
-void draw_layer(
+static void draw_layer(
 	real distance,
 	real alpha,
 	real_rgb_color const *color,
@@ -1939,21 +1918,12 @@ static void draw_initial_layer(
 	real_rgb_color const *color,
 	real progress)
 {
-	struct gravy_layer layer;
-
-	layer.texture_width= 640.f;
-	layer.texture_height= 480.f;
-	layer.x= 0.f;
-	layer.y= 0.f;
-	layer.half_width= (real)fabs(640.0/2.0);
-	layer.half_height= (real)fabs(480.0/2.0);
-	layer.distance= 0.f;
-	draw_layer_int(&layer, color, 1.f, progress);
+	draw_layer(0.f, 1.f, color, progress);
 
 	return;
 }
 
-void do_convoluation_coords(
+static void do_convoluation_coords(
 	real x,
 	real y)
 {
@@ -1965,7 +1935,7 @@ void do_convoluation_coords(
 	return;
 }
 
-void draw_fade_layer(
+static void draw_fade_layer(
 	real x_offset,
 	real y_offset,
 	real alpha)

@@ -33,6 +33,8 @@ boolean progress_bar_is_active(
 	void);
 void progress_bar_enable(
 	boolean enabled);
+void progress_bar_eachframe(
+	void);
 void progress_bar_display(
 	real progress);
 boolean progress_bar_is_stuff_ready(

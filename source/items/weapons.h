@@ -253,12 +253,20 @@ boolean weapon_handle_potential_inventory_item(
 	long item_object_index,
 	short local_player_index,
 	short *rounds_picked_up);
+short animation_choose_random_permutation(
+	long animation_graph_index,
+	short animation_index);
 void weapon_unready(long weapon_index);
 boolean weapon_put_away(long weapon_index, boolean immediate);
 
 void weapon_set_integrated_light_power(long weapon_index, real light_power);
 
 void weapon_owner_update(long weapon_index, word control_flags, real primary_trigger);
+void weapon_preprocess_node_orientations(
+	long weapon_index,
+	struct real_orientation *node_orientations);
+boolean weapon_update(
+	long object_index);
 
 struct weapon_interface_state;
 
@@ -267,6 +275,8 @@ void weapon_export_function_values(
 	long weapon_index);
 
 void weapon_set_total_rounds(long weapon_index, short *rounds_array);
+void weapon_delete(
+	long object_index);
 void weapon_set_current_amount(
 	long weapon_index,
 	real current_amount);

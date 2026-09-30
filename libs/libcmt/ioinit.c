@@ -93,5 +93,5 @@ void __cdecl _ioterm(
 typedef int (__cdecl *io_initializer_proc)(
 	void);
 #pragma data_seg(".CRT$RII20")
-io_initializer_proc io_initialize_handles= _ioinit;
+static io_initializer_proc __pioinit= _ioinit;
 #pragma data_seg()

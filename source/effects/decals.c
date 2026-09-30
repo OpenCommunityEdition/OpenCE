@@ -212,12 +212,10 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define plane2d_from_points plane2d_from_points_inline
 #include "effects/decals.h"
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
-#undef plane2d_from_points
 
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -233,7 +231,7 @@ symbols in this file:
 #include "bitmaps/bitmaps.h"
 #include "cache/texture_cache.h"
 #include "effects/decal_definitions.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "render/render.h"
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
@@ -483,7 +481,9 @@ struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] 
 	{ 10.0f,  10.0f, 1.5f, FALSE }
 };
 
-static real const seconds_per_tick = 1.0f / TICKS_PER_SECOND;
+/* SECONDS_PER_TICK: name from the 2003 PC demo PDB and the HCEX PDB (decals file static const float) */
+static real const SECONDS_PER_TICK = 1.0f / TICKS_PER_SECOND;
+boolean debug_decals;
 
 /* ---------- public code */
 
@@ -807,26 +807,6 @@ static void decal_sprite_get_bounds(
 		- sprite->bounds.y0) * height_scale;
 
 	return;
-}
-
-real_plane2d *plane2d_from_points(
-	real_plane2d *plane,
-	real_point2d const *point0,
-	real_point2d const *point1)
-{
-	plane->n.i = point1->y - point0->y;
-	plane->n.j = point0->x - point1->x;
-
-	if (normalize2d(&plane->n) == 0.0f)
-	{
-		plane->d = 0.0f;
-
-		return NULL;
-	}
-
-	plane->d = dot_product2d((real_vector2d *)point0, &plane->n);
-
-	return plane;
 }
 
 pixel32 real_a_rgb_color_to_pixel32(
@@ -1857,13 +1837,13 @@ void decal_new_from_collision(
 								&collision_bsp->surfaces,
 								deviant_surface,
 								struct collision_surface);
-							real_plane3d surface_plane;
+							real_plane3d surface_plane1;
 							short next_deviant_surface_index;
 
 							bsp3d_get_plane_from_designator(
 								&collision_bsp->bsp3d,
 								surface->plane_designator,
-								&surface_plane);
+								&surface_plane1);
 
 							match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 2399,
 								deviant_surface_bunch_size<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE);
@@ -1882,15 +1862,15 @@ void decal_new_from_collision(
 										&collision_bsp->surfaces,
 										next_deviant_surface,
 										struct collision_surface);
-									real_plane3d next_surface_plane;
+									real_plane3d surface_plane2;
 									real angle;
 
 									bsp3d_get_plane_from_designator(
 										&collision_bsp->bsp3d,
 										next_surface->plane_designator,
-										&next_surface_plane);
+										&surface_plane2);
 
-									angle = angle_between_normals3d(&surface_plane.n, &next_surface_plane.n);
+									angle = angle_between_normals3d(&surface_plane1.n, &surface_plane2.n);
 									if (angle<=DEGREES_TO_RADIANS(decal_wrap_parameters[definition->type].minimum_wrap_angle))
 									{
 										match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 2422,
@@ -1905,9 +1885,9 @@ void decal_new_from_collision(
 								long closest_surface_index = NONE;
 								real closest_minimum_distance;
 								real closest_maximum_distance;
-								real_plane3d closest_surface_plane;
-								real_point3d closest_edge_start;
-								real_point3d closest_edge_end;
+								real_plane3d closest_plane;
+								real_point3d closest_vertex1;
+								real_point3d closest_vertex2;
 								short bunch_index;
 
 								for (bunch_index = 0;
@@ -1954,11 +1934,11 @@ void decal_new_from_collision(
 											bsp3d_get_plane_from_designator(
 												&collision_bsp->bsp3d,
 												bunch_surface->plane_designator,
-												&closest_surface_plane);
+												&closest_plane);
 											closest_minimum_distance = minimum_distance;
 											closest_maximum_distance = maximum_distance;
-											closest_edge_start = edge_start->point;
-											closest_edge_end = edge_end->point;
+											closest_vertex1 = edge_start->point;
+											closest_vertex2 = edge_end->point;
 											closest_surface_index = bunch_surface_index;
 										}
 
@@ -1974,46 +1954,46 @@ void decal_new_from_collision(
 									struct decal_projection wrapped_projection;
 									real_vector3d edge_axis;
 
-									vector_from_points3d(&closest_edge_start, &closest_edge_end, &edge_axis);
+									vector_from_points3d(&closest_vertex1, &closest_vertex2, &edge_axis);
 
 									if (normalize3d(&edge_axis) > 0.0f)
 									{
 										real sign = triple_product3d(
-											&closest_surface_plane.n,
+											&closest_plane.n,
 											&projection.plane.n,
 											&edge_axis) < 0.0f ? 1.0f : -1.0f;
 										real angle;
-										real_matrix4x3 rotation;
-										real_matrix4x3 wrapped_basis;
+										real_matrix4x3 wrap_rotation;
+										real_matrix4x3 wrap_basis;
 
 										angle = angle_between_normals3d(
-											&closest_surface_plane.n,
+											&closest_plane.n,
 											&projection.plane.n) * sign;
 										matrix4x3_rotation_from_axis_and_angle(
-											&rotation,
+											&wrap_rotation,
 											&edge_axis,
 											(real)sin(angle),
 											(real)cos(angle));
 
-										wrapped_basis.position.x = basis.position.x - closest_edge_start.x;
-										wrapped_basis.position.y = basis.position.y - closest_edge_start.y;
-										wrapped_basis.position.z = basis.position.z - closest_edge_start.z;
-										matrix4x3_transform_point(&rotation, &wrapped_basis.position, &wrapped_basis.position);
-										matrix4x3_transform_normal(&rotation, &basis.forward, &wrapped_basis.forward);
-										matrix4x3_transform_normal(&rotation, &basis.left, &wrapped_basis.left);
-										matrix4x3_transform_normal(&rotation, &basis.up, &wrapped_basis.up);
-										wrapped_basis.scale = 1.0f;
-										wrapped_basis.position.x += closest_edge_start.x;
-										wrapped_basis.position.y += closest_edge_start.y;
-										wrapped_basis.position.z += closest_edge_start.z;
+										wrap_basis.position.x = basis.position.x - closest_vertex1.x;
+										wrap_basis.position.y = basis.position.y - closest_vertex1.y;
+										wrap_basis.position.z = basis.position.z - closest_vertex1.z;
+										matrix4x3_transform_point(&wrap_rotation, &wrap_basis.position, &wrap_basis.position);
+										matrix4x3_transform_normal(&wrap_rotation, &basis.forward, &wrap_basis.forward);
+										matrix4x3_transform_normal(&wrap_rotation, &basis.left, &wrap_basis.left);
+										matrix4x3_transform_normal(&wrap_rotation, &basis.up, &wrap_basis.up);
+										wrap_basis.scale = 1.0f;
+										wrap_basis.position.x += closest_vertex1.x;
+										wrap_basis.position.y += closest_vertex1.y;
+										wrap_basis.position.z += closest_vertex1.z;
 
-										decal_projection_create(&wrapped_basis, &extent, &wrapped_projection);
-										normal_bounds.x0 = MIN(wrapped_basis.up.i, normal_bounds.x0);
-										normal_bounds.x1 = MAX(wrapped_basis.up.i, normal_bounds.x1);
-										normal_bounds.y0 = MIN(wrapped_basis.up.j, normal_bounds.y0);
-										normal_bounds.y1 = MAX(wrapped_basis.up.j, normal_bounds.y1);
-										normal_bounds.z0 = MIN(wrapped_basis.up.k, normal_bounds.z0);
-										normal_bounds.z1 = MAX(wrapped_basis.up.k, normal_bounds.z1);
+										decal_projection_create(&wrap_basis, &extent, &wrapped_projection);
+										normal_bounds.x0 = MIN(wrap_basis.up.i, normal_bounds.x0);
+										normal_bounds.x1 = MAX(wrap_basis.up.i, normal_bounds.x1);
+										normal_bounds.y0 = MIN(wrap_basis.up.j, normal_bounds.y0);
+										normal_bounds.y1 = MAX(wrap_basis.up.j, normal_bounds.y1);
+										normal_bounds.z0 = MIN(wrap_basis.up.k, normal_bounds.z0);
+										normal_bounds.z1 = MAX(wrap_basis.up.k, normal_bounds.z1);
 									}
 									else
 									{
@@ -2145,16 +2125,16 @@ void decal_new_from_collision(
 								real intensity = real_local_random_range(
 									definition->intensity_lower_bound,
 									definition->intensity_upper_bound);
-								real_rgb_color color;
+								real_rgb_color decal_color;
 								real interpolation = real_local_random_range(0.0f, 1.0f);
 
 								rgb_colors_interpolate(
-									&color,
+									&decal_color,
 									(definition->flags >> _decal_definition_color_interpolate_in_hsv_bit) & 3,
 									&definition->color_lower_bound,
 									&definition->color_upper_bound,
 									interpolation);
-								decal->color = real_a_rgb_color_to_pixel32(intensity, &color);
+								decal->color = real_a_rgb_color_to_pixel32(intensity, &decal_color);
 								decal->intensity = 255;
 							}
 
@@ -2325,7 +2305,7 @@ static void decal_update(
 	long decal_index)
 {
 	struct decal_datum *decal = DECAL_GET(decal_index);
-	real elapsed = (game_time_get() - decal->creation_time) * seconds_per_tick;
+	real elapsed = (game_time_get() - decal->creation_time) * SECONDS_PER_TICK;
 
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 307, decal->definition_index!=NONE);
 

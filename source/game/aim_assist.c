@@ -50,7 +50,6 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "math/real_math_cones.h"
 #include "items/weapon_definitions.h"
@@ -114,12 +113,6 @@ static void object_compute_autoaim_target(
 	real_point3d const *position,
 	real_vector3d const *direction,
 	real_point3d *target);
-boolean aim_assist_compute_target(
-	struct aim_assist_parameters const *parameters,
-	long object_index,
-	real_point3d const *position,
-	real_vector3d const *direction,
-	struct aim_assist_target *target);
 static short find_aim_assist_targets_recursive(
 	struct aim_assist_parameters const *parameters,
 	long object_index,
@@ -141,13 +134,6 @@ static short find_aim_assist_targets(
 	short ignore_team_index,
 	short maximum_target_count,
 	struct aim_assist_target *targets);
-boolean aim_assist(
-	struct aim_assist_parameters const *parameters,
-	real_point3d const *position,
-	real_vector3d const *direction,
-	long ignore_object_index,
-	short ignore_team_index,
-	struct aim_assist_target *target);
 
 /* ---------- globals */
 

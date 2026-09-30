@@ -281,16 +281,15 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/actor_activation.h"
-#include "ai/actor_iterators.h"
 #include "encounters.h"
 
 #include "actions.h"
 #include "actors.h"
 #include "actor_definitions.h"
-#include "actor_iterators.h"
 #include "actor_placement.h"
 #include "actor_types.h"
 #include "ai.h"
+#include "ai/ai_globals.h"
 #include "ai_debug.h"
 #include "ai_communication.h"
 #include "ai_profile.h"
@@ -473,17 +472,6 @@ struct actor_iterator
 	long next_index;
 };
 
-struct encounter_ai_globals_prefix
-{
-	boolean ai_active;
-	boolean ai_initialized_for_map;
-	boolean ai_has_control_data;
-	boolean time_given_this_frame;
-	short last_highest_service_timer;
-	short current_highest_service_timer;
-	long first_encounterless_actor_index;
-};
-
 typedef char encounter_iterator_size_assert[
 	sizeof(struct encounter_iterator) == 0x18 ? 1 : -1];
 typedef char encounter_iterator_index_offset_assert[
@@ -507,9 +495,9 @@ typedef char actor_iterator_index_offset_assert[
 typedef char actor_iterator_next_index_offset_assert[
 	offsetof(struct actor_iterator, next_index) == 0x18 ? 1 : -1];
 typedef char encounter_ai_globals_initialized_offset_assert[
-	offsetof(struct encounter_ai_globals_prefix, ai_initialized_for_map) == 0x1 ? 1 : -1];
+	offsetof(struct ai_globals, ai_initialized_for_map) == 0x1 ? 1 : -1];
 typedef char encounter_ai_globals_encounterless_actor_offset_assert[
-	offsetof(struct encounter_ai_globals_prefix, first_encounterless_actor_index) == 0x8 ? 1 : -1];
+	offsetof(struct ai_globals, first_encounterless_actor_index) == 0x8 ? 1 : -1];
 typedef char encounter_datum_active_offset_assert[
 	offsetof(struct encounter_datum, active) == 0xD ? 1 : -1];
 typedef char encounter_datum_status_dirty_offset_assert[
@@ -579,8 +567,6 @@ static short squad_get_actor_type(
 	struct squad_definition *squad_definition);
 
 /* ---------- globals */
-
-extern struct encounter_ai_globals_prefix *ai_globals;
 
 struct data_array *encounter_data;
 struct platoon_datum *platoon_array;

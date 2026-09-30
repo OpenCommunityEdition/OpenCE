@@ -15,16 +15,6 @@ WIND.H
 
 /* ---------- prototypes/WIND.C */
 
-boolean scenario_get_current(
-	struct location const *location,
-	real_point3d const *position,
-	real_vector3d *current,
-	long flags);
-void scenario_get_current_from_weather_palette(
-	real_point3d const *position,
-	real_vector3d *current,
-	long flags,
-	short weather_palette_index);
 void wind_dispose_from_old_map(
 	void);
 void wind_initialize_for_new_map(
