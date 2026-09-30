@@ -106,14 +106,21 @@ enum
 #define match_vhalt(file, line, string) do { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); halt_and_catch_fire(); } while (FALSE);
 #ifdef HALO_RELEASE
 /* release builds of the native ports (configure.py --release): like the
-retail game, nothing is checked; the expressions are still evaluated, since a
-few do work the game relies on (heap_insert in path_obstacle_avoidance.c,
-hs_parse_variable in hs_compile.c). Each is a statement ending in a
-brace, like the checked form, which some uses rely on (no semicolon). */
-#define match_assert(file, line, expr) { (void)(expr); }
-#define match_vassert(file, line, expr, string) { (void)(expr); }
-#define match_warn(file, line, expr) { (void)(expr); }
-#define match_vwarn(file, line, expr, string) { (void)(expr); }
+retail game, a failed assertion does not stop the game, but it is noted in
+debug.txt (release_assert_failed, cseries.c). The expressions are evaluated
+as in the checked form, since a few do work the game relies on (heap_insert
+in path_obstacle_avoidance.c, hs_parse_variable in hs_compile.c). A message
+is written only when it is a string literal: one built from the failing
+data (csprintf of a bad index's name) was never evaluated in a release
+build, and could fault where the game would carry on. Each is a statement
+ending in a brace, like the checked form, which some uses rely on (no
+semicolon). */
+#define RELEASE_ASSERT_MESSAGE(string) \
+	(__builtin_constant_p(string) ? (char const *)(string) : "<message not formatted in release builds>")
+#define match_assert(file, line, expr) if (!(expr)) { release_assert_failed(#expr, MATCH_FILE(file), MATCH_LINE(line), TRUE); }
+#define match_vassert(file, line, expr, string) if (!(expr)) { release_assert_failed(RELEASE_ASSERT_MESSAGE(string), MATCH_FILE(file), MATCH_LINE(line), TRUE); }
+#define match_warn(file, line, expr) if (!(expr)) { release_assert_failed(#expr, MATCH_FILE(file), MATCH_LINE(line), FALSE); }
+#define match_vwarn(file, line, expr, string) if (!(expr)) { release_assert_failed(RELEASE_ASSERT_MESSAGE(string), MATCH_FILE(file), MATCH_LINE(line), FALSE); }
 #else
 #define match_assert(file, line, expr) if (!(expr)) { display_assert(#expr, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
 #define match_vassert(file, line, expr, string) if (!(expr)) { display_assert(string, MATCH_FILE(file), MATCH_LINE(line), TRUE); system_exit(-1); }
@@ -191,6 +198,9 @@ char *strupr(char *string);
 char *strlwr(char *string);
 char *csprintf(char *buffer, char *format, ...);
 void display_assert(char *information, char *file, long line, boolean fatal);
+#ifdef HALO_RELEASE
+void release_assert_failed(char const *information, char const *file, long line, boolean fatal);
+#endif
 long csmemcmp(const void *p1, const void *p2, unsigned long size);
 void *csmemmove(void *destination, const void *source, unsigned long size);
 void *csmemset(void *buffer, long c, unsigned long size);
