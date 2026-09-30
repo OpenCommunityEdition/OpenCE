@@ -48,4 +48,29 @@ const char *halo_ray_tracing_probe_next(void);
 view, 5 split (tests) */
 void halo_ray_tracing_debug_mode(int mode);
 
+/* the settings the overlay changes while playing (settings_overlay.c) */
+struct halo_ray_tracing_settings
+{
+	/* display.ray_tracing: 0 off, 1 on (Metal's rays with the screen's), 2
+	the screen's rays only */
+	int tracing;
+	/* what it shows (F6): 0 the lighting, 1 the ray view, 2 split, 3 the
+	occlusion, 4 the depth */
+	int view;
+	/* display.ray_tracing_gi: 0 off, 1 traced, 2 black, 3 path */
+	int gi;
+	/* display.ray_tracing_lights "traced"; display.ray_tracing_shapes (0
+	model, 1 collision); display.ray_tracing_objects; _gi_split */
+	int traced_lights, shapes, objects, gi_split;
+	/* the strengths */
+	float occlusion, reflections, bounce, shadows, gi_sun, gi_bounce, gi_glow, gi_lights;
+	/* (read only) whether Metal's rays can be had, and whether the ray
+	tracing could not start */
+	int hardware_available, failed;
+};
+void halo_ray_tracing_get(struct halo_ray_tracing_settings *settings);
+/* takes them up from the next frame (the traced light gathered again when
+what it traces changes) */
+void halo_ray_tracing_set(const struct halo_ray_tracing_settings *settings);
+
 #endif

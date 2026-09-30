@@ -155,8 +155,11 @@ static struct
 	packed in RGBA8), for their pixels */
 	GLuint objects_texture, objects_program;
 	GLint objects_uniforms, objects_depth, gbuffer_objects, gbuffer_objects_known;
-	/* the world-space rays (macOS: Metal) */
+	/* the world-space rays (macOS: Metal), and whether their programs were
+	made (and tried: "screen" makes them only when Metal's rays are asked
+	for) */
 	int hardware;
+	int hardware_linked, hardware_tried;
 	GLuint gbuffer_program, gbuffer_framebuffer;
 	GLint gbuffer_uniforms, gbuffer_depth;
 	unsigned long world_generation;
@@ -912,6 +915,59 @@ static int mode_from_setting(const char *text)
 	return _ray_tracing_on;
 }
 
+/* Metal's rays' programs (macOS), once: ray.hardware_linked if they are
+there */
+static void hardware_link(void)
+{
+	if (ray.hardware_tried)
+		return;
+	ray.hardware_tried = 1;
+#ifdef HALO_MACOS
+	if (host_rt_available())
+	{
+		ray.gbuffer_program = link(gbuffer_source, "ray tracing depth and normals");
+		if (ray.gbuffer_program)
+		{
+			ray.gbuffer_uniforms = glGetUniformLocation(ray.gbuffer_program, "u");
+			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
+			ray.gbuffer_objects = glGetUniformLocation(ray.gbuffer_program, "objects_texture");
+			ray.gbuffer_objects_known = glGetUniformLocation(ray.gbuffer_program, "objects_known");
+			ray.denoise_program = link_with(vertex_source, denoise_source, "ray tracing light buffer denoise");
+			if (ray.denoise_program)
+			{
+				ray.denoise_uniforms = glGetUniformLocation(ray.denoise_program, "u");
+				ray.denoise_lights = glGetUniformLocation(ray.denoise_program, "lights_texture");
+				ray.denoise_results = glGetUniformLocation(ray.denoise_program, "results_texture");
+				ray.denoise_gbuffer = glGetUniformLocation(ray.denoise_program, "gbuffer_texture");
+				ray.denoise_counts = glGetUniformLocation(ray.denoise_program, "counts_texture");
+			}
+			ray.inject_program = link(inject_source, "ray tracing light buffer");
+			if (ray.inject_program)
+			{
+				ray.inject_uniforms = glGetUniformLocation(ray.inject_program, "u");
+				ray.inject_depth = glGetUniformLocation(ray.inject_program, "depth_texture");
+				ray.inject_irradiance = glGetUniformLocation(ray.inject_program, "irradiance_texture");
+				ray.inject_gbuffer = glGetUniformLocation(ray.inject_program, "gbuffer_texture");
+				ray.inject_split = glGetUniformLocation(ray.inject_program, "split");
+				ray.inject_results = glGetUniformLocation(ray.inject_program, "results_texture");
+				ray.inject_objects = glGetUniformLocation(ray.inject_program, "objects_texture");
+				ray.inject_cameras = glGetUniformLocation(ray.inject_program, "cameras");
+				ray.inject_grid = glGetUniformLocation(ray.inject_program, "previous_grid");
+			}
+			ray.objects_program = link(objects_source, "ray tracing objects' depth");
+			if (ray.objects_program)
+			{
+				ray.objects_uniforms = glGetUniformLocation(ray.objects_program, "u");
+				ray.objects_depth = glGetUniformLocation(ray.objects_program, "depth_texture");
+			}
+			glGenFramebuffers(1, &ray.gbuffer_framebuffer);
+			ray.hardware = 1;
+			ray.hardware_linked = 1;
+		}
+	}
+#endif
+}
+
 static void initialize(void)
 {
 	ray.initialized = 1;
@@ -975,50 +1031,10 @@ static void initialize(void)
 	ray.composite_objects = glGetUniformLocation(ray.composite_program, "objects_depth");
 	ray.composite_gbuffer = glGetUniformLocation(ray.composite_program, "gbuffer_now");
 	ray.composite_correct = glGetUniformLocation(ray.composite_program, "correct");
-#ifdef HALO_MACOS
-	/* "screen" keeps to the screen's rays */
-	if (strcmp(config_string("display.ray_tracing"), "screen") && host_rt_available())
-	{
-		ray.gbuffer_program = link(gbuffer_source, "ray tracing depth and normals");
-		if (ray.gbuffer_program)
-		{
-			ray.gbuffer_uniforms = glGetUniformLocation(ray.gbuffer_program, "u");
-			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
-			ray.gbuffer_objects = glGetUniformLocation(ray.gbuffer_program, "objects_texture");
-			ray.gbuffer_objects_known = glGetUniformLocation(ray.gbuffer_program, "objects_known");
-			ray.denoise_program = link_with(vertex_source, denoise_source, "ray tracing light buffer denoise");
-			if (ray.denoise_program)
-			{
-				ray.denoise_uniforms = glGetUniformLocation(ray.denoise_program, "u");
-				ray.denoise_lights = glGetUniformLocation(ray.denoise_program, "lights_texture");
-				ray.denoise_results = glGetUniformLocation(ray.denoise_program, "results_texture");
-				ray.denoise_gbuffer = glGetUniformLocation(ray.denoise_program, "gbuffer_texture");
-				ray.denoise_counts = glGetUniformLocation(ray.denoise_program, "counts_texture");
-			}
-			ray.inject_program = link(inject_source, "ray tracing light buffer");
-			if (ray.inject_program)
-			{
-				ray.inject_uniforms = glGetUniformLocation(ray.inject_program, "u");
-				ray.inject_depth = glGetUniformLocation(ray.inject_program, "depth_texture");
-				ray.inject_irradiance = glGetUniformLocation(ray.inject_program, "irradiance_texture");
-				ray.inject_gbuffer = glGetUniformLocation(ray.inject_program, "gbuffer_texture");
-				ray.inject_split = glGetUniformLocation(ray.inject_program, "split");
-				ray.inject_results = glGetUniformLocation(ray.inject_program, "results_texture");
-				ray.inject_objects = glGetUniformLocation(ray.inject_program, "objects_texture");
-				ray.inject_cameras = glGetUniformLocation(ray.inject_program, "cameras");
-				ray.inject_grid = glGetUniformLocation(ray.inject_program, "previous_grid");
-			}
-			ray.objects_program = link(objects_source, "ray tracing objects' depth");
-			if (ray.objects_program)
-			{
-				ray.objects_uniforms = glGetUniformLocation(ray.objects_program, "u");
-				ray.objects_depth = glGetUniformLocation(ray.objects_program, "depth_texture");
-			}
-			glGenFramebuffers(1, &ray.gbuffer_framebuffer);
-			ray.hardware = 1;
-		}
-	}
-#endif
+	/* "screen" keeps to the screen's rays (Metal's are made ready when they
+	are asked for: halo_ray_tracing_set) */
+	if (strcmp(config_string("display.ray_tracing"), "screen"))
+		hardware_link();
 	glGenVertexArrays(1, &ray.vertex_array);
 	glGenFramebuffers(1, &ray.scene_framebuffer);
 	glGenFramebuffers(1, &ray.effect_framebuffer);
@@ -1139,6 +1155,92 @@ void halo_ray_tracing_debug_mode(int mode)
 	ray.enabled = mode != _ray_tracing_off;
 }
 
+/* the views in the settings overlay's order (settings_overlay.c), as F6's */
+static const int settings_views[] = { _ray_tracing_on, _ray_tracing_debug_rays, _ray_tracing_debug_split,
+	_ray_tracing_debug_occlusion, _ray_tracing_debug_depth };
+
+/* the settings as they are now (the overlay's rows) */
+void halo_ray_tracing_get(struct halo_ray_tracing_settings *settings)
+{
+	int index;
+
+	if (!ray.initialized)
+		initialize();
+	memset(settings, 0, sizeof(*settings));
+	settings->tracing = !ray.enabled ? 0 : ray.hardware ? 1 : 2;
+	for (index = 0; index < (int)(sizeof(settings_views) / sizeof(settings_views[0])); index++)
+	{
+		if (ray.mode == settings_views[index])
+			settings->view = index;
+	}
+	settings->gi = ray.gi;
+	settings->traced_lights = ray.traced_lights;
+	settings->shapes = ray.shapes;
+	settings->objects = ray.objects;
+	settings->gi_split = ray.gi_split;
+	settings->occlusion = ray.occlusion_strength;
+	settings->reflections = ray.reflection_strength;
+	settings->bounce = ray.bounce_strength;
+	settings->shadows = ray.shadow_strength;
+	settings->gi_sun = ray.gi_sun;
+	settings->gi_bounce = ray.gi_bounce;
+	settings->gi_glow = ray.gi_glow;
+	settings->gi_lights = ray.gi_lights;
+	settings->hardware_available = ray.hardware_linked || !ray.hardware_tried;
+	settings->failed = ray.failed;
+}
+
+/* takes them up at once. What the traced light has gathered over the last
+frames is dropped when what it traces changes (the traced light's mode, the
+lights, the objects' shapes, Metal's rays on or off): the next frame starts
+it again, as the first frame of a level does */
+void halo_ray_tracing_set(const struct halo_ray_tracing_settings *settings)
+{
+	int hardware, restart, was_hardware;
+
+	if (!ray.initialized)
+		initialize();
+	/* (making Metal's programs sets ray.hardware) */
+	was_hardware = ray.hardware;
+	if (settings->tracing == 1)
+		hardware_link();
+	hardware = settings->tracing == 1 && ray.hardware_linked;
+	restart = hardware != was_hardware || settings->gi != ray.gi || settings->traced_lights != ray.traced_lights ||
+		settings->shapes != ray.shapes || settings->objects != ray.objects || (settings->tracing != 0) != ray.enabled;
+	ray.enabled = settings->tracing != 0;
+	ray.hardware = hardware;
+	if (settings->view >= 0 && settings->view < (int)(sizeof(settings_views) / sizeof(settings_views[0])))
+		ray.mode = settings_views[settings->view];
+	if (ray.mode == _ray_tracing_off)
+		ray.mode = _ray_tracing_on;
+	ray.gi = settings->gi;
+	ray.traced_lights = settings->traced_lights;
+	ray.shapes = settings->shapes;
+	ray.objects = settings->objects;
+	ray.gi_split = settings->gi_split;
+	ray.occlusion_strength = settings->occlusion;
+	ray.reflection_strength = settings->reflections;
+	ray.bounce_strength = settings->bounce;
+	ray.shadow_strength = settings->shadows;
+	ray.gi_sun = settings->gi_sun;
+	ray.gi_bounce = settings->gi_bounce;
+	ray.gi_glow = settings->gi_glow;
+	ray.gi_lights = settings->gi_lights;
+	if (restart)
+	{
+		/* (no last camera: Metal's kernel takes none of its history; no last
+		frame's rays for the light buffer, which takes the game's light for
+		a frame) */
+		ray.previous_camera[12] = 0.0f;
+		ray.gi_previous = 0;
+		ray.gi_traced = 0;
+		ray.light_stages = 0;
+		platform_log("ray tracing: %s, traced light %d, lights %s, shapes %s, objects %s (the traced light starts again)",
+			!ray.enabled ? "off" : ray.hardware ? "on" : "the screen's rays", ray.gi,
+			ray.traced_lights ? "traced" : "game", ray.shapes ? "collision" : "model", ray.objects ? "on" : "off");
+	}
+}
+
 #ifdef HALO_MACOS
 /* the level's rays with Metal: the depth and normals into the shared
 texture, the rays, and the results' texture; 0 if not */
@@ -1249,6 +1351,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	{
 		platform_log("ray tracing: the shared depth texture cannot be drawn to; world-space rays off");
 		ray.hardware = 0;
+		ray.hardware_linked = 0;
 		return 0;
 	}
 	glUseProgram(ray.gbuffer_program);
