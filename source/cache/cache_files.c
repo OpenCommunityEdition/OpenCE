@@ -604,6 +604,41 @@ boolean cache_file_header_verify(
 	return TRUE;
 }
 
+#ifdef HALO_LINUX
+/* port: the builds of the released maps that play multiplayer together (a
+PAL map as the NTSC maps, port/linux/game/pal_tags.c). A map of another
+build may differ in what machines send each other, so its players cannot
+open the multiplayer menu (ui_widget.c, ui_widget_launch_widget) */
+static struct
+{
+	char const *build;
+	char const *region;
+} const cache_file_multiplayer_builds[] =
+{
+	{ "01.01.14.2342", "PAL" },
+	{ "01.10.12.2276", "NTSC" },
+	{ "01.08.15.1749", "NTSC" },
+};
+
+/* the region of the loaded map's build if it plays multiplayer, else NULL;
+build gets the build (a cache file's header need not end it) */
+char const *cache_files_multiplayer_region(
+	char build[0x20])
+{
+	short index;
+
+	csstrncpy(build, cache_file_globals.header.build, 0x20);
+	build[0x1F] = 0;
+	for (index = 0; index < NUMBEROF(cache_file_multiplayer_builds); index++)
+	{
+		if (!csstrcmp(build, cache_file_multiplayer_builds[index].build))
+			return cache_file_multiplayer_builds[index].region;
+	}
+
+	return NULL;
+}
+#endif
+
 boolean cache_files_give_time_to_precache(
 	char const *map_name)
 {

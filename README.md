@@ -1,5 +1,7 @@
 # Halo: Combat Evolved for Linux, Windows and Android
 
+[![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
+
 This project is a port of the Halo: Combat Evolved decompilation to Linux,
 Windows and Android. The decompilation is of the Xbox build 2342
 (`cachebeta.exe`, SHA-256
