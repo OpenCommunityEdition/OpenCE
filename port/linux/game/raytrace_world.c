@@ -1132,6 +1132,71 @@ static boolean emitter_color(const struct object_definition *definition, float *
 	return found;
 }
 
+/* an object's energy (a Jackal's shield, a plasma shield: a part of its
+model as it is now drawn with a transparent plasma shader): the shader's
+colour, the stronger of its facing and edge colours by their alpha; FALSE
+if it has none */
+static boolean object_plasma_color(struct object_datum *object, float *color)
+{
+	const struct object_definition *definition = object_definition_get(object->definition_index);
+	const struct model *model;
+	long region_index;
+
+	if (definition->object.model.index == NONE)
+		return FALSE;
+	model = model_definition_get(definition->object.model.index);
+	for (region_index = 0; region_index < model->regions.count; region_index++)
+	{
+		const struct model_region *region = (const struct model_region *)model->regions.address + region_index;
+		const struct model_region_permutation *permutation;
+		const struct model_geometry_view *geometry;
+		char permutation_index = object->object.region_permutations[region_index];
+		short geometry_index = NONE, level, part_index;
+
+		if (permutation_index == NONE || permutation_index >= region->permutations.count)
+			continue;
+		permutation = (const struct model_region_permutation *)region->permutations.address + permutation_index;
+		for (level = RAY_TRACED_MODEL_DETAIL_LEVEL; level >= 0 && geometry_index == NONE; level--)
+			geometry_index = permutation->geometry_indices[level];
+		if (geometry_index == NONE || geometry_index >= model->geometries.count)
+			continue;
+		geometry = (const struct model_geometry_view *)model->geometries.address + geometry_index;
+		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+		{
+			const struct model_geometry_part_view *part = (const struct model_geometry_part_view *)geometry->parts.address +
+				part_index;
+			const struct tag_reference *reference;
+			const byte *shader;
+
+			if (part->shader_index < 0 || part->shader_index >= model->shaders.count)
+				continue;
+			reference = (const struct tag_reference *)((const byte *)model->shaders.address + part->shader_index * 32);
+			if (reference->index == NONE)
+				continue;
+			shader = (const byte *)tag_get(0x73686472 /* 'shdr' */, reference->index);
+			/* (type 10, transparent plasma; its definition after the shader's
+			0x28 bytes: the facing colour at 0x64, its alpha 0x60, the edge's
+			0x74 and 0x70 - rasterizer_xbox_plasma_energy.c) */
+			if (shader && *(const short *)(shader + 0x24) == 10)
+			{
+				const float *facing = (const float *)(shader + 0x64), *edge = (const float *)(shader + 0x74);
+				float facing_alpha = PIN(*(const float *)(shader + 0x60), 0.0f, 1.0f);
+				float edge_alpha = PIN(*(const float *)(shader + 0x70), 0.0f, 1.0f);
+				int channel;
+
+				for (channel = 0; channel < 3; channel++)
+					color[channel] = MAX(facing[channel] * facing_alpha, edge[channel] * edge_alpha);
+				if (color[0] + color[1] + color[2] > 0.05f)
+					return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
+/* how bright an object's energy (object_plasma_color) is, of the emitters' */
+#define RAY_TRACED_PLASMA_INTENSITY 0.35f
+
 /* this frame's emitters near the camera, 8 floats each (the position, the
 radius, the colour, the intensity); returns how many, at most maximum */
 long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera)
@@ -1152,7 +1217,7 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		const real_point3d *at = object->object.type == _object_type_projectile ? &object->object.position :
 			&object->object.bounding_sphere_center;
 		float dx = at->x - camera[0], dy = at->y - camera[1], dz = at->z - camera[2], color[3];
-		float *out = emitters + count * 8;
+		float *out = emitters + count * 8, intensity = RAY_TRACED_EMITTER_INTENSITY;
 
 		/* (not what you carry: your weapon's glow is at the camera, and the
 		first person draws it on the gun) */
@@ -1160,7 +1225,8 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 			(player_unit != NONE && (iterator.index == player_unit ||
 				(object->object.parent_object_index != NONE &&
 					object_get_ultimate_parent(iterator.index) == player_unit))) ||
-			!emitter_color(object_definition_get(object->definition_index), color))
+			(!emitter_color(object_definition_get(object->definition_index), color) &&
+				!(object_plasma_color(object, color) && (intensity = RAY_TRACED_PLASMA_INTENSITY) > 0.0f)))
 		{
 			continue;
 		}
@@ -1172,7 +1238,7 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		out[4] = color[0];
 		out[5] = color[1];
 		out[6] = color[2];
-		out[7] = RAY_TRACED_EMITTER_INTENSITY;
+		out[7] = intensity;
 		count++;
 	}
 	return count;

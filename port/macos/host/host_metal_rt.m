@@ -760,6 +760,33 @@ static NSString *const kernel_source = @
 	/* rows run from the top: +y on screen is down */
 	"	float3 P = camera + forward * z + right * (ndc.x * t * aspect * z) - up * (ndc.y * t * z);\n"
 	"	float3 N = normalize(right * g.y - up * g.z + forward * g.w);\n"
+	/* a level pixel, with the drawn level: its surface exactly - a ray from
+	   the camera through it, to the level's triangle there, and that
+	   triangle's facing (the depth's point and the facing from its
+	   differences drift at a glancing angle and far off: a facing tipped
+	   into the ground had the rays leave from under it, and black) */
+	"	if (c[23] > 0.5 && g.x > 0.0 && gi_ready != 0u)\n"
+	"	{\n"
+	"		float3 to_p = P - camera;\n"
+	"		float dist = length(to_p);\n"
+	"		float3 view_dir = to_p / max(dist, 1e-4);\n"
+	"		ray primary(camera, view_dir, c[12], dist * 1.1 + 0.5);\n"
+	"		hit_info ph = closest_hit(primary, world, 1u, CUT_ARGS);\n"
+	"		if (ph.type != intersection_type::none && ph.instance_id == 0u && abs(ph.distance - dist) < dist * 0.05 + 0.1)\n"
+	"		{\n"
+	"			uint pb = ph.primitive_id * 3u;\n"
+	"			float3 a0 = float3(level_vertices[indices[pb] * 3u], level_vertices[indices[pb] * 3u + 1u], level_vertices[indices[pb] * 3u + 2u]);\n"
+	"			float3 a1 = float3(level_vertices[indices[pb + 1u] * 3u], level_vertices[indices[pb + 1u] * 3u + 1u], level_vertices[indices[pb + 1u] * 3u + 2u]);\n"
+	"			float3 a2 = float3(level_vertices[indices[pb + 2u] * 3u], level_vertices[indices[pb + 2u] * 3u + 1u], level_vertices[indices[pb + 2u] * 3u + 2u]);\n"
+	"			float3 Ng = cross(a1 - a0, a2 - a0);\n"
+	"			if (dot(Ng, Ng) > 1e-12)\n"
+	"			{\n"
+	"				Ng = normalize(Ng);\n"
+	"				N = dot(Ng, view_dir) > 0.0 ? -Ng : Ng;\n"
+	"				P = camera + view_dir * ph.distance;\n"
+	"			}\n"
+	"		}\n"
+	"	}\n"
 	"	float3 tangent = normalize(abs(N.z) < 0.9 ? cross(N, float3(0, 0, 1)) : cross(N, float3(1, 0, 0)));\n"
 	"	float3 bitangent = cross(N, tangent);\n"
 	/* the instances' masks: 1 the level, 2 the objects, 4 the player's body
@@ -2363,7 +2390,10 @@ int host_rt_trace(const float *camera, int width, int height)
 		}
 		else
 			rt.overloaded = 0;
-		if (ms > 22.0 && rt.shed < 7)
+		/* (7 steps, and one more for each halving of the rays a pixel) */
+		int most = 7 + (camera[93] >= 8.0f ? 3 : camera[93] >= 4.0f ? 2 : camera[93] >= 2.0f ? 1 : 0);
+
+		if (ms > 22.0 && rt.shed < most)
 		{
 			rt.shed++;
 			rt.calm = 0;
@@ -2446,10 +2476,23 @@ int host_rt_trace(const float *camera, int width, int height)
 	}
 	[encoder setBuffer:rt.probe offset:0 atIndex:5];
 	[encoder setBytes:rt.lights length:sizeof(rt.lights) atIndex:6];
+	/* the governor's steps: first the rays a pixel asked for, halved a step
+	at a time down to one; then the rest (shed_rest) - the traced light's
+	samples thinned (every 8th, 16th frame a pixel), a bounce fewer, the
+	lights halved, one bounce. More rays asked for than the frames allow were
+	paid for, then thinned away, as grain */
+	float shed_rays = camera[93] >= 1.0f ? (camera[93] > 8.0f ? 8.0f : floorf(camera[93])) : 1.0f;
+	int shed_rest = rt.shed;
+
+	while (shed_rest > 0 && shed_rays > 1.0f)
+	{
+		shed_rays = floorf(shed_rays / 2.0f);
+		shed_rest--;
+	}
 	{
 		/* (the traced light's samples thin first - its period, below - then
 		the lights and the emitters halve) */
-		int cut = rt.shed > 2 ? rt.shed - 2 : 0;
+		int cut = shed_rest > 2 ? shed_rest - 2 : 0;
 		unsigned int light_count = rt.light_count >> cut, emitter_count = rt.emitter_count >> cut;
 
 		/* (the 4 nearest always: the flashlight, what is at hand) */
@@ -2470,7 +2513,7 @@ int host_rt_trace(const float *camera, int width, int height)
 		memcpy(constants, camera, 84 * sizeof(float));
 		/* (the settings' bounces and rays a pixel, 92 and 93) */
 		constants[92] = camera[92];
-		constants[93] = camera[93];
+		constants[93] = shed_rays;
 		/* (the exposure: HALO_RT_EXPOSURE, a number, holds it) */
 		if (!(rt.exposure > 0.0f))
 			rt.exposure = 1.0f;
@@ -2487,7 +2530,7 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* (the traced light's new samples: every 4th frame a pixel, every
 		8th or 16th as the governor sheds) */
 		if (!(camera[63] > 0.0f))
-			constants[63] = (float)(4 << (rt.shed < 2 ? rt.shed : 2));
+			constants[63] = (float)(4 << (shed_rest < 2 ? shed_rest : 2));
 		/* (the path tracer's bounces: 3, 2 once the governor sheds, 1 from
 		its third step) */
 		{
@@ -2495,7 +2538,7 @@ int host_rt_trace(const float *camera, int width, int height)
 			sheds, one only from its third step) */
 			float bounces = camera[92] >= 1.0f ? (camera[92] > 4.0f ? 4.0f : camera[92]) : 3.0f;
 
-			constants[85] = rt.shed >= 3 ? 1.0f : rt.shed >= 1 && bounces > 1.0f ? bounces - 1.0f : bounces;
+			constants[85] = shed_rest >= 3 ? 1.0f : shed_rest >= 1 && bounces > 1.0f ? bounces - 1.0f : bounces;
 		}
 		/* (the most one ray to a glowing triangle brings: HALO_RT_GLOW_CLAMP) */
 		constants[86] = getenv("HALO_RT_GLOW_CLAMP") ? (float)atof(getenv("HALO_RT_GLOW_CLAMP")) : 4.0f;
