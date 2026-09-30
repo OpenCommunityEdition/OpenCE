@@ -1223,7 +1223,8 @@ void halo_ray_tracing_set(const struct halo_ray_tracing_settings *settings)
 	was_hardware = ray.hardware;
 	if (settings->tracing == 1)
 		hardware_link();
-	hardware = settings->tracing == 1 && ray.hardware_linked;
+	/* (off keeps which rays F9 turns back on: Metal's, or the screen's) */
+	hardware = settings->tracing == 1 ? ray.hardware_linked : settings->tracing == 2 ? 0 : ray.hardware;
 	restart = hardware != was_hardware || settings->gi != ray.gi || settings->traced_lights != ray.traced_lights ||
 		settings->shapes != ray.shapes || settings->objects != ray.objects || (settings->tracing != 0) != ray.enabled;
 	ray.enabled = settings->tracing != 0;
