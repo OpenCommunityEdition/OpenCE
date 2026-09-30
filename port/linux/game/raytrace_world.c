@@ -595,29 +595,6 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 				vertex_size = (long)sizeof(struct model_vertex_view);
 			}
 
-			/* (HALO_RT_LOG_SHAPES: each model's parts' data, once) */
-			if (getenv("HALO_RT_LOG_SHAPES") && part_index == 0 && region_index == 0)
-			{
-				extern void platform_log(const char *format, ...);
-				static long logged[64];
-				static int logged_count;
-				int seen = 0, k;
-
-				for (k = 0; k < logged_count; k++)
-					seen |= logged[k] == definition->object.model.index;
-				if (!seen && logged_count < 64)
-				{
-					logged[logged_count++] = definition->object.model.index;
-					platform_log("ray tracing model %ld: part flags %lx, triangles block %ld at %p, compressed %ld at %p, "
-						"uncompressed %ld at %p, triangle buffer type %d count %ld at %p, vertex buffer type %d count %ld "
-						"offset %ld at %p", definition->object.model.index, (unsigned long)part->flags,
-						(long)part->triangles.count, part->triangles.address, (long)part->compressed_vertices.count,
-						part->compressed_vertices.address, (long)part->uncompressed_vertices.count,
-						part->uncompressed_vertices.address, part->triangle_buffer.type, part->triangle_buffer.count,
-						part->triangle_buffer.base_address, part->vertex_buffer.type, part->vertex_buffer.count,
-						part->vertex_buffer.offset, part->vertex_buffer.base_address);
-				}
-			}
 			if ((part->flags & 1) || !strip || !vertex_data || vertex_count <= 0 || part->triangle_buffer.type != 1 ||
 				(part->vertex_buffer.type != 4 && part->vertex_buffer.type != 5 && part->vertex_buffer.base_address))
 			{
@@ -674,65 +651,6 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 						u_scale *= map_u != 0.0f ? map_u : 1.0f;
 						v_scale *= map_v != 0.0f ? map_v : 1.0f;
 					}
-				}
-			}
-			/* (HALO_RT_LOG_SHAPES: each model's first parts' shaders, once) */
-			if (getenv("HALO_RT_LOG_SHAPES") && part_index < 3 && part->shader_index >= 0 &&
-				part->shader_index < model->shaders.count)
-			{
-				extern void platform_log(const char *format, ...);
-				static long seen[256];
-				static int seen_count;
-				long key = definition->object.model.index * 64 + geometry_index * 4 + part_index;
-				int k, found = 0;
-
-				for (k = 0; k < seen_count; k++)
-					found |= seen[k] == key;
-				if (!found && seen_count < 256)
-				{
-					const struct tag_reference *reference = (const struct tag_reference *)
-						((const byte *)model->shaders.address + part->shader_index * 32);
-					const byte *part_shader = reference->index != NONE ? (const byte *)tag_get(0x73686472 /* 'shdr' */,
-						reference->index) : NULL;
-
-					seen[seen_count++] = key;
-					if (part_shader)
-						platform_log("ray tracing: %s part %d: shader %s, type %d, flags %04x",
-							tag_get_name(definition->object.model.index), part_index, tag_get_name(reference->index),
-							*(const short *)(part_shader + 0x24), *(const unsigned short *)(part_shader + 0x28));
-				}
-			}
-			/* (HALO_RT_LOG_SHAPES: a part whose model-space vertices are far
-			off, with its buffers, once each) */
-			if (getenv("HALO_RT_LOG_SHAPES"))
-			{
-				extern void platform_log(const char *format, ...);
-				static long logged[128];
-				static int logged_count;
-				long key = definition->object.model.index * 4096 + geometry_index * 64 + part_index, bad = 0, v;
-				int seen = 0, k;
-
-				for (v = 0; v < vertex_count; v++)
-				{
-					const float *position = (const float *)(vertex_data + v * vertex_size);
-
-					if (!(position[0] * position[0] + position[1] * position[1] + position[2] * position[2] < 1e4f))
-						bad++;
-				}
-				for (k = 0; k < logged_count; k++)
-					seen |= logged[k] == key;
-				if (bad && !seen && logged_count < 128)
-				{
-					const unsigned long *hardware = (const unsigned long *)part->vertex_buffer.hardware_format;
-
-					logged[logged_count++] = key;
-					platform_log("ray tracing: %s geometry %d part %d: %ld of %ld vertices far off; vertex buffer type %d "
-						"count %ld offset %ld at %p, hardware %p (%08lx %08lx %08lx); strip %ld at %p; part flags %lx",
-						tag_get_name(definition->object.model.index), geometry_index, part_index, bad, vertex_count,
-						part->vertex_buffer.type, part->vertex_buffer.count, part->vertex_buffer.offset,
-						part->vertex_buffer.base_address, hardware, hardware ? hardware[0] : 0, hardware ? hardware[1] : 0,
-						hardware ? hardware[2] : 0, part->triangle_buffer.count, part->triangle_buffer.base_address,
-						(unsigned long)part->flags);
 				}
 			}
 			for (index = 0; index + 2 < strip_count && count < room; index++)
@@ -861,7 +779,6 @@ static long object_shapes(long object_index, struct object_datum *object, float 
 {
 	const struct object_definition *definition = object_definition_get(object->definition_index);
 	const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
-	float radius = object->object.bounding_sphere_radius;
 	long count = 0;
 
 	/* the drawn model */
@@ -1740,120 +1657,8 @@ static void level_build(const struct structure_bsp *bsp)
 			free(triangle_materials);
 	}
 	level.materials_changed = TRUE;
-	if (getenv("HALO_RT_LOG_SHAPES"))
-	{
-		long cutouts = 0, logged = 0;
-
-		for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
-		{
-			const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
-				struct structure_lightmap);
-			long material_index;
-
-			for (material_index = 0; material_index < lightmap->materials.count; material_index++)
-			{
-				const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials,
-					material_index, struct structure_material);
-				const struct shader *shader = material->shader.index != NONE ?
-					shader_definition_get(material->shader.index) : NULL;
-
-				if (shader && shader->base.type == _ray_level_shader_type_environment &&
-					(*(const unsigned short *)((const byte *)shader + 0x28) & 1))
-				{
-					cutouts++;
-					if (logged++ < 8)
-						platform_log("ray tracing: alpha-tested level material %s, %ld triangles",
-							tag_get_name(material->shader.index), (long)material->surface_count);
-				}
-				else if (shader && shader->base.type != _ray_level_shader_type_environment && logged < 16)
-				{
-					logged++;
-					platform_log("ray tracing: level material %s, shader type %d", tag_get_name(material->shader.index),
-						shader->base.type);
-				}
-			}
-		}
-		platform_log("ray tracing: %ld alpha-tested level materials", cutouts);
-	}
 	platform_log("ray tracing: the level's bounds %.1f..%.1f %.1f..%.1f %.1f..%.1f", bsp->world_bounds.x0,
 		bsp->world_bounds.x1, bsp->world_bounds.y0, bsp->world_bounds.y1, bsp->world_bounds.z0, bsp->world_bounds.z1);
-	/* (the brightest glowing materials, where they are: for test cameras) */
-	{
-		long logged = 0, index;
-		float threshold = 1e30f;
-
-		while (logged < (getenv("HALO_RT_LOG_SHAPES") ? 40 : 6))
-		{
-			float best = 0.0f;
-			long best_index = NONE, lightmap_best = 0, material_best = 0;
-
-			index = 0;
-			for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
-			{
-				const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
-					struct structure_lightmap);
-				long material_index;
-
-				for (material_index = 0; material_index < lightmap->materials.count; material_index++, index++)
-				{
-					const float *m = level.materials + index * RAY_LEVEL_MATERIAL_FLOATS;
-					float power = m[4] + m[5] + m[6];
-
-					if (power > best && power < threshold)
-					{
-						best = power;
-						best_index = index;
-						lightmap_best = lightmap_index;
-						material_best = material_index;
-					}
-				}
-			}
-			if (best_index == NONE)
-				break;
-			{
-				const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_best,
-					struct structure_lightmap);
-				const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials, material_best,
-					struct structure_material);
-
-				const byte *vertices = (const byte *)material->compressed_vertex_data.address;
-				float center[3] = { 0.0f, 0.0f, 0.0f };
-				long vertex_index;
-
-				for (vertex_index = 0; vertices && vertex_index < material->vertices.count; vertex_index++)
-				{
-					const float *point = (const float *)(vertices + vertex_index * _ray_level_vertex_size);
-
-					center[0] += point[0] / (float)material->vertices.count;
-					center[1] += point[1] / (float)material->vertices.count;
-					center[2] += point[2] / (float)material->vertices.count;
-				}
-				{
-					const float *glow = level.materials + best_index * RAY_LEVEL_MATERIAL_FLOATS + 4;
-
-					platform_log("ray tracing: glowing material %s: %.2f (%.2f %.2f %.2f), %ld vertices about %.1f %.1f %.1f",
-						material->shader.index != NONE ? tag_get_name(material->shader.index) : "?", best, glow[0], glow[1],
-						glow[2], (long)material->vertices.count, center[0], center[1], center[2]);
-				}
-				/* (and its first vertex, and the way it faces - its packed normal,
-				11, 11 and 10 bits: for test cameras in front of it) */
-				if (vertices && material->vertices.count > 0)
-				{
-					const float *point = (const float *)vertices;
-					unsigned long packed = *(const unsigned long *)(vertices + 12);
-					long x = (long)(packed & 0x7FF), y = (long)((packed >> 11) & 0x7FF), z = (long)(packed >> 22);
-
-					x = x >= 1024 ? x - 2048 : x;
-					y = y >= 1024 ? y - 2048 : y;
-					z = z >= 512 ? z - 1024 : z;
-					platform_log("ray tracing:   a vertex %.2f %.2f %.2f facing %.2f %.2f %.2f", point[0], point[1], point[2],
-						(float)x / 1023.0f, (float)y / 1023.0f, (float)z / 511.0f);
-				}
-			}
-			threshold = best;
-			logged++;
-		}
-	}
 }
 
 /* the active BSP's drawn triangles: returns its generation, which changes
@@ -1954,14 +1759,6 @@ boolean halo_ray_tracing_level_materials(const float **materials, long *count)
 			{
 				level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 4 + channel] += RAY_SELF_ILLUMINATION_POWER *
 					(colors[channel] * sum[0] + colors[3 + channel] * sum[1] + colors[6 + channel] * sum[2] * 0.5f);
-			}
-			{
-				static long logged;
-				const float *glow = level.materials + index * RAY_LEVEL_MATERIAL_FLOATS + 4;
-
-				if (logged++ < 24)
-					platform_log("ray tracing: self-illuminated material %ld glows %.2f %.2f %.2f", index, glow[0], glow[1],
-						glow[2]);
 			}
 			level.self_maps[index] = NULL;
 			level.materials_changed = TRUE;
@@ -2096,30 +1893,6 @@ boolean halo_ray_tracing_sky(float *sky)
 			out[6] = cosf(PIN(diameter, 0.0f, 3.0f) * 0.5f);
 			out[7] = 1.0f;
 			fill++;
-		}
-	}
-	{
-		static const void *logged;
-
-		if (logged != view)
-		{
-			logged = view;
-			for (index = 0; index < view->lights.count; index++)
-			{
-				const struct sky_light_view *light = (const struct sky_light_view *)view->lights.address + index;
-				const float *color = (const float *)((const byte *)light + 0x50);
-				real_vector3d vector;
-
-				vector3d_from_euler_angles2d(&vector, &light->direction);
-				platform_log("sky light %ld: flags %08lx colour %.2f %.2f %.2f power %.2f dir %.2f %.2f %.2f diameter %.3f flare %d",
-					index, *(const unsigned long *)((const byte *)light + 0x4C), color[0], color[1], color[2],
-					*(const float *)((const byte *)light + 0x5C), vector.i, vector.j, vector.k,
-					*(const float *)((const byte *)light + 0x70), light->lens_flare.index != NONE);
-			}
-			platform_log("sky: indoor ambient %.2f %.2f %.2f x %.2f, outdoor %.2f %.2f %.2f x %.2f",
-				((const float *)(raw + 0x38))[0], ((const float *)(raw + 0x38))[1], ((const float *)(raw + 0x38))[2],
-				*(const float *)(raw + 0x44), ((const float *)(raw + 0x48))[0], ((const float *)(raw + 0x48))[1],
-				((const float *)(raw + 0x48))[2], *(const float *)(raw + 0x54));
 		}
 	}
 	for (index = 0; index < view->lights.count; index++)
