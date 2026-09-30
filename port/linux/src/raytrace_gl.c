@@ -55,7 +55,7 @@ unsigned char halo_ray_tracing_sun(float *direction);
 /* the dynamic lights (source/objects/object_lights.c): 8 floats each */
 long halo_ray_tracing_lights(float *lights, long maximum);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
@@ -873,14 +873,15 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */
 	{
-		static float transforms[511 * 12];
-		static unsigned char masks[511];
-		long count = ray.objects ? halo_ray_tracing_objects(transforms, masks, 511, position, camera + 28) : 0;
+		/* (their triangles, at most the host's 65536) */
+		static float triangles[65536 * 9];
+		static unsigned char groups[65536];
+		long count = ray.objects ? halo_ray_tracing_objects(triangles, groups, 65536, position, camera + 28) : 0;
 
 		if (!ray.objects)
 			camera[31] = 0.0f;
 
-		host_rt_set_objects(transforms, masks, (int)count);
+		host_rt_set_objects(triangles, groups, (int)count);
 	}
 	/* the dynamic lights, for their shadows */
 	{

@@ -396,15 +396,18 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 	return generation;
 }
 
-/* the objects as shapes for the rays: the marines, each an ellipsoid a
-little larger than its box (the one in the open as the player's body,
-whose shadow only the rays draw) */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+/* the objects as triangles for the rays: the marines, each its box (as a
+unit's collision model is its shape), wound counterclockwise seen from
+outside; the one in the open as the player's body, whose shadow only the
+rays draw */
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere)
 {
 	/* view space: x, y (up), z (forward); the world's x, y, z are the
 	view's x, z, y */
 	static const float boxes[2][6] = { { 3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f }, { -2.4f, -1.0f, 8.8f, -1.8f, 0.8f, 9.4f } };
+	static const int faces[6][4] = { { 0, 2, 6, 4 }, { 1, 5, 7, 3 }, { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, { 0, 1, 3, 2 },
+		{ 4, 6, 7, 5 } };
 	long count = 0, index;
 
 	(void)camera;
@@ -415,22 +418,38 @@ long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maxi
 	player_sphere[3] = 1.0f;
 	if (getenv("RT_NO_OBJECTS"))
 		return 0;
-	for (index = 0; index < 2 && count < maximum; index++)
+	for (index = 0; index < 2; index++)
 	{
 		const float *b = boxes[index];
-		float *m = transforms + count * 12;
-		float half[3] = { (b[3] - b[0]) * 0.65f, (b[5] - b[2]) * 0.65f, (b[4] - b[1]) * 0.65f };
-		float center[3] = { (b[0] + b[3]) * 0.5f, (b[2] + b[5]) * 0.5f, (b[1] + b[4]) * 0.5f };
-		int row;
+		float corners[8][3], center[3];
+		int corner, face, half;
 
-		for (row = 0; row < 3; row++)
+		for (corner = 0; corner < 8; corner++)
 		{
-			m[row * 4 + 0] = row == 0 ? half[0] : 0.0f;
-			m[row * 4 + 1] = row == 1 ? half[1] : 0.0f;
-			m[row * 4 + 2] = row == 2 ? half[2] : 0.0f;
-			m[row * 4 + 3] = center[row];
+			corners[corner][0] = corner & 1 ? b[3] : b[0];
+			corners[corner][1] = corner & 4 ? b[5] : b[2];
+			corners[corner][2] = corner & 2 ? b[4] : b[1];
 		}
-		masks[count++] = index == 1 ? 4 : (1 << 3 | 2);
+		center[0] = (b[0] + b[3]) * 0.5f;
+		center[1] = (b[2] + b[5]) * 0.5f;
+		center[2] = (b[1] + b[4]) * 0.5f;
+		for (face = 0; face < 6; face++)
+		{
+			for (half = 0; half < 2 && count < maximum; half++)
+			{
+				const float *p = corners[faces[face][0]], *q = corners[faces[face][half ? 2 : 1]];
+				const float *r = corners[faces[face][half ? 3 : 2]];
+				float u[3] = { q[0] - p[0], q[1] - p[1], q[2] - p[2] }, v[3] = { r[0] - p[0], r[1] - p[1], r[2] - p[2] };
+				float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+				float out = n[0] * (p[0] - center[0]) + n[1] * (p[1] - center[1]) + n[2] * (p[2] - center[2]);
+				float *t = triangles + count * 9;
+
+				memcpy(t, p, sizeof(float) * 3);
+				memcpy(t + 3, out < 0.0f ? r : q, sizeof(float) * 3);
+				memcpy(t + 6, out < 0.0f ? q : r, sizeof(float) * 3);
+				groups[count++] = index == 1 ? 4 : (1 << 3 | 2);
+			}
+		}
 	}
 	return count;
 }

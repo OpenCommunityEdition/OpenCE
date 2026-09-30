@@ -200,12 +200,14 @@ added onto the lightmaps' light; the lighting darkens only their share of a
 pixel's light (the stages above), by the share of their rays that arrive.
 
 The characters and the vehicles are in Metal's rays too
-(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): a
-biped as its skeleton's bones, each an ellipsoid from its node to its
-parent's as the animation poses it; a vehicle as its bounding sphere
-flattened along its axes. They are instances beside the level's mesh, in a
-scene rebuilt each frame, and the rays choose what they see by the
-instances' masks:
+(`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`), as
+their collision models: the meshes the game tests its bullets against, a
+mesh for each node's region as it is now (its damage permutation), placed
+each frame by the node's matrix as the animation poses it. A unit without
+them is its skeleton's bones, each an ellipsoid (bipeds), or its bounding
+sphere flattened along its axes. Each object is a mesh of its own beside the
+level's, in a scene rebuilt each frame, and the rays choose what they see
+by the instances' masks:
 
 | Rays | See |
 | --- | --- |
@@ -218,8 +220,7 @@ instances' masks:
 So the ground darkens under the marines and the vehicles, and in the sun
 you see your own shadow, which the game never drew in the first person.
 
-Each object is its own small mesh (its bone shapes, 20 triangles each,
-placed on the CPU), rebuilt each frame, and only the objects within 25
+Each object's mesh is rebuilt each frame, and only the objects within 25
 world units of the camera (at most 32) are in. Rays that can find only the
 level (the reflections, and the occlusion away from every object's bounding
 sphere) go through the level's own structure, not the scene's instances: on

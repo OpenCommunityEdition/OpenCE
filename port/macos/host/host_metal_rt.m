@@ -60,13 +60,11 @@ typedef int EGLint_;
 
 #define HOST_RT_MAXIMUM_OBJECTS 511
 #define HOST_RT_MAXIMUM_LIGHTS 8
-/* the objects' sphere: an icosahedron (enough for soft shadows and
-occlusion, and quick to trace) */
-#define HOST_RT_SPHERE_TRIANGLES 20
 /* the objects, each its own mesh (its bounds its own, so that a ray far
-from them all walks none), and their shapes each at most */
+from them all walks none), and its triangles at most; and all of theirs */
 #define HOST_RT_GROUPS 32
-#define HOST_RT_GROUP_SHAPES 64
+#define HOST_RT_GROUP_TRIANGLES 8192
+#define HOST_RT_OBJECT_TRIANGLES 65536
 
 static struct
 {
@@ -76,13 +74,9 @@ static struct
 	id<MTLComputePipelineState> pipeline;
 	id<MTLAccelerationStructure> world;
 	unsigned int world_generation;
-	/* the objects (host_rt_set_objects): a unit sphere's triangles under each
-	one's transform, in two meshes rebuilt each frame (the objects', the
-	player's body's), and the scene of the level and the two. The buffers
-	the frame writes are in rings of three: the GPU may still read the last
-	ones. */
-	float sphere[HOST_RT_SPHERE_TRIANGLES * 3 * 3];
-	int sphere_ready;
+	/* the objects (host_rt_set_objects): a mesh for each, rebuilt each
+	frame, and the scene of the level and them. The buffers the frame writes
+	are in rings of three: the GPU may still read the last ones. */
 	id<MTLAccelerationStructure> bodies[HOST_RT_GROUPS], scene;
 	NSArray<id<MTLAccelerationStructure>> *scene_structures;
 	float spheres[HOST_RT_GROUPS + 1][4];
@@ -91,8 +85,10 @@ static struct
 	unsigned int sphere_count;
 	id<MTLBuffer> body_vertices[3][HOST_RT_GROUPS], body_scratch[HOST_RT_GROUPS], instance_buffers[3], scene_scratch;
 	int instance_ring;
-	float object_transforms[HOST_RT_MAXIMUM_OBJECTS * 12];
-	unsigned char object_masks[HOST_RT_MAXIMUM_OBJECTS];
+	/* the objects' triangles in the world this frame, and each one's group
+	(its object above, its kind - 2 an object, 4 the player's body - below) */
+	float *object_triangles;
+	unsigned char *object_groups;
 	int object_count;
 	id<MTLTexture> textures[3];
 	unsigned int gl_textures[3];
@@ -538,100 +534,24 @@ int host_rt_set_world(uint32_t generation, const float *vertices, int vertex_cou
 	return 1;
 }
 
-/* a unit sphere (an icosahedron, 20 triangles, or split once, 80), wound as the
-level's are, counterclockwise seen from outside */
-static void make_sphere(void)
+/* this frame's objects: their triangles in the world (9 floats each) and
+each one's group (its object, 0 to 31, above 3 bits of its kind: 2 an
+object, 4 the player's body) */
+void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count)
 {
-	static const float t = 1.6180340f;
-	float corners[12][3] = { { -1, t, 0 }, { 1, t, 0 }, { -1, -t, 0 }, { 1, -t, 0 }, { 0, -1, t }, { 0, 1, t },
-		{ 0, -1, -t }, { 0, 1, -t }, { t, 0, -1 }, { t, 0, 1 }, { -t, 0, -1 }, { -t, 0, 1 } };
-	static const int faces[20][3] = { { 0, 11, 5 }, { 0, 5, 1 }, { 0, 1, 7 }, { 0, 7, 10 }, { 0, 10, 11 }, { 1, 5, 9 },
-		{ 5, 11, 4 }, { 11, 10, 2 }, { 10, 7, 6 }, { 7, 1, 8 }, { 3, 9, 4 }, { 3, 4, 2 }, { 3, 2, 6 }, { 3, 6, 8 },
-		{ 3, 8, 9 }, { 4, 9, 5 }, { 2, 4, 11 }, { 6, 2, 10 }, { 8, 6, 7 }, { 9, 8, 1 } };
-	float *vertices = rt.sphere;
-	int face, corner, count = 0;
-
-	for (corner = 0; corner < 12; corner++)
+	if (!rt.object_triangles)
 	{
-		float length = sqrtf(corners[corner][0] * corners[corner][0] + corners[corner][1] * corners[corner][1] +
-			corners[corner][2] * corners[corner][2]);
-
-		corners[corner][0] /= length;
-		corners[corner][1] /= length;
-		corners[corner][2] /= length;
+		rt.object_triangles = malloc(HOST_RT_OBJECT_TRIANGLES * 9 * sizeof(float));
+		rt.object_groups = malloc(HOST_RT_OBJECT_TRIANGLES);
+		if (!rt.object_triangles || !rt.object_groups)
+			return;
 	}
-	for (face = 0; face < 20 && HOST_RT_SPHERE_TRIANGLES == 20; face++)
-	{
-		const float *a = corners[faces[face][0]], *b = corners[faces[face][1]], *c = corners[faces[face][2]];
-		float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
-		float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
-		int flip = n[0] * a[0] + n[1] * a[1] + n[2] * a[2] < 0.0f, k;
-
-		/* (the corners a little out, the faces a little in: about the sphere) */
-		for (k = 0; k < 3; k++)
-		{
-			const float *vertex = (const float *[]){ a, b, c }[flip && k ? 3 - k : k];
-
-			vertices[count * 3 + 0] = vertex[0] * 1.12f;
-			vertices[count * 3 + 1] = vertex[1] * 1.12f;
-			vertices[count * 3 + 2] = vertex[2] * 1.12f;
-			count++;
-		}
-	}
-	for (face = 0; face < 20 && HOST_RT_SPHERE_TRIANGLES == 80; face++)
-	{
-		const float *a = corners[faces[face][0]], *b = corners[faces[face][1]], *c = corners[faces[face][2]];
-		float ab[3], bc[3], ca[3];
-		const float *triangles[4][3] = { { a, ab, ca }, { ab, b, bc }, { ca, bc, c }, { ab, bc, ca } };
-		int i, k;
-
-		for (i = 0; i < 3; i++)
-		{
-			ab[i] = a[i] + b[i];
-			bc[i] = b[i] + c[i];
-			ca[i] = c[i] + a[i];
-		}
-		for (i = 0; i < 3; i++)
-		{
-			float *m = i == 0 ? ab : i == 1 ? bc : ca;
-			float length = sqrtf(m[0] * m[0] + m[1] * m[1] + m[2] * m[2]);
-
-			m[0] /= length;
-			m[1] /= length;
-			m[2] /= length;
-		}
-		for (i = 0; i < 4; i++)
-		{
-			const float *p = triangles[i][0], *q = triangles[i][1], *r = triangles[i][2];
-			float u[3] = { q[0] - p[0], q[1] - p[1], q[2] - p[2] }, v[3] = { r[0] - p[0], r[1] - p[1], r[2] - p[2] };
-			float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
-			int flip = n[0] * p[0] + n[1] * p[1] + n[2] * p[2] < 0.0f;
-
-			for (k = 0; k < 3; k++)
-			{
-				const float *vertex = triangles[i][flip && k ? 3 - k : k];
-
-				vertices[count * 3 + 0] = vertex[0];
-				vertices[count * 3 + 1] = vertex[1];
-				vertices[count * 3 + 2] = vertex[2];
-				count++;
-			}
-		}
-	}
-	rt.sphere_ready = 1;
-}
-
-/* this frame's objects: each a unit sphere under a 3x4 transform (rows, 12
-floats: the ellipsoid's axes as columns, then its center), with its mask (2
-an object, 4 the player's body) */
-void host_rt_set_objects(const float *transforms, const unsigned char *masks, int count)
-{
 	if (count < 0)
 		count = 0;
-	if (count > HOST_RT_MAXIMUM_OBJECTS)
-		count = HOST_RT_MAXIMUM_OBJECTS;
-	memcpy(rt.object_transforms, transforms, (size_t)count * 12 * sizeof(float));
-	memcpy(rt.object_masks, masks, (size_t)count);
+	if (count > HOST_RT_OBJECT_TRIANGLES)
+		count = HOST_RT_OBJECT_TRIANGLES;
+	memcpy(rt.object_triangles, triangles, (size_t)count * 9 * sizeof(float));
+	memcpy(rt.object_groups, groups, (size_t)count);
 	rt.object_count = count;
 }
 
@@ -645,11 +565,9 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	id<MTLBuffer> buffer;
 	id<MTLAccelerationStructureCommandEncoder> encoder;
 	int index, group, ring = rt.instance_ring, count;
-	int group_shapes[HOST_RT_GROUPS] = { 0 };
+	int group_triangles[HOST_RT_GROUPS] = { 0 };
 	unsigned char group_masks[HOST_RT_GROUPS] = { 0 };
 
-	if (!rt.sphere_ready)
-		make_sphere();
 	if (!rt.instance_buffers[0])
 	{
 		for (index = 0; index < 3; index++)
@@ -657,33 +575,24 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			rt.instance_buffers[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) *
 				sizeof(MTLAccelerationStructureInstanceDescriptor) options:MTLResourceStorageModeShared];
 			for (group = 0; group < HOST_RT_GROUPS; group++)
-				rt.body_vertices[index][group] = [rt.device newBufferWithLength:HOST_RT_GROUP_SHAPES *
-					sizeof(rt.sphere) options:MTLResourceStorageModeShared];
+				rt.body_vertices[index][group] = [rt.device newBufferWithLength:HOST_RT_GROUP_TRIANGLES * 9 *
+					sizeof(float) options:MTLResourceStorageModeShared];
 		}
 	}
 	rt.instance_ring = (ring + 1) % 3;
-	/* each object's shapes, placed */
+	/* each object's triangles, into its mesh */
 	for (index = 0; index < rt.object_count; index++)
 	{
-		unsigned char mask = rt.object_masks[index];
-		int shape, vertex;
+		unsigned char mask = rt.object_groups[index];
 		float *vertices;
-		const float *m = &rt.object_transforms[index * 12];
 
 		group = mask >> 3;
-		if (group >= HOST_RT_GROUPS || group_shapes[group] >= HOST_RT_GROUP_SHAPES)
+		if (group >= HOST_RT_GROUPS || group_triangles[group] >= HOST_RT_GROUP_TRIANGLES)
 			continue;
 		group_masks[group] = mask & 7;
-		shape = group_shapes[group]++;
-		vertices = (float *)rt.body_vertices[ring][group].contents + shape * HOST_RT_SPHERE_TRIANGLES * 9;
-		for (vertex = 0; vertex < HOST_RT_SPHERE_TRIANGLES * 3; vertex++)
-		{
-			const float *v = &rt.sphere[vertex * 3];
-
-			vertices[vertex * 3 + 0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
-			vertices[vertex * 3 + 1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
-			vertices[vertex * 3 + 2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
-		}
+		vertices = (float *)rt.body_vertices[ring][group].contents + group_triangles[group] * 9;
+		memcpy(vertices, &rt.object_triangles[index * 9], 9 * sizeof(float));
+		group_triangles[group]++;
 	}
 	encoder = [commands accelerationStructureCommandEncoder];
 	structures = [NSMutableArray arrayWithObject:rt.world];
@@ -704,7 +613,7 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
 		MTLPrimitiveAccelerationStructureDescriptor *mesh;
 
-		if (!group_shapes[group])
+		if (!group_triangles[group])
 			continue;
 		geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
 		geometry.vertexBuffer = rt.body_vertices[ring][group];
@@ -717,7 +626,7 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			/* sized for the most shapes, once */
 			MTLAccelerationStructureSizes sizes;
 
-			geometry.triangleCount = HOST_RT_GROUP_SHAPES * HOST_RT_SPHERE_TRIANGLES;
+			geometry.triangleCount = HOST_RT_GROUP_TRIANGLES;
 			sizes = [rt.device accelerationStructureSizesWithDescriptor:mesh];
 			rt.bodies[group] = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
 			rt.body_scratch[group] = [rt.device newBufferWithLength:sizes.buildScratchBufferSize
@@ -728,7 +637,7 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 				return 0;
 			}
 		}
-		geometry.triangleCount = (NSUInteger)(group_shapes[group] * HOST_RT_SPHERE_TRIANGLES);
+		geometry.triangleCount = (NSUInteger)group_triangles[group];
 		[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
 			scratchBufferOffset:0];
 		instances[count].mask = group_masks[group];
@@ -770,9 +679,9 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		float low[3] = { 1e30f, 1e30f, 1e30f }, high[3] = { -1e30f, -1e30f, -1e30f };
 		int vertex, axis;
 
-		if (!group_shapes[group])
+		if (!group_triangles[group])
 			continue;
-		for (vertex = 0; vertex < group_shapes[group] * HOST_RT_SPHERE_TRIANGLES * 3; vertex++)
+		for (vertex = 0; vertex < group_triangles[group] * 3; vertex++)
 		{
 			for (axis = 0; axis < 3; axis++)
 			{

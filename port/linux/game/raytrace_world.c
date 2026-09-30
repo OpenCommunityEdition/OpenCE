@@ -233,13 +233,18 @@ boolean halo_ray_tracing_sun(float *direction)
 
 /* ---------- the objects
 
-The units (the bipeds and the vehicles) as shapes for the rays: each a unit
-sphere under a transform, an ellipsoid. A biped's are its skeleton's bones,
-each from its node to its parent's, as the animation poses them (the
-nodes' matrices, between the last two ticks as the frame draws them); a
-vehicle's, its bounding sphere flattened along its axes. Masks: 2 an
-object, 4 the local player's body (the first person does not draw it, so
-only the rays show its shadow). */
+The units (the bipeds and the vehicles) as triangles for the rays, in the
+world, each frame: their collision models - the meshes the game tests its
+bullets against, a mesh for each node's region as it now is (its damage
+permutation), placed by the node's matrix as the animation poses it (between
+the last two ticks, as the frame draws it). A unit without them is its
+skeleton's bones, each an ellipsoid from its node to its parent's (bipeds),
+or its bounding sphere flattened along its axes. Each triangle's group: its
+object (0 to 31, the player's first) above, its kind below (2 an object, 4
+the local player's body: the first person does not draw it, so only the
+rays show its shadow). */
+
+#include "physics/collision_model_definitions.h"
 
 enum
 {
@@ -247,40 +252,209 @@ enum
 	_ray_mask_player = 4,
 };
 
-/* the ellipsoid with these axes (each its half length as its length) about
-this center, as 3x4 rows */
-static void ellipsoid(float *m, const float *center, const float *u, const float *v, const float *w)
-{
-	int row;
+/* the objects nearer the camera than this (world units) are in the rays */
+#define RAY_TRACED_OBJECT_DISTANCE 25.0f
+#define RAY_TRACED_OBJECT_GROUPS 32
 
-	for (row = 0; row < 3; row++)
+/* a collision mesh's triangles, in its node's space (9 floats each), made
+once for each mesh while its map is loaded */
+struct mesh_triangles
+{
+	const struct collision_bsp *bsp;
+	unsigned long generation;
+	float *triangles;
+	long count;
+};
+
+static struct mesh_triangles meshes[512];
+static long mesh_count;
+
+static long bsp_triangulate(const struct collision_bsp *bsp, float *out, long maximum)
+{
+	const struct collision_surface *surfaces = bsp->surfaces.address;
+	const struct collision_edge *edges = bsp->edges.address;
+	const struct collision_vertex *vertices = bsp->vertices.address;
+	long surface_index, count = 0;
+
+	for (surface_index = 0; surface_index < bsp->surfaces.count && count < maximum; surface_index++)
 	{
-		m[row * 4 + 0] = u[row];
-		m[row * 4 + 1] = v[row];
-		m[row * 4 + 2] = w[row];
-		m[row * 4 + 3] = center[row];
+		const struct collision_surface *surface = &surfaces[surface_index];
+		long ring[MAXIMUM_VERTICES_PER_COLLISION_SURFACE];
+		long ring_count = 0, edge_index = surface->first_edge_index, steps, corner, plane_index;
+		float normal[3] = { 0.0f, 0.0f, 0.0f };
+
+		for (steps = 0; steps < MAXIMUM_EDGES_PER_COLLISION_SURFACE * 2; steps++)
+		{
+			const struct collision_edge *edge;
+			int side;
+
+			if (edge_index < 0 || edge_index >= bsp->edges.count)
+				break;
+			edge = &edges[edge_index];
+			side = edge->surface_indices[0] == surface_index ? 0 : 1;
+			if (ring_count < MAXIMUM_VERTICES_PER_COLLISION_SURFACE)
+				ring[ring_count++] = edge->vertex_indices[side];
+			edge_index = edge->edge_indices[side];
+			if (edge_index == surface->first_edge_index)
+				break;
+		}
+		plane_index = surface->plane_designator & LONG_MAX;
+		if (plane_index < bsp->bsp3d.planes.count)
+		{
+			const real_plane3d *plane = (const real_plane3d *)bsp->bsp3d.planes.address + plane_index;
+			float sign = (surface->plane_designator & LONG_MIN) ? -1.0f : 1.0f;
+
+			normal[0] = plane->n.i * sign;
+			normal[1] = plane->n.j * sign;
+			normal[2] = plane->n.k * sign;
+		}
+		for (corner = 1; corner + 1 < ring_count && count < maximum; corner++)
+		{
+			long a = ring[0], b = ring[corner], c = ring[corner + 1];
+			const float *pa, *pb, *pc;
+			float u[3], v[3], facing, *t = out + count * 9;
+
+			if (a < 0 || b < 0 || c < 0 || a >= bsp->vertices.count || b >= bsp->vertices.count ||
+				c >= bsp->vertices.count)
+			{
+				continue;
+			}
+			pa = &vertices[a].point.x;
+			pb = &vertices[b].point.x;
+			pc = &vertices[c].point.x;
+			/* wound counterclockwise seen from outside, as the level's */
+			u[0] = pb[0] - pa[0];
+			u[1] = pb[1] - pa[1];
+			u[2] = pb[2] - pa[2];
+			v[0] = pc[0] - pa[0];
+			v[1] = pc[1] - pa[1];
+			v[2] = pc[2] - pa[2];
+			facing = (u[1] * v[2] - u[2] * v[1]) * normal[0] + (u[2] * v[0] - u[0] * v[2]) * normal[1] +
+				(u[0] * v[1] - u[1] * v[0]) * normal[2];
+			if (facing < 0.0f)
+			{
+				const float *swap = pb;
+
+				pb = pc;
+				pc = swap;
+			}
+			memcpy(t, pa, 3 * sizeof(float));
+			memcpy(t + 3, pb, 3 * sizeof(float));
+			memcpy(t + 6, pc, 3 * sizeof(float));
+			count++;
+		}
 	}
+	return count;
+}
+
+/* the mesh's triangles, made the first time it is asked for; NULL if none */
+static const struct mesh_triangles *mesh_get(const struct collision_bsp *bsp)
+{
+	long index, capacity;
+	struct mesh_triangles *mesh;
+
+	for (index = 0; index < mesh_count; index++)
+	{
+		if (meshes[index].bsp == bsp && meshes[index].generation == world.generation)
+			return meshes[index].count > 0 ? &meshes[index] : NULL;
+	}
+	/* a new map: the meshes of the last are gone */
+	if (mesh_count && meshes[0].generation != world.generation)
+	{
+		for (index = 0; index < mesh_count; index++)
+		{
+			if (meshes[index].triangles)
+				free(meshes[index].triangles);
+		}
+		mesh_count = 0;
+	}
+	if (mesh_count >= (long)(sizeof(meshes) / sizeof(meshes[0])))
+		return NULL;
+	mesh = &meshes[mesh_count++];
+	mesh->bsp = bsp;
+	mesh->generation = world.generation;
+	mesh->triangles = NULL;
+	mesh->count = 0;
+	capacity = bsp->surfaces.count * (MAXIMUM_VERTICES_PER_COLLISION_SURFACE - 2);
+	if (capacity <= 0)
+		return NULL;
+	mesh->triangles = malloc((size_t)capacity * 9 * sizeof(float));
+	if (!mesh->triangles)
+		return NULL;
+	mesh->count = bsp_triangulate(bsp, mesh->triangles, capacity);
+	return mesh->count > 0 ? mesh : NULL;
+}
+
+/* a unit sphere (an icosahedron: 20 triangles, wound as the level's) */
+static const float icosahedron[20][9] = {
+#define ICO_T 1.6180340f
+#define ICO_V(x, y, z) (x) * 0.5257311f * 1.12f, (y) * 0.5257311f * 1.12f, (z) * 0.5257311f * 1.12f
+	{ ICO_V(-1, ICO_T, 0), ICO_V(0, 1, ICO_T), ICO_V(-ICO_T, 0, 1) },
+	{ ICO_V(-1, ICO_T, 0), ICO_V(1, ICO_T, 0), ICO_V(0, 1, ICO_T) },
+	{ ICO_V(-1, ICO_T, 0), ICO_V(0, 1, -ICO_T), ICO_V(1, ICO_T, 0) },
+	{ ICO_V(-1, ICO_T, 0), ICO_V(-ICO_T, 0, -1), ICO_V(0, 1, -ICO_T) },
+	{ ICO_V(-1, ICO_T, 0), ICO_V(-ICO_T, 0, 1), ICO_V(-ICO_T, 0, -1) },
+	{ ICO_V(1, ICO_T, 0), ICO_V(ICO_T, 0, 1), ICO_V(0, 1, ICO_T) },
+	{ ICO_V(0, 1, ICO_T), ICO_V(0, -1, ICO_T), ICO_V(-ICO_T, 0, 1) },
+	{ ICO_V(-ICO_T, 0, 1), ICO_V(-1, -ICO_T, 0), ICO_V(-ICO_T, 0, -1) },
+	{ ICO_V(-ICO_T, 0, -1), ICO_V(0, -1, -ICO_T), ICO_V(0, 1, -ICO_T) },
+	{ ICO_V(0, 1, -ICO_T), ICO_V(ICO_T, 0, -1), ICO_V(1, ICO_T, 0) },
+	{ ICO_V(1, -ICO_T, 0), ICO_V(0, -1, ICO_T), ICO_V(ICO_T, 0, 1) },
+	{ ICO_V(1, -ICO_T, 0), ICO_V(-1, -ICO_T, 0), ICO_V(0, -1, ICO_T) },
+	{ ICO_V(1, -ICO_T, 0), ICO_V(0, -1, -ICO_T), ICO_V(-1, -ICO_T, 0) },
+	{ ICO_V(1, -ICO_T, 0), ICO_V(ICO_T, 0, -1), ICO_V(0, -1, -ICO_T) },
+	{ ICO_V(1, -ICO_T, 0), ICO_V(ICO_T, 0, 1), ICO_V(ICO_T, 0, -1) },
+	{ ICO_V(0, -1, ICO_T), ICO_V(0, 1, ICO_T), ICO_V(ICO_T, 0, 1) },
+	{ ICO_V(-1, -ICO_T, 0), ICO_V(-ICO_T, 0, 1), ICO_V(0, -1, ICO_T) },
+	{ ICO_V(0, -1, -ICO_T), ICO_V(-ICO_T, 0, -1), ICO_V(-1, -ICO_T, 0) },
+	{ ICO_V(ICO_T, 0, -1), ICO_V(0, 1, -ICO_T), ICO_V(0, -1, -ICO_T) },
+	{ ICO_V(ICO_T, 0, 1), ICO_V(1, ICO_T, 0), ICO_V(ICO_T, 0, -1) },
+#undef ICO_V
+#undef ICO_T
+};
+
+/* an ellipsoid (a unit sphere under axes u, v, w about center) as
+triangles into out; returns how many (20, or 0 without room) */
+static long ellipsoid_triangles(float *out, long room, const float *center, const float *u, const float *v,
+	const float *w)
+{
+	long triangle, corner;
+
+	if (room < 20)
+		return 0;
+	for (triangle = 0; triangle < 20; triangle++)
+	{
+		for (corner = 0; corner < 3; corner++)
+		{
+			const float *p = &icosahedron[triangle][corner * 3];
+			float *q = out + triangle * 9 + corner * 3;
+			int axis;
+
+			/* (the table's winding checked: each face's normal points out) */
+			for (axis = 0; axis < 3; axis++)
+				q[axis] = center[axis] + u[axis] * p[0] + v[axis] * p[1] + w[axis] * p[2];
+		}
+	}
+	return 20;
 }
 
 /* a bone from a to b, r thick each way, ending in round caps */
-static void bone(float *m, const real_point3d *a, const real_point3d *b, float r)
+static long bone_triangles(float *out, long room, const real_point3d *a, const real_point3d *b, float r)
 {
 	float center[3] = { (a->x + b->x) * 0.5f, (a->y + b->y) * 0.5f, (a->z + b->z) * 0.5f };
 	float d[3] = { b->x - a->x, b->y - a->y, b->z - a->z };
 	float length = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-	float u[3], v[3], w[3], half;
+	float u[3], v[3], w[3], half, l;
 
 	if (length < 1e-4f)
 	{
 		float x[3] = { r, 0, 0 }, y[3] = { 0, r, 0 }, z[3] = { 0, 0, r };
 
-		ellipsoid(m, center, x, y, z);
-		return;
+		return ellipsoid_triangles(out, room, center, x, y, z);
 	}
 	d[0] /= length;
 	d[1] /= length;
 	d[2] /= length;
-	/* two directions across it */
 	if (fabsf(d[2]) < 0.9f)
 	{
 		v[0] = -d[1];
@@ -293,13 +467,10 @@ static void bone(float *m, const real_point3d *a, const real_point3d *b, float r
 		v[1] = -d[2];
 		v[2] = d[1];
 	}
-	{
-		float l = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-
-		v[0] /= l;
-		v[1] /= l;
-		v[2] /= l;
-	}
+	l = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+	v[0] /= l;
+	v[1] /= l;
+	v[2] /= l;
 	w[0] = d[1] * v[2] - d[2] * v[1];
 	w[1] = d[2] * v[0] - d[0] * v[2];
 	w[2] = d[0] * v[1] - d[1] * v[0];
@@ -313,49 +484,79 @@ static void bone(float *m, const real_point3d *a, const real_point3d *b, float r
 	w[0] *= r;
 	w[1] *= r;
 	w[2] *= r;
-	ellipsoid(m, center, u, v, w);
+	return ellipsoid_triangles(out, room, center, u, v, w);
 }
 
-/* the objects nearer the camera than this (world units) are in the rays */
-#define RAY_TRACED_OBJECT_DISTANCE 25.0f
-
-/* one object's shapes (its mask: the group in the high bits, below the
-kind); returns how many */
-static long object_shapes(long object_index, struct object_datum *object, unsigned char mask, float *transforms,
-	unsigned char *masks, long maximum)
+/* one object's triangles into out (at most room); returns how many */
+static long object_triangles(long object_index, struct object_datum *object, float *out, long room)
 {
-	long count = 0;
+	const struct object_definition *definition = object_definition_get(object->definition_index);
+	const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
 	float radius = object->object.bounding_sphere_radius;
+	long count = 0;
 
-	if (object->object.type == _object_type_biped)
+	/* the collision model: its meshes, where the game's bullets hit */
+	if (matrices && definition->object.collision_model.index != NONE)
 	{
-		const struct object_definition *definition = object_definition_get(object->definition_index);
-		const struct model *model = definition->object.model.index != NONE ?
-			model_definition_get(definition->object.model.index) : NULL;
-		const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
-		const struct model_node *nodes;
-		long node_index;
-		/* a limb's thickness, from the biped's size */
-		float r = radius * 0.13f;
+		const struct collision_model *model = collision_model_definition_get(definition->object.collision_model.index);
+		const struct collision_node *nodes = (const struct collision_node *)model->nodes.address;
+		short node_index;
 
-		if (!model || !matrices || model->nodes.count <= 0)
-			return 0;
-		if (r < 0.02f)
-			r = 0.02f;
-		if (r > 0.12f)
-			r = 0.12f;
-		nodes = (const struct model_node *)model->nodes.address;
-		for (node_index = 0; node_index < model->nodes.count && count < maximum; node_index++)
+		for (node_index = 0; node_index < model->nodes.count && count < room; node_index++)
+		{
+			const struct collision_node *node = &nodes[node_index];
+			const struct mesh_triangles *mesh;
+			short permutation;
+			long triangle;
+
+			if (node->region_index == NONE || node->bsps.count <= 0)
+				continue;
+			permutation = object->object.region_permutations[node->region_index];
+			if (permutation == NONE)
+				continue;
+			permutation = PIN(permutation, 0, node->bsps.count - 1);
+			mesh = mesh_get((const struct collision_bsp *)node->bsps.address + permutation);
+			if (!mesh)
+				continue;
+			for (triangle = 0; triangle < mesh->count && count < room; triangle++, count++)
+			{
+				int corner;
+
+				for (corner = 0; corner < 3; corner++)
+				{
+					const float *p = &mesh->triangles[triangle * 9 + corner * 3];
+					real_point3d local = { p[0], p[1], p[2] }, placed;
+
+					matrix4x3_transform_point(&matrices[node_index], &local, &placed);
+					out[count * 9 + corner * 3 + 0] = placed.x;
+					out[count * 9 + corner * 3 + 1] = placed.y;
+					out[count * 9 + corner * 3 + 2] = placed.z;
+				}
+			}
+		}
+		if (count > 0)
+			return count;
+	}
+	/* without: a biped's bones */
+	if (object->object.type == _object_type_biped && matrices && definition->object.model.index != NONE)
+	{
+		const struct model *model = model_definition_get(definition->object.model.index);
+		const struct model_node *nodes = (const struct model_node *)model->nodes.address;
+		long node_index;
+		float r = PIN(radius * 0.13f, 0.02f, 0.12f);
+
+		for (node_index = 0; node_index < model->nodes.count; node_index++)
 		{
 			short parent = nodes[node_index].parent_node_index;
 
 			if (parent < 0 || parent >= model->nodes.count)
 				continue;
-			bone(transforms + count * 12, &matrices[parent].position, &matrices[node_index].position, r);
-			masks[count++] = mask;
+			count += bone_triangles(out + count * 9, room - count, &matrices[parent].position,
+				&matrices[node_index].position, r);
 		}
+		return count;
 	}
-	else if (maximum > 0)
+	/* or its bounding sphere along its axes */
 	{
 		const real_vector3d *forward = &object->object.forward, *up = &object->object.up;
 		float center[3] = { object->object.bounding_sphere_center.x, object->object.bounding_sphere_center.y,
@@ -366,23 +567,19 @@ static long object_shapes(long object_index, struct object_datum *object, unsign
 			(up->k * forward->i - up->i * forward->k) * radius * 0.45f,
 			(up->i * forward->j - up->j * forward->i) * radius * 0.45f };
 
-		ellipsoid(transforms, center, u, v, w);
-		masks[count++] = mask;
+		return ellipsoid_triangles(out, room, center, u, v, w);
 	}
-	return count;
 }
 
-/* this frame's shapes near the camera, at most maximum: their transforms
-(12 floats each) and masks (the kind, 2 an object or 4 the player's body,
-in the low 3 bits; the object, 0 to 31, above: the player's first), and the
-player's body's bounding sphere (center, radius; radius 0 if none); returns
-how many */
-long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
+/* this frame's objects near the camera as triangles (9 floats each, at most
+maximum) and each triangle's group, and the player's body's bounding sphere
+(center, radius; radius 0 if none); returns how many triangles */
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere)
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
-	long count = 0, player_unit = NONE, player_index, group = 1;
+	long count = 0, player_unit = NONE, player_index, group = 1, added, index;
 
 	player_sphere[0] = player_sphere[1] = player_sphere[2] = player_sphere[3] = 0.0f;
 	if (global_structure_bsp_index == NONE || !object_header_data)
@@ -397,25 +594,29 @@ long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maxi
 		player_sphere[1] = object->object.bounding_sphere_center.y;
 		player_sphere[2] = object->object.bounding_sphere_center.z;
 		player_sphere[3] = object->object.bounding_sphere_radius;
-		count += object_shapes(player_unit, object, _ray_mask_player, transforms, masks, maximum);
+		added = object_triangles(player_unit, object, triangles, maximum);
+		for (index = 0; index < added; index++)
+			groups[index] = _ray_mask_player;
+		count += added;
 	}
 	object_iterator_new(&iterator, _object_mask_unit, 0);
-	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum && group < 32)
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum &&
+		group < RAY_TRACED_OBJECT_GROUPS)
 	{
 		float radius = object->object.bounding_sphere_radius;
 		float dx = object->object.bounding_sphere_center.x - camera[0];
 		float dy = object->object.bounding_sphere_center.y - camera[1];
 		float dz = object->object.bounding_sphere_center.z - camera[2];
 		float reach = RAY_TRACED_OBJECT_DISTANCE + radius;
-		long added;
 
 		if (iterator.index == player_unit || !(radius > 0.0f) || radius > 20.0f ||
 			dx * dx + dy * dy + dz * dz > reach * reach)
 		{
 			continue;
 		}
-		added = object_shapes(iterator.index, object, (unsigned char)(group << 3 | _ray_mask_object),
-			transforms + count * 12, masks + count, maximum - count);
+		added = object_triangles(iterator.index, object, triangles + count * 9, maximum - count);
+		for (index = 0; index < added; index++)
+			groups[count + index] = (unsigned char)(group << 3 | _ray_mask_object);
 		if (added > 0)
 		{
 			count += added;
