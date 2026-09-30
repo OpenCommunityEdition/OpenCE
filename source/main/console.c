@@ -389,7 +389,6 @@ boolean console_update(
 
 	short i;
 
-#ifdef HALO_LINUX
 	/* the port's debug.commands (HALO_COMMANDS): console commands at their
 	times, for tests */
 	{
@@ -407,7 +406,6 @@ boolean console_update(
 			}
 		}
 	}
-#endif
 
 	if (console_globals.active)
 	{
