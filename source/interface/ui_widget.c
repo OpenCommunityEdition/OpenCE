@@ -873,7 +873,9 @@ enum
 {
 	/* the button event types are the gamepad button indices; the enumeration
 	runs 0..33 and only the types this file names are listed */
+	_widget_event_a_button = _gamepad_analog_button_a,
 	_widget_event_b_button = _gamepad_analog_button_b,
+	_widget_event_start_button = _gamepad_binary_button_start,
 	_widget_event_dpad_up = _gamepad_binary_button_dpad_up,
 	_widget_event_dpad_down = _gamepad_binary_button_dpad_down,
 	_widget_event_dpad_left = _gamepad_binary_button_dpad_left,
@@ -1419,6 +1421,22 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+static short ui_exit_game_widget_get(
+	struct widget_instance const *widget);
+static boolean ui_exit_game_widget_set_text(
+	struct widget_instance *widget);
+static void ui_exit_game_main_menu_loaded(
+	struct widget_instance *root);
+static void ui_exit_game_item_render(
+	struct widget_instance *widget,
+	struct ui_widget_definition *definition,
+	rectangle2d *clip_rect,
+	point2d offset,
+	boolean focus);
+static short ui_exit_game_button_press(
+	struct widget_instance *widget,
+	short button_index,
+	boolean *widget_deleted);
 
 /* ---------- globals */
 
@@ -3743,6 +3761,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
+			/* port: EXIT GAME in the main menu, unless a created handler
+			closed the widget */
+			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
+				ui_exit_game_main_menu_loaded(widget);
 		}
 		else
 		{
@@ -4864,7 +4886,9 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	/* port: EXIT GAME's question has the code's text */
+	if (!ui_exit_game_widget_set_text(widget) &&
+		definition->text_label_string_list.index != NONE)
 	{
 		short string_list_index;
 		wchar_t *string;
@@ -5193,6 +5217,239 @@ static void widget_instance_render_spinner_list(
 	}
 
 	return;
+}
+
+/* ---------- EXIT GAME (desktop builds)
+
+The Xbox game never ended on its own, so its main menu has no way out. Where
+halo_exit_game_supported (port/linux/include/halo_exit_game.h), the main
+menu's GAME DEMOS item, hidden on every computer (xbox_demos_available), is
+EXIT GAME instead. Its art says GAME DEMOS and no item's art has an X, so the
+label is drawn with the menus' font in the other items' colours.
+
+A asks first, on the question screen of a profile's deletion
+(ui\shell\error\confirm_delete_profile, without its fullscreen wrapper, whose
+A deletes the profile) with the code's text. A there ends the main loop
+(main_exit_game); B goes back with EXIT GAME focused (process_ui_widgets).
+START (Escape) opens the question, as it opens the other items, but does not
+answer it. */
+
+enum
+{
+	_ui_exit_game_widget_item,		/* the main menu's EXIT GAME */
+	_ui_exit_game_widget_question,	/* the screen that asks */
+	_ui_exit_game_widget_question_text,
+	NUMBER_OF_UI_EXIT_GAME_WIDGETS
+};
+
+enum
+{
+	/* where the label's line begins in the item: its capitals then take the
+	rows the other items' letters take (6 to 26 of 33) */
+	UI_EXIT_GAME_LABEL_TOP = 6,
+	/* how far the focused label's glow reaches */
+	UI_EXIT_GAME_GLOW_RADIUS = 2
+};
+
+static char const ui_exit_game_widget_names[NUMBER_OF_UI_EXIT_GAME_WIDGETS][24] =
+{
+	"exit_game_item",
+	"exit_game_question",
+	"exit_game_question_text"
+};
+
+static wchar_t const ui_exit_game_label[] = L"EXIT GAME";
+static wchar_t const ui_exit_game_question[] = L"Are you sure you want\r\nto exit the game?";
+
+/* the other items' art: their letters blue and less than half opaque, and
+the focused item's white in a blue glow (each copy of the letters that make
+the glow adds this much) */
+static real_argb_color const ui_exit_game_label_color = { { 119.0f / 255.0f, 35.0f / 255.0f, 149.0f / 255.0f, 1.0f } };
+static real_argb_color const ui_exit_game_glow_color = { { 0.12f, 41.0f / 255.0f, 149.0f / 255.0f, 1.0f } };
+
+static short ui_exit_game_widget_get(
+	struct widget_instance const *widget)
+{
+	short index;
+
+	for (index = 0; index < NUMBER_OF_UI_EXIT_GAME_WIDGETS; index++)
+	{
+		if (widget->name == ui_exit_game_widget_names[index])
+			return index;
+	}
+
+	return NONE;
+}
+
+/* the code's text for the question's text box; FALSE for any other widget */
+static boolean ui_exit_game_widget_set_text(
+	struct widget_instance *widget)
+{
+	unsigned long length;
+
+	if (ui_exit_game_widget_get(widget) != _ui_exit_game_widget_question_text)
+		return FALSE;
+	length = ustrlen(ui_exit_game_question);
+	widget->parameters.text_box.text = pool_resize_pointer(
+		widget_memory_pool,
+		widget->parameters.text_box.text,
+		2 * length + 2,
+		__FILE__,
+		__LINE__);
+	if (widget->parameters.text_box.text)
+		csmemcpy(widget->parameters.text_box.text, ui_exit_game_question, 2 * length + 2);
+
+	return TRUE;
+}
+
+static void ui_exit_game_main_menu_loaded(
+	struct widget_instance *root)
+{
+	struct widget_instance *item;
+
+	if (!halo_exit_game_supported() ||
+		root->definition_tag_index != tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\main_menu\\main_menu"))
+	{
+		return;
+	}
+	item = widget_instance_find_by_tag_index_recursive(
+		root,
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\main_menu\\main_menu_item_game_demos"));
+	if (!item ||
+		item->type != _ui_widget_type_text_box ||
+		!item->parent ||
+		item->parent->type != _ui_widget_type_column_list)
+	{
+		return;
+	}
+	item->name = ui_exit_game_widget_names[_ui_exit_game_widget_item];
+	item->visible = TRUE;
+	item->disabled = FALSE;
+
+	return;
+}
+
+static void ui_exit_game_item_render(
+	struct widget_instance *widget,
+	struct ui_widget_definition *definition,
+	rectangle2d *clip_rect,
+	point2d offset,
+	boolean focus)
+{
+	long font_index = tag_loaded(FONT_GROUP_TAG, "ui\\large_ui");
+	real alpha_modifier = widget_instance_get_cumulative_alpha_modifier(widget);
+	rectangle2d bounds = definition->bounds;
+	rectangle2d clip = clip_rect ? *clip_rect : definition->bounds;
+	real_argb_color color;
+
+	if (font_index == NONE)
+		return;
+	bounds.x0 += offset.x;
+	bounds.x1 += offset.x;
+	bounds.y0 += offset.y + UI_EXIT_GAME_LABEL_TOP;
+	bounds.y1 += offset.y;
+	if (focus)
+	{
+		short dx, dy;
+
+		color = ui_exit_game_glow_color;
+		color.alpha *= alpha_modifier;
+		draw_string_set_draw_mode(font_index, NONE, _text_justification_center, 0, &color);
+		for (dy = -UI_EXIT_GAME_GLOW_RADIUS; dy <= UI_EXIT_GAME_GLOW_RADIUS; dy++)
+		{
+			for (dx = -UI_EXIT_GAME_GLOW_RADIUS; dx <= UI_EXIT_GAME_GLOW_RADIUS; dx++)
+			{
+				rectangle2d glow_bounds = bounds;
+
+				/* (a rounded square about the letters) */
+				if ((!dx && !dy) || ABS(dx) + ABS(dy) > UI_EXIT_GAME_GLOW_RADIUS + 1)
+					continue;
+				glow_bounds.x0 += dx;
+				glow_bounds.x1 += dx;
+				glow_bounds.y0 += dy;
+				glow_bounds.y1 += dy;
+				rasterizer_draw_unicode_string(&glow_bounds, &clip, NULL, 0, ui_exit_game_label);
+			}
+		}
+		color = *global_real_argb_white;
+		color.alpha = alpha_modifier;
+	}
+	else
+	{
+		color = ui_exit_game_label_color;
+		color.alpha *= alpha_modifier;
+	}
+	draw_string_set_draw_mode(font_index, NONE, _text_justification_center, 0, &color);
+	rasterizer_draw_unicode_string(&bounds, &clip, NULL, 0, ui_exit_game_label);
+
+	return;
+}
+
+/* A on EXIT GAME: the question in place of the main menu */
+static boolean ui_exit_game_ask(
+	struct widget_instance *item,
+	boolean *widget_deleted)
+{
+	long question_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\error\\confirm_delete_profile");
+	long text_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\error\\confirm_delete_profile_text_box");
+	struct widget_instance *question;
+	struct widget_instance *text;
+
+	if (question_tag_index == NONE || text_tag_index == NONE)
+	{
+		error(_error_silent, "failed to load the EXIT GAME question");
+
+		return FALSE;
+	}
+	/* (this deletes the main menu, and the item with it) */
+	question = ui_widget_launch_widget(item, question_tag_index);
+	if (!question)
+		return FALSE;
+	*widget_deleted = TRUE;
+	text = widget_instance_find_by_tag_index_recursive(question, text_tag_index);
+	if (!text || text->type != _ui_widget_type_text_box)
+	{
+		/* (never with the text that asks to delete a profile) */
+		error(_error_silent, "failed to load the EXIT GAME question");
+		widget_instance_go_back_to_previous(question);
+
+		return FALSE;
+	}
+	question->name = ui_exit_game_widget_names[_ui_exit_game_widget_question];
+	text->name = ui_exit_game_widget_names[_ui_exit_game_widget_question_text];
+
+	return TRUE;
+}
+
+/* a button pressed on EXIT GAME or its question: the sound it makes, or NONE
+for a button the widget leaves to the others */
+static short ui_exit_game_button_press(
+	struct widget_instance *widget,
+	short button_index,
+	boolean *widget_deleted)
+{
+	switch (ui_exit_game_widget_get(widget))
+	{
+	case _ui_exit_game_widget_item:
+		if (button_index == _widget_event_a_button ||
+			button_index == _widget_event_start_button)
+		{
+			return ui_exit_game_ask(widget, widget_deleted) ?
+				_ui_audio_feedback_forward :
+				_ui_audio_feedback_flag_failure;
+		}
+		break;
+	case _ui_exit_game_widget_question:
+		if (button_index == _widget_event_a_button)
+		{
+			main_exit_game();
+
+			return _ui_audio_feedback_forward;
+		}
+		break;
+	}
+
+	return NONE;
 }
 
 /* ---------- the mouse (desktop builds)
@@ -5687,17 +5944,22 @@ static void ui_widgets_process_mouse(
 			}
 			else
 			{
+				struct widget_instance *menu = ui_mouse_menu();
 				long index;
 
 				/* a screen with nothing to pick (a message to dismiss): the
-				click is its A */
+				click is its A; but not EXIT GAME's question, which a click
+				beside its buttons must not answer */
 				for (index = 0; index < ui_mouse_target_count; index++)
 				{
 					if (ui_mouse_targets[index].kind != _ui_mouse_target_button)
 						break;
 				}
-				if (index == ui_mouse_target_count)
+				if (index == ui_mouse_target_count &&
+					!(menu && ui_exit_game_widget_get(menu) == _ui_exit_game_widget_question))
+				{
 					ui_mouse_press(_gamepad_analog_button_a);
+				}
 			}
 		}
 		if (ui_mouse_press_count)
@@ -5747,6 +6009,18 @@ static void widget_instance_render_recursive(
 	if (!widget->visible)
 		return;
 	ui_mouse_note_target(widget, definition, offset);
+	/* port: EXIT GAME's label is the code's, not the GAME DEMOS art */
+	if (ui_exit_game_widget_get(widget) == _ui_exit_game_widget_item)
+	{
+		ui_exit_game_item_render(
+			widget,
+			definition,
+			clip_rect,
+			offset,
+			widget_instance_text_box_is_focused(widget));
+
+		return;
+	}
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -6608,7 +6882,28 @@ static void widget_instance_process_one_event_recursive(
 			}
 		}
 	}
-	if (event_for_this_widget)
+	/* port: EXIT GAME and its question answer their buttons in code, not
+	with their tags' handlers (GAME DEMOS's would launch the Xbox demos) */
+	if (event_for_this_widget &&
+		!widget_deleted &&
+		ui_exit_game_widget_get(widget) != NONE)
+	{
+		if (event->type == _event_type_button &&
+			event->data.button.value == 1)
+		{
+			short sound = ui_exit_game_button_press(
+				widget,
+				event->data.button.index,
+				&widget_deleted);
+
+			if (sound != NONE)
+			{
+				audio_feedback = sound;
+				event_handled = TRUE;
+			}
+		}
+	}
+	else if (event_for_this_widget)
 	{
 		long handler_index;
 
