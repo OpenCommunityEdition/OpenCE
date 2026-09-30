@@ -112,6 +112,10 @@ These settings are new, or have a different default on macOS:
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
 | `display.ray_tracing_shadows` | `1.0` | How dark the sun's traced shadows are (0.0 to 1.0). |
 | `display.ray_tracing_objects` | `true` | The characters and vehicles in Metal's rays too: their contact shadows, and your own body's shadow. |
+| `display.ray_tracing_gi` | `"traced"` | The level lit by the rays in place of its lightmaps (refer to "The traced light, in place of the lightmaps"). `"black"`: without the lightmaps at all. `"off"`: the lightmaps. |
+| `display.ray_tracing_gi_split` | `false` | The game's light on the left half of the screen, the traced on the right. |
+| `display.ray_tracing_level` | `"render"` | The level in the rays as it is drawn; `"collision"`: its collision surfaces. |
+| `display.ray_tracing_lights` | `"traced"` | Every light traced in its colour; `"game"`: the game's lights, their shadows traced. |
 | `network.tailscale` | `true` | System link across a Tailscale network (refer to "Multiplayer"). |
 | `network.allow_upnp` | `false` | Tailscale and the local network do not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
@@ -245,30 +249,72 @@ you see your own shadow, which the game never drew in the first person.
 
 | Thing | In the rays as | Casts shadows | Lights |
 | --- | --- | --- | --- |
-| The level | its collision mesh (the surfaces the game collides with) | yes | - |
+| The level | its drawn triangles, with each surface's colour, the light it gives off and its lightmap (`display.ray_tracing_level`: or its collision mesh) | yes | its glowing surfaces (lamps, panels) |
 | Characters, vehicles, weapons, items, scenery, devices | their drawn models (or collision models, or ellipsoids: F4) | yes | their light volumes |
 | Projectiles and grenades | their drawn models | yes | their glows (a needle's pink) |
 | Your body | its drawn model | the sun's only (the flashlight is in it) | - |
-| The sun | a light far away | - | the objects' shadows, your body's on the level |
+| The sun and the sky | the sky tag's lights: the sun far away, its wide lights (the sky's dome) | - | traced, with their shadows |
 | The game's lights (flashlight, plasma, explosions, Guilty Spark, lamps) | point lights and spots, the 16 nearest, reaching 25 units at most | - | yes, traced, in their colour |
 | Glows (light volumes) with no light | point lights, up to 16, reaching 12 units at most | - | yes |
-| The lightmaps (the level's baked light) | kept: the game's, darkened only by what they never saw (the objects' occlusion, your shadow) | - | - |
-| Water | not yet: the level's render mesh is not traced | no | no |
+| The lightmaps (the level's baked light) | replaced by the traced light (`display.ray_tracing_gi` "traced"); where a bounce lands, its light is the lightmap's there | - | - |
+| Water, glass | not in the rays (drawn after them); the water draws its own sky reflection again | no | no |
 | Particles, decals, contrails, the sky | no | no | no |
 | Shaders' own glow (shields, panels' self-illumination) without a light volume | no | - | no |
 | Reflections of the objects | no: reflections see the level only | - | - |
-| The objects' lighting | the game's (all its lights, unshadowed), with the sun's and the level's traced shadows | - | - |
+| The objects' lighting | the game's (sampled from the lightmap under each), with the sun's and the level's traced shadows, occlusion and the traced lights | - | - |
 
 A governor keeps the rays off the whole machine's back: a GPU busy for
 long enough freezes the Mac's display, not only the game. It reads each
-frame's time on the GPU; over 20 ms it halves the traced lights and
-emitters, under 10 ms for a second it brings back a step, and after ten
-frames in a row over a quarter of a second it stops the rays and logs why.
+frame's time the rays take on the GPU; over 22 ms it steps up - first the
+traced light's new samples thin (every 8th, then 16th frame a pixel), then
+the traced lights and emitters halve - under 16 ms for a second it steps
+back, and after ten frames in a row over a quarter of a second it stops the
+rays and logs why.
 
-Taking over the rest - the lightmaps and the cube maps - needs light that
-bounces: the level's render mesh with its textures in the rays, and paths
-of several bounces from each pixel, which the M2's GPU, without ray tracing
-hardware, cannot trace at a playable rate yet.
+### The traced light, in place of the lightmaps
+
+`display.ray_tracing_gi` ("traced" by default) lights the level with the
+rays instead of its lightmaps. Halo's lightmaps were baked offline from the
+level's own lights: its shaders' radiosity (every lamp, light strip and
+glowing panel is a surface that gives off light, in a colour, with a
+power) and its sky's lights (the sun, and wide lights for the sky's dome).
+The rays read the same data from the map and light each of the level's
+pixels themselves:
+
+- The level is in the rays as it is drawn (`halo_ray_tracing_level` in
+  `port/linux/game/raytrace_world.c`): each lightmap material's triangles,
+  with their lightmap coordinates, each material's colour (its base map's
+  average, read by the game's own `bitmap_2d_get_pixel` once the texture
+  cache has it), the light it gives off, and its lightmap page (decoded as
+  the texture cache loads it, packed into one Metal texture).
+- The sun, with its shadow, every pixel every frame.
+- The sky's wide lights, a ray toward a point of one; a bounce ray, over
+  the half sphere; and a ray to a point of a glowing triangle, chosen as
+  likely as the light it gives off (next event estimation). Where a bounce
+  lands, the light there is that surface's lightmap times its colour: the
+  lightmap already holds every bounce the light took, so one ray brings
+  them all. These are new every 4th frame a pixel and accumulate over the
+  frames, followed as the camera moves.
+- The traced lights and glows (the flashlight, plasma, Guilty Spark's).
+
+The light goes into the game's light buffer - after its lightmap and
+dynamic lights pass, before the textures multiply in - on the level's
+pixels, so the game's own textures, detail maps and decals shade it as
+they shaded the lightmaps. (It is the last frame's rays, each pixel's
+point found in their view: Metal's writes of this frame are not yet seen by
+GL that early.) The objects, drawn before the level, keep the game's light
+with the traced shadows.
+
+"black" leaves the lightmaps out entirely, even where the bounces land:
+only what the rays find lit - the sun, the sky, the lamps, the lights -
+lights the level. `display.ray_tracing_gi_split` shows the game's light on
+the left half of the screen and the traced on the right. The parts'
+strengths are `display.ray_tracing_gi_sun`, `_bounce`, `_glow` and
+`_lights`.
+
+The traced light costs about 5 ms a frame of the GPU on an M2 Pro (1440 x
+1080; the rays at half that). The cube maps (the environment's shiny
+reflections) and the objects' own lighting are still the game's.
 
 Each object's mesh is rebuilt each frame, and only the objects within 25
 world units of the camera (at most 32) are in. Rays that can find only the

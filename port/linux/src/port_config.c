@@ -152,7 +152,7 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"The level in Metal's rays: \"render\" (its drawn triangles, as you see them)\n"
 		"or \"collision\" (the surfaces the game collides with) (macOS)." },
-	{ "display.ray_tracing_gi", _config_string, "\"off\"", "HALO_RAY_TRACING_GI", _environment_value,
+	{ "display.ray_tracing_gi", _config_string, "\"traced\"", "HALO_RAY_TRACING_GI", _environment_value,
 		_platform_all,
 		"The level's light traced in place of its lightmaps (macOS): \"traced\" (the\n"
 		"sun, the sky, the glowing surfaces and the lights, with the lightmaps' light\n"
