@@ -1,7 +1,9 @@
 /*
 RAYTRACE_GL.C
 
-Screen-space ray-traced lighting for the native ports (display.ray_tracing).
+Ray-traced lighting for the native ports (display.ray_tracing): rays
+through the screen's depth on every port, and on macOS also rays through
+the level itself with Metal (port/macos/host/host_metal_rt.m).
 
 Once the game has drawn a window's opaque world, before its transparent
 geometry, fog, effects and HUD (source/render/render.c), rays are marched
@@ -18,10 +20,14 @@ sees it:
   surface reflects that colour, by the Fresnel term (glancing angles
   reflect most), so floors and wet ground pick up the scene.
 
-The Xbox game has no scene representation to trace beyond what the camera
-sees, and Apple silicon before the M3 has no ray tracing hardware, so these
-are the screen-space kind: rays leaving the screen find nothing, and are
-faded out. The pass costs a few milliseconds at the display's resolution.
+Rays through the screen's depth find only what the camera sees: rays
+leaving the screen find nothing, and are faded out. On macOS, where Metal
+can trace rays (in compute on M1 and M2, in the ray tracing hardware of the
+M3 and later), the occlusion and reflections are also traced through the
+level's own geometry (its collision surfaces,
+port/linux/game/raytrace_world.c), which finds what the camera does not
+see; the screen's rays still find the objects, which the level does not
+hold. The pass costs a few milliseconds at the display's resolution.
 
 It runs as two draws: rays into an effect texture (occlusion, reflection),
 then the composite back into the window, with a depth-aware blur of the
@@ -32,10 +38,18 @@ occlusion. F9 switches it on and off while playing.
 #include "gl.h"
 #include "port_config.h"
 #include "raytrace_gl.h"
+#ifdef HALO_MACOS
+/* the host's Metal ray tracing (port/macos/host/host_metal_rt.m) */
+#include "guest_host_desktop.h"
+#endif
 
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+/* port/linux/game/raytrace_world.c: the level's triangles */
+unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
+	long *triangle_count);
 
 /* d3d8_gl.c: the window's current targets and viewport, in GL pixels */
 int xgpu_current_targets(GLuint *color, GLuint *depth, int *width, int *height, int viewport[4]);
@@ -60,7 +74,12 @@ static struct
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
-	GLint composite_debug;
+	GLint composite_debug, composite_rt, composite_rt_enabled;
+	/* the world-space rays (macOS: Metal) */
+	int hardware;
+	GLuint gbuffer_program, gbuffer_framebuffer;
+	GLint gbuffer_uniforms, gbuffer_depth;
+	unsigned long world_generation;
 	GLuint vertex_array;
 	GLuint scene_texture, effect_texture;
 	GLuint scene_framebuffer, effect_framebuffer, output_framebuffer, source_framebuffer;
@@ -206,11 +225,34 @@ static const char trace_source[] =
 	"	result = vec4(light, 1.0 - occlusion * u[2].y);\n"
 	"}\n";
 
+/* each pixel's linear depth and view-space normal, for the world-space
+rays: x, y, z of the normal with x right, y down, z into the screen */
+static const char gbuffer_source[] =
+	SHADER_HEADER
+	COMMON_SOURCE
+	"out vec4 result;\n"
+	"void main()\n"
+	"{\n"
+	"	ivec2 p = ivec2(gl_FragCoord.xy);\n"
+	"	float d = depth_at(p);\n"
+	"	if (d >= 0.99999) { result = vec4(0.0); return; }\n"
+	"	vec3 P = position_at(p);\n"
+	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n"
+	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n"
+	"	vec3 dx = abs(r.z - P.z) < abs(P.z - l.z) ? r - P : P - l;\n"
+	"	vec3 dy = abs(t.z - P.z) < abs(P.z - b.z) ? t - P : P - b;\n"
+	"	vec3 N = normalize(cross(dy, dx));\n"
+	"	if (dot(N, P) > 0.0) N = -N;\n"
+	"	result = vec4(P.z, N);\n"
+	"}\n";
+
 static const char composite_source[] =
 	SHADER_HEADER
 	COMMON_SOURCE
 	"uniform sampler2D scene_texture;\n"
 	"uniform sampler2D effect_texture;\n"
+	"uniform sampler2D rt_texture;\n"
+	"uniform int rt_enabled;\n"
 	"uniform int debug_mode;\n"
 	"out vec4 result;\n"
 	"void main()\n"
@@ -230,12 +272,26 @@ static const char composite_source[] =
 	"			ivec2 q = clamp(p + ivec2(x, y), ivec2(u[1].xy), ivec2(u[1].xy + u[1].zw) - 1);\n"
 	"			float w = 1.0 / (1e-3 + abs(linear_depth(texelFetch(depth_texture, q, 0).r) - z) / z * 40.0);\n"
 	"			vec4 e = texelFetch(effect_texture, q, 0);\n"
-	"			visibility += e.a * w;\n"
+	"			float v = e.a;\n"
+	/* the world's occlusion (Metal's rays) with the screen's (which also
+	   finds the objects) */
+	"			if (rt_enabled != 0) v *= mix(1.0, texelFetch(rt_texture, q, 0).r, u[2].y);\n"
+	"			visibility += v * w;\n"
 	"			light += e.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
 	"	visibility /= total;\n"
 	"	light /= total;\n"
+	/* a traced reflection, where the camera sees what it hit, before the
+	   screen's */
+	"	if (rt_enabled != 0)\n"
+	"	{\n"
+	"		vec4 hit = texelFetch(rt_texture, p, 0);\n"
+	/* (a: how much, with the Fresnel term; the screen's rays traced no
+	   reflection: u[2].z was 0 for them) */
+	"		if (hit.a > 0.0)\n"
+	"			light += texelFetch(scene_texture, ivec2(hit.gb * u[3].yz), 0).rgb * hit.a * u[3].w;\n"
+	"	}\n"
 	"	if (debug_mode == 2) { result = vec4(vec3(visibility), 1.0); return; }\n"
 	"	result = vec4(scene.rgb * visibility + light * (1.0 - scene.rgb * 0.5), scene.a);\n"
 	"}\n";
@@ -295,6 +351,8 @@ static int mode_from_setting(const char *text)
 		return _ray_tracing_debug_occlusion;
 	if (!strcmp(text, "depth"))
 		return _ray_tracing_debug_depth;
+	if (!strcmp(text, "screen"))
+		return _ray_tracing_on;
 	return _ray_tracing_on;
 }
 
@@ -324,13 +382,30 @@ static void initialize(void)
 	ray.composite_depth = glGetUniformLocation(ray.composite_program, "depth_texture");
 	ray.composite_effect = glGetUniformLocation(ray.composite_program, "effect_texture");
 	ray.composite_debug = glGetUniformLocation(ray.composite_program, "debug_mode");
+	ray.composite_rt = glGetUniformLocation(ray.composite_program, "rt_texture");
+	ray.composite_rt_enabled = glGetUniformLocation(ray.composite_program, "rt_enabled");
+#ifdef HALO_MACOS
+	/* "screen" keeps to the screen's rays */
+	if (strcmp(config_string("display.ray_tracing"), "screen") && host_rt_available())
+	{
+		ray.gbuffer_program = link(gbuffer_source, "ray tracing depth and normals");
+		if (ray.gbuffer_program)
+		{
+			ray.gbuffer_uniforms = glGetUniformLocation(ray.gbuffer_program, "u");
+			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
+			glGenFramebuffers(1, &ray.gbuffer_framebuffer);
+			ray.hardware = 1;
+		}
+	}
+#endif
 	glGenVertexArrays(1, &ray.vertex_array);
 	glGenFramebuffers(1, &ray.scene_framebuffer);
 	glGenFramebuffers(1, &ray.effect_framebuffer);
 	glGenFramebuffers(1, &ray.output_framebuffer);
 	glGenFramebuffers(1, &ray.source_framebuffer);
-	platform_log("ray tracing: %s (F9 switches it; occlusion %.2f, reflections %.2f, bounce %.2f)",
-		ray.enabled ? "on" : "off", ray.occlusion_strength, ray.reflection_strength, ray.bounce_strength);
+	platform_log("ray tracing: %s, %s (F9 switches it; occlusion %.2f, reflections %.2f, bounce %.2f)",
+		ray.enabled ? "on" : "off", ray.hardware ? "world-space rays (Metal) with the screen's" : "the screen's rays",
+		ray.occlusion_strength, ray.reflection_strength, ray.bounce_strength);
 }
 
 static GLuint make_texture(int width, int height)
@@ -385,9 +460,83 @@ void halo_ray_tracing_debug_mode(int mode)
 	ray.enabled = mode != _ray_tracing_off;
 }
 
-void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view)
+#ifdef HALO_MACOS
+/* the level's rays with Metal: the depth and normals into the shared
+texture, the rays, and the results' texture; 0 if not */
+static GLuint world_rays(const float *uniforms, const float *position, const float *forward, const float *up,
+	int width, int height, GLuint depth)
 {
-	GLuint color, depth;
+	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+	const float *vertices;
+	const unsigned long *indices;
+	long vertex_count, triangle_count;
+	unsigned long generation;
+	GLuint input, output;
+	float camera[24], right[3], length;
+
+	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
+	if (!generation)
+		return 0;
+	if (generation != ray.world_generation)
+	{
+		ray.world_generation = generation;
+		host_rt_set_world(generation, vertices, (int)vertex_count, (const unsigned int *)indices, (int)triangle_count);
+	}
+	input = host_rt_texture(0, width, height);
+	output = host_rt_texture(1, width, height);
+	/* (the host's texture creation binds on the active unit) */
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depth);
+	if (!input || !output)
+		return 0;
+	glBindFramebuffer(GL_FRAMEBUFFER, ray.gbuffer_framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, input, 0);
+	glDrawBuffers(1, &draw_buffer);
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	{
+		platform_log("ray tracing: the shared depth texture cannot be drawn to; world-space rays off");
+		ray.hardware = 0;
+		return 0;
+	}
+	glUseProgram(ray.gbuffer_program);
+	glUniform4fv(ray.gbuffer_uniforms, 4, uniforms);
+	glUniform1i(ray.gbuffer_depth, 1);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	/* the camera: its right is forward x up (the game's world is
+	right-handed, z up) */
+	right[0] = forward[1] * up[2] - forward[2] * up[1];
+	right[1] = forward[2] * up[0] - forward[0] * up[2];
+	right[2] = forward[0] * up[1] - forward[1] * up[0];
+	length = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+	if (length <= 0.0f)
+		return 0;
+	memcpy(camera, position, 3 * sizeof(float));
+	memcpy(camera + 3, forward, 3 * sizeof(float));
+	memcpy(camera + 6, up, 3 * sizeof(float));
+	camera[9] = right[0] / length;
+	camera[10] = right[1] / length;
+	camera[11] = right[2] / length;
+	camera[12] = uniforms[0];
+	camera[13] = uniforms[1];
+	camera[14] = uniforms[2];
+	camera[15] = uniforms[3];
+	memcpy(camera + 16, uniforms + 4, 4 * sizeof(float));
+	camera[20] = (float)(ray.frame & 1023);
+	/* world units: about 3 m each */
+	camera[21] = 0.6f;
+	camera[22] = 40.0f;
+	camera[23] = 0.0f;
+	if (!host_rt_trace(camera, width, height))
+		return 0;
+	return output;
+}
+#endif
+
+void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
+	const float *forward, const float *up)
+{
+	GLuint color, depth, world_results = 0;
 	int width, height, viewport[4];
 	float uniforms[16];
 	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
@@ -427,7 +576,11 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	uniforms[12] = (float)(ray.frame & 63);
 	uniforms[13] = (float)width;
 	uniforms[14] = (float)height;
-	uniforms[15] = 0.0f;
+	/* the reflections' strength for the composite; the screen's rays
+	trace none when Metal's do */
+	uniforms[15] = ray.reflection_strength;
+	if (ray.hardware)
+		uniforms[10] = 0.0f;
 
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
@@ -456,6 +609,15 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glUniform1i(ray.trace_depth, 1);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
+#ifdef HALO_MACOS
+	if (ray.hardware && position && forward && up)
+		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
+#else
+	(void)position;
+	(void)forward;
+	(void)up;
+#endif
+
 	/* the composite, into the window's colour (its depth not attached,
 	being read) */
 	glBindFramebuffer(GL_FRAMEBUFFER, ray.output_framebuffer);
@@ -463,6 +625,10 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glDrawBuffers(1, &draw_buffer);
 	glUseProgram(ray.composite_program);
 	glUniform4fv(ray.composite_uniforms, 4, uniforms);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ray.scene_texture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depth);
 	glUniform1i(ray.composite_scene, 0);
 	glUniform1i(ray.composite_depth, 1);
 	glActiveTexture(GL_TEXTURE2);
@@ -470,6 +636,11 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glBindSampler(2, 0);
 	glUniform1i(ray.composite_effect, 2);
 	glUniform1i(ray.composite_debug, ray.mode);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, world_results);
+	glBindSampler(3, 0);
+	glUniform1i(ray.composite_rt, 3);
+	glUniform1i(ray.composite_rt_enabled, world_results != 0);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 	/* the renderer's state is its own again */

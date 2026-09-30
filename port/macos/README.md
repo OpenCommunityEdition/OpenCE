@@ -73,7 +73,7 @@ These settings are new, or have a different default on macOS:
 | --- | --- | --- |
 | `display.resolution` | `"native"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
-| `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
+| `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |
 | `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
@@ -140,28 +140,42 @@ does not register the scheme.) Tailscale needs no invite.
 ## Ray-traced lighting
 
 After the game draws the solid parts of the 3D world, and before the
-transparent parts, the fog, the effects and the HUD, the lighting
-(`port/linux/src/raytrace_gl.c`) sends rays through that picture's depth
-buffer:
+transparent parts, the fog, the effects and the HUD, the lighting sends
+rays from each pixel:
 
-- Ambient occlusion: rays go from each pixel across the half sphere above
-  the surface. A ray that hits a surface near it makes the pixel darker.
-  Corners, creases and the ground below objects get darker, as in the real
-  world.
-- One bounce of indirect light: the color that a ray hits adds a small
-  quantity of light. A red wall makes the floor next to it a little red.
+- Ambient occlusion: rays go across the half sphere above the surface. A
+  ray that hits a surface near it makes the pixel darker. Corners, creases
+  and the ground below objects get darker, as in the real world.
 - Reflections: a ray goes in the mirror direction of the view. The surface
-  reflects the color where the ray hits. Surfaces reflect more at glancing
-  angles (the Fresnel effect).
+  reflects the color where the ray hits, more at glancing angles (the
+  Fresnel effect).
+- One bounce of indirect light: the color that a screen ray hits adds a
+  small quantity of light. A red wall makes the floor next to it a little
+  red.
 
-The rays go through the screen's depth buffer, because the Xbox game has
-no other data about the scene, and Macs before the M3 have no ray tracing
-hardware. A ray that goes off the screen hits nothing. Its effect fades.
-At the display's resolution, the lighting takes a few milliseconds of an
-M2 Pro's time for each frame.
+On macOS the rays go through the level itself with Metal's ray tracing
+(`port/macos/host/host_metal_rt.m`): the level's collision surfaces
+(`port/linux/game/raytrace_world.c`) are a Metal acceleration structure,
+built when the level loads. These rays find the level's geometry also where
+the camera does not see it. A reflection takes its color from the screen
+where the camera sees the point that the ray hit. On M1 and M2, Metal traces
+the rays in compute; on M3 and later (the M5 and M6 too), in the GPU's ray
+tracing hardware.
+
+Rays through the screen's depth buffer also operate on every platform. They
+find the objects (the level's surfaces do not include them) and give the
+bounce. Where Metal cannot trace rays, they are the only rays.
+
+| `display.ray_tracing` | Rays |
+| --- | --- |
+| `"on"` | Metal's through the level, and the screen's. |
+| `"screen"` | The screen's only. |
+| `"off"` | None. |
+| `"occlusion"`, `"depth"` | Show what the lighting uses. |
 
 `port/macos/tests/run_raytrace_test.sh` draws a test scene through the
-lighting on ANGLE and writes the pictures to `build/macos/raytrace_test`.
+lighting on ANGLE, with Metal's rays, and writes the pictures to
+`build/macos/raytrace_test`.
 
 ## How the port operates
 

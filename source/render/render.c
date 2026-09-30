@@ -420,7 +420,8 @@ static void render_window(
 		/* the native ports' screen-space ray-traced lighting, on the
 		opaque world (port/linux/src/raytrace_gl.c) */
 		halo_ray_traced_lighting(rasterizer_camera->z_near, rasterizer_camera->z_far,
-			rasterizer_camera->vertical_field_of_view);
+			rasterizer_camera->vertical_field_of_view, &rasterizer_camera->position.x,
+			&rasterizer_camera->forward.i, &rasterizer_camera->up.i);
 #endif
 		structure_render_transparent_geometry();
 		structure_render_fog();

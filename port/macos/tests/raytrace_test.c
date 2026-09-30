@@ -16,9 +16,24 @@ Built and run by port/macos/tests/run_raytrace_test.sh.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "gl.h"
 #include "raytrace_gl.h"
+
+#ifdef HALO_MACOS
+/* the host's (port/macos/host/host_metal_rt.m, linked in) */
+void host_logf(int priority, const char *format, ...)
+{
+	va_list arguments;
+
+	(void)priority;
+	va_start(arguments, format);
+	vprintf(format, arguments);
+	va_end(arguments);
+	printf("\n");
+}
+#endif
 
 #define WIDTH 854
 #define HEIGHT 480
@@ -27,6 +42,15 @@ Built and run by port/macos/tests/run_raytrace_test.sh.
 #define FIELD_OF_VIEW 1.22f
 
 static const char *ray_tracing_mode = "on";
+
+/* the scene in the game's world: right-handed, z up; the camera at the
+origin looks along +y (view x, y up, z forward -> world x, z, y) */
+static float world_vertices[4096 * 3];
+/* 32-bit, as the guest's unsigned long is (the host reads them so) */
+static unsigned int world_indices[4096];
+
+unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
+	long *triangle_count);
 
 void platform_log(const char *format, ...)
 {
@@ -104,6 +128,9 @@ struct vertex { float x, y, z, r, g, b; };
 
 static int vertex_count;
 static struct vertex vertices[4096];
+static void build_scene(void);
+static int vertex_count_scene(void);
+static const struct vertex *vertices_scene(void);
 
 static void quad(const float *a, const float *b, const float *c, const float *d, float r, float g, float bl)
 {
@@ -126,6 +153,7 @@ static void quad(const float *a, const float *b, const float *c, const float *d,
 /* view space: x right, y up, z into the screen */
 static void build_scene(void)
 {
+	vertex_count = 0;
 	float f0[3] = { -8, -1, 1 }, f1[3] = { 8, -1, 1 }, f2[3] = { 8, -1, 20 }, f3[3] = { -8, -1, 20 };
 	float w0[3] = { -8, -1, 12 }, w1[3] = { 8, -1, 12 }, w2[3] = { 8, 5, 12 }, w3[3] = { -8, 5, 12 };
 	float s0[3] = { -3, -1, 3 }, s1[3] = { -3, -1, 12 }, s2[3] = { -3, 5, 12 }, s3[3] = { -3, 5, 3 };
@@ -141,6 +169,18 @@ static void build_scene(void)
 	quad(b010, b110, b111, b011, 0.95f, 0.9f, 0.4f);
 	quad(b000, b010, b011, b001, 0.8f, 0.7f, 0.25f);
 	quad(b100, b101, b111, b110, 0.8f, 0.7f, 0.25f);
+}
+
+static int vertex_count_scene(void)
+{
+	if (!vertex_count)
+		build_scene();
+	return vertex_count;
+}
+
+static const struct vertex *vertices_scene(void)
+{
+	return vertices;
 }
 
 static GLuint program_from(const char *vertex_source, const char *pixel_source)
@@ -160,6 +200,25 @@ static GLuint program_from(const char *vertex_source, const char *pixel_source)
 	return program;
 }
 
+unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
+	long *triangle_count)
+{
+	int index;
+
+	for (index = 0; index < vertex_count_scene(); index++)
+	{
+		world_vertices[index * 3 + 0] = vertices_scene()[index].x;
+		world_vertices[index * 3 + 1] = vertices_scene()[index].z;
+		world_vertices[index * 3 + 2] = vertices_scene()[index].y;
+		world_indices[index] = (unsigned int)index;
+	}
+	*vertices = world_vertices;
+	*vertex_count = vertex_count_scene();
+	*indices = (const unsigned long *)world_indices;
+	*triangle_count = vertex_count_scene() / 3;
+	return 1;
+}
+
 static void draw_scene(void)
 {
 	static GLuint program, buffer, array;
@@ -168,7 +227,7 @@ static void draw_scene(void)
 	if (!program)
 	{
 		program = program_from(scene_vertex, scene_pixel);
-		build_scene();
+		vertex_count_scene();
 		glGenVertexArrays(1, &array);
 		glBindVertexArray(array);
 		glGenBuffers(1, &buffer);
@@ -211,6 +270,8 @@ static void save(const char *path)
 	printf("wrote %s\n", path);
 }
 
+static const float camera_position[3] = { 0, 0, 0 }, camera_forward[3] = { 0, 1, 0 }, camera_up[3] = { 0, 0, 1 };
+
 int main(int argc, char **argv)
 {
 	SDL_Window *window;
@@ -226,6 +287,7 @@ int main(int argc, char **argv)
 	SDL_SetHint(SDL_HINT_OPENGL_LIBRARY, path);
 	snprintf(path, sizeof(path), "%s/libEGL.dylib", argv[1]);
 	SDL_SetHint(SDL_HINT_EGL_LIBRARY, path);
+	setenv("ANGLE_DEFAULT_PLATFORM", "metal", 0);
 	if (!SDL_Init(SDL_INIT_VIDEO))
 	{
 		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -257,18 +319,33 @@ int main(int argc, char **argv)
 
 	draw_scene();
 	save("raytrace_before.ppm");
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW);
+	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
 	save("raytrace_after.ppm");
 	/* the pass's views: occlusion, then depth (F9 turns it off and on, and
 	the mode is read again) */
 	draw_scene();
 	halo_ray_tracing_debug_mode(2);
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW);
+	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
 	save("raytrace_occlusion.ppm");
 	draw_scene();
 	halo_ray_tracing_debug_mode(3);
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW);
+	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
 	save("raytrace_depth.ppm");
+#ifdef HALO_MACOS
+	{
+		/* the depth and normals the rays start from, and the rays'
+		results, across row 150 */
+		extern int host_rt_debug_read(int which, int x, int y, int count, float *values);
+		static float row[WIDTH * 4], results[WIDTH * 4];
+		int x;
+
+		host_rt_debug_read(0, 0, 150, WIDTH, row);
+		host_rt_debug_read(1, 0, 150, WIDTH, results);
+		for (x = 360; x < 660; x += 20)
+			printf("row 150 x %d: z %.4f normal %.3f %.3f %.3f  visibility %.3f\n", x, row[x * 4], row[x * 4 + 1],
+				row[x * 4 + 2], row[x * 4 + 3], results[x * 4]);
+	}
+#endif
 	printf("GL error %#x\n", glGetError());
 	SDL_Quit();
 	return 0;
