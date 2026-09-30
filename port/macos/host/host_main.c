@@ -400,6 +400,41 @@ int main(int argc, char *argv[])
 			environment_set(&environment, name, equals + 1);
 		}
 	}
+	/* the command line's settings (--name=value, --name value, --name,
+	--no-name: port_config.c's), one a line, as HALO_SETTINGS; the rest of
+	the line goes to the game */
+	{
+		static char settings[4096];
+		size_t used = 0;
+		int kept = 1;
+
+		for (index = 1; index < argc; index++)
+		{
+			const char *arg = argv[index];
+			int written;
+
+			if (strncmp(arg, "--", 2) || !arg[2])
+			{
+				argv[kept++] = argv[index];
+				continue;
+			}
+			arg += 2;
+			/* (a value after it, not itself a flag) */
+			if (!strchr(arg, '=') && index + 1 < argc && strncmp(argv[index + 1], "--", 2) &&
+				strncmp(arg, "no-", 3))
+			{
+				written = snprintf(settings + used, sizeof(settings) - used, "%s=%s\n", arg, argv[index + 1]);
+				index++;
+			}
+			else
+				written = snprintf(settings + used, sizeof(settings) - used, "%s\n", arg);
+			if (written > 0 && used + (size_t)written < sizeof(settings))
+				used += (size_t)written;
+		}
+		argc = kept;
+		if (used)
+			environment_set(&environment, "HALO_SETTINGS", settings);
+	}
 	snprintf(path, sizeof(path), "%s/", host_data_root);
 	environment_set(&environment, "HALO_BASE_PATH", path);
 	time_zone(zone, sizeof(zone));

@@ -105,6 +105,17 @@ These settings are new, or have a different default on macOS:
 | --- | --- | --- |
 | `display.resolution` | `"1080p"` | The picture's pixels. `"native"`: the display's in fullscreen, the window's in a window. `"720p"`, `"1080p"`, `"1440p"`, `"2160p"`: that many lines, in the shape of the display or window. `"<width>x<height>"`: that picture. `"xbox"`: 640x480. |
 | `display.show_fps` | `false` | Start with the frames-a-second counter shown (F7 / ⌘P). |
+
+Every setting can also be given on the command line, over `config.toml` and
+the `HALO_*` variables: `--display.vsync=false`, or by the last part of its
+name alone, `--vsync=false` (a dash for an underscore: `--hidden-window`);
+a boolean alone is true (`--mute`), `--no-` before it false
+(`--no-vsync`); and short names `--gi path`, `--rt off`, `--map c10`,
+`--fps`, `--windowed`. `--help` lists them all:
+
+```
+build/macos-release/Halo.app/Contents/MacOS/halo --gi path --no-vsync --fps --map c10
+```
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
 | `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |

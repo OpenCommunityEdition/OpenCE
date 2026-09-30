@@ -751,6 +751,119 @@ static void config_report_unknown_keys(toml_datum_t table)
 	}
 }
 
+/* the command line's short names for settings */
+static const struct
+{
+	const char *alias;
+	const char *name;
+	const char *value;
+} config_aliases[] = {
+	{ "gi", "display.ray_tracing_gi", NULL },
+	{ "rt", "display.ray_tracing", NULL },
+	{ "map", "game.map", NULL },
+	{ "fps", "display.show_fps", NULL },
+	{ "windowed", "display.fullscreen", "false" },
+	{ "no_vsync", "display.vsync", "false" },
+	{ "mute", "audio.enabled", "false" },
+};
+
+/* a setting by the command line's name for it: its whole name, an alias,
+or the last part of one name alone ("vsync": display.vsync); -1 if none */
+static long config_argument_index(const char *name, const char **value)
+{
+	size_t index, length = strlen(name);
+	long found = -1;
+
+	for (index = 0; index < sizeof(config_aliases) / sizeof(config_aliases[0]); index++)
+	{
+		if (!strcmp(name, config_aliases[index].alias))
+		{
+			if (config_aliases[index].value)
+				*value = config_aliases[index].value;
+			return config_setting_index(config_aliases[index].name);
+		}
+	}
+	if ((found = config_setting_index(name)) >= 0)
+		return found;
+	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+	{
+		const char *setting = config_settings[index].name, *dot = strrchr(setting, '.');
+
+		if (dot && strlen(dot + 1) == length && !strcmp(dot + 1, name))
+		{
+			if (found >= 0)
+				return -2;
+			found = (long)index;
+		}
+	}
+	return found;
+}
+
+/* the command line's settings (HALO_SETTINGS, from the host: a line each,
+"name=value", "name" - true - or "no-name" - false), over the file's and the
+environment's; "help" lists them all */
+static void config_apply_arguments(const char *text)
+{
+	while (text && *text)
+	{
+		char line[512], name[256];
+		const char *end = strchr(text, '\n'), *value;
+		size_t length = end ? (size_t)(end - text) : strlen(text), index;
+		char *equals;
+		long setting;
+
+		if (length >= sizeof(line))
+			length = sizeof(line) - 1;
+		memcpy(line, text, length);
+		line[length] = 0;
+		text = end ? end + 1 : text + length;
+		if (!line[0])
+			continue;
+		if (!strcmp(line, "help"))
+		{
+			for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+				fprintf(stderr, "--%s (%s, %s)\n    %s\n", config_settings[index].name,
+					config_settings[index].default_value, config_settings[index].environment,
+					config_settings[index].comment);
+			fprintf(stderr, "short names: the last part of a name (--vsync=false), and --gi, --rt, --map, --fps, "
+				"--windowed, --no-vsync, --mute\n");
+			exit(0);
+		}
+		equals = strchr(line, '=');
+		value = equals ? equals + 1 : "true";
+		if (equals)
+			*equals = 0;
+		snprintf(name, sizeof(name), "%s", line);
+		for (index = 0; name[index]; index++)
+			if (name[index] == '-')
+				name[index] = '_';
+		setting = config_argument_index(name, &value);
+		if (setting < 0 && !equals && !strncmp(name, "no_", 3))
+		{
+			value = "false";
+			setting = config_argument_index(name + 3, &value);
+		}
+		if (setting == -2)
+		{
+			platform_log("settings: --%s is more than one setting's name; give it whole", line);
+			continue;
+		}
+		if (setting < 0)
+		{
+			platform_log("settings: no setting --%s (--help lists them)", line);
+			continue;
+		}
+		if (config_settings[setting].type == _config_string)
+		{
+			free(config_values[setting].string);
+			config_values[setting].string = strdup(value);
+		}
+		else
+			config_set_from_text(&config_values[setting], config_settings[setting].type, value);
+		platform_log("settings: --%s: %s = %s", line, config_settings[setting].name, value);
+	}
+}
+
 static void config_load(void)
 {
 	char path[1024];
@@ -832,6 +945,7 @@ static void config_load(void)
 			break;
 		}
 	}
+	config_apply_arguments(getenv("HALO_SETTINGS"));
 }
 
 static const struct config_value *config_value(const char *name, enum config_type type)
