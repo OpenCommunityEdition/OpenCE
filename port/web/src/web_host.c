@@ -6,9 +6,10 @@ The services the Android host supplies to the shared OpenGL ES renderer
 
 The worker recorder snapshots buffer data when it is given, then merges
 append-only stream writes before replaying their draws. A frame's commands
-are flushed before presentation. This avoids repeatedly modifying the large
-stream buffers between draws without adding GPU fences that this continuously
-running worker could not wait on.
+are flushed before presentation. The GPU queue is drained once per stream
+ring rotation so drivers do not retain an unlimited number of upload copies.
+WebGL fences cannot become signaled until the worker yields to its event loop;
+this blocking game loop uses a periodic finish instead.
 */
 
 #include <GLES3/gl3.h>
@@ -75,5 +76,9 @@ void host_gl_fence_frame(unsigned int slot)
 
 void host_gl_wait_frame(unsigned int slot)
 {
-	(void)slot;
+	/* Three ring slots (d3d8_gl.c): let frames overlap, then complete their
+	work before starting another rotation. Waiting happens on the game worker,
+	not the page/network thread. glFinish is also a recorder replay barrier. */
+	if (slot == 0)
+		glFinish();
 }

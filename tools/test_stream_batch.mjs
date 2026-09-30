@@ -277,6 +277,31 @@ compare("mixed uniform snapshots retain source offsets and survive later source 
 }
 process.stdout.write("PASS fixed queue bound and complete large-frame replay\n");
 
+compare("snapshot arena wraps without changing earlier draws or uniform values", (gl, frame) => {
+    vertexBuffer(gl); frame();
+    const data = new Uint8Array(8192), color = new Float32Array(4);
+    for (let draw = 0; draw < 2300; draw++) {
+        data.fill(draw & 255); color.fill(draw);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+        gl.uniform4fv({}, color);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    data.fill(0); color.fill(0);
+});
+
+compare("oversized synchronous upload invalidates snapshots before later partial writes", (gl, frame) => {
+    vertexBuffer(gl); frame();
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Uint8Array([1, 2, 3]));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // A desktop streaming slot is larger than the fixed snapshot arena.
+    gl.bufferData(gl.ARRAY_BUFFER, 32 * 1024 * 1024, gl.STREAM_DRAW);
+    const big = new Uint8Array(17 * 1024 * 1024).fill(8);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, big);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Uint8Array([4]));
+    gl.bufferSubData(gl.ARRAY_BUFFER, 2, new Uint8Array([6]));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+});
+
 // The worker has no document, window, timers or animation-frame callback.
 // Exercise the same installer through the source runtime's presentation path,
 // including a frame without a final blit and the explicit source opt-out.

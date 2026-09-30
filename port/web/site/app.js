@@ -67,10 +67,11 @@ can run the game, copies the game data out of the player's disc image
   // ---------- settings (this browser's; nothing else depends on them)
 
   const coarsePointer = matchMedia('(pointer: coarse)').matches;
-  const settings = { touch: coarsePointer, look: 1.4, vsync: true, glDebug: false };
+  const settings = { touch: coarsePointer, look: 1.4, vsync: true, glDebug: false, renderHeight: ios || pixelFrames ? 480 : 720 };
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem('halo-web-settings') || '{}'));
   } catch { /* private browsing: the defaults */ }
+  if (![480, 720, 1080, 1440].includes(Number(settings.renderHeight))) settings.renderHeight = ios || pixelFrames ? 480 : 720;
 
   function saveSettings() {
     try { localStorage.setItem('halo-web-settings', JSON.stringify(settings)); } catch { /* not kept */ }
@@ -183,15 +184,9 @@ can run the game, copies the game data out of the player's disc image
         'Threads: this page is not cross-origin isolated. Reload it; if this stays, the browser is too old.') && ok;
     ok = addCheck(webgl2InWorkers(), 'WebGL 2 from a worker (OffscreenCanvas; iOS 17 or later)') && ok;
     ok = await checkGameStorage() && ok;
-    if (ok) {
-      try {
-        state.memory = new WebAssembly.Memory({ initial: MEMORY_PAGES, maximum: MEMORY_PAGES, shared: true });
-        addCheck(true, 'Memory (2.1 GB of address space)');
-      } catch (error) {
-        ok = addCheck(false, 'Memory: the browser would not reserve 2.1 GB of address space for the game (' +
-          error.message + '). Close other tabs and apps, then reload.');
-      }
-    }
+    // Reserve the Xbox address window only after Play owns the game lock.
+    // Downloads, idle launchers and a second tab need no game-sized memory.
+    ok = addCheck(typeof WebAssembly !== 'undefined' && typeof WebAssembly.Memory === 'function', 'WebAssembly memory') && ok;
     if (navigator.storage && navigator.storage.estimate) {
       try {
         const estimate = await navigator.storage.estimate();
@@ -611,12 +606,11 @@ can run the game, copies the game data out of the player's disc image
     const short = Math.min(window.innerWidth, window.innerHeight);
     let width = Math.round(long * scale);
     let height = Math.round(short * scale);
-    // The game draws 480 lines. Keep iOS bitmap handoffs and Chrome/macOS
-    // pixel readbacks at that size rather than copying a Retina-sized frame.
-    // CSS scales the canvas to the screen; diagnostics can override the cap.
+    // Bound render targets and transferred frame surfaces independently of
+    // Retina/4K desktop size. Settings and diagnostics can opt into more detail.
     const requestedHeight = Number(diagnosticOptions.get('render_height'));
     const maximumHeight = Number.isFinite(requestedHeight) && requestedHeight > 0 ?
-      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : (ios || pixelFrames ? 480 : 1440);
+      Math.max(480, Math.min(1440, Math.round(requestedHeight))) : Number(settings.renderHeight);
     if (height > maximumHeight) {
       width = Math.round(width * maximumHeight / height);
       height = maximumHeight;
@@ -781,6 +775,21 @@ can run the game, copies the game data out of the player's disc image
       state.releaseGameLock?.();
       state.releaseGameLock = null;
       state.started = false;
+      return;
+    }
+    try {
+      state.memory = new WebAssembly.Memory({ initial: MEMORY_PAGES, maximum: MEMORY_PAGES, shared: true });
+    } catch (error) {
+      state.releaseGameLock?.();
+      state.releaseGameLock = null;
+      state.started = false;
+      state.audio?.close().catch(() => {});
+      state.audio = null;
+      state.quickFailed = true;
+      cancelQuickPlay();
+      quickStatus('error', 'The browser could not reserve memory for Halo. Close other Halo tabs or apps and retry.');
+      log('memory: ' + (error?.message || error));
+      updatePlayButton();
       return;
     }
     updatePlayButton();
@@ -1226,6 +1235,14 @@ can run the game, copies the game data out of the player's disc image
     $('opt-touch').checked = settings.touch;
     $('opt-look').value = settings.look;
     $('opt-vsync').checked = settings.vsync;
+    $('opt-resolution').value = settings.renderHeight;
+    $('opt-resolution').onchange = (event) => {
+      const height = Number(event.target.value);
+      if (![480, 720, 1080, 1440].includes(height)) return;
+      settings.renderHeight = height;
+      saveSettings();
+      if (state.shared) updateDisplaySize();
+    };
     $('opt-touch').onchange = (event) => { settings.touch = event.target.checked; saveSettings(); };
     $('opt-look').oninput = (event) => {
       settings.look = parseFloat(event.target.value);

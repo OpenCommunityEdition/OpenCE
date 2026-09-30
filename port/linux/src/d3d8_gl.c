@@ -752,6 +752,9 @@ static void surface_dimensions(const D3DSurface *surface, unsigned long *width, 
 static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
+#ifdef HALO_WEB
+	struct render_target_entry *resized = NULL;
+#endif
 	unsigned long width, height;
 	BOOL depth;
 
@@ -769,13 +772,23 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
 		if (entry->target.data == surface->Data && entry->target.width == width &&
-			entry->target.height == height && entry->target.depth == depth &&
-			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+			entry->target.height == height && entry->target.depth == depth)
 		{
-			return entry;
+			if (entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+				return entry;
+#ifdef HALO_WEB
+			/* A browser resize changes the scale, not the guest surface.
+			Reuse its texture (and attached FBOs) instead of retaining a
+			full color/depth allocation for every window size forever. */
+			resized = entry;
+#endif
 		}
 	}
+#ifdef HALO_WEB
+	entry = resized ? resized : calloc(1, sizeof(*entry));
+#else
 	entry = calloc(1, sizeof(*entry));
+#endif
 	entry->target.data = surface->Data;
 	entry->target.width = width;
 	entry->target.height = height;
@@ -784,7 +797,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[1] = scale[1];
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
-	glGenTextures(1, &entry->target.texture);
+	if (!entry->target.texture)
+		glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	if (depth)
@@ -794,6 +808,10 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 	xgpu_gl_state_invalidate();
+#ifdef HALO_WEB
+	if (resized)
+		return entry;
+#endif
 	entry->next = render_targets;
 	render_targets = entry;
 	entry->next_in_bucket = *render_target_bucket(entry->target.data);

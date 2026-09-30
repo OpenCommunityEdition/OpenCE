@@ -171,7 +171,7 @@ code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
 .room-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
 .room-line strong { font-size: 20px; letter-spacing: 0.12em; color: var(--accent); }
 .small-button { min-height: 34px; padding: 0 12px; font-size: 13px; }
-.settings input[type=text], .settings input[type=password] {
+.settings input[type=text], .settings input[type=password], .settings select {
   flex: 1;
   min-width: 120px;
   min-height: 36px;

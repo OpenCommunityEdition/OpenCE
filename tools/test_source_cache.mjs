@@ -4,12 +4,16 @@ import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../port/web/site/cache.js', import.meta.url), 'utf8');
+const hashSource = readFileSync(new URL('../port/web/site/vendor/sha256.js', import.meta.url), 'utf8');
 const bytes = new Uint8Array(2048).fill(7);
 bytes.set(new TextEncoder().encode('daeh'), 0);
 bytes.set(new TextEncoder().encode('toof'), 2044);
-const sha256 = Buffer.from(await webcrypto.subtle.digest('SHA-256', bytes)).toString('hex');
 
 async function scenario(options = {}) {
+  const content = options.bytes || bytes;
+  const hash = Buffer.from(await webcrypto.subtle.digest('SHA-256', content)).toString('hex');
+  const split = Math.ceil(content.length / 2);
+  const reads = [], readBuffers = new Set();
   const files = new Map(), directories = new Set(['']), writes = [], requests = [], progress = [], reservations = [], workerMessages = [];
   const abort = new AbortController();
   const absent = () => new DOMException('missing', 'NotFoundError');
@@ -38,7 +42,19 @@ async function scenario(options = {}) {
           next.set(data); next.set(value, at); data = next;
           return value.length;
         },
-        flush() { files.set(path, data); },
+        getSize() { return data.length; },
+        read(value, { at }) {
+          const count = Math.min(value.length, data.length - at, options.shortReads ? 317 : Infinity);
+          value.set(data.subarray(at, at + count));
+          reads.push({ at, requested: value.length, count });
+          readBuffers.add(value.buffer);
+          if (options.cancelVerification) abort.abort();
+          return count;
+        },
+        flush() {
+          if (options.corruptWritten && path.endsWith('.map')) data[100] ^= 1;
+          files.set(path, data);
+        },
         close() { files.set(path, data); },
       };
     },
@@ -90,29 +106,31 @@ async function scenario(options = {}) {
       requests.push(String(url));
       if (String(url).endsWith('manifest.json')) {
         const manifest = { version: 2, files: context.HaloCache.expected.map(name => ({
-          name: 'maps/' + name, size: bytes.length, sha256,
-          chunks: [0, 1].map(index => ({ path: `chunks/${name}.part00${index}`, size: bytes.length / 2 })),
+          name: 'maps/' + name, size: content.length, sha256: hash,
+          chunks: [0, 1].map(index => ({ path: `chunks/${name}.part00${index}`, size: index ? content.length - split : split })),
         })) };
         if (options.badManifest) manifest.files[1].chunks[0].path = 'https://unexpected.example/steal';
         return new Response(JSON.stringify(manifest));
       }
       if (options.cancel || (options.cancelMap && String(url).includes(options.cancelMap))) abort.abort();
       const index = String(url).endsWith('000') ? 0 : 1;
-      const block = bytes.slice(index * 1024, (index + 1) * 1024);
+      const block = content.slice(index ? split : 0, index ? content.length : split);
       if (options.corrupt) block.fill(0);
       return new Response(options.truncated ? block.slice(0, 512) : block);
     },
   };
+  context.self = context;
+  vm.runInNewContext(hashSource, context);
   vm.runInNewContext(source, context);
   const names = context.HaloCache.expected;
   const cached = Array.isArray(options.cached) ? options.cached : options.cached === 'partial' ? names.slice(1) : options.cached ? names : [];
   const root = options.native ? 'maps' : 'halo/data/maps';
-  for (const name of cached) put(root + '/' + name, bytes);
+  for (const name of cached) put(root + '/' + name, content);
   if (cached.length && !options.native && !options.noMarker) {
-    put('halo/data/maps.json', JSON.stringify(Object.fromEntries(cached.map(name => [name, bytes.length]))));
+    put('halo/data/maps.json', JSON.stringify(Object.fromEntries(cached.map(name => [name, content.length]))));
   }
   if (cached.length && options.native && !options.noMarker) {
-    put('maps/.complete', JSON.stringify({ files: cached, bytes: cached.length * bytes.length }));
+    put('maps/.complete', JSON.stringify({ files: cached, bytes: cached.length * content.length }));
   }
   if (options.corruptCached) put(root + '/ui.map', new Uint8Array(2048));
   if (options.badMarker && options.native) put('maps/.complete', JSON.stringify({ files: cached, bytes: 1 }));
@@ -121,7 +139,7 @@ async function scenario(options = {}) {
   let result, error;
   try { result = await context.HaloCache.ensure({ required: options.required, signal: abort.signal, onProgress: entry => progress.push(entry) }); }
   catch (caught) { error = caught; }
-  return { result, error, requests, writes, files, progress, names, reservations, context, workerMessages, initialState };
+  return { result, error, requests, writes, files, progress, names, reservations, context, workerMessages, initialState, reads, readBuffers };
 }
 
 let r = await scenario({ cached: 'all' });
@@ -141,6 +159,27 @@ assert.equal(r.result.files.length, 24); assert.equal(r.requests.length, 3);
 assert.deepEqual([...r.files.get('halo/data/maps/ui.map')], [...bytes]);
 assert.equal(JSON.parse(new TextDecoder().decode(r.files.get('halo/data/maps.json')))['ui.map'], bytes.length);
 console.log('PASS resume downloads only missing map, concatenates chunks and commits after SHA256');
+r = await scenario({ cached: 'partial', shortReads: true });
+assert.equal(r.error, undefined);
+assert.ok(r.reads.length > 1, 'short reads must continue until the entire saved file is hashed');
+assert.equal(r.readBuffers.size, 1, 'every read reuses the same backing buffer');
+const large = new Uint8Array(2 * 1024 * 1024 + 67).fill(19);
+large.set(bytes.subarray(0, 4), 0); large.set(bytes.subarray(2044), 2044);
+r = await scenario({ cached: 'partial', bytes: large });
+assert.equal(r.error, undefined);
+assert.equal(r.reads.length, 3);
+assert.equal(r.readBuffers.size, 1);
+assert.equal(Math.max(...r.reads.map(read => read.requested)), 1024 * 1024);
+assert.equal(r.reads.at(-1).count, 67);
+console.log('PASS large-map SHA256 reads back every byte with one buffer bounded to 1 MiB, including short reads');
+r = await scenario({ cached: 'partial', corruptWritten: true });
+assert.match(r.error.message, /integrity/);
+assert.equal(r.files.has('halo/data/maps/ui.map'), false);
+console.log('PASS SHA256 detects corruption in the stored file, not just incoming network bytes');
+r = await scenario({ cached: 'partial', cancelVerification: true });
+assert.equal(r.error.name, 'AbortError');
+assert.equal(r.files.has('halo/data/maps/ui.map'), false);
+console.log('PASS cancellation during verification never commits a partially checked map');
 r = await scenario({ cached: 'all', corruptCached: true });
 assert.equal(r.result.files.length, 24); assert.equal(r.requests.length, 3);
 console.log('PASS damaged cache header triggers repair of only that map');

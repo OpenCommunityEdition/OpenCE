@@ -118,6 +118,12 @@
       <summary>Settings and data</summary>
       <label class="row"><input type="checkbox" id="opt-touch"> Touch controls</label>
       <label class="row">Aim sensitivity <input type="range" id="opt-look" min="0.4" max="3" step="0.1"></label>
+      <label class="row">Render resolution <select id="opt-resolution">
+        <option value="480">480p · lowest memory</option>
+        <option value="720">720p · balanced</option>
+        <option value="1080">1080p · high detail</option>
+        <option value="1440">1440p · highest detail</option>
+      </select></label>
       <label class="row"><input type="checkbox" id="opt-vsync" checked> Wait for the display (smoother, saves battery)</label>
       <label class="row"><input type="checkbox" id="opt-gldebug"> Log graphics errors (for bug reports)</label>
       <p class="small">Online play: a TURN relay, for networks that WebRTC cannot cross directly (some mobile networks).</p>

@@ -70,6 +70,7 @@ async function launch(query = '', viewport = {}, initiallyHidden = false) {
   module.onRuntimeInitialized();
   return {
     context, timers, hiddenAtAttach,
+    resolution(height) { element('opt-resolution').onchange({ target: { value: String(height) } }); },
     output: () => element('body').children.find(child => child.id === 'performance-stats'),
     samples() { return JSON.parse(this.output().dataset.samples); },
     tick(milliseconds = 1000) {
@@ -143,7 +144,7 @@ test('reference geometry path is opt-in for controlled comparisons', async () =>
   }
 });
 
-test('Chrome on Mac negotiates pixel frames and caps readback height without changing other browsers', async () => {
+test('Chrome on Mac negotiates pixel frames; other desktops default to 720p', async () => {
   for (const [userAgent, enabled] of [
     ['Mozilla/5.0 (Macintosh) Chrome/153.0.0.0 Safari/537.36', true],
     ['Mozilla/5.0 (Macintosh) Chrome/153.0.0.0 Edg/153.0.0.0', true],
@@ -152,7 +153,7 @@ test('Chrome on Mac negotiates pixel frames and caps readback height without cha
   ]) {
     const page = await launch('', { navigator: { userAgent, platform: 'Test', storage: { getDirectory() {} } } });
     assert.equal(page.context.Module.arguments.includes('--HALO_WEB_PIXEL_FRAMES=1'), enabled);
-    assert.equal(page.displaySize()[1], enabled ? 480 : 1440);
+    assert.equal(page.displaySize()[1], enabled ? 480 : 720);
   }
   const forced = await launch('?frame_transport=rgba');
   assert.equal(forced.context.Module.arguments.includes('--HALO_WEB_PIXEL_FRAMES=1'), true);
@@ -196,13 +197,13 @@ test('a delayed visible timer retains the real elapsed window and bounded recent
   assert.equal(samples.at(-1).fps, 1);
 });
 
-test('presentation height override is bounded, preserves aspect, and leaves the default unchanged', async () => {
+test('presentation height override is bounded and preserves aspect above the 720p desktop default', async () => {
   for (const [query, expected] of [
-    ['', [2560, 1440]], ['?render_height=480', [852, 480]],
+    ['', [1280, 720]], ['?render_height=480', [852, 480]],
     ['?render_height=720', [1280, 720]], ['?render_height=1440', [2560, 1440]],
     ['?render_height=9999', [2560, 1440]], ['?render_height=1', [852, 480]],
-    ['?render_height=0', [2560, 1440]], ['?render_height=invalid', [2560, 1440]],
-    ['?render_height=Infinity', [2560, 1440]],
+    ['?render_height=0', [1280, 720]], ['?render_height=invalid', [1280, 720]],
+    ['?render_height=Infinity', [1280, 720]],
   ]) {
     const page = await launch(query);
     assert.deepEqual(page.displaySize(), expected, query || 'default');
@@ -211,6 +212,19 @@ test('presentation height override is bounded, preserves aspect, and leaves the 
   assert.deepEqual(portrait.displaySize(), [1280, 720]);
   const small = await launch('?render_height=720', { devicePixelRatio: 1, innerWidth: 640, innerHeight: 360 });
   assert.deepEqual(small.displaySize(), [640, 360], 'a maximum does not upscale small viewports');
+});
+
+test('resolution settings update display size, reject invalid values, and retain diagnostic overrides', async () => {
+  const page = await launch();
+  for (const [height, expected] of [[480, [852, 480]], [1080, [1920, 1080]], [1440, [2560, 1440]], [720, [1280, 720]]]) {
+    page.resolution(height);
+    assert.deepEqual(page.displaySize(), expected);
+  }
+  page.resolution(9999);
+  assert.deepEqual(page.displaySize(), [1280, 720]);
+  const override = await launch('?render_height=480');
+  override.resolution(1440);
+  assert.deepEqual(override.displaySize(), [852, 480]);
 });
 
 test('iPhone and desktop-mode iPad avoid Retina-sized bitmap copies and retain overrides', async () => {

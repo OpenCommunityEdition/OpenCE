@@ -20,6 +20,12 @@
         const methodNames = new Set([...Object.getOwnPropertyNames(WebGLRenderingContext.prototype), ...Object.getOwnPropertyNames(WebGL2RenderingContext.prototype)]);
         for (const name of methodNames) if (name !== "constructor" && typeof gl[name] === "function") native[name] = gl[name].bind(gl);
         let commands = [], bufferCommands = [], bytes = 0, flushing = false;
+        // Keep snapshots until replay without allocating a new backing store
+        // for every draw. Native GL consumes the bytes before this arena is
+        // reused. Align views for every uniform element type (including f64).
+        const snapshotLimit = 16 * 1024 * 1024;
+        const snapshots = new Uint8Array(snapshotLimit);
+        let snapshotOffset = 0;
         const buffers = new Map(), elementBuffers = new Map(), storage = new WeakMap();
         let vao = null, drawFramebuffer = null;
         const bound = target => target === gl.ELEMENT_ARRAY_BUFFER ? elementBuffers.get(vao) : buffers.get(target);
@@ -90,7 +96,37 @@
             }
             stats.flushes++;
             stats.commands += work.length;
+            snapshotOffset = 0;
             flushing = false;
+        };
+        const snapshot = (data, sourceOffset = 0, length = data.length) => {
+            const source = sourceOffset || length !== data.length ? data.subarray(sourceOffset, sourceOffset + length) : data;
+            const size = source.byteLength;
+            if (size > snapshotLimit) return null;
+            let offset = (snapshotOffset + 7) & ~7;
+            if (offset + size > snapshotLimit || bytes + size > snapshotLimit) {
+                flush();
+                offset = 0;
+            }
+            const copy = new data.constructor(snapshots.buffer, offset, source.length);
+            copy.set(source);
+            snapshotOffset = offset + size;
+            bytes += size;
+            return copy;
+        };
+        const updateShadow = (info, offset, data) => {
+            if (!info || offset < 0 || offset + data.byteLength > info.size) return;
+            const end = offset + data.byteLength;
+            if (end > info.shadow.length) {
+                // Retain only the used part of a streaming buffer. Most frames
+                // use a fraction of the 16 MiB capacity of each ring slot.
+                let size = Math.max(65536, info.shadow.length);
+                while (size < end) size *= 2;
+                const grown = new Uint8Array(Math.min(size, info.size));
+                grown.set(info.shadow);
+                info.shadow = grown;
+            }
+            info.shadow.set(data, offset);
         };
         const record = (name, args, buffer, info) => {
             const command = [name, args, buffer, info];
@@ -169,7 +205,7 @@
                 stats.numericAllocations++;
                 let info;
                 if (buffer && streamStorage(target, data, usage)) {
-                    info = { size: data, usage, shadow: new Uint8Array(data) };
+                    info = { size: data, usage, shadow: new Uint8Array(0) };
                     storage.set(buffer, info);
                 } else if (buffer) storage.delete(buffer);
                 record("bufferData", [target, data, usage], buffer, info);
@@ -179,11 +215,19 @@
             countKind(uploadTargets, String(target));
             const unit = data.BYTES_PER_ELEMENT || 1;
             const count = length || (data.byteLength / unit - sourceOffset);
-            const copy = new Uint8Array(data.buffer, data.byteOffset + sourceOffset * unit, count * unit).slice();
-            bytes += copy.byteLength;
-            stats.recordBytes += copy.byteLength;
+            const source = new Uint8Array(data.buffer, data.byteOffset + sourceOffset * unit, count * unit);
+            const copy = snapshot(source);
             const buffer = bound(target), info = buffer && storage.get(buffer);
-            if (info?.shadow && offset >= 0 && offset + copy.byteLength <= info.size) info.shadow.set(copy, offset);
+            if (!copy) {
+                // A single oversized write is consumed synchronously instead
+                // of exceeding the recorder's memory bound.
+                flush();
+                if (buffer) storage.delete(buffer);
+                native.bufferSubData(target, offset, data, sourceOffset, length);
+                return;
+            }
+            stats.recordBytes += copy.byteLength;
+            updateShadow(info, offset, copy);
             record("bufferSubData", [target, offset, copy], buffer, info);
         };
         for (const name of methodNames) {
@@ -195,9 +239,15 @@
                     const data = args[dataIndex];
                     const offset = args[dataIndex + 1] || 0;
                     const length = args[dataIndex + 2] || data.length - offset;
-                    const copy = data.slice(offset, offset + length);
+                    let copy;
+                    if (ArrayBuffer.isView(data)) {
+                        copy = snapshot(data, offset, length);
+                        if (!copy) { flush(); native[name](...args); return; }
+                    } else {
+                        copy = data.slice(offset, offset + length);
+                        bytes += copy.length * 8;
+                    }
                     const result = args.slice(0, dataIndex).concat([copy]);
-                    bytes += copy.byteLength || copy.length * 8;
                     record(name, result);
                 };
             } else if (/^clearBuffer(?:fv|iv|uiv)$/.test(name)) {

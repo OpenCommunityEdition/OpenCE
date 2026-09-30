@@ -158,7 +158,7 @@ async function extract(file) {
   return { files: files.length, bytes: total };
 }
 
-importScripts('cache.js');
+importScripts('vendor/sha256.js', 'cache.js');
 let cacheAbort = null;
 
 onmessage = async (event) => {

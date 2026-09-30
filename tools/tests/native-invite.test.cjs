@@ -231,20 +231,52 @@ test('missing storage API fails cleanly without inspecting data or allocating me
   assert.ok(element('checks').children.some(check => check.className === 'check bad' && /storage is unavailable/.test(check.textContent)));
 });
 
-test('usable storage is opened before memory allocation and normal cached startup remains available', async () => {
+test('idle launcher allocates no game memory; Play allocates after storage and the game lock', async () => {
   const order = [];
   const { element } = await launcher(undefined, {
     defaultRoom: '',
     gameStorage: { async getDirectory() { order.push('storage'); return {}; } },
     Memory: class { constructor() { order.push('memory'); } },
+    gameLocks: { request: async (_name, _options, callback) => { order.push('lock'); return callback({}); } },
     mapsState: async () => {
       order.push('maps');
       return fullMaps();
     },
   });
-  assert.deepEqual(order, ['storage', 'memory', 'maps']);
+  assert.deepEqual(order, ['storage', 'maps']);
   assert.equal(element('step-play').hidden, false);
   assert.ok(element('checks').children.some(check => check.className === 'check' && /Game file storage/.test(check.textContent)));
+  await element('play').onclick();
+  assert.deepEqual(order, ['storage', 'maps', 'lock', 'memory']);
+});
+
+test('a second game tab never reserves memory, and allocation failure releases the lock for retry', async () => {
+  let allocations = 0;
+  const blocked = await launcher(undefined, {
+    defaultRoom: '', gameLocks: { request: async (_name, _options, callback) => callback(null) },
+    Memory: class { constructor() { allocations++; } },
+  });
+  await blocked.element('play').onclick();
+  assert.equal(allocations, 0);
+  assert.equal(blocked.context.Module, undefined);
+
+  let locks = 0, released = 0;
+  const retry = await launcher(undefined, {
+    defaultRoom: '', gameLocks: { request: async (_name, _options, callback) => {
+      locks++;
+      await callback({});
+      released++;
+    } },
+    Memory: class { constructor() { if (++allocations === 1) throw new RangeError('out of memory'); } },
+  });
+  await retry.element('play').onclick();
+  await new Promise(setImmediate);
+  assert.equal(retry.context.Module, undefined);
+  assert.equal(released, 1, 'failed allocation must not retain the game lock');
+  await retry.element('play').onclick();
+  assert.ok(retry.context.Module, 'Play can recover from transient allocation failure');
+  assert.equal(allocations, 2);
+  assert.equal(locks, 2);
 });
 
 for (const autoLaunch of [false, true]) {

@@ -34,6 +34,29 @@ globalThis.HaloCache = (() => {
     return text(0) === 'daeh' && text(2044) === 'toof';
   }
 
+  async function fileHash(handle, size, signal) {
+    // SubtleCrypto requires an entire map in an ArrayBuffer and can copy it
+    // again internally. Read back the saved file with one reusable buffer;
+    // verification memory stays bounded even for 278 MiB campaign maps.
+    const access = await handle.createSyncAccessHandle();
+    try {
+      if (access.getSize() !== size) throw new Error('Downloaded file changed during its integrity check');
+      const buffer = new Uint8Array(Math.min(size, 1024 * 1024));
+      const digest = sha256.create();
+      let position = 0;
+      while (position < size) {
+        signal.throwIfAborted();
+        const count = access.read(buffer.subarray(0, Math.min(buffer.length, size - position)), { at: position });
+        if (!count) throw new Error('Could not read downloaded file for its integrity check');
+        digest.update(buffer.subarray(0, count));
+        position += count;
+        // Let the worker process cancellation between blocks.
+        if (position < size) await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      return digest.hex();
+    } finally { access.close(); }
+  }
+
   async function inspect(path, manifest = null) {
     const maps = new Map();
     let folder;
@@ -311,8 +334,7 @@ globalThis.HaloCache = (() => {
               signal.throwIfAborted();
               report('checking', 'Checking downloaded data', `Verifying ${name} before saving it.`, done + written);
               const cached = await handle.getFile();
-              const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', await cached.arrayBuffer()));
-              const hash = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+              const hash = await fileHash(handle, cached.size, signal);
               if (cached.size !== file.size || hash !== file.sha256 || !await headerValid(cached)) {
                 throw new Error(`${name} failed its integrity check`);
               }

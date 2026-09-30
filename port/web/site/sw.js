@@ -24,6 +24,7 @@ const SHELL = [
   'input.js',
   'net.js',
   'cache.js',
+  'vendor/sha256.js',
   'site-config.js',
   'native-invite.js',
   'gateway.js',
