@@ -171,6 +171,9 @@ const HaloNet = (() => {
   const MIGRATION_HEADER = 8;
   const MAX_RELIABLE_QUEUE = 8 * 1024 * 1024;
   const MAX_CHANNEL_BUFFER = 1024 * 1024;
+  const PING_CONTROL = 'halo-host-rtt-v1:';
+  const PING_STALE_MS = 10000;
+  const PING_PEERS = 128;
   const KIND = { DATAGRAM: 1, OPEN: 2, DATA: 3, CLOSE: 4, REFUSE: 5 };
 
   const state = {
@@ -194,6 +197,8 @@ const HaloNet = (() => {
     quick: null,
     quickSequence: 0,
     roomGeneration: 0,
+    pings: { signature: '', authority: null, rows: [], updated: 0, sequence: 0, received: 0 },
+    pingProbe: 0,
   };
 
   function randomId() {
@@ -235,6 +240,8 @@ const HaloNet = (() => {
       brokers: state.brokers.filter((broker) => broker.ready).length,
       players: connected,
       names: [...state.peers.values()].filter((peer) => peer.open).map((peer) => peer.name),
+      hostPings: state.pings.rows.map(([address, ms]) => ({ address: addressText(address),
+        ms: Date.now() - state.pings.updated < PING_STALE_MS && ms >= 0 ? ms : null })),
     };
   }
 
@@ -409,6 +416,10 @@ const HaloNet = (() => {
       state.peers.set(id, peer);
     }
     if (address) {
+      if (peer.address !== (address >>> 0)) {
+        peer.pingPending = peer.hostPing = null;
+        invalidatePeerPing(peer);
+      }
       if (state.byAddress.get(peer.address) === peer) state.byAddress.delete(peer.address);
       peer.address = address >>> 0;
       const previous = state.byAddress.get(peer.address);
@@ -433,6 +444,8 @@ const HaloNet = (() => {
     const previous = peer.pc;
     peer.pc = null;
     peer.open = false;
+    peer.pingPending = peer.hostPing = null;
+    invalidatePeerPing(peer);
     retireStreams(peer);
     try { previous?.close(); } catch { /* closed */ }
     const pc = new RTCPeerConnection({ iceServers: state.iceServers });
@@ -471,6 +484,7 @@ const HaloNet = (() => {
       if (typeof event.data === 'string') {
         if (event.data === 'halo-room-ping-v1' && peer.unreliable.readyState === 'open')
           peer.unreliable.send('halo-room-pong-v1');
+        else if (event.data.startsWith(PING_CONTROL)) receivePing(peer, event.data);
         return;
       }
       // Network events also drain output while background timers are throttled.
@@ -506,6 +520,8 @@ const HaloNet = (() => {
     const pc = peer.pc, wasOpen = peer.open;
     peer.pc = null;
     peer.open = false;
+    peer.pingPending = peer.hostPing = null;
+    invalidatePeerPing(peer);
     peer.received = [];
     peer.receivedHead = peer.receivedBytes = 0;
     retireStreams(peer);
@@ -586,6 +602,122 @@ const HaloNet = (() => {
       }
       if (peer.open && peer.unreliable?.readyState === 'open' && peer.unreliable.bufferedAmount < MAX_CHANNEL_BUFFER)
         peer.unreliable.send('halo-room-ping-v1');
+    }
+    sweepPings(now);
+  }
+
+  // Measure over the gameplay channel, rather than MQTT or ICE candidate
+  // statistics. Only the selected host probes, then publishes its RTT table.
+  function pingAuthority() {
+    const coordinator = state.quick?.coordinator;
+    const result = coordinator?.result, presence = coordinator?.presence;
+    if (!result || presence?.gamePhase !== 'playing' || presence.matchId === null ||
+        coordinator.recovering || coordinator.missingSince != null || state.quick.held) return null;
+    if (!Number.isInteger(presence.matchId) || !Number.isInteger(coordinator.epoch)) return null;
+    return { hostId: result.hostId, host: result.hostAddress >>> 0,
+      epoch: coordinator.epoch, match: presence.matchId, local: result.role === 'host' };
+  }
+
+  function publishPingMemory() {
+    if (!state.shared || !Number.isInteger(state.shared.offsets.pingSequence)) return;
+    const i32 = words(), pings = state.pings, authority = pings.authority;
+    Atomics.add(i32, field('pingSequence'), 1);
+    Atomics.store(i32, field('pingHost'), authority?.host || 0);
+    Atomics.store(i32, field('pingEpoch'), authority?.epoch || 0);
+    Atomics.store(i32, field('pingUpdated'), pings.updated | 0);
+    const rows = pings.rows.slice(0, Math.min(PING_PEERS, state.shared.offsets.pingPeerCount));
+    Atomics.store(i32, field('pingCount'), rows.length);
+    rows.forEach(([address, ms], index) => {
+      Atomics.store(i32, field('pingPeers') + index * 2, address | 0);
+      Atomics.store(i32, field('pingPeers') + index * 2 + 1, ms);
+    });
+    Atomics.add(i32, field('pingSequence'), 1);
+  }
+
+  function syncPingAuthority() {
+    const authority = pingAuthority();
+    const signature = authority ? `${state.roomGeneration}:${authority.hostId}:${authority.host}:${authority.epoch}:${authority.match}` : '';
+    if (signature !== state.pings.signature) {
+      state.pings = { signature, authority, rows: [], updated: 0, sequence: 0, received: 0 };
+      for (const peer of state.peers.values()) peer.pingPending = peer.hostPing = null;
+      publishPingMemory();
+    }
+    return authority;
+  }
+
+  function invalidatePeerPing(peer) {
+    if (state.pings.authority?.hostId === peer.id) {
+      state.pings.rows = []; state.pings.updated = 0;
+      // A reopened connection must not revive an old table sequence.
+    } else state.pings.rows = state.pings.rows.filter(row => row[0] !== peer.address);
+    publishPingMemory();
+  }
+
+  function sendPing(peer, message) {
+    if (peer.open && peer.unreliable?.readyState === 'open' && peer.unreliable.bufferedAmount < MAX_CHANNEL_BUFFER)
+      peer.unreliable.send(PING_CONTROL + JSON.stringify(message));
+  }
+
+  function hostPingTable(now, authority, broadcast = true) {
+    state.pings.rows = [[state.address, 0, state.id], ...[...state.peers.values()]
+      .filter(peer => peer.open && peer.quick?.epoch === authority.epoch && peer.quick?.matchId === authority.match)
+      .slice(0, PING_PEERS - 1).map(peer => [peer.address,
+        peer.hostPing && now - peer.hostPing.at >= 0 && now - peer.hostPing.at < PING_STALE_MS ? peer.hostPing.ms : -1, peer.id])];
+    state.pings.updated = now;
+    publishPingMemory();
+    if (!broadcast) return;
+    const table = { ...authority, local: undefined, type: 'table', sequence: ++state.pings.sequence, rows: state.pings.rows };
+    for (const peer of state.peers.values()) sendPing(peer, table);
+  }
+
+  function sweepPings(now) {
+    const authority = syncPingAuthority();
+    if (!authority?.local) return;
+    for (const peer of state.peers.values()) {
+      if (!peer.open || peer.quick?.epoch !== authority.epoch || peer.quick?.matchId !== authority.match) continue;
+      if (peer.pingPending && now - peer.pingPending.at < PING_STALE_MS && now >= peer.pingPending.at) continue;
+      peer.pingPending = { sequence: ++state.pingProbe, at: now };
+      sendPing(peer, { ...authority, local: undefined, type: 'probe', sequence: peer.pingPending.sequence });
+    }
+    hostPingTable(now, authority);
+  }
+
+  function receivePing(peer, wire) {
+    const authority = syncPingAuthority();
+    if (!authority || wire.length > 8192 || !peer.open) return;
+    let message;
+    try { message = JSON.parse(wire.slice(PING_CONTROL.length)); } catch { return; }
+    if (!message || message.hostId !== authority.hostId || message.host !== authority.host ||
+        message.epoch !== authority.epoch || message.match !== authority.match ||
+        !Number.isSafeInteger(message.sequence) || message.sequence <= 0) return;
+    const now = Date.now();
+    if (message.type === 'probe' && !authority.local && peer.id === authority.hostId && peer.address === authority.host) {
+      sendPing(peer, { ...message, type: 'pong' });
+    } else if (message.type === 'pong' && authority.local && peer.pingPending?.sequence === message.sequence) {
+      const ms = now - peer.pingPending.at;
+      peer.pingPending = null;
+      if (ms < 0 || ms >= PING_STALE_MS) return;
+      peer.hostPing = { ms: Math.round(ms), at: now };
+      hostPingTable(now, authority, false);
+    } else if (message.type === 'table' && !authority.local && peer.id === authority.hostId && peer.address === authority.host) {
+      if (message.sequence <= state.pings.received || !Array.isArray(message.rows) ||
+          message.rows.length < 1 || message.rows.length > PING_PEERS) return;
+      const addresses = new Set();
+      for (const row of message.rows) {
+        if (!Array.isArray(row) || row.length !== 3 || !/^[a-f0-9]{16}$/.test(row[2] || '') ||
+            !Number.isInteger(row[0]) || row[0] <= 0 || row[0] > 0xffffffff ||
+            !Number.isInteger(row[1]) || row[1] < -1 || row[1] >= PING_STALE_MS || addresses.has(row[0]) ||
+            (row[0] === authority.host && (row[1] !== 0 || row[2] !== authority.hostId))) return;
+        addresses.add(row[0]);
+      }
+      if (!addresses.has(authority.host)) return;
+      state.pings.received = message.sequence;
+      // Address reuse after a reload must not attach the departed peer's
+      // RTT to its replacement, even if an older table arrives late.
+      state.pings.rows = message.rows.filter(([address, , id]) =>
+        address === state.address ? id === state.id : state.byAddress.get(address)?.id === id);
+      state.pings.updated = now;
+      publishPingMemory();
     }
   }
 
@@ -696,6 +828,7 @@ const HaloNet = (() => {
   }
 
   function pump() {
+    syncPingAuthority();
     if (!state.shared) return;
     if (state.transport) state.transport.flush(incoming);
     for (const [key, close] of state.pendingCloses) {
@@ -788,6 +921,7 @@ const HaloNet = (() => {
     state.shared = { memory, base, offsets };
     const i32 = words();
     Atomics.store(i32, field('netLocalAddress'), state.address | 0);
+    publishPingMemory();
     if (state.transport) state.transport.attach(state.shared);
     // (the game's sockets look at the incoming ring every few milliseconds;
     // this looks at the outgoing one as often)
@@ -871,6 +1005,7 @@ const HaloNet = (() => {
     const attempt = state.quick;
     if (!attempt) return;
     state.quick = null;
+    syncPingAuthority();
     clearInterval(attempt.timer);
     attempt.signal?.removeEventListener('abort', attempt.abort);
     if (!attempt.resolved) attempt.reject(new DOMException('Quick play cancelled.', 'AbortError'));

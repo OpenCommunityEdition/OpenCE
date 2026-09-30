@@ -677,6 +677,14 @@ can run the game, copies the game data out of the player's disc image
       'gatewayPeers', 'gatewayPeerCount'];
     const offsets = {};
     names.forEach((name, index) => { offsets[name] = words[index]; });
+    // Cached older runtimes export only the original 36 offsets. Their shared
+    // size must include the appended table before reading its extra offsets.
+    const pingStart = offsets.gatewayPeers + offsets.gatewayPeerCount * 12;
+    if (offsets.size >= pingStart + 20 + 128 * 8) {
+      const pingNames = ['pingSequence', 'pingHost', 'pingEpoch', 'pingUpdated', 'pingCount', 'pingPeers', 'pingPeerCount'];
+      const pingWords = new Int32Array(state.memory.buffer, pointer + 36 * 4, pingNames.length);
+      pingNames.forEach((name, index) => { offsets[name] = pingWords[index]; });
+    }
     return offsets;
   }
 

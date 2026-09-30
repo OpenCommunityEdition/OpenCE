@@ -33,6 +33,47 @@ posix_socket_last_error().
 
 #include "posix.h"
 #include "web_shared.h"
+#include "web_ping.h"
+
+static unsigned int ping_address(unsigned int native)
+{
+	return (native >> 24) | ((native >> 8) & 0xff00u) |
+		((native << 8) & 0xff0000u) | (native << 24);
+}
+
+static int web_net_host_ping_at(unsigned int address, unsigned int host,
+	unsigned int epoch, unsigned int now)
+{
+	struct web_shared_state *shared = web_shared_state();
+	unsigned int sequence = __atomic_load_n(&shared->ping_sequence, __ATOMIC_SEQ_CST);
+	int count, result = -1, index;
+	if (!sequence || (sequence & 1) || !address || !host)
+		return -1;
+	if ((unsigned int)__atomic_load_n(&shared->ping_host, __ATOMIC_SEQ_CST) != ping_address(host) ||
+		(unsigned int)__atomic_load_n(&shared->ping_epoch, __ATOMIC_SEQ_CST) != epoch ||
+		now - (unsigned int)__atomic_load_n(&shared->ping_updated, __ATOMIC_SEQ_CST) >= WEB_PING_STALE_MS)
+		return -1;
+	count = __atomic_load_n(&shared->ping_count, __ATOMIC_SEQ_CST);
+	if (count < 0 || count > WEB_PING_PEERS)
+		return -1;
+	for (index = 0; index < count; index++)
+	{
+		if ((unsigned int)__atomic_load_n(&shared->ping_peers[index][0], __ATOMIC_SEQ_CST) == ping_address(address))
+			result = __atomic_load_n(&shared->ping_peers[index][1], __ATOMIC_SEQ_CST);
+	}
+	if (sequence != (unsigned int)__atomic_load_n(&shared->ping_sequence, __ATOMIC_SEQ_CST) ||
+		result < 0 || result >= WEB_PING_STALE_MS)
+		return -1;
+	return result;
+}
+
+int web_net_host_ping(unsigned int address, unsigned int host, unsigned int epoch)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	return web_net_host_ping_at(address, host, epoch,
+		(unsigned int)((unsigned long long)now.tv_sec * 1000 + now.tv_nsec / 1000000));
+}
 
 /* Winsock error codes (winerror.h) */
 #define WSAEBADF 10009

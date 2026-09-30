@@ -563,6 +563,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #ifdef HALO_WEB
 #include "networking/network_migration.h"
+#include "../../port/web/src/web_ping.h"
 #endif
 #include "objects.h"
 #include "objects/damage_effect_definitions.h"
@@ -1445,8 +1446,12 @@ static void rasterize_in_game_score_draw_line(
 	long row_index)
 {
 	rectangle2d bounds = render.camera.window_bounds;
-	short narrow_tab_stops[3];
-	short wide_tab_stops[3];
+	short narrow_tab_stops[3
+#ifdef HALO_WEB
+		+ 1
+#endif
+	];
+	short wide_tab_stops[NUMBEROF(narrow_tab_stops)];
 	short *tab_stops;
 	boolean splitscreen;
 	long font_index;
@@ -1463,6 +1468,8 @@ static void rasterize_in_game_score_draw_line(
 	/* Leave room for the host label beside a full-length player name. */
 	narrow_tab_stops[2] += 50;
 	wide_tab_stops[2] += 50;
+	narrow_tab_stops[3] = 280;
+	wide_tab_stops[3] = 440;
 #endif
 
 	if (bounds.x1 - bounds.x0 > 320)
@@ -1471,7 +1478,7 @@ static void rasterize_in_game_score_draw_line(
 		tab_stops = narrow_tab_stops;
 
 	if (row_index)
-		draw_string_set_tab_stops(tab_stops, 3);
+		draw_string_set_tab_stops(tab_stops, NUMBEROF(narrow_tab_stops));
 	else
 		draw_string_set_tab_stops(NULL, 0);
 
@@ -1707,6 +1714,39 @@ static long game_engine_score_host_player(void)
 	}
 	return NONE;
 }
+
+static int game_engine_score_host_ping(long player_index)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	struct player_datum *player = player_try_and_get(player_index);
+	unsigned long address, host_address;
+	short machine, host_machine, index;
+	long *players;
+	if (!client || !network_game_is_active() || !player || player->quit_out_of_game)
+		return -1;
+	machine = player->network_player_data.machine_index;
+	host_machine = network_game_client_migration_host_machine(client);
+	if (machine < 0 || machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES ||
+		host_machine < 0 || host_machine >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return -1;
+	players = machine_get_player_list(machine);
+	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+		if (players[index] == player_index) break;
+	if (index == MAXIMUM_LOCAL_PLAYERS) return -1;
+	if (global_network_game_server_get())
+	{
+		unsigned long addresses[HALO_PORT_MAXIMUM_NETWORK_MACHINES] = { 0 };
+		network_game_server_migration_routes(addresses, NUMBEROF(addresses));
+		address = addresses[machine];
+		host_address = addresses[host_machine];
+	}
+	else
+	{
+		address = network_game_client_migration_owner_address(machine);
+		host_address = network_game_client_migration_owner_address(host_machine);
+	}
+	return web_net_host_ping(address, host_address, network_game_migration_epoch());
+}
 #endif
 
 static long select_players_to_display(
@@ -1862,7 +1902,11 @@ static void game_engine_rasterize_in_game_score(
 		score_name = L"";
 
 	game_engine->format_score_name(score_string);
+#ifdef HALO_WEB
+	usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s\t%s\tPing", column_name, score_name, score_string);
+#else
 	usprintf(row_string, L"\t%s\t%s\t%s", column_name, score_name, score_string);
+#endif
 	rasterize_in_game_score_draw_line(row_string, FALSE, &color, 1);
 
 	entry_index = 0;
@@ -1948,14 +1992,21 @@ static void game_engine_rasterize_in_game_score(
 #endif
 
 #ifdef HALO_WEB
+				wchar_t ping_string[16];
+				int ping = game_engine_score_host_ping(entry_player_index);
+				if (ping >= 0)
+					usnprintf(ping_string, NUMBEROF(ping_string), L"%d", ping);
+				else
+					usnprintf(ping_string, NUMBEROF(ping_string), L"--");
 				usnprintf(
 					row_string,
 					NUMBEROF(row_string),
-					L"\t%s\t%s%s\t%s",
+					L"\t%s\t%s%s\t%s\t%s",
 					place_string,
 					player->name,
 					entry_player_index == host_player_index ? L" (HOST)" : L"",
-					status_string);
+					status_string,
+					ping_string);
 				row_string[NUMBEROF(row_string) - 1] = 0;
 #else
 				usprintf(

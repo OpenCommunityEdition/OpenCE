@@ -38,20 +38,24 @@ function fixture(options = {}) {
     'return { get fixtureState() { return state; }, peerFor, createConnection, dropPeer, handleSignal, pump, sweep, attach, join, leave,');
   vm.runInNewContext(source + '\nglobalThis.net = HaloNet; globalThis.Coordinator = HaloQuickCoordinator;', context);
   const net = context.net;
-  const memory = { buffer: new SharedArrayBuffer(1024) };
+  const memory = { buffer: new SharedArrayBuffer(4096) };
   const offsets = { netInWrite: 0, netInRead: 4, netOutWrite: 8, netOutRead: 12,
-    netLocalAddress: 16, netIn: 64, netOut: 320, netInBytes: 256, netOutBytes: 256 };
+    netLocalAddress: 16, netIn: 64, netOut: 320, netInBytes: 256, netOutBytes: 256,
+    pingSequence: 576, pingHost: 580, pingEpoch: 584, pingUpdated: 588, pingCount: 592,
+    pingPeers: 600, pingPeerCount: 128 };
   net.attach({ memory, base: 0, offsets });
-  const peer = net.peerFor('2222222222222222', 0x0201010a, 'Peer');
+  if (options.id) net.fixtureState.id = options.id;
+  const peer = net.peerFor(options.peerId || '2222222222222222', options.peerAddress || 0x0201010a, 'Peer');
   const pc = net.createConnection(peer);
   peer.reliable.onopen();
   const words = new Int32Array(memory.buffer), bytes = new Uint8Array(memory.buffer);
-  return { net, peer, pc, words, bytes, intervals, connections,
+  return { net, peer, pc, words, bytes, offsets, intervals, connections,
+    now(time) { now = time; },
     tick(time) { now = time; net.sweep(); },
     receive(packet) { peer.reliable.onmessage({ data: packet.buffer }); },
     authority(epoch = 0, host = peer) {
       const state = net.fixtureState;
-      state.address = 0x0101010a; words[4] = state.address;
+      state.address = options.address || 0x0101010a; words[4] = state.address;
       const coordinator = new context.Coordinator(state.id, state.address, now);
       coordinator.epoch = epoch;
       coordinator.result = { role: 'join', hostId: host.id, hostAddress: host.address };
@@ -417,4 +421,121 @@ test('heartbeat expiry retires native streams and obsolete pongs cannot revive t
   oldUnreliable.onmessage({ data: 'halo-room-pong-v1' });
   assert.equal(f.peer.lastPacketAt, 0, 'obsolete liveness callbacks stop before updating peer state');
   assert.equal(f.consume().length, 0);
+});
+
+
+const pingPrefix = 'halo-host-rtt-v1:';
+function pingMessages(peer, type) {
+  return peer.unreliable.sent.filter(value => typeof value === 'string' && value.startsWith(pingPrefix))
+    .map(value => JSON.parse(value.slice(pingPrefix.length))).filter(value => value.type === type);
+}
+function receivePing(f, peer, message) { peer.unreliable.onmessage({ data: pingPrefix + JSON.stringify(message) }); }
+function hostAuthority(f, epoch = 3) {
+  const coordinator = f.authority(epoch), state = f.net.fixtureState;
+  coordinator.result = { role: 'host', hostId: state.id, hostAddress: state.address };
+  coordinator.presence.role = 'host'; coordinator.presence.hostId = state.id;
+  f.peer.quick = { ...coordinator.presence, role: 'join' };
+  return coordinator;
+}
+function sharedPings(f) {
+  const start = f.offsets.pingPeers / 4;
+  return Array.from({ length: f.words[f.offsets.pingCount / 4] }, (_, i) =>
+    [f.words[start + i * 2] >>> 0, f.words[start + i * 2 + 1]]);
+}
+
+test('host measures correlated RTT and every client receives the host measurements', () => {
+  const host = fixture(), coordinator = hostAuthority(host);
+  const client = fixture({ id: host.peer.id, address: host.peer.address,
+    peerId: host.net.fixtureState.id, peerAddress: host.net.fixtureState.address });
+  client.authority(3);
+  host.tick(1000);
+  const probe = pingMessages(host.peer, 'probe').at(-1);
+  client.now(1010); receivePing(client, client.peer, probe);
+  const pong = pingMessages(client.peer, 'pong').at(-1);
+  assert.equal(pong.sequence, probe.sequence);
+  host.now(1045); receivePing(host, host.peer, pong);
+  host.tick(2000);
+  const table = pingMessages(host.peer, 'table').at(-1);
+  assert.deepEqual(table.rows.map(row => row.slice(0, 2)), [[host.net.fixtureState.address, 0], [host.peer.address, 45]]);
+  client.now(1055); receivePing(client, client.peer, table);
+  assert.deepEqual(sharedPings(client), table.rows.map(row => row.slice(0, 2)));
+  assert.deepEqual(sharedPings(host), table.rows.map(row => row.slice(0, 2)));
+  assert.equal(host.words[host.offsets.pingSequence / 4] & 1, 0);
+  assert.equal(client.words[client.offsets.pingHost / 4] >>> 0, coordinator.result.hostAddress);
+  assert.deepEqual(client.consume(), [], 'RTT controls stay outside the native game packet ring');
+});
+
+test('ping samples expire and migration clears them before the replacement host probes', () => {
+  const f = fixture(), coordinator = hostAuthority(f);
+  f.tick(1000);
+  const probe = pingMessages(f.peer, 'probe').at(-1);
+  f.now(1060); receivePing(f, f.peer, { ...probe, type: 'pong' });
+  assert.equal(sharedPings(f)[1][1], 60);
+  f.tick(11060); assert.equal(sharedPings(f)[1][1], -1);
+  coordinator.recover(12000); f.net.pump();
+  assert.deepEqual(sharedPings(f), []);
+  assert.equal(f.words[f.offsets.pingHost / 4], 0);
+  f.now(12010); receivePing(f, f.peer, { ...probe, type: 'pong' });
+  assert.deepEqual(sharedPings(f), [], 'a delayed old-host probe cannot repopulate migration state');
+  f.authority(4); f.tick(12020);
+  assert.deepEqual(sharedPings(f), [], 'a new client waits for the replacement host table');
+  hostAuthority(f, 5); f.tick(13000);
+  assert.deepEqual(sharedPings(f), [[f.net.fixtureState.address, 0], [f.peer.address, -1]]);
+});
+
+test('only fresh current-host tables are accepted; invalid rows never replace a good table', () => {
+  const f = fixture(); f.authority(3); f.tick(1000);
+  f.net.peerFor('3333333333333333', 0x0301010a, 'Other');
+  const table = { type: 'table', hostId: f.peer.id, host: f.peer.address, epoch: 3,
+    match: 500, sequence: 1, rows: [[f.peer.address, 0, f.peer.id], [f.net.fixtureState.address, 83, f.net.fixtureState.id], [0x0301010a, 160, '3333333333333333']] };
+  receivePing(f, f.peer, table);
+  assert.deepEqual(sharedPings(f), table.rows.map(row => row.slice(0, 2)), 'another player shows its RTT to the host');
+  const updated = f.words[f.offsets.pingUpdated / 4];
+  f.now(2000);
+  for (const invalid of [table, { ...table, epoch: 2 }, { ...table, match: 501 },
+    { ...table, hostId: '3333333333333333' }, { ...table, host: 0x0401010a },
+    { ...table, sequence: 2, rows: [[f.peer.address, 5, f.peer.id]] },
+    { ...table, sequence: 2, rows: [[f.peer.address, 0, f.peer.id], [f.peer.address, 99, f.peer.id]] },
+    { ...table, sequence: 2, rows: [[f.peer.address, 0, f.peer.id], [1, NaN, f.net.fixtureState.id]] },
+    { ...table, sequence: 2, rows: [[f.peer.address, 0, f.peer.id], [1, 10000, f.net.fixtureState.id]] },
+    { ...table, sequence: 2, rows: Array.from({ length: 129 }, (_, i) => [i + 1, 0, f.peer.id]) }]) {
+    receivePing(f, f.peer, invalid);
+    assert.deepEqual(sharedPings(f), table.rows.map(row => row.slice(0, 2)));
+    assert.equal(f.words[f.offsets.pingUpdated / 4], updated, 'replay cannot renew a stale table');
+  }
+  const other = f.net.peerFor('3333333333333333', 0x0301010a, 'Other');
+  f.net.createConnection(other); other.reliable.onopen();
+  receivePing(f, other, { ...table, sequence: 2 });
+  assert.equal(f.words[f.offsets.pingUpdated / 4], updated, 'a non-host cannot impersonate the table publisher');
+  f.now(11000);
+  assert.ok(f.net.status().hostPings.every(row => row.ms === null));
+});
+
+test('reopened and replaced peer connections cannot reuse previous latency', () => {
+  const f = fixture(); hostAuthority(f); f.tick(1000);
+  const oldChannel = f.peer.unreliable, probe = pingMessages(f.peer, 'probe').at(-1);
+  f.now(1080); receivePing(f, f.peer, { ...probe, type: 'pong' });
+  assert.equal(sharedPings(f)[1][1], 80);
+  f.net.createConnection(f.peer); f.peer.reliable.onopen(); f.tick(2000);
+  assert.equal(sharedPings(f)[1][1], -1);
+  oldChannel.onmessage({ data: pingPrefix + JSON.stringify({ ...probe, type: 'pong' }) });
+  assert.equal(sharedPings(f)[1][1], -1);
+  const replacement = f.net.peerFor('3333333333333333', f.peer.address, 'Reload');
+  f.net.createConnection(replacement); replacement.reliable.onopen();
+  assert.ok(sharedPings(f).every(row => row[0] !== replacement.address), 'old address sample was retired');
+});
+
+
+test('delayed host tables cannot attribute a departed peer RTT to a reused address', () => {
+  const f = fixture(); f.authority(3); f.tick(1000);
+  const address = 0x0301010a, oldId = '3333333333333333', newId = '4444444444444444';
+  const old = f.net.peerFor(oldId, address, 'Old');
+  const table = { type: 'table', hostId: f.peer.id, host: f.peer.address, epoch: 3,
+    match: 500, sequence: 1, rows: [[f.peer.address, 0, f.peer.id], [address, 99, oldId]] };
+  receivePing(f, f.peer, table); assert.equal(sharedPings(f)[1][1], 99);
+  f.net.peerFor(newId, address, 'Reload');
+  receivePing(f, f.peer, { ...table, sequence: 2 });
+  assert.deepEqual(sharedPings(f), [[f.peer.address, 0]]);
+  receivePing(f, f.peer, { ...table, sequence: 3, rows: [[f.peer.address, 0, f.peer.id], [address, 33, newId]] });
+  assert.deepEqual(sharedPings(f), [[f.peer.address, 0], [address, 33]]);
 });

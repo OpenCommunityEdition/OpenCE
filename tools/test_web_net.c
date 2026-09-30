@@ -186,12 +186,47 @@ static void test_reloaded_pending_stream_replaces_backlog_entry(void)
 	assert(posix_socket_close(listener) == 0);
 }
 
+
+static void test_host_ping_table(void)
+{
+    const unsigned int host = 0x0a010102, player = 0x0a010103;
+    shared.ping_sequence = 2;
+    shared.ping_host = ping_address(host);
+    shared.ping_epoch = 3;
+    shared.ping_updated = 1000;
+    shared.ping_count = 2;
+    shared.ping_peers[0][0] = ping_address(host); shared.ping_peers[0][1] = 0;
+    shared.ping_peers[1][0] = ping_address(player); shared.ping_peers[1][1] = 83;
+    assert(web_net_host_ping_at(host, host, 3, 1100) == 0);
+    assert(web_net_host_ping_at(player, host, 3, 1100) == 83);
+    assert(web_net_host_ping_at(0x0a010104, host, 3, 1100) == -1);
+    assert(web_net_host_ping_at(player, player, 3, 1100) == -1);
+    assert(web_net_host_ping_at(player, host, 4, 1100) == -1);
+    assert(web_net_host_ping_at(player, host, 3, 11000) == -1);
+    shared.ping_sequence = 3; // Do not block the renderer on a publishing page.
+    assert(web_net_host_ping_at(player, host, 3, 1100) == -1);
+    shared.ping_sequence = 4;
+    shared.ping_count = WEB_PING_PEERS + 1;
+    assert(web_net_host_ping_at(player, host, 3, 1100) == -1);
+    shared.ping_count = -1;
+    assert(web_net_host_ping_at(player, host, 3, 1100) == -1);
+    shared.ping_count = 2;
+    shared.ping_peers[1][1] = -1;
+    assert(web_net_host_ping_at(player, host, 3, 1100) == -1);
+    shared.ping_peers[1][1] = 10000;
+    assert(web_net_host_ping_at(player, host, 3, 1100) == -1);
+    shared.ping_peers[1][1] = 42;
+    shared.ping_updated = (int32_t)0xfffffff0u; // Date.now() low-word rollover.
+    assert(web_net_host_ping_at(player, host, 3, 0x10) == 42);
+}
+
 int main(void)
 {
+	test_host_ping_table();
 	test_stream_backpressure();
 	test_datagram_peek_and_truncation();
 	test_reloaded_stream_waits_for_old_endpoint_release();
 	test_reloaded_pending_stream_replaces_backlog_entry();
-	puts("web_net backpressure, datagram, and stream reload regression tests passed");
+	puts("web_net ping, backpressure, datagram, and stream reload regression tests passed");
 	return 0;
 }

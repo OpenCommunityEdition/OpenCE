@@ -33,6 +33,8 @@ so the layout is the same on both sides.
 #define WEB_NET_OUT_BYTES (1024 * 1024) /* powers of two */
 #define WEB_NET_IN_BYTES (2 * 1024 * 1024)
 #define WEB_GATEWAY_PEERS 32
+#define WEB_PING_PEERS 128
+#define WEB_PING_STALE_MS 10000
 
 enum
 {
@@ -122,6 +124,10 @@ struct web_shared_state
 	volatile int32_t gateway_enabled;
 	volatile int32_t gateway_identifier[2];
 	volatile int32_t gateway_peers[WEB_GATEWAY_PEERS][3];
+	/* Host RTT table: page publishes under an odd/even sequence lock. All
+	addresses use the shared network byte order; -1 means no fresh sample. */
+	volatile int32_t ping_sequence, ping_host, ping_epoch, ping_updated, ping_count;
+	volatile int32_t ping_peers[WEB_PING_PEERS][2];
 };
 
 /* a packet in the rings: this header, then the payload, padded to 4 bytes;

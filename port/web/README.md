@@ -102,7 +102,11 @@ backgrounding, resize or controller connection. Test its input handling with
 - A keyboard and mouse (iPad or computer): as on Linux. Click the game to lock
   the pointer; Esc releases it. Hold Tab (or F1) to show the multiplayer
   scoreboard; `(HOST)` identifies the current host beside their player name
-  and follows host migrations. Use the mouse wheel to change weapons.
+  and follows host migrations. The Ping column shows each player's measured
+  round-trip latency to that host in milliseconds (host: `0`, unavailable or
+  stale: `--`). The host probes every three seconds and shares its measurements;
+  changing hosts clears the previous measurements. Use the mouse wheel to
+  change weapons.
 
 ## Online play
 
