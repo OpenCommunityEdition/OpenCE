@@ -503,14 +503,6 @@ static NSString *const kernel_source = @
 	"{\n"
 	"	if (i >= probe_count) return;\n"
 	"	float3 P = probe_in[i].xyz;\n"
-	"	intersector<triangle_data, instancing> nearest;\n"
-	"	nearest.assume_geometry_type(geometry_type::triangle);\n"
-	"	nearest.force_opacity(forced_opacity::opaque);\n"
-	"	nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
-	"	intersector<triangle_data, instancing> blocked_by;\n"
-	"	blocked_by.accept_any_intersection(true);\n"
-	"	blocked_by.assume_geometry_type(geometry_type::triangle);\n"
-	"	blocked_by.force_opacity(forced_opacity::opaque);\n"
 	"	const uint N = 64u;\n"
 	"	float3 radiance[64];\n"
 	"	float3 directions[64];\n"
@@ -651,21 +643,16 @@ static NSString *const kernel_source = @
 	   one texel from a thread are not ordered) */
 	/* the ray view: what a ray from the camera through the pixel finds in
 	   Metal's scene - the level's collision triangles each its own colour
-	   with its edges drawn, the objects' shapes orange, the player's body
-	   cyan - darkened where a ray from the hit to the sun is blocked */
+	   with its edges drawn, the objects' shapes orange (not the player's
+	   body, which the camera is inside) - darkened where a ray from the hit
+	   to the sun is blocked */
 	"	if (c[32] > 0.5 && (c[32] < 1.5 || p.x >= origin.x + size.x * 0.5))\n"
 	"	{\n"
 	"		float3 eye = float3(c[0], c[1], c[2]), ahead = float3(c[3], c[4], c[5]);\n"
 	"		float3 above = float3(c[6], c[7], c[8]), across = float3(c[9], c[10], c[11]);\n"
 	"		float2 q = (p - origin) / size * 2.0 - 1.0;\n"
 	"		float3 dir = normalize(ahead + across * (q.x * c[14] * c[15]) - above * (q.y * c[14]));\n"
-	"		intersector<triangle_data, instancing> view;\n"
-	"		view.assume_geometry_type(geometry_type::triangle);\n"
-	"		view.force_opacity(forced_opacity::opaque);\n"
-	"		view.set_triangle_front_facing_winding(winding::clockwise);\n"
-	"		view.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"		ray primary(eye, dir, c[12], c[13]);\n"
-	/* (not the player's body: the camera is inside it) */
 	"		hit_info h = closest_hit(primary, world, 3u, CUT_ARGS);\n"
 	"		float3 color;\n"
 	"		if (h.type == intersection_type::none)\n"
@@ -701,11 +688,9 @@ static NSString *const kernel_source = @
 	"			}\n"
 	"			else\n"
 	"			{\n"
-	"				auto body = view.intersect(primary, world, 4u);\n"
-	"				bool player = body.type != intersection_type::none && abs(body.distance - h.distance) < 1e-3;\n"
-	"				base = player ? float3(0.2, 0.9, 1.0) : float3(1.0, 0.55, 0.15);\n"
+	"				base = float3(1.0, 0.55, 0.15);\n"
 	/* (with the traced light: as the rays light it, tinted) */
-	"				if (gi_ready != 0u && !player)\n"
+	"				if (gi_ready != 0u)\n"
 	"				{\n"
 	"					float3 No = object_normal(h.instance_id, h.geometry_id, h.primitive_id, dir, object_tris, instance_tris);\n"
 	"					uint view_seed = pcg(id.x + pcg(id.y + pcg(uint(c[44]))));\n"
@@ -716,13 +701,8 @@ static NSString *const kernel_source = @
 	"			if (gi_ready == 0u) base *= 1.0 / (1.0 + h.distance * 0.015);\n"
 	"			if (c[27] > 0.0 && gi_ready == 0u)\n"
 	"			{\n"
-	"				intersector<triangle_data, instancing> sun_hit;\n"
-	"				sun_hit.accept_any_intersection(true);\n"
-	"				sun_hit.force_opacity(forced_opacity::opaque);\n"
-	"				sun_hit.set_triangle_front_facing_winding(winding::clockwise);\n"
-	"				sun_hit.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"				ray to_sun(eye + dir * h.distance - dir * 0.02, float3(c[24], c[25], c[26]), 0.0, 2000.0);\n"
-	"				if (sun_hit.intersect(to_sun, world, 7u).type != intersection_type::none) base *= 0.45;\n"
+	"				if (blocked(to_sun, world, 7u, CUT_ARGS)) base *= 0.45;\n"
 	"			}\n"
 	"			color = base;\n"
 	"		}\n"
@@ -844,23 +824,13 @@ static NSString *const kernel_source = @
 	"	}\n"
 	"	float visibility = 1.0 - occlusion / 4.0;\n"
 	/* the sun's shadow, on what the level's lightmaps do not shade: an
-	   object's pixel (the guest marks them; without the marks, a pixel where
-	   a short ray into it finds no level surface) facing the sun, whose ray
-	   to it the level blocks. The sun is a small disc: the rays spread a
-	   little. */
+	   object's pixel (the guest marks them: its depth negative) facing the
+	   sun, whose ray to it the level blocks. The sun is a small disc: the
+	   rays spread a little. */
 	"	if (c[27] > 0.0)\n"
 	"	{\n"
 	"		float3 sun = float3(c[24], c[25], c[26]);\n"
-	"		bool on_level;\n"
-	"		if (c[23] > 0.5) on_level = g.x > 0.0;\n"
-	"		else\n"
-	"		{\n"
-	"			intersector<triangle_data> surface_probe;\n"
-	"			surface_probe.accept_any_intersection(true);\n"
-	"			surface_probe.force_opacity(forced_opacity::opaque);\n"
-	"			ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
-	"			on_level = surface_probe.intersect(probe, level).type != intersection_type::none;\n"
-	"		}\n"
+	"		bool on_level = g.x > 0.0;\n"
 	/* an object's pixel: the level's and the other objects' shadows; the
 	   level's: the player's body's only (the lightmaps have the level's,
 	   and the game draws the other objects') */
@@ -956,12 +926,6 @@ static NSString *const kernel_source = @
 	"	if (gi_ready != 0u && c[42] > 0.5 && !object)\n"
 	"	{\n"
 	"		float3 direct = emitted * c[61];\n"
-	/* (the drawn level from both sides: its surfaces are the ones drawn, and
-	   a ray that leaves through one's back has gone through a wall) */
-	"		intersector<triangle_data, instancing> blocked_by;\n"
-	"		blocked_by.accept_any_intersection(true);\n"
-	"		blocked_by.assume_geometry_type(geometry_type::triangle);\n"
-	"		blocked_by.force_opacity(forced_opacity::opaque);\n"
 	"		float3 sun_dir = float3(c[24], c[25], c[26]);\n"
 	"		float3 sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
 	"		float ndl = dot(N, sun_dir);\n"
@@ -973,10 +937,6 @@ static NSString *const kernel_source = @
 	"			if (!blocked(to_sun, world, object ? 3u : 7u, CUT_ARGS))\n"
 	"				direct += sun_color * ndl;\n"
 	"		}\n"
-	"		intersector<triangle_data, instancing> nearest;\n"
-	"		nearest.assume_geometry_type(geometry_type::triangle);\n"
-	"		nearest.force_opacity(forced_opacity::opaque);\n"
-	"		nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
 	"		uint seed = pcg(id.x + pcg(id.y + pcg(uint(c[44]))));\n"
 	"		float3 indirect = float3(0.0);\n"
 	"		float4 before = float4(0.0);\n"
@@ -2774,31 +2734,4 @@ void host_rt_set_emitters(const float *emitters, int count)
 		count = HOST_RT_MAXIMUM_EMITTERS;
 	memcpy(rt.emitters, emitters, (size_t)count * 8 * sizeof(float));
 	rt.emitter_count = (unsigned int)count;
-}
-
-/* tests: count pixels of row y of shared texture `which` from x, as floats
-(RGBA; the results texture's halves widened), into values */
-int host_rt_debug_read(int which, int x, int y, int count, float *values)
-{
-	id<MTLBuffer> buffer;
-	id<MTLCommandBuffer> commands;
-	id<MTLBlitCommandEncoder> blit;
-	int bytes = which == 0 ? 16 : 8, index;
-
-	if (!rt.available || which < 0 || which > 1 || !rt.textures[which])
-		return 0;
-	rt.glFinish();
-	buffer = [rt.device newBufferWithLength:(NSUInteger)(count * bytes) options:MTLResourceStorageModeShared];
-	commands = [rt.queue commandBuffer];
-	blit = [commands blitCommandEncoder];
-	[blit copyFromTexture:rt.textures[which] sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake((NSUInteger)x,
-		(NSUInteger)y, 0) sourceSize:MTLSizeMake((NSUInteger)count, 1, 1) toBuffer:buffer destinationOffset:0
-		destinationBytesPerRow:(NSUInteger)(count * bytes) destinationBytesPerImage:(NSUInteger)(count * bytes)];
-	[blit endEncoding];
-	[commands commit];
-	[commands waitUntilCompleted];
-	for (index = 0; index < count * 4; index++)
-		values[index] = which == 0 ? ((const float *)buffer.contents)[index] :
-			(float)((const __fp16 *)buffer.contents)[index];
-	return 1;
 }

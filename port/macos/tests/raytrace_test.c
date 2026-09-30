@@ -26,8 +26,8 @@ in the collision surfaces. The pictures, as PPM files:
 - raytrace_rays: the ray view, what Metal's rays find from the camera;
   raytrace_split: the lighting and the ray view side by side;
 - raytrace_undivided: without the stages, as before them: the occlusion
-  over all the light, the dynamic lights' too, and the objects' pixels
-  found by a short ray (the rock under the overhang taken for one);
+  over all the light, the dynamic lights' too, and no pixel known as an
+  object's (none takes the sun's traced shadows);
 - raytrace_sun_0 to _3: the sun from the left, high, from the right and
   low behind the overhang (the marine under it in its shadow).
 

@@ -399,7 +399,7 @@ bounce. Where Metal cannot trace rays, they are the only rays.
 The ray view (F6 / ⌘B) traces a ray from the camera through each pixel
 into Metal's scene and draws what it finds: the level's collision triangles,
 each its own colour with its edges drawn; the characters' and vehicles'
-shapes orange; your own body cyan (look down); and, darker, where a second
+shapes orange (not your own body, which the camera is inside); and, darker, where a second
 ray from the hit to the sun is blocked. It is the scene the lighting's rays
 go through.
 
