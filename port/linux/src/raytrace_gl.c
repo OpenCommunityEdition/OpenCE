@@ -54,7 +54,7 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 unsigned char halo_ray_tracing_sun(float *direction);
 /* the emitters (port/linux/game/raytrace_world.c): 8 floats each */
 long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera);
-/* the dynamic lights (source/objects/object_lights.c): 8 floats each */
+/* the dynamic lights (source/objects/object_lights.c): 12 floats each */
 long halo_ray_tracing_lights(float *lights, long maximum);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
@@ -919,7 +919,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	}
 	/* the dynamic lights, for their shadows */
 	{
-		static float lights[8 * 8];
+		static float lights[8 * 12];
 		long light_count = halo_ray_tracing_lights(lights, 8);
 
 		host_rt_set_lights(lights, (int)light_count);

@@ -96,7 +96,7 @@ static struct
 	EGLImage_ images[3];
 	int widths[3], heights[3];
 	/* the dynamic lights (host_rt_set_lights): 8 floats each */
-	float lights[HOST_RT_MAXIMUM_LIGHTS * 8];
+	float lights[HOST_RT_MAXIMUM_LIGHTS * 12];
 	unsigned int light_count;
 	/* the emitters (host_rt_set_emitters): 8 floats each */
 	float emitters[HOST_RT_MAXIMUM_EMITTERS * 8];
@@ -339,19 +339,21 @@ static NSString *const kernel_source = @
 	"		float total = 0.0, arriving = 0.0;\n"
 	"		for (uint l = 0; l < light_count; l++)\n"
 	"		{\n"
-	"			float3 at = lights[l * 2u].xyz;\n"
-	"			float reach = lights[l * 2u].w;\n"
+	"			float3 at = lights[l * 3u].xyz;\n"
+	"			float reach = lights[l * 3u].w;\n"
 	"			float3 L = at - P;\n"
 	"			float d = length(L);\n"
 	"			if (d >= reach || d < 1e-3) continue;\n"
 	"			L /= d;\n"
 	"			float facing = dot(N, L);\n"
 	"			if (facing <= 0.0) continue;\n"
-	"			float4 cone = lights[l * 2u + 1u];\n"
+	"			float4 cone = lights[l * 3u + 1u];\n"
 	"			if (cone.w > -1.5 && dot(-L, cone.xyz) < cone.w) continue;\n"
 	"			float weight = facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
 	"			total += weight;\n"
-	"			ray to_light(P + N * bias, L, 0.0, max(d - bias * 4.0, 0.0));\n"
+	/* (stopping short of the light by its object's size: the light's own
+	   object does not shadow it) */
+	"			ray to_light(P + N * bias, L, 0.0, max(d - bias * 4.0 - lights[l * 3u + 2u].x, 0.0));\n"
 	"			bool blocked = any_hit.intersect(to_light, world, 3u).type != intersection_type::none;\n"
 	"			if (!blocked) arriving += weight;\n"
 	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, blocked ? P + N * bias + L * d : at, 4.0, blocked);\n"
@@ -890,15 +892,16 @@ int host_rt_trace(const float *camera, int width, int height)
 	return commands.status == MTLCommandBufferStatusCompleted;
 }
 
-/* this frame's dynamic lights, 8 floats each (the position, the radius, the
-direction, the cosine of the cone's cutoff or -2 all round) */
+/* this frame's dynamic lights, 12 floats each (the position, the radius, the
+direction, the cosine of the cone's cutoff or -2 all round, how far short of
+the light its rays stop) */
 void host_rt_set_lights(const float *lights, int count)
 {
 	if (count < 0)
 		count = 0;
 	if (count > HOST_RT_MAXIMUM_LIGHTS)
 		count = HOST_RT_MAXIMUM_LIGHTS;
-	memcpy(rt.lights, lights, (size_t)count * 8 * sizeof(float));
+	memcpy(rt.lights, lights, (size_t)count * 12 * sizeof(float));
 	rt.light_count = (unsigned int)count;
 }
 
