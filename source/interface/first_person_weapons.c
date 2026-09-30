@@ -377,6 +377,8 @@ static short first_person_weapon_index_from_unit_index(
 /* port/linux/game/pal_tags.c's */
 boolean pal_tags_first_person_advance(short local_player_index, long graph_index, short animation_index,
 	short frame_index);
+real pal_tags_first_person_fraction(short local_player_index, long graph_index, short animation_index,
+	short frame_index);
 #endif
 
 /* ---------- globals */
@@ -1114,6 +1116,40 @@ static void first_person_weapon_build_node_matrices(
 						state_animation,
 						first_person_weapon->state_animation.frame_index,
 						first_person_weapon->node_orientations);
+#ifdef HALO_LINUX
+					/* port: a PAL map's animation, slowed to the NTSC maps' pace,
+					between the frame it is on and the next: held on the frame, it
+					stood still for that tick, and a reload moved in fits and starts
+					(port/linux/game/pal_tags.c) */
+					{
+						real fraction= pal_tags_first_person_fraction(
+							local_player_index,
+							weapon_definition->weapon.interface_definition.first_person_animations.index,
+							first_person_weapon->state_animation.index,
+							first_person_weapon->state_animation.frame_index);
+
+						if (fraction>0.0f &&
+							first_person_weapon->state_animation.frame_index+1<state_animation->frame_count)
+						{
+							real_orientation next_node_orientations[MAXIMUM_NODES_PER_ANIMATION];
+							short node_index;
+
+							animation_get_node_orientations(
+								NULL,
+								state_animation,
+								(short)(first_person_weapon->state_animation.frame_index+1),
+								next_node_orientations);
+							for (node_index= 0; node_index<state_animation->node_count; node_index++)
+							{
+								orientations_interpolate(
+									&first_person_weapon->node_orientations[node_index],
+									&next_node_orientations[node_index],
+									fraction,
+									&first_person_weapon->node_orientations[node_index]);
+							}
+						}
+					}
+#endif
 				}
 				else
 				{
