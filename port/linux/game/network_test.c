@@ -4,10 +4,12 @@ NETWORK_TEST.C
 Automated system link sessions for testing the netcode without the menus
 (debug.network_test in config.toml, HALO_NETWORK_TEST):
 
-- "host:<map>[:<variant>]" hosts a game on that multiplayer map
-  (bloodgulch, ...) with one of the built-in game variants (slayer by
-  default; game_engine_get_variant_by_name), as the pregame screen's fast
-  setup does, and starts it debug.network_test_start seconds later;
+- "host:<map>[:<variant>[,<variant>...]]" hosts a game on that
+  multiplayer map (bloodgulch, ...) with one of the built-in game variants
+  (slayer by default; game_engine_get_variant_by_name), as the pregame
+  screen's fast setup does, and starts it debug.network_test_start seconds
+  later; with more variants, once a game is over (debug.network_test_score
+  makes it short) the next, as the host's button on the scores does;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
 
@@ -80,6 +82,11 @@ static struct
 	short mode;
 	char map_name[64];
 	char variant_name[64];
+	/* ... the variant of this game, of variant_name's list; and the seconds
+	the last game's scores have been shown */
+	short variant_index;
+	real postgame_seconds;
+	boolean game_over;
 	real start_delay;
 	real menu_seconds;
 	boolean set_up;
@@ -97,6 +104,31 @@ static struct
 	long score_to_win;
 	long logged_time;
 } network_test;
+
+/* the variant at the index of the list (copied to name), FALSE past its end */
+static boolean network_test_variant(
+	short index,
+	char *name,
+	size_t size)
+{
+	char const *variant = network_test.variant_name;
+
+	for (; index > 0 && variant; index--)
+	{
+		variant = strchr(variant, ',');
+		if (variant)
+			variant++;
+	}
+	if (!variant || !*variant)
+		return FALSE;
+	if (name)
+	{
+		size_t length = strcspn(variant, ",");
+
+		snprintf(name, size, "%.*s", (int)length, variant);
+	}
+	return TRUE;
+}
 
 static void network_test_read_settings(
 	void)
@@ -248,10 +280,12 @@ static void network_test_log_players(
 		long local_player_index = local_player_get_player_index(0);
 		struct observer_result const *camera = observer_get_camera(0);
 
-		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s | sent %ld received %ld corrected %ld"
+		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
 			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
-			game_engine_can_score() ? "playing" : "game over", sent, received, corrections,
+			game_engine_can_score() ? "playing" : "game over",
+			game_engine_running() ? (long)game_engine_get_variant()->universal_variant.score_to_win : 0L,
+			sent, received, corrections,
 			sent_reports, dealt_reports, rejected_reports, replayed_events,
 			local_player_index == NONE ? -1L : (long)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player_index),
 			camera ? camera->position.x : 0.0f, camera ? camera->position.y : 0.0f, camera ? camera->position.z : 0.0f,
@@ -596,6 +630,55 @@ void network_test_update(
 		}
 	}
 
+	/* the next game of the list: once the scores have been shown a while,
+	the host's button (the bots may press it first) */
+	if (network_test.mode == _network_test_host && network_test.started && game_engine_running() &&
+		!main_menu_loaded && !game_engine_can_score())
+	{
+		network_test.game_over = TRUE;
+		if (game_engine_showing_postgame() && global_network_game_server_get())
+		{
+			network_test.postgame_seconds += seconds;
+			if (network_test.postgame_seconds >= 3.0f && network_test_variant(network_test.variant_index + 1, NULL, 0))
+			{
+				network_test.postgame_seconds = 0.0f;
+				network_game_server_reset_to_pregame(global_network_game_server_get());
+			}
+		}
+	}
+	/* (a joining machine's player: the other team again in the next game's
+	lobby, whose variant may have teams where the last had none) */
+	if (network_test.mode == _network_test_join && network_test.team_set && game_engine_running() &&
+		!main_menu_loaded && !game_engine_can_score())
+	{
+		network_test.game_over = TRUE;
+	}
+	if (network_test.mode == _network_test_join && network_test.game_over && main_menu_loaded)
+	{
+		network_test.game_over = FALSE;
+		network_test.team_set = FALSE;
+		network_test.joined_seconds = 0.0f;
+	}
+	/* ... back in the lobby, set up as the first was */
+	if (network_test.mode == _network_test_host && network_test.game_over && main_menu_loaded)
+	{
+		network_test.game_over = FALSE;
+		network_test.postgame_seconds = 0.0f;
+		if (network_test_variant(network_test.variant_index + 1, NULL, 0))
+		{
+			network_test.variant_index++;
+			network_test.started = FALSE;
+			network_test.map_set = FALSE;
+			network_test.setup_seconds = 0.0f;
+			network_test.menu_seconds = 0.0f;
+			/* (as picking the next game's map does: the scores' map choice
+			holds the countdown) */
+			if (global_network_game_server_get())
+				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+			platform_log("network test: the next game");
+		}
+	}
+
 	if (!main_menu_loaded)
 		return;
 	network_test.menu_seconds += seconds;
@@ -627,7 +710,13 @@ void network_test_update(
 				snprintf(path, sizeof(path), "levels\\test\\%s\\%s", network_test.map_name, network_test.map_name);
 				network_game_server_change_map_name(global_network_game_server_get(), path);
 				/* the variant, as picking the game settings does */
-				variant = *game_engine_get_variant_by_name(&variant, network_test.variant_name);
+				{
+					char variant_name[64];
+
+					network_test_variant(network_test.variant_index, variant_name, sizeof(variant_name));
+					variant = *game_engine_get_variant_by_name(&variant, variant_name);
+					platform_log("network test: game %d, %s", network_test.variant_index + 1, variant_name);
+				}
 				/* debug.network_test_score: a short game, to test the next */
 				if (network_test.score_to_win > 0)
 					variant.universal_variant.score_to_win = network_test.score_to_win;
@@ -681,7 +770,7 @@ void network_test_update(
 		{
 			network_test.joined_seconds += seconds;
 			if (network_test.joined_seconds >= 5.0f)
-				network_test.team_set = network_game_client_set_team(1);
+				network_test.team_set = network_game_client_set_team(NONE);
 		}
 		break;
 	}

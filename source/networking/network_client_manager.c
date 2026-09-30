@@ -2876,7 +2876,8 @@ boolean network_game_client_join_first_available_game(
 }
 
 /* ... and puts this machine's players on a team (a team game needs both
-teams), as the pregame screen's team choice does */
+teams), as the pregame screen's team choice does; NONE: the other team from
+another machine's player */
 boolean network_game_client_set_team(
 	char team_index)
 {
@@ -2886,6 +2887,15 @@ boolean network_game_client_set_team(
 
 	if (!client || client->state != _network_game_client_state_pregame)
 		return FALSE;
+	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS && team_index == NONE; player_index++)
+	{
+		struct network_player const *player = &client->game.players[player_index];
+
+		if (network_player_is_valid(player) && player->machine_index != (char)client->machine_index)
+			team_index = player->team_index == 1 ? 0 : 1;
+	}
+	if (team_index == NONE)
+		team_index = 1;
 	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS; player_index++)
 	{
 		struct network_player player = client->game.players[player_index];

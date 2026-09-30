@@ -583,6 +583,12 @@ void game_initialize_for_new_map(
 	players_initialize_for_new_map();
 	scenario_initialize_for_new_map();
 	objects_initialize_for_new_map();
+	/* nothing of the distributed netcode's carried into the new game
+	(port/linux/game/network_distributed.c), before anything of the map
+	makes an object: a client makes the map's objects, and the game type's
+	(the flags of capture the flag, game_engine_initialize_for_new_map), at
+	the host's indices, not its own objects' of the last game's */
+	network_distributed_new_game();
 	render_interpolation_reset();
 	render_initialize_for_new_map();
 	structures_initialize_for_new_map();
@@ -600,9 +606,6 @@ void game_initialize_for_new_map(
 	weather_particle_systems_initialize_for_new_map();
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
-	/* nothing of the distributed netcode's carried into the new game
-	(port/linux/game/network_distributed.c) */
-	network_distributed_new_game();
 	game_statistics_start();
 	update_server_new();
 	player_control_initialize_for_new_map();

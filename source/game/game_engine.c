@@ -3161,6 +3161,14 @@ boolean game_engine_running(
 	return running;
 }
 
+/* port: whether the game is over and its scores are shown (where the
+host's button starts the next, game_engine_update) */
+boolean game_engine_showing_postgame(
+	void)
+{
+	return game_engine != NULL && game_engine_globals.postgame_state == game_engine_mode_postgame_rasterize;
+}
+
 boolean game_engine_force_single_screen(
 	void)
 {
