@@ -185,8 +185,14 @@ rays from each pixel:
 
 The rays are traced at half the resolution (a quarter of the pixels), then
 a blur that stops at edges in depth brings them to the full resolution.
-Metal traces 8 occlusion rays per pixel, on a pattern that changes every
-pixel of a 4x4 block, so the blur averages 128 directions.
+Metal traces 4 occlusion rays per pixel, on a pattern that changes every
+pixel of a 4x4 block, so the blur averages 64 directions. The reflection
+ray is left out where the surface faces the camera: there it reflects 4%
+of the light (Fresnel's), too little to see.
+
+GL and Metal take turns on the GPU (`EGL_ANGLE_metal_shared_event_sync`):
+the CPU does not wait for either, and prepares the next frame while the GPU
+traces. `HALO_RT_CPU_SYNC=1` makes the CPU wait instead, to compare.
 
 On macOS the rays go through the level itself with Metal's ray tracing
 (`port/macos/host/host_metal_rt.m`): the level's collision surfaces

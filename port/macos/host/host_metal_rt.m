@@ -12,15 +12,20 @@ M1 and M2, in the GPU's ray tracing hardware on M3 and later.
   texture it shares with Metal (host_rt_texture: a Metal texture that
   ANGLE, which draws the game on the same Metal device, takes as a GL
   texture through EGL_ANGLE_metal_texture_client_buffer).
-- The rays (host_rt_trace): from each pixel's point in the world, eight rays
+- The rays (host_rt_trace): from each pixel's point in the world, four rays
   over the hemisphere around its normal, which find the level's geometry
   near it wherever it is, on screen or not (ambient occlusion), and one
   along the view's reflection, whose hit is projected back onto the screen
   for its colour if the camera sees it there. The results go to a second
   shared texture, which the guest composites.
 
-GL and Metal take turns: glFinish before the rays, and the command buffer
-completed before GL reads the results.
+GL and Metal take turns on the GPU, through a Metal shared event
+(EGL_ANGLE_metal_shared_event_sync): GL signals it when the depth and
+normals are drawn, the rays wait for that and signal it when done, and GL
+waits for that before it reads the results. The CPU waits for neither, so
+it prepares the next frame while the GPU traces. Without the extension,
+glFinish before the rays and the command buffer completed before GL
+reads the results.
 */
 
 #include "host.h"
@@ -40,6 +45,13 @@ typedef int EGLint_;
 #define EGL_METAL_DEVICE_ANGLE_ 0x34A6
 #define EGL_METAL_TEXTURE_ANGLE_ 0x34A7
 #define EGL_NONE_ 0x3038
+#define EGL_EXTENSIONS_ 0x3055
+#define EGL_SYNC_CONDITION_ 0x30F8
+#define EGL_SYNC_METAL_SHARED_EVENT_ANGLE_ 0x34D8
+#define EGL_SYNC_METAL_SHARED_EVENT_OBJECT_ANGLE_ 0x34D9
+#define EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_LO_ANGLE_ 0x34DA
+#define EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_HI_ANGLE_ 0x34DB
+#define EGL_SYNC_METAL_SHARED_EVENT_SIGNALED_ANGLE_ 0x34DC
 #define GL_TEXTURE_2D_ 0x0DE1
 #define GL_TEXTURE_MIN_FILTER_ 0x2801
 #define GL_TEXTURE_MAG_FILTER_ 0x2800
@@ -69,6 +81,14 @@ static struct
 	void (*glTexParameteri)(unsigned int, unsigned int, int);
 	void (*glEGLImageTargetTexture2DOES)(unsigned int, void *);
 	void (*glFinish)(void);
+	void (*glFlush)(void);
+	/* the GPU-side turns: the event and its last value */
+	id<MTLSharedEvent> event;
+	uint64_t event_value;
+	const char *(*eglQueryString)(EGLDisplay_, EGLint_);
+	void *(*eglCreateSync)(EGLDisplay_, unsigned int, const EGLAttrib_ *);
+	unsigned int (*eglDestroySync)(EGLDisplay_, void *);
+	unsigned int (*eglWaitSync)(EGLDisplay_, void *, EGLint_);
 } rt;
 
 static NSString *const kernel_source = @
@@ -114,13 +134,13 @@ static NSString *const kernel_source = @
 	"	float radius = c[21];\n"
 	"	float bias = 0.02 + z * 0.002;\n"
 	"	float occlusion = 0.0;\n"
-	"	for (uint i = 0; i < 8; i++)\n"
+	"	for (uint i = 0; i < 4; i++)\n"
 	"	{\n"
 	/* stratified, in a pattern that repeats every 4x4 pixels: the guest's
-	   4x4 blur takes in all 16 of its sets of directions, so the result is
-	   smooth and holds still from frame to frame */
+	   4x4 blur takes in all 16 of its sets of directions (64 in all), so the
+	   result is smooth and holds still from frame to frame */
 	"		uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
-	"		float u = (float(i) + (float(k) + 0.5) / 16.0) / 8.0;\n"
+	"		float u = (float(i) + (float(k) + 0.5) / 16.0) / 4.0;\n"
 	"		float v = fract(float(i) * 0.61803399 + float(k) / 16.0);\n"
 	/* cosine-weighted over the hemisphere */
 	"		float r = sqrt(u), angle = 6.2831853 * v;\n"
@@ -130,7 +150,7 @@ static NSString *const kernel_source = @
 	"		if (hit.type != intersection_type::none)\n"
 	"			occlusion += 1.0 - hit.distance / radius;\n"
 	"	}\n"
-	"	float visibility = 1.0 - occlusion / 8.0;\n"
+	"	float visibility = 1.0 - occlusion / 4.0;\n"
 	/* the sun's shadow, on what the level's lightmaps do not shade: a pixel
 	   whose surface is not the level's (an object) - a short ray into it
 	   finds no level surface - facing the sun, whose ray to it the level
@@ -152,9 +172,15 @@ static NSString *const kernel_source = @
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
 	"	}\n"
-	/* the reflection: its hit, where the camera sees it */
+	/* the reflection: its hit, where the camera sees it. How much the
+	   surface reflects is Fresnel's, more at glancing angles; facing the
+	   camera, it reflects so little (4%, times the guest's strength) that
+	   the ray is left out, faded in from a twentieth of the full reflection. */
 	"	float3 V = normalize(P - camera);\n"
 	"	float3 R = reflect(V, N);\n"
+	"	float fresnel = mix(0.04, 1.0, pow(1.0 - clamp(dot(-V, N), 0.0, 1.0), 5.0));\n"
+	"	float fade = smoothstep(0.05, 0.1, fresnel);\n"
+	"	if (fade <= 0.0) { result.write(float4(visibility, 0.0, 0.0, 0.0), id); return; }\n"
 	"	intersector<triangle_data> closest;\n"
 	"	closest.assume_geometry_type(geometry_type::triangle);\n"
 	"	closest.force_opacity(forced_opacity::opaque);\n"
@@ -180,10 +206,7 @@ static NSString *const kernel_source = @
 	"				{\n"
 	"					float2 edge = min(screen - origin, origin + size - screen) / (size * 0.08);\n"
 	"					out.gb = screen / float2(gbuffer.get_width(), gbuffer.get_height());\n"
-	/* how much it reflects: Fresnel's, more at glancing angles */
-	"					float fresnel = pow(1.0 - clamp(dot(-V, N), 0.0, 1.0), 5.0);\n"
-	"					out.a = clamp(min(edge.x, edge.y), 0.0, 1.0) * (1.0 - hit.distance / c[22]) *\n"
-	"						mix(0.04, 1.0, fresnel);\n"
+	"					out.a = clamp(min(edge.x, edge.y), 0.0, 1.0) * (1.0 - hit.distance / c[22]) * fresnel * fade;\n"
 	"				}\n"
 	"			}\n"
 	"		}\n"
@@ -222,6 +245,11 @@ int host_rt_available(void)
 	rt.glTexParameteri = gl_symbol("glTexParameteri");
 	rt.glEGLImageTargetTexture2DOES = gl_symbol("glEGLImageTargetTexture2DOES");
 	rt.glFinish = gl_symbol("glFinish");
+	rt.glFlush = gl_symbol("glFlush");
+	rt.eglQueryString = egl_symbol("eglQueryString");
+	rt.eglCreateSync = egl_symbol("eglCreateSync");
+	rt.eglDestroySync = egl_symbol("eglDestroySync");
+	rt.eglWaitSync = egl_symbol("eglWaitSync");
 	if (!rt.eglGetCurrentDisplay || !rt.eglCreateImageKHR || !rt.eglQueryDisplayAttribEXT ||
 		!rt.eglQueryDeviceAttribEXT || !rt.glEGLImageTargetTexture2DOES || !rt.glFinish || !rt.glGenTextures)
 	{
@@ -251,9 +279,19 @@ int host_rt_available(void)
 		return 0;
 	}
 	rt.queue = [rt.device newCommandQueue];
+	{
+		const char *extensions = rt.eglQueryString ? rt.eglQueryString(rt.display, EGL_EXTENSIONS_) : NULL;
+
+		if (extensions && strstr(extensions, "EGL_ANGLE_metal_shared_event_sync") && rt.eglCreateSync &&
+			rt.eglDestroySync && rt.eglWaitSync && rt.glFlush && !getenv("HALO_RT_CPU_SYNC"))
+		{
+			rt.event = [rt.device newSharedEvent];
+		}
+	}
 	rt.available = 1;
-	host_logf(HOST_LOG_INFO, "ray tracing: Metal on %s (%s)", rt.device.name.UTF8String,
-		[rt.device supportsFamily:MTLGPUFamilyApple9] ? "ray tracing hardware" : "in compute");
+	host_logf(HOST_LOG_INFO, "ray tracing: Metal on %s (%s; %s)", rt.device.name.UTF8String,
+		[rt.device supportsFamily:MTLGPUFamilyApple9] ? "ray tracing hardware" : "in compute",
+		rt.event ? "GL and Metal in turn on the GPU" : "the CPU waits for GL and Metal");
 	return 1;
 }
 
@@ -361,9 +399,35 @@ int host_rt_trace(const float *camera, int width, int height)
 		return 0;
 	}
 	start = SDL_GetTicksNS();
-	rt.glFinish();
+	if (rt.event)
+	{
+		/* GL signals the event when it has drawn the depth and normals */
+		uint64_t drawn = ++rt.event_value;
+		const EGLAttrib_ attributes[] = { EGL_SYNC_METAL_SHARED_EVENT_OBJECT_ANGLE_, (EGLAttrib_)(__bridge void *)rt.event,
+			EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_LO_ANGLE_, (EGLAttrib_)(drawn & 0xFFFFFFFFu),
+			EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_HI_ANGLE_, (EGLAttrib_)(drawn >> 32), EGL_NONE_ };
+		void *sync = rt.eglCreateSync(rt.display, EGL_SYNC_METAL_SHARED_EVENT_ANGLE_, attributes);
+
+		if (!sync)
+		{
+			host_logf(HOST_LOG_ERROR, "ray tracing: GL does not signal the Metal event; the CPU waits instead");
+			rt.event = nil;
+			rt.glFinish();
+		}
+		else
+		{
+			rt.eglDestroySync(rt.display, sync);
+			rt.glFlush();
+		}
+	}
+	else
+	{
+		rt.glFinish();
+	}
 	finished = SDL_GetTicksNS();
 	commands = [rt.queue commandBuffer];
+	if (rt.event)
+		[commands encodeWaitForEvent:rt.event value:rt.event_value];
 	encoder = [commands computeCommandEncoder];
 	[encoder setComputePipelineState:rt.pipeline];
 	[encoder setTexture:rt.textures[0] atIndex:0];
@@ -374,6 +438,34 @@ int host_rt_trace(const float *camera, int width, int height)
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];
 	[encoder endEncoding];
+	if (rt.event)
+	{
+		/* GL waits on the GPU for the rays to finish */
+		uint64_t traced = ++rt.event_value;
+		const EGLAttrib_ attributes[] = { EGL_SYNC_CONDITION_, EGL_SYNC_METAL_SHARED_EVENT_SIGNALED_ANGLE_,
+			EGL_SYNC_METAL_SHARED_EVENT_OBJECT_ANGLE_, (EGLAttrib_)(__bridge void *)rt.event,
+			EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_LO_ANGLE_, (EGLAttrib_)(traced & 0xFFFFFFFFu),
+			EGL_SYNC_METAL_SHARED_EVENT_SIGNAL_VALUE_HI_ANGLE_, (EGLAttrib_)(traced >> 32), EGL_NONE_ };
+		void *sync;
+
+		[commands encodeSignalEvent:rt.event value:traced];
+		[commands commit];
+		sync = rt.eglCreateSync(rt.display, EGL_SYNC_METAL_SHARED_EVENT_ANGLE_, attributes);
+		if (sync && rt.eglWaitSync(rt.display, sync, 0))
+		{
+			rt.eglDestroySync(rt.display, sync);
+			host_rt_finish_ns += finished - start;
+			host_rt_trace_ns += SDL_GetTicksNS() - finished;
+			host_rt_traces++;
+			return 1;
+		}
+		if (sync)
+			rt.eglDestroySync(rt.display, sync);
+		host_logf(HOST_LOG_ERROR, "ray tracing: GL does not wait for the Metal event; the CPU waits instead");
+		rt.event = nil;
+		[commands waitUntilCompleted];
+		return commands.status == MTLCommandBufferStatusCompleted;
+	}
 	[commands commit];
 	[commands waitUntilCompleted];
 	host_rt_finish_ns += finished - start;
