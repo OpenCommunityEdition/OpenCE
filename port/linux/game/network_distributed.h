@@ -54,6 +54,8 @@ enum
 	_distributed_message_relayed_actions,
 	/* the unreliable messages of a tick to one machine, in one datagram */
 	_distributed_message_batch,
+	/* atomic authoritative handover checkpoint (reliable fragments) */
+	_distributed_message_migration_checkpoint,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -141,6 +143,11 @@ short distributed_client_machines(long *machine_indices, short maximum);
 /* (the host) how long a message takes that client and its answer back, in
 ticks (and its jitter), as its players' input messages tell */
 real distributed_machine_round_trip_ticks(long machine_index);
+boolean network_distributed_migration_ready(void);
+long network_distributed_migration_tick(void);
+boolean network_distributed_migration_promote(void);
+/* Connection caches only; the live map, players and objects remain intact. */
+void network_distributed_migration_reset_transport(void);
 /* the vectors in 16 bits a part (struct distributed_vector) */
 void distributed_vector_pack(real_vector3d const *vector, real scale, struct distributed_vector *result);
 void distributed_vector_unpack(struct distributed_vector const *vector, real scale, real_vector3d *result);
@@ -166,6 +173,10 @@ void network_objects_apply_vehicle_predictions(void);
 word network_objects_entry_size(byte type);
 /* whether this client has the host's object at this index */
 boolean network_objects_client_has(long object_index);
+long network_objects_migration_write(byte *buffer, long size);
+boolean network_objects_migration_validate(byte const *buffer, long size);
+boolean network_objects_migration_restore(byte const *buffer, long size, long elapsed_ticks);
+void network_objects_migration_reset_transport(void);
 /* moves the object where the host has it, drawn gliding from where it was */
 void network_objects_correct(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity);
@@ -185,5 +196,10 @@ void network_damage_client_tick(void);
 void network_damage_handle_events(void const *entries, short count);
 void network_damage_handle_reports(long machine_index, void const *entries, short count);
 word network_damage_entry_size(byte type);
+/* Projectile catchup advances its physics without repeating committed damage. */
+void network_damage_migration_replay(boolean replaying);
+long network_damage_migration_write(byte *buffer, long size);
+boolean network_damage_migration_validate(byte const *buffer, long size);
+boolean network_damage_migration_restore(byte const *buffer, long size);
 
 #endif // __NETWORK_DISTRIBUTED_H

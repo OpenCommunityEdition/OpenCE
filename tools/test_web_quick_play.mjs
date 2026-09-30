@@ -1,15 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
-import vm from 'node:vm';
+import { network } from './tests/web-quick-play-fixture.cjs';
 const { HaloQuickCoordinator: Coordinator } = createRequire(import.meta.url)('../port/web/site/net.js');
 
 const A = '1111111111111111', B = '2222222222222222', C = '0000000000000000';
 const ADDRESS_A = 0x0101010a, ADDRESS_B = 0x0201010a, ADDRESS_C = 0x0301010a;
 const peer = (coordinator, open = true) => ({ id: coordinator.id, address: coordinator.address, open,
   quick: { ...coordinator.presence } });
+const checkpoint = (coordinator, tick = 90, matchId = 500) => coordinator.checkpoint(coordinator.epoch, tick, matchId);
 
 function runTogether(coordinators, end = 10000) {
   const results = new Map();
@@ -115,7 +114,7 @@ test('surviving players elect one replacement and converge after the old host re
   const host = new Coordinator(A, ADDRESS_A, 0);
   const b = new Coordinator(B, ADDRESS_B, 0), d = new Coordinator('3333333333333333', ADDRESS_C, 0);
   runTogether([host, b, d]);
-  for (const coordinator of [host, b, d]) coordinator.launched('playing');
+  for (const coordinator of [host, b, d]) { coordinator.launched('playing'); checkpoint(coordinator); }
   for (let now = 11000; now <= 31000; now += 100) {
     const snapshot = [b, d].map(coordinator => peer(coordinator));
     for (const coordinator of [b, d]) coordinator.tick(now, snapshot.filter(p => p.id !== coordinator.id), true);
@@ -138,9 +137,81 @@ test('a brief lost host connection recovers without restarting the match', () =>
   assert.equal(joiner.epoch, 0); assert.equal(joiner.recovering, false);
 });
 
+test('replacement election prefers the newest checkpoint and preserves the same match', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), b = new Coordinator(B, ADDRESS_B, 0);
+  const d = new Coordinator('3333333333333333', ADDRESS_C, 0);
+  runTogether([host, b, d]);
+  for (const coordinator of [host, b, d]) coordinator.launched('playing');
+  checkpoint(host, 100); checkpoint(b, 100); checkpoint(d, 125);
+  for (let now = 11000; now <= 31000; now += 100) {
+    const snapshot = [b, d].map(coordinator => peer(coordinator));
+    for (const coordinator of [b, d]) coordinator.tick(now, snapshot.filter(p => p.id !== coordinator.id), true);
+  }
+  assert.equal(d.result.role, 'host'); assert.equal(b.result.hostId, d.id);
+  assert.equal(d.presence.matchId, 500); assert.equal(b.presence.matchId, 500);
+  assert.equal(d.presence.checkpointTick, 125);
+});
+
+test('an unsnapshotted loading newcomer cannot replace a loaded survivor', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), survivor = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, survivor]);
+  for (const coordinator of [host, survivor]) { coordinator.launched('playing'); checkpoint(coordinator); }
+  const newcomer = new Coordinator(C, ADDRESS_C, 10000);
+  newcomer.tick(10000, [peer(host), peer(survivor)], true);
+  newcomer.tick(11500, [peer(host), peer(survivor)], true);
+  newcomer.launched('loading');
+  for (let now = 12000; now <= 33000; now += 100) {
+    const snapshot = [survivor, newcomer].map(coordinator => peer(coordinator));
+    for (const coordinator of [survivor, newcomer]) coordinator.tick(now, snapshot.filter(p => p.id !== coordinator.id), true);
+  }
+  assert.equal(survivor.result.role, 'host');
+  assert.notEqual(newcomer.result?.role, 'host', 'a lower ID does not make an unloaded engine authoritative');
+});
+
+test('checkpoint admission rejects older ticks, different matches and stale epochs', () => {
+  const a = new Coordinator(A, ADDRESS_A, 0); runTogether([a]); a.launched('playing');
+  checkpoint(a, 125);
+  a.checkpoint(0, 100, 500); a.checkpoint(0, 150, 999);
+  assert.equal(a.presence.checkpointTick, 125); assert.equal(a.presence.matchId, 500);
+  a.recover(10000);
+  a.checkpoint(0, 200, 500);
+  assert.equal(a.presence.checkpointTick, 125); assert.equal(a.presence.matchId, 500);
+});
+
+test('host loss without a verified checkpoint holds the match instead of creating a fresh game', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
+  runTogether([host, joiner]); host.launched('playing'); joiner.launched('playing');
+  joiner.tick(11000, [], true); joiner.tick(21000, [], true);
+  for (let now = 22000; now <= 55000; now += 1000)
+    assert.equal(joiner.tick(now, [], true).result, undefined);
+  assert.equal(joiner.presence.role, 'candidate');
+  assert.equal(joiner.result, null);
+});
+
+test('recovery cannot follow a host lacking a checkpoint of the same running match', () => {
+  for (const metadata of [
+    { migration: true, matchId: 999, checkpointTick: 125 },
+    { migration: true, matchId: 500, checkpointTick: -1 },
+    { migration: false, matchId: 500, checkpointTick: 125 },
+  ]) {
+    const host = new Coordinator(A, ADDRESS_A, 0), survivor = new Coordinator(B, ADDRESS_B, 0);
+    runTogether([host, survivor]); survivor.launched('playing'); checkpoint(survivor);
+    survivor.recover(11000);
+    const incompatible = { id: C, address: ADDRESS_C, open: true,
+      quick: { role: 'host', hostId: C, phase: 'launched', gamePhase: 'playing',
+        epoch: 1, failover: true, ...metadata } };
+    for (const now of [11000, 13000, 20000]) {
+      const status = survivor.tick(now, [incompatible], true);
+      assert.notEqual(status.result?.hostId, C);
+      assert.notEqual(survivor.presence.hostId, C, 'host role alone does not authorize resetting onto another match');
+    }
+  }
+});
+
 test('a silent open host channel eventually fails over despite healthy signalling', () => {
   const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
   runTogether([host, joiner]);
+  for (const coordinator of [host, joiner]) { coordinator.launched('playing'); checkpoint(coordinator); }
   const silent = { ...peer(host), lastPacketAt: 10000 };
   assert.equal(joiner.tick(34999, [silent], true).result.hostId, A);
   assert.equal(joiner.tick(35000, [silent], true).state, 'reconnecting');
@@ -153,76 +224,11 @@ test('a silent open host channel eventually fails over despite healthy signallin
 test('recovery cannot elect a host while all signalling brokers are unavailable', () => {
   const host = new Coordinator(A, ADDRESS_A, 0), joiner = new Coordinator(B, ADDRESS_B, 0);
   runTogether([host, joiner]);
+  for (const coordinator of [host, joiner]) { coordinator.launched('playing'); checkpoint(coordinator); }
   joiner.tick(10000, [], false); joiner.tick(20000, [], false);
   assert.equal(joiner.tick(30000, [], false).result, undefined);
   assert.equal(joiner.presence.role, 'candidate');
 });
-
-// Exercise the real public API and encrypted presence publication with a fake
-// broker and deterministic clock. This does not open a network or run Halo.
-async function network() {
-  let now = 0, nextTimer = 0, roomKey;
-  const timers = new Map(), sockets = [], messages = [], encryption = [], decryption = [], connections = [];
-  class Socket {
-    readyState = 1;
-    constructor() { sockets.push(this); }
-    send() {}
-    close() { this.readyState = 3; }
-  }
-  const subtle = {};
-  for (const method of ['importKey', 'digest'])
-    subtle[method] = webcrypto.subtle[method].bind(webcrypto.subtle);
-  subtle.deriveKey = async (...args) => (roomKey = await webcrypto.subtle.deriveKey(...args));
-  subtle.decrypt = (...args) => {
-    const pending = webcrypto.subtle.decrypt(...args); decryption.push(pending); return pending;
-  };
-  subtle.encrypt = (...args) => {
-    messages.push(JSON.parse(new TextDecoder().decode(args[2])));
-    const pending = webcrypto.subtle.encrypt(...args);
-    encryption.push(pending);
-    return pending;
-  };
-  const context = {
-    crypto: { getRandomValues: webcrypto.getRandomValues.bind(webcrypto), subtle },
-    Date: class extends Date { static now() { return now; } },
-    TextEncoder, TextDecoder, Uint8Array, DOMException,
-    localStorage: { getItem() { return null; }, setItem() {} }, WebSocket: Socket,
-    RTCPeerConnection: class {
-      constructor() { connections.push(this); this.channels = []; }
-      createDataChannel() {
-        const channel = { readyState: 'open', bufferedAmount: 0, send() {} };
-        this.channels.push(channel); return channel;
-      }
-      async createOffer() { return { sdp: 'offer' }; }
-      async setLocalDescription(value) { this.localDescription = value; }
-      close() {}
-    },
-    setInterval: fn => { const id = ++nextTimer; timers.set(id, fn); return id; },
-    clearInterval: id => timers.delete(id), setTimeout() {}, clearTimeout() {},
-  };
-  vm.runInNewContext(readFileSync(new URL('../port/web/site/net.js', import.meta.url), 'utf8') +
-    '\nglobalThis.net = HaloNet;', context);
-  await context.net.join('TEST42', { brokers: ['wss://test.invalid'] });
-  sockets[0].onmessage({ data: new Uint8Array([0x20, 2, 0, 0]).buffer });
-  return { net: context.net, messages,
-    tick(time) { now = time; for (const fn of [...timers.values()]) fn(); },
-    async close() { await context.net.leave(); await Promise.all(encryption); },
-    latest() { return messages.filter(message => message.type === 'hello').at(-1); },
-    async hostPresence(epoch = 0) {
-      const iv = webcrypto.getRandomValues(new Uint8Array(12));
-      const plain = new TextEncoder().encode(JSON.stringify({ type: 'hello', from: 'ffffffffffffffff',
-        mid: webcrypto.randomUUID(), address: ADDRESS_B, name: 'Host', quickSequence: epoch + 1,
-        quick: { role: 'host', hostId: 'ffffffffffffffff', phase: 'launched', gamePhase: 'playing', epoch, failover: true } }));
-      const encrypted = new Uint8Array(await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, roomKey, plain));
-      const body = [0, 1, 120, ...iv, ...encrypted], length = [];
-      let size = body.length;
-      do { let byte = size % 128; size = Math.floor(size / 128); length.push(size ? byte | 128 : byte); } while (size);
-      sockets[0].onmessage({ data: new Uint8Array([0x30, ...length, ...body]).buffer });
-      await Promise.all(decryption); await new Promise(setImmediate);
-      return connections.at(-1);
-    },
-  };
-}
 
 test('public API monitors after launch and calls failover once with the new host', async () => {
   const fixture = await network(), replacements = [], statuses = [];
@@ -234,13 +240,204 @@ test('public API monitors after launch and calls failover once with the new host
     const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
       onStatus: value => statuses.push(value) });
     fixture.tick(1500); const selected = await attempt;
-    assert.equal(selected.role, 'join'); fixture.net.quickPlayStarted();
+    assert.equal(selected.role, 'join'); assert.equal(selected.epoch, 0);
+    fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing');
+    fixture.checkpoint();
+    statuses.length = 0;
     pc.connectionState = 'failed'; pc.onconnectionstatechange();
     fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
     assert.equal(replacements.length, 1); assert.equal(replacements[0].role, 'host');
     assert.equal(replacements[0].room, 'TEST42'); assert.equal(replacements[0].hostAddress, fixture.net.address);
+    assert.equal(replacements[0].epoch, 1, 'the engine receives the replacement authority epoch');
     fixture.tick(21000); assert.equal(replacements.length, 1);
-    assert.ok(statuses.some(status => status.state === 'recovering'));
+    assert.ok(statuses.some(status => status.state === 'reconnecting' && status.hold === true),
+      'simulation is held as soon as the host connection is lost');
+    assert.ok(statuses.some(status => status.state === 'recovering' && status.hold === true));
+    assert.ok(statuses.filter(status => status.hold === true).every(status => !/restart|reset/i.test(status.message)));
+    assert.ok(!statuses.some(status => status.state === 'playing' && status.hold === false),
+      'electing a replacement does not release the engine before migration finishes');
+  } finally { await fixture.close(); }
+});
+
+test('public API releases a brief reconnect hold without migrating or changing epoch', async () => {
+  const fixture = await network(), replacements = [], statuses = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
+      onStatus: value => statuses.push(value) });
+    fixture.tick(1500); const selected = await attempt;
+    fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing');
+    fixture.checkpoint();
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000);
+    assert.equal(statuses.at(-1).state, 'reconnecting'); assert.equal(statuses.at(-1).hold, true);
+    const returned = await fixture.hostPresence(); returned.channels[0].onopen();
+    fixture.tick(2100);
+    assert.equal(statuses.at(-1).state, 'playing'); assert.equal(statuses.at(-1).hold, false);
+    assert.equal(replacements.length, 0, 'the original match keeps its authority after a short outage');
+    assert.equal(selected.epoch, 0); assert.equal(fixture.latest().quick.epoch, 0);
+  } finally { await fixture.close(); }
+});
+
+test('native loss receipts during a loaded match election are consumed without advancing its epoch again', async () => {
+  const fixture = await network(), replacements = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000);
+    assert.equal(fixture.latest().quick.role, 'candidate', 'signalling is electing with no selected result');
+    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(fixture.net.quickPlayLost(), true, 'duplicate native EOF is also part of this recovery');
+    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(fixture.latest().quick.matchId, 500);
+    fixture.tick(18000); fixture.tick(19500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].epoch, 1);
+  } finally { await fixture.close(); }
+});
+
+test('the first native loss starts recovery once and consumes repeated receipts for a loaded match', async () => {
+  const fixture = await network();
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay(); fixture.tick(1500); await attempt;
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(fixture.latest().quick.epoch, 1);
+  } finally { await fixture.close(); }
+});
+
+for (const role of ['host', 'join']) {
+  test(`a delayed native loss after selecting a replacement ${role} preserves that pending epoch`, async () => {
+    const fixture = await network(), replacements = [];
+    try {
+      const host = await fixture.hostPresence(); host.channels[0].onopen();
+      const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value) });
+      fixture.tick(1500); await attempt;
+      fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+      if (role === 'host') {
+        host.connectionState = 'failed'; host.onconnectionstatechange();
+        fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+      } else {
+        await fixture.hostPresence(1); fixture.tick(2000); fixture.tick(3500);
+      }
+      assert.equal(replacements.length, 1); assert.equal(replacements[0].role, role);
+      assert.equal(fixture.net.quickPlayLost(), true);
+      assert.equal(fixture.net.quickPlayLost(), true);
+      fixture.tick(20000);
+      assert.equal(replacements.length, 1, 'old disconnects cannot initiate another failover');
+      assert.equal(fixture.latest().quick.epoch, 1);
+      assert.equal(fixture.latest().quick.matchId, 500);
+      fixture.net.cancelQuickPlay();
+      assert.equal(fixture.net.quickPlayLost(), false, 'explicit cancellation restores normal routing');
+    } finally { await fixture.close(); }
+  });
+}
+
+test('unresolved setup and initial host loss retain their existing native status routing', async () => {
+  const fixture = await network();
+  try {
+    assert.equal(fixture.net.quickPlayLost(), false);
+    const attempt = fixture.net.quickPlay();
+    assert.equal(fixture.net.quickPlayLost(), false);
+    fixture.tick(6000); fixture.tick(7500); await attempt;
+    assert.equal(fixture.net.quickPlayLost(), false, 'an initial hosting runtime is not recovering a loaded match');
+    assert.equal(fixture.latest().quick.epoch, 0);
+  } finally { await fixture.close(); }
+});
+
+test('a newer room epoch reaches the engine once and cannot be replaced by stale presence', async () => {
+  const fixture = await network(), replacements = [], statuses = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
+      onStatus: value => statuses.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing');
+    fixture.checkpoint();
+    await fixture.hostPresence(4); fixture.tick(2000); fixture.tick(3500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].epoch, 4);
+    assert.equal(replacements[0].role, 'join');
+    assert.ok(statuses.some(status => status.state === 'recovering' && status.hold === true));
+    await fixture.hostPresence(0); fixture.tick(4000);
+    assert.equal(replacements.length, 1); assert.equal(fixture.latest().quick.epoch, 4);
+  } finally { await fixture.close(); }
+});
+
+test('a fresh entrant follows a checkpointed migrated host without becoming eligible to replace it', async () => {
+  const fixture = await network();
+  try {
+    const host = await fixture.hostPresence(4); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay();
+    fixture.tick(1500); const selected = await attempt;
+    assert.equal(selected.role, 'join'); assert.equal(selected.epoch, 4);
+    assert.equal(selected.hostAddress, ADDRESS_B);
+    fixture.net.quickPlayStarted();
+    assert.equal(fixture.latest().quick.checkpointTick, -1, 'joining a host is not a verified local snapshot');
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+    assert.equal(fixture.latest().quick.role, 'candidate', 'an entrant still loading cannot create a fresh replacement match');
+  } finally { await fixture.close(); }
+});
+
+test('a native migration failure withdraws host authority while preserving later same-match recovery', async () => {
+  const fixture = await network(), replacements = [];
+  try {
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value) });
+    fixture.tick(6000); fixture.tick(7500); await attempt;
+    fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    fixture.net.quickPlayPhase('migration-failed');
+    assert.equal(fixture.latest().quick.role, 'candidate');
+    assert.equal(fixture.latest().quick.hostId, null);
+    assert.equal(fixture.latest().quick.gamePhase, 'migration-failed');
+    assert.equal(fixture.latest().quick.checkpointTick, -1);
+    assert.equal(fixture.latest().quick.matchId, 500);
+    fixture.checkpoint(125); // A delayed transfer cannot override the native failure receipt.
+    fixture.tick(13500); fixture.tick(15000); fixture.tick(42501);
+    assert.equal(fixture.latest().quick.role, 'candidate'); assert.equal(replacements.length, 0);
+    const host = await fixture.hostPresence(1); host.channels[0].onopen();
+    fixture.tick(43000); fixture.tick(44500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].role, 'join');
+    assert.equal(replacements[0].epoch, 1); assert.equal(replacements[0].hostAddress, ADDRESS_B);
+    assert.equal(fixture.latest().quick.matchId, 500, 'failure retains the preserved match identity');
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint(150, 1);
+    assert.equal(fixture.latest().quick.gamePhase, 'playing'); assert.equal(fixture.latest().quick.checkpointTick, 150);
+  } finally { await fixture.close(); }
+});
+
+test('an entrant still loading keeps its election timeout even after inheriting a match identity', () => {
+  const host = new Coordinator(A, ADDRESS_A, 0); runTogether([host]); host.launched('playing');
+  host.epoch = host.presence.epoch = 4; checkpoint(host);
+  const entrant = new Coordinator(B, ADDRESS_B, 10000);
+  entrant.tick(10000, [peer(host)], true); entrant.tick(11500, [peer(host)], true); entrant.launched('loading');
+  assert.equal(entrant.presence.matchId, 500);
+  entrant.tick(12000, [], true); entrant.tick(22000, [], true);
+  assert.match(entrant.tick(57000, [], true).error, /reachable host/,
+    'a selected room identity alone does not establish a loaded match that must wait indefinitely');
+});
+
+test('a failed client follows a later host epoch despite invalidated replacement eligibility', async () => {
+  const fixture = await network(), replacements = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayStarted(); fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    fixture.net.quickPlayPhase('migration-failed');
+    assert.equal(fixture.latest().quick.role, 'join'); assert.equal(fixture.latest().quick.checkpointTick, -1);
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+    assert.equal(replacements.length, 0, 'a paused failed client cannot promote its old snapshot');
+    const replacement = await fixture.hostPresence(1); replacement.channels[0].onopen();
+    fixture.tick(20000); fixture.tick(21500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].role, 'join');
+    assert.equal(replacements[0].epoch, 1); assert.equal(fixture.latest().quick.matchId, 500);
+    assert.equal(fixture.latest().quick.checkpointTick, -1, 'following a new host does not invent a verified snapshot');
   } finally { await fixture.close(); }
 });
 
@@ -263,6 +460,7 @@ test('public quick-play API withdraws cancelled eligibility and allows a fresh a
     const result = await retry;
     assert.equal(result.role, 'host'); assert.equal(result.room, 'TEST42');
     assert.equal(result.hostAddress, fixture.net.address);
+    assert.equal(result.epoch, 0);
   } finally { await fixture.close(); }
 });
 

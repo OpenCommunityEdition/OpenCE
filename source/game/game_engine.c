@@ -8241,4 +8241,72 @@ void game_engine_read_network_state(
 	default: break;
 	}
 }
+
+/* Unlike the regular game-state update this also preserves the authority's
+postgame clock and team allocator. HUD timers belong to the local machine. */
+struct game_engine_migration_state
+{
+	long type;
+	unsigned long flags;
+	long next_team_index;
+	real postgame_timer;
+	real postgame_progress;
+	long postgame_state;
+	long state_size;
+};
+
+long game_engine_write_migration_state(byte *buffer, long size)
+{
+	struct game_engine_migration_state state;
+	long written;
+	if (size < (long)sizeof(state))
+		return 0;
+	memset(&state, 0, sizeof(state));
+	state.type = game_engine_get_type();
+	state.flags = game_engine_globals.flags;
+	state.next_team_index = game_engine_globals.next_team_index;
+	state.postgame_timer = game_engine_globals.postgame_timer;
+	state.postgame_progress = game_engine_globals.postgame_progress;
+	state.postgame_state = game_engine_globals.postgame_state;
+	written = game_engine_write_network_state(buffer + sizeof(state), size - sizeof(state));
+	if (written <= 0)
+		return 0;
+	state.state_size = written;
+	memcpy(buffer, &state, sizeof(state));
+	return sizeof(state) + written;
+}
+
+boolean game_engine_validate_migration_state(byte const *buffer, long size)
+{
+	struct game_engine_migration_state state;
+	byte current[0xF00];
+	long expected;
+	if (size < (long)sizeof(state))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	expected = game_engine_write_network_state(current, sizeof(current));
+	return game_engine && state.type == game_engine_get_type() && expected > 0 &&
+		state.state_size == expected && state.state_size == size - (long)sizeof(state);
+}
+
+boolean game_engine_read_migration_state(byte const *buffer, long size, boolean restore_game_type)
+{
+	struct game_engine_migration_state state;
+	if (!game_engine_validate_migration_state(buffer, size))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	/* Set the postgame state first so restoring it does not announce another
+game end or invoke the end-game callback a second time. */
+	game_engine_globals.flags = state.flags;
+	game_engine_globals.next_team_index = state.next_team_index;
+	if (restore_game_type || game_engine_globals.postgame_state == state.postgame_state)
+	{
+		game_engine_globals.postgame_timer = state.postgame_timer;
+		game_engine_globals.postgame_progress = state.postgame_progress;
+		game_engine_globals.postgame_state = state.postgame_state;
+	}
+	if (restore_game_type)
+		game_engine_read_network_state(buffer + sizeof(state), state.state_size);
+	return TRUE;
+}
 #endif

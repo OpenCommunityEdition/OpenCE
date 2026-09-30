@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const { network } = require('./web-quick-play-fixture.cjs');
 const Invite = require('../../port/web/site/native-invite.js');
 const Gateway = require('../../port/web/site/gateway.js');
 const TOKEN = '0123456789ab' + 'c'.repeat(32);
@@ -116,7 +117,7 @@ test('invalid identity and insecure relay fail closed', async () => {
 async function launcher(useTransport = async () => {}, options = {}) {
   const elements = new Map();
   const storage = options.storage || new Map(), joins = [], listeners = [];
-  const quickCalls = [], phases = [], windowEvents = new Map(), uiActive = [];
+  const quickCalls = [], phases = [], checkpoints = [], windowEvents = new Map(), uiActive = [];
   const inspections = [], downloads = [];
   let room = null;
   function element(id) {
@@ -163,9 +164,14 @@ async function launcher(useTransport = async () => {}, options = {}) {
         return new Promise((_resolve, reject) => request.signal.addEventListener('abort',
           () => reject(new DOMException('Aborted', 'AbortError')), { once: true }));
       },
-      cancelQuickPlay() {}, quickPlayStarted() {}, newRoomCode: () => 'PRIVATE7',
-      quickPlayLost: () => options.hostLost ?? true,
-      quickPlayPhase(phase) { phases.push(phase); return options.recovering ?? false; },
+      cancelQuickPlay() { options.net?.cancelQuickPlay(); },
+      quickPlayStarted() { options.net?.quickPlayStarted(); }, newRoomCode: () => 'PRIVATE7',
+      quickPlayLost: () => options.net ? options.net.quickPlayLost() : options.hostLost ?? true,
+      quickPlayCheckpoint(value) { checkpoints.push(value); options.net?.quickPlayCheckpoint(value); },
+      quickPlayPhase(phase) {
+        phases.push(phase);
+        return options.net ? options.net.quickPlayPhase(phase) : options.recovering ?? false;
+      },
       async join(code) {
         joins.push(code);
         await options.beforeJoin?.();
@@ -192,7 +198,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
   if (!options.mapsState) assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
-  return { element, context, storage, joins, quickCalls, phases, windowEvents, uiActive, inspections, downloads,
+  return { element, context, storage, joins, quickCalls, phases, checkpoints, windowEvents, uiActive, inspections, downloads,
     emitNetwork: (type, detail) => listeners.forEach(listener => listener(type, detail)) };
 }
 
@@ -485,21 +491,60 @@ test('existing host selection joins its exact address without a menu click', asy
   assert.ok(joined.context.Module.arguments.includes('--HALO_QUICK_PLAY_TARGET=10.2.3.4'));
 });
 
-test('host failover restarts the real launcher into the selected role without reloading', async () => {
+test('host failover migrates the existing engine with its authority epoch and holds the match', async () => {
   const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FRIENDS9',
     quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: 0x0403020a }) });
-  const restarts = [];
-  page.context.Module._web_quick_play_restart = (...args) => restarts.push(args);
+  const module = page.context.Module, migrations = [], holds = [];
+  module._web_quick_play_restart = () => assert.fail('host departure must never restart or reset the match');
+  module._web_quick_play_migrate = (...args) => migrations.push(args);
+  module._web_quick_play_hold = value => holds.push(value);
   const request = page.quickCalls[0];
-  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS });
-  assert.deepEqual(restarts, [[1, ADDRESS]]);
-  request.onFailover({ role: 'join', room: 'FRIENDS9', hostAddress: 0x0302010a });
-  assert.deepEqual(restarts[1], [2, 0x0302010a]);
+  request.onStatus({ state: 'reconnecting', message: 'Waiting for the host connection.', hold: true });
+  assert.deepEqual(holds, [1]);
+  request.onStatus({ state: 'playing', message: 'Connection restored.', hold: false });
+  assert.deepEqual(holds, [1, 0]);
+  request.onStatus({ state: 'recovering', message: 'Choosing a replacement host.', hold: true });
+  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS, epoch: 1 });
+  assert.deepEqual(migrations, [[1, ADDRESS, 1]]);
+  request.onFailover({ role: 'join', room: 'FRIENDS9', hostAddress: 0x0302010a, epoch: 2 });
+  assert.deepEqual(migrations[1], [2, 0x0302010a, 2]);
+  assert.equal(page.context.Module, module, 'the running WebAssembly module stays alive');
   assert.equal(page.context.location.search, '?room=FRIENDS9');
   assert.match(page.element('quick-game-status').textContent, /replacement host/);
+  assert.doesNotMatch(page.element('quick-game-status').textContent, /restart|reset/i);
   page.element('main-menu').onclick();
-  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS });
-  assert.equal(restarts.length, 2, 'Main menu cancels automatic recovery');
+  const holdCount = holds.length;
+  request.onFailover({ role: 'host', room: 'FRIENDS9', hostAddress: ADDRESS, epoch: 3 });
+  request.onStatus({ state: 'recovering', message: 'Late recovery.', hold: true });
+  assert.equal(migrations.length, 2, 'Main menu cancels automatic recovery');
+  assert.equal(holds.length, holdCount, 'late recovery cannot pause a canceled match');
+});
+
+test('engine checkpoint receipts update recovery eligibility without changing the playing screen', async () => {
+  const page = await launcher(undefined, { quickPlay: async ({ room }) => ({ role: 'host', room, epoch: 0 }) });
+  const module = page.context.Module;
+  module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Beaver Creek.' }));
+  module.haloMessage(6, JSON.stringify({ phase: 'checkpoint', epoch: 0, tick: 125, matchId: 500 }));
+  assert.deepEqual(page.checkpoints.map(value => ({ ...value })), [
+    { phase: 'checkpoint', epoch: 0, tick: 125, matchId: 500 },
+  ]);
+  assert.deepEqual(page.phases, ['playing']);
+  assert.equal(page.element('quick-panel').hidden, true);
+  assert.equal(page.element('quick-game-status').textContent, 'Playing Beaver Creek.');
+});
+
+test('a late entrant initializes its engine with the recovered host authority epoch', async () => {
+  const page = await launcher(undefined, {
+    quickPlay: async ({ room }) => ({ role: 'join', room, hostAddress: ADDRESS, epoch: 4 }),
+  });
+  const epochs = [], module = page.context.Module;
+  module._web_quick_play_set_epoch = epoch => epochs.push(epoch);
+  // Stop at the shared-state boundary; this fixture intentionally does not
+  // allocate the production WebAssembly memory or start graphics/audio.
+  const boundary = new Error('shared-state test boundary');
+  module._web_shared_state = () => { throw boundary; };
+  assert.throws(() => module.onRuntimeInitialized(), error => error === boundary);
+  assert.deepEqual(epochs, [4], 'epoch zero would reject every migrated host packet and checkpoint');
 });
 
 test('a lost host report preserves room recovery instead of returning to manual play', async () => {
@@ -511,6 +556,70 @@ test('a lost host report preserves room recovery instead of returning to manual 
   assert.match(page.element('quick-game-status').textContent, /replacement host/);
   assert.equal(page.quickCalls[0].signal.aborted, false);
 });
+
+async function loadedRoomLauncher() {
+  const fixture = await network();
+  const host = await fixture.hostPresence(); host.channels[0].onopen();
+  const page = await launcher(undefined, { url: 'http://localhost:8780/?room=TEST42',
+    mapsState: async () => quickMaps(), net: fixture.net,
+    quickPlay: request => fixture.net.quickPlay(request) });
+  fixture.tick(1500); await new Promise(setImmediate);
+  const module = page.context.Module, migrations = [];
+  assert.ok(module, 'the initial elected match launched');
+  module._web_quick_play_restart = () => assert.fail('disconnect must preserve the existing match');
+  module._web_quick_play_migrate = (...args) => migrations.push(args);
+  module._web_quick_play_hold = () => {};
+  module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Playing Beaver Creek.' }));
+  module.haloMessage(6, JSON.stringify({ phase: 'checkpoint', epoch: 0, tick: 125, matchId: 500 }));
+  return { fixture, host, page, module, migrations };
+}
+
+test('the actual launcher consumes native disconnect after signalling has cleared its election result', async () => {
+  const { fixture, host, page, module, migrations } = await loadedRoomLauncher();
+  try {
+    const location = page.context.location.href;
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000);
+    assert.equal(fixture.latest().quick.role, 'candidate');
+    module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Host lost.' }));
+    assert.equal(page.quickCalls[0].signal.aborted, false, 'native EOF cannot cancel an active preserved election');
+    assert.equal(page.element('fatal').hidden, true, 'bootstrap maps cannot turn this receipt into a fatal reload');
+    assert.equal(fixture.latest().quick.epoch, 1);
+    fixture.tick(18000); fixture.tick(19500);
+    assert.deepEqual(migrations, [[1, fixture.net.address, 1]], 'the same running engine receives the elected host');
+    assert.equal(page.context.Module, module); assert.equal(page.context.location.href, location);
+    assert.equal(fixture.latest().quick.matchId, 500);
+  } finally { await fixture.close(); }
+});
+
+for (const role of ['host', 'join']) {
+  test(`the actual launcher consumes a queued disconnect after replacement ${role} selection`, async () => {
+    const { fixture, host, page, module, migrations } = await loadedRoomLauncher();
+    try {
+      const location = page.context.location.href;
+      if (role === 'host') {
+        host.connectionState = 'failed'; host.onconnectionstatechange();
+        fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+      } else {
+        await fixture.hostPresence(1); fixture.tick(2000); fixture.tick(3500);
+      }
+      assert.equal(migrations.length, 1); assert.equal(migrations[0][0], role === 'host' ? 1 : 2);
+      module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Old host disconnected.' }));
+      module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Queued old session closed.' }));
+      fixture.tick(20000);
+      assert.equal(page.quickCalls[0].signal.aborted, false);
+      assert.equal(page.element('fatal').hidden, true);
+      assert.equal(fixture.latest().quick.epoch, 1, 'queued old-session status cannot elect another authority');
+      assert.equal(migrations.length, 1);
+      module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Preserved match resumed.' }));
+      module.haloMessage(6, JSON.stringify({ phase: 'checkpoint', epoch: 1, tick: 150, matchId: 500 }));
+      assert.equal(page.element('quick-panel').hidden, true);
+      assert.equal(fixture.latest().quick.matchId, 500);
+      assert.equal(fixture.latest().quick.checkpointTick, 150);
+      assert.equal(page.context.Module, module); assert.equal(page.context.location.href, location);
+    } finally { await fixture.close(); }
+  });
+}
 
 test('switching an active match restarts in the selected room and preserves cached game data', async () => {
   const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FQLX01&batch_streams=0',

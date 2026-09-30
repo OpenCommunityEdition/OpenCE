@@ -164,16 +164,23 @@ run a permanent game server.
 Players spawn with the human pistol in place of the map's plasma pistol,
 including late joins and respawns.
 
-When the host disconnects, surviving quick-play participants automatically
-elect a replacement and restart Beaver Creek Slayer in the same room. The
-engine does not migrate a running match's state: scores, positions and the
-match timer reset. Everyone needs the updated browser build. A brief lost
-connection has a 10-second grace period; silent WebRTC channels are detected
-after 25 seconds. Election and map loading add time after detection. Players
-who choose *Main menu* or *Leave*, idle launchers, and native invites do not
-participate. An older returning host yields to the room's newer election
-epoch. Disconnected network partitions can temporarily form separate matches;
-the public brokers are not a consensus service and this is not seamless HA.
+When the host disconnects, quick play freezes the loaded match and elects a
+replacement from surviving players with a complete checkpoint of that match.
+The replacement adopts the existing world and roster; the other players
+reattach their original machine and player slots. Scores, positions, inventory
+and the match timer are retained. There is no automatic new-match fallback.
+If recovery cannot complete, the match stays paused until the player explicitly
+leaves. Everyone must use the new launcher and runtime.
+
+A brief lost connection has a 10-second grace period; silent WebRTC channels
+are detected after 25 seconds. Election and reconnecting add time after
+detection, without loading a new map. Authoritative checkpoints are sent every
+15 ticks, so authority-only state can resume from a recent checkpoint rather
+than the exact instant a tab crashed. Packet epochs fence previous hosts.
+*Main menu*, *Leave*, idle launchers and native invites do not participate.
+The room's public brokers are not a consensus service: network partitions can
+still produce divergent continuations. See [host migration](../linux/HOST_MIGRATION.md)
+for the checkpoint and resume contract and its verification limits.
 In historical September 29 testing on runtime `0780c5587f467c15`, Chrome's
 saved engine log confirmed that a two-player client joined at tick 655,
 lost the host connection, created a replacement local

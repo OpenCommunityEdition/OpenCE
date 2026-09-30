@@ -233,7 +233,7 @@ static short damage_event_count;
 /* ... dealing a client's report */
 static boolean damage_dealing_report;
 /* ... each player's weapons of late, and hits left */
-static struct
+static struct damage_player_authority
 {
 	long definition_indices[MAXIMUM_RECENT_WEAPONS];
 	long times[MAXIMUM_RECENT_WEAPONS];
@@ -263,6 +263,12 @@ static struct distributed_hit_report damage_reports[MAXIMUM_HIT_REPORTS_PER_TICK
 static short damage_report_count;
 /* ... replaying the host's killing blow (its player effect came before) */
 static boolean damage_replaying_kill;
+static boolean damage_migration_replaying;
+
+void network_damage_migration_replay(boolean replaying)
+{
+	damage_migration_replaying = replaying;
+}
 
 /* ---------- common */
 
@@ -330,6 +336,8 @@ boolean network_damage_deals(
 	real_vector3d const *object_normal,
 	boolean authorized)
 {
+	if (damage_migration_replaying)
+		return FALSE;
 	if (!network_game_distributed())
 		return TRUE;
 	if (game_connection() == _game_connection_network_client)
@@ -993,4 +1001,102 @@ void network_damage_new_game(
 		damage_players[player_index].vehicle_time = -RECENT_WEAPON_TICKS - 1;
 		damage_players[player_index].hit_reports = HIT_REPORT_BURST;
 	}
+}
+
+struct migration_damage_state
+{
+	long player_count;
+	long times[TARGET_HISTORY_TICKS];
+};
+
+struct migration_damage_player
+{
+	long player_index;
+	struct damage_player_authority authority;
+	struct
+	{
+		long object_index;
+		real_point3d position;
+		real speed;
+	} targets[TARGET_HISTORY_TICKS][2];
+};
+
+long network_damage_migration_write(byte *buffer, long size)
+{
+	struct migration_damage_state state;
+	long offset = sizeof(state);
+	short player;
+	short tick;
+	if (size < offset)
+		return 0;
+	memset(&state, 0, sizeof(state));
+	for (tick = 0; tick < TARGET_HISTORY_TICKS; tick++)
+		state.times[tick] = damage_history[tick].time;
+	for (player = 0; player < MAXIMUM_TRACKED_PLAYERS; player++)
+	{
+		struct migration_damage_player record;
+		if (!distributed_player(player))
+			continue;
+		if (size - offset < (long)sizeof(record))
+			return 0;
+		memset(&record, 0, sizeof(record));
+		record.player_index = player;
+		record.authority = damage_players[player];
+		for (tick = 0; tick < TARGET_HISTORY_TICKS; tick++)
+			memcpy(record.targets[tick], damage_history[tick].objects[player], sizeof(record.targets[tick]));
+		memcpy(buffer + offset, &record, sizeof(record));
+		offset += sizeof(record);
+		state.player_count++;
+	}
+	memcpy(buffer, &state, sizeof(state));
+	return offset;
+}
+
+boolean network_damage_migration_validate(byte const *buffer, long size)
+{
+	struct migration_damage_state state;
+	byte seen[MAXIMUM_TRACKED_PLAYERS];
+	long index;
+	if (size < (long)sizeof(state))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	if (state.player_count < 0 || state.player_count > MAXIMUM_TRACKED_PLAYERS ||
+		size - (long)sizeof(state) != state.player_count * (long)sizeof(struct migration_damage_player))
+		return FALSE;
+	memset(seen, 0, sizeof(seen));
+	for (index = 0; index < state.player_count; index++)
+	{
+		struct migration_damage_player record;
+		memcpy(&record, buffer + sizeof(state) + index * sizeof(record), sizeof(record));
+		if (record.player_index < 0 || record.player_index >= MAXIMUM_TRACKED_PLAYERS || seen[record.player_index])
+			return FALSE;
+		seen[record.player_index] = 1;
+	}
+	return TRUE;
+}
+
+boolean network_damage_migration_restore(byte const *buffer, long size)
+{
+	struct migration_damage_state state;
+	long index;
+	short tick;
+	if (!network_damage_migration_validate(buffer, size))
+		return FALSE;
+	memcpy(&state, buffer, sizeof(state));
+	for (tick = 0; tick < TARGET_HISTORY_TICKS; tick++)
+		damage_history[tick].time = state.times[tick];
+	for (index = 0; index < state.player_count; index++)
+	{
+		struct migration_damage_player record;
+		memcpy(&record, buffer + sizeof(state) + index * sizeof(record), sizeof(record));
+		damage_players[record.player_index] = record.authority;
+		for (tick = 0; tick < TARGET_HISTORY_TICKS; tick++)
+			memcpy(damage_history[tick].objects[record.player_index], record.targets[tick], sizeof(record.targets[tick]));
+	}
+	/* Pending local hit reports remain queued for the new host. Old outgoing
+visual damage events must not be announced twice after the handover. */
+	damage_event_count = 0;
+	damage_dealing_report = FALSE;
+	damage_replaying_kill = FALSE;
+	return TRUE;
 }

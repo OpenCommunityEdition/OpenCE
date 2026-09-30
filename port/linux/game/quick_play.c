@@ -1,5 +1,5 @@
-/* Browser quick play uses the normal session and player APIs. A host recovery
-request restarts the session on this thread; it never generates player input.
+/* Browser quick play uses the normal session and player APIs. Host migration
+adopts the running world on this thread; it never generates player input.
 Cancellation and ordinary match endings leave the menus in control. */
 #ifdef HALO_WEB
 
@@ -13,6 +13,7 @@ Cancellation and ordinary match endings leave the menus in control. */
 #include "networking/network_game_globals.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_migration.h"
 #include "game/game.h"
 #include "game/game_engine.h"
 #endif
@@ -21,11 +22,13 @@ Cancellation and ordinary match endings leave the menus in control. */
 
 const char *config_string(const char *name);
 int web_quick_play_take_cancel(void);
-int web_quick_play_take_restart(int *host, unsigned long *target);
+int web_quick_play_take_migrate(int *host, unsigned long *target, unsigned int *epoch);
+int web_quick_play_take_hold(void);
+unsigned long web_quick_play_initial_epoch(void);
 void web_quick_play_report(const char *phase, const char *message);
 
 enum { QUICK_OFF, QUICK_SETTLING, QUICK_SEARCHING, QUICK_JOINING, QUICK_PREGAME,
-	QUICK_STARTING, QUICK_PLAYING, QUICK_DONE };
+	QUICK_STARTING, QUICK_PLAYING, QUICK_HOLD, QUICK_MIGRATING, QUICK_BLOCKED, QUICK_DONE };
 
 static struct
 {
@@ -33,6 +36,8 @@ static struct
 	short phase;
 	unsigned long target, phase_at, player_at, retry_at, menu_at;
 	boolean menu_seen;
+	boolean was_paused, migration_committed;
+	unsigned int epoch;
 } quick_play;
 
 /* transport_client_start converts the socket's network-order word with
@@ -73,6 +78,9 @@ static void quick_play_phase(short phase, unsigned long now, const char *name, c
 
 static void quick_play_finish(const char *phase, const char *message, boolean leave)
 {
+	if ((quick_play.phase == QUICK_HOLD || quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED) &&
+		game_time_initialized())
+		game_time_set_paused(quick_play.was_paused);
 	quick_play.phase = QUICK_DONE;
 	if (leave)
 	{
@@ -114,30 +122,72 @@ boolean web_quick_play_pistol_starts(void)
 		(quick_play.phase == QUICK_STARTING || quick_play.phase == QUICK_PLAYING);
 }
 
+boolean web_match_migration_enabled(void)
+{
+	return quick_play.owned && (quick_play.phase == QUICK_PLAYING || quick_play.phase == QUICK_HOLD ||
+		quick_play.phase == QUICK_MIGRATING || quick_play.phase == QUICK_BLOCKED);
+}
+
+boolean web_match_migration_lost(void)
+{
+	if (!web_match_migration_enabled()) return FALSE;
+	if (quick_play.phase == QUICK_PLAYING)
+	{
+		quick_play.was_paused = game_time_get_paused();
+		game_time_set_paused(TRUE);
+		quick_play_phase(QUICK_HOLD, system_milliseconds(), "disconnected",
+			"The host connection was lost. Preserving the match while a replacement is chosen...");
+	}
+	return TRUE;
+}
+
 void quick_play_update(boolean main_menu_loaded)
 {
 	unsigned long now = system_milliseconds();
 	struct network_game_client *client;
 	short state;
-	int restart_host;
-	unsigned long restart_target;
+	int migration_host, hold;
+	unsigned long migration_target;
+	unsigned int migration_epoch;
 
-	if (web_quick_play_take_restart(&restart_host, &restart_target))
+	/* Explicit cancellation wins over any queued election or hold. */
+	if (web_quick_play_take_cancel() && quick_play.phase != QUICK_OFF)
 	{
-		if (quick_play.owned && global_network_game_client_get())
-			network_game_abort();
-		main_goto_main_menu();
-		memset(&quick_play, 0, sizeof(quick_play));
-		quick_play.checked = TRUE;
-		quick_play.host = restart_host;
-		quick_play.target = restart_target;
-		quick_play_phase(QUICK_SETTLING, now, "loading", "Restarting multiplayer with the replacement host...");
+		quick_play_finish("menu", "Returned to the main menu.", TRUE);
+		return;
+	}
+	hold = web_quick_play_take_hold();
+	if (hold == 1) web_match_migration_lost();
+	else if (hold == 2 && quick_play.phase == QUICK_HOLD && global_network_game_client_get() &&
+		!network_game_client_get_error(global_network_game_client_get()))
+	{
+		game_time_set_paused(quick_play.was_paused);
+		quick_play_phase(QUICK_PLAYING, now, "playing", "Multiplayer is ready.");
+	}
+	if (web_quick_play_take_migrate(&migration_host, &migration_target, &migration_epoch) &&
+		web_match_migration_enabled() && migration_epoch > quick_play.epoch)
+	{
+		web_match_migration_lost();
+		quick_play.epoch = migration_epoch;
+		quick_play.target = migration_target;
+		quick_play.host = migration_host;
+		quick_play.migration_committed = FALSE;
+		if ((migration_host && !create_global_network_game_server_from_migration(migration_epoch)) ||
+			!network_game_client_begin_migration(global_network_game_client_get(),
+				migration_host ? 0x7f000001UL : migration_target, migration_epoch))
+		{
+			quick_play_phase(QUICK_BLOCKED, now, "migration-failed",
+				"Host migration could not restore the connection. The match is preserved and paused.");
+			return;
+		}
+		quick_play_phase(QUICK_MIGRATING, now, "migrating", "Reconnecting players to the same match...");
 	}
 
 	if (!quick_play.checked)
 	{
 		const char *mode = config_string("network.quick_play");
 		quick_play.checked = TRUE;
+		quick_play.epoch = (unsigned int)web_quick_play_initial_epoch();
 		if (!mode[0])
 			return;
 		if (strcmp(mode, "host") && strcmp(mode, "join"))
@@ -153,10 +203,26 @@ void quick_play_update(boolean main_menu_loaded)
 		}
 		quick_play_phase(QUICK_SETTLING, now, "loading", "Opening multiplayer...");
 	}
-	/* The page writes an atomic request; only this game thread touches game state. */
-	if (web_quick_play_take_cancel() && quick_play.phase != QUICK_OFF)
+	if (quick_play.phase == QUICK_HOLD || quick_play.phase == QUICK_BLOCKED)
+		return;
+	if (quick_play.phase == QUICK_MIGRATING)
 	{
-		quick_play_finish("menu", "Returned to the main menu.", TRUE);
+		struct network_game_server *server = global_network_game_server_get();
+		client = global_network_game_client_get();
+		if (quick_play.host && server && !quick_play.migration_committed &&
+			(network_game_server_migration_ready(server) || now - quick_play.phase_at >= 12000UL))
+		{
+			network_game_server_migration_finish(server);
+			quick_play.migration_committed = TRUE;
+		}
+		if (client && network_game_client_migration_ready(client))
+		{
+			game_time_set_paused(quick_play.was_paused);
+			quick_play_phase(QUICK_PLAYING, now, "playing", "The match continues with the replacement host.");
+		}
+		else if (now - quick_play.phase_at >= 45000UL)
+			quick_play_phase(QUICK_BLOCKED, now, "migration-failed",
+				"The replacement host could not reconnect. The match is preserved and paused.");
 		return;
 	}
 	if (quick_play.phase == QUICK_OFF || quick_play.phase == QUICK_DONE)
@@ -214,6 +280,7 @@ void quick_play_update(boolean main_menu_loaded)
 	}
 	if (network_game_client_get_error(client))
 	{
+		if (!quick_play.host && quick_play.phase == QUICK_PLAYING && web_match_migration_lost()) return;
 		quick_play_finish(!quick_play.host && quick_play.phase == QUICK_PLAYING ? "disconnected" : "error",
 			"The multiplayer connection failed. Use the game menus or reload to try again.", TRUE);
 		return;

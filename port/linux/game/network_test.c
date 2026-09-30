@@ -10,6 +10,8 @@ Automated system link sessions for testing the netcode without the menus
   setup does, and starts it debug.network_test_start seconds later;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
+- "observe" only logs the existing game; it never creates a session,
+  adds players or runs the scripted kills, pickups and vehicle actions.
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
@@ -74,6 +76,7 @@ enum
 	_network_test_off,
 	_network_test_host,
 	_network_test_join,
+	_network_test_observe,
 };
 
 static struct
@@ -97,6 +100,7 @@ static struct
 	real vehicle_time;
 	real pickup_time;
 	long logged_time;
+	long observed_time;
 } network_test;
 
 static void network_test_read_settings(
@@ -122,6 +126,10 @@ static void network_test_read_settings(
 	else if (!strcmp(setting, "join"))
 	{
 		network_test.mode = _network_test_join;
+	}
+	else if (!strcmp(setting, "observe"))
+	{
+		network_test.mode = _network_test_observe;
 	}
 	network_test.start_delay = (real)config_real("debug.network_test_start");
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
@@ -451,6 +459,24 @@ void network_test_update(
 		network_test_read_settings();
 	if (network_test.mode == _network_test_off)
 		return;
+	if (network_test.mode == _network_test_observe)
+	{
+		if (game_in_progress() && !main_menu_loaded)
+		{
+			long observed_time = game_time_get();
+
+			/* Migration can restore an earlier confirmed game tick. Report it
+			immediately instead of waiting for the prediction clock to catch up. */
+			if (observed_time < network_test.observed_time ||
+				observed_time - network_test.logged_time >= TICKS_PER_SECOND)
+			{
+				network_test.logged_time = observed_time;
+				network_test_log_players();
+			}
+			network_test.observed_time = observed_time;
+		}
+		return;
+	}
 
 	/* the game running: report */
 	if (game_in_progress() && !main_menu_loaded && game_time_get() - network_test.logged_time >= TICKS_PER_SECOND)

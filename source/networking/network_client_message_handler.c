@@ -197,6 +197,9 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "networking/network_client_manager.h"
+#ifdef HALO_WEB
+#include "network_migration.h"
+#endif
 #include "networking/network_client_message_handler.h"
 #include "networking/network_messages.h"
 
@@ -526,6 +529,10 @@ boolean network_game_client_handle_message(
 		0x2F,
 		client && message && (message_size == GET_MESSAGE_SIZE(*message)) && source_address);
 
+#ifdef HALO_WEB
+	if (GET_MESSAGE_TYPE(*message) == 2 && network_game_client_handle_migration(client, message, message_size, source_address))
+		return TRUE;
+#endif
 	message_type = (byte)GET_MESSAGE_TYPE(*message);
 	if (GET_MESSAGE_FLAGS(*message))
 	{
@@ -740,6 +747,11 @@ boolean network_game_client_handle_message(
 				break;
 
 			case _message_type_data:
+#ifdef HALO_WEB
+				/* An old host's queued datagrams cannot mutate the adopted match. */
+				if (!network_game_client_address_matches_server(client, source_address))
+					break;
+#endif
 #ifdef HALO_LINUX
 				/* the distributed netcode's messages (port/linux/NETCODE.md) */
 				network_distributed_handle_message(NONE, message, message_size);

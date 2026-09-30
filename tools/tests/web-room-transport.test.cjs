@@ -35,8 +35,8 @@ function fixture(options = {}) {
   let source = fs.readFileSync(require.resolve('../../port/web/site/net.js'), 'utf8');
   assert.ok(source.includes('return { attach, join, leave,'));
   source = source.replace('return { attach, join, leave,',
-    'return { peerFor, createConnection, dropPeer, handleSignal, pump, sweep, attach, join, leave,');
-  vm.runInNewContext(source + '\nglobalThis.net = HaloNet;', context);
+    'return { get fixtureState() { return state; }, peerFor, createConnection, dropPeer, handleSignal, pump, sweep, attach, join, leave,');
+  vm.runInNewContext(source + '\nglobalThis.net = HaloNet; globalThis.Coordinator = HaloQuickCoordinator;', context);
   const net = context.net;
   const memory = { buffer: new SharedArrayBuffer(1024) };
   const offsets = { netInWrite: 0, netInRead: 4, netOutWrite: 8, netOutRead: 12,
@@ -49,6 +49,19 @@ function fixture(options = {}) {
   return { net, peer, pc, words, bytes, intervals, connections,
     tick(time) { now = time; net.sweep(); },
     receive(packet) { peer.reliable.onmessage({ data: packet.buffer }); },
+    authority(epoch = 0, host = peer) {
+      const state = net.fixtureState;
+      state.address = 0x0101010a; words[4] = state.address;
+      const coordinator = new context.Coordinator(state.id, state.address, now);
+      coordinator.epoch = epoch;
+      coordinator.result = { role: 'join', hostId: host.id, hostAddress: host.address };
+      coordinator.presence = { role: 'join', hostId: host.id, phase: 'launched',
+        gamePhase: 'playing', epoch, failover: true, migration: true, matchId: 500, checkpointTick: 90 };
+      state.quick = { coordinator, resolved: true };
+      host.quick = { role: 'host', hostId: host.id, phase: 'launched',
+        gamePhase: 'playing', epoch, failover: true, migration: true, matchId: 500, checkpointTick: 90 };
+      return coordinator;
+    },
     consume() {
       const result = [];
       let read = words[1] >>> 0;
@@ -98,6 +111,64 @@ function packets(bytes) {
   }
   return result;
 }
+
+function migrationFrame(packet, epoch) {
+  const wire = new Uint8Array(packet.length + 8), view = new DataView(wire.buffer);
+  view.setUint32(0, 0x484d4731, true);
+  view.setUint32(4, epoch, true);
+  wire.set(packet, 8);
+  return wire;
+}
+
+test('quick-play frames carry authority epochs without reducing the largest game packet', () => {
+  const f = fixture(); f.authority(3);
+  f.receive(migrationFrame(streamPacket(f, 2), 3)); f.consume();
+  const largest = streamPacket(f, 3, false, 256);
+  f.receive(migrationFrame(largest, 3));
+  assert.deepEqual(f.consume(), Array.from(largest), 'the wrapper stays outside the engine receive ring');
+  assert.equal(f.pc.closed, undefined);
+  const outgoing = streamPacket(f, 1, true, 256);
+  f.bytes.set(outgoing, 320); f.words[2] = outgoing.length;
+  f.net.pump();
+  assert.deepEqual(Array.from(f.peer.unreliable.sent.at(-1)), Array.from(migrationFrame(outgoing, 3)));
+});
+
+test('stale authority and unwrapped legacy frames never enter a running quick-play match', () => {
+  for (const unreliable of [false, true]) {
+    const f = fixture(); f.authority(3);
+    const current = streamPacket(f, unreliable ? 1 : 2);
+    const receive = data => (unreliable ? f.peer.unreliable : f.peer.reliable).onmessage({ data: data.buffer });
+    receive(migrationFrame(current, 2));
+    receive(current);
+    assert.deepEqual(f.consume(), [], 'old authority cannot write into the game packet ring');
+    receive(migrationFrame(current, 3));
+    assert.deepEqual(f.consume(), Array.from(current));
+  }
+});
+
+test('reliable frames queued under backpressure are fenced when authority changes', () => {
+  const f = fixture(), coordinator = f.authority(0);
+  f.words[0] = 256; // The engine has not drained any of the full input ring.
+  const old = streamPacket(f, 2);
+  f.receive(migrationFrame(old, 0));
+  assert.ok(f.peer.receivedBytes > 0);
+  coordinator.epoch = coordinator.presence.epoch = 1;
+  f.peer.quick.epoch = 1;
+  f.words[1] = f.words[0];
+  f.net.pump();
+  assert.deepEqual(f.consume(), [], 'a buffered old-epoch OPEN cannot recreate the previous host connection');
+  assert.equal(f.peer.receivedBytes, 0);
+  f.receive(migrationFrame(old, 1));
+  assert.deepEqual(f.consume(), Array.from(old));
+});
+
+test('an epoch wrapper cannot authorize a packet claiming a different peer address', () => {
+  const f = fixture(); f.authority(1);
+  const forged = streamPacket(f, 2);
+  new DataView(forged.buffer).setUint32(8, 0x0301010a, true);
+  f.receive(migrationFrame(forged, 1));
+  assert.deepEqual(f.consume(), [], 'the WebRTC sender and engine packet source must agree');
+});
 
 test('reliable OPEN, DATA and CLOSE survive a full receive ring in order', () => {
   const f = fixture();
