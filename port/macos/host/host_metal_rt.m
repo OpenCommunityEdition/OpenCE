@@ -1245,7 +1245,10 @@ int host_rt_available(void)
 		rt.dummy_texture = [rt.device newTextureWithDescriptor:descriptor];
 		rt.dummy = [rt.device newBufferWithLength:512 options:MTLResourceStorageModeShared];
 		if (!rt.dummy_texture || !rt.dummy)
+		{
+			host_logf(HOST_LOG_ERROR, "ray tracing: Metal does not make the stand-in buffer and texture");
 			return 0;
+		}
 		memset(rt.dummy.contents, 0, 512);
 	}
 	{
