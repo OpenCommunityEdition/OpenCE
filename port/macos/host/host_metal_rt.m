@@ -210,6 +210,17 @@ static NSString *const kernel_source = @
 	"	seed = pcg(seed);\n"
 	"	return float(seed >> 8) / 16777216.0;\n"
 	"}\n"
+	/* and spread evenly: a pixel's nth sample the nth point of the R2
+	   sequence (each next one where the last left the most room), shifted
+	   by the pixel's interleaved gradient noise (neighbours shifted far
+	   apart) - over its samples a pixel covers the directions evenly, and
+	   what noise is left is fine, not in clumps, for the denoiser */
+	"static float2 spread01(uint2 pixel, float n, float salt)\n"
+	"{\n"
+	"	float2 p = float2(pixel) + salt * float2(5.588238, 3.1415926);\n"
+	"	float ign = fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));\n"
+	"	return fract(float2(ign, fract(ign * 1.6180339887 + 0.5)) + n * float2(0.7548776662, 0.5698402910));\n"
+	"}\n"
 	/* the cutouts (alpha-tested: foliage, fences): a candidate hit on one is
 	solid where its mask (its texture's alpha) is - the level's (instance 0;
 	its primitives from c[83]) by its material and base map coordinates, an
@@ -790,15 +801,16 @@ static NSString *const kernel_source = @
 	"				float2 ps = origin + (pn * 0.5 + 0.5) * size;\n"
 	"				if (all(ps >= origin) && all(ps < origin + size))\n"
 	"				{\n"
-	/* (its alpha: its depth, in 64ths, and how many frames it holds, below:
-	   each new frame takes 1 / that many, down to c[62]) */
+	/* (its alpha: its depth, in 64ths, and how many samples it holds, below:
+	   each new sample takes 1 / that many - their average - down to c[62],
+	   the most samples it keeps) */
 	"					float4 was = history_in.read(uint2(ps));\n"
 	"					float was_frames = fmod(was.a, 256.0), was_z = floor(was.a / 256.0) / 64.0;\n"
 	"					if (was_z > 0.0 && abs(was_z - pz) < pz * 0.04 + 0.03)\n"
 	"					{\n"
 	"						before = was;\n"
 	"						frames = min(was_frames + 1.0, 255.0);\n"
-	"						weight = max(1.0 / frames, (c[62] > 0.0 ? c[62] : 0.02) * max(c[63], 1.0));\n"
+	"						weight = max(1.0 / frames, c[62] > 0.0 ? c[62] : 0.03);\n"
 	"					}\n"
 	"				}\n"
 	"			}\n"
@@ -810,6 +822,9 @@ static NSString *const kernel_source = @
 	"		if (!sample_now) frames = fmod(before.a, 256.0);\n"
 	"		if (sample_now)\n"
 	"		{\n"
+	/* (the sequence's place: the samples, and past the most it counts, on
+	   with the frame) */
+	"		float n = frames < 254.5 ? frames : frames + float(uint(c[44]) & 4095u);\n"
 	/* the sky's wide lights (c[64-79]: each its direction, its colour and
 	   power, the cosine of its half width, whether there is one): a ray
 	   toward a point of each, new each frame, accumulated with the bounces */
@@ -841,8 +856,8 @@ static NSString *const kernel_source = @
 	   the level: the sky's light; where it lands on an object: a dim share
 	   of the light around */
 	"		{\n"
-	"			float u1 = random01(seed);\n"
-	"			float u2 = random01(seed);\n"
+	"			float2 u = spread01(id, n, 0.0);\n"
+	"			float u1 = u.x, u2 = u.y;\n"
 	"			float r = sqrt(u1), a = 6.2831853 * u2;\n"
 	"			float3 d = normalize(tangent * (r * cos(a)) + bitangent * (r * sin(a)) + N * sqrt(max(0.0, 1.0 - u1)));\n"
 	"			float3 origin = P + N * bias;\n"
@@ -952,11 +967,12 @@ static NSString *const kernel_source = @
 	   bounces', over pi) */
 	"		if (glowing_count > 0u)\n"
 	"		{\n"
-	"			float pick = random01(seed);\n"
+	"			float2 g = spread01(id, n, 1.0);\n"
+	"			float pick = g.x;\n"
 	"			uint lo = 0u, hi = glowing_count - 1u;\n"
 	"			while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
 	"			float4 a = glowing[lo * 3u], b = glowing[lo * 3u + 1u], cc = glowing[lo * 3u + 2u];\n"
-	"			float r1 = sqrt(random01(seed));\n"
+	"			float r1 = sqrt(g.y);\n"
 	"			float r2 = random01(seed);\n"
 	"			float3 at = a.xyz * (1.0 - r1) + b.xyz * (r1 * (1.0 - r2)) + cc.xyz * (r1 * r2);\n"
 	"			float3 cross_ab = cross(b.xyz - a.xyz, cc.xyz - a.xyz);\n"

@@ -123,6 +123,8 @@ static struct
 	/* the traced light, denoised on the rays' grid (rgb, a: whether there is
 	some), and its pass */
 	GLuint denoised_texture, denoise_program;
+	/* (the denoise passes in between) */
+	GLuint denoising_texture;
 	/* what the light buffer took this frame (the window's resolution; 0
 	where it took the game's), and whether it did */
 	GLuint applied_texture;
@@ -218,10 +220,16 @@ way), and the composite blends them back up across edges by depth */
 	"	return u[1].xy + (ndc * 0.5 + 0.5) * u[1].zw;\n" \
 	"}\n"
 
-/* the traced light, denoised on the rays' grid, after they are traced: of
-the 9x9 of the rays' pixels around (every other one) those of like depth
-and facing that have traced light (their results' r 2; the light in the
-lights' texture, gba) - out: the light, and 1 where there is some */
+/* the traced light, denoised on the rays' grid, after they are traced: an
+a-trous wavelet filter (as SVGF's, Schied et al. 2017), four passes of 5x5
+taps each twice as far apart as the last (1, 2, 4, 8 of the rays' pixels),
+which together reach 61 across. Each tap weighs by the B3 spline, and less
+the farther its depth and facing are from this pixel's (the gbuffer's), and
+the farther its light's brightness is from this one's, measured against how
+much the light varies here (3x3) - noise is smoothed, an edge in the light
+(a shadow's) kept. u[0]: the grid; u[1]: the taps' step, whether the light
+is the lights' texture (the first pass: gba, where the results' r is 2)
+rather than the last pass's (rgb, a 1 where there is some) */
 static const char denoise_source[] =
 	SHADER_HEADER
 	"uniform sampler2D lights_texture;\n"
@@ -229,26 +237,53 @@ static const char denoise_source[] =
 	"uniform sampler2D gbuffer_texture;\n"
 	"uniform vec4 u[4];\n"
 	"out vec4 result;\n"
+	"ivec2 lo, hi;\n"
+	"vec4 light_at(ivec2 k)\n"
+	"{\n"
+	"	if (u[1].y > 0.5)\n"
+	"		return texelFetch(results_texture, k, 0).r < 1.5 ? vec4(0.0) : vec4(texelFetch(lights_texture, k, 0).gba, 1.0);\n"
+	"	return texelFetch(lights_texture, k, 0);\n"
+	"}\n"
+	"float brightness(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }\n"
 	"void main()\n"
 	"{\n"
 	"	ivec2 q0 = ivec2(gl_FragCoord.xy);\n"
-	"	ivec2 lo = ivec2(u[0].xy), hi = max(lo, ivec2(u[0].xy + u[0].zw) - 1);\n"
+	"	lo = ivec2(u[0].xy); hi = max(lo, ivec2(u[0].xy + u[0].zw) - 1);\n"
 	"	vec4 g0 = texelFetch(gbuffer_texture, q0, 0);\n"
-	"	if (g0.x <= 0.0 || texelFetch(results_texture, q0, 0).r < 1.5) { result = vec4(0.0); return; }\n"
+	"	vec4 l0 = light_at(q0);\n"
+	"	if (g0.x <= 0.0 || l0.a <= 0.0) { result = vec4(0.0); return; }\n"
+	/* (how much the light varies here: its brightness's, 3x3) */
+	"	float m1 = 0.0, m2 = 0.0, n = 0.0;\n"
+	"	for (int y = -1; y <= 1; y++)\n"
+	"		for (int x = -1; x <= 1; x++)\n"
+	"		{\n"
+	"			vec4 l = light_at(clamp(q0 + ivec2(x, y), lo, hi));\n"
+	"			if (l.a <= 0.0) continue;\n"
+	"			float b = brightness(l.rgb);\n"
+	"			m1 += b; m2 += b * b; n += 1.0;\n"
+	"		}\n"
+	"	m1 /= n; m2 /= n;\n"
+	"	float spread = 4.0 * sqrt(max(m2 - m1 * m1, 0.0)) + 0.02 + 0.1 * m1;\n"
+	"	float b0 = brightness(l0.rgb);\n"
+	"	int step = int(u[1].x);\n"
+	"	float h[5] = float[5](0.0625, 0.25, 0.375, 0.25, 0.0625);\n"
 	"	vec3 sum = vec3(0.0);\n"
 	"	float total = 0.0;\n"
 	"	for (int y = -2; y <= 2; y++)\n"
 	"		for (int x = -2; x <= 2; x++)\n"
 	"		{\n"
-	"			ivec2 k = clamp(q0 + ivec2(x, y) * 2, lo, hi);\n"
+	"			ivec2 k = clamp(q0 + ivec2(x, y) * step, lo, hi);\n"
 	"			vec4 g = texelFetch(gbuffer_texture, k, 0);\n"
-	"			if (g.x <= 0.0 || texelFetch(results_texture, k, 0).r < 1.5) continue;\n"
-	"			float w = 1.0 / (1.0 + abs(g.x - g0.x) / g0.x * 40.0);\n"
-	"			w *= pow(max(dot(g.yzw, g0.yzw), 0.0), 8.0) * exp(-float(x * x + y * y) * 0.3);\n"
-	"			sum += texelFetch(lights_texture, k, 0).gba * w;\n"
+	"			vec4 l = light_at(k);\n"
+	"			if (g.x <= 0.0 || l.a <= 0.0) continue;\n"
+	"			float w = h[x + 2] * h[y + 2];\n"
+	"			w *= exp(-abs(g.x - g0.x) / (g0.x * 0.012 * float(step) + 0.01));\n"
+	"			w *= pow(max(dot(g.yzw, g0.yzw), 0.0), 32.0);\n"
+	"			w *= exp(-abs(brightness(l.rgb) - b0) / spread);\n"
+	"			sum += l.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
-	"	result = total > 0.0 ? vec4(sum / total, 1.0) : vec4(0.0);\n"
+	"	result = total > 0.0 ? vec4(sum / total, 1.0) : vec4(l0.rgb, 1.0);\n"
 	"}\n";
 
 /* the traced light into the light buffer, in place of the lightmaps', on
@@ -1015,6 +1050,7 @@ static void size_textures(int width, int height)
 		glDeleteTextures(1, &ray.lit_texture);
 		glDeleteTextures(1, &ray.objects_texture);
 		glDeleteTextures(1, &ray.denoised_texture);
+		glDeleteTextures(1, &ray.denoising_texture);
 		glDeleteTextures(1, &ray.applied_texture);
 	}
 	ray.scene_texture = make_texture(width, height);
@@ -1023,6 +1059,7 @@ static void size_textures(int width, int height)
 	ray.lit_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.objects_texture = make_texture(width, height);
 	ray.denoised_texture = make_float_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.denoising_texture = make_float_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.applied_texture = make_float_texture(width, height);
 	ray.light_stages = 0;
 	ray.width = width;
@@ -1285,9 +1322,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[47] = ray.gi_glow;
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
-	/* (how much of each new frame the accumulated light takes, at least:
-	enough that the light follows a change within a second, not smears) */
-	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.05f;
+	/* (how much of each new sample the accumulated light takes, at least:
+	the average of the last 33 or so) */
+	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.03f;
 	/* (the traced light's new samples every this many frames a pixel: 0,
 	the host's governor chooses) */
 	camera[63] = getenv("HALO_RT_GI_PERIOD") ? (float)atof(getenv("HALO_RT_GI_PERIOD")) : 0.0f;
@@ -1525,7 +1562,7 @@ static int denoise_traced_light(GLuint world_results, const float *uniforms, int
 {
 #ifdef HALO_MACOS
 	ray.gi_previous = world_results && ray.gi && ray.lights_texture && ray.gbuffer_texture && ray.denoise_program &&
-		ray.denoised_texture;
+		ray.denoised_texture && ray.denoising_texture;
 	if (ray.gi_previous)
 	{
 		/* the traced light, denoised on the rays' grid, for the next frame */
@@ -1536,17 +1573,13 @@ static int denoise_traced_light(GLuint world_results, const float *uniforms, int
 		grid[1] = uniforms[5] / TRACE_SCALE;
 		grid[2] = uniforms[6] / TRACE_SCALE;
 		grid[3] = uniforms[7] / TRACE_SCALE;
+		int pass;
+
 		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.denoised_texture, 0);
 		glDrawBuffers(1, &denoise_buffer);
 		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 		glDisable(GL_SCISSOR_TEST);
 		glUseProgram(ray.denoise_program);
-		glUniform4fv(ray.denoise_uniforms, 4, grid);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, ray.lights_texture);
-		glBindSampler(1, 0);
-		glUniform1i(ray.denoise_lights, 1);
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, world_results);
 		glBindSampler(2, 0);
@@ -1555,7 +1588,23 @@ static int denoise_traced_light(GLuint world_results, const float *uniforms, int
 		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
 		glBindSampler(3, 0);
 		glUniform1i(ray.denoise_gbuffer, 3);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		/* (the four passes: the lights' texture into the one in between, it
+		into the denoised, and back, the last into the denoised) */
+		for (pass = 0; pass < 4; pass++)
+		{
+			GLuint from = pass == 0 ? ray.lights_texture : (pass & 1) ? ray.denoising_texture : ray.denoised_texture;
+			GLuint to = (pass & 1) ? ray.denoised_texture : ray.denoising_texture;
+
+			grid[4] = (float)(1 << pass);
+			grid[5] = pass == 0 ? 1.0f : 0.0f;
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, to, 0);
+			glUniform4fv(ray.denoise_uniforms, 4, grid);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, from);
+			glBindSampler(1, 0);
+			glUniform1i(ray.denoise_lights, 1);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
 		glEnable(GL_SCISSOR_TEST);
 		ray.gi_results_texture = world_results;
 		ray.gi_lights_texture = ray.denoised_texture;
