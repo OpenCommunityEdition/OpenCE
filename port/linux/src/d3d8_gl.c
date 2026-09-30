@@ -210,6 +210,14 @@ long halo_screen_width(void)
 	return screen_width;
 }
 
+/* how many pixels the screen's targets draw to the Xbox's one, the larger
+of the two ways (the screen effects' convolutions: rasterizer_xbox_screen_effect.c) */
+float halo_screen_scale(void)
+{
+	halo_screen_width();
+	return screen_scale[0] > screen_scale[1] ? screen_scale[0] : screen_scale[1];
+}
+
 void halo_screen_ui_offset(unsigned char centered)
 {
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
