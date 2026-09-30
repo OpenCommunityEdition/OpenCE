@@ -16,6 +16,8 @@ Keyboard and mouse (port 0):
 	left ctrl, C     left stick click    Z, middle button right stick click
 	escape           start               F1               back
 	F12              release or recapture the mouse
+	Command-X        the next debug camera (as black held for a second)
+	Command-Z        the flying camera's controls (as the right stick click)
 
 In the menus the mouse is free and drives a pointer instead
 (port/linux/include/halo_ui_pointer.h, source/interface/ui_widget.c): its
@@ -149,6 +151,40 @@ int halo_linux_mouse_aiming(short gamepad_index)
 	return aiming;
 }
 
+/* ---------- the debug cameras' keys */
+
+/* Command-X and Command-Z on macOS (sdl_platform.c): the next debug camera,
+and taking or letting go of the flying camera's controls, at once, as the
+black button held for a second and the right stick's button do
+(source/camera/director.c). When each was last pressed, until the game
+takes it; a press the game does not take within half a second (in the
+menus, while loading) is dropped. */
+static Uint64 debug_camera_pressed_ms[2];
+
+#define DEBUG_CAMERA_KEY_MS 500
+
+void halo_debug_camera_key(int switch_camera)
+{
+	pthread_mutex_lock(&mouse_lock);
+	debug_camera_pressed_ms[switch_camera ? 1 : 0] = SDL_GetTicks() + 1;
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+/* whether the player on the gamepad asked for the next camera
+(switch_camera) or for the flying camera's controls since the last call */
+int halo_debug_camera_request(short gamepad_index, int switch_camera)
+{
+	Uint64 pressed;
+
+	if (gamepad_index != 0)
+		return FALSE;
+	pthread_mutex_lock(&mouse_lock);
+	pressed = debug_camera_pressed_ms[switch_camera ? 1 : 0];
+	debug_camera_pressed_ms[switch_camera ? 1 : 0] = 0;
+	pthread_mutex_unlock(&mouse_lock);
+	return pressed && SDL_GetTicks() + 1 - pressed <= DEBUG_CAMERA_KEY_MS;
+}
+
 /* collects the motion the game has not asked for yet; motion that nobody
 consumes for a few polls (menus, cutscenes) is dropped so it cannot jerk
 the view later */
@@ -259,11 +295,15 @@ as scripted, for tests with screenshots (debug.screenshot_every). The times
 are seconds since the game started; <to> may be left out for a tap (a
 tenth of a second). The actions: forward, back, left, right (walking),
 turnleft, turnright, up, down (looking), fire, grenade, jump, crouch, zoom,
-action, flashlight, reload, switch (weapons), start. */
+action, flashlight, reload, switch (weapons), start; camera and
+cameracontrol press Command-X and Command-Z once (the debug cameras);
+mouseleft, mouseright, mouseup, mousedown move the mouse, 400 pixels a
+second. */
 static struct
 {
 	double from, to;
 	char action[16];
+	BOOL pressed;
 } test_script[64];
 static int test_script_count = -1;
 
@@ -302,15 +342,40 @@ static void test_script_load(const char *script)
 
 static void test_script_gamepad(XINPUT_GAMEPAD *pad)
 {
+	static double last_t = -1.0;
 	double t = (double)SDL_GetTicks() / 1000.0;
+	/* the seconds since the last poll, for the mouse's motion */
+	float dt = last_t < 0.0 || t - last_t > 0.1 ? 0.0f : (float)(t - last_t);
 	int index;
 
+	last_t = t;
 	for (index = 0; index < test_script_count; index++)
 	{
 		const char *action = test_script[index].action;
+		float mouse_x = 0.0f, mouse_y = 0.0f;
 
 		if (t < test_script[index].from || t >= test_script[index].to)
 			continue;
+		if (!strcmp(action, "camera") || !strcmp(action, "cameracontrol"))
+		{
+			if (!test_script[index].pressed)
+				halo_debug_camera_key(!strcmp(action, "camera"));
+			test_script[index].pressed = TRUE;
+			continue;
+		}
+		if (!strcmp(action, "mouseleft")) mouse_x = -400.0f * dt;
+		else if (!strcmp(action, "mouseright")) mouse_x = 400.0f * dt;
+		else if (!strcmp(action, "mouseup")) mouse_y = -400.0f * dt;
+		else if (!strcmp(action, "mousedown")) mouse_y = 400.0f * dt;
+		if (mouse_x != 0.0f || mouse_y != 0.0f)
+		{
+			pthread_mutex_lock(&mouse_lock);
+			mouse_pending_x += mouse_x;
+			mouse_pending_y += mouse_y;
+			mouse_aimed_ms = SDL_GetTicks();
+			pthread_mutex_unlock(&mouse_lock);
+			continue;
+		}
 		if (!strcmp(action, "forward")) pad->sThumbLY = 32000;
 		else if (!strcmp(action, "back")) pad->sThumbLY = -32000;
 		else if (!strcmp(action, "left")) pad->sThumbLX = -32000;

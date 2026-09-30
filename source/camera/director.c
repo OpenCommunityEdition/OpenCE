@@ -781,6 +781,7 @@ static boolean director_update_controls(
 	struct camera_control *controls)
 {
 	boolean switch_camera = FALSE;
+	boolean toggle_controls;
 	long player_index;
 	struct director *director = director_get(local_player_index);
 
@@ -812,13 +813,23 @@ static boolean director_update_controls(
 				ticks != last_ticks[local_player_index];
 			last_ticks[local_player_index] = ticks;
 		}
+		{
+			/* Command-X switches at once and Command-Z takes or lets go of
+			the flying camera's controls (port/linux/src/xinput_sdl.c) */
+			extern int halo_debug_camera_request(short gamepad_index, int switch_camera);
+
+			if (halo_debug_camera_request((short)player_index, TRUE))
+				switch_camera = TRUE;
+			toggle_controls = halo_debug_camera_request((short)player_index, FALSE);
+		}
 
 		if (director->camera_proc !=
 				(director_camera_update_proc)first_person_camera_update &&
 			director->camera_proc !=
 				(director_camera_update_proc)following_camera_update)
 		{
-			if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1)
+			if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1 ||
+				toggle_controls)
 				director->debug_controls = !director->debug_controls;
 			if (director->debug_controls)
 			{
@@ -844,6 +855,21 @@ static boolean director_update_controls(
 				controls->facing_delta.pitch =
 					(real)gamepad->sticks[_gamepad_stick_right].y *
 						director_globals.dtime * 0.0000196349538f;
+				{
+					/* the mouse turns the camera as it aims
+					(port/linux/src/xinput_sdl.c): the player's look code
+					leaves its motion here while the facing is inhibited
+					(game/player_control.c) */
+					extern int halo_linux_mouse_look(short gamepad_index, real *yaw, real *pitch);
+					real mouse_yaw;
+					real mouse_pitch;
+
+					if (halo_linux_mouse_look((short)player_index, &mouse_yaw, &mouse_pitch))
+					{
+						controls->facing_delta.yaw += mouse_yaw;
+						controls->facing_delta.pitch += mouse_pitch;
+					}
+				}
 				controls->position_delta.i =
 					(real)gamepad->sticks[_gamepad_stick_left].y *
 						director->debug_input_scale * director_globals.dtime * 0.00005f;

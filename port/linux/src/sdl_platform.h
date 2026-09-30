@@ -68,5 +68,7 @@ BOOL platform_ui_pointer_read(struct platform_ui_pointer *pointer);
 void platform_video_window_size(int *width, int *height);
 #endif
 BOOL platform_next_keystroke(struct platform_keystroke *keystroke);
+/* Command-X (switch_camera) and Command-Z: the debug cameras (xinput_sdl.c) */
+void halo_debug_camera_key(int switch_camera);
 
 #endif
