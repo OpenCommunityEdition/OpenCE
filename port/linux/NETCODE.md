@@ -213,14 +213,17 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
 `debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a
 game without the menus (in a team game the joining player takes the other
-team), and `debug.test_input` plays controller 1 with a scripted bot; each
-machine logs every player's position, health and shields, weapons,
-grenades, score, kills and deaths every second, with the objects made and
-removed and the hits reported, dealt, rejected and replayed, so two
-machines' views of one game can be compared. `debug.network_test_kill`,
+team), and `debug.test_input` plays controller 1 with a scripted bot (or,
+`look:<seed>`, one that stands still, only turning and looking up and
+down); each machine logs every player's position, health and shields,
+where they aim and face, their animation state and how hard they move,
+weapons, grenades, score, kills and deaths every second, with the objects
+made and removed and the hits reported, dealt, rejected and replayed, so
+two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
-swap the bots' wandering does not reach. `debug.network_latency` and
+swap the bots' wandering does not reach, and `debug.network_test_score`
+shortens the game, to test the next. `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet.
 

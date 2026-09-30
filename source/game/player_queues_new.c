@@ -945,14 +945,28 @@ void update_client_handle_server_update(
 	return;
 }
 
-void update_queues_reset_and_fill_with_lies(
+#ifdef HALO_LINUX
+/* port: the distributed netcode's record of each player's latest input,
+forgotten for a new game (network_distributed_new_game) as after loading
+one: a game counts its ticks and the host its updates from the start again,
+so the last game's latest, kept, would be later than any of this game's and
+every new input taken for an old one (the players driven by the last game's
+last input: aiming where they last aimed, running if they last ran) */
+void update_queues_distributed_reset(
 	void)
 {
-#ifdef HALO_LINUX
 	csmemset(update_server_pending_control_flags, 0, sizeof(update_server_pending_control_flags));
 	csmemset(update_client_relayed_actions, 0, sizeof(update_client_relayed_actions));
 	csmemset(update_server_distributed_inputs, 0, sizeof(update_server_distributed_inputs));
 	csmemset(update_client_local_inputs, 0, sizeof(update_client_local_inputs));
+}
+
+#endif
+void update_queues_reset_and_fill_with_lies(
+	void)
+{
+#ifdef HALO_LINUX
+	update_queues_distributed_reset();
 #endif
 	if (update_server_globals.initialized)
 	{

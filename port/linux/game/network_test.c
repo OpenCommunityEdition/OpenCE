@@ -48,12 +48,14 @@ Called from the main loop every frame (main.c).
 #include "scenario/scenario.h"
 #include "camera/observer.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(char const *name);
 double config_real(char const *name);
+long config_integer(char const *name);
 void platform_log(char const *format, ...);
 /* damage.c's */
 void damage_kill_object_for_player(long object_index, long player_index);
@@ -91,6 +93,7 @@ static struct
 	real shoot_interval;
 	real vehicle_time;
 	real pickup_time;
+	long score_to_win;
 	long logged_time;
 } network_test;
 
@@ -123,6 +126,7 @@ static void network_test_read_settings(
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
+	network_test.score_to_win = (long)config_integer("debug.network_test_score");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
 }
@@ -155,6 +159,17 @@ static void network_test_log_players(
 				object->object.shield_vitality, placed != object ? " riding" : "",
 				TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit) ? " camo" : "",
 				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
+			/* where it aims (yaw and pitch, degrees), its animation state and
+			how hard it is moving */
+			length += snprintf(line + length, sizeof(line) - (size_t)length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
+				atan2(unit->unit.aiming_vector.j, unit->unit.aiming_vector.i) * 57.29578,
+				asin(PIN(unit->unit.aiming_vector.k, -1.0f, 1.0f)) * 57.29578,
+				atan2(object->object.forward.j, object->object.forward.i) * 57.29578,
+				atan2(unit->unit.looking_vector.j, unit->unit.looking_vector.i) * 57.29578,
+				asin(PIN(unit->unit.looking_vector.k, -1.0f, 1.0f)) * 57.29578,
+				(int)unit->unit.animation.aiming_screen_index, (int)unit->unit.animation.looking_screen_index,
+				(int)unit->unit.animation.state,
+				sqrt(unit->unit.throttle.i * unit->unit.throttle.i + unit->unit.throttle.j * unit->unit.throttle.j));
 			for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
 			{
 				long weapon_index = unit->unit.weapon_object_indices[slot];
@@ -589,6 +604,9 @@ void network_test_update(
 				network_game_server_change_map_name(global_network_game_server_get(), path);
 				/* the variant, as picking the game settings does */
 				variant = *game_engine_get_variant_by_name(&variant, network_test.variant_name);
+				/* debug.network_test_score: a short game, to test the next */
+				if (network_test.score_to_win > 0)
+					variant.universal_variant.score_to_win = network_test.score_to_win;
 				player_ui_set_game_variant(&variant);
 				network_game_server_change_game_variant(global_network_game_server_get(), &variant);
 				network_test.map_set = TRUE;

@@ -208,7 +208,9 @@ once a frame, at the display's refresh rate. */
 /* debug.test_input "bot:<seed>": a scripted player for the automated
 network tests (port/linux/game/network_test.c), different for each seed:
 it walks and strafes in circles, turns, fires every few seconds, jumps now
-and then and throws a grenade every seven seconds */
+and then and throws a grenade every seven seconds; "look:<seed>" stands
+still, only turning and looking up and down (where remote players aim and
+whether they stand) */
 static int test_input_holding_action;
 static Uint64 test_input_holding_action_since;
 
@@ -226,6 +228,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
 	static int seed = -1;
+	static int looking;
 	double t;
 
 	if (!checked)
@@ -237,6 +240,11 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
+		else if (!strncmp(setting, "look:", 5))
+		{
+			seed = atoi(setting + 5);
+			looking = 1;
+		}
 	}
 	if (seed < 0)
 		return;
@@ -248,6 +256,12 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		return;
 	}
 	t = (double)SDL_GetTicks() / 1000.0 + seed * 1.7;
+	if (looking)
+	{
+		pad->sThumbRX = (SHORT)(sin(t * 0.5) * 14000.0);
+		pad->sThumbRY = (SHORT)(sin(t * 0.3) * 32000.0);
+		return;
+	}
 	pad->sThumbLY = (SHORT)(sin(t * 0.9) * 32000.0);
 	pad->sThumbLX = (SHORT)(cos(t * 0.6 + seed) * 20000.0);
 	pad->sThumbRX = (SHORT)(sin(t * 0.4) * 14000.0);

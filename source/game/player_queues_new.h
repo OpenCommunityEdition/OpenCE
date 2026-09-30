@@ -86,6 +86,9 @@ long update_server_ticked_update_number(
 struct player_action const *update_server_update_actions(
 	long update_number,
 	short *count);
+/* each player's latest input forgotten, for a new game */
+void update_queues_distributed_reset(
+	void);
 /* (a client) the host's action for the player at that absolute index, of
 the host's update */
 void update_client_handle_relayed_action(

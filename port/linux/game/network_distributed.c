@@ -1590,6 +1590,8 @@ void network_distributed_new_game(
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
 	distributed_pickup_count = 0;
+	/* (each player's latest input: player_queues_new.c) */
+	update_queues_distributed_reset();
 	network_objects_new_game();
 	network_damage_new_game();
 }
