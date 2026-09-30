@@ -119,7 +119,7 @@ a boolean alone is true (`--mute`), `--no-` before it false
 build/macos-release/Halo.app/Contents/MacOS/halo --gi path --no-vsync --fps --map c10
 ```
 | `display.render_scale` | `1.0` | Multiplies the resolution: below 1.0 is faster, above 1.0 supersamples (up to 4.0). |
-| `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` and `"depth"` show what the lighting uses. |
+| `display.ray_tracing` | `"on"` | The ray-traced lighting (refer to "Ray-traced lighting"). `"screen"`: without Metal's rays. `"off"`: off. `"occlusion"` shows what the lighting uses. |
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |
 | `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
@@ -395,7 +395,7 @@ bounce. Where Metal cannot trace rays, they are the only rays.
 | `"on"` | Metal's through the level, and the screen's. |
 | `"screen"` | The screen's only. |
 | `"off"` | None. |
-| `"occlusion"`, `"depth"` | Show what the lighting uses. |
+| `"occlusion"` | Show what the lighting uses. |
 | `"rays"`, `"split"` | The ray view: what Metal's rays find from the camera (`"split"`: the lighting on the left, the ray view on the right). |
 
 The ray view (F6 / ⌘B) traces a ray from the camera through each pixel

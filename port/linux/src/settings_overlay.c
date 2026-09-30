@@ -132,7 +132,7 @@ static char resolution_custom[64];
 
 static const char *const tracing_labels[] = { "Full", "Lite (screen only)", "Off" };
 static const char *const tracing_values[] = { "on", "screen", "off" };
-static const char *const view_labels[] = { "Lighting", "Ray view", "Split", "Occlusion", "Depth" };
+static const char *const view_labels[] = { "Lighting", "Ray view", "Split", "Occlusion" };
 static const char *const gi_labels[] = { "Traced", "Path", "Off" };
 static const char *const gi_values[] = { "traced", "path", "off" };
 static const char *const lights_labels[] = { "Traced", "Game" };
@@ -189,10 +189,10 @@ static const struct row rows[] =
 
 	{ _row_heading, _row_none, "Ray tracing" },
 	{ _row_choice, _row_ray_tracing, "Ray tracing", "display.ray_tracing", tracing_labels, 3 },
-	{ _row_choice, _row_ray_view, "View", NULL, view_labels, 5, 0, 0, 0, 0, 0,
+	{ _row_choice, _row_ray_view, "View", NULL, view_labels, 4, 0, 0, 0, 0, 0,
 		"What the ray tracing shows (F6 steps through it): the lighting; the ray view (what\n"
 		"the rays hit, from the camera); the lighting and the ray view side by side; the\n"
-		"traced occlusion; the depth. For looking, not saved." },
+		"traced occlusion. For looking, not saved." },
 	{ _row_choice, _row_ray_gi, "Traced light", "display.ray_tracing_gi", gi_labels, 3 },
 	{ _row_choice, _row_ray_lights, "Lights", "display.ray_tracing_lights", lights_labels, 2 },
 	{ _row_choice, _row_ray_shapes, "Object shapes", "display.ray_tracing_shapes", shapes_labels, 2 },

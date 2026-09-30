@@ -84,7 +84,6 @@ enum
 	_ray_tracing_off,
 	_ray_tracing_on,
 	_ray_tracing_debug_occlusion,
-	_ray_tracing_debug_depth,
 	/* what Metal's rays find, from the camera: all the screen, its right half */
 	_ray_tracing_debug_rays,
 	_ray_tracing_debug_split,
@@ -557,12 +556,11 @@ static const char composite_source[] =
 	"	ivec2 p = ivec2(gl_FragCoord.xy);\n"
 	"	vec4 scene = texelFetch(scene_texture, p, 0);\n"
 	"	float d = depth_at(p);\n"
-	"	if (debug_mode == 3) { float z = linear_depth(d); result = vec4(vec3(fract(z / 10.0)), 1.0); return; }\n"
 	/* the ray view (Metal's rays from the camera), on all the screen or its
 	   right half, a line between */
-	"	if (debug_mode == 4 || (debug_mode == 5 && float(p.x) >= u[1].x + u[1].z * 0.5))\n"
+	"	if (debug_mode == 3 || (debug_mode == 4 && float(p.x) >= u[1].x + u[1].z * 0.5))\n"
 	"	{\n"
-	"		if (debug_mode == 5 && float(p.x) < u[1].x + u[1].z * 0.5 + 2.0) { result = vec4(1.0); return; }\n"
+	"		if (debug_mode == 4 && float(p.x) < u[1].x + u[1].z * 0.5 + 2.0) { result = vec4(1.0); return; }\n"
 	"		result = rt_enabled != 0 ? vec4(texelFetch(rt_texture, p / TRACE_SCALE, 0).rgb, 1.0) :\n"
 	"			vec4(0.4, 0.0, 0.4, 1.0);\n"
 	"		return;\n"
@@ -741,8 +739,6 @@ static int mode_from_setting(const char *text)
 		return _ray_tracing_off;
 	if (!strcmp(text, "occlusion"))
 		return _ray_tracing_debug_occlusion;
-	if (!strcmp(text, "depth"))
-		return _ray_tracing_debug_depth;
 	if (!strcmp(text, "rays"))
 		return _ray_tracing_debug_rays;
 	if (!strcmp(text, "split"))
@@ -987,8 +983,8 @@ const char *halo_ray_tracing_next_view(void)
 	return names[next];
 }
 
-/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
-view, 5 split (tests) */
+/* what it shows: 1 the lighting, 2 the occlusion, 3 the ray view, 4 split
+(tests) */
 void halo_ray_tracing_debug_mode(int mode)
 {
 	if (!ray.initialized)
@@ -999,7 +995,7 @@ void halo_ray_tracing_debug_mode(int mode)
 
 /* the views in the settings overlay's order (settings_overlay.c), as F6's */
 static const int settings_views[] = { _ray_tracing_on, _ray_tracing_debug_rays, _ray_tracing_debug_split,
-	_ray_tracing_debug_occlusion, _ray_tracing_debug_depth };
+	_ray_tracing_debug_occlusion };
 
 /* the settings as they are now (the overlay's rows) */
 void halo_ray_tracing_get(struct halo_ray_tracing_settings *settings)

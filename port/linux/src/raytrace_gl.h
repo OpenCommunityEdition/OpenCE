@@ -41,8 +41,8 @@ const char *halo_ray_tracing_next_view(void);
 /* F4: the objects' shapes in the rays next (the drawn models, the collision
 models, ellipsoids); returns their name */
 const char *halo_ray_tracing_shapes_next(void);
-/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
-view, 5 split (tests) */
+/* what it shows: 1 the lighting, 2 the occlusion, 3 the ray view, 4 split
+(tests) */
 void halo_ray_tracing_debug_mode(int mode);
 
 /* the settings the overlay changes while playing (settings_overlay.c) */
@@ -52,7 +52,7 @@ struct halo_ray_tracing_settings
 	the screen's rays only */
 	int tracing;
 	/* what it shows (F6): 0 the lighting, 1 the ray view, 2 split, 3 the
-	occlusion, 4 the depth */
+	occlusion */
 	int view;
 	/* display.ray_tracing_gi: 0 off, 1 traced, 3 path */
 	int gi;
