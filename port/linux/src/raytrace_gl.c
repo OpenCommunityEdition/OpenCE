@@ -1486,6 +1486,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[63] = getenv("HALO_RT_GI_PERIOD") ? (float)atof(getenv("HALO_RT_GI_PERIOD")) : 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
+	/* (whether there is a sun, apart from how dark its shadows on the
+	objects are: the Shadows slider at 0 turned the traced sun off too) */
+	camera[35] = halo_ray_tracing_sun(camera + 24) ? 1.0f : 0.0f;
 	/* the objects, as shapes for the rays */
 	{
 		/* (their triangles, at most the host's 65536) */

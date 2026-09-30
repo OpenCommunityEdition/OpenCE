@@ -1142,7 +1142,7 @@ static boolean object_plasma_color(struct object_datum *object, float *color)
 	const struct model *model;
 	long region_index;
 
-	if (definition->object.model.index == NONE)
+	if (definition->object.model.index == NONE || getenv("HALO_RT_NO_PLASMA"))
 		return FALSE;
 	model = model_definition_get(definition->object.model.index);
 	for (region_index = 0; region_index < model->regions.count; region_index++)

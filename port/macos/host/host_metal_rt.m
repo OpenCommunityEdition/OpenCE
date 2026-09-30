@@ -431,7 +431,7 @@ static NSString *const kernel_source = @
 	"	float3 E = float3(0.0);\n"
 	"	float3 sun_dir = float3(c[24], c[25], c[26]);\n"
 	"	float hs = dot(N, sun_dir);\n"
-	"	if (c[27] > 0.0 && hs > 0.0 && c[45] > 0.0)\n"
+	"	if (c[35] > 0.5 && hs > 0.0 && c[45] > 0.0)\n"
 	"	{\n"
 	"		ray to_sun(H, sun_dir, 0.0, 2000.0);\n"
 	"		if (!blocked(to_sun, world, 3u, cutout_start, indices, base_texcoords, triangle_materials, materials, object_cutouts,\n"
@@ -570,7 +570,7 @@ static NSString *const kernel_source = @
 	/* the sun, where it reaches */
 	"	float3 sun = float3(c[24], c[25], c[26]);\n"
 	"	float3 sun_color = float3(0.0);\n"
-	"	if (c[27] > 0.0 && c[45] > 0.0)\n"
+	"	if (c[35] > 0.5 && c[45] > 0.0)\n"
 	"	{\n"
 	"		ray to_sun(P, sun, 0.05, 2000.0);\n"
 	"		if (!blocked(to_sun, world, 1u, CUT_ARGS))\n"
@@ -756,7 +756,11 @@ static NSString *const kernel_source = @
 	"	float3 camera = float3(c[0], c[1], c[2]), forward = float3(c[3], c[4], c[5]);\n"
 	"	float3 up = float3(c[6], c[7], c[8]), right = float3(c[9], c[10], c[11]);\n"
 	"	float t = c[14], aspect = c[15];\n"
-	"	float2 ndc = (p - origin) / size * 2.0 - 1.0;\n"
+	/* (where the gbuffer took the pixel: the window's pixel 2k, its middle
+	   k + 0.25 on the rays' grid, not k + 0.5 - the ray from the camera and
+	   the depth's point half a pixel apart, the exact surface refused far
+	   off on a glancing floor) */
+	"	float2 ndc = (float2(id) + 0.25 - origin) / size * 2.0 - 1.0;\n"
 	/* rows run from the top: +y on screen is down */
 	"	float3 P = camera + forward * z + right * (ndc.x * t * aspect * z) - up * (ndc.y * t * z);\n"
 	"	float3 N = normalize(right * g.y - up * g.z + forward * g.w);\n"
@@ -772,7 +776,7 @@ static NSString *const kernel_source = @
 	"		float3 view_dir = to_p / max(dist, 1e-4);\n"
 	"		ray primary(camera, view_dir, c[12], dist * 1.1 + 0.5);\n"
 	"		hit_info ph = closest_hit(primary, world, 1u, CUT_ARGS);\n"
-	"		if (ph.type != intersection_type::none && ph.instance_id == 0u && abs(ph.distance - dist) < dist * 0.05 + 0.1)\n"
+	"		if (ph.type != intersection_type::none && ph.instance_id == 0u && abs(ph.distance - dist) < dist * 0.02 + 0.05)\n"
 	"		{\n"
 	"			uint pb = ph.primitive_id * 3u;\n"
 	"			float3 a0 = float3(level_vertices[indices[pb] * 3u], level_vertices[indices[pb] * 3u + 1u], level_vertices[indices[pb] * 3u + 2u]);\n"
@@ -968,7 +972,7 @@ static NSString *const kernel_source = @
 	     accumulated over the frames, followed as the camera moves (the last
 	     frame's camera, c[48-59]; c[60] whether there is one);
 	   - the traced lights' and the glows' (c[61]). */
-	"	if (gi_ready != 0u && c[42] > 0.5)\n"
+	"	if (gi_ready != 0u && c[42] > 0.5 && !object)\n"
 	"	{\n"
 	"		float3 direct = emitted * c[61];\n"
 	/* (the drawn level from both sides: its surfaces are the ones drawn, and
@@ -980,7 +984,7 @@ static NSString *const kernel_source = @
 	"		float3 sun_dir = float3(c[24], c[25], c[26]);\n"
 	"		float3 sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
 	"		float ndl = dot(N, sun_dir);\n"
-	"		if (c[27] > 0.0 && ndl > 0.0 && c[45] > 0.0)\n"
+	"		if (c[35] > 0.5 && ndl > 0.0 && c[45] > 0.0)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
@@ -1785,7 +1789,26 @@ void host_rt_set_level_materials(const float *materials, int count)
 	rt.drawn_materials = [rt.device newBufferWithBytes:materials length:(NSUInteger)count * 32
 		options:MTLResourceStorageModeShared];
 	/* the glowing triangles, each as likely as the light it gives off (its
-	glow's brightness times its area) */
+	glow's brightness times its area) - made again only when the glows
+	changed (the colours come in a few a frame for hundreds of frames) */
+	{
+		static uint64_t last_glows;
+		static void *last_level;
+		uint64_t glows = 1469598103934665603ULL;
+		int material;
+
+		for (material = 0; material < count; material++)
+		{
+			uint32_t bits[3];
+
+			memcpy(bits, &materials[material * 8 + 4], sizeof(bits));
+			glows = (glows ^ bits[0] ^ ((uint64_t)bits[1] << 21) ^ ((uint64_t)bits[2] << 42)) * 1099511628211ULL;
+		}
+		if (glows == last_glows && last_level == (__bridge void *)rt.drawn && rt.glowing)
+			return;
+		last_glows = glows;
+		last_level = (__bridge void *)rt.drawn;
+	}
 	if (rt.drawn && rt.drawn_vertices && rt.drawn_indices && rt.drawn_triangle_materials)
 	{
 		const float *vertices = rt.drawn_vertices.contents;
@@ -2214,14 +2237,17 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			mesh.geometryDescriptors = @[ geometry, cutouts ];
 		else
 			mesh.geometryDescriptors = @[ group_triangles[group] ? geometry : cutouts ];
-		if (group_triangles[group] == rt.body_counts[group][0] && cutout_fill[group] == rt.body_counts[group][1] &&
-			rt.body_age[group] < 30 && body_moved(ring, group, group_triangles[group], cutout_fill[group]) < 1.0f)
+		float moved = group_triangles[group] == rt.body_counts[group][0] &&
+			cutout_fill[group] == rt.body_counts[group][1] && rt.body_age[group] < 30 ?
+			body_moved(ring, group, group_triangles[group], cutout_fill[group]) : 1e30f;
+
+		if (moved < 1.0f)
 		{
 			/* (the last frame's triangles: kept; moved a little - a
 			character's, animated: refitted. Moved more, or others in their
 			place - a full group's, as the camera goes: built anew, a refit's
 			boxes would span the level) */
-			if (body_moved(ring, group, group_triangles[group], cutout_fill[group]) == 0.0f)
+			if (moved == 0.0f)
 				rt.body_age[group] = 0;
 			else
 			{
