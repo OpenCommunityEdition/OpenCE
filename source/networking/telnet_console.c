@@ -44,6 +44,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint.h"
 #include "hs/hs.h"
 #include "networking/telnet_console.h"
@@ -77,6 +78,9 @@ struct telnet_console_globals
 
 /* ---------- prototypes */
 
+/* the platform layer's (port/linux/src/port_config.c) */
+int config_boolean(const char *name);
+
 static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
@@ -93,12 +97,19 @@ void telnet_console_initialize(
 {
 	csmemset(&telnet_console_globals, 0, sizeof(telnet_console_globals));
 
+	/* the native builds' console runs any script it is sent, with no
+	password: only when asked for (debug.telnet_console), and only from
+	this machine */
+	if (!config_boolean("debug.telnet_console"))
+		return;
+
 	telnet_console_globals.listening_endpoint = create_transport_endpoint(_transport_endpoint_type_telnet);
 	if (telnet_console_globals.listening_endpoint)
 	{
 		struct transport_address address = {{0}};
 
 		address.address_length = IPV4_ADDRESS_LENGTH;
+		address.address.long_words[0] = IPV4_LOOPBACK_ADDRESS;
 		address.port = TELNET_CONSOLE_PORT;
 
 		if (bind_endpoint(telnet_console_globals.listening_endpoint, &address)==_transport_error_none)
@@ -195,6 +206,12 @@ void telnet_console_process(
 		{
 			struct transport_endpoint *endpoint = accept_endpoint(telnet_console_globals.listening_endpoint);
 
+			/* (a client that stops reading does not stall the game) */
+			if (endpoint && set_endpoint_blocking(endpoint, FALSE) != _transport_error_none)
+			{
+				delete_transport_endpoint(endpoint);
+				endpoint = NULL;
+			}
 			if (endpoint)
 			{
 				long client_index;
@@ -273,7 +290,7 @@ static boolean process_telnet_client_buffer(
 		char *character = buffer+index;
 		long length;
 
-		if (*character>0x7f)
+		if ((unsigned char)*character>0x7f)
 			continue;
 
 		if (isalnum(*character) || ispunct(*character) || *character==' ')

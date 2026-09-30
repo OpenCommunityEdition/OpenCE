@@ -1486,6 +1486,7 @@ static void network_player_log_idle_action(
 	long player_index,
 	unsigned long control_flags)
 {
+	/* (a time past this game's is the last game's: game time restarts) */
 	static long logged_times[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 	struct player_datum *player = player_get(player_index);
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
@@ -1498,7 +1499,8 @@ static void network_player_log_idle_action(
 		player->local_player_index != NONE || player->action_result != _player_action_result_reload ||
 		!(control_flags & (FLAG(_unit_control_action_bit) | FLAG(_unit_control_swap_weapons_bit))) ||
 		absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
-		(logged_times[absolute_index] && game_time_get() - logged_times[absolute_index] < 3 * TICKS_PER_SECOND))
+		(logged_times[absolute_index] && logged_times[absolute_index] <= game_time_get() &&
+			game_time_get() - logged_times[absolute_index] < 3 * TICKS_PER_SECOND))
 	{
 		return;
 	}

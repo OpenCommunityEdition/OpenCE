@@ -123,8 +123,6 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_ODDBALLS = 16,
-
 	ODDBALL_START_ANNOUNCEMENT_TICKS = 2 * TICKS_PER_SECOND,
 	ODDBALL_SPAWN_DELAY_TICKS = 15 * TICKS_PER_SECOND,
 	ODDBALL_UNTOUCHED_RESET_TICKS = 40 * TICKS_PER_SECOND,
@@ -237,6 +235,18 @@ typedef char verify_scenario_netgame_flag_size[
 /* ---------- globals */
 
 static struct oddball_globals oddball_globals = { 0 };
+
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
+/* port: the host's ball resets a client of the distributed netcode shows
+(each machine counts them, a client as it last had them from the host):
+all, and those of balls that had been touched */
+static struct
+{
+	byte resets;
+	byte touched_resets;
+} oddball_events;
 
 /* ---------- public code */
 
@@ -597,14 +607,24 @@ static void create_the_ball(
 	return;
 }
 
+/* port: what a ball's reset shows every machine's players (the host's from
+the reset, before reset_ball, a client's from the host's state) */
+static void oddball_show_reset(
+	boolean touched)
+{
+	if (touched)
+		game_show_score(NONE, _oddball_message_ball_was_reset);
+	if (game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
+		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+
+	return;
+}
+
 static void reset_ball(
 	long weapon_index)
 {
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	real_point3d position = find_position_for_ball(weapon->object.owner_team_index);
-
-	if (game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count <= ODDBALL_MAXIMUM_BALLS_FOR_RESET_SOUND)
-		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 
 	game_engine_flag_reset(weapon_index, &position);
 	SET_FLAG(weapon->weapon.flags, _oddball_weapon_touched_bit, FALSE);
@@ -661,6 +681,7 @@ static boolean oddball_engine_initialize_for_new_map(
 	global_scenario_get();
 	csmemset(&oddball_globals, 0, sizeof(oddball_globals));
 
+	csmemset(&oddball_events, 0, sizeof(oddball_events));
 	oddball_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
 	if (accumulate_score_by_time())
 		oddball_globals.score_to_win *= ODDBALL_SCORE_TICKS_PER_UNIT;
@@ -705,7 +726,10 @@ static void oddball_engine_player_update(
 	long ball_count;
 
 	game_engine_state_message(player_index, NONE, NONE);
-	update_ball_ownership(player_index);
+	/* (a client of the distributed netcode has the host's carriers and
+	scores, game_engine_oddball_read_network_state, and shows the rest) */
+	if (!network_game_distributed_client())
+		update_ball_ownership(player_index);
 	ball_count = player_ball_count(player_index);
 
 	player->speed_multiplier = 1.0f;
@@ -730,10 +754,19 @@ static void oddball_engine_player_update(
 
 	if (game_engine_can_score() && accumulate_score_by_time() && ball_count > 0)
 	{
-		long ball_index;
+		if (!network_game_distributed_client())
+		{
+			long ball_index;
 
-		for (ball_index = 0; ball_index < ball_count; ball_index++)
-			oddball_add_time_with_ball(player_index);
+			for (ball_index = 0; ball_index < ball_count; ball_index++)
+				oddball_add_time_with_ball(player_index);
+		}
+		/* (a client's carrier's line, which the host's time with the ball
+		shows: the score the host sends) */
+		else if (game_engine_get_variant()->game_engine_variant.oddball.oddball_ball_type == _oddball_normal)
+		{
+			game_engine_state_message(player_index, _oddball_message_you_have_the_ball_tick, player_index);
+		}
 	}
 
 	if (oddball_ball_transfer_by_killing() && ball_count > 0)
@@ -758,7 +791,9 @@ static void oddball_engine_player_update(
 				short rounds_loaded = (short)(*score / TICKS_PER_SECOND);
 				struct weapon_datum *weapon = weapon_get(weapon_index);
 
-				if (*score > 0 &&
+				/* (a client's with the host's score) */
+				if (!network_game_distributed_client() &&
+					*score > 0 &&
 					*score % ODDBALL_SCORE_WARNING_TICKS == 0 &&
 					*score < oddball_globals.score_to_win)
 				{
@@ -794,16 +829,22 @@ static void oddball_engine_weapon_update(
 		NONE,
 		oddball_globals.current_ball_owner[weapon->object.owner_team_index]);
 
-	if ((unsigned long)(game_time_get() - weapon->item.last_owned_time) > ODDBALL_UNTOUCHED_RESET_TICKS &&
+	/* (a client of the distributed netcode has the ball where the host
+	puts it) */
+	if (!network_game_distributed_client() &&
+		(unsigned long)(game_time_get() - weapon->item.last_owned_time) > ODDBALL_UNTOUCHED_RESET_TICKS &&
 		weapon_is_flag(weapon_index))
 	{
 		boolean connected_to_map = TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit);
 
 		if (connected_to_map && weapon->object.parent_object_index == NONE)
 		{
-			if (TEST_FLAG(weapon->weapon.flags, _oddball_weapon_touched_bit))
-				game_show_score(NONE, _oddball_message_ball_was_reset);
+			boolean touched = TEST_FLAG(weapon->weapon.flags, _oddball_weapon_touched_bit);
 
+			oddball_show_reset(touched);
+			oddball_events.resets++;
+			if (touched)
+				oddball_events.touched_resets++;
 			reset_ball(weapon_index);
 		}
 	}
@@ -864,7 +905,10 @@ static void oddball_engine_update(
 	ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
 	for (ball_index = 0; ball_index < ball_spawn_count; ball_index++)
 	{
-		if (oddball_globals.ball_spawn_timer[ball_index] > 0)
+		/* (a client of the distributed netcode has the host's balls, and
+		says "play ball" when the host's state has one spawned) */
+		if (!network_game_distributed_client() &&
+			oddball_globals.ball_spawn_timer[ball_index] > 0)
 		{
 			if (--oddball_globals.ball_spawn_timer[ball_index] == 0)
 			{
@@ -996,16 +1040,17 @@ static void oddball_engine_player_killed_player(
 			if (player_has_ball(dead_player_index))
 			{
 				killer->statistics.multiplayer_statistics.oddball_statistics.ball_carrier_kills++;
-				if (terminator_scoring_rules() && game_engine_can_score())
+				if (terminator_scoring_rules() && game_engine_can_score() && !network_game_distributed_client())
 					oddball_add_score(killing_player_index);
 			}
 			else if (player_has_ball(killing_player_index))
 			{
 				killer->statistics.multiplayer_statistics.oddball_statistics.kills_as_ball_carrier++;
-				if (terminator_scoring_rules() && game_engine_can_score())
+				if (terminator_scoring_rules() && game_engine_can_score() && !network_game_distributed_client())
 					oddball_add_score(killing_player_index);
 			}
-			else if (ball_available())
+			/* (a client has the host's scores, and its end of the game) */
+			else if (ball_available() && !network_game_distributed_client())
 			{
 				oddball_add_score(killing_player_index);
 			}
@@ -1300,11 +1345,87 @@ struct oddball_network_state
 	/* the balls' carriers, by absolute index (their datum identifiers are
 	each machine's own) */
 	byte current_ball_owner[MAXIMUM_ODDBALLS];
+	/* the host's resets (oddball_events) */
+	byte resets;
+	byte touched_resets;
 };
+
+typedef char verify_oddball_network_state_size[
+	sizeof(struct oddball_network_state) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
 
 /* port/linux/game/network_distributed.c's */
 byte distributed_player_to_byte(long player_index);
 long distributed_player_from_byte(byte player_index);
+
+/* a client: the sounds of the host's scores (the host's as
+oddball_engine_player_update and oddball_add_score play them each tick) */
+static void oddball_client_score_sounds(
+	struct oddball_network_state const *state)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long team_index;
+
+	for (team_index = 0; team_index < (long)NUMBEROF(state->team_score); team_index++)
+	{
+		long previous_score = oddball_globals.team_score[team_index];
+		long score = state->team_score[team_index];
+		long warning_score = oddball_globals.score_to_win - 30 * TICKS_PER_SECOND;
+
+		if (previous_score < warning_score && score >= warning_score)
+		{
+			if (game_engine_has_teams())
+			{
+				game_engine_play_multiplayer_sound(
+					team_index == _team_red ?
+						_multiplayer_sound_red_team_30_seconds_to_win :
+						_multiplayer_sound_blue_team_30_seconds_to_win);
+			}
+			else
+			{
+				game_engine_play_multiplayer_sound(_multiplayer_sound_30_seconds_to_win);
+			}
+		}
+		warning_score = oddball_globals.score_to_win - 60 * TICKS_PER_SECOND;
+		if (previous_score < warning_score && score >= warning_score)
+		{
+			if (game_engine_has_teams())
+			{
+				game_engine_play_multiplayer_sound(
+					team_index == _team_red ?
+						_multiplayer_sound_red_team_minute_to_win :
+						_multiplayer_sound_blue_team_minute_to_win);
+			}
+			else
+			{
+				game_engine_play_multiplayer_sound(_multiplayer_sound_one_minute_to_win);
+			}
+		}
+	}
+
+	/* every five seconds a carrier holds the ball */
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)))
+	{
+		long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		long previous_score;
+		long score;
+
+		if (absolute_index >= (long)NUMBEROF(state->individual_score))
+			continue;
+		previous_score = oddball_globals.individual_score[absolute_index];
+		score = state->individual_score[absolute_index];
+		if (score > previous_score && previous_score >= 0 &&
+			score / ODDBALL_SCORE_WARNING_TICKS > previous_score / ODDBALL_SCORE_WARNING_TICKS &&
+			score < oddball_globals.score_to_win &&
+			player_ball_count(iterator.datum_index) > 0)
+		{
+			game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
+		}
+	}
+
+	return;
+}
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is */
@@ -1324,13 +1445,16 @@ long game_engine_oddball_write_network_state(
 	csmemcpy(state.team_score, oddball_globals.team_score, sizeof(state.team_score));
 	csmemcpy(state.individual_score, oddball_globals.individual_score, sizeof(state.individual_score));
 	csmemcpy(state.ball_spawn_timer, oddball_globals.ball_spawn_timer, sizeof(state.ball_spawn_timer));
+	state.resets = oddball_events.resets;
+	state.touched_resets = oddball_events.touched_resets;
 	csmemcpy(buffer, &state, sizeof(state));
 	return sizeof(state);
 }
 
 void game_engine_oddball_read_network_state(
 	byte const *buffer,
-	long size)
+	long size,
+	boolean first)
 {
 	struct oddball_network_state state;
 	short ball_index;
@@ -1340,7 +1464,31 @@ void game_engine_oddball_read_network_state(
 	csmemcpy(&state, buffer, sizeof(state));
 	for (ball_index = 0; ball_index < MAXIMUM_ODDBALLS; ball_index++)
 		oddball_globals.current_ball_owner[ball_index] = distributed_player_from_byte(state.current_ball_owner[ball_index]);
+	if (!first)
+	{
+		long ball_spawn_count = game_engine_get_variant()->game_engine_variant.oddball.ball_spawn_count;
+
+		oddball_client_score_sounds(&state);
+		/* each ball the host has reset (oddball_engine_weapon_update), the
+		touched ones first */
+		{
+			byte resets = (byte)(state.resets - oddball_events.resets);
+			byte touched_resets = (byte)(state.touched_resets - oddball_events.touched_resets);
+			byte reset;
+
+			for (reset = 0; reset < resets && reset < MAXIMUM_ODDBALLS; reset++)
+				oddball_show_reset(reset < touched_resets);
+		}
+		/* a ball the host has spawned (oddball_engine_update) */
+		for (ball_index = 0; ball_index < ball_spawn_count && ball_index < MAXIMUM_ODDBALLS; ball_index++)
+		{
+			if (oddball_globals.ball_spawn_timer[ball_index] > 0 && state.ball_spawn_timer[ball_index] == 0)
+				game_engine_play_multiplayer_sound(_multiplayer_sound_play_ball);
+		}
+	}
 	csmemcpy(oddball_globals.team_score, state.team_score, sizeof(state.team_score));
 	csmemcpy(oddball_globals.individual_score, state.individual_score, sizeof(state.individual_score));
 	csmemcpy(oddball_globals.ball_spawn_timer, state.ball_spawn_timer, sizeof(state.ball_spawn_timer));
+	oddball_events.resets = state.resets;
+	oddball_events.touched_resets = state.touched_resets;
 }

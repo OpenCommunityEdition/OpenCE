@@ -180,6 +180,9 @@ struct game_options;
 #include "units/units.h"
 #include "units/vehicles.h"
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -312,7 +315,11 @@ void game_tick(
 	remove_quitting_players_from_game();
 	game_allegiance_update();
 	units_update();
-	ai_update();
+	/* (the host's actors drive the host's units, which a client of the
+	distributed netcode has from the host: its own would fight the host's
+	positions, and could place objects of their own) */
+	if (!network_game_distributed_client())
+		ai_update();
 	players_update_before_game();
 
 	seconds_per_tick = game_globals->players_are_double_speed
@@ -576,6 +583,7 @@ void game_initialize_for_new_map(
 	players_initialize_for_new_map();
 	scenario_initialize_for_new_map();
 	objects_initialize_for_new_map();
+	render_interpolation_reset();
 	render_initialize_for_new_map();
 	structures_initialize_for_new_map();
 	breakable_surfaces_initialize_for_new_map();

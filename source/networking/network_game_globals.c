@@ -595,25 +595,20 @@ boolean network_game_client_end_frame(
 	{
 		now = system_milliseconds();
 		if (now-bss_004566dc.last_client_update_time >=
-			/* (the input goes in its own message, network_distributed.c:
-			this one only says the client is there) */
+			/* (the input goes in its own message, network_distributed.c,
+			and the host takes its own players' at each tick,
+			update_server_next_update: this one only says the client is
+			there) */
 			100 &&
 			network_game_client_server_has_started_game(global_network_game_client))
 		{
-			network_game_client_get_next_update_number(global_network_game_client);
-			network_game_client_get_game(global_network_game_client);
 			update_client_build_client_update(&update);
 
-			if (network_client_get_oos(global_network_game_client))
-			{
-				message.update_number = network_game_client_get_next_update_number(
-					global_network_game_client) | 0x80000000;
-			}
-			else
-			{
-				message.update_number = network_game_client_get_next_update_number(
-					global_network_game_client) & 0x7FFFFFFF;
-			}
+			/* (the out-of-sync bit, 0x80000000, went with the lockstep
+			netcode: a machine no longer simulates others' players to go
+			out of sync with) */
+			message.update_number = network_game_client_get_next_update_number(
+				global_network_game_client) & 0x7FFFFFFF;
 
 			csmemcpy(message.update, &update, sizeof(update));
 			message.local_player_count = local_player_count();

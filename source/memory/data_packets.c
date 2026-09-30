@@ -502,6 +502,13 @@ static void _data_packet_decode(
 				void *source;
 
 				data_size = (short)data_decode_integer(state, field->count);
+				/* port: no more than the field holds (the rest of the packet is
+				not to be read then) */
+				if (data_size < 0 || data_size > field->count)
+				{
+					state->overflow = TRUE;
+					data_size = 0;
+				}
 				*(short *)decoded_data = data_size;
 				source = data_decode_memory(state, data_size, 1);
 				if (source)

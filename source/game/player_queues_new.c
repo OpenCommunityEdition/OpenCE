@@ -230,8 +230,8 @@ static struct update *update_server_get_update(
 	long update_number);
 static struct update *update_client_get_update(
 	long update_number);
-static boolean update_server_machine_is_local(
-	long machine_index);
+static void update_server_take_local_actions(
+	void);
 
 /* ---------- globals */
 
@@ -374,6 +374,10 @@ void update_server_next_update(
 		0xFA,
 		update_server_globals.initialized);
 	update_server_globals.next_update_number_to_build += 1;
+	if (game_connection() == _game_connection_network_server)
+	{
+		update_server_take_local_actions();
+	}
 	update = update_server_get_update(update_number);
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
@@ -552,8 +556,16 @@ static long update_client_pending_game_time = NONE;
 void update_client_queue(
 	struct player_action const *action)
 {
-	update_client_globals.saved_action_collection.actions[
-		update_client_globals.current_local_player] = *action;
+	/* port: player_control.c queues the action of each local player that
+	has a player, in order: kept at that local player's index (the Xbox
+	game's at its count, which the dequeue and the host read as the index:
+	a single player on the second controller, or players on the first and
+	third, got the wrong or no action) */
+	while (update_client_globals.current_local_player < MAXIMUM_LOCAL_PLAYERS &&
+		local_player_get_player_index((short)update_client_globals.current_local_player) == NONE)
+	{
+		++update_client_globals.current_local_player;
+	}
 	if (update_client_globals.current_local_player < MAXIMUM_LOCAL_PLAYERS)
 	{
 		struct player_action *saved = &update_client_globals.saved_action_collection.actions[
@@ -563,6 +575,7 @@ void update_client_queue(
 		real *pending_primary_trigger = &update_client_pending_primary_triggers[
 			update_client_globals.current_local_player];
 
+		*saved = *action;
 		*pending |= action->control_flags;
 		*pending_primary_trigger = MAX(*pending_primary_trigger, action->primary_trigger);
 		saved->control_flags = *pending;
@@ -578,7 +591,7 @@ void update_client_queue_push(
 {
 	/* while the clock is stopped no tick will take them */
 	if (update_client_pending_game_time != game_time_get() ||
-		game_time_get_paused())
+		game_time_get_paused() || game_time_held())
 	{
 		update_client_pending_game_time = game_time_get();
 		csmemset(
@@ -805,9 +818,9 @@ void update_server_handle_client_update(
 		0x22A,
 		update_server_globals.initialized);
 	/* (the distributed netcode takes another machine's players' input from
-	its own message, update_server_handle_distributed_input) */
-	if (game_connection() == _game_connection_network_server &&
-		!update_server_machine_is_local(machine_index))
+	its own message, update_server_handle_distributed_input, and the host's
+	own players' at each tick, update_server_take_local_actions) */
+	if (game_connection() == _game_connection_network_server)
 	{
 		return;
 	}
@@ -818,8 +831,16 @@ void update_server_handle_client_update(
 			struct update_server_queue_datum *queue = datum_get(
 				update_server_globals.queues,
 				player_list[player_index]);
+			struct player_datum *player = player_try_and_get(player_list[player_index]);
 
-			queue->current_action = actions[action_index++];
+			/* port: the actions are at their local players' indices
+			(update_client_queue) */
+			action_index = player ? player->local_player_index : NONE;
+			if (action_index<0 || action_index>=MAXIMUM_LOCAL_PLAYERS)
+			{
+				continue;
+			}
+			queue->current_action = actions[action_index];
 			update_server_pending_control_flags[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[player_index])] |=
 				queue->current_action.control_flags;
 			match_assert_valid_real(
@@ -872,11 +893,11 @@ void update_client_handle_server_update(
 	}
 	else if (!global_network_game_client_get() || !global_network_game_server_get())
 	{
+		/* (only the host and a local game build updates now, which go
+		out of sync with nobody) */
 		if (!main_menu_is_active())
 		{
 			error(_error_silent, "failed to get an update (#%d); sp scenario= '%s'", update_number, main_get_map_name());
-			error(_error_silent, "if you're in a multiplayer game, you might be out of sync now");
-			error(_error_silent, "if you're playing single player/coop, you can probably ignore this");
 		}
 	}
 
@@ -975,22 +996,26 @@ long player_new_queue(
 	return queue_index;
 }
 
-/* whether the machine's players are this machine's (the host's own input
-comes to it as a client's does) */
-static boolean update_server_machine_is_local(
-	long machine_index)
+/* the distributed netcode's host: its own players take their input at its
+tick, as a client's own do (update_client_dequeue_distributed), not from
+its own client's update, which goes ten times a second (a press between two
+was lost, and the aim moved in steps) */
+static void update_server_take_local_actions(
+	void)
 {
-	long *player_list = machine_get_player_list(machine_index);
-	short index;
+	short local_player_index;
 
-	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
 	{
-		struct player_datum *player = player_list[index] != NONE ? player_try_and_get(player_list[index]) : NULL;
+		long player_index = local_player_get_player_index(local_player_index);
+		struct update_server_queue_datum *queue = player_index != NONE ?
+			(struct update_server_queue_datum *)datum_try_and_get(update_server_globals.queues, player_index) : NULL;
 
-		if (player)
-			return player->local_player_index != NONE;
+		if (queue)
+		{
+			queue->current_action = update_client_globals.saved_action_collection.actions[local_player_index];
+		}
 	}
-	return TRUE;
 }
 
 /* an action fit to take: finite, its choices in range */

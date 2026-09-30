@@ -14055,11 +14055,11 @@ boolean hs_compile_and_evaluate(
 				case 0:
 					break;
 				case 1:
-					sprintf(expanded, "(%s)", buffer);
+					snprintf(expanded, sizeof(expanded), "(%s)", buffer);
 					expression = expanded;
 					break;
 				case 2:
-					sprintf(expanded, "(set %s)", buffer);
+					snprintf(expanded, sizeof(expanded), "(set %s)", buffer);
 					expression = expanded;
 					break;
 				default:

@@ -5,9 +5,11 @@ Memory capacity of the native builds (Windows, Linux, Android), sized for the
 session limits in halo_port_limits.h, which includes this file. The Xbox
 sizes are given in parentheses below.
 
-Every machine in a session must be built with the same values: every machine
-simulates the game, and a pool that runs full changes the simulation (an
-object or a deterministic effect is not created).
+Every machine in a session must be built with the same values: the
+distributed netcode names objects and players by their datum index, the
+same on every machine (port/linux/game/network_objects.c tracks
+MAXIMUM_TRACKED_OBJECTS = HALO_PORT_MAXIMUM_OBJECTS_PER_MAP objects, and a
+client's own objects take the upper half of the object array).
 */
 
 #ifndef __HALO_PORT_CAPACITY_H

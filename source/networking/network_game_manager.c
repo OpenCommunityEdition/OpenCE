@@ -157,15 +157,15 @@ boolean network_game_add_machine(
 		0x6A,
 		game && machine && network_machine_is_valid(machine));
 
-	for (machine_index = 0; machine_index < NETWORK_GAME_MACHINE_SLOTS; machine_index++)
+	/* port: at its own index, not the first free slot: the host numbers a
+	machine by its connection's slot, which must be its slot here (two
+	machines once shared an index) */
+	machine_index = machine->machine_index;
+	if (!network_machine_is_valid(&game->machines[machine_index]))
 	{
-		if (!network_machine_is_valid(&game->machines[machine_index]))
-		{
-			csmemcpy(&game->machines[machine_index], machine, sizeof(*machine));
-			game->machine_count++;
-			result = TRUE;
-			break;
-		}
+		csmemcpy(&game->machines[machine_index], machine, sizeof(*machine));
+		game->machine_count++;
+		result = TRUE;
 	}
 
 	return result;
@@ -379,6 +379,26 @@ boolean network_game_add_player(
 	return result;
 }
 
+/* port: whether a player can be added to the game (a free slot, which in a
+game in progress is not the slot of a player who left: network_game_add_player) */
+boolean network_game_has_free_player_slot(
+	struct network_game *game)
+{
+	long player_index;
+
+	if (game->player_count >= game->maximum_players)
+		return FALSE;
+	for (player_index = 0; player_index < NETWORK_GAME_PLAYER_SLOTS; player_index++)
+	{
+		if (game->players[player_index].player_list_index == NONE &&
+			!network_game_player_slot_held(player_index))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 boolean network_player_is_valid(
 	struct network_player *player)
 {
@@ -545,7 +565,10 @@ boolean network_game_update_player(
 		0x101,
 		game && player);
 
-	if (network_game_player_is_valid(player, game))
+	/* (port: the slot comes from the wire: one out of the list wrote over
+	the machines) */
+	if (network_game_player_is_valid(player, game) &&
+		VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS))
 	{
 		current_player = &game->players[player->player_list_index];
 		if (current_player->controller_index == player->controller_index &&

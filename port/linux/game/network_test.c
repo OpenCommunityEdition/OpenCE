@@ -49,6 +49,7 @@ Called from the main loop every frame (main.c).
 #include "camera/observer.h"
 
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -131,6 +132,26 @@ static void network_test_read_settings(
 		platform_log("network test: %s", setting);
 }
 
+/* appends to a line, cut short when it is full */
+static void network_test_append(
+	char *line,
+	int size,
+	int *length,
+	char const *format,
+	...)
+{
+	va_list arguments;
+	int written;
+
+	if (*length >= size - 1)
+		return;
+	va_start(arguments, format);
+	written = vsnprintf(line + *length, (size_t)(size - *length), format, arguments);
+	va_end(arguments);
+	if (written > 0)
+		*length = MIN(*length + written, size - 1);
+}
+
 /* every player's unit, as this machine sees it */
 static void network_test_log_players(
 	void)
@@ -140,8 +161,9 @@ static void network_test_log_players(
 	char line[4096];
 	int length = 0;
 
+	line[0] = 0;
 	data_iterator_new(&iterator, player_data);
-	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL && length < (int)sizeof(line) - 96)
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
 		if (player->unit_index != NONE)
 		{
@@ -153,7 +175,7 @@ static void network_test_log_players(
 			struct object_datum *placed = object->object.parent_object_index != NONE ?
 				object_get(object->object.parent_object_index) : object;
 
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s%s g%d/%d w",
+			network_test_append(line, (int)sizeof(line), &length, " player %ld: (%.3f %.3f %.3f) h%.2f/%.2f%s%s g%d/%d w",
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), placed->object.position.x,
 				placed->object.position.y, placed->object.position.z, object->object.body_vitality,
 				object->object.shield_vitality, placed != object ? " riding" : "",
@@ -161,7 +183,7 @@ static void network_test_log_players(
 				unit->unit.grenade_counts[0], unit->unit.grenade_counts[1]);
 			/* where it aims (yaw and pitch, degrees), its animation state and
 			how hard it is moving */
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
+			network_test_append(line, (int)sizeof(line), &length, " a%.0f/%.0f f%.0f l%.0f/%.0f as%d/%d st%d thr%.2f",
 				atan2(unit->unit.aiming_vector.j, unit->unit.aiming_vector.i) * 57.29578,
 				asin(PIN(unit->unit.aiming_vector.k, -1.0f, 1.0f)) * 57.29578,
 				atan2(object->object.forward.j, object->object.forward.i) * 57.29578,
@@ -178,7 +200,7 @@ static void network_test_log_players(
 				{
 					struct weapon_datum *weapon = weapon_get(weapon_index);
 
-					length += snprintf(line + length, sizeof(line) - (size_t)length, " %lx:%d",
+					network_test_append(line, (int)sizeof(line), &length, " %lx:%d",
 						(unsigned long)weapon->definition_index & 0xFFFF, weapon->weapon.magazines[0].rounds_total +
 						weapon->weapon.magazines[0].rounds_loaded);
 				}
@@ -186,11 +208,11 @@ static void network_test_log_players(
 		}
 		else
 		{
-			length += snprintf(line + length, sizeof(line) - (size_t)length, " player %ld: dead",
+			network_test_append(line, (int)sizeof(line), &length, " player %ld: dead",
 				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index));
 		}
 		/* the game type's score and the kills and deaths */
-		length += snprintf(line + length, sizeof(line) - (size_t)length, " s%ld k%d d%d f%d t%ld m%d",
+		network_test_append(line, (int)sizeof(line), &length, " s%ld k%d d%d f%d t%ld m%d",
 			game_engine && game_engine->get_player_score ?
 				game_engine->get_player_score(iterator.datum_index, _get_score_individual) : -1L,
 			player->statistics.kills[0], player->statistics.deaths, player->statistics.friendly_fire_kills, (long)player->team_index,
@@ -479,7 +501,7 @@ void network_test_update(
 		network_test.logged_time = game_time_get();
 		network_test_log_players();
 		if (network_test.shoot_interval > 0.0f &&
-			game_time_get() % (long)(network_test.shoot_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+			game_time_get() % MAX(1, (long)(network_test.shoot_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{
 			network_test_shoot();
 		}
@@ -523,7 +545,7 @@ void network_test_update(
 		/* debug.network_test_kill: the host kills the last player every so
 		often, to test deaths and respawns reaching the clients */
 		if (network_test.mode == _network_test_host && network_test.kill_interval > 0.0f &&
-			game_time_get() % (long)(network_test.kill_interval * TICKS_PER_SECOND) < TICKS_PER_SECOND)
+			game_time_get() % MAX(1, (long)(network_test.kill_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{
 			struct data_iterator iterator;
 			struct player_datum *player;
@@ -551,6 +573,8 @@ void network_test_update(
 				{
 					struct object_iterator objects;
 					struct unit_datum *unit = unit_get(first->unit_index);
+					long held_index = unit->unit.weapon_object_indices[0];
+					long held_definition_index = held_index != NONE ? weapon_get(held_index)->definition_index : NONE;
 
 					object_iterator_new(&objects, _object_mask_weapon, 0);
 					while (object_iterator_next(&objects))
@@ -558,7 +582,7 @@ void network_test_update(
 						struct weapon_datum *weapon = weapon_get(objects.index);
 
 						if (weapon->object.parent_object_index == NONE &&
-							weapon->definition_index != weapon_get(unit->unit.weapon_object_indices[0])->definition_index)
+							weapon->definition_index != held_definition_index)
 						{
 							if (unit_add_weapon_to_inventory(first->unit_index, objects.index, TRUE))
 								platform_log("network test: the first player picks up a weapon");

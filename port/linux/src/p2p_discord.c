@@ -15,7 +15,10 @@ links (p2p.c).
 
 The protocol: frames of a little-endian opcode and length, then JSON. The
 handshake (opcode 0) names the application; commands and events are opcode
-1; 2 closes; 3 and 4 are ping and pong.
+1; 2 closes; 3 and 4 are ping and pong. Nothing here waits for Discord (the
+p2p thread holds its lock, which the game's threads take): what it does not
+take at once waits in a buffer, and a client that lets that fill up is
+disconnected.
 */
 
 #include "platform.h"
@@ -51,6 +54,8 @@ static struct
 	unsigned long nonce;
 	unsigned char input[BUFFER_SIZE];
 	int input_size;
+	unsigned char output[BUFFER_SIZE];
+	int output_size;
 
 	/* what to show; changed marks it for sending */
 	int hosting;
@@ -67,22 +72,49 @@ static void discord_close(void)
 	discord.handle = -1;
 	discord.ready = 0;
 	discord.input_size = 0;
+	discord.output_size = 0;
+}
+
+/* what can be written now */
+static void discord_flush(void)
+{
+	while (discord.handle >= 0 && discord.output_size > 0)
+	{
+		int written = posix_discord_write(discord.handle, discord.output, discord.output_size);
+
+		if (written < 0)
+		{
+			discord_close();
+			return;
+		}
+		if (!written)
+			return;
+		memmove(discord.output, discord.output + written, (size_t)(discord.output_size - written));
+		discord.output_size -= written;
+	}
 }
 
 static void discord_send(int opcode, const char *json, int size)
 {
-	unsigned char frame[8 + 2048];
+	unsigned char *frame;
 
 	if (discord.handle < 0 || size > 2048)
 		return;
+	if (discord.output_size + 8 + size > BUFFER_SIZE)
+	{
+		platform_log("Internet play: Discord is not responding; disconnected from it");
+		discord_close();
+		return;
+	}
+	frame = discord.output + discord.output_size;
 	frame[0] = (unsigned char)opcode;
 	frame[1] = frame[2] = frame[3] = 0;
 	frame[4] = (unsigned char)size;
 	frame[5] = (unsigned char)(size >> 8);
 	frame[6] = frame[7] = 0;
 	memcpy(frame + 8, json, (size_t)size);
-	if (posix_discord_write(discord.handle, frame, 8 + size) < 0)
-		discord_close();
+	discord.output_size += 8 + size;
+	discord_flush();
 }
 
 static void send_activity(void)
@@ -247,6 +279,7 @@ void p2p_discord_update(void)
 			/* how Discord starts the game for an invite when it is not
 			running; the game then receives the invite once connected */
 			snprintf(scheme, sizeof(scheme), "discord-%s", application);
+			/* (it lets go of the p2p lock while it may wait) */
 			p2p_register_url_scheme(scheme, "Halo: Combat Evolved");
 		}
 	}
@@ -269,6 +302,9 @@ void p2p_discord_update(void)
 		if (discord.handle < 0)
 			return;
 	}
+	discord_flush();
+	if (discord.handle < 0)
+		return;
 	discord_read();
 	if (discord.ready && discord.changed)
 	{

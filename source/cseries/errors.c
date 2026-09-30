@@ -242,7 +242,7 @@ void error(
 	{
 		long time = system_milliseconds();
 
-		if (time > bss_0031df2c.last_error_time+900)
+		if ((unsigned long)(time - bss_0031df2c.last_error_time) > 900)
 		{
 			bss_0031df2c.error_count = 0;
 		}

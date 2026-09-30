@@ -615,7 +615,9 @@ void network_event(
 	_vsnprintf(temporary, NUMBEROF(temporary) - 1, format, arguments);
 	va_end(arguments);
 
-	error(3, temporary);
+	/* (formatted already: what it holds, names and addresses from the
+	network among it, is not a format) */
+	error(3, "%s", temporary);
 
 	return;
 }

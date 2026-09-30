@@ -557,7 +557,9 @@ char *data_decode_string(
 	char *string = state->buffer + state->offset;
 	short string_length = 0;
 
-	while (state->offset + string_length < state->buffer_size)
+	/* port: no longer than the field holds (the packet's field has room for
+	maximum_length characters and the terminator) */
+	while (state->offset + string_length < state->buffer_size && string_length <= (short)maximum_length)
 	{
 		if (!string[string_length])
 		{
