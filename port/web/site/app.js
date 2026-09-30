@@ -67,7 +67,7 @@ can run the game, copies the game data out of the player's disc image
   // ---------- settings (this browser's; nothing else depends on them)
 
   const coarsePointer = matchMedia('(pointer: coarse)').matches;
-  const settings = { touch: coarsePointer, look: 1.4, vsync: true, glDebug: false, renderHeight: ios || pixelFrames ? 480 : 720 };
+  const settings = { touch: coarsePointer, touchFps: false, look: 1.4, vsync: true, glDebug: false, renderHeight: ios || pixelFrames ? 480 : 720 };
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem('halo-web-settings') || '{}'));
   } catch { /* private browsing: the defaults */ }
@@ -903,6 +903,7 @@ can run the game, copies the game data out of the player's disc image
           canvas,
           touchRoot: $('touch'),
           touch: settings.touch,
+          touchFps: settings.touchFps === true,
         });
         HaloInput.setLookSensitivity(settings.look);
         HaloNet.attach({ memory: state.memory, base: state.shared, offsets: state.offsets });
@@ -1234,6 +1235,7 @@ can run the game, copies the game data out of the player's disc image
     document.addEventListener('visibilitychange', onVisibility);
 
     $('opt-touch').checked = settings.touch;
+    $('opt-touch-fps').checked = settings.touchFps === true;
     $('opt-look').value = settings.look;
     $('opt-vsync').checked = settings.vsync;
     $('opt-resolution').value = settings.renderHeight;
@@ -1245,6 +1247,7 @@ can run the game, copies the game data out of the player's disc image
       if (state.shared) updateDisplaySize();
     };
     $('opt-touch').onchange = (event) => { settings.touch = event.target.checked; saveSettings(); };
+    $('opt-touch-fps').onchange = (event) => { settings.touchFps = event.target.checked; saveSettings(); };
     $('opt-look').oninput = (event) => {
       settings.look = parseFloat(event.target.value);
       saveSettings();

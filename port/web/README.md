@@ -79,6 +79,20 @@ and [Silent Mode](https://support.apple.com/guide/iphone/silence-iphone-iph81c7f
 
 ### Game input
 
+Settings and data offers an optional **Compact FPS touch controls (gameplay)**
+layout. Select it before starting; the original controller layout remains the
+default and includes menu-navigation buttons. The compact layout has a floating
+movement stick that is invisible at rest, drag-to-aim, and hold-to-fire with
+immediate release. Dragging the Fire action also aims. Tap the upper-left
+weapon/ammo HUD to swap weapons. Smaller action buttons provide jump, melee,
+reload/use, crouch, zoom, grenade throw and grenade-type switching.
+
+The compact HUD omits D-pad, Start/Select and flashlight controls. It assumes a
+full-viewport landscape game canvas. Its input is released on interruption,
+backgrounding, resize or controller connection. Test its input handling with
+`node --test tools/test_web_touch_controls.mjs` (Node.js 22 or newer).
+
+
 - A controller that the browser knows (Xbox, PlayStation, MFi, Switch Pro):
   as on Android. The browser sees a controller only after a button is pushed.
 - Touch: the left half of the screen is a stick for moving; drag on the right

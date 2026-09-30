@@ -51,6 +51,7 @@ jobs:
         run: |
           node --test tools/tests/*.test.cjs
           node --test tools/test_web_quick_play.mjs
+          node --test tools/test_web_touch_controls.mjs
           node tools/test_source_cache.mjs
           clang -std=c11 -pthread -fsanitize=address,undefined -g -Iport/linux/src tools/test_web_net.c -o build/test_web_net
           build/test_web_net

@@ -231,6 +231,180 @@ const HaloInput = (() => {
 
   // ---------- touch controls
 
+  function buildCompactTouchControls(root) {
+    root.classList.add('fps-controls');
+    // Compact actions; movement and aiming are independent multitouch regions.
+    const layout = [
+      ['fire', '◎', { axis: 5 }, 'fps-fire', 'Fire'],
+      ['a', '↑', { bit: BUTTON.SOUTH }, 'fps-jump', 'Jump'],
+      ['b', '╱', { bit: BUTTON.EAST }, 'fps-melee', 'Melee'],
+      ['x', '↻', { bit: BUTTON.WEST }, 'fps-reload', 'Reload / Use'],
+      ['y', '', { bit: BUTTON.NORTH }, 'fps-weapon-hud', ''],
+      ['lt', '●', { axis: 4 }, 'fps-grenade', 'Throw'],
+      ['black', '⇆', { bit: BUTTON.RIGHT_SHOULDER }, 'fps-grenade-type', 'Grenade'],
+      ['ls', '⌄', { bit: BUTTON.LEFT_STICK }, 'fps-crouch', 'Crouch'],
+      ['rs', '⊕', { bit: BUTTON.RIGHT_STICK }, 'fps-zoom', 'Zoom'],
+    ];
+    const held = new Map(); // touch identifier -> control
+    const buttonState = new Map(); // control id -> count of touches
+    const stick = { id: null, x: 0, y: 0, element: null, knob: null };
+    const look = { id: null, x: 0, y: 0 };
+
+    const stickBase = document.createElement('div');
+    stickBase.className = 'touch-stick';
+    const knob = document.createElement('div');
+    knob.className = 'touch-knob';
+    stickBase.appendChild(knob);
+    root.appendChild(stickBase);
+    stick.element = stickBase;
+    stick.knob = knob;
+
+    const controls = {};
+    for (const [id, label, action, cls, caption] of layout) {
+      const element = document.createElement('div');
+      element.className = 'touch-button ' + cls;
+      element.dataset.control = id;
+      element.setAttribute('aria-label', id === 'y' ? 'Swap weapon' : caption || id);
+      if (label) {
+        const glyph = document.createElement('span');
+        glyph.className = 'glyph';
+        glyph.textContent = label;
+        element.appendChild(glyph);
+      }
+      if (caption) {
+        const hint = document.createElement('span');
+        hint.className = 'caption';
+        hint.textContent = caption;
+        element.appendChild(hint);
+      }
+      root.appendChild(element);
+      controls[id] = { element, action };
+    }
+
+    function refreshButtons() {
+      let buttons = 0;
+      touchPad.axes[4] = 0;
+      touchPad.axes[5] = 0;
+      for (const [id, count] of buttonState) {
+        if (count <= 0) continue;
+        const { action } = controls[id];
+        if (action.bit !== undefined) buttons |= 1 << action.bit;
+        if (action.axis !== undefined) touchPad.axes[action.axis] = 32767;
+      }
+      touchPad.buttons = buttons;
+      for (const id in controls) controls[id].element.classList.toggle('pressed', (buttonState.get(id) || 0) > 0);
+    }
+
+    const STICK_RADIUS = 40;
+
+    function start(event) {
+      pushEvent(EVENT.FOCUS, 1);
+      touchUsed = true;
+      for (const touch of event.changedTouches) {
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const control = target && target.closest && target.closest('.touch-button');
+        if (control) {
+          const id = control.dataset.control;
+          held.set(touch.identifier, { kind: 'button', id });
+          buttonState.set(id, (buttonState.get(id) || 0) + 1);
+          // aiming while firing: a touch on the fire button also aims
+          if (id === 'fire' && look.id === null) {
+            look.id = touch.identifier;
+            look.x = touch.clientX;
+            look.y = touch.clientY;
+          }
+          continue;
+        }
+        if (touch.clientX < window.innerWidth * 0.38 && stick.id === null) {
+          stick.id = touch.identifier;
+          stick.x = touch.clientX;
+          stick.y = touch.clientY;
+          stick.element.style.left = (touch.clientX - 48) + 'px';
+          stick.element.style.top = (touch.clientY - 48) + 'px';
+          stick.element.style.bottom = 'auto';
+          stick.element.classList.add('active');
+          held.set(touch.identifier, { kind: 'stick' });
+        } else if (look.id === null) {
+          look.id = touch.identifier;
+          look.x = touch.clientX;
+          look.y = touch.clientY;
+          held.set(touch.identifier, { kind: 'look' });
+        }
+      }
+      refreshButtons();
+      event.preventDefault();
+    }
+
+    function move(event) {
+      for (const touch of event.changedTouches) {
+        if (touch.identifier === stick.id) {
+          let dx = touch.clientX - stick.x;
+          let dy = touch.clientY - stick.y;
+          const length = Math.hypot(dx, dy);
+          if (length > STICK_RADIUS) {
+            dx *= STICK_RADIUS / length;
+            dy *= STICK_RADIUS / length;
+          }
+          stick.knob.style.transform = `translate(${dx}px, ${dy}px)`;
+          touchPad.axes[0] = axis(dx / STICK_RADIUS);
+          touchPad.axes[1] = axis(dy / STICK_RADIUS);
+        }
+        if (touch.identifier === look.id) {
+          const dx = touch.clientX - look.x;
+          const dy = touch.clientY - look.y;
+          look.x = touch.clientX;
+          look.y = touch.clientY;
+          pushEvent(EVENT.MOUSE_MOTION, 0, 0, 0, 0, dx * lookSensitivity * 2, dy * lookSensitivity * 2);
+        }
+      }
+      event.preventDefault();
+    }
+
+    function end(event) {
+      for (const touch of event.changedTouches) {
+        const entry = held.get(touch.identifier);
+        held.delete(touch.identifier);
+        if (entry && entry.kind === 'button') {
+          buttonState.set(entry.id, Math.max(0, (buttonState.get(entry.id) || 0) - 1));
+        }
+        if (touch.identifier === stick.id) {
+          stick.id = null;
+          stick.knob.style.transform = '';
+          stick.element.classList.remove('active');
+          // back to its resting place
+          stick.element.style.left = '';
+          stick.element.style.top = '';
+          stick.element.style.bottom = '';
+          touchPad.axes[0] = 0;
+          touchPad.axes[1] = 0;
+        }
+        if (touch.identifier === look.id) look.id = null;
+      }
+      refreshButtons();
+      event.preventDefault();
+    }
+
+    function releaseTouches() {
+      held.clear(); buttonState.clear();
+      stick.id = null; look.id = null;
+      touchPad.axes.fill(0); touchPad.buttons = 0;
+      stick.knob.style.transform = '';
+      stick.element.classList.remove('active');
+      stick.element.style.left = ''; stick.element.style.top = ''; stick.element.style.bottom = '';
+      refreshButtons();
+    }
+    window.addEventListener('blur', releaseTouches);
+    window.addEventListener('resize', releaseTouches);
+    window.addEventListener('gamepadconnected', releaseTouches);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) releaseTouches(); });
+    root.addEventListener('contextmenu', event => event.preventDefault());
+    root.addEventListener('touchstart', start, { passive: false });
+    root.addEventListener('touchmove', move, { passive: false });
+    root.addEventListener('touchend', end, { passive: false });
+    root.addEventListener('touchcancel', end, { passive: false });
+  }
+
+
   function buildTouchControls(root) {
     // the original Xbox controller's layout (the Controller S): gem-coloured
     // A, B, X and Y in a diamond with the white and black buttons below
@@ -404,7 +578,7 @@ const HaloInput = (() => {
 
   // ---------- setup
 
-  function attach({ memory, base, offsets, canvas, touchRoot, touch }) {
+  function attach({ memory, base, offsets, canvas, touchRoot, touch, touchFps = false }) {
     const buffer = memory.buffer;
     shared = { i32: new Int32Array(buffer), f32: new Float32Array(buffer), base, offsets, ids: [] };
     window.addEventListener('keydown', (event) => onKey(event, true));
@@ -414,7 +588,8 @@ const HaloInput = (() => {
     attachMouse(canvas);
     touchEnabled = touch;
     if (touch) {
-      buildTouchControls(touchRoot);
+      if (touchFps) buildCompactTouchControls(touchRoot);
+      else buildTouchControls(touchRoot);
       touchUsed = true;
     }
   }

@@ -461,3 +461,38 @@ body.has-controller .touch-layer { display: none; }
   .touch-button.left-click, .touch-button.right-click { bottom: calc(var(--edge-bottom) + 158px); }
   .touch-button.right-click { right: calc(210px + var(--edge-right)); }
 }
+
+
+/* Optional compact FPS gameplay layout. */
+.touch-layer.fps-controls { -webkit-user-select: none; user-select: none; }
+/* Compact two-thumb HUD, independent of the legacy controller artwork. */
+.touch-layer.fps-controls .touch-button {
+  width: 46px; height: 46px; min-width: 44px; min-height: 44px;
+  border: 1px solid #ffffff70; border-radius: 50%;
+  background: #14202d55; box-shadow: none;
+  color: #fff; opacity: .78; display: flex; align-items: center; justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+.touch-layer.fps-controls .touch-button.pressed { background: #d5ecff55; opacity: 1; }
+.touch-layer.fps-controls .glyph { font-size: 23px; font-weight: 500; }
+.touch-layer.fps-controls .caption { white-space: nowrap; position: absolute; top: auto; bottom: 4px; margin: 0; font: 600 7px/1 system-ui; letter-spacing: 0; }
+.touch-layer.fps-controls .glyph { transform: translateY(-4px); }
+.touch-layer.fps-controls .fps-fire { width: 64px; height: 64px; right: calc(82px + env(safe-area-inset-right)); bottom: calc(126px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-fire .glyph { font-size: 36px; }
+.touch-layer.fps-controls .fps-jump { right: calc(18px + env(safe-area-inset-right)); bottom: calc(78px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-crouch { right: calc(74px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-melee { right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-reload { right: calc(134px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+/* Invisible target over the engine's ammo/weapon HUD, including while pressed. */
+.touch-layer.fps-controls .fps-weapon-hud,
+.touch-layer.fps-controls .fps-weapon-hud.pressed {
+  left: max(6vw, env(safe-area-inset-left)); top: max(4vh, env(safe-area-inset-top));
+  width: 16vw; height: 16vh; opacity: 0; border: 0; background: transparent;
+}
+.touch-layer.fps-controls .fps-zoom { right: calc(18px + env(safe-area-inset-right)); bottom: calc(142px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-grenade { left: calc(148px + env(safe-area-inset-left)); bottom: calc(34px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .fps-grenade-type { left: calc(204px + env(safe-area-inset-left)); bottom: calc(34px + env(safe-area-inset-bottom)); }
+.touch-layer.fps-controls .touch-stick { opacity: 0; width: 96px; height: 96px; left: calc(28px + env(safe-area-inset-left)); bottom: calc(28px + env(safe-area-inset-bottom)); border: 1px solid #ffffff50; background: #14202d22; box-shadow: none; }
+.touch-layer.fps-controls .touch-knob { left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border: 1px solid #ffffff80; background: #d2e9fa33; box-shadow: none; }
+
+.touch-layer.fps-controls .touch-stick.active { opacity: 1; }
