@@ -906,7 +906,7 @@ and the rays shadow it: object_lights.c.) */
 #define RAY_TRACED_EMITTER_DISTANCE 30.0f
 /* how far an emitter's light reaches (world units), and how bright */
 #define RAY_TRACED_EMITTER_RADIUS 3.0f
-#define RAY_TRACED_EMITTER_INTENSITY 2.0f
+#define RAY_TRACED_EMITTER_INTENSITY 1.0f
 
 #define GROUP_TAG_LIGHT_VOLUME 0x6D677332 /* 'mgs2' */
 #define GROUP_TAG_LIGHT 0x6C696768 /* 'ligh' */
@@ -960,10 +960,13 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
-	long count = 0;
+	long count = 0, player_unit = NONE, player_index;
 
 	if (global_structure_bsp_index == NONE || !object_header_data)
 		return 0;
+	player_index = local_player_get_player_index(0);
+	if (player_index != NONE)
+		player_unit = player_get(player_index)->unit_index;
 	object_iterator_new(&iterator, RAY_TRACED_OBJECT_TYPES, 0);
 	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
 	{
@@ -973,7 +976,12 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		float dx = at->x - camera[0], dy = at->y - camera[1], dz = at->z - camera[2], color[3];
 		float *out = emitters + count * 8;
 
+		/* (not what you carry: your weapon's glow is at the camera, and the
+		first person draws it on the gun) */
 		if (dx * dx + dy * dy + dz * dz > RAY_TRACED_EMITTER_DISTANCE * RAY_TRACED_EMITTER_DISTANCE ||
+			(player_unit != NONE && (iterator.index == player_unit ||
+				(object->object.parent_object_index != NONE &&
+					object_get_ultimate_parent(iterator.index) == player_unit))) ||
 			!emitter_color(object_definition_get(object->definition_index), color))
 		{
 			continue;
