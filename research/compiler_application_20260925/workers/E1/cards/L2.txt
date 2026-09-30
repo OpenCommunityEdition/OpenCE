@@ -1,5 +1,0 @@
-CARD L2  (written 2026-09-26 01:38:34 -0700, before compiling)  lab labs/lab_paren2.c (never landing)
-Question: is the 0x267 barrier after `(X + 1.0f)` unconditional, or context-dependent (constant multiplier, inline
-real_random() operand, accumulation, operand order)?
-Prediction: unconditional - all four functions carry one 0x267 between fadd and fmul (p ~0.8). If any lacks it, that
-context is a candidate for January's first term.

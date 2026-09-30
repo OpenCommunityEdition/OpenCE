@@ -1,5 +1,0 @@
-CARD C11  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x4a163e..0x4a16c7): danger colour = currently_perceived ? (acknowledgement_timer>0 ? white :
-(noticed_danger ? yellow : blue)) : darkgreen through three unnamed temps (-0x18d0,-0x18d4,-0x18d8) copied into the
-named colour [ebp-0xf58]. Ours: nested if/else. Correction: declaration initialiser with the nested conditional
-(rule 9). Prediction: block unchanged.

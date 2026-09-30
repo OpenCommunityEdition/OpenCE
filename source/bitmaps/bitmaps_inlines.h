@@ -66,83 +66,21 @@ __inline pixel32 real_argb_color_to_pixel32(
 		long green;
 		long blue;
 
-#ifdef HALO_LINUX
 		result = (pixel32)(
 			(long)__builtin_rint((double)color->blue * scale) |
 			((long)__builtin_rint((double)color->green * scale) << 8) |
 			((long)__builtin_rint((double)color->red * scale) << 16) |
 			((long)__builtin_rint((double)color->alpha * scale) << 24));
-#else
-		__asm
-		{
-			mov		edx, color
-			fld		dword ptr [edx]
-			fld		dword ptr [edx+4]
-			fld		dword ptr [edx+8]
-			fld		dword ptr [edx+12]
-			fld		scale
-			fmul	st(4), st
-			fmul	st(3), st
-			fmul	st(2), st
-			fmulp	st(1), st
-			fistp	blue
-			fistp	green
-			fistp	red
-			fistp	alpha
-			mov		edx, blue
-			mov		ebx, green
-			mov		ecx, red
-			mov		eax, alpha
-			shl		ebx, 8
-			shl		ecx, 16
-			shl		eax, 24
-			or		edx, ebx
-			or		edx, ecx
-			or		edx, eax
-			mov		result, edx
-		}
-#endif
 	}
 
 	{
 		pixel32 verify;
 
-#ifdef HALO_LINUX
 		verify = (pixel32)(
 			((long)__builtin_rint((double)color->blue * scale) & 0xff) |
 			(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |
 			(((long)__builtin_rint((double)color->red * scale) & 0xff) << 16) |
 			((long)__builtin_rint((double)color->alpha * scale) << 24));
-#else
-		__asm
-		{
-			mov		edx, color
-			fld		dword ptr [edx]
-			fld		dword ptr [edx+4]
-			fld		dword ptr [edx+8]
-			fld		dword ptr [edx+12]
-			fld		scale
-			fmul	st(4), st
-			fmul	st(3), st
-			fmul	st(2), st
-			fmulp	st(1), st
-			fistp	verify
-			and		verify, 0FFh
-			mov		edx, verify
-			fistp	verify
-			and		verify, 0FFh
-			shl		verify, 8
-			or		edx, verify
-			fistp	verify
-			and		verify, 0FFh
-			shl		verify, 16
-			or		edx, verify
-			fistp	verify
-			shl		verify, 24
-			or		edx, verify
-			mov		verify, edx
-		}
-#endif
 
 		match_assert(
 			"..\\bitmaps\\bitmaps_inlines.h",
@@ -161,36 +99,10 @@ __inline pixel32 real_rgb_color_to_pixel32(
 
 	match_assert_valid_real_rgb_color("..\\bitmaps\\bitmaps_inlines.h", 0xC9, color);
 
-#ifdef HALO_LINUX
 	result = (pixel32)(
 		((long)__builtin_rint((double)color->blue * scale) & 0xff) |
 		(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |
 		(((long)__builtin_rint((double)color->red * scale) & 0xff) << 16));
-#else
-	__asm
-	{
-		mov edx, color
-		fld dword ptr [edx]
-		fld dword ptr [edx+4]
-		fld dword ptr [edx+8]
-		fld scale
-		fmul st(3), st(0)
-		fmul st(2), st(0)
-		fmulp st(1), st(0)
-		fistp result
-		and result, 0ffh
-		mov edx, result
-		fistp result
-		and result, 0ffh
-		shl result, 8
-		or edx, result
-		fistp result
-		and result, 0ffh
-		shl result, 16
-		or edx, result
-		mov result, edx
-	}
-#endif
 
 	return result;
 }
@@ -210,18 +122,7 @@ __inline pixel32 real_alpha_to_pixel32(
 		291,
 		alpha>=0.0f && alpha<=1.0f);
 
-#ifdef HALO_LINUX
 	result = (pixel32)((long)__builtin_rint((double)alpha * scale) << 24);
-#else
-	__asm
-	{
-		fld		alpha
-		fld		scale
-		fmulp	st(1), st
-		fistp	result
-		shl		result, 24
-	}
-#endif
 
 	return result;
 }

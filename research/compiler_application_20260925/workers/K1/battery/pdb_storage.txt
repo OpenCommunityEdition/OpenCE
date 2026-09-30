@@ -1,4 +1,0 @@
-source/ai/ai_communication: 279 split symbols, 3 disagreements with PDB publics
-   _actor_reset_idle_vocalization_timer               split 2 ours 3 PDB-public False
-   _ai_communication_update_speech_timers             split 2 ours 3 PDB-public False
-   _ai_conversation_new                               split 2 ours 2 PDB-public False

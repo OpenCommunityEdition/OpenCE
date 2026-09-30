@@ -367,23 +367,17 @@ enum
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limit (port/linux/include/halo_port_limits.h) */
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-#endif
 	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
 };
 
-#ifdef HALO_LINUX
 enum
 {
 	/* the networked pregame screen has panels for the local machine and three
 	remote machines, fewer than the native builds' sessions can hold */
 	NUMBER_OF_REMOTE_MACHINE_PANELS = 3,
 };
-#endif
 
 enum network_game_platform
 {
@@ -431,17 +425,11 @@ enum multiplayer_game_bitmap_frame
 /* Same TU-local definition as network_client_manager.c, network_game_manager.c,
    network_server_manager.c and network_server_message_handler.c; no shared header
    owns it. January assertion strings in those objects preserve the macro name. */
-#ifdef HALO_LINUX
 /* widened: a char machine index is always below the native builds' 128
 machines, and clang warns about the always-true char comparison */
 #define network_machine_is_valid(machine) \
 	((machine) && (machine)->machine_index >= 0 && \
 	(long)(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
-#else
-#define network_machine_is_valid(machine) \
-	((machine) && (machine)->machine_index >= 0 && \
-	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
-#endif
 
 /* ---------- structures */
 
@@ -534,10 +522,6 @@ typedef char network_advertised_game_platform_offset_assert[
 	offsetof(struct network_advertised_game, platform) == 0xDE ? 1 : -1];
 typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
-#ifndef HALO_LINUX
-typedef char network_game_players_offset_assert[
-	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
-#else
 /* the native builds' session limits move the players; every copy of the
 record is checked against port/linux/include/halo_port_limits.h (this one
 declares it only up to the players) */
@@ -548,7 +532,6 @@ typedef char network_game_players_end_assert[
 		HALO_PORT_NETWORK_GAME_PLAYERS_END ? 1 : -1];
 typedef char network_game_size_assert[
 	sizeof(struct network_game) <= HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
-#endif
 
 struct playlist_profile
 {
@@ -1226,7 +1209,6 @@ static void server_list_menu_update(
 					0x364);
 				if (number_of_players_text->parameters.text_box.text)
 				{
-#ifdef HALO_LINUX
 					/* room for a three-digit count: the Linux runtime's
 					_vsnwprintf writes its terminator inside the count */
 					usnprintf(
@@ -1234,13 +1216,6 @@ static void server_list_menu_update(
 						4,
 						L"%d",
 						server->player_count);
-#else
-					usnprintf(
-						number_of_players_text->parameters.text_box.text,
-						3,
-						L"%d",
-						server->player_count);
-#endif
 					number_of_players_text->parameters.text_box.text[3] = 0;
 				}
 
@@ -1597,14 +1572,9 @@ static void network_pregame_status_screen_update(
 		}
 
 		{
-#ifdef HALO_LINUX
 			/* one entry per remote machine panel, not per remote machine */
 			long machine_indices[NUMBER_OF_REMOTE_MACHINE_PANELS];
 			struct widget_instance *machine_widgets[NUMBER_OF_REMOTE_MACHINE_PANELS];
-#else
-			long machine_indices[MAXIMUM_NETWORK_MACHINE_COUNT - 1];
-			struct widget_instance *machine_widgets[MAXIMUM_NETWORK_MACHINE_COUNT - 1];
-#endif
 			long machine_widget_index;
 			long j;
 
@@ -1621,16 +1591,9 @@ static void network_pregame_status_screen_update(
 				if (network_machine_is_valid(machine) &&
 					machine->machine_index != local_machine_index)
 				{
-#ifdef HALO_LINUX
 					/* more remote machines than panels: show the first ones */
 					if (j >= NUMBER_OF_REMOTE_MACHINE_PANELS)
 						break;
-#else
-					match_assert(
-						"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
-						0x4D4,
-						j<(MAXIMUM_NETWORK_MACHINE_COUNT-1));
-#endif
 
 					machine_indices[j] = machine_index;
 					j++;
@@ -1638,11 +1601,7 @@ static void network_pregame_status_screen_update(
 			}
 
 			for (machine_widget_index = 0;
-#ifdef HALO_LINUX
 				machine_widget_index < NUMBER_OF_REMOTE_MACHINE_PANELS;
-#else
-				machine_widget_index < MAXIMUM_NETWORK_MACHINE_COUNT - 1;
-#endif
 				machine_widget_index++)
 			{
 				struct widget_instance *remote_machine_icon;
@@ -2025,14 +1984,10 @@ static void netgame_prejoin_players(
 				player_ui_local_player_wants_to_play_multiplayer((short)state_or_index.index);
 		}
 
-#ifdef HALO_LINUX
 		/* every player slot of the native builds' larger sessions */
 		for (state_or_index.index = 0;
 			(short)state_or_index.index < (short)NUMBEROF(game->players);
 			state_or_index.index++)
-#else
-		for (state_or_index.index = 0; (short)state_or_index.index < 16; state_or_index.index++)
-#endif
 		{
 			if (network_player_is_valid(&game->players[(short)state_or_index.index]) &&
 				network_game_player_is_local(&game->players[(short)state_or_index.index]))
@@ -2855,13 +2810,9 @@ static void multiplayer_game_set_text_box_for_number_of_players(
 			0xB56);
 		if (widget->parameters.text_box.text)
 		{
-#ifdef HALO_LINUX
 			/* room for a three-digit count: the Linux runtime's _vsnwprintf
 			writes its terminator inside the count */
 			usnprintf(widget->parameters.text_box.text, 4, L"%d", game->player_count);
-#else
-			usnprintf(widget->parameters.text_box.text, 3, L"%d", game->player_count);
-#endif
 			widget->parameters.text_box.text[3] = 0;
 		}
 		return;

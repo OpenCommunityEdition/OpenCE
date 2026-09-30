@@ -6,9 +6,7 @@ force-included by halo_linux_prefix.h and halo_windows_prefix.h.
 
 The Xbox game allows 16 players on at most 4 machines (up to 4 players each
 on split screen). The native builds allow 128 players on up to 128
-machines; split screen stays at 4 players per machine. Game sources use
-these values only under #ifdef HALO_LINUX, so the byte-matching MSVC build
-keeps the original limits.
+machines; split screen stays at 4 players per machine.
 
 128 is the largest session that fits the game's existing records: player,
 machine and team indices are stored in signed chars (0..127 with NONE), and

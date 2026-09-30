@@ -1,5 +1,0 @@
-CARD C7  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x4a053f..0x4a0588): 'panic'/'hide' select is an unnamed temp (-0x18a0) pushed directly as the
-csprintf %s argument. Ours: named char const *string. NOTE /Od reads the guard data through a named pointer local
-[ebp-0xae0]; that pointer is a separate question (not in this card).
-Correction: inline cower_panicked ? "panic" : "hide". Prediction: block unchanged.

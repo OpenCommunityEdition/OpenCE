@@ -36,7 +36,6 @@ word network_game_server_get_state(
 	short *substate);
 boolean network_game_server_game_is_open(
 	struct network_game_server *server);
-#ifdef HALO_LINUX
 /* joining a distributed game in progress (network_server_manager.c) */
 boolean network_game_server_accepts_late_joins(
 	struct network_game_server *server);
@@ -56,7 +55,6 @@ boolean network_game_server_send_game_settings_to_client_machine(
 	struct network_game_server_client_machine *machine,
 	void const *game,
 	long game_size);
-#endif
 boolean network_game_server_game_is_valid(
 	struct network_game_server *server);
 boolean network_game_server_client_machine_is_joined_to_game(

@@ -2,8 +2,7 @@
 BINK_NULL.C
 
 The Bink video SDK entry points bink_playback.c uses. There is no Bink
-decoder in the Linux build (the RAD SDK is proprietary and the reconstructed
-libs/binkxbox is incomplete), so BinkOpen reports that a movie cannot be
+decoder in the native builds (the RAD SDK is proprietary), so BinkOpen reports that a movie cannot be
 opened and the game skips it, exactly as it does for a missing movie file.
 
 The prototypes match the declarations in bink_playback.c; the RAD SDK's

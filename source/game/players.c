@@ -276,7 +276,6 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 
-#ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
@@ -307,23 +306,14 @@ boolean network_game_distributed(void);
 netcode, whose players' weapons, grenades and power-ups are the host's
 (port/linux/game/network_distributed.c) */
 #define players_decide_pickups() (!network_game_distributed_client())
-#else
-#define player_network_picked_up(player, player_index, kind, definition_index, count)
-#define players_decide_pickups() TRUE
-#endif
 
 /* ---------- constants */
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
 	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = 16,
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-#endif
 	MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED = 183,
 	_collision_test_for_player_teleport_flags =
 		FLAG(_collision_test_front_facing_surfaces_bit) |
@@ -513,12 +503,8 @@ void players_initialize(
 {
 	player_data = game_state_data_new(
 		"players",
-#ifdef HALO_LINUX
 		/* a player's datum index is also its action slot in every update */
 		NETWORK_GAME_MAXIMUM_PLAYER_COUNT,
-#else
-		16,
-#endif
 		sizeof(struct player_datum));
 	team_data = game_state_data_new(
 		"teams",
@@ -568,11 +554,7 @@ void players_initialize_for_new_map(
 	csmemset(
 		machine_to_player_table,
 		NONE,
-#ifdef HALO_LINUX
 		sizeof(machine_to_player_table));
-#else
-		0x40);
-#endif
 
 	return;
 }
@@ -1411,7 +1393,6 @@ static void player_spawn(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): a
 client's player takes the unit the host spawned it with (the host's object,
 at the host's index, with the host's weapons), as player_spawn gives a
@@ -1563,7 +1544,6 @@ void network_player_detach_unit(
 	if (player->local_player_index != NONE)
 		player_control_new_unit(player->local_player_index, NONE);
 }
-#endif
 
 /* Exact: January emits this private dead-unit replacement helper from the
    reconstructed player_teleport_internal caller below. */
@@ -3609,9 +3589,7 @@ void players_update_before_game(
 					/* (a client of the distributed netcode's players take the units
 					the host spawns them with, network_player_attach_unit) */
 					if (
-#ifdef HALO_LINUX
 						!network_game_distributed_client() &&
-#endif
 						game_engine_should_spawn_player(iterator.datum_index))
 					{
 						game_engine_prespawn_player_update(iterator.datum_index);
@@ -3621,10 +3599,8 @@ void players_update_before_game(
 						else
 							player->respawn_timer = 1;
 					}
-#ifdef HALO_LINUX
 					else if (network_game_distributed_client())
 						game_engine_client_respawn_countdown(iterator.datum_index);
-#endif
 				}
 				else if (!main_menu_is_active())
 				{
@@ -3640,9 +3616,7 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
-#ifdef HALO_LINUX
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
-#endif
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
 						!player_handle_action(iterator.datum_index))

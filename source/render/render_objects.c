@@ -117,12 +117,8 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger render state cache (halo_port_capacity.h) */
 	MAXIMUM_CACHED_OBJECT_RENDER_STATES = HALO_PORT_MAXIMUM_CACHED_OBJECT_RENDER_STATES,
-#else
-	MAXIMUM_CACHED_OBJECT_RENDER_STATES = 256,
-#endif
 	NUMBER_OF_SHADOW_VOLUME_PLANES = 6,
 	MAXIMUM_OBJECT_RENDER_STATE_AGE = 1000,
 	OBJECT_RENDER_STATE_LARGE_INTERVAL = 3,
@@ -200,14 +196,9 @@ typedef char object_render_data_size_assert[
 	sizeof(struct object_render_data) == 0x48 ? 1 : -1];
 typedef char object_render_state_size_assert[
 	sizeof(struct object_render_state) == 0x100 ? 1 : -1];
-#ifdef HALO_LINUX
 /* the native builds render up to MAXIMUM_RENDERED_OBJECTS (objects.h) */
 typedef char render_object_globals_size_assert[
 	sizeof(struct render_object_globals) == 4 + MAXIMUM_RENDERED_OBJECTS * sizeof(long) ? 1 : -1];
-#else
-typedef char render_object_globals_size_assert[
-	sizeof(struct render_object_globals) == 0x404 ? 1 : -1];
-#endif
 
 /* ---------- prototypes */
 
@@ -896,15 +887,11 @@ static void object_render_state_refresh(
 	struct object_render_state *state = object_render_state_get(render_state_index);
 	long scene_age = render.scene_index - state->render_scene_index;
 	long render_age = render.frame_index - state->render_frame_index;
-#ifdef HALO_LINUX
 	/* The native builds draw several frames per tick
 	(port/linux/game/render_interpolation.c), and a refresh moves the lighting
 	a fixed step toward its target: refresh at the intervals in ticks the
 	Xbox refreshed at in frames, so lighting changes as fast as it did. */
 	long refresh_age = game_time_get() - state->refresh_frame_index;
-#else
-	long refresh_age = render.frame_index - state->refresh_frame_index;
-#endif
 	boolean refresh = FALSE;
 
 	if (refresh_age < 0 || scene_age < 0)
@@ -943,11 +930,7 @@ static void object_render_state_refresh(
 		state->object_index = object_index;
 		lights_prepare_for_object_static(object_index, &state->desired_lighting);
 		state->level_of_detail_pixels = level_of_detail_pixels;
-#ifdef HALO_LINUX
 		state->refresh_frame_index = game_time_get();
-#else
-		state->refresh_frame_index = render.frame_index;
-#endif
 	}
 
 	if (rebuild || scene_age > 0)

@@ -1,6 +1,0 @@
-CARD C5  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x49f20f..0x49f24d): 'unr %d %d' time argument is an unnamed temp (-0x1878) pushed directly; the
-select is emitted NONE-arm first: cmp last_unreachable_time,-1 / jne compute / temp=-1, i.e.
-last_unreachable_time==NONE ? NONE : game_time_get()-last_unreachable_time. Ours: named long time with != polarity.
-January 0x223c..0x2256 (mov eax,-1; cmp; je; call; sub) is identical for both spellings.
-Correction: inline the /Od polarity. Prediction: block unchanged; downstream may move.

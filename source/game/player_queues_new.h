@@ -61,7 +61,6 @@ void update_client_handle_server_update(
 void update_queues_reset_and_fill_with_lies(
 	void);
 
-#ifdef HALO_LINUX
 /* the distributed netcode's inputs (port/linux/game/network_distributed.c):
 each tick's buttons are sent again with the ticks after it, and taken once,
 from whichever message brings them first. control_flags holds the buttons
@@ -104,7 +103,6 @@ boolean update_client_distributed_input(
 	long *tick,
 	struct player_action *action,
 	unsigned short *control_flags);
-#endif
 long player_new_queue(
 	long player_index);
 

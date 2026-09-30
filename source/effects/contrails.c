@@ -82,14 +82,10 @@ symbols in this file:
 enum
 {
 	MAXIMUM_CONTRAIL_INSTANCES = 4,
-#ifdef HALO_LINUX
 	/* the native builds' larger contrail point pool (halo_port_capacity.h);
 	contrail_update_points lists a contrail's points in an array of this size
 	without a bound check, so it must stay the size of the pool */
 	MAXIMUM_CONTRAIL_POINTS = HALO_PORT_MAXIMUM_CONTRAIL_POINTS
-#else
-	MAXIMUM_CONTRAIL_POINTS = 1024
-#endif
 };
 
 enum
@@ -194,14 +190,9 @@ real contrail_scale_random_value(
 void contrails_initialize(
 	void)
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger contrail pools (halo_port_capacity.h) */
 	contrail_data = game_state_data_new("contrail", HALO_PORT_MAXIMUM_CONTRAILS, 0x44);
 	contrail_point_data = game_state_data_new("contrail point", MAXIMUM_CONTRAIL_POINTS, 0x38);
-#else
-	contrail_data = game_state_data_new("contrail", 256, 0x44);
-	contrail_point_data = game_state_data_new("contrail point", 1024, 0x38);
-#endif
 	if (contrail_data && contrail_point_data)
 		return;
 
@@ -377,7 +368,6 @@ void contrails_update(
 	real dt)
 {
 	long contrail_index;
-#ifdef HALO_LINUX
 	/* The native builds update contrails every frame, several frames per
 	tick (port/linux/game/render_interpolation.c), but objects and their
 	markers move only on ticks: points due on a frame that ran no tick would
@@ -398,7 +388,6 @@ void contrails_update(
 	{
 		point_dt = 0.0f;
 	}
-#endif
 
 	for (contrail_index = data_next_index(contrail_data, NONE);
 		contrail_index != NONE;
@@ -437,17 +426,10 @@ void contrails_update(
 
 			if (active)
 			{
-#ifdef HALO_LINUX
 				contrail_add_points(
 					contrail_index,
 					contrail_compute_new_point_count(contrail_index, point_dt),
 					TRUE);
-#else
-				contrail_add_points(
-					contrail_index,
-					contrail_compute_new_point_count(contrail_index, dt),
-					TRUE);
-#endif
 			}
 		}
 

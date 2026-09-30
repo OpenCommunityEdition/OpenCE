@@ -549,10 +549,8 @@ boolean game_load(
 	return game_globals->map_loaded;
 }
 
-#ifdef HALO_LINUX
 void network_distributed_new_game(void);
 void network_objects_placed(void);
-#endif
 
 void game_initialize_for_new_map(
 	void)
@@ -594,11 +592,9 @@ void game_initialize_for_new_map(
 	weather_particle_systems_initialize_for_new_map();
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
-#ifdef HALO_LINUX
 	/* nothing of the distributed netcode's carried into the new game
 	(port/linux/game/network_distributed.c) */
 	network_distributed_new_game();
-#endif
 	game_statistics_start();
 	update_server_new();
 	player_control_initialize_for_new_map();
@@ -616,11 +612,9 @@ void game_initialize_for_new_map(
 	objects_place();
 	if (!game_in_editor())
 		ai_place();
-#ifdef HALO_LINUX
 	/* (the map's objects, placed as on the host: a distributed client's own
 	from now on go elsewhere, port/linux/game/network_objects.c) */
 	network_objects_placed();
-#endif
 	ui_widgets_safe_to_load(TRUE);
 
 	return;

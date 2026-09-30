@@ -162,7 +162,6 @@ unsigned long event_manager_time_of_last_event(
 	return event_manager_globals.state.time_of_last_event;
 }
 
-#ifdef HALO_LINUX
 void event_manager_post_button(
 	short controller_index,
 	short button_index)
@@ -183,7 +182,6 @@ void event_manager_post_button(
 	return;
 }
 
-#endif
 /* ---------- private code */
 
 static void queue_event(

@@ -1,9 +1,0 @@
-CARD H-5b (A3)  written 2026-09-26 01:10:47 -0700  -- BEFORE its first compile.  RESEARCH PROBE (zero credit)
-base: copies/hs_H5. H-5 S1 outcome: 65/66; only _hs_long_to_short residual (VC7 folds the self word store: ours
-  'mov eax,[ebp+8]' vs January 'mov ax,[ebp+8]; mov [ebp+8],ax; mov eax,[ebp+8]').
-X: HCEX hs_long_to_short(long l) has a 'long result' local.
-S2a: 'long result; *(short *)&result= (short)l; return result;' (HCEX local; upper 2 bytes indeterminate =
-     explicit uninitialised read, held class) -- prediction EXACT (VC7 homes result in the dead argument slot, as
-     the union 'result' does today).
-S2b: 'long result= l; *(short *)&result= (short)l; return result;' (UB-free) -- prediction NOT exact (copy then
-     self-word-store folds like S1).

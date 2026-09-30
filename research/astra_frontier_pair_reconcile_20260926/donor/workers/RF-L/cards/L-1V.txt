@@ -1,6 +1,0 @@
-Record L-1V (observation of the L-1 candidate source; no source change) - written 2026-09-26 17:15:44 -0700
-Disclosure: no separate pre-card; the traced quantity was pre-registered in card L-1 ("ordinal 33 or 29 -> id & 3 = 1").
-Runs (stock-equal, work/sf_l1, work/vn_l1): sortfinal.py + vnjoin.py on scratch l1.c.
-Result: the `definition + 0x4c` expression = VN temp 0x17d (ordinal 29; the -6 route: the loop's widget+0x24 and widget+0x30 ADD,
-memory value and load all hit the first-access entries). Final sort of the loop ADD: [SR 0x254 key 0x19500,
-load [t_17d] key 0x14008] -> IV first -> base = IV. Matches the L-1 prediction.

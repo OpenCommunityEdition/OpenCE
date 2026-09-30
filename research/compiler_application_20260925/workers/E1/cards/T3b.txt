@@ -1,6 +1,0 @@
-CARD T3b (written 2026-09-26 01:46:18 -0700, before the trace)  cinematic_render OR subtrees: children
-Chains at the sort bps: in1 subtree's child 1 / child 2 (+0x28 list), in2 subtree's child 1 / child 2.
-Prediction: SHL children = [alpha value (kind 1/2 symbol, or a temp whose key is its defining subtree's hash), const
-24 (level 0)]; AND children = [shadow_color field (kind 5/6 memory with base = title, or a scalar-replaced kind-2
-field symbol), const 0x00ffffff]. The AND inner 0xfe3a is dominated by the field operand's key; the SHL inner 0x0421
-by the alpha symbol's id<<5 (id ~ 0x21 if a plain local).

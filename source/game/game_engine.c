@@ -586,26 +586,20 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 
-#ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
 void network_distributed_player_killed(long *killing_player_index, long *killing_object_index,
 	long dead_player_index, boolean *friendly_fire);
-#endif
 
 /* ---------- constants */
 
 enum
 {
-#ifdef HALO_LINUX
 	/* port: the native builds' session limit (halo_port_limits.h) */
 	MULTIPLAYER_MAXIMUM_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	/* ui\multiplayer_game_text only has strings for the first 16 places */
 	NUMBER_OF_PLACE_STRINGS = 16,
-#else
-	MULTIPLAYER_MAXIMUM_PLAYERS = 16,
-#endif
 };
 
 /* scenario_starting_equipment.flags (HCEX names) */
@@ -910,13 +904,9 @@ static long adjust_score_for_ranking(
 
 short debug_player_color = NONE;
 
-#ifdef HALO_LINUX
 /* port: slayer's kill-in-order target uses the player's absolute index as
 its goal index, so every player needs a goal slot */
 struct netgame_goal global_goal[MAX(32, MULTIPLAYER_MAXIMUM_PLAYERS)] = { 0 };
-#else
-struct netgame_goal global_goal[32] = { 0 };
-#endif
 struct game_variant global_variant = { 0 };
 struct game_engine *game_engine = NULL;
 
@@ -984,7 +974,6 @@ static void initialize_player_multiplayer_data(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* port: English ordinal for a zero-based place past the string list's 16
 ("17th", "22nd", "111th"; "tied for 17th" when tied), in a static buffer */
 static wchar_t *place_ordinal_string(
@@ -1021,7 +1010,6 @@ static wchar_t *place_ordinal_string(
 
 	return string;
 }
-#endif
 
 static wchar_t *get_place_string(
 	struct statistic_buffer *entry)
@@ -1029,12 +1017,10 @@ static wchar_t *get_place_string(
 	long string_index = PIN(entry->place & 0x7F, 0, 15);
 	long string_list_index;
 
-#ifdef HALO_LINUX
 	/* port: places past the 16th are spelled out instead of clamped (the
 	caller's format string marks a tie) */
 	if ((entry->place & 0x7F) >= NUMBER_OF_PLACE_STRINGS)
 		return place_ordinal_string(entry->place & 0x7F, FALSE);
-#endif
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 	if (string_list_index != NONE)
 		return unicode_string_list_get_string(
@@ -1798,12 +1784,8 @@ static void drawline(
 void game_engine_post_rasterize_post_game(
 	void)
 {
-#ifdef HALO_LINUX
 	/* port: sized like every buffer handed to populate_statistic_buffer */
 	struct statistic_buffer entries[MULTIPLAYER_MAXIMUM_PLAYERS];
-#else
-	struct statistic_buffer entries[16];
-#endif
 	wchar_t score_string[256];
 	wchar_t row_string[256];
 	short tab_stops[6];
@@ -2775,9 +2757,7 @@ static void game_engine_update_purge(
 
 	/* (a client of the distributed netcode removes items when the host does,
 	port/linux/game/network_distributed.c) */
-#ifdef HALO_LINUX
 	if (!network_game_distributed_client())
-#endif
 	{
 		struct object_iterator item_iterator;
 
@@ -3057,21 +3037,13 @@ static void game_engine_post_rasterize_in_game(
 		!gamepad->buttons[_gamepad_binary_button_back]) &&
 		game_engine_globals.postgame_state != game_engine_mode_postgame_delay)
 	{
-#ifdef HALO_LINUX
 		/* a frame is no longer a tick (render_interpolation.c): fade in half
 		a second, not in 15 frames */
 		fade -= 0.06666667f * main_get_seconds_elapsed() * TICKS_PER_SECOND;
-#else
-		fade -= 0.06666667f;
-#endif
 	}
 	else
 	{
-#ifdef HALO_LINUX
 		fade += 0.06666667f * main_get_seconds_elapsed() * TICKS_PER_SECOND;
-#else
-		fade += 0.06666667f;
-#endif
 	}
 
 	fade = PIN(fade, 0.0f, 1.0f);
@@ -3679,9 +3651,7 @@ void game_engine_update(
 				/* (a client of the distributed netcode has the host's scores,
 				flags, balls and hills: game_engine_read_network_state) */
 				if (game_engine->player_update_each_tick
-#ifdef HALO_LINUX
 					&& !network_game_distributed_client()
-#endif
 					)
 				{
 					game_engine->player_update_each_tick(player_iterator.datum_index);
@@ -3690,9 +3660,7 @@ void game_engine_update(
 		}
 
 		if (game_engine->update
-#ifdef HALO_LINUX
 			&& !network_game_distributed_client()
-#endif
 			)
 		{
 			game_engine->update();
@@ -3704,9 +3672,7 @@ void game_engine_update(
 			/* (a client of the distributed netcode ends the game when the host
 			has) */
 			if (
-#ifdef HALO_LINUX
 				!network_game_distributed_client() &&
-#endif
 				game_engine_should_end_game())
 			{
 				game_engine_end_game();
@@ -3848,12 +3814,10 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
-#ifdef HALO_LINUX
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
 		&friendly_fire);
-#endif
 	dead_player->death_time = game_time_get();
 	if (game_engine->player_killed_player)
 	{
@@ -4200,20 +4164,12 @@ wchar_t *get_place_name(
 	long lookup_index;
 	long string_list_index;
 
-#ifdef HALO_LINUX
 	/* port: a session can have more places than the string list names */
 	match_vassert(
 		"c:\\halo\\SOURCE\\game\\game_engine.c",
 		0x1316,
 		place.place < MULTIPLAYER_MAXIMUM_PLAYERS,
 		"place.place < maximum_places");
-#else
-	match_vassert(
-		"c:\\halo\\SOURCE\\game\\game_engine.c",
-		0x1316,
-		place.place < 16,
-		"place.place < maximum_places");
-#endif
 
 	if (TEST_FLAG(place.flags, _place_two_groups) && TEST_FLAG(place.flags, _place_tied))
 		lookup_index = 35;
@@ -4223,12 +4179,10 @@ wchar_t *get_place_name(
 		lookup_index = 34;
 	else if (TEST_FLAG(place.flags, _place_all_tied))
 		lookup_index = 32;
-#ifdef HALO_LINUX
 	/* port: places past the 16th are spelled out; a tie is marked like the
 	string list's tied places */
 	else if (place.place >= NUMBER_OF_PLACE_STRINGS)
 		return place_ordinal_string(place.place, TEST_FLAG(place.flags, _place_tied));
-#endif
 	else
 	{
 		lookup_index = place.place;
@@ -4473,12 +4427,10 @@ void game_engine_player_damaged_player(
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_engine.c", 0xA20, dead_player_index != NONE);
 
-#ifdef HALO_LINUX
 	/* (a client of the distributed netcode replaying the host's damage has
 	the host's game type state, game_engine_read_network_state) */
 	if (network_game_distributed_client())
 		return;
-#endif
 	if (game_engine && game_engine->player_damaged_player)
 		game_engine->player_damaged_player(damaging_player_index, dead_player_index, damage_type);
 
@@ -4547,12 +4499,8 @@ short game_engine_player_get_custom_motion_sensor_positions(
 		struct player_datum *player = player_get(player_index);
 		long goal_index;
 
-#ifdef HALO_LINUX
 		/* port: every goal, one per player in the native builds' sessions */
 		for (goal_index = 0; goal_index < (long)NUMBEROF(global_goal); goal_index++)
-#else
-		for (goal_index = 0; goal_index < 32; goal_index++)
-#endif
 		{
 			struct netgame_goal *goal = &global_goal[goal_index];
 
@@ -4588,12 +4536,8 @@ void game_engine_render_nav_points(
 				real_point3d head_position;
 
 				unit_get_head_position(player->unit_index, &head_position);
-		#ifdef HALO_LINUX
 		/* port: every goal, one per player in the native builds' sessions */
 		for (goal_index = 0; goal_index < (long)NUMBEROF(global_goal); goal_index++)
-#else
-		for (goal_index = 0; goal_index < 32; goal_index++)
-#endif
 				{
 					if (goal_matches_player(player, player_index, goal_index))
 					{
@@ -6214,7 +6158,6 @@ void game_engine_player_added(
 		}
 		else
 		{
-#ifdef HALO_LINUX
 			/* port: a free-for-all team is the player's own slot, which stays
 			below the player limit and is the same on every machine */
 			long team_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
@@ -6223,13 +6166,6 @@ void game_engine_player_added(
 				(char)team_index;
 			player->team_index =
 				(signed char)team_index;
-#else
-			player->network_player_data.team_index =
-				(char)*next_team_index;
-			player->team_index =
-				(signed char)*next_team_index;
-			(*next_team_index)++;
-#endif
 		}
 
 		if (player_index != NONE)
@@ -6899,7 +6835,6 @@ static void internal_rasterize_target_name(
 			target_player_index = NONE;
 	}
 
-#ifdef HALO_LINUX
 	/* This is drawn once a frame, several frames per tick
 	(render_interpolation.c): the hold time counts ticks, as it did on the
 	Xbox. */
@@ -6916,7 +6851,6 @@ static void internal_rasterize_target_name(
 		{
 			if (last_game_time)
 				*last_game_time = game_time_get();
-#endif
 	if (player->player_display_index != target_player_index)
 	{
 		if (player->player_display_count > 0)
@@ -6928,10 +6862,8 @@ static void internal_rasterize_target_name(
 	{
 		player->player_display_count++;
 	}
-#ifdef HALO_LINUX
 		}
 	}
-#endif
 
 	if (player->player_display_index != NONE)
 	{
@@ -7429,12 +7361,10 @@ static void game_engine_update_item_spawn(
 	struct scenario *scenario = global_scenario_get();
 	short equipment_index;
 
-#ifdef HALO_LINUX
 	/* a client of the distributed netcode has the host's items
 	(port/linux/game/network_distributed.c) */
 	if (network_game_distributed_client())
 		return;
-#endif
 
 	for (equipment_index = 0;
 		equipment_index < scenario->netgame_equipment.count;
@@ -7777,7 +7707,6 @@ boolean game_engine_get_state_message(
 	return result;
 }
 
-#ifdef HALO_LINUX
 /* port: a distributed client's players spawn when the host spawns them
 (network_player_attach_unit), but their respawn countdown runs here as it
 does on the host (game_engine_should_spawn_player), for the hud's count and
@@ -7812,7 +7741,6 @@ void game_engine_client_respawn_countdown(
 	return;
 }
 
-#endif
 boolean game_engine_should_spawn_player(
 	long player_index)
 {
@@ -7916,12 +7844,8 @@ struct game_engine_place game_engine_get_place(
 	{
 		struct data_iterator iterator;
 		struct player_datum *other_player;
-#ifdef HALO_LINUX
 		/* port: free-for-all team indices run up to the player limit */
 		unsigned long team_mask[BIT_VECTOR_SIZE_IN_LONGS(MULTIPLAYER_MAXIMUM_PLAYERS)] = { 0 };
-#else
-		unsigned long team_mask = 0;
-#endif
 		long score = game_engine->get_player_score(player_index, score_type);
 
 		data_iterator_new(&iterator, player_data);
@@ -7941,7 +7865,6 @@ struct game_engine_place game_engine_get_place(
 			if (different_player &&
 				score_type == _get_score_team)
 			{
-#ifdef HALO_LINUX
 				/* a team outside the mask (none yet) counts on its own */
 				if (VALID_INDEX(other_player->team_index, MULTIPLAYER_MAXIMUM_PLAYERS))
 				{
@@ -7950,12 +7873,6 @@ struct game_engine_place game_engine_get_place(
 					else
 						BIT_VECTOR_SET_FLAG(team_mask, other_player->team_index, TRUE);
 				}
-#else
-				if (TEST_FLAG(team_mask, other_player->team_index))
-					different_player = FALSE;
-				else
-					SET_FLAG(team_mask, other_player->team_index, TRUE);
-#endif
 			}
 
 			if (different_player)
@@ -8042,7 +7959,6 @@ static void netgame_verify_spawn_points(
 	return;
 }
 
-#ifdef HALO_LINUX
 long game_engine_slayer_write_network_state(byte *buffer, long size);
 void game_engine_slayer_read_network_state(byte const *buffer, long size);
 long game_engine_ctf_write_network_state(byte *buffer, long size);
@@ -8108,4 +8024,3 @@ void game_engine_read_network_state(
 	default: break;
 	}
 }
-#endif

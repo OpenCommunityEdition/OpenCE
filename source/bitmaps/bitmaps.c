@@ -1139,7 +1139,7 @@ pixel32 bitmap_2d_get_pixel(
 			 * January's __FILE__ address as the high dword the double is a tiny positive normal and the halt message
 			 * shows "lod=0.000000" (at most 182 characters plus NUL in the 256-byte buffer; January's formatter has no x87 code).
 			 * display_assert then returns into an unconditional system_exit, which never returns (halt_and_catch_fire).
-			 * A corrected build passes lod; see docs/object_matching_logs/astra_get_pixel_disclosure_20260927.md. */
+			 * A corrected build passes lod. */
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
 				0x2A0,

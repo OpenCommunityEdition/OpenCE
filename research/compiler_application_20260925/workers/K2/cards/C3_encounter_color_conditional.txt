@@ -1,9 +1,0 @@
-CARD C3  (written 2026-09-26 02:05:14 -0700, before compile)
-Observed: ID-sensitive x87 sites downstream of the activation block (0xf52 group, marker fst/fstp, later sites).
-Evidence (D, /Od 0x49d853..0x49d8ac): encounter_color is assigned from a nested conditional through two unnamed temps
-(-0x184c outer select on encounter bit, -0x1850 inner select on the named boolean at [ebp-0x24d] =
-outside_current_bsp), then copied into the named slot [ebp-0x13c]. Ours: if / else-if / else chain.
-January bytes of this block are identical to ours today; J cannot discriminate spelling, only D can.
-Correction: encounter_color = encounter->active ? green : (outside_current_bsp ? red : purple);
-Prediction: block bytes unchanged; downstream ID-sensitive sites move (direction unknown).
-Decisive test: gate on C1+C2+C3.

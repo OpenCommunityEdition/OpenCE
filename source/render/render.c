@@ -112,11 +112,7 @@ enum
 
 /* ---------- macros */
 
-#ifdef HALO_LINUX
 #define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH halo_screen_width()
-#else
-#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH 640
-#endif
 #define RASTERIZER_TARGET_RENDER_PRIMARY_HEIGHT 480
 
 /* ---------- structures */
@@ -219,13 +215,9 @@ static void render_nonplayer_frame(
 		break;
 
 	case 1:
-#ifdef HALO_LINUX
 		halo_screen_ui_offset(TRUE);
 		game_engine_nonplayer_post_rasterize();
 		halo_screen_ui_offset(FALSE);
-#else
-		game_engine_nonplayer_post_rasterize();
-#endif
 		break;
 
 	default:
@@ -263,13 +255,9 @@ void render_frame_pregame(
 	rasterizer_parameters.rasterizer_target = 0;
 	rasterizer_window_begin(&rasterizer_parameters);
 
-#ifdef HALO_LINUX
 	halo_screen_ui_offset(TRUE);
 	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
 	halo_screen_ui_offset(FALSE);
-#else
-	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
-#endif
 	bink_playback_render();
 
 	{
@@ -422,13 +410,9 @@ static void render_window(
 		rasterizer_lens_flares_draw();
 		interface_draw_screen();
 		rasterizer_screen_flash();
-#ifdef HALO_LINUX
 		halo_screen_ui_offset(TRUE);
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
 		halo_screen_ui_offset(FALSE);
-#else
-		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
-#endif
 	}
 
 	bink_playback_render();
@@ -609,12 +593,8 @@ void render_frame(
 	render.frame_index++;
 	render.time_delta_since_tick_sec = time_delta_since_tick_sec;
 	memset(&parameters, 0, sizeof(parameters));
-#ifdef HALO_LINUX
 	/* continuous between ticks (render_interpolation.c) */
 	parameters.game_time_sec = render_interpolation_game_time_sec(game_time_get());
-#else
-	parameters.game_time_sec = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
-#endif
 	rasterizer_frame_begin(&parameters);
 	rasterizer_windows_begin();
 
@@ -651,13 +631,9 @@ void render_frame(
 		render_nonplayer_frame(window, window_type);
 	}
 
-#ifdef HALO_LINUX
 	halo_screen_ui_offset(TRUE);
 	progress_bar_eachframe();
 	halo_screen_ui_offset(FALSE);
-#else
-	progress_bar_eachframe();
-#endif
 	rasterizer_windows_end();
 	rasterizer_frame_end();
 

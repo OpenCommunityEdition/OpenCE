@@ -262,8 +262,8 @@ floating-point contraction, as on x86.
 
 ### Game source changes
 
-The C replacements of the x86 inline assembly are in `#ifdef HALO_LINUX`
-(refer to [port/linux/README.md](../linux/README.md#game-source-changes)).
+The x86 inline assembly is replaced by C (refer to
+[port/linux/README.md](../linux/README.md#game-source-changes)).
 These changes are in `#ifdef HALO_ANDROID`:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does

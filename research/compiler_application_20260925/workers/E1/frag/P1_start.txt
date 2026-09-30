@@ -1,3 +1,0 @@
-	while (TRUE)
-	{
-		long next_surface_index;

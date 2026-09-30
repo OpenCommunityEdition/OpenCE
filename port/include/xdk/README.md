@@ -64,8 +64,7 @@ Direct3D tables) are public Win32 facts or C plumbing.
 - `tools/xdk_headers.py` checks each generated structure's size and member
   offsets against the PDB, for Linux, Windows and Android.
 - The game's units were compiled with the original compiler and these
-  headers, and compared with the January build (`build/split`, from the
-  byte-matching setup): every function that matched the original with the
+  headers, and compared with the January build: every function that matched the original with the
   SDK's headers calls the same functions with the same constants and data
   with these. Where the code differs, it is only in form: the inline
   functions here are written differently from the SDK's (a switch where it

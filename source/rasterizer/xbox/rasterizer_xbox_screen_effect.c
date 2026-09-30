@@ -431,7 +431,6 @@ static void rasterizer_screen_effect_set_texture_transforms(
 				223,
 				main_get_window_count()<=1);
 
-#ifdef HALO_LINUX
 			/* The native builds draw several frames per tick
 			(port/linux/game/render_interpolation.c): move the noise 30 times
 			a second, as the Xbox did once a frame, not every frame. */
@@ -447,12 +446,6 @@ static void rasterizer_screen_effect_set_texture_transforms(
 				random_value = real_seed_random(&noise_seed);
 				constants[5][3] += noise_scale.j * random_value * noise_size.j;
 			}
-#else
-			random_value = real_seed_random(get_global_local_random_seed_address());
-			constants[4][3] += noise_scale.i * random_value * noise_size.i;
-			random_value = real_seed_random(get_global_local_random_seed_address());
-			constants[5][3] += noise_scale.j * random_value * noise_size.j;
-#endif
 		}
 
 		IDirect3DDevice8_SetVertexShaderConstant(
@@ -993,17 +986,10 @@ void _rasterizer_screen_effect(
 
 			if (pass == 0 && main_get_window_count() > 1 && pass_count != 1)
 			{
-#ifdef HALO_LINUX
 				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
 					(1.0f / (real)halo_screen_width()) - 1.0f;
 				vertex_bounds.x1 = 2 * global_window_parameters.camera.viewport_bounds.x1 *
 					(1.0f / (real)halo_screen_width()) - 1.0f;
-#else
-				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
-					(1.0f / 640.0f) - 1.0f;
-				vertex_bounds.x1 = 2 * global_window_parameters.camera.viewport_bounds.x1 *
-					(1.0f / 640.0f) - 1.0f;
-#endif
 				vertex_bounds.y0 = -2 * global_window_parameters.camera.viewport_bounds.y0 *
 					(1.0f / 480.0f) + 1.0f;
 				vertex_bounds.y1 = -2 * global_window_parameters.camera.viewport_bounds.y1 *

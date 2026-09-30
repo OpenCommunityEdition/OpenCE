@@ -1,16 +1,73 @@
 {
-  "comment": "Native Linux build inputs. See port/linux/README.md.",
-  "projects": [
-    "halobetacache"
-  ],
-  "exclude_sources": [
-    "source/main/d3d_intimacy.cpp"
-  ],
+  "comment": "Native build inputs, shared by the Windows and Android builds. See port/linux/README.md.",
+  "game": {
+    "comment": "The game: every C file under root but those excluded (zlib's and libtiff's own programs), built with these defines and include directories.",
+    "root": "source",
+    "exclude": [
+      "source/bitmaps/libtiff/mkg3states.c",
+      "source/bitmaps/libtiff/mkspans.c",
+      "source/memory/zlib/contrib/asm386/gvmat32c.c",
+      "source/memory/zlib/contrib/minizip/miniunz.c",
+      "source/memory/zlib/contrib/minizip/minizip.c",
+      "source/memory/zlib/contrib/minizip/unzip.c",
+      "source/memory/zlib/contrib/minizip/zip.c",
+      "source/memory/zlib/contrib/untgz/untgz.c",
+      "source/memory/zlib/example.c",
+      "source/memory/zlib/maketree.c",
+      "source/memory/zlib/minigzip.c"
+    ],
+    "defines": [
+      "DEBUG",
+      "xbox"
+    ],
+    "include_dirs": [
+      "source",
+      "source/main",
+      "source/cseries",
+      "source/sound",
+      "source/bink",
+      "source/saved films",
+      "source/saved games",
+      "source/cache",
+      "source/units",
+      "source/text",
+      "source/tag_files",
+      "source/structures",
+      "source/shell",
+      "source/shaders",
+      "source/scenario",
+      "source/render",
+      "source/rasterizer",
+      "source/physics",
+      "source/objects",
+      "source/objects/widgets",
+      "source/networking",
+      "source/models",
+      "source/memory",
+      "source/memory/zlib",
+      "source/math",
+      "source/tool",
+      "source/items",
+      "source/interface",
+      "source/input",
+      "source/hs",
+      "source/game",
+      "source/effects",
+      "source/editor",
+      "source/dialogs",
+      "source/devices",
+      "source/cutscene",
+      "source/camera",
+      "source/bungie_net",
+      "source/bitmaps",
+      "source/ai"
+    ]
+  },
+  "game_sources": "port/linux/game",
   "platform_sources": "port/linux/src",
   "libraries": [
     "SDL3",
     "m",
     "pthread"
-  ],
-  "game_sources": "port/linux/game"
+  ]
 }

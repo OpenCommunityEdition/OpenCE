@@ -972,12 +972,10 @@ static void unit_cause_continuous_melee_damage(long unit_index);
 
 static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
-#ifdef HALO_LINUX
 /* port/linux/game/network_objects.c's */
 boolean network_objects_creating_host_object(void);
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
-#endif
 static void unit_drop_grenades(
 	long unit_index);
 static void unit_drop_inventory_weapons(
@@ -2428,12 +2426,10 @@ static void unit_add_initial_weapons(
 	struct unit_datum *unit = unit_get(unit_index);
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 
-#ifdef HALO_LINUX
 	/* (a client of the distributed netcode making the host's unit: its
 	weapons are the host's objects, port/linux/game/network_objects.c) */
 	if (network_objects_creating_host_object())
 		return;
-#endif
 	for (initial_weapon_index = 0;
 		initial_weapon_index < unit_definition->unit.initial_weapons.count;
 		initial_weapon_index++)
@@ -7595,7 +7591,6 @@ static void unit_throw_grenade_move_to_hand(
 		!actor_has_unlimited_grenades(unit->unit.actor_index)))
 	{
 		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7966, unit->unit.current_grenade_index>=0 && unit->unit.current_grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES);
-#ifdef HALO_LINUX
 		/* port: a distributed client's grenade counts are the host's (what
 		every unit carries, network_objects.c), which can arrive between a
 		throw starting and the grenade reaching the hand, the throw already
@@ -7606,7 +7601,6 @@ static void unit_throw_grenade_move_to_hand(
 				--unit->unit.grenade_counts[unit->unit.current_grenade_index];
 		}
 		else
-#endif
 		{
 		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7967, unit->unit.grenade_counts[unit->unit.current_grenade_index]>0);
 		--unit->unit.grenade_counts[unit->unit.current_grenade_index];
@@ -11643,7 +11637,6 @@ static boolean unit_integrated_night_vision_is_active(
 
 /* Verify the public seat-helper declaration without perturbing this legacy
  * translation unit's authenticated function-declaration order. */
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_objects.c): a client's
 unit carries the host's weapons, the same objects, moved in and out as the
 host's unit had them (the host has applied the game's rules) */
@@ -11699,4 +11692,3 @@ void unit_network_forget_weapon(
 	if (unit->unit.desired_weapon_index == slot || unit->unit.desired_weapon_index == NONE)
 		unit->unit.desired_weapon_index = unit_weapon_next_index(unit_index, NONE, 0);
 }
-#endif

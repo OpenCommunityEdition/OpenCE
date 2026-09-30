@@ -138,7 +138,6 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 
-#ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_damage.c's */
@@ -158,9 +157,6 @@ static boolean distributed_damage_authorized;
 overcharge): not a client of the distributed netcode, which has the host's
 (damage_set_network_state) */
 #define objects_update_shields() (!network_game_distributed_client())
-#else
-#define objects_update_shields() TRUE
-#endif
 
 /* ---------- constants */
 
@@ -1380,7 +1376,6 @@ void object_cause_damage(
 	short object_number;
 	long damaged_object_indices[16];
 
-#ifdef HALO_LINUX
 	/* the distributed netcode (port/linux/NETCODE.md): the host deals
 	damage; a client reports its own players' hits instead, and the host
 	deals those (port/linux/game/network_damage.c) */
@@ -1389,7 +1384,6 @@ void object_cause_damage(
 	{
 		return;
 	}
-#endif
 
 	damage_effect = damage_effect_definition_get(damage->definition_index);
 	damage_definition = &damage_effect->damage;
@@ -1567,12 +1561,10 @@ void object_cause_damage(
 
 			if (player_index != NONE)
 			{
-#ifdef HALO_LINUX
 				/* (the host's, for its clients; a client replaying the host's
 				killing blow has had its player effect already) */
 				network_damage_player_effect(player_index, damage, total_damage);
 				if (!network_damage_replaying_kill())
-#endif
 				player_effect_start(
 					player_index,
 					damage,
@@ -1801,7 +1793,6 @@ void object_cause_damage(
 				body_damage,
 				body_damage_multiplier,
 				body_part);
-#ifdef HALO_LINUX
 			/* (the host's, for its clients) */
 			network_damage_aftermath(
 				current_object_index,
@@ -1814,7 +1805,6 @@ void object_cause_damage(
 				current_object_index == object_index ? node_index : NONE,
 				current_object_index == object_index ? region_index : NONE,
 				current_object_index == object_index ? material_index : NONE);
-#endif
 			if (TEST_FLAG(
 				being_damaged_flags,
 				_object_being_damaged_body_destroyed_bit))
@@ -1834,13 +1824,9 @@ void area_of_effect_cause_damage(
 {
 	struct damage_effect_definition *definition =
 		damage_effect_definition_get(damage->definition_index);
-#ifdef HALO_LINUX
 	/* the native builds damage more objects per explosion
 	(halo_port_capacity.h): 64 runs out in a crowd of 128 players */
 	long object_indices[HALO_PORT_MAXIMUM_AREA_OF_EFFECT_OBJECTS];
-#else
-	long object_indices[64];
-#endif
 	short object_count;
 
 	object_count = objects_in_sphere(
@@ -1921,9 +1907,7 @@ void object_damage_update(
 					SET_FLAG(damage.flags, _damage_no_statistics_bit, TRUE);
 				}
 
-#ifdef HALO_LINUX
 				distributed_damage_authorized = TRUE;
-#endif
 				object_cause_damage(
 					&damage,
 					object_index,
@@ -1931,9 +1915,7 @@ void object_damage_update(
 					NONE,
 					NONE,
 					NULL);
-#ifdef HALO_LINUX
 				distributed_damage_authorized = FALSE;
-#endif
 			}
 		}
 
@@ -2561,7 +2543,6 @@ static void object_permutation_shield_regions(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): a
 client's copy of an object takes the host's vitality and recent damage
 (what the shields' and the HUD's effects show), with the effects of its
@@ -2686,4 +2667,3 @@ void damage_kill_object_for_player(
 	damage.owner_team_index = (short)player->team_index;
 	object_cause_damage(&damage, object_index, NONE, NONE, NONE, NULL);
 }
-#endif

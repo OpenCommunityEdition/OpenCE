@@ -49,26 +49,16 @@ struct network_game
 	struct game_variant variant;
 	byte __padding10C;
 	char minimum_players;
-#ifdef HALO_LINUX
 	/* port: 128 does not fit a signed char */
 	byte maximum_players;
-#else
-	char maximum_players;
-#endif
 	byte maximum_teams;
 	short difficulty;
 	short machine_count;
-#ifdef HALO_LINUX
 	/* port: the native builds' session limits, 128 machines and players
 	(port/linux/include/halo_port_limits.h) */
 	struct network_machine machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 	short player_count;
 	struct network_player players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-	struct network_machine machines[4];
-	short player_count;
-	struct network_player players[16];
-#endif
 	short __unknown426;
 	unsigned long random_seed;
 	long number_of_games_played;

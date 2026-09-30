@@ -247,8 +247,6 @@ have up to 4 players (split screen).
 - `include/halo_port_capacity.h` sets the memory for the limits. The game
   state is 16 MB at `0x81A00000` (3.3 MB on the Xbox). The pools of objects,
   effects, particles, contrails, lights and sounds are also larger.
-- The byte-matching build keeps the limits of the Xbox. All the changes are
-  in `#ifdef HALO_LINUX`.
 
 Obey these rules:
 
@@ -467,8 +465,7 @@ code or data.
 with the function in `effects/decals.c`. clang used the copy, and parts of
 levels were not visible. The copy now agrees with the function.
 
-Other changes are in `#ifdef HALO_LINUX`. All the native ports define
-`HALO_LINUX`. The byte-matching build does not define it.
+Other changes:
 
 | File | Change |
 | --- | --- |
@@ -480,9 +477,8 @@ Other changes are in `#ifdef HALO_LINUX`. All the native ports define
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 
-The x86 inline assembly of the game has C replacements in
-`#ifdef HALO_LINUX`. Thus the compiler can optimize that code for each
-processor:
+The x86 inline assembly of the game is replaced by C. Thus the compiler
+can optimize that code for each processor:
 
 | File | Assembly | Replacement |
 | --- | --- | --- |

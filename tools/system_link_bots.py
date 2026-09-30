@@ -1,6 +1,6 @@
 """Stand-in system link machines for testing large multiplayer sessions.
 
-Joins a native-build Halo host (port/, built with HALO_LINUX) with many
+Joins a native-build Halo host (port/) with many
 lightweight machines, each with one player, speaking the game's system link
 protocol directly: TCP to the host's port 5150 for the game's messages, UDP for
 player input. Each machine binds its own loopback address (127.0.0.2,

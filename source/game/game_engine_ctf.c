@@ -1379,7 +1379,6 @@ struct game_engine ctf_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the parts of ctf_globals that are the same on every machine (the flag
 objects are the host's, at the same indices everywhere: the flags' scenario
 places are each machine's own pointers) */
@@ -1427,4 +1426,3 @@ void game_engine_ctf_read_network_state(
 	csmemcpy(ctf_globals.flag_warning_ticks, state.flag_warning_ticks, sizeof(state.flag_warning_ticks));
 	ctf_globals.flag_swap_timer = state.flag_swap_timer;
 }
-#endif

@@ -1,6 +1,0 @@
-CARD C4  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x49f0c5..0x49f12f): the unreachable-props weight text passes its colour as a nested conditional
-through two unnamed temps (-0x1870 outer on prop->ignore bit, -0x1874 inner on preferred_target) pushed directly as the
-render_debug_string_at_point colour argument; no named colour slot exists in this block. Ours: named color + if/else.
-Correction: inline prop->ignore ? blue : (prop->preferred_target ? pink : red). January block bytes identical today.
-Prediction: block bytes unchanged; downstream ID-sensitive sites may move. Tested cumulatively on C1..C3.

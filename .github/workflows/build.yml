@@ -23,8 +23,6 @@ on:
   push:
     paths-ignore:
       - "**.md"
-      - "docs/**"
-      - "research/**"
   workflow_dispatch:
 
 concurrency:

@@ -122,12 +122,8 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger pool of object looping sounds (halo_port_capacity.h) */
 	MAXIMUM_GAME_LOOPING_SOUNDS = HALO_PORT_MAXIMUM_GAME_LOOPING_SOUNDS,
-#else
-	MAXIMUM_GAME_LOOPING_SOUNDS = 1024,
-#endif
 	_cluster_sound_distance_unreachable_bit = 7,
 	CLUSTER_SOUND_DISTANCE_VALUE_MASK = 0x7F,
 	_game_looping_sound_unattached_bit = 0,
@@ -909,7 +905,6 @@ void game_sound_set_mouth_aperture(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* The native ports draw several frames per game tick (port/linux/game/
 render_interpolation.c), and the sound manager refreshes every sound each
 frame; on the Xbox, frames and ticks were one. A sound's obstruction, a
@@ -936,7 +931,6 @@ static long obstruction_cache_slot(
 	return (long)(((words[0] * 73856093UL) ^ (words[1] * 19349663UL) ^ (words[2] * 83492791UL) ^
 		(unsigned long)local_player_index) % OBSTRUCTION_CACHE_SLOTS);
 }
-#endif
 
 void compute_sound_obstruction(
 	short local_player_index,
@@ -944,7 +938,6 @@ void compute_sound_obstruction(
 	real distance)
 {
 	struct observer_result const *camera = observer_get_camera(local_player_index);
-#ifdef HALO_LINUX
 	long slot = obstruction_cache_slot(local_player_index, &source->location.position);
 	long now = game_time_get();
 
@@ -959,7 +952,6 @@ void compute_sound_obstruction(
 		source->occlusion = obstruction_cache[slot].occlusion;
 		return;
 	}
-#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\game_sound.c",
@@ -1032,14 +1024,12 @@ void compute_sound_obstruction(
 		926,
 		global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;
-#ifdef HALO_LINUX
 	obstruction_cache[slot].valid = TRUE;
 	obstruction_cache[slot].game_time = now;
 	obstruction_cache[slot].local_player_index = local_player_index;
 	obstruction_cache[slot].position = source->location.position;
 	obstruction_cache[slot].obstruction = source->obstruction;
 	obstruction_cache[slot].occlusion = source->occlusion;
-#endif
 
 	return;
 }

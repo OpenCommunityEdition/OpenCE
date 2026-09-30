@@ -546,7 +546,6 @@ void flag_update(
 					SET_FLAG(physics_flags, _point_physics_ignore_position_under_water_bit, TRUE);
 				}
 
-#ifdef HALO_LINUX
 				/* The native builds update flags every frame, several frames a
 				tick (port/linux/game/render_interpolation.c): a new random push
 				every frame would mostly cancel out and leave the cloth stiller
@@ -564,9 +563,6 @@ void flag_update(
 					seed ^= seed >> 16;
 					seed_random_direction3d(&seed, &turbulence);
 				}
-#else
-				local_random_direction3d(&turbulence);
-#endif
 				scale_vector3d(&turbulence, wind_scale, &turbulence);
 
 				new_position = vertex->position;

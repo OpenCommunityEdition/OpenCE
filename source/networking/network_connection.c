@@ -221,22 +221,14 @@ symbols in this file:
 included. The Xbox game uses the split screen player count (4), which is
 also its machine count; the native builds use their machine limit
 (port/linux/include/halo_port_limits.h). */
-#ifdef HALO_LINUX
 #define NETWORK_CONNECTION_MAXIMUM_CLIENTS HALO_PORT_MAXIMUM_NETWORK_MACHINES
-#else
-#define NETWORK_CONNECTION_MAXIMUM_CLIENTS MAXIMUM_NUMBER_OF_LOCAL_PLAYERS
-#endif
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the per-tick update of 128 players is 3,857 bytes */
 	RELIABLE_MESSAGE_MAXIMUM_SIZE = HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE,
 	/* how long a stream write waits for a peer that is not reading */
 	NETWORK_CONNECTION_WRITE_TIMEOUT = 2000,
-#else
-	RELIABLE_MESSAGE_MAXIMUM_SIZE = 2048,
-#endif
 	MAXIMUM_RESERVED_NETWORK_PORT = 1023,
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
@@ -894,7 +886,6 @@ boolean network_connection_write(
 			(connection->flags&FLAG(_connection_create_clientside_client_bit)) ||
 			(connection->flags&FLAG(_connection_create_serverside_client_bit)));
 
-#ifdef HALO_LINUX
 		/* A stream socket may take only part of a message (the per-tick
 		update of 128 players is 3.9 KB): send the rest too, or the peer
 		loses its place in the stream. A peer that stops reading for
@@ -942,16 +933,6 @@ boolean network_connection_write(
 				SET_FLAG(connection->flags, _connection_closed_bit, TRUE);
 			}
 		}
-#else
-		do
-		{
-			bytes_written = write_endpoint(
-				connection->reliable_endpoint,
-				message,
-				buffer_size);
-		}
-		while (bytes_written <= 0 && bytes_written == _transport_result_operation_would_block);
-#endif
 
 		if (bytes_written > 0)
 		{
@@ -1167,12 +1148,8 @@ struct network_connection *network_connection_new(
 			{
 				connection = &server->connection;
 				reliable_queue_size = 0;
-#ifdef HALO_LINUX
 				/* room for every machine's input datagrams between two idles */
 				unreliable_queue_size = 0x20000;
-#else
-				unreliable_queue_size = 0x1900;
-#endif
 			}
 			else
 			{
@@ -1189,12 +1166,8 @@ struct network_connection *network_connection_new(
 			0xB6);
 		if (connection)
 		{
-#ifdef HALO_LINUX
 			/* a few seconds of per-tick updates of 128 players (3.9 KB each) */
 			reliable_queue_size = 0x40000;
-#else
-			reliable_queue_size = 0x8000;
-#endif
 			unreliable_queue_size = 0x640;
 		}
 	}

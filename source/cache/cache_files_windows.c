@@ -1020,14 +1020,6 @@ static void cache_files_open_cache_files(
 			char *cache_map_name = cached_map_file_get(map_file_index)->header.name;
 
 			cached_map_file_read_header(map_file_index);
-#ifndef HALO_LINUX
-			/* (the native builds keep a copied map whatever build made it;
-			the checksum below still has to match the original's) */
-			if (strcmp(map_file->header.build, CACHE_FILE_BUILD_STRING) != 0)
-			{
-				valid = FALSE;
-			}
-#endif
 			if (cache_file_read_header_from_dvd(cache_map_name, &dvd_header) &&
 				map_file->header.checksum == dvd_header.checksum &&
 				valid)

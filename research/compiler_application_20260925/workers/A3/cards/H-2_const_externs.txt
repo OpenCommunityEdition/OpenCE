@@ -1,8 +1,0 @@
-CARD H-2 (A3)  written 2026-09-26 01:02:37 -0700  -- BEFORE its first compile
-observed: hs_runtime.c declares non-const externs for objects defined const: hs_type_sizes (hs.c:6222 'short
-  const'), hs_external_global_count (hs_globals_external.c:926 'short const'), 38 _hs_type_*_default (hs.c:6275-6313
-  'const'). J: January places _hs_type_sizes, __hs_type_*_default (except the string pointer) and
-  _hs_external_global_count in .rdata (const is authentic).
-correction: add const to those 40 extern declarations (string default already 'char const *', unchanged).
-prediction: byte-inert (read by value; no address taken); 66/66; 0 changed.
-risk: const extern loads CSE'd across calls in reconcile_read -> codegen change.

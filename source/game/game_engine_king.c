@@ -106,12 +106,8 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* port: king_globals' score slots follow the session player limit */
 	MAXIMUM_KING_SCORE_SLOTS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
-#else
-	MAXIMUM_KING_SCORE_SLOTS = 16,
-#endif
 	MAXIMUM_HILL_POINTS = 12,
 	MAXIMUM_HILLS = 64,
 	NUMBER_OF_DEFAULT_ANIMATION_VALUES = 4,
@@ -1098,7 +1094,6 @@ struct game_engine king_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is (the
 scores and the hill, which moves) */
@@ -1119,4 +1114,3 @@ void game_engine_king_read_network_state(
 	if (size == (long)sizeof(king_globals))
 		csmemcpy(&king_globals, buffer, sizeof(king_globals));
 }
-#endif

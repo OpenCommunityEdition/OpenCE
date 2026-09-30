@@ -1,2 +1,0 @@
-source/rasterizer/xbox/rasterizer_xbox_dynavobgeom: 31 split symbols, 1 disagreements with PDB publics
-   _reported_too_many_transparent_geometry_groups     split -  ours 2 PDB-public False (candidate-only external)

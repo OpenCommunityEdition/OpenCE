@@ -2312,7 +2312,6 @@ static struct widget_instance *ui_widget_launch_widget(
 	struct widget_instance *new_widget;
 	short local_player_index;
 
-#ifdef HALO_LINUX
 	/* port: the multiplayer menus open only on maps of a build that plays
 	multiplayer with the others (cache_files.c, cache_files_multiplayer_region);
 	otherwise the player is told why, and the main menu stays */
@@ -2339,7 +2338,6 @@ static struct widget_instance *ui_widget_launch_widget(
 			return NULL;
 		}
 	}
-#endif
 
 	if (TEST_FLAG(definition->flags, _widget_always_use_tag_controller_index_bit))
 	{
@@ -2770,14 +2768,12 @@ void ui_widgets_close_all(
 {
 	long local_player_index;
 
-#ifdef HALO_LINUX
 	/* port: the virtual keyboard goes with the widgets (while the widget
 	whose text it edits is still there): left open, it drew on after a game
 	loaded, with the menu map's font, which the game's tags no longer have
 	(a player typing when the host started the game) */
 	if (virtual_keyboard_active())
 		virtual_keyboard_close();
-#endif
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
@@ -5207,7 +5203,6 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* ---------- the mouse (desktop builds)
 
 The menus were made for a controller: the d-pad moves the focus through a
@@ -5724,8 +5719,6 @@ static void ui_widgets_process_mouse(
 	return;
 }
 
-#endif
-
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -5761,9 +5754,7 @@ static void widget_instance_render_recursive(
 	}
 	if (!widget->visible)
 		return;
-#ifdef HALO_LINUX
 	ui_mouse_note_target(widget, definition, offset);
-#endif
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -6019,20 +6010,16 @@ void render_ui_widgets(
 				bounds.y1 = window_bounds->y1 - window_bounds->y0;
 				offset.x = 0;
 				offset.y = 0;
-#ifdef HALO_LINUX
 				/* the mouse drives the first player's menus */
 				ui_mouse_noting_targets = widget->local_player_index == NONE ||
 					widget->local_player_index == 0;
-#endif
 				widget_instance_render_recursive(
 					widget_globals.active_widgets[widget_index],
 					&bounds,
 					offset,
 					TRUE,
 					FALSE);
-#ifdef HALO_LINUX
 				ui_mouse_noting_targets = FALSE;
-#endif
 				if (widget_globals.debug_show_path)
 				{
 					real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -6062,14 +6049,9 @@ void render_ui_widgets(
 		{
 			real alpha;
 
-#ifdef HALO_LINUX
 			/* the whole screen, around the centered 640 columns */
 			bounds.x0 = (short)(-(halo_screen_width() - 640) / 2);
 			bounds.x1 = (short)(640 + (halo_screen_width() - 640) / 2);
-#else
-			bounds.x0 = 0;
-			bounds.x1 = 640;
-#endif
 			bounds.y0 = 0;
 			bounds.y1 = 480;
 			if (widget_globals.fade_to_black >= 0.95f)
@@ -6935,7 +6917,6 @@ static boolean ui_check_for_pause_game(
 			}
 		}
 	}
-#ifdef HALO_LINUX
 	/* This runs once a frame, several frames per tick on the native builds
 	(port/linux/game/render_interpolation.c): count the lock down in 30 Hz
 	ticks of real time, not in frames. */
@@ -6949,10 +6930,6 @@ static boolean ui_check_for_pause_game(
 		widget_globals.pause_disabled_ticks =
 			FLOOR(widget_globals.pause_disabled_ticks - ticks, 0);
 	}
-#else
-	widget_globals.pause_disabled_ticks =
-		FLOOR(widget_globals.pause_disabled_ticks - 1, 0);
-#endif
 
 	return pause_pressed;
 }
@@ -6972,9 +6949,7 @@ void process_ui_widgets(
 		644,
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
-#ifdef HALO_LINUX
 	ui_widgets_process_mouse();
-#endif
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))

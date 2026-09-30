@@ -174,20 +174,12 @@ void cluster_partition_new(
 		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->cluster_first_data_references));
 
 	sprintf(cluster_name, "cluster %s", name);
-#ifdef HALO_LINUX
 	/* the native builds' longer reference lists (halo_port_capacity.h): an
 	object or light that cannot be referenced drops out of its clusters */
 	partition->data_reference_data = reference_list_new(cluster_name, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES);
-#else
-	partition->data_reference_data = reference_list_new(cluster_name, 2048);
-#endif
 
 	sprintf(cluster_name, "%s cluster", name);
-#ifdef HALO_LINUX
 	partition->cluster_reference_data = reference_list_new(cluster_name, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES);
-#else
-	partition->cluster_reference_data = reference_list_new(cluster_name, 2048);
-#endif
 
 	if (!partition->cluster_first_data_references ||
 		!partition->cluster_reference_data ||

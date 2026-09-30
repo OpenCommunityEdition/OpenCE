@@ -1,7 +1,0 @@
-COMMAND: C:\Users\isabe\AppData\Local\Programs\Python\Python312\python.exe -B -m tools.campaign.stable_verdicts diff C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R1_P02_DSH\stable.json C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R2_render_recursive\stable.json
-EXIT: 0
---- stdout ---
-gained source/interface/ui_widget::section:86 _widget_instance_render_recursive -> _widget_instance_render_recursive 752
-gained 1 752 bytes; regressions 0
-
---- stderr ---

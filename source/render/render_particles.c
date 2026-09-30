@@ -34,14 +34,10 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* render_particles lists every visible particle in an array of this size
 	without a bound check, so it must stay the size of the native builds'
 	particle pool (effects/particles.c, halo_port_capacity.h) */
 	MAXIMUM_RENDERED_PARTICLES = HALO_PORT_MAXIMUM_PARTICLES,
-#else
-	MAXIMUM_RENDERED_PARTICLES = 1024,
-#endif
 	MAXIMUM_RENDERED_PARTICLE_GROUPS = 512,
 };
 

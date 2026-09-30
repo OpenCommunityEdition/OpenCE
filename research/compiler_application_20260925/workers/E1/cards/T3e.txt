@@ -1,5 +1,0 @@
-CARD T3e (written 2026-09-26 01:50:35 -0700, before the traces)  identity of the shadow_color operand's BASE
-Chains at the sort bps: child1 of in1 and of in2 -> +0x34 base record (0x16 dwords) and -> base +0x18 (symbol record).
-Prediction: the base is a kind-1/2 symbol entry whose key low byte = (id << 5) & 0xff; its symbol is a compiler-created
-temp (high id, numbered in IL creation order - which is why upstream temp counts move it), not the named `title`
-local (id < 32). production/lab_min3: id = 0 mod 8; lab_min4/lab_min0: id = 2 mod 8.

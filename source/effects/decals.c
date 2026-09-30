@@ -832,42 +832,11 @@ pixel32 real_a_rgb_color_to_pixel32(
 			color->green,
 			color->blue));
 
-#ifdef HALO_LINUX
 	result = (pixel32)(
 		((long)__builtin_rint((double)color->blue * scale) & 0xff) |
 		(((long)__builtin_rint((double)color->green * scale) & 0xff) << 8) |
 		(((long)__builtin_rint((double)color->red * scale) & 0xff) << 16) |
 		((long)__builtin_rint((double)alpha * scale) << 24));
-#else
-	__asm
-	{
-		mov		edx, color
-		fld		alpha
-		fld		dword ptr [edx]
-		fld		dword ptr [edx+4]
-		fld		dword ptr [edx+8]
-		fld		scale
-		fmul	st(4), st
-		fmul	st(3), st
-		fmul	st(2), st
-		fmulp	st(1), st
-		fistp	result
-		and		result, 0FFh
-		mov		edx, result
-		fistp	result
-		and		result, 0FFh
-		shl		result, 8
-		or		edx, result
-		fistp	result
-		and		result, 0FFh
-		shl		result, 16
-		or		edx, result
-		fistp	result
-		shl		result, 24
-		or		edx, result
-		mov		result, edx
-	}
-#endif
 
 	return result;
 }

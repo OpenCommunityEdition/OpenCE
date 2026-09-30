@@ -579,32 +579,9 @@ boolean cache_file_header_verify(
 		return FALSE;
 	}
 
-#ifndef HALO_LINUX
-	/* (the native builds try a cache file whatever build made it, NTSC's
-	01.10.12.2276 included) */
-	if (csstrcmp(header->build, "01.01.14.2342"))
-	{
-		if (fatal)
-		{
-			match_vassert(
-				"c:\\halo\\SOURCE\\cache\\cache_files.c",
-				553,
-				FALSE,
-				csprintf(
-					temporary,
-					"the cache file '%s' belongs to a different build (%s)",
-					header->name,
-					header->build));
-		}
-
-		return FALSE;
-	}
-#endif
-
 	return TRUE;
 }
 
-#ifdef HALO_LINUX
 /* port: the builds of the released maps, by region. Any build here plays
 multiplayer with the others; a map of another build may differ in what
 machines send each other, so its players cannot open the multiplayer menu
@@ -647,14 +624,12 @@ char const *cache_files_multiplayer_region(
 
 	return cache_files_build_region(cache_file_globals.header.build);
 }
-#endif
 
 boolean cache_files_give_time_to_precache(
 	char const *map_name)
 {
 	boolean result = FALSE;
 
-#ifdef HALO_LINUX
 	/* port: no map named yet is nothing to precache. A client joining over
 	the internet asks for its multiplayer map (network_game_client_update_precache_status)
 	before the host's settings name it: an empty name, which matched a cache
@@ -663,7 +638,6 @@ boolean cache_files_give_time_to_precache(
 	taken for a map missing from the disc (the damaged disc error) */
 	if (!map_name || !map_name[0])
 		return FALSE;
-#endif
 	if (cache_files_precache_map_loaded(map_name))
 	{
 		result = TRUE;
@@ -746,14 +720,12 @@ long scenario_tags_load(
 			global_tag_instances = cache_file_globals.tag_header->tag_instances;
 			tags_header_register_vertex_and_index_buffers(cache_file_globals.tag_header);
 			cache_file_globals.tags_loaded = TRUE;
-#ifdef HALO_LINUX
 			/* port: a PAL map played as the NTSC maps are (port/linux/game/pal_tags.c) */
 			{
 				extern void pal_tags_loaded(char const *build);
 
 				pal_tags_loaded(cache_file_globals.header.build);
 			}
-#endif
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
 	}
@@ -864,7 +836,6 @@ void *tag_get(
 	return tag_instance->base_address;
 }
 
-#ifdef HALO_LINUX
 /* whether the index is a loaded tag of the group (or a group it inherits
 from): the distributed netcode names tags another machine sent
 (port/linux/game/network_damage.c), which tag_get would only assert on */
@@ -886,7 +857,6 @@ boolean tag_index_is_group(
 			tag_instance->parent_group_tags[1] == group_tag);
 }
 
-#endif
 char *tag_get_name(
 	long tag_index)
 {

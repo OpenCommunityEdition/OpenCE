@@ -1386,12 +1386,8 @@ void rasterizer_set_target_as_texture(
 				render_primary->Common = RASTERIZER_TARGET_RENDER_PRIMARY_COMMON;
 				render_primary->Data = d3d_backbuffer->Data;
 				render_primary->Lock = 0;
-#ifdef HALO_LINUX
 				/* the back buffer's width (rasterizer_screen_width_update) */
 				render_primary->Size = d3d_backbuffer->Size;
-#else
-				render_primary->Size = RASTERIZER_TARGET_RENDER_PRIMARY_SIZE;
-#endif
 				render_primary->Format = RASTERIZER_TARGET_RENDER_PRIMARY_FORMAT;
 				result = IDirect3DSurface8_Release(d3d_backbuffer);
 				if (result >= 0)
@@ -1811,11 +1807,7 @@ boolean rasterizer_preinitialize__fill_you_up_with_the_devils_cock(
 		d3d_present_parameters.EnableAutoDepthStencil = TRUE;
 		d3d_present_parameters.AutoDepthStencilFormat = D3DFMT_D24S8;
 		d3d_present_parameters.BackBufferFormat = D3DFMT_A8R8G8B8;
-#ifdef HALO_LINUX
 		d3d_present_parameters.BackBufferWidth = halo_screen_width();
-#else
-		d3d_present_parameters.BackBufferWidth = RASTERIZER_SCREEN_WIDTH;
-#endif
 		d3d_present_parameters.BackBufferHeight = RASTERIZER_SCREEN_HEIGHT;
 		d3d_present_parameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
 
@@ -2367,7 +2359,6 @@ void _rasterizer_frame_end(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* The native ports can change the width of the screen between frames (F11
 switches the desktop builds between fullscreen at the display's shape and a
 640x480 window: halo_screen_commit, port/linux/src/d3d8_gl.c, which resizes
@@ -2408,7 +2399,6 @@ static void rasterizer_screen_width_update(
 	return;
 }
 
-#endif
 void _rasterizer_present(
 	struct bitmap_data *screenshot_bitmap,
 	point2d const *screenshot_index)
@@ -2534,9 +2524,7 @@ void _rasterizer_present(
 			"IDirect3DDevice8_Present(global_d3d_device, NULL, NULL, window_globals.hWndPresentTarget, NULL)");
 	}
 	rasterizer_globals.fps_accumulation_frame_index++;
-#ifdef HALO_LINUX
 	rasterizer_screen_width_update();
-#endif
 	if (!success)
 		error(_error_silent, "### ERROR rasterizer_present failed");
 	return;
@@ -2872,7 +2860,6 @@ boolean _rasterizer_initialize(
 
 		rasterizer_globals.reserved04.screen_bounds.y0 = 0;
 		rasterizer_globals.reserved04.screen_bounds.x0 = 0;
-#ifdef HALO_LINUX
 		/* the device's aspect ratio, with the title-safe frame (the HUD)
 		widened in proportion */
 		rasterizer_globals.reserved04.screen_bounds.x1 = (short)halo_screen_width();
@@ -2881,12 +2868,6 @@ boolean _rasterizer_initialize(
 			(short)(RASTERIZER_FRAME_BOUNDS_X0 * halo_screen_width() / RASTERIZER_SCREEN_WIDTH);
 		rasterizer_globals.reserved04.frame_bounds.x1 =
 			(short)(halo_screen_width() - rasterizer_globals.reserved04.frame_bounds.x0);
-#else
-		rasterizer_globals.reserved04.screen_bounds.x1 = RASTERIZER_SCREEN_WIDTH;
-		rasterizer_globals.reserved04.screen_bounds.y1 = RASTERIZER_SCREEN_HEIGHT;
-		rasterizer_globals.reserved04.frame_bounds.x0 = RASTERIZER_FRAME_BOUNDS_X0;
-		rasterizer_globals.reserved04.frame_bounds.x1 = RASTERIZER_FRAME_BOUNDS_X1;
-#endif
 		rasterizer_globals.reserved04.frame_bounds.y0 = RASTERIZER_FRAME_BOUNDS_Y0;
 		rasterizer_globals.reserved04.frame_bounds.y1 = RASTERIZER_FRAME_BOUNDS_Y1;
 		rasterizer_globals.fps_accumulation_frame_index = 1;
@@ -3093,12 +3074,8 @@ boolean _rasterizer_initialize(
 						d3d_texture->Common = RASTERIZER_TARGET_RENDER_PRIMARY_COMMON;
 						d3d_texture->Data = (frame_index == 1) ? global_d3d_surface_render_primary->Data : 0;
 						d3d_texture->Lock = 0;
-#ifdef HALO_LINUX
 						/* the back buffer's width (rasterizer_screen_width_update) */
 						d3d_texture->Size = global_d3d_surface_render_primary->Size;
-#else
-						d3d_texture->Size = RASTERIZER_TARGET_RENDER_PRIMARY_SIZE;
-#endif
 						d3d_texture->Format = RASTERIZER_TARGET_RENDER_PRIMARY_FORMAT;
 					}
 				}
@@ -3130,11 +3107,7 @@ boolean _rasterizer_initialize(
 					d3d_texture->Common = RASTERIZER_TARGET_RENDER_PRIMARY_COMMON;
 					d3d_texture->Data = global_d3d_surface_render_primary_z->Data;
 					d3d_texture->Lock = 0;
-#ifdef HALO_LINUX
 					d3d_texture->Size = global_d3d_surface_render_primary->Size;
-#else
-					d3d_texture->Size = RASTERIZER_TARGET_RENDER_PRIMARY_SIZE;
-#endif
 					d3d_texture->Format = RASTERIZER_TARGET_RENDER_PRIMARY_FORMAT;
 				}
 				else

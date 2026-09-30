@@ -959,12 +959,8 @@ static void hud_draw_players(
 
 	if (player_index != NONE)
 	{
-#ifdef HALO_LINUX
 		/* the native builds' sessions hold more than 16 players */
 		long teammate_indices[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-		long teammate_indices[16];
-#endif
 		long teammate_count = 0;
 		struct data_iterator iterator;
 		struct player_datum *player;
@@ -977,13 +973,9 @@ static void hud_draw_players(
 				team_index == player->team_index &&
 				player->unit_index != NONE)
 			{
-#ifdef HALO_LINUX
 				/* never write past the buffer, whatever the player data holds */
 				if (teammate_count < (long)NUMBEROF(teammate_indices))
 					teammate_indices[teammate_count++] = iterator.datum_index;
-#else
-				teammate_indices[teammate_count++] = iterator.datum_index;
-#endif
 			}
 		}
 

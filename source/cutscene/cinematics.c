@@ -459,7 +459,6 @@ void cinematic_render(
 					((pixel32)shadow_alpha << 24) |
 					(title->shadow_color & 0x00FFFFFF));
 
-#ifdef HALO_LINUX
 				{
 					/* the bounds are for 640 columns: on a wider screen move
 					them so they keep their place relative to its sides */
@@ -472,7 +471,6 @@ void cinematic_render(
 					wide_bounds.x1 += shift;
 					title_bounds = &wide_bounds;
 				}
-#endif
 				rasterizer_draw_unicode_string(
 					title_bounds,
 					NULL,
