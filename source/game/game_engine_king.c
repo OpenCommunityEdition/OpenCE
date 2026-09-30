@@ -188,6 +188,9 @@ static struct king_globals king_globals = { 0 };
 static short king_engine_num_hills = 0;
 static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+
 /* ---------- public code */
 
 static void king_engine_dispose(
@@ -447,8 +450,13 @@ static void king_engine_player_update(
 		if (game_engine_can_score() && player_inside_hill(player_index))
 		{
 			king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] = TRUE;
-			player->statistics.multiplayer_statistics.king_statistics.time_on_hill++;
-			if (king_globals.score_tick[player->team_index] < game_time_get())
+			/* (a client of the distributed netcode has the host's scores,
+			game_engine_king_read_network_state, and shows who is on the
+			hill as it sees them) */
+			if (!network_game_distributed_client())
+				player->statistics.multiplayer_statistics.king_statistics.time_on_hill++;
+			if (!network_game_distributed_client() &&
+				king_globals.score_tick[player->team_index] < game_time_get())
 			{
 				long score_to_win;
 				long score;
@@ -755,7 +763,9 @@ static boolean king_engine_goal_matches_player(
 static void king_engine_update(
 	void)
 {
-	if (game_engine_can_score() &&
+	/* (a client of the distributed netcode has the host's hill) */
+	if (!network_game_distributed_client() &&
+		game_engine_can_score() &&
 		game_engine_get_variant()->game_engine_variant.king.moving_hill &&
 		--king_globals.hill_timer == 0)
 	{
@@ -1094,9 +1104,11 @@ struct game_engine king_engine =
 	NULL,
 };
 
+typedef char verify_king_network_state_size[
+	sizeof(struct king_globals) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
+
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
-type's state the host sends its clients, which take it as it is (the
-scores and the hill, which moves) */
+type's state the host sends its clients */
 long game_engine_king_write_network_state(
 	byte *buffer,
 	long size)
@@ -1107,10 +1119,84 @@ long game_engine_king_write_network_state(
 	return sizeof(king_globals);
 }
 
+/* a client: the sounds of a team's score passing from previous_score to
+score (the host's as king_engine_player_update plays them each tick) */
+static void king_client_score_sounds(
+	long team_index,
+	long previous_score,
+	long score)
+{
+	long score_to_win = game_engine_get_variant()->universal_variant.score_to_win*TICKS_PER_MINUTE;
+
+	if (score <= previous_score || previous_score < 0)
+		return;
+	if (previous_score < score_to_win - HILL_30_SECOND_WARNING &&
+		score >= score_to_win - HILL_30_SECOND_WARNING)
+	{
+		if (game_engine_has_teams())
+		{
+			game_engine_play_multiplayer_sound(
+				team_index ?
+					_multiplayer_sound_blue_30_seconds :
+					_multiplayer_sound_red_30_seconds);
+		}
+		else
+		{
+			game_engine_play_multiplayer_sound(_multiplayer_sound_30_seconds);
+		}
+	}
+	if (previous_score < score_to_win - HILL_60_SECOND_WARNING &&
+		score >= score_to_win - HILL_60_SECOND_WARNING)
+	{
+		if (game_engine_has_teams())
+		{
+			game_engine_play_multiplayer_sound(
+				team_index ?
+					_multiplayer_sound_blue_60_seconds :
+					_multiplayer_sound_red_60_seconds);
+		}
+		else
+		{
+			game_engine_play_multiplayer_sound(_multiplayer_sound_60_seconds);
+		}
+	}
+	if (score / HILL_SCORE_SOUND_INTERVAL > previous_score / HILL_SCORE_SOUND_INTERVAL &&
+		score < score_to_win)
+	{
+		game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_timer_end);
+	}
+
+	return;
+}
+
+/* a client takes the host's scores and which hill it is, and finds the
+hill's points itself (not the host's count of them, which the hill's
+drawing indexes by), and who is on the hill and the hill's state (which
+king_calculate_hill_state keeps from what it sees, sounding as it changes) */
 void game_engine_king_read_network_state(
 	byte const *buffer,
-	long size)
+	long size,
+	boolean first)
 {
-	if (size == (long)sizeof(king_globals))
-		csmemcpy(&king_globals, buffer, sizeof(king_globals));
+	struct king_globals state;
+	long team_index;
+
+	if (size != (long)sizeof(state))
+		return;
+	csmemcpy(&state, buffer, sizeof(state));
+	for (team_index = 0; team_index < (long)NUMBEROF(state.score); team_index++)
+	{
+		if (!first)
+			king_client_score_sounds(team_index, king_globals.score[team_index], state.score[team_index]);
+	}
+	csmemcpy(king_globals.score, state.score, sizeof(king_globals.score));
+	csmemcpy(king_globals.score_tick, state.score_tick, sizeof(king_globals.score_tick));
+	king_globals.hill_timer = state.hill_timer;
+	if (state.hill_id != king_globals.hill_id)
+	{
+		king_globals.hill_id = state.hill_id;
+		find_hill();
+		if (!first)
+			game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+	}
 }

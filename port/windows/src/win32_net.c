@@ -19,9 +19,12 @@ codes, so this passes nearly everything straight through.
 
 #include "posix.h"
 
-/* mstcpip.h has it only in some Windows SDKs */
+/* mstcpip.h has them only in some Windows SDKs */
 #ifndef SIO_UDP_CONNRESET
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
+#endif
+#ifndef SIO_UDP_NETRESET
+#define SIO_UDP_NETRESET _WSAIOW(IOC_VENDOR, 15)
 #endif
 
 static __thread int last_error;
@@ -75,12 +78,14 @@ int posix_socket(int family, int type, int protocol)
 	{
 		/* Windows reports an ICMP port unreachable (a datagram to an address
 		nothing listens on, such as a network.broadcast machine not running)
-		as a WSAECONNRESET from the socket's next recvfrom; neither the Xbox
-		nor Linux does */
+		as a WSAECONNRESET from the socket's next recvfrom, and a time
+		exceeded as a WSAENETRESET; neither the Xbox nor Linux does, and the
+		game takes both as its connection lost */
 		BOOL report = FALSE;
 		DWORD returned = 0;
 
 		WSAIoctl(result, SIO_UDP_CONNRESET, &report, sizeof(report), NULL, 0, &returned, NULL, NULL);
+		WSAIoctl(result, SIO_UDP_NETRESET, &report, sizeof(report), NULL, 0, &returned, NULL, NULL);
 	}
 	last_error = 0;
 	return from_socket(result);
@@ -288,13 +293,44 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	return result;
 }
 
+/* the address the default route leaves from: a UDP socket "connected" to
+an internet address (a documentation one; nothing is sent) has it */
+static posix_ulong default_route_address(void)
+{
+	struct sockaddr_in route;
+	int length = sizeof(route);
+	posix_ulong result = 0;
+	SOCKET probe;
+
+	start_winsock();
+	probe = WSASocketW(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_NO_HANDLE_INHERIT);
+	if (probe == INVALID_SOCKET)
+		return 0;
+	memset(&route, 0, sizeof(route));
+	route.sin_family = AF_INET;
+	route.sin_port = htons(9);
+	route.sin_addr.s_addr = htonl(0xC6336401);
+	if (connect(probe, (struct sockaddr *)&route, sizeof(route)) == 0 &&
+		getsockname(probe, (struct sockaddr *)&route, &length) == 0 &&
+		route.sin_addr.s_addr != htonl(INADDR_ANY) && (ntohl(route.sin_addr.s_addr) >> 24) != 127)
+	{
+		result = route.sin_addr.s_addr;
+	}
+	closesocket(probe);
+	return result;
+}
+
 posix_ulong posix_local_ipv4_address(void)
 {
 	ULONG size = 16 * 1024;
 	IP_ADAPTER_ADDRESSES *adapters = NULL, *adapter;
-	posix_ulong result = 0;
+	posix_ulong result = default_route_address();
 	ULONG status;
 
+	/* no route out (a network without the internet): the first adapter
+	that is up and not loopback */
+	if (result)
+		return result;
 	do
 	{
 		free(adapters);
@@ -331,7 +367,9 @@ posix_ulong posix_local_ipv4_address(void)
 
 void posix_random_bytes(void *buffer, posix_ulong size)
 {
-	BCryptGenRandom(NULL, buffer, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+	/* the keys and invites made from these must not be guessable */
+	if (!BCRYPT_SUCCESS(BCryptGenRandom(NULL, buffer, size, BCRYPT_USE_SYSTEM_PREFERRED_RNG)))
+		abort();
 }
 
 posix_ulong posix_resolve_ipv4(const char *host)

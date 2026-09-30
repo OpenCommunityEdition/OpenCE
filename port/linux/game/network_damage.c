@@ -19,9 +19,9 @@ being hit looks and feels like on the clients).
   about where the host had it when the shooter saw it (the host keeps a
   second of where players' units and vehicles were, and looks back as far
   as that machine's round trip), the impact at the target, and no more
-  reports than any weapon could fire. What the shooter saw hit, hits. The
-  host's own copies of a client's projectiles deal nothing (the client's
-  report does).
+  reports than the weapon that deals them fires (an explosion's hits are
+  one). What the shooter saw hit, hits. The host's own copies of a client's
+  projectiles deal nothing (the client's report does).
 */
 
 #include "cseries.h"
@@ -32,6 +32,8 @@ being hit looks and feels like on the clients).
 #include "objects/objects.h"
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
+#include "effects/effect_definitions.h"
+#include "physics/collision_model_definitions.h"
 #include "items/weapon_definitions.h"
 #include "items/projectile_definitions.h"
 #include "scenario/scenario.h"
@@ -64,11 +66,24 @@ enum
 	died or dropped the launcher) */
 	MAXIMUM_RECENT_WEAPONS = 8,
 	RECENT_WEAPON_TICKS = 10 * TICKS_PER_SECOND,
-	/* a player's hits: a bucket of this many, filling at this many a
-	second, which no weapon (a shotgun's pellets, a grenade among a crowd)
-	empties */
-	HIT_REPORT_BURST = 160,
-	HIT_REPORTS_PER_SECOND = 120,
+	/* a player's hits: a bucket of this many seconds of fire, filling at a
+	second a second, a hit taking what one of its weapon's projectiles
+	takes to fire (at twice the weapon's fastest rate: a shotgun's
+	pellets, a spray); an explosion's hits are one, however many it hits */
+	HIT_REPORT_BURST_SECONDS = 3,
+	HIT_REPORT_RATE_MARGIN = 2,
+	/* the hits a second of what no trigger's rate says: melee, a
+	grenade, a vehicle, a weapon's own detonation */
+	MELEE_HITS_PER_SECOND = 4,
+	GRENADE_HITS_PER_SECOND = 4,
+	VEHICLE_HITS_PER_SECOND = 15,
+	EFFECT_HITS_PER_SECOND = 4,
+	/* the explosions of a tick told apart */
+	MAXIMUM_EXPLOSIONS_PER_TICK = 32,
+	/* what weapons and grenades deal, remembered (a power of two) */
+	DAMAGE_RATE_CACHE_SIZE = 1024,
+	/* the damage events kept for killing blows */
+	RESERVED_KILL_EVENTS = 64,
 	/* tags within tags followed looking for a damage effect */
 	MAXIMUM_TAG_DEPTH = 4,
 	/* the ticks of where players' units and vehicles were, a power of two
@@ -77,6 +92,9 @@ enum
 	/* ... looked back over beyond a shooter's round trip (the frame drawn a
 	tick behind, the report's own tick) */
 	TARGET_HISTORY_SLACK_TICKS = 3,
+	/* ... and the longest round trip looked back over (a client tells its
+	own: a longer one does not look further back) */
+	TARGET_HISTORY_MAXIMUM_ROUND_TRIP_TICKS = 15,
 };
 
 enum
@@ -104,6 +122,15 @@ far it moves in a few ticks: a client's copy runs a little ahead of the
 host's word on it) */
 #define REPORT_HISTORY_TOLERANCE 2.0f
 #define REPORT_HISTORY_LEAD_TICKS 3.0f
+/* how far from the origin anything in a report is (world units), and the
+largest damage scale a client's hit has */
+#define REPORT_WORLD_BOUND 32768.0f
+#define REPORT_MAXIMUM_SCALE 1.5f
+
+/* the damage flags a client's hit has: what its own object_cause_damage is
+given (neither the host's instant kills nor its passengers' passthrough) */
+#define REPORT_DAMAGE_FLAGS (FLAG(_damage_area_of_effect_bit) | FLAG(_damage_create_localized_effect_bit) | \
+	FLAG(_damage_from_weapon_bit) | FLAG(_damage_damaged_one_object_bit))
 
 /* the host's struct damage_data, as the other machines have it */
 struct distributed_damage
@@ -170,47 +197,6 @@ struct distributed_hit_report_message
 	struct distributed_hit_report reports[MAXIMUM_ENTRIES_PER_MESSAGE];
 };
 
-/* the effect tag's layout, as effects.c has it (for the damage its parts
-deal) */
-struct distributed_effect_definition
-{
-	long flags;
-	short loop_start_index;
-	short loop_stop_index;
-	real runtime_danger_radius;
-	real unused00c[7];
-	struct tag_block locations;
-	struct tag_block events;
-};
-
-struct distributed_effect_event_definition
-{
-	long flags;
-	real skip_fraction;
-	real delay_lower_bound;
-	real delay_upper_bound;
-	real duration_lower_bound;
-	real duration_upper_bound;
-	real unused018[5];
-	struct tag_block parts;
-	struct tag_block particles;
-};
-
-struct distributed_effect_part_definition
-{
-	short environment;
-	short disposition;
-	short location_index;
-	word flags;
-	long unused008[3];
-	unsigned long runtime_base_class_tag;
-	struct tag_reference reference;
-	byte unused028[0x68 - 0x28];
-};
-
-typedef char distributed_effect_part_definition_size_assert[
-	sizeof(struct distributed_effect_part_definition) == 0x68 ? 1 : -1];
-
 /* the vehicle damage in the globals' falling damage block, as vehicles.c
 has it */
 struct distributed_falling_damage
@@ -222,8 +208,6 @@ struct distributed_falling_damage
 	struct tag_reference vehicle_collision_damage;
 	struct tag_reference flaming_death_damage;
 };
-
-#define EFFECT_TAG 'effe'
 
 /* ---------- globals */
 
@@ -237,10 +221,23 @@ static struct
 {
 	long definition_indices[MAXIMUM_RECENT_WEAPONS];
 	long times[MAXIMUM_RECENT_WEAPONS];
+	long grenade_times[NUMBER_OF_UNIT_GRENADE_TYPES];
 	long vehicle_time;
-	real hit_reports;
-	long hit_reports_time;
+	real hit_seconds;
+	long hit_seconds_time;
 } damage_players[MAXIMUM_TRACKED_PLAYERS];
+/* ... the explosions whose hits came this tick, each paid for once */
+static struct
+{
+	long time;
+	short count;
+	struct
+	{
+		short player_index;
+		long definition_index;
+		real_point3d epicenter;
+	} explosions[MAXIMUM_EXPLOSIONS_PER_TICK];
+} damage_explosions;
 /* ... where each player's unit and vehicle were at each of the last ticks */
 static struct damage_history_tick
 {
@@ -252,6 +249,14 @@ static struct damage_history_tick
 		real speed;
 	} objects[MAXIMUM_TRACKED_PLAYERS][2];
 } damage_history[TARGET_HISTORY_TICKS];
+/* ... what each weapon or grenade deals, as the tags have it (their walk
+is long): the hits a second of a damage effect from it */
+static struct damage_rate_cache_entry
+{
+	long source_index;
+	long damage_index;
+	real rate;
+} damage_rate_cache[DAMAGE_RATE_CACHE_SIZE];
 /* for the automated tests' reports (network_test.c) */
 static long damage_rejected_reports;
 static long damage_dealt_reports;
@@ -303,8 +308,8 @@ static boolean distributed_damage_to_data(
 	result->flags = damage->flags;
 	result->owner_player_index = distributed_player_from_byte(damage->owner_player_index);
 	result->owner_team_index = damage->owner_team_index;
-	result->owner_object_index = damage->owner_object_index != NONE && object_try_and_get(damage->owner_object_index) ?
-		damage->owner_object_index : NONE;
+	result->owner_object_index = distributed_object_index_valid(damage->owner_object_index) &&
+		object_try_and_get(damage->owner_object_index) ? damage->owner_object_index : NONE;
 	result->origin = damage->origin;
 	result->epicenter = damage->epicenter;
 	result->direction = damage->direction;
@@ -382,7 +387,8 @@ void network_damage_player_effect(
 	struct distributed_damage_event *event;
 
 	if (game_connection() != _game_connection_network_server ||
-		damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK || distributed_player_is_local(player_index))
+		damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - RESERVED_KILL_EVENTS ||
+		distributed_player_is_local(player_index))
 	{
 		return;
 	}
@@ -411,15 +417,17 @@ void network_damage_aftermath(
 {
 	struct distributed_damage_event *event;
 	struct unit_datum *unit;
+	boolean kill;
 
-	if (game_connection() != _game_connection_network_server ||
-		damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK)
-	{
+	if (game_connection() != _game_connection_network_server)
 		return;
-	}
 	/* (units only: items and the like the objects' states place) */
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_unit);
 	if (!unit)
+		return;
+	/* (the last events kept for killing blows) */
+	kill = TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) && unit->unit.player_index != NONE;
+	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
 		return;
 	event = &damage_events[damage_event_count++];
 	csmemset(event, 0, sizeof(*event));
@@ -436,14 +444,20 @@ void network_damage_aftermath(
 	event->region_index = region_index;
 	event->material_index = material_index;
 	/* a player's killing blow, with who the host says dealt it */
-	if (TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) && unit->unit.player_index != NONE)
+	if (kill)
 	{
 		boolean friendly_fire = FALSE;
 		boolean killed_by_vehicle = FALSE;
 
 		event->kind = _damage_event_kill;
-		distributed_get_death((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index), &event->player_index,
-			&friendly_fire, &killed_by_vehicle);
+		/* (no killer when the game noted none: a death it did not score) */
+		if (!distributed_get_death((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index),
+			&event->player_index, &friendly_fire, &killed_by_vehicle))
+		{
+			event->player_index = NO_PLAYER;
+			friendly_fire = FALSE;
+			killed_by_vehicle = FALSE;
+		}
 		SET_FLAG(event->kill_flags, _damage_event_friendly_fire_bit, friendly_fire);
 		SET_FLAG(event->kill_flags, _damage_event_killed_by_vehicle_bit, killed_by_vehicle);
 	}
@@ -459,29 +473,29 @@ static boolean distributed_effect_deals(
 	long damage_index,
 	short depth)
 {
-	struct distributed_effect_definition *effect;
+	struct effect_definition *effect;
 	short event_index;
 
-	if (depth > MAXIMUM_TAG_DEPTH || !tag_index_is_group(effect_index, EFFECT_TAG))
+	if (depth > MAXIMUM_TAG_DEPTH || !tag_index_is_group(effect_index, EFFECT_DEFINITION_TAG))
 		return FALSE;
-	effect = (struct distributed_effect_definition *)tag_get(EFFECT_TAG, effect_index);
+	effect = (struct effect_definition *)tag_get(EFFECT_DEFINITION_TAG, effect_index);
 	for (event_index = 0; event_index < effect->events.count; event_index++)
 	{
-		struct distributed_effect_event_definition *event = TAG_BLOCK_GET_ELEMENT(
-			&effect->events, event_index, struct distributed_effect_event_definition);
+		struct effect_event_definition *event = TAG_BLOCK_GET_ELEMENT(
+			&effect->events, event_index, struct effect_event_definition);
 		short part_index;
 
 		for (part_index = 0; part_index < event->parts.count; part_index++)
 		{
-			struct distributed_effect_part_definition *part = TAG_BLOCK_GET_ELEMENT(
-				&event->parts, part_index, struct distributed_effect_part_definition);
+			struct effect_part_definition *part = TAG_BLOCK_GET_ELEMENT(
+				&event->parts, part_index, struct effect_part_definition);
 
 			if (part->reference.index == NONE)
 				continue;
 			if (part->reference.index == damage_index ||
 				(part->reference.group_tag == PROJECTILE_DEFINITION_TAG &&
 					distributed_projectile_deals(part->reference.index, damage_index, depth + 1)) ||
-				(part->reference.group_tag == EFFECT_TAG &&
+				(part->reference.group_tag == EFFECT_DEFINITION_TAG &&
 					distributed_effect_deals(part->reference.index, damage_index, depth + 1)))
 			{
 				return TRUE;
@@ -528,21 +542,24 @@ static boolean distributed_projectile_deals(
 	return FALSE;
 }
 
-static boolean distributed_weapon_deals(
+/* how many hits a second the weapon deals of the damage, 0 for none */
+static real distributed_weapon_deals(
 	long weapon_definition_index,
 	long damage_index)
 {
 	struct weapon_definition *weapon;
 	short trigger_index;
+	real rate = 0.0f;
 
 	if (!tag_index_is_group(weapon_definition_index, WEAPON_DEFINITION_TAG))
-		return FALSE;
+		return 0.0f;
 	weapon = weapon_definition_get(weapon_definition_index);
-	if (weapon->weapon.melee_attack_damage.index == damage_index ||
-		distributed_effect_deals(weapon->weapon.detonation_effect.index, damage_index, 0) ||
+	if (weapon->weapon.melee_attack_damage.index == damage_index)
+		rate = MELEE_HITS_PER_SECOND;
+	if (distributed_effect_deals(weapon->weapon.detonation_effect.index, damage_index, 0) ||
 		distributed_effect_deals(weapon->weapon.overheated_effect.index, damage_index, 0))
 	{
-		return TRUE;
+		rate = MAX(rate, EFFECT_HITS_PER_SECOND);
 	}
 	for (trigger_index = 0; trigger_index < weapon->weapon.triggers.count; trigger_index++)
 	{
@@ -550,36 +567,84 @@ static boolean distributed_weapon_deals(
 			&weapon->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 
 		if (distributed_projectile_deals(trigger->projectile.index, damage_index, 0))
-			return TRUE;
+		{
+			real rate_of_fire = MAX(trigger->initial_rate_of_fire, trigger->final_rate_of_fire);
+
+			/* (none is no limit, weapon_trigger_can_fire_again: a shot a tick,
+			or a press, the plasma pistol's, as fast as a player taps) */
+			if (rate_of_fire <= 0.0001f)
+			{
+				rate_of_fire = TEST_FLAG(trigger->flags, _weapon_trigger_latched_bit) ?
+					TICKS_PER_SECOND / 2.0f : (real)TICKS_PER_SECOND;
+			}
+			rate = MAX(rate, MAX(rate_of_fire, 1.0f) * MAX(trigger->projectiles_per_shot, 1));
+		}
 	}
-	return FALSE;
+	return rate;
 }
 
-/* whether the player could have dealt the damage: their weapons, lately,
-their grenades, their vehicle */
-static boolean distributed_player_deals(
+/* the source's (a weapon's, a grenade's projectile's) hits a second of the
+damage, walking its tags once a game */
+static real distributed_source_deals(
+	long source_index,
+	long damage_index,
+	boolean grenade)
+{
+	unsigned long hash = ((unsigned long)source_index * 2654435761u) ^ ((unsigned long)damage_index * 40503u);
+	short probe;
+
+	for (probe = 0; probe < 16; probe++)
+	{
+		struct damage_rate_cache_entry *entry =
+			&damage_rate_cache[(hash + probe) & (DAMAGE_RATE_CACHE_SIZE - 1)];
+
+		if (entry->source_index == source_index && entry->damage_index == damage_index)
+			return entry->rate;
+		if (entry->source_index == NONE)
+		{
+			entry->source_index = source_index;
+			entry->damage_index = damage_index;
+			entry->rate = grenade ?
+				(distributed_projectile_deals(source_index, damage_index, 0) ? (real)GRENADE_HITS_PER_SECOND : 0.0f) :
+				distributed_weapon_deals(source_index, damage_index);
+			return entry->rate;
+		}
+	}
+	return grenade ?
+		(distributed_projectile_deals(source_index, damage_index, 0) ? (real)GRENADE_HITS_PER_SECOND : 0.0f) :
+		distributed_weapon_deals(source_index, damage_index);
+}
+
+/* how many hits a second the player could deal of the damage: their
+weapons, lately, their grenades, their vehicle; 0 when none of them deals
+it */
+static real distributed_player_deals(
 	short player_index,
 	long damage_index)
 {
 	struct game_globals *globals = scenario_get_game_globals();
 	short index;
+	real rate = 0.0f;
 
 	for (index = 0; index < MAXIMUM_RECENT_WEAPONS; index++)
 	{
 		if (damage_players[player_index].definition_indices[index] != NONE &&
-			game_time_get() - damage_players[player_index].times[index] <= RECENT_WEAPON_TICKS &&
-			distributed_weapon_deals(damage_players[player_index].definition_indices[index], damage_index))
+			game_time_get() - damage_players[player_index].times[index] <= RECENT_WEAPON_TICKS)
 		{
-			return TRUE;
+			rate = MAX(rate, distributed_source_deals(damage_players[player_index].definition_indices[index],
+				damage_index, FALSE));
 		}
 	}
-	for (index = 0; index < globals->grenades.count; index++)
+	for (index = 0; index < globals->grenades.count && index < NUMBER_OF_UNIT_GRENADE_TYPES; index++)
 	{
 		struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(&globals->grenades, index,
 			struct game_globals_grenade);
 
-		if (distributed_projectile_deals(grenade->projectile.index, damage_index, 0))
-			return TRUE;
+		if (game_time_get() - damage_players[player_index].grenade_times[index] <= RECENT_WEAPON_TICKS &&
+			grenade->projectile.index != NONE)
+		{
+			rate = MAX(rate, distributed_source_deals(grenade->projectile.index, damage_index, TRUE));
+		}
 	}
 	if (game_time_get() - damage_players[player_index].vehicle_time <= RECENT_WEAPON_TICKS &&
 		globals->falling_damage.count > 0)
@@ -590,10 +655,10 @@ static boolean distributed_player_deals(
 		if (falling_damage->vehicle_killed_unit_damage_effect.index == damage_index ||
 			falling_damage->vehicle_collision_damage.index == damage_index)
 		{
-			return TRUE;
+			rate = MAX(rate, VEHICLE_HITS_PER_SECOND);
 		}
 	}
-	return FALSE;
+	return rate * HIT_REPORT_RATE_MARGIN;
 }
 
 /* where each player's unit and vehicle are this tick, noted */
@@ -693,6 +758,16 @@ static void distributed_note_weapons(
 		units[1] = object_get(unit_index)->object.parent_object_index;
 		if (units[1] != NONE)
 			damage_players[player_index].vehicle_time = game_time_get();
+		{
+			struct unit_datum *unit = unit_get(unit_index);
+			short grenade_index;
+
+			for (grenade_index = 0; grenade_index < NUMBER_OF_UNIT_GRENADE_TYPES; grenade_index++)
+			{
+				if (unit->unit.grenade_counts[grenade_index] > 0)
+					damage_players[player_index].grenade_times[grenade_index] = game_time_get();
+			}
+		}
 		for (unit_number = 0; unit_number < 2; unit_number++)
 		{
 			struct unit_datum *unit = units[unit_number] != NONE ?
@@ -701,6 +776,13 @@ static void distributed_note_weapons(
 
 			if (!unit)
 				continue;
+			/* (a vehicle's weapons its driver's and gunner's, not its
+			passengers') */
+			if (unit_number == 1 && unit->unit.driver_object_index != unit_index &&
+				unit->unit.gunner_object_index != unit_index)
+			{
+				continue;
+			}
 			for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
 			{
 				long weapon_index = unit->unit.weapon_object_indices[weapon_slot];
@@ -729,14 +811,76 @@ static void distributed_note_weapons(
 	}
 }
 
-/* whether the host takes the report */
+/* whether the node, region and material are the object's (or NONE) */
+static boolean distributed_damage_indices_valid(
+	long object_index,
+	short node_index,
+	short region_index,
+	short material_index)
+{
+	struct object_datum *object = object_get(object_index);
+	long collision_model_index = object_definition_get(object->definition_index)->object.collision_model.index;
+	struct collision_model *collision_model = collision_model_index != NONE ?
+		collision_model_definition_get(collision_model_index) : NULL;
+
+	if (node_index != NONE && (node_index < 0 || !object_has_node(object_index, node_index)))
+		return FALSE;
+	if (region_index != NONE && (region_index < 0 || region_index >= MAXIMUM_REGIONS_PER_OBJECT ||
+		!collision_model || region_index >= collision_model->resistance.regions.count))
+	{
+		return FALSE;
+	}
+	if (material_index != NONE && (material_index < 0 || !collision_model ||
+		material_index >= collision_model->resistance.materials.count))
+	{
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/* whether the damage's numbers are all finite and in the world */
+static boolean distributed_damage_numbers_valid(
+	struct distributed_damage const *damage)
+{
+	return distributed_point_valid(&damage->origin, REPORT_WORLD_BOUND) &&
+		distributed_point_valid(&damage->epicenter, REPORT_WORLD_BOUND) &&
+		distributed_point_valid((real_point3d const *)&damage->direction, 2.0f) &&
+		distributed_real_valid(damage->scale) && distributed_real_valid(damage->multiplier) &&
+		distributed_real_valid(damage->material_effect_scale);
+}
+
+/* whether the object is another player's (their unit, or what carries it:
+damage.c's get_player_index_from_object_or_parents), whose damage a
+client's player does not deal */
+static boolean distributed_object_of_another_player(
+	short player_index,
+	long object_index)
+{
+	while (object_index != NONE)
+	{
+		if (unit_try_and_get(object_index))
+		{
+			long owner = player_index_from_unit_index(object_index);
+
+			return owner != NONE && DATUM_INDEX_TO_ABSOLUTE_INDEX(owner) != player_index;
+		}
+		object_index = object_get(object_index)->object.parent_object_index;
+	}
+	return FALSE;
+}
+
+/* whether the host takes the report, which it makes the damage as the
+host deals it */
 static boolean distributed_report_valid(
 	long machine_index,
-	struct distributed_hit_report const *report)
+	struct distributed_hit_report const *report,
+	struct damage_data *damage)
 {
 	short player_index = report->damage.owner_player_index;
+	struct player_datum *player;
 	struct object_datum *target;
 	struct damage_effect_definition *definition;
+	real rate;
 	real tolerance;
 	real dx, dy, dz;
 	real impact_distance_squared;
@@ -744,23 +888,38 @@ static boolean distributed_report_valid(
 
 	/* that machine's player */
 	if (player_index == NO_PLAYER || player_index >= MAXIMUM_TRACKED_PLAYERS ||
-		!distributed_player(player_index) || !distributed_machine_has_player(machine_index, player_index))
+		!(player = distributed_player(player_index)) || !distributed_machine_has_player(machine_index, player_index))
 	{
 		return FALSE;
 	}
-	/* one of the host's objects */
+	/* one of the host's objects (the index whole: identifier 0 is any
+	object at the index) */
+	if (!distributed_object_index_valid(report->object_index))
+		return FALSE;
 	target = (struct object_datum *)object_try_and_get_and_verify_type(report->object_index,
 		_object_mask_biped | _object_mask_vehicle | _object_mask_weapon | _object_mask_equipment);
 	if (!target || !tag_index_is_group(report->damage.definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
 		return FALSE;
+	/* numbers the game can take */
+	if (!distributed_damage_numbers_valid(&report->damage) ||
+		!distributed_point_valid(&report->target_position, REPORT_WORLD_BOUND) ||
+		(report->has_normal && !distributed_point_valid((real_point3d const *)&report->object_normal, 2.0f)) ||
+		!(report->damage.scale >= 0.0f && report->damage.scale <= REPORT_MAXIMUM_SCALE) ||
+		!distributed_damage_indices_valid(report->object_index, report->node_index, report->region_index,
+			report->material_index))
+	{
+		return FALSE;
+	}
 	/* damage that player could deal */
-	if (!distributed_player_deals(player_index, report->damage.definition_index))
+	rate = distributed_player_deals(player_index, report->damage.definition_index);
+	if (rate <= 0.0f)
 		return FALSE;
 	/* the target about where the host had it when the shooter saw it: a
 	player's unit or vehicle as far back as the shooter's round trip, else
 	(what no player has) about where it is */
 	{
-		long ticks = (long)ceil(distributed_machine_round_trip_ticks(machine_index)) + TARGET_HISTORY_SLACK_TICKS;
+		long ticks = MIN((long)ceil(distributed_machine_round_trip_ticks(machine_index)),
+			TARGET_HISTORY_MAXIMUM_ROUND_TRIP_TICKS) + TARGET_HISTORY_SLACK_TICKS;
 		short seen = distributed_target_seen(report->object_index, &report->target_position,
 			MIN(ticks, TARGET_HISTORY_TICKS - 1));
 
@@ -778,7 +937,7 @@ static boolean distributed_report_valid(
 			dx = report->target_position.x - origin.x;
 			dy = report->target_position.y - origin.y;
 			dz = report->target_position.z - origin.z;
-			if (dx * dx + dy * dy + dz * dz > tolerance * tolerance)
+			if (!(dx * dx + dy * dy + dz * dz <= tolerance * tolerance))
 				return FALSE;
 		}
 	}
@@ -795,19 +954,65 @@ static boolean distributed_report_valid(
 	dy = report->damage.epicenter.y - report->target_position.y;
 	dz = report->damage.epicenter.z - report->target_position.z;
 	impact_distance_squared = MIN(impact_distance_squared, dx * dx + dy * dy + dz * dz);
-	if (impact_distance_squared > reach * reach)
+	if (!(impact_distance_squared <= reach * reach))
 		return FALSE;
-	/* no more than any weapon fires */
+	/* no more than the weapon fires: an explosion's hits of a tick are one */
 	{
-		real *hit_reports = &damage_players[player_index].hit_reports;
-		long elapsed = game_time_get() - damage_players[player_index].hit_reports_time;
+		real *hit_seconds = &damage_players[player_index].hit_seconds;
+		long elapsed = game_time_get() - damage_players[player_index].hit_seconds_time;
+		boolean paid = FALSE;
 
-		*hit_reports = MIN((real)HIT_REPORT_BURST,
-			*hit_reports + (real)elapsed * HIT_REPORTS_PER_SECOND / TICKS_PER_SECOND);
-		damage_players[player_index].hit_reports_time = game_time_get();
-		if (*hit_reports < 1.0f)
-			return FALSE;
-		*hit_reports -= 1.0f;
+		if (damage_explosions.time != game_time_get())
+		{
+			damage_explosions.time = game_time_get();
+			damage_explosions.count = 0;
+		}
+		if (TEST_FLAG(report->damage.flags, _damage_area_of_effect_bit))
+		{
+			short index;
+
+			for (index = 0; index < damage_explosions.count; index++)
+			{
+				if (damage_explosions.explosions[index].player_index == player_index &&
+					damage_explosions.explosions[index].definition_index == report->damage.definition_index &&
+					damage_explosions.explosions[index].epicenter.x == report->damage.epicenter.x &&
+					damage_explosions.explosions[index].epicenter.y == report->damage.epicenter.y &&
+					damage_explosions.explosions[index].epicenter.z == report->damage.epicenter.z)
+				{
+					paid = TRUE;
+					break;
+				}
+			}
+		}
+		if (!paid)
+		{
+			*hit_seconds = MIN((real)HIT_REPORT_BURST_SECONDS, *hit_seconds + (real)elapsed / TICKS_PER_SECOND);
+			damage_players[player_index].hit_seconds_time = game_time_get();
+			if (*hit_seconds < 1.0f / rate)
+				return FALSE;
+			*hit_seconds -= 1.0f / rate;
+			if (TEST_FLAG(report->damage.flags, _damage_area_of_effect_bit) &&
+				damage_explosions.count < MAXIMUM_EXPLOSIONS_PER_TICK)
+			{
+				damage_explosions.explosions[damage_explosions.count].player_index = player_index;
+				damage_explosions.explosions[damage_explosions.count].definition_index = report->damage.definition_index;
+				damage_explosions.explosions[damage_explosions.count].epicenter = report->damage.epicenter;
+				damage_explosions.count++;
+			}
+		}
+	}
+	/* the damage as the host deals it: what a client's hit can be, from the
+	player's own */
+	if (!distributed_damage_to_data(&report->damage, damage))
+		return FALSE;
+	damage->flags &= REPORT_DAMAGE_FLAGS;
+	damage->multiplier = 1.0f;
+	damage->owner_player_index = DATUM_INDEX_NEW(player_index, player->identifier);
+	damage->owner_team_index = (short)player->team_index;
+	if (damage->owner_object_index != NONE &&
+		distributed_object_of_another_player(player_index, damage->owner_object_index))
+	{
+		damage->owner_object_index = distributed_living_unit(player);
 	}
 	return TRUE;
 }
@@ -825,7 +1030,7 @@ void network_damage_handle_reports(
 		struct distributed_hit_report const *report = &reports[index];
 		struct damage_data damage;
 
-		if (!distributed_report_valid(machine_index, report) || !distributed_damage_to_data(&report->damage, &damage))
+		if (!distributed_report_valid(machine_index, report, &damage))
 		{
 			damage_rejected_reports++;
 			continue;
@@ -843,27 +1048,41 @@ void network_damage_host_tick(
 {
 	struct distributed_damage_event_message message;
 	short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_damage_event));
-	short index;
-	short count = 0;
+	long machine_indices[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	short machine_count = damage_event_count ?
+		distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES) : 0;
+	short machine_number;
 
 	distributed_note_weapons();
 	distributed_note_targets();
-	for (index = 0; index < damage_event_count; index++)
+	/* each machine the damage to units, and its own players' screen
+	effects (no other machine's) */
+	for (machine_number = 0; machine_number < machine_count; machine_number++)
 	{
-		message.events[count++] = damage_events[index];
-		if (count == limit)
+		long machine_index = machine_indices[machine_number];
+		short index;
+		short count = 0;
+
+		for (index = 0; index < damage_event_count; index++)
 		{
-			distributed_send(&message, _distributed_message_damage_events, count,
-				(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)),
-				_distributed_to_clients);
-			count = 0;
+			if (damage_events[index].kind == _damage_event_player_effect &&
+				!distributed_machine_has_player(machine_index, damage_events[index].player_index))
+			{
+				continue;
+			}
+			message.events[count++] = damage_events[index];
+			if (count == limit)
+			{
+				distributed_send_to_machine(machine_index, &message, _distributed_message_damage_events, count,
+					(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)));
+				count = 0;
+			}
 		}
-	}
-	if (count)
-	{
-		distributed_send(&message, _distributed_message_damage_events, count,
-			(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)),
-			_distributed_to_clients);
+		if (count)
+		{
+			distributed_send_to_machine(machine_index, &message, _distributed_message_damage_events, count,
+				(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)));
+		}
 	}
 	damage_event_count = 0;
 }
@@ -882,8 +1101,12 @@ void network_damage_handle_events(
 		struct distributed_damage_event const *event = &events[index];
 		struct damage_data damage;
 
-		if (!distributed_damage_to_data(&event->damage, &damage))
+		if (!distributed_damage_numbers_valid(&event->damage) || !distributed_damage_to_data(&event->damage, &damage) ||
+			!distributed_real_valid(event->shield_damage) || !distributed_real_valid(event->body_damage) ||
+			!distributed_real_valid(event->body_damage_multiplier) || !distributed_real_valid(event->total_damage))
+		{
 			continue;
+		}
 		damage_replayed_events++;
 		switch (event->kind)
 		{
@@ -909,7 +1132,9 @@ void network_damage_handle_events(
 		case _damage_event_kill:
 			if (network_objects_client_has(event->object_index) &&
 				object_try_and_get_and_verify_type(event->object_index, _object_mask_unit) &&
-				!TEST_FLAG(object_get(event->object_index)->object.damage_flags, _object_dead_bit))
+				!TEST_FLAG(object_get(event->object_index)->object.damage_flags, _object_dead_bit) &&
+				distributed_damage_indices_valid(event->object_index, event->node_index, event->region_index,
+					event->material_index))
 			{
 				struct unit_datum *unit = unit_get(event->object_index);
 
@@ -988,7 +1213,13 @@ void network_damage_new_game(
 
 		for (index = 0; index < MAXIMUM_RECENT_WEAPONS; index++)
 			damage_players[player_index].definition_indices[index] = NONE;
+		for (index = 0; index < NUMBER_OF_UNIT_GRENADE_TYPES; index++)
+			damage_players[player_index].grenade_times[index] = -RECENT_WEAPON_TICKS - 1;
 		damage_players[player_index].vehicle_time = -RECENT_WEAPON_TICKS - 1;
-		damage_players[player_index].hit_reports = HIT_REPORT_BURST;
+		damage_players[player_index].hit_seconds = HIT_REPORT_BURST_SECONDS;
 	}
+	damage_explosions.time = NONE;
+	damage_explosions.count = 0;
+	for (player_index = 0; player_index < DAMAGE_RATE_CACHE_SIZE; player_index++)
+		damage_rate_cache[player_index].source_index = NONE;
 }

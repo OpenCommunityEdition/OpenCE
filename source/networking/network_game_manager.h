@@ -97,6 +97,8 @@ void network_game_reset_for_next_round(
 boolean network_game_add_player(
 	struct network_game *game,
 	struct network_player *player);
+boolean network_game_has_free_player_slot(
+	struct network_game *game);
 void network_game_invalidate_machine(
 	struct network_game *game,
 	word machine_index);

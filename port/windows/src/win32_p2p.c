@@ -4,7 +4,7 @@ WIN32_P2P.C
 The process and desktop half of port/linux/src/posix.h for Windows, which
 internet play uses (p2p.c; the Linux versions are in posix_net.c): the
 command line, the registry entry that makes this executable open halo://
-links, and Discord's local pipe.
+links, the user's secret, and Discord's local pipe.
 */
 
 #include <windows.h>
@@ -80,6 +80,50 @@ int posix_register_url_scheme(const char *scheme, const char *description)
 	return ok ? 1 : 0;
 }
 
+int posix_user_secret(unsigned char *secret, int size)
+{
+	/* in the user's local application data, which only they (and the
+	system's administrators) can read */
+	char directory[MAX_PATH], path[MAX_PATH + 64];
+	DWORD length = GetEnvironmentVariableA("LOCALAPPDATA", directory, sizeof(directory));
+	int attempt;
+
+	if (!length || length >= sizeof(directory))
+		return 0;
+	snprintf(path, sizeof(path), "%s\\halo-ce-universal.key", directory);
+	for (attempt = 0; attempt < 3; attempt++)
+	{
+		DWORD done = 0;
+		BOOL ok;
+		HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL, NULL);
+
+		if (file != INVALID_HANDLE_VALUE)
+		{
+			ok = ReadFile(file, secret, (DWORD)size, &done, NULL) && done == (DWORD)size;
+			CloseHandle(file);
+			/* a key cut short (a write that failed, or was stopped) is made
+			again: the delete fails while another copy still writes it */
+			if (!ok && attempt == 0 && DeleteFileA(path))
+				continue;
+			return ok ? 1 : 0;
+		}
+		if (GetLastError() == ERROR_SHARING_VIOLATION)
+			return 0;
+		file = CreateFileA(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		/* (another copy of the game made it first: read that one) */
+		if (file == INVALID_HANDLE_VALUE)
+			continue;
+		posix_random_bytes(secret, (posix_ulong)size);
+		ok = WriteFile(file, secret, (DWORD)size, &done, NULL) && done == (DWORD)size;
+		CloseHandle(file);
+		if (!ok)
+			DeleteFileA(path);
+		return ok ? 1 : 0;
+	}
+	return 0;
+}
+
 /* ---------- Discord's local pipe */
 
 enum
@@ -107,6 +151,15 @@ int posix_discord_connect(void)
 		pipe = CreateFileA(name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 		if (pipe != INVALID_HANDLE_VALUE)
 		{
+			/* writes never wait (the p2p thread holds its lock): a write takes
+			what fits in the pipe */
+			DWORD mode = PIPE_READMODE_BYTE | PIPE_NOWAIT;
+
+			if (!SetNamedPipeHandleState(pipe, &mode, NULL, NULL))
+			{
+				CloseHandle(pipe);
+				continue;
+			}
 			discord_pipes[slot] = pipe;
 			return slot;
 		}
@@ -116,13 +169,14 @@ int posix_discord_connect(void)
 
 int posix_discord_write(int handle, const void *buffer, int length)
 {
-	DWORD written;
+	DWORD written = 0;
 
 	if (handle < 0 || handle >= MAXIMUM_DISCORD_PIPES || !discord_pipes[handle])
 		return -1;
-	if (!WriteFile(discord_pipes[handle], buffer, (DWORD)length, &written, NULL) || written != (DWORD)length)
+	/* (a pipe that does not wait writes what fits, maybe nothing) */
+	if (!WriteFile(discord_pipes[handle], buffer, (DWORD)length, &written, NULL))
 		return -1;
-	return length;
+	return (int)written;
 }
 
 int posix_discord_read(int handle, void *buffer, int length)
