@@ -59,7 +59,7 @@ typedef int EGLint_;
 #define GL_NEAREST_ 0x2600
 
 #define HOST_RT_MAXIMUM_OBJECTS 511
-#define HOST_RT_MAXIMUM_LIGHTS 8
+#define HOST_RT_MAXIMUM_LIGHTS 16
 #define HOST_RT_MAXIMUM_EMITTERS 16
 /* the objects, each its own mesh (its bounds its own, so that a ray far
 from them all walks none), and its triangles at most; and all of theirs */
@@ -95,7 +95,7 @@ static struct
 	unsigned int gl_textures[3];
 	EGLImage_ images[3];
 	int widths[3], heights[3];
-	/* the dynamic lights (host_rt_set_lights): 8 floats each */
+	/* the lights (host_rt_set_lights): 12 floats each */
 	float lights[HOST_RT_MAXIMUM_LIGHTS * 12];
 	unsigned int light_count;
 	/* the emitters (host_rt_set_emitters): 8 floats each */
@@ -335,7 +335,12 @@ static NSString *const kernel_source = @
 	   their light that arrives, each weighted by how much it gives */
 	"	float lights_arriving = 1.0;\n"
 	"	float3 emitted = float3(0.0);\n"
-	"	if (light_count > 0u)\n"
+	/* (traced lights, c[34]: every light's own, in its colour, in place of
+	   the game's dynamic lights on the level; an object's pixel keeps the
+	   game's lighting, which has all its lights) */
+	"	bool traced_lights = c[34] > 0.5;\n"
+	"	bool object_pixel = c[23] > 0.5 && g.x <= 0.0;\n"
+	"	if (light_count > 0u && !(traced_lights && object_pixel))\n"
 	"	{\n"
 	"		float total = 0.0, arriving = 0.0;\n"
 	"		for (uint l = 0; l < light_count; l++)\n"
@@ -351,15 +356,19 @@ static NSString *const kernel_source = @
 	"			float4 cone = lights[l * 3u + 1u];\n"
 	"			if (cone.w > -1.5 && dot(-L, cone.xyz) < cone.w) continue;\n"
 	"			float weight = facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
+	/* (a spot's edge, soft) */
+	"			if (cone.w > -1.5) weight *= smoothstep(cone.w, mix(cone.w, 1.0, 0.25), dot(-L, cone.xyz));\n"
 	"			total += weight;\n"
 	/* (stopping short of the light by its object's size: the light's own
 	   object does not shadow it) */
 	"			ray to_light(P + N * bias, L, 0.0, max(d - bias * 4.0 - lights[l * 3u + 2u].x, 0.0));\n"
 	"			bool blocked = any_hit.intersect(to_light, world, 3u).type != intersection_type::none;\n"
 	"			if (!blocked) arriving += weight;\n"
+	"			if (!blocked && traced_lights) emitted += lights[l * 3u + 2u].yzw * weight * 1.5;\n"
 	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, blocked ? P + N * bias + L * d : at, 4.0, blocked);\n"
 	"		}\n"
-	"		if (total > 0.0) lights_arriving = arriving / total;\n"
+	"		if (traced_lights) lights_arriving = 0.0;\n"
+	"		else if (total > 0.0) lights_arriving = arriving / total;\n"
 	"	}\n"
 	/* the emitters (a needle's glow): their light, where their rays arrive
 	   (short of the emitter itself, inside its own model) */

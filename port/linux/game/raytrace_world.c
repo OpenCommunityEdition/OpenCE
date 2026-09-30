@@ -895,10 +895,11 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 /* ---------- the emitters
 
 The glowing things the game draws without a light of their own - a
-needle, a plasma bolt's glow: a projectile with a light volume (the glow's
-sprite) attached and no light - as lights for the rays: each lights what
-is near it in its glow's colour, with its shadows. (Those with a light the
-game draws it, and the rays shadow it: object_lights.c.) */
+needle, a plasma bolt's glow, Guilty Spark's eye, a glowing panel: any
+object with a light volume (the glow's sprite) attached or as a widget, and
+no light - as lights for the rays: each lights what is near it in its
+glow's colour, with its shadows. (Those with a light the game draws it,
+and the rays shadow it: object_lights.c.) */
 
 #include "objects/widgets/light_volumes.h"
 
@@ -910,15 +911,37 @@ game draws it, and the rays shadow it: object_lights.c.) */
 #define GROUP_TAG_LIGHT_VOLUME 0x6D677332 /* 'mgs2' */
 #define GROUP_TAG_LIGHT 0x6C696768 /* 'ligh' */
 
-/* the colour of the glow the definition attaches, if it attaches no light;
-FALSE if none */
+/* a light volume's colour (its first frame's near colour); FALSE if dark */
+static boolean light_volume_color(long definition_index, float *color)
+{
+	const struct light_volume_definition *volume = light_volume_definition_get(definition_index);
+	const struct light_volume_frame *frame;
+
+	if (volume->frames.count <= 0)
+		return FALSE;
+	frame = (const struct light_volume_frame *)volume->frames.address;
+	color[0] = frame->color_hither.red;
+	color[1] = frame->color_hither.green;
+	color[2] = frame->color_hither.blue;
+	return color[0] + color[1] + color[2] > 0.05f;
+}
+
+/* the colour of the glow the definition attaches (or has as a widget), if
+it attaches no light; FALSE if none */
 static boolean emitter_color(const struct object_definition *definition, float *color)
 {
 	const struct object_attachment_definition *attachments =
 		(const struct object_attachment_definition *)definition->object.attachments.address;
+	const struct object_definition_widget *widgets =
+		(const struct object_definition_widget *)definition->object.widgets.address;
 	long index;
 	boolean found = FALSE;
 
+	for (index = 0; index < definition->object.widgets.count && !found; index++)
+	{
+		if (widgets[index].type.group_tag == GROUP_TAG_LIGHT_VOLUME && widgets[index].type.index != NONE)
+			found = light_volume_color(widgets[index].type.index, color);
+	}
 	for (index = 0; index < definition->object.attachments.count; index++)
 	{
 		const struct tag_reference *type = &attachments[index].type;
@@ -926,18 +949,7 @@ static boolean emitter_color(const struct object_definition *definition, float *
 		if (type->group_tag == GROUP_TAG_LIGHT && type->index != NONE)
 			return FALSE;
 		if (!found && type->group_tag == GROUP_TAG_LIGHT_VOLUME && type->index != NONE)
-		{
-			const struct light_volume_definition *volume = light_volume_definition_get(type->index);
-			const struct light_volume_frame *frame;
-
-			if (volume->frames.count <= 0)
-				continue;
-			frame = (const struct light_volume_frame *)volume->frames.address;
-			color[0] = frame->color_hither.red;
-			color[1] = frame->color_hither.green;
-			color[2] = frame->color_hither.blue;
-			found = color[0] + color[1] + color[2] > 0.05f;
-		}
+			found = light_volume_color(type->index, color);
 	}
 	return found;
 }
@@ -952,10 +964,12 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 
 	if (global_structure_bsp_index == NONE || !object_header_data)
 		return 0;
-	object_iterator_new(&iterator, _object_mask_projectile, 0);
+	object_iterator_new(&iterator, RAY_TRACED_OBJECT_TYPES, 0);
 	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
 	{
-		const real_point3d *at = &object->object.position;
+		/* (a projectile at its point; anything larger at its middle) */
+		const real_point3d *at = object->object.type == _object_type_projectile ? &object->object.position :
+			&object->object.bounding_sphere_center;
 		float dx = at->x - camera[0], dy = at->y - camera[1], dz = at->z - camera[2], color[3];
 		float *out = emitters + count * 8;
 
@@ -967,7 +981,7 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 		out[0] = at->x;
 		out[1] = at->y;
 		out[2] = at->z;
-		out[3] = RAY_TRACED_EMITTER_RADIUS;
+		out[3] = MAX(RAY_TRACED_EMITTER_RADIUS, object->object.bounding_sphere_radius * 3.0f);
 		out[4] = color[0];
 		out[5] = color[1];
 		out[6] = color[2];

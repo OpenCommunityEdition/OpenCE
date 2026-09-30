@@ -55,7 +55,7 @@ unsigned char halo_ray_tracing_sun(float *direction);
 /* the emitters (port/linux/game/raytrace_world.c): 8 floats each */
 long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camera);
 /* the dynamic lights (source/objects/object_lights.c): 12 floats each */
-long halo_ray_tracing_lights(float *lights, long maximum);
+long halo_ray_tracing_lights(float *lights, long maximum, long all);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
 long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
 	float *player_sphere, long shapes);
@@ -87,6 +87,8 @@ static struct
 	/* the objects' shapes in the rays: 0 the drawn models, 1 the collision
 	models, 2 ellipsoids */
 	int shapes;
+	/* display.ray_tracing_lights: every light traced, in place of the game's */
+	int traced_lights;
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -670,6 +672,7 @@ static void initialize(void)
 
 		ray.shapes = !strcmp(shapes, "collision") ? 1 : !strcmp(shapes, "simple") ? 2 : 0;
 	}
+	ray.traced_lights = strcmp(config_string("display.ray_tracing_lights"), "game") != 0;
 	/* no drawing (debug.null_renderer: headless tests, bots) has no GL */
 	if (config_boolean("debug.null_renderer") || !glCreateShader)
 	{
@@ -906,7 +909,8 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	/* the ray view, the ray probe */
 	camera[32] = ray.mode == _ray_tracing_debug_rays ? 1.0f : ray.mode == _ray_tracing_debug_split ? 2.0f : 0.0f;
 	camera[33] = probe.mode == 1 ? 1.0f : 0.0f;
-	camera[34] = camera[35] = 0.0f;
+	camera[34] = ray.traced_lights ? 1.0f : 0.0f;
+	camera[35] = 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */
@@ -924,10 +928,11 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		kept to their outsides as the collision models' is) */
 		host_rt_set_objects(triangles, groups, (int)count, ray.shapes == 0);
 	}
-	/* the dynamic lights, for their shadows */
+	/* the lights: traced, all of them, or the game's dynamic ones, for their
+	shadows */
 	{
-		static float lights[8 * 12];
-		long light_count = halo_ray_tracing_lights(lights, 8);
+		static float lights[16 * 12];
+		long light_count = halo_ray_tracing_lights(lights, 16, ray.traced_lights);
 
 		host_rt_set_lights(lights, (int)light_count);
 	}

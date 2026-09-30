@@ -195,17 +195,24 @@ rays from each pixel:
   those whose depth has not changed since the game drew the objects,
   before the level (`halo_ray_traced_light_stage(2)`).
 
-The dynamic lights - the flashlight, the plasma bolts', the explosions' -
-cast traced shadows too (`halo_ray_tracing_lights` in
-`source/objects/object_lights.c`): from each pixel a ray goes to each light
-that reaches it (inside its cone, for a spot like the flashlight), and the
-level and the objects block it. The game drew these lights without shadows,
-added onto the lightmaps' light; the lighting darkens only their share of a
-pixel's light (the stages above), by the share of their rays that arrive.
+The game's lights are traced (`halo_ray_tracing_lights` in
+`source/objects/object_lights.c`; `display.ray_tracing_lights`, "traced"
+by default): the flashlight, the plasma bolts', the explosions', and the
+lights the game only ever drew on the objects, never on the level - Guilty
+Spark's, a Covenant lamp's. From each pixel of the level a ray goes to each
+light that reaches it (inside its cone, with a soft edge, for a spot like
+the flashlight); where the level and the objects do not block it, the
+light arrives in its colour, fading with its distance and its angle. The
+game's own drawing of its dynamic lights on the level (no shadows, added
+onto the lightmaps' light: its share of a pixel's light, the stages above)
+is taken out, and the traced light is added in its place. The objects keep
+the game's lighting of them, which has all its lights. With "game", the
+game draws its dynamic lights and the rays only darken them where they are
+blocked.
 
 The glowing things the game draws without a light of their own - a
-needle, a plasma bolt's glow: a projectile with a light volume attached and
-no light - are lights in the rays (`halo_ray_tracing_emitters` in
+needle, a plasma bolt's glow, a glowing panel: any object with a light
+volume attached (or as a widget) and no light - are lights in the rays (`halo_ray_tracing_emitters` in
 `port/linux/game/raytrace_world.c`): each lights what is near it in its
 glow's colour, with its shadows. The ray probe draws the rays to them pink.
 
@@ -233,6 +240,29 @@ by the instances' masks:
 
 So the ground darkens under the marines and the vehicles, and in the sun
 you see your own shadow, which the game never drew in the first person.
+
+### What the rays see, and what they do not yet
+
+| Thing | In the rays as | Casts shadows | Lights |
+| --- | --- | --- | --- |
+| The level | its collision mesh (the surfaces the game collides with) | yes | - |
+| Characters, vehicles, weapons, items, scenery, devices | their drawn models (or collision models, or ellipsoids: F4) | yes | their light volumes |
+| Projectiles and grenades | their drawn models | yes | their glows (a needle's pink) |
+| Your body | its drawn model | the sun's only (the flashlight is in it) | - |
+| The sun | a light far away | - | the objects' shadows, your body's on the level |
+| The game's lights (flashlight, plasma, explosions, Guilty Spark, lamps) | point lights and spots, 16 nearest | - | yes, traced, in their colour |
+| Glows (light volumes) with no light | point lights, 16 nearest | - | yes |
+| The lightmaps (the level's baked light) | kept: the game's, darkened by the occlusion | - | - |
+| Water | not yet: the level's render mesh is not traced | no | no |
+| Particles, decals, contrails, the sky | no | no | no |
+| Shaders' own glow (shields, panels' self-illumination) without a light volume | no | - | no |
+| Reflections of the objects | no: reflections see the level only | - | - |
+| The objects' lighting | the game's (all its lights, unshadowed), with the sun's and the level's traced shadows | - | - |
+
+Taking over the rest - the lightmaps and the cube maps - needs light that
+bounces: the level's render mesh with its textures in the rays, and paths
+of several bounces from each pixel, which the M2's GPU, without ray tracing
+hardware, cannot trace at a playable rate yet.
 
 Each object's mesh is rebuilt each frame, and only the objects within 25
 world units of the camera (at most 32) are in. Rays that can find only the

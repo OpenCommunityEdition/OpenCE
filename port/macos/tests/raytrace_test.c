@@ -98,6 +98,9 @@ const char *config_string(const char *name)
 	/* RT_MODE=screen: without Metal's rays */
 	if (!strcmp(name, "display.ray_tracing"))
 		return getenv("RT_MODE") ? getenv("RT_MODE") : "on";
+	/* RT_LIGHTS=game: the game's lights, only their shadows traced */
+	if (!strcmp(name, "display.ray_tracing_lights"))
+		return getenv("RT_LIGHTS") ? getenv("RT_LIGHTS") : "traced";
 	return "";
 }
 
@@ -458,18 +461,20 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 /* the dynamic lights, as the scene's second pass draws them (world: the
 view's x, z, y): the flashlight from under the camera, and the plasma
 bolt's light */
-long halo_ray_tracing_lights(float *lights, long maximum)
+long halo_ray_tracing_lights(float *lights, long maximum, long all)
 {
 	float axis[3] = { -3.3f, 9.0f, -0.7f };
 	float length = sqrtf(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
-	const float all[2][12] = {
-		{ 0.0f, 0.0f, -0.2f, 25.0f, axis[0] / length, axis[1] / length, axis[2] / length, 0.93f, 0.0f, 0.0f, 0.0f, 0.0f },
-		{ -3.0f, 14.5f, -0.4f, 4.5f, 0.0f, 0.0f, 1.0f, -2.0f, 0.0f, 0.0f, 0.0f, 0.0f } };
-	long count = getenv("RT_NO_LIGHTS") ? 0 : 2;
+	const float scene[3][12] = {
+		{ 0.0f, 0.0f, -0.2f, 25.0f, axis[0] / length, axis[1] / length, axis[2] / length, 0.93f, 0.0f, 1.0f, 0.95f, 0.85f },
+		{ -3.0f, 14.5f, -0.4f, 4.5f, 0.0f, 0.0f, 1.0f, -2.0f, 0.0f, 0.3f, 0.6f, 1.0f },
+		/* (a light the game draws on the objects only - Guilty Spark's) */
+		{ 2.5f, 6.0f, 1.2f, 5.0f, 0.0f, 0.0f, 1.0f, -2.0f, 0.5f, 0.4f, 0.8f, 1.0f } };
+	long count = getenv("RT_NO_LIGHTS") ? 0 : all ? 3 : 2;
 
 	if (count > maximum)
 		count = maximum;
-	memcpy(lights, all, (size_t)count * 12 * sizeof(float));
+	memcpy(lights, scene, (size_t)count * 12 * sizeof(float));
 	return count;
 }
 

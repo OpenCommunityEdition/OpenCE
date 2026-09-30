@@ -2392,7 +2392,8 @@ marine's flashlight, a plasma bolt's, is not shadowed by it); returns how
 many, at most maximum */
 long halo_ray_tracing_lights(
 	float *lights,
-	long maximum)
+	long maximum,
+	long all)
 {
 	long count = 0;
 	short light_index;
@@ -2407,16 +2408,30 @@ long halo_ray_tracing_lights(
 		struct point_light_definition *definition;
 		float *out = lights + count * 12;
 
-		if (!TEST_FLAG(light->flags, _point_light_dynamic_bit) || light->rasterizer_light_index == NONE ||
-			!(light->radius > 0.0f))
+		real radius = light->radius;
+
+		definition = light_definition_get(light->definition_index);
+		/* (the game's own lights, which it draws on the objects only - Guilty
+		Spark's - have no radius of their own: their definition's) */
+		if (!TEST_FLAG(light->flags, _point_light_dynamic_bit))
+		{
+			if (!all || !definition)
+				continue;
+			radius = definition->radius * MAX(definition->radius_modifier_upper_bound, 1.0f);
+		}
+		else if (light->rasterizer_light_index == NONE)
 		{
 			continue;
 		}
-		definition = light_definition_get(light->definition_index);
+		if (!(radius > 0.0f) ||
+			light->color.red + light->color.green + light->color.blue < 0.01f)
+		{
+			continue;
+		}
 		out[0] = light->position.x;
 		out[1] = light->position.y;
 		out[2] = light->position.z;
-		out[3] = light->radius;
+		out[3] = radius;
 		out[4] = light->forward.i;
 		out[5] = light->forward.j;
 		out[6] = light->forward.k;
@@ -2430,7 +2445,9 @@ long halo_ray_tracing_lights(
 			if (owner)
 				out[8] = PIN(owner->object.bounding_sphere_radius, 0.0f, 1.0f);
 		}
-		out[9] = out[10] = out[11] = 0.0f;
+		out[9] = light->color.red;
+		out[10] = light->color.green;
+		out[11] = light->color.blue;
 		count++;
 	}
 	return count;

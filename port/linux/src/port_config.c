@@ -142,6 +142,12 @@ static const struct config_setting config_settings[] =
 		"The characters' and vehicles' shapes in Metal's rays: \"model\" (their drawn\n"
 		"models, skinned as drawn), \"collision\" (the meshes their bullets hit) or\n"
 		"\"simple\" (ellipsoids); F4 steps through them (macOS)." },
+	{ "display.ray_tracing_lights", _config_string, "\"traced\"", "HALO_RAY_TRACING_LIGHTS", _environment_value,
+		_platform_all,
+		"The lights on the level in Metal's rays: \"traced\" (every light the game has,\n"
+		"its own lights too - Guilty Spark's, the glows' - traced in its colour, with\n"
+		"its shadows, in place of the game's) or \"game\" (the game's dynamic lights as\n"
+		"it draws them, only their shadows traced) (macOS)." },
 	{ "display.ray_tracing_objects", _config_boolean, "true", "HALO_RAY_TRACING_OBJECTS", _environment_value,
 		_platform_all,
 		"The characters and vehicles in Metal's rays too: their contact shadows on\n"
