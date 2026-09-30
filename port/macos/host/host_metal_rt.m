@@ -276,11 +276,11 @@ static NSString *const kernel_source = @
 	"		float3 d = normalize(tangent * (r * cos(angle)) + bitangent * (r * sin(angle)) + N * sqrt(max(0.0, 1.0 - u)));\n"
 	"		ray occlusion_ray(P + N * bias, d, 0.0, radius);\n"
 	/* (an object's occlusion: the level's and the other objects'; the
-	   level's: everything's, the player's body too) */
+	   level's: everything's but the player's body, inside which the camera is) */
 	"		float distance_hit = -1.0;\n"
 	"		if (near_objects)\n"
 	"		{\n"
-	"			auto hit = any_hit.intersect(occlusion_ray, world, object ? 3u : 7u);\n"
+	"			auto hit = any_hit.intersect(occlusion_ray, world, 3u);\n"
 	"			if (hit.type != intersection_type::none) distance_hit = hit.distance;\n"
 	"		}\n"
 	"		else\n"

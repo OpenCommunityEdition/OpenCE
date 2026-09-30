@@ -608,6 +608,29 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 			const struct model_vertex_view *vertices = (const struct model_vertex_view *)part->compressed_vertices.address;
 			long index, strip_count = part->triangle_buffer.count + 2, vertex_count = part->compressed_vertices.count;
 
+			/* (HALO_RT_LOG_SHAPES: each model's parts' data, once) */
+			if (getenv("HALO_RT_LOG_SHAPES") && part_index == 0 && region_index == 0)
+			{
+				extern void platform_log(const char *format, ...);
+				static long logged[64];
+				static int logged_count;
+				int seen = 0, k;
+
+				for (k = 0; k < logged_count; k++)
+					seen |= logged[k] == definition->object.model.index;
+				if (!seen && logged_count < 64)
+				{
+					logged[logged_count++] = definition->object.model.index;
+					platform_log("ray tracing model %ld: part flags %lx, triangles block %ld at %p, compressed %ld at %p, "
+						"uncompressed %ld at %p, triangle buffer type %d count %ld at %p, vertex buffer type %d count %ld "
+						"offset %ld at %p", definition->object.model.index, (unsigned long)part->flags,
+						(long)part->triangles.count, part->triangles.address, (long)part->compressed_vertices.count,
+						part->compressed_vertices.address, (long)part->uncompressed_vertices.count,
+						part->uncompressed_vertices.address, part->triangle_buffer.type, part->triangle_buffer.count,
+						part->triangle_buffer.base_address, part->vertex_buffer.type, part->vertex_buffer.count,
+						part->vertex_buffer.offset, part->vertex_buffer.base_address);
+				}
+			}
 			if ((part->flags & 1) || !strip || !vertices || vertex_count <= 0 || part->triangle_buffer.type != 1)
 				continue;
 			for (index = 0; index + 2 < strip_count && count < room; index++)
