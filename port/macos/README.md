@@ -420,6 +420,9 @@ code for the window, the mouse, the keyboard and the first start.
   flashlight, reload, switch, start); with `HALO_SCREENSHOT_DIR` and
   `HALO_SCREENSHOT_EVERY=<frames>` it records a test drive, and
   `HALO_EXIT_AFTER=<seconds>` ends it.
+- `HALO_COMMANDS="47=cheat_all_weapons;50=cheat_spawn_warthog"` runs
+  console commands at those seconds since start: with the scripted input,
+  a test drive can stage a scene (weapons, vehicles, grenades).
 
 - `host.txt` in the game's folder is the log of the host, and, when the
   game does not start from a terminal, of the game's port (for one, why

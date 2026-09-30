@@ -56,6 +56,9 @@ void halo_ray_traced_light_stage(int stage);
 /* the console command that starts game.map (HALO_MAP), or NULL
 (port/linux/src/port_config.c) */
 const char *halo_startup_map_command(void);
+/* the next of debug.commands (HALO_COMMANDS) whose time has come, or NULL
+(port/linux/src/port_config.c) */
+const char *halo_timed_command_next(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

@@ -248,6 +248,10 @@ static const struct config_setting config_settings[] =
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
 	{ "debug.network_loss", _config_real, "0.0", "HALO_NETWORK_LOSS", _environment_value, _platform_all,
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
+	{ "debug.commands", _config_string, "\"\"", "HALO_COMMANDS", _environment_value, _platform_all,
+		"Console commands at times, for tests: \"<seconds>=<command>;...\" (seconds\n"
+		"since the game started), such as \"47=cheat_all_weapons;50=cheat_spawn_warthog\";\n"
+		"empty for none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
@@ -976,4 +980,53 @@ const char *halo_startup_map_command(void)
 			command[length] = '\\';
 	platform_log("game.map: %s", command);
 	return command;
+}
+
+/* debug.commands: the next command whose time has come, once each, or NULL */
+const char *halo_timed_command_next(void)
+{
+	static int loaded;
+	static int count, next;
+	static struct { double at; char command[200]; } commands[32];
+	static char current[200];
+	double now;
+
+	if (!loaded)
+	{
+		const char *text = config_string("debug.commands");
+
+		loaded = 1;
+		while (*text && count < 32)
+		{
+			char *end;
+			double at = strtod(text, &end);
+			size_t length = 0;
+
+			if (end == text || *end != '=')
+				break;
+			end++;
+			while (end[length] && end[length] != ';' && length < sizeof(commands[0].command) - 1)
+				length++;
+			commands[count].at = at;
+			memcpy(commands[count].command, end, length);
+			commands[count].command[length] = 0;
+			count++;
+			text = end + length;
+			while (*text && *text != ';')
+				text++;
+			if (*text == ';')
+				text++;
+		}
+		if (count)
+			platform_log("commands: %d timed", count);
+	}
+	if (next >= count)
+		return NULL;
+	now = (double)SDL_GetTicks() / 1000.0;
+	if (now < commands[next].at)
+		return NULL;
+	strcpy(current, commands[next].command);
+	next++;
+	platform_log("commands: %s", current);
+	return current;
 }
