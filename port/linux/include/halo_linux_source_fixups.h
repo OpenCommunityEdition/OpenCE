@@ -48,7 +48,8 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	const float *forward, const float *up);
 /* the light in the window before and after the dynamic lights (0: the
 lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
-lights): the occlusion darkens only the lightmaps' share */
+lights): the occlusion darkens only the lightmaps' share; 2: the objects
+drawn, before the level (their pixels take the sun's traced shadows) */
 void halo_ray_traced_light_stage(int stage);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"

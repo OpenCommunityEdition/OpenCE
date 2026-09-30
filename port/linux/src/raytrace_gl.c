@@ -82,6 +82,10 @@ static struct
 	the stages taken this frame (bits 0 and 1) */
 	GLuint baked_texture, lit_texture, light_framebuffer;
 	int light_stages;
+	/* the objects' depth, before the level is drawn (half resolution,
+	packed in RGBA8), for their pixels */
+	GLuint objects_texture, objects_program;
+	GLint objects_uniforms, objects_depth, gbuffer_objects, gbuffer_objects_known;
 	/* the world-space rays (macOS: Metal) */
 	int hardware;
 	GLuint gbuffer_program, gbuffer_framebuffer;
@@ -248,6 +252,8 @@ rays: x, y, z of the normal with x right, y down, z into the screen */
 static const char gbuffer_source[] =
 	SHADER_HEADER
 	COMMON_SOURCE
+	"uniform sampler2D objects_texture;\n"
+	"uniform int objects_known;\n"
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
@@ -266,7 +272,27 @@ static const char gbuffer_source[] =
 	"	vec3 dy = top ? t - P : P - b;\n"
 	"	vec3 N = normalize(cross(dy, dx));\n"
 	"	if (dot(N, P) > 0.0) N = -N;\n"
+	/* an object's pixel (its depth when the objects were drawn is its
+	   depth now): the depth negative */
+	"	if (objects_known != 0)\n"
+	"	{\n"
+	"		vec4 o = texelFetch(objects_texture, ivec2(gl_FragCoord.xy), 0);\n"
+	"		float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
+	"		if (abs(object - d) < 4.0 / 16777215.0) P.z = -P.z;\n"
+	"	}\n"
 	"	result = vec4(P.z, N);\n"
+	"}\n";
+
+/* the objects' depth, packed in 24 bits */
+static const char objects_source[] =
+	SHADER_HEADER
+	COMMON_SOURCE
+	"out vec4 result;\n"
+	"void main()\n"
+	"{\n"
+	"	float d = clamp(depth_at(ivec2(gl_FragCoord.xy) * TRACE_SCALE), 0.0, 1.0);\n"
+	"	uint v = uint(d * 16777215.0 + 0.5);\n"
+	"	result = vec4(float(v & 255u), float((v >> 8) & 255u), float(v >> 16), 255.0) / 255.0;\n"
 	"}\n";
 
 static const char composite_source[] =
@@ -437,6 +463,14 @@ static void initialize(void)
 		{
 			ray.gbuffer_uniforms = glGetUniformLocation(ray.gbuffer_program, "u");
 			ray.gbuffer_depth = glGetUniformLocation(ray.gbuffer_program, "depth_texture");
+			ray.gbuffer_objects = glGetUniformLocation(ray.gbuffer_program, "objects_texture");
+			ray.gbuffer_objects_known = glGetUniformLocation(ray.gbuffer_program, "objects_known");
+			ray.objects_program = link(objects_source, "ray tracing objects' depth");
+			if (ray.objects_program)
+			{
+				ray.objects_uniforms = glGetUniformLocation(ray.objects_program, "u");
+				ray.objects_depth = glGetUniformLocation(ray.objects_program, "depth_texture");
+			}
 			glGenFramebuffers(1, &ray.gbuffer_framebuffer);
 			ray.hardware = 1;
 		}
@@ -477,11 +511,13 @@ static void size_textures(int width, int height)
 		glDeleteTextures(1, &ray.effect_texture);
 		glDeleteTextures(1, &ray.baked_texture);
 		glDeleteTextures(1, &ray.lit_texture);
+		glDeleteTextures(1, &ray.objects_texture);
 	}
 	ray.scene_texture = make_texture(width, height);
 	ray.effect_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.baked_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.lit_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.objects_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.light_stages = 0;
 	ray.width = width;
 	ray.height = height;
@@ -558,6 +594,11 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	glUseProgram(ray.gbuffer_program);
 	glUniform4fv(ray.gbuffer_uniforms, 4, uniforms);
 	glUniform1i(ray.gbuffer_depth, 1);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, ray.objects_texture);
+	glBindSampler(2, 0);
+	glUniform1i(ray.gbuffer_objects, 2);
+	glUniform1i(ray.gbuffer_objects_known, (ray.light_stages & 4) != 0);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 	/* the camera: its right is forward x up (the game's world is
@@ -587,7 +628,8 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	/* world units: about 3 m each */
 	camera[21] = 0.6f;
 	camera[22] = 40.0f;
-	camera[23] = 0.0f;
+	/* the objects' pixels, marked in the depth and normals */
+	camera[23] = (ray.light_stages & 4) ? 1.0f : 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	if (!host_rt_trace(camera, width, height))
@@ -603,7 +645,7 @@ void halo_ray_traced_light_stage(int stage)
 
 	if (!ray.initialized)
 		initialize();
-	if (!ray.enabled || ray.failed || stage < 0 || stage > 1)
+	if (!ray.enabled || ray.failed || stage < 0 || stage > 2)
 		return;
 	if (!xgpu_current_targets(&color, &depth, &width, &height, viewport) || !color || viewport[2] < 16 ||
 		viewport[3] < 16)
@@ -611,8 +653,44 @@ void halo_ray_traced_light_stage(int stage)
 		return;
 	}
 	size_textures(width, height);
-	if (stage == 0)
-		ray.light_stages = 0;
+	if (stage == 2)
+	{
+		/* the objects' depth, on the rays' grid (Metal's rays: their pixels) */
+		const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+		float uniforms[16] = { 0 };
+
+		if (!ray.hardware || !ray.objects_program || !depth)
+			return;
+		uniforms[4] = (float)viewport[0];
+		uniforms[5] = (float)viewport[1];
+		uniforms[6] = (float)viewport[2];
+		uniforms[7] = (float)viewport[3];
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_SCISSOR_TEST);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.objects_texture, 0);
+		glDrawBuffers(1, &draw_buffer);
+		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+		glBindVertexArray(ray.vertex_array);
+		glUseProgram(ray.objects_program);
+		glUniform4fv(ray.objects_uniforms, 4, uniforms);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depth);
+		glBindSampler(1, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glUniform1i(ray.objects_depth, 1);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glActiveTexture(GL_TEXTURE0);
+		ray.light_stages |= 1 << 2;
+		xgpu_gl_bind_device_vertex_array();
+		xgpu_gl_state_invalidate();
+		return;
+	}
 	/* the window's light, at half resolution */
 	glDisable(GL_SCISSOR_TEST);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, ray.source_framebuffer);
@@ -747,7 +825,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glBindTexture(GL_TEXTURE_2D, ray.lit_texture);
 	glBindSampler(5, 0);
 	glUniform1i(ray.composite_lit, 5);
-	glUniform1i(ray.composite_light_split, ray.light_stages == 3);
+	glUniform1i(ray.composite_light_split, (ray.light_stages & 3) == 3);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	ray.light_stages = 0;
 

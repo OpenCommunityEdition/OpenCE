@@ -367,6 +367,9 @@ static void render_window(
 		first_person_weapon_render_update();
 		lights_preprocess_scene();
 		render_objects();
+#ifdef HALO_LINUX
+		halo_ray_traced_light_stage(2);
+#endif
 		structure_render_preprocess();
 		structure_render_lightmaps();
 		rasterizer_lens_flares_submit_occlusion_tests();

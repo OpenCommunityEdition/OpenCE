@@ -17,13 +17,15 @@ The ray-traced lighting takes the light between the stages
 The scene: a bumpy ground, a back wall, a red wall at the left, an
 overhang on a pillar and a crate (the level: in Metal's acceleration
 structure), and two marines (objects: not in it), one under the overhang
-and one in the open. The pictures, as PPM files:
+and one in the open, and a rock under the overhang that is drawn but not
+in the collision surfaces. The pictures, as PPM files:
 
 - raytrace_off: without the ray-traced lighting;
 - raytrace_after: with it;
 - raytrace_occlusion, raytrace_depth: what it uses;
-- raytrace_undivided: the occlusion over all the light, the dynamic lights'
-  too (as before the stages);
+- raytrace_undivided: without the stages, as before them: the occlusion
+  over all the light, the dynamic lights' too, and the objects' pixels
+  found by a short ray (the rock under the overhang taken for one);
 - raytrace_sun_0 to _3: the sun from the left, high, from the right and
   low behind the overhang (the marine under it in its shadow).
 
@@ -154,8 +156,8 @@ static const char scene_vertex[] =
 	"	kind = color.a;\n"
 	"}\n";
 
-/* pass 0: the light (the level's) or the finished colour (the objects');
-1: the dynamic lights, added; 2: the level's textures, multiplied in */
+/* pass 0: the objects, finished, or the level's light; 1: the dynamic
+lights, added; 2: the level's textures, multiplied in */
 static const char scene_pixel[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
@@ -207,7 +209,10 @@ static struct vertex *vertices;
 /* each vertex's triangle's outward normal (view space), for the level's
 triangles' winding */
 static float *outwards;
-static int vertex_count, vertex_capacity, structure_vertex_count;
+/* the vertices: the level's in the rays' world, then the level's drawn only
+(where its rendered surfaces stand out of its collision surfaces), then
+the objects' */
+static int vertex_count, vertex_capacity, world_vertex_count, structure_vertex_count;
 
 static void add_triangle(const float *a, const float *b, const float *c, const float *albedo, float kind,
 	const float *outward)
@@ -300,6 +305,11 @@ static void build_scene(int dense)
 	add_box(1, 2.2f, 8, 6, 2.6f, 13, concrete, 0);
 	add_box(5.3f, -1.6f, 8, 6, 2.2f, 8.7f, concrete, 0);
 	add_box(-1, -1.6f, 5, 0.5f, 0.3f, 6.5f, crate, 0);
+	world_vertex_count = vertex_count;
+	/* a rock under the overhang, drawn but not in the collision surfaces
+	(as the level's rendered rock stands out of them): the level's, so no
+	traced sun shadow */
+	add_box(2.2f, -1.6f, 11.2f, 3.0f, -0.55f, 12.2f, stone, 0);
 	structure_vertex_count = vertex_count;
 	/* the objects: a marine under the overhang, one in the open */
 	add_box(3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f, armour, 1);
@@ -337,7 +347,7 @@ them */
 static float *world_vertices;
 static unsigned int *world_indices;
 
-unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_count, const unsigned long **indices,
+unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_count_out, const unsigned long **indices,
 	long *triangle_count)
 {
 	static unsigned long generation;
@@ -345,16 +355,16 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 
 	if (!generation)
 	{
-		world_vertices = malloc((size_t)structure_vertex_count * 3 * sizeof(float));
-		world_indices = malloc((size_t)structure_vertex_count * sizeof(unsigned int));
-		for (index = 0; index < structure_vertex_count; index++)
+		world_vertices = malloc((size_t)world_vertex_count * 3 * sizeof(float));
+		world_indices = malloc((size_t)world_vertex_count * sizeof(unsigned int));
+		for (index = 0; index < world_vertex_count; index++)
 		{
 			world_vertices[index * 3 + 0] = vertices[index].x;
 			world_vertices[index * 3 + 1] = vertices[index].z;
 			world_vertices[index * 3 + 2] = vertices[index].y;
 			world_indices[index] = (unsigned int)index;
 		}
-		for (index = 0; index + 2 < structure_vertex_count; index += 3)
+		for (index = 0; index + 2 < world_vertex_count; index += 3)
 		{
 			float *a = &world_vertices[index * 3], *b = a + 3, *c = a + 6;
 			float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
@@ -372,9 +382,9 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 		generation = 1;
 	}
 	*world = world_vertices;
-	*world_vertex_count = structure_vertex_count;
+	*world_vertex_count_out = world_vertex_count;
 	*indices = (const unsigned long *)world_indices;
-	*triangle_count = structure_vertex_count / 3;
+	*triangle_count = world_vertex_count / 3;
 	return generation;
 }
 
@@ -398,15 +408,24 @@ static void draw_pass(int pass)
 	glUniform4fv(glGetUniformLocation(program, "sun"), 1, sun_view);
 	glUniform1i(glGetUniformLocation(program, "pass"), pass);
 	glBindVertexArray(array);
-	if (pass == 0)
+	if (pass == 0 || pass == 3)
 	{
+		glUniform1i(glGetUniformLocation(program, "pass"), 0);
 		glDisable(GL_BLEND);
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LEQUAL);
-		glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
-		glClearDepthf(1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+		if (pass == 0)
+		{
+			/* the objects first, as the game draws them */
+			glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
+			glClearDepthf(1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glDrawArrays(GL_TRIANGLES, structure_vertex_count, vertex_count - structure_vertex_count);
+		}
+		else
+		{
+			glDrawArrays(GL_TRIANGLES, 0, structure_vertex_count);
+		}
 		return;
 	}
 	/* the level's surfaces only, where they are seen */
@@ -426,7 +445,8 @@ static void draw_pass(int pass)
 static const float camera_position[3] = { 0, 0, 0 }, camera_forward[3] = { 0, 1, 0 }, camera_up[3] = { 0, 0, 1 };
 
 /* a frame, as the game draws it; lighting: 0 none, 1 the ray-traced
-lighting, 2 it without the light's stages */
+lighting, 2 it without the stages (the dynamic lights darkened too, the
+objects' pixels found by probing) */
 static void draw_frame(int lighting)
 {
 	if (!program)
@@ -443,6 +463,9 @@ static void draw_frame(int lighting)
 		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex), (void *)12);
 	}
 	draw_pass(0);
+	if (lighting == 1)
+		halo_ray_traced_light_stage(2);
+	draw_pass(3);
 	if (lighting == 1)
 		halo_ray_traced_light_stage(0);
 	draw_pass(1);
@@ -533,8 +556,8 @@ int main(int argc, char **argv)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
 
 	build_scene(getenv("RT_DENSE") && atoi(getenv("RT_DENSE")));
-	printf("the scene: %d triangles in the level, %d in the objects\n", structure_vertex_count / 3,
-		(vertex_count - structure_vertex_count) / 3);
+	printf("the scene: %d triangles in the level's rays, %d drawn only, %d in the objects\n", world_vertex_count / 3,
+		(structure_vertex_count - world_vertex_count) / 3, (vertex_count - structure_vertex_count) / 3);
 
 	if (getenv("RT_BENCH"))
 	{

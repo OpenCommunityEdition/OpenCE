@@ -179,9 +179,12 @@ rays from each pixel:
   red.
 - Sun shadows (Metal only): the sun is the first light of the level's sky
   that has a lens flare, taken as a point light very far away. A ray goes
-  towards it from each pixel of an object; if the level is in the way, the
-  pixel is in shadow. The level's own surfaces already have the sun's
-  shadows in their lightmaps, so their pixels send no shadow ray.
+  towards it from each pixel of an object (the marines, the vehicles, the
+  weapon in your hands); if the level is in the way, the pixel is in
+  shadow. The level's own surfaces already have the sun's shadows in their
+  lightmaps, so their pixels send no shadow ray. The objects' pixels are
+  those whose depth has not changed since the game drew the objects,
+  before the level (`halo_ray_traced_light_stage(2)`).
 
 The occlusion and the sun's shadows darken the level's baked light (its
 lightmaps), not the flashlight's, the plasma's or the other dynamic

@@ -98,8 +98,9 @@ static NSString *const kernel_source = @
 	"using namespace raytracing;\n"
 	/* c: position 0-2, forward 3-5, up 6-8, right 9-11, near 12, far 13,
 	   tan of half the vertical field of view 14, aspect 15, viewport 16-19,
-	   frame 20, occlusion radius 21, reflection distance 22, the direction to
-	   the sun 24-26 and whether there is one 27 */
+	   frame 20, occlusion radius 21, reflection distance 22, whether the
+	   objects' pixels are known 23 (then their depth is negative), the
+	   direction to the sun 24-26 and whether there is one 27 */
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	primitive_acceleration_structure world [[buffer(0)]],\n"
@@ -110,7 +111,7 @@ static NSString *const kernel_source = @
 	"	float2 p = float2(id) + 0.5;\n"
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
 	"	float4 g = gbuffer.read(id);\n"
-	"	float z = g.x;\n"
+	"	float z = abs(g.x);\n"
 	"	if (z <= c[12] || z >= c[13] * 0.999) { result.write(float4(1.0, 0.0, 0.0, 0.0), id); return; }\n"
 	"	float3 camera = float3(c[0], c[1], c[2]), forward = float3(c[3], c[4], c[5]);\n"
 	"	float3 up = float3(c[6], c[7], c[8]), right = float3(c[9], c[10], c[11]);\n"
@@ -151,18 +152,24 @@ static NSString *const kernel_source = @
 	"			occlusion += 1.0 - hit.distance / radius;\n"
 	"	}\n"
 	"	float visibility = 1.0 - occlusion / 4.0;\n"
-	/* the sun's shadow, on what the level's lightmaps do not shade: a pixel
-	   whose surface is not the level's (an object) - a short ray into it
-	   finds no level surface - facing the sun, whose ray to it the level
-	   blocks. The sun is a small disc: the rays spread a little. */
+	/* the sun's shadow, on what the level's lightmaps do not shade: an
+	   object's pixel (the guest marks them; without the marks, a pixel where
+	   a short ray into it finds no level surface) facing the sun, whose ray
+	   to it the level blocks. The sun is a small disc: the rays spread a
+	   little. */
 	"	if (c[27] > 0.0)\n"
 	"	{\n"
 	"		float3 sun = float3(c[24], c[25], c[26]);\n"
-	"		intersector<triangle_data> surface_probe;\n"
-	"		surface_probe.accept_any_intersection(true);\n"
-	"		surface_probe.force_opacity(forced_opacity::opaque);\n"
-	"		ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
-	"		bool on_level = surface_probe.intersect(probe, world).type != intersection_type::none;\n"
+	"		bool on_level;\n"
+	"		if (c[23] > 0.5) on_level = g.x > 0.0;\n"
+	"		else\n"
+	"		{\n"
+	"			intersector<triangle_data> surface_probe;\n"
+	"			surface_probe.accept_any_intersection(true);\n"
+	"			surface_probe.force_opacity(forced_opacity::opaque);\n"
+	"			ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
+	"			on_level = surface_probe.intersect(probe, world).type != intersection_type::none;\n"
+	"		}\n"
 	"		if (!on_level && dot(N, sun) > 0.0)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
@@ -200,7 +207,7 @@ static NSString *const kernel_source = @
 	"			float2 screen = origin + (hit_ndc * 0.5 + 0.5) * size;\n"
 	"			if (all(screen >= origin) && all(screen < origin + size))\n"
 	"			{\n"
-	"				float seen = gbuffer.read(uint2(screen)).x;\n"
+	"				float seen = abs(gbuffer.read(uint2(screen)).x);\n"
 	/* seen there, not hidden behind something nearer */
 	"				if (seen > 0.0 && seen > hz * 0.9 - 0.1)\n"
 	"				{\n"
