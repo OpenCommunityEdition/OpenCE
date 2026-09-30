@@ -339,6 +339,35 @@ for (const role of ['host', 'join']) {
   });
 }
 
+test('a connection failure after host takeover withdraws that host while preserving its match for another survivor', async () => {
+  const fixture = await network(), replacements = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+    assert.equal(replacements[0].role, 'host');
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint(150, 1);
+    fixture.tick(20000); // Native playing acknowledgement releases the recovery hold.
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(fixture.latest().quick.epoch, 2);
+    assert.equal(fixture.latest().quick.matchId, 500);
+    assert.equal(fixture.latest().quick.gamePhase, 'migration-failed');
+    assert.equal(fixture.net.quickPlayLost(), true, 'duplicate error cannot advance the authority again');
+    fixture.tick(26000); fixture.tick(60000);
+    assert.equal(replacements.length, 1, 'a failed host cannot immediately elect itself again');
+    const replacement = await fixture.hostPresence(2); replacement.channels[0].onopen();
+    fixture.tick(61000); fixture.tick(62500);
+    assert.equal(replacements.length, 2); assert.equal(replacements[1].role, 'join');
+    assert.equal(replacements[1].epoch, 2);
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint(180, 2);
+    assert.equal(fixture.latest().quick.matchId, 500);
+    assert.equal(fixture.latest().quick.gamePhase, 'playing');
+  } finally { await fixture.close(); }
+});
+
 test('unresolved setup and initial host loss retain their existing native status routing', async () => {
   const fixture = await network();
   try {

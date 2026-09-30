@@ -280,7 +280,9 @@ void quick_play_update(boolean main_menu_loaded)
 	}
 	if (network_game_client_get_error(client))
 	{
-		if (!quick_play.host && quick_play.phase == QUICK_PLAYING && web_match_migration_lost()) return;
+		/* The host also has a local client connection, including after live
+		   adoption. Its failure must not tear down the world before recovery. */
+		if (quick_play.phase == QUICK_PLAYING && web_match_migration_lost()) return;
 		quick_play_finish(!quick_play.host && quick_play.phase == QUICK_PLAYING ? "disconnected" : "error",
 			"The multiplayer connection failed. Use the game menus or reload to try again.", TRUE);
 		return;

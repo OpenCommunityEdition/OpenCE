@@ -208,6 +208,16 @@ int main(void)
 	assert(!strcmp(last_phase, "playing") && !paused && created == 1 && !maps && !starts && !aborts && !menus);
 	assert(!web_quick_play_initial_map()[0]);
 
+	/* A promoted host still has a local network client. If that connection
+	   fails after takeover, preserve the world for another handoff as well. */
+	mock_client.error = 8; step(1, FALSE);
+	assert(!strcmp(last_phase, "disconnected") && paused && !aborts && !menus);
+	migration_ready = cohort_ready = FALSE;
+	web_quick_play_migrate(2, 0x0403020aU, 2); step(1, FALSE);
+	assert(!quick_play.host && reattached == 2 && engine_epoch == 2 && paused);
+	migration_ready = TRUE; step(1, FALSE);
+	assert(!strcmp(last_phase, "playing") && !paused && created == 1 && !maps && !starts && !aborts && !menus);
+
 	/* A survivor reconnects its existing player to the exact elected address. */
 	launch("join"); mock_client.state = _network_game_client_state_ingame;
 	step(1, FALSE); web_quick_play_hold(1); step(1, FALSE); assert(paused);

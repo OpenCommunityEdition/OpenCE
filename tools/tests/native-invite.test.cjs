@@ -621,6 +621,27 @@ for (const role of ['host', 'join']) {
   });
 }
 
+test('a promoted host connection failure preserves the launcher and reattaches to another host', async () => {
+  const { fixture, host, page, module, migrations } = await loadedRoomLauncher();
+  try {
+    const location = page.context.location.href;
+    host.connectionState = 'failed'; host.onconnectionstatechange();
+    fixture.tick(2000); fixture.tick(12000); fixture.tick(18000); fixture.tick(19500);
+    module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Preserved match resumed.' }));
+    module.haloMessage(6, JSON.stringify({ phase: 'checkpoint', epoch: 1, tick: 150, matchId: 500 }));
+    fixture.tick(20000);
+    module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'Replacement host connection failed.' }));
+    assert.equal(page.quickCalls[0].signal.aborted, false);
+    assert.equal(page.element('fatal').hidden, true);
+    assert.equal(page.context.location.href, location);
+    const replacement = await fixture.hostPresence(2); replacement.channels[0].onopen();
+    fixture.tick(21000); fixture.tick(22500);
+    assert.deepEqual(migrations, [[1, fixture.net.address, 1], [2, 0x0201010a, 2]]);
+    assert.equal(page.context.Module, module);
+    assert.equal(fixture.latest().quick.matchId, 500);
+  } finally { await fixture.close(); }
+});
+
 test('switching an active match restarts in the selected room and preserves cached game data', async () => {
   const page = await launcher(undefined, { url: 'http://localhost:8780/?room=FQLX01&batch_streams=0',
     quickPlay: async ({ room }) => ({ role: 'host', room }) });

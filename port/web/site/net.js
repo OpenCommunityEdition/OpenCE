@@ -1117,7 +1117,14 @@ const HaloNet = (() => {
     // those old-session receipts without cancelling the preserved match or
     // advancing its authority a second time.
     if (coordinator.hasMatch && (coordinator.recovering || attempt.held || attempt.migrationPending)) return true;
-    if (coordinator.result?.role !== 'join') return false;
+    if (coordinator.result?.role === 'host') {
+      if (!coordinator.hasMatch) return false;
+      // A broken host's local native connection cannot serve this authority.
+      // Keep its world, withdraw its candidacy, and follow a healthy survivor
+      // rather than cancelling quick play or immediately choosing it again.
+      coordinator.presence.gamePhase = 'migration-failed';
+      coordinator.presence.checkpointTick = -1;
+    } else if (coordinator.result?.role !== 'join') return false;
     attempt.held = true;
     coordinator.recover(Date.now());
     publishQuick();
