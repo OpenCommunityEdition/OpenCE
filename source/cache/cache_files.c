@@ -127,6 +127,8 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* where the window is in this process (port/linux/include/halo_port_window.h) */
 #include "halo_port_window.h"
+/* how big the tag cache is here (port/linux/include/halo_port_capacity.h) */
+#include "halo_port_capacity.h"
 #endif
 #include "errors.h"
 #include "tag_files/tag_groups.h"
@@ -147,6 +149,14 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* where the tag cache is in this process (halo_port_window.h) */
 #define TAG_CACHE_ADDRESS PORT_WINDOW_ADDRESS(0x803A6000)
+
+/* how big it is: the Xbox's 22 MB, or the native builds' larger one
+(halo_port_capacity.h) */
+#ifdef HALO_LINUX
+#define TAG_CACHE_SIZE HALO_PORT_TAG_CACHE_SIZE
+#else
+#define TAG_CACHE_SIZE 0x1600000
+#endif
 #else
 #define TAG_CACHE_ADDRESS 0x803A6000
 #endif
@@ -491,7 +501,7 @@ long tag_loaded(
 void cache_files_enable_writes(
 	void)
 {
-	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, 0x01600000, PAGE_READWRITE);
+	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, TAG_CACHE_SIZE, PAGE_READWRITE);
 
 	return;
 }
@@ -499,7 +509,7 @@ void cache_files_enable_writes(
 void cache_files_disable_writes(
 	void)
 {
-	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, 0x01600000, PAGE_READONLY);
+	XPhysicalProtect((void *)TAG_CACHE_ADDRESS, TAG_CACHE_SIZE, PAGE_READONLY);
 	XPhysicalProtect(
 		cache_file_globals.tag_header->vertex_buffers,
 		cache_file_globals.tag_header->vertex_buffer_count * 12,
@@ -749,7 +759,7 @@ long scenario_tags_load(
 		tag_cache_base_address = physical_memory_get_tag_cache_base_address();
 		if (cache_file_header_verify(&cache_file_globals.header, scenario_name, TRUE))
 		{
-			csmemset(tag_cache_base_address, 0xCD, 0x01600000);
+			csmemset(tag_cache_base_address, 0xCD, TAG_CACHE_SIZE);
 			cache_file_read(
 				NONE,
 				cache_file_globals.header.tag_data_offset,
@@ -814,7 +824,7 @@ boolean scenario_structure_bsp_load(
 	csmemset(
 		tag_cache_base_address + cache_file_globals.header.tag_data_size,
 		0xCD,
-		0x01600000 - cache_file_globals.header.tag_data_size);
+		TAG_CACHE_SIZE - cache_file_globals.header.tag_data_size);
 	{
 		boolean read_complete;
 

@@ -29,10 +29,20 @@ The CPU part holds about 13.6 MB of pools at the sizes below (the Xbox pools
 fill 3,165,260 of its 0x305000 bytes); the GPU part holds only the decal
 vertices, as on the Xbox. */
 
+/* A map's tag data runs from the tag cache up to wherever that map puts its
+level data, and the largest maps shipped need more than the Xbox's 0x1600000
+(the cache ends at 0x819A6000 on the Xbox): one is measured at 0x167C800, half
+a megabyte over. Reading it walks off the end of the mapping into the part
+of the window the host left reserved, which faults. The native builds give
+it 30 MB. */
+#define HALO_PORT_TAG_CACHE_SIZE 0x1E00000 /* (0x1600000) */
+
 /* the game's own address, which is where the port places the game state
 when the window is where the game data expects it; on Android, where the
-host puts the window, the port shifts it (halo_port_window.h) */
-#define HALO_PORT_GAME_STATE_XBOX_ADDRESS 0x81A00000 /* (0x80061000) */
+host puts the window, the port shifts it (halo_port_window.h). It sits above
+the enlarged tag cache and above where maps put their level data, which
+starts just past that cache's end. */
+#define HALO_PORT_GAME_STATE_XBOX_ADDRESS 0x86000000 /* (0x80061000) */
 #define HALO_PORT_GAME_STATE_CPU_SIZE 0xFC0000 /* (0x305000) */
 #define HALO_PORT_GAME_STATE_GPU_SIZE 0x40000 /* (0x40000) */
 #define HALO_PORT_GAME_STATE_SIZE (HALO_PORT_GAME_STATE_CPU_SIZE+HALO_PORT_GAME_STATE_GPU_SIZE)

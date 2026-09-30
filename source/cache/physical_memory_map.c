@@ -41,6 +41,7 @@ symbols in this file:
 #ifdef HALO_LINUX
 /* where the window is in this process (port/linux/include/halo_port_window.h) */
 #include "halo_port_window.h"
+#include "halo_port_capacity.h"
 #endif
 
 /* ---------- constants */
@@ -62,7 +63,12 @@ symbols in this file:
 desktop ports, shifted where the host put the window on Android) */
 #define GAME_STATE_BASE_ADDRESS PORT_WINDOW_ADDRESS(GAME_STATE_XBOX_ADDRESS)
 #define TAG_CACHE_BASE_ADDRESS PORT_WINDOW_ADDRESS(TAG_CACHE_XBOX_ADDRESS)
+#ifdef HALO_LINUX
+/* the native builds' larger tag cache (halo_port_capacity.h) */
+#define TAG_CACHE_SIZE HALO_PORT_TAG_CACHE_SIZE
+#else
 #define TAG_CACHE_SIZE 0x1600000
+#endif
 #define TEXTURE_CACHE_SIZE 0x1600000
 #define SOUND_CACHE_SIZE 0x400000
 
