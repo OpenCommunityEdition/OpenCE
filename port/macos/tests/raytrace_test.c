@@ -49,6 +49,15 @@ static float world_vertices[4096 * 3];
 /* 32-bit, as the guest's unsigned long is (the host reads them so) */
 static unsigned int world_indices[4096];
 
+/* the sun: high, from the right and behind the camera */
+unsigned char halo_ray_tracing_sun(float *direction)
+{
+	direction[0] = 0.5f;
+	direction[1] = -0.4f;
+	direction[2] = 0.77f;
+	return 1;
+}
+
 unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
 	long *triangle_count);
 
@@ -71,6 +80,8 @@ double config_real(const char *name)
 {
 	if (!strcmp(name, "display.ray_tracing_occlusion"))
 		return 0.8;
+	if (!strcmp(name, "display.ray_tracing_shadows"))
+		return 1.0;
 	if (!strcmp(name, "display.ray_tracing_reflections"))
 		return 0.25;
 	return 0.25;

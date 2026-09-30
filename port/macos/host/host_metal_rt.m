@@ -78,7 +78,8 @@ static NSString *const kernel_source = @
 	"using namespace raytracing;\n"
 	/* c: position 0-2, forward 3-5, up 6-8, right 9-11, near 12, far 13,
 	   tan of half the vertical field of view 14, aspect 15, viewport 16-19,
-	   frame 20, occlusion radius 21, reflection distance 22 */
+	   frame 20, occlusion radius 21, reflection distance 22, the direction to
+	   the sun 24-26 and whether there is one 27 */
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	primitive_acceleration_structure world [[buffer(0)]],\n"
@@ -124,6 +125,24 @@ static NSString *const kernel_source = @
 	"			occlusion += 1.0 - hit.distance / radius;\n"
 	"	}\n"
 	"	float visibility = 1.0 - occlusion / 8.0;\n"
+	/* the sun's shadow, on what the level's lightmaps do not shade: a pixel
+	   whose surface is not the level's (an object) - a short ray into it
+	   finds no level surface - facing the sun, whose ray to it the level
+	   blocks. The sun is a small disc: the rays spread a little. */
+	"	if (c[27] > 0.0)\n"
+	"	{\n"
+	"		float3 sun = float3(c[24], c[25], c[26]);\n"
+	"		ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
+	"		bool on_level = any_hit.intersect(probe, world).type != intersection_type::none;\n"
+	"		if (!on_level && dot(N, sun) > 0.0)\n"
+	"		{\n"
+	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
+	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
+	"			ray shadow_ray(P + N * bias, normalize(sun + spread), 0.0, 2000.0);\n"
+	"			if (any_hit.intersect(shadow_ray, world).type != intersection_type::none)\n"
+	"				visibility *= 1.0 - 0.55 * c[27];\n"
+	"		}\n"
+	"	}\n"
 	/* the reflection: its hit, where the camera sees it */
 	"	float3 V = normalize(P - camera);\n"
 	"	float3 R = reflect(V, N);\n"
@@ -313,7 +332,7 @@ uint32_t host_rt_texture(int which, int width, int height)
 	return rt.gl_textures[which];
 }
 
-/* the rays, for the camera (the 24 values the kernel names); 1 if done */
+/* the rays, for the camera (the 28 values the kernel names); 1 if done */
 int host_rt_trace(const float *camera, int width, int height)
 {
 	id<MTLCommandBuffer> commands;
@@ -332,7 +351,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setTexture:rt.textures[0] atIndex:0];
 	[encoder setTexture:rt.textures[1] atIndex:1];
 	[encoder setAccelerationStructure:rt.world atBufferIndex:0];
-	[encoder setBytes:camera length:24 * sizeof(float) atIndex:1];
+	[encoder setBytes:camera length:28 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];

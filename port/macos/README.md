@@ -73,12 +73,15 @@ The controls and most of the settings are those of the Linux build. Refer
 to [port/linux/README.md](../linux/README.md). The keys that the macOS
 build adds:
 
-| Key | Function |
-| --- | --- |
-| F8 | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
-| F9 | Switch the ray-traced lighting on or off. |
-| F11 | Switch between fullscreen and a window. |
-| F12 | Release or capture the mouse. |
+| Key | Mac keyboard | Function |
+| --- | --- | --- |
+| F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
+| F9 | ⌘T | Switch the ray-traced lighting on or off. |
+| F11 | ⌘F | Switch between fullscreen and a window. |
+| F12 | ⌘G | Release or capture the mouse. |
+
+On a Mac keyboard, F11 shows the desktop and F8 to F12 are media keys
+unless fn is held, so the Command shortcuts do the same.
 
 These settings are new, or have a different default on macOS:
 

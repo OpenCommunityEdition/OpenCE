@@ -18,6 +18,7 @@ and the debug keyboard that the game's console reads.
 #include "raytrace_gl.h"
 
 #include <SDL3/SDL.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +49,23 @@ static unsigned long keystroke_head, keystroke_count;
 void updater_start(void);
 void updater_poll(SDL_Window *window);
 #endif
+
+/* the game's console (source/interface/terminal.c): a line on the screen
+that fades */
+void terminal_printf(const void *color, const char *format, ...);
+
+/* what the port's keys did: on the screen and in the log */
+static void notice(const char *format, ...)
+{
+	char text[256];
+	va_list arguments;
+
+	va_start(arguments, format);
+	vsnprintf(text, sizeof(text), format, arguments);
+	va_end(arguments);
+	platform_log("%s", text);
+	terminal_printf(NULL, "%s", text);
+}
 
 BOOL platform_sdl_initialize(void)
 {
@@ -737,35 +755,61 @@ void platform_pump_events(void)
 			exit(EXIT_SUCCESS);
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
-			if (event.key.scancode < SDL_SCANCODE_COUNT)
+		{
+			/* the port's keys: F8 to F12, or on macOS, whose own keys F11 and
+			the media keys are, Command with a letter (the letter then does
+			nothing in the game) */
+			SDL_Scancode action = event.key.scancode;
+
+#ifdef HALO_MACOS
+			if (event.key.mod & SDL_KMOD_GUI)
 			{
-				input_state.keys[event.key.scancode] = event.key.down;
-				if (event.key.down)
-					keys_pressed[event.key.scancode] = 1;
+				switch (event.key.scancode)
+				{
+				case SDL_SCANCODE_F: action = SDL_SCANCODE_F11; break;
+				case SDL_SCANCODE_R: action = SDL_SCANCODE_F8; break;
+				case SDL_SCANCODE_T: action = SDL_SCANCODE_F9; break;
+				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
+				default: break;
+				}
 			}
-			queue_keystroke(&event.key);
+			if (action == event.key.scancode)
+#endif
+			{
+				if (event.key.scancode < SDL_SCANCODE_COUNT)
+				{
+					input_state.keys[event.key.scancode] = event.key.down;
+					if (event.key.down)
+						keys_pressed[event.key.scancode] = 1;
+				}
+				queue_keystroke(&event.key);
+			}
 			/* F12 releases or recaptures the mouse */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F12)
 			{
 				input_state.mouse_released = !input_state.mouse_released;
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
+				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
 			}
 			/* F8 steps through the resolutions (d3d8_gl.c) */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F8)
-				halo_screen_resolution_next();
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F8)
+				notice("resolution: %s", halo_screen_resolution_next());
 			/* F9 switches the ray-traced lighting (raytrace_gl.c) */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F9)
-				halo_ray_tracing_toggle();
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F9)
+				notice("ray tracing: %s", halo_ray_tracing_toggle());
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
 			window's size and place while fullscreen) */
-			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F11)
 			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+				bool fullscreen = !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN);
+
+				SDL_SetWindowFullscreen(platform_window, fullscreen);
+				notice("%s", fullscreen ? "fullscreen" : "window");
 			}
 #endif
 			break;
+		}
 		case SDL_EVENT_MOUSE_MOTION:
 #ifndef HALO_ANDROID
 			/* in the menus the mouse moves the pointer, not the view */

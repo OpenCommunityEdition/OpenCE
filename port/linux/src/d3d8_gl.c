@@ -96,7 +96,7 @@ static const char *const resolution_presets[] = { "native", "2160p", "1440p", "1
 /* F8's choice, -1 until F8 is pressed (display.resolution then) */
 static int resolution_preset = -1;
 
-void halo_screen_resolution_next(void)
+const char *halo_screen_resolution_next(void)
 {
 	const char *current = resolution_preset >= 0 ? resolution_presets[resolution_preset] :
 		config_string("display.resolution");
@@ -112,6 +112,7 @@ void halo_screen_resolution_next(void)
 		}
 	}
 	platform_log("screen: resolution %s (F8)", resolution_presets[resolution_preset]);
+	return resolution_presets[resolution_preset];
 }
 
 /* the picture's pixels for an output of display_width x display_height;

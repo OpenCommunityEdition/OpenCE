@@ -116,6 +116,10 @@ static const struct config_setting config_settings[] =
 	{ "display.ray_tracing_bounce", _config_real, "0.25", "HALO_RAY_TRACING_BOUNCE", _environment_value,
 		_platform_all,
 		"How much light one traced bounce carries between surfaces, 0.0 to 1.0." },
+	{ "display.ray_tracing_shadows", _config_real, "1.0", "HALO_RAY_TRACING_SHADOWS", _environment_value,
+		_platform_all,
+		"How dark the sun's traced shadows on characters, vehicles and items are,\n"
+		"0.0 to 1.0 (macOS, with Metal's rays)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

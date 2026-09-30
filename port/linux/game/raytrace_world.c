@@ -17,6 +17,8 @@ is split into a fan of triangles.
 #include "cseries.h"
 #include "physics/collision_bsp_definitions.h"
 #include "scenario/scenario.h"
+#include "render/render.h"
+#include "tag_files/tag_files.h"
 
 enum
 {
@@ -125,4 +127,62 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 	*indices = world.indices;
 	*triangle_count = world.triangle_count;
 	return world.generation;
+}
+
+/* ---------- the sun
+
+The first light of the visible sky with a direction (the one whose lens
+flare the sky draws: render_sky.c) is taken as the sun. */
+
+
+struct sky_light_view
+{
+	struct tag_reference lens_flare;
+	char marker_name[TAG_STRING_LENGTH + 1];
+	byte pad31[0x37];
+	real_euler_angles2d direction;
+	byte pad70[4];
+};
+
+struct sky_view
+{
+	struct tag_reference model;
+	struct tag_reference animation_graph;
+	byte pad20[0x8C];
+	struct tag_block render_model_regions;
+	struct tag_block animations;
+	struct tag_block lights;
+};
+
+typedef char sky_light_view_size_assert[sizeof(struct sky_light_view) == 0x74 ? 1 : -1];
+typedef char sky_view_lights_offset_assert[offsetof(struct sky_view, lights) == 0xC4 ? 1 : -1];
+
+struct sky *scenario_get_sky(short sky_index);
+
+/* the direction towards the sun in the world (unit length); FALSE if the
+visible sky has none */
+boolean halo_ray_tracing_sun(float *direction)
+{
+	const struct sky_view *sky;
+	long index;
+
+	if (render.visible_sky_index == NONE)
+		return FALSE;
+	sky = (const struct sky_view *)scenario_get_sky(render.visible_sky_index);
+	if (!sky)
+		return FALSE;
+	for (index = 0; index < sky->lights.count; index++)
+	{
+		const struct sky_light_view *light = (const struct sky_light_view *)sky->lights.address + index;
+		real_vector3d vector;
+
+		if (light->lens_flare.index == NONE)
+			continue;
+		vector3d_from_euler_angles2d(&vector, &light->direction);
+		direction[0] = vector.i;
+		direction[1] = vector.j;
+		direction[2] = vector.k;
+		return TRUE;
+	}
+	return FALSE;
 }

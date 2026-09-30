@@ -13,7 +13,8 @@ forward and up vectors in the world (3 floats each) */
 void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up);
 /* F9 (sdl_platform.c) */
-void halo_ray_tracing_toggle(void);
+/* returns what it is now, as text */
+const char *halo_ray_tracing_toggle(void);
 /* what it shows: 1 the lighting, 2 the occlusion, 3 the depth (tests) */
 void halo_ray_tracing_debug_mode(int mode);
 
