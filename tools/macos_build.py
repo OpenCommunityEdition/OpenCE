@@ -314,13 +314,18 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
            description="MACOS HOST THUNKS $out")
 
     _generate_variant(n, sln, config, "native", angles["arm64"], libsdl)
+    # the same with the original's debug checks off (HALO_RELEASE), for
+    # playing: build/macos-release/Halo.app (ninja macos_release_app)
+    _generate_variant(n, sln, config, "release", angles["arm64"], libsdl)
     _generate_variant(n, sln, config, "x86_64", angles["x86_64"], libsdl)
     n.newline()
 
 
 def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str, angle: Path, libsdl: Path) -> None:
-    native = variant == "native"
-    build = BUILD if native else Path("build/macos-x86_64")
+    native = variant in ("native", "release")
+    release = variant == "release" or getattr(sln, "port_release", False)
+    build = BUILD if variant == "native" else Path("build/macos-release") if variant == "release" else \
+        Path("build/macos-x86_64")
     stage = build / "Halo"
     guest_dir = build / "guest"
     obj_dir = guest_dir / "obj"
@@ -335,7 +340,7 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
     image = stage / "halo_guest.elf"
     host_executable = stage / "halo"
     python = "$python"
-    target = "macos" if native else "macos_x86_64"
+    target = {"native": "macos", "release": "macos_release"}.get(variant, "macos_x86_64")
     cc_rule = "macos_native_cc" if native else "macos_guest_cc"
     host_arch = "arm64" if native else "x86_64"
 
@@ -387,7 +392,7 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         f"-isystem {MUSL_DIR}/include",
     ]
     abi_flags = NATIVE_ABI_FLAGS if native else X86_ABI_FLAGS
-    guest_abi = " ".join(abi_flags + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
+    guest_abi = " ".join(abi_flags + (["-DHALO_RELEASE"] if release else []))
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = list(generated_headers)
     if native:
@@ -560,13 +565,14 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         n.build(outputs=bundle / "Info.plist", rule="macos_copy", inputs=PORT_DIR / "Info.plist")
         n.build(outputs=bundle / "Resources" / "halo.icns", rule="macos_icon", inputs=PORT_DIR / "Info.plist",
                 implicit=[Path("port/android/art")])
-        n.rule(name="macos_sign", command="codesign --force --deep --sign - $bundle > /dev/null 2>&1 && touch $out",
-               description="MACOS SIGN $bundle")
+        if variant == "native":
+            n.rule(name="macos_sign", command="codesign --force --deep --sign - $bundle > /dev/null 2>&1 && touch $out",
+                   description="MACOS SIGN $bundle")
         signed = build / "Halo.app.signed"
         n.build(outputs=signed, rule="macos_sign",
                 inputs=[*bundle_files, bundle / "Info.plist", bundle / "Resources" / "halo.icns"],
                 variables={"bundle": str(build / "Halo.app")})
-        n.build(outputs="macos_app", rule="phony", inputs=[signed])
+        n.build(outputs=target + "_app", rule="phony", inputs=[signed])
 
     # ---------- the runtime test (port/macos/tests): its own guest image,
     # staged with the same host
