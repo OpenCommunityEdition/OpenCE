@@ -1665,14 +1665,39 @@ static void light_grid_ask(void)
 
 	if (!rt.glowing || !rt.glowing_count || !vertices || !vertex_count)
 		return;
-	for (index = 0; index < vertex_count; index++)
+	/* (the box: the glowing triangles', 40 units more all round, within the
+	level's - b30's sea reaches 1000 out, and cells over it were 42 units) */
+	{
+		const float *glow = rt.glowing.contents;
+		float level_lo[3] = { 1e30f, 1e30f, 1e30f }, level_hi[3] = { -1e30f, -1e30f, -1e30f };
+
+		for (index = 0; index < vertex_count; index++)
+			for (axis = 0; axis < 3; axis++)
+			{
+				float value = vertices[index * 3 + axis];
+
+				level_lo[axis] = value < level_lo[axis] ? value : level_lo[axis];
+				level_hi[axis] = value > level_hi[axis] ? value : level_hi[axis];
+			}
+		for (index = 0; index < rt.glowing_count; index++)
+		{
+			int corner;
+
+			for (corner = 0; corner < 3; corner++)
+				for (axis = 0; axis < 3; axis++)
+				{
+					float value = glow[index * 12 + corner * 4 + axis];
+
+					lo[axis] = value < lo[axis] ? value : lo[axis];
+					hi[axis] = value > hi[axis] ? value : hi[axis];
+				}
+		}
 		for (axis = 0; axis < 3; axis++)
 		{
-			float value = vertices[index * 3 + axis];
-
-			lo[axis] = value < lo[axis] ? value : lo[axis];
-			hi[axis] = value > hi[axis] ? value : hi[axis];
+			lo[axis] = fmaxf(lo[axis] - 40.0f, level_lo[axis]);
+			hi[axis] = fminf(hi[axis] + 40.0f, level_hi[axis]);
 		}
+	}
 	copy = malloc(rt.glowing_count * 12 * sizeof(float));
 	if (!copy)
 		return;
