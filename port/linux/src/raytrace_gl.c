@@ -931,8 +931,39 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	/* the lights: traced, all of them, or the game's dynamic ones, for their
 	shadows */
 	{
-		static float lights[8 * 12];
-		long light_count = halo_ray_tracing_lights(lights, 8, ray.traced_lights);
+		static float lights[64 * 12];
+		long light_count = halo_ray_tracing_lights(lights, 64, ray.traced_lights), i, j;
+
+		/* the 16 nearest (to their reach's edge: a wide light far off can
+		still reach you), first */
+		for (i = 0; i < light_count && i < 16; i++)
+		{
+			long nearest = i;
+			float best = 1e30f;
+
+			for (j = i; j < light_count; j++)
+			{
+				const float *l = lights + j * 12;
+				float dx = l[0] - position[0], dy = l[1] - position[1], dz = l[2] - position[2];
+				float edge = sqrtf(dx * dx + dy * dy + dz * dz) - l[3];
+
+				if (edge < best)
+				{
+					best = edge;
+					nearest = j;
+				}
+			}
+			if (nearest != i)
+			{
+				float swap[12];
+
+				memcpy(swap, lights + i * 12, sizeof(swap));
+				memcpy(lights + i * 12, lights + nearest * 12, sizeof(swap));
+				memcpy(lights + nearest * 12, swap, sizeof(swap));
+			}
+		}
+		if (light_count > 16)
+			light_count = 16;
 
 		host_rt_set_lights(lights, (int)light_count);
 	}

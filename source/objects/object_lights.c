@@ -2417,8 +2417,8 @@ long halo_ray_tracing_lights(
 		{
 			if (!all || !definition)
 				continue;
-			/* (at most 10 world units: each pixel it reaches traces a ray to it) */
-			radius = MIN(definition->radius * MAX(definition->radius_modifier_upper_bound, 1.0f), 10.0f);
+			/* (at most 25 world units: each pixel it reaches traces a ray to it) */
+			radius = MIN(definition->radius * MAX(definition->radius_modifier_upper_bound, 1.0f), 25.0f);
 		}
 		else if (light->rasterizer_light_index == NONE)
 		{
