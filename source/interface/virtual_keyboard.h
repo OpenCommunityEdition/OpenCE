@@ -39,6 +39,24 @@ void virtual_keyboard_process(
 void virtual_keyboard_render(
 	void);
 
+/**
+ * @brief Applies a click or tap, in the menus' 640x480 coordinates that the
+ * keyboard draws in, to the keyboard.
+ *
+ * A key takes the focus and is pressed as A presses the focused key. BACK
+ * cancels as B does. ENTER goes to Done and presses it as Start does, not as
+ * A does: a touch has no focused key to confirm with. Keys that span several
+ * cells take the focus at their first.
+ *
+ * @param x horizontal position of the click
+ * @param y vertical position of the click
+ * @return TRUE if the click was on a key or on the BACK or ENTER legend,
+ * which then acted; FALSE otherwise
+ */
+boolean virtual_keyboard_click(
+	short x,
+	short y);
+
 /* ---------- globals */
 
 /* ---------- public code */

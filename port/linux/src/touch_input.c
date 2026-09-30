@@ -1,0 +1,119 @@
+/*
+TOUCH_INPUT.C
+
+The touchscreen of the Android build. SDL's finger events become the
+menus' pointer (touch_menu.c) while a menu is up, as the desktop mouse
+does (sdl_platform.c, platform_ui_pointer_read). Sizes are in dp, from the
+display density the app passes (HALO_DISPLAY_DENSITY, host_main.c).
+*/
+
+#include "touch_input.h"
+#include "touch_menu.h"
+
+#include <stdlib.h>
+
+/* a tap moves at most this far; a drag of this length is one wheel step */
+#define TOUCH_TAP_SLOP_DP 12.0f
+#define TOUCH_SCROLL_STEP_DP 40.0f
+/* the menus post one press a frame and drop presses beyond their queue
+(ui_widget.c): one step a read keeps up with them without losing any */
+#define TOUCH_STEPS_PER_READ 1
+
+static struct touch_menu menu;
+static int menu_ready;
+static int menu_active;
+/**
+ * @brief The pixels in a dp: Android's densityDpi / 160, or else a guess
+ * from the height.
+ * @return pixels a dp; 0 while neither is known (the window does not exist
+ * yet)
+ */
+static float pixels_per_dp(void)
+{
+	const char *density = getenv("HALO_DISPLAY_DENSITY");
+	int width = 0, height = 0;
+
+	if (density && atof(density) > 0.0)
+		return (float)atof(density);
+	platform_video_drawable_size(&width, &height);
+	/* a phone held in landscape is about 360 dp high, whatever its density */
+	return height > 0 ? (float)height / 360.0f : 0.0f;
+}
+
+/**
+ * @brief Sets the gestures' sizes up, once they can be known; until then a
+ * dp is a pixel and the next call tries again.
+ */
+static void menu_setup(void)
+{
+	if (!menu_ready)
+	{
+		struct touch_menu_settings settings;
+		float dp = pixels_per_dp();
+
+		settings.slop = TOUCH_TAP_SLOP_DP * (dp > 0.0f ? dp : 1.0f);
+		settings.step = TOUCH_SCROLL_STEP_DP * (dp > 0.0f ? dp : 1.0f);
+		settings.steps_per_read = TOUCH_STEPS_PER_READ;
+		touch_menu_init(&menu, &settings);
+		menu_ready = dp > 0.0f;
+	}
+}
+
+void touch_input_event(unsigned int type, const SDL_TouchFingerEvent *finger)
+{
+	int width = 0, height = 0;
+	float x, y;
+
+	menu_setup();
+	/* SDL gives 0..1 of the window; the window is its pixels on Android */
+	platform_video_drawable_size(&width, &height);
+	x = finger->x * (float)width;
+	y = finger->y * (float)height;
+	switch (type)
+	{
+	case SDL_EVENT_FINGER_DOWN:
+		touch_menu_down(&menu, finger->fingerID, x, y);
+		break;
+	case SDL_EVENT_FINGER_MOTION:
+		touch_menu_move(&menu, finger->fingerID, x, y);
+		break;
+	case SDL_EVENT_FINGER_UP:
+		touch_menu_up(&menu, finger->fingerID, x, y);
+		break;
+	case SDL_EVENT_FINGER_CANCELED:
+		touch_menu_cancel(&menu);
+		break;
+	}
+}
+
+void touch_input_cancel(void)
+{
+	menu_setup();
+	touch_menu_cancel(&menu);
+}
+
+void touch_input_menu_set_active(int active)
+{
+	/* what a finger began before the menu opened or closed must not
+	click in it */
+	menu_setup();
+	touch_menu_reset(&menu);
+	menu_active = active;
+}
+
+void touch_input_menu_read(struct platform_ui_pointer *pointer)
+{
+	struct touch_menu_output output;
+
+	menu_setup();
+	touch_menu_read(&menu, &output);
+	pointer->x = output.x;
+	pointer->y = output.y;
+	pointer->click_x = output.click_x;
+	pointer->click_y = output.click_y;
+	pointer->moved = output.moved ? TRUE : FALSE;
+	pointer->left_clicks = output.clicks;
+	pointer->right_clicks = 0;
+	pointer->wheel_steps = output.wheel_steps;
+	pointer->touch = TRUE;
+}

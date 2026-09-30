@@ -92,8 +92,17 @@ with the positions on the Xbox controller:
 | Create | back | |
 
 The controller gets the rumble. The back gesture of Android is the B
-button. A Bluetooth or USB keyboard operates as on Linux. The screen does
-not accept touch input.
+button. A Bluetooth or USB keyboard operates as on Linux.
+
+The touchscreen operates the menus: tap an item to select it (on a
+setting with values, tap its left or right half), tap a button of the key
+at the bottom of a screen (for example "B = Back") to push it, and drag to
+scroll a list (down or right steps back, up or left steps forward). A drag
+stops at the first and the last item, and it does not change a setting's
+value. The gameplay does not accept touch input yet.
+
+On the on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
+"A =ENTER" to accept the name.
 
 ## Settings
 
@@ -310,6 +319,6 @@ assembly of the port is necessary:
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to approximately `0x89000000`. If the addresses are not
   available, the app shows a message.
-- The game does not accept touch input. Use a controller or a keyboard.
+- Touch operates only the menus. In the game, use a controller or a keyboard.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.

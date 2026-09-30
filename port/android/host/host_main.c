@@ -233,6 +233,13 @@ static uint32_t make_boot(const struct environment *environment)
 
 #define MAIN_STACK_SIZE (16 * 1024 * 1024)
 
+/**
+ * @brief The thread that runs the game: passes the display and its density,
+ * the time zone and the data and save folders to the guest through its
+ * environment, and runs the guest's main.
+ * @param unused the thread argument, not used
+ * @return never returns normally
+ */
 static void *game_main(void *unused)
 {
 	struct environment environment = { { 0 }, 0 };
@@ -277,6 +284,19 @@ static void *game_main(void *unused)
 			snprintf(width, sizeof(width), "%d", (480 * longer / shorter) & ~1);
 			environment_set(&environment, "HALO_DISPLAY_WIDTH", width);
 			host_logf(HOST_LOG_INFO, "display %dx%d: rendering %sx480", mode->w, mode->h, width);
+		}
+		{
+			/* dp for the touch controls (port/linux/src/touch_input.c): SDL
+			gives Android's densityDpi / 160 */
+			float density = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+			char text[16];
+
+			if (density > 0.0f)
+			{
+				snprintf(text, sizeof(text), "%g", density);
+				environment_set(&environment, "HALO_DISPLAY_DENSITY", text);
+				host_logf(HOST_LOG_INFO, "display density %s", text);
+			}
 		}
 	}
 	time_zone(zone, sizeof(zone));

@@ -5228,6 +5228,11 @@ struct ui_mouse_target
 	rectangle2d bounds;
 	short kind;
 	short button_index;
+	/* a button's parts, kept so its area can be settled once the whole frame's
+	buttons are known (ui_mouse_fit_button_targets) */
+	rectangle2d icon_bounds;
+	struct widget_instance *label;
+	rectangle2d label_bounds;
 };
 
 static struct ui_mouse_target ui_mouse_targets[UI_MOUSE_MAXIMUM_TARGETS];
@@ -5246,6 +5251,9 @@ static boolean ui_mouse_hover_pending = FALSE;
 static boolean ui_mouse_click_pending = FALSE;
 static short ui_mouse_hover_x, ui_mouse_hover_y;
 static short ui_mouse_click_x, ui_mouse_click_y;
+/* whether the latest pointer read was the touchscreen: the taller legend
+areas are for a finger only, the desktop mouse keeps their original height */
+static boolean ui_mouse_pointer_is_touch = FALSE;
 
 static void ui_mouse_press(
 	short button_index)
@@ -5352,6 +5360,14 @@ static boolean ui_mouse_widget_is_item(
 		widget->type == _ui_widget_type_column_list;
 }
 
+/**
+ * @brief Notes a widget as a tap target of this frame, if it is one: an
+ * item, a value, a list slot, or a legend button (kept in parts, which
+ * ui_mouse_fit_button_targets settles into the tap area).
+ * @param widget the widget being rendered
+ * @param definition the widget's definition
+ * @param offset where the widget's parent is drawn, in menu coordinates
+ */
 static void ui_mouse_note_target(
 	struct widget_instance *widget,
 	struct ui_widget_definition const *definition,
@@ -5360,6 +5376,9 @@ static void ui_mouse_note_target(
 	struct widget_instance *parent = widget->parent;
 	struct ui_mouse_target *target;
 	rectangle2d bounds = definition->bounds;
+	rectangle2d icon_bounds = bounds;
+	rectangle2d target_label_bounds = bounds;
+	struct widget_instance *target_label = NULL;
 	short button_index;
 	short kind;
 
@@ -5378,7 +5397,8 @@ static void ui_mouse_note_target(
 	{
 		/* the icon and its label: the text beginning just right of it */
 		struct widget_instance *sibling;
-		rectangle2d label_bounds;
+		rectangle2d label_bounds = bounds;
+		struct widget_instance *label = NULL;
 		short best_distance = 17;
 
 		kind = _ui_mouse_target_button;
@@ -5402,14 +5422,12 @@ static void ui_mouse_note_target(
 			{
 				best_distance = distance;
 				label_bounds = sibling_bounds;
+				label = sibling;
 			}
 		}
-		if (best_distance < 17)
-		{
-			bounds.x1 = MAX(bounds.x1, label_bounds.x1);
-			bounds.y0 = MIN(bounds.y0, label_bounds.y0);
-			bounds.y1 = MAX(bounds.y1, label_bounds.y1);
-		}
+		icon_bounds = bounds;
+		target_label = best_distance < 17 ? label : NULL;
+		target_label_bounds = label_bounds;
 	}
 	else if (parent && ui_mouse_list_shows_several(parent))
 	{
@@ -5441,6 +5459,133 @@ static void ui_mouse_note_target(
 	target->bounds = bounds;
 	target->kind = kind;
 	target->button_index = button_index;
+	target->icon_bounds = icon_bounds;
+	target->label = target_label;
+	target->label_bounds = target_label_bounds;
+
+	return;
+}
+
+/**
+ * @brief The right edge of a legend label's text as the game draws it, or
+ * NONE when it cannot be measured (no text, no font, or icons in the string,
+ * which the measuring does not account for).
+ * @param label the label's text box widget
+ * @param label_bounds the text box's bounds where it is drawn, in menu coordinates
+ */
+static short ui_mouse_label_text_right(
+	struct widget_instance *label,
+	rectangle2d const *label_bounds)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(label->definition_tag_index);
+	wchar_t const *text = label->parameters.text_box.text;
+	real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	rectangle2d bounds = *label_bounds;
+	rectangle2d text_bounds;
+	rectangle2d cursor_bounds;
+
+	if (!text || !*text || definition->text_font.index == NONE ||
+		definition->justification < 0 || definition->justification >= NUMBER_OF_TEXT_JUSTIFICATIONS ||
+		string_has_icons_to_draw(text))
+	{
+		return NONE;
+	}
+	/* as widget_instance_render_text_box places the text */
+	bounds.x0 += definition->horizontal_offset;
+	bounds.y0 += definition->vertical_offset;
+	/* this leaves the label's font, justification and a white colour as the
+	global draw mode. That is harmless: it runs at the end of the widget
+	render, where the menu's own text has already left a menu font there, and
+	the menu, HUD, cinematic and terminal draws set their font before they
+	draw; the debug texts that set only a colour or format find a menu font
+	either way */
+	draw_string_set_draw_mode(definition->text_font.index, NONE, definition->justification, 0, &color);
+	draw_unicode_string_compute_bounds(&bounds, text, &text_bounds, &cursor_bounds);
+
+	return text_bounds.x1 == SHORT_MIN ? NONE : text_bounds.x1;
+}
+
+/**
+ * @brief Settles the areas of the frame's legend buttons: each reaches its
+ * label's drawn text (the text box can be far wider than the text, and would
+ * cover the next legend), stops before the next legend's icon on its row,
+ * and, for a touchscreen only, grows up to 8 units upward (not past an item,
+ * value or list slot above it) and in the screen's bottom strip runs down to
+ * the screen's edge. Recomputed from the parts kept at noting, so running it
+ * again changes nothing.
+ */
+static void ui_mouse_fit_button_targets(
+	void)
+{
+	long index;
+	long other;
+
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *target = &ui_mouse_targets[index];
+		short text_right;
+
+		if (target->kind != _ui_mouse_target_button)
+			continue;
+		target->bounds = target->icon_bounds;
+		if (target->label)
+		{
+			target->bounds.x1 = MAX(target->bounds.x1, target->label_bounds.x1);
+			target->bounds.y0 = MIN(target->bounds.y0, target->label_bounds.y0);
+			target->bounds.y1 = MAX(target->bounds.y1, target->label_bounds.y1);
+			text_right = ui_mouse_label_text_right(target->label, &target->label_bounds);
+			if (text_right != NONE)
+			{
+				target->bounds.x1 = MAX(target->icon_bounds.x1, MIN(target->label_bounds.x1, text_right + 2));
+			}
+		}
+		target->bounds.x0 = target->icon_bounds.x0;
+	}
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *target = &ui_mouse_targets[index];
+
+		if (target->kind != _ui_mouse_target_button)
+			continue;
+		for (other = 0; other < ui_mouse_target_count; other++)
+		{
+			struct ui_mouse_target const *next = &ui_mouse_targets[other];
+
+			if (other != index && next->kind == _ui_mouse_target_button &&
+				next->icon_bounds.x0 > target->icon_bounds.x0 &&
+				next->bounds.y0 < target->bounds.y1 && next->bounds.y1 > target->bounds.y0 &&
+				next->icon_bounds.x0 - 1 < target->bounds.x1)
+			{
+				target->bounds.x1 = MAX(next->icon_bounds.x0 - 1, target->icon_bounds.x1);
+			}
+		}
+	}
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *target = &ui_mouse_targets[index];
+		short top;
+
+		if (target->kind != _ui_mouse_target_button || !ui_mouse_pointer_is_touch)
+			continue;
+		if (target->bounds.y1 >= 400)
+			target->bounds.y1 = 480;
+		/* growing upward must not take the tap from an item, value or list
+		slot above the legend: those keep their areas, and the legend is noted
+		later, so it would win the overlap */
+		top = target->bounds.y0 - 8;
+		for (other = 0; other < ui_mouse_target_count; other++)
+		{
+			struct ui_mouse_target const *above = &ui_mouse_targets[other];
+
+			if (above->kind != _ui_mouse_target_button &&
+				above->bounds.y1 <= target->bounds.y0 &&
+				above->bounds.x0 < target->bounds.x1 && above->bounds.x1 > target->bounds.x0)
+			{
+				top = MAX(top, above->bounds.y1);
+			}
+		}
+		target->bounds.y0 = top;
+	}
 
 	return;
 }
@@ -5540,10 +5685,22 @@ static void ui_mouse_step_list_to_slot(
 	return;
 }
 
-/* the widget the wheel steps: the innermost on the focus's way that the
-d-pad steps through */
+/**
+ * @brief The widget the wheel steps: the innermost on the focus's way that
+ * the d-pad steps through.
+ *
+ * A touch drag skips a list showing one value at a time (a setting): it
+ * moves between the rows, around the setting, so a drag never changes a
+ * value; that takes a tap on one of its halves. The desktop wheel keeps the
+ * game's own d-pad reach and steps a setting's value.
+ *
+ * @param root the menu
+ * @param skip_settings TRUE for a touch drag
+ * @return the widget, or NULL when none takes the d-pad
+ */
 static struct widget_instance *ui_mouse_wheel_widget(
-	struct widget_instance *root)
+	struct widget_instance *root,
+	boolean skip_settings)
 {
 	struct widget_instance *result = NULL;
 	struct widget_instance *widget;
@@ -5552,6 +5709,8 @@ static struct widget_instance *ui_mouse_wheel_widget(
 	{
 		struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 
+		if (skip_settings && widget->type == _ui_widget_type_spinner_list && !ui_mouse_list_shows_several(widget))
+			continue;
 		if (definition->flags & (FLAG(_widget_dpad_updown_tabs_thru_children_bit) |
 			FLAG(_widget_dpad_leftright_tabs_thru_children_bit) |
 			FLAG(_widget_dpad_updown_tabs_thru_list_items_bit) |
@@ -5562,6 +5721,104 @@ static struct widget_instance *ui_mouse_wheel_widget(
 	}
 
 	return result;
+}
+
+/**
+ * @brief How many presses of a d-pad button can step the focus before it
+ * would wrap around to the other end.
+ *
+ * The game's lists wrap (widget_event_function_list_widget_goto_next_item
+ * and _previous_item, and widget_instance_tab_to_next_valid_widget and
+ * _previous_), so a long touch drag would lap a short list and stop
+ * anywhere: the drag stops at the ends. The press goes down from the
+ * screen to the first widget on the focus's way that tabs in its direction
+ * (widget_instance_process_one_event_recursive), and the ends are that
+ * widget's.
+ *
+ * @param root the menu
+ * @param button the d-pad button that would be pressed
+ * @param forward TRUE to count toward the end after the focus, FALSE toward
+ * the start
+ * @return the presses that step before the end, 0 at the end or for a
+ * setting (changed by clicks only), NONE when no widget tabs that way
+ */
+static long ui_mouse_wheel_room(
+	struct widget_instance *root,
+	short button,
+	boolean forward)
+{
+	boolean horizontal = button == _widget_event_dpad_left || button == _widget_event_dpad_right;
+	struct widget_instance *widget;
+
+	for (widget = root; widget; widget = widget->focused_child)
+	{
+		struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+		boolean list = widget->type == _ui_widget_type_spinner_list || widget->type == _ui_widget_type_column_list;
+		struct widget_instance *child;
+		long room = 0;
+
+		if (TEST_FLAG(definition->flags, horizontal ?
+				_widget_dpad_leftright_tabs_thru_children_bit :
+				_widget_dpad_updown_tabs_thru_children_bit) &&
+			widget->focused_child)
+		{
+			/* a child the tab functions would skip gives no press a place to
+			land, so only the ones that take events, pass them on, or sit in
+			a list count */
+			for (child = forward ? widget->focused_child->next : widget->focused_child->previous;
+				child;
+				child = forward ? child->next : child->previous)
+			{
+				struct ui_widget_definition *child_definition = ui_widget_definition_get(child->definition_tag_index);
+
+				if (child_definition->event_handlers.count > 0 ||
+					TEST_FLAG(child_definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
+					list)
+				{
+					room++;
+				}
+			}
+
+			return room;
+		}
+		if (list && TEST_FLAG(definition->flags, horizontal ?
+			_widget_dpad_leftright_tabs_thru_list_items_bit :
+			_widget_dpad_updown_tabs_thru_list_items_bit))
+		{
+			/* a setting is changed by clicks only */
+			if (widget->type == _ui_widget_type_spinner_list && !ui_mouse_list_shows_several(widget))
+				return 0;
+			if (widget->parameters.list.list_items && widget->parameters.list.number_of_items > 0)
+			{
+				room = forward ?
+					widget->parameters.list.number_of_items - 1 - widget->parameters.list.selected_index :
+					widget->parameters.list.selected_index;
+			}
+			else if (widget->focused_child)
+			{
+				/* a list of the tag's children, which the focus walks; the
+				focus skips a disabled child to the next that takes events, or
+				wraps (widget_instance_give_focus_directly): the main menu ends
+				with its hidden "game demos" */
+				for (child = forward ? widget->focused_child->next : widget->focused_child->previous;
+					child;
+					child = forward ? child->next : child->previous)
+				{
+					if (!child->disabled)
+						room++;
+				}
+				if (forward && widget->parameters.list.number_of_items > 0)
+				{
+					room = MIN(room, widget->parameters.list.number_of_items - 1 -
+						widget->parameters.list.selected_index);
+				}
+			}
+
+			return MAX(room, 0);
+		}
+	}
+
+	return NONE;
 }
 
 /* the menu the mouse drives: the first player's, or everyone's */
@@ -5590,17 +5847,31 @@ static boolean ui_mouse_menus_active(
 	return virtual_keyboard_active() || ui_mouse_menu() != NULL;
 }
 
-/* the pointer's motion, clicks and wheel since the last frame, as the first
-player's controller events */
+/**
+ * @brief Turns the pointer's motion, clicks and wheel since the last frame
+ * into the first player's controller events. While the virtual keyboard is
+ * up it gets the clicks and the menu behind gets nothing. A touch drag
+ * stops at the list's ends and skips settings (ui_mouse_wheel_widget,
+ * ui_mouse_wheel_room); the desktop wheel wraps as the d-pad does.
+ */
 static void ui_widgets_process_mouse(
 	void)
 {
 	struct halo_ui_pointer pointer;
 	struct ui_mouse_target *target;
 	short controller_index = 0;
+	boolean pointer_active;
+	boolean keyboard_active;
 
-	if (!halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) ||
-		virtual_keyboard_active())
+	pointer_active = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) != 0;
+	if (pointer_active)
+		ui_mouse_pointer_is_touch = pointer.touch != 0;
+	/* the virtual keyboard takes the pointer's clicks itself; a click that
+	closes it (Done) is not also a click on the menu behind */
+	keyboard_active = virtual_keyboard_active();
+	if (pointer_active && keyboard_active && pointer.left_clicks)
+		virtual_keyboard_click(pointer.click_x, pointer.click_y);
+	if (!pointer_active || keyboard_active)
 	{
 		ui_mouse_press_count = 0;
 		ui_mouse_hover_pending = FALSE;
@@ -5624,14 +5895,34 @@ static void ui_widgets_process_mouse(
 			ui_mouse_press(_widget_event_b_button);
 		if (pointer.wheel_steps && ui_mouse_menu())
 		{
-			struct widget_instance *widget = ui_mouse_wheel_widget(ui_mouse_menu());
-			short back = _widget_event_dpad_up, forward = _widget_event_dpad_down;
+			boolean touch = pointer.touch != 0;
+			struct widget_instance *widget = ui_mouse_wheel_widget(ui_mouse_menu(), touch);
+			boolean going_forward = pointer.wheel_steps < 0;
+			short back = _widget_event_dpad_up, forward = _widget_event_dpad_down, button;
+			long room = NONE;
+			long index;
 			long step;
 
 			if (widget)
 				ui_mouse_list_directions(widget, &back, &forward);
-			for (step = 0; step < ABS(pointer.wheel_steps) && step < 4; step++)
-				ui_mouse_press(pointer.wheel_steps > 0 ? back : forward);
+			button = going_forward ? forward : back;
+			/* only a touch drag stops at the ends, and does nothing with no list
+			to step; the desktop wheel wraps as the d-pad does, and falls back
+			to up and down */
+			if (touch)
+			{
+				room = widget ? ui_mouse_wheel_room(ui_mouse_menu(), button, going_forward) : 0;
+				/* the presses still waiting step the list first */
+				for (index = 0; widget && room != NONE && index < ui_mouse_press_count; index++)
+				{
+					if (ui_mouse_presses[index] == button)
+						room = MAX(room - 1, 0);
+					else if (ui_mouse_presses[index] == (going_forward ? back : forward))
+						room++;
+				}
+			}
+			for (step = 0; step < ABS(pointer.wheel_steps) && step < 4 && (room == NONE || step < room); step++)
+				ui_mouse_press(button);
 		}
 		if (!ui_mouse_press_count && ui_mouse_hover_pending)
 		{
@@ -5969,6 +6260,13 @@ void render_ui_widgets_postgame(
 	return;
 }
 
+/**
+ * @brief Renders the active widgets for one local player's viewport (or the
+ * whole screen), noting the first player's tap targets, and draws the
+ * debug view of the targets and the virtual keyboard when they are up.
+ * @param local_player_index the viewport's player, or NONE for the whole screen
+ * @param window_bounds the viewport's bounds on the screen
+ */
 void render_ui_widgets(
 	short local_player_index,
 	rectangle2d const *window_bounds)
@@ -6066,6 +6364,7 @@ void render_ui_widgets(
 				}
 			}
 		}
+		ui_mouse_fit_button_targets();
 		if (widget_globals.fade_to_black >= 0.0f &&
 			widget_globals.fade_to_black <= 1.0f)
 		{
