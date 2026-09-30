@@ -114,7 +114,9 @@ static struct
 	double lightmap_sum[3], lightmap_samples;
 	unsigned long level_generation;
 	GLuint inject_program;
-	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split, inject_results;
+	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split, inject_results, inject_fallback;
+	/* the lightmaps' average light (the inject's where it has none) */
+	float lightmap_average[3];
 	GLint inject_objects, inject_cameras, inject_grid;
 	/* the last frame's rays, for the light buffer: their textures, the
 	trace grid (origin, size), the camera's tan and aspect; whether there
@@ -309,6 +311,8 @@ static const char inject_source[] =
 	"uniform vec4 cameras[8];\n"
 	"uniform vec4 previous_grid;\n"
 	"uniform int split;\n"
+	/* (the light where there is none at all: the level's average, lit) */
+	"uniform vec4 fallback;\n"
 	"layout(location = 0) out vec4 result;\n"
 	/* (and what it puts there, for the composite) */
 	"layout(location = 1) out vec4 applied;\n"
@@ -329,8 +333,10 @@ static const char inject_source[] =
 	"	vec3 P = cameras[0].xyz + cameras[1].xyz * z + cameras[3].xyz * (ndc.x * t * aspect * z) - cameras[2].xyz * (ndc.y * t * z);\n"
 	"	vec3 rel = P - cameras[4].xyz;\n"
 	"	float pz = dot(rel, cameras[5].xyz);\n"
-	"	if (pz <= u[0].x) discard;\n"
-	"	vec2 pn = vec2(dot(rel, cameras[7].xyz) / (pz * cameras[4].w * cameras[5].w), -dot(rel, cameras[6].xyz) / (pz * cameras[4].w));\n"
+	/* (behind the last camera - turned right round: where it is on the
+	   screen now, in the last frame's view) */
+	"	vec2 pn = pz > u[0].x ? vec2(dot(rel, cameras[7].xyz) / (pz * cameras[4].w * cameras[5].w), -dot(rel, cameras[6].xyz) / (pz * cameras[4].w)) : ndc;\n"
+	"	pz = max(pz, u[0].x);\n"
 	"	vec2 q = previous_grid.xy + (pn * 0.5 + 0.5) * previous_grid.zw - 0.5;\n"
 	"	ivec2 lo = ivec2(previous_grid.xy), hi = max(lo, ivec2(previous_grid.xy + previous_grid.zw) - 1);\n"
 	"	ivec2 base = ivec2(floor(q));\n"
@@ -362,8 +368,20 @@ static const char inject_source[] =
 	"			sum += light.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
+	/* (and none like it - come into view as the camera turned, off the last
+	   frame's edge: the light nearest it there, whatever its depth, until
+	   the rays reach it - with the lightmaps left out, black otherwise) */
+	"	for (int y = -2; y <= 2 && total <= 0.0; y++)\n"
+	"		for (int x = -2; x <= 2; x++)\n"
+	"		{\n"
+	"			ivec2 k = clamp(base + ivec2(x, y) * 2, lo, hi);\n"
+	"			vec4 light = texelFetch(irradiance_texture, k, 0);\n"
+	"			if (light.a < 0.5) continue;\n"
+	"			sum += light.rgb;\n"
+	"			total += 1.0;\n"
+	"		}\n"
 	"	if (split == 2) { result = vec4(0.0, total > 0.0 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
-	"	if (total <= 0.0) discard;\n"
+	"	if (total <= 0.0) { result = vec4(fallback.rgb, 1.0); applied = vec4(fallback.rgb + 1.0, 1.0); return; }\n"
 	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
 	/* (plus 1: a pixel it took nothing for stays 0, the alpha being masked) */
 	"	applied = vec4(result.rgb + 1.0, 1.0);\n"
@@ -1003,6 +1021,7 @@ static void initialize(void)
 				ray.inject_irradiance = glGetUniformLocation(ray.inject_program, "irradiance_texture");
 				ray.inject_gbuffer = glGetUniformLocation(ray.inject_program, "gbuffer_texture");
 				ray.inject_split = glGetUniformLocation(ray.inject_program, "split");
+				ray.inject_fallback = glGetUniformLocation(ray.inject_program, "fallback");
 				ray.inject_results = glGetUniformLocation(ray.inject_program, "results_texture");
 				ray.inject_objects = glGetUniformLocation(ray.inject_program, "objects_texture");
 				ray.inject_cameras = glGetUniformLocation(ray.inject_program, "cameras");
@@ -1308,6 +1327,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		camera[81] = (float)(ray.lightmap_sum[1] / ray.lightmap_samples);
 		camera[82] = (float)(ray.lightmap_sum[2] / ray.lightmap_samples);
 	}
+	memcpy(ray.lightmap_average, camera + 80, sizeof(ray.lightmap_average));
 	{
 		static int frames;
 		long done, total;
@@ -1799,6 +1819,11 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glBindSampler(5, 0);
 	glUniform1i(ray.inject_objects, 5);
 	glUniform1i(ray.inject_split, getenv("HALO_RT_INJECT_DEBUG") ? 2 : ray.gi_split);
+	{
+		float fallback[4] = { ray.lightmap_average[0], ray.lightmap_average[1], ray.lightmap_average[2], 0.0f };
+
+		glUniform4fv(ray.inject_fallback, 1, fallback);
+	}
 	/* (added to the self-illumination and the light decals, the lightmaps
 	left out; or in the lightmaps' light's place) */
 	if (adding)
