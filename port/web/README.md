@@ -100,8 +100,7 @@ backgrounding, resize or controller connection. Test its input handling with
   while a controller is connected. *Settings and data* sets the aim
   sensitivity, or turns the touch controls off.
 - A keyboard and mouse (iPad or computer): as on Linux. Click the game to lock
-  the pointer; Esc releases it. Hold Tab (or F1) to show the multiplayer
-  scoreboard/player list; use the mouse wheel to change weapons.
+  the pointer; Esc releases it.
 
 ## Online play
 
