@@ -25,6 +25,7 @@ in the collision surfaces. The pictures, as PPM files:
 - raytrace_occlusion, raytrace_depth: what it uses;
 - raytrace_rays: the ray view, what Metal's rays find from the camera;
   raytrace_split: the lighting and the ray view side by side;
+- raytrace_probe: the ray probe, the rays of the surface at the center;
 - raytrace_undivided: without the stages, as before them: the occlusion
   over all the light, the dynamic lights' too, and the objects' pixels
   found by a short ray (the rock under the overhang taken for one);
@@ -638,6 +639,16 @@ int main(int argc, char **argv)
 	halo_ray_tracing_debug_mode(5);
 	draw_frame(1);
 	save("raytrace_split.ppm");
+	/* the ray probe: the rays of the surface at the center, drawn (a frame
+	to trace them, one to draw them) */
+	halo_ray_tracing_debug_mode(1);
+	halo_ray_tracing_probe_next();
+	draw_frame(1);
+	glFinish();
+	draw_frame(1);
+	save("raytrace_probe.ppm");
+	halo_ray_tracing_probe_next();
+	halo_ray_tracing_probe_next();
 	halo_ray_tracing_debug_mode(1);
 	for (index = 0; index < 4; index++)
 	{

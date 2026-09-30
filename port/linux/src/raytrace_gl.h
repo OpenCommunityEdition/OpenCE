@@ -23,6 +23,9 @@ const char *halo_ray_tracing_toggle(void);
 /* F6: the next view (the lighting, the ray view, split, the occlusion);
 returns its name */
 const char *halo_ray_tracing_next_view(void);
+/* F5: the ray probe off, live (the crosshair's rays drawn), frozen; returns
+what it is now */
+const char *halo_ray_tracing_probe_next(void);
 /* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
 view, 5 split (tests) */
 void halo_ray_tracing_debug_mode(int mode);

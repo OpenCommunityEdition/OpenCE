@@ -398,9 +398,9 @@ static GLuint compile(GLenum type, const char *source, const char *what)
 	return shader;
 }
 
-static GLuint link(const char *fragment, const char *what)
+static GLuint link_with(const char *vertex_text, const char *fragment, const char *what)
 {
-	GLuint vertex = compile(GL_VERTEX_SHADER, vertex_source, "full-screen vertex");
+	GLuint vertex = compile(GL_VERTEX_SHADER, vertex_text, "vertex");
 	GLuint pixel = compile(GL_FRAGMENT_SHADER, fragment, what);
 	GLuint program;
 	GLint status = 0;
@@ -423,6 +423,181 @@ static GLuint link(const char *fragment, const char *what)
 		return 0;
 	}
 	return program;
+}
+
+static GLuint link(const char *fragment, const char *what)
+{
+	return link_with(vertex_source, fragment, what);
+}
+
+/* ---------- the ray probe
+
+The rays the lighting sends from the surface at the crosshair (Metal's: the
+kernel writes them, host_rt_probe reads them back), drawn as lines in the
+world: the occlusion rays white, the ray to the sun yellow, the reflection
+cyan, each red where it hit; the normal green. Frozen, they stay where they
+were while the camera moves round them. Where the scene is nearer than a
+line, the line is faint. */
+
+#define PROBE_SEGMENTS 15
+
+static const char probe_vertex_source[] =
+	SHADER_HEADER
+	"uniform vec4 seg_a[15];\n" /* from, kind */
+	"uniform vec4 seg_b[15];\n" /* to, whether it hit */
+	"uniform vec4 eye;\n"
+	"uniform vec4 ahead;\n"
+	"uniform vec4 above;\n"
+	"uniform vec4 across;\n"
+	"uniform vec4 lens;\n" /* near, far, tan of half the vertical field of view, aspect */
+	"uniform vec4 pixels;\n" /* the viewport's width and height */
+	"out vec4 line_color;\n"
+	"out float view_z;\n"
+	"vec3 to_view(vec3 w) { vec3 v = w - eye.xyz; return vec3(dot(v, across.xyz), dot(v, above.xyz), dot(v, ahead.xyz)); }\n"
+	"vec4 to_clip(vec3 v)\n"
+	"{\n"
+	"	float z = v.z;\n"
+	"	float depth = lens.y / (lens.y - lens.x) * (1.0 - lens.x / z);\n"
+	/* (rows from the top, as the game's targets hold them) */
+	"	return vec4(v.x / (lens.z * lens.w), -v.y / lens.z, (depth * 2.0 - 1.0) * z, z);\n"
+	"}\n"
+	"void main()\n"
+	"{\n"
+	"	int s = gl_VertexID / 6, corner = gl_VertexID - s * 6;\n"
+	"	vec3 a = to_view(seg_a[s].xyz), b = to_view(seg_b[s].xyz);\n"
+	"	float kind = seg_a[s].w, hit = seg_b[s].w;\n"
+	"	float nearest = lens.x * 2.0;\n"
+	"	if (a.z < nearest && b.z < nearest) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); line_color = vec4(0.0); view_z = 0.0; return; }\n"
+	"	if (a.z < nearest) a = mix(a, b, (nearest - a.z) / (b.z - a.z));\n"
+	"	if (b.z < nearest) b = mix(b, a, (nearest - b.z) / (a.z - b.z));\n"
+	"	vec4 ca = to_clip(a), cb = to_clip(b);\n"
+	"	vec2 direction = (cb.xy / cb.w - ca.xy / ca.w) * pixels.xy;\n"
+	"	direction = length(direction) > 1e-4 ? normalize(direction) : vec2(1.0, 0.0);\n"
+	"	float thickness = kind > 2.5 ? 2.0 : 3.0;\n"
+	"	vec2 side = vec2(-direction.y, direction.x) * thickness * 2.0 / pixels.xy;\n"
+	/* two triangles: a-, b-, b+ and a-, b+, a+ */
+	"	bool at_b = corner == 1 || corner == 2 || corner == 4;\n"
+	"	float sign_side = (corner == 0 || corner == 1 || corner == 3) ? -1.0 : 1.0;\n"
+	"	vec4 c = at_b ? cb : ca;\n"
+	"	c.xy += side * sign_side * c.w;\n"
+	"	gl_Position = c;\n"
+	"	view_z = at_b ? b.z : a.z;\n"
+	"	vec3 color = kind < 0.5 ? (hit > 0.5 ? vec3(1.0, 0.25, 0.2) : vec3(1.0)) :\n"
+	"		kind < 1.5 ? (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.9, 0.2)) :\n"
+	"		kind < 2.5 ? (hit > 0.5 ? vec3(0.2, 1.0, 1.0) : vec3(0.5, 0.75, 0.8)) : vec3(0.3, 1.0, 0.3);\n"
+	"	line_color = vec4(color, 1.0);\n"
+	"}\n";
+
+static const char probe_pixel_source[] =
+	SHADER_HEADER
+	COMMON_SOURCE
+	"in vec4 line_color;\n"
+	"in float view_z;\n"
+	"out vec4 result;\n"
+	"void main()\n"
+	"{\n"
+	"	float scene = linear_depth(texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).r);\n"
+	/* behind the scene: faint */
+	"	float alpha = view_z > scene * 1.02 + 0.02 ? 0.3 : 1.0;\n"
+	"	result = vec4(line_color.rgb, alpha);\n"
+	"}\n";
+
+static struct
+{
+	int mode;	/* 0 off, 1 live, 2 frozen */
+	GLuint program;
+	GLint seg_a, seg_b, eye, ahead, above, across, lens, pixels, u, depth;
+	float segments[PROBE_SEGMENTS * 8];
+	int count;
+} probe;
+
+/* F5: the ray probe off, live (the crosshair's rays), frozen (where they
+were); returns what it is now */
+const char *halo_ray_tracing_probe_next(void)
+{
+	probe.mode = (probe.mode + 1) % 3;
+	if (probe.mode == 1)
+		probe.count = 0;
+	return probe.mode == 0 ? "off" : probe.mode == 1 ? "the crosshair's rays" : "frozen (walk round them)";
+}
+
+static void probe_draw(GLuint color, GLuint depth, const int *viewport, const float *uniforms, const float *position,
+	const float *forward, const float *up)
+{
+	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+	float a[PROBE_SEGMENTS * 4], b[PROBE_SEGMENTS * 4], vector[4], right[3], length;
+	int index;
+
+	if (!probe.mode || probe.count <= 0 || !position || !forward || !up)
+		return;
+	if (!probe.program)
+	{
+		probe.program = link_with(probe_vertex_source, probe_pixel_source, "ray probe");
+		if (!probe.program)
+		{
+			probe.mode = 0;
+			return;
+		}
+		probe.seg_a = glGetUniformLocation(probe.program, "seg_a");
+		probe.seg_b = glGetUniformLocation(probe.program, "seg_b");
+		probe.eye = glGetUniformLocation(probe.program, "eye");
+		probe.ahead = glGetUniformLocation(probe.program, "ahead");
+		probe.above = glGetUniformLocation(probe.program, "above");
+		probe.across = glGetUniformLocation(probe.program, "across");
+		probe.lens = glGetUniformLocation(probe.program, "lens");
+		probe.pixels = glGetUniformLocation(probe.program, "pixels");
+		probe.u = glGetUniformLocation(probe.program, "u");
+		probe.depth = glGetUniformLocation(probe.program, "depth_texture");
+	}
+	for (index = 0; index < PROBE_SEGMENTS; index++)
+	{
+		const float *segment = &probe.segments[index * 8];
+		int k;
+
+		for (k = 0; k < 4; k++)
+		{
+			a[index * 4 + k] = index < probe.count ? segment[k] : 0.0f;
+			b[index * 4 + k] = index < probe.count ? segment[4 + k] : 0.0f;
+		}
+	}
+	right[0] = forward[1] * up[2] - forward[2] * up[1];
+	right[1] = forward[2] * up[0] - forward[0] * up[2];
+	right[2] = forward[0] * up[1] - forward[1] * up[0];
+	length = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+	if (length <= 0.0f)
+		return;
+	glBindFramebuffer(GL_FRAMEBUFFER, ray.output_framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+	glDrawBuffers(1, &draw_buffer);
+	glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	glScissor(viewport[0], viewport[1], viewport[2], viewport[3]);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glUseProgram(probe.program);
+	glUniform4fv(probe.seg_a, PROBE_SEGMENTS, a);
+	glUniform4fv(probe.seg_b, PROBE_SEGMENTS, b);
+	vector[3] = 0.0f;
+	memcpy(vector, position, 3 * sizeof(float));
+	glUniform4fv(probe.eye, 1, vector);
+	memcpy(vector, forward, 3 * sizeof(float));
+	glUniform4fv(probe.ahead, 1, vector);
+	memcpy(vector, up, 3 * sizeof(float));
+	glUniform4fv(probe.above, 1, vector);
+	vector[0] = right[0] / length;
+	vector[1] = right[1] / length;
+	vector[2] = right[2] / length;
+	glUniform4fv(probe.across, 1, vector);
+	glUniform4fv(probe.lens, 1, uniforms);
+	vector[0] = (float)viewport[2];
+	vector[1] = (float)viewport[3];
+	vector[2] = vector[3] = 0.0f;
+	glUniform4fv(probe.pixels, 1, vector);
+	glUniform4fv(probe.u, 4, uniforms);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depth);
+	glUniform1i(probe.depth, 1);
+	glDrawArrays(GL_TRIANGLES, 0, probe.count * 6);
+	glDisable(GL_BLEND);
 }
 
 static int mode_from_setting(const char *text)
@@ -676,9 +851,10 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[22] = 40.0f;
 	/* the objects' pixels, marked in the depth and normals */
 	camera[23] = (ray.light_stages & 4) ? 1.0f : 0.0f;
-	/* the ray view */
+	/* the ray view, the ray probe */
 	camera[32] = ray.mode == _ray_tracing_debug_rays ? 1.0f : ray.mode == _ray_tracing_debug_split ? 2.0f : 0.0f;
-	camera[33] = camera[34] = camera[35] = 0.0f;
+	camera[33] = probe.mode == 1 ? 1.0f : 0.0f;
+	camera[34] = camera[35] = 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */
@@ -694,6 +870,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	}
 	if (!host_rt_trace(camera, width, height))
 		return 0;
+	/* (the probe's rays: the last frame's, which the GPU has written) */
+	if (probe.mode == 1)
+		probe.count = host_rt_probe(probe.segments, PROBE_SEGMENTS);
 	return output;
 }
 #endif
@@ -888,6 +1067,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glUniform1i(ray.composite_light_split, (ray.light_stages & 3) == 3);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	ray.light_stages = 0;
+	probe_draw(color, depth, viewport, uniforms, position, forward, up);
 
 	/* the renderer's state is its own again */
 	glActiveTexture(GL_TEXTURE0);

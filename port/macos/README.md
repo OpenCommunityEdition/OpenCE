@@ -75,6 +75,7 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
+| F5 | ⌘L | The ray probe: draw the rays the lighting sends from the surface at the crosshair; again to freeze them in place (walk round them); again for off. |
 | F6 | ⌘B | Step through what the ray tracing shows: the lighting, the ray view, split, the occlusion (refer to "Ray-traced lighting"). |
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
 | F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
@@ -268,6 +269,12 @@ each its own colour with its edges drawn; the characters' and vehicles'
 shapes orange; your own body cyan (look down); and, darker, where a second
 ray from the hit to the sun is blocked. It is the scene the lighting's rays
 go through.
+
+The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
+at the crosshair, as the kernel traced them: the occlusion rays white, the
+ray to the sun yellow, the reflection cyan, each red where it hit
+something; the surface's normal green. Pressed again, the rays stay where
+they were, and you can walk round them; lines behind the scene are faint.
 
 `port/macos/tests/run_raytrace_test.sh` draws a test scene through the
 lighting on ANGLE, with Metal's rays, as the game draws its frame (the

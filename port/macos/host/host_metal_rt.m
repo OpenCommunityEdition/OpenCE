@@ -85,6 +85,8 @@ static struct
 	id<MTLAccelerationStructure> bodies[HOST_RT_GROUPS], scene;
 	NSArray<id<MTLAccelerationStructure>> *scene_structures;
 	float spheres[HOST_RT_GROUPS + 1][4];
+	/* the ray probe's segments (the kernel writes them) */
+	id<MTLBuffer> probe;
 	unsigned int sphere_count;
 	id<MTLBuffer> body_vertices[3][HOST_RT_GROUPS], body_scratch[HOST_RT_GROUPS], instance_buffers[3], scene_scratch;
 	int instance_ring;
@@ -128,7 +130,17 @@ static NSString *const kernel_source = @
 	   objects' pixels are known 23 (then their depth is negative), the
 	   direction to the sun 24-26 and whether there is one 27, the player's
 	   body's bounding sphere 28-31 (radius 0: none), the ray view 32 (0 off,
-	   1 all the screen, 2 its right half) */
+	   1 all the screen, 2 its right half), the ray probe 33 */
+	/* the ray probe: a ray of the probe pixel, as a segment (from, kind; to,
+	   whether it hit) after the count in probe[0] */
+	"static void probe_segment(device float4 *probe, thread uint &n, float3 a, float3 b, float kind, bool hit)\n"
+	"{\n"
+	"	if (n >= 15u) return;\n"
+	"	probe[1u + n * 2u] = float4(a, kind);\n"
+	"	probe[2u + n * 2u] = float4(b, hit ? 1.0 : 0.0);\n"
+	"	n++;\n"
+	"	probe[0] = float4(float(n), 0.0, 0.0, 0.0);\n"
+	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
@@ -136,11 +148,16 @@ static NSString *const kernel_source = @
 	"	primitive_acceleration_structure level [[buffer(2)]],\n"
 	"	constant float4 *spheres [[buffer(3)]],\n"
 	"	constant uint &sphere_count [[buffer(4)]],\n"
+	"	device float4 *probe [[buffer(5)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
 	"	float2 p = float2(id) + 0.5;\n"
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
+	/* the ray probe (c[33]): the rays of the pixel at the viewport's center */
+	"	bool is_probe = c[33] > 0.5 && all(id == uint2(origin + size * 0.5));\n"
+	"	uint probe_count = 0u;\n"
+	"	if (is_probe) probe[0] = float4(0.0);\n"
 	/* the ray view: what a ray from the camera through the pixel finds in
 	   Metal's scene - the level's collision triangles each its own colour
 	   with its edges drawn, the objects' shapes orange, the player's body
@@ -208,6 +225,7 @@ static NSString *const kernel_source = @
 	/* the instances' masks: 1 the level, 2 the objects, 4 the player's body
 	   (which the game does not draw in the first person) */
 	"	bool object = c[23] > 0.5 && g.x < 0.0;\n"
+	"	if (is_probe) probe_segment(probe, probe_count, P, P + N * 0.4, 3.0, false);\n"
 	"	intersector<triangle_data, instancing> any_hit;\n"
 	"	any_hit.accept_any_intersection(true);\n"
 	"	any_hit.assume_geometry_type(geometry_type::triangle);\n"
@@ -260,6 +278,9 @@ static NSString *const kernel_source = @
 	"		}\n"
 	"		if (distance_hit >= 0.0)\n"
 	"			occlusion += 1.0 - distance_hit / radius;\n"
+	"		if (is_probe)\n"
+	"			probe_segment(probe, probe_count, P + N * bias, P + N * bias + d * (distance_hit >= 0.0 ? distance_hit : radius),\n"
+	"				0.0, distance_hit >= 0.0);\n"
 	"	}\n"
 	"	float visibility = 1.0 - occlusion / 4.0;\n"
 	/* the sun's shadow, on what the level's lightmaps do not shade: an
@@ -295,6 +316,20 @@ static NSString *const kernel_source = @
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
 	"	}\n"
+	/* (the probe's ray to the sun: always, against everything, to its first hit) */
+	"	if (is_probe && c[27] > 0.0)\n"
+	"	{\n"
+	"		intersector<triangle_data, instancing> sun_closest;\n"
+	"		sun_closest.assume_geometry_type(geometry_type::triangle);\n"
+	"		sun_closest.force_opacity(forced_opacity::opaque);\n"
+	"		sun_closest.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"		sun_closest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
+	"		float3 sun = float3(c[24], c[25], c[26]);\n"
+	"		ray to_sun(P + N * bias, sun, 0.0, 60.0);\n"
+	"		auto sh = sun_closest.intersect(to_sun, world, 7u);\n"
+	"		bool blocked = sh.type != intersection_type::none;\n"
+	"		probe_segment(probe, probe_count, P + N * bias, P + N * bias + sun * (blocked ? sh.distance : 60.0), 1.0, blocked);\n"
+	"	}\n"
 	/* the reflection: its hit, where the camera sees it. How much the
 	   surface reflects is Fresnel's, more at glancing angles; facing the
 	   camera, it reflects so little (4%, times the guest's strength) that
@@ -311,6 +346,10 @@ static NSString *const kernel_source = @
 	"	closest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	ray reflection_ray(P + N * bias, R, 0.0, c[22]);\n"
 	"	auto hit = closest.intersect(reflection_ray, level);\n"
+	"	if (is_probe)\n"
+	"		probe_segment(probe, probe_count, P + N * bias,\n"
+	"			P + N * bias + R * (hit.type != intersection_type::none ? hit.distance : c[22]), 2.0,\n"
+	"			hit.type != intersection_type::none);\n"
 	"	float4 out = float4(visibility, 0.0, 0.0, 0.0);\n"
 	"	if (hit.type != intersection_type::none)\n"
 	"	{\n"
@@ -821,6 +860,12 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setAccelerationStructure:rt.world atBufferIndex:2];
 	[encoder setBytes:rt.spheres length:sizeof(rt.spheres) atIndex:3];
 	[encoder setBytes:&rt.sphere_count length:sizeof(rt.sphere_count) atIndex:4];
+	if (!rt.probe)
+	{
+		rt.probe = [rt.device newBufferWithLength:32 * 4 * sizeof(float) options:MTLResourceStorageModeShared];
+		memset(rt.probe.contents, 0, rt.probe.length);
+	}
+	[encoder setBuffer:rt.probe offset:0 atIndex:5];
 	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
@@ -860,6 +905,28 @@ int host_rt_trace(const float *camera, int width, int height)
 	host_rt_trace_ns += SDL_GetTicksNS() - finished;
 	host_rt_traces++;
 	return commands.status == MTLCommandBufferStatusCompleted;
+}
+
+/* the ray probe's last rays: up to maximum segments of 8 floats each (from
+x, y, z, kind: 0 occlusion, 1 the sun, 2 the reflection, 3 the normal; to
+x, y, z, whether it hit); returns how many */
+int host_rt_probe(float *segments, int maximum)
+{
+	const float *values;
+	int count;
+
+	if (!rt.available || !rt.probe || maximum <= 0)
+		return 0;
+	values = (const float *)rt.probe.contents;
+	count = (int)values[0];
+	if (count < 0)
+		count = 0;
+	if (count > 15)
+		count = 15;
+	if (count > maximum)
+		count = maximum;
+	memcpy(segments, values + 4, (size_t)count * 8 * sizeof(float));
+	return count;
 }
 
 /* tests: count pixels of row y of shared texture `which` from x, as floats
