@@ -118,13 +118,21 @@ static struct
 	/* the traced light, denoised on the rays' grid (rgb, a: whether there is
 	some), and its pass */
 	GLuint denoised_texture, denoise_program;
+	/* what the light buffer took this frame (the window's resolution; 0
+	where it took the game's), and whether it did */
+	GLuint applied_texture;
+	int gi_applied;
+	GLint composite_denoised, composite_applied, composite_objects, composite_gbuffer, composite_correct;
 	GLint denoise_uniforms, denoise_lights, denoise_results, denoise_gbuffer;
 	float gi_grid[4], gi_tan, gi_aspect;
 	int gi_previous;
 	int gi_split;
 	GLuint irradiance_texture, gbuffer_texture;
-	/* the last frame's camera (13 values) */
+	/* the last frame's camera (13 values); whether this frame's rays were
+	traced for the light buffer already, and their results */
 	float previous_camera[13];
+	int gi_traced;
+	GLuint gi_traced_results;
 	GLuint trace_program, composite_program;
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
@@ -255,7 +263,9 @@ static const char inject_source[] =
 	"uniform vec4 cameras[8];\n"
 	"uniform vec4 previous_grid;\n"
 	"uniform int split;\n"
-	"out vec4 result;\n"
+	"layout(location = 0) out vec4 result;\n"
+	/* (and what it puts there, for the composite) */
+	"layout(location = 1) out vec4 applied;\n"
 	"void main()\n"
 	"{\n"
 	"	ivec2 p = ivec2(gl_FragCoord.xy);\n"
@@ -296,6 +306,8 @@ static const char inject_source[] =
 	"	if (split == 2) { result = vec4(0.0, total > 0.0 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
 	"	if (total <= 0.0) discard;\n"
 	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
+	/* (plus 1: a pixel it took nothing for stays 0, the alpha being masked) */
+	"	applied = vec4(result.rgb + 1.0, 1.0);\n"
 	"}\n";
 
 static const char trace_source[] =
@@ -455,6 +467,13 @@ static const char composite_source[] =
 	"uniform sampler2D lit_texture;\n"
 	"uniform int light_split;\n"
 	"uniform sampler2D lit_rt;\n"
+	/* (this frame's traced light, denoised on the rays' grid; what the light
+	buffer took; the objects' depth; the rays' depth; whether to) */
+	"uniform sampler2D denoised_texture;\n"
+	"uniform sampler2D applied_texture;\n"
+	"uniform sampler2D objects_depth;\n"
+	"uniform sampler2D gbuffer_now;\n"
+	"uniform int correct;\n"
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
@@ -472,6 +491,44 @@ static const char composite_source[] =
 	"		return;\n"
 	"	}\n"
 	"	if (d >= 0.99999) { result = scene; return; }\n"
+	/* the level's pixels, put right to this frame's traced light: the
+	   light buffer took the last frame's (moved with the camera; where none
+	   was, the game's), so each pixel is scaled by this frame's over what it
+	   took - no lag, and no gaps where the view opens up */
+	"	if (correct != 0)\n"
+	"	{\n"
+	"		vec4 o = texelFetch(objects_depth, p, 0);\n"
+	"		float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
+	"		if (abs(object - d) >= 4.0 / 16777215.0)\n"
+	"		{\n"
+	"			float z = linear_depth(d);\n"
+	"			vec2 q = (vec2(p) + 0.5) / float(TRACE_SCALE) - 0.5;\n"
+	"			ivec2 base = ivec2(floor(q));\n"
+	"			vec2 f = q - floor(q);\n"
+	"			ivec2 lo = ivec2(u[1].xy) / TRACE_SCALE, hi = max(lo, (ivec2(u[1].xy + u[1].zw) + TRACE_SCALE - 1) / TRACE_SCALE - 1);\n"
+	"			vec3 now = vec3(0.0);\n"
+	"			float total = 0.0;\n"
+	"			for (int y = 0; y <= 1; y++)\n"
+	"				for (int x = 0; x <= 1; x++)\n"
+	"				{\n"
+	"					ivec2 k = clamp(base + ivec2(x, y), lo, hi);\n"
+	"					float g = texelFetch(gbuffer_now, k, 0).x;\n"
+	"					vec4 light = texelFetch(denoised_texture, k, 0);\n"
+	"					if (g <= 0.0 || light.a < 0.5 || abs(g - z) > z * 0.05 + 0.05) continue;\n"
+	"					float w = (x == 0 ? 1.0 - f.x : f.x) * (y == 0 ? 1.0 - f.y : f.y) + 1e-4;\n"
+	"					now += light.rgb * w;\n"
+	"					total += w;\n"
+	"				}\n"
+	"			if (total > 0.0)\n"
+	"			{\n"
+	"				vec4 took = texelFetch(applied_texture, p, 0);\n"
+	/* (none taken: the game's light, as the light stages kept it) */
+	"				vec3 was = took.r > 0.5 ? took.rgb - 1.0 : texelFetch(lit_texture, p / TRACE_SCALE, 0).rgb;\n"
+	"				now = min(now / total, vec3(1.0));\n"
+	"				scene.rgb *= clamp((now + 0.02) / (was + 0.02), vec3(0.25), vec3(4.0));\n"
+	"			}\n"
+	"		}\n"
+	"	}\n"
 	/* the occlusion blurred over 4x4 of the rays' pixels (8x8 of the
 	   window's at half resolution: all 16 of the rays' sets of directions)
 	   of similar depth */
@@ -854,6 +911,11 @@ static void initialize(void)
 	ray.composite_lit = glGetUniformLocation(ray.composite_program, "lit_texture");
 	ray.composite_light_split = glGetUniformLocation(ray.composite_program, "light_split");
 	ray.composite_lit_rt = glGetUniformLocation(ray.composite_program, "lit_rt");
+	ray.composite_denoised = glGetUniformLocation(ray.composite_program, "denoised_texture");
+	ray.composite_applied = glGetUniformLocation(ray.composite_program, "applied_texture");
+	ray.composite_objects = glGetUniformLocation(ray.composite_program, "objects_depth");
+	ray.composite_gbuffer = glGetUniformLocation(ray.composite_program, "gbuffer_now");
+	ray.composite_correct = glGetUniformLocation(ray.composite_program, "correct");
 #ifdef HALO_MACOS
 	/* "screen" keeps to the screen's rays */
 	if (strcmp(config_string("display.ray_tracing"), "screen") && host_rt_available())
@@ -948,6 +1010,7 @@ static void size_textures(int width, int height)
 		glDeleteTextures(1, &ray.lit_texture);
 		glDeleteTextures(1, &ray.objects_texture);
 		glDeleteTextures(1, &ray.denoised_texture);
+		glDeleteTextures(1, &ray.applied_texture);
 	}
 	ray.scene_texture = make_texture(width, height);
 	ray.effect_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
@@ -955,6 +1018,7 @@ static void size_textures(int width, int height)
 	ray.lit_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
 	ray.objects_texture = make_texture(width, height);
 	ray.denoised_texture = make_float_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.applied_texture = make_float_texture(width, height);
 	ray.light_stages = 0;
 	ray.width = width;
 	ray.height = height;
@@ -1433,6 +1497,66 @@ static void lighting_uniforms(float *uniforms, float z_near, float z_far, float 
 		uniforms[10] = 0.0f;
 }
 
+/* the traced light, denoised on the rays' grid (for the light buffer): the
+rays' textures, the grid they were traced on, the camera's lens; FALSE if
+there is none */
+static int denoise_traced_light(GLuint world_results, const float *uniforms, int width, int height)
+{
+#ifdef HALO_MACOS
+	ray.gi_previous = world_results && ray.gi && ray.lights_texture && ray.gbuffer_texture && ray.denoise_program &&
+		ray.denoised_texture;
+	if (ray.gi_previous)
+	{
+		/* the traced light, denoised on the rays' grid, for the next frame */
+		float grid[16] = { 0 };
+		const GLenum denoise_buffer = GL_COLOR_ATTACHMENT0;
+
+		grid[0] = uniforms[4] / TRACE_SCALE;
+		grid[1] = uniforms[5] / TRACE_SCALE;
+		grid[2] = uniforms[6] / TRACE_SCALE;
+		grid[3] = uniforms[7] / TRACE_SCALE;
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.denoised_texture, 0);
+		glDrawBuffers(1, &denoise_buffer);
+		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+		glDisable(GL_SCISSOR_TEST);
+		glUseProgram(ray.denoise_program);
+		glUniform4fv(ray.denoise_uniforms, 4, grid);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, ray.lights_texture);
+		glBindSampler(1, 0);
+		glUniform1i(ray.denoise_lights, 1);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, world_results);
+		glBindSampler(2, 0);
+		glUniform1i(ray.denoise_results, 2);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
+		glBindSampler(3, 0);
+		glUniform1i(ray.denoise_gbuffer, 3);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glEnable(GL_SCISSOR_TEST);
+		ray.gi_results_texture = world_results;
+		ray.gi_lights_texture = ray.denoised_texture;
+		ray.gi_gbuffer_texture = ray.gbuffer_texture;
+		ray.gi_grid[0] = uniforms[4] / TRACE_SCALE;
+		ray.gi_grid[1] = uniforms[5] / TRACE_SCALE;
+		ray.gi_grid[2] = uniforms[6] / TRACE_SCALE;
+		ray.gi_grid[3] = uniforms[7] / TRACE_SCALE;
+		ray.gi_tan = uniforms[2];
+		ray.gi_aspect = uniforms[3];
+	}
+	glActiveTexture(GL_TEXTURE0);
+	return ray.gi_previous;
+#else
+	(void)world_results;
+	(void)uniforms;
+	(void)width;
+	(void)height;
+	return 0;
+#endif
+}
+
 /* after the game's lightmaps and dynamic lights, before the textures
 multiply them in (render.c): with display.ray_tracing_gi, the rays traced
 now, and their light put in the light buffer in place of the game's on the
@@ -1448,8 +1572,9 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 
 	if (!ray.initialized)
 		initialize();
+	ray.gi_traced = 0;
 	if (!ray.enabled || ray.failed || !ray.gi || !ray.hardware || !ray.inject_program || !ray.drawn_level ||
-		!ray.gi_previous || !(ray.light_stages & 4) || !(z_near > 0.0f) || !(z_far > z_near) ||
+		!(ray.light_stages & 4) || !(z_near > 0.0f) || !(z_far > z_near) ||
 		!(vertical_field_of_view > 0.0f) || !position || !forward || !up)
 	{
 		return;
@@ -1467,6 +1592,36 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 		return;
 	size_textures(width, height);
 	lighting_uniforms(uniforms, z_near, z_far, vertical_field_of_view, viewport, width, height);
+	/* (HALO_RT_GI_SAME_FRAME: the rays traced now, for this frame's light
+	buffer - but GL does not see Metal's writes this early in the frame, so
+	the last frame's are taken, and the composite puts this frame's right) */
+	if (getenv("HALO_RT_GI_SAME_FRAME"))
+	{
+		GLuint results;
+
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glEnable(GL_SCISSOR_TEST);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+		glScissor(viewport[0] / TRACE_SCALE, viewport[1] / TRACE_SCALE, (viewport[2] + TRACE_SCALE - 1) / TRACE_SCALE,
+			(viewport[3] + TRACE_SCALE - 1) / TRACE_SCALE);
+		glBindVertexArray(ray.vertex_array);
+		results = world_rays(uniforms, position, forward, up, width, height, depth);
+		if (results && denoise_traced_light(results, uniforms, width, height))
+		{
+			ray.gi_traced = 1;
+			ray.gi_traced_results = results;
+		}
+	}
+	if (!ray.gi_previous)
+	{
+		xgpu_gl_bind_device_vertex_array();
+		xgpu_gl_state_invalidate();
+		return;
+	}
 	/* this camera and the last frame's (ray.previous_camera: position,
 	forward, up, right) */
 	memset(cameras, 0, sizeof(cameras));
@@ -1493,11 +1648,25 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glViewport(0, 0, width, height);
 	glScissor(viewport[0], viewport[1], viewport[2], viewport[3]);
 	glBindVertexArray(ray.vertex_array);
-	/* the light buffer's colour (not its alpha, the game's) */
-	glBindFramebuffer(GL_FRAMEBUFFER, ray.output_framebuffer);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
-	glDrawBuffers(1, &draw_buffer);
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+	/* the light buffer's colour (not its alpha, the game's), and what goes
+	in it, for the composite (cleared: none) */
+	{
+		const GLenum both[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.applied_texture, 0);
+		glDrawBuffers(1, &draw_buffer);
+		glDisable(GL_SCISSOR_TEST);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glEnable(GL_SCISSOR_TEST);
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.output_framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, ray.applied_texture, 0);
+		glDrawBuffers(2, both);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+	}
 	glUseProgram(ray.inject_program);
 	glUniform4fv(ray.inject_uniforms, 4, uniforms);
 	glUniform4fv(ray.inject_cameras, 8, cameras);
@@ -1523,6 +1692,10 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glUniform1i(ray.inject_split, getenv("HALO_RT_INJECT_DEBUG") ? 2 : ray.gi_split);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	/* (the second target off again: the output framebuffer is the
+	composite's too) */
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
+	ray.gi_applied = 1;
 	glActiveTexture(GL_TEXTURE0);
 	xgpu_gl_bind_device_vertex_array();
 	xgpu_gl_state_invalidate();
@@ -1596,53 +1769,16 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 #ifdef HALO_MACOS
-	if (ray.hardware && position && forward && up)
+	/* (traced already this frame, for the light buffer) */
+	if (ray.gi_traced)
+		world_results = ray.gi_traced_results;
+	else if (ray.hardware && position && forward && up)
 		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
 	/* (for the next frame's light buffer: these rays, the grid they were
 	traced on, the camera's lens) */
-	ray.gi_previous = world_results && ray.gi && ray.lights_texture && ray.gbuffer_texture && ray.denoise_program &&
-		ray.denoised_texture;
-	if (ray.gi_previous)
-	{
-		/* the traced light, denoised on the rays' grid, for the next frame */
-		float grid[16] = { 0 };
-		const GLenum denoise_buffer = GL_COLOR_ATTACHMENT0;
-
-		grid[0] = uniforms[4] / TRACE_SCALE;
-		grid[1] = uniforms[5] / TRACE_SCALE;
-		grid[2] = uniforms[6] / TRACE_SCALE;
-		grid[3] = uniforms[7] / TRACE_SCALE;
-		glBindFramebuffer(GL_FRAMEBUFFER, ray.light_framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ray.denoised_texture, 0);
-		glDrawBuffers(1, &denoise_buffer);
-		glViewport(0, 0, (width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
-		glDisable(GL_SCISSOR_TEST);
-		glUseProgram(ray.denoise_program);
-		glUniform4fv(ray.denoise_uniforms, 4, grid);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, ray.lights_texture);
-		glBindSampler(1, 0);
-		glUniform1i(ray.denoise_lights, 1);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, world_results);
-		glBindSampler(2, 0);
-		glUniform1i(ray.denoise_results, 2);
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
-		glBindSampler(3, 0);
-		glUniform1i(ray.denoise_gbuffer, 3);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		glEnable(GL_SCISSOR_TEST);
-		ray.gi_results_texture = world_results;
-		ray.gi_lights_texture = ray.denoised_texture;
-		ray.gi_gbuffer_texture = ray.gbuffer_texture;
-		ray.gi_grid[0] = uniforms[4] / TRACE_SCALE;
-		ray.gi_grid[1] = uniforms[5] / TRACE_SCALE;
-		ray.gi_grid[2] = uniforms[6] / TRACE_SCALE;
-		ray.gi_grid[3] = uniforms[7] / TRACE_SCALE;
-		ray.gi_tan = uniforms[2];
-		ray.gi_aspect = uniforms[3];
-	}
+	if (!ray.gi_traced)
+		denoise_traced_light(world_results, uniforms, width, height);
+	ray.gi_traced = 0;
 #else
 	(void)position;
 	(void)forward;
@@ -1687,6 +1823,31 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glBindTexture(GL_TEXTURE_2D, world_results ? ray.lights_texture : 0);
 	glBindSampler(6, 0);
 	glUniform1i(ray.composite_lit_rt, 6);
+	/* (the correction to this frame's traced light: when it was denoised this
+	frame, the light buffer took some, and the objects' depth is known) */
+	{
+		int correct = ray.gi && world_results && ray.gi_previous && ray.gi_applied && (ray.light_stages & 7) == 7 &&
+			ray.gbuffer_texture;
+
+		glActiveTexture(GL_TEXTURE7);
+		glBindTexture(GL_TEXTURE_2D, correct ? ray.denoised_texture : 0);
+		glBindSampler(7, 0);
+		glUniform1i(ray.composite_denoised, 7);
+		glActiveTexture(GL_TEXTURE8);
+		glBindTexture(GL_TEXTURE_2D, correct ? ray.applied_texture : 0);
+		glBindSampler(8, 0);
+		glUniform1i(ray.composite_applied, 8);
+		glActiveTexture(GL_TEXTURE9);
+		glBindTexture(GL_TEXTURE_2D, correct ? ray.objects_texture : 0);
+		glBindSampler(9, 0);
+		glUniform1i(ray.composite_objects, 9);
+		glActiveTexture(GL_TEXTURE10);
+		glBindTexture(GL_TEXTURE_2D, correct ? ray.gbuffer_texture : 0);
+		glBindSampler(10, 0);
+		glUniform1i(ray.composite_gbuffer, 10);
+		glUniform1i(ray.composite_correct, correct && !getenv("HALO_RT_GI_NO_CORRECT"));
+		ray.gi_applied = 0;
+	}
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	ray.light_stages = 0;
 	probe_draw(color, depth, viewport, uniforms, position, forward, up);

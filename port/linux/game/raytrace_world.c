@@ -662,6 +662,32 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 			{
 				continue;
 			}
+			/* (HALO_RT_LOG_SHAPES: each model's first parts' shaders, once) */
+			if (getenv("HALO_RT_LOG_SHAPES") && part_index < 3 && part->shader_index >= 0 &&
+				part->shader_index < model->shaders.count)
+			{
+				extern void platform_log(const char *format, ...);
+				static long seen[256];
+				static int seen_count;
+				long key = definition->object.model.index * 64 + geometry_index * 4 + part_index;
+				int k, found = 0;
+
+				for (k = 0; k < seen_count; k++)
+					found |= seen[k] == key;
+				if (!found && seen_count < 256)
+				{
+					const struct tag_reference *reference = (const struct tag_reference *)
+						((const byte *)model->shaders.address + part->shader_index * 32);
+					const byte *part_shader = reference->index != NONE ? (const byte *)tag_get(0x73686472 /* 'shdr' */,
+						reference->index) : NULL;
+
+					seen[seen_count++] = key;
+					if (part_shader)
+						platform_log("ray tracing: %s part %d: shader %s, type %d, flags %04x",
+							tag_get_name(definition->object.model.index), part_index, tag_get_name(reference->index),
+							*(const short *)(part_shader + 0x24), *(const unsigned short *)(part_shader + 0x28));
+				}
+			}
 			/* (HALO_RT_LOG_SHAPES: a part whose model-space vertices are far
 			off, with its buffers, once each) */
 			if (getenv("HALO_RT_LOG_SHAPES"))
@@ -1354,6 +1380,41 @@ static void level_build(const struct structure_bsp *bsp)
 		}
 	}
 	level.materials_changed = TRUE;
+	if (getenv("HALO_RT_LOG_SHAPES"))
+	{
+		long cutouts = 0, logged = 0;
+
+		for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
+		{
+			const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
+				struct structure_lightmap);
+			long material_index;
+
+			for (material_index = 0; material_index < lightmap->materials.count; material_index++)
+			{
+				const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials,
+					material_index, struct structure_material);
+				const struct shader *shader = material->shader.index != NONE ?
+					shader_definition_get(material->shader.index) : NULL;
+
+				if (shader && shader->base.type == _ray_level_shader_type_environment &&
+					(*(const unsigned short *)((const byte *)shader + 0x28) & 1))
+				{
+					cutouts++;
+					if (logged++ < 8)
+						platform_log("ray tracing: alpha-tested level material %s, %ld triangles",
+							tag_get_name(material->shader.index), (long)material->surface_count);
+				}
+				else if (shader && shader->base.type != _ray_level_shader_type_environment && logged < 16)
+				{
+					logged++;
+					platform_log("ray tracing: level material %s, shader type %d", tag_get_name(material->shader.index),
+						shader->base.type);
+				}
+			}
+		}
+		platform_log("ray tracing: %ld alpha-tested level materials", cutouts);
+	}
 	platform_log("ray tracing: the level's bounds %.1f..%.1f %.1f..%.1f %.1f..%.1f", bsp->world_bounds.x0,
 		bsp->world_bounds.x1, bsp->world_bounds.y0, bsp->world_bounds.y1, bsp->world_bounds.z0, bsp->world_bounds.z1);
 	/* (the brightest glowing materials, where they are: for test cameras) */
