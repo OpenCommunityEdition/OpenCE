@@ -37,17 +37,27 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   and no further from an anchor (one it took, a newer once a second) than
   a player moves in the client's ticks since, those no more than its own
   since and a little jitter (so the tolerance and the jitter are not gained
-  again each tick); a player on foot moves (and the host takes their
-  velocity) no faster than twice as fast as they run and jump, or as fast
-  as the host's own copy of them went in the last few seconds (a fall, an
-  explosion's throw, which the client learns of a round trip late),
-  whichever is more, and no more than 2 world units a tick, with a
-  twentieth of a world unit a tick more for where they are; a teleporter,
-  which moves the host's own copy too, starts afresh.
+  again each tick); a player on foot moves across and up (and the host
+  takes their velocity) no faster than twice as fast as they run and jump,
+  or as fast as the host's own ticks sent its copy of them in the last few
+  seconds or the flight they began then (an explosion's throw, which the
+  client learns of a round trip late), whichever is more; down no faster
+  than that and a fall from the highest the host has had them since they
+  were on the ground; no more than 2 world units a tick, with a twentieth
+  of a world unit a tick more for where they are; and no higher above
+  where the host last had them on the ground than a jump takes them (as
+  fast up as a jump or a run, the legs drawn up, and a world unit more)
+  and a throw its ticks gave them. What the host's ticks sent its copy is
+  its speed less as much as the velocity it took of the client was faster
+  than the player goes of their own (and up, what its tick added but a
+  jump's), so a client that says it goes faster (a copy said to hover and
+  fall, gaining the host's gravity each tick) gains nothing by it. A
+  teleporter, which moves the host's own copy too, starts afresh.
 - **Shooter's hits.** A client reports what its own players hit; the host
-  checks the report (the player's, a weapon they carry, the target where
-  the host had it when the shooter saw it, no faster than weapons fire) and
-  deals the damage. What the shooter saw hit, hits.
+  checks the report (the player's, a weapon they carry, fired from within
+  its reach, the target where the host had it when the shooter saw it, no
+  faster than weapons fire) and deals the damage. What the shooter saw
+  hit, hits.
 
 A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
@@ -72,7 +82,9 @@ what the machines send each other more closely; version 6 sends a unit's
 state and a player's input without the parts that are their defaults, fills
 each datagram, sends damage and pickups only to the machines they concern,
 stamps a hit with the host's tick the client had heard of, and checks hits
-and a client's own player's moves more closely.
+and a client's own player's moves more closely; version 7 sends with a
+killing blow its killer's score after it, and with a body's state that it
+is dead.
 
 ## Joining a game in progress
 
@@ -135,9 +147,10 @@ a pregame keep-alive every five seconds from the host
      most every other look unless the game ended; reliably, so never
      again unchanged), the game type's state (scores, the flags, the balls
      and their carriers, the king's hill, the players' speeds) and whether
-     the game is over. A machine that has loaded is sent all of both at once. It counts
-     the game type's events (captures, grabs and returns of the flags,
-     laps, the balls reset), and a client announces those it has not had,
+     the game is over. A machine that has loaded is sent all of both at
+     once. It counts the game type's events (captures, grabs and returns
+     of the flags, laps, the balls reset, a ball passed to its carrier's
+     killer), and a client announces those it has not had,
      as the host does its own; a client runs the rest of the game type's
      update that only shows the game (waypoints, messages, sounds, a
      carrier's speed).
@@ -183,9 +196,13 @@ a pregame keep-alive every five seconds from the host
    which the host takes within a tolerance, as it does its own player's
    unit, and no further from an anchor (one it took, a newer once a
    second) than the vehicle moves in the client's ticks since, those no
-   more than its own since and a little jitter (its speed, the host's
-   copy's or twice the tag's top speed, whichever is more, no more than 3
-   world units a tick, and a tenth more a tick, with the blend distance; a
+   more than its own since and a little jitter (twice the tag's top speed,
+   or as fast as the host's own ticks sent its copy in the last few
+   seconds beyond the velocity it took of the client, whichever is more,
+   no more than 3 world units a tick, and a tenth more a tick, with the
+   blend distance; its velocity no faster, without the tenth, so that the
+   client's word does not raise it, so a vehicle falls no faster than
+   that and a tick's gravity: a long fall's last moves are the host's; a
    teleporter falls back to the tolerance). The host sends the client its own vehicle
    every third tick, with the client's tick it took the vehicle at
    (`_distributed_object_predicted_bit` and a 16-bit time in the object's
@@ -209,11 +226,24 @@ a pregame keep-alive every five seconds from the host
      origin) and body (its epicenter), both within a few world units of
      where the host had the player; a collision from the vehicle (its
      epicenter) within a few world units and the vehicle's size of where
-     the host had the vehicle the player rode; the origin at the target in
-     each (an explosion's and a melee blow's within its reach); the target
-     within a few world units of where the host had it at the tick the
-     report was made at (a player's unit or vehicle: the host keeps a
-     second of where they were) or of where it is (more for a fast one);
+     the host had the vehicle the player drove, the target (where the
+     client had it) no further from it than their sizes and the push the
+     vehicle gives it; the origin at the target in each (an explosion's and
+     a melee blow's within its reach); what hits at a point within its
+     reach of where the host had the player (their unit, or the vehicle it
+     rode, and its size) since it could have been fired: the projectile's
+     range, or its speed for as long as its timer runs, what it sets off
+     going off from there, with 6 world units more (the host keeps thirteen
+     seconds of where each player was, every third tick, as a rocket flies
+     and a grenade outlives its thrower, and looks no further back than
+     the client's round trip and a second before the report came; not checked for what the tags do
+     not bound: a projectile that sticks, which what it sticks to carries,
+     one whose timer starts once it bounces or rests, a weapon's own
+     detonation; no line of sight); the target within a few world units of
+     where the host had it at the tick the report was made at (a player's
+     unit or vehicle: the host keeps a second of where they were) or of
+     where it is (more for a fast one; also for one that is no longer a
+     player's, a body or a vehicle left);
      and no more reports than the weapon that deals them fires (its rate of
      fire and projectiles a shot, with a margin; an explosion's hits count
      as one, when its damage has a reach, and no object is hit twice by
@@ -223,26 +253,41 @@ a pregame keep-alive every five seconds from the host
      before the host looks through its history, so a flood of them costs
      the sender its hits. The damage is dealt as a client's own hit can
      be: only the flags such a hit has, area damage as the game deals that
-     damage (the report's only for damage dealt both ways), and the host's
-     multiplier and team, not the report's, its owner the player's unit
-     (or the vehicle it rides, or a unit of theirs); a report with a
-     number that is not finite, or a node, region or material the target
-     does not have, is refused. Its own copies of a client's projectiles
-     deal nothing (the report does), but once that client has left the
-     game they deal what they hit, as its own do (a hit the client
-     reported just before it left may so be dealt twice).
+     damage (the report's only for damage dealt both ways), an explosion's
+     direction from its epicenter to the target's centre (where the client
+     had it) and its scale no more than its fall off over that distance
+     gives (unless it does not fall off), any other's direction one long,
+     and the host's multiplier and team, not the report's, its owner the
+     player's unit (or the vehicle it rides, or a unit of theirs); a
+     report with a number that is not finite, or a node, region or
+     material the target does not have, is refused. Its own copies of a
+     client's projectiles deal nothing (the report does), but once that
+     client has left the game they deal what they hit, as its own do (a
+     hit the client reported just before it left may so be dealt twice).
    - The host sends its clients the damage it dealt to units, and a client
      replays what it does besides the harm (which the units' states
      bring): the player's screen flash and shake, the unit's flinch, pain
      sound, knockback and stun, the scope it knocks the player out of, and
      who the HUD shows hit them. A killing blow it replays whole, so the
      body falls as the shot had it and the kill is announced with the
-     host's killer; an actor's (a biped no player's, alive until then)
+     host's killer (and the killer's score after it, as the host's game
+     type has it: the game type's state, which brings the scores, may come
+     after the blow), and a telefrag's message (a client does not decide a
+     telefrag itself: it sees who blocks a teleporter a latency late); an actor's (a biped no player's, alive until then)
      too, counted by no one there (the host's statistics come as they
      are). A killing blow goes to every client; other damage to
      the machines of the unit's player, its riders and the damage's owner,
      and of the clients sent that player this tick (who can see them); a
-     player's screen effects to that player's machine alone.
+     player's screen effects to that player's machine alone, but for a
+     weapon's own shake of the player firing it (no one's damage), which
+     that player's machine shows itself at once. The killing blow is sent
+     unreliably: an actor's body the host says is dead (the objects' states
+     say so) that is still alive half a second on is killed with nothing
+     to show (a player's the units' states kill).
+   - A client's own projectiles respond to what they hit as the game has
+     them: the host's shields and health, which the client has, say
+     whether the shield or the body took the hit, and how much is left of
+     it (the host's own copies of a client's projectiles likewise).
 
 ## Transport
 

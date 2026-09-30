@@ -165,7 +165,8 @@ static const struct config_setting config_settings[] =
 		"test the next); 0 the game type's own." },
 	{ "debug.network_test_shoot", _config_real, "0.0", "HALO_NETWORK_TEST_SHOOT", _environment_value, _platform_all,
 		"Every this many seconds each automated test player hits the next with\n"
-		"their weapon; 0 never." },
+		"their weapon, within its reach (the host brings far players near the\n"
+		"first a second before); 0 never." },
 	{ "debug.network_test_vehicle", _config_real, "0.0", "HALO_NETWORK_TEST_VEHICLE", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host seats its last\n"
 		"player as a vehicle's driver (and out 15 seconds on); 0 never." },

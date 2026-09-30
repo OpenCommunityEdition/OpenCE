@@ -591,6 +591,8 @@ boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
 void network_distributed_player_killed(long *killing_player_index, long *killing_object_index,
 	long dead_player_index, boolean *friendly_fire);
+/* port/linux/game/network_damage.c's */
+boolean network_damage_killer_score(long player_index, long *score);
 
 /* ---------- constants */
 
@@ -6959,7 +6961,11 @@ static boolean internal_rasterize_score(
 		if (message >= _game_engine_message_multi_kill_with_score &&
 			message <= _game_engine_message_killed_enemy_with_score)
 		{
-			score = game_engine->get_player_score(player_index, TRUE);
+			/* port: a client of the distributed netcode replaying the host's
+			killing blow: the score the host's game type gave its killer
+			(its own has it only once the game type's state comes) */
+			if (!network_damage_killer_score(player_index, &score))
+				score = game_engine->get_player_score(player_index, TRUE);
 		}
 	}
 
@@ -7998,6 +8004,17 @@ long game_engine_king_write_network_state(byte *buffer, long size);
 boolean game_engine_king_read_network_state(byte const *buffer, long size, boolean first);
 long game_engine_race_write_network_state(byte *buffer, long size);
 boolean game_engine_race_read_network_state(byte const *buffer, long size, boolean first);
+
+/* the distributed netcode (port/linux/game/network_damage.c): a player's
+score as the game type has it (with its killing blows' messages), 0 for
+none */
+long game_engine_network_player_score(
+	long player_index)
+{
+	if (!game_engine || !game_engine->get_player_score)
+		return 0;
+	return game_engine->get_player_score(player_index, TRUE);
+}
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the
 current game type's state (scores, and what else every machine must agree

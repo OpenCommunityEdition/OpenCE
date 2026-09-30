@@ -709,7 +709,8 @@ static boolean network_game_server_machine_has_players(
 	long machine_index);
 static void network_game_server_refuse_late_joiner(
 	struct network_game_server *server,
-	struct network_game_server_client_machine *machine);
+	struct network_game_server_client_machine *machine,
+	word reason);
 static boolean network_game_server_drop_client_machine(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *client);
@@ -778,6 +779,18 @@ static long network_game_server_frequent_updates_until[MAXIMUM_NETWORK_MACHINE_C
 /* port: the client machines that have slowed this countdown (once each:
 network_game_server_client_machine_may_slow_countdown) */
 static boolean network_game_server_countdown_slowed[MAXIMUM_NETWORK_MACHINE_COUNT];
+
+/* port: when each client machine joined (system_milliseconds): one that has
+added no player this long after holds the lobby's countdown (a machine's
+player is asked for as it joins) */
+static unsigned long network_game_server_client_machine_join_times[MAXIMUM_NETWORK_MACHINE_COUNT];
+enum
+{
+	NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT = 15 * MILLISECONDS_PER_SECOND,
+	/* the connections of one address that have not joined yet a server
+	takes (network_game_server_add_new_client) */
+	MAXIMUM_WAITING_CONNECTIONS_PER_ADDRESS = 2,
+};
 
 /* port: the players added to the game in progress from each client
 machine's address (a machine joins from one address, and joining again
@@ -1639,6 +1652,7 @@ boolean network_game_server_accept_client_machine_into_game(
 					}
 				}
 				network_game_server_client_machine_addresses[machine_index] = address.address.long_words[0];
+				network_game_server_client_machine_join_times[machine_index] = system_milliseconds();
 			}
 			else
 			{
@@ -2090,7 +2104,7 @@ void network_game_server_update_ticks(
 						if (network_game_server_machine_has_players(server, client_machine->machine_index))
 							network_game_server_start_late_joiner(server, client_machine);
 						else
-							network_game_server_refuse_late_joiner(server, client_machine);
+							network_game_server_refuse_late_joiner(server, client_machine, _rejection_code_game_is_full);
 					}
 				}
 
@@ -2175,9 +2189,10 @@ static boolean network_game_server_machine_has_players(
 (the game filled up): told the game is full, and let go */
 static void network_game_server_refuse_late_joiner(
 	struct network_game_server *server,
-	struct network_game_server_client_machine *machine)
+	struct network_game_server_client_machine *machine,
+	word reason)
 {
-	struct message_server_machine_rejected rejection = { _rejection_code_game_is_full };
+	struct message_server_machine_rejected rejection = { reason };
 	struct network_message *message;
 
 	network_event("refusing machine #%d: no player of it can join the game", machine->machine_index);
@@ -3521,11 +3536,37 @@ static boolean network_game_server_add_new_client(
 					NULL);
 				if (client_address.address.ipv4_address)
 				{
+					/* port: the connections of an address that have not joined
+					yet (each holds a machine's slot until the join timeout):
+					a few, so that one machine does not take them all */
+					long waiting_count = 0;
+					long other_index;
+
+					for (other_index = 0;
+						other_index < MAXIMUM_NETWORK_MACHINE_COUNT &&
+							client_address.address.ipv4_address != IPV4_LOOPBACK_ADDRESS;
+						other_index++)
+					{
+						struct network_game_server_client_machine *other = &server->client_machines[other_index];
+						struct transport_address other_address = { 0 };
+
+						if (!other->connection || network_game_server_client_machine_is_joined_to_game(server, other))
+							continue;
+						network_connection_get_address(other->connection, &other_address, NULL);
+						if (other_address.address.ipv4_address == client_address.address.ipv4_address)
+							waiting_count++;
+					}
 					if (!network_game_should_accept_remote_connections() &&
 						client_address.address.ipv4_address != IPV4_LOOPBACK_ADDRESS)
 					{
 						network_event(
 							"remote system tried to join our server but we are not accepting remote connections: address= '%s'",
+							transport_address_to_string(&client_address));
+					}
+					else if (waiting_count >= MAXIMUM_WAITING_CONNECTIONS_PER_ADDRESS)
+					{
+						network_event(
+							"refusing another connection from %s, which has not joined with those it has",
 							transport_address_to_string(&client_address));
 					}
 					else
@@ -3859,13 +3900,18 @@ static boolean network_game_server_idle_pregame_tasks(
 					client_machine);
 			}
 			/* port: a machine that joined and can add no player (the lobby
-			filled after it joined) holds the countdown for ever: refused */
+			filled after it joined), or adds none, holds the countdown for
+			ever: refused */
 			else if (network_game_server_client_machine_is_joined_to_game(server, client_machine) &&
 				!network_game_server_client_machine_is_local(server, client_machine) &&
 				!network_game_server_machine_has_players(server, client_machine->machine_index) &&
-				!network_game_has_free_player_slot(&server->game))
+				(!network_game_has_free_player_slot(&server->game) ||
+					system_milliseconds() - network_game_server_client_machine_join_times[client_machine->machine_index] >
+						NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT))
 			{
-				network_game_server_refuse_late_joiner(server, client_machine);
+				network_game_server_refuse_late_joiner(server, client_machine,
+					network_game_has_free_player_slot(&server->game) ? _rejection_code_game_is_closed :
+						_rejection_code_game_is_full);
 			}
 		}
 

@@ -4,11 +4,13 @@ P2P.C
 Internet play: machines that shared an invite reach each other's system
 link games as if they were on one LAN, without a server of this project's.
 
-- An invite is a link, halo://join/<host><token>: the hosting machine's
-  identifier (which its XNADDR also carries: the hash of the X25519 public
-  key it makes each run) and a random 16-byte token. A machine makes one
-  when its game starts hosting (the game listens for connections), logs it,
-  puts it on the clipboard, and offers it through Discord (p2p_discord.c). Nothing about a game is published anywhere else:
+- An invite is a link, halo://join/<host><token>: the hash of the X25519
+  public key the hosting machine makes each run (16 bytes of it, which no
+  other key can be found to have; the first 6 are the machine's identifier,
+  which its XNADDR also carries) and a random 16-byte token. A machine
+  makes one when its game starts hosting (the game listens for
+  connections), logs it, puts it on the clipboard, and offers it through
+  Discord (p2p_discord.c). Nothing about a game is published anywhere else:
   without an invite there is no way to find or join it.
 - Signalling (p2p_signal.c) goes through public MQTT brokers, on topics
   that are hashes of the token, with messages sealed with a key derived
@@ -326,6 +328,7 @@ static struct
 	int join_requested;
 	int joining;
 	unsigned char join_host[P2P_IDENTIFIER_SIZE];
+	unsigned char join_host_hash[P2P_KEY_HASH_SIZE];
 	unsigned char join_token[P2P_TOKEN_SIZE];
 	unsigned long join_time;
 
@@ -505,15 +508,28 @@ const unsigned char *p2p_identifier(void)
 	return identifier;
 }
 
-void p2p_identifier_for(const unsigned char *key, unsigned char *result)
+void p2p_key_hash(const unsigned char *key, unsigned char *hash)
 {
 	unsigned char digest[P2P_SHA256_SIZE];
 
 	p2p_sha256(key, P2P_KEY_SIZE, digest);
-	memcpy(result, digest, P2P_IDENTIFIER_SIZE);
+	memcpy(hash, digest, P2P_KEY_HASH_SIZE);
+}
+
+void p2p_identifier_from_hash(const unsigned char *hash, unsigned char *result)
+{
+	memcpy(result, hash, P2P_IDENTIFIER_SIZE);
 	/* like a locally administered unicast MAC address, as XNADDR's abEnet
 	holds one */
 	result[0] = (unsigned char)((result[0] & 0xFC) | 0x02);
+}
+
+void p2p_identifier_for(const unsigned char *key, unsigned char *result)
+{
+	unsigned char hash[P2P_KEY_HASH_SIZE];
+
+	p2p_key_hash(key, hash);
+	p2p_identifier_from_hash(hash, result);
 }
 
 const unsigned char *p2p_public_key(void)
@@ -641,7 +657,7 @@ static void peer_send(struct peer *peer, const unsigned char *inner, int size)
 static void peer_ping(struct peer *peer, const struct p2p_candidate *to)
 {
 	unsigned char inner[5];
-	unsigned long now = p2p_now();
+	unsigned int now = (unsigned int)p2p_now();
 
 	inner[0] = _packet_ping;
 	memcpy(inner + 1, &now, 4);
@@ -721,7 +737,7 @@ static void drop_peer(struct peer *peer, const char *reason)
 	makes no second session from one request, which anyone who saw it could
 	send again) */
 	if (ask_again)
-		p2p_signal_join(p2p.join_host, p2p.join_token);
+		p2p_signal_join(p2p.join_host_hash, p2p.join_token);
 }
 
 static void add_candidates(struct peer *peer, const struct p2p_candidate *candidates, int count)
@@ -2046,10 +2062,11 @@ static void tunnel_received(const unsigned char *packet, int size, const struct 
 	case _packet_pong:
 		if (inner_size >= 5)
 		{
-			unsigned long sent;
+			/* (4 bytes of the clock, as the ping carries) */
+			unsigned int sent;
 
 			memcpy(&sent, inner + 1, 4);
-			peer->round_trip = p2p_now() - sent;
+			peer->round_trip = (unsigned int)p2p_now() - sent;
 		}
 		break;
 	case _packet_datagram:
@@ -2083,12 +2100,15 @@ static void tunnel_readable(void)
 
 /* ---------- invites */
 
-/* the host identifier and token in an invite link or code within text */
-static int parse_invite(const char *text, unsigned char *host, unsigned char *token)
+/* the host's key hash and the token in an invite link or code within text:
+1 if it holds one, -1 if it holds an older version's (with the host's
+identifier alone, which a key made to have it could pass for), else 0 */
+static int parse_invite(const char *text, unsigned char *host_hash, unsigned char *token)
 {
-	unsigned char bytes[P2P_IDENTIFIER_SIZE + P2P_TOKEN_SIZE];
+	unsigned char bytes[P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE];
 	const char *start = NULL;
 	const char *search;
+	int digits;
 	int index;
 
 	for (search = text; *search && !start; search++)
@@ -2109,41 +2129,40 @@ static int parse_invite(const char *text, unsigned char *host, unsigned char *to
 		start = text;
 		while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
 			start++;
-		for (index = 0; index < (int)sizeof(bytes) * 2; index++)
-		{
-			if (hex_value(start[index]) < 0)
-				return 0;
-		}
-		for (search = start + index; *search; search++)
+		for (search = start; hex_value(*search) >= 0; search++)
+			;
+		for (; *search; search++)
 		{
 			if (*search != ' ' && *search != '\t' && *search != '\r' && *search != '\n')
 				return 0;
 		}
 	}
-	for (index = 0; index < (int)sizeof(bytes); index++)
-	{
-		int high = hex_value(start[index * 2]);
-		int low = high < 0 ? -1 : hex_value(start[index * 2 + 1]);
-
-		if (low < 0)
-			return 0;
-		bytes[index] = (unsigned char)(high << 4 | low);
-	}
-	if (hex_value(start[sizeof(bytes) * 2]) >= 0)
+	for (digits = 0; hex_value(start[digits]) >= 0; digits++)
+		;
+	if (digits == 2 * (P2P_IDENTIFIER_SIZE + P2P_TOKEN_SIZE))
+		return -1;
+	if (digits != (int)sizeof(bytes) * 2)
 		return 0;
-	memcpy(host, bytes, P2P_IDENTIFIER_SIZE);
-	memcpy(token, bytes + P2P_IDENTIFIER_SIZE, P2P_TOKEN_SIZE);
+	for (index = 0; index < (int)sizeof(bytes); index++)
+		bytes[index] = (unsigned char)(hex_value(start[index * 2]) << 4 | hex_value(start[index * 2 + 1]));
+	memcpy(host_hash, bytes, P2P_KEY_HASH_SIZE);
+	memcpy(token, bytes + P2P_KEY_HASH_SIZE, P2P_TOKEN_SIZE);
 	return 1;
 }
 
-/* under p2p_lock */
+/* under p2p_lock: parse_invite's result */
 static int join_invite(const char *text)
 {
-	unsigned char host[P2P_IDENTIFIER_SIZE], token[P2P_TOKEN_SIZE];
+	unsigned char hash[P2P_KEY_HASH_SIZE], host[P2P_IDENTIFIER_SIZE], token[P2P_TOKEN_SIZE];
 	struct peer *peer;
+	int parsed = parse_invite(text, hash, token);
 
-	if (!parse_invite(text, host, token))
-		return 0;
+	if (parsed < 0)
+		platform_log("Internet play: that invite is from an older version of the game, which this one "
+			"cannot join");
+	if (parsed <= 0)
+		return parsed;
+	p2p_identifier_from_hash(hash, host);
 	if (!memcmp(host, identifier, P2P_IDENTIFIER_SIZE))
 		return 1;
 	peer = find_peer(host);
@@ -2152,10 +2171,11 @@ static int join_invite(const char *text)
 		platform_log("Internet play: already connected to that invite's host");
 		return 1;
 	}
-	if ((p2p.joining || p2p.join_requested) && !memcmp(host, p2p.join_host, sizeof(host)) &&
+	if ((p2p.joining || p2p.join_requested) && !memcmp(hash, p2p.join_host_hash, sizeof(hash)) &&
 		!memcmp(token, p2p.join_token, sizeof(token)))
 		return 1;
 	memcpy(p2p.join_host, host, sizeof(host));
+	memcpy(p2p.join_host_hash, hash, sizeof(hash));
 	memcpy(p2p.join_token, token, sizeof(token));
 	p2p.join_requested = 1;
 	return 1;
@@ -2169,13 +2189,14 @@ int p2p_join_invite(const char *text)
 	pthread_mutex_lock(&p2p_lock);
 	result = join_invite(text);
 	pthread_mutex_unlock(&p2p_lock);
-	if (result && !p2p.running)
+	if (result > 0 && !p2p.running)
 		platform_log("Internet play is off (network.online in config.toml): the invite is ignored");
-	return result;
+	return result > 0;
 }
 
 void p2p_invite_received(const char *text)
 {
+	/* (an older version's is logged as such) */
 	if (!join_invite(text))
 		platform_log("Internet play: that is not an invite");
 }
@@ -2196,7 +2217,7 @@ static void update_joining(void)
 		p2p_hex(p2p.join_host, P2P_IDENTIFIER_SIZE, name);
 		platform_log("Internet play: joining %s's game", name);
 		p2p_signal_start();
-		p2p_signal_join(p2p.join_host, p2p.join_token);
+		p2p_signal_join(p2p.join_host_hash, p2p.join_token);
 	}
 	else if (p2p.joining && elapsed(p2p.join_time, JOIN_TIMEOUT))
 	{
@@ -2222,18 +2243,18 @@ static void update_hosting(void)
 
 	if (want && !p2p.hosting)
 	{
-		char text[2 * (P2P_IDENTIFIER_SIZE + P2P_TOKEN_SIZE) + 1];
+		char text[2 * (P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE) + 1];
 
 		/* one invite for the whole run, so a link keeps working from game
 		to game */
 		if (!p2p.has_token)
 		{
-			unsigned char bytes[P2P_IDENTIFIER_SIZE + P2P_TOKEN_SIZE];
+			unsigned char bytes[P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE];
 
 			posix_random_bytes(p2p.token, sizeof(p2p.token));
 			p2p.has_token = 1;
-			memcpy(bytes, identifier, P2P_IDENTIFIER_SIZE);
-			memcpy(bytes + P2P_IDENTIFIER_SIZE, p2p.token, P2P_TOKEN_SIZE);
+			p2p_key_hash(p2p_public_key(), bytes);
+			memcpy(bytes + P2P_KEY_HASH_SIZE, p2p.token, P2P_TOKEN_SIZE);
 			p2p_hex(bytes, sizeof(bytes), text);
 			snprintf(p2p.invite, sizeof(p2p.invite), "halo://join/%s", text);
 		}
@@ -2436,16 +2457,17 @@ const char *p2p_take_clipboard_text(void)
 
 /* ---------- invites from elsewhere */
 
-/* the first command line argument holding an invite */
+/* the first command line argument holding an invite (or an older
+version's, which the copy that takes it says it cannot join) */
 static int command_line_invite(char *text, int size)
 {
 	int index;
 
 	for (index = 1; posix_command_line_argument(index, text, (posix_ulong)size); index++)
 	{
-		unsigned char host[P2P_IDENTIFIER_SIZE], token[P2P_TOKEN_SIZE];
+		unsigned char hash[P2P_KEY_HASH_SIZE], token[P2P_TOKEN_SIZE];
 
-		if (parse_invite(text, host, token))
+		if (parse_invite(text, hash, token))
 			return 1;
 	}
 	return 0;

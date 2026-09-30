@@ -323,8 +323,10 @@ Machines with an invite link can play system link on the internet. This
 project has no server.
 
 When a copy of the game starts to host a system link game, it makes an
-invite link: `halo://join/<44 hexadecimal digits>`. The game writes the link
-to the standard error and puts it on the clipboard.
+invite link: `halo://join/<64 hexadecimal digits>`. The game writes the link
+to the standard error and puts it on the clipboard. The links of older
+versions of the game (44 digits) do not operate. The game writes a message
+when it gets one.
 
 To join a game, do one of these steps:
 
@@ -334,7 +336,7 @@ To join a game, do one of these steps:
   `$XDG_RUNTIME_DIR`, else `~/.halo-ce-universal.key`; on Windows in
   `%LOCALAPPDATA%`) encrypts the link, so the programs of other users cannot
   read it.
-- Copy the link (or the 44 digits) and go to the game.
+- Copy the link (or the 64 digits) and go to the game.
 - Enter `halo <link>`.
 - Accept a Discord invite. Refer to "Discord".
 
@@ -348,13 +350,16 @@ Only machines with the invite can find the game:
 
 - Each copy of the game makes an X25519 key pair when it starts. Its
   identifier is from the hash of its public key.
-- The link contains the identifier of the host and a random 16-byte token.
+- The link contains a 16-byte hash of the public key of the host and a
+  random 16-byte token. The identifier of the host is from the first 6
+  bytes of the hash.
 - The machines exchange their public keys and addresses through public MQTT
   brokers (`network.signalling_brokers`). The topics are HMACs of the token.
   A key from the token encrypts and authenticates the messages
   (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
   with a key that only it and the player can calculate. Its public key must
-  agree with the identifier in the link.
+  agree with the hash in the link. The hash is long, so no other machine can
+  find a key with the same hash.
 - Then the player shows in the same way that it has the private key of its
   public key. Only then does the host make a session for the player. Thus
   other machines with the invite cannot make sessions in the name of a
@@ -370,9 +375,16 @@ Only machines with the invite can find the game:
   must ask again sends a new request.
 - The host tries to reach at most 8 new players at the same time. The
   other players ask again.
+- The host answers a request that is not proven at most one time each
+  second. It answers at most 20 of these requests each second,
+  after a first 32. Each answer goes only through the broker that brought
+  the request. Thus a flood of requests does not use much of the bandwidth
+  of the host.
 - The host does the key work of at most 20 requests each second from keys
-  that it does not know, after a first 32. Thus a flood of requests does
-  not stop the connections of the players.
+  that it does not know, after a first 32. It keeps the key work of the
+  last 256 keys. Thus the proof of a player does not need more key work. A
+  flood of requests can make players join more slowly. A player asks again
+  for 90 seconds.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection

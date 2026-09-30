@@ -499,7 +499,9 @@ long read_endpoint(
 
 		ep->error = (word)result;
 	}
-	else if (result == 0)
+	/* (port: a stream's end; an empty datagram is only empty, which anyone
+	may send: skipped, network_connection_idle) */
+	else if (result == 0 && ep->type != _transport_type_udp)
 	{
 		result = _transport_error_connection_lost;
 	}

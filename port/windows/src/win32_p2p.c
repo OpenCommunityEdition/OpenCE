@@ -189,7 +189,10 @@ int posix_discord_connect(void)
 		HANDLE pipe;
 
 		snprintf(name, sizeof(name), "\\\\.\\pipe\\discord-ipc-%d", number);
-		pipe = CreateFileA(name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+		/* (the pipe's server may only identify this user, not act as them:
+		it may be another user's) */
+		pipe = CreateFileA(name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+			SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, NULL);
 		if (pipe != INVALID_HANDLE_VALUE)
 		{
 			/* writes never wait (the p2p thread holds its lock): a write takes

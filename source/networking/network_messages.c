@@ -182,6 +182,9 @@ symbols in this file:
 #include "memory/data_packet_groups.h"
 #include "networking/network_messages.h"
 
+/* cseries_windows.c's */
+unsigned long system_milliseconds(void);
+
 /* ---------- constants */
 
 /* ---------- macros */
@@ -610,6 +613,34 @@ void network_event(
 
 #line 331 "c:\\halo\\SOURCE\\networking\\network_messages.c"
 	match_assert(__FILE__, __LINE__, format);
+
+	/* port: no more than NETWORK_EVENTS_PER_SECOND lines a second, then how
+	many were left out (a flood of datagrams, which anyone may send, each
+	logged, stalled the game writing its log a line at a time) */
+	{
+		enum
+		{
+			NETWORK_EVENTS_PER_SECOND = 64,
+		};
+		static unsigned long second_time = 0;
+		static long second_count = 0;
+		static long left_out_count = 0;
+		unsigned long now = system_milliseconds();
+
+		if (!second_time || now - second_time >= 1000)
+		{
+			second_time = now ? now : 1;
+			second_count = 0;
+			if (left_out_count)
+				error(3, "(%ld more network events not logged)", left_out_count);
+			left_out_count = 0;
+		}
+		if (++second_count > NETWORK_EVENTS_PER_SECOND)
+		{
+			left_out_count++;
+			return;
+		}
+	}
 
 	va_start(arguments, format);
 	_vsnprintf(temporary, NUMBEROF(temporary) - 1, format, arguments);

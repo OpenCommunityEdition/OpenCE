@@ -3814,6 +3814,31 @@ void players_update_before_game(
 	return;
 }
 
+/* the telefrag message to a local player (port: its own function, which a
+client of the distributed netcode calls with the host's telefrag kill,
+port/linux/game/network_damage.c) */
+void players_show_telefragged(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	long message_list_index;
+
+	if (player->local_player_index == NONE)
+		return;
+	message_list_index = tag_loaded(
+		UNICODE_STRING_LIST_TAG,
+		"ui\\multiplayer_game_text");
+	hud_print_message(
+		player->local_player_index,
+		message_list_index != NONE
+			? unicode_string_list_get_string(
+				message_list_index,
+				MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED)
+			: L"");
+
+	return;
+}
+
 void players_update_after_game(
 	void)
 {
@@ -3825,7 +3850,6 @@ void players_update_after_game(
 	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
 	long telefrag_ticks;
 	long root_object_index;
-	long message_list_index;
 	short bsp_switch_trigger_volume_index;
 
 	profile_enter(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
@@ -3840,18 +3864,10 @@ void players_update_after_game(
 	data_iterator_new(&iterator, player_data);
 	while (player = data_iterator_next(&iterator))
 	{
-		/* port: a client of the distributed netcode: whether it showed the
-		telefrag message since the player last blocked no teleporter (its
-		view of blocking comes and goes a latency apart from the host's) */
-		static boolean telefrag_shown[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-		long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
-
 		if (!player->is_blocking_teleporter)
 		{
 			if (player->telefrag_timeout > 0)
 				player->telefrag_timeout--;
-			if (player->telefrag_timeout == 0 && absolute_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
-				telefrag_shown[absolute_index] = FALSE;
 		}
 		else
 		{
@@ -3859,44 +3875,20 @@ void players_update_after_game(
 			if (telefrag_ticks >= 90)
 			{
 				/* a client's view of who blocks is a latency late: the
-				host's kill arrives with its damage events (the message
-				shown once) */
-				boolean client = network_game_distributed_client();
-				boolean show = !client;
-
-				if (client && absolute_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS &&
-					!telefrag_shown[absolute_index])
-				{
-					telefrag_shown[absolute_index] = TRUE;
-					show = TRUE;
-				}
-
-				if (player->unit_index != NONE)
+				host's kill arrives with its damage events, and its message
+				with it (players_show_telefragged) */
+				if (network_game_distributed_client())
+					player_telefrag_effect_stop(iterator.datum_index);
+				else if (player->unit_index != NONE)
 				{
 					unit = unit_get(player->unit_index);
-					if (show && !TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
+					if (!TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
 					{
-						if (player->local_player_index != NONE)
-						{
-							message_list_index = tag_loaded(
-								UNICODE_STRING_LIST_TAG,
-								"ui\\multiplayer_game_text");
-							hud_print_message(
-								player->local_player_index,
-								message_list_index != NONE
-									? unicode_string_list_get_string(
-										message_list_index,
-										MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED)
-									: L"");
-						}
-
+						players_show_telefragged(iterator.datum_index);
 						player_telefrag_effect_stop(iterator.datum_index);
-						if (!client)
-							unit_kill(player->unit_index);
+						unit_kill(player->unit_index);
 					}
 				}
-				if (client)
-					player_telefrag_effect_stop(iterator.datum_index);
 			}
 			else
 			{
