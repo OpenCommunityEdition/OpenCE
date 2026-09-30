@@ -923,6 +923,7 @@ can run the game, copies the game data out of the player's disc image
   // ---------- online play (net.js)
 
   function setUpInvites() {
+    if (!$('invite-input')) return;
     const relay = window.HALO_BROWSER_CONFIG?.relayUrl || '';
     const linked = new URLSearchParams(location.hash.slice(1)).get('join');
     state.invite = linked ? HaloInvite.parse(linked) : null;
@@ -1186,7 +1187,7 @@ can run the game, copies the game data out of the player's disc image
       last = localStorage.getItem('halo-web-room');
       left = localStorage.getItem('halo-web-room-left') === '1';
     } catch { /* none */ }
-    if (!new URLSearchParams(location.hash.slice(1)).has('join')) {
+    if (!$('invite-input') || !new URLSearchParams(location.hash.slice(1)).has('join')) {
       if (linked) joinRoom(linked, { updateURL: false });
       else if (!left && (last || DEFAULT_ROOM)) joinRoom(last || DEFAULT_ROOM, { remember: !!last, updateURL: false });
     }
