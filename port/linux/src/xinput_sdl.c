@@ -16,8 +16,10 @@ Keyboard and mouse (port 0):
 	left ctrl, C     left stick click    Z, middle button right stick click
 	escape           start               F1               back
 	F12              release or recapture the mouse
-	Command-X        the next debug camera (as black held for a second)
-	Command-Z        the flying camera's controls (as the right stick click)
+	Command-X        the next debug camera
+	Command-Z        take or let go of the flying camera's controls; with
+	                 them, Space rises, left ctrl or C sinks, shift (or Q)
+	                 speeds up (source/camera/director.c)
 
 In the menus the mouse is free and drives a pointer instead
 (port/linux/include/halo_ui_pointer.h, source/interface/ui_widget.c): its
@@ -195,6 +197,31 @@ int halo_debug_camera_request(short gamepad_index, int switch_camera)
 	return pressed && SDL_GetTicks() + 1 - pressed <= DEBUG_CAMERA_KEY_MS;
 }
 
+/* port 0's last poll: shift held (the flying camera's speed), and the black
+button and the right stick's button held on the SDL gamepad, not by the
+keyboard's X and Z (XInputGetState) */
+static BOOL debug_camera_shift;
+static BOOL pad_black_held, pad_right_thumb_held;
+/* debug.test_input's "fast" */
+static BOOL test_script_fast;
+
+/* whether shift is held, for the flying camera's speed */
+int halo_debug_camera_fast(short gamepad_index)
+{
+	return gamepad_index == 0 && (debug_camera_shift || test_script_fast);
+}
+
+/* whether the black button (black) or the right stick's button is held on
+a gamepad: the director's own switches (a camera a second the black button
+is held, the flying camera's controls at the stick's click) are the
+gamepads' alone; on the keyboard, Command-X and Command-Z do them */
+int halo_debug_camera_pad_held(short gamepad_index, int black)
+{
+	if (gamepad_index != 0)
+		return TRUE;
+	return black ? pad_black_held : pad_right_thumb_held;
+}
+
 /* collects the motion the game has not asked for yet; motion that nobody
 consumes for a few polls (menus, cutscenes) is dropped so it cannot jerk
 the view later */
@@ -305,10 +332,11 @@ as scripted, for tests with screenshots (debug.screenshot_every). The times
 are seconds since the game started; <to> may be left out for a tap (a
 tenth of a second). The actions: forward, back, left, right (walking),
 turnleft, turnright, up, down (looking), fire, grenade, jump, crouch, zoom,
-action, flashlight, reload, switch (weapons), start; camera and
+action, flashlight, reload, switch (weapons), black (the grenade, as the
+keyboard's X), start; camera and
 cameracontrol press Command-X and Command-Z once (the debug cameras);
-mouseleft, mouseright, mouseup, mousedown move the mouse, 400 pixels a
-second. */
+fast holds shift; mouseleft, mouseright, mouseup, mousedown move the mouse,
+400 pixels a second. */
 static struct
 {
 	double from, to;
@@ -359,6 +387,7 @@ static void test_script_gamepad(XINPUT_GAMEPAD *pad)
 	int index;
 
 	last_t = t;
+	test_script_fast = FALSE;
 	for (index = 0; index < test_script_count; index++)
 	{
 		const char *action = test_script[index].action;
@@ -371,6 +400,11 @@ static void test_script_gamepad(XINPUT_GAMEPAD *pad)
 			if (!test_script[index].pressed)
 				halo_debug_camera_key(!strcmp(action, "camera"));
 			test_script[index].pressed = TRUE;
+			continue;
+		}
+		if (!strcmp(action, "fast"))
+		{
+			test_script_fast = TRUE;
 			continue;
 		}
 		if (!strcmp(action, "mouseleft")) mouse_x = -400.0f * dt;
@@ -401,6 +435,7 @@ static void test_script_gamepad(XINPUT_GAMEPAD *pad)
 		else if (!strcmp(action, "reload")) pad->bAnalogButtons[XINPUT_GAMEPAD_B] = 255;
 		else if (!strcmp(action, "switch")) pad->bAnalogButtons[XINPUT_GAMEPAD_Y] = 255;
 		else if (!strcmp(action, "flashlight")) pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] = 255;
+		else if (!strcmp(action, "black")) pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] = 255;
 		else if (!strcmp(action, "crouch")) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
 		else if (!strcmp(action, "zoom")) pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
 		else if (!strcmp(action, "start")) pad->wButtons |= XINPUT_GAMEPAD_START;
@@ -704,6 +739,10 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			keyboard_gamepad(&input, &state->Gamepad);
 		if (count > 0)
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		debug_camera_shift = !console_is_active() &&
+			(input.keys[SDL_SCANCODE_LSHIFT] || input.keys[SDL_SCANCODE_RSHIFT]);
+		pad_black_held = count > 0 && SDL_GetGamepadButton(gamepads[0], SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+		pad_right_thumb_held = count > 0 && SDL_GetGamepadButton(gamepads[0], SDL_GAMEPAD_BUTTON_RIGHT_STICK);
 		test_input_gamepad(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
@@ -740,6 +779,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 				any |= state->Gamepad.bAnalogButtons[button] > 30;
 			held[port] = any || settings_overlay_active();
 			memset(&state->Gamepad, 0, sizeof(state->Gamepad));
+			if (port == 0)
+				debug_camera_shift = pad_black_held = pad_right_thumb_held = FALSE;
 		}
 	}
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))

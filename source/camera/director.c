@@ -780,6 +780,13 @@ static boolean director_update_controls(
 	short local_player_index,
 	struct camera_control *controls)
 {
+	/* the port's keyboard (port/linux/src/xinput_sdl.c): Command-X switches
+	at once and Command-Z takes or lets go of the flying camera's controls;
+	the black button held and the right stick's button do only on a gamepad,
+	not as the keyboard's X and Z; shift speeds the flying camera up */
+	extern int halo_debug_camera_request(short gamepad_index, int switch_camera);
+	extern int halo_debug_camera_pad_held(short gamepad_index, int black);
+	extern int halo_debug_camera_fast(short gamepad_index);
 	boolean switch_camera = FALSE;
 	boolean toggle_controls;
 	long player_index;
@@ -799,7 +806,8 @@ static boolean director_update_controls(
 		if (director_camera_switch_fast)
 		{
 			switch_camera =
-				gamepad->buttons[_gamepad_analog_button_black] == 1;
+				gamepad->buttons[_gamepad_analog_button_black] == 1 &&
+				halo_debug_camera_pad_held((short)player_index, TRUE);
 		}
 		else
 		{
@@ -810,38 +818,46 @@ static boolean director_update_controls(
 			static byte last_ticks[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 
 			switch_camera = ticks > 0 && ticks % TICKS_PER_SECOND == 0 &&
-				ticks != last_ticks[local_player_index];
+				ticks != last_ticks[local_player_index] &&
+				halo_debug_camera_pad_held((short)player_index, TRUE);
 			last_ticks[local_player_index] = ticks;
 		}
-		{
-			/* Command-X switches at once and Command-Z takes or lets go of
-			the flying camera's controls (port/linux/src/xinput_sdl.c) */
-			extern int halo_debug_camera_request(short gamepad_index, int switch_camera);
-
-			if (halo_debug_camera_request((short)player_index, TRUE))
-				switch_camera = TRUE;
-			toggle_controls = halo_debug_camera_request((short)player_index, FALSE);
-		}
+		if (halo_debug_camera_request((short)player_index, TRUE))
+			switch_camera = TRUE;
+		toggle_controls = halo_debug_camera_request((short)player_index, FALSE);
 
 		if (director->camera_proc !=
 				(director_camera_update_proc)first_person_camera_update &&
 			director->camera_proc !=
 				(director_camera_update_proc)following_camera_update)
 		{
-			if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1 ||
+			if ((gamepad->buttons[_gamepad_binary_button_right_thumb] == 1 &&
+					halo_debug_camera_pad_held((short)player_index, FALSE)) ||
 				toggle_controls)
 				director->debug_controls = !director->debug_controls;
 			if (director->debug_controls)
 			{
+				/* up with the right trigger or A (the jump: Space), down
+				with the left trigger or the left stick's button (the
+				crouch: left ctrl, C); the player's input is held meanwhile,
+				so they neither jump nor crouch */
+				real speed_scale =
+					(halo_debug_camera_fast((short)player_index) ||
+						gamepad->buttons[_gamepad_analog_button_white] != 0)
+					? 4.f
+					: 1.f;
+
 				control_flags = 0;
 				SET_FLAG(
 					control_flags,
 					_camera_control_up_bit,
-					gamepad->buttons[_gamepad_analog_button_right_trigger] != 0);
+					gamepad->buttons[_gamepad_analog_button_right_trigger] != 0 ||
+						gamepad->buttons[_gamepad_analog_button_a] != 0);
 				SET_FLAG(
 					control_flags,
 					_camera_control_down_bit,
-					gamepad->buttons[_gamepad_analog_button_left_trigger] != 0);
+					gamepad->buttons[_gamepad_analog_button_left_trigger] != 0 ||
+						gamepad->buttons[_gamepad_binary_button_left_thumb] != 0);
 				controls->wheel_delta =
 					(real)((gamepad->buttons[_gamepad_binary_button_dpad_up] > 1) -
 						(gamepad->buttons[_gamepad_binary_button_dpad_down] > 1)) * 0.4f;
@@ -878,6 +894,11 @@ static boolean director_update_controls(
 						director->debug_input_scale * director_globals.dtime * -0.00005f;
 				controls->position_delta.k +=
 					director->debug_variables[_variable_height].delta;
+				/* shift, or the white button (the flashlight: Q), four
+				times as fast */
+				controls->position_delta.i *= speed_scale;
+				controls->position_delta.j *= speed_scale;
+				controls->position_delta.k *= speed_scale;
 				controls->active = TRUE;
 				director_inhibit_input(local_player_index);
 				director_inhibit_facing(local_player_index);
