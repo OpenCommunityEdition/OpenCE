@@ -81,7 +81,16 @@ build adds:
 | F12 | ⌘G | Release or capture the mouse. |
 
 On a Mac keyboard, F11 shows the desktop and F8 to F12 are media keys
-unless fn is held, so the Command shortcuts do the same.
+unless fn is held, so the Command shortcuts do the same. Each key shows
+what it did in the game's console at the top of the screen (for example
+`ray tracing: on`), and writes it to `debug.txt`.
+
+`HALO_FULLSCREEN=false` (or `display.fullscreen = false`) starts the game
+in a window:
+
+```bash
+open --env HALO_FULLSCREEN=false --env HALO_FPS=1 build/macos/Halo.app
+```
 
 These settings are new, or have a different default on macOS:
 
@@ -93,6 +102,7 @@ These settings are new, or have a different default on macOS:
 | `display.ray_tracing_occlusion` | `0.8` | How much the traced occlusion darkens corners and creases (0.0 to 1.0). |
 | `display.ray_tracing_reflections` | `0.25` | How strongly the surfaces reflect the traced scene (0.0 to 1.0). |
 | `display.ray_tracing_bounce` | `0.25` | How much light one traced bounce carries between surfaces (0.0 to 1.0). |
+| `display.ray_tracing_shadows` | `1.0` | How dark the sun's traced shadows are (0.0 to 1.0). |
 | `network.tailscale` | `true` | System link across a Tailscale network (refer to "Multiplayer"). |
 | `network.allow_upnp` | `false` | Tailscale and the local network do not need a forwarded port. |
 | `network.join_from_clipboard` | `false` | An invite link on the clipboard does not join a game. |
@@ -167,12 +177,26 @@ rays from each pixel:
 - One bounce of indirect light: the color that a screen ray hits adds a
   small quantity of light. A red wall makes the floor next to it a little
   red.
+- Sun shadows (Metal only): the sun is the first light of the level's sky
+  that has a lens flare, taken as a point light very far away. A ray goes
+  towards it from each pixel of an object; if the level is in the way, the
+  pixel is in shadow. The level's own surfaces already have the sun's
+  shadows in their lightmaps, so their pixels send no shadow ray.
+
+The rays are traced at half the resolution (a quarter of the pixels), then
+a blur that stops at edges in depth brings them to the full resolution.
+Metal traces 8 occlusion rays per pixel, on a pattern that changes every
+pixel of a 4x4 block, so the blur averages 128 directions.
 
 On macOS the rays go through the level itself with Metal's ray tracing
 (`port/macos/host/host_metal_rt.m`): the level's collision surfaces
 (`port/linux/game/raytrace_world.c`) are a Metal acceleration structure,
 built when the level loads. These rays find the level's geometry also where
-the camera does not see it. A reflection takes its color from the screen
+the camera does not see it. The triangles face out of the level (the
+collision surface's plane gives the side), and the rays pass through their
+backs: where the drawn surface is a little inside its collision surface, a
+ray that leaves the drawn surface does not hit the collision surface behind
+it and darken the pixel. A reflection takes its color from the screen
 where the camera sees the point that the ray hit. On M1 and M2, Metal traces
 the rays in compute; on M3 and later (the M5 and M6 too), in the GPU's ray
 tracing hardware.
@@ -290,6 +314,12 @@ code for the window, the mouse, the keyboard and the first start.
 - `HALO_PROFILE=1 build/macos/Halo/halo` samples every thread 1000 times a
   second, and writes `profile.txt` to the game's folder at exit: the game
   functions and the host functions (SDL, ANGLE) where the time goes.
+- `HALO_FPS=1` writes to `host.txt` every 5 seconds: the frames per
+  second, the time the main thread waits for the GPU to finish the GL
+  frame, and the time Metal's rays take.
+- `display.render_scale = 0.75` (or F8 / ⌘R to 1440p or 1080p) is the
+  largest speed-up with ray tracing on a Retina display: the rays' cost
+  follows the number of pixels.
 
 ## Find problems
 

@@ -74,6 +74,7 @@ static void world_build(const struct collision_bsp *bsp)
 	{
 		const struct collision_surface *surface = &surfaces[surface_index];
 		long ring[MAXIMUM_VERTICES_PER_COLLISION_SURFACE];
+		float normal[3];
 		long count = 0, edge_index = surface->first_edge_index, steps, corner;
 
 		if (surface->flags & _collision_surface_invisible_flag)
@@ -94,6 +95,25 @@ static void world_build(const struct collision_bsp *bsp)
 			if (edge_index == surface->first_edge_index)
 				break;
 		}
+		/* the surface's outward normal: its plane, negated by the
+		designator's sign bit */
+		{
+			long plane_index = surface->plane_designator & LONG_MAX;
+
+			if (plane_index < bsp->bsp3d.planes.count)
+			{
+				const real_plane3d *plane = (const real_plane3d *)bsp->bsp3d.planes.address + plane_index;
+				float sign = (surface->plane_designator & LONG_MIN) ? -1.0f : 1.0f;
+
+				normal[0] = plane->n.i * sign;
+				normal[1] = plane->n.j * sign;
+				normal[2] = plane->n.k * sign;
+			}
+			else
+			{
+				normal[0] = normal[1] = normal[2] = 0.0f;
+			}
+		}
 		for (corner = 1; corner + 1 < count && world.triangle_count < capacity; corner++)
 		{
 			long a = ring[0], b = ring[corner], c = ring[corner + 1];
@@ -102,6 +122,25 @@ static void world_build(const struct collision_bsp *bsp)
 				c >= world.vertex_count)
 			{
 				continue;
+			}
+			/* wound counterclockwise seen from the outside, so the rays can
+			pass out of the level's surfaces from behind them: where the
+			rendered surface lies behind its collision surface, a ray
+			leaving it does not find the collision surface's back */
+			{
+				const float *pa = &world.vertices[a * 3], *pb = &world.vertices[b * 3], *pc = &world.vertices[c * 3];
+				float u[3] = { pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2] };
+				float v[3] = { pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2] };
+				float facing = (u[1] * v[2] - u[2] * v[1]) * normal[0] + (u[2] * v[0] - u[0] * v[2]) * normal[1] +
+					(u[0] * v[1] - u[1] * v[0]) * normal[2];
+
+				if (facing < 0.0f)
+				{
+					long swap = b;
+
+					b = c;
+					c = swap;
+				}
 			}
 			world.indices[world.triangle_count * 3 + 0] = (unsigned long)a;
 			world.indices[world.triangle_count * 3 + 1] = (unsigned long)b;

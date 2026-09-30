@@ -105,6 +105,12 @@ static NSString *const kernel_source = @
 	"	any_hit.accept_any_intersection(true);\n"
 	"	any_hit.assume_geometry_type(geometry_type::triangle);\n"
 	"	any_hit.force_opacity(forced_opacity::opaque);\n"
+	/* the level's triangles face outwards, wound counterclockwise around
+	   their normal (raytrace_world.c), which Metal's rays see from the front
+	   as clockwise (tested: port/macos/tests/run_raytrace_test.sh): a ray
+	   leaving a surface from behind it passes */
+	"	any_hit.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"	any_hit.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	float radius = c[21];\n"
 	"	float bias = 0.02 + z * 0.002;\n"
 	"	float occlusion = 0.0;\n"
@@ -132,8 +138,11 @@ static NSString *const kernel_source = @
 	"	if (c[27] > 0.0)\n"
 	"	{\n"
 	"		float3 sun = float3(c[24], c[25], c[26]);\n"
+	"		intersector<triangle_data> surface_probe;\n"
+	"		surface_probe.accept_any_intersection(true);\n"
+	"		surface_probe.force_opacity(forced_opacity::opaque);\n"
 	"		ray probe(P + N * bias, -N, 0.0, bias * 3.0);\n"
-	"		bool on_level = any_hit.intersect(probe, world).type != intersection_type::none;\n"
+	"		bool on_level = surface_probe.intersect(probe, world).type != intersection_type::none;\n"
 	"		if (!on_level && dot(N, sun) > 0.0)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
@@ -149,6 +158,8 @@ static NSString *const kernel_source = @
 	"	intersector<triangle_data> closest;\n"
 	"	closest.assume_geometry_type(geometry_type::triangle);\n"
 	"	closest.force_opacity(forced_opacity::opaque);\n"
+	"	closest.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"	closest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"	ray reflection_ray(P + N * bias, R, 0.0, c[22]);\n"
 	"	auto hit = closest.intersect(reflection_ray, world);\n"
 	"	float4 out = float4(visibility, 0.0, 0.0, 0.0);\n"
@@ -333,8 +344,13 @@ uint32_t host_rt_texture(int which, int width, int height)
 }
 
 /* the rays, for the camera (the 28 values the kernel names); 1 if done */
+/* the time waited on GL (glFinish) and on the rays, for the frame
+statistics (host_sdl.c) */
+uint64_t host_rt_finish_ns, host_rt_trace_ns, host_rt_traces;
+
 int host_rt_trace(const float *camera, int width, int height)
 {
+	uint64_t start, finished;
 	id<MTLCommandBuffer> commands;
 	id<MTLComputeCommandEncoder> encoder;
 	MTLSize group, groups;
@@ -344,7 +360,9 @@ int host_rt_trace(const float *camera, int width, int height)
 	{
 		return 0;
 	}
+	start = SDL_GetTicksNS();
 	rt.glFinish();
+	finished = SDL_GetTicksNS();
 	commands = [rt.queue commandBuffer];
 	encoder = [commands computeCommandEncoder];
 	[encoder setComputePipelineState:rt.pipeline];
@@ -358,6 +376,9 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder endEncoding];
 	[commands commit];
 	[commands waitUntilCompleted];
+	host_rt_finish_ns += finished - start;
+	host_rt_trace_ns += SDL_GetTicksNS() - finished;
+	host_rt_traces++;
 	return commands.status == MTLCommandBufferStatusCompleted;
 }
 

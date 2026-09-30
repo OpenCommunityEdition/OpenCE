@@ -53,6 +53,8 @@ void updater_poll(SDL_Window *window);
 /* the game's console (source/interface/terminal.c): a line on the screen
 that fades */
 void terminal_printf(const void *color, const char *format, ...);
+/* the game's log (source/cseries/errors.c): priority 0 only logs */
+void error(short priority, const char *format, ...);
 
 /* what the port's keys did: on the screen and in the log */
 static void notice(const char *format, ...)
@@ -64,6 +66,8 @@ static void notice(const char *format, ...)
 	vsnprintf(text, sizeof(text), format, arguments);
 	va_end(arguments);
 	platform_log("%s", text);
+	/* (and in debug.txt, as the game's own messages are) */
+	error(0, "%s", text);
 	terminal_printf(NULL, "%s", text);
 }
 

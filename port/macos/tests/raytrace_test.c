@@ -223,6 +223,22 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 		world_vertices[index * 3 + 2] = vertices_scene()[index].y;
 		world_indices[index] = (unsigned int)index;
 	}
+	/* each triangle facing the camera, counterclockwise from it, as the
+	level's face outwards (raytrace_world.c) */
+	for (index = 0; index + 2 < vertex_count_scene(); index += 3)
+	{
+		float *a = &world_vertices[index * 3], *b = a + 3, *c = a + 6;
+		float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+		float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+
+		if (n[0] * -a[0] + n[1] * -a[1] + n[2] * -a[2] < 0.0f)
+		{
+			unsigned int swap = world_indices[index + 1];
+
+			world_indices[index + 1] = world_indices[index + 2];
+			world_indices[index + 2] = swap;
+		}
+	}
 	*vertices = world_vertices;
 	*vertex_count = vertex_count_scene();
 	*indices = (const unsigned long *)world_indices;
@@ -350,10 +366,10 @@ int main(int argc, char **argv)
 		static float row[WIDTH * 4], results[WIDTH * 4];
 		int x;
 
-		host_rt_debug_read(0, 0, 150, WIDTH, row);
-		host_rt_debug_read(1, 0, 150, WIDTH, results);
-		for (x = 360; x < 660; x += 20)
-			printf("row 150 x %d: z %.4f normal %.3f %.3f %.3f  visibility %.3f\n", x, row[x * 4], row[x * 4 + 1],
+		host_rt_debug_read(0, 0, 166, WIDTH / 2, row);
+		host_rt_debug_read(1, 0, 166, WIDTH / 2, results);
+		for (x = 60; x < 130; x += 8)
+			printf("half row 166 x %d: z %.4f normal %.3f %.3f %.3f  visibility %.3f\n", x, row[x * 4], row[x * 4 + 1],
 				row[x * 4 + 2], row[x * 4 + 3], results[x * 4]);
 	}
 #endif
