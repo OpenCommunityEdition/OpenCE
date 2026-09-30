@@ -1102,6 +1102,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
 	/* (how much of each new frame the accumulated light takes, at least) */
+	/* (the traced light's new samples every this many frames a pixel: 0,
+	the host's governor chooses) */
+	camera[63] = getenv("HALO_RT_GI_PERIOD") ? (float)atof(getenv("HALO_RT_GI_PERIOD")) : 0.0f;
 	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.02f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;

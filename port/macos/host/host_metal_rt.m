@@ -344,8 +344,10 @@ static NSString *const kernel_source = @
 	   level's own occlusion, baked, so their rays find only the objects,
 	   which the lightmaps never saw - and none, away from the objects */
 	"	bool level_pixel = c[23] > 0.5 && !object;\n"
+	/* (with the traced light, a level pixel's occlusion is in it) */
+	"	bool traced_level = gi_ready != 0u && c[42] > 0.5 && level_pixel;\n"
 	"	float occlusion = 0.0;\n"
-	"	for (uint i = 0; i < (level_pixel && !near_objects ? 0u : 4u); i++)\n"
+	"	for (uint i = 0; i < ((level_pixel && !near_objects) || traced_level ? 0u : 4u); i++)\n"
 	"	{\n"
 	/* stratified, in a pattern that repeats every 4x4 pixels: the guest's
 	   4x4 blur takes in all 16 of its sets of directions (64 in all), so the
@@ -398,7 +400,7 @@ static NSString *const kernel_source = @
 	/* an object's pixel: the level's and the other objects' shadows; the
 	   level's: the player's body's only (the lightmaps have the level's,
 	   and the game draws the other objects') */
-	"		if (dot(N, sun) > 0.0)\n"
+	"		if (dot(N, sun) > 0.0 && !traced_level)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
@@ -497,7 +499,7 @@ static NSString *const kernel_source = @
 	"		float3 sun_dir = float3(c[24], c[25], c[26]);\n"
 	"		float3 sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
 	"		float ndl = dot(N, sun_dir);\n"
-	"		if (c[27] > 0.0 && ndl > 0.0)\n"
+	"		if (c[27] > 0.0 && ndl > 0.0 && c[45] > 0.0)\n"
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
@@ -511,13 +513,49 @@ static NSString *const kernel_source = @
 	"		nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
 	"		uint seed = pcg(id.x + pcg(id.y + pcg(uint(c[44]))));\n"
 	"		float3 indirect = float3(0.0);\n"
+	"		float4 before = float4(0.0);\n"
+	"		float weight = 1.0, frames = 1.0;\n"
+	"		if (c[60] > 0.5)\n"
+	"		{\n"
+	"			float3 pp = float3(c[48], c[49], c[50]), pf = float3(c[51], c[52], c[53]);\n"
+	"			float3 pu = float3(c[54], c[55], c[56]), pr = float3(c[57], c[58], c[59]);\n"
+	"			float3 rel = P - pp;\n"
+	"			float pz = dot(rel, pf);\n"
+	"			if (pz > c[12])\n"
+	"			{\n"
+	"				float2 pn = float2(dot(rel, pr) / (pz * t * aspect), -dot(rel, pu) / (pz * t));\n"
+	"				float2 ps = origin + (pn * 0.5 + 0.5) * size;\n"
+	"				if (all(ps >= origin) && all(ps < origin + size))\n"
+	"				{\n"
+	/* (its alpha: its depth, in 64ths, and how many frames it holds, below:
+	   each new frame takes 1 / that many, down to c[62]) */
+	"					float4 was = history_in.read(uint2(ps));\n"
+	"					float was_frames = fmod(was.a, 256.0), was_z = floor(was.a / 256.0) / 64.0;\n"
+	"					if (was_z > 0.0 && abs(was_z - pz) < pz * 0.04 + 0.03)\n"
+	"					{\n"
+	"						before = was;\n"
+	"						frames = min(was_frames + 1.0, 255.0);\n"
+	"						weight = max(1.0 / frames, (c[62] > 0.0 ? c[62] : 0.02) * max(c[63], 1.0));\n"
+	"					}\n"
+	"				}\n"
+	"			}\n"
+	"		}\n"
+	/* (new samples every c[63]th frame a pixel, in a scattered pattern,
+	   where it has a history; the rest of the time, its history) */
+	"		uint period = max(uint(c[63]), 1u);\n"
+	"		bool sample_now = weight >= 1.0 || (pcg(id.x + id.y * 4096u) + uint(c[44])) % period == 0u;\n"
+	"		if (!sample_now) frames = fmod(before.a, 256.0);\n"
+	"		if (sample_now)\n"
+	"		{\n"
 	/* the sky's wide lights (c[64-79]: each its direction, its colour and
 	   power, the cosine of its half width, whether there is one): a ray
 	   toward a point of each, new each frame, accumulated with the bounces */
-	"		for (uint s = 0; s < 2u; s++)\n"
+	/* (one of them, chosen at random, for both) */
+	"		uint fills = (c[71] > 0.5 ? 1u : 0u) + (c[79] > 0.5 ? 1u : 0u);\n"
+	"		uint chosen = fills == 2u ? (random01(seed) < 0.5 ? 0u : 1u) : (c[71] > 0.5 ? 0u : 1u);\n"
+	"		for (uint s = chosen; s <= chosen && fills > 0u; s++)\n"
 	"		{\n"
 	"			uint o = 64u + s * 8u;\n"
-	"			if (c[o + 7u] < 0.5) continue;\n"
 	"			float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
 	"			float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
 	"			float3 ax_b = cross(axis, ax_t);\n"
@@ -529,9 +567,9 @@ static NSString *const kernel_source = @
 	"			if (facing <= 0.0) continue;\n"
 	"			ray to_sky(P + N * bias, d, 0.0, 2000.0);\n"
 	"			if (blocked_by.intersect(to_sky, world, object ? 3u : 7u).type == intersection_type::none)\n"
-	"				indirect += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45];\n"
+	"				indirect += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45] * float(fills);\n"
 	"		}\n"
-	"		for (uint i = 0; i < 2u; i++)\n"
+	"		for (uint i = 0; i < 1u; i++)\n"
 	"		{\n"
 	"			float u1 = random01(seed);\n"
 	"			float u2 = random01(seed);\n"
@@ -565,7 +603,7 @@ static NSString *const kernel_source = @
 	"				}\n"
 	"			}\n"
 	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, P + N * bias + d * (h.type == intersection_type::none ? 3.0 : h.distance), 5.0, h.type != intersection_type::none);\n"
-	"			indirect += L * 0.5;\n"
+	"			indirect += L;\n"
 	"		}\n"
 	/* a ray to a point of a glowing triangle, chosen as likely as the light
 	   it gives off: what it gives off where it is not blocked, over the
@@ -597,34 +635,8 @@ static NSString *const kernel_source = @
 	"				}\n"
 	"			}\n"
 	"		}\n"
-	"		float4 before = float4(0.0);\n"
-	"		float weight = 1.0, frames = 1.0;\n"
-	"		if (c[60] > 0.5)\n"
-	"		{\n"
-	"			float3 pp = float3(c[48], c[49], c[50]), pf = float3(c[51], c[52], c[53]);\n"
-	"			float3 pu = float3(c[54], c[55], c[56]), pr = float3(c[57], c[58], c[59]);\n"
-	"			float3 rel = P - pp;\n"
-	"			float pz = dot(rel, pf);\n"
-	"			if (pz > c[12])\n"
-	"			{\n"
-	"				float2 pn = float2(dot(rel, pr) / (pz * t * aspect), -dot(rel, pu) / (pz * t));\n"
-	"				float2 ps = origin + (pn * 0.5 + 0.5) * size;\n"
-	"				if (all(ps >= origin) && all(ps < origin + size))\n"
-	"				{\n"
-	/* (its alpha: its depth, in 64ths, and how many frames it holds, below:
-	   each new frame takes 1 / that many, down to c[62]) */
-	"					float4 was = history_in.read(uint2(ps));\n"
-	"					float was_frames = fmod(was.a, 256.0), was_z = floor(was.a / 256.0) / 64.0;\n"
-	"					if (was_z > 0.0 && abs(was_z - pz) < pz * 0.04 + 0.03)\n"
-	"					{\n"
-	"						before = was;\n"
-	"						frames = min(was_frames + 1.0, 255.0);\n"
-	"						weight = max(1.0 / frames, c[62] > 0.0 ? c[62] : 0.02);\n"
-	"					}\n"
-	"				}\n"
-	"			}\n"
 	"		}\n"
-	"		float3 accumulated = mix(before.rgb, indirect, weight);\n"
+	"		float3 accumulated = sample_now ? mix(before.rgb, indirect, weight) : before.rgb;\n"
 	"		history_out.write(float4(accumulated, round(z * 64.0) * 256.0 + frames), id);\n"
 	/* (a level pixel: its light goes in the light buffer, occlusion and
 	   all - the result's 2 says so, to the guest's light buffer pass and the
@@ -1246,9 +1258,11 @@ int host_rt_trace(const float *camera, int width, int height)
 	{
 		return 0;
 	}
-	/* the governor (the last trace's time, a frame or so behind): over 20 ms
-	the lights and the emitters are halved, under 10 ms for a second they
-	come back a step; a quarter of a second, ten frames in a row, and the
+	/* the governor (the last trace's time, a frame or so behind - the rays'
+	own, not the wait for GL): over 22 ms it steps up, under 16 ms for a
+	second it steps back - the first two steps thin the traced light's new
+	samples (every 8th frame a pixel, then 16th), the rest halve the lights
+	and the emitters; a quarter of a second, ten frames in a row, and the
 	rays stop for good */
 	{
 		double ms = rt.gpu_ms;
@@ -1264,13 +1278,13 @@ int host_rt_trace(const float *camera, int width, int height)
 		}
 		else
 			rt.overloaded = 0;
-		if (ms > 20.0 && rt.shed < 5)
+		if (ms > 22.0 && rt.shed < 7)
 		{
 			rt.shed++;
 			rt.calm = 0;
 			rt.gpu_ms = 0.0;
 		}
-		else if (ms < 10.0 && rt.shed > 0 && ++rt.calm >= 60)
+		else if (ms < 16.0 && rt.shed > 0 && ++rt.calm >= 60)
 		{
 			rt.shed--;
 			rt.calm = 0;
@@ -1303,9 +1317,16 @@ int host_rt_trace(const float *camera, int width, int height)
 		rt.glFinish();
 	}
 	finished = SDL_GetTicksNS();
-	commands = [rt.queue commandBuffer];
+	/* (the wait for GL in a command buffer of its own: the rays' time on the
+	GPU, which the governor reads, is theirs alone) */
 	if (rt.event)
-		[commands encodeWaitForEvent:rt.event value:rt.event_value];
+	{
+		id<MTLCommandBuffer> wait = [rt.queue commandBuffer];
+
+		[wait encodeWaitForEvent:rt.event value:rt.event_value];
+		[wait commit];
+	}
+	commands = [rt.queue commandBuffer];
 	if (!encode_scene(commands))
 	{
 		[commands commit];
@@ -1330,7 +1351,10 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setBuffer:rt.probe offset:0 atIndex:5];
 	[encoder setBytes:rt.lights length:sizeof(rt.lights) atIndex:6];
 	{
-		unsigned int light_count = rt.light_count >> rt.shed, emitter_count = rt.emitter_count >> rt.shed;
+		/* (the traced light's samples thin first - its period, below - then
+		the lights and the emitters halve) */
+		int cut = rt.shed > 2 ? rt.shed - 2 : 0;
+		unsigned int light_count = rt.light_count >> cut, emitter_count = rt.emitter_count >> cut;
 
 		[encoder setBytes:&light_count length:sizeof(light_count) atIndex:7];
 		[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
@@ -1344,6 +1368,10 @@ int host_rt_trace(const float *camera, int width, int height)
 		id<MTLBuffer> any = rt.probe;
 
 		memcpy(constants, camera, sizeof(constants));
+		/* (the traced light's new samples: every 4th frame a pixel, every
+		8th or 16th as the governor sheds) */
+		if (!(camera[63] > 0.0f))
+			constants[63] = (float)(4 << (rt.shed < 2 ? rt.shed : 2));
 		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||
 			rt.history[0].height != (NSUInteger)height))
 		{
