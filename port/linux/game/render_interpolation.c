@@ -33,7 +33,6 @@ on top of it, fading each tick.
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "render/render_cameras.h"
 #include "units/units.h"
