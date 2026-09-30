@@ -203,7 +203,9 @@ static const struct row rows[] =
 	{ _row_real, _row_ray_gi_bounce, "Bounced light", "display.ray_tracing_gi_bounce", NULL, 0, 0.0f, 2.0f, 0.1f },
 	{ _row_real, _row_ray_gi_glow, "Glowing surfaces", "display.ray_tracing_gi_glow", NULL, 0, 0.0f, 2.0f, 0.1f },
 	{ _row_real, _row_ray_gi_lights, "Lights' strength", "display.ray_tracing_gi_lights", NULL, 0, 0.0f, 2.0f, 0.1f },
-	{ _row_boolean, _row_ray_gi_split, "Split: game | traced", "display.ray_tracing_gi_split" },
+	{ _row_boolean, _row_ray_gi_split, "Split: game | traced", "display.ray_tracing_gi_split", NULL, 0, 0, 0, 0, 0, 0,
+		"The game's own light on the left half of the screen, the traced on the right, to\n"
+		"compare them. For looking, not saved." },
 
 	{ _row_heading, _row_none, "Sound" },
 	{ _row_boolean, _row_audio, "Sound", "audio.enabled" },
@@ -447,9 +449,13 @@ static void set_index(const struct row *row, int index)
 		halo_ray_tracing_set(&ray);
 		break;
 	case _row_ray_gi_split:
+		/* (for comparing, as the view: not saved - left on, half the screen
+		kept the game's light at the next start) */
 		ray.gi_split = index;
 		halo_ray_tracing_set(&ray);
-		break;
+		status_set(index ? "Split on: the game's light on the left, the traced on the right (not saved)" :
+			"Split off (not saved)");
+		return;
 	case _row_map:
 		map_selected = index;
 		return;

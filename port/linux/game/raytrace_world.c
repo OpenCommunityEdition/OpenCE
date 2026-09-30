@@ -1622,9 +1622,12 @@ static void level_build(const struct structure_bsp *bsp)
 			level.material_count++;
 		}
 	}
-	/* the alpha-tested triangles last (the rays test them apart) */
+	/* the alpha-tested triangles last (the rays test them apart); the
+	transparent ones (water, glass) left out - the rays pass through them
+	(in the rays, water's surface shadowed the shore and the shallows
+	black) */
 	{
-		long read, write = 0, cut = 0;
+		long read, write = 0, cut = 0, transparent = 0;
 		unsigned long *indices = malloc((size_t)MAX(level.triangle_count, 1) * 3 * sizeof(unsigned long));
 		unsigned long *triangle_materials = malloc((size_t)MAX(level.triangle_count, 1) * sizeof(unsigned long));
 
@@ -1637,8 +1640,14 @@ static void level_build(const struct structure_bsp *bsp)
 				for (read = 0; read < level.triangle_count; read++)
 				{
 					unsigned long material = level.triangle_materials[read];
-					boolean cutout = level.materials[material * RAY_LEVEL_MATERIAL_FLOATS + 3] >= 16.0f;
+					float flags = level.materials[material * RAY_LEVEL_MATERIAL_FLOATS + 3];
+					boolean cutout = flags >= 16.0f;
 
+					if (flags == (float)_ray_level_material_transparent)
+					{
+						transparent += pass == 0;
+						continue;
+					}
 					if (cutout != (pass == 1))
 						continue;
 					memcpy(indices + write * 3, level.indices + read * 3, 3 * sizeof(unsigned long));
@@ -1649,9 +1658,11 @@ static void level_build(const struct structure_bsp *bsp)
 				if (pass == 0)
 					level.cutout_start = write;
 			}
+			level.triangle_count = write;
 			memcpy(level.indices, indices, (size_t)level.triangle_count * 3 * sizeof(unsigned long));
 			memcpy(level.triangle_materials, triangle_materials, (size_t)level.triangle_count * sizeof(unsigned long));
-			platform_log("ray tracing: %ld of the level's triangles are cutouts (alpha-tested)", cut);
+			platform_log("ray tracing: %ld of the level's triangles are cutouts (alpha-tested), %ld transparent (left out)",
+				cut, transparent);
 		}
 		else
 		{
@@ -1705,7 +1716,7 @@ static void level_build(const struct structure_bsp *bsp)
 		long logged = 0, index;
 		float threshold = 1e30f;
 
-		while (logged < 6)
+		while (logged < (getenv("HALO_RT_LOG_SHAPES") ? 40 : 6))
 		{
 			float best = 0.0f;
 			long best_index = NONE, lightmap_best = 0, material_best = 0;
@@ -1751,9 +1762,13 @@ static void level_build(const struct structure_bsp *bsp)
 					center[1] += point[1] / (float)material->vertices.count;
 					center[2] += point[2] / (float)material->vertices.count;
 				}
-				platform_log("ray tracing: glowing material %s: %.2f, %ld vertices about %.1f %.1f %.1f",
-					material->shader.index != NONE ? tag_get_name(material->shader.index) : "?", best,
-					(long)material->vertices.count, center[0], center[1], center[2]);
+				{
+					const float *glow = level.materials + best_index * RAY_LEVEL_MATERIAL_FLOATS + 4;
+
+					platform_log("ray tracing: glowing material %s: %.2f (%.2f %.2f %.2f), %ld vertices about %.1f %.1f %.1f",
+						material->shader.index != NONE ? tag_get_name(material->shader.index) : "?", best, glow[0], glow[1],
+						glow[2], (long)material->vertices.count, center[0], center[1], center[2]);
+				}
 				/* (and its first vertex, and the way it faces - its packed normal,
 				11, 11 and 10 bits: for test cameras in front of it) */
 				if (vertices && material->vertices.count > 0)

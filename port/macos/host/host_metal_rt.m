@@ -126,6 +126,8 @@ static struct
 	id<MTLBuffer> exposure_sums[3];
 	int exposure_ring;
 	float exposure;
+	/* the white balance: each colour's multiplier (the lightmaps' tint) */
+	float balance[3];
 	/* the objects' shapes' last build's time on the GPU */
 	double build_ms;
 	float probe_results[64 * 10];
@@ -609,7 +611,7 @@ static NSString *const kernel_source = @
 	"	for (uint k = 0; k < N; k++)\n"
 	"		E += radiance[k] * max(dot(directions[k], D), 0.0);\n"
 	"	E = E * (4.0 / float(N)) + sun_color * max(dot(sun, D), 0.0) + glow_light;\n"
-	"	probe_out[i * 2u] = float4(E * c[84], total > 0.0 ? clamp(length(toward) / total, 0.0, 1.0) : 0.0);\n"
+	"	probe_out[i * 2u] = float4(E * c[84] * float3(c[88], c[89], c[90]), total > 0.0 ? clamp(length(toward) / total, 0.0, 1.0) : 0.0);\n"
 	"	probe_out[i * 2u + 1u] = float4(D, 1.0);\n"
 	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
@@ -1164,7 +1166,7 @@ static NSString *const kernel_source = @
 	"		{\n"
 	"			visibility = 2.0;\n"
 	/* (its first: how many samples it holds, for the denoiser) */
-	"			lit_value = float4(frames, (direct + accumulated) * c[84]);\n"
+	"			lit_value = float4(frames, (direct + accumulated) * c[84] * float3(c[88], c[89], c[90]));\n"
 	"		}\n"
 	/* (the exposure's sums: every 8th pixel each way, the level's baked
 	   light where a ray from the camera finds the pixel's surface - its
@@ -1194,6 +1196,12 @@ static NSString *const kernel_source = @
 	"					atomic_fetch_add_explicit(&exposure_sums[0], uint(min(dot(baked, luma), 16.0) * 256.0), memory_order_relaxed);\n"
 	"					atomic_fetch_add_explicit(&exposure_sums[1], uint(min(dot(traced, luma), 16.0) * 256.0), memory_order_relaxed);\n"
 	"					atomic_fetch_add_explicit(&exposure_sums[2], 1u, memory_order_relaxed);\n"
+	/* (and each colour's, for the white balance) */
+	"					for (uint k = 0u; k < 3u; k++)\n"
+	"					{\n"
+	"						atomic_fetch_add_explicit(&exposure_sums[3u + k], uint(min(baked[k], 16.0) * 256.0), memory_order_relaxed);\n"
+	"						atomic_fetch_add_explicit(&exposure_sums[6u + k], uint(min(traced[k], 16.0) * 256.0), memory_order_relaxed);\n"
+	"					}\n"
 	"				}\n"
 	"			}\n"
 	"		}\n"
@@ -2424,7 +2432,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	/* the drawn level's surfaces and the traced light's textures (in their
 	place, anything bound: the kernel reads them only when gi_ready) */
 	{
-		float constants[88] = { 0 };
+		float constants[92] = { 0 };
 		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas;
 		id<MTLBuffer> any = rt.probe;
 
@@ -2433,6 +2441,15 @@ int host_rt_trace(const float *camera, int width, int height)
 		if (!(rt.exposure > 0.0f))
 			rt.exposure = 1.0f;
 		constants[84] = getenv("HALO_RT_EXPOSURE") ? (float)atof(getenv("HALO_RT_EXPOSURE")) : rt.exposure;
+		/* (the white balance: HALO_RT_WHITE_BALANCE=0 holds it at 1) */
+		if (!(rt.balance[0] > 0.0f))
+			rt.balance[0] = rt.balance[1] = rt.balance[2] = 1.0f;
+		{
+			int k, balanced = !getenv("HALO_RT_WHITE_BALANCE") || atoi(getenv("HALO_RT_WHITE_BALANCE")) != 0;
+
+			for (k = 0; k < 3; k++)
+				constants[88 + k] = balanced ? rt.balance[k] : 1.0f;
+		}
 		/* (the traced light's new samples: every 4th frame a pixel, every
 		8th or 16th as the governor sheds) */
 		if (!(camera[63] > 0.0f))
@@ -2458,15 +2475,22 @@ int host_rt_trace(const float *camera, int width, int height)
 			constants[60] = 0.0f;
 		}
 		gi_ready = gi_ready && rt.history[0] && rt.history[1];
-		[encoder setBuffer:gi_ready ? rt.drawn_indices : any offset:0 atIndex:10];
+		/* (the drawn level's triangles and materials: the cutouts need them
+		whatever the traced light, which the rest are for) */
+		BOOL drawn_ready = rt.use_drawn && rt.drawn && rt.drawn_indices && rt.drawn_triangle_materials &&
+			rt.drawn_materials;
+
+		[encoder setBuffer:drawn_ready ? rt.drawn_indices : any offset:0 atIndex:10];
 		[encoder setBuffer:gi_ready ? rt.drawn_texcoords : any offset:0 atIndex:11];
-		[encoder setBuffer:gi_ready ? rt.drawn_triangle_materials : any offset:0 atIndex:12];
-		[encoder setBuffer:gi_ready ? rt.drawn_materials : any offset:0 atIndex:13];
+		[encoder setBuffer:drawn_ready ? rt.drawn_triangle_materials : any offset:0 atIndex:12];
+		[encoder setBuffer:drawn_ready ? rt.drawn_materials : any offset:0 atIndex:13];
 		[encoder setBuffer:gi_ready ? rt.drawn_pages : any offset:0 atIndex:14];
 		[encoder setBytes:&gi_ready length:sizeof(gi_ready) atIndex:15];
 		/* the cutouts: the level's coordinates, the masks, the objects' */
 		{
-			uint32_t cutouts_ready = gi_ready && rt.mask_atlas && rt.mask_rects && rt.drawn_base_texcoords &&
+			/* (the leaves' holes whatever the traced light: with it off, they
+			were solid squares to the rays) */
+			uint32_t cutouts_ready = drawn_ready && rt.mask_atlas && rt.mask_rects && rt.drawn_base_texcoords &&
 				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring] && !getenv("HALO_RT_NO_CUTOUTS");
 
 			[encoder setBuffer:cutouts_ready ? rt.drawn_base_texcoords : any offset:0 atIndex:21];
@@ -2488,9 +2512,9 @@ int host_rt_trace(const float *camera, int width, int height)
 			id<MTLBuffer> sums;
 
 			if (!rt.exposure_sums[ring])
-				rt.exposure_sums[ring] = [rt.device newBufferWithLength:16 options:MTLResourceStorageModeShared];
+				rt.exposure_sums[ring] = [rt.device newBufferWithLength:64 options:MTLResourceStorageModeShared];
 			sums = rt.exposure_sums[ring];
-			memset(sums.contents, 0, 16);
+			memset(sums.contents, 0, 64);
 			[encoder setBuffer:sums offset:0 atIndex:27];
 			rt.exposure_ring = (ring + 1) % 3;
 			if (gi_ready)
@@ -2507,6 +2531,17 @@ int host_rt_trace(const float *camera, int width, int height)
 
 						target = target < 0.25f ? 0.25f : target > 8.0f ? 8.0f : target;
 						rt.exposure *= powf(target / rt.exposure, 0.05f);
+						/* (the white balance: each colour's baked over traced, over
+						the brightness's - the lightmaps' tint, 0.5 to 2 -
+						followed as slowly) */
+						for (int k = 0; k < 3; k++)
+						{
+							float tint = values[6 + k] > 0 && values[0] > 0 ?
+								((float)values[3 + k] / (float)values[6 + k]) / ((float)values[0] / (float)values[1]) : 1.0f;
+
+							tint = tint < 0.5f ? 0.5f : tint > 2.0f ? 2.0f : tint;
+							rt.balance[k] *= powf(tint / rt.balance[k], 0.05f);
+						}
 					}
 				}];
 			}
@@ -2550,7 +2585,8 @@ int host_rt_trace(const float *camera, int width, int height)
 			if (++frames == (getenv("HALO_RT_LOG_FRAMES") ? atoi(getenv("HALO_RT_LOG_FRAMES")) : 600))
 			{
 				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (the objects' shapes %.2f; shed %d, "
-					"exposure %.2f)", total / frames, builds / frames, rt.shed, rt.exposure);
+					"exposure %.2f, white balance %.2f %.2f %.2f)", total / frames, builds / frames, rt.shed, rt.exposure,
+					rt.balance[0], rt.balance[1], rt.balance[2]);
 				total = 0.0;
 				builds = 0.0;
 				frames = 0;
