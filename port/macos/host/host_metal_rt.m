@@ -90,6 +90,19 @@ static struct
 	chances to it, its material) and how many; the vertices, kept for it */
 	id<MTLBuffer> drawn_vertices, glowing;
 	uint32_t glowing_count;
+	/* the cutouts (alpha-tested): the drawn level's base map coordinates and
+	its first alpha-tested triangle; the masks, packed into one texture, and
+	where each is in it; the objects' cutouts this frame (2 float4 each:
+	corners' coordinates, mask), in turn, and each instance's first */
+	id<MTLBuffer> drawn_base_texcoords;
+	uint32_t drawn_cutout_start;
+	id<MTLTexture> mask_atlas;
+	id<MTLBuffer> mask_rects;
+	unsigned long mask_generation;
+	int mask_x, mask_y, mask_row;
+	float *object_cutout_input;
+	id<MTLBuffer> object_cutouts[3], instance_offsets[3], cut_vertices[3][HOST_RT_GROUPS];
+	int scene_ring;
 	/* the light probes: their pipeline, the points asked for this frame,
 	the results' buffers in turn, and the last results read back (7 floats
 	each: the point, the light, how much from one way; then the way in
@@ -197,6 +210,103 @@ static NSString *const kernel_source = @
 	"	seed = pcg(seed);\n"
 	"	return float(seed >> 8) / 16777216.0;\n"
 	"}\n"
+	/* the cutouts (alpha-tested: foliage, fences): a candidate hit on one is
+	solid where its mask (its texture's alpha) is - the level's (instance 0;
+	its primitives from c[83]) by its material and base map coordinates, an
+	object's by the frame's cutouts, from its instance's first */
+	"constexpr sampler nearest_clamp(filter::nearest, address::clamp_to_edge);\n"
+	"#define CUT_PARAMS uint cutout_start, device const uint *indices, device const float2 *base_texcoords, \\\n"
+	"	device const uint *triangle_materials, device const float4 *materials, device const float4 *object_cutouts, \\\n"
+	"	device const uint *instance_offsets, device const float4 *mask_rects, texture2d<float, access::sample> masks, \\\n"
+	"	uint cutouts_ready\n"
+	"#define CUT_ARGS uint(c[83]), indices, base_texcoords, triangle_materials, materials, object_cutouts, \\\n"
+	"	instance_offsets, mask_rects, masks, cutouts_ready\n"
+	"static bool cutout_solid(uint instance, uint primitive, float2 b, CUT_PARAMS)\n"
+	"{\n"
+	"	if (cutouts_ready == 0u) return true;\n"
+	"	float2 uv;\n"
+	"	int mask;\n"
+	"	if (instance == 0u)\n"
+	"	{\n"
+	"		uint triangle = cutout_start + primitive;\n"
+	"		uint v = uint(materials[triangle_materials[triangle] * 2u].w);\n"
+	"		if (v < 16u) return true;\n"
+	"		mask = int(v >> 4) - 1;\n"
+	"		uint base = triangle * 3u;\n"
+	"		uv = base_texcoords[indices[base]] * (1.0 - b.x - b.y) + base_texcoords[indices[base + 1u]] * b.x +\n"
+	"			base_texcoords[indices[base + 2u]] * b.y;\n"
+	"	}\n"
+	"	else\n"
+	"	{\n"
+	"		uint at = (instance_offsets[instance] + primitive) * 2u;\n"
+	"		float4 a = object_cutouts[at], z = object_cutouts[at + 1u];\n"
+	"		uv = a.xy * (1.0 - b.x - b.y) + a.zw * b.x + z.xy * b.y;\n"
+	"		mask = int(z.z);\n"
+	"	}\n"
+	"	if (mask < 0 || mask >= 256) return true;\n"
+	"	float4 rect = mask_rects[mask];\n"
+	"	if (rect.z <= 0.0) return true;\n"
+	"	float2 inset = float2(0.5 / 2048.0);\n"
+	"	return masks.sample(nearest_clamp, rect.xy + clamp(fract(uv) * rect.zw, inset, rect.zw - inset), metal::level(0.0)).r >= 0.5;\n"
+	"}\n"
+	/* whether anything solid is on the ray (from both sides) */
+	"static bool blocked(ray r, instance_acceleration_structure world, uint mask_bits, CUT_PARAMS)\n"
+	"{\n"
+	"	intersection_params params;\n"
+	"	params.accept_any_intersection(true);\n"
+	"	params.assume_geometry_type(geometry_type::triangle);\n"
+	"	intersection_query<triangle_data, instancing> q(r, world, mask_bits, params);\n"
+	"	while (q.next())\n"
+	"	{\n"
+	"		if (q.get_candidate_intersection_type() == intersection_type::triangle &&\n"
+	"			cutout_solid(q.get_candidate_instance_id(), q.get_candidate_primitive_id(),\n"
+	"				q.get_candidate_triangle_barycentric_coord(), cutout_start, indices, base_texcoords, triangle_materials,\n"
+	"				materials, object_cutouts, instance_offsets, mask_rects, masks, cutouts_ready))\n"
+	"			q.commit_triangle_intersection();\n"
+	"	}\n"
+	"	return q.get_committed_intersection_type() != intersection_type::none;\n"
+	"}\n"
+	/* the nearest solid thing on the ray (the level's primitive: its
+	triangle's, cutouts after the opaque) */
+	"struct hit_info\n"
+	"{\n"
+	"	intersection_type type;\n"
+	"	float distance;\n"
+	"	uint instance_id, primitive_id;\n"
+	"	float2 triangle_barycentric_coord;\n"
+	"	bool triangle_front_facing;\n"
+	"};\n"
+	"static hit_info closest_hit(ray r, instance_acceleration_structure world, uint mask_bits, CUT_PARAMS)\n"
+	"{\n"
+	"	intersection_params params;\n"
+	"	params.assume_geometry_type(geometry_type::triangle);\n"
+	"	intersection_query<triangle_data, instancing> q(r, world, mask_bits, params);\n"
+	"	while (q.next())\n"
+	"	{\n"
+	"		if (q.get_candidate_intersection_type() == intersection_type::triangle &&\n"
+	"			cutout_solid(q.get_candidate_instance_id(), q.get_candidate_primitive_id(),\n"
+	"				q.get_candidate_triangle_barycentric_coord(), cutout_start, indices, base_texcoords, triangle_materials,\n"
+	"				materials, object_cutouts, instance_offsets, mask_rects, masks, cutouts_ready))\n"
+	"			q.commit_triangle_intersection();\n"
+	"	}\n"
+	"	hit_info h;\n"
+	"	h.type = q.get_committed_intersection_type();\n"
+	"	h.distance = 0.0;\n"
+	"	h.instance_id = 0u;\n"
+	"	h.primitive_id = 0u;\n"
+	"	h.triangle_barycentric_coord = float2(0.0);\n"
+	"	h.triangle_front_facing = true;\n"
+	"	if (h.type != intersection_type::none)\n"
+	"	{\n"
+	"		h.distance = q.get_committed_distance();\n"
+	"		h.instance_id = q.get_committed_instance_id();\n"
+	"		h.primitive_id = q.get_committed_primitive_id() +\n"
+	"			(h.instance_id == 0u && q.get_committed_geometry_id() == 1u ? cutout_start : 0u);\n"
+	"		h.triangle_barycentric_coord = q.get_committed_triangle_barycentric_coord();\n"
+	"		h.triangle_front_facing = q.is_committed_triangle_front_facing();\n"
+	"	}\n"
+	"	return h;\n"
+	"}\n"
 	/* light probes (host_rt_set_probes): the light at points in space - the
 	   objects', for the game's lighting of them (object_lights.c) - over
 	   64 directions of the sphere: where a ray lands on the level, its
@@ -217,6 +327,12 @@ static NSString *const kernel_source = @
 	"	device const float4 *probe_in [[buffer(18)]],\n"
 	"	device float4 *probe_out [[buffer(19)]],\n"
 	"	constant uint &probe_count [[buffer(20)]],\n"
+	"	device const float2 *base_texcoords [[buffer(21)]],\n"
+	"	device const float4 *mask_rects [[buffer(22)]],\n"
+	"	device const float4 *object_cutouts [[buffer(23)]],\n"
+	"	device const uint *instance_offsets [[buffer(24)]],\n"
+	"	constant uint &cutouts_ready [[buffer(25)]],\n"
+	"	texture2d<float, access::sample> masks [[texture(7)]],\n"
 	"	texture2d<float, access::sample> atlas [[texture(3)]],\n"
 	"	uint i [[thread_position_in_grid]])\n"
 	"{\n"
@@ -242,7 +358,7 @@ static NSString *const kernel_source = @
 	"		float phi = float(k) * 2.39996323;\n"
 	"		float3 d = float3(r * cos(phi), r * sin(phi), z);\n"
 	"		ray probe_ray(P, d, 0.05, 600.0);\n"
-	"		auto h = nearest.intersect(probe_ray, world, 1u);\n"
+	"		hit_info h = closest_hit(probe_ray, world, 1u, CUT_ARGS);\n"
 	"		float3 L = float3(0.0);\n"
 	"		if (h.type == intersection_type::none)\n"
 	"		{\n"
@@ -284,7 +400,7 @@ static NSString *const kernel_source = @
 	"	if (c[27] > 0.0 && c[45] > 0.0)\n"
 	"	{\n"
 	"		ray to_sun(P, sun, 0.05, 2000.0);\n"
-	"		if (blocked_by.intersect(to_sun, world, 1u).type == intersection_type::none)\n"
+	"		if (!blocked(to_sun, world, 1u, CUT_ARGS))\n"
 	"		{\n"
 	"			sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
 	"			float luminance = dot(sun_color, float3(0.3, 0.59, 0.11)) * float(N) * 0.25;\n"
@@ -310,7 +426,7 @@ static NSString *const kernel_source = @
 	"		float cos_there = abs(dot(normalize(cross_ab), L));\n"
 	"		if (cos_there <= 0.0 || a.w <= 0.0 || d < 1e-3) continue;\n"
 	"		ray to_glow(P, L, 0.05, max(d - 0.01, 0.0));\n"
-	"		if (blocked_by.intersect(to_glow, world, 1u).type != intersection_type::none) continue;\n"
+	"		if (blocked(to_glow, world, 1u, CUT_ARGS)) continue;\n"
 	"		float3 given = min(materials[uint(cc.w) * 2u + 1u].rgb * c[47] * cos_there * 0.5 * length(cross_ab) / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0)) / 8.0;\n"
 	"		glow_light += given;\n"
 	"		glow_toward += L * dot(given, float3(0.3, 0.59, 0.11));\n"
@@ -349,6 +465,13 @@ static NSString *const kernel_source = @
 	"	constant uint &gi_ready [[buffer(15)]],\n"
 	"	device const float4 *glowing [[buffer(16)]],\n"
 	"	constant uint &glowing_count [[buffer(17)]],\n"
+	"	device const float2 *base_texcoords [[buffer(21)]],\n"
+	"	device const float4 *mask_rects [[buffer(22)]],\n"
+	"	device const float4 *object_cutouts [[buffer(23)]],\n"
+	"	device const uint *instance_offsets [[buffer(24)]],\n"
+	"	constant uint &cutouts_ready [[buffer(25)]],\n"
+	"	texture2d<float, access::sample> masks [[texture(7)]],\n"
+	"	device const float *level_vertices [[buffer(26)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -377,7 +500,7 @@ static NSString *const kernel_source = @
 	"		view.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"		ray primary(eye, dir, c[12], c[13]);\n"
 	/* (not the player's body: the camera is inside it) */
-	"		auto h = view.intersect(primary, world, 3u);\n"
+	"		hit_info h = closest_hit(primary, world, 3u, CUT_ARGS);\n"
 	"		float3 color;\n"
 	"		if (h.type == intersection_type::none)\n"
 	"			color = mix(float3(0.62, 0.72, 0.9), float3(0.18, 0.28, 0.55), clamp(dir.z * 2.0, 0.0, 1.0));\n"
@@ -548,7 +671,7 @@ static NSString *const kernel_source = @
 	/* (the level's: only where the body's shadow can fall, near it) */
 	"			bool near_body = c[31] > 0.0 && distance(P, float3(c[28], c[29], c[30])) < c[31] * 8.0;\n"
 	"			if ((!on_level || near_body) &&\n"
-	"				any_hit.intersect(shadow_ray, world, on_level ? 4u : 3u).type != intersection_type::none)\n"
+	"				blocked(shadow_ray, world, on_level ? 4u : 3u, CUT_ARGS))\n"
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
 	"	}\n"
@@ -644,7 +767,7 @@ static NSString *const kernel_source = @
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
 	"			ray to_sun(P + N * bias, normalize(sun_dir + spread), 0.0, 2000.0);\n"
-	"			if (blocked_by.intersect(to_sun, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"			if (!blocked(to_sun, world, object ? 3u : 7u, CUT_ARGS))\n"
 	"				direct += sun_color * ndl;\n"
 	"		}\n"
 	"		intersector<triangle_data, instancing> nearest;\n"
@@ -706,45 +829,121 @@ static NSString *const kernel_source = @
 	"			float facing = dot(N, d);\n"
 	"			if (facing <= 0.0) continue;\n"
 	"			ray to_sky(P + N * bias, d, 0.0, 2000.0);\n"
-	"			if (blocked_by.intersect(to_sky, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"			if (!blocked(to_sky, world, object ? 3u : 7u, CUT_ARGS))\n"
 	"				indirect += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45] * float(fills);\n"
 	"		}\n"
-	"		for (uint i = 0; i < 1u; i++)\n"
+	/* the bounce: a path over the half sphere, cosine-weighted. Where it
+	   lands on the level, the light there - with the lightmaps (c[42] 1),
+	   its lightmap times its colour; the path tracer (c[42] 3), the sun,
+	   the sky's light and a glowing triangle's traced from there, and on
+	   (c[62]... bounces at most 3), its colour taken each time; without
+	   (2), what it gives off only (the rays to the glows). Where it leaves
+	   the level: the sky's light; where it lands on an object: a dim share
+	   of the light around */
 	"		{\n"
 	"			float u1 = random01(seed);\n"
 	"			float u2 = random01(seed);\n"
 	"			float r = sqrt(u1), a = 6.2831853 * u2;\n"
 	"			float3 d = normalize(tangent * (r * cos(a)) + bitangent * (r * sin(a)) + N * sqrt(max(0.0, 1.0 - u1)));\n"
-	"			ray bounce(P + N * bias, d, 0.0, 600.0);\n"
-	"			auto h = nearest.intersect(bounce, world, 3u);\n"
+	"			float3 origin = P + N * bias;\n"
+	"			float3 throughput = float3(1.0);\n"
 	"			float3 L = float3(0.0);\n"
-	"			if (h.type == intersection_type::none)\n"
-	"				L = float3(c[39], c[40], c[41]);\n"
-	/* (a surface's back: inside a wall, dark) */
-	"			else if (h.instance_id == 0u && h.triangle_front_facing)\n"
+	"			uint depth = c[42] > 2.5 ? 3u : 1u;\n"
+	"			for (uint bounce_index = 0; bounce_index < depth; bounce_index++)\n"
 	"			{\n"
+	"				ray bounce(origin, d, 0.0, 600.0);\n"
+	"				hit_info h = closest_hit(bounce, world, 3u, CUT_ARGS);\n"
+	"				if (is_probe) probe_segment(probe, probe_count, origin, origin + d * (h.type == intersection_type::none ? 3.0 : h.distance), 5.0, h.type != intersection_type::none);\n"
+	"				if (h.type == intersection_type::none)\n"
+	"				{\n"
+	"					L += throughput * float3(c[39], c[40], c[41]);\n"
+	"					break;\n"
+	"				}\n"
+	"				if (h.instance_id != 0u)\n"
+	"				{\n"
+	"					L += throughput * float3(c[80], c[81], c[82]) * 0.35 * (c[42] < 1.5 ? c[43] : 1.0);\n"
+	"					break;\n"
+	"				}\n"
+	/* (a surface's back: inside a wall, dark) */
+	"				if (!h.triangle_front_facing) break;\n"
 	"				uint m = triangle_materials[h.primitive_id];\n"
 	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
-	/* (what it gives off is found by the rays to the glowing triangles) */
-	"				L = glowing_count == 0u ? glow.rgb * c[47] : float3(0.0);\n"
-	/* (no page, or none yet: the lightmaps' average light, c[80-82]) */
-	"				if (c[42] < 1.5 && (glow.w < 0.0 || pages[uint(glow.w)].z <= 0.0))\n"
-	"					L += surface.rgb * float3(c[80], c[81], c[82]) * c[43];\n"
-	"				else if (c[42] < 1.5)\n"
+	"				uint base = h.primitive_id * 3u;\n"
+	"				float2 b = h.triangle_barycentric_coord;\n"
+	/* (what it gives off: found by the rays to the glowing triangles) */
+	"				if (glowing_count == 0u) L += throughput * glow.rgb * c[47];\n"
+	"				if (c[42] < 1.5)\n"
 	"				{\n"
-	"					float4 page = pages[uint(glow.w)];\n"
+	"					if (glow.w < 0.0 || pages[uint(glow.w)].z <= 0.0)\n"
+	"						L += throughput * surface.rgb * float3(c[80], c[81], c[82]) * c[43];\n"
+	"					else\n"
 	"					{\n"
-	"						uint base = h.primitive_id * 3u;\n"
-	"						float2 b = h.triangle_barycentric_coord;\n"
+	"						float4 page = pages[uint(glow.w)];\n"
 	"						float2 uv = texcoords[indices[base]] * (1.0 - b.x - b.y) + texcoords[indices[base + 1u]] * b.x +\n"
 	"							texcoords[indices[base + 2u]] * b.y;\n"
 	"						float2 inset = float2(0.5 / 4096.0);\n"
 	"						float2 at = page.xy + clamp(uv * page.zw, inset, page.zw - inset);\n"
-	"						L += surface.rgb * atlas.sample(linear_clamp, at, metal::level(0.0)).rgb * c[43];\n"
+	"						L += throughput * surface.rgb * atlas.sample(linear_clamp, at, metal::level(0.0)).rgb * c[43];\n"
 	"					}\n"
+	"					break;\n"
 	"				}\n"
+	"				if (c[42] < 2.5) break;\n"
+	/* the path tracer: the light at the hit, from the sun, a wide sky light
+	   and a glowing triangle, traced; then on, from it */
+	"				float3 v0 = float3(level_vertices[indices[base] * 3u], level_vertices[indices[base] * 3u + 1u], level_vertices[indices[base] * 3u + 2u]);\n"
+	"				float3 v1 = float3(level_vertices[indices[base + 1u] * 3u], level_vertices[indices[base + 1u] * 3u + 1u], level_vertices[indices[base + 1u] * 3u + 2u]);\n"
+	"				float3 v2 = float3(level_vertices[indices[base + 2u] * 3u], level_vertices[indices[base + 2u] * 3u + 1u], level_vertices[indices[base + 2u] * 3u + 2u]);\n"
+	"				float3 Nh = normalize(cross(v1 - v0, v2 - v0));\n"
+	"				if (dot(Nh, d) > 0.0) Nh = -Nh;\n"
+	"				float3 H = origin + d * h.distance + Nh * bias;\n"
+	"				throughput *= surface.rgb;\n"
+	"				float3 E = float3(0.0);\n"
+	"				float hs = dot(Nh, sun_dir);\n"
+	"				if (c[27] > 0.0 && hs > 0.0)\n"
+	"				{\n"
+	"					ray to_sun_h(H, sun_dir, 0.0, 2000.0);\n"
+	"					if (!blocked(to_sun_h, world, 3u, CUT_ARGS)) E += sun_color * hs;\n"
+	"				}\n"
+	"				if (fills > 0u)\n"
+	"				{\n"
+	"					uint o = 64u + chosen * 8u;\n"
+	"					float3 axis = float3(c[o], c[o + 1u], c[o + 2u]);\n"
+	"					float3 ax_t = normalize(abs(axis.z) < 0.9 ? cross(axis, float3(0, 0, 1)) : cross(axis, float3(1, 0, 0)));\n"
+	"					float3 ax_b = cross(axis, ax_t);\n"
+	"					float w1 = random01(seed), w2 = random01(seed);\n"
+	"					float cos_t = mix(1.0, c[o + 6u], w1), sin_t = sqrt(max(0.0, 1.0 - cos_t * cos_t)), phi = 6.2831853 * w2;\n"
+	"					float3 sd = normalize(axis * cos_t + ax_t * (sin_t * cos(phi)) + ax_b * (sin_t * sin(phi)));\n"
+	"					float facing = dot(Nh, sd);\n"
+	"					ray to_sky_h(H, sd, 0.0, 2000.0);\n"
+	"					if (facing > 0.0 && !blocked(to_sky_h, world, 3u, CUT_ARGS))\n"
+	"						E += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45] * float(fills);\n"
+	"				}\n"
+	"				if (glowing_count > 0u)\n"
+	"				{\n"
+	"					float pick = random01(seed);\n"
+	"					uint lo = 0u, hi = glowing_count - 1u;\n"
+	"					while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"					float4 ga = glowing[lo * 3u], gb = glowing[lo * 3u + 1u], gc = glowing[lo * 3u + 2u];\n"
+	"					float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
+	"					float3 at = ga.xyz * (1.0 - r1) + gb.xyz * (r1 * (1.0 - r2)) + gc.xyz * (r1 * r2);\n"
+	"					float3 gcross = cross(gb.xyz - ga.xyz, gc.xyz - ga.xyz);\n"
+	"					float3 Lg = at - H;\n"
+	"					float gd2 = dot(Lg, Lg), gd = sqrt(gd2);\n"
+	"					Lg /= max(gd, 1e-4);\n"
+	"					float ch = dot(Nh, Lg), ct = abs(dot(normalize(gcross), Lg));\n"
+	"					ray to_glow_h(H, Lg, 0.0, max(gd - 0.01, 0.0));\n"
+	"					if (ch > 0.0 && ct > 0.0 && ga.w > 0.0 && gd > 1e-3 && !blocked(to_glow_h, world, 3u, CUT_ARGS))\n"
+	"						E += min(materials[uint(gc.w) * 2u + 1u].rgb * c[47] * ch * ct * 0.5 * length(gcross) / (max(gd2, 0.01) * ga.w) * 0.3183099, float3(4.0));\n"
+	"				}\n"
+	"				L += throughput * E;\n"
+	/* (on: cosine-weighted about the hit's facing) */
+	"				float v1r = random01(seed), v2r = random01(seed);\n"
+	"				float3 ht = normalize(abs(Nh.z) < 0.9 ? cross(Nh, float3(0, 0, 1)) : cross(Nh, float3(1, 0, 0)));\n"
+	"				float3 hb = cross(Nh, ht);\n"
+	"				float rr = sqrt(v1r), aa = 6.2831853 * v2r;\n"
+	"				d = normalize(ht * (rr * cos(aa)) + hb * (rr * sin(aa)) + Nh * sqrt(max(0.0, 1.0 - v1r)));\n"
+	"				origin = H;\n"
 	"			}\n"
-	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, P + N * bias + d * (h.type == intersection_type::none ? 3.0 : h.distance), 5.0, h.type != intersection_type::none);\n"
 	"			indirect += L;\n"
 	"		}\n"
 	/* a ray to a point of a glowing triangle, chosen as likely as the light
@@ -770,7 +969,7 @@ static NSString *const kernel_source = @
 	"			if (cos_here > 0.0 && cos_there > 0.0 && a.w > 0.0 && d > 1e-3)\n"
 	"			{\n"
 	"				ray to_glow(P + N * bias, L, 0.0, max(d - 0.01, 0.0));\n"
-	"				if (blocked_by.intersect(to_glow, world, 3u).type == intersection_type::none)\n"
+	"				if (!blocked(to_glow, world, 3u, CUT_ARGS))\n"
 	"				{\n"
 	"					float3 given = materials[uint(cc.w) * 2u + 1u].rgb * c[47];\n"
 	"					indirect += min(given * cos_here * cos_there * area / (max(d2, 0.01) * a.w) * 0.3183099, float3(4.0));\n"
@@ -982,14 +1181,16 @@ int host_rt_set_world(uint32_t generation, const float *vertices, int vertex_cou
 /* this frame's objects: their triangles in the world (9 floats each) and
 each one's group (its object, 0 to 31, above 3 bits of its kind: 2 an
 object, 4 the player's body) */
-void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count, int two_sided)
+void host_rt_set_objects(const float *triangles, const unsigned char *groups, const float *cutouts, int count,
+	int two_sided)
 {
 	rt.objects_two_sided = two_sided;
 	if (!rt.object_triangles)
 	{
 		rt.object_triangles = malloc(HOST_RT_OBJECT_TRIANGLES * 9 * sizeof(float));
 		rt.object_groups = malloc(HOST_RT_OBJECT_TRIANGLES);
-		if (!rt.object_triangles || !rt.object_groups)
+		rt.object_cutout_input = malloc(HOST_RT_OBJECT_TRIANGLES * 8 * sizeof(float));
+		if (!rt.object_triangles || !rt.object_groups || !rt.object_cutout_input)
 			return;
 	}
 	if (count < 0)
@@ -998,6 +1199,15 @@ void host_rt_set_objects(const float *triangles, const unsigned char *groups, in
 		count = HOST_RT_OBJECT_TRIANGLES;
 	memcpy(rt.object_triangles, triangles, (size_t)count * 9 * sizeof(float));
 	memcpy(rt.object_groups, groups, (size_t)count);
+	if (cutouts)
+		memcpy(rt.object_cutout_input, cutouts, (size_t)count * 8 * sizeof(float));
+	else
+	{
+		int index;
+
+		for (index = 0; index < count; index++)
+			rt.object_cutout_input[index * 8 + 6] = -1.0f;
+	}
 	rt.object_count = count;
 }
 
@@ -1010,8 +1220,9 @@ static id<MTLAccelerationStructure> level_structure(void)
 
 /* the drawn level's triangles (vertices: x, y, z; texcoords: the lightmap's
 u, v; indices: three a triangle; each triangle's material) */
-int host_rt_set_level(uint32_t generation, const float *vertices, const float *texcoords, int vertex_count,
-	const uint32_t *indices, const uint32_t *triangle_materials, int triangle_count)
+int host_rt_set_level(uint32_t generation, const float *vertices, const float *texcoords,
+	const float *base_texcoords, int vertex_count, const uint32_t *indices, const uint32_t *triangle_materials,
+	int triangle_count, int cutout_start)
 {
 	MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
 	MTLPrimitiveAccelerationStructureDescriptor *descriptor;
@@ -1039,15 +1250,39 @@ int host_rt_set_level(uint32_t generation, const float *vertices, const float *t
 		options:MTLResourceStorageModeShared];
 	rt.drawn_triangle_materials = [rt.device newBufferWithBytes:triangle_materials
 		length:(NSUInteger)triangle_count * 4 options:MTLResourceStorageModeShared];
+	rt.drawn_base_texcoords = [rt.device newBufferWithBytes:base_texcoords length:(NSUInteger)vertex_count * 8
+		options:MTLResourceStorageModeShared];
+	if (cutout_start < 0 || cutout_start > triangle_count)
+		cutout_start = triangle_count;
+	rt.drawn_cutout_start = (uint32_t)cutout_start;
+	/* the opaque triangles, then the alpha-tested (geometry 1: the rays test
+	their masks) */
 	geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
 	geometry.vertexBuffer = vertex_buffer;
 	geometry.vertexStride = 12;
 	geometry.indexBuffer = rt.drawn_indices;
 	geometry.indexType = MTLIndexTypeUInt32;
-	geometry.triangleCount = (NSUInteger)triangle_count;
-	geometry.opaque = YES;
+	geometry.triangleCount = (NSUInteger)(cutout_start > 0 ? cutout_start : triangle_count);
+	geometry.opaque = cutout_start > 0 ? YES : NO;
 	descriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
-	descriptor.geometryDescriptors = @[ geometry ];
+	if (cutout_start > 0 && cutout_start < triangle_count)
+	{
+		MTLAccelerationStructureTriangleGeometryDescriptor *cutouts =
+			[MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+
+		cutouts.vertexBuffer = vertex_buffer;
+		cutouts.vertexStride = 12;
+		cutouts.indexBuffer = rt.drawn_indices;
+		cutouts.indexBufferOffset = (NSUInteger)cutout_start * 12;
+		cutouts.indexType = MTLIndexTypeUInt32;
+		cutouts.triangleCount = (NSUInteger)(triangle_count - cutout_start);
+		cutouts.opaque = NO;
+		descriptor.geometryDescriptors = @[ geometry, cutouts ];
+	}
+	else
+	{
+		descriptor.geometryDescriptors = @[ geometry ];
+	}
 	sizes = [rt.device accelerationStructureSizesWithDescriptor:descriptor];
 	rt.drawn = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
 	scratch = [rt.device newBufferWithLength:sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
@@ -1175,6 +1410,61 @@ int host_rt_probe_results(float *results, int maximum)
 	return count;
 }
 
+#define HOST_RT_MASK_ATLAS_SIZE 2048
+#define HOST_RT_MASKS 256
+
+/* a cutout's mask (a byte of alpha a texel), into the masks' texture (rows
+of masks); generation: the masks start anew when it changes */
+int host_rt_set_mask(uint32_t generation, int index, int width, int height, const unsigned char *alpha)
+{
+	float *rect;
+
+	if (!rt.available || index < 0 || index >= HOST_RT_MASKS || width <= 0 || height <= 0 || width > 256 ||
+		height > 256)
+	{
+		return 0;
+	}
+	if (!rt.mask_atlas)
+	{
+		MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
+			texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm width:HOST_RT_MASK_ATLAS_SIZE
+			height:HOST_RT_MASK_ATLAS_SIZE mipmapped:NO];
+
+		descriptor.usage = MTLTextureUsageShaderRead;
+		descriptor.storageMode = MTLStorageModeShared;
+		rt.mask_atlas = [rt.device newTextureWithDescriptor:descriptor];
+		rt.mask_rects = [rt.device newBufferWithLength:HOST_RT_MASKS * 16 options:MTLResourceStorageModeShared];
+		if (!rt.mask_atlas || !rt.mask_rects)
+			return 0;
+		memset(rt.mask_rects.contents, 0, HOST_RT_MASKS * 16);
+	}
+	if (generation != rt.mask_generation)
+	{
+		rt.mask_generation = generation;
+		rt.mask_x = rt.mask_y = rt.mask_row = 0;
+		memset(rt.mask_rects.contents, 0, HOST_RT_MASKS * 16);
+	}
+	if (rt.mask_x + width > HOST_RT_MASK_ATLAS_SIZE)
+	{
+		rt.mask_x = 0;
+		rt.mask_y += rt.mask_row;
+		rt.mask_row = 0;
+	}
+	if (rt.mask_y + height > HOST_RT_MASK_ATLAS_SIZE)
+		return 0;
+	[rt.mask_atlas replaceRegion:MTLRegionMake2D((NSUInteger)rt.mask_x, (NSUInteger)rt.mask_y, (NSUInteger)width,
+		(NSUInteger)height) mipmapLevel:0 withBytes:alpha bytesPerRow:(NSUInteger)width];
+	rect = (float *)rt.mask_rects.contents + index * 4;
+	rect[0] = (float)rt.mask_x / HOST_RT_MASK_ATLAS_SIZE;
+	rect[1] = (float)rt.mask_y / HOST_RT_MASK_ATLAS_SIZE;
+	rect[2] = (float)width / HOST_RT_MASK_ATLAS_SIZE;
+	rect[3] = (float)height / HOST_RT_MASK_ATLAS_SIZE;
+	rt.mask_x += width;
+	if (height > rt.mask_row)
+		rt.mask_row = height;
+	return 1;
+}
+
 #define HOST_RT_ATLAS_SIZE 4096
 #define HOST_RT_PAGES 256
 
@@ -1237,8 +1527,11 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	id<MTLBuffer> buffer;
 	id<MTLAccelerationStructureCommandEncoder> encoder;
 	int index, group, ring = rt.instance_ring, count;
-	int group_triangles[HOST_RT_GROUPS] = { 0 };
+	int group_triangles[HOST_RT_GROUPS] = { 0 }, group_cutouts[HOST_RT_GROUPS] = { 0 };
+	int cutout_offsets[HOST_RT_GROUPS] = { 0 }, cutout_fill[HOST_RT_GROUPS] = { 0 }, cutout_total = 0;
 	unsigned char group_masks[HOST_RT_GROUPS] = { 0 };
+	uint32_t *offsets;
+	float *cutout_attributes;
 
 	if (!rt.instance_buffers[0])
 	{
@@ -1247,25 +1540,69 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			rt.instance_buffers[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) *
 				sizeof(MTLAccelerationStructureInstanceDescriptor) options:MTLResourceStorageModeShared];
 			for (group = 0; group < HOST_RT_GROUPS; group++)
+			{
 				rt.body_vertices[index][group] = [rt.device newBufferWithLength:HOST_RT_GROUP_TRIANGLES * 9 *
 					sizeof(float) options:MTLResourceStorageModeShared];
+				rt.cut_vertices[index][group] = [rt.device newBufferWithLength:HOST_RT_GROUP_TRIANGLES * 9 *
+					sizeof(float) options:MTLResourceStorageModeShared];
+			}
+			rt.object_cutouts[index] = [rt.device newBufferWithLength:HOST_RT_OBJECT_TRIANGLES * 32
+				options:MTLResourceStorageModeShared];
+			rt.instance_offsets[index] = [rt.device newBufferWithLength:(HOST_RT_GROUPS + 1) * 4
+				options:MTLResourceStorageModeShared];
 		}
 	}
 	rt.instance_ring = (ring + 1) % 3;
-	/* each object's triangles, into its mesh */
+	rt.scene_ring = ring;
+	/* each object's triangles, into its mesh: the opaque, and the cutouts
+	(alpha-tested: the rays test their masks), whose coordinates and masks go
+	in the frame's cutouts, each instance's from its first */
+	for (index = 0; index < rt.object_count; index++)
+	{
+		group = rt.object_groups[index] >> 3;
+		if (group < HOST_RT_GROUPS && rt.object_cutout_input[index * 8 + 6] >= 0.0f)
+			group_cutouts[group]++;
+	}
+	for (group = 0; group < HOST_RT_GROUPS; group++)
+	{
+		if (group_cutouts[group] > HOST_RT_GROUP_TRIANGLES)
+			group_cutouts[group] = HOST_RT_GROUP_TRIANGLES;
+		cutout_offsets[group] = cutout_total;
+		cutout_total += group_cutouts[group];
+	}
+	cutout_attributes = (float *)rt.object_cutouts[ring].contents;
 	for (index = 0; index < rt.object_count; index++)
 	{
 		unsigned char mask = rt.object_groups[index];
+		const float *cut = &rt.object_cutout_input[index * 8];
 		float *vertices;
 
 		group = mask >> 3;
-		if (group >= HOST_RT_GROUPS || group_triangles[group] >= HOST_RT_GROUP_TRIANGLES)
+		if (group >= HOST_RT_GROUPS)
 			continue;
 		group_masks[group] = mask & 7;
-		vertices = (float *)rt.body_vertices[ring][group].contents + group_triangles[group] * 9;
+		if (cut[6] >= 0.0f)
+		{
+			float *attributes;
+
+			if (cutout_fill[group] >= group_cutouts[group])
+				continue;
+			vertices = (float *)rt.cut_vertices[ring][group].contents + cutout_fill[group] * 9;
+			attributes = cutout_attributes + (cutout_offsets[group] + cutout_fill[group]) * 8;
+			memcpy(attributes, cut, 8 * sizeof(float));
+			cutout_fill[group]++;
+		}
+		else
+		{
+			if (group_triangles[group] >= HOST_RT_GROUP_TRIANGLES)
+				continue;
+			vertices = (float *)rt.body_vertices[ring][group].contents + group_triangles[group] * 9;
+			group_triangles[group]++;
+		}
 		memcpy(vertices, &rt.object_triangles[index * 9], 9 * sizeof(float));
-		group_triangles[group]++;
 	}
+	offsets = (uint32_t *)rt.instance_offsets[ring].contents;
+	memset(offsets, 0, (HOST_RT_GROUPS + 1) * 4);
 	encoder = [commands accelerationStructureCommandEncoder];
 	structures = [NSMutableArray arrayWithObject:level_structure()];
 	buffer = rt.instance_buffers[ring];
@@ -1273,7 +1610,8 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	memset(instances, 0, (HOST_RT_GROUPS + 1) * sizeof(*instances));
 	for (index = 0; index <= HOST_RT_GROUPS; index++)
 	{
-		instances[index].options = MTLAccelerationStructureInstanceOptionOpaque;
+		/* (not forced opaque: the cutouts' geometries are not) */
+		instances[index].options = MTLAccelerationStructureInstanceOptionNone;
 		instances[index].transformationMatrix.columns[0] = MTLPackedFloat3Make(1, 0, 0);
 		instances[index].transformationMatrix.columns[1] = MTLPackedFloat3Make(0, 1, 0);
 		instances[index].transformationMatrix.columns[2] = MTLPackedFloat3Make(0, 0, 1);
@@ -1282,23 +1620,28 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	count = 1;
 	for (group = 0; group < HOST_RT_GROUPS; group++)
 	{
-		MTLAccelerationStructureTriangleGeometryDescriptor *geometry;
+		MTLAccelerationStructureTriangleGeometryDescriptor *geometry, *cutouts;
 		MTLPrimitiveAccelerationStructureDescriptor *mesh;
 
-		if (!group_triangles[group])
+		if (!group_triangles[group] && !cutout_fill[group])
 			continue;
 		geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
 		geometry.vertexBuffer = rt.body_vertices[ring][group];
 		geometry.vertexStride = 12;
 		geometry.opaque = YES;
+		cutouts = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+		cutouts.vertexBuffer = rt.cut_vertices[ring][group];
+		cutouts.vertexStride = 12;
+		cutouts.opaque = NO;
 		mesh = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
-		mesh.geometryDescriptors = @[ geometry ];
 		if (!rt.bodies[group])
 		{
-			/* sized for the most shapes, once */
+			/* sized for the most shapes, once (both kinds, full) */
 			MTLAccelerationStructureSizes sizes;
 
 			geometry.triangleCount = HOST_RT_GROUP_TRIANGLES;
+			cutouts.triangleCount = HOST_RT_GROUP_TRIANGLES;
+			mesh.geometryDescriptors = @[ geometry, cutouts ];
 			sizes = [rt.device accelerationStructureSizesWithDescriptor:mesh];
 			rt.bodies[group] = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
 			rt.body_scratch[group] = [rt.device newBufferWithLength:sizes.buildScratchBufferSize
@@ -1310,8 +1653,14 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			}
 		}
 		geometry.triangleCount = (NSUInteger)group_triangles[group];
+		cutouts.triangleCount = (NSUInteger)cutout_fill[group];
+		if (group_triangles[group] && cutout_fill[group])
+			mesh.geometryDescriptors = @[ geometry, cutouts ];
+		else
+			mesh.geometryDescriptors = @[ group_triangles[group] ? geometry : cutouts ];
 		[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
 			scratchBufferOffset:0];
+		offsets[count] = (uint32_t)cutout_offsets[group];
 		instances[count].mask = group_masks[group];
 		if (rt.objects_two_sided)
 			instances[count].options |= MTLAccelerationStructureInstanceOptionDisableTriangleCulling;
@@ -1350,16 +1699,18 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	for (group = 0; group < HOST_RT_GROUPS; group++)
 	{
 		const float *vertices = (const float *)rt.body_vertices[ring][group].contents;
+		const float *cut = (const float *)rt.cut_vertices[ring][group].contents;
 		float low[3] = { 1e30f, 1e30f, 1e30f }, high[3] = { -1e30f, -1e30f, -1e30f };
 		int vertex, axis;
 
-		if (!group_triangles[group])
+		if (!group_triangles[group] && !cutout_fill[group])
 			continue;
-		for (vertex = 0; vertex < group_triangles[group] * 3; vertex++)
+		for (vertex = 0; vertex < (group_triangles[group] + cutout_fill[group]) * 3; vertex++)
 		{
 			for (axis = 0; axis < 3; axis++)
 			{
-				float value = vertices[vertex * 3 + axis];
+				float value = vertex < group_triangles[group] * 3 ? vertices[vertex * 3 + axis] :
+					cut[(vertex - group_triangles[group] * 3) * 3 + axis];
 
 				if (value < low[axis])
 					low[axis] = value;
@@ -1574,6 +1925,20 @@ int host_rt_trace(const float *camera, int width, int height)
 		[encoder setBuffer:gi_ready ? rt.drawn_materials : any offset:0 atIndex:13];
 		[encoder setBuffer:gi_ready ? rt.drawn_pages : any offset:0 atIndex:14];
 		[encoder setBytes:&gi_ready length:sizeof(gi_ready) atIndex:15];
+		/* the cutouts: the level's coordinates, the masks, the objects' */
+		{
+			uint32_t cutouts_ready = gi_ready && rt.mask_atlas && rt.mask_rects && rt.drawn_base_texcoords &&
+				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring];
+
+			[encoder setBuffer:cutouts_ready ? rt.drawn_base_texcoords : any offset:0 atIndex:21];
+			[encoder setBuffer:cutouts_ready ? rt.mask_rects : any offset:0 atIndex:22];
+			[encoder setBuffer:cutouts_ready ? rt.object_cutouts[rt.scene_ring] : any offset:0 atIndex:23];
+			[encoder setBuffer:cutouts_ready ? rt.instance_offsets[rt.scene_ring] : any offset:0 atIndex:24];
+			[encoder setBytes:&cutouts_ready length:sizeof(cutouts_ready) atIndex:25];
+			[encoder setBuffer:gi_ready && rt.drawn_vertices ? rt.drawn_vertices : any offset:0 atIndex:26];
+			[encoder setTexture:cutouts_ready ? rt.mask_atlas : rt.textures[1] atIndex:7];
+			constants[83] = (float)rt.drawn_cutout_start;
+		}
 		{
 			uint32_t glowing_count = gi_ready && rt.glowing ? rt.glowing_count : 0;
 

@@ -58,12 +58,17 @@ long halo_ray_tracing_emitters(float *emitters, long maximum, const float *camer
 /* the dynamic lights (source/objects/object_lights.c): 12 floats each */
 long halo_ray_tracing_lights(float *lights, long maximum, long all);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
-long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, float *cutouts, long maximum,
+	const float *camera,
 	float *player_sphere, long shapes);
 /* the drawn level, its materials and lightmap pages, and the sky's light
 (port/linux/game/raytrace_world.c) */
-unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
-	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count);
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, const float **base_texcoords,
+	long *vertex_count, const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count,
+	long *cutout_start);
+/* the cutouts' masks, decoded as the texture cache loads their bitmaps */
+unsigned char halo_ray_tracing_mask(long *index, const unsigned char **alpha, long *width, long *height,
+	unsigned long *generation);
 unsigned char halo_ray_tracing_level_materials(const float **materials, long *count);
 unsigned char halo_ray_tracing_level_page(long *page, const unsigned char **pixels, long *width, long *height);
 unsigned char halo_ray_tracing_sky(float *sky);
@@ -873,7 +878,7 @@ static void initialize(void)
 	{
 		const char *gi = config_string("display.ray_tracing_gi");
 
-		ray.gi = !strcmp(gi, "traced") ? 1 : !strcmp(gi, "black") ? 2 : 0;
+		ray.gi = !strcmp(gi, "traced") ? 1 : !strcmp(gi, "black") ? 2 : !strcmp(gi, "path") ? 3 : 0;
 	}
 	ray.gi_sun = (float)config_real("display.ray_tracing_gi_sun");
 	ray.gi_bounce = (float)config_real("display.ray_tracing_gi_bounce");
@@ -1114,24 +1119,37 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	lightmap pages as the texture cache loads them (two a frame) */
 	if (ray.drawn_level)
 	{
-		const float *level_vertices, *texcoords, *materials;
+		const float *level_vertices, *texcoords, *base_texcoords, *materials;
 		const unsigned long *level_indices, *triangle_materials;
-		long level_vertex_count, level_triangle_count, material_count, page, page_width, page_height, step;
+		long level_vertex_count, level_triangle_count, material_count, page, page_width, page_height, step, cutout_start;
 		const unsigned char *pixels;
-		unsigned long level_generation = halo_ray_tracing_level(&level_vertices, &texcoords, &level_vertex_count,
-			&level_indices, &triangle_materials, &level_triangle_count);
+		unsigned long level_generation = halo_ray_tracing_level(&level_vertices, &texcoords, &base_texcoords,
+			&level_vertex_count, &level_indices, &triangle_materials, &level_triangle_count, &cutout_start);
 
 		if (level_generation && level_generation != ray.level_generation)
 		{
 			ray.level_generation = level_generation;
 			ray.lightmap_sum[0] = ray.lightmap_sum[1] = ray.lightmap_sum[2] = ray.lightmap_samples = 0.0;
-			host_rt_set_level(level_generation, level_vertices, texcoords, (int)level_vertex_count,
-				(const unsigned int *)level_indices, (const unsigned int *)triangle_materials, (int)level_triangle_count);
+			host_rt_set_level(level_generation, level_vertices, texcoords, base_texcoords, (int)level_vertex_count,
+				(const unsigned int *)level_indices, (const unsigned int *)triangle_materials, (int)level_triangle_count,
+				(int)cutout_start);
 		}
 		if (level_generation)
 		{
 			if (halo_ray_tracing_level_materials(&materials, &material_count))
 				host_rt_set_level_materials(materials, (int)material_count);
+			/* (the cutouts' masks, four a frame) */
+			{
+				long mask, mask_width, mask_height;
+				const unsigned char *alpha;
+				unsigned long mask_generation;
+
+				for (step = 0; step < 4 && halo_ray_tracing_mask(&mask, &alpha, &mask_width, &mask_height,
+					&mask_generation); step++)
+				{
+					host_rt_set_mask((unsigned int)mask_generation, (int)mask, (int)mask_width, (int)mask_height, alpha);
+				}
+			}
 			for (step = 0; step < 2 && halo_ray_tracing_level_page(&page, &pixels, &page_width, &page_height); step++)
 			{
 				static int pages;
@@ -1267,11 +1285,12 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[47] = ray.gi_glow;
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
-	/* (how much of each new frame the accumulated light takes, at least) */
+	/* (how much of each new frame the accumulated light takes, at least:
+	enough that the light follows a change within a second, not smears) */
+	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.05f;
 	/* (the traced light's new samples every this many frames a pixel: 0,
 	the host's governor chooses) */
 	camera[63] = getenv("HALO_RT_GI_PERIOD") ? (float)atof(getenv("HALO_RT_GI_PERIOD")) : 0.0f;
-	camera[62] = getenv("HALO_RT_GI_BLEND") ? (float)atof(getenv("HALO_RT_GI_BLEND")) : 0.02f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */
@@ -1279,15 +1298,17 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		/* (their triangles, at most the host's 65536) */
 		static float triangles[65536 * 9];
 		static unsigned char groups[65536];
+		/* (and their cutouts: 8 floats each) */
+		static float cutouts[65536 * 8];
 		long count = ray.objects ?
-			halo_ray_tracing_objects(triangles, groups, 65536, position, camera + 28, ray.shapes) : 0;
+			halo_ray_tracing_objects(triangles, groups, cutouts, 65536, position, camera + 28, ray.shapes) : 0;
 
 		if (!ray.objects)
 			camera[31] = 0.0f;
 
 		/* (the drawn models are traced from both sides: their winding is not
 		kept to their outsides as the collision models' is) */
-		host_rt_set_objects(triangles, groups, (int)count, ray.shapes == 0);
+		host_rt_set_objects(triangles, groups, cutouts, (int)count, ray.shapes == 0);
 	}
 	/* the lights: traced, all of them, or the game's dynamic ones, for their
 	shadows */

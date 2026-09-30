@@ -25,6 +25,8 @@ is split into a fan of triangles.
 #include "objects/object_definitions.h"
 #include "models/model_definitions.h"
 #include "game/players.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_group_lookup.h"
 
 enum
 {
@@ -562,13 +564,26 @@ enum
 /* the object's drawn model, skinned as the renderer skins it (each vertex
 by its two nodes' matrices, each the node's pose times its inverse default
 pose: models.c), its regions as they are now; returns how many triangles */
+/* this frame's objects' triangles and their cutouts (8 floats each: the
+corners' texture coordinates, the mask or -1, 0), for the triangles'
+indices from the first */
+static const float *ray_triangles_base;
+static float *ray_cutouts;
+static long mask_index(struct bitmap_data *bitmap);
+
+static float *triangle_cutout(const float *triangle)
+{
+	return ray_cutouts && ray_triangles_base ? ray_cutouts + (triangle - ray_triangles_base) / 9 * 8 : NULL;
+}
+
 static long model_triangles(struct object_datum *object, const real_matrix4x3 *matrices, float *out, long room)
 {
 	const struct object_definition *definition = object_definition_get(object->definition_index);
 	const struct model *model;
 	const struct model_node *nodes;
 	static real_matrix4x3 relative[RAY_TRACED_MAXIMUM_NODES];
-	long count = 0, node_index, region_index;
+	long count = 0, node_index, region_index, part_mask = -1;
+	float u_scale = 1.0f, v_scale = 1.0f;
 
 	if (!matrices || definition->object.model.index == NONE)
 		return 0;
@@ -662,6 +677,49 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 			{
 				continue;
 			}
+			/* the part's shader: a transparent one (a shield's, glass, a
+			hologram) is not in the rays; an alpha-tested one - a model's, unless
+			it says not; an environment's that says so - is a cutout, by its
+			base map's alpha, its coordinates scaled as the renderer scales them */
+			{
+				const byte *shader = NULL;
+				short shader_type = 4;
+				unsigned short shader_flags = 0;
+
+				part_mask = -1;
+				u_scale = model->base_map_scale.i != 0.0f ? model->base_map_scale.i : 1.0f;
+				v_scale = model->base_map_scale.j != 0.0f ? model->base_map_scale.j : 1.0f;
+				if (part->shader_index >= 0 && part->shader_index < model->shaders.count)
+				{
+					const struct tag_reference *reference = (const struct tag_reference *)
+						((const byte *)model->shaders.address + part->shader_index * 32);
+
+					if (reference->index != NONE)
+						shader = (const byte *)tag_get(0x73686472 /* 'shdr' */, reference->index);
+				}
+				if (shader)
+				{
+					shader_type = *(const short *)(shader + 0x24);
+					shader_flags = *(const unsigned short *)(shader + 0x28);
+				}
+				if (shader_type != 3 && shader_type != 4)
+					continue;
+				if (shader && ((shader_type == 4 && !(shader_flags & 4)) || (shader_type == 3 && (shader_flags & 1))))
+				{
+					const struct tag_reference *base_map = (const struct tag_reference *)
+						(shader + (shader_type == 4 ? 0xA4 : 0x88));
+
+					if (base_map->index != NONE)
+						part_mask = mask_index(bitmap_group_try_and_get_bitmap(base_map->index, 0));
+					if (shader_type == 4)
+					{
+						float map_u = *(const float *)(shader + 0x9C), map_v = *(const float *)(shader + 0xA0);
+
+						u_scale *= map_u != 0.0f ? map_u : 1.0f;
+						v_scale *= map_v != 0.0f ? map_v : 1.0f;
+					}
+				}
+			}
 			/* (HALO_RT_LOG_SHAPES: each model's first parts' shaders, once) */
 			if (getenv("HALO_RT_LOG_SHAPES") && part_index < 3 && part->shader_index >= 0 &&
 				part->shader_index < model->shaders.count)
@@ -734,6 +792,29 @@ static long model_triangles(struct object_datum *object, const real_matrix4x3 *m
 				for (corner = 0; corner < 3; corner++)
 				{
 					const byte *raw = vertex_data + corners[corner] * vertex_size;
+					float *cut = triangle_cutout(out + count * 9);
+
+					if (cut)
+					{
+						float u, v;
+
+						if (compressed)
+						{
+							const struct model_vertex_view *view = (const struct model_vertex_view *)raw;
+
+							u = (float)view->texture_coordinates[0] * (1.0f / 32767.0f);
+							v = (float)view->texture_coordinates[1] * (1.0f / 32767.0f);
+						}
+						else
+						{
+							u = *(const float *)(raw + 48);
+							v = *(const float *)(raw + 52);
+						}
+						cut[corner * 2 + 0] = u * u_scale;
+						cut[corner * 2 + 1] = v * v_scale;
+						cut[6] = (float)part_mask;
+						cut[7] = 0.0f;
+					}
 					const real_point3d *position = (const real_point3d *)raw;
 					short node0, node1;
 					float weight0;
@@ -814,9 +895,13 @@ static long object_triangles_sane(long object_index, const struct object_datum *
 	return count;
 }
 
+/* whether the last object_shapes made the drawn model's triangles (with
+their cutouts) */
+static boolean ray_model_made;
+
 /* one object's triangles into out (at most room), of the shapes; returns
 how many */
-static long object_triangles(long object_index, struct object_datum *object, float *out, long room, long shapes)
+static long object_shapes(long object_index, struct object_datum *object, float *out, long room, long shapes)
 {
 	const struct object_definition *definition = object_definition_get(object->definition_index);
 	const real_matrix4x3 *matrices = object_get_node_matrices(object_index);
@@ -830,7 +915,10 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 		/* (a drawn model read wrong - its vertices far off: its collision
 		model instead) */
 		if (count > 0 && object_triangles_sane(object_index, object, out, count))
+		{
+			ray_model_made = TRUE;
 			return count;
+		}
 		count = 0;
 	}
 	/* the collision model: its meshes, where the game's bullets hit */
@@ -909,6 +997,26 @@ static long object_triangles(long object_index, struct object_datum *object, flo
 	}
 }
 
+/* one object's triangles, and their cutouts (none but a drawn model's) */
+static long object_triangles(long object_index, struct object_datum *object, float *out, long room, long shapes)
+{
+	long count, index;
+
+	ray_model_made = FALSE;
+	count = object_shapes(object_index, object, out, room, shapes);
+	if (!ray_model_made)
+	{
+		for (index = 0; index < count; index++)
+		{
+			float *cut = triangle_cutout(out + index * 9);
+
+			if (cut)
+				cut[6] = -1.0f;
+		}
+	}
+	return count;
+}
+
 /* the objects in the rays: all that the game draws as models - units,
 items, projectiles, scenery, devices */
 #define RAY_TRACED_OBJECT_TYPES (_object_mask_unit | _object_mask_item | _object_mask_projectile | \
@@ -942,8 +1050,8 @@ maximum) and each triangle's group, and the player's body's bounding sphere
 and what it carries are group 0; the other units (with what they carry)
 each a group; the loose objects (items on the ground, projectiles,
 scenery, devices) share the last. */
-long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
-	float *player_sphere, long shapes)
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, float *cutouts, long maximum,
+	const float *camera, float *player_sphere, long shapes)
 {
 	struct object_iterator iterator;
 	struct object_datum *object;
@@ -951,6 +1059,8 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maxi
 	const unsigned char loose = (unsigned char)((RAY_TRACED_OBJECT_GROUPS - 1) << 3 | _ray_mask_object);
 
 	player_sphere[0] = player_sphere[1] = player_sphere[2] = player_sphere[3] = 0.0f;
+	ray_triangles_base = triangles;
+	ray_cutouts = cutouts;
 	if (global_structure_bsp_index == NONE || !object_header_data)
 		return 0;
 	player_index = local_player_get_player_index(0);
@@ -1161,11 +1271,16 @@ static struct
 	unsigned long generation;
 	float *vertices;
 	float *texcoords;
+	/* each vertex's base map coordinates (for the cutouts) */
+	float *base_texcoords;
 	unsigned long *indices;
 	unsigned long *triangle_materials;
 	long vertex_count, triangle_count;
-	/* RAY_LEVEL_MATERIAL_FLOATS each: the colour, the flags; the light
-	given off, the lightmap page (-1 none) */
+	/* the alpha-tested triangles are last, from this one */
+	long cutout_start;
+	/* RAY_LEVEL_MATERIAL_FLOATS each: the colour, the flags (1 transparent;
+	16 times one more than its cutout's mask, if it is alpha-tested); the
+	light given off, the lightmap page (-1 none) */
 	float *materials;
 	long material_count;
 	/* each material's base map, until its colour is known */
@@ -1193,9 +1308,98 @@ static boolean level_bitmap_readable(struct bitmap_data *bitmap)
 		bitmap->base_address;
 }
 
+/* the cutouts' masks: the alpha of the textures of what is alpha-tested
+(the level's foliage and fences, the plants' and the objects' models), as
+the rays need it to see through their holes - each a mipmap of at most
+128x128, decoded once the texture cache has it */
+#define RAY_MASKS 256
+
+static struct
+{
+	struct bitmap_data *bitmaps[RAY_MASKS];
+	boolean done[RAY_MASKS];
+	long count;
+	unsigned long generation;
+	unsigned char pixels[128 * 128];
+} masks;
+
+/* the mask of a bitmap's alpha, asked for; -1 if there is no room */
+static long mask_index(struct bitmap_data *bitmap)
+{
+	long index;
+
+	if (!bitmap)
+		return -1;
+	for (index = 0; index < masks.count; index++)
+	{
+		if (masks.bitmaps[index] == bitmap)
+			return index;
+	}
+	if (masks.count >= RAY_MASKS)
+		return -1;
+	masks.bitmaps[masks.count] = bitmap;
+	masks.done[masks.count] = FALSE;
+	return masks.count++;
+}
+
+static boolean level_bitmap_readable(struct bitmap_data *bitmap);
+
+/* the next mask the texture cache has the bitmap of, decoded (its alpha,
+a byte a texel); FALSE when none is ready. *generation changes when the
+masks start anew (a new level) */
+boolean halo_ray_tracing_mask(long *index, const unsigned char **alpha, long *width, long *height,
+	unsigned long *generation)
+{
+	long mask;
+
+	*generation = masks.generation;
+	for (mask = 0; mask < masks.count; mask++)
+	{
+		struct bitmap_data *bitmap = masks.bitmaps[mask];
+		long mipmap = 0, x, y, w, h;
+		float lod = 1.0f;
+
+		if (masks.done[mask] || !level_bitmap_readable(bitmap))
+			continue;
+		while (mipmap < bitmap->mipmap_count && ((bitmap->width >> mipmap) > 128 || (bitmap->height >> mipmap) > 128) &&
+			(bitmap->width >> (mipmap + 1)) >= 8 && (bitmap->height >> (mipmap + 1)) >= 8)
+		{
+			mipmap++;
+		}
+		if (bitmap->mipmap_count > 0)
+			lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
+		w = MAX(bitmap->width >> mipmap, 1);
+		h = MAX(bitmap->height >> mipmap, 1);
+		if (w > 128 || h > 128)
+		{
+			masks.done[mask] = TRUE;
+			continue;
+		}
+		for (y = 0; y < h; y++)
+		{
+			for (x = 0; x < w; x++)
+			{
+				real_point2d point;
+
+				point.x = ((float)x + 0.5f) / (float)w;
+				point.y = ((float)y + 0.5f) / (float)h;
+				masks.pixels[y * w + x] = (unsigned char)(bitmap_2d_get_pixel(bitmap, &point, lod) >> 24);
+			}
+		}
+		masks.done[mask] = TRUE;
+		*index = mask;
+		*alpha = masks.pixels;
+		*width = w;
+		*height = h;
+		return TRUE;
+	}
+	return FALSE;
+}
+
 static void level_free(void)
 {
-	void **blocks[] = { (void **)&level.vertices, (void **)&level.texcoords, (void **)&level.indices,
+	void **blocks[] = { (void **)&level.vertices, (void **)&level.texcoords, (void **)&level.base_texcoords,
+		(void **)&level.indices,
 		(void **)&level.triangle_materials, (void **)&level.materials, (void **)&level.base_maps,
 		(void **)&level.pages, (void **)&level.pages_done };
 	long index;
@@ -1217,6 +1421,8 @@ static void level_build(const struct structure_bsp *bsp)
 	level_free();
 	level.bsp = bsp;
 	level.generation++;
+	masks.count = 0;
+	masks.generation++;
 	if (!bsp)
 		return;
 	/* the sizes */
@@ -1243,13 +1449,14 @@ static void level_build(const struct structure_bsp *bsp)
 		return;
 	level.vertices = malloc((size_t)vertex_count * 3 * sizeof(float));
 	level.texcoords = malloc((size_t)vertex_count * 2 * sizeof(float));
+	level.base_texcoords = malloc((size_t)vertex_count * 2 * sizeof(float));
 	level.indices = malloc((size_t)triangle_count * 3 * sizeof(unsigned long));
 	level.triangle_materials = malloc((size_t)triangle_count * sizeof(unsigned long));
 	level.materials = malloc((size_t)material_count * RAY_LEVEL_MATERIAL_FLOATS * sizeof(float));
 	level.base_maps = malloc((size_t)material_count * sizeof(struct bitmap_data *));
 	level.pages = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(struct bitmap_data *));
 	level.pages_done = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(boolean));
-	if (!level.vertices || !level.texcoords || !level.indices || !level.triangle_materials || !level.materials ||
+	if (!level.vertices || !level.texcoords || !level.base_texcoords || !level.indices || !level.triangle_materials || !level.materials ||
 		!level.base_maps || !level.pages || !level.pages_done)
 	{
 		level_free();
@@ -1302,6 +1509,14 @@ static void level_build(const struct structure_bsp *bsp)
 						level.base_maps[level.material_count] = bitmap_group_try_and_get_bitmap(
 							environment->base_map.index,
 							(short)(material->permutation_index % group->bitmaps.count));
+						/* (alpha-tested: a cutout, by its base map's alpha) */
+						if (*(const unsigned short *)((const byte *)shader + 0x28) & 1)
+						{
+							long mask = mask_index(level.base_maps[level.material_count]);
+
+							if (mask >= 0)
+								out[3] += (float)((mask + 1) * 16);
+						}
 					}
 				}
 			}
@@ -1332,6 +1547,11 @@ static void level_build(const struct structure_bsp *bsp)
 				}
 				level.texcoords[level.vertex_count * 2 + 0] = texcoord.x;
 				level.texcoords[level.vertex_count * 2 + 1] = texcoord.y;
+				environment_vertex_compressed_get_texcoord(
+					(const struct environment_vertex_compressed *)(vertices + vertex_index * _ray_level_vertex_size),
+					&texcoord);
+				level.base_texcoords[level.vertex_count * 2 + 0] = texcoord.x;
+				level.base_texcoords[level.vertex_count * 2 + 1] = texcoord.y;
 				level.vertex_count++;
 			}
 			for (surface_offset = 0; surface_offset < material->surface_count; surface_offset++)
@@ -1378,6 +1598,46 @@ static void level_build(const struct structure_bsp *bsp)
 			}
 			level.material_count++;
 		}
+	}
+	/* the alpha-tested triangles last (the rays test them apart) */
+	{
+		long read, write = 0, cut = 0;
+		unsigned long *indices = malloc((size_t)MAX(level.triangle_count, 1) * 3 * sizeof(unsigned long));
+		unsigned long *triangle_materials = malloc((size_t)MAX(level.triangle_count, 1) * sizeof(unsigned long));
+
+		if (indices && triangle_materials)
+		{
+			long pass;
+
+			for (pass = 0; pass < 2; pass++)
+			{
+				for (read = 0; read < level.triangle_count; read++)
+				{
+					unsigned long material = level.triangle_materials[read];
+					boolean cutout = level.materials[material * RAY_LEVEL_MATERIAL_FLOATS + 3] >= 16.0f;
+
+					if (cutout != (pass == 1))
+						continue;
+					memcpy(indices + write * 3, level.indices + read * 3, 3 * sizeof(unsigned long));
+					triangle_materials[write] = material;
+					write++;
+					cut += pass;
+				}
+				if (pass == 0)
+					level.cutout_start = write;
+			}
+			memcpy(level.indices, indices, (size_t)level.triangle_count * 3 * sizeof(unsigned long));
+			memcpy(level.triangle_materials, triangle_materials, (size_t)level.triangle_count * sizeof(unsigned long));
+			platform_log("ray tracing: %ld of the level's triangles are cutouts (alpha-tested)", cut);
+		}
+		else
+		{
+			level.cutout_start = level.triangle_count;
+		}
+		if (indices)
+			free(indices);
+		if (triangle_materials)
+			free(triangle_materials);
 	}
 	level.materials_changed = TRUE;
 	if (getenv("HALO_RT_LOG_SHAPES"))
@@ -1480,8 +1740,9 @@ static void level_build(const struct structure_bsp *bsp)
 
 /* the active BSP's drawn triangles: returns its generation, which changes
 when the BSP does; 0 while there is none */
-unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
-	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count)
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, const float **base_texcoords,
+	long *vertex_count, const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count,
+	long *cutout_start)
 {
 	const struct structure_bsp *bsp = global_structure_bsp_index != NONE ? global_structure_bsp_get() : NULL;
 
@@ -1491,6 +1752,8 @@ unsigned long halo_ray_tracing_level(const float **vertices, const float **texco
 		return 0;
 	*vertices = level.vertices;
 	*texcoords = level.texcoords;
+	*base_texcoords = level.base_texcoords;
+	*cutout_start = level.cutout_start;
 	*vertex_count = level.vertex_count;
 	*indices = level.indices;
 	*triangle_materials = level.triangle_materials;

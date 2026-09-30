@@ -40,12 +40,15 @@ int host_rt_set_world(unsigned int generation, const float *vertices, int vertex
 	int triangle_count);
 unsigned int host_rt_texture(int which, int width, int height);
 int host_rt_trace(const float *camera, int width, int height);
-void host_rt_set_objects(const float *triangles, const unsigned char *groups, int count, int two_sided);
+void host_rt_set_objects(const float *triangles, const unsigned char *groups, const float *cutouts, int count,
+	int two_sided);
 int host_rt_probe(float *segments, int maximum);
 void host_rt_set_lights(const float *lights, int count);
 void host_rt_set_emitters(const float *emitters, int count);
-int host_rt_set_level(unsigned int generation, const float *vertices, const float *texcoords, int vertex_count,
-	const unsigned int *indices, const unsigned int *triangle_materials, int triangle_count);
+int host_rt_set_level(unsigned int generation, const float *vertices, const float *texcoords,
+	const float *base_texcoords, int vertex_count, const unsigned int *indices, const unsigned int *triangle_materials,
+	int triangle_count, int cutout_start);
+int host_rt_set_mask(unsigned int generation, int index, int width, int height, const unsigned char *alpha);
 void host_rt_set_level_materials(const float *materials, int count);
 int host_rt_set_level_page(int page, int width, int height, const unsigned char *pixels);
 void host_rt_set_probes(const float *points, int count);

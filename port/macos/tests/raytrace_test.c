@@ -403,9 +403,10 @@ unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_cou
 unit's collision model is its shape), wound counterclockwise seen from
 outside; the one in the open as the player's body, whose shadow only the
 rays draw */
-long halo_ray_tracing_objects(float *triangles, unsigned char *groups, long maximum, const float *camera,
-	float *player_sphere, long shapes)
+long halo_ray_tracing_objects(float *triangles, unsigned char *groups, float *cutouts, long maximum,
+	const float *camera, float *player_sphere, long shapes)
 {
+	(void)cutouts;
 	/* view space: x, y (up), z (forward); the world's x, y, z are the
 	view's x, z, y */
 	static const float boxes[2][6] = { { 3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f }, { -2.4f, -1.0f, 8.8f, -1.8f, 0.8f, 9.4f } };
@@ -480,15 +481,29 @@ long halo_ray_tracing_lights(float *lights, long maximum, long all)
 
 /* the drawn level, its materials and pages, and the sky: none here (the
 collision level stands in) */
-unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, long *vertex_count,
-	const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count)
+unsigned long halo_ray_tracing_level(const float **vertices, const float **texcoords, const float **base_texcoords,
+	long *vertex_count, const unsigned long **indices, const unsigned long **triangle_materials, long *triangle_count,
+	long *cutout_start)
 {
+	(void)base_texcoords;
+	(void)cutout_start;
 	(void)vertices;
 	(void)texcoords;
 	(void)vertex_count;
 	(void)indices;
 	(void)triangle_materials;
 	(void)triangle_count;
+	return 0;
+}
+
+unsigned char halo_ray_tracing_mask(long *index, const unsigned char **alpha, long *width, long *height,
+	unsigned long *generation)
+{
+	(void)index;
+	(void)alpha;
+	(void)width;
+	(void)height;
+	*generation = 0;
 	return 0;
 }
 

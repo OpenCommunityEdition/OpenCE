@@ -83,5 +83,6 @@ host_rt_set_emitters
 host_rt_set_level
 host_rt_set_level_materials
 host_rt_set_level_page
+host_rt_set_mask
 host_rt_set_probes
 host_rt_probe_results
