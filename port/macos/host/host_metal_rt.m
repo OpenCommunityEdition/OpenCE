@@ -90,6 +90,12 @@ static struct
 	chances to it, its material) and how many; the vertices, kept for it */
 	id<MTLBuffer> drawn_vertices, glowing;
 	uint32_t glowing_count;
+	/* the light grid: the level's box in cells, each with the glowing
+	triangles that light it most (their light over their distance squared,
+	the 32 most), built apart as the glowing ones change (light_grid_build),
+	and the glowing triangles it was built from */
+	id<MTLBuffer> grid_info, grid_cells, grid_entries;
+	__unsafe_unretained id<MTLBuffer> grid_glowing;
 	/* the cutouts (alpha-tested): the drawn level's base map coordinates and
 	its first alpha-tested triangle; the masks, packed into one texture, and
 	where each is in it; the objects' cutouts this frame (2 float4 each:
@@ -235,6 +241,53 @@ static NSString *const kernel_source = @
 	"	float ign = fract(52.9829189 * fract(dot(p, float2(0.06711056, 0.00583715))));\n"
 	"	return fract(float2(ign, fract(ign * 1.6180339887 + 0.5)) + n * float2(0.7548776662, 0.5698402910));\n"
 	"}\n"
+	/* a glowing triangle to trace toward from P: four times in five one of
+	   its cell's (the light grid's: those that light it most), else any, by
+	   its light; and the chance it had, both ways */
+	"struct glow_choice { uint index; float probability; };\n"
+	"#define GRID_PARAMS constant float4 *grid_info, device const uint2 *grid_cells, device const uint2 *grid_entries\n"
+	"#define GRID_ARGS grid_info, grid_cells, grid_entries\n"
+	"static glow_choice glow_pick(float3 P, float u, device const float4 *glowing, uint glowing_count, GRID_PARAMS)\n"
+	"{\n"
+	"	uint offset = 0u, count = 0u;\n"
+	"	if (grid_info[1].w > 0.5)\n"
+	"	{\n"
+	"		int3 q = int3(floor((P - grid_info[0].xyz) / grid_info[0].w));\n"
+	"		int3 dims = int3(grid_info[1].xyz);\n"
+	"		if (all(q >= 0) && all(q < dims))\n"
+	"		{\n"
+	"			uint2 cell = grid_cells[(uint(q.z) * uint(dims.y) + uint(q.y)) * uint(dims.x) + uint(q.x)];\n"
+	"			offset = cell.x;\n"
+	"			count = cell.y;\n"
+	"		}\n"
+	"	}\n"
+	"	float share = count > 0u ? 0.8 : 0.0;\n"
+	"	glow_choice g;\n"
+	"	if (u < share)\n"
+	"	{\n"
+	"		float v = u / share;\n"
+	"		uint lo = 0u, hi = count - 1u;\n"
+	"		while (lo < hi) { uint mid = (lo + hi) / 2u; if (as_type<float>(grid_entries[offset + mid].y) < v) lo = mid + 1u; else hi = mid; }\n"
+	"		g.index = min(grid_entries[offset + lo].x, glowing_count - 1u);\n"
+	"	}\n"
+	"	else\n"
+	"	{\n"
+	"		float v = share > 0.0 ? (u - share) / (1.0 - share) : u;\n"
+	"		uint lo = 0u, hi = glowing_count - 1u;\n"
+	"		while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < v) lo = mid + 1u; else hi = mid; }\n"
+	"		g.index = lo;\n"
+	"	}\n"
+	"	float in_cell = 0.0;\n"
+	"	if (count > 0u)\n"
+	"	{\n"
+	"		uint lo = 0u, hi = count - 1u;\n"
+	"		while (lo < hi) { uint mid = (lo + hi) / 2u; if (grid_entries[offset + mid].x < g.index) lo = mid + 1u; else hi = mid; }\n"
+	"		if (grid_entries[offset + lo].x == g.index)\n"
+	"			in_cell = as_type<float>(grid_entries[offset + lo].y) - (lo > 0u ? as_type<float>(grid_entries[offset + lo - 1u].y) : 0.0);\n"
+	"	}\n"
+	"	g.probability = share * in_cell + (1.0 - share) * glowing[g.index * 3u].w;\n"
+	"	return g;\n"
+	"}\n"
 	/* the cutouts (alpha-tested: foliage, fences): a candidate hit on one is
 	solid where its mask (its texture's alpha) is - the level's (instance 0;
 	its primitives from c[83]) by its material and base map coordinates, an
@@ -353,6 +406,9 @@ static NSString *const kernel_source = @
 	"	device const float4 *pages [[buffer(14)]],\n"
 	"	device const float4 *glowing [[buffer(16)]],\n"
 	"	constant uint &glowing_count [[buffer(17)]],\n"
+	"	constant float4 *grid_info [[buffer(28)]],\n"
+	"	device const uint2 *grid_cells [[buffer(29)]],\n"
+	"	device const uint2 *grid_entries [[buffer(30)]],\n"
 	"	device const float4 *probe_in [[buffer(18)]],\n"
 	"	device float4 *probe_out [[buffer(19)]],\n"
 	"	constant uint &probe_count [[buffer(20)]],\n"
@@ -442,10 +498,10 @@ static NSString *const kernel_source = @
 	"	uint seed = pcg(i + pcg(uint(c[44])));\n"
 	"	for (uint g = 0; g < 8u && glowing_count > 0u; g++)\n"
 	"	{\n"
-	"		float pick = random01(seed);\n"
-	"		uint lo = 0u, hi = glowing_count - 1u;\n"
-	"		while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"		glow_choice choice = glow_pick(P, random01(seed), glowing, glowing_count, GRID_ARGS);\n"
+	"		uint lo = choice.index;\n"
 	"		float4 a = glowing[lo * 3u], b = glowing[lo * 3u + 1u], cc = glowing[lo * 3u + 2u];\n"
+	"		a.w = choice.probability;\n"
 	"		float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
 	"		float3 at = a.xyz * (1.0 - r1) + b.xyz * (r1 * (1.0 - r2)) + cc.xyz * (r1 * r2);\n"
 	"		float3 cross_ab = cross(b.xyz - a.xyz, cc.xyz - a.xyz);\n"
@@ -494,6 +550,9 @@ static NSString *const kernel_source = @
 	"	constant uint &gi_ready [[buffer(15)]],\n"
 	"	device const float4 *glowing [[buffer(16)]],\n"
 	"	constant uint &glowing_count [[buffer(17)]],\n"
+	"	constant float4 *grid_info [[buffer(28)]],\n"
+	"	device const uint2 *grid_cells [[buffer(29)]],\n"
+	"	device const uint2 *grid_entries [[buffer(30)]],\n"
 	"	device const float2 *base_texcoords [[buffer(21)]],\n"
 	"	device const float4 *mask_rects [[buffer(22)]],\n"
 	"	device const float4 *object_cutouts [[buffer(23)]],\n"
@@ -954,10 +1013,10 @@ static NSString *const kernel_source = @
 	"				}\n"
 	"				if (glowing_count > 0u)\n"
 	"				{\n"
-	"					float pick = random01(seed);\n"
-	"					uint lo = 0u, hi = glowing_count - 1u;\n"
-	"					while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"					glow_choice choice = glow_pick(H, random01(seed), glowing, glowing_count, GRID_ARGS);\n"
+	"					uint lo = choice.index;\n"
 	"					float4 ga = glowing[lo * 3u], gb = glowing[lo * 3u + 1u], gc = glowing[lo * 3u + 2u];\n"
+	"					ga.w = choice.probability;\n"
 	"					float r1 = sqrt(random01(seed)), r2 = random01(seed);\n"
 	"					float3 at = ga.xyz * (1.0 - r1) + gb.xyz * (r1 * (1.0 - r2)) + gc.xyz * (r1 * r2);\n"
 	"					float3 gcross = cross(gb.xyz - ga.xyz, gc.xyz - ga.xyz);\n"
@@ -987,10 +1046,10 @@ static NSString *const kernel_source = @
 	"		if (glowing_count > 0u)\n"
 	"		{\n"
 	"			float2 g = spread01(id, n, 1.0);\n"
-	"			float pick = g.x;\n"
-	"			uint lo = 0u, hi = glowing_count - 1u;\n"
-	"			while (lo < hi) { uint mid = (lo + hi) / 2u; if (glowing[mid * 3u + 1u].w < pick) lo = mid + 1u; else hi = mid; }\n"
+	"			glow_choice choice = glow_pick(P, g.x, glowing, glowing_count, GRID_ARGS);\n"
+	"			uint lo = choice.index;\n"
 	"			float4 a = glowing[lo * 3u], b = glowing[lo * 3u + 1u], cc = glowing[lo * 3u + 2u];\n"
+	"			a.w = choice.probability;\n"
 	"			float r1 = sqrt(g.y);\n"
 	"			float r2 = random01(seed);\n"
 	"			float3 at = a.xyz * (1.0 - r1) + b.xyz * (r1 * (1.0 - r2)) + cc.xyz * (r1 * r2);\n"
@@ -1368,6 +1427,210 @@ int host_rt_set_level(uint32_t generation, const float *vertices, const float *t
 	return 1;
 }
 
+/* the light grid (rt.grid_*): the level's box (lo to hi) cut into at most
+16384 cells, each listing the 32 glowing triangles (12 floats each: a, its
+chance; b, the running chance; c) whose light over their distance squared
+to its middle is greatest, by index, each with the running share of that
+(a float's bits) - built on a queue of its own, the latest asked for */
+#define LIGHT_GRID_CELL_TRIANGLES 32
+
+static void light_grid_build(const float *glow, uint32_t count, const float *lo, const float *hi,
+	__unsafe_unretained id<MTLBuffer> source)
+{
+	float extent[3], size, *center_x, *power;
+	int dims[3], axis;
+	uint32_t cells, cell, *cell_data, *entries, used = 0, index;
+	id<MTLBuffer> info_buffer, cells_buffer, entries_buffer;
+
+	for (axis = 0; axis < 3; axis++)
+		extent[axis] = hi[axis] - lo[axis] + 1.0f;
+	size = cbrtf(extent[0] * extent[1] * extent[2] / 16384.0f);
+	if (size < 3.0f)
+		size = 3.0f;
+	for (axis = 0; axis < 3; axis++)
+	{
+		dims[axis] = (int)ceilf(extent[axis] / size);
+		dims[axis] = dims[axis] < 1 ? 1 : dims[axis] > 128 ? 128 : dims[axis];
+	}
+	cells = (uint32_t)(dims[0] * dims[1] * dims[2]);
+	center_x = malloc(count * 3 * sizeof(float));
+	power = malloc(count * sizeof(float));
+	cell_data = malloc(cells * 2 * sizeof(uint32_t));
+	entries = malloc((size_t)cells * LIGHT_GRID_CELL_TRIANGLES * 2 * sizeof(uint32_t));
+	if (!center_x || !power || !cell_data || !entries)
+	{
+		free(center_x);
+		free(power);
+		free(cell_data);
+		free(entries);
+		return;
+	}
+	for (index = 0; index < count; index++)
+	{
+		for (axis = 0; axis < 3; axis++)
+			center_x[index * 3 + axis] = (glow[index * 12 + axis] + glow[index * 12 + 4 + axis] +
+				glow[index * 12 + 8 + axis]) / 3.0f;
+		power[index] = glow[index * 12 + 3];
+	}
+	for (cell = 0; cell < cells; cell++)
+	{
+		uint32_t best_index[LIGHT_GRID_CELL_TRIANGLES];
+		float best_weight[LIGHT_GRID_CELL_TRIANGLES], middle[3], near = size * size * 0.25f, total = 0.0f, running = 0.0f;
+		int kept = 0, weakest = 0, k, j;
+
+		middle[0] = lo[0] + ((float)(cell % (uint32_t)dims[0]) + 0.5f) * size;
+		middle[1] = lo[1] + ((float)((cell / (uint32_t)dims[0]) % (uint32_t)dims[1]) + 0.5f) * size;
+		middle[2] = lo[2] + ((float)(cell / (uint32_t)(dims[0] * dims[1])) + 0.5f) * size;
+		for (index = 0; index < count; index++)
+		{
+			float dx = center_x[index * 3] - middle[0], dy = center_x[index * 3 + 1] - middle[1];
+			float dz = center_x[index * 3 + 2] - middle[2], d2 = dx * dx + dy * dy + dz * dz;
+			float weight = power[index] / (d2 > near ? d2 : near);
+
+			if (kept < LIGHT_GRID_CELL_TRIANGLES)
+			{
+				best_index[kept] = index;
+				best_weight[kept] = weight;
+				kept++;
+			}
+			else if (weight > best_weight[weakest])
+			{
+				best_index[weakest] = index;
+				best_weight[weakest] = weight;
+			}
+			else
+				continue;
+			/* (the weakest kept, again) */
+			if (kept == LIGHT_GRID_CELL_TRIANGLES)
+			{
+				weakest = 0;
+				for (k = 1; k < kept; k++)
+					if (best_weight[k] < best_weight[weakest])
+						weakest = k;
+			}
+		}
+		/* (by index, for the kernel's search; the running share) */
+		for (k = 1; k < kept; k++)
+			for (j = k; j > 0 && best_index[j - 1] > best_index[j]; j--)
+			{
+				uint32_t swap_index = best_index[j];
+				float swap_weight = best_weight[j];
+
+				best_index[j] = best_index[j - 1];
+				best_weight[j] = best_weight[j - 1];
+				best_index[j - 1] = swap_index;
+				best_weight[j - 1] = swap_weight;
+			}
+		for (k = 0; k < kept; k++)
+			total += best_weight[k];
+		cell_data[cell * 2] = used;
+		cell_data[cell * 2 + 1] = total > 0.0f ? (uint32_t)kept : 0;
+		for (k = 0; k < kept && total > 0.0f; k++)
+		{
+			float share;
+
+			running += best_weight[k] / total;
+			share = k == kept - 1 ? 1.0f : running;
+			entries[(used + (uint32_t)k) * 2] = best_index[k];
+			memcpy(&entries[(used + (uint32_t)k) * 2 + 1], &share, sizeof(share));
+		}
+		if (total > 0.0f)
+			used += (uint32_t)kept;
+	}
+	{
+		float info[8] = { lo[0], lo[1], lo[2], size, (float)dims[0], (float)dims[1], (float)dims[2], 1.0f };
+
+		info_buffer = [rt.device newBufferWithBytes:info length:sizeof(info) options:MTLResourceStorageModeShared];
+		cells_buffer = [rt.device newBufferWithBytes:cell_data length:cells * 2 * sizeof(uint32_t)
+			options:MTLResourceStorageModeShared];
+		entries_buffer = [rt.device newBufferWithBytes:entries length:(used ? used : 1) * 2 * sizeof(uint32_t)
+			options:MTLResourceStorageModeShared];
+	}
+	free(center_x);
+	free(power);
+	free(cell_data);
+	free(entries);
+	@synchronized (rt.queue)
+	{
+		rt.grid_info = info_buffer;
+		rt.grid_cells = cells_buffer;
+		rt.grid_entries = entries_buffer;
+		rt.grid_glowing = source;
+	}
+	host_logf(HOST_LOG_INFO, "ray tracing: the light grid, %dx%dx%d cells of %.1f, %u glowing triangles", dims[0], dims[1],
+		dims[2], size, count);
+}
+
+/* the light grid asked for: the glowing triangles now (copied), built on its
+queue when it is free - one build at a time, of the latest asked for */
+static void light_grid_ask(void)
+{
+	static dispatch_queue_t queue;
+	static float *pending;
+	static uint32_t pending_count;
+	static float pending_lo[3], pending_hi[3];
+	static __unsafe_unretained id<MTLBuffer> pending_source;
+	static int scheduled;
+	const float *vertices = rt.drawn_vertices.contents;
+	NSUInteger vertex_count = rt.drawn_vertices.length / 12, index;
+	float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f }, *copy;
+	int axis;
+
+	if (!rt.glowing || !rt.glowing_count || !vertices || !vertex_count)
+		return;
+	for (index = 0; index < vertex_count; index++)
+		for (axis = 0; axis < 3; axis++)
+		{
+			float value = vertices[index * 3 + axis];
+
+			lo[axis] = value < lo[axis] ? value : lo[axis];
+			hi[axis] = value > hi[axis] ? value : hi[axis];
+		}
+	copy = malloc(rt.glowing_count * 12 * sizeof(float));
+	if (!copy)
+		return;
+	memcpy(copy, rt.glowing.contents, rt.glowing_count * 12 * sizeof(float));
+	if (!queue)
+		queue = dispatch_queue_create("halo.light_grid", DISPATCH_QUEUE_SERIAL);
+	@synchronized (rt.queue)
+	{
+		free(pending);
+		pending = copy;
+		pending_count = rt.glowing_count;
+		memcpy(pending_lo, lo, sizeof(lo));
+		memcpy(pending_hi, hi, sizeof(hi));
+		pending_source = rt.glowing;
+		if (scheduled)
+			return;
+		scheduled = 1;
+	}
+	dispatch_async(queue, ^{
+		for (;;)
+		{
+			float *glow, build_lo[3], build_hi[3];
+			uint32_t build_count;
+			__unsafe_unretained id<MTLBuffer> source;
+
+			@synchronized (rt.queue)
+			{
+				if (!pending)
+				{
+					scheduled = 0;
+					return;
+				}
+				glow = pending;
+				pending = NULL;
+				build_count = pending_count;
+				memcpy(build_lo, pending_lo, sizeof(build_lo));
+				memcpy(build_hi, pending_hi, sizeof(build_hi));
+				source = pending_source;
+			}
+			light_grid_build(glow, build_count, build_lo, build_hi, source);
+			free(glow);
+		}
+	});
+}
+
 /* the drawn level's materials: 8 floats each (the colour, the flags; the
 light given off, the lightmap page or -1) */
 void host_rt_set_level_materials(const float *materials, int count)
@@ -1446,6 +1709,7 @@ void host_rt_set_level_materials(const float *materials, int count)
 				host_logf(HOST_LOG_INFO, "ray tracing: %u glowing triangles", rt.glowing_count);
 			logged = rt.glowing_count;
 		}
+		light_grid_ask();
 	}
 }
 
@@ -1587,6 +1851,30 @@ int host_rt_set_level_page(int page, int width, int height, const unsigned char 
 	if (height > rt.atlas_row)
 		rt.atlas_row = height;
 	return 1;
+}
+
+/* how far a group's triangles moved since the last frame's (the ring's
+last), the most any corner did (0: none) */
+static float body_moved(int ring, int group, int triangles, int cutouts)
+{
+	int last = (ring + 2) % 3, kind;
+	float most = 0.0f;
+
+	for (kind = 0; kind < 2; kind++)
+	{
+		const float *now = (const float *)(kind ? rt.cut_vertices : rt.body_vertices)[ring][group].contents;
+		const float *then = (const float *)(kind ? rt.cut_vertices : rt.body_vertices)[last][group].contents;
+		int count = (kind ? cutouts : triangles) * 9, index;
+
+		for (index = 0; index < count; index++)
+		{
+			float moved = fabsf(now[index] - then[index]);
+
+			if (moved > most)
+				most = moved;
+		}
+	}
+	return most;
 }
 
 /* the scene for this frame's rays: each object's mesh, and the level and
@@ -1737,18 +2025,14 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		else
 			mesh.geometryDescriptors = @[ group_triangles[group] ? geometry : cutouts ];
 		if (group_triangles[group] == rt.body_counts[group][0] && cutout_fill[group] == rt.body_counts[group][1] &&
-			rt.body_age[group] < 60)
+			rt.body_age[group] < 30 && body_moved(ring, group, group_triangles[group], cutout_fill[group]) < 1.0f)
 		{
-			int last = (ring + 2) % 3;
-
-			/* (the last frame's triangles: kept) */
-			if (!memcmp(rt.body_vertices[ring][group].contents, rt.body_vertices[last][group].contents,
-					(size_t)group_triangles[group] * 36) &&
-				!memcmp(rt.cut_vertices[ring][group].contents, rt.cut_vertices[last][group].contents,
-					(size_t)cutout_fill[group] * 36))
-			{
+			/* (the last frame's triangles: kept; moved a little - a
+			character's, animated: refitted. Moved more, or others in their
+			place - a full group's, as the camera goes: built anew, a refit's
+			boxes would span the level) */
+			if (body_moved(ring, group, group_triangles[group], cutout_fill[group]) == 0.0f)
 				rt.body_age[group] = 0;
-			}
 			else
 			{
 				[encoder refitAccelerationStructure:rt.bodies[group] descriptor:mesh destination:nil
@@ -2093,6 +2377,19 @@ int host_rt_trace(const float *camera, int width, int height)
 
 			[encoder setBuffer:glowing_count ? rt.glowing : any offset:0 atIndex:16];
 			[encoder setBytes:&glowing_count length:sizeof(glowing_count) atIndex:17];
+			/* (the light grid, when it is of these glowing triangles) */
+			@synchronized (rt.queue)
+			{
+				BOOL gridded = glowing_count && rt.grid_info && rt.grid_glowing == rt.glowing && !getenv("HALO_RT_NO_GRID");
+				static const float none[8] = { 0 };
+
+				if (gridded)
+					[encoder setBuffer:rt.grid_info offset:0 atIndex:28];
+				else
+					[encoder setBytes:none length:sizeof(none) atIndex:28];
+				[encoder setBuffer:gridded ? rt.grid_cells : any offset:0 atIndex:29];
+				[encoder setBuffer:gridded ? rt.grid_entries : any offset:0 atIndex:30];
+			}
 		}
 		[encoder setTexture:gi_ready ? rt.atlas : rt.textures[1] atIndex:3];
 		[encoder setTexture:gi_ready ? rt.history[rt.history_index] : rt.textures[1] atIndex:5];

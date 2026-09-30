@@ -343,6 +343,19 @@ static const char inject_source[] =
 	"			total += w;\n"
 	"		}\n"
 	/* (split 2, HALO_RT_INJECT_DEBUG: green where there is traced light) */
+	/* (none there - a place the last frame did not see, beside an edge: the
+	   nearest like it, 5x5 about, less strictly by depth) */
+	"	for (int y = -2; y <= 2 && total <= 0.0; y++)\n"
+	"		for (int x = -2; x <= 2; x++)\n"
+	"		{\n"
+	"			ivec2 k = clamp(base + ivec2(x, y), lo, hi);\n"
+	"			float g = texelFetch(gbuffer_texture, k, 0).x;\n"
+	"			vec4 light = texelFetch(irradiance_texture, k, 0);\n"
+	"			if (g <= 0.0 || light.a < 0.5 || abs(g - pz) > pz * 0.2 + 0.1) continue;\n"
+	"			float w = 1.0 / (1.0 + float(x * x + y * y));\n"
+	"			sum += light.rgb * w;\n"
+	"			total += w;\n"
+	"		}\n"
 	"	if (split == 2) { result = vec4(0.0, total > 0.0 ? 1.0 : 0.0, 0.0, 1.0); return; }\n"
 	"	if (total <= 0.0) discard;\n"
 	"	result = vec4(min(sum / total, vec3(1.0)), 1.0);\n"
@@ -1631,10 +1644,25 @@ static int denoise_traced_light(GLuint world_results, const float *uniforms, int
 multiply them in (render.c): with display.ray_tracing_gi, the rays traced
 now, and their light put in the light buffer in place of the game's on the
 level's pixels, for the textures to multiply as the lightmaps' */
+int halo_ray_traced_lightmaps_hidden(void)
+{
+#ifdef HALO_MACOS
+	/* (HALO_RT_KEEP_LIGHTMAPS: the traced light in their place, as before;
+	and the split and its debugging keep them, for the left half) */
+	return ray.initialized && ray.enabled && !ray.failed && ray.gi && ray.hardware && ray.inject_program &&
+		ray.drawn_level && ray.gi_previous && (ray.light_stages & 4) && !ray.gi_split &&
+		!getenv("HALO_RT_INJECT_DEBUG") && !getenv("HALO_RT_KEEP_LIGHTMAPS");
+#else
+	return 0;
+#endif
+}
+
 void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up)
 {
 #ifdef HALO_MACOS
+	int adding = halo_ray_traced_lightmaps_hidden();
+
 	GLuint color, depth;
 	int width, height, viewport[4];
 	float uniforms[16], cameras[32], right[3], length;
@@ -1760,7 +1788,16 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	glBindSampler(5, 0);
 	glUniform1i(ray.inject_objects, 5);
 	glUniform1i(ray.inject_split, getenv("HALO_RT_INJECT_DEBUG") ? 2 : ray.gi_split);
+	/* (added to the self-illumination and the light decals, the lightmaps
+	left out; or in the lightmaps' light's place) */
+	if (adding)
+	{
+		glEnable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_ONE, GL_ONE);
+	}
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDisable(GL_BLEND);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	/* (the second target off again: the output framebuffer is the
 	composite's too) */

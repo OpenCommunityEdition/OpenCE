@@ -17,6 +17,11 @@ lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
 lights): the occlusion darkens only the lightmaps' share; 2: the objects
 drawn, before the level (their pixels take the sun's traced shadows) */
 void halo_ray_traced_light_stage(int stage);
+/* whether the level's lightmaps are left out of the light buffer this
+frame (the traced light is added in their place, after the light decals):
+the lightmap pass draws the self-illumination alone, and the game's
+unshadowed dynamic lights on the level are not drawn (the rays trace them) */
+int halo_ray_traced_lightmaps_hidden(void);
 /* an object's light, as the game samples it from the lightmap under it
 (object_lights.c): the colour, the way it comes from and how much from that
 way, replaced by the traced light's probe near the point, if there is one

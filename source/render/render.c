@@ -342,7 +342,9 @@ static void render_window(
 		rasterizer_lens_flares_submit_occlusion_tests();
 		render_object_shadows();
 		halo_ray_traced_light_stage(0);
-		lights_render_diffuse();
+		/* (port: the traced lights, shadowed, in their place) */
+		if (!halo_ray_traced_lightmaps_hidden())
+			lights_render_diffuse();
 
 		rasterizer_decals_begin(_decal_layer_light);
 		for (rendered_cluster_index = 0;

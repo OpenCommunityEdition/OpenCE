@@ -1172,6 +1172,13 @@ typedef char ray_level_shader_primary_offset_assert[
 typedef char ray_level_shader_self_illumination_map_offset_assert[
 	offsetof(struct ray_level_shader_environment, self_illumination_map) == 0x254 ? 1 : -1];
 
+/* the light a shader's radiosity power gives off, as the rays take it: its
+power is all it gives off, each way together, and the rays take the light
+one way - pi times it. (Against the lightmaps, the exposure then: Chill Out,
+lit by its panels alone, about 1.3; c10's halls about 3; b30 outdoors, lit
+by the sun, 1.1) */
+#define RAY_RADIOSITY_POWER_SCALE 3.14159265f
+
 /* how bright a self-illuminated surface's light is, of its colour (a panel
 drawn at full brightness lights what faces it, near, about as much) */
 #define RAY_SELF_ILLUMINATION_POWER 4.0f
@@ -1407,9 +1414,12 @@ static void level_build(const struct structure_bsp *bsp)
 			out[4] = out[5] = out[6] = 0.0f;
 			if (shader && shader->base.radiosity.power > 0.0f)
 			{
-				out[4] = shader->base.radiosity.color_of_emitted_light.red * shader->base.radiosity.power;
-				out[5] = shader->base.radiosity.color_of_emitted_light.green * shader->base.radiosity.power;
-				out[6] = shader->base.radiosity.color_of_emitted_light.blue * shader->base.radiosity.power;
+				out[4] = shader->base.radiosity.color_of_emitted_light.red * shader->base.radiosity.power *
+					RAY_RADIOSITY_POWER_SCALE;
+				out[5] = shader->base.radiosity.color_of_emitted_light.green * shader->base.radiosity.power *
+					RAY_RADIOSITY_POWER_SCALE;
+				out[6] = shader->base.radiosity.color_of_emitted_light.blue * shader->base.radiosity.power *
+					RAY_RADIOSITY_POWER_SCALE;
 			}
 			out[7] = level.pages[lightmap_index] ? (float)lightmap_index : -1.0f;
 			level.base_maps[level.material_count] = NULL;
@@ -1675,6 +1685,20 @@ static void level_build(const struct structure_bsp *bsp)
 				platform_log("ray tracing: glowing material %s: %.2f, %ld vertices about %.1f %.1f %.1f",
 					material->shader.index != NONE ? tag_get_name(material->shader.index) : "?", best,
 					(long)material->vertices.count, center[0], center[1], center[2]);
+				/* (and its first vertex, and the way it faces - its packed normal,
+				11, 11 and 10 bits: for test cameras in front of it) */
+				if (vertices && material->vertices.count > 0)
+				{
+					const float *point = (const float *)vertices;
+					unsigned long packed = *(const unsigned long *)(vertices + 12);
+					long x = (long)(packed & 0x7FF), y = (long)((packed >> 11) & 0x7FF), z = (long)(packed >> 22);
+
+					x = x >= 1024 ? x - 2048 : x;
+					y = y >= 1024 ? y - 2048 : y;
+					z = z >= 512 ? z - 1024 : z;
+					platform_log("ray tracing:   a vertex %.2f %.2f %.2f facing %.2f %.2f %.2f", point[0], point[1], point[2],
+						(float)x / 1023.0f, (float)y / 1023.0f, (float)z / 511.0f);
+				}
 			}
 			threshold = best;
 			logged++;
