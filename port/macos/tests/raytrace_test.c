@@ -1,11 +1,34 @@
 /*
 RAYTRACE_TEST.C
 
-Draws a scene with a known depth buffer (a floor, a wall and a box, with
-the game's depth convention: 0 at the near plane, rows from the top) into
-textures like the game's targets, runs port/linux/src/raytrace_gl.c on it
-through ANGLE, as the macOS port does, and writes the picture before and
-after, and the pass's occlusion and depth views, as PPM files.
+Draws a scene as the game draws its frame, into textures like the game's
+targets, and runs port/linux/src/raytrace_gl.c on it through ANGLE, as the
+macOS port does:
+
+1. the light: the level's baked light (the lightmaps: a sky's ambient and
+   the sun), and the objects, finished (the game draws them first);
+2. the dynamic lights, added: a flashlight from the camera and a plasma
+   bolt's blue light (the game's lights_render_diffuse);
+3. the level's textures, multiplied in (structure_render_diffuse_texture).
+
+The ray-traced lighting takes the light between the stages
+(halo_ray_traced_light_stage), and runs after the three.
+
+The scene: a bumpy ground, a back wall, a red wall at the left, an
+overhang on a pillar and a crate (the level: in Metal's acceleration
+structure), and two marines (objects: not in it), one under the overhang
+and one in the open. The pictures, as PPM files:
+
+- raytrace_off: without the ray-traced lighting;
+- raytrace_after: with it;
+- raytrace_occlusion, raytrace_depth: what it uses;
+- raytrace_undivided: the occlusion over all the light, the dynamic lights'
+  too (as before the stages);
+- raytrace_sun_0 to _3: the sun from the left, high, from the right and
+  low behind the overhang (the marine under it in its shadow).
+
+RT_BENCH=<frames> times the frame with and without the lighting;
+RT_DENSE=1 makes the ground about 100,000 triangles (a level's size).
 
 Built and run by port/macos/tests/run_raytrace_test.sh.
 */
@@ -41,25 +64,19 @@ void host_logf(int priority, const char *format, ...)
 #define FAR 1024.0f
 #define FIELD_OF_VIEW 1.22f
 
-static const char *ray_tracing_mode = "on";
+/* the direction to the sun in the world (right-handed, z up; the camera at
+the origin looks along +y) */
+static float sun_world[3] = { 0.5f, -0.4f, 0.77f };
 
-/* the scene in the game's world: right-handed, z up; the camera at the
-origin looks along +y (view x, y up, z forward -> world x, z, y) */
-static float world_vertices[4096 * 3];
-/* 32-bit, as the guest's unsigned long is (the host reads them so) */
-static unsigned int world_indices[4096];
-
-/* the sun: high, from the right and behind the camera */
 unsigned char halo_ray_tracing_sun(float *direction)
 {
-	direction[0] = 0.5f;
-	direction[1] = -0.4f;
-	direction[2] = 0.77f;
+	float length = sqrtf(sun_world[0] * sun_world[0] + sun_world[1] * sun_world[1] + sun_world[2] * sun_world[2]);
+
+	direction[0] = sun_world[0] / length;
+	direction[1] = sun_world[1] / length;
+	direction[2] = sun_world[2] / length;
 	return 1;
 }
-
-unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
-	long *triangle_count);
 
 void platform_log(const char *format, ...)
 {
@@ -73,7 +90,10 @@ void platform_log(const char *format, ...)
 
 const char *config_string(const char *name)
 {
-	return !strcmp(name, "display.ray_tracing") ? ray_tracing_mode : "";
+	/* RT_MODE=screen: without Metal's rays */
+	if (!strcmp(name, "display.ray_tracing"))
+		return getenv("RT_MODE") ? getenv("RT_MODE") : "on";
+	return "";
 }
 
 double config_real(const char *name)
@@ -110,12 +130,16 @@ void xgpu_gl_bind_device_vertex_array(void)
 {
 }
 
+/* ---------- the scene, in view space: x right, y up, z into the screen */
+
 static const char scene_vertex[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
 	"in vec3 position;\n"
-	"in vec3 color;\n"
-	"out vec3 shade;\n"
+	"in vec4 color;\n"
+	"out vec3 view;\n"
+	"out vec3 albedo;\n"
+	"flat out float kind;\n"
 	"uniform vec4 camera;\n" /* near, far, tan(fov/2), aspect */
 	"void main()\n"
 	"{\n"
@@ -125,84 +149,180 @@ static const char scene_vertex[] =
 	"	float depth = camera.y / (camera.y - camera.x) * (1.0 - camera.x / z);\n"
 	/* rows from the top, as the game's targets hold them */
 	"	gl_Position = vec4(ndc.x * z, -ndc.y * z, (depth * 2.0 - 1.0) * z, z);\n"
-	"	shade = color;\n"
+	"	view = position;\n"
+	"	albedo = color.rgb;\n"
+	"	kind = color.a;\n"
 	"}\n";
 
+/* pass 0: the light (the level's) or the finished colour (the objects');
+1: the dynamic lights, added; 2: the level's textures, multiplied in */
 static const char scene_pixel[] =
 	"#version 300 es\n"
 	"precision highp float;\n"
-	"in vec3 shade;\n"
+	"in vec3 view;\n"
+	"in vec3 albedo;\n"
+	"flat in float kind;\n"
+	"uniform int pass;\n"
+	"uniform vec4 sun;\n"
 	"out vec4 result;\n"
-	"void main() { result = vec4(shade, 1.0); }\n";
+	"void main()\n"
+	"{\n"
+	"	vec3 N = normalize(cross(dFdx(view), dFdy(view)));\n"
+	"	if (dot(N, view) > 0.0) N = -N;\n"
+	"	vec3 ambient = vec3(0.30, 0.33, 0.40);\n"
+	"	vec3 sunlight = vec3(0.75, 0.70, 0.60) * max(dot(N, sun.xyz), 0.0);\n"
+	"	if (pass == 0)\n"
+	"	{\n"
+	"		vec3 light = ambient + sunlight;\n"
+	"		result = vec4(kind > 0.5 ? albedo * light : light, 1.0);\n"
+	"	}\n"
+	"	else if (pass == 1)\n"
+	"	{\n"
+	/* the flashlight: a cone from the camera, a little below it */
+	"		vec3 from = view - vec3(0.0, -0.2, 0.0);\n"
+	"		float distance = length(from);\n"
+	"		vec3 axis = normalize(vec3(-3.3, -0.9, 9.0) - vec3(0.0, -0.2, 0.0));\n"
+	"		float cone = smoothstep(0.93, 0.975, dot(from / distance, axis));\n"
+	"		vec3 flashlight = vec3(1.0, 0.95, 0.8) * 1.4 * cone * max(dot(N, -from / distance), 0.0) /\n"
+	"			(1.0 + distance * distance * 0.01);\n"
+	/* the plasma bolt's light: blue, near the back left corner */
+	"		vec3 to = vec3(-3.0, -0.4, 14.5) - view;\n"
+	"		float d = length(to);\n"
+	"		vec3 plasma = vec3(0.25, 0.55, 1.6) * max(dot(N, to / d), 0.0) * max(1.0 - d / 4.5, 0.0);\n"
+	"		result = vec4(flashlight + plasma, 1.0);\n"
+	"	}\n"
+	"	else\n"
+	"	{\n"
+	/* a texture: a check and a little grain */
+	"		vec2 cell = floor(vec2(view.x + view.y, view.z + view.y) * 2.0);\n"
+	"		float check = mod(cell.x + cell.y, 2.0) * 0.12;\n"
+	"		float grain = fract(sin(dot(floor(view.xz * 16.0), vec2(12.9898, 78.233))) * 43758.5453) * 0.08;\n"
+	"		result = vec4(albedo * (0.84 + check + grain), 1.0);\n"
+	"	}\n"
+	"}\n";
 
-struct vertex { float x, y, z, r, g, b; };
+struct vertex { float x, y, z, r, g, b, kind; };
 
-static int vertex_count;
-static struct vertex vertices[4096];
-static void build_scene(void);
-static int vertex_count_scene(void);
-static const struct vertex *vertices_scene(void);
+static struct vertex *vertices;
+/* each vertex's triangle's outward normal (view space), for the level's
+triangles' winding */
+static float *outwards;
+static int vertex_count, vertex_capacity, structure_vertex_count;
 
-static void quad(const float *a, const float *b, const float *c, const float *d, float r, float g, float bl)
+static void add_triangle(const float *a, const float *b, const float *c, const float *albedo, float kind,
+	const float *outward)
 {
-	const float *corners[6] = { a, b, c, a, c, d };
+	const float *corners[3] = { a, b, c };
 	int index;
 
-	for (index = 0; index < 6; index++)
+	if (vertex_count + 3 > vertex_capacity)
 	{
-		struct vertex *v = &vertices[vertex_count++];
+		vertex_capacity = vertex_capacity ? vertex_capacity * 2 : 4096;
+		vertices = realloc(vertices, (size_t)vertex_capacity * sizeof(*vertices));
+		outwards = realloc(outwards, (size_t)vertex_capacity * 3 * sizeof(float));
+	}
+	for (index = 0; index < 3; index++)
+	{
+		struct vertex *v = &vertices[vertex_count];
 
 		v->x = corners[index][0];
 		v->y = corners[index][1];
 		v->z = corners[index][2];
-		v->r = r;
-		v->g = g;
-		v->b = bl;
+		v->r = albedo[0];
+		v->g = albedo[1];
+		v->b = albedo[2];
+		v->kind = kind;
+		memcpy(&outwards[vertex_count * 3], outward, 3 * sizeof(float));
+		vertex_count++;
 	}
 }
 
-/* view space: x right, y up, z into the screen */
-static void build_scene(void)
+static void add_quad(const float *a, const float *b, const float *c, const float *d, const float *albedo, float kind,
+	const float *outward)
 {
+	add_triangle(a, b, c, albedo, kind, outward);
+	add_triangle(a, c, d, albedo, kind, outward);
+}
+
+static void add_box(float x0, float y0, float z0, float x1, float y1, float z1, const float *albedo, float kind)
+{
+	float p[8][3];
+	static const float normals[6][3] = { { -1, 0, 0 }, { 1, 0, 0 }, { 0, -1, 0 }, { 0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 } };
+	static const int faces[6][4] = { { 0, 2, 6, 4 }, { 1, 5, 7, 3 }, { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, { 0, 1, 3, 2 },
+		{ 4, 6, 7, 5 } };
+	int corner, face;
+
+	for (corner = 0; corner < 8; corner++)
+	{
+		p[corner][0] = corner & 1 ? x1 : x0;
+		p[corner][1] = corner & 2 ? y1 : y0;
+		p[corner][2] = corner & 4 ? z1 : z0;
+	}
+	for (face = 0; face < 6; face++)
+		add_quad(p[faces[face][0]], p[faces[face][1]], p[faces[face][2]], p[faces[face][3]], albedo, kind, normals[face]);
+}
+
+static float ground(float x, float z)
+{
+	return -1.0f + 0.18f * sinf(x * 1.1f) * cosf(z * 0.8f) + 0.08f * sinf(x * 3.1f + z * 2.3f);
+}
+
+static void build_scene(int dense)
+{
+	static const float up[3] = { 0, 1, 0 }, toward[3] = { 0, 0, -1 }, right[3] = { 1, 0, 0 };
+	static const float grass[3] = { 0.45f, 0.55f, 0.35f }, stone[3] = { 0.45f, 0.5f, 0.62f }, red[3] = { 0.8f, 0.22f, 0.16f };
+	static const float concrete[3] = { 0.7f, 0.68f, 0.62f }, crate[3] = { 0.85f, 0.7f, 0.35f };
+	static const float armour[3] = { 0.35f, 0.55f, 0.3f }, orange[3] = { 0.9f, 0.55f, 0.2f };
+	int columns = dense ? 200 : 60, rows = dense ? 250 : 75, i, j;
+	float x0 = -10, x1 = 10, z0 = 1, z1 = 26;
+
 	vertex_count = 0;
-	float f0[3] = { -8, -1, 1 }, f1[3] = { 8, -1, 1 }, f2[3] = { 8, -1, 20 }, f3[3] = { -8, -1, 20 };
-	float w0[3] = { -8, -1, 12 }, w1[3] = { 8, -1, 12 }, w2[3] = { 8, 5, 12 }, w3[3] = { -8, 5, 12 };
-	float s0[3] = { -3, -1, 3 }, s1[3] = { -3, -1, 12 }, s2[3] = { -3, 5, 12 }, s3[3] = { -3, 5, 3 };
-	/* a box on the floor */
-	float bx0 = 0.5f, bx1 = 2.0f, by0 = -1, by1 = 0.5f, bz0 = 5, bz1 = 6.5f;
-	float b000[3] = { bx0, by0, bz0 }, b100[3] = { bx1, by0, bz0 }, b110[3] = { bx1, by1, bz0 }, b010[3] = { bx0, by1, bz0 };
-	float b001[3] = { bx0, by0, bz1 }, b101[3] = { bx1, by0, bz1 }, b111[3] = { bx1, by1, bz1 }, b011[3] = { bx0, by1, bz1 };
+	/* the level: the ground */
+	for (j = 0; j < rows; j++)
+		for (i = 0; i < columns; i++)
+		{
+			float xa = x0 + (x1 - x0) * i / columns, xb = x0 + (x1 - x0) * (i + 1) / columns;
+			float za = z0 + (z1 - z0) * j / rows, zb = z0 + (z1 - z0) * (j + 1) / rows;
+			float a[3] = { xa, ground(xa, za), za }, b[3] = { xb, ground(xb, za), zb - (zb - za) };
+			float c[3] = { xb, ground(xb, zb), zb }, d[3] = { xa, ground(xa, zb), zb };
 
-	quad(f0, f1, f2, f3, 0.55f, 0.55f, 0.5f);
-	quad(w0, w1, w2, w3, 0.35f, 0.45f, 0.7f);
-	quad(s0, s1, s2, s3, 0.8f, 0.2f, 0.15f);
-	quad(b000, b100, b110, b010, 0.9f, 0.8f, 0.3f);
-	quad(b010, b110, b111, b011, 0.95f, 0.9f, 0.4f);
-	quad(b000, b010, b011, b001, 0.8f, 0.7f, 0.25f);
-	quad(b100, b101, b111, b110, 0.8f, 0.7f, 0.25f);
-}
+			add_quad(a, b, c, d, grass, 0, up);
+		}
+	/* the back wall, the red wall at the left */
+	{
+		float a[3] = { -10, -1.6f, 18 }, b[3] = { 10, -1.6f, 18 }, c[3] = { 10, 6, 18 }, d[3] = { -10, 6, 18 };
+		float e[3] = { -4, -1.6f, 3 }, f[3] = { -4, -1.6f, 18 }, g[3] = { -4, 5, 18 }, h[3] = { -4, 5, 3 };
 
-static int vertex_count_scene(void)
-{
-	if (!vertex_count)
-		build_scene();
-	return vertex_count;
-}
-
-static const struct vertex *vertices_scene(void)
-{
-	return vertices;
+		add_quad(a, b, c, d, stone, 0, toward);
+		add_quad(e, f, g, h, red, 0, right);
+	}
+	/* the overhang on its pillar, and a crate */
+	add_box(1, 2.2f, 8, 6, 2.6f, 13, concrete, 0);
+	add_box(5.3f, -1.6f, 8, 6, 2.2f, 8.7f, concrete, 0);
+	add_box(-1, -1.6f, 5, 0.5f, 0.3f, 6.5f, crate, 0);
+	structure_vertex_count = vertex_count;
+	/* the objects: a marine under the overhang, one in the open */
+	add_box(3.2f, -1.0f, 10.2f, 3.8f, 0.8f, 10.8f, armour, 1);
+	add_box(-2.4f, -1.0f, 8.8f, -1.8f, 0.8f, 9.4f, orange, 1);
 }
 
 static GLuint program_from(const char *vertex_source, const char *pixel_source)
 {
 	GLuint vertex = glCreateShader(GL_VERTEX_SHADER), pixel = glCreateShader(GL_FRAGMENT_SHADER);
 	GLuint program = glCreateProgram();
+	GLint status = 0;
+	char log[4096];
 
 	glShaderSource(vertex, 1, &vertex_source, NULL);
 	glCompileShader(vertex);
 	glShaderSource(pixel, 1, &pixel_source, NULL);
 	glCompileShader(pixel);
+	glGetShaderiv(pixel, GL_COMPILE_STATUS, &status);
+	if (!status)
+	{
+		glGetShaderInfoLog(pixel, sizeof(log), NULL, log);
+		fprintf(stderr, "scene shader: %s\n", log);
+	}
 	glAttachShader(program, vertex);
 	glAttachShader(program, pixel);
 	glBindAttribLocation(program, 0, "position");
@@ -211,73 +331,126 @@ static GLuint program_from(const char *vertex_source, const char *pixel_source)
 	return program;
 }
 
-unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count, const unsigned long **indices,
+/* the level's triangles in the world (x, z, y of the view), wound
+counterclockwise around their outward normal, as raytrace_world.c has
+them */
+static float *world_vertices;
+static unsigned int *world_indices;
+
+unsigned long halo_ray_tracing_world(const float **world, long *world_vertex_count, const unsigned long **indices,
 	long *triangle_count)
 {
+	static unsigned long generation;
 	int index;
 
-	for (index = 0; index < vertex_count_scene(); index++)
+	if (!generation)
 	{
-		world_vertices[index * 3 + 0] = vertices_scene()[index].x;
-		world_vertices[index * 3 + 1] = vertices_scene()[index].z;
-		world_vertices[index * 3 + 2] = vertices_scene()[index].y;
-		world_indices[index] = (unsigned int)index;
-	}
-	/* each triangle facing the camera, counterclockwise from it, as the
-	level's face outwards (raytrace_world.c) */
-	for (index = 0; index + 2 < vertex_count_scene(); index += 3)
-	{
-		float *a = &world_vertices[index * 3], *b = a + 3, *c = a + 6;
-		float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
-		float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
-
-		if (n[0] * -a[0] + n[1] * -a[1] + n[2] * -a[2] < 0.0f)
+		world_vertices = malloc((size_t)structure_vertex_count * 3 * sizeof(float));
+		world_indices = malloc((size_t)structure_vertex_count * sizeof(unsigned int));
+		for (index = 0; index < structure_vertex_count; index++)
 		{
-			unsigned int swap = world_indices[index + 1];
-
-			world_indices[index + 1] = world_indices[index + 2];
-			world_indices[index + 2] = swap;
+			world_vertices[index * 3 + 0] = vertices[index].x;
+			world_vertices[index * 3 + 1] = vertices[index].z;
+			world_vertices[index * 3 + 2] = vertices[index].y;
+			world_indices[index] = (unsigned int)index;
 		}
+		for (index = 0; index + 2 < structure_vertex_count; index += 3)
+		{
+			float *a = &world_vertices[index * 3], *b = a + 3, *c = a + 6;
+			float u[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, v[3] = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
+			float n[3] = { u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0] };
+			const float *o = &outwards[index * 3];
+
+			if (n[0] * o[0] + n[1] * o[2] + n[2] * o[1] < 0.0f)
+			{
+				unsigned int swap = world_indices[index + 1];
+
+				world_indices[index + 1] = world_indices[index + 2];
+				world_indices[index + 2] = swap;
+			}
+		}
+		generation = 1;
 	}
-	*vertices = world_vertices;
-	*vertex_count = vertex_count_scene();
+	*world = world_vertices;
+	*world_vertex_count = structure_vertex_count;
 	*indices = (const unsigned long *)world_indices;
-	*triangle_count = vertex_count_scene() / 3;
-	return 1;
+	*triangle_count = structure_vertex_count / 3;
+	return generation;
 }
 
-static void draw_scene(void)
-{
-	static GLuint program, buffer, array;
-	float camera[4] = { NEAR, FAR, tanf(FIELD_OF_VIEW * 0.5f), (float)WIDTH / HEIGHT };
+static GLuint program, buffer, array;
 
+static void draw_pass(int pass)
+{
+	float camera[4] = { NEAR, FAR, tanf(FIELD_OF_VIEW * 0.5f), (float)WIDTH / HEIGHT };
+	float length = sqrtf(sun_world[0] * sun_world[0] + sun_world[1] * sun_world[1] + sun_world[2] * sun_world[2]);
+	float sun_view[4] = { sun_world[0] / length, sun_world[2] / length, sun_world[1] / length, 0.0f };
+
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glViewport(0, 0, WIDTH, HEIGHT);
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_STENCIL_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	glUseProgram(program);
+	glUniform4fv(glGetUniformLocation(program, "camera"), 1, camera);
+	glUniform4fv(glGetUniformLocation(program, "sun"), 1, sun_view);
+	glUniform1i(glGetUniformLocation(program, "pass"), pass);
+	glBindVertexArray(array);
+	if (pass == 0)
+	{
+		glDisable(GL_BLEND);
+		glDepthMask(GL_TRUE);
+		glDepthFunc(GL_LEQUAL);
+		glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
+		glClearDepthf(1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+		return;
+	}
+	/* the level's surfaces only, where they are seen */
+	glEnable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_EQUAL);
+	if (pass == 1)
+		glBlendFunc(GL_ONE, GL_ONE);
+	else
+		glBlendFunc(GL_DST_COLOR, GL_ZERO);
+	glDrawArrays(GL_TRIANGLES, 0, structure_vertex_count);
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LEQUAL);
+}
+
+static const float camera_position[3] = { 0, 0, 0 }, camera_forward[3] = { 0, 1, 0 }, camera_up[3] = { 0, 0, 1 };
+
+/* a frame, as the game draws it; lighting: 0 none, 1 the ray-traced
+lighting, 2 it without the light's stages */
+static void draw_frame(int lighting)
+{
 	if (!program)
 	{
 		program = program_from(scene_vertex, scene_pixel);
-		vertex_count_scene();
 		glGenVertexArrays(1, &array);
 		glBindVertexArray(array);
 		glGenBuffers(1, &buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, buffer);
-		glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(struct vertex), vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertex_count * sizeof(struct vertex), vertices, GL_STATIC_DRAW);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex), (void *)0);
 		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex), (void *)12);
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex), (void *)12);
 	}
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glViewport(0, 0, WIDTH, HEIGHT);
-	glDisable(GL_SCISSOR_TEST);
-	glClearColor(0.5f, 0.7f, 0.9f, 1.0f);
-	glClearDepthf(1.0f);
-	glEnable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-	glDepthFunc(GL_LEQUAL);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(program);
-	glUniform4fv(glGetUniformLocation(program, "camera"), 1, camera);
-	glBindVertexArray(array);
-	glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+	draw_pass(0);
+	if (lighting == 1)
+		halo_ray_traced_light_stage(0);
+	draw_pass(1);
+	if (lighting == 1)
+		halo_ray_traced_light_stage(1);
+	draw_pass(2);
+	if (lighting)
+		halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
 }
 
 static void save(const char *path)
@@ -297,13 +470,28 @@ static void save(const char *path)
 	printf("wrote %s\n", path);
 }
 
-static const float camera_position[3] = { 0, 0, 0 }, camera_forward[3] = { 0, 1, 0 }, camera_up[3] = { 0, 0, 1 };
+static double bench(int lighting, int frames)
+{
+	uint64_t start;
+	int frame;
+
+	draw_frame(lighting);
+	glFinish();
+	start = SDL_GetTicksNS();
+	for (frame = 0; frame < frames; frame++)
+		draw_frame(lighting);
+	glFinish();
+	return (double)(SDL_GetTicksNS() - start) / 1e6 / frames;
+}
 
 int main(int argc, char **argv)
 {
 	SDL_Window *window;
 	SDL_GLContext context;
 	char path[1024];
+	static const float suns[4][3] = { { -0.8f, 0.1f, 0.55f }, { 0.1f, 0.2f, 1.0f }, { 0.8f, -0.1f, 0.5f },
+		{ -0.05f, 0.9f, 0.45f } };
+	int index;
 
 	if (argc < 2)
 	{
@@ -344,35 +532,44 @@ int main(int argc, char **argv)
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_texture, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
 
-	draw_scene();
-	save("raytrace_before.ppm");
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
-	save("raytrace_after.ppm");
-	/* the pass's views: occlusion, then depth (F9 turns it off and on, and
-	the mode is read again) */
-	draw_scene();
-	halo_ray_tracing_debug_mode(2);
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
-	save("raytrace_occlusion.ppm");
-	draw_scene();
-	halo_ray_tracing_debug_mode(3);
-	halo_ray_traced_lighting(NEAR, FAR, FIELD_OF_VIEW, camera_position, camera_forward, camera_up);
-	save("raytrace_depth.ppm");
-#ifdef HALO_MACOS
-	{
-		/* the depth and normals the rays start from, and the rays'
-		results, across row 150 */
-		extern int host_rt_debug_read(int which, int x, int y, int count, float *values);
-		static float row[WIDTH * 4], results[WIDTH * 4];
-		int x;
+	build_scene(getenv("RT_DENSE") && atoi(getenv("RT_DENSE")));
+	printf("the scene: %d triangles in the level, %d in the objects\n", structure_vertex_count / 3,
+		(vertex_count - structure_vertex_count) / 3);
 
-		host_rt_debug_read(0, 0, 166, WIDTH / 2, row);
-		host_rt_debug_read(1, 0, 166, WIDTH / 2, results);
-		for (x = 60; x < 130; x += 8)
-			printf("half row 166 x %d: z %.4f normal %.3f %.3f %.3f  visibility %.3f\n", x, row[x * 4], row[x * 4 + 1],
-				row[x * 4 + 2], row[x * 4 + 3], results[x * 4]);
+	if (getenv("RT_BENCH"))
+	{
+		int frames = atoi(getenv("RT_BENCH"));
+
+		if (frames < 1)
+			frames = 100;
+		halo_ray_tracing_debug_mode(1);
+		printf("the frame without the lighting: %.3f ms\n", bench(0, frames));
+		printf("the frame with the lighting: %.3f ms\n", bench(1, frames));
+		SDL_Quit();
+		return 0;
 	}
-#endif
+
+	draw_frame(0);
+	save("raytrace_off.ppm");
+	halo_ray_tracing_debug_mode(1);
+	draw_frame(1);
+	save("raytrace_after.ppm");
+	draw_frame(2);
+	save("raytrace_undivided.ppm");
+	halo_ray_tracing_debug_mode(2);
+	draw_frame(1);
+	save("raytrace_occlusion.ppm");
+	halo_ray_tracing_debug_mode(3);
+	draw_frame(1);
+	save("raytrace_depth.ppm");
+	halo_ray_tracing_debug_mode(1);
+	for (index = 0; index < 4; index++)
+	{
+		memcpy(sun_world, suns[index], sizeof(sun_world));
+		draw_frame(1);
+		snprintf(path, sizeof(path), "raytrace_sun_%d.ppm", index);
+		save(path);
+	}
 	printf("GL error %#x\n", glGetError());
 	SDL_Quit();
 	return 0;

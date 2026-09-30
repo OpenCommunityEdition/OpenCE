@@ -12,6 +12,10 @@ camera's clip planes, vertical field of view (radians), and position,
 forward and up vectors in the world (3 floats each) */
 void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up);
+/* the light in the window before and after the dynamic lights (0: the
+lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
+lights): the occlusion darkens only the lightmaps' share */
+void halo_ray_traced_light_stage(int stage);
 /* F9 (sdl_platform.c) */
 /* returns what it is now, as text */
 const char *halo_ray_tracing_toggle(void);

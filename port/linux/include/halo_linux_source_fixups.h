@@ -46,6 +46,10 @@ void halo_screen_ui_offset(unsigned char centered);
 (port/linux/src/raytrace_gl.c) */
 void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up);
+/* the light in the window before and after the dynamic lights (0: the
+lightmaps, 1: with the flashlight's, the plasma's and the other dynamic
+lights): the occlusion darkens only the lightmaps' share */
+void halo_ray_traced_light_stage(int stage);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

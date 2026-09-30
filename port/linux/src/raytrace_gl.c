@@ -77,6 +77,11 @@ static struct
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
 	GLint composite_debug, composite_rt, composite_rt_enabled;
+	GLint composite_baked, composite_lit, composite_light_split;
+	/* the light before and after the dynamic lights (half resolution), and
+	the stages taken this frame (bits 0 and 1) */
+	GLuint baked_texture, lit_texture, light_framebuffer;
+	int light_stages;
 	/* the world-space rays (macOS: Metal) */
 	int hardware;
 	GLuint gbuffer_program, gbuffer_framebuffer;
@@ -161,8 +166,13 @@ static const char trace_source[] =
 	   edges do not bend it */
 	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n"
 	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n"
-	"	vec3 dx = abs(r.z - P.z) < abs(P.z - l.z) ? r - P : P - l;\n"
-	"	vec3 dy = abs(t.z - P.z) < abs(P.z - b.z) ? t - P : P - b;\n"
+	/* the side nearer in depth (not across an edge), inside the viewport:
+	   at its border, the side outside is the pixel itself */
+	"	ivec2 low = ivec2(u[1].xy), high = ivec2(u[1].xy + u[1].zw) - 1;\n"
+	"	bool right = p.x >= high.x ? false : p.x <= low.x ? true : abs(r.z - P.z) < abs(P.z - l.z);\n"
+	"	bool top = p.y >= high.y ? false : p.y <= low.y ? true : abs(t.z - P.z) < abs(P.z - b.z);\n"
+	"	vec3 dx = right ? r - P : P - l;\n"
+	"	vec3 dy = top ? t - P : P - b;\n"
 	"	vec3 N = normalize(cross(dy, dx));\n"
 	"	if (dot(N, P) > 0.0) N = -N;\n"
 	"	float jitter = noise(gl_FragCoord.xy);\n"
@@ -247,8 +257,13 @@ static const char gbuffer_source[] =
 	"	vec3 P = position_at(p);\n"
 	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n"
 	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n"
-	"	vec3 dx = abs(r.z - P.z) < abs(P.z - l.z) ? r - P : P - l;\n"
-	"	vec3 dy = abs(t.z - P.z) < abs(P.z - b.z) ? t - P : P - b;\n"
+	/* the side nearer in depth (not across an edge), inside the viewport:
+	   at its border, the side outside is the pixel itself */
+	"	ivec2 low = ivec2(u[1].xy), high = ivec2(u[1].xy + u[1].zw) - 1;\n"
+	"	bool right = p.x >= high.x ? false : p.x <= low.x ? true : abs(r.z - P.z) < abs(P.z - l.z);\n"
+	"	bool top = p.y >= high.y ? false : p.y <= low.y ? true : abs(t.z - P.z) < abs(P.z - b.z);\n"
+	"	vec3 dx = right ? r - P : P - l;\n"
+	"	vec3 dy = top ? t - P : P - b;\n"
 	"	vec3 N = normalize(cross(dy, dx));\n"
 	"	if (dot(N, P) > 0.0) N = -N;\n"
 	"	result = vec4(P.z, N);\n"
@@ -262,6 +277,9 @@ static const char composite_source[] =
 	"uniform sampler2D rt_texture;\n"
 	"uniform int rt_enabled;\n"
 	"uniform int debug_mode;\n"
+	"uniform sampler2D baked_texture;\n"
+	"uniform sampler2D lit_texture;\n"
+	"uniform int light_split;\n"
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
@@ -270,15 +288,19 @@ static const char composite_source[] =
 	"	float d = depth_at(p);\n"
 	"	if (debug_mode == 3) { float z = linear_depth(d); result = vec4(vec3(fract(z / 10.0)), 1.0); return; }\n"
 	"	if (d >= 0.99999) { result = scene; return; }\n"
-	/* the occlusion blurred over 4x4 pixels of similar depth */
+	/* the occlusion blurred over 4x4 of the rays' pixels (8x8 of the
+	   window's at half resolution: all 16 of the rays' sets of directions)
+	   of similar depth */
 	"	float z = linear_depth(d);\n"
 	"	float total = 0.0, visibility = 0.0;\n"
 	"	vec3 light = vec3(0.0);\n"
 	"	for (int y = -2; y < 2; y++)\n"
 	"		for (int x = -2; x < 2; x++)\n"
 	"		{\n"
-	"			ivec2 q = clamp(p + ivec2(x, y), ivec2(u[1].xy), ivec2(u[1].xy + u[1].zw) - 1);\n"
-	"			float w = 1.0 / (1e-3 + abs(linear_depth(texelFetch(depth_texture, q, 0).r) - z) / z * 40.0);\n"
+	"			ivec2 q = clamp(p + ivec2(x, y) * TRACE_SCALE, ivec2(u[1].xy), ivec2(u[1].xy + u[1].zw) - 1);\n"
+	/* (a pixel 10% nearer or farther counts a quarter; across an edge,
+	   hardly) */
+	"			float w = 1.0 / (1.0 + abs(linear_depth(texelFetch(depth_texture, q, 0).r) - z) / z * 30.0);\n"
 	"			vec4 e = texelFetch(effect_texture, q / TRACE_SCALE, 0);\n"
 	"			float v = e.a;\n"
 	/* the world's occlusion (Metal's rays) with the screen's (which also
@@ -290,6 +312,16 @@ static const char composite_source[] =
 	"		}\n"
 	"	visibility /= total;\n"
 	"	light /= total;\n"
+	/* the lightmaps' share of the light: the occlusion and the sun's
+	   shadows darken it, not the flashlight's or the other dynamic lights'
+	   (objects, drawn before the lightmaps, have it all) */
+	"	if (light_split != 0)\n"
+	"	{\n"
+	"		const vec3 luma = vec3(0.3, 0.59, 0.11);\n"
+	"		float baked = dot(texelFetch(baked_texture, p / TRACE_SCALE, 0).rgb, luma);\n"
+	"		float lit = dot(texelFetch(lit_texture, p / TRACE_SCALE, 0).rgb, luma);\n"
+	"		visibility = mix(1.0, visibility, lit > 0.004 ? clamp(baked / lit, 0.0, 1.0) : 1.0);\n"
+	"	}\n"
 	/* a traced reflection, where the camera sees what it hit, before the
 	   screen's */
 	"	if (rt_enabled != 0)\n"
@@ -393,6 +425,9 @@ static void initialize(void)
 	ray.composite_debug = glGetUniformLocation(ray.composite_program, "debug_mode");
 	ray.composite_rt = glGetUniformLocation(ray.composite_program, "rt_texture");
 	ray.composite_rt_enabled = glGetUniformLocation(ray.composite_program, "rt_enabled");
+	ray.composite_baked = glGetUniformLocation(ray.composite_program, "baked_texture");
+	ray.composite_lit = glGetUniformLocation(ray.composite_program, "lit_texture");
+	ray.composite_light_split = glGetUniformLocation(ray.composite_program, "light_split");
 #ifdef HALO_MACOS
 	/* "screen" keeps to the screen's rays */
 	if (strcmp(config_string("display.ray_tracing"), "screen") && host_rt_available())
@@ -412,6 +447,7 @@ static void initialize(void)
 	glGenFramebuffers(1, &ray.effect_framebuffer);
 	glGenFramebuffers(1, &ray.output_framebuffer);
 	glGenFramebuffers(1, &ray.source_framebuffer);
+	glGenFramebuffers(1, &ray.light_framebuffer);
 	platform_log("ray tracing: %s, %s (F9 switches it; occlusion %.2f, reflections %.2f, bounce %.2f)",
 		ray.enabled ? "on" : "off", ray.hardware ? "world-space rays (Metal) with the screen's" : "the screen's rays",
 		ray.occlusion_strength, ray.reflection_strength, ray.bounce_strength);
@@ -439,9 +475,14 @@ static void size_textures(int width, int height)
 	{
 		glDeleteTextures(1, &ray.scene_texture);
 		glDeleteTextures(1, &ray.effect_texture);
+		glDeleteTextures(1, &ray.baked_texture);
+		glDeleteTextures(1, &ray.lit_texture);
 	}
 	ray.scene_texture = make_texture(width, height);
 	ray.effect_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.baked_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.lit_texture = make_texture((width + TRACE_SCALE - 1) / TRACE_SCALE, (height + TRACE_SCALE - 1) / TRACE_SCALE);
+	ray.light_stages = 0;
 	ray.width = width;
 	ray.height = height;
 	glBindFramebuffer(GL_FRAMEBUFFER, ray.scene_framebuffer);
@@ -555,6 +596,37 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 }
 #endif
 
+void halo_ray_traced_light_stage(int stage)
+{
+	GLuint color, depth;
+	int width, height, viewport[4];
+
+	if (!ray.initialized)
+		initialize();
+	if (!ray.enabled || ray.failed || stage < 0 || stage > 1)
+		return;
+	if (!xgpu_current_targets(&color, &depth, &width, &height, viewport) || !color || viewport[2] < 16 ||
+		viewport[3] < 16)
+	{
+		return;
+	}
+	size_textures(width, height);
+	if (stage == 0)
+		ray.light_stages = 0;
+	/* the window's light, at half resolution */
+	glDisable(GL_SCISSOR_TEST);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, ray.source_framebuffer);
+	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, ray.light_framebuffer);
+	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+		stage == 0 ? ray.baked_texture : ray.lit_texture, 0);
+	glBlitFramebuffer(viewport[0], viewport[1], viewport[0] + viewport[2], viewport[1] + viewport[3],
+		viewport[0] / TRACE_SCALE, viewport[1] / TRACE_SCALE, (viewport[0] + viewport[2]) / TRACE_SCALE,
+		(viewport[1] + viewport[3]) / TRACE_SCALE, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	ray.light_stages |= 1 << stage;
+	xgpu_gl_state_invalidate();
+}
+
 void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of_view, const float *position,
 	const float *forward, const float *up)
 {
@@ -667,7 +739,17 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glBindSampler(3, 0);
 	glUniform1i(ray.composite_rt, 3);
 	glUniform1i(ray.composite_rt_enabled, world_results != 0);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, ray.baked_texture);
+	glBindSampler(4, 0);
+	glUniform1i(ray.composite_baked, 4);
+	glActiveTexture(GL_TEXTURE5);
+	glBindTexture(GL_TEXTURE_2D, ray.lit_texture);
+	glBindSampler(5, 0);
+	glUniform1i(ray.composite_lit, 5);
+	glUniform1i(ray.composite_light_split, ray.light_stages == 3);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+	ray.light_stages = 0;
 
 	/* the renderer's state is its own again */
 	glActiveTexture(GL_TEXTURE0);

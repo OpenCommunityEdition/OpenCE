@@ -183,6 +183,13 @@ rays from each pixel:
   pixel is in shadow. The level's own surfaces already have the sun's
   shadows in their lightmaps, so their pixels send no shadow ray.
 
+The occlusion and the sun's shadows darken the level's baked light (its
+lightmaps), not the flashlight's, the plasma's or the other dynamic
+lights': the game draws the lightmaps' light, adds the dynamic lights, then
+multiplies in the textures, and the lighting takes the light before and
+after the dynamic lights (`halo_ray_traced_light_stage` in
+`source/render/render.c`) to know each pixel's baked share.
+
 The rays are traced at half the resolution (a quarter of the pixels), then
 a blur that stops at edges in depth brings them to the full resolution.
 Metal traces 4 occlusion rays per pixel, on a pattern that changes every
@@ -219,8 +226,13 @@ bounce. Where Metal cannot trace rays, they are the only rays.
 | `"occlusion"`, `"depth"` | Show what the lighting uses. |
 
 `port/macos/tests/run_raytrace_test.sh` draws a test scene through the
-lighting on ANGLE, with Metal's rays, and writes the pictures to
-`build/macos/raytrace_test`.
+lighting on ANGLE, with Metal's rays, as the game draws its frame (the
+light, the dynamic lights, the textures), and writes the pictures to
+`build/macos/raytrace_test`: bumpy ground, walls, an overhang, a crate, two
+marines (objects, not in the level's rays), a flashlight, a plasma light,
+and the sun from four directions. `RT_BENCH=200` times the frame with and
+without the lighting; `RT_DENSE=1` makes the level about 100,000
+triangles; `RT_MODE=screen` leaves out Metal's rays.
 
 ## How the port operates
 
@@ -329,8 +341,10 @@ code for the window, the mouse, the keyboard and the first start.
 
 ## Find problems
 
-- `host.txt` in the game's folder is the log of the host. `debug.txt` is
-  the log of the game. Start `halo` in a terminal to see both.
+- `host.txt` in the game's folder is the log of the host, and, when the
+  game does not start from a terminal, of the game's port (for one, why
+  it quit: `window closed` is ⌘Q or the window's close button). `debug.txt`
+  is the log of the game. Start `halo` in a terminal to see both.
 - If the guest code stops, `host.txt` shows the registers and the frame
   chain. To find the functions, enter
   `llvm-symbolizer --obj=build/macos/Halo/halo_guest.elf <address>` with

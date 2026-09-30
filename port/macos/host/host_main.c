@@ -47,6 +47,8 @@ static char image_folder[1024];
 /* ---------- logging and termination */
 
 static FILE *log_file;
+/* stderr goes to host.txt too (not from a terminal: from Finder or open) */
+static int stderr_to_log;
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void host_log(int priority, const char *text)
@@ -55,7 +57,8 @@ void host_log(int priority, const char *text)
 	const char *name = priority >= 0 && priority <= 6 ? names[priority] : "";
 
 	pthread_mutex_lock(&log_lock);
-	fprintf(stderr, "halo host %s: %s\n", name, text);
+	if (!stderr_to_log)
+		fprintf(stderr, "halo host %s: %s\n", name, text);
 	if (log_file)
 	{
 		fprintf(log_file, "%s: %s\n", name, text);
@@ -360,6 +363,13 @@ int main(int argc, char *argv[])
 		host_fatal("cannot enter %s", host_data_root);
 	snprintf(path, sizeof(path), "%s/host.txt", host_data_root);
 	log_file = fopen(path, "w");
+	/* the game's own messages (platform_log: why it quit, for one) go to
+	stderr, which nothing shows unless a terminal started the game */
+	if (log_file && !isatty(STDERR_FILENO) && dup2(fileno(log_file), STDERR_FILENO) >= 0)
+	{
+		setvbuf(stderr, NULL, _IOLBF, 0);
+		stderr_to_log = 1;
+	}
 	host_logf(HOST_LOG_INFO, "Halo for macOS starting in %s", host_data_root);
 	host_install_signal_handlers();
 	load_angle();

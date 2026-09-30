@@ -18,7 +18,7 @@ clang -O2 -g -DHALO_GLES -DHALO_MACOS -fobjc-arc -Iport/macos/tests/shim -Iport/
 	-framework Metal -framework Foundation -o "$out/raytrace_test"
 cd "$out"
 ./raytrace_test "$OLDPWD/build/macos/third_party/angle-arm64"
-for picture in raytrace_before raytrace_after raytrace_occlusion raytrace_depth; do
-	sips -s format png "$picture.ppm" --out "$picture.png" > /dev/null
+for picture in *.ppm; do
+	sips -s format png "$picture" --out "${picture%.ppm}.png" > /dev/null
 done
 echo "pictures in $out"
