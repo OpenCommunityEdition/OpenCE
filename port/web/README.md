@@ -107,6 +107,8 @@ backgrounding, resize or controller connection. Test its input handling with
   stale: `--`). The host probes every three seconds and shares its measurements;
   changing hosts clears the previous measurements. Use the mouse wheel to
   change weapons.
+- Empty or whitespace-only player names receive a random, unique name from the
+  host, including players joining after the match starts.
 
 ## Online play
 

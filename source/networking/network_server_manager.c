@@ -1812,7 +1812,11 @@ boolean network_game_server_add_player_to_game(
 		network_game_server_next_team_index =
 			(network_game_server_next_team_index + 1) % NUMBER_OF_MULTIPLAYER_TEAMS;
 
+#ifdef HALO_WEB
+		if (network_game_player_name_is_blank(player->name))
+#else
 		if (!player->name[0])
+#endif
 			get_unique_random_name(server, player);
 
 		if (!player_name_is_unique(server, player->name))

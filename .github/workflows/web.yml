@@ -63,6 +63,7 @@ jobs:
           python3 tools/test_network_migration_checkpoint_runtime.py
           python3 tools/test_web_server_policy.py
           python3 tools/test_network_player_rejoin.py
+          python3 tools/test_web_player_names.py
           python3 tools/test_web_solo_host.py
           python3 tools/test_network_pending_rejoin.py
           python3 tools/test_network_client_update_lifecycle.py
