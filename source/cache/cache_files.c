@@ -615,6 +615,16 @@ boolean cache_files_give_time_to_precache(
 {
 	boolean result = FALSE;
 
+#ifdef HALO_LINUX
+	/* port: no map named yet is nothing to precache. A client joining over
+	the internet asks for its multiplayer map (network_game_client_update_precache_status)
+	before the host's settings name it: an empty name, which matched a cache
+	file slot not yet used, and once all six hold maps (two campaign levels,
+	the main menu and three multiplayer maps played) matched none, so was
+	taken for a map missing from the disc (the damaged disc error) */
+	if (!map_name || !map_name[0])
+		return FALSE;
+#endif
 	if (cache_files_precache_map_loaded(map_name))
 	{
 		result = TRUE;
