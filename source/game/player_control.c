@@ -1232,6 +1232,17 @@ static void get_local_player_input_blob(
 							&control->magnetism_level,
 							&target_angular_position,
 							&target_angular_velocity);
+#ifdef HALO_LINUX
+						{
+							/* no magnetism for the mouse (port/linux/src/xinput_sdl.c) */
+							extern int halo_linux_mouse_aiming(short gamepad_index);
+
+							if (halo_linux_mouse_aiming(gamepad_index))
+							{
+								control->magnetism_level = 0.f;
+							}
+						}
+#endif
 						if (player_magnetism_flag && control->magnetism_level > 0.f &&
 							(fabs(clamped_yaw) > _real_epsilon ||
 							fabs(clamped_pitch) > _real_epsilon ||
