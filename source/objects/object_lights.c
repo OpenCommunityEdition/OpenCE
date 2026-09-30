@@ -2382,3 +2382,47 @@ void lights_prepare_for_object_static(
 
 	return;
 }
+
+#ifdef HALO_LINUX
+/* the native ports' ray-traced lighting (port/linux/src/raytrace_gl.c):
+this frame's dynamic lights, as lights_render_diffuse draws them - 8 floats
+each: the position and the radius, the direction and the cosine of the
+cone's cutoff (-2 for a light all round); returns how many, at most
+maximum */
+long halo_ray_tracing_lights(
+	float *lights,
+	long maximum)
+{
+	long count = 0;
+	short light_index;
+
+	if (!should_render_lights())
+		return 0;
+	for (light_index = 0;
+		light_index < lights_globals.scene_point_light_count && count < maximum;
+		light_index++)
+	{
+		struct light_datum *light = light_get(lights_globals.scene_point_lights[light_index]);
+		struct point_light_definition *definition;
+		float *out = lights + count * 8;
+
+		if (!TEST_FLAG(light->flags, _point_light_dynamic_bit) || light->rasterizer_light_index == NONE ||
+			!(light->radius > 0.0f))
+		{
+			continue;
+		}
+		definition = light_definition_get(light->definition_index);
+		out[0] = light->position.x;
+		out[1] = light->position.y;
+		out[2] = light->position.z;
+		out[3] = light->radius;
+		out[4] = light->forward.i;
+		out[5] = light->forward.j;
+		out[6] = light->forward.k;
+		out[7] = definition && definition->cutoff_angle < _pi * 0.99f ?
+			definition->runtime_cosine_cutoff_angle : -2.0f;
+		count++;
+	}
+	return count;
+}
+#endif

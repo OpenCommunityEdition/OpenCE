@@ -59,6 +59,7 @@ typedef int EGLint_;
 #define GL_NEAREST_ 0x2600
 
 #define HOST_RT_MAXIMUM_OBJECTS 511
+#define HOST_RT_MAXIMUM_LIGHTS 8
 /* the objects' sphere: an icosahedron (enough for soft shadows and
 occlusion, and quick to trace) */
 #define HOST_RT_SPHERE_TRIANGLES 20
@@ -93,10 +94,13 @@ static struct
 	float object_transforms[HOST_RT_MAXIMUM_OBJECTS * 12];
 	unsigned char object_masks[HOST_RT_MAXIMUM_OBJECTS];
 	int object_count;
-	id<MTLTexture> textures[2];
-	unsigned int gl_textures[2];
-	EGLImage_ images[2];
-	int widths[2], heights[2];
+	id<MTLTexture> textures[3];
+	unsigned int gl_textures[3];
+	EGLImage_ images[3];
+	int widths[3], heights[3];
+	/* the dynamic lights (host_rt_set_lights): 8 floats each */
+	float lights[HOST_RT_MAXIMUM_LIGHTS * 8];
+	unsigned int light_count;
 	EGLDisplay_ display;
 	EGLDisplay_ (*eglGetCurrentDisplay)(void);
 	EGLImage_ (*eglCreateImageKHR)(EGLDisplay_, void *, unsigned int, void *, const EGLint_ *);
@@ -143,12 +147,15 @@ static NSString *const kernel_source = @
 	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
+	"	texture2d<float, access::write> lit [[texture(2)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
 	"	constant float *c [[buffer(1)]],\n"
 	"	primitive_acceleration_structure level [[buffer(2)]],\n"
 	"	constant float4 *spheres [[buffer(3)]],\n"
 	"	constant uint &sphere_count [[buffer(4)]],\n"
 	"	device float4 *probe [[buffer(5)]],\n"
+	"	constant float4 *lights [[buffer(6)]],\n"
+	"	constant uint &light_count [[buffer(7)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -156,6 +163,9 @@ static NSString *const kernel_source = @
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
 	/* the ray probe (c[33]): the rays of the pixel at the viewport's center */
 	"	bool is_probe = c[33] > 0.5 && all(id == uint2(origin + size * 0.5));\n"
+	/* how much of the dynamic lights' light reaches the pixel: all, unless
+	   traced otherwise below */
+	"	lit.write(float4(1.0), id);\n"
 	"	uint probe_count = 0u;\n"
 	"	if (is_probe) probe[0] = float4(0.0);\n"
 	/* the ray view: what a ray from the camera through the pixel finds in
@@ -315,6 +325,34 @@ static NSString *const kernel_source = @
 	"				any_hit.intersect(shadow_ray, world, on_level ? 4u : 3u).type != intersection_type::none)\n"
 	"				visibility *= 1.0 - 0.55 * c[27];\n"
 	"		}\n"
+	"	}\n"
+	/* the dynamic lights (the flashlight, the plasma's, explosions'): a ray to
+	   each that reaches the pixel, blocked by the level or the objects (not
+	   the player's body, from which the flashlight shines); the share of
+	   their light that arrives, each weighted by how much it gives */
+	"	if (light_count > 0u)\n"
+	"	{\n"
+	"		float total = 0.0, arriving = 0.0;\n"
+	"		for (uint l = 0; l < light_count; l++)\n"
+	"		{\n"
+	"			float3 at = lights[l * 2u].xyz;\n"
+	"			float reach = lights[l * 2u].w;\n"
+	"			float3 L = at - P;\n"
+	"			float d = length(L);\n"
+	"			if (d >= reach || d < 1e-3) continue;\n"
+	"			L /= d;\n"
+	"			float facing = dot(N, L);\n"
+	"			if (facing <= 0.0) continue;\n"
+	"			float4 cone = lights[l * 2u + 1u];\n"
+	"			if (cone.w > -1.5 && dot(-L, cone.xyz) < cone.w) continue;\n"
+	"			float weight = facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
+	"			total += weight;\n"
+	"			ray to_light(P + N * bias, L, 0.0, max(d - bias * 4.0, 0.0));\n"
+	"			bool blocked = any_hit.intersect(to_light, world, 3u).type != intersection_type::none;\n"
+	"			if (!blocked) arriving += weight;\n"
+	"			if (is_probe) probe_segment(probe, probe_count, P + N * bias, blocked ? P + N * bias + L * d : at, 4.0, blocked);\n"
+	"		}\n"
+	"		if (total > 0.0) lit.write(float4(arriving / total), id);\n"
 	"	}\n"
 	/* (the probe's ray to the sun: always, against everything, to its first hit) */
 	"	if (is_probe && c[27] > 0.0)\n"
@@ -762,7 +800,7 @@ uint32_t host_rt_texture(int which, int width, int height)
 	MTLTextureDescriptor *descriptor;
 	const EGLint_ attributes[] = { EGL_NONE_ };
 
-	if (!rt.available || which < 0 || which > 1 || width <= 0 || height <= 0)
+	if (!rt.available || which < 0 || which > 2 || width <= 0 || height <= 0)
 		return 0;
 	if (rt.textures[which] && rt.widths[which] == width && rt.heights[which] == height)
 		return rt.gl_textures[which];
@@ -810,8 +848,9 @@ int host_rt_trace(const float *camera, int width, int height)
 	id<MTLComputeCommandEncoder> encoder;
 	MTLSize group, groups;
 
-	if (!rt.available || !rt.world || !rt.textures[0] || !rt.textures[1] ||
-		rt.widths[0] != width || rt.widths[1] != width || rt.heights[0] != height || rt.heights[1] != height)
+	if (!rt.available || !rt.world || !rt.textures[0] || !rt.textures[1] || !rt.textures[2] ||
+		rt.widths[0] != width || rt.widths[1] != width || rt.heights[0] != height || rt.heights[1] != height ||
+		rt.widths[2] != width || rt.heights[2] != height)
 	{
 		return 0;
 	}
@@ -854,6 +893,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setComputePipelineState:rt.pipeline];
 	[encoder setTexture:rt.textures[0] atIndex:0];
 	[encoder setTexture:rt.textures[1] atIndex:1];
+	[encoder setTexture:rt.textures[2] atIndex:2];
 	[encoder setAccelerationStructure:rt.scene atBufferIndex:0];
 	for (id<MTLAccelerationStructure> structure in rt.scene_structures)
 		[encoder useResource:structure usage:MTLResourceUsageRead];
@@ -866,6 +906,8 @@ int host_rt_trace(const float *camera, int width, int height)
 		memset(rt.probe.contents, 0, rt.probe.length);
 	}
 	[encoder setBuffer:rt.probe offset:0 atIndex:5];
+	[encoder setBytes:rt.lights length:sizeof(rt.lights) atIndex:6];
+	[encoder setBytes:&rt.light_count length:sizeof(rt.light_count) atIndex:7];
 	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
@@ -905,6 +947,18 @@ int host_rt_trace(const float *camera, int width, int height)
 	host_rt_trace_ns += SDL_GetTicksNS() - finished;
 	host_rt_traces++;
 	return commands.status == MTLCommandBufferStatusCompleted;
+}
+
+/* this frame's dynamic lights, 8 floats each (the position, the radius, the
+direction, the cosine of the cone's cutoff or -2 all round) */
+void host_rt_set_lights(const float *lights, int count)
+{
+	if (count < 0)
+		count = 0;
+	if (count > HOST_RT_MAXIMUM_LIGHTS)
+		count = HOST_RT_MAXIMUM_LIGHTS;
+	memcpy(rt.lights, lights, (size_t)count * 8 * sizeof(float));
+	rt.light_count = (unsigned int)count;
 }
 
 /* the ray probe's last rays: up to maximum segments of 8 floats each (from

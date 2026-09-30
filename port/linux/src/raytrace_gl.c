@@ -52,6 +52,8 @@ unsigned long halo_ray_tracing_world(const float **vertices, long *vertex_count,
 	long *triangle_count);
 /* the direction towards the sky's sun; 0 if none */
 unsigned char halo_ray_tracing_sun(float *direction);
+/* the dynamic lights (source/objects/object_lights.c): 8 floats each */
+long halo_ray_tracing_lights(float *lights, long maximum);
 /* the objects as shapes for the rays (port/linux/game/raytrace_world.c) */
 long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maximum, const float *camera,
 	float *player_sphere);
@@ -84,7 +86,9 @@ static struct
 	GLint trace_uniforms, composite_uniforms;
 	GLint trace_scene, trace_depth, composite_scene, composite_depth, composite_effect;
 	GLint composite_debug, composite_rt, composite_rt_enabled;
-	GLint composite_baked, composite_lit, composite_light_split;
+	GLint composite_baked, composite_lit, composite_light_split, composite_lit_rt;
+	/* the traced share of the dynamic lights' light (Metal's third texture) */
+	GLuint lights_texture;
 	/* the light before and after the dynamic lights (half resolution), and
 	the stages taken this frame (bits 0 and 1) */
 	GLuint baked_texture, lit_texture, light_framebuffer;
@@ -313,6 +317,7 @@ static const char composite_source[] =
 	"uniform sampler2D baked_texture;\n"
 	"uniform sampler2D lit_texture;\n"
 	"uniform int light_split;\n"
+	"uniform sampler2D lit_rt;\n"
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
@@ -334,7 +339,7 @@ static const char composite_source[] =
 	   window's at half resolution: all 16 of the rays' sets of directions)
 	   of similar depth */
 	"	float z = linear_depth(d);\n"
-	"	float total = 0.0, visibility = 0.0;\n"
+	"	float total = 0.0, visibility = 0.0, dynamic_visibility = 0.0;\n"
 	"	vec3 light = vec3(0.0);\n"
 	"	for (int y = -2; y < 2; y++)\n"
 	"		for (int x = -2; x < 2; x++)\n"
@@ -349,10 +354,12 @@ static const char composite_source[] =
 	   finds the objects) */
 	"			if (rt_enabled != 0) v *= mix(1.0, texelFetch(rt_texture, q / TRACE_SCALE, 0).r, u[2].y);\n"
 	"			visibility += v * w;\n"
+	"			dynamic_visibility += (rt_enabled != 0 ? texelFetch(lit_rt, q / TRACE_SCALE, 0).r : 1.0) * w;\n"
 	"			light += e.rgb * w;\n"
 	"			total += w;\n"
 	"		}\n"
 	"	visibility /= total;\n"
+	"	dynamic_visibility /= total;\n"
 	"	light /= total;\n"
 	/* the lightmaps' share of the light: the occlusion and the sun's
 	   shadows darken it, not the flashlight's or the other dynamic lights'
@@ -362,7 +369,10 @@ static const char composite_source[] =
 	"		const vec3 luma = vec3(0.3, 0.59, 0.11);\n"
 	"		float baked = dot(texelFetch(baked_texture, p / TRACE_SCALE, 0).rgb, luma);\n"
 	"		float lit = dot(texelFetch(lit_texture, p / TRACE_SCALE, 0).rgb, luma);\n"
-	"		visibility = mix(1.0, visibility, lit > 0.004 ? clamp(baked / lit, 0.0, 1.0) : 1.0);\n"
+	/* (the dynamic lights' share: its traced shadows, the flashlight's
+	   and the others') */
+	"		float share = lit > 0.004 ? clamp(baked / lit, 0.0, 1.0) : 1.0;\n"
+	"		visibility = share * visibility + (1.0 - share) * dynamic_visibility;\n"
 	"	}\n"
 	/* a traced reflection, where the camera sees what it hit, before the
 	   screen's */
@@ -435,7 +445,8 @@ static GLuint link(const char *fragment, const char *what)
 The rays the lighting sends from the surface at the crosshair (Metal's: the
 kernel writes them, host_rt_probe reads them back), drawn as lines in the
 world: the occlusion rays white, the ray to the sun yellow, the reflection
-cyan, each red where it hit; the normal green. Frozen, they stay where they
+cyan, the rays to the dynamic lights (the flashlight's) orange, each red
+where it hit; the normal green. Frozen, they stay where they
 were while the camera moves round them. Where the scene is nearer than a
 line, the line is faint. */
 
@@ -484,7 +495,8 @@ static const char probe_vertex_source[] =
 	"	view_z = at_b ? b.z : a.z;\n"
 	"	vec3 color = kind < 0.5 ? (hit > 0.5 ? vec3(1.0, 0.25, 0.2) : vec3(1.0)) :\n"
 	"		kind < 1.5 ? (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.9, 0.2)) :\n"
-	"		kind < 2.5 ? (hit > 0.5 ? vec3(0.2, 1.0, 1.0) : vec3(0.5, 0.75, 0.8)) : vec3(0.3, 1.0, 0.3);\n"
+	"		kind < 2.5 ? (hit > 0.5 ? vec3(0.2, 1.0, 1.0) : vec3(0.5, 0.75, 0.8)) :\n"
+	"		kind < 3.5 ? vec3(0.3, 1.0, 0.3) : (hit > 0.5 ? vec3(1.0, 0.15, 0.15) : vec3(1.0, 0.55, 0.1));\n"
 	"	line_color = vec4(color, 1.0);\n"
 	"}\n";
 
@@ -650,6 +662,7 @@ static void initialize(void)
 	ray.composite_baked = glGetUniformLocation(ray.composite_program, "baked_texture");
 	ray.composite_lit = glGetUniformLocation(ray.composite_program, "lit_texture");
 	ray.composite_light_split = glGetUniformLocation(ray.composite_program, "light_split");
+	ray.composite_lit_rt = glGetUniformLocation(ray.composite_program, "lit_rt");
 #ifdef HALO_MACOS
 	/* "screen" keeps to the screen's rays */
 	if (strcmp(config_string("display.ray_tracing"), "screen") && host_rt_available())
@@ -798,10 +811,11 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	height = (height + TRACE_SCALE - 1) / TRACE_SCALE;
 	input = host_rt_texture(0, width, height);
 	output = host_rt_texture(1, width, height);
+	ray.lights_texture = host_rt_texture(2, width, height);
 	/* (the host's texture creation binds on the active unit) */
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, depth);
-	if (!input || !output)
+	if (!input || !output || !ray.lights_texture)
 		return 0;
 	glBindFramebuffer(GL_FRAMEBUFFER, ray.gbuffer_framebuffer);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, input, 0);
@@ -867,6 +881,13 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 			camera[31] = 0.0f;
 
 		host_rt_set_objects(transforms, masks, (int)count);
+	}
+	/* the dynamic lights, for their shadows */
+	{
+		static float lights[8 * 8];
+		long light_count = halo_ray_tracing_lights(lights, 8);
+
+		host_rt_set_lights(lights, (int)light_count);
 	}
 	if (!host_rt_trace(camera, width, height))
 		return 0;
@@ -1065,6 +1086,10 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glBindSampler(5, 0);
 	glUniform1i(ray.composite_lit, 5);
 	glUniform1i(ray.composite_light_split, (ray.light_stages & 3) == 3);
+	glActiveTexture(GL_TEXTURE6);
+	glBindTexture(GL_TEXTURE_2D, world_results ? ray.lights_texture : 0);
+	glBindSampler(6, 0);
+	glUniform1i(ray.composite_lit_rt, 6);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	ray.light_stages = 0;
 	probe_draw(color, depth, viewport, uniforms, position, forward, up);

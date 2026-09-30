@@ -435,6 +435,24 @@ long halo_ray_tracing_objects(float *transforms, unsigned char *masks, long maxi
 	return count;
 }
 
+/* the dynamic lights, as the scene's second pass draws them (world: the
+view's x, z, y): the flashlight from under the camera, and the plasma
+bolt's light */
+long halo_ray_tracing_lights(float *lights, long maximum)
+{
+	float axis[3] = { -3.3f, 9.0f, -0.7f };
+	float length = sqrtf(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+	const float all[2][8] = {
+		{ 0.0f, 0.0f, -0.2f, 25.0f, axis[0] / length, axis[1] / length, axis[2] / length, 0.93f },
+		{ -3.0f, 14.5f, -0.4f, 4.5f, 0.0f, 0.0f, 1.0f, -2.0f } };
+	long count = getenv("RT_NO_LIGHTS") ? 0 : 2;
+
+	if (count > maximum)
+		count = maximum;
+	memcpy(lights, all, (size_t)count * 8 * sizeof(float));
+	return count;
+}
+
 static GLuint program, buffer, array;
 
 static void draw_pass(int pass)

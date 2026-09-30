@@ -191,6 +191,14 @@ rays from each pixel:
   those whose depth has not changed since the game drew the objects,
   before the level (`halo_ray_traced_light_stage(2)`).
 
+The dynamic lights - the flashlight, the plasma bolts', the explosions' -
+cast traced shadows too (`halo_ray_tracing_lights` in
+`source/objects/object_lights.c`): from each pixel a ray goes to each light
+that reaches it (inside its cone, for a spot like the flashlight), and the
+level and the objects block it. The game drew these lights without shadows,
+added onto the lightmaps' light; the lighting darkens only their share of a
+pixel's light (the stages above), by the share of their rays that arrive.
+
 The characters and the vehicles are in Metal's rays too
 (`halo_ray_tracing_objects` in `port/linux/game/raytrace_world.c`): a
 biped as its skeleton's bones, each an ellipsoid from its node to its
@@ -272,8 +280,8 @@ go through.
 
 The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
 at the crosshair, as the kernel traced them: the occlusion rays white, the
-ray to the sun yellow, the reflection cyan, each red where it hit
-something; the surface's normal green. Pressed again, the rays stay where
+ray to the sun yellow, the reflection cyan, the rays to the dynamic lights
+orange, each red where it hit something; the surface's normal green. Pressed again, the rays stay where
 they were, and you can walk round them; lines behind the scene are faint.
 
 `port/macos/tests/run_raytrace_test.sh` draws a test scene through the
