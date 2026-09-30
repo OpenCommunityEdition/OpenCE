@@ -186,7 +186,8 @@ static NSString *const kernel_source = @
 	"		view.set_triangle_front_facing_winding(winding::clockwise);\n"
 	"		view.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"		ray primary(eye, dir, c[12], c[13]);\n"
-	"		auto h = view.intersect(primary, world, 7u);\n"
+	/* (not the player's body: the camera is inside it) */
+	"		auto h = view.intersect(primary, world, 3u);\n"
 	"		float3 color;\n"
 	"		if (h.type == intersection_type::none)\n"
 	"			color = mix(float3(0.62, 0.72, 0.9), float3(0.18, 0.28, 0.55), clamp(dir.z * 2.0, 0.0, 1.0));\n"
@@ -372,8 +373,10 @@ static NSString *const kernel_source = @
 	"		L /= d;\n"
 	"		float facing = dot(N, L);\n"
 	"		if (facing <= 0.0) continue;\n"
-	"		ray to_emitter(P + N * bias, L, 0.0, max(d - 0.15, 0.0));\n"
-	"		bool blocked = any_hit.intersect(to_emitter, world, 3u).type != intersection_type::none;\n"
+	/* (the level only, stopping short: a needle is half in what it stuck in,
+	   and inside its own model) */
+	"		ray to_emitter(P + N * bias, L, 0.0, max(d - 0.35, 0.0));\n"
+	"		bool blocked = level_hit.intersect(to_emitter, level).type != intersection_type::none;\n"
 	"		if (!blocked)\n"
 	"			emitted += emitters[e * 2u + 1u].rgb * emitters[e * 2u + 1u].w * facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
 	"		if (is_probe) probe_segment(probe, probe_count, P + N * bias, at, 5.0, blocked);\n"

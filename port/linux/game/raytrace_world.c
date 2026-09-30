@@ -904,8 +904,8 @@ game draws it, and the rays shadow it: object_lights.c.) */
 
 #define RAY_TRACED_EMITTER_DISTANCE 30.0f
 /* how far an emitter's light reaches (world units), and how bright */
-#define RAY_TRACED_EMITTER_RADIUS 1.5f
-#define RAY_TRACED_EMITTER_INTENSITY 1.2f
+#define RAY_TRACED_EMITTER_RADIUS 3.0f
+#define RAY_TRACED_EMITTER_INTENSITY 2.0f
 
 #define GROUP_TAG_LIGHT_VOLUME 0x6D677332 /* 'mgs2' */
 #define GROUP_TAG_LIGHT 0x6C696768 /* 'ligh' */

@@ -293,6 +293,14 @@ shapes orange; your own body cyan (look down); and, darker, where a second
 ray from the hit to the sun is blocked. It is the scene the lighting's rays
 go through.
 
+The game's own debug cameras fly round the scene too: hold X (the
+controller's black button) for a second to go from the first person to a
+flying camera, then to one following the player, and back. In the flying
+camera, Z (the right stick's button, or the middle mouse button) takes its
+controls: WASD moves, the mouse turns, the left button rises, the right
+button (or G) sinks, the arrows up and down change the speed; Z again lets
+go of them.
+
 The ray probe (F5 / ⌘L) draws the rays the lighting sends from the surface
 at the crosshair, as the kernel traced them: the occlusion rays white, the
 ray to the sun yellow, the reflection cyan, the rays to the dynamic lights
