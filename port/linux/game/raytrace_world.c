@@ -259,6 +259,9 @@ enum
 
 /* the objects nearer the camera than this (world units) are in the rays */
 #define RAY_TRACED_OBJECT_DISTANCE 25.0f
+/* how far the camera goes before the objects near it are chosen again */
+#define RAY_TRACED_OBJECT_ANCHOR_STEP 4.0f
+static const float *ray_object_anchor;
 #define RAY_TRACED_OBJECT_GROUPS 32
 
 /* the model geometry's layout (models.c keeps it private) */
@@ -1015,14 +1018,29 @@ long halo_ray_tracing_objects(float *triangles, unsigned char *groups, float *cu
 		count += object_triangles_sane(player_unit, object, triangles,
 			object_family_triangles(player_unit, object, triangles, maximum, shapes, _ray_mask_player, groups));
 	}
+	/* (the objects near a point that moves only as the camera goes 4 units
+	from it - 4 farther, all round: the same objects frame to frame, whose
+	shapes the host keeps rather than builds again) */
+	{
+		static float anchor[3] = { 1e30f, 1e30f, 1e30f };
+		float ax = camera[0] - anchor[0], ay = camera[1] - anchor[1], az = camera[2] - anchor[2];
+
+		if (ax * ax + ay * ay + az * az > RAY_TRACED_OBJECT_ANCHOR_STEP * RAY_TRACED_OBJECT_ANCHOR_STEP)
+		{
+			anchor[0] = camera[0];
+			anchor[1] = camera[1];
+			anchor[2] = camera[2];
+		}
+		ray_object_anchor = anchor;
+	}
 	object_iterator_new(&iterator, RAY_TRACED_OBJECT_TYPES, 0);
 	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL && count < maximum)
 	{
 		float radius = object->object.bounding_sphere_radius;
-		float dx = object->object.bounding_sphere_center.x - camera[0];
-		float dy = object->object.bounding_sphere_center.y - camera[1];
-		float dz = object->object.bounding_sphere_center.z - camera[2];
-		float reach = RAY_TRACED_OBJECT_DISTANCE + radius;
+		float dx = object->object.bounding_sphere_center.x - ray_object_anchor[0];
+		float dy = object->object.bounding_sphere_center.y - ray_object_anchor[1];
+		float dz = object->object.bounding_sphere_center.z - ray_object_anchor[2];
+		float reach = RAY_TRACED_OBJECT_DISTANCE + RAY_TRACED_OBJECT_ANCHOR_STEP + radius;
 		boolean unit = ((1UL << object->object.type) & _object_mask_unit) != 0;
 		long added;
 

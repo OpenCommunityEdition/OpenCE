@@ -852,7 +852,11 @@ static NSString *const kernel_source = @
 	"		{\n"
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
-	"			ray shadow_ray(P + N * bias, normalize(sun + spread), 0.0, 2000.0);\n"
+	/* (an object's pixel's ray starts clear of the object's own surface: its
+	   point, from the depth, can be a little inside the drawn model - traced
+	   from both sides - which then shadowed all of itself, more or less as
+	   the view turned) */
+	"			ray shadow_ray(P + N * bias, normalize(sun + spread), on_level ? 0.0 : 0.12 + z * 0.003, 2000.0);\n"
 	/* (the level's: only where the body's shadow can fall, near it) */
 	"			bool near_body = c[31] > 0.0 && distance(P, float3(c[28], c[29], c[30])) < c[31] * 8.0;\n"
 	"			if ((!on_level || near_body) &&\n"
