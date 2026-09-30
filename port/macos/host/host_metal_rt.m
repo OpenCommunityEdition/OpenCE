@@ -173,7 +173,6 @@ static NSString *const kernel_source = @
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	texture2d<float, access::write> lit [[texture(2)]],\n"
 	"	texture2d<float, access::sample> atlas [[texture(3)]],\n"
-	"	texture2d<float, access::write> irradiance [[texture(4)]],\n"
 	"	texture2d<float, access::read> history_in [[texture(5)]],\n"
 	"	texture2d<float, access::write> history_out [[texture(6)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
@@ -199,9 +198,8 @@ static NSString *const kernel_source = @
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
 	/* the ray probe (c[33]): the rays of the pixel at the viewport's center */
 	"	bool is_probe = c[33] > 0.5 && all(id == uint2(origin + size * 0.5));\n"
-	/* how much of the dynamic lights' light reaches the pixel (all, unless
-	   traced otherwise below), and the emitters' light (none) */
-	"	lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
+	/* (each texture is written once a pixel, on each way out: two writes of
+	   one texel from a thread are not ordered) */
 	"	uint probe_count = 0u;\n"
 	"	if (is_probe) probe[0] = float4(0.0);\n"
 	/* the ray view: what a ray from the camera through the pixel finds in
@@ -273,11 +271,19 @@ static NSString *const kernel_source = @
 	"			color = base;\n"
 	"		}\n"
 	"		result.write(float4(color, 1.0), id);\n"
+	"		lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
 	"		return;\n"
 	"	}\n"
 	"	float4 g = gbuffer.read(id);\n"
 	"	float z = abs(g.x);\n"
-	"	if (z <= c[12] || z >= c[13] * 0.999) { result.write(float4(1.0, 0.0, 0.0, 0.0), id); return; }\n"
+	/* (nothing there, or at the far plane: no traced light - alpha 0, the
+	   game's stays) */
+	"	if (z <= c[12] || z >= c[13] * 0.999)\n"
+	"	{\n"
+	"		result.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
+	"		lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
+	"		return;\n"
+	"	}\n"
 	"	float3 camera = float3(c[0], c[1], c[2]), forward = float3(c[3], c[4], c[5]);\n"
 	"	float3 up = float3(c[6], c[7], c[8]), right = float3(c[9], c[10], c[11]);\n"
 	"	float t = c[14], aspect = c[15];\n"
@@ -446,7 +452,7 @@ static NSString *const kernel_source = @
 	"			emitted += emitters[e * 2u + 1u].rgb * emitters[e * 2u + 1u].w * facing * (1.0 - d / reach) * (1.0 - d / reach);\n"
 	"		if (is_probe) probe_segment(probe, probe_count, P + N * bias, at, 5.0, blocked);\n"
 	"	}\n"
-	"	lit.write(float4(lights_arriving, emitted), id);\n"
+	"	float4 lit_value = float4(lights_arriving, emitted);\n"
 	/* the traced light (c[42]: 1 with the lightmaps' light where the rays
 	   land, 2 without - only what the rays find lit: the sun, the sky, the
 	   glowing surfaces, the lights), in the light buffer's units, for the
@@ -463,6 +469,12 @@ static NSString *const kernel_source = @
 	"	if (gi_ready != 0u && c[42] > 0.5)\n"
 	"	{\n"
 	"		float3 direct = emitted * c[61];\n"
+	/* (the drawn level from both sides: its surfaces are the ones drawn, and
+	   a ray that leaves through one's back has gone through a wall) */
+	"		intersector<triangle_data, instancing> blocked_by;\n"
+	"		blocked_by.accept_any_intersection(true);\n"
+	"		blocked_by.assume_geometry_type(geometry_type::triangle);\n"
+	"		blocked_by.force_opacity(forced_opacity::opaque);\n"
 	"		float3 sun_dir = float3(c[24], c[25], c[26]);\n"
 	"		float3 sun_color = float3(c[36], c[37], c[38]) * c[45];\n"
 	"		float ndl = dot(N, sun_dir);\n"
@@ -471,14 +483,13 @@ static NSString *const kernel_source = @
 	"			uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
 	"			float3 spread = (tangent * (float(k & 3u) - 1.5) + bitangent * (float(k >> 2) - 1.5)) * 0.006;\n"
 	"			ray to_sun(P + N * bias, normalize(sun_dir + spread), 0.0, 2000.0);\n"
-	"			if (any_hit.intersect(to_sun, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"			if (blocked_by.intersect(to_sun, world, object ? 3u : 7u).type == intersection_type::none)\n"
 	"				direct += sun_color * ndl;\n"
 	"		}\n"
 	"		intersector<triangle_data, instancing> nearest;\n"
 	"		nearest.assume_geometry_type(geometry_type::triangle);\n"
 	"		nearest.force_opacity(forced_opacity::opaque);\n"
 	"		nearest.set_triangle_front_facing_winding(winding::clockwise);\n"
-	"		nearest.set_triangle_cull_mode(triangle_cull_mode::back);\n"
 	"		uint seed = (id.x * 1973u + id.y * 9277u + uint(c[44]) * 26699u) | 1u;\n"
 	"		float3 indirect = float3(0.0);\n"
 	/* the sky's wide lights (c[64-79]: each its direction, its colour and
@@ -500,7 +511,7 @@ static NSString *const kernel_source = @
 	"			float facing = dot(N, d);\n"
 	"			if (facing <= 0.0) continue;\n"
 	"			ray to_sky(P + N * bias, d, 0.0, 2000.0);\n"
-	"			if (any_hit.intersect(to_sky, world, object ? 3u : 7u).type == intersection_type::none)\n"
+	"			if (blocked_by.intersect(to_sky, world, object ? 3u : 7u).type == intersection_type::none)\n"
 	"				indirect += float3(c[o + 3u], c[o + 4u], c[o + 5u]) * facing * c[45];\n"
 	"		}\n"
 	"		for (uint i = 0; i < 2u; i++)\n"
@@ -516,7 +527,8 @@ static NSString *const kernel_source = @
 	"			float3 L = float3(0.0);\n"
 	"			if (h.type == intersection_type::none)\n"
 	"				L = float3(c[39], c[40], c[41]);\n"
-	"			else if (h.instance_id == 0u)\n"
+	/* (a surface's back: inside a wall, dark) */
+	"			else if (h.instance_id == 0u && h.triangle_front_facing)\n"
 	"			{\n"
 	"				uint m = triangle_materials[h.primitive_id];\n"
 	"				float4 surface = materials[m * 2u], glow = materials[m * 2u + 1u];\n"
@@ -560,15 +572,16 @@ static NSString *const kernel_source = @
 	"		}\n"
 	"		float3 accumulated = mix(before.rgb, indirect, weight);\n"
 	"		history_out.write(float4(accumulated, z), id);\n"
-	"		irradiance.write(float4(direct + accumulated, 1.0), id);\n"
-	/* (a level pixel: its light is in the light buffer now, occlusion and
-	   all - the composite takes 2 for that, and its lights' light none) */
+	/* (a level pixel: its light goes in the light buffer, occlusion and
+	   all - the result's 2 says so, to the guest's light buffer pass and the
+	   composite - and the lights' texture carries it: 1, then the light) */
 	"		if (!object)\n"
 	"		{\n"
 	"			visibility = 2.0;\n"
-	"			lit.write(float4(1.0, 0.0, 0.0, 0.0), id);\n"
+	"			lit_value = float4(1.0, direct + accumulated);\n"
 	"		}\n"
 	"	}\n"
+	"	lit.write(lit_value, id);\n"
 	/* (the probe's ray to the sun: always, against everything, to its first hit) */
 	"	if (is_probe && c[27] > 0.0)\n"
 	"	{\n"
@@ -1199,8 +1212,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	place, anything bound: the kernel reads them only when gi_ready) */
 	{
 		float constants[80];
-		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas &&
-			rt.textures[3] && rt.widths[3] == width && rt.heights[3] == height;
+		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas;
 		id<MTLBuffer> any = rt.probe;
 
 		memcpy(constants, camera, sizeof(constants));
@@ -1227,7 +1239,6 @@ int host_rt_trace(const float *camera, int width, int height)
 		[encoder setBuffer:gi_ready ? rt.drawn_pages : any offset:0 atIndex:14];
 		[encoder setBytes:&gi_ready length:sizeof(gi_ready) atIndex:15];
 		[encoder setTexture:gi_ready ? rt.atlas : rt.textures[1] atIndex:3];
-		[encoder setTexture:gi_ready ? rt.textures[3] : rt.textures[1] atIndex:4];
 		[encoder setTexture:gi_ready ? rt.history[rt.history_index] : rt.textures[1] atIndex:5];
 		[encoder setTexture:gi_ready ? rt.history[rt.history_index ^ 1] : rt.textures[2] atIndex:6];
 		if (gi_ready)
@@ -1236,7 +1247,20 @@ int host_rt_trace(const float *camera, int width, int height)
 	}
 	[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
 		if (done.GPUEndTime > done.GPUStartTime)
+		{
+			static double total;
+			static int frames;
+
 			rt.gpu_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+			/* (every 600 frames: the rays' average time on the GPU) */
+			total += rt.gpu_ms;
+			if (++frames == 600)
+			{
+				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (shed %d)", total / frames, rt.shed);
+				total = 0.0;
+				frames = 0;
+			}
+		}
 	}];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);

@@ -1354,6 +1354,67 @@ static void level_build(const struct structure_bsp *bsp)
 		}
 	}
 	level.materials_changed = TRUE;
+	platform_log("ray tracing: the level's bounds %.1f..%.1f %.1f..%.1f %.1f..%.1f", bsp->world_bounds.x0,
+		bsp->world_bounds.x1, bsp->world_bounds.y0, bsp->world_bounds.y1, bsp->world_bounds.z0, bsp->world_bounds.z1);
+	/* (the brightest glowing materials, where they are: for test cameras) */
+	{
+		long logged = 0, index;
+		float threshold = 1e30f;
+
+		while (logged < 6)
+		{
+			float best = 0.0f;
+			long best_index = NONE, lightmap_best = 0, material_best = 0;
+
+			index = 0;
+			for (lightmap_index = 0; lightmap_index < bsp->lightmaps.count; lightmap_index++)
+			{
+				const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_index,
+					struct structure_lightmap);
+				long material_index;
+
+				for (material_index = 0; material_index < lightmap->materials.count; material_index++, index++)
+				{
+					const float *m = level.materials + index * RAY_LEVEL_MATERIAL_FLOATS;
+					float power = m[4] + m[5] + m[6];
+
+					if (power > best && power < threshold)
+					{
+						best = power;
+						best_index = index;
+						lightmap_best = lightmap_index;
+						material_best = material_index;
+					}
+				}
+			}
+			if (best_index == NONE)
+				break;
+			{
+				const struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&bsp->lightmaps, lightmap_best,
+					struct structure_lightmap);
+				const struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials, material_best,
+					struct structure_material);
+
+				const byte *vertices = (const byte *)material->compressed_vertex_data.address;
+				float center[3] = { 0.0f, 0.0f, 0.0f };
+				long vertex_index;
+
+				for (vertex_index = 0; vertices && vertex_index < material->vertices.count; vertex_index++)
+				{
+					const float *point = (const float *)(vertices + vertex_index * _ray_level_vertex_size);
+
+					center[0] += point[0] / (float)material->vertices.count;
+					center[1] += point[1] / (float)material->vertices.count;
+					center[2] += point[2] / (float)material->vertices.count;
+				}
+				platform_log("ray tracing: glowing material %s: %.2f, %ld vertices about %.1f %.1f %.1f",
+					material->shader.index != NONE ? tag_get_name(material->shader.index) : "?", best,
+					(long)material->vertices.count, center[0], center[1], center[2]);
+			}
+			threshold = best;
+			logged++;
+		}
+	}
 }
 
 /* the active BSP's drawn triangles: returns its generation, which changes

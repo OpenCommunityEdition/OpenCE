@@ -162,7 +162,7 @@ static const struct config_setting config_settings[] =
 		_platform_all, "The traced sun's strength (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_gi_bounce", _config_real, "1.0", "HALO_RAY_TRACING_GI_BOUNCE", _environment_value,
 		_platform_all, "The traced bounced light's strength (display.ray_tracing_gi)." },
-	{ "display.ray_tracing_gi_glow", _config_real, "1.0", "HALO_RAY_TRACING_GI_GLOW", _environment_value,
+	{ "display.ray_tracing_gi_glow", _config_real, "0.02", "HALO_RAY_TRACING_GI_GLOW", _environment_value,
 		_platform_all, "The glowing surfaces' traced light's strength (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_gi_split", _config_boolean, "false", "HALO_RAY_TRACING_GI_SPLIT", _environment_set_is_true,
 		_platform_all, "The game's light on the screen's left half, the traced on its right (display.ray_tracing_gi)." },
