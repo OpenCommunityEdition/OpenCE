@@ -112,6 +112,14 @@ static struct
 	uint32_t probe_count;
 	id<MTLBuffer> probe_in[3], probe_out[3];
 	int probe_ring;
+	/* the exposure: the level's baked light over its traced light, where
+	both are known (a few of the level's pixels, summed by the rays, read
+	back when they are done), followed slowly; the traced light is taken
+	times it, so the rays' light is as bright, overall, as the level's
+	artists lit it */
+	id<MTLBuffer> exposure_sums[3];
+	int exposure_ring;
+	float exposure;
 	float probe_results[64 * 10];
 	int probe_result_count;
 	id<MTLTexture> atlas;
@@ -449,7 +457,7 @@ static NSString *const kernel_source = @
 	"	for (uint k = 0; k < N; k++)\n"
 	"		E += radiance[k] * max(dot(directions[k], D), 0.0);\n"
 	"	E = E * (4.0 / float(N)) + sun_color * max(dot(sun, D), 0.0) + glow_light;\n"
-	"	probe_out[i * 2u] = float4(E, total > 0.0 ? clamp(length(toward) / total, 0.0, 1.0) : 0.0);\n"
+	"	probe_out[i * 2u] = float4(E * c[84], total > 0.0 ? clamp(length(toward) / total, 0.0, 1.0) : 0.0);\n"
 	"	probe_out[i * 2u + 1u] = float4(D, 1.0);\n"
 	"}\n"
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
@@ -483,6 +491,7 @@ static NSString *const kernel_source = @
 	"	constant uint &cutouts_ready [[buffer(25)]],\n"
 	"	texture2d<float, access::sample> masks [[texture(7)]],\n"
 	"	device const float *level_vertices [[buffer(26)]],\n"
+	"	device atomic_uint *exposure_sums [[buffer(27)]],\n"
 	"	uint2 id [[thread_position_in_grid]])\n"
 	"{\n"
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
@@ -1001,7 +1010,38 @@ static NSString *const kernel_source = @
 	"		if (!object)\n"
 	"		{\n"
 	"			visibility = 2.0;\n"
-	"			lit_value = float4(1.0, direct + accumulated);\n"
+	"			lit_value = float4(1.0, (direct + accumulated) * c[84]);\n"
+	"		}\n"
+	/* (the exposure's sums: every 8th pixel each way, the level's baked
+	   light where a ray from the camera finds the pixel's surface - its
+	   lightmap - and the traced light there without the dynamic lights,
+	   which the lightmaps have not; in 256ths) */
+	"		if (!object && ((id.x | id.y) & 7u) == 0u)\n"
+	"		{\n"
+	"			float3 to_p = P - camera;\n"
+	"			float dist = length(to_p);\n"
+	"			ray look(camera, to_p / max(dist, 1e-4), c[12], dist + 0.5);\n"
+	"			hit_info lh = closest_hit(look, world, 1u, CUT_ARGS);\n"
+	"			if (lh.type != intersection_type::none && lh.instance_id == 0u && abs(lh.distance - dist) < dist * 0.03 + 0.05)\n"
+	"			{\n"
+	"				uint m = triangle_materials[lh.primitive_id];\n"
+	"				float4 glow = materials[m * 2u + 1u];\n"
+	"				if (glow.w >= 0.0 && pages[uint(glow.w)].z > 0.0)\n"
+	"				{\n"
+	"					float4 page = pages[uint(glow.w)];\n"
+	"					uint base = lh.primitive_id * 3u;\n"
+	"					float2 b = lh.triangle_barycentric_coord;\n"
+	"					float2 uv = texcoords[indices[base]] * (1.0 - b.x - b.y) + texcoords[indices[base + 1u]] * b.x +\n"
+	"						texcoords[indices[base + 2u]] * b.y;\n"
+	"					float2 inset = float2(0.5 / 4096.0);\n"
+	"					float3 baked = atlas.sample(linear_clamp, page.xy + clamp(uv * page.zw, inset, page.zw - inset), metal::level(0.0)).rgb;\n"
+	"					float3 traced = max(direct - emitted * c[61], float3(0.0)) + accumulated;\n"
+	"					float3 luma = float3(0.2126, 0.7152, 0.0722);\n"
+	"					atomic_fetch_add_explicit(&exposure_sums[0], uint(min(dot(baked, luma), 16.0) * 256.0), memory_order_relaxed);\n"
+	"					atomic_fetch_add_explicit(&exposure_sums[1], uint(min(dot(traced, luma), 16.0) * 256.0), memory_order_relaxed);\n"
+	"					atomic_fetch_add_explicit(&exposure_sums[2], 1u, memory_order_relaxed);\n"
+	"				}\n"
+	"			}\n"
 	"		}\n"
 	"	}\n"
 	"	lit.write(lit_value, id);\n"
@@ -1910,11 +1950,15 @@ int host_rt_trace(const float *camera, int width, int height)
 	/* the drawn level's surfaces and the traced light's textures (in their
 	place, anything bound: the kernel reads them only when gi_ready) */
 	{
-		float constants[84];
+		float constants[88] = { 0 };
 		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas;
 		id<MTLBuffer> any = rt.probe;
 
-		memcpy(constants, camera, sizeof(constants));
+		memcpy(constants, camera, 84 * sizeof(float));
+		/* (the exposure: HALO_RT_EXPOSURE, a number, holds it) */
+		if (!(rt.exposure > 0.0f))
+			rt.exposure = 1.0f;
+		constants[84] = getenv("HALO_RT_EXPOSURE") ? (float)atof(getenv("HALO_RT_EXPOSURE")) : rt.exposure;
 		/* (the traced light's new samples: every 4th frame a pixel, every
 		8th or 16th as the governor sheds) */
 		if (!(camera[63] > 0.0f))
@@ -1952,8 +1996,38 @@ int host_rt_trace(const float *camera, int width, int height)
 			[encoder setBuffer:cutouts_ready ? rt.instance_offsets[rt.scene_ring] : any offset:0 atIndex:24];
 			[encoder setBytes:&cutouts_ready length:sizeof(cutouts_ready) atIndex:25];
 			[encoder setBuffer:gi_ready && rt.drawn_vertices ? rt.drawn_vertices : any offset:0 atIndex:26];
+
 			[encoder setTexture:cutouts_ready ? rt.mask_atlas : rt.textures[1] atIndex:7];
 			constants[83] = (float)rt.drawn_cutout_start;
+		}
+		/* the exposure's sums, zeroed, read when the rays are done */
+		{
+			int ring = rt.exposure_ring;
+			id<MTLBuffer> sums;
+
+			if (!rt.exposure_sums[ring])
+				rt.exposure_sums[ring] = [rt.device newBufferWithLength:16 options:MTLResourceStorageModeShared];
+			sums = rt.exposure_sums[ring];
+			memset(sums.contents, 0, 16);
+			[encoder setBuffer:sums offset:0 atIndex:27];
+			rt.exposure_ring = (ring + 1) % 3;
+			if (gi_ready)
+			{
+				[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
+					const uint32_t *values = sums.contents;
+
+					(void)done;
+					/* (the baked light over the traced, over a hundred pixels or
+					more, followed a twentieth a frame, 0.25 to 8) */
+					if (values[2] > 100 && values[1] > values[2])
+					{
+						float target = (float)values[0] / (float)values[1];
+
+						target = target < 0.25f ? 0.25f : target > 8.0f ? 8.0f : target;
+						rt.exposure *= powf(target / rt.exposure, 0.05f);
+					}
+				}];
+			}
 		}
 		{
 			uint32_t glowing_count = gi_ready && rt.glowing ? rt.glowing_count : 0;
@@ -1979,7 +2053,8 @@ int host_rt_trace(const float *camera, int width, int height)
 			total += rt.gpu_ms;
 			if (++frames == 600)
 			{
-				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (shed %d)", total / frames, rt.shed);
+				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (shed %d, exposure %.2f)", total / frames,
+					rt.shed, rt.exposure);
 				total = 0.0;
 				frames = 0;
 			}

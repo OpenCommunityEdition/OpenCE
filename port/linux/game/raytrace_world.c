@@ -1263,7 +1263,30 @@ struct ray_level_shader_environment
 	struct shader shader;
 	byte reserved28[0x60];
 	struct tag_reference base_map;
+	byte reserved98[0xE8];
+	/* the self-illumination (rasterizer_xbox_environment.c): its map's red,
+	green and blue say where the primary, secondary and plasma colours glow;
+	without a map, nothing glows */
+	word self_illumination_flags;
+	short pad182;
+	byte reserved184[0x18];
+	real_rgb_color primary_on_color;
+	byte reserved1A8[0x30];
+	real_rgb_color secondary_on_color;
+	byte reserved1E4[0x30];
+	real_rgb_color plasma_on_color;
+	byte reserved220[0x30];
+	real self_illumination_map_scale;
+	struct tag_reference self_illumination_map;
 };
+typedef char ray_level_shader_primary_offset_assert[
+	offsetof(struct ray_level_shader_environment, primary_on_color) == 0x19C ? 1 : -1];
+typedef char ray_level_shader_self_illumination_map_offset_assert[
+	offsetof(struct ray_level_shader_environment, self_illumination_map) == 0x254 ? 1 : -1];
+
+/* how bright a self-illuminated surface's light is, of its colour (a panel
+drawn at full brightness lights what faces it, near, about as much) */
+#define RAY_SELF_ILLUMINATION_POWER 4.0f
 
 static struct
 {
@@ -1285,6 +1308,10 @@ static struct
 	long material_count;
 	/* each material's base map, until its colour is known */
 	struct bitmap_data **base_maps;
+	/* each material's self-illumination map, until its glow is known, and
+	its primary, secondary and plasma colours (9 floats) */
+	struct bitmap_data **self_maps;
+	float *self_colors;
 	boolean materials_changed;
 	/* each page's bitmap (the lightmap's), and whether it is decoded */
 	struct bitmap_data **pages;
@@ -1401,6 +1428,7 @@ static void level_free(void)
 	void **blocks[] = { (void **)&level.vertices, (void **)&level.texcoords, (void **)&level.base_texcoords,
 		(void **)&level.indices,
 		(void **)&level.triangle_materials, (void **)&level.materials, (void **)&level.base_maps,
+		(void **)&level.self_maps, (void **)&level.self_colors,
 		(void **)&level.pages, (void **)&level.pages_done };
 	long index;
 
@@ -1454,10 +1482,12 @@ static void level_build(const struct structure_bsp *bsp)
 	level.triangle_materials = malloc((size_t)triangle_count * sizeof(unsigned long));
 	level.materials = malloc((size_t)material_count * RAY_LEVEL_MATERIAL_FLOATS * sizeof(float));
 	level.base_maps = malloc((size_t)material_count * sizeof(struct bitmap_data *));
+	level.self_maps = malloc((size_t)material_count * sizeof(struct bitmap_data *));
+	level.self_colors = malloc((size_t)material_count * 9 * sizeof(float));
 	level.pages = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(struct bitmap_data *));
 	level.pages_done = malloc((size_t)MAX(bsp->lightmaps.count, 1) * sizeof(boolean));
 	if (!level.vertices || !level.texcoords || !level.base_texcoords || !level.indices || !level.triangle_materials || !level.materials ||
-		!level.base_maps || !level.pages || !level.pages_done)
+		!level.base_maps || !level.self_maps || !level.self_colors || !level.pages || !level.pages_done)
 	{
 		level_free();
 		return;
@@ -1495,10 +1525,36 @@ static void level_build(const struct structure_bsp *bsp)
 			}
 			out[7] = level.pages[lightmap_index] ? (float)lightmap_index : -1.0f;
 			level.base_maps[level.material_count] = NULL;
+			level.self_maps[level.material_count] = NULL;
 			if (opaque)
 			{
 				const struct ray_level_shader_environment *environment =
 					(const struct ray_level_shader_environment *)shader;
+
+				/* (self-illuminated: its glow once its map is read) */
+				if (environment->self_illumination_map.index != NONE)
+				{
+					const struct bitmap_group *group = bitmap_group_get(environment->self_illumination_map.index);
+					float *colors = level.self_colors + level.material_count * 9;
+
+					colors[0] = environment->primary_on_color.red;
+					colors[1] = environment->primary_on_color.green;
+					colors[2] = environment->primary_on_color.blue;
+					colors[3] = environment->secondary_on_color.red;
+					colors[4] = environment->secondary_on_color.green;
+					colors[5] = environment->secondary_on_color.blue;
+					colors[6] = environment->plasma_on_color.red;
+					colors[7] = environment->plasma_on_color.green;
+					colors[8] = environment->plasma_on_color.blue;
+					if (group && group->bitmaps.count > 0 &&
+						colors[0] + colors[1] + colors[2] + colors[3] + colors[4] + colors[5] + colors[6] + colors[7] +
+						colors[8] > 0.0f)
+					{
+						level.self_maps[level.material_count] = bitmap_group_try_and_get_bitmap(
+							environment->self_illumination_map.index,
+							(short)(material->permutation_index % group->bitmaps.count));
+					}
+				}
 
 				if (environment->base_map.index != NONE)
 				{
@@ -1761,6 +1817,39 @@ unsigned long halo_ray_tracing_level(const float **vertices, const float **texco
 	return level.generation;
 }
 
+/* a readable bitmap's average colour (0 to 1): a small mipmap's, at 16
+points - the smallest at least 8 pixels across (a compressed one's blocks
+are 4); bitmap_2d_get_pixel takes it as a fraction of the mipmaps, rounded
+down */
+static void level_bitmap_average(struct bitmap_data *bitmap, float *average)
+{
+	float sum[3] = { 0.0f, 0.0f, 0.0f }, lod = 1.0f;
+	long sample, mipmap = 0;
+
+	while (mipmap < bitmap->mipmap_count && (bitmap->width >> (mipmap + 1)) >= 8 &&
+		(bitmap->height >> (mipmap + 1)) >= 8)
+	{
+		mipmap++;
+	}
+	if (bitmap->mipmap_count > 0)
+		lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
+	for (sample = 0; sample < 16; sample++)
+	{
+		real_point2d point;
+		pixel32 pixel;
+
+		point.x = ((float)(sample & 3) + 0.5f) / 4.0f;
+		point.y = ((float)(sample >> 2) + 0.5f) / 4.0f;
+		pixel = bitmap_2d_get_pixel(bitmap, &point, lod);
+		sum[0] += (float)((pixel >> 16) & 0xff) / 255.0f;
+		sum[1] += (float)((pixel >> 8) & 0xff) / 255.0f;
+		sum[2] += (float)(pixel & 0xff) / 255.0f;
+	}
+	average[0] = sum[0] / 16.0f;
+	average[1] = sum[1] / 16.0f;
+	average[2] = sum[2] / 16.0f;
+}
+
 /* the materials (RAY_LEVEL_MATERIAL_FLOATS each); TRUE when they changed
 since the last call. Each call reads a few more base maps' colours, as the
 texture cache loads them. */
@@ -1775,40 +1864,41 @@ boolean halo_ray_tracing_level_materials(const float **materials, long *count)
 		struct bitmap_data *bitmap = level.base_maps[index];
 
 		level.next_material = (index + 1) % level.material_count;
-		if (!bitmap)
-			continue;
-		/* (asks the cache for it, without waiting) */
-		if (level_bitmap_readable(bitmap))
+		/* (asks the cache for them, without waiting) */
+		if (bitmap && level_bitmap_readable(bitmap))
 		{
-			float sum[3] = { 0.0f, 0.0f, 0.0f }, lod = 1.0f;
-			long sample, mipmap = 0;
+			float sum[3];
 
-			/* a small mipmap's colour, at 16 points: the smallest at least 8
-			pixels across (a compressed one's blocks are 4) - bitmap_2d_get_pixel
-			takes it as a fraction of the mipmaps, rounded down */
-			while (mipmap < bitmap->mipmap_count && (bitmap->width >> (mipmap + 1)) >= 8 &&
-				(bitmap->height >> (mipmap + 1)) >= 8)
-			{
-				mipmap++;
-			}
-			if (bitmap->mipmap_count > 0)
-				lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
-			for (sample = 0; sample < 16; sample++)
-			{
-				real_point2d point;
-				pixel32 pixel;
-
-				point.x = ((float)(sample & 3) + 0.5f) / 4.0f;
-				point.y = ((float)(sample >> 2) + 0.5f) / 4.0f;
-				pixel = bitmap_2d_get_pixel(bitmap, &point, lod);
-				sum[0] += (float)((pixel >> 16) & 0xff) / 255.0f;
-				sum[1] += (float)((pixel >> 8) & 0xff) / 255.0f;
-				sum[2] += (float)(pixel & 0xff) / 255.0f;
-			}
-			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 0] = sum[0] / 16.0f;
-			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 1] = sum[1] / 16.0f;
-			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 2] = sum[2] / 16.0f;
+			level_bitmap_average(bitmap, sum);
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 0] = sum[0];
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 1] = sum[1];
+			level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 2] = sum[2];
 			level.base_maps[index] = NULL;
+			level.materials_changed = TRUE;
+		}
+		/* (a self-illuminated one's glow: each colour where its channel of
+		the map is, on average - the plasma's half the time) */
+		if (level.self_maps[index] && level_bitmap_readable(level.self_maps[index]))
+		{
+			const float *colors = level.self_colors + index * 9;
+			float sum[3];
+			long channel;
+
+			level_bitmap_average(level.self_maps[index], sum);
+			for (channel = 0; channel < 3; channel++)
+			{
+				level.materials[index * RAY_LEVEL_MATERIAL_FLOATS + 4 + channel] += RAY_SELF_ILLUMINATION_POWER *
+					(colors[channel] * sum[0] + colors[3 + channel] * sum[1] + colors[6 + channel] * sum[2] * 0.5f);
+			}
+			{
+				static long logged;
+				const float *glow = level.materials + index * RAY_LEVEL_MATERIAL_FLOATS + 4;
+
+				if (logged++ < 24)
+					platform_log("ray tracing: self-illuminated material %ld glows %.2f %.2f %.2f", index, glow[0], glow[1],
+						glow[2]);
+			}
+			level.self_maps[index] = NULL;
 			level.materials_changed = TRUE;
 		}
 	}
