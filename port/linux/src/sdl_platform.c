@@ -857,7 +857,6 @@ void platform_pump_events(void)
 				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
 				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
 				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
-				case SDL_SCANCODE_L: action = SDL_SCANCODE_F5; break;
 				case SDL_SCANCODE_J: action = SDL_SCANCODE_F4; break;
 				/* the next debug camera, and the flying camera's controls
 				(xinput_sdl.c, source/camera/director.c) */
@@ -905,10 +904,6 @@ void platform_pump_events(void)
 			/* F4: the objects' shapes in the rays (raytrace_gl.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F4)
 				notice("ray tracing shapes: %s", halo_ray_tracing_shapes_next());
-			/* F5: the ray probe, the rays of the crosshair's surface drawn
-			(raytrace_gl.c) */
-			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F5)
-				notice("ray probe: %s", halo_ray_tracing_probe_next());
 			/* F6 steps through what the ray tracing shows (raytrace_gl.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F6)
 				notice("ray tracing view: %s", halo_ray_tracing_next_view());

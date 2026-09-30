@@ -41,9 +41,6 @@ const char *halo_ray_tracing_next_view(void);
 /* F4: the objects' shapes in the rays next (the drawn models, the collision
 models, ellipsoids); returns their name */
 const char *halo_ray_tracing_shapes_next(void);
-/* F5: the ray probe off, live (the crosshair's rays drawn), frozen; returns
-what it is now */
-const char *halo_ray_tracing_probe_next(void);
 /* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
 view, 5 split (tests) */
 void halo_ray_tracing_debug_mode(int mode);
