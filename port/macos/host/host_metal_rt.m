@@ -127,7 +127,8 @@ static NSString *const kernel_source = @
 	   frame 20, occlusion radius 21, reflection distance 22, whether the
 	   objects' pixels are known 23 (then their depth is negative), the
 	   direction to the sun 24-26 and whether there is one 27, the player's
-	   body's bounding sphere 28-31 (radius 0: none) */
+	   body's bounding sphere 28-31 (radius 0: none), the ray view 32 (0 off,
+	   1 all the screen, 2 its right half) */
 	"kernel void trace(texture2d<float, access::read> gbuffer [[texture(0)]],\n"
 	"	texture2d<float, access::write> result [[texture(1)]],\n"
 	"	instance_acceleration_structure world [[buffer(0)]],\n"
@@ -140,6 +141,58 @@ static NSString *const kernel_source = @
 	"	float2 origin = float2(c[16], c[17]), size = float2(c[18], c[19]);\n"
 	"	float2 p = float2(id) + 0.5;\n"
 	"	if (any(p < origin) || any(p >= origin + size)) return;\n"
+	/* the ray view: what a ray from the camera through the pixel finds in
+	   Metal's scene - the level's collision triangles each its own colour
+	   with its edges drawn, the objects' shapes orange, the player's body
+	   cyan - darkened where a ray from the hit to the sun is blocked */
+	"	if (c[32] > 0.5 && (c[32] < 1.5 || p.x >= origin.x + size.x * 0.5))\n"
+	"	{\n"
+	"		float3 eye = float3(c[0], c[1], c[2]), ahead = float3(c[3], c[4], c[5]);\n"
+	"		float3 above = float3(c[6], c[7], c[8]), across = float3(c[9], c[10], c[11]);\n"
+	"		float2 q = (p - origin) / size * 2.0 - 1.0;\n"
+	"		float3 dir = normalize(ahead + across * (q.x * c[14] * c[15]) - above * (q.y * c[14]));\n"
+	"		intersector<triangle_data, instancing> view;\n"
+	"		view.assume_geometry_type(geometry_type::triangle);\n"
+	"		view.force_opacity(forced_opacity::opaque);\n"
+	"		view.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"		view.set_triangle_cull_mode(triangle_cull_mode::back);\n"
+	"		ray primary(eye, dir, c[12], c[13]);\n"
+	"		auto h = view.intersect(primary, world, 7u);\n"
+	"		float3 color;\n"
+	"		if (h.type == intersection_type::none)\n"
+	"			color = mix(float3(0.62, 0.72, 0.9), float3(0.18, 0.28, 0.55), clamp(dir.z * 2.0, 0.0, 1.0));\n"
+	"		else\n"
+	"		{\n"
+	"			float3 base;\n"
+	"			if (h.instance_id == 0)\n"
+	"			{\n"
+	"				uint k = h.primitive_id * 2654435761u;\n"
+	"				base = 0.3 + 0.6 * float3(float(k & 255u), float((k >> 8) & 255u), float((k >> 16) & 255u)) / 255.0;\n"
+	"				float2 b = h.triangle_barycentric_coord;\n"
+	"				if (min(min(b.x, b.y), 1.0 - b.x - b.y) < 0.02) base *= 0.2;\n"
+	"			}\n"
+	"			else\n"
+	"			{\n"
+	"				auto body = view.intersect(primary, world, 4u);\n"
+	"				bool player = body.type != intersection_type::none && abs(body.distance - h.distance) < 1e-3;\n"
+	"				base = player ? float3(0.2, 0.9, 1.0) : float3(1.0, 0.55, 0.15);\n"
+	"			}\n"
+	"			base *= 1.0 / (1.0 + h.distance * 0.015);\n"
+	"			if (c[27] > 0.0)\n"
+	"			{\n"
+	"				intersector<triangle_data, instancing> sun_hit;\n"
+	"				sun_hit.accept_any_intersection(true);\n"
+	"				sun_hit.force_opacity(forced_opacity::opaque);\n"
+	"				sun_hit.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"				sun_hit.set_triangle_cull_mode(triangle_cull_mode::back);\n"
+	"				ray to_sun(eye + dir * h.distance - dir * 0.02, float3(c[24], c[25], c[26]), 0.0, 2000.0);\n"
+	"				if (sun_hit.intersect(to_sun, world, 7u).type != intersection_type::none) base *= 0.45;\n"
+	"			}\n"
+	"			color = base;\n"
+	"		}\n"
+	"		result.write(float4(color, 1.0), id);\n"
+	"		return;\n"
+	"	}\n"
 	"	float4 g = gbuffer.read(id);\n"
 	"	float z = abs(g.x);\n"
 	"	if (z <= c[12] || z >= c[13] * 0.999) { result.write(float4(1.0, 0.0, 0.0, 0.0), id); return; }\n"
@@ -706,7 +759,7 @@ uint32_t host_rt_texture(int which, int width, int height)
 	return rt.gl_textures[which];
 }
 
-/* the rays, for the camera (the 32 values the kernel names); 1 if done */
+/* the rays, for the camera (the 36 values the kernel names); 1 if done */
 /* the time waited on GL (glFinish) and on the rays, for the frame
 statistics (host_sdl.c) */
 uint64_t host_rt_finish_ns, host_rt_trace_ns, host_rt_traces;
@@ -768,7 +821,7 @@ int host_rt_trace(const float *camera, int width, int height)
 	[encoder setAccelerationStructure:rt.world atBufferIndex:2];
 	[encoder setBytes:rt.spheres length:sizeof(rt.spheres) atIndex:3];
 	[encoder setBytes:&rt.sphere_count length:sizeof(rt.sphere_count) atIndex:4];
-	[encoder setBytes:camera length:32 * sizeof(float) atIndex:1];
+	[encoder setBytes:camera length:36 * sizeof(float) atIndex:1];
 	group = MTLSizeMake(8, 8, 1);
 	groups = MTLSizeMake(((NSUInteger)width + 7) / 8, ((NSUInteger)height + 7) / 8, 1);
 	[encoder dispatchThreadgroups:groups threadsPerThreadgroup:group];

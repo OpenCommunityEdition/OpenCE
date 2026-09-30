@@ -67,6 +67,9 @@ enum
 	_ray_tracing_on,
 	_ray_tracing_debug_occlusion,
 	_ray_tracing_debug_depth,
+	/* what Metal's rays find, from the camera: all the screen, its right half */
+	_ray_tracing_debug_rays,
+	_ray_tracing_debug_split,
 };
 
 static struct
@@ -317,6 +320,15 @@ static const char composite_source[] =
 	"	vec4 scene = texelFetch(scene_texture, p, 0);\n"
 	"	float d = depth_at(p);\n"
 	"	if (debug_mode == 3) { float z = linear_depth(d); result = vec4(vec3(fract(z / 10.0)), 1.0); return; }\n"
+	/* the ray view (Metal's rays from the camera), on all the screen or its
+	   right half, a line between */
+	"	if (debug_mode == 4 || (debug_mode == 5 && float(p.x) >= u[1].x + u[1].z * 0.5))\n"
+	"	{\n"
+	"		if (debug_mode == 5 && float(p.x) < u[1].x + u[1].z * 0.5 + 2.0) { result = vec4(1.0); return; }\n"
+	"		result = rt_enabled != 0 ? vec4(texelFetch(rt_texture, p / TRACE_SCALE, 0).rgb, 1.0) :\n"
+	"			vec4(0.4, 0.0, 0.4, 1.0);\n"
+	"		return;\n"
+	"	}\n"
 	"	if (d >= 0.99999) { result = scene; return; }\n"
 	/* the occlusion blurred over 4x4 of the rays' pixels (8x8 of the
 	   window's at half resolution: all 16 of the rays' sets of directions)
@@ -421,6 +433,10 @@ static int mode_from_setting(const char *text)
 		return _ray_tracing_debug_occlusion;
 	if (!strcmp(text, "depth"))
 		return _ray_tracing_debug_depth;
+	if (!strcmp(text, "rays"))
+		return _ray_tracing_debug_rays;
+	if (!strcmp(text, "split"))
+		return _ray_tracing_debug_split;
 	if (!strcmp(text, "screen"))
 		return _ray_tracing_on;
 	return _ray_tracing_on;
@@ -547,7 +563,32 @@ const char *halo_ray_tracing_toggle(void)
 	return ray.hardware ? "on (Metal: level rays, sun shadows, screen rays)" : "on (screen rays)";
 }
 
-/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth (tests) */
+/* F6: what it shows next - the lighting, the ray view, the lighting and the
+ray view side by side, the occlusion; returns its name */
+const char *halo_ray_tracing_next_view(void)
+{
+	static const int order[] = { _ray_tracing_on, _ray_tracing_debug_rays, _ray_tracing_debug_split,
+		_ray_tracing_debug_occlusion };
+	static const char *const names[] = { "lighting", "ray view (what Metal's rays hit)",
+		"split (lighting | ray view)", "occlusion" };
+	int index, next = 0;
+
+	if (!ray.initialized)
+		initialize();
+	for (index = 0; index < 4; index++)
+	{
+		if (ray.enabled && ray.mode == order[index])
+			next = (index + 1) % 4;
+	}
+	ray.mode = order[next];
+	ray.enabled = 1;
+	if (!ray.hardware && (ray.mode == _ray_tracing_debug_rays || ray.mode == _ray_tracing_debug_split))
+		return "ray view needs Metal's rays";
+	return names[next];
+}
+
+/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
+view, 5 split (tests) */
 void halo_ray_tracing_debug_mode(int mode)
 {
 	if (!ray.initialized)
@@ -568,7 +609,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[32], right[3], length;
+	float camera[36], right[3], length;
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -635,6 +676,9 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[22] = 40.0f;
 	/* the objects' pixels, marked in the depth and normals */
 	camera[23] = (ray.light_stages & 4) ? 1.0f : 0.0f;
+	/* the ray view */
+	camera[32] = ray.mode == _ray_tracing_debug_rays ? 1.0f : ray.mode == _ray_tracing_debug_split ? 2.0f : 0.0f;
+	camera[33] = camera[34] = camera[35] = 0.0f;
 	/* the sun, for shadows on the objects */
 	camera[27] = halo_ray_tracing_sun(camera + 24) ? ray.shadow_strength : 0.0f;
 	/* the objects, as shapes for the rays */

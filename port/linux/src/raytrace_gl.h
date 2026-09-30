@@ -20,7 +20,11 @@ void halo_ray_traced_light_stage(int stage);
 /* F9 (sdl_platform.c) */
 /* returns what it is now, as text */
 const char *halo_ray_tracing_toggle(void);
-/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth (tests) */
+/* F6: the next view (the lighting, the ray view, split, the occlusion);
+returns its name */
+const char *halo_ray_tracing_next_view(void);
+/* what it shows: 1 the lighting, 2 the occlusion, 3 the depth, 4 the ray
+view, 5 split (tests) */
 void halo_ray_tracing_debug_mode(int mode);
 
 #endif

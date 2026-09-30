@@ -109,8 +109,9 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"Ray-traced lighting on the 3D world (port/linux/src/raytrace_gl.c): \"on\"\n"
 		"(on macOS with Metal's rays through the level), \"screen\" (the screen's rays\n"
-		"only), \"off\", or \"occlusion\" and \"depth\" to see what it works from.\n"
-		"F9 switches it while playing." },
+		"only), \"off\", or \"occlusion\" and \"depth\" to see what it works from, or\n"
+		"\"rays\" and \"split\" to see what Metal's rays find. F9 switches it while\n"
+		"playing; F6 steps through the views." },
 	{ "display.ray_tracing_occlusion", _config_real, "0.8", "HALO_RAY_TRACING_OCCLUSION", _environment_value,
 		_platform_all,
 		"How much traced ambient occlusion darkens creases and corners, 0.0 to 1.0." },

@@ -769,7 +769,7 @@ void platform_pump_events(void)
 		case SDL_EVENT_KEY_DOWN:
 		case SDL_EVENT_KEY_UP:
 		{
-			/* the port's keys: F7 to F12, or on macOS, whose own keys F11 and
+			/* the port's keys: F6 to F12, or on macOS, whose own keys F11 and
 			the media keys are, Command with a letter (the letter then does
 			nothing in the game) */
 			SDL_Scancode action = event.key.scancode;
@@ -784,6 +784,7 @@ void platform_pump_events(void)
 				case SDL_SCANCODE_T: action = SDL_SCANCODE_F9; break;
 				case SDL_SCANCODE_G: action = SDL_SCANCODE_F12; break;
 				case SDL_SCANCODE_P: action = SDL_SCANCODE_F7; break;
+				case SDL_SCANCODE_B: action = SDL_SCANCODE_F6; break;
 				default: break;
 				}
 			}
@@ -805,6 +806,9 @@ void platform_pump_events(void)
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 				notice("mouse %s", input_state.mouse_released ? "released" : "captured");
 			}
+			/* F6 steps through what the ray tracing shows (raytrace_gl.c) */
+			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F6)
+				notice("ray tracing view: %s", halo_ray_tracing_next_view());
 			/* F7 shows or hides the game's frames-a-second counter (its own
 			display_framerate: source/main/main.c) */
 			if (event.key.down && !event.key.repeat && action == SDL_SCANCODE_F7)

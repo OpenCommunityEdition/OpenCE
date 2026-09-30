@@ -75,6 +75,7 @@ build adds:
 
 | Key | Mac keyboard | Function |
 | --- | --- | --- |
+| F6 | ⌘B | Step through what the ray tracing shows: the lighting, the ray view, split, the occlusion (refer to "Ray-traced lighting"). |
 | F7 | ⌘P | Show or hide the frames-a-second counter. |
 | F8 | ⌘R | Change the resolution: native, 2160p, 1440p, 1080p, 720p, then the Xbox's 640x480. |
 | F9 | ⌘T | Switch the ray-traced lighting on or off. |
@@ -259,6 +260,14 @@ bounce. Where Metal cannot trace rays, they are the only rays.
 | `"screen"` | The screen's only. |
 | `"off"` | None. |
 | `"occlusion"`, `"depth"` | Show what the lighting uses. |
+| `"rays"`, `"split"` | The ray view: what Metal's rays find from the camera (`"split"`: the lighting on the left, the ray view on the right). |
+
+The ray view (F6 / ⌘B) traces a ray from the camera through each pixel
+into Metal's scene and draws what it finds: the level's collision triangles,
+each its own colour with its edges drawn; the characters' and vehicles'
+shapes orange; your own body cyan (look down); and, darker, where a second
+ray from the hit to the sun is blocked. It is the scene the lighting's rays
+go through.
 
 `port/macos/tests/run_raytrace_test.sh` draws a test scene through the
 lighting on ANGLE, with Metal's rays, as the game draws its frame (the
