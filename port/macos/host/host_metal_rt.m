@@ -1004,9 +1004,13 @@ static NSString *const kernel_source = @
 	"		if (!sample_now) frames = fmod(before.a, 256.0);\n"
 	"		if (sample_now)\n"
 	"		{\n"
+	/* (c[93] rays a pixel, their light averaged: the setting's) */
+	"		uint spp = uint(clamp(c[93], 1.0, 8.0));\n"
+	"		for (uint spp_k = 0u; spp_k < spp; spp_k++)\n"
+	"		{\n"
 	/* (the sequence's place: the samples, and past the most it counts, on
-	   with the frame) */
-	"		float n = frames < 254.5 ? frames : frames + float(uint(c[44]) & 4095u);\n"
+	   with the frame; each of this frame's rays its own) */
+	"		float n = (frames < 254.5 ? frames : frames + float(uint(c[44]) & 4095u)) * float(spp) + float(spp_k);\n"
 	/* the sky's wide lights (c[64-79]: each its direction, its colour and
 	   power, the cosine of its half width, whether there is one): a ray
 	   toward a point of each, new each frame, accumulated with the bounces */
@@ -1045,7 +1049,7 @@ static NSString *const kernel_source = @
 	"			float3 origin = P + N * bias;\n"
 	"			float3 throughput = float3(1.0);\n"
 	"			float3 L = float3(0.0);\n"
-	"			uint depth = c[42] > 2.5 ? uint(clamp(c[85], 1.0, 3.0)) : 1u;\n"
+	"			uint depth = c[42] > 2.5 ? uint(clamp(c[85], 1.0, 4.0)) : 1u;\n"
 	"			for (uint bounce_index = 0; bounce_index < depth; bounce_index++)\n"
 	"			{\n"
 	"				ray bounce(origin, d, 0.0, 600.0);\n"
@@ -1150,6 +1154,8 @@ static NSString *const kernel_source = @
 	"				}\n"
 	"			}\n"
 	"		}\n"
+	"		}\n"
+	"		indirect /= float(spp);\n"
 	"		}\n"
 	/* (a sample far brighter than the pixel's average - a ray that found a
 	   small bright glow, one in thousands - taken down to 6 times it: the
@@ -2457,11 +2463,14 @@ int host_rt_trace(const float *camera, int width, int height)
 	/* the drawn level's surfaces and the traced light's textures (in their
 	place, anything bound: the kernel reads them only when gi_ready) */
 	{
-		float constants[92] = { 0 };
+		float constants[96] = { 0 };
 		uint32_t gi_ready = camera[42] > 0.5f && rt.use_drawn && rt.drawn && rt.drawn_materials && rt.atlas;
 		id<MTLBuffer> any = rt.probe;
 
 		memcpy(constants, camera, 84 * sizeof(float));
+		/* (the settings' bounces and rays a pixel, 92 and 93) */
+		constants[92] = camera[92];
+		constants[93] = camera[93];
 		/* (the exposure: HALO_RT_EXPOSURE, a number, holds it) */
 		if (!(rt.exposure > 0.0f))
 			rt.exposure = 1.0f;
@@ -2481,7 +2490,13 @@ int host_rt_trace(const float *camera, int width, int height)
 			constants[63] = (float)(4 << (rt.shed < 2 ? rt.shed : 2));
 		/* (the path tracer's bounces: 3, 2 once the governor sheds, 1 from
 		its third step) */
-		constants[85] = rt.shed >= 3 ? 1.0f : rt.shed >= 1 ? 2.0f : 3.0f;
+		{
+			/* (the bounces: the setting's, 1 to 4; one fewer once the governor
+			sheds, one only from its third step) */
+			float bounces = camera[92] >= 1.0f ? (camera[92] > 4.0f ? 4.0f : camera[92]) : 3.0f;
+
+			constants[85] = rt.shed >= 3 ? 1.0f : rt.shed >= 1 && bounces > 1.0f ? bounces - 1.0f : bounces;
+		}
 		/* (the most one ray to a glowing triangle brings: HALO_RT_GLOW_CLAMP) */
 		constants[86] = getenv("HALO_RT_GLOW_CLAMP") ? (float)atof(getenv("HALO_RT_GLOW_CLAMP")) : 4.0f;
 		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||

@@ -64,6 +64,9 @@ struct halo_ray_tracing_settings
 	int traced_lights, shapes, objects, gi_split;
 	/* the strengths */
 	float occlusion, reflections, bounce, shadows, gi_sun, gi_bounce, gi_glow, gi_lights;
+	/* the path tracer's bounces at most (1-4), the traced light's rays a
+	pixel (1-8) */
+	float gi_bounces, gi_samples;
 	/* (read only) whether Metal's rays can be had, and whether the ray
 	tracing could not start */
 	int hardware_available, failed;

@@ -109,6 +109,8 @@ static struct
 	its parts' strengths, and the light buffer's pass */
 	int drawn_level, gi;
 	float gi_sun, gi_bounce, gi_glow, gi_lights;
+	/* the path tracer's bounces at most, the traced light's rays a pixel */
+	float gi_bounces, gi_samples;
 	/* the lightmap pages' average light (sums of a sample of their pixels,
 	and how many), for where a page is missing */
 	double lightmap_sum[3], lightmap_samples;
@@ -1012,6 +1014,8 @@ static void initialize(void)
 	ray.gi_sun = (float)config_real("display.ray_tracing_gi_sun");
 	ray.gi_bounce = (float)config_real("display.ray_tracing_gi_bounce");
 	ray.gi_glow = (float)config_real("display.ray_tracing_gi_glow");
+	ray.gi_bounces = (float)config_real("display.ray_tracing_bounces");
+	ray.gi_samples = (float)config_real("display.ray_tracing_samples");
 	ray.gi_lights = (float)config_real("display.ray_tracing_gi_lights");
 	ray.gi_split = config_boolean("display.ray_tracing_gi_split");
 	/* no drawing (debug.null_renderer: headless tests, bots) has no GL */
@@ -1204,6 +1208,8 @@ void halo_ray_tracing_get(struct halo_ray_tracing_settings *settings)
 	settings->gi_sun = ray.gi_sun;
 	settings->gi_bounce = ray.gi_bounce;
 	settings->gi_glow = ray.gi_glow;
+	settings->gi_bounces = ray.gi_bounces;
+	settings->gi_samples = ray.gi_samples;
 	settings->gi_lights = ray.gi_lights;
 	settings->hardware_available = ray.hardware_linked || !ray.hardware_tried;
 	settings->failed = ray.failed;
@@ -1245,6 +1251,8 @@ void halo_ray_tracing_set(const struct halo_ray_tracing_settings *settings)
 	ray.gi_sun = settings->gi_sun;
 	ray.gi_bounce = settings->gi_bounce;
 	ray.gi_glow = settings->gi_glow;
+	ray.gi_bounces = settings->gi_bounces;
+	ray.gi_samples = settings->gi_samples;
 	ray.gi_lights = settings->gi_lights;
 	if (restart)
 	{
@@ -1284,7 +1292,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[84], right[3], length;
+	float camera[96], right[3], length;
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -1464,6 +1472,10 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	camera[45] = ray.gi_sun;
 	camera[46] = ray.drawn_level ? 1.0f : 0.0f;
 	camera[47] = ray.gi_glow;
+	/* (the path tracer's bounces at most, and the traced light's rays a pixel
+	each frame it takes new ones) */
+	camera[92] = (float)ray.gi_bounces;
+	camera[93] = (float)ray.gi_samples;
 	memcpy(camera + 48, ray.previous_camera, 13 * sizeof(float));
 	camera[61] = ray.gi_lights;
 	/* (how much of each new sample the accumulated light takes, at least:

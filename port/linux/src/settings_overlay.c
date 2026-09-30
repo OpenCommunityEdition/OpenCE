@@ -91,6 +91,8 @@ enum row_id
 	_row_ray_gi_sun,
 	_row_ray_gi_bounce,
 	_row_ray_gi_glow,
+	_row_ray_bounces,
+	_row_ray_samples,
 	_row_ray_gi_lights,
 	_row_ray_gi_split,
 	_row_audio,
@@ -202,6 +204,8 @@ static const struct row rows[] =
 	{ _row_real, _row_ray_gi_sun, "Sun", "display.ray_tracing_gi_sun", NULL, 0, 0.0f, 2.0f, 0.1f },
 	{ _row_real, _row_ray_gi_bounce, "Bounced light", "display.ray_tracing_gi_bounce", NULL, 0, 0.0f, 2.0f, 0.1f },
 	{ _row_real, _row_ray_gi_glow, "Glowing surfaces", "display.ray_tracing_gi_glow", NULL, 0, 0.0f, 2.0f, 0.1f },
+	{ _row_real, _row_ray_bounces, "Bounces (path)", "display.ray_tracing_bounces", NULL, 0, 1.0f, 4.0f, 1.0f },
+	{ _row_real, _row_ray_samples, "Rays per pixel", "display.ray_tracing_samples", NULL, 0, 1.0f, 8.0f, 1.0f },
 	{ _row_real, _row_ray_gi_lights, "Lights' strength", "display.ray_tracing_gi_lights", NULL, 0, 0.0f, 2.0f, 0.1f },
 	{ _row_boolean, _row_ray_gi_split, "Split: game | traced", "display.ray_tracing_gi_split", NULL, 0, 0, 0, 0, 0, 0,
 		"The game's own light on the left half of the screen, the traced on the right, to\n"
@@ -366,6 +370,8 @@ static float row_real(const struct row *row)
 	case _row_ray_gi_sun: return ray.gi_sun;
 	case _row_ray_gi_bounce: return ray.gi_bounce;
 	case _row_ray_gi_glow: return ray.gi_glow;
+	case _row_ray_bounces: return ray.gi_bounces;
+	case _row_ray_samples: return ray.gi_samples;
 	case _row_ray_gi_lights: return ray.gi_lights;
 	default:
 		return row->setting ? (float)config_real(row->setting) : 0.0f;
@@ -498,6 +504,8 @@ static void set_real(const struct row *row, float value, int save)
 	case _row_ray_gi_sun: ray.gi_sun = value; break;
 	case _row_ray_gi_bounce: ray.gi_bounce = value; break;
 	case _row_ray_gi_glow: ray.gi_glow = value; break;
+	case _row_ray_bounces: ray.gi_bounces = value; break;
+	case _row_ray_samples: ray.gi_samples = value; break;
 	case _row_ray_gi_lights: ray.gi_lights = value; break;
 	default: break;
 	}

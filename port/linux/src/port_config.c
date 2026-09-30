@@ -166,6 +166,15 @@ static const struct config_setting config_settings[] =
 		_platform_all, "The traced bounced light's strength (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_gi_glow", _config_real, "1.0", "HALO_RAY_TRACING_GI_GLOW", _environment_value,
 		_platform_all, "The glowing surfaces' traced light's strength (display.ray_tracing_gi)." },
+	{ "display.ray_tracing_bounces", _config_real, "3", "HALO_RAY_TRACING_BOUNCES", _environment_value,
+		_platform_all,
+		"How many times the path tracer's light bounces at most, 1 to 4 (display.ray_tracing_gi\n"
+		"\"path\"): more reach farther into the shade, and cost more. The governor takes one\n"
+		"off under load, and all but one when the frames are slow." },
+	{ "display.ray_tracing_samples", _config_real, "1", "HALO_RAY_TRACING_SAMPLES", _environment_value,
+		_platform_all,
+		"The traced light's rays a pixel each time it takes new ones, 1 to 8: more, less\n"
+		"noise and blotches, and that many times the cost of its rays." },
 	{ "display.ray_tracing_gi_split", _config_boolean, "false", "HALO_RAY_TRACING_GI_SPLIT", _environment_set_is_true,
 		_platform_all, "The game's light on the screen's left half, the traced on its right (display.ray_tracing_gi)." },
 	{ "display.ray_tracing_gi_lights", _config_real, "0.5", "HALO_RAY_TRACING_GI_LIGHTS", _environment_value,
