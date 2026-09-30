@@ -896,7 +896,9 @@ static NSString *const kernel_source = @
 	/* (new samples every c[63]th frame a pixel, in a scattered pattern,
 	   where it has a history; the rest of the time, its history) */
 	"		uint period = max(uint(c[63]), 1u);\n"
-	"		bool sample_now = weight >= 1.0 || (pcg(id.x + id.y * 4096u) + uint(c[44])) % period == 0u;\n"
+	/* (and every frame while it holds fewer than 8: a place just come into
+	   view fills in at once, not over seconds) */
+	"		bool sample_now = weight >= 1.0 || frames <= 8.0 || (pcg(id.x + id.y * 4096u) + uint(c[44])) % period == 0u;\n"
 	"		if (!sample_now) frames = fmod(before.a, 256.0);\n"
 	"		if (sample_now)\n"
 	"		{\n"
@@ -941,7 +943,7 @@ static NSString *const kernel_source = @
 	"			float3 origin = P + N * bias;\n"
 	"			float3 throughput = float3(1.0);\n"
 	"			float3 L = float3(0.0);\n"
-	"			uint depth = c[42] > 2.5 ? 3u : 1u;\n"
+	"			uint depth = c[42] > 2.5 ? uint(clamp(c[85], 1.0, 3.0)) : 1u;\n"
 	"			for (uint bounce_index = 0; bounce_index < depth; bounce_index++)\n"
 	"			{\n"
 	"				ray bounce(origin, d, 0.0, 600.0);\n"
@@ -1085,7 +1087,8 @@ static NSString *const kernel_source = @
 	"		if (!object)\n"
 	"		{\n"
 	"			visibility = 2.0;\n"
-	"			lit_value = float4(1.0, (direct + accumulated) * c[84]);\n"
+	/* (its first: how many samples it holds, for the denoiser) */
+	"			lit_value = float4(frames, (direct + accumulated) * c[84]);\n"
 	"		}\n"
 	/* (the exposure's sums: every 8th pixel each way, the level's baked
 	   light where a ray from the camera finds the pixel's surface - its
@@ -2286,6 +2289,10 @@ int host_rt_trace(const float *camera, int width, int height)
 		int cut = rt.shed > 2 ? rt.shed - 2 : 0;
 		unsigned int light_count = rt.light_count >> cut, emitter_count = rt.emitter_count >> cut;
 
+		/* (the 4 nearest always: the flashlight, what is at hand) */
+		light_count = MAX(light_count, MIN(rt.light_count, 4u));
+		emitter_count = MAX(emitter_count, MIN(rt.emitter_count, 4u));
+
 		[encoder setBytes:&light_count length:sizeof(light_count) atIndex:7];
 		[encoder setBytes:rt.emitters length:sizeof(rt.emitters) atIndex:8];
 		[encoder setBytes:&emitter_count length:sizeof(emitter_count) atIndex:9];
@@ -2306,6 +2313,9 @@ int host_rt_trace(const float *camera, int width, int height)
 		8th or 16th as the governor sheds) */
 		if (!(camera[63] > 0.0f))
 			constants[63] = (float)(4 << (rt.shed < 2 ? rt.shed : 2));
+		/* (the path tracer's bounces: 3, 2 once the governor sheds, 1 from
+		its third step) */
+		constants[85] = rt.shed >= 3 ? 1.0f : rt.shed >= 1 ? 2.0f : 3.0f;
 		if (gi_ready && (!rt.history[0] || rt.history[0].width != (NSUInteger)width ||
 			rt.history[0].height != (NSUInteger)height))
 		{

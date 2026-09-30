@@ -130,7 +130,7 @@ static struct
 	GLuint applied_texture;
 	int gi_applied;
 	GLint composite_denoised, composite_applied, composite_objects, composite_gbuffer, composite_correct;
-	GLint denoise_uniforms, denoise_lights, denoise_results, denoise_gbuffer;
+	GLint denoise_uniforms, denoise_lights, denoise_results, denoise_gbuffer, denoise_counts;
 	float gi_grid[4], gi_tan, gi_aspect;
 	int gi_previous;
 	int gi_split;
@@ -221,9 +221,10 @@ way), and the composite blends them back up across edges by depth */
 	"}\n"
 
 /* the traced light, denoised on the rays' grid, after they are traced: an
-a-trous wavelet filter (as SVGF's, Schied et al. 2017), four passes of 5x5
-taps each twice as far apart as the last (1, 2, 4, 8 of the rays' pixels),
-which together reach 61 across. Each tap weighs by the B3 spline, and less
+a-trous wavelet filter (as SVGF's, Schied et al. 2017), three passes of 5x5
+taps each twice as far apart as the last (1, 2, 4 of the rays' pixels),
+which together reach 29 across - fewer as the pixel's samples grow (the
+lights' texture's first: how many). Each tap weighs by the B3 spline, and less
 the farther its depth and facing are from this pixel's (the gbuffer's), and
 the farther its light's brightness is from this one's, measured against how
 much the light varies here (3x3) - noise is smoothed, an edge in the light
@@ -235,6 +236,7 @@ static const char denoise_source[] =
 	"uniform sampler2D lights_texture;\n"
 	"uniform sampler2D results_texture;\n"
 	"uniform sampler2D gbuffer_texture;\n"
+	"uniform sampler2D counts_texture;\n"
 	"uniform vec4 u[4];\n"
 	"out vec4 result;\n"
 	"ivec2 lo, hi;\n"
@@ -266,6 +268,10 @@ static const char denoise_source[] =
 	"	float spread = 4.0 * sqrt(max(m2 - m1 * m1, 0.0)) + 0.02 + 0.1 * m1;\n"
 	"	float b0 = brightness(l0.rgb);\n"
 	"	int step = int(u[1].x);\n"
+	/* (a pixel of many samples wants little of it: past 8, the taps 2 apart
+	   at most; past 24, 1) */
+	"	float held = texelFetch(counts_texture, q0, 0).r;\n"
+	"	if ((held > 24.0 && step > 1) || (held > 8.0 && step > 2)) { result = vec4(l0.rgb, 1.0); return; }\n"
 	"	float h[5] = float[5](0.0625, 0.25, 0.375, 0.25, 0.0625);\n"
 	"	vec3 sum = vec3(0.0);\n"
 	"	float total = 0.0;\n"
@@ -987,6 +993,7 @@ static void initialize(void)
 				ray.denoise_lights = glGetUniformLocation(ray.denoise_program, "lights_texture");
 				ray.denoise_results = glGetUniformLocation(ray.denoise_program, "results_texture");
 				ray.denoise_gbuffer = glGetUniformLocation(ray.denoise_program, "gbuffer_texture");
+				ray.denoise_counts = glGetUniformLocation(ray.denoise_program, "counts_texture");
 			}
 			ray.inject_program = link(inject_source, "ray tracing light buffer");
 			if (ray.inject_program)
@@ -1601,12 +1608,16 @@ static int denoise_traced_light(GLuint world_results, const float *uniforms, int
 		glBindTexture(GL_TEXTURE_2D, ray.gbuffer_texture);
 		glBindSampler(3, 0);
 		glUniform1i(ray.denoise_gbuffer, 3);
-		/* (the four passes: the lights' texture into the one in between, it
-		into the denoised, and back, the last into the denoised) */
-		for (pass = 0; pass < 4; pass++)
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, ray.lights_texture);
+		glBindSampler(4, 0);
+		glUniform1i(ray.denoise_counts, 4);
+		/* (the three passes: the lights' texture into the denoised, it into
+		the one in between, and back) */
+		for (pass = 0; pass < 3; pass++)
 		{
-			GLuint from = pass == 0 ? ray.lights_texture : (pass & 1) ? ray.denoising_texture : ray.denoised_texture;
-			GLuint to = (pass & 1) ? ray.denoised_texture : ray.denoising_texture;
+			GLuint from = pass == 0 ? ray.lights_texture : (pass & 1) ? ray.denoised_texture : ray.denoising_texture;
+			GLuint to = (pass & 1) ? ray.denoising_texture : ray.denoised_texture;
 
 			grid[4] = (float)(1 << pass);
 			grid[5] = pass == 0 ? 1.0f : 0.0f;
