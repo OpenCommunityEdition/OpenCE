@@ -1338,7 +1338,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 		/* (and their cutouts: 8 floats each) */
 		static float cutouts[65536 * 8];
 		long count = ray.objects ?
-			halo_ray_tracing_objects(triangles, groups, cutouts, 65536, position, camera + 28, ray.shapes) : 0;
+			halo_ray_tracing_objects(triangles, groups, cutouts, getenv("HALO_RT_OBJECT_TRIANGLES") ? atol(getenv("HALO_RT_OBJECT_TRIANGLES")) : 65536, position, camera + 28, ray.shapes) : 0;
 
 		if (!ray.objects)
 			camera[31] = 0.0f;

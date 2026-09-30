@@ -120,6 +120,8 @@ static struct
 	id<MTLBuffer> exposure_sums[3];
 	int exposure_ring;
 	float exposure;
+	/* the objects' shapes' last build's time on the GPU */
+	double build_ms;
 	float probe_results[64 * 10];
 	int probe_result_count;
 	id<MTLTexture> atlas;
@@ -128,10 +130,14 @@ static struct
 	one's, in turn */
 	id<MTLTexture> history[2];
 	int history_index;
-	/* the objects (host_rt_set_objects): a mesh for each, rebuilt each
-	frame, and the scene of the level and them. The buffers the frame writes
-	are in rings of three: the GPU may still read the last ones. */
+	/* the objects (host_rt_set_objects): a mesh for each, and the scene of
+	the level and them. The buffers the frame writes are in rings of three:
+	the GPU may still read the last ones. A mesh whose triangles are the
+	last frame's is kept; one with as many, moved (a character's, animated),
+	refitted (its boxes moved to them, a fraction of a build); built anew
+	when its triangles are others, and every 60th frame */
 	id<MTLAccelerationStructure> bodies[HOST_RT_GROUPS], scene;
+	int body_counts[HOST_RT_GROUPS][2], body_age[HOST_RT_GROUPS];
 	NSArray<id<MTLAccelerationStructure>> *scene_structures;
 	float spheres[HOST_RT_GROUPS + 1][4];
 	/* the ray probe's segments (the kernel writes them) */
@@ -274,6 +280,8 @@ static NSString *const kernel_source = @
 	"	intersection_params params;\n"
 	"	params.accept_any_intersection(true);\n"
 	"	params.assume_geometry_type(geometry_type::triangle);\n"
+	/* (without the masks, all solid: no candidates to look at) */
+	"	if (cutouts_ready == 0u) params.force_opacity(forced_opacity::opaque);\n"
 	"	intersection_query<triangle_data, instancing> q(r, world, mask_bits, params);\n"
 	"	while (q.next())\n"
 	"	{\n"
@@ -299,6 +307,8 @@ static NSString *const kernel_source = @
 	"{\n"
 	"	intersection_params params;\n"
 	"	params.assume_geometry_type(geometry_type::triangle);\n"
+	"	params.set_triangle_front_facing_winding(winding::clockwise);\n"
+	"	if (cutouts_ready == 0u) params.force_opacity(forced_opacity::opaque);\n"
 	"	intersection_query<triangle_data, instancing> q(r, world, mask_bits, params);\n"
 	"	while (q.next())\n"
 	"	{\n"
@@ -1002,6 +1012,12 @@ static NSString *const kernel_source = @
 	"			}\n"
 	"		}\n"
 	"		}\n"
+	/* (a sample far brighter than the pixel's average - a ray that found a
+	   small bright glow, one in thousands - taken down to 6 times it: the
+	   denoiser would spread it into a square) */
+	"		float sample_brightness = dot(indirect, float3(0.2126, 0.7152, 0.0722));\n"
+	"		float ceiling = frames > 4.0 ? max(dot(before.rgb, float3(0.2126, 0.7152, 0.0722)) * 6.0, 0.25) : 4.0;\n"
+	"		if (sample_brightness > ceiling) indirect *= ceiling / sample_brightness;\n"
 	"		float3 accumulated = sample_now ? mix(before.rgb, indirect, weight) : before.rgb;\n"
 	"		history_out.write(float4(accumulated, round(z * 64.0) * 256.0 + frames), id);\n"
 	/* (a level pixel: its light goes in the light buffer, occlusion and
@@ -1679,8 +1695,12 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		MTLAccelerationStructureTriangleGeometryDescriptor *geometry, *cutouts;
 		MTLPrimitiveAccelerationStructureDescriptor *mesh;
 
+		/* (none this frame: its mesh, built from what is gone, is not kept) */
 		if (!group_triangles[group] && !cutout_fill[group])
+		{
+			rt.body_counts[group][0] = rt.body_counts[group][1] = -1;
 			continue;
+		}
 		geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
 		geometry.vertexBuffer = rt.body_vertices[ring][group];
 		geometry.vertexStride = 12;
@@ -1690,6 +1710,7 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 		cutouts.vertexStride = 12;
 		cutouts.opaque = NO;
 		mesh = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+		mesh.usage = MTLAccelerationStructureUsageRefit;
 		if (!rt.bodies[group])
 		{
 			/* sized for the most shapes, once (both kinds, full) */
@@ -1700,8 +1721,9 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			mesh.geometryDescriptors = @[ geometry, cutouts ];
 			sizes = [rt.device accelerationStructureSizesWithDescriptor:mesh];
 			rt.bodies[group] = [rt.device newAccelerationStructureWithSize:sizes.accelerationStructureSize];
-			rt.body_scratch[group] = [rt.device newBufferWithLength:sizes.buildScratchBufferSize
-				options:MTLResourceStorageModePrivate];
+			rt.body_scratch[group] = [rt.device newBufferWithLength:MAX(sizes.buildScratchBufferSize,
+				sizes.refitScratchBufferSize) options:MTLResourceStorageModePrivate];
+			rt.body_counts[group][0] = rt.body_counts[group][1] = -1;
 			if (!rt.bodies[group] || !rt.body_scratch[group])
 			{
 				[encoder endEncoding];
@@ -1714,8 +1736,34 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 			mesh.geometryDescriptors = @[ geometry, cutouts ];
 		else
 			mesh.geometryDescriptors = @[ group_triangles[group] ? geometry : cutouts ];
-		[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
-			scratchBufferOffset:0];
+		if (group_triangles[group] == rt.body_counts[group][0] && cutout_fill[group] == rt.body_counts[group][1] &&
+			rt.body_age[group] < 60)
+		{
+			int last = (ring + 2) % 3;
+
+			/* (the last frame's triangles: kept) */
+			if (!memcmp(rt.body_vertices[ring][group].contents, rt.body_vertices[last][group].contents,
+					(size_t)group_triangles[group] * 36) &&
+				!memcmp(rt.cut_vertices[ring][group].contents, rt.cut_vertices[last][group].contents,
+					(size_t)cutout_fill[group] * 36))
+			{
+				rt.body_age[group] = 0;
+			}
+			else
+			{
+				[encoder refitAccelerationStructure:rt.bodies[group] descriptor:mesh destination:nil
+					scratchBuffer:rt.body_scratch[group] scratchBufferOffset:0];
+				rt.body_age[group]++;
+			}
+		}
+		else
+		{
+			[encoder buildAccelerationStructure:rt.bodies[group] descriptor:mesh scratchBuffer:rt.body_scratch[group]
+				scratchBufferOffset:0];
+			rt.body_counts[group][0] = group_triangles[group];
+			rt.body_counts[group][1] = cutout_fill[group];
+			rt.body_age[group] = 0;
+		}
 		offsets[count] = (uint32_t)cutout_offsets[group];
 		instances[count].mask = group_masks[group];
 		if (rt.objects_two_sided)
@@ -1913,12 +1961,23 @@ int host_rt_trace(const float *camera, int width, int height)
 		[wait encodeWaitForEvent:rt.event value:rt.event_value];
 		[wait commit];
 	}
-	commands = [rt.queue commandBuffer];
-	if (!encode_scene(commands))
+	/* (the objects' shapes built in a command buffer of their own: their
+	time on the GPU, and the rays', logged apart) */
 	{
-		[commands commit];
-		return 0;
+		id<MTLCommandBuffer> builds = [rt.queue commandBuffer];
+
+		if (!encode_scene(builds))
+		{
+			[builds commit];
+			return 0;
+		}
+		[builds addCompletedHandler:^(id<MTLCommandBuffer> done) {
+			if (done.GPUEndTime > done.GPUStartTime)
+				rt.build_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+		}];
+		[builds commit];
 	}
+	commands = [rt.queue commandBuffer];
 	encoder = [commands computeCommandEncoder];
 	[encoder setComputePipelineState:rt.pipeline];
 	[encoder setTexture:rt.textures[0] atIndex:0];
@@ -1988,7 +2047,7 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* the cutouts: the level's coordinates, the masks, the objects' */
 		{
 			uint32_t cutouts_ready = gi_ready && rt.mask_atlas && rt.mask_rects && rt.drawn_base_texcoords &&
-				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring];
+				rt.object_cutouts[rt.scene_ring] && rt.instance_offsets[rt.scene_ring] && !getenv("HALO_RT_NO_CUTOUTS");
 
 			[encoder setBuffer:cutouts_ready ? rt.drawn_base_texcoords : any offset:0 atIndex:21];
 			[encoder setBuffer:cutouts_ready ? rt.mask_rects : any offset:0 atIndex:22];
@@ -2045,17 +2104,19 @@ int host_rt_trace(const float *camera, int width, int height)
 	[commands addCompletedHandler:^(id<MTLCommandBuffer> done) {
 		if (done.GPUEndTime > done.GPUStartTime)
 		{
-			static double total;
+			static double total, builds;
 			static int frames;
 
-			rt.gpu_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+			rt.gpu_ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0 + rt.build_ms;
+			builds += rt.build_ms;
 			/* (every 600 frames: the rays' average time on the GPU) */
 			total += rt.gpu_ms;
-			if (++frames == 600)
+			if (++frames == (getenv("HALO_RT_LOG_FRAMES") ? atoi(getenv("HALO_RT_LOG_FRAMES")) : 600))
 			{
-				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (shed %d, exposure %.2f)", total / frames,
-					rt.shed, rt.exposure);
+				host_logf(HOST_LOG_INFO, "ray tracing: %.2f ms a frame on the GPU (the objects' shapes %.2f; shed %d, "
+					"exposure %.2f)", total / frames, builds / frames, rt.shed, rt.exposure);
 				total = 0.0;
+				builds = 0.0;
 				frames = 0;
 			}
 		}
