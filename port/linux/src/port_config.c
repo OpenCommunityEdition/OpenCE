@@ -71,6 +71,14 @@ made for; off elsewhere */
 #define HALO_CONFIG_RAY_TRACING "\"off\""
 #endif
 
+/* the resolution: 1080p on macOS (Retina displays' native pixels are many,
+and the ray-traced lighting's cost follows them); the display's elsewhere */
+#ifdef HALO_MACOS
+#define HALO_CONFIG_RESOLUTION "\"1080p\""
+#else
+#define HALO_CONFIG_RESOLUTION "\"native\""
+#endif
+
 /* a default the macOS port turns off */
 #ifdef HALO_MACOS
 #define HALO_CONFIG_MACOS_FALSE "false"
@@ -83,7 +91,7 @@ static const struct config_setting config_settings[] =
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
 		"Start fullscreen, in the display's shape; false starts in a window, in\n"
 		"the window's shape. display.resolution sets the pixels. F11 switches." },
-	{ "display.resolution", _config_string, "\"native\"", "HALO_RESOLUTION", _environment_value, _platform_desktop,
+	{ "display.resolution", _config_string, HALO_CONFIG_RESOLUTION, "HALO_RESOLUTION", _environment_value, _platform_desktop,
 		"The picture's pixels: \"native\" (the display's in fullscreen, the window's\n"
 		"in a window), \"720p\", \"1080p\", \"1440p\", \"2160p\", \"<width>x<height>\",\n"
 		"or \"xbox\" for the Xbox's 640x480. F8 steps through them while playing." },
