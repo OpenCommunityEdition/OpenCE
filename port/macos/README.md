@@ -388,7 +388,9 @@ tracing hardware.
 
 Rays through the screen's depth buffer also operate on every platform. They
 find the objects (the level's surfaces do not include them) and give the
-bounce. Where Metal cannot trace rays, they are the only rays.
+bounce. Where Metal cannot trace rays, they are the only rays. With
+Metal's traced light (`display.ray_tracing_gi`) they are left out: that
+light has the level's occlusion and bounce in it already.
 
 | `display.ray_tracing` | Rays |
 | --- | --- |

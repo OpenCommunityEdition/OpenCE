@@ -133,6 +133,7 @@ static struct
 	GLuint applied_texture;
 	int gi_applied;
 	GLint composite_denoised, composite_applied, composite_objects, composite_gbuffer, composite_correct;
+	GLint composite_screen_rays;
 	GLint denoise_uniforms, denoise_lights, denoise_results, denoise_gbuffer, denoise_counts;
 	float gi_grid[4], gi_tan, gi_aspect;
 	int gi_previous;
@@ -542,6 +543,8 @@ static const char composite_source[] =
 	"uniform sampler2D objects_depth;\n"
 	"uniform sampler2D gbuffer_now;\n"
 	"uniform int correct;\n"
+	/* (whether the screen's rays were traced: not with Metal's traced light) */
+	"uniform int screen_rays;\n"
 	"out vec4 result;\n"
 	"void main()\n"
 	"{\n"
@@ -608,7 +611,7 @@ static const char composite_source[] =
 	/* (a pixel 10% nearer or farther counts a quarter; across an edge,
 	   hardly) */
 	"			float w = 1.0 / (1.0 + abs(linear_depth(texelFetch(depth_texture, q, 0).r) - z) / z * 30.0);\n"
-	"			vec4 e = texelFetch(effect_texture, q / TRACE_SCALE, 0);\n"
+	"			vec4 e = screen_rays != 0 ? texelFetch(effect_texture, q / TRACE_SCALE, 0) : vec4(0.0, 0.0, 0.0, 1.0);\n"
 	"			float v = e.a;\n"
 	/* the world's occlusion (Metal's rays) with the screen's (which also
 	   finds the objects) */
@@ -858,6 +861,7 @@ static void initialize(void)
 	ray.composite_objects = glGetUniformLocation(ray.composite_program, "objects_depth");
 	ray.composite_gbuffer = glGetUniformLocation(ray.composite_program, "gbuffer_now");
 	ray.composite_correct = glGetUniformLocation(ray.composite_program, "correct");
+	ray.composite_screen_rays = glGetUniformLocation(ray.composite_program, "screen_rays");
 	/* "screen" keeps to the screen's rays (Metal's are made ready when they
 	are asked for: halo_ray_tracing_set) */
 	if (strcmp(config_string("display.ray_tracing"), "screen"))
@@ -1744,7 +1748,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	const float *forward, const float *up)
 {
 	GLuint color, depth, world_results = 0;
-	int width, height, viewport[4];
+	int width, height, viewport[4], screen_rays;
 	float uniforms[16];
 	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
 
@@ -1781,25 +1785,15 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	glScissor(viewport[0] / TRACE_SCALE, viewport[1] / TRACE_SCALE, (viewport[2] + TRACE_SCALE - 1) / TRACE_SCALE,
 		(viewport[3] + TRACE_SCALE - 1) / TRACE_SCALE);
 	glBindVertexArray(ray.vertex_array);
-
-	/* the rays */
-	glBindFramebuffer(GL_FRAMEBUFFER, ray.effect_framebuffer);
-	glDrawBuffers(1, &draw_buffer);
-	glUseProgram(ray.trace_program);
-	glUniform4fv(ray.trace_uniforms, 4, uniforms);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, ray.scene_texture);
-	glBindSampler(0, 0);
-	glUniform1i(ray.trace_scene, 0);
+	/* (the depth, read texel by texel by every pass) */
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, depth);
 	glBindSampler(1, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glUniform1i(ray.trace_depth, 1);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 #ifdef HALO_MACOS
+	/* Metal's rays */
 	if (ray.hardware && position && forward && up)
 		world_results = world_rays(uniforms, position, forward, up, width, height, depth);
 	/* (for the next frame's light buffer: these rays, the grid they were
@@ -1810,6 +1804,25 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 	(void)forward;
 	(void)up;
 #endif
+	/* the screen's rays - not with Metal's traced light, which has the
+	level's occlusion and bounced light in it, and whose rays occlude the
+	objects (the screen's bounce was added to it, counted twice) */
+	screen_rays = !(world_results && ray.gi && ray.drawn_level);
+	if (screen_rays)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, ray.effect_framebuffer);
+		glDrawBuffers(1, &draw_buffer);
+		glUseProgram(ray.trace_program);
+		glUniform4fv(ray.trace_uniforms, 4, uniforms);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, ray.scene_texture);
+		glBindSampler(0, 0);
+		glUniform1i(ray.trace_scene, 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depth);
+		glUniform1i(ray.trace_depth, 1);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
 
 	/* the composite, into the window's colour at its full resolution (its
 	depth not attached, being read) */
@@ -1872,6 +1885,7 @@ void halo_ray_traced_lighting(float z_near, float z_far, float vertical_field_of
 		glBindSampler(10, 0);
 		glUniform1i(ray.composite_gbuffer, 10);
 		glUniform1i(ray.composite_correct, correct);
+		glUniform1i(ray.composite_screen_rays, screen_rays);
 		ray.gi_applied = 0;
 	}
 	glDrawArrays(GL_TRIANGLES, 0, 3);
