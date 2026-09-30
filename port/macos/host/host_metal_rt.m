@@ -632,9 +632,9 @@ static int encode_scene(id<MTLCommandBuffer> commands)
 	for (index = 0; index <= HOST_RT_GROUPS; index++)
 	{
 		instances[index].options = MTLAccelerationStructureInstanceOptionOpaque;
-		instances[index].transformationMatrix.columns[0] = (MTLPackedFloat3){ { 1, 0, 0 } };
-		instances[index].transformationMatrix.columns[1] = (MTLPackedFloat3){ { 0, 1, 0 } };
-		instances[index].transformationMatrix.columns[2] = (MTLPackedFloat3){ { 0, 0, 1 } };
+		instances[index].transformationMatrix.columns[0] = MTLPackedFloat3Make(1, 0, 0);
+		instances[index].transformationMatrix.columns[1] = MTLPackedFloat3Make(0, 1, 0);
+		instances[index].transformationMatrix.columns[2] = MTLPackedFloat3Make(0, 0, 1);
 	}
 	instances[0].mask = 1;
 	count = 1;
