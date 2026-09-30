@@ -85,7 +85,7 @@ build adds:
 | F11 | ⌘F | Switch between fullscreen and a window. |
 | F12 | ⌘G | Release or capture the mouse. |
 | | ⌘X | The next camera: the first person, a flying camera, one following the player, and back (the debug cameras, under "Ray-traced lighting"). |
-| | ⌘Z | In the flying camera, take its controls or let go of them: WASD moves, the mouse turns, Space rises, left ctrl or C sinks, shift (or Q) goes four times as fast. |
+| | ⌘Z | In the flying camera, take its controls or let go of them: WASD moves, the mouse turns, Space rises, left ctrl or C sinks, shift (or Q) goes twelve times as fast. |
 
 ⌘Q quits on a second press within two seconds (Q is the flashlight, and ⌘
 is held for the keys above); the window's close button quits at once.

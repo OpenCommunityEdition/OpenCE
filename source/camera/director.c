@@ -844,7 +844,7 @@ static boolean director_update_controls(
 				real speed_scale =
 					(halo_debug_camera_fast((short)player_index) ||
 						gamepad->buttons[_gamepad_analog_button_white] != 0)
-					? 4.f
+					? 12.f
 					: 1.f;
 
 				control_flags = 0;
