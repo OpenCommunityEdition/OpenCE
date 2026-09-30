@@ -115,7 +115,7 @@ static struct
 	double lightmap_sum[3], lightmap_samples;
 	unsigned long level_generation;
 	GLuint inject_program;
-	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split, inject_results, inject_fallback;
+	GLint inject_uniforms, inject_depth, inject_irradiance, inject_gbuffer, inject_split, inject_fallback;
 	/* the lightmaps' average light (the inject's where it has none) */
 	float lightmap_average[3];
 	GLint inject_objects, inject_cameras, inject_grid;
@@ -221,6 +221,27 @@ way), and the composite blends them back up across edges by depth */
 	"{\n" \
 	"	vec2 ndc = vec2(v.x / (v.z * u[0].z * u[0].w), v.y / (v.z * u[0].z));\n" \
 	"	return u[1].xy + (ndc * 0.5 + 0.5) * u[1].zw;\n" \
+	"}\n" \
+	/* the normal at p (P its position): the flatter of the two differences \
+	   on each axis, so edges do not bend it - the side nearer in depth, \
+	   inside the viewport (at its border, the side outside is the pixel \
+	   itself); facing the camera */ \
+	"vec3 normal_at(ivec2 p, vec3 P)\n" \
+	"{\n" \
+	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n" \
+	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n" \
+	"	ivec2 low = ivec2(u[1].xy), high = ivec2(u[1].xy + u[1].zw) - 1;\n" \
+	"	bool right = p.x >= high.x ? false : p.x <= low.x ? true : abs(r.z - P.z) < abs(P.z - l.z);\n" \
+	"	bool top = p.y >= high.y ? false : p.y <= low.y ? true : abs(t.z - P.z) < abs(P.z - b.z);\n" \
+	"	vec3 N = normalize(cross(top ? t - P : P - b, right ? r - P : P - l));\n" \
+	"	return dot(N, P) > 0.0 ? -N : N;\n" \
+	"}\n" \
+	/* whether the depth d is an object's: the objects' depth there (o, \
+	   packed in 24 bits before the level was drawn), unchanged */ \
+	"bool is_object(vec4 o, float d)\n" \
+	"{\n" \
+	"	float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n" \
+	"	return abs(object - d) < 4.0 / 16777215.0;\n" \
 	"}\n"
 
 /* the traced light, denoised on the rays' grid, after they are traced: an
@@ -324,9 +345,7 @@ static const char inject_source[] =
 	"	if (split != 0 && float(p.x) < u[1].x + u[1].z * 0.5) discard;\n"
 	"	float d = depth_at(p);\n"
 	"	if (d >= 0.99999) discard;\n"
-	"	vec4 o = texelFetch(objects_texture, p, 0);\n"
-	"	float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
-	"	if (abs(object - d) < 4.0 / 16777215.0) discard;\n"
+	"	if (is_object(texelFetch(objects_texture, p, 0), d)) discard;\n"
 	"	float z = linear_depth(d);\n"
 	"	float t = cameras[0].w, aspect = cameras[1].w;\n"
 	"	vec2 grid_origin = u[1].xy / float(TRACE_SCALE), grid_size = u[1].zw / float(TRACE_SCALE);\n"
@@ -401,19 +420,7 @@ static const char trace_source[] =
 	"	float d = depth_at(p);\n"
 	"	if (d >= 0.99999) { result = vec4(0.0, 0.0, 0.0, 1.0); return; }\n"
 	"	vec3 P = position_at(p);\n"
-	/* the normal: the flatter of the two differences on each axis, so
-	   edges do not bend it */
-	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n"
-	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n"
-	/* the side nearer in depth (not across an edge), inside the viewport:
-	   at its border, the side outside is the pixel itself */
-	"	ivec2 low = ivec2(u[1].xy), high = ivec2(u[1].xy + u[1].zw) - 1;\n"
-	"	bool right = p.x >= high.x ? false : p.x <= low.x ? true : abs(r.z - P.z) < abs(P.z - l.z);\n"
-	"	bool top = p.y >= high.y ? false : p.y <= low.y ? true : abs(t.z - P.z) < abs(P.z - b.z);\n"
-	"	vec3 dx = right ? r - P : P - l;\n"
-	"	vec3 dy = top ? t - P : P - b;\n"
-	"	vec3 N = normalize(cross(dy, dx));\n"
-	"	if (dot(N, P) > 0.0) N = -N;\n"
+	"	vec3 N = normal_at(p, P);\n"
 	"	float jitter = noise(gl_FragCoord.xy);\n"
 	/* occlusion and bounce: 8 directions around the normal, 4 steps each,
 	   within the radius (screen-space size from the depth) */
@@ -496,25 +503,10 @@ static const char gbuffer_source[] =
 	"	float d = depth_at(p);\n"
 	"	if (d >= 0.99999) { result = vec4(0.0); return; }\n"
 	"	vec3 P = position_at(p);\n"
-	"	vec3 l = position_at(p - ivec2(1, 0)), r = position_at(p + ivec2(1, 0));\n"
-	"	vec3 b = position_at(p - ivec2(0, 1)), t = position_at(p + ivec2(0, 1));\n"
-	/* the side nearer in depth (not across an edge), inside the viewport:
-	   at its border, the side outside is the pixel itself */
-	"	ivec2 low = ivec2(u[1].xy), high = ivec2(u[1].xy + u[1].zw) - 1;\n"
-	"	bool right = p.x >= high.x ? false : p.x <= low.x ? true : abs(r.z - P.z) < abs(P.z - l.z);\n"
-	"	bool top = p.y >= high.y ? false : p.y <= low.y ? true : abs(t.z - P.z) < abs(P.z - b.z);\n"
-	"	vec3 dx = right ? r - P : P - l;\n"
-	"	vec3 dy = top ? t - P : P - b;\n"
-	"	vec3 N = normalize(cross(dy, dx));\n"
-	"	if (dot(N, P) > 0.0) N = -N;\n"
+	"	vec3 N = normal_at(p, P);\n"
 	/* an object's pixel (its depth when the objects were drawn is its
 	   depth now): the depth negative */
-	"	if (objects_known != 0)\n"
-	"	{\n"
-	"		vec4 o = texelFetch(objects_texture, ivec2(gl_FragCoord.xy) * TRACE_SCALE, 0);\n"
-	"		float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
-	"		if (abs(object - d) < 4.0 / 16777215.0) P.z = -P.z;\n"
-	"	}\n"
+	"	if (objects_known != 0 && is_object(texelFetch(objects_texture, p, 0), d)) P.z = -P.z;\n"
 	"	result = vec4(P.z, N);\n"
 	"}\n";
 
@@ -572,9 +564,7 @@ static const char composite_source[] =
 	   took - no lag, and no gaps where the view opens up */
 	"	if (correct != 0)\n"
 	"	{\n"
-	"		vec4 o = texelFetch(objects_depth, p, 0);\n"
-	"		float object = dot(floor(o.rgb * 255.0 + 0.5), vec3(1.0, 256.0, 65536.0)) / 16777215.0;\n"
-	"		if (abs(object - d) >= 4.0 / 16777215.0)\n"
+	"		if (!is_object(texelFetch(objects_depth, p, 0), d))\n"
 	"		{\n"
 	"			float z = linear_depth(d);\n"
 	"			vec2 q = (vec2(p) + 0.5) / float(TRACE_SCALE) - 0.5;\n"
@@ -783,7 +773,6 @@ static void hardware_link(void)
 				ray.inject_gbuffer = glGetUniformLocation(ray.inject_program, "gbuffer_texture");
 				ray.inject_split = glGetUniformLocation(ray.inject_program, "split");
 				ray.inject_fallback = glGetUniformLocation(ray.inject_program, "fallback");
-				ray.inject_results = glGetUniformLocation(ray.inject_program, "results_texture");
 				ray.inject_objects = glGetUniformLocation(ray.inject_program, "objects_texture");
 				ray.inject_cameras = glGetUniformLocation(ray.inject_program, "cameras");
 				ray.inject_grid = glGetUniformLocation(ray.inject_program, "previous_grid");
@@ -1097,6 +1086,24 @@ static struct
 	int result_count;
 } probes;
 
+/* the camera's right: forward x up (the game's world is right-handed, z
+up), normalized; 0 if they are parallel */
+static int camera_right(const float *forward, const float *up, float *right)
+{
+	float length;
+
+	right[0] = forward[1] * up[2] - forward[2] * up[1];
+	right[1] = forward[2] * up[0] - forward[0] * up[2];
+	right[2] = forward[0] * up[1] - forward[1] * up[0];
+	length = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
+	if (length <= 0.0f)
+		return 0;
+	right[0] /= length;
+	right[1] /= length;
+	right[2] /= length;
+	return 1;
+}
+
 static GLuint world_rays(const float *uniforms, const float *position, const float *forward, const float *up,
 	int width, int height, GLuint depth)
 {
@@ -1106,7 +1113,7 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	long vertex_count, triangle_count;
 	unsigned long generation;
 	GLuint input, output;
-	float camera[96], right[3], length;
+	float camera[96];
 
 	generation = halo_ray_tracing_world(&vertices, &vertex_count, &indices, &triangle_count);
 	if (!generation)
@@ -1206,20 +1213,12 @@ static GLuint world_rays(const float *uniforms, const float *position, const flo
 	glUniform1i(ray.gbuffer_objects_known, (ray.light_stages & 4) != 0);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
-	/* the camera: its right is forward x up (the game's world is
-	right-handed, z up) */
-	right[0] = forward[1] * up[2] - forward[2] * up[1];
-	right[1] = forward[2] * up[0] - forward[0] * up[2];
-	right[2] = forward[0] * up[1] - forward[1] * up[0];
-	length = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
-	if (length <= 0.0f)
+	/* the camera: its position, forward, up and right */
+	if (!camera_right(forward, up, camera + 9))
 		return 0;
 	memcpy(camera, position, 3 * sizeof(float));
 	memcpy(camera + 3, forward, 3 * sizeof(float));
 	memcpy(camera + 6, up, 3 * sizeof(float));
-	camera[9] = right[0] / length;
-	camera[10] = right[1] / length;
-	camera[11] = right[2] / length;
 	camera[12] = uniforms[0];
 	camera[13] = uniforms[1];
 	camera[14] = uniforms[2];
@@ -1617,7 +1616,7 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 
 	GLuint color, depth;
 	int width, height, viewport[4];
-	float uniforms[16], cameras[32], right[3], length;
+	float uniforms[16], cameras[32];
 	const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
 
 	if (!ray.initialized)
@@ -1633,11 +1632,10 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 	{
 		return;
 	}
-	right[0] = forward[1] * up[2] - forward[2] * up[1];
-	right[1] = forward[2] * up[0] - forward[0] * up[2];
-	right[2] = forward[0] * up[1] - forward[1] * up[0];
-	length = sqrtf(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
-	if (length <= 0.0f)
+	/* this camera and the last frame's (ray.previous_camera: position,
+	forward, up, right) */
+	memset(cameras, 0, sizeof(cameras));
+	if (!camera_right(forward, up, cameras + 12))
 		return;
 	size_textures(width, height);
 	lighting_uniforms(uniforms, z_near, z_far, vertical_field_of_view, viewport, width, height);
@@ -1647,17 +1645,11 @@ void halo_ray_traced_light_buffer(float z_near, float z_far, float vertical_fiel
 		xgpu_gl_state_invalidate();
 		return;
 	}
-	/* this camera and the last frame's (ray.previous_camera: position,
-	forward, up, right) */
-	memset(cameras, 0, sizeof(cameras));
 	memcpy(cameras + 0, position, 3 * sizeof(float));
 	cameras[3] = uniforms[2];
 	memcpy(cameras + 4, forward, 3 * sizeof(float));
 	cameras[7] = uniforms[3];
 	memcpy(cameras + 8, up, 3 * sizeof(float));
-	cameras[12] = right[0] / length;
-	cameras[13] = right[1] / length;
-	cameras[14] = right[2] / length;
 	memcpy(cameras + 16, ray.previous_camera + 0, 3 * sizeof(float));
 	cameras[19] = ray.gi_tan;
 	memcpy(cameras + 20, ray.previous_camera + 3, 3 * sizeof(float));
