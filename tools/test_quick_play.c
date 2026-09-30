@@ -19,6 +19,9 @@ static const char *mode, *target;
 static short connection, join_result;
 static int created, aborts, menus, add_requests, starts, searches, reports, maps;
 static int quick_policy, policy_requests, countdown;
+static int adopted, reattached, finished;
+static boolean paused, migration_ready, cohort_ready, migration_supported;
+static unsigned long engine_epoch;
 static char last_phase[32];
 
 unsigned long system_milliseconds(void) { return clock_ms; }
@@ -70,6 +73,19 @@ boolean network_game_client_server_has_started_game(struct network_game_client *
 { (void)value; return FALSE; }
 short network_game_client_quick_join(unsigned long address)
 { searches++; last_target = address; return join_result; }
+boolean game_time_initialized(void) { return client && client->state == _network_game_client_state_ingame; }
+boolean game_time_get_paused(void) { return paused; }
+void game_time_set_paused(boolean value) { paused = value; }
+boolean create_global_network_game_server_from_migration(unsigned long epoch)
+{ adopted++; engine_epoch = epoch; server = &mock_server; connection = _game_connection_network_server; return migration_supported; }
+boolean network_game_client_begin_migration(struct network_game_client *value, unsigned long address, unsigned long epoch)
+{ assert(value == client); reattached++; last_target = address; engine_epoch = epoch; value->error = 0; return migration_supported; }
+boolean network_game_client_migration_ready(struct network_game_client *value)
+{ assert(value == client); return migration_ready; }
+boolean network_game_server_migration_ready(struct network_game_server *value)
+{ assert(value == server); return cohort_ready; }
+void network_game_server_migration_finish(struct network_game_server *value)
+{ assert(value == server); finished++; }
 
 static void reset(const char *setting)
 {
@@ -77,10 +93,13 @@ static void reset(const char *setting)
 	memset(&mock_client, 0, sizeof(mock_client));
 	client = NULL; server = NULL; mode = setting; target = "";
 	clock_ms = 1000; last_target = 0; connection = 0; join_result = 0;
-	cancel_requested = 0; restart_requested = 0; background_active = 0; background_drain_until = 0;
+	cancel_requested = 0; migration_requested = 0; hold_requested = 0; initial_epoch = 0;
+	background_active = 0; background_drain_until = 0;
 	created = aborts = menus = add_requests = starts = searches = reports = maps = 0;
 	quick_policy = TRUE; policy_requests = 0; countdown = NONE;
 	last_phase[0] = 0;
+	adopted = reattached = finished = 0; paused = migration_ready = cohort_ready = FALSE;
+	migration_supported = TRUE; engine_epoch = 0;
 }
 static void step(unsigned long elapsed, boolean menu)
 { clock_ms += elapsed; quick_play_update(menu); }
@@ -174,35 +193,56 @@ int main(void)
 	assert(!strcmp(last_phase, "menu") && aborts == 1);
 	step(1000000, TRUE); assert(created == 1 && searches == 1 && !starts);
 
-	/* A lost running host permits a subsequent page-elected restart. */
+	/* Host loss holds the actual session until the elected host adopts it.
+	   No abort, menu, map selection, lobby, new player or start is allowed. */
 	launch("join"); mock_client.state = _network_game_client_state_ingame;
 	step(1, FALSE); mock_client.error = 8; step(1, FALSE);
-	assert(!strcmp(last_phase, "disconnected") && aborts == 1);
-	web_quick_play_restart(1, 0); step(1, FALSE);
-	assert(!strcmp(last_phase, "loading") && quick_play.host);
-	step(1, TRUE); step(2000, TRUE);
-	assert(created == 2 && connection == _game_connection_network_server);
+	assert(!strcmp(last_phase, "disconnected") && paused && !aborts && !menus);
+	web_quick_play_migrate(1, 0x0302010aU, 1); step(1, FALSE);
+	assert(!strcmp(last_phase, "migrating") && quick_play.host && adopted == 1 && reattached == 1);
+	assert(last_target == 0x7f000001UL && engine_epoch == 1 && paused);
+	step(1000, FALSE); assert(!finished && paused);
+	cohort_ready = TRUE; step(1, FALSE); assert(finished == 1 && paused);
+	step(1, FALSE); assert(finished == 1 && paused);
+	migration_ready = TRUE; step(1, FALSE);
+	assert(!strcmp(last_phase, "playing") && !paused && created == 1 && !maps && !starts && !aborts && !menus);
 	assert(!web_quick_play_initial_map()[0]);
 
-	/* Another survivor restarts as a client of the exact new host address. */
+	/* A survivor reconnects its existing player to the exact elected address. */
 	launch("join"); mock_client.state = _network_game_client_state_ingame;
-	step(1, FALSE); client = NULL; step(1, FALSE);
-	assert(!strcmp(last_phase, "disconnected"));
-	web_quick_play_restart(2, 0x0302010aU); step(1, FALSE);
-	assert(quick_play.target == 0x0a010203UL && !quick_play.host);
-	step(1, TRUE); step(2000, TRUE); step(500, TRUE);
-	assert(created == 2 && last_target == 0x0a010203UL);
+	step(1, FALSE); web_quick_play_hold(1); step(1, FALSE); assert(paused);
+	web_quick_play_migrate(2, 0x0302010aU, 4); step(1, FALSE);
+	assert(quick_play.target == 0x0a010203UL && !quick_play.host && engine_epoch == 4);
+	assert(reattached == 1 && !adopted && paused && !aborts && !menus);
+	web_quick_play_migrate(1, 0, 3); step(1, FALSE); assert(reattached == 1 && !adopted);
+	web_quick_play_hold(0); step(1, FALSE); assert(paused); /* no premature release */
+	migration_ready = TRUE; step(1, FALSE); assert(!paused && !strcmp(last_phase, "playing"));
+	assert(created == 1 && !starts && !maps && !add_requests);
 
-	/* Cancel wins over a queued recovery, even while the page is hidden. */
-	web_quick_play_restart(1, 0); web_quick_play_cancel(); step(1, FALSE);
-	assert(!strcmp(last_phase, "menu") && !restart_requested);
+	/* A brief outage releases its hold without adopting or reconnecting. */
+	launch("join"); mock_client.state = _network_game_client_state_ingame; step(1, FALSE);
+	web_quick_play_hold(1); step(1, FALSE); assert(paused);
+	web_quick_play_hold(0); step(1, FALSE);
+	assert(!paused && !adopted && !reattached && !aborts && !menus);
+
+	/* Failure leaves the world paused. It must never silently reset the match. */
+	web_quick_play_hold(1); step(1, FALSE); migration_supported = FALSE;
+	web_quick_play_migrate(2, 0x0302010aU, 1); step(1, FALSE);
+	assert(paused && !aborts && !menus && !strcmp(last_phase, "migration-failed"));
+	step(100000, FALSE); assert(paused && !aborts && !menus);
+
+	/* Explicit Main menu wins over an election, even while hidden. */
+	web_quick_play_migrate(1, 0, 2); web_quick_play_cancel(); step(1, FALSE);
+	assert(!strcmp(last_phase, "menu") && !migration_requested && !paused);
 	assert(!web_quick_play_take_cancel());
-	web_quick_play_restart(0, 123); assert(!restart_requested);
-	web_quick_play_restart(2, 0x0403020aU); assert(web_quick_play_background_active());
-	{ int host; unsigned long next_target;
-	  assert(web_quick_play_take_restart(&host, &next_target));
-	  assert(!host && next_target == 0x0a020304UL);
-	  assert(!web_quick_play_take_restart(&host, &next_target)); }
+	web_quick_play_migrate(0, 123, 1); assert(!migration_requested);
+	web_quick_play_migrate(2, 123, 0); assert(!migration_requested);
+	web_quick_play_migrate(2, 0x0403020aU, 0x7fffffffU); assert(web_quick_play_background_active());
+	{ int host; unsigned long next_target; unsigned int epoch;
+	  assert(web_quick_play_take_migrate(&host, &next_target, &epoch));
+	  assert(!host && next_target == 0x0a020304UL && epoch == 0x7fffffffU);
+	  assert(!web_quick_play_take_migrate(&host, &next_target, &epoch)); }
+	web_quick_play_set_address(0x0403020aU); assert(web_quick_play_address() == 0x0a020304UL);
 	puts("Quick-play lifecycle, confirmation, targeting, timeout, cancellation and late-join tests passed.");
 	return 0;
 }

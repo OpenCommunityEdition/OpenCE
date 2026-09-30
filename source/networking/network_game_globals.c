@@ -107,6 +107,10 @@ symbols in this file:
 #include "main/main.h"
 #include "memory/data_packet_groups.h"
 #include "network_client_manager.h"
+#ifdef HALO_WEB
+#include "network_migration.h"
+#include "../../port/linux/game/network_distributed.h"
+#endif
 #include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
@@ -643,6 +647,11 @@ boolean network_game_client_end_frame(
 	}
 	else if (network_game_client_get_state(global_network_game_client, NULL) == _network_game_client_state_ingame)
 	{
+#ifdef HALO_WEB
+		/* There is no gameplay write until the same player has reattached. */
+		if (network_game_client_migration_waiting(global_network_game_client))
+			return TRUE;
+#endif
 		now = system_milliseconds();
 		if (now-bss_004566dc.last_client_update_time >=
 #ifdef HALO_LINUX
@@ -850,3 +859,35 @@ boolean create_global_network_game_server(
 }
 
 /* ---------- private code */
+
+#ifdef HALO_WEB
+boolean create_global_network_game_server_from_migration(unsigned long epoch)
+{
+	if (global_network_game_server || !global_network_game_client || !epoch ||
+		!network_distributed_migration_ready() || !network_distributed_migration_promote())
+		return FALSE;
+	global_network_game_server = network_game_server_adopt_match(global_network_game_client, epoch);
+	if (!global_network_game_server)
+		return FALSE;
+	bss_004566dc.client_started = FALSE;
+	network_game_follow_host_netcode(TRUE);
+	game_connection_set(_game_connection_network_server);
+	update_queues_migrate();
+	return TRUE;
+}
+#endif
+
+#ifdef HALO_WEB
+void network_game_demote_migration_host(void)
+{
+	if (global_network_game_server)
+	{
+		network_game_server_release_migration_transport(global_network_game_server);
+		global_network_game_server = NULL;
+		bss_004566dc.quickstart_local = FALSE;
+	}
+	bss_004566dc.client_started = FALSE;
+	network_game_follow_host_netcode(TRUE);
+	game_connection_set(_game_connection_network_client);
+}
+#endif

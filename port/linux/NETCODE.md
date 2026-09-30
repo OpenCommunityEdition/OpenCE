@@ -47,7 +47,8 @@ update"), and stays in the list of games. Version 1 was the first of this
 netcode; version 2 lets a machine join a game in progress; version 3 puts
 each player in its slot of the host's player list on every machine;
 version 4 plays the European (PAL) maps as the North American ones
-(`port/linux/game/pal_tags.c`).
+(`port/linux/game/pal_tags.c`); version 5 adds browser match-preserving
+host migration, typed checkpoints and original-roster reattachment.
 
 ## Joining a game in progress
 

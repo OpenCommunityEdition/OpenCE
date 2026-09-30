@@ -666,6 +666,8 @@ void network_test_update(boolean main_menu_loaded, real seconds);
 #endif
 #ifdef HALO_WEB
 void quick_play_update(boolean main_menu_loaded);
+boolean web_match_migration_enabled(void);
+boolean web_match_migration_lost(void);
 #endif
 
 /* ---------- prototypes */
@@ -3232,24 +3234,39 @@ void main_loop(
 			{
 				if (!network_game_client_start_frame())
 				{
-					display_error_when_main_menu_loaded(6);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(6);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 			}
 			else if (connection==_game_connection_network_server)
 			{
 				if (!network_game_client_start_frame())
 				{
-					display_error_when_main_menu_loaded(1);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(1);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 				else if (!network_game_server_start_frame())
 				{
-					display_error_when_main_menu_loaded(1);
-					error(_error_silent, "the game host went down");
-					network_game_abort();
+#ifdef HALO_WEB
+					if (!web_match_migration_lost())
+#endif
+					{
+						display_error_when_main_menu_loaded(1);
+						error(_error_silent, "the game host went down");
+						network_game_abort();
+					}
 				}
 			}
 			else if (connection==_game_connection_film_playback)
@@ -3284,8 +3301,13 @@ void main_loop(
 					connection = main_globals.connection;
 					if (connection>_game_connection_local && connection<=_game_connection_network_server && !network_game_client_end_frame())
 					{
-						display_error_when_main_menu_loaded(1);
-						network_game_abort();
+#ifdef HALO_WEB
+						if (!web_match_migration_lost())
+#endif
+						{
+							display_error_when_main_menu_loaded(1);
+							network_game_abort();
+						}
 					}
 
 					game_time_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);

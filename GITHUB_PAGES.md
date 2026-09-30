@@ -70,13 +70,18 @@ join that host, including while the match is running. Only players preparing
 to launch participate in host selection, so an idle tab or a download does
 not become the host. The public room is not a persistent game server.
 
-Surviving players automatically elect a replacement when the host disconnects
-and restart the same room's Beaver Creek Slayer match. Scores, positions and
-the match timer reset; all players need the updated browser build. A brief
-connection loss has a 10-second grace period, and silent channels are detected
-after 25 seconds, followed by election and map loading. Returning hosts join
-the newer room epoch. Network partitions can temporarily create separate
-matches; this is recovery by restarting the match, not seamless state migration.
+The source migration path preserves the loaded match when its host leaves.
+It pauses gameplay, elects a survivor with a verified checkpoint, and reconnects
+players into their existing slots under the replacement host. Scores, positions,
+inventory and the timer are retained. Recovery failure leaves the match paused;
+it never starts a new match automatically. All participants need the matching
+new launcher and runtime; this source change is not evidence of deployment.
+
+A brief connection loss has a 10-second grace period, and silent channels are
+detected after 25 seconds, followed by election and reconnecting. Authority-only
+state may resume from the latest 15-tick checkpoint. Returning hosts yield to
+the newer room epoch. Public signaling does not provide distributed consensus;
+partitions can still create divergent continuations of a match.
 
 The page shows connection and loading progress. A browser may require a tap
 to enable sound and pointer capture, but no System Link menu navigation is

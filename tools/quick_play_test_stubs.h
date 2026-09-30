@@ -32,4 +32,12 @@ struct game_variant *game_engine_get_variant_by_name(struct game_variant *, cons
 void player_ui_set_game_variant(struct game_variant *);
 void ui_widgets_close_all(void);
 void *ui_widget_load_by_name_or_tag(const char *, int, void *, int, int, int, int);
+boolean game_time_initialized(void);
+boolean game_time_get_paused(void);
+void game_time_set_paused(boolean);
+boolean create_global_network_game_server_from_migration(unsigned long);
+boolean network_game_client_begin_migration(struct network_game_client *, unsigned long, unsigned long);
+boolean network_game_client_migration_ready(struct network_game_client *);
+boolean network_game_server_migration_ready(struct network_game_server *);
+void network_game_server_migration_finish(struct network_game_server *);
 #endif

@@ -57,6 +57,10 @@ jobs:
           build/test_web_net
           clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -Itools -Isource tools/test_quick_play.c -o build/test_quick_play
           build/test_quick_play
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tools/tests/network-checkpoint-test.c -o build/test_network_checkpoint
+          build/test_network_checkpoint
+          python3 tools/test_web_migration_managers.py
+          python3 tools/test_network_migration_checkpoint_runtime.py
           python3 tools/test_web_server_policy.py
           python3 tools/test_network_player_rejoin.py
           python3 tools/test_web_solo_host.py

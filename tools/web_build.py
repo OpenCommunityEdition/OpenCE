@@ -145,7 +145,7 @@ LINK_FLAGS = [
     "-sMAX_WEBGL_VERSION=2",
     "-sGL_ENABLE_GET_PROC_ADDRESS=1",
     "-sENVIRONMENT=web,worker",
-    "-sEXPORTED_FUNCTIONS=_main,_malloc,_free,_web_shared_state,_web_shared_offsets,_web_quick_play_cancel,_web_quick_play_restart",
+    "-sEXPORTED_FUNCTIONS=_main,_malloc,_free,_web_shared_state,_web_shared_offsets,_web_quick_play_cancel,_web_quick_play_migrate,_web_quick_play_hold,_web_quick_play_set_address,_web_quick_play_set_epoch",
     "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAPF32,wasmMemory,UTF8ToString,stringToUTF8,lengthBytesUTF8",
     "-sINCOMING_MODULE_JS_API=print,printErr,locateFile,onAbort,preRun,arguments,mainScriptUrlOrBlob,"
     "instantiateWasm,wasmMemory,setStatus,monitorRunDependencies,onRuntimeInitialized",
