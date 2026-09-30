@@ -765,7 +765,29 @@ void platform_pump_events(void)
 	{
 		switch (event.type)
 		{
+#ifdef HALO_MACOS
+		/* the window's close button quits at once */
+		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			pthread_mutex_unlock(&input_lock);
+			platform_log("window closed");
+			exit(EXIT_SUCCESS);
+#endif
 		case SDL_EVENT_QUIT:
+#ifdef HALO_MACOS
+			/* Command-Q quits on a second press within two seconds: Q is the
+			flashlight, and Command is held for the port's keys */
+			{
+				static Uint64 first_quit;
+				Uint64 now = SDL_GetTicks();
+
+				if (!first_quit || now - first_quit > 2000)
+				{
+					first_quit = now;
+					notice("press Command-Q again to quit");
+					break;
+				}
+			}
+#endif
 			pthread_mutex_unlock(&input_lock);
 			platform_log("window closed");
 			exit(EXIT_SUCCESS);
