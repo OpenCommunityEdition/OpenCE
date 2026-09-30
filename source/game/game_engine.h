@@ -362,6 +362,10 @@ real game_engine_get_starting_location_rating(
 	struct player_starting_location const *starting_location);
 boolean game_engine_should_spawn_player(
 	long player_index);
+#ifdef HALO_LINUX
+void game_engine_client_respawn_countdown(
+	long player_index);
+#endif
 void game_engine_postspawn_player_update(
 	long player_index);
 

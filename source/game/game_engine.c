@@ -7892,6 +7892,42 @@ boolean game_engine_get_state_message(
 	return result;
 }
 
+#ifdef HALO_LINUX
+/* port: a distributed client's players spawn when the host spawns them
+(network_player_attach_unit), but their respawn countdown runs here as it
+does on the host (game_engine_should_spawn_player), for the hud's count and
+its sounds: it stops a tick short, where the host's unit ends it */
+void game_engine_client_respawn_countdown(
+	long player_index)
+{
+	struct player_datum *player;
+
+	if (!game_engine)
+		return;
+	player = player_get(player_index);
+	if (player->quit_out_of_game == TRUE ||
+		player->statistics.deaths == 0 ||
+		player->respawn_timer <= 1 ||
+		game_engine_player_is_out_of_lives(player_index) ||
+		game_engine_player_is_odd_man_out(player_index) ||
+		game_engine_globals.postgame_state == _game_engine_postgame_state_rasterize ||
+		game_engine_globals.postgame_state == _game_engine_postgame_state_rasterize_delay)
+	{
+		return;
+	}
+	if (player->local_player_index != NONE &&
+		(player->respawn_timer == 90 || player->respawn_timer == 60 || player->respawn_timer == 30))
+	{
+		game_engine_play_multiplayer_sound(_multiplayer_sound_countdown_for_respawn);
+	}
+	player->respawn_timer--;
+	if (player->local_player_index != NONE && player->respawn_timer == 1)
+		game_engine_play_multiplayer_sound(_multiplayer_sound_respawn);
+
+	return;
+}
+
+#endif
 boolean game_engine_should_spawn_player(
 	long player_index)
 {
