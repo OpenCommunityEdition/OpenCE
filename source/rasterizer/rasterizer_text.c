@@ -66,13 +66,14 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_internal.h"
+#include "bitmaps/bitmaps.h"
 #include "math/integer_math.h"
 #include "rasterizer/rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_text.h"
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "render/render.h"
+#include "text/draw_string.h"
 #include "text/font_group.h"
 #include "text/unicode.h"
 
@@ -149,22 +150,8 @@ struct hardware_character_cache
 
 /* ---------- prototypes */
 
-struct bitmap_data *hardware_character_cache_get_bitmap(
+static struct bitmap_data *hardware_character_cache_get_bitmap(
 	void);
-void draw_string(
-	draw_character_proc draw_character,
-	rectangle2d const *bounds,
-	point2d *cursor_reference,
-	rectangle2d const *clip,
-	short height_adjust,
-	char const *string);
-void draw_unicode_string(
-	draw_character_proc draw_character,
-	rectangle2d const *bounds,
-	point2d *cursor_reference,
-	rectangle2d const *clip,
-	short height_adjust,
-	wchar_t const *string);
 static void hardware_character_cache_get_origin(
 	short hardware_character_index,
 	short *x0,
@@ -174,7 +161,7 @@ static void flush_hardware_character(
 static void cache_hardware_format_character(
 	struct font_header *font,
 	struct font_character *font_character);
-void rasterizer_draw_character(
+static void rasterizer_draw_character(
 	struct parse_string_state *state,
 	struct font_header *font,
 	struct font_character *font_character,
@@ -199,7 +186,6 @@ static void rasterizer_draw_character_with_dropshadow(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static struct hardware_character_cache hardware_character_cache;
 static pixel32 global_shadow_color = 0;
@@ -305,7 +291,7 @@ rasterizer_text_cache_dispose(
 	return;
 }
 
-void
+static void
 rasterizer_draw_character(
 	struct parse_string_state *state,
 	struct font_header *font,
@@ -356,7 +342,9 @@ rasterizer_draw_string(
 	short height_adjust,
 	char const *string)
 {
-	if (rasterizer_debug_options.dynamic_screen_geometry
+	boolean drop_shadow = TRUE;
+
+	if (rasterizer_debug_options.draw_dynamic_screen_geometry
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
@@ -372,9 +360,20 @@ rasterizer_draw_string(
 
 		if (bitmap && string[0])
 		{
-			/* January calls strlen() here and discards the result; the call is
-			part of the object and is reproduced. */
-			strlen(string);
+			long length = strlen(string);
+			long vertex_count;
+			draw_character_proc draw_character;
+
+			if (drop_shadow)
+			{
+				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL * 2;
+				draw_character = rasterizer_draw_character_with_dropshadow;
+			}
+			else
+			{
+				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL;
+				draw_character = rasterizer_draw_character;
+			}
 
 			if (!bounds)
 			{
@@ -418,7 +417,7 @@ rasterizer_draw_string(
 
 			rasterizer_text_begin(&parameters);
 			draw_string(
-				rasterizer_draw_character_with_dropshadow,
+				draw_character,
 				&window_bounds,
 				cursor_reference,
 				&viewport_bounds,
@@ -439,7 +438,9 @@ rasterizer_draw_unicode_string(
 	short height_adjust,
 	wchar_t const *string)
 {
-	if (rasterizer_debug_options.dynamic_screen_geometry
+	boolean drop_shadow = TRUE;
+
+	if (rasterizer_debug_options.draw_dynamic_screen_geometry
 		&& global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		struct bitmap_data *bitmap;
@@ -455,9 +456,20 @@ rasterizer_draw_unicode_string(
 
 		if (bitmap && string[0])
 		{
-			/* January calls ustrlen() here and discards the result; the call is
-			part of the object and is reproduced. */
-			ustrlen(string);
+			long length = ustrlen(string);
+			long vertex_count;
+			draw_character_proc draw_character;
+
+			if (drop_shadow)
+			{
+				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL * 2;
+				draw_character = rasterizer_draw_character_with_dropshadow;
+			}
+			else
+			{
+				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL;
+				draw_character = rasterizer_draw_character;
+			}
 
 			if (!bounds)
 			{
@@ -501,7 +513,7 @@ rasterizer_draw_unicode_string(
 
 			rasterizer_text_begin(&parameters);
 			draw_unicode_string(
-				rasterizer_draw_character_with_dropshadow,
+				draw_character,
 				&window_bounds,
 				cursor_reference,
 				&viewport_bounds,
@@ -582,7 +594,7 @@ rasterizer_draw_character_with_dropshadow(
 
 /* ---------- private code */
 
-struct bitmap_data *
+static struct bitmap_data *
 hardware_character_cache_get_bitmap(
 	void)
 {

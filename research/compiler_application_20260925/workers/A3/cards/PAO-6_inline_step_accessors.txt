@@ -1,8 +1,0 @@
-CARD PAO-6 (A3)  written 2026-09-26 01:20:11 -0700  -- BEFORE its first compile
-base: pao5. evidence: atlas 7eacac85 (first-party 2001-09-25 cachebeta.map, 'map' tier) tags _path_get_step and
-  _path_get_step_index as 'i path_obstacle_avoidance.obj' (inline-function COMDATs); J: both are external,
-  defined only by path_obstacle_avoidance.obj, referenced out of line by no object.
-correction: 'struct obstacle_path_step *path_get_step(' -> '__inline struct obstacle_path_step *path_get_step(' and
-  'unsigned short path_get_step_index(' -> '__inline unsigned short path_get_step_index('.
-prediction: byte-inert (non-static __inline still emits the external COMDAT; callers already inline them).
-  If any row changes -> not adopted (disclose only).

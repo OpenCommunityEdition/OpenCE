@@ -122,7 +122,6 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game_engine.h"
-#include "game_engine_runtime.h"
 #include "players.h"
 #include "players_runtime.h"
 #include "items/weapons.h"
@@ -232,6 +231,8 @@ typedef char verify_ctf_globals_size[
 
 /* ---------- prototypes */
 
+void ctf_state_message_update_warning(
+	long team_index);
 static long ctf_create_flag_object(
 	struct scenario_netgame_flag *flag);
 
@@ -1378,7 +1379,6 @@ struct game_engine ctf_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the parts of ctf_globals that are the same on every machine (the flag
 objects are the host's, at the same indices everywhere: the flags' scenario
 places are each machine's own pointers) */
@@ -1426,4 +1426,3 @@ void game_engine_ctf_read_network_state(
 	csmemcpy(ctf_globals.flag_warning_ticks, state.flag_warning_ticks, sizeof(state.flag_warning_ticks));
 	ctf_globals.flag_swap_timer = state.flag_swap_timer;
 }
-#endif

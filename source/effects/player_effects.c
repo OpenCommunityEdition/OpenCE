@@ -91,11 +91,10 @@ symbols in this file:
 #include "camera/observer.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
 #include "math/periodic_functions.h"
-#include "math/random_math.h"
+#include "math/real_math.h"
 #include "main/console.h"
 #include "networking/network_connection.h"
 #include "objects/damage.h"
@@ -357,11 +356,11 @@ void player_effect_dispose_from_old_map(
 
 void player_effect_add_continuous_effect(
 	short local_player_index,
-	long definition_index,
+	long effect_index,
 	real distance)
 {
 	struct continuous_damage_effect_definition *definition =
-		continuous_damage_effect_definition_get(definition_index);
+		continuous_damage_effect_definition_get(effect_index);
 
 	if (distance < definition->cutoff_radius)
 	{
@@ -821,7 +820,6 @@ void player_effect_get_camera_effect_matrix(
 
 	if (local_player_index != NONE)
 	{
-#ifdef HALO_LINUX
 		/* The camera is drawn every frame, several frames per tick on the
 		native builds (port/linux/game/render_interpolation.c), and each draw
 		shook it in a new random direction: shake once a tick, as on the
@@ -836,7 +834,6 @@ void player_effect_get_camera_effect_matrix(
 		tick_seed *= 0x7FEB352DUL;
 		tick_seed ^= tick_seed >> 15;
 		*local_seed = tick_seed;
-#endif
 		game_time_get();
 
 		if (TEST_FLAG(player_effect_globals->global_flags, _scripted_player_effect_active_bit))
@@ -1031,15 +1028,11 @@ void player_effect_get_camera_effect_matrix(
 					continuous->vibrate_frequencies[0],
 					continuous->vibrate_frequencies[1]);
 
-#ifdef HALO_LINUX
 				/* Looping sounds add their continuous shake once a frame
 				(game_sound.c), so it is used up once a frame too: a frame that
 				runs no tick (port/linux/game/render_interpolation.c) must not
 				keep it and have the next frame's shake added on top. */
 				effect->continuous_effect_timer = 1;
-#else
-				effect->continuous_effect_timer += game_time_get_elapsed();
-#endif
 
 				if (effect->continuous_effect_timer > 0)
 				{
@@ -1057,9 +1050,7 @@ void player_effect_get_camera_effect_matrix(
 				matrix4x3_multiply(matrix, &effect_matrix, matrix);
 			}
 		}
-#ifdef HALO_LINUX
 		*local_seed = saved_local_seed;
-#endif
 	}
 
 	return;

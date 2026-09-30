@@ -1,9 +1,0 @@
-== section order: DIFFERS
-   first differing positions (after): ['?duration@?1??game_engine_update_teleporter@@9@9', '_global_autogenerate_count', '_game_engine_player_has_flag', '_get_postgame_hilite_colors', '_game_engine_running', '_game_engine_force_single_screen']
-== symbols only in before: []
-== symbols only in after : ['?alpha@?1??game_engine_update_teleporter@@9@9', '?blue@?1??game_engine_update_teleporter@@9@9', '?duration@?1??game_engine_update_teleporter@@9@9', '?green@?1??game_engine_update_teleporter@@9@9', '?max_intensity@?1??game_engine_update_teleporter@@9@9', '?red@?1??game_engine_update_teleporter@@9@9', '?screen_flash_type@?1??game_engine_update_teleporter@@9@9']
-== symbols with changed storage/value: []
-   reloc spelling differs in _game_engine_player_get_custom_motion_sensor_positions 1 of 7 rows, e.g. [((131, 6, '_global_variant', 0), (131, 6, '_global_goal', 1024))]
-   reloc spelling differs in _game_engine_render_nav_points                     1 of 11 rows, e.g. [((186, 6, '_global_variant', 0), (186, 6, '_global_goal', 1024))]
-   reloc spelling differs in _game_engine_update_teleporter                     7 of 46 rows, e.g. [((712, 6, '_debug_player_color', 4), (712, 6, '?screen_flash_type@?1??game_engine_update_teleporter@@9@9', 0)), ((738, 6, '_debug_player_color', 28), (738, 6, '?duration@?1??game_engine_update_teleporter@@9@9', 0))]
-== sections with raw relocation-spelling differences: 3

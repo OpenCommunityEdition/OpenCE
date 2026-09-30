@@ -59,13 +59,13 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void _data_packet_verify(
+static void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
 	short *field_count);
 
-void _data_packet_encode(
+static void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -74,7 +74,7 @@ void _data_packet_encode(
 	struct data_packet_field *fields,
 	short *field_count);
 
-void _data_packet_decode(
+static void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -205,7 +205,7 @@ boolean data_packet_decode(
 
 /* ---------- private code */
 
-void _data_packet_verify(
+static void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
@@ -303,7 +303,7 @@ void _data_packet_verify(
 	return;
 }
 
-void _data_packet_encode(
+static void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -438,7 +438,7 @@ void _data_packet_encode(
 	return;
 }
 
-void _data_packet_decode(
+static void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,

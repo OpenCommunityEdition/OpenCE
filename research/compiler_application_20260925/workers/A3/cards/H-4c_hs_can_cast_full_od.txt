@@ -1,7 +1,0 @@
-CARD H-4c (A3)  written 2026-09-26 01:05:03 -0700  -- BEFORE its first compile
-base: H-4b. D /Od 0x600a30 object_name branch: 'if actual is object_name: push (desired-0x2b), push (actual-0x2b),
-  call' with no store to the object-type local ([ebp-8] is written only in the object branch).
-correction: object_name branch returns hs_object_type_can_cast(actual_type-_hs_type_object_name,
-  desired_type-_hs_type_object_name) directly; object_type moves into the object branch as its declaration
-  (desired object type), function-scope 'short object_type;' removed.
-prediction: EXACT (same values reach the call); 66/66, 0 changed.

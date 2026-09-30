@@ -2,7 +2,6 @@
 UNIT_HUD_INTERFACE_DEFINITION.H
 
 January unit-HUD tag layout, corroborated by HCEX PDB member records.
-See docs/object_matching_logs/input_hud_player_ui_followup_20260904.md.
 */
 
 #ifndef __UNIT_HUD_INTERFACE_DEFINITION_H

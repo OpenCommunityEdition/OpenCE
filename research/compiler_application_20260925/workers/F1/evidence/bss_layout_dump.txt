@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "C:\halo-worktrees\claude-compiler-application-20260925\scratch\campaign\workers\F1\bss_dump.py", line 3, in <module>
-    import coff_compare as cc
-ModuleNotFoundError: No module named 'coff_compare'

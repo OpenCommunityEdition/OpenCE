@@ -330,8 +330,6 @@ boolean network_damage_deals(
 	real_vector3d const *object_normal,
 	boolean authorized)
 {
-	if (!network_game_distributed())
-		return TRUE;
 	if (game_connection() == _game_connection_network_client)
 	{
 		if (authorized)
@@ -383,7 +381,7 @@ void network_damage_player_effect(
 {
 	struct distributed_damage_event *event;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK || distributed_player_is_local(player_index))
 	{
 		return;
@@ -414,7 +412,7 @@ void network_damage_aftermath(
 	struct distributed_damage_event *event;
 	struct unit_datum *unit;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK)
 	{
 		return;

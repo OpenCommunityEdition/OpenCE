@@ -40,17 +40,11 @@ symbols in this file:
 
 /* ---------- constants */
 
-#ifdef HALO_LINUX
 /* the native builds' larger game state, placed above the tag cache
 (halo_port_capacity.h); the verified part is the CPU part, as on the Xbox */
 #define GAME_STATE_BASE_ADDRESS HALO_PORT_GAME_STATE_BASE_ADDRESS
 #define GAME_STATE_SIZE HALO_PORT_GAME_STATE_SIZE
 #define GAME_STATE_VERIFY_SIZE HALO_PORT_GAME_STATE_CPU_SIZE
-#else
-#define GAME_STATE_BASE_ADDRESS 0x80061000
-#define GAME_STATE_SIZE 0x345000
-#define GAME_STATE_VERIFY_SIZE 0x305000
-#endif
 #define TAG_CACHE_BASE_ADDRESS 0x803A6000
 #define TAG_CACHE_SIZE 0x1600000
 #define TEXTURE_CACHE_SIZE 0x1600000

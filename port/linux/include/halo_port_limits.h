@@ -6,9 +6,7 @@ force-included by halo_linux_prefix.h and halo_windows_prefix.h.
 
 The Xbox game allows 16 players on at most 4 machines (up to 4 players each
 on split screen). The native builds allow 128 players on up to 128
-machines; split screen stays at 4 players per machine. Game sources use
-these values only under #ifdef HALO_LINUX, so the byte-matching MSVC build
-keeps the original limits.
+machines; split screen stays at 4 players per machine.
 
 128 is the largest session that fits the game's existing records: player,
 machine and team indices are stored in signed chars (0..127 with NONE), and
@@ -71,7 +69,8 @@ Raise it with any change to what the machines send each other. */
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0
 #define HALO_PORT_ADVERTISED_FLAGS_OFFSET 2
-/* ... the host plays the distributed netcode (else lockstep) */
+/* ... the host plays the distributed netcode (always, since the lockstep
+netcode was removed; hosts of version 4 built before then may not) */
 #define HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG 0x01
 
 /* a message header's 12-bit length allows messages of up to 0xFFF bytes,

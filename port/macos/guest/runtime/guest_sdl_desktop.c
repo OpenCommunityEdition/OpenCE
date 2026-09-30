@@ -364,6 +364,13 @@ bool SDL_WaitEventTimeout(SDL_Event *event, Sint32 timeoutMS)
 	return result != 0;
 }
 
+void SDL_PumpEvents(void)
+{
+	/* (the host's SDL_WaitEventTimeout without an event pumps them) */
+	host_sdl_wait_event_timeout(NULL, 0);
+	dialog_poll();
+}
+
 /* ---------- message boxes */
 
 bool SDL_ShowMessageBox(const SDL_MessageBoxData *messageboxdata, int *buttonid)

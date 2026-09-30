@@ -108,15 +108,10 @@ symbols in this file:
 enum
 {
 	CPU_PAGE_SIZE = 0x1000,
-#ifdef HALO_LINUX
 	/* the native builds' larger game state (halo_port_capacity.h); the saved
 	game files only need to hold it */
 	GAME_STATE_SIZE = HALO_PORT_GAME_STATE_SIZE,
 	GAME_STATE_FILE_SIZE = HALO_PORT_GAME_STATE_SIZE
-#else
-	GAME_STATE_SIZE = 0x345000,
-	GAME_STATE_FILE_SIZE = 0x380000
-#endif
 };
 
 /* ---------- structures */
@@ -149,7 +144,7 @@ static HANDLE game_state_open_persistent_storage(
 
 /* ---------- globals */
 
-struct xbox_game_state_globals_prefix xbox_game_state_globals = { 0 };
+static struct xbox_game_state_globals_prefix xbox_game_state_globals = { 0 };
 
 /* ---------- public code */
 

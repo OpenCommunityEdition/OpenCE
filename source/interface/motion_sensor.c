@@ -98,7 +98,6 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "game_state.h"
 #include "interface/hud.h"
@@ -266,8 +265,8 @@ static struct motion_sensor_globals_definition *motion_sensor_globals = NULL;
 static real sweep_theta = 0.f;
 boolean debug_motion_sensor_draw_all_units= {0};
 
-extern short blip_player_index;
-extern real_point2d center_point;
+short blip_player_index;
+real_point2d center_point;
 
 /* ---------- private code */
 
@@ -333,7 +332,7 @@ static void motion_sensor_update(
 		short local_player_slots[4] = { 0 };
 		short player_count = local_player_count();
 		short local_player_index = local_player_get_next(NONE);
-		struct object_iterator iterator;
+		struct object_iterator iter;
 		real_point3d camera_positions[2];
 		boolean done = FALSE;
 		short player_scan_index;
@@ -375,19 +374,19 @@ static void motion_sensor_update(
 			local_player_index = local_player_get_next(local_player_index);
 		}
 
-		object_iterator_new(&iterator, _object_mask_unit, TRUE);
-		while (object_iterator_next(&iterator) && !done)
+		object_iterator_new(&iter, _object_mask_unit, TRUE);
+		while (object_iterator_next(&iter) && !done)
 		{
-			if (should_track_object(iterator.index) &&
-				should_draw_object(iterator.index))
+			if (should_track_object(iter.index) &&
+				should_draw_object(iter.index))
 			{
-				real_point3d object_position;
+				real_point3d center;
 				real object_radius;
 				short players_full = 0;
 
 				object_get_bounding_sphere(
-					iterator.index,
-					&object_position,
+					iter.index,
+					&center,
 					&object_radius);
 
 				for (player_scan_index = 0;
@@ -415,16 +414,15 @@ static void motion_sensor_update(
 							real_vector3d displacement;
 
 							displacement.i =
-								object_position.x -
+								center.x -
 								camera_positions[scan_player_index].x;
 							displacement.j =
-								object_position.y -
+								center.y -
 								camera_positions[scan_player_index].y;
 							displacement.k =
-								object_position.z -
+								center.z -
 								camera_positions[scan_player_index].z;
 
-#ifdef HALO_LINUX
 							/* test the range before taking a blip slot in multiplayer
 							too: with the native builds' larger sessions, units out of
 							range would otherwise fill the slots (update_motion_sensor
@@ -436,12 +434,6 @@ static void motion_sensor_update(
 							if (magnitude_squared3d(&displacement) <=
 								hud_globals->defaults.motion_sensor_range *
 									hud_globals->defaults.motion_sensor_range)
-#else
-							if (game_engine_running() ||
-								magnitude_squared3d(&displacement) <=
-									hud_globals->defaults.motion_sensor_range *
-										hud_globals->defaults.motion_sensor_range)
-#endif
 							{
 								struct motion_sensor_player *player =
 									&motion_sensor_globals->players[scan_player_index];
@@ -452,10 +444,10 @@ static void motion_sensor_update(
 
 								motion_sensor_blip_set_type_and_size(
 									blip,
-									iterator.index,
+									iter.index,
 									scan_player_index);
 
-								player->unit_indices[blip_index] = iterator.index;
+								player->unit_indices[blip_index] = iter.index;
 								sensor->blip_count++;
 								local_player_slots[scan_player_index] =
 									(short)(blip_index + 1);
@@ -640,7 +632,7 @@ static void render_motion_sensor(
 	director_perspective perspective;
 	struct motion_sensor_player *player;
 	real relative_scale;
-	real_point2d center;
+	real_point2d corner;
 	short history_index;
 
 	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
@@ -655,9 +647,9 @@ static void render_motion_sensor(
 	relative_scale =
 		hud_globals->defaults.motion_sensor_scale /
 		hud_globals->defaults.motion_sensor_range;
-	center.x = (real)reference->x;
-	center.y = (real)reference->y;
-	blip_begin(&center, 0, in_multiplayer, local_player_index);
+	corner.x = (real)reference->x;
+	corner.y = (real)reference->y;
+	blip_begin(&corner, 0, in_multiplayer, local_player_index);
 
 	for (history_index = 0;
 		history_index < MOTION_SENSOR_HISTORY_COUNT;
@@ -684,14 +676,14 @@ static void render_motion_sensor(
 
 			if (blip->type != _blip_type_none)
 			{
-				real_point2d point;
+				real_point2d blip_pos;
 
-				tiny_point2d_get(&blip->position, &point);
+				tiny_point2d_get(&blip->position, &blip_pos);
 				render_blip(
 					sensor,
 					blip->type,
 					blip->size,
-					&point,
+					&blip_pos,
 					relative_scale,
 					fade,
 					radius);
@@ -710,14 +702,14 @@ static void render_motion_sensor(
 			if (game_engine_get_goal_in_use(
 				(short)sensor->custom_blip_goal_indices[blip_index]))
 			{
-				real_point2d point;
+				real_point2d blip_pos;
 
-				tiny_point2d_get(&sensor->custom_blips[blip_index], &point);
+				tiny_point2d_get(&sensor->custom_blips[blip_index], &blip_pos);
 				render_blip(
 					sensor,
 					_blip_type_custom,
 					_hud_blip_type_medium,
-					&point,
+					&blip_pos,
 					relative_scale,
 					fade,
 					radius);
@@ -797,12 +789,10 @@ void motion_sensor_tick(
 		sweep_theta = 0.4f;
 	}
 
-#ifdef HALO_LINUX
 	/* The HUD is drawn once a frame, several frames per tick
 	(port/linux/game/render_interpolation.c), and each update moves the
 	blip history on a step: update once a tick, as on the Xbox. */
 	if (motion_sensor_globals->last_update_time != game_time_get())
-#endif
 	motion_sensor_update();
 
 	return;
@@ -1131,9 +1121,7 @@ motion_sensor_initialize_for_new_map(
 	long player_count;
 
 	csmemset(motion_sensor_globals, 0, sizeof(*motion_sensor_globals));
-#ifdef HALO_LINUX
 	motion_sensor_globals->last_update_time = NONE;
-#endif
 	player = motion_sensor_globals->players;
 	player_count = NUMBEROF(motion_sensor_globals->players);
 

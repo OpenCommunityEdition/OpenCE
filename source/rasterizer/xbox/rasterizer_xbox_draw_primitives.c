@@ -212,11 +212,11 @@ symbols in this file:
 
 /* ---------- headers */
 
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "cseries.h"
 #include "cseries/errors.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "rasterizer.h"
+#include "rasterizer_console_vars.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_xbox_draw_primitives.h"
 /* The January object retains out-of-line copies of the D3D inline wrappers.
@@ -317,14 +317,6 @@ struct dynamic_triangles_globals
 	byte pad300d[3];
 };
 
-struct rasterizer_draw_primitives_debug_options_prefix
-{
-	byte reserved00[2];
-	short stats;
-	byte reserved04[0x5F];
-	boolean split_dynamic_geometry_between_windows;
-};
-
 typedef char dynamic_vertex_group_size_assert[
 	sizeof(struct dynamic_vertex_group) == 0x14 ? 1 : -1];
 typedef char dynamic_vertex_buffer_size_assert[
@@ -341,9 +333,6 @@ static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 
 /* ---------- globals */
 
-extern struct rasterizer_draw_primitives_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
-
 static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER_TYPES] =
 {
 	D3DPT_TRIANGLELIST,
@@ -351,7 +340,7 @@ static D3DPRIMITIVETYPE const d3d_primitive_type_table[NUMBER_OF_TRIANGLE_BUFFER
 };
 
 
-struct dynamic_vertices_globals dynamic_vertices = {0};
+static struct dynamic_vertices_globals dynamic_vertices = {0};
 static struct dynamic_triangles_globals dynamic_triangles = {0};
 static D3DVertexBuffer *aux_dynamic_unlit_vb = NULL;
 static boolean dynamic_triangles_overflow_warning = FALSE;
@@ -514,7 +503,7 @@ void rasterizer_dynamic_geometry_begin(
 {
 	long vertex_type;
 
-	if (rasterizer_debug_options.split_dynamic_geometry_between_windows)
+	if (rasterizer_debug_options.splitscreen_VB_optimization_enabled)
 	{
 		match_assert(
 			RASTERIZER_XBOX_DRAW_PRIMITIVES_FILE,
@@ -642,7 +631,7 @@ long _rasterizer_dynamic_triangles_new(
 			dynamic_triangles.triangle_count += count;
 			dynamic_triangles.buffer_count++;
 
-			if (rasterizer_debug_options.stats==_rasterizer_stats_geometry)
+			if (rasterizer_debug_options.statistics_mode==_rasterizer_stats_geometry)
 			{
 				rasterizer_frame_statistics.dynamic_triangle_count += count;
 				rasterizer_frame_statistics.dynamic_triangle_buffer_count++;
@@ -792,7 +781,7 @@ long _rasterizer_dynamic_vertices_new(
 			group->vertex_count += count;
 			dynamic_vertices.buffer_count++;
 
-			if (rasterizer_debug_options.stats==_rasterizer_stats_geometry)
+			if (rasterizer_debug_options.statistics_mode==_rasterizer_stats_geometry)
 			{
 				rasterizer_frame_statistics.dynamic_vertex_count += count;
 				rasterizer_frame_statistics.dynamic_vertex_buffer_count++;

@@ -100,12 +100,8 @@ enum
 	_string_name_kills_score_n_team_score_of_max = 0xB5,
 	_string_name_kills_score_of_max = 0xB6,
 	_game_engine_test_flag_rasterize_score = 1,
-#ifdef HALO_LINUX
 	/* port: the native builds' session limit (halo_port_limits.h) */
 	_slayer_maximum_players = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
-#else
-	_slayer_maximum_players = 16,
-#endif
 };
 
 /* ---------- macros */
@@ -122,22 +118,13 @@ enum
 
 struct slayer_globals
 {
-#ifdef HALO_LINUX
 	/* port: indexed by team (free for all gives every player a team) and by
 	absolute player index, so both follow the session player limit */
 	long team_score[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 	long individual_score[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-	long team_score[16];
-	long individual_score[16];
-#endif
 };
 
 /* January's layout; the port's arrays are larger */
-#ifndef HALO_LINUX
-typedef char verify_slayer_globals_size[
-	sizeof(struct slayer_globals) == 0x80 ? 1 : -1];
-#endif
 
 /* ---------- prototypes */
 
@@ -155,7 +142,7 @@ static void find_next_target(
 
 /* ---------- globals */
 
-struct slayer_globals slayer_globals = { 0 };
+static struct slayer_globals slayer_globals = { 0 };
 
 /* ---------- code */
 
@@ -705,7 +692,6 @@ struct game_engine slayer_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is */
 long game_engine_slayer_write_network_state(
@@ -725,4 +711,3 @@ void game_engine_slayer_read_network_state(
 	if (size == (long)sizeof(slayer_globals))
 		csmemcpy(&slayer_globals, buffer, sizeof(slayer_globals));
 }
-#endif

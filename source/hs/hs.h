@@ -157,6 +157,8 @@ void hs_initialize(
 	void);
 void hs_initialize_for_new_map(
 	void);
+void hs_dispose_from_old_map(
+	void);
 void hs_update(
 	void);
 void hs_node_gc(
@@ -234,6 +236,15 @@ char const *hs_global_get_name(
 	short global_index);
 /* ---------- prototypes/HS_COMPILE.C */
 
+void hs_compile_initialize(
+	boolean compiling_scenario);
+void hs_compile_dispose(
+	void);
+long hs_compile_expression(
+	long source_size,
+	char const *source,
+	char const **error_message,
+	char const **error_source);
 boolean hs_parse(
 	long expression_index,
 	short expected_type);
@@ -242,6 +253,9 @@ void hs_compile(
 	char const *source,
 	char const **error_message,
 	char const **error_source);
+boolean hs_compile_postprocess(
+	char const **error_message_pointer,
+	char const **error_source_pointer);
 
 /* ---------- globals */
 

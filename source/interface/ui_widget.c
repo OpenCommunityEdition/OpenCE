@@ -633,13 +633,13 @@ struct widget_instance;
 #include "bitmaps/bitmaps.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/common/thread.h"
+#include "cache/cache_files.h"
 #include "cache/texture_cache.h"
 #include "cseries/cseries_windows.h"
 #include "cutscene/cinematics.h"
 #include "event_manager.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "hs/hs.h"
 #include "input/input.h"
@@ -657,7 +657,6 @@ struct widget_instance;
 #include "interface/ui_widget_text_search_and_replace_functions.h"
 #include "interface/virtual_keyboard.h"
 #include "main/main.h"
-#include "main/main_runtime.h"
 #include "memory/stack_memory_pool.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_connection.h"
@@ -959,32 +958,12 @@ struct stack_memory_pool_medium
 	struct stack_memory_pool_block *blocks[MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS - 1];
 };
 
-/* narrow views of the tag definitions this file reaches through; the owning
-translation units (HUD.C, HUD_MESSAGING.C, INTERFACE.C) keep their own */
-
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	pixel32 color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
-struct interface_tag_references_definition
-{
-	struct tag_reference tags[NUMBER_OF_INTERFACE_TAGS];
-	byte unused[48];
-};
-
 typedef char verify_icon_hud_element_definition_size[
 	sizeof(struct icon_hud_element_definition) == 0x10 ? 1 : -1];
 typedef char verify_hud_globals_button_icons_offset[
 	offsetof(struct hud_globals_definition, messaging.button_icons) == 0xC4 ? 1 : -1];
 typedef char verify_interface_tag_references_definition_size[
-	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
+	sizeof(struct game_globals_interface_tag_references) == 0x130 ? 1 : -1];
 /* narrow views of the 'DeLa' widget definition tag and of the three block
 elements this file walks; only the members this file reaches are named and
 every other span is left explicitly unknown */
@@ -1336,7 +1315,7 @@ static void ui_widget_delete_children_recursive(
 	struct widget_instance *widget);
 static struct widget_instance *ui_widget_launch_widget(
 	struct widget_instance *widget,
-	long widget_tag_index);
+	long new_widget_tag_index);
 static __inline boolean widget_instance_can_handle_events(
 	struct widget_instance *widget);
 static struct widget_instance *widget_instance_find_by_tag_index_recursive(
@@ -1449,8 +1428,8 @@ static struct ui_widget_bss_prefix ui_widget_globals_storage;
 #define widget_globals ui_widget_globals_storage.widget_globals
 #define we_are_at_the_main_menu ui_widget_globals_storage.we_are_at_the_main_menu
 #define dpad_event_times ui_widget_globals_storage.dpad_event_times
-extern real_argb_color ui_plasma_effect_color;
-extern short local_player_index_for_draw_string_and_hack_in_icons;
+real_argb_color ui_plasma_effect_color;
+short local_player_index_for_draw_string_and_hack_in_icons;
 
 /* January defines this and never references it, as we do not */
 real const _one_over_255 = 1.0f / 255.0f;
@@ -1574,9 +1553,9 @@ static char button_mappings[_icon_custom_1 - _icon_action] =
 	_icon_right_stick	/* look */
 };
 
-real global_ui_white_red = 0.8f;
-real global_ui_white_green = 0.8f;
-real global_ui_white_blue = 0.8f;
+static real global_ui_white_red = 0.8f;
+static real global_ui_white_green = 0.8f;
+static real global_ui_white_blue = 0.8f;
 
 
 /* ---------- public code */
@@ -1649,8 +1628,8 @@ void draw_bitmap_in_rect(
 		real_argb_color plasma_fade = ui_plasma_effect_color;
 		real_rgb_color map_tint = { 0.9f, 0.9f, 0.9f };
 		real map_fade = 0.9f;
-		rectangle2d default_bitmap_rect;
-		real_point2d positions[NUMBER_OF_POINTS_PER_RECTANGLE];
+		rectangle2d temp;
+		real_point2d points[NUMBER_OF_POINTS_PER_RECTANGLE];
 		struct dynamic_screen_vertex vertices[NUMBER_OF_POINTS_PER_RECTANGLE];
 		struct rasterizer_dynamic_screen_geometry_parameters parameters;
 		real bitmap_width;
@@ -1669,11 +1648,11 @@ void draw_bitmap_in_rect(
 
 		if (!bitmap_rect)
 		{
-			default_bitmap_rect.x0 = 0;
-			default_bitmap_rect.y0 = 0;
-			default_bitmap_rect.x1 = bitmap->width;
-			default_bitmap_rect.y1 = bitmap->height;
-			bitmap_rect = &default_bitmap_rect;
+			temp.x0 = 0;
+			temp.y0 = 0;
+			temp.x1 = bitmap->width;
+			temp.y1 = bitmap->height;
+			bitmap_rect = &temp;
 		}
 
 		rectangle_width = rect->x1 - rect->x0;
@@ -1682,32 +1661,32 @@ void draw_bitmap_in_rect(
 		rectangle_y0 = rect->y0;
 		source_width = bitmap_rect->x1 - bitmap_rect->x0;
 		source_height = bitmap_rect->y1 - bitmap_rect->y0;
-		positions[0].x = (real)rectangle_x0;
-		positions[0].y = (real)rectangle_y0;
-		positions[1].x = (real)(rectangle_x0 + rectangle_width);
-		positions[1].y = (real)rectangle_y0;
-		positions[2].x = (real)(rectangle_x0 + rectangle_width);
-		positions[2].y = (real)(rectangle_y0 + rectangle_height);
-		positions[3].x = (real)rectangle_x0;
-		positions[3].y = (real)(rectangle_y0 + rectangle_height);
+		points[0].x = (real)rectangle_x0;
+		points[0].y = (real)rectangle_y0;
+		points[1].x = (real)(rectangle_x0 + rectangle_width);
+		points[1].y = (real)rectangle_y0;
+		points[2].x = (real)(rectangle_x0 + rectangle_width);
+		points[2].y = (real)(rectangle_y0 + rectangle_height);
+		points[3].x = (real)rectangle_x0;
+		points[3].y = (real)(rectangle_y0 + rectangle_height);
 
 		if (clip_rect)
 		{
 			if (clip_rect->x0 > rect->x0)
 			{
-				positions[0].x = positions[3].x = (real)clip_rect->x0;
+				points[0].x = points[3].x = (real)clip_rect->x0;
 			}
 			if (clip_rect->x1 < rect->x1)
 			{
-				positions[1].x = positions[2].x = (real)clip_rect->x1;
+				points[1].x = points[2].x = (real)clip_rect->x1;
 			}
 			if (clip_rect->y0 > rect->y0)
 			{
-				positions[0].y = positions[1].y = (real)clip_rect->y0;
+				points[0].y = points[1].y = (real)clip_rect->y0;
 			}
 			if (clip_rect->y1 < rect->y1)
 			{
-				positions[2].y = positions[3].y = (real)clip_rect->y1;
+				points[2].y = points[3].y = (real)clip_rect->y1;
 			}
 		}
 
@@ -1729,7 +1708,7 @@ void draw_bitmap_in_rect(
 				(vertex_index % 3) ? texture_width : 0.0f;
 			vertices[vertex_index].texture_coordinates.y =
 				(vertex_index > 1) ? texture_height : 0.0f;
-			vertices[vertex_index].position = positions[vertex_index];
+			vertices[vertex_index].position = points[vertex_index];
 		}
 
 		csmemset(&parameters, 0, sizeof(parameters));
@@ -2326,12 +2305,39 @@ static void ui_widget_delete_children_recursive(
 
 static struct widget_instance *ui_widget_launch_widget(
 	struct widget_instance *widget,
-	long widget_tag_index)
+	long new_widget_tag_index)
 {
-	struct ui_widget_definition *definition = ui_widget_definition_get(widget_tag_index);
+	struct ui_widget_definition *definition = ui_widget_definition_get(new_widget_tag_index);
 	struct widget_instance *root;
 	struct widget_instance *new_widget;
 	short local_player_index;
+
+	/* port: the multiplayer menus open only on maps of a build that plays
+	multiplayer with the others (cache_files.c, cache_files_multiplayer_region);
+	otherwise the player is told why, and the main menu stays */
+	{
+		static char const multiplayer_menus[] = "ui\\shell\\main_menu\\multiplayer_type_select\\";
+		char const *name = tag_get_name(new_widget_tag_index);
+		char build[0x20];
+
+		if (name &&
+			!csstrncmp(name, multiplayer_menus, sizeof(multiplayer_menus) - 1) &&
+			!cache_files_multiplayer_region(build))
+		{
+			void platform_log(char const *format, ...);
+			void platform_show_message(char const *title, char const *message);
+			char message[256];
+
+			platform_log("multiplayer is unavailable: maps of build %s are not supported", build);
+			csprintf(
+				message,
+				"Your maps (build %s) aren't supported for multiplayer yet.\n\nAsk in the Discord to get them added.",
+				build);
+			platform_show_message("Halo: multiplayer unavailable", message);
+
+			return NULL;
+		}
+	}
 
 	if (TEST_FLAG(definition->flags, _widget_always_use_tag_controller_index_bit))
 	{
@@ -2392,7 +2398,7 @@ static struct widget_instance *ui_widget_launch_widget(
 	root = widget_instance_get_topmost_parent(widget);
 	new_widget = ui_widget_load_by_name_or_tag(
 		NULL,
-		widget_tag_index,
+		new_widget_tag_index,
 		NULL,
 		local_player_index,
 		root->definition_tag_index,
@@ -2762,14 +2768,12 @@ void ui_widgets_close_all(
 {
 	long local_player_index;
 
-#ifdef HALO_LINUX
 	/* port: the virtual keyboard goes with the widgets (while the widget
 	whose text it edits is still there): left open, it drew on after a game
 	loaded, with the menu map's font, which the game's tags no longer have
 	(a player typing when the host started the game) */
 	if (virtual_keyboard_active())
 		virtual_keyboard_close();
-#endif
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
@@ -3789,7 +3793,7 @@ static void render_state_bitmap(
 	struct icon_hud_element_definition *icon)
 {
 	struct game_globals *game_globals;
-	struct interface_tag_references_definition *interface_tag_references;
+	struct game_globals_interface_tag_references *interface_tag_references;
 	long bitmap_group_index;
 	long frame_index;
 	struct bitmap_data const *bitmap;
@@ -3803,9 +3807,9 @@ static void render_state_bitmap(
 		? TAG_BLOCK_GET_ELEMENT(
 			&game_globals->interface_tag_references,
 			0,
-			struct interface_tag_references_definition)
+			struct game_globals_interface_tag_references)
 		: NULL;
-	bitmap_group_index = interface_tag_references->tags[_interface_bitmap_iface_map2].index;
+	bitmap_group_index = interface_tag_references->interface_tag_references[_interface_bitmap_iface_map2].index;
 	frame_index = 0;
 	bitmap = NULL;
 	clip = NULL;
@@ -5199,7 +5203,6 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* ---------- the mouse (desktop builds)
 
 The menus were made for a controller: the d-pad moves the focus through a
@@ -5716,8 +5719,6 @@ static void ui_widgets_process_mouse(
 	return;
 }
 
-#endif
-
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -5753,9 +5754,7 @@ static void widget_instance_render_recursive(
 	}
 	if (!widget->visible)
 		return;
-#ifdef HALO_LINUX
 	ui_mouse_note_target(widget, definition, offset);
-#endif
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -6011,20 +6010,16 @@ void render_ui_widgets(
 				bounds.y1 = window_bounds->y1 - window_bounds->y0;
 				offset.x = 0;
 				offset.y = 0;
-#ifdef HALO_LINUX
 				/* the mouse drives the first player's menus */
 				ui_mouse_noting_targets = widget->local_player_index == NONE ||
 					widget->local_player_index == 0;
-#endif
 				widget_instance_render_recursive(
 					widget_globals.active_widgets[widget_index],
 					&bounds,
 					offset,
 					TRUE,
 					FALSE);
-#ifdef HALO_LINUX
 				ui_mouse_noting_targets = FALSE;
-#endif
 				if (widget_globals.debug_show_path)
 				{
 					real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -6054,14 +6049,9 @@ void render_ui_widgets(
 		{
 			real alpha;
 
-#ifdef HALO_LINUX
 			/* the whole screen, around the centered 640 columns */
 			bounds.x0 = (short)(-(halo_screen_width() - 640) / 2);
 			bounds.x1 = (short)(640 + (halo_screen_width() - 640) / 2);
-#else
-			bounds.x0 = 0;
-			bounds.x1 = 640;
-#endif
 			bounds.y0 = 0;
 			bounds.y1 = 480;
 			if (widget_globals.fade_to_black >= 0.95f)
@@ -6746,6 +6736,7 @@ static boolean ui_check_for_pause_game(
 {
 	boolean pause_pressed = FALSE;
 	boolean network_game = network_game_is_active();
+	short controller_index = NONE;
 
 	if (game_in_progress() &&
 		!cinematic_in_progress() &&
@@ -6753,190 +6744,179 @@ static boolean ui_check_for_pause_game(
 		!we_are_at_the_main_menu &&
 		widget_globals.pause_disabled_ticks == 0)
 	{
-		short controller_index;
+		long gamepad_index;
 
-		for (controller_index = 0;
-			controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
-			controller_index++)
+		for (gamepad_index = 0;
+			gamepad_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
+			gamepad_index++)
 		{
-			if (input_has_gamepad(controller_index) &&
-				local_player_exists(controller_index) &&
-				input_get_gamepad_state(controller_index)->
+			if (input_has_gamepad(gamepad_index) &&
+				local_player_exists(gamepad_index) &&
+				input_get_gamepad_state(gamepad_index)->
 					buttons[_gamepad_binary_button_start] == 1)
 			{
-				boolean pressed_by_first_local_player = TRUE;
-				short local_player_count = 0;
-				short pressing_local_player_index = NONE;
-				short local_player_index;
-
 				pause_pressed = TRUE;
-				for (local_player_index = local_player_get_next(NONE);
-					local_player_index != NONE;
-					local_player_index = local_player_get_next(local_player_index))
-				{
-					if (local_player_index == controller_index)
-					{
-						pressing_local_player_index = controller_index;
-						if (local_player_count >= 1)
-							pressed_by_first_local_player = FALSE;
-					}
-					local_player_count++;
-				}
-				if (network_game)
-				{
-					if (game_engine_allow_pause() &&
-						pressing_local_player_index == controller_index)
-					{
-						if (!widget_globals.active_widgets[controller_index])
-						{
-							struct network_game_client *client = global_network_game_client_get();
-							struct network_game *network_game_data =
-								network_game_client_get_game(client);
-							short machine_index =
-								network_game_client_get_machine_index(client);
-							char const *widget_name;
+				controller_index = gamepad_index;
+				break;
+			}
+		}
+	}
+	if (pause_pressed)
+	{
+		boolean pressed_by_first_local_player = TRUE;
+		short local_player_count = 0;
+		short pressing_local_player_index = NONE;
+		short local_player_index;
 
-							switch (local_player_count)
-							{
-							case 1:
-								widget_name =
-									"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game";
-								break;
-							case 2:
-								widget_name =
-									"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game";
-								break;
-							case 3:
-								widget_name = pressed_by_first_local_player == TRUE
-									? "ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game"
-									: "ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
-								break;
-							case 4:
-								widget_name =
-									"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
-								break;
-							default:
-								error(
-									_error_silent,
-									"invalid local player count for multiplayer game");
-								widget_name = NULL;
-								break;
-							}
-							if (widget_name &&
-								!ui_widget_load_by_name_or_tag(
-									widget_name,
-									NONE,
-									NULL,
-									controller_index,
-									NONE,
-									NONE,
-									NONE))
-							{
-								error(
-									_error_silent,
-									"failed to load multiplayer pause game window");
-							}
-						}
-						else
-						{
-							ui_widget_delete(widget_globals.active_widgets[controller_index]);
-						}
-					}
-				}
-				else
+		for (local_player_index = local_player_get_next(NONE);
+			local_player_index != NONE;
+			local_player_index = local_player_get_next(local_player_index))
+		{
+			if (local_player_index == controller_index)
+			{
+				pressing_local_player_index = controller_index;
+				if (local_player_count >= 1)
+					pressed_by_first_local_player = FALSE;
+			}
+			local_player_count++;
+		}
+		if (network_game)
+		{
+			if (game_engine_allow_pause() &&
+				pressing_local_player_index == controller_index)
+			{
+				if (!widget_globals.active_widgets[controller_index])
 				{
+					struct network_game_client *client = global_network_game_client_get();
+					struct network_game *network_game_data =
+						network_game_client_get_game(client);
+					short machine_index =
+						network_game_client_get_machine_index(client);
+					char const *widget_name;
+
 					switch (local_player_count)
 					{
-					case 0:
 					case 1:
-						if (widget_globals.active_widgets[controller_index])
-						{
-							if (game_time_get_paused() == TRUE)
-								ui_widgets_close_all();
-						}
-						else if (!ui_widget_load_by_name_or_tag(
-							"ui\\shell\\solo_game\\pause_game\\pause_game",
-							NONE,
-							NULL,
-							controller_index,
-							NONE,
-							NONE,
-							NONE))
-						{
-							error(
-								_error_silent,
-								"failed to load full screen pause game window");
-						}
+						widget_name =
+							"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game";
 						break;
 					case 2:
-						if (widget_globals.active_widgets[controller_index])
-						{
-							if (game_time_get_paused() == TRUE)
-								ui_widgets_close_all();
-						}
-						else if (!game_time_get_paused())
-						{
-							if (!ui_widget_load_by_name_or_tag(
-								"ui\\shell\\solo_game\\pause_game\\pause_game_split_screen",
-								NONE,
-								NULL,
-								controller_index,
-								NONE,
-								NONE,
-								NONE))
-							{
-								error(
-									_error_silent,
-									"failed to load split screen pause game window");
-							}
-						}
+						widget_name =
+							"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game";
+						break;
+					case 3:
+						widget_name = pressed_by_first_local_player == TRUE
+							? "ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game"
+							: "ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
+						break;
+					case 4:
+						widget_name =
+							"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game";
 						break;
 					default:
 						error(
 							_error_silent,
-							"the ui seems to be confused... assuming you are playing full-screen single player?");
-						if (widget_globals.initialized)
-						{
-							boolean widgets_active = FALSE;
-							long widget_index;
-
-							for (widget_index = 0;
-								widget_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
-								widget_index++)
-							{
-								if (widget_globals.active_widgets[widget_index])
-								{
-									widgets_active = TRUE;
-									break;
-								}
-							}
-							if (widgets_active)
-							{
-								ui_widgets_close_all();
-								break;
-							}
-						}
-						if (!ui_widget_load_by_name_or_tag(
-							"ui\\shell\\solo_game\\pause_game\\pause_game",
+							"invalid local player count for multiplayer game");
+						widget_name = NULL;
+						break;
+					}
+					if (widget_name &&
+						!ui_widget_load_by_name_or_tag(
+							widget_name,
 							NONE,
 							NULL,
 							controller_index,
 							NONE,
 							NONE,
 							NONE))
-						{
-							error(
-								_error_silent,
-								"failed to load full screen pause game window");
-						}
-						break;
+					{
+						error(
+							_error_silent,
+							"failed to load multiplayer pause game window");
 					}
+				}
+				else
+				{
+					ui_widget_delete(widget_globals.active_widgets[controller_index]);
+				}
+			}
+		}
+		else
+		{
+			switch (local_player_count)
+			{
+			case 0:
+			case 1:
+				if (widget_globals.active_widgets[controller_index])
+				{
+					if (game_time_get_paused() == TRUE)
+						ui_widgets_close_all();
+				}
+				else if (!ui_widget_load_by_name_or_tag(
+					"ui\\shell\\solo_game\\pause_game\\pause_game",
+					NONE,
+					NULL,
+					controller_index,
+					NONE,
+					NONE,
+					NONE))
+				{
+					error(
+						_error_silent,
+						"failed to load full screen pause game window");
+				}
+				break;
+			case 2:
+				if (widget_globals.active_widgets[controller_index])
+				{
+					if (game_time_get_paused() == TRUE)
+						ui_widgets_close_all();
+				}
+				else if (!game_time_get_paused())
+				{
+					if (!ui_widget_load_by_name_or_tag(
+						"ui\\shell\\solo_game\\pause_game\\pause_game_split_screen",
+						NONE,
+						NULL,
+						controller_index,
+						NONE,
+						NONE,
+						NONE))
+					{
+						error(
+							_error_silent,
+							"failed to load split screen pause game window");
+					}
+				}
+				break;
+			default:
+				error(
+					_error_silent,
+					"the ui seems to be confused... assuming you are playing full-screen single player?");
+				if (!ui_widgets_active())
+				{
+					if (!ui_widget_load_by_name_or_tag(
+						"ui\\shell\\solo_game\\pause_game\\pause_game",
+						NONE,
+						NULL,
+						controller_index,
+						NONE,
+						NONE,
+						NONE))
+					{
+						error(
+							_error_silent,
+							"failed to load full screen pause game window");
+					}
+				}
+				else
+				{
+					ui_widgets_close_all();
 				}
 				break;
 			}
 		}
 	}
-#ifdef HALO_LINUX
 	/* This runs once a frame, several frames per tick on the native builds
 	(port/linux/game/render_interpolation.c): count the lock down in 30 Hz
 	ticks of real time, not in frames. */
@@ -6950,10 +6930,6 @@ static boolean ui_check_for_pause_game(
 		widget_globals.pause_disabled_ticks =
 			FLOOR(widget_globals.pause_disabled_ticks - ticks, 0);
 	}
-#else
-	widget_globals.pause_disabled_ticks =
-		FLOOR(widget_globals.pause_disabled_ticks - 1, 0);
-#endif
 
 	return pause_pressed;
 }
@@ -6973,9 +6949,7 @@ void process_ui_widgets(
 		644,
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
-#ifdef HALO_LINUX
 	ui_widgets_process_mouse();
-#endif
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))

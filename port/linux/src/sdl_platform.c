@@ -265,7 +265,10 @@ static BOOL data_choose_image(char *path, int size)
 	/* the dialog answers through events (and on some systems another
 	thread) */
 	while (!SDL_GetAtomicInt(&choice.done))
-		SDL_WaitEventTimeout(NULL, 50);
+	{
+		SDL_PumpEvents();
+		SDL_Delay(50);
+	}
 	if (!choice.path[0])
 		return FALSE;
 	snprintf(path, (size_t)size, "%s", choice.path);

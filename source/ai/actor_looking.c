@@ -166,13 +166,14 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "ai/actor_looking.h"
+#include "math/real_math.h"
 
 #include "actors.h"
 #include "actor_definitions.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
 #include "cseries/errors.h"
+#include "game/game.h"
 #include "items/weapon_definitions.h"
 #include "main/console.h"
 #include "physics/collisions.h"
@@ -1430,10 +1431,10 @@ void actor_look_update(
 		if (actor_combat_currently_firing_burst(actor_index) &&
 			!actor->orders.combat.abort_burst)
 		{
-			struct direction_specification burst_specification;
+			struct direction_specification temporary_direction;
 
-			burst_specification.type = _direction_specification_target;
-			if (actor_look_decode_direction(actor_index, &burst_specification, &primary_vector))
+			temporary_direction.type = _direction_specification_target;
+			if (actor_look_decode_direction(actor_index, &temporary_direction, &primary_vector))
 			{
 				primary_priority = _primary_priority_locked_aiming;
 				aiming_at_target = TRUE;
@@ -1895,22 +1896,22 @@ update_facing:
 			}
 			else
 			{
-				real_vector2d facing2d;
-				real_vector2d aiming2d;
-				real_vector2d fixed2d;
+				real_vector2d desired_facing;
+				real_vector2d desired_aiming;
+				real_vector2d stationary_facing;
 
-				facing2d.i = actor->control.desired_facing_vector.i;
-				facing2d.j = actor->control.desired_facing_vector.j;
-				aiming2d.i = actor->control.desired_aiming_vector.i;
-				aiming2d.j = actor->control.desired_aiming_vector.j;
-				fixed2d.i = actor->control.fixed_stationary_facing_vector.i;
-				fixed2d.j = actor->control.fixed_stationary_facing_vector.j;
+				desired_facing.i = actor->control.desired_facing_vector.i;
+				desired_facing.j = actor->control.desired_facing_vector.j;
+				desired_aiming.i = actor->control.desired_aiming_vector.i;
+				desired_aiming.j = actor->control.desired_aiming_vector.j;
+				stationary_facing.i = actor->control.fixed_stationary_facing_vector.i;
+				stationary_facing.j = actor->control.fixed_stationary_facing_vector.j;
 
-				valid = normalize2d(&facing2d) != 0.0f &&
-					normalize2d(&aiming2d) != 0.0f &&
-					normalize2d(&fixed2d) != 0.0f &&
-					dot_product2d(&fixed2d, &facing2d) > stationary_cosine &&
-					dot_product2d(&aiming2d, &fixed2d) > stationary_cosine;
+				valid = normalize2d(&desired_facing) != 0.0f &&
+					normalize2d(&desired_aiming) != 0.0f &&
+					normalize2d(&stationary_facing) != 0.0f &&
+					dot_product2d(&stationary_facing, &desired_facing) > stationary_cosine &&
+					dot_product2d(&desired_aiming, &stationary_facing) > stationary_cosine;
 			}
 
 			if (!valid)

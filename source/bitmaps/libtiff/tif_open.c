@@ -1,5 +1,5 @@
 #ifndef lint
-char data_002dae60[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_open.c,v 1.33 92/02/14 13:40:51 sam Exp $";
+static char data_002dae60[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_open.c,v 1.33 92/02/14 13:40:51 sam Exp $";
 #endif
 
 /*
@@ -71,7 +71,7 @@ static int bigTypeshift[13] = {
 	0,		/* TIFF_FLOAT */
 	0,		/* TIFF_DOUBLE */
 };
-int bss_0031bea0[13] = {
+static int bss_0031bea0[13] = {
 	0,		/* TIFF_NOTYPE */
 	0,		/* TIFF_BYTE */
 	0,		/* TIFF_ASCII */

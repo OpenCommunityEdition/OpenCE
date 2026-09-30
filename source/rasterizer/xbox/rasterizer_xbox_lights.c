@@ -88,6 +88,7 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
@@ -108,28 +109,6 @@ enum
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
 
 struct lens_flare_definition
 {
@@ -171,13 +150,12 @@ static short rasterizer_sun_glow_convolve(
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
 
 void rasterizer_sun_glow_draw(
-	struct rasterizer_lens_flare_submit_parameters const *parameters)
+	struct rasterizer_lens_flare_submit_parameters const *flare)
 {
 	real vertex_constants[5][4];
 	real_point3d occlusion_point;
@@ -185,8 +163,8 @@ void rasterizer_sun_glow_draw(
 	real_rectangle2d screen_bounds;
 	real brightness;
 	real_rectangle2d bounds;
-	real_vector2d projected_axes;
-	real_point3d projected_center;
+	real_vector2d axes;
+	real_point3d center;
 	real_vector3d direction;
 	real intensity;
 	short viewport_width;
@@ -202,9 +180,9 @@ void rasterizer_sun_glow_draw(
 		583,
 		global_d3d_device);
 
-	direction.i = parameters->position.x - global_window_parameters.camera.position.x;
-	direction.j = parameters->position.y - global_window_parameters.camera.position.y;
-	direction.k = parameters->position.z - global_window_parameters.camera.position.z;
+	direction.i = flare->position.x - global_window_parameters.camera.position.x;
+	direction.j = flare->position.y - global_window_parameters.camera.position.y;
+	direction.k = flare->position.z - global_window_parameters.camera.position.z;
 	normalize3d(&direction);
 
 	intensity =
@@ -257,22 +235,22 @@ void rasterizer_sun_glow_draw(
 		vertex_constants,
 		5);
 
-	direction = uncompress_int32_to_real_vector3d(parameters->compressed_direction);
-	occlusion_point.x = parameters->definition->occlusion_radius * direction.i +
-		parameters->position.x;
-	occlusion_point.y = parameters->definition->occlusion_radius * direction.j +
-		parameters->position.y;
-	occlusion_point.z = parameters->definition->occlusion_radius * direction.k +
-		parameters->position.z;
+	direction = uncompress_int32_to_real_vector3d(flare->compressed_direction);
+	occlusion_point.x = flare->definition->occlusion_radius * direction.i +
+		flare->position.x;
+	occlusion_point.y = flare->definition->occlusion_radius * direction.j +
+		flare->position.y;
+	occlusion_point.z = flare->definition->occlusion_radius * direction.k +
+		flare->position.z;
 
 	if (rasterizer_project_billboard(
 		&occlusion_point,
-		parameters->definition->occlusion_radius,
-		&projected_center,
-		&projected_axes))
+		flare->definition->occlusion_radius,
+		&center,
+		&axes))
 	{
-		center_x = (real)floor(projected_center.x + 0.5f);
-		center_y = (real)floor(projected_center.y + 0.5f);
+		center_x = (real)floor(center.x + 0.5f);
+		center_y = (real)floor(center.y + 0.5f);
 
 		bounds.x0 = center_x - 32.0f;
 		bounds.y0 = center_y - 32.0f;
@@ -420,7 +398,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x0,
 				bounds.y0,
-				projected_center.z,
+				center.z,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 0);
 			IDirect3DDevice8_SetVertexData4f(
@@ -428,7 +406,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x1,
 				bounds.y0,
-				projected_center.z,
+				center.z,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 1);
 			IDirect3DDevice8_SetVertexData4f(
@@ -436,7 +414,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x1,
 				bounds.y1,
-				projected_center.z,
+				center.z,
 				1.0f);
 			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 1);
 			IDirect3DDevice8_SetVertexData4f(
@@ -444,7 +422,7 @@ void rasterizer_sun_glow_draw(
 				0,
 				bounds.x0,
 				bounds.y1,
-				projected_center.z,
+				center.z,
 				1.0f);
 			IDirect3DDevice8_End(global_d3d_device);
 

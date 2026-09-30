@@ -1,5 +1,7 @@
 # Halo: Combat Evolved for Linux, Windows and Android
 
+[![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
+
 This project is a port of the Halo: Combat Evolved decompilation to Linux,
 Windows and Android. The decompilation is of the Xbox build 2342
 (`cachebeta.exe`, SHA-256
@@ -72,7 +74,7 @@ The game can play system link games on a local network and on the internet:
 - Linux, Windows and Android machines can play in the same game.
 - An invite link lets a machine join a game on the internet. No server of
   this project is necessary.
-- The default netcode is new. Each machine moves its own player at once,
+- The netcode is new. Each machine moves its own player at once,
   and the host makes the decisions for the game. Refer to
   [port/linux/NETCODE.md](port/linux/NETCODE.md).
 
@@ -137,13 +139,3 @@ To record a new profile:
 The build then plays the main menu and the first minute of each campaign
 level. This procedure continues for approximately 15 minutes. The game
 data must be in `assets/`.
-
-### The byte-matching build
-
-The original project also has a byte-matching build. That build compiles
-the game with the compiler of the Xbox SDK and compares the result with
-`cachebeta.exe`. This project does not generate that build, because the
-Xbox SDK is not free to distribute. The sources of that build are not
-changed. To use the build again, set `SolutionConfig.matching` in
-`tools/project_x86.py`. You must also have the Xbox SDK in `xbox/` and
-`cachebeta.exe` in the root folder.

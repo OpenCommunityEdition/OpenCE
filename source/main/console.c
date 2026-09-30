@@ -355,7 +355,6 @@ void console_startup(
 		fclose(file);
 	}
 
-#ifdef HALO_LINUX
 	/* the port's game.map (HALO_MAP) */
 	{
 		const char *command = halo_startup_map_command();
@@ -370,7 +369,6 @@ void console_startup(
 			}
 		}
 	}
-#endif
 
 	return;
 }

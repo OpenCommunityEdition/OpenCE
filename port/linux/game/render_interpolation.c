@@ -30,9 +30,15 @@ on top of it, fading each tick.
 #include "cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "camera/director.h"
 #include "camera/observer.h"
+#include "cutscene/cinematics.h"
 #include "game/players.h"
 #include "render/render_cameras.h"
+#include "units/units.h"
+
+/* port/linux/src/port_config.c */
+int config_boolean(const char *name);
 
 #include <math.h>
 #include <stdlib.h>
@@ -471,15 +477,70 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 
 /* ---------- camera */
 
+static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
+
+static struct observer_result const *render_interpolation_blended_camera(
+	short local_player_index,
+	struct observer_result const *observer);
+
+/* A first-person view is posed from the player's facing, which the input
+turns every frame (player_control.c), but the observer keeps it as of the
+last tick and the blend above draws it a tick later still. On foot, the view
+points where the player aims now (display.direct_camera). In a vehicle's
+seat or a cinematic the view is the seat's or the script's: left as it is.
+Desktop only: display.direct_camera is not an Android setting, and its
+default would otherwise apply there. */
+static struct observer_result const *render_interpolation_direct_camera(
+	short local_player_index,
+	struct observer_result const *observer)
+{
+#ifdef HALO_ANDROID
+	(void)local_player_index;
+	return observer;
+#else
+	static int enabled = -1;
+	struct observer_result *direct;
+	long unit_index;
+
+	if (enabled < 0)
+		enabled = config_boolean("display.direct_camera");
+	if (!enabled || !observer ||
+		director_get_perspective(local_player_index) != _director_perspective_first_person ||
+		director_inhibited_facing(local_player_index) ||
+		cinematic_in_progress())
+	{
+		return observer;
+	}
+	unit_index = player_control_get_unit_index(local_player_index);
+	if (unit_index == NONE || object_get(unit_index)->object.parent_object_index != NONE)
+		return observer;
+
+	direct = &direct_cameras[local_player_index];
+	*direct = *observer;
+	player_control_get_facing_direction(local_player_index, &direct->forward);
+	observer_up_from_forward(&direct->forward, &direct->up);
+	return direct;
+#endif
+}
+
 struct observer_result const *render_interpolation_camera(
+	short local_player_index,
+	struct observer_result const *observer)
+{
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return observer;
+	return render_interpolation_direct_camera(local_player_index,
+		render_interpolation_blended_camera(local_player_index, observer));
+}
+
+static struct observer_result const *render_interpolation_blended_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
 	struct interpolated_camera *camera;
 	real t = interpolation_fraction;
 
-	if (!interpolation_rendering || !observer ||
-		local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+	if (!interpolation_rendering || !observer)
 	{
 		return observer;
 	}

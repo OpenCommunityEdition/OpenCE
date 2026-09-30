@@ -31,8 +31,6 @@ boolean network_game_server_idle(
 	struct network_game_server *server);
 void network_game_server_open_game(
 	struct network_game_server *server);
-void network_game_server_close_game(
-	struct network_game_server *server);
 void network_game_server_switch_to_postgame(
 	struct network_game_server *server);
 boolean network_game_server_graceful_shutdown(
@@ -44,11 +42,6 @@ void network_game_server_pause_countdown(
 	boolean pause_countdown);
 void network_game_generate_join_game_token(
 	byte *join_token);
-long network_game_server_get_oldest_client_update_received(
-	struct network_game_server *server);
-void network_game_server_stalled_on_client(
-	struct network_game_server *server,
-	boolean stalled);
 void network_game_server_update_ticks(
 	struct network_game_server *server,
 	short tick_count);

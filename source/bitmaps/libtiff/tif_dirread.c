@@ -4,7 +4,7 @@ struct tif_dirread_data {
 	char fetch_tag_message[19];
 };
 
-struct tif_dirread_data data_002b8618 = {
+static struct tif_dirread_data data_002b8618 = {
 	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirread.c,v 1.20 92/03/25 09:58:09 sam Exp $",
 	"to fetch tag value"
 };

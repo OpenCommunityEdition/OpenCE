@@ -8,15 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import linux_build, linux_link_check, linux_msvc_semantics, msvc_deps_filter
-from tools.download_tool import uasm_url
-from tools.project_x86 import (
-    Object,
-    ObjectStatus,
-    ProjectConfig,
-    SolutionConfig,
-    generate_build_ninja,
-)
+from tools import linux_build, linux_link_check, linux_msvc_semantics
 
 
 # ---------- MSVC semantics header
@@ -129,30 +121,6 @@ def test_xdk_headers_regroups_anonymous_members():
                          "unsigned long After;"]
 
 
-# ---------- /showIncludes filter
-
-
-def test_deps_filter_resolves_windows_style_paths(tmp_path, monkeypatch):
-    write(tmp_path / "source" / "cseries" / "cseries.h", "")
-    write(tmp_path / "xbox" / "include" / "PopPack.h", "")
-    monkeypatch.chdir(tmp_path)
-    msvc_deps_filter.resolve.cache_clear()
-    msvc_deps_filter.directory_entries.cache_clear()
-
-    prefix = msvc_deps_filter.INCLUDE_PREFIX
-    assert msvc_deps_filter.filter_line(f"{prefix} source/cseries\\cseries.h\n") == \
-        f"{prefix} source/cseries/cseries.h\n"
-    assert msvc_deps_filter.filter_line(f"{prefix} xbox/include\\POPPACK.H\n") == \
-        f"{prefix} xbox/include/PopPack.h\n"
-    # wibo reports absolute paths on drive Z:, in lower case
-    absolute = "z:" + str(tmp_path).lower().replace("/", "\\") + "\\xbox\\include\\poppack.h"
-    assert msvc_deps_filter.filter_line(f"{prefix} {absolute}\n") == \
-        f"{prefix} xbox/include/PopPack.h\n"
-    # unknown files and ordinary output pass through untouched
-    assert msvc_deps_filter.filter_line(f"{prefix} missing\\file.h\n") == f"{prefix} missing\\file.h\n"
-    assert msvc_deps_filter.filter_line("cseries.c\n") == "cseries.c\n"
-
-
 # ---------- weak reference link check
 
 
@@ -180,47 +148,16 @@ def test_link_check_rejects_undefined_weak_references(tmp_path):
     assert check(caller, local, provider) == 0
 
 
-# ---------- MASM stand-in and build graph
+# ---------- game sources
 
 
-def test_uasm_release_url():
-    assert uasm_url("v2.57r") == \
-        "https://github.com/Terraspace/UASM/releases/download/v2.57r/uasm257_linux64.zip"
-
-
-def make_solution(tmp_path, monkeypatch, **settings) -> SolutionConfig:
+def test_game_sources_leave_out_the_excluded(tmp_path, monkeypatch):
+    write(tmp_path / "source" / "a.c", "")
+    write(tmp_path / "source" / "zlib" / "b.c", "")
+    write(tmp_path / "source" / "zlib" / "example.c", "")
+    write(tmp_path / "source" / "a.h", "")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["configure.py"])
-    sln = SolutionConfig()
-    sln.build_dir = Path("build")
-    sln.config_dir = Path("config")
-    sln.tools_dir = Path("tools")
-    sln.baserom = Path("target.exe")
-    sln.objdiff_path = Path("objdiff-cli")
-    sln.csplit_path = Path("csplit")
-    for key, value in settings.items():
-        setattr(sln, key, value)
-    project = ProjectConfig(cflags=[], defines=[], include_dirs=[], asmflags=[])
-    project.name = "libcmt"
-    project.guid = "test"
-    project.objects = [Object(ObjectStatus.Matching, Path("libs/libcmt/llshr.asm"))]
-    sln.projects = [project]
-    return sln
-
-
-def test_uasm_assembles_asm_units_when_no_masm_exists(tmp_path, monkeypatch):
-    sln = make_solution(tmp_path, monkeypatch, uasm_tag="v2.57r", wrapper=Path("wine"))
-    monkeypatch.setattr(SolutionConfig, "use_uasm", lambda self: True)
-    generate_build_ninja(sln)
-    ninja = re.sub(r"\$\n\s+", "", Path("build.ninja").read_text(encoding="utf-8"))
-    assert "command = build/tools/uasm/uasm -nologo -c -coff $asmflags -Fo$out $in" in ninja
-    assert "tool = uasm" in ninja
-    assert "llshr.obj: ml libs/libcmt/llshr.asm | build/tools/uasm" in ninja
-
-
-def test_build_graph_without_port_has_no_linux_target(tmp_path, monkeypatch):
-    sln = make_solution(tmp_path, monkeypatch)
-    generate_build_ninja(sln)
-    ninja = Path("build.ninja").read_text(encoding="utf-8")
-    assert "linux_cc" not in ninja
-    assert "build linux:" not in ninja
+    config = {"game": {"root": "source", "exclude": ["source/zlib/example.c"],
+                       "defines": ["DEBUG"], "include_dirs": ["source", "source/saved games"]}}
+    assert linux_build.game_sources(config) == [Path("source/a.c"), Path("source/zlib/b.c")]
+    assert linux_build.game_defines_and_includes(config) == '-DDEBUG -Isource -I"source/saved games"'

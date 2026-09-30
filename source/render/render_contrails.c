@@ -25,6 +25,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cache/texture_cache.h"
 #include "effects/contrail_definitions.h"
 #include "effects/contrails.h"
 #include "bitmaps/bitmap_group.h"
@@ -68,21 +69,12 @@ typedef char verify_contrail_vertex_size[
 
 /* ---------- prototypes */
 
-void render_contrails(
+static void render_contrails(
 	unsigned long render_mode_flags);
-void render_contrail(
+static void render_contrail(
 	struct contrail_datum *contrail,
 	struct contrail_definition *definition,
 	short instance_index);
-
-struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
-	long bitmap_group_index,
-	short sequence_index,
-	short frame_index);
-void *_texture_cache_bitmap_get_hardware_format(
-	struct bitmap_data *bitmap,
-	boolean block,
-	boolean load);
 
 real contrail_fade(
 	struct contrail_definition *definition,
@@ -120,7 +112,7 @@ real contrail_fade(
 	return result;
 }
 
-void render_contrail(
+static void render_contrail(
 	struct contrail_datum *contrail,
 	struct contrail_definition *definition,
 	short instance_index)
@@ -451,7 +443,7 @@ void render_contrail(
 	return;
 }
 
-void render_contrails(
+static void render_contrails(
 	unsigned long render_mode_flags)
 {
 	if (render_contrails_enabled)

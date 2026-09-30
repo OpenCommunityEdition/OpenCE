@@ -1350,7 +1350,7 @@ void network_distributed_player_killed(
 	short dead_absolute_index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
 	struct distributed_death *death;
 
-	if (!network_game_distributed() || dead_absolute_index < 0 || dead_absolute_index >= MAXIMUM_TRACKED_PLAYERS)
+	if (dead_absolute_index < 0 || dead_absolute_index >= MAXIMUM_TRACKED_PLAYERS)
 		return;
 	death = &distributed_deaths[dead_absolute_index];
 	if (game_connection() == _game_connection_network_server)
@@ -1437,7 +1437,7 @@ void network_distributed_player_picked_up(
 {
 	struct distributed_pickup *pickup;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		distributed_pickup_count >= MAXIMUM_PICKUPS_PER_TICK)
 	{
 		return;
@@ -1590,6 +1590,8 @@ void network_distributed_new_game(
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
 	distributed_pickup_count = 0;
+	/* (each player's latest input: player_queues_new.c) */
+	update_queues_distributed_reset();
 	network_objects_new_game();
 	network_damage_new_game();
 }
@@ -1600,7 +1602,7 @@ void network_distributed_tick(
 {
 	short connection = game_connection();
 
-	if (!network_game_distributed() || game_time_get() == distributed_last_sent_time)
+	if (game_time_get() == distributed_last_sent_time)
 		return;
 	distributed_last_sent_time = game_time_get();
 	if (connection == _game_connection_network_server)
@@ -1678,7 +1680,7 @@ void network_distributed_handle_message(
 	word entry_size;
 
 	/* (none between games: loading, or in the menus) */
-	if (size < sizeof(header) || !network_game_distributed() || !game_in_progress())
+	if (size < sizeof(header) || !game_in_progress())
 		return;
 	csmemcpy(&header, message, sizeof(header));
 	/* a tick's messages in one: each as if it came alone */

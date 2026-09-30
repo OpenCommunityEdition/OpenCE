@@ -107,7 +107,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game/game_engine_place.h"
-#include "game/game_engine_runtime.h"
+#include "game/game_engine.h"
 #include "game.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
@@ -219,28 +219,15 @@ enum multiplayer_game_text
 struct oddball_globals
 {
 	long score_to_win;
-#ifdef HALO_LINUX
 	/* port: the scores are indexed by team (free for all gives every player
 	a team) and by absolute player index, not by ball */
 	long team_score[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 	long individual_score[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-	long team_score[MAXIMUM_ODDBALLS];
-	long individual_score[MAXIMUM_ODDBALLS];
-#endif
 	long ball_spawn_timer[MAXIMUM_ODDBALLS];
 	long current_ball_owner[MAXIMUM_ODDBALLS];
 };
 
 /* January's layout; the port's score arrays are larger */
-#ifndef HALO_LINUX
-typedef char verify_oddball_globals_size[
-	sizeof(struct oddball_globals) == 0x104 ? 1 : -1];
-typedef char verify_oddball_globals_ball_spawn_timer_offset[
-	offsetof(struct oddball_globals, ball_spawn_timer) == 0x84 ? 1 : -1];
-typedef char verify_oddball_globals_current_ball_owner_offset[
-	offsetof(struct oddball_globals, current_ball_owner) == 0xC4 ? 1 : -1];
-#endif
 
 typedef char verify_scenario_netgame_flag_size[
 	sizeof(struct scenario_netgame_flag) == 0x94 ? 1 : -1];
@@ -1304,7 +1291,6 @@ struct game_engine oddball_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the parts of oddball_globals that are the same on every machine */
 struct oddball_network_state
 {
@@ -1358,4 +1344,3 @@ void game_engine_oddball_read_network_state(
 	csmemcpy(oddball_globals.individual_score, state.individual_score, sizeof(state.individual_score));
 	csmemcpy(oddball_globals.ball_spawn_timer, state.ball_spawn_timer, sizeof(state.ball_spawn_timer));
 }
-#endif

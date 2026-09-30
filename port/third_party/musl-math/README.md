@@ -8,8 +8,8 @@ Upstream: https://musl.libc.org, release 1.2.5 (the release the Android
 port builds its C library from). The files in `src/` are musl's
 `src/math/` files, copied unchanged.
 
-System link games run in lockstep, so every machine must compute the same
-results to the last bit, and the C libraries' versions of these functions
+Every machine in a system link game simulates it from the same inputs, so
+every machine must compute the same results to the last bit, and the C libraries' versions of these functions
 differ (glibc, the Windows UCRT, Android's musl). Every native port builds
 these instead, from the same source with the same flags, as `halo_sin` and
 so on (`port/include/halo_math.h`, which the game's `<math.h>` includes).

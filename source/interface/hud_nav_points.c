@@ -99,7 +99,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "game_state.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "networking/network_connection.h"
 #include "memory/data.h"
@@ -199,15 +201,6 @@ struct hud_nav_point_player_datum
 	struct hud_nav_point_datum nav_points[MAXIMUM_NUMBER_OF_NAV_POINTS];
 };
 
-struct scenario_cutscene_flag
-{
-	long runtime_unused;
-	char name[TAG_STRING_LENGTH];
-	real_point3d position;
-	real_euler_angles2d facing;
-	byte unused[0x24];
-};
-
 struct hud_nav_object_datum
 {
 	byte unused[0xB6];
@@ -221,32 +214,6 @@ struct hud_nav_object_datum
 
 static void hud_update_nav_point_local_player(
 	short local_player_index);
-
-void *object_try_and_get_and_verify_type(
-	long object_index,
-	unsigned long valid_type_flags);
-
-void object_get_bounding_sphere(
-	long object_index,
-	real_point3d *center,
-	real *radius);
-
-real_point3d *game_engine_get_goal_position(
-	real_point3d *position,
-	short goal_index);
-
-void custom_render_nav_point(
-	short local_player_index,
-	real_point3d const *position,
-	short nav_index,
-	short render_type);
-
-void game_engine_render_nav_points(
-	short local_player_index);
-
-void unit_get_head_position(
-	long unit_index,
-	real_point3d *head_position);
 
 /* ---------- globals */
 
@@ -711,7 +678,7 @@ void custom_render_nav_point(
 	real_point3d view_point;
 	real distance;
 	real arrow_scale;
-	real_point2d screen_point;
+	real_point2d screen_position;
 	real horizontal_radius;
 	real vertical_radius;
 	real vertical_component;
@@ -731,16 +698,16 @@ void custom_render_nav_point(
 		long unit_index = local_player_get_player_index(local_player_index)==NONE ?
 			NONE :
 			player_get(local_player_get_player_index(local_player_index))->unit_index;
-		real_point3d camera_position;
+		real_point3d cam_pos;
 		real delta_x;
 		real delta_y;
 		real delta_z;
 
-		unit_get_camera_position(unit_index, &camera_position);
+		unit_get_camera_position(unit_index, &cam_pos);
 
-		delta_x = position->x-camera_position.x;
-		delta_y = position->y-camera_position.y;
-		delta_z = position->z-camera_position.z;
+		delta_x = position->x-cam_pos.x;
+		delta_y = position->y-cam_pos.y;
+		delta_z = position->z-cam_pos.z;
 		distance = square_root(
 			delta_x*delta_x + (delta_y*delta_y + delta_z*delta_z));
 	}
@@ -766,18 +733,18 @@ void custom_render_nav_point(
 			&render.camera,
 			&render.frustum,
 			&view_point,
-			&screen_point))
+			&screen_position))
 	{
-		screen_point.x = view_point.x;
-		screen_point.y = -view_point.y;
+		screen_position.x = view_point.x;
+		screen_position.y = -view_point.y;
 		waypoint_type = _waypoint_off_screen;
 	}
 	else
 	{
-		screen_point.x -= (real)(
+		screen_position.x -= (real)(
 			((render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2) +
 			render.camera.viewport_bounds.x0);
-		screen_point.y -= (real)(
+		screen_position.y -= (real)(
 			((render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2) +
 			render.camera.viewport_bounds.y0);
 	}
@@ -789,8 +756,8 @@ void custom_render_nav_point(
 		((real)(render.camera.window_bounds.y1-render.camera.window_bounds.y0) -
 		(hud_globals->waypoint.bottom_offset+hud_globals->waypoint.top_offset))*0.5f;
 	radius_product = vertical_radius*horizontal_radius;
-	vertical_component = vertical_radius*screen_point.x;
-	horizontal_component = horizontal_radius*screen_point.y;
+	vertical_component = vertical_radius*screen_position.x;
+	horizontal_component = horizontal_radius*screen_position.y;
 	theta = 0.0f;
 
 	if (waypoint_type==_waypoint_off_screen ||
@@ -802,18 +769,18 @@ void custom_render_nav_point(
 			(vertical_component*vertical_component + horizontal_component*horizontal_component));
 
 		waypoint_type = _waypoint_off_screen;
-		screen_point.x *= scale;
-		screen_point.y *= scale;
+		screen_position.x *= scale;
+		screen_position.y *= scale;
 
 		if (!TEST_FLAG(arrow->flags, _hud_waypoint_dont_rotate_offscreen_bit))
 		{
-			theta = -arctangent(screen_point.x, screen_point.y);
+			theta = -arctangent(screen_position.x, screen_position.y);
 		}
 	}
 
-	screen_point.x += (real)(
+	screen_position.x += (real)(
 		(render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2);
-	screen_point.y += (real)(
+	screen_position.y += (real)(
 		(render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2);
 
 	match_assert(
@@ -837,18 +804,18 @@ void custom_render_nav_point(
 			(struct bitmap_data *)bitmap, FALSE, TRUE))
 		{
 			point2d point;
-			real_rgb_color color;
+			real_rgb_color rgb_temp;
 			byte alpha;
 			real fade;
 
-			point.x = (short)(long)screen_point.x;
-			point.y = (short)(long)screen_point.y;
+			point.x = (short)(long)screen_position.x;
+			point.y = (short)(long)screen_position.y;
 			alpha = (byte)PIN(fast_ftol_C(arrow->opacity)*255, 0, 255);
-			pixel32_to_real_rgb_color(arrow->color, &color);
+			pixel32_to_real_rgb_color(arrow->color, &rgb_temp);
 			fade = 1.0f-arrow->fade;
-			color.red *= PIN(fade, 0.0f, 1.0f);
-			color.green *= PIN(fade, 0.0f, 1.0f);
-			color.blue *= PIN(fade, 0.0f, 1.0f);
+			rgb_temp.red *= PIN(fade, 0.0f, 1.0f);
+			rgb_temp.green *= PIN(fade, 0.0f, 1.0f);
+			rgb_temp.blue *= PIN(fade, 0.0f, 1.0f);
 
 			hud_draw_bitmap_direct(
 				bitmap,
@@ -857,7 +824,7 @@ void custom_render_nav_point(
 				clip,
 				arrow_scale,
 				theta,
-				((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color),
+				((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp),
 				FALSE);
 
 			if (waypoint_type!=_waypoint_off_screen)
@@ -873,9 +840,9 @@ void custom_render_nav_point(
 
 				placement.corner = _hud_anchor_top_left;
 				numbers.colors.color =
-					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color);
+					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp);
 				numbers.colors.flash_color =
-					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&color);
+					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp);
 				numbers.digits = 3;
 				numbers.fractional_digits = 1;
 				numbers.number_flags =

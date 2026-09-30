@@ -42,7 +42,7 @@ struct crc_globals
 #if !(defined(__aarch64__) && defined(__ILP32__)) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
-struct crc_globals crc_globals;
+static struct crc_globals crc_globals;
 #if !(defined(__aarch64__) && defined(__ILP32__))
 #pragma bss_seg()
 #endif

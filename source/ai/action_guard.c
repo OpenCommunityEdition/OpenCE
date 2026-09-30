@@ -53,6 +53,7 @@ symbols in this file:
 #include "actor_definitions.h"
 #include "ai_communication.h"
 #include "props.h"
+#include "game/game_allegiance.h"
 
 /* ---------- constants */
 
@@ -77,24 +78,6 @@ enum
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-boolean game_team_is_ally(
-	short team_a,
-	short team_b);
-
-long actor_target_unit_index(
-	long actor_index);
-
-void actor_perception_forget_recent_damage(
-	long actor_index);
-
-void actor_perception_retreat_successful(
-	long actor_index);
-
-void actor_stimulus_suspicion(
-	long actor_index,
-	short suspicion_level,
-	long ticks);
 
 /* ---------- globals */
 

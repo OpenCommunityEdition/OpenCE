@@ -51,6 +51,12 @@ boolean cache_file_header_verify(
 	struct cache_file_header *header,
 	char const *scenario_name,
 	boolean fatal);
+boolean cache_files_give_time_to_precache(
+	char const *map_name);
+char const *cache_files_build_region(
+	char const *build);
+char const *cache_files_multiplayer_region(
+	char build[0x20]);
 
 unsigned long cache_files_get_checksum(
 	void);

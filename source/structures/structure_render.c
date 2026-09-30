@@ -224,6 +224,7 @@ static struct profile_section render_structure_shadows_draw_section =
 	{ "render_structure_shadows_draw", NONE, TRUE };
 
 static short report_dynamic_structure_triangle_failure = TRUE;
+boolean debug_leaf_portals;
 
 /* ---------- public code */
 

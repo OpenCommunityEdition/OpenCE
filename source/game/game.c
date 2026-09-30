@@ -119,11 +119,8 @@ struct game_options;
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-#define set_random_seed set_random_seed_inline
 #include "game/game.h"
-#undef set_random_seed
 #include "ai/ai.h"
-#include "ai/ai_runtime.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
 #include "cache/cache_files.h"
@@ -144,8 +141,6 @@ struct game_options;
 #include "game/cheats.h"
 #include "game/game_allegiance.h"
 #include "game/game_engine.h"
-#include "game/game_engine_runtime.h"
-#include "game/player_control.h"
 #include "game/player_queues_new.h"
 #include "game/player_rumble.h"
 #include "game/players.h"
@@ -162,20 +157,22 @@ struct game_options;
 #include "items/projectiles.h"
 #include "main/main.h"
 #include "main/console.h"
-#include "math/random_math.h"
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "networking/network_messages.h"
 #include "networking/telnet_console.h"
 #include "objects/objects.h"
+#include "objects/widgets/widgets.h"
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_usage.h"
 #include "physics/point_physics.h"
+#include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
 #include "saved games/saved_game_files.h"
 #include "scenario/scenario.h"
+#include "shaders/shaders.h"
 #include "sound/game_sound.h"
 #include "sound/sound_classes.h"
 #include "sound/sound_manager.h"
@@ -226,144 +223,11 @@ typedef char verify_game_runtime_globals_difficulty_offset[
 
 /* ---------- prototypes */
 
-void game_engine_game_starting(
-	void);
-
-void game_engine_player_added(
-	long player_index);
-
-void recorded_animations_dispose(
-	void);
-void cinematic_dispose(
-	void);
-void hs_dispose(
-	void);
-void cheats_dispose(
-	void);
-void ui_widgets_dispose(
-	void);
-void editor_dispose(
-	void);
-void player_effect_dispose(
-	void);
-void rumble_dispose(
-	void);
-void game_sound_dispose(
-	void);
-void sound_classes_dispose(
-	void);
-void particles_dispose(
-	void);
-void contrails_dispose(
-	void);
-void players_dispose(
-	void);
-void decals_dispose(
-	void);
-void breakable_surfaces_dispose(
-	void);
-void structures_dispose(
-	void);
-void render_dispose(
-	void);
-void objects_dispose(
-	void);
-void director_dispose(
-	void);
-void interface_dispose(
-	void);
-void game_allegiance_dispose(
-	void);
-void saved_game_files_dispose(
-	void);
-void event_manager_dispose(
-	void);
-void input_abstraction_dispose(
-	void);
-void player_ui_dispose(
-	void);
-void game_state_dispose(
-	void);
-void bink_playback_dispose(
-	void);
-void progress_bar_dispose(
-	void);
-
-void rasterizer_dispose_from_old_map(
-	void);
-void game_state_dispose_from_old_map(
-	void);
-void cheats_dispose_from_old_map(
-	void);
-void recorded_animations_dispose_from_old_map(
-	void);
-void hs_dispose_from_old_map(
-	void);
-void cinematic_dispose_from_old_map(
-	void);
-void editor_dispose_from_old_map(
-	void);
-void ai_dispose_from_old_map(
-	void);
-void player_effect_dispose_from_old_map(
-	void);
-void rumble_dispose_from_old_map(
-	void);
-void point_physics_dispose_from_old_map(
-	void);
-void decals_dispose_from_old_map(
-	void);
-void breakable_surfaces_dispose_from_old_map(
-	void);
-void structures_dispose_from_old_map(
-	void);
-void render_dispose_from_old_map(
-	void);
-void objects_dispose_from_old_map(
-	void);
-void director_dispose_from_old_map(
-	void);
-void observer_dispose_from_old_map(
-	void);
-void interface_dispose_from_old_map(
-	void);
-void players_dispose_from_old_map(
-	void);
-void contrails_dispose_from_old_map(
-	void);
-void particles_dispose_from_old_map(
-	void);
-void game_sound_dispose_from_old_map(
-	void);
-void sound_classes_dispose_from_old_map(
-	void);
-void sound_dispose_from_old_map(
-	void);
-void game_allegiance_dispose_from_old_map(
-	void);
-void game_engine_dispose_from_old_map(
-	void);
-void scenario_dispose_from_old_map(
-	void);
-void particles_update(
-	real dt);
-void contrails_update(
-	real dt);
-void widgets_update(
-	real dt);
-void scenario_frame_update(
-	real dt);
-void rasterizer_frame_update(
-	real dt);
-void numeric_countdown_timer_update(
-	void);
-
 /* ---------- globals */
 
 static struct game_runtime_globals_prefix *game_globals = NULL;
 extern struct game_variant game_variant_global;
 extern struct data_array *player_data;
-extern short player_spawn_count;
 
 char const *global_game_difficulty_level_names[NUMBER_OF_GAME_DIFFICULTY_LEVELS] =
 {
@@ -659,14 +523,6 @@ boolean game_is_cooperative(
 	return player_spawn_count > 1;
 }
 
-void set_random_seed(
-	unsigned long seed)
-{
-	*get_global_random_seed_address() = seed;
-
-	return;
-}
-
 boolean game_load(
 	struct game_options *options)
 {
@@ -693,16 +549,12 @@ boolean game_load(
 	return game_globals->map_loaded;
 }
 
-#ifdef HALO_LINUX
 void network_distributed_new_game(void);
 void network_objects_placed(void);
-#endif
 
 void game_initialize_for_new_map(
 	void)
 {
-	unsigned long random_seed;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game.c",
 		0x1D1,
@@ -712,8 +564,7 @@ void game_initialize_for_new_map(
 		0x1D2,
 		!game_globals->active);
 
-	random_seed = game_globals->options.random_seed;
-	*get_global_random_seed_address() = random_seed;
+	set_random_seed(game_globals->options.random_seed);
 	game_engine_dispose();
 	game_engine_initialize(&game_variant_global);
 	real_math_reset_precision();
@@ -741,11 +592,9 @@ void game_initialize_for_new_map(
 	weather_particle_systems_initialize_for_new_map();
 	point_physics_initialize_for_new_map();
 	game_engine_initialize_for_new_map();
-#ifdef HALO_LINUX
 	/* nothing of the distributed netcode's carried into the new game
 	(port/linux/game/network_distributed.c) */
 	network_distributed_new_game();
-#endif
 	game_statistics_start();
 	update_server_new();
 	player_control_initialize_for_new_map();
@@ -763,11 +612,9 @@ void game_initialize_for_new_map(
 	objects_place();
 	if (!game_in_editor())
 		ai_place();
-#ifdef HALO_LINUX
 	/* (the map's objects, placed as on the host: a distributed client's own
 	from now on go elsewhere, port/linux/game/network_objects.c) */
 	network_objects_placed();
-#endif
 	ui_widgets_safe_to_load(TRUE);
 
 	return;

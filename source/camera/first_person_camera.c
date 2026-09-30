@@ -26,6 +26,7 @@ symbols in this file:
 #include "observer.h"
 #include "static_camera.h"
 
+#include "game/players.h"
 #include "objects/objects.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
@@ -53,14 +54,6 @@ struct first_person_camera_result
 };
 
 /* ---------- prototypes */
-
-long player_control_get_unit_index(
-	short local_player_index);
-void player_control_get_facing_direction(
-	short local_player_index,
-	real_vector3d *facing_direction);
-real player_control_get_field_of_view(
-	short local_player_index);
 
 static void first_person_camera_for_unit_and_vector(
 	long unit_index,

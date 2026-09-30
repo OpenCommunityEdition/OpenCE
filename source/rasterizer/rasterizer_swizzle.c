@@ -10,7 +10,6 @@ RASTERIZER_SWIZZLE.C
 #include "math/integer_math.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_mipmap.h"
 #include "rasterizer/rasterizer_swizzle.h"
 
 /* ---------- constants */

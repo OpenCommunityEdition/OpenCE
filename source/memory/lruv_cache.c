@@ -126,7 +126,7 @@ struct lruv_cache_hole
 
 /* ---------- prototypes */
 
-void lruv_cache_verify(
+static void lruv_cache_verify(
 	struct lruv_cache *cache,
 	boolean verify_blocks);
 
@@ -760,7 +760,7 @@ static long lruv_cache_bytes_to_pages(
 	return page_count;
 }
 
-void lruv_cache_verify(
+static void lruv_cache_verify(
 	struct lruv_cache *cache,
 	boolean verify_blocks)
 {

@@ -28,16 +28,12 @@ enum
 
 /* ---------- prototypes */
 
-/* random_math.c doesn't appear to have a header? */
-extern unsigned long *get_global_local_random_seed_address(void);
-extern short seed_random_range(unsigned long *seed, short lower_bound, short upper_bound);
-
 /* ---------- globals */
 
 static unsigned long attract_mode_countdown_timer;
 static char bss_00453ae8[128];
 
-short data_002e4c84 = NONE;
+static short data_002e4c84 = NONE;
 
 /* ---------- public code */
 

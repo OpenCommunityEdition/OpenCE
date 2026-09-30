@@ -395,7 +395,7 @@ long player_profile_new(
 	short local_player_index,
 	wchar_t *name)
 {
-	struct file_reference file;
+	struct file_reference profile_file;
 	long player_profile_index = create_enumerated_saved_game_file(
 		_saved_game_file_type_player_profile,
 		local_player_index,
@@ -403,7 +403,7 @@ long player_profile_new(
 
 	if (player_profile_index != NONE)
 	{
-		if (saved_game_file_open(&file, player_profile_index))
+		if (saved_game_file_open(&profile_file, player_profile_index))
 		{
 			struct player_profile_file_block block = {0};
 			struct player_profile *profile = &block.profile;
@@ -441,9 +441,9 @@ long player_profile_new(
 			saved_game_file_generate_checksum(&block.profile, sizeof(block.profile),
 				&block.checksum);
 
-			succeeded = file_set_position(&file, 0) &&
-				file_write(&file, sizeof(block), &block);
-			saved_game_file_close(&file, player_profile_index);
+			succeeded = file_set_position(&profile_file, 0) &&
+				file_write(&profile_file, sizeof(block), &block);
+			saved_game_file_close(&profile_file, player_profile_index);
 
 			if (!succeeded)
 			{
@@ -848,15 +848,15 @@ static void player_profile_create_default_profiles_on_disk(
 	for (i = 0; i < NUMBER_OF_DEFAULT_PROFILES; i++)
 	{
 		struct player_profile_file_block block = {0};
-		char path[MAXIMUM_FILENAME_LENGTH+1];
+		char full_path[MAXIMUM_FILENAME_LENGTH+1];
 		struct file_reference file;
 		boolean succeeded = FALSE;
 
 		build_default_profile(&block.profile, i);
 
-		_snprintf(path, MAXIMUM_FILENAME_LENGTH, "z:\\saved\\player_profiles\\default_profile\\%02d.sav", i);
+		_snprintf(full_path, MAXIMUM_FILENAME_LENGTH, "z:\\saved\\player_profiles\\default_profile\\%02d.sav", i);
 
-		if (file_reference_create_from_path(&file, path, FALSE))
+		if (file_reference_create_from_path(&file, full_path, FALSE))
 		{
 			saved_game_file_generate_checksum(&block.profile, sizeof(block.profile),
 				&block.checksum);
@@ -872,7 +872,7 @@ static void player_profile_create_default_profiles_on_disk(
 					error(
 						_error_silent,
 						"failed to close default player profile file '%s'",
-						path);
+						full_path);
 				}
 			}
 		}
@@ -882,7 +882,7 @@ static void player_profile_create_default_profiles_on_disk(
 			error(
 				_error_silent,
 				"failed to create/update default player profile file '%s' on disk",
-				path);
+				full_path);
 		}
 	}
 

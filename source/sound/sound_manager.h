@@ -36,6 +36,8 @@ boolean sound_valid_for_channel(
 
 void sound_dispose(
 	void);
+void sound_enable(
+	boolean enable);
 
 void sound_initialize(
 	void);

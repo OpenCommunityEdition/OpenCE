@@ -230,8 +230,6 @@ symbols in this file:
 
 #include "cseries.h"
 #include "bitmaps/bitmaps.h"
-#include "bitmaps/bitmaps_internal.h"
-#include "bitmaps/bitmaps_mipmap.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/s3tc/s3tc.h"
 #include "cseries/errors.h"
@@ -243,8 +241,6 @@ symbols in this file:
 
 enum
 {
-	NUMBER_OF_ENTRIES_IN_PALETTE = 256,
-
 	MAXIMUM_BITMAP_WIDTH = 30000,
 	MAXIMUM_BITMAP_HEIGHT = 30000,
 	MAXIMUM_BITMAP_DEPTH = 256,
@@ -303,6 +299,9 @@ enum
 
 /* ---------- prototypes */
 
+long bitmap_mipmap_get_pixel_count(
+	struct bitmap_data *bitmap,
+	short mipmap_index);
 static boolean bitmap_format_type_valid_width(
 	short format,
 	short type,
@@ -1140,7 +1139,7 @@ pixel32 bitmap_2d_get_pixel(
 			 * January's __FILE__ address as the high dword the double is a tiny positive normal and the halt message
 			 * shows "lod=0.000000" (at most 182 characters plus NUL in the 256-byte buffer; January's formatter has no x87 code).
 			 * display_assert then returns into an unconditional system_exit, which never returns (halt_and_catch_fire).
-			 * A corrected build passes lod; see docs/object_matching_logs/astra_get_pixel_disclosure_20260927.md. */
+			 * A corrected build passes lod. */
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmaps.c",
 				0x2A0,

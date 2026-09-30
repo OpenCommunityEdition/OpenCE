@@ -228,6 +228,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
@@ -261,7 +262,6 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "players.h"
 #include "player_queues_new.h"
-#include "player_control.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
@@ -276,7 +276,6 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 
-#ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
@@ -301,29 +300,19 @@ enum
 		network_distributed_player_picked_up(player_index, kind, definition_index, count)
 
 static void network_player_log_idle_action(long player_index, unsigned long control_flags);
-boolean network_game_distributed(void);
 
 /* whether this machine decides pickups: not a client of the distributed
 netcode, whose players' weapons, grenades and power-ups are the host's
 (port/linux/game/network_distributed.c) */
 #define players_decide_pickups() (!network_game_distributed_client())
-#else
-#define player_network_picked_up(player, player_index, kind, definition_index, count)
-#define players_decide_pickups() TRUE
-#endif
 
 /* ---------- constants */
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
 	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = 16,
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-#endif
 	MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED = 183,
 	_collision_test_for_player_teleport_flags =
 		FLAG(_collision_test_front_facing_surfaces_bit) |
@@ -349,15 +338,6 @@ struct scenario_bsp_switch_trigger_volume
 	short source_structure_bsp_index;
 	short destination_structure_bsp_index;
 	short cutscene_flag_index;
-};
-
-struct scenario_cutscene_flag
-{
-	long runtime_unused;
-	char name[TAG_STRING_LENGTH];
-	real_point3d position;
-	real_euler_angles2d facing;
-	byte unused[0x24];
 };
 
 struct unit_control_data
@@ -522,12 +502,8 @@ void players_initialize(
 {
 	player_data = game_state_data_new(
 		"players",
-#ifdef HALO_LINUX
 		/* a player's datum index is also its action slot in every update */
 		NETWORK_GAME_MAXIMUM_PLAYER_COUNT,
-#else
-		16,
-#endif
 		sizeof(struct player_datum));
 	team_data = game_state_data_new(
 		"teams",
@@ -577,11 +553,7 @@ void players_initialize_for_new_map(
 	csmemset(
 		machine_to_player_table,
 		NONE,
-#ifdef HALO_LINUX
 		sizeof(machine_to_player_table));
-#else
-		0x40);
-#endif
 
 	return;
 }
@@ -1420,7 +1392,6 @@ static void player_spawn(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): a
 client's player takes the unit the host spawned it with (the host's object,
 at the host's index, with the host's weapons), as player_spawn gives a
@@ -1523,7 +1494,7 @@ static void network_player_log_idle_action(
 	long nearest_index = NONE;
 	real nearest_distance = 0.0f;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		player->local_player_index != NONE || player->action_result != _player_action_result_reload ||
 		!(control_flags & (FLAG(_unit_control_action_bit) | FLAG(_unit_control_swap_weapons_bit))) ||
 		absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
@@ -1572,7 +1543,6 @@ void network_player_detach_unit(
 	if (player->local_player_index != NONE)
 		player_control_new_unit(player->local_player_index, NONE);
 }
-#endif
 
 /* Exact: January emits this private dead-unit replacement helper from the
    reconstructed player_teleport_internal caller below. */
@@ -3198,18 +3168,18 @@ static void player_examine_nearby_device(
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct device_datum *device;
-	real_point3d camera_position;
+	real_point3d camera;
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	device = device_get(device_index);
-	unit_get_camera_position(player->unit_index, &camera_position);
+	unit_get_camera_position(player->unit_index, &camera);
 	if (fast_vector_intersects_sphere(
-		&camera_position,
+		&camera,
 		&unit->unit.aiming_vector,
 		&device->object.bounding_sphere_center,
 		device->object.bounding_sphere_radius) &&
-		device_frontfacing(device_index, &camera_position, &unit->unit.aiming_vector) &&
+		device_frontfacing(device_index, &camera, &unit->unit.aiming_vector) &&
 		device_can_change_position(device_index))
 	{
 		player_set_action_result(
@@ -3618,9 +3588,7 @@ void players_update_before_game(
 					/* (a client of the distributed netcode's players take the units
 					the host spawns them with, network_player_attach_unit) */
 					if (
-#ifdef HALO_LINUX
 						!network_game_distributed_client() &&
-#endif
 						game_engine_should_spawn_player(iterator.datum_index))
 					{
 						game_engine_prespawn_player_update(iterator.datum_index);
@@ -3630,6 +3598,8 @@ void players_update_before_game(
 						else
 							player->respawn_timer = 1;
 					}
+					else if (network_game_distributed_client())
+						game_engine_client_respawn_countdown(iterator.datum_index);
 				}
 				else if (!main_menu_is_active())
 				{
@@ -3645,9 +3615,7 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
-#ifdef HALO_LINUX
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
-#endif
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
 						!player_handle_action(iterator.datum_index))

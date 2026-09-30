@@ -23,8 +23,6 @@ on:
   push:
     paths-ignore:
       - "**.md"
-      - "docs/**"
-      - "research/**"
   workflow_dispatch:
 
 concurrency:
@@ -338,4 +336,33 @@ jobs:
                 {name: "Latest release builds", value: $downloads}
               ]
             }]}' > payload.json
-          curl -fsS -H "Content-Type: application/json" -d @payload.json "$WEBHOOK"
+          # Discord rate limits webhooks (HTTP 429, with how many seconds to
+          # wait in retry_after): wait and try again, a few times. A post
+          # still limited, or a network or Discord error, is a warning rather
+          # than a failed run; any other answer (a deleted webhook) fails. (At
+          # most 5 tries of 15 seconds and 4 waits of 30: inside the job's 5
+          # minutes.)
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sS --max-time 15 -o response.json -w '%{http_code}' \
+              -H "Content-Type: application/json" -d @payload.json "$WEBHOOK") || code=000
+            case "$code" in
+              2??)
+                exit 0
+                ;;
+              429)
+                wait=$(jq -r '.retry_after // 5' response.json 2>/dev/null || echo 5)
+                wait=$(awk -v w="$wait" 'BEGIN { w += 0; if (w < 1) w = 1; if (w > 30) w = 30; printf "%d", w + 0.999 }')
+                echo "Discord is rate limiting the webhook; trying again in ${wait}s (attempt $attempt of 5)"
+                ;;
+              000|5??)
+                wait=5
+                echo "Discord answered HTTP $code; trying again in ${wait}s (attempt $attempt of 5)"
+                ;;
+              *)
+                echo "::error::Discord answered HTTP $code: $(cat response.json 2>/dev/null)"
+                exit 1
+                ;;
+            esac
+            [ "$attempt" -lt 5 ] && sleep "$wait"
+          done
+          echo "::warning::The Discord post did not go through after 5 attempts (HTTP $code)"

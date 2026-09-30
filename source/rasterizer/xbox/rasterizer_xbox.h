@@ -19,7 +19,7 @@ struct bitmap_data;
 struct pixel_shader_definition;
 struct real_matrix4x3;
 struct rasterizer_model_begin_parameters;
-struct rasterizer_model_skinning_parameters;
+struct render_skinning;
 struct shader;
 struct triangle_buffer;
 struct vertex_buffer;
@@ -108,7 +108,7 @@ boolean rasterizer_set_texture_direct(
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
 void rasterizer_set_model_skinning(
-	struct rasterizer_model_skinning_parameters const *skinning);
+	struct render_skinning const *skinning);
 union point2d *rasterizer_set_texture(
 	short stage,
 	short bitmap_type,

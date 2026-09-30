@@ -19,7 +19,7 @@ symbols in this file:
 00083E00 0030:
 	_control_update (0000)
 00083E30 0130:
-	_code_00083e30 (0000)
+	_control_toggle (0000)
 00083F60 0040:
 	_control_touched (0000)
 00083FA0 0040:
@@ -60,7 +60,7 @@ struct device_group_datum
 
 /* ---------- prototypes */
 
-static void code_00083e30(
+static void control_toggle(
 	long control_index);
 
 /* ---------- globals */
@@ -142,7 +142,7 @@ void control_touched(
 	struct control_definition *definition= control_definition_get(control->definition_index);
 
 	if (definition->control.triggers_when == 0)
-		code_00083e30(control_index);
+		control_toggle(control_index);
 
 	return;
 }
@@ -154,14 +154,14 @@ void control_destroyed(
 	struct control_definition *definition= control_definition_get(control->definition_index);
 
 	if (definition->control.triggers_when == 1)
-		code_00083e30(control_index);
+		control_toggle(control_index);
 
 	return;
 }
 
 /* ---------- private code */
 
-static void code_00083e30(
+static void control_toggle(
 	long control_index)
 {
 	struct control_datum *control= control_get(control_index);

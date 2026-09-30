@@ -292,22 +292,14 @@ enum
 {
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
-#ifdef HALO_LINUX
 	/* every machine of a session may connect at once */
 	MAXIMUM_PENDING_CONNECTIONS = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	MAXIMUM_PENDING_CONNECTIONS = 32,
-#endif
 	MAXIMUM_ENDPOINT_THREADS = 64,
-#ifdef HALO_LINUX
 	/* a host's connection to a machine holds the updates that machine has
 	not acknowledged, up to 128 ticks of 3.9 KB with 128 players, and the
 	host's connection to its own client all it sends in one frame; a full
 	buffer blocks the host (network_connection_write) */
 	MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE = 1024 * 1024,
-#else
-	MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE = 16 * 1024,
-#endif
 };
 
 /* ---------- macros */
@@ -1712,7 +1704,7 @@ static SOCKET create_socket(
 			winsock_error_to_string(WSAGetLastError());
 		}
 
-#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+#ifndef HALO_WINDOWS
 		/* Linux (and Android) grow a stream socket's buffers as far as the
 		connection needs, to several megabytes; setting a size would fix them,
 		at no more than the system's limit (about 416 KB by default) */
@@ -1756,7 +1748,7 @@ static SOCKET create_socket(
 		{
 			winsock_error_to_string(WSAGetLastError());
 		}
-#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+#ifndef HALO_WINDOWS
 		}
 #endif
 	}

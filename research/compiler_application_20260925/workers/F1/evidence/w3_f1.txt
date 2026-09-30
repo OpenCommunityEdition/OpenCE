@@ -1,1 +1,0 @@
-rc 0 {'warning C4146': 1, 'warning C4244': 11, 'warning C4305': 1}

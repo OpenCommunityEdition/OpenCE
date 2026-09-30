@@ -1,7 +1,0 @@
-CARD C9  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x4a1581..0x4a15f3): the 'trying: %sbusy dmg %.1f' arguments are two unnamed temps pushed directly:
--0x18c8 (unit==NULL ? 0.f : current_body_damage, evaluated first = rightmost argument) and -0x18cc, whose select is
-emitted with the "" arm first: cmp unit_index,-1 / je not- / unit_is_busy / je not- / temp="", i.e.
-(unit_index!=NONE && unit_is_busy(unit_index)) ? "" : "not-". Ours: named damage and string, || polarity.
-January 0x3d51..0x3d85 is identical today (mov eax,""; jne; mov eax,"not-"); the polarity change may alter layout.
-Correction: inline both with the /Od polarity. Prediction: block bytes unchanged (risk: layout).

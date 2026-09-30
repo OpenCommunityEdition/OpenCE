@@ -58,7 +58,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include <stdlib.h>
 
 #include "cseries.h"
@@ -66,7 +65,7 @@ symbols in this file:
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
 #include "rasterizer.h"
-#include "rasterizer_debug.h"
+#include "rasterizer_console_vars.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox_debug.h"
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
@@ -126,33 +125,20 @@ struct rasterizer_debug_data
 };
 #pragma pack(pop)
 
-struct rasterizer_debug_options_prefix
-{
-	byte reserved00[2];
-	short stats;
-	byte reserved04[0x21];
-	boolean debug_geometry;
-};
-
 typedef char rasterizer_debug_data_size_assert[
 	sizeof(struct rasterizer_debug_data) == 0x21 ? 1 : -1];
 typedef char rasterizer_debug_primitive_size_assert[
 	sizeof(struct rasterizer_debug_primitive) == 0x3C ? 1 : -1];
-typedef char rasterizer_debug_options_debug_geometry_offset_assert[
-	offsetof(struct rasterizer_debug_options_prefix, debug_geometry) == 0x25 ? 1 : -1];
 
 /* ---------- prototypes */
 
+long rasterizer_debug_new_primitive(
+	long *primitive_count);
+void rasterizer_debug_test(
+	void);
 static int __cdecl rasterizer_debug_compare_primitives(
 	void const *primitive0_pointer,
 	void const *primitive1_pointer);
-long rasterizer_debug_new_primitive(
-	long *primitive_count);
-void rasterizer_debug_line_shaded(
-	real_point3d const *p0,
-	real_point3d const *p1,
-	real_argb_color const *color0,
-	real_argb_color const *color1);
 void rasterizer_debug_triangle_shaded(
 	real_point3d const *p0,
 	real_point3d const *p1,
@@ -164,9 +150,6 @@ void rasterizer_debug_triangle_shaded(
 /* ---------- globals */
 
 static struct rasterizer_debug_data debug_data;
-
-extern struct rasterizer_debug_options_prefix rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- public code */
 
@@ -181,7 +164,7 @@ long rasterizer_debug_new_primitive(
 		primitive_index = (*primitive_count)++;
 		debug_data.primitive_count++;
 
-		if (rasterizer_debug_options.stats==_rasterizer_stats_geometry)
+		if (rasterizer_debug_options.statistics_mode==_rasterizer_stats_geometry)
 		{
 			rasterizer_frame_statistics.debug_primitive_count++;
 		}
@@ -332,7 +315,7 @@ void rasterizer_debug_draw(
 
 	if (debug_data.initialized &&
 		debug_data.primitive_count>0 &&
-		rasterizer_debug_options.debug_geometry)
+		rasterizer_debug_options.draw_debug_geometry)
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c",
@@ -537,7 +520,7 @@ void rasterizer_debug_line_shaded(
 	real_argb_color const *color0,
 	real_argb_color const *color1)
 {
-	if (debug_data.initialized && rasterizer_debug_options.debug_geometry)
+	if (debug_data.initialized && rasterizer_debug_options.draw_debug_geometry)
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c",
@@ -603,7 +586,7 @@ void rasterizer_debug_triangle_shaded(
 	real_argb_color const *color1,
 	real_argb_color const *color2)
 {
-	if (debug_data.initialized && rasterizer_debug_options.debug_geometry)
+	if (debug_data.initialized && rasterizer_debug_options.draw_debug_geometry)
 	{
 		match_assert(
 			"c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c",

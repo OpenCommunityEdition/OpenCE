@@ -90,6 +90,7 @@ symbols in this file:
 #include "math/geometry.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_models.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
@@ -105,12 +106,8 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* port: king_globals' score slots follow the session player limit */
 	MAXIMUM_KING_SCORE_SLOTS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
-#else
-	MAXIMUM_KING_SCORE_SLOTS = 16,
-#endif
 	MAXIMUM_HILL_POINTS = 12,
 	MAXIMUM_HILLS = 64,
 	NUMBER_OF_DEFAULT_ANIMATION_VALUES = 4,
@@ -150,62 +147,10 @@ enum
 
 /* ---------- structures */
 
-/* Target-proven vertex layouts used by this translation unit's quad helper. */
-struct model_vertex_uncompressed
-{
-	real_point3d position;
-	real_vector3d normal;
-	real_vector3d binormal;
-	real_vector3d tangent;
-	real_point2d texcoord;
-	short nodes[2];
-	real node_weights[2];
-};
-
-struct model_vertex_compressed
-{
-	real_point3d position;
-	unsigned long normal;
-	unsigned long binormal;
-	unsigned long tangent;
-	point2d texcoord;
-	byte nodes[2];
-	short node_weight;
-};
-
 typedef char verify_model_vertex_uncompressed_size[
 	sizeof(struct model_vertex_uncompressed) == 0x44 ? 1 : -1];
 typedef char verify_model_vertex_compressed_size[
 	sizeof(struct model_vertex_compressed) == 0x20 ? 1 : -1];
-
-/* January-local render packet layouts used by render_dynamic_quad. */
-struct rasterizer_model_skinning
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
-};
-
-struct render_model_effect
-{
-	short type;
-	word pad;
-	real intensity;
-	byte reserved[0x20];
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct rasterizer_model_skinning skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct render_model_effect effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
 
 typedef char verify_rasterizer_model_begin_parameters_size[
 	sizeof(struct rasterizer_model_begin_parameters) == 0xCC ? 1 : -1];
@@ -234,58 +179,60 @@ static void king_calculate_hill_state(
 /* ---------- globals */
 
 /* Shared rasterizer defaults, named by the January image. */
-extern real_rgb_color global_default_animation_colors[4];
-extern real global_default_animation_values[4];
+real_rgb_color global_default_animation_colors[4];
+real global_default_animation_values[4];
 
-struct king_globals king_globals = { 0 };
-static short king_engine_hill_count = 0;
+static struct king_globals king_globals = { 0 };
+/* king_engine_num_hills: name from the 2003 PC demo PDB (file static short at king_globals+0x1AC),
+ * corroborated by January: same .bss contribution offset, width and neighbours */
+static short king_engine_num_hills = 0;
 static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
 
 /* ---------- public code */
 
-void king_engine_dispose(
+static void king_engine_dispose(
 	void)
 {
 	return;
 }
 
-void king_engine_dispose_from_old_map(
+static void king_engine_dispose_from_old_map(
 	void)
 {
 	return;
 }
 
-void king_engine_game_ending(
+static void king_engine_game_ending(
 	void)
 {
 	return;
 }
 
-void king_engine_statistics_append(
+static void king_engine_statistics_append(
 	long statistic)
 {
 	return;
 }
 
-void king_engine_handle_client_message(
+static void king_engine_handle_client_message(
 	void *message)
 {
 	return;
 }
 
-void king_engine_handle_server_message(
+static void king_engine_handle_server_message(
 	void *message)
 {
 	return;
 }
 
-void king_engine_pregame_post_rasterize(
+static void king_engine_pregame_post_rasterize(
 	void)
 {
 	return;
 }
 
-void king_engine_post_rasterize(
+static void king_engine_post_rasterize(
 	void)
 {
 	struct game_globals *game_globals;
@@ -370,7 +317,7 @@ void king_engine_post_rasterize(
 	return;
 }
 
-void king_engine_player_damaged_player(
+static void king_engine_player_damaged_player(
 	long damaging_player_index,
 	long dead_player_index,
 	boolean damage_type)
@@ -378,7 +325,7 @@ void king_engine_player_damaged_player(
 	return;
 }
 
-void king_engine_player_killed_player(
+static void king_engine_player_killed_player(
 	long killing_player_index,
 	long killing_object_index,
 	long dead_player_index,
@@ -387,13 +334,13 @@ void king_engine_player_killed_player(
 	return;
 }
 
-void king_engine_prespawn_player_update(
+static void king_engine_prespawn_player_update(
 	long player_index)
 {
 	return;
 }
 
-void king_engine_player_added(
+static void king_engine_player_added(
 	long player_index)
 {
 	player_get(player_index);
@@ -401,7 +348,7 @@ void king_engine_player_added(
 	return;
 }
 
-void king_engine_game_starting(
+static void king_engine_game_starting(
 	void)
 {
 	game_engine_play_multiplayer_sound(
@@ -412,7 +359,7 @@ void king_engine_game_starting(
 	return;
 }
 
-wchar_t *king_get_score_string(
+static wchar_t *king_get_score_string(
 	long player_index,
 	wchar_t *buffer)
 {
@@ -426,7 +373,7 @@ wchar_t *king_get_score_string(
 	return buffer;
 }
 
-wchar_t *king_get_team_score_string(
+static wchar_t *king_get_team_score_string(
 	long team_index,
 	wchar_t *buffer)
 {
@@ -438,14 +385,14 @@ wchar_t *king_get_team_score_string(
 	return buffer;
 }
 
-boolean king_engine_initialize_for_new_map(
+static boolean king_engine_initialize_for_new_map(
 	void)
 {
 	struct scenario *scenario = global_scenario_get();
 	short flag_index;
 
 	csmemset(&king_globals, 0, sizeof(king_globals));
-	king_engine_hill_count = 0;
+	king_engine_num_hills = 0;
 	for (flag_index = 0; flag_index < scenario->netgame_flags.count; flag_index++)
 	{
 		struct scenario_netgame_flag *flag = TAG_BLOCK_GET_ELEMENT(
@@ -458,7 +405,7 @@ boolean king_engine_initialize_for_new_map(
 			boolean found = FALSE;
 			short hill_index;
 
-			for (hill_index = 0; hill_index < king_engine_hill_count; hill_index++)
+			for (hill_index = 0; hill_index < king_engine_num_hills; hill_index++)
 			{
 				if (king_engine_hills[hill_index] == flag->team_index)
 				{
@@ -467,7 +414,7 @@ boolean king_engine_initialize_for_new_map(
 				}
 			}
 			if (!found)
-				king_engine_hills[king_engine_hill_count++] = flag->team_index;
+				king_engine_hills[king_engine_num_hills++] = flag->team_index;
 		}
 	}
 
@@ -486,7 +433,7 @@ boolean king_engine_initialize_for_new_map(
 	return TRUE;
 }
 
-void king_engine_player_update(
+static void king_engine_player_update(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
@@ -554,7 +501,7 @@ void king_engine_player_update(
 	return;
 }
 
-boolean king_engine_display_score(
+static boolean king_engine_display_score(
 	long player_index,
 	long message,
 	long message_player_index,
@@ -635,7 +582,7 @@ boolean king_engine_display_score(
 	return result;
 }
 
-long king_get_score(
+static long king_get_score(
 	long player_index,
 	enum get_score_type score_type)
 {
@@ -775,7 +722,7 @@ void render_dynamic_quad(
 	return;
 }
 
-wchar_t *king_get_score_header_string(
+static wchar_t *king_get_score_header_string(
 	wchar_t *buffer)
 {
 	long string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
@@ -796,7 +743,7 @@ wchar_t *king_get_score_header_string(
 	return buffer;
 }
 
-boolean king_engine_goal_matches_player(
+static boolean king_engine_goal_matches_player(
 	long player_index,
 	long goal_index)
 {
@@ -805,7 +752,7 @@ boolean king_engine_goal_matches_player(
 	return matches;
 }
 
-void king_engine_update(
+static void king_engine_update(
 	void)
 {
 	if (game_engine_can_score() &&
@@ -1091,12 +1038,12 @@ static long find_next_hill(
 	long hill_id)
 {
 	long next_hill_id;
-	short start_index = random_range(0, king_engine_hill_count);
+	short start_index = random_range(0, king_engine_num_hills);
 	short i;
 
-	for (i = 0; i < king_engine_hill_count; i++)
+	for (i = 0; i < king_engine_num_hills; i++)
 	{
-		short hill_index = (start_index + i)%king_engine_hill_count;
+		short hill_index = (start_index + i)%king_engine_num_hills;
 
 		if (hill_id != king_engine_hills[hill_index])
 			return king_engine_hills[hill_index];
@@ -1147,7 +1094,6 @@ struct game_engine king_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is (the
 scores and the hill, which moves) */
@@ -1168,4 +1114,3 @@ void game_engine_king_read_network_state(
 	if (size == (long)sizeof(king_globals))
 		csmemcpy(&king_globals, buffer, sizeof(king_globals));
 }
-#endif

@@ -44,18 +44,18 @@ typedef char widget_instance_local_player_index_offset[
 
 typedef wchar_t *(*ui_widget_text_replacement_function)(void *widget);
 
-wchar_t *widget_replace_function_null(void *widget);
-wchar_t *widget_controller(void *widget);
+static wchar_t *widget_replace_function_null(void *widget);
+static wchar_t *widget_controller(void *widget);
 
 /* ---------- globals */
 
-ui_widget_text_replacement_function replace_function_list[2] =
+static ui_widget_text_replacement_function replace_function_list[2] =
 {
 	widget_replace_function_null,
 	widget_controller
 };
 
-wchar_t result[2] = { 0 };
+static wchar_t result[2] = { 0 };
 
 /* ---------- public code */
 
@@ -71,13 +71,13 @@ wchar_t *ui_widget_search_and_replace_invoke(void *widget, unsigned short functi
 
 /* ---------- private code */
 
-wchar_t *widget_replace_function_null(void *widget)
+static wchar_t *widget_replace_function_null(void *widget)
 {
 	(void)widget;
 	return L"";
 }
 
-wchar_t *widget_controller(void *widget)
+static wchar_t *widget_controller(void *widget)
 {
 	struct widget_instance_prefix *instance = widget;
 

@@ -101,7 +101,7 @@ void biped_reset(
 boolean biped_flying_through_air(
 	long biped_index);
 void biped_adjust_placement(
-	long biped_index,
+	long object_index,
 	struct object_placement_data *data);
 void biped_export_function_values(
 	long biped_index);

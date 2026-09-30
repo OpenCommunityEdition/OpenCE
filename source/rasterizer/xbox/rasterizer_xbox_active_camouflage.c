@@ -67,7 +67,7 @@ symbols in this file:
 
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
@@ -252,11 +252,10 @@ typedef char verify_transparent_geometry_group_animation_offset[
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
-boolean local_active_camouflage_visibility_flag = FALSE;
-boolean local_active_camouflage_debug_cached_flag = FALSE;
-short local_active_camouflage_debug_cache_count = 0;
+static boolean local_active_camouflage_visibility_flag = FALSE;
+static boolean local_active_camouflage_debug_cached_flag = FALSE;
+static short local_active_camouflage_debug_cache_count = 0;
 
 /* ---------- public code */
 
@@ -282,7 +281,7 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 		41,
 		global_d3d_device);
 
-	if (rasterizer_debug_options.active_camouflage &&
+	if (rasterizer_debug_options.active_camouflage_enabled &&
 		local_active_camouflage_visibility_flag)
 	{
 		real screen_projection[5][4];
@@ -465,7 +464,7 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 		rasterizer_secondary_render_target_debug(&bounds);
 
 		local_active_camouflage_debug_cache_count++;
-		if (!rasterizer_debug_options.active_camouflage_multipass)
+		if (!rasterizer_debug_options.active_camouflage_multipass_enabled)
 		{
 			local_active_camouflage_visibility_flag = FALSE;
 		}
@@ -503,7 +502,7 @@ void rasterizer_active_camouflage_draw(
 		157,
 		global_d3d_device);
 
-	if (rasterizer_debug_options.active_camouflage &&
+	if (rasterizer_debug_options.active_camouflage_enabled &&
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
 	{
 		struct shader_model_definition *model;

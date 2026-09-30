@@ -61,8 +61,6 @@ void player_ui_clear_multiplayer_autojoin_for_local_player(
 	short local_player_index);
 short player_ui_get_last_single_player_level_played(
 	short local_player_index);
-short player_ui_get_single_player_local_player_controller(
-	short local_player_index);
 void player_ui_local_player_joined_multiplayer_game(
 	short local_player_index);
 boolean player_ui_rumble_disabled(

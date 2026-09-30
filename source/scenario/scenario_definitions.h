@@ -315,6 +315,15 @@ struct scenario
 	struct tag_block structure_bsp_references; // scenario_structure_bsp_reference
 };
 
+struct scenario_cutscene_flag
+{
+	long runtime_unused;
+	char name[TAG_STRING_LENGTH];
+	real_point3d position;
+	real_euler_angles2d facing;
+	byte unused[0x24];
+};
+
 /* ---------- prototypes/EXAMPLE.C */
 
 /* ---------- globals */

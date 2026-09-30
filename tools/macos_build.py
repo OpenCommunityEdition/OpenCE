@@ -26,11 +26,9 @@ libGLESv2.dylib, taken from an installed Chromium-based application unless
 --macos-angle names a folder holding them).
 
 Requirements: Xcode's clang, ninja, cmake, and ld.lld with llvm-ar (the
-``ziglang`` Python package's are found automatically). Like the Linux and
-Android builds, this is independent of the byte-matching graph.
+``ziglang`` Python package's are found automatically).
 """
 
-import os
 import shutil
 import subprocess
 import sys
@@ -40,7 +38,8 @@ from typing import Any, Dict, List, Optional
 from .android_build import (GUEST_ABI_FLAGS as ANDROID_ABI_FLAGS, GUEST_CODE_FLAGS, MUSL_URL, MUSL_VERSION, SDL_TAG,
                             SDL_URL, VARIADIC_PROTOTYPE_FILES, KCP_DIR, TOML_DIR, _musl_sources, _quote)
 from .linux_build import (MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE, compile_launcher,
-                          miniupnpc_sources, musl_math_sources, xdk_headers)
+                          game_defines_and_includes, game_sources, miniupnpc_sources, musl_math_sources,
+                          xdk_headers)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/macos")
@@ -414,7 +413,6 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
 
     # the game
     objects: List[Path] = []
-    excluded = set(config.get("exclude_sources", []))
     game_flags = [
         "-std=gnu89", "-D__STRICT_ANSI__", "-w",
         "-Wno-error=incompatible-pointer-types",
@@ -424,29 +422,18 @@ def _generate_variant(n: Writer, sln: Any, config: Dict[str, Any], variant: str,
         "-Wno-error=implicit-int",
         "-Wno-error=return-type",
     ]
-    for proj in sln.projects:
-        if proj.name not in config["projects"]:
-            continue
-        options = proj.options
-        defines = " ".join(f"-D{d}" for d in options.get("defines") or [])
-        includes = " ".join(
-            f"-I{_quote(d)}" for d in options.get("include_dirs") or [] if Path(d) != Path("xbox/include")
-        )
-        game_cflags = " ".join([
-            guest_abi, guest_code, " ".join(game_flags),
-            f"-include {prefix_header}", f"-include {semantics_header}", defines,
-            f"-I{LINUX_DIR}/include", includes, *libc_includes, f"-idirafter {XDK_INCLUDE}",
-        ])
-        for obj in proj.objects:
-            name = str(obj.file_path).replace(os.sep, "/")
-            if obj.status.name == "Missing" or name in excluded or obj.file_path.suffix.lower() != ".c":
-                continue
-            cflags = game_cflags
-            if name in VARIADIC_PROTOTYPE_FILES:
-                cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
-            objects.append(guest_object(obj.file_path, cflags))
-        for source in sorted(Path(config["game_sources"]).glob("*.c")):
-            objects.append(guest_object(source, game_cflags))
+    game_cflags = " ".join([
+        guest_abi, guest_code, " ".join(game_flags),
+        f"-include {prefix_header}", f"-include {semantics_header}",
+        f"-I{LINUX_DIR}/include", game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
+    ])
+    for source in game_sources(config):
+        cflags = game_cflags
+        if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
+            cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
+        objects.append(guest_object(source, cflags))
+    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+        objects.append(guest_object(source, game_cflags))
 
     # the platform layer shared with Linux, and the guest runtime
     runtime_dirs = f"-I{ANDROID_DIR}/guest/runtime -I{PORT_DIR}/guest/runtime -I{ANDROID_DIR}/include"

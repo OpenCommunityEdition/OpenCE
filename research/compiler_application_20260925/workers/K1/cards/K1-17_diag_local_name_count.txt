@@ -1,7 +1,0 @@
-CARD K1-17  (pre-registered 2026-09-26 02:37:03 -0700)  DIAGNOSTIC ONLY - never a landing shape (filler declarations are forbidden)
-Base: k16 (11 hunks; real residual 0xfc add-esp schedule, 0x1d49 magnitude operand order).
-Question: are the two remaining ties keyed to the number/order of NAMED LOCALS in the function (symbol ids), the
-  way K1-10/K1-14 suggest? Probe: one unused "short k1_probe;" declared (a) at function scope (first declaration),
-  (b) in the possibility block before "information", (c) in the non-reply block before "speech".
-Prediction: (a) may flip 0xfc and/or 0x1d49; (b)/(c) may flip only 0x1d49. If none flips anything, the residual is
-  not name-id keyed.

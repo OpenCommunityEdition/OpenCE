@@ -181,7 +181,7 @@ static struct data_array *animation_threads;
 boolean debug_recording = FALSE;
 static struct animation_thread_debug *animation_threads_debug = NULL;
 
-struct animation_playback current_playback =
+static struct animation_playback current_playback =
 {
 	recorded_animation_initialize_event_stream,
 	recorded_animation_apply_event_stream

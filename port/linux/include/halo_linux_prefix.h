@@ -24,8 +24,6 @@ does. */
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
 
-#define HALO_LINUX 1
-
 /* ---------- XDK architecture selection (MSVC predefines these) */
 
 #define _X86_ 1

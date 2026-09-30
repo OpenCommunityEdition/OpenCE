@@ -89,7 +89,7 @@ symbols in this file:
 00283D80 0021:
 	??_C@_0CB@MPOLIODB@global_network_game_server?$DN?$DNNULL@ (0000)
 0030A988 00da:
-	_data_0030a988 (0000)
+	_player_action_packet_definition_fields (0000)
 	_player_action_packet_definition (0028)
 	_player_action_collection_definition (00c4)
 004566DC 0010:
@@ -177,47 +177,18 @@ struct client_game_update_message
 	byte update[0x80];
 };
 
-struct network_machine
-{
-	byte __unknown0[0x40];
-	char machine_index;
-};
-
 struct local_network_player
 {
 	byte __unknown0[0x1C];
 	boolean machine_index;
 };
 
-struct network_game
-{
-#ifdef HALO_LINUX
-	/* the players follow the machines, which follow the native builds'
-	session limits (port/linux/include/halo_port_limits.h) */
-	byte __unknown0[HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET];
-	struct network_player players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-	byte __unknown0[0x226];
-	struct network_player players[16];
-#endif
-	byte __unknown426[2];
-	long random_seed;
-	long number_of_games_played;
-};
-
 typedef char network_machine_index_offset_assert[
 	offsetof(struct network_machine, machine_index) == 0x40 ? 1 : -1];
-#ifdef HALO_LINUX
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
 typedef char network_game_random_seed_offset_assert[
 	offsetof(struct network_game, random_seed) == HALO_PORT_NETWORK_GAME_RANDOM_SEED_OFFSET ? 1 : -1];
-#else
-typedef char network_game_players_offset_assert[
-	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
-typedef char network_game_random_seed_offset_assert[
-	offsetof(struct network_game, random_seed) == 0x428 ? 1 : -1];
-#endif
 
 struct network_game_globals
 {
@@ -235,15 +206,12 @@ typedef char network_game_globals_size_assert[
 
 /* ---------- prototypes */
 
-unsigned long *get_global_local_random_seed_address(
-	void);
-unsigned short seed_random(
-	unsigned long *seed);
-
 /* ---------- globals */
 
-struct network_game_globals bss_004566dc = { 0 };
-struct data_packet_field data_0030a988[4] =
+static struct network_game_globals bss_004566dc = { 0 };
+/* name from the 2003 PC demo PDB and the HCEX PDB (file static struct data_packet_field[4]); January's
+ * 40 bytes are identical to the demo's and it has no public for it (static) */
+static struct data_packet_field player_action_packet_definition_fields[4] =
 {
 	{ _data_packet_field_longs, 6, 0, 0, 0 },
 	{ _data_packet_field_shorts, 3, 0, 0, 0 },
@@ -257,7 +225,7 @@ struct player_action_packet_definition_storage player_action_packet_definition =
 		0,
 		0x20,
 		1,
-		data_0030a988,
+		player_action_packet_definition_fields,
 		FALSE,
 	},
 	0,
@@ -292,7 +260,6 @@ struct player_action_collection_definition player_action_collection_definition =
 
 /* ---------- public code */
 
-#ifdef HALO_LINUX
 /* the distributed netcode's per-tick state (port/linux/game/network_distributed.c),
 unreliably to the host, as the game update is */
 boolean network_distributed_client_send(
@@ -326,40 +293,13 @@ boolean network_distributed_client_send_reliably(
 		(message_header *)buffer, size, NULL, 1);
 }
 
-/* the platform layer's (port/linux/src/port_config.c) */
-char const *config_string(char const *name);
-
 /* a client of the distributed netcode, which decides nothing the host does */
 boolean network_game_distributed_client(
 	void)
 {
-	return game_connection() == _game_connection_network_client && network_game_distributed();
+	return game_connection() == _game_connection_network_client;
 }
 
-/* the netcode of the host this machine joined (network_client_manager.c),
-NONE when it hosts, or has joined none: then its own setting */
-static short network_game_host_distributed = NONE;
-
-boolean network_game_distributed(
-	void)
-{
-	static short distributed = NONE;
-
-	if (network_game_host_distributed != NONE)
-		return network_game_host_distributed;
-	if (distributed == NONE)
-		distributed = !csstrcmp(config_string("network.netcode"), "distributed");
-	return distributed;
-}
-
-/* joining a host: its netcode is this machine's until it hosts */
-void network_game_follow_host_netcode(
-	boolean distributed)
-{
-	network_game_host_distributed = distributed ? TRUE : FALSE;
-}
-
-#endif
 boolean network_game_is_active(
 	void)
 {
@@ -655,13 +595,9 @@ boolean network_game_client_end_frame(
 	{
 		now = system_milliseconds();
 		if (now-bss_004566dc.last_client_update_time >=
-#ifdef HALO_LINUX
-			/* (the distributed netcode's input goes in its own message,
-			network_distributed.c: this one only says the client is there) */
-			(network_game_distributed() ? 100 : 0x10) &&
-#else
-			0x10 &&
-#endif
+			/* (the input goes in its own message, network_distributed.c:
+			this one only says the client is there) */
+			100 &&
 			network_game_client_server_has_started_game(global_network_game_client))
 		{
 			network_game_client_get_next_update_number(global_network_game_client);
@@ -747,11 +683,7 @@ void network_game_client_local_player_quit(
 		{
 			player_index = 0;
 			player_machine_index = &game->players[0].machine_index;
-#ifdef HALO_LINUX
 			while (player_index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
-#else
-			while (player_index < 16)
-#endif
 			{
 				test_player = (struct network_player *)(
 					player_machine_index - offsetof(struct network_player, machine_index));
@@ -845,10 +777,6 @@ boolean create_global_network_game_server(
 		0xD6,
 		global_network_game_server==NULL);
 
-#ifdef HALO_LINUX
-	/* (hosting: this machine's own netcode setting) */
-	network_game_host_distributed = NONE;
-#endif
 	global_network_game_server = network_game_server_create();
 	if (global_network_game_server)
 	{

@@ -107,7 +107,7 @@ symbols in this file:
 #if !(defined(__aarch64__) && defined(__ILP32__)) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
-char transport_address_string[256];
+static char transport_address_string[256];
 #if !(defined(__aarch64__) && defined(__ILP32__))
 #pragma bss_seg()
 #endif

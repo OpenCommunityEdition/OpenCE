@@ -17,6 +17,7 @@ symbols in this file:
 #include "flying_camera.h"
 #include "observer.h"
 #include "static_camera.h"
+#include "rasterizer/rasterizer_console_vars.h"
 
 /* ---------- constants */
 
@@ -24,18 +25,9 @@ symbols in this file:
 
 /* ---------- structures */
 
-struct rasterizer_debug_options
-{
-	byte reserved[0x5E];
-	short flying_camera_reset_ticks;
-	byte trailing[8];
-};
-
 /* ---------- prototypes */
 
 /* ---------- globals */
-
-extern struct rasterizer_debug_options rasterizer_debug_options;
 
 /* ---------- public code */
 
@@ -81,12 +73,12 @@ void flying_camera_update(
 		camera->roll += controls->facing_delta.roll;
 	}
 
-	if (rasterizer_debug_options.flying_camera_reset_ticks > 0)
+	if (rasterizer_debug_options.freeze_flying_camera > 0)
 	{
 		camera->facing.yaw = 0.f;
 		camera->facing.pitch = 0.f;
 		camera->roll = 0.f;
-		rasterizer_debug_options.flying_camera_reset_ticks--;
+		rasterizer_debug_options.freeze_flying_camera--;
 	}
 
 	result->timer = 0.3f;

@@ -86,7 +86,6 @@ symbols in this file:
 #include "actions.h"
 
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "ai.h"
 #include "ai_communication.h"
@@ -120,14 +119,6 @@ enum
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-boolean unit_get_melee_range_and_ticks(
-	long unit_index,
-	boolean secondary,
-	short *melee_tick,
-	real *attack_time,
-	short *frame_count,
-	real *damage_time);
 
 static real action_charge_find_target_range(
 	long actor_index,
@@ -688,15 +679,15 @@ boolean action_charge_perform(
 
 		if (state_data->leap_pending || (melee && !state_data->melee_suicide))
 		{
-			real_vector2d facing_direction;
+			real_vector2d target_alignment_vector;
 
-			facing_direction.i = direction.i;
-			facing_direction.j = direction.j;
-			if (normalize2d(&facing_direction) > 0.f)
+			target_alignment_vector.i = direction.i;
+			target_alignment_vector.j = direction.j;
+			if (normalize2d(&target_alignment_vector) > 0.f)
 			{
 				real minimum_alignment = state_data->launched_leap ? 0.f : 0.8660254f;
 
-				if (dot_product2d(&facing_direction, (real_vector2d *)&actor->input.facing_vector) < minimum_alignment)
+				if (dot_product2d(&target_alignment_vector, (real_vector2d *)&actor->input.facing_vector) < minimum_alignment)
 				{
 					melee = FALSE;
 					state_data->leap_pending = FALSE;
@@ -710,17 +701,17 @@ boolean action_charge_perform(
 
 		if (melee)
 		{
-			real_vector2d melee_direction;
+			real_vector2d alignment_vector;
 
-			melee_direction.i = direction.i;
-			melee_direction.j = direction.j;
-			if (normalize2d(&melee_direction) == 0.f)
+			alignment_vector.i = direction.i;
+			alignment_vector.j = direction.j;
+			if (normalize2d(&alignment_vector) == 0.f)
 			{
-				melee_direction.i = actor->input.facing_vector.i;
-				melee_direction.j = actor->input.facing_vector.j;
+				alignment_vector.i = actor->input.facing_vector.i;
+				alignment_vector.j = actor->input.facing_vector.j;
 			}
 
-			if (unit_melee_attack_begin(actor->meta.unit_index, FALSE, &melee_direction))
+			if (unit_melee_attack_begin(actor->meta.unit_index, FALSE, &alignment_vector))
 			{
 				ai_communication_event(
 					_ai_communication_melee,

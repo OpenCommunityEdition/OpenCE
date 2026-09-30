@@ -29,7 +29,7 @@ symbols in this file:
 000D3190 0130:
 	_terminal_printf (0000)
 002712D0 0006:
-	rdata_002712d0 (0000)
+	_terminal_tab_stops (0000)
 002712D8 0010:
 	??_C@_0BA@LJDMLJDP@terminal?5output?$AA@ (0000)
 002712E8 0006:
@@ -59,9 +59,7 @@ symbols in this file:
 #include "telnet_console.h"
 #include "rasterizer.h"
 #include "render.h"
-#ifdef HALO_LINUX
 #include "main/main.h"
-#endif
 #include "draw_string.h"
 #include "byte_swapping.h"
 #include "tag_groups.h"
@@ -118,9 +116,11 @@ static long terminal_new_line(void);
 
 boolean terminal_render_enable = TRUE;
 
-const short rdata_002712d0[] = {160, 320, 470};
+/* name from the 2003 PC demo PDB and the HCEX PDB (terminal file static const short[3]); January's 6 bytes
+ * are identical to the demo's and it has no public for it (static) */
+static const short terminal_tab_stops[] = {160, 320, 470};
 
-struct terminal_globals terminal_globals = {0};
+static struct terminal_globals terminal_globals = {0};
 
 /* ---------- public code */
 
@@ -283,14 +283,14 @@ void terminal_draw(
 				if (line->tabstop)
 				{
 					draw_string_set_tab_stops(
-						rdata_002712d0,
-						NUMBEROF(rdata_002712d0)
+						terminal_tab_stops,
+						NUMBEROF(terminal_tab_stops)
 					);
 				}
 
 				draw_string_set_draw_mode(font_tag_index, NONE, 0, 0, &color);
 				rasterizer_draw_string(&terminal_gets_bounds, NULL, NULL, 0, line->buffer);
-				draw_string_set_tab_stops(rdata_002712d0, 0);
+				draw_string_set_tab_stops(terminal_tab_stops, 0);
 			}
 		}
 	}
@@ -434,7 +434,6 @@ static void terminal_update_output(
 {
 	struct output_line_datum *line;
 	long line_index = terminal_globals.newest_output_line_index;
-#ifdef HALO_LINUX
 	/* This runs once a frame, several frames per tick on the native builds
 	(port/linux/game/render_interpolation.c): count the line timers in 30 Hz
 	ticks of real time, as they counted on the Xbox, not in frames. */
@@ -444,7 +443,6 @@ static void terminal_update_output(
 	leftover_ticks += main_get_seconds_elapsed() * TICKS_PER_SECOND;
 	ticks = (long)leftover_ticks;
 	leftover_ticks -= (real)ticks;
-#endif
 
 	while (line_index!=NONE)
 	{
@@ -452,11 +450,7 @@ static void terminal_update_output(
 		
 		line = output_line_get(line_index);
 		older_line_index = line->older_line_index;
-#ifdef HALO_LINUX
 		line->timer += ticks;
-#else
-		line->timer++;
-#endif
 
 		if (line->timer>OUTPUT_TOTAL_TIME)
 		{

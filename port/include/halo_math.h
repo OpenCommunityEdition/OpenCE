@@ -4,10 +4,11 @@ HALO_MATH.H
 The same maths functions on every native port (included by the game's
 <math.h>: port/linux/include/math.h, port/windows/include/crt/math.h).
 
-System link games run in lockstep: every machine simulates the whole game
-from the same inputs, and the host checks each machine's random seed every
-tick, so a machine whose floating point results differ in the last bit
-goes out of sync within ticks. The C libraries' sin, pow and the rest are
+In a system link game every machine simulates the players from the same
+inputs, and what the host does not correct (projectiles, devices, the
+objects it does not send, port/linux/NETCODE.md) only stays the same on
+every machine if their floating point results agree to the last bit. The
+C libraries' sin, pow and the rest are
 not the same bit for bit (glibc on Linux, the UCRT on Windows, musl on
 Android), and the compiler folds calls with constant arguments using the
 build machine's own. So the game calls halo_ versions instead, built on

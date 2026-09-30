@@ -504,7 +504,7 @@ struct actor_debug_info
 	long vision_last_time;
 	real vision_last_maximum_distance;
 	real vision_last_perception_factor;
-	short num_debug_evaluations;
+	short perception_awareness_speed;
 	short firing_position_type_mismatch_ticks;
 };
 
@@ -539,9 +539,13 @@ void ai_debug_render(
 void ai_debug_vocalize(
 	char const *priority_name,
 	char const *vocalization_name);
+void ai_debug_speak_list(
+	char const *list_name);
 
 void ai_debug_change_selected_encounter(
 	boolean a1);
+void ai_debug_teleport_to(
+	long ai_index);
 
 void ai_debug_change_selected_actor(
 	boolean a1);

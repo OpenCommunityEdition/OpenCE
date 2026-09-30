@@ -120,14 +120,9 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
 	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	MAXIMUM_NUMBER_OF_PLAYERS = 16,
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-#endif
 
 	MAXIMUM_SERVER_UPDATES = 32,
 	MAXIMUM_CLIENT_UPDATES = 128,
@@ -206,39 +201,22 @@ struct update_client_globals
 
 typedef char player_action_collection_size_assert[
 	sizeof(struct player_action_collection) == 0x80 ? 1 : -1];
-#ifdef HALO_LINUX
 /* the update arrays follow the session limit (the networking units' copies
 of struct server_update must have the same size) */
 typedef char server_update_size_assert[
 	sizeof(struct server_update) == 4 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
 typedef char update_size_assert[
 	sizeof(struct update) == 4 + sizeof(struct server_update) ? 1 : -1];
-#else
-typedef char server_update_size_assert[
-	sizeof(struct server_update) == 0x204 ? 1 : -1];
-typedef char update_size_assert[
-	sizeof(struct update) == 0x208 ? 1 : -1];
-#endif
 typedef char update_server_queue_datum_size_assert[
 	sizeof(struct update_server_queue_datum) == 0x28 ? 1 : -1];
 typedef char update_client_queue_datum_size_assert[
 	sizeof(struct update_client_queue_datum) == 0x28 ? 1 : -1];
-#ifdef HALO_LINUX
 typedef char update_server_globals_size_assert[
 	sizeof(struct update_server_globals) == 0xC + MAXIMUM_SERVER_UPDATES * sizeof(struct update) ? 1 : -1];
-#else
-typedef char update_server_globals_size_assert[
-	sizeof(struct update_server_globals) == 0x410C ? 1 : -1];
-#endif
 typedef char update_server_globals_queues_offset_assert[
 	offsetof(struct update_server_globals, queues) == 0x8 ? 1 : -1];
-#ifdef HALO_LINUX
 typedef char update_client_globals_size_assert[
 	sizeof(struct update_client_globals) == 0x94 + MAXIMUM_CLIENT_UPDATES * sizeof(struct update) ? 1 : -1];
-#else
-typedef char update_client_globals_size_assert[
-	sizeof(struct update_client_globals) == 0x10494 ? 1 : -1];
-#endif
 typedef char update_client_globals_saved_actions_offset_assert[
 	offsetof(struct update_client_globals, saved_action_collection) == 0xC ? 1 : -1];
 typedef char update_client_globals_current_local_player_offset_assert[
@@ -252,14 +230,11 @@ static struct update *update_server_get_update(
 	long update_number);
 static struct update *update_client_get_update(
 	long update_number);
-#ifdef HALO_LINUX
 static boolean update_server_machine_is_local(
 	long machine_index);
-#endif
 
 /* ---------- globals */
 
-#ifdef HALO_LINUX
 /* The host takes a client's input as it comes, each packet replacing the
 last, and a client sends one a frame (several per tick): a button pressed
 in only one packet between two of the host's ticks would be lost. Every
@@ -294,8 +269,6 @@ static struct
 	struct player_action action;
 	unsigned short control_flags[DISTRIBUTED_INPUT_HISTORY];
 } update_client_local_inputs[MAXIMUM_LOCAL_PLAYERS];
-
-#endif
 
 static struct update_server_globals update_server_globals = { 0 };
 static struct update_client_globals update_client_globals = { 0 };
@@ -411,7 +384,6 @@ void update_server_next_update(
 	queue = (struct update_server_queue_datum *)update_server_globals.queues->data;
 	for (queue_index = 0; queue_index<update_server_globals.queues->count; ++queue_index, ++queue)
 	{
-#ifdef HALO_LINUX
 		/* port: a slot no player holds (the distributed netcode's players keep
 		their slots in the host's player list, which may leave gaps:
 		network_game_manager.c) has an idle action, not what its queue's
@@ -429,15 +401,12 @@ void update_server_next_update(
 			update->update.action_count += 1;
 			continue;
 		}
-#endif
 		csmemcpy(
 			&update->update.actions[queue_index],
 			&queue->current_action,
 			sizeof(struct player_action));
-#ifdef HALO_LINUX
 		update->update.actions[queue_index].control_flags |= update_server_pending_control_flags[queue_index];
 		update_server_pending_control_flags[queue_index] = 0;
-#endif
 		update->update.action_count += 1;
 	}
 	update_client_handle_server_update(&update->update, update_number);
@@ -568,7 +537,6 @@ void update_client_add_player(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* The native builds draw several frames per 30 Hz tick
 (port/linux/game/render_interpolation.c) and build an action every frame, and
 only the last one before a tick reaches it: a button pressed and released
@@ -581,13 +549,11 @@ static unsigned long update_client_pending_control_flags[MAXIMUM_LOCAL_PLAYERS];
 static real update_client_pending_primary_triggers[MAXIMUM_LOCAL_PLAYERS];
 static long update_client_pending_game_time = NONE;
 
-#endif
 void update_client_queue(
 	struct player_action const *action)
 {
 	update_client_globals.saved_action_collection.actions[
 		update_client_globals.current_local_player] = *action;
-#ifdef HALO_LINUX
 	if (update_client_globals.current_local_player < MAXIMUM_LOCAL_PLAYERS)
 	{
 		struct player_action *saved = &update_client_globals.saved_action_collection.actions[
@@ -602,7 +568,6 @@ void update_client_queue(
 		saved->control_flags = *pending;
 		saved->primary_trigger = *pending_primary_trigger;
 	}
-#endif
 	++update_client_globals.current_local_player;
 
 	return;
@@ -611,7 +576,6 @@ void update_client_queue(
 void update_client_queue_push(
 	void)
 {
-#ifdef HALO_LINUX
 	/* while the clock is stopped no tick will take them */
 	if (update_client_pending_game_time != game_time_get() ||
 		game_time_get_paused())
@@ -626,7 +590,6 @@ void update_client_queue_push(
 			0,
 			sizeof(update_client_pending_primary_triggers));
 	}
-#endif
 	update_client_globals.current_local_player = 0;
 	csmemset(
 		&update_client_globals.saved_action_collection,
@@ -636,7 +599,6 @@ void update_client_queue_push(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the local player (of this machine) controlling the player at player_index,
 or NONE */
 static short update_client_local_player_index(
@@ -706,7 +668,6 @@ static boolean update_client_dequeue_distributed(
 	return TRUE;
 }
 
-#endif
 boolean update_client_dequeue(
 	struct player_action *actions)
 {
@@ -718,10 +679,8 @@ boolean update_client_dequeue(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 		0x1AF,
 		update_client_globals.initialized);
-#ifdef HALO_LINUX
-	if (game_connection() == _game_connection_network_client && network_game_distributed())
+	if (game_connection() == _game_connection_network_client)
 		return update_client_dequeue_distributed(actions);
-#endif
 	update = update_client_get_update(update_client_globals.next_update_number_to_dequeue);
 	if (!update ||
 		update_client_globals.next_update_number_to_dequeue>update_client_globals.latest_update_number_received ||
@@ -789,13 +748,6 @@ boolean update_client_dequeue(
 	return TRUE;
 }
 
-long update_client_get_maximum_actions(
-	void)
-{
-	return update_client_globals.latest_update_number_received -
-		update_client_globals.next_update_number_to_dequeue + 1;
-}
-
 long update_client_get_maximum_possible_server_time(
 	void)
 {
@@ -852,15 +804,13 @@ void update_server_handle_client_update(
 		"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 		0x22A,
 		update_server_globals.initialized);
-#ifdef HALO_LINUX
 	/* (the distributed netcode takes another machine's players' input from
 	its own message, update_server_handle_distributed_input) */
-	if (game_connection() == _game_connection_network_server && network_game_distributed() &&
+	if (game_connection() == _game_connection_network_server &&
 		!update_server_machine_is_local(machine_index))
 	{
 		return;
 	}
-#endif
 	for (player_index = 0; player_index<MAXIMUM_LOCAL_PLAYERS; ++player_index)
 	{
 		if (player_list[player_index]!=NONE)
@@ -870,10 +820,8 @@ void update_server_handle_client_update(
 				player_list[player_index]);
 
 			queue->current_action = actions[action_index++];
-#ifdef HALO_LINUX
 			update_server_pending_control_flags[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[player_index])] |=
 				queue->current_action.control_flags;
-#endif
 			match_assert_valid_real(
 				"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 				0x238,
@@ -945,15 +893,25 @@ void update_client_handle_server_update(
 	return;
 }
 
-void update_queues_reset_and_fill_with_lies(
+/* port: the distributed netcode's record of each player's latest input,
+forgotten for a new game (network_distributed_new_game) as after loading
+one: a game counts its ticks and the host its updates from the start again,
+so the last game's latest, kept, would be later than any of this game's and
+every new input taken for an old one (the players driven by the last game's
+last input: aiming where they last aimed, running if they last ran) */
+void update_queues_distributed_reset(
 	void)
 {
-#ifdef HALO_LINUX
 	csmemset(update_server_pending_control_flags, 0, sizeof(update_server_pending_control_flags));
 	csmemset(update_client_relayed_actions, 0, sizeof(update_client_relayed_actions));
 	csmemset(update_server_distributed_inputs, 0, sizeof(update_server_distributed_inputs));
 	csmemset(update_client_local_inputs, 0, sizeof(update_client_local_inputs));
-#endif
+}
+
+void update_queues_reset_and_fill_with_lies(
+	void)
+{
+	update_queues_distributed_reset();
 	if (update_server_globals.initialized)
 	{
 		update_server_globals.next_update_number_to_build = 0;
@@ -1017,7 +975,6 @@ long player_new_queue(
 	return queue_index;
 }
 
-#ifdef HALO_LINUX
 /* whether the machine's players are this machine's (the host's own input
 comes to it as a client's does) */
 static boolean update_server_machine_is_local(
@@ -1154,7 +1111,6 @@ boolean update_client_distributed_input(
 	return TRUE;
 }
 
-#endif
 /* ---------- private code */
 
 static struct update *update_server_get_update(

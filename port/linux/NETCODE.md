@@ -1,4 +1,4 @@
-# Distributed netcode (the default)
+# Distributed netcode
 
 The Xbox game plays system link in lockstep: clients send their input to
 the host, the host sends every machine every player's input for each 30 Hz
@@ -7,8 +7,9 @@ each tick's update. A client therefore sees its own movement and shots a
 full round trip late, and any machine whose simulation differs in the last
 bit goes out of sync.
 
-`network.netcode = "distributed"` replaces that with the model of later
-Halo engines (the "distributed" simulation of the MonkeyNuts/Ares source)
+The native builds replace that (they no longer have the lockstep netcode)
+with the model of later Halo engines (the "distributed" simulation of the
+MonkeyNuts/Ares source)
 with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
 
 - **Every machine ticks on its own clock.** Nobody waits for anybody: a
@@ -31,8 +32,9 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   the host had it when the shooter saw it, no faster than weapons fire) and
   deals the damage. What the shooter saw hit, hits.
 
-A client plays whichever netcode its host plays (the host's
-`network.netcode`, which its game's advertisement carries).
+A host's game advertisement says that it plays this netcode. A client does
+not join a host that does not (one of network version 4 built before the
+lockstep netcode was removed, set to play it): it tells the player why.
 
 ## Versions
 
@@ -51,9 +53,9 @@ version 4 plays the European (PAL) maps as the North American ones
 
 ## Joining a game in progress
 
-A distributed game stays open when it starts (a lockstep one closes, as on
-the Xbox, since every machine must simulate it from its first tick), and
-the game list shows it. A machine that joins it is accepted as in the
+A game stays open when it starts (on the Xbox it closed, since every
+machine had to simulate it from its first tick), and the game list shows
+it. A machine that joins it is accepted as in the
 pregame, and its players are added as the game adds a player in game:
 every machine in the game spawns them, told by the game's own
 `_message_server_add_player_ingame`. Then the host sends that machine alone
@@ -68,7 +70,7 @@ and the game type's state, and it plays on as any other client.
 The netcode names a player by its datum's index, which must be the same on
 every machine, the one that joined too. That machine has not the players
 who left (their datums stay until the game ends), nor the order in which
-the others added players. So in a distributed game each player's datum is
+the others added players. So each player's datum is
 its slot in the host's player list: every machine makes it there, and the
 host gives a player added to the game in progress a slot whose datum is
 free (`network_game_manager.c`). A player added to the game in progress
@@ -85,7 +87,9 @@ a pregame keep-alive every five seconds from the host
 1. (Done) Decoupled ticks: clients tick on their own clock with local input
    for local players and the latest relayed input for remote ones; the host
    no longer waits for clients; taps are accumulated so a quick button
-   press is never lost (lockstep too); out-of-sync checks off.
+   press is never lost; out-of-sync checks off. The lockstep netcode is
+   gone: the host's per-tick game update carries no actions, and only
+   keeps the clients' count of its ticks.
 2. (Done) Authority: clients skip damage, deaths, spawns, pickups, item
    spawns, and scoring, and apply the host's state for them
    (`port/linux/game/network_distributed.c`):
@@ -213,14 +217,17 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
 `debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a
 game without the menus (in a team game the joining player takes the other
-team), and `debug.test_input` plays controller 1 with a scripted bot; each
-machine logs every player's position, health and shields, weapons,
-grenades, score, kills and deaths every second, with the objects made and
-removed and the hits reported, dealt, rejected and replayed, so two
-machines' views of one game can be compared. `debug.network_test_kill`,
+team), and `debug.test_input` plays controller 1 with a scripted bot (or,
+`look:<seed>`, one that stands still, only turning and looking up and
+down); each machine logs every player's position, health and shields,
+where they aim and face, their animation state and how hard they move,
+weapons, grenades, score, kills and deaths every second, with the objects
+made and removed and the hits reported, dealt, rejected and replayed, so
+two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
-swap the bots' wandering does not reach. `debug.network_latency` and
+swap the bots' wandering does not reach, and `debug.network_test_score`
+shortens the game, to test the next. `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet.
 

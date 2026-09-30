@@ -52,7 +52,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "game/game_allegiance.h"
 #include "saved games/game_state.h"
 
@@ -202,7 +202,6 @@ boolean game_team_is_enemy(
 			game_allegiance_globals->friendly_bitvector,
 			NUMBER_OF_GAME_TEAMS * our_team_index + other_team_index);
 	}
-#ifdef HALO_LINUX
 	/* port: free for all gives every player a team, up to the player limit,
 	past the table's 10. Treat such a team like teams 0..9, whose diagonal is
 	friendly: it is not its own enemy, so a suicide does not score as a kill.
@@ -212,7 +211,6 @@ boolean game_team_is_enemy(
 	{
 		result = FALSE;
 	}
-#endif
 
 	return result;
 }

@@ -152,14 +152,15 @@ the setting for one start of the game. It has priority over the file.
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
+| `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
+| `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
-| `network.netcode` | `"distributed"` | `HALO_NETCODE` | `"distributed"`: each machine moves its own player at once, and the host makes the decisions (refer to `NETCODE.md`). `"lockstep"`: as on the Xbox. The host's setting applies: a machine that joins a game uses the netcode of the host. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -176,7 +177,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
 | `debug.gpu_stats`, `debug.gpu_trace_frame`, `debug.gpu_trace_constants`, `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | Tools to find problems in the graphics: counts for each frame, all the GL state of one frame, the GLSL code, the textures. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
-| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
+| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
@@ -227,6 +228,12 @@ Each frame shows the world between the last two ticks
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
 
+The direction of the view is an exception. The game reads the mouse and the
+sticks in each frame. In first person, on foot, each frame points the view
+where the player aims at that time (`display.direct_camera`). Thus the view
+turns in the frame that the mouse moves. In a vehicle and in cinematics, the
+view mixes as the other things do. On Android, the view mixes as before.
+
 To get 30 frames each second, set `display.interpolation = false`.
 
 To see the frame rate:
@@ -247,8 +254,6 @@ have up to 4 players (split screen).
 - `include/halo_port_capacity.h` sets the memory for the limits. The game
   state is 16 MB at `0x81A00000` (3.3 MB on the Xbox). The pools of objects,
   effects, particles, contrails, lights and sounds are also larger.
-- The byte-matching build keeps the limits of the Xbox. All the changes are
-  in `#ifdef HALO_LINUX`.
 
 Obey these rules:
 
@@ -271,9 +276,10 @@ These are the differences from the Xbox:
   The other machines are also in the game.
 - In free-for-all games, each player is a team.
 
-Linux, Windows and Android machines can play in the same game. With the
-netcode `"lockstep"`, each machine must calculate the same floating-point
-results. Thus all the ports:
+Linux, Windows and Android machines can play in the same game. Each machine
+simulates the players from the same inputs, and the host does not correct
+all of the game. Thus each machine must calculate the same floating-point
+results, and all the ports:
 
 - Compile without fused multiply-add (`-ffp-contract=off`).
 - Use the math functions of musl (`port/include/halo_math.h`,
@@ -300,8 +306,8 @@ interface.
 ### Test with many machines
 
 `tools/system_link_bots.py` adds simple machines to a game. Each machine has
-one player. The machines obey the system link protocol and send input, but
-they do not calculate the game.
+one player. The machines obey the system link protocol, but they do not
+calculate the game or move their players.
 
 1. Start a game on the host.
 2. Enter `python tools/system_link_bots.py --host 127.0.0.200 --machines 127 --start`.
@@ -467,8 +473,7 @@ code or data.
 with the function in `effects/decals.c`. clang used the copy, and parts of
 levels were not visible. The copy now agrees with the function.
 
-Other changes are in `#ifdef HALO_LINUX`. All the native ports define
-`HALO_LINUX`. The byte-matching build does not define it.
+Other changes:
 
 | File | Change |
 | --- | --- |
@@ -480,9 +485,8 @@ Other changes are in `#ifdef HALO_LINUX`. All the native ports define
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 
-The x86 inline assembly of the game has C replacements in
-`#ifdef HALO_LINUX`. Thus the compiler can optimize that code for each
-processor:
+The x86 inline assembly of the game is replaced by C. Thus the compiler
+can optimize that code for each processor:
 
 | File | Assembly | Replacement |
 | --- | --- | --- |

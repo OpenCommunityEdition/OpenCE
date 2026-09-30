@@ -73,6 +73,7 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "ai/ai_profile.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_utilities.h"
 #include "bitmaps/color_table_group.h"
 #include "camera/director.h"
 #include "cseries/profile.h"
@@ -81,7 +82,6 @@ symbols in this file:
 #include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "interface/hud.h"
@@ -89,8 +89,8 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
 #include "interface/terminal.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "main/main.h"
-#include "main/main_runtime.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
 #include "physics/collision_usage.h"
@@ -154,7 +154,7 @@ enum
 #define interface_tag_references_get() \
 	(scenario_get_game_globals()->interface_tag_references.count ? \
 		TAG_BLOCK_GET_ELEMENT(&scenario_get_game_globals()->interface_tag_references, 0, \
-			struct interface_tag_references_definition) : \
+			struct game_globals_interface_tag_references) : \
 		NULL)
 
 #define weapon_hud_interface_definition_get(index) \
@@ -162,88 +162,11 @@ enum
 
 /* ---------- structures */
 
-union argb_color
-{
-	word n[4];
-};
-typedef union argb_color argb_color;
-
 typedef char argb_color_size_assert[
-	sizeof(argb_color) == 0x8 ? 1 : -1];
-
-struct interface_tag_references_definition
-{
-	struct tag_reference tags[NUMBER_OF_INTERFACE_TAGS];
-	byte unused[48];
-};
+	sizeof(union argb_color) == 0x8 ? 1 : -1];
 
 typedef char interface_tag_references_definition_size_assert[
-	sizeof(struct interface_tag_references_definition) == 0x130 ? 1 : -1];
-
-struct weapon_flash_state_definition
-{
-	short flags;
-	short pad02;
-	short total_ammo;
-	short loaded_ammo;
-	short heat;
-	short age;
-	long unused0C[8];
-};
-
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	pixel32 color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
-struct weapon_hud_interface_definition
-{
-	struct tag_reference parent_hud;
-	struct weapon_flash_state_definition flash_cutoffs;
-	struct hud_absolute_placement_definition absolute_placement;
-	struct tag_block statics;
-	struct tag_block meters;
-	struct tag_block numbers;
-	struct tag_block crosshairs;
-	struct tag_block overlays;
-	unsigned long valid_crosshair_types_flags;
-	struct tag_block warning_sounds;
-	struct tag_block screen_effects;
-	long unusedB8[33];
-	struct icon_hud_element_definition messaging_icon;
-	long unused14C[12];
-};
-
-struct hud_screen_effect_definition
-{
-	long unused00;
-	word mask_flags;
-	word mask_pad;
-	long mask_unused[4];
-	struct tag_reference mask_fullscreen;
-	struct tag_reference mask_splitscreen;
-	long unused38[2];
-	word convolution_flags;
-	word convolution_pad;
-	real convolution_radius_in_bounds[2];
-	real convolution_radius_out_bounds[2];
-	long unused54[6];
-	word light_enhancement_flags;
-	short light_enhancement_script_source;
-	real light_enhancement_intensity;
-	long unused74[6];
-	word desaturation_flags;
-	short desaturation_script_source;
-	real desaturation_intensity;
-	real_rgb_color desaturation_tint;
-	long unusedA0[6];
-};
+	sizeof(struct game_globals_interface_tag_references) == 0x130 ? 1 : -1];
 
 typedef char weapon_hud_interface_definition_screen_effects_offset_assert[
 	offsetof(struct weapon_hud_interface_definition, screen_effects) == 0xAC ? 1 : -1];
@@ -262,12 +185,6 @@ typedef char hud_screen_effect_definition_desaturation_flags_offset_assert[
 typedef char rasterizer_cinematic_screen_effect_parameters_tint_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, filter_desaturation_tint) == 0x14 ? 1 : -1];
 
-struct system_memory_information
-{
-	long available_physical_memory;
-	long total_physical_memory;
-};
-
 struct profile_value
 {
 	char name[256];
@@ -282,21 +199,14 @@ struct profile_value
 typedef char profile_value_size_assert[
 	sizeof(struct profile_value) == 0x20C ? 1 : -1];
 
-struct interface_hud_scripted_globals
-{
-	boolean show_hud;
-	boolean show_hud_help_text;
-	byte unused[2];
-};
-
 typedef char interface_hud_globals_default_weapon_hud_index_offset_assert[
 	offsetof(struct hud_globals_definition, defaults.default_weapon_hud.index) == 0x2CC ? 1 : -1];
 
 /* ---------- prototypes */
 
-void interface_splitscreen_render(
+static void interface_splitscreen_render(
 	void);
-void render_debug_profile(
+static void render_debug_profile(
 	void);
 static void render_debug_profile_stall_tick(
 	short stall_type,
@@ -306,24 +216,22 @@ static void render_debug_profile_stall_tick(
 	real scale);
 /* ---------- globals */
 
-extern struct interface_hud_scripted_globals *hud_scripted_globals;
-
-static short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
-static struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
+short profile_game_value_count = NUMBER_OF_PROFILE_GAME_VALUES;
+struct profile_value profile_game_values[MAXIMUM_PROFILE_VALUES] =
 {
 	{ "game", "game", &global_real_argb_yellow, NONE, NONE, FALSE, TRUE },
 	{ "objects_update", "objects", &global_real_argb_green, NONE, NONE, FALSE, TRUE },
 	{ "ai_update", "ai", &global_real_argb_blue, NONE, NONE, FALSE, TRUE },
 };
 
-static short profile_frame_value_count = NUMBER_OF_PROFILE_FRAME_VALUES;
-static struct profile_value profile_frame_values[MAXIMUM_PROFILE_VALUES] =
+short profile_frame_value_count = NUMBER_OF_PROFILE_FRAME_VALUES;
+struct profile_value profile_frame_values[MAXIMUM_PROFILE_VALUES] =
 {
 	{ "frame", "frame", &global_real_argb_white, NONE, NONE, FALSE, TRUE },
 };
 
-static short profile_graph_value_count = NUMBER_OF_PROFILE_GRAPH_VALUES;
-static struct profile_value profile_graph_values[MAXIMUM_PROFILE_VALUES] =
+short profile_graph_value_count = NUMBER_OF_PROFILE_GRAPH_VALUES;
+struct profile_value profile_graph_values[MAXIMUM_PROFILE_VALUES] =
 {
 	{ "stall", "stall", &global_real_argb_red, NONE, NONE, FALSE, TRUE },
 	{ "texture", "texture", &global_real_argb_orange, NONE, NONE, FALSE, TRUE },
@@ -362,7 +270,7 @@ void interface_initialize_for_new_map(
 	first_person_weapons_initialize_for_new_map();
 
 	draw_string_set_draw_mode(
-		interface_tag_references_get()->tags[_interface_font_terminal].index,
+		interface_tag_references_get()->interface_tag_references[_interface_font_terminal].index,
 		NONE,
 		0,
 		0,
@@ -400,7 +308,7 @@ long interface_get_tag_index(
 		109,
 		interface_tag_index>=0 && interface_tag_index<NUMBER_OF_INTERFACE_TAGS);
 
-	return interface_tag_references_get()->tags[interface_tag_index].index;
+	return interface_tag_references_get()->interface_tag_references[interface_tag_index].index;
 }
 
 real_argb_color *interface_get_real_argb_color(
@@ -448,10 +356,10 @@ void interface_set_bitmap_text_draw_mode(
 	return;
 }
 
-argb_color *interface_get_rgb_color(
+union argb_color *interface_get_rgb_color(
 	short interface_color_table_index,
 	short color_index,
-	argb_color *color)
+	union argb_color *color)
 {
 	real_argb_color real_color;
 
@@ -951,7 +859,7 @@ static void render_debug_profile_stall_tick(
 	return;
 }
 
-void render_debug_profile(
+static void render_debug_profile(
 	void)
 {
 	if (profile_display)
@@ -977,8 +885,8 @@ void render_debug_profile(
 
 			csstrcpy(buffer, "");
 			sprintf(buffer+csstrlen(buffer), "% 6.1fk free of % 6.1fk total|n",
-				memory_information.available_physical_memory/1024.0f,
-				memory_information.total_physical_memory/1024.0f);
+				memory_information.free/1024.0f,
+				memory_information.total/1024.0f);
 			sprintf(buffer+csstrlen(buffer), "% 5d active of % 5d objects (% 3.1f%% used)|n",
 				objects_information.active_object_count,
 				objects_information.object_count,
@@ -1304,7 +1212,7 @@ void render_debug_profile(
 	return;
 }
 
-void interface_splitscreen_render(
+static void interface_splitscreen_render(
 	void)
 {
 	rectangle2d bounds;

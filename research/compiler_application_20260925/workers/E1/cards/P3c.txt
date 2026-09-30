@@ -1,8 +1,0 @@
-CARD P3c (written 2026-09-26 01:42:08 -0700, before compiling)  periodic builder: P3 + cosine() (/Od 0x455220)
-Evidence: D - /Od builder calls fn 0x455220 (a one-line real_math.h cosine() wrapper) three times; admission source
-review forbids hand-expanded helpers the /Od build calls. Ledger N7 (fifty-objects periodic LEDGER P38): (real)cos and
-cosine() give identical builder bytes on the pre-P3 body.
-Shape: P3 with `cosine(8.2f*_pi*index/PERIODIC_FUNCTION_TABLE_SIZE)` etc. (no (real) cast). build_table untouched
-(its cos/sin stay direct: cosine()/sine() there are J-refuted, P38).
-Prediction: builder still EXACT; object gains ONE new surplus COMDAT `_cosine` (16 B) identical to January's selected
-copy; provider_link PASS both orders; no other section change (p ~0.85).

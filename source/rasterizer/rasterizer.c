@@ -304,7 +304,7 @@ symbols in this file:
 #include "real_math.h"
 #include "rasterizer_widgets.h"
 #include "rasterizer.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_globals_internal.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_models.h"
@@ -329,7 +329,7 @@ enum
 /* ---------- macros */
 
 #define rasterizer_model_obscurer_object_index bss_004662ec
-#define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.debug_model_vertices
+#define rasterizer_debug_model_vertices_enabled rasterizer_debug_options.debug_model_vertices_enabled
 
 /* ---------- structures */
 
@@ -360,13 +360,6 @@ struct model_geometry_part
 	struct tag_block triangles;
 	struct triangle_buffer triangle_buffer;
 	struct vertex_buffer vertex_buffer;
-};
-
-struct rasterizer_model_skinning
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad;
 };
 
 struct rasterizer_debug_model_vertex
@@ -409,8 +402,6 @@ void _rasterizer_decal_vertices_delete(
 	long decal_vertex_buffer_index);
 void _rasterizer_decal_vertices_unlock(
 	void);
-void _rasterizer_widget_end(
-	void);
 
 void _rasterizer_decals_update_function_pointers(void);
 void _rasterizer_decals_initialize(
@@ -432,9 +423,9 @@ void _rasterizer_decals_flush(
 void _rasterizer_detail_objects_begin(
 	void);
 void _rasterizer_detail_objects_rebuild_vertices(
-	struct detail_object_view_data *view_data);
+	struct detail_object_view_data const *detail_object_view_data);
 void _rasterizer_detail_objects_draw(
-	struct detail_object_view_data *view_data);
+	struct detail_object_view_data const *detail_object_view_data);
 void _rasterizer_detail_objects_end(
 	void);
 void _rasterizer_screen_effect(
@@ -592,7 +583,8 @@ struct rasterizer_globals_definition rasterizer_globals =
 	{ 0 },
 	{ 0 },
 	{ 0 },
-	{ 0, 3, 0, 0 },
+	768,
+	0,
 	FALSE,
 	TRUE,
 	FALSE,
@@ -603,85 +595,87 @@ struct rasterizer_globals_definition rasterizer_globals =
 	1024.f,
 	0.01171875f,
 	1024.f,
-	{ 0 }
+	NULL,
+	NULL,
+	NULL
 };
-struct rasterizer_debug_options_definition rasterizer_debug_options =
+struct rasterizer_debug_options rasterizer_debug_options =
 {
 	FALSE, /* fps_accumulation */
 	0, /* pad01 */
-	0, /* stats */
-	0, /* mode */
-	FALSE, /* wireframe */
-	FALSE, /* debug_model_vertices */
+	0, /* statistics_mode */
+	0, /* drawing_mode */
+	FALSE, /* wireframe_enabled */
+	FALSE, /* debug_model_vertices_enabled */
 	NONE, /* debug_model_lod */
-	FALSE, /* debug_transparents */
-	FALSE, /* debug_meter_shader */
-	TRUE, /* models */
-	TRUE, /* model_transparents */
+	FALSE, /* debug_transparent_geometry_enabled */
+	FALSE, /* debug_meter_shader_enabled */
+	TRUE, /* draw_models */
+	TRUE, /* draw_model_transparent_geometry */
 	TRUE, /* draw_first_person_weapon_first */
-	TRUE, /* stencil_mask */
-	2, /* environment */
-	TRUE, /* environment_lightmaps */
-	TRUE, /* environment_shadows */
-	TRUE, /* environment_diffuse_lights */
-	TRUE, /* environment_diffuse_textures */
-	TRUE, /* environment_decals */
-	TRUE, /* environment_specular_lights */
-	TRUE, /* environment_specular_lightmaps */
-	TRUE, /* environment_reflection_lightmap_mask */
-	TRUE, /* environment_reflection_mirrors */
-	TRUE, /* environment_reflections */
-	TRUE, /* environment_transparents */
-	TRUE, /* environment_fog */
-	TRUE, /* environment_fog_screen */
-	TRUE, /* water */
-	TRUE, /* lens_flares */
-	TRUE, /* dynamic_unlit_geometry */
-	TRUE, /* dynamic_lit_geometry */
-	TRUE, /* dynamic_screen_geometry */
-	TRUE, /* hud_motion_sensor */
-	TRUE, /* detail_objects */
-	TRUE, /* debug_geometry */
+	TRUE, /* stencil_mask_enabled */
+	2, /* draw_environment */
+	TRUE, /* draw_environment_lightmaps */
+	TRUE, /* draw_environment_shadows */
+	TRUE, /* draw_environment_diffuse_lights */
+	TRUE, /* draw_environment_textures */
+	TRUE, /* draw_environment_decals */
+	TRUE, /* draw_environment_specular_lights */
+	TRUE, /* draw_environment_specular_lightmaps */
+	TRUE, /* draw_environment_reflection_lightmap_masks */
+	TRUE, /* draw_environment_reflection_mirrors */
+	TRUE, /* draw_environment_reflections */
+	TRUE, /* draw_environment_transparent_geometry */
+	TRUE, /* draw_environment_fog */
+	TRUE, /* draw_environment_fog_screen */
+	TRUE, /* draw_water */
+	TRUE, /* draw_lens_flares */
+	TRUE, /* draw_dynamic_unlit_geometry */
+	TRUE, /* draw_dynamic_lit_geometry */
+	TRUE, /* draw_dynamic_screen_geometry */
+	TRUE, /* draw_hud_motion_sensor */
+	TRUE, /* draw_detail_objects */
+	TRUE, /* draw_debug_geometry */
 	FALSE, /* debug_geometry_multipass */
-	TRUE, /* fog_atmosphere */
-	TRUE, /* fog_plane */
-	TRUE, /* bump_mapping */
+	TRUE, /* fog_atmospheric_enabled */
+	TRUE, /* fog_planar_enabled */
+	TRUE, /* bump_mapping_enabled */
 	{ 0 }, /* pad2A[2] */
 	1.0f, /* lightmap_ambient */
-	{ 0 }, /* reserved30[2] */
+	0, /* _lightmap_mode */
 	0, /* pad3 */
-	TRUE, /* lightmaps_incident_radiosity */
-	TRUE, /* lightmaps_filtering */
+	TRUE, /* lightmap_incident_radiosity_enabled */
+	TRUE, /* lightmap_filtering_enabled */
 	{ 0 }, /* pad36[2] */
 	0.0f, /* model_lighting_ambient */
-	TRUE, /* environment_alpha_testing */
-	TRUE, /* environment_specular_mask */
-	TRUE, /* shadows_convolution */
-	FALSE, /* shadows_debug */
-	FALSE, /* water_mipmapping */
-	TRUE, /* active_camouflage */
-	TRUE, /* active_camouflage_multipass */
-	TRUE, /* plasma_energy */
-	TRUE, /* lens_flares_occlusion */
-	FALSE, /* lens_flares_occlusion_debug */
-	TRUE, /* ray_of_buddha */
-	TRUE, /* screen_flashes */
-	TRUE, /* screen_effects */
-	FALSE, /* DXTC_noise */
-	FALSE, /* soft_filter */
-	FALSE, /* secondary_render_target_debug */
-	FALSE, /* profile_log */
+	TRUE, /* environment_alpha_testing_enabled */
+	TRUE, /* environment_specular_mask_enabled */
+	TRUE, /* shadow_convolution_enabled */
+	FALSE, /* shadow_debug_enabled */
+	FALSE, /* water_mipmapping_enabled */
+	TRUE, /* active_camouflage_enabled */
+	TRUE, /* active_camouflage_multipass_enabled */
+	TRUE, /* plasma_energy_enabled */
+	TRUE, /* lens_flare_occlusion_enabled */
+	FALSE, /* lens_flare_occlusion_debug */
+	TRUE, /* lens_flare_sun_glow_enabled */
+	TRUE, /* screen_flash_enabled */
+	TRUE, /* screen_effects_enabled */
+	FALSE, /* DXTC_noise_enabled */
+	FALSE, /* soft_filter_enabled */
+	FALSE, /* secondary_render_target_debug_enabled */
+	FALSE, /* profile_log_enabled */
 	{ 0 }, /* pad4D[3] */
-	0.4f, /* detail_objects_offset_multiplier */
+	0.4f, /* detail_object_screen_facing_offset_multiplier */
 	8, /* zbias */
 	1.0f / 256.0f, /* zoffset */
 	FALSE, /* force_all_player_views_to_default_player */
-	FALSE, /* safe_frame_bounds */
+	FALSE, /* safe_frame_bounds_adjust_enabled */
 	0, /* freeze_flying_camera */
-	TRUE, /* zsprites */
-	TRUE, /* filthy_decal_fog_hack */
-	TRUE, /* smart */
-	FALSE, /* splitscreen_VB_optimization */
+	TRUE, /* zsprite_enabled */
+	TRUE, /* filthy_decal_fog_hack_enabled */
+	TRUE, /* smart_states_enabled */
+	FALSE, /* splitscreen_VB_optimization_enabled */
 	FALSE, /* profile_print_locks */
 	{ 0 }, /* pad65[3] */
 	0.0f, /* profile_objectlock_time */
@@ -691,12 +685,11 @@ struct rasterizer_debug_options_definition rasterizer_debug_options =
 	FALSE, /* transparent_pixel_counter */
 	{ 0 }, /* pad8A[2] */
 };
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 /* No PDB name survives for this target-owned BSS symbol. */
 #if !(defined(__aarch64__) && defined(__ILP32__)) /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
-long bss_004662ec;
+static long bss_004662ec;
 real_argb_color *global_rasterizer_model_ambient_reflection_tint;
 #if !(defined(__aarch64__) && defined(__ILP32__))
 #pragma bss_seg()
@@ -728,22 +721,22 @@ void rasterizer_reset_state(
 void rasterizer_frame_begin(
 	struct rasterizer_frame_begin_parameters const *parameters)
 {
-	if (rasterizer_debug_options.environment <= 1)
+	if (rasterizer_debug_options.draw_environment <= 1)
 	{
-		rasterizer_debug_options.environment_fog = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_transparents = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_reflections = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_reflection_mirrors = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_reflection_lightmap_mask = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_specular_lightmaps = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_specular_lights = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_decals = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_diffuse_textures = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_shadows = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_diffuse_lights = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_lightmaps = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment_fog_screen = rasterizer_debug_options.environment;
-		rasterizer_debug_options.environment = 2;
+		rasterizer_debug_options.draw_environment_fog = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_transparent_geometry = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_reflections = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_reflection_mirrors = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_reflection_lightmap_masks = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_specular_lightmaps = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_specular_lights = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_decals = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_textures = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_shadows = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_diffuse_lights = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_lightmaps = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment_fog_screen = rasterizer_debug_options.draw_environment;
+		rasterizer_debug_options.draw_environment = 2;
 	}
 
 	if (rasterizer_globals.near_clip_distance == 0.f)
@@ -1887,7 +1880,7 @@ void rasterizer_debug_immediate_vector(
 
 void rasterizer_debug_model_vertices(
 	long object_index,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	struct model_geometry_part const *part)
 {
 	long debug_vertex_count;

@@ -14,7 +14,7 @@ RASTERIZER_MODELS.H
 
 struct model_geometry_part;
 struct rasterizer_model_begin_parameters;
-struct rasterizer_model_skinning;
+struct render_skinning;
 struct render_sort_filth;
 struct shader;
 struct triangle_buffer;
@@ -27,10 +27,6 @@ void rasterizer_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters,
 	boolean is_dynamic);
 void rasterizer_model_end(
-	void);
-void rasterizer_environment_shadow_model_begin(
-	struct rasterizer_model_begin_parameters const *parameters);
-void rasterizer_environment_shadow_model_end(
 	void);
 void rasterizer_model_draw(
 	struct shader *shader,
@@ -50,14 +46,9 @@ void rasterizer_model_transparent_geometry_submit(
 	long dynamic_vertex_buffer_index,
 	union real_point3d const *centroid,
 	struct render_sort_filth *sort_filth);
-void rasterizer_environment_shadow_model_draw(
-	struct shader const *shader,
-	short shader_permutation_index,
-	struct triangle_buffer const *triangle_buffer,
-	struct vertex_buffer const *vertex_buffer);
 void rasterizer_debug_model_vertices(
 	long object_index,
-	struct rasterizer_model_skinning const *skinning,
+	struct render_skinning const *skinning,
 	struct model_geometry_part const *part);
 
 #endif // __RASTERIZER_MODELS_H

@@ -1,19 +1,0 @@
-source/ai/actor_combat                   control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/ai/actors                         control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/aim_assist                   control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/game_engine                  control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/game_engine_ctf              control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/game_engine_oddball          control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/player_control               control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/game/players                      control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/interface/first_person_weapons    control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/interface/hud                     control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/interface/hud_draw                control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/interface/hud_weapon              control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/interface/interface               control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/items/weapons                     control: objcmp IDENTICAL: 0 difference(s) | base->p1: sec40 .text raw bytes differ sec40 .text relocations differ (4 vs 4) objcmp DIFFERENT: 2 difference(s) 
-source/objects/object_types              control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/objects/objects                   control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/units/bipeds                      control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/units/unit_scripting_commands     control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 
-source/units/units                       control: objcmp IDENTICAL: 0 difference(s) | base->p1: objcmp IDENTICAL: 0 difference(s) 

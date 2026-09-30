@@ -92,6 +92,10 @@ static const struct config_setting config_settings[] =
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
+	{ "display.direct_camera", _config_boolean, "true", "HALO_DIRECT_CAMERA", _environment_value, _platform_desktop,
+		"In first person, point the view where the player aims now instead of\n"
+		"where the last tick left it: the view turns the frame the mouse moves,\n"
+		"not up to two ticks (66 ms) later." },
 
 	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_value, _platform_desktop,
 		"Show the game's frames-a-second counter (F7, or Command-P on a Mac,\n"
@@ -106,6 +110,11 @@ static const struct config_setting config_settings[] =
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
+	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
+		"Magnetism while aiming with the mouse, as with a controller: the view\n"
+		"slowed and dragged along by a target. The last of the mouse and the\n"
+		"right stick to move decides. The bullets' autoaim (bent toward the\n"
+		"target) stays either way." },
 
 	{ "game.map", _config_string, "\"\"", "HALO_MAP", _environment_value, _platform_all,
 		"A map to start at start-up, after init.txt: a campaign level's name\n"
@@ -136,11 +145,6 @@ static const struct config_setting config_settings[] =
 		"game's announcements also go to the tailnet's online machines, and a\n"
 		"game hosted here is reached through this machine's Tailscale address by\n"
 		"machines on the tailnet. The local network is searched as well." },
-	{ "network.netcode", _config_string, "\"distributed\"", "HALO_NETCODE", _environment_value, _platform_all,
-		"\"distributed\" (work in progress, port/linux/NETCODE.md) predicts each\n"
-		"player's own moves and lets the host decide the rest; \"lockstep\" plays\n"
-		"system link as the Xbox game did. The host's is played: a machine that\n"
-		"joins a game plays its host's." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
@@ -189,6 +193,9 @@ static const struct config_setting config_settings[] =
 		"Seconds after hosting that an automated test game starts." },
 	{ "debug.network_test_kill", _config_real, "0.0", "HALO_NETWORK_TEST_KILL", _environment_value, _platform_all,
 		"Every this many seconds an automated test host kills its last player; 0 never." },
+	{ "debug.network_test_score", _config_integer, "0", "HALO_NETWORK_TEST_SCORE", _environment_value, _platform_all,
+		"The score an automated test host's game type plays to (a short game, to\n"
+		"test the next); 0 the game type's own." },
 	{ "debug.network_test_shoot", _config_real, "0.0", "HALO_NETWORK_TEST_SHOOT", _environment_value, _platform_all,
 		"Every this many seconds each automated test player hits the next with\n"
 		"their weapon; 0 never." },
@@ -205,7 +212,8 @@ static const struct config_setting config_settings[] =
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
-		"network tests); \"script:<from>-<to>=<action>,...\" plays the actions in\n"
+		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
+		"up and down; \"script:<from>-<to>=<action>,...\" plays the actions in\n"
 		"those seconds (forward, back, left, right, turnleft, turnright, up, down,\n"
 		"fire, grenade, jump, crouch, zoom, action, flashlight, reload, switch, start);\n"
 		"empty for none." },
