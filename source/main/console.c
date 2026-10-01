@@ -196,7 +196,10 @@ void console_warning(
 	vsprintf(buffer, format, arglist);
 	buffer[255] = '\0';
 
-	terminal_printf(global_real_argb_red, "%s", buffer);
+	/* (port: an important line, shown as config.toml's game.console_log
+	says; the answer to a command someone typed, always) */
+	if (terminal_shows(terminal_command_running ? _terminal_message_serious : _terminal_message_important))
+		terminal_printf(global_real_argb_red, "%s", buffer);
 	if (console_dump_to_file)
 	{
 		csstrncat(buffer, "\r\n", NUMBEROF(buffer));

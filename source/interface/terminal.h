@@ -53,6 +53,18 @@ void terminal_draw(
 	void);
 boolean terminal_update(void);
 void terminal_printf(real_argb_color const *color, char const *format, ...);
+/* port: kinds of what is logged, and whether the console shows a kind on
+screen (config.toml's game.console_log) */
+enum
+{
+	_terminal_message_serious = 0,
+	_terminal_message_important,
+	_terminal_message_chatter,
+};
+boolean terminal_shows(short kind);
+/* port: whether a command someone typed is running (hs_compile_and_evaluate):
+what it logs, its errors too, is its answer, always shown */
+extern boolean terminal_command_running;
 
 /* ---------- globals */
 

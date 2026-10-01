@@ -14085,7 +14085,25 @@ static boolean hs_expression_changes_no_game(
 	return TRUE;
 }
 
+static boolean hs_compile_and_evaluate_command(
+	char const *expression);
+
+/* port: a command someone typed (the console, the telnet console, a cheat
+button, init.txt): what it logs is its answer, shown whatever
+config.toml's game.console_log is (terminal_command_running) */
 boolean hs_compile_and_evaluate(
+	char const *expression)
+{
+	boolean was_running = terminal_command_running;
+	boolean result;
+
+	terminal_command_running = TRUE;
+	result = hs_compile_and_evaluate_command(expression);
+	terminal_command_running = was_running;
+	return result;
+}
+
+static boolean hs_compile_and_evaluate_command(
 	char const *expression)
 {
 	boolean success = FALSE;

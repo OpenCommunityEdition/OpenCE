@@ -544,15 +544,23 @@ static void sound_cache_start_loading_sound(
 		system_milliseconds() -
 			xbox_sound_cache_globals.last_allocation_failure_time > 10000)
 	{
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		error(
 			_error_silent,
 			"SOUND CACHE BLOWN!!!! double-click \"GETSTABBED.BAT\" on your PC now!!!");
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		lruv_debug_to_file(
 			"d:\\stabbed.txt",
 			sound->name,
