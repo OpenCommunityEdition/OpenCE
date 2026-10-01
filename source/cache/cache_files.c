@@ -325,6 +325,12 @@ char const *cache_files_map_directory(
 void scenario_tags_unload(
 	void)
 {
+	/* port: the high-res HUD forgets this map's bitmaps (port/linux/game/hud_hires_tags.c) */
+	{
+		extern void hud_hires_tags_unloaded(void);
+
+		hud_hires_tags_unloaded();
+	}
 	sound_cache_close();
 	texture_cache_close();
 	cache_file_close();
@@ -798,6 +804,12 @@ long scenario_tags_load(
 				extern void pal_tags_loaded(char const *build);
 
 				pal_tags_loaded(cache_file_globals.header.build);
+			}
+			/* port: the bitmaps the high-res HUD stands for (port/linux/game/hud_hires_tags.c) */
+			{
+				extern void hud_hires_tags_loaded(void);
+
+				hud_hires_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}

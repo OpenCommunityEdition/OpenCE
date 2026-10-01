@@ -29,6 +29,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
                           compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, xdk_headers)
+from .embed_assets import hud_asset_inputs, hud_assets_build
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -193,7 +194,7 @@ def _musl_sources() -> List[Path]:
 
 
 def android_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "guest" / "runtime", PORT_DIR / "host", LINUX_DIR / "src"]
+    return [Path(__file__), PORT_DIR / "guest" / "runtime", PORT_DIR / "host", LINUX_DIR / "src", *hud_asset_inputs()]
 
 
 def generate_android_build(n: Writer, sln: Any) -> None:
@@ -407,6 +408,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
         if source.name.startswith("posix_") or source.name in guest_host_only:
             continue
+        objects.append(guest_object(source, platform_cflags))
+    # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
+    for source in hud_assets_build(n, "android", gen_dir / "hud_hires_assets.c"):
         objects.append(guest_object(source, platform_cflags))
     # the settings file's parser (port/third_party/tomlc17)
     objects.append(guest_object(TOML_DIR / "tomlc17.c", platform_cflags))

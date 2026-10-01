@@ -137,6 +137,7 @@ struct xgpu_texture_description
 	BOOL linear;        /* not swizzled; addressed with texel coordinates */
 	BOOL compressed;
 	unsigned long pitch; /* linear textures */
+	BOOL hires;         /* a high-res HUD texture drawn in the texture's place (hud_hires.h) */
 };
 
 void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_texture_description *description);

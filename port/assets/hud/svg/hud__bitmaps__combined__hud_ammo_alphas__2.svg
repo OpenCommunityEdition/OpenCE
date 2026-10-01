@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <!-- rocket ammo: tail fin + body, grey translucent fill with white outline; pair repeated -->
+  <defs>
+    <g id="rocket" fill="#a6a6a6" fill-opacity=".651" stroke="#fff" stroke-width="4.1" stroke-miterlimit="10">
+      <path d="M30.7,1.35 H51.4 L58.4,22 H90.6 L79.5,46 H48.1 L24.5,62.2 H3.5 L18.4,46.2 H11.6 L22.65,22 H29.35 Z"/>
+      <path d="M88.5,48.4 L124.3,52 L191.9,46.1 L210.8,32.8 L202.7,21.9 L142.6,16 L101.8,19.8 Z"/>
+    </g>
+  </defs>
+  <use href="#rocket"/>
+  <use href="#rocket" x="214"/>
+</svg>

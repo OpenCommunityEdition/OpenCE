@@ -1,0 +1,978 @@
+{
+ "scale": 8,
+ "source_scale": 4,
+ "assets": [
+  {
+   "name": "hud_unit_meters__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_meters",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "kind": "meter",
+   "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      34,
+      122,
+      65
+     ],
+     "source": [
+      0,
+      136
+     ],
+     "clip": [
+      0,
+      136,
+      488,
+      260
+     ]
+    },
+    {
+     "xbox": [
+      130,
+      0,
+      252,
+      31
+     ],
+     "source": [
+      520,
+      0
+     ],
+     "clip": [
+      520,
+      0,
+      1008,
+      124
+     ]
+    },
+    {
+     "xbox": [
+      88,
+      65,
+      176,
+      79
+     ],
+     "source": [
+      351,
+      260
+     ],
+     "clip": [
+      352,
+      260,
+      704,
+      316
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      65,
+      88,
+      79
+     ],
+     "source": [
+      490,
+      136
+     ],
+     "clip": [
+      488,
+      136,
+      840,
+      192
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      79,
+      130,
+      89
+     ],
+     "source": [
+      2,
+      356
+     ],
+     "clip": [
+      0,
+      356,
+      520,
+      396
+     ]
+    },
+    {
+     "xbox": [
+      122,
+      48,
+      252,
+      58
+     ],
+     "source": [
+      -1,
+      316
+     ],
+     "clip": [
+      0,
+      316,
+      520,
+      356
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      0,
+      130,
+      34
+     ],
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      520,
+      136
+     ]
+    },
+    {
+     "xbox": [
+      122,
+      34,
+      210,
+      48
+     ],
+     "source": [
+      1,
+      260
+     ],
+     "clip": [
+      0,
+      260,
+      352,
+      316
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_meters__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_meters",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "kind": "meter",
+   "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      62,
+      105,
+      78
+     ],
+     "source": [
+      4,
+      248
+     ],
+     "clip": [
+      0,
+      248,
+      424,
+      312
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      0,
+      114,
+      27
+     ],
+     "source": [
+      1,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      456,
+      108
+     ]
+    },
+    {
+     "xbox": [
+      130,
+      27,
+      239,
+      45
+     ],
+     "source": [
+      448,
+      108
+     ],
+     "clip": [
+      448,
+      108,
+      884,
+      180
+     ]
+    },
+    {
+     "xbox": [
+      105,
+      62,
+      210,
+      75
+     ],
+     "source": [
+      424,
+      248
+     ],
+     "clip": [
+      424,
+      248,
+      856,
+      300
+     ]
+    },
+    {
+     "xbox": [
+      108,
+      45,
+      219,
+      62
+     ],
+     "source": [
+      436,
+      180
+     ],
+     "clip": [
+      436,
+      180,
+      880,
+      248
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      45,
+      108,
+      62
+     ],
+     "source": [
+      2,
+      180
+     ],
+     "clip": [
+      0,
+      180,
+      436,
+      248
+     ]
+    },
+    {
+     "xbox": [
+      114,
+      0,
+      221,
+      22
+     ],
+     "source": [
+      456,
+      0
+     ],
+     "clip": [
+      456,
+      0,
+      884,
+      88
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      27,
+      130,
+      45
+     ],
+     "source": [
+      -35,
+      108
+     ],
+     "clip": [
+      0,
+      108,
+      448,
+      180
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      78,
+      130,
+      88
+     ],
+     "source": [
+      -32,
+      312
+     ],
+     "clip": [
+      0,
+      312,
+      432,
+      352
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_counter_numbers__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_counter_numbers",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "a8y8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      24,
+      18,
+      36
+     ],
+     "source": [
+      2,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      72,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      0,
+      18,
+      12
+     ],
+     "source": [
+      72,
+      0
+     ],
+     "clip": [
+      72,
+      0,
+      144,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      18,
+      0,
+      36,
+      12
+     ],
+     "source": [
+      145,
+      0
+     ],
+     "clip": [
+      144,
+      0,
+      216,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      36,
+      0,
+      54,
+      12
+     ],
+     "source": [
+      217,
+      0
+     ],
+     "clip": [
+      216,
+      0,
+      288,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      34,
+      12,
+      53,
+      24
+     ],
+     "source": [
+      289,
+      0
+     ],
+     "clip": [
+      288,
+      0,
+      360,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      71,
+      12,
+      89,
+      24
+     ],
+     "source": [
+      361,
+      0
+     ],
+     "clip": [
+      360,
+      0,
+      432,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      107,
+      12,
+      125,
+      24
+     ],
+     "source": [
+      432,
+      0
+     ],
+     "clip": [
+      432,
+      0,
+      504,
+      48
+     ]
+    },
+    {
+     "xbox": [
+      18,
+      24,
+      36,
+      36
+     ],
+     "source": [
+      1,
+      48
+     ],
+     "clip": [
+      0,
+      48,
+      72,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      108,
+      0,
+      126,
+      12
+     ],
+     "source": [
+      72,
+      48
+     ],
+     "clip": [
+      72,
+      48,
+      144,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      54,
+      0,
+      72,
+      12
+     ],
+     "source": [
+      144,
+      48
+     ],
+     "clip": [
+      144,
+      48,
+      216,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      72,
+      0,
+      90,
+      12
+     ],
+     "source": [
+      214,
+      50
+     ],
+     "clip": [
+      216,
+      48,
+      288,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      53,
+      12,
+      71,
+      24
+     ],
+     "source": [
+      286,
+      49
+     ],
+     "clip": [
+      288,
+      48,
+      360,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      90,
+      0,
+      108,
+      12
+     ],
+     "source": [
+      368,
+      49
+     ],
+     "clip": [
+      360,
+      48,
+      432,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      89,
+      12,
+      107,
+      24
+     ],
+     "source": [
+      431,
+      52
+     ],
+     "clip": [
+      432,
+      48,
+      504,
+      96
+     ]
+    },
+    {
+     "xbox": [
+      0,
+      12,
+      34,
+      24
+     ],
+     "source": [
+      0,
+      108
+     ],
+     "clip": [
+      0,
+      96,
+      136,
+      144
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 0,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__0.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      4,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 1,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__1.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "source": [
+      1,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 2,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__2.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 3,
+   "width": 128,
+   "height": 16,
+   "format": "a8y8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__3.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 4,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__4.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__5",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 5,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__5.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      2,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__6",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 6,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__6.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__7",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 7,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_alphas__7.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_outlines__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "a8y8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_outlines__0.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 2,
+   "width": 32,
+   "height": 16,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_ammo_type_icons__2.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      16
+     ],
+     "source": [
+      0,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      64
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 3,
+   "width": 128,
+   "height": 128,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__3.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      128
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      512
+     ]
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 4,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "kind": "alpha",
+   "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__4.svg",
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ]
+    }
+   ]
+  }
+ ]
+}

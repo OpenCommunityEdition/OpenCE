@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="64" viewBox="0 0 512 64">
+  <!-- slanted meter bar, grey translucent fill fading slightly darker downwards (rgb = alpha) -->
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="44">
+      <stop offset="0" stop-color="#c7c7c7" stop-opacity=".781"/>
+      <stop offset="1" stop-color="#b4b4b4" stop-opacity=".705"/>
+    </linearGradient>
+  </defs>
+  <path d="M20,0 H412 L392,44 H0 Z" fill="url(#g)"/>
+</svg>

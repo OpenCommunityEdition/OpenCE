@@ -22,6 +22,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PR
                           march_flag, miniupnpc_sources, pgo_mode, compile_launcher, game_defines_and_includes,
                           game_sources, musl_math_cflags, musl_math_sources, pgo_profile, profile_use_flags,
                           xdk_headers)
+from .embed_assets import hud_asset_inputs, hud_assets_build
 from .ninja_syntax import Writer
 
 LINUX_DIR = Path("port/linux")
@@ -132,7 +133,7 @@ def _load_config() -> Dict[str, Any]:
 
 def windows_configure_inputs() -> List[Path]:
     """Files whose change must re-run configure.py."""
-    return [Path(__file__), PORT_CONFIG, PORT_DIR / "src", LINUX_DIR / "src", LINUX_DIR / "game"]
+    return [Path(__file__), PORT_CONFIG, PORT_DIR / "src", LINUX_DIR / "src", LINUX_DIR / "game", *hud_asset_inputs()]
 
 
 def _quote(path: Any) -> str:
@@ -287,6 +288,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         description="WINDOWS COPY $out",
     )
 
+    # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
+    embedded_assets = hud_assets_build(n, "windows", BUILD / "generated" / "hud_hires_assets.c")
+
     abi = " ".join(WINDOWS_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     sdl_include = SDL_DIR / "include"
     libs = " ".join(
@@ -383,6 +387,8 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         for source in miniupnpc_sources():
             add_object(source, " ".join([abi, *WIN32_FLAGS, miniupnpc_include, f"-I{MINIUPNPC_DIR / 'src'}",
                                          "-D_CRT_SECURE_NO_WARNINGS", "-D_WINSOCK_DEPRECATED_NO_WARNINGS", "-w"]))
+        for source in embedded_assets:
+            add_object(source, platform_cflags)
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))

@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from .embed_assets import hud_asset_inputs, hud_assets_build
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux")
@@ -284,7 +285,8 @@ def linux_configure_inputs() -> List[Path]:
     # (the folders of the game's sources, so that adding or removing one
     # re-runs it)
     game_folders = sorted({source.parent for source in game_sources(_load_port_config())})
-    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE, *game_folders]
+    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE, *game_folders,
+            *hud_asset_inputs()]
 
 
 def _quote(path: Any) -> str:
@@ -358,6 +360,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         pool="console",
     )
 
+    # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
+    embedded_assets = hud_assets_build(n, "linux", build_dir / "generated" / "hud_hires_assets.c")
+
     abi = " ".join(LINUX_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
@@ -429,6 +434,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
+        for source in embedded_assets:
+            add_object(source, platform_cflags)
         # the self-updater's TLS (port/third_party/mbedtls), with the host's
         # ABI as the posix_*.c that use it (and no loop turned into glibc's
         # wcslen, which linux_link_check.py rejects: the game's wchar_t is

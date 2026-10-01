@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <!-- 12 two-part slanted ammo ticks (alpha mask); lower part has a flared foot -->
+  <defs>
+    <path id="t" fill="#fff" d="M33.4,0 h19 L33.76,40 h-19 Z
+      M12.89,44 h19 L24.43,60 h2.7 L25.03,64.5 H0.66 L2.75,60 h2.68 Z"/>
+  </defs>
+  <use href="#t" x="0.000"/>
+  <use href="#t" x="34.973"/>
+  <use href="#t" x="69.946"/>
+  <use href="#t" x="104.919"/>
+  <use href="#t" x="139.892"/>
+  <use href="#t" x="174.865"/>
+  <use href="#t" x="209.838"/>
+  <use href="#t" x="244.811"/>
+  <use href="#t" x="279.784"/>
+  <use href="#t" x="314.757"/>
+  <use href="#t" x="349.730"/>
+  <use href="#t" x="384.703"/>
+</svg>

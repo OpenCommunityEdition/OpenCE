@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="128" viewBox="0 0 512 128">
+  <!-- 2x2 rifle rounds (alpha mask): rimmed case with rounded shoulder + ogive bullet -->
+  <defs>
+    <path id="r" fill="#fff" d="M20,0 H28 V5.5 H101.8 V6.4 H108.5 A7.5,7.5 0 0 1 116,13.9 V22.1 A7.5,7.5 0 0 1 108.5,29.6 H101.8 V30.5 H28 V36 H20 Z
+      M120,8 H135 C163.6,9 194.5,13.65 212.3,18 C194.5,22.35 163.6,27 135,28 H120 Z"/>
+  </defs>
+  <use href="#r"/>
+  <use href="#r" x="208"/>
+  <use href="#r" x="-20" y="44"/>
+  <use href="#r" x="188" y="44"/>
+</svg>
