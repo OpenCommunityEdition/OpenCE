@@ -411,6 +411,8 @@ struct message_client_join_game_request
 {
 	wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
 	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
+	/* port: the machine's hardware id, as hex, as it tells it (p2p.c) */
+	char hardware_id[0x20];
 };
 
 struct message_client_settings_request
@@ -1699,6 +1701,16 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server));
 
+			/* port: its hardware id, as it tells it: hex only (anything else
+			left out), no more than its field; the host logs it, and refuses
+			one it banned (network_game_server_accept_client_machine_into_game) */
+			{
+				char hardware_id[sizeof(join_game_request.hardware_id) + 1];
+
+				csmemcpy(hardware_id, join_game_request.hardware_id, sizeof(join_game_request.hardware_id));
+				hardware_id[sizeof(join_game_request.hardware_id)] = 0;
+				network_game_server_set_machine_hardware_id(server_client_machine, hardware_id);
+			}
 			/* (the name comes from the wire, and need not end: in ASCII,
 			for the log) */
 			join_game_request.machine_name[MAXIMUM_MACHINE_NAME_LENGTH - 1] = 0;

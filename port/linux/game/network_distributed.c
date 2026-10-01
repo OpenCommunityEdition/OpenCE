@@ -68,6 +68,8 @@ machine (their datum identifiers need not be).
 #include "network_distributed.h"
 
 #include <limits.h>
+#include <stdio.h>
+#include <time.h>
 #include <math.h>
 
 /* network_game_globals.c's and network_server_message_handler.c's */
@@ -86,6 +88,49 @@ long game_engine_write_network_state(byte *buffer, long size);
 void game_engine_read_network_state(byte const *buffer, long size);
 /* physics.c's (world units a tick, each tick) */
 extern real global_gravity;
+/* network_server_manager.c's, cseries_windows.c's, console.c's, p2p.c's */
+void network_game_server_kick_machine(long machine_index);
+unsigned long network_game_server_machine_address(long machine_index);
+char const *network_game_server_machine_hardware_id(long machine_index);
+void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
+void p2p_discord_sanitize(char *destination, int size, const char *source, int name);
+void p2p_discord_identity(char *id, int id_size, char *name, int name_size);
+unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
+unsigned long system_milliseconds(void);
+void console_warning(const char *format, ...);
+
+/* the host: a client's game run faster than its clock (a speed hack, which
+speeds up the machine's own clock: nothing on it can tell), found by its
+ticks, which its messages are stamped with, going by faster than the
+host's own clock's time, and ahead of the host's (a client's clock never
+is: it starts at the host's, and only ever jumps forward to it, when it is
+behind; a host that stalled has every client ahead, their ticks going by as
+fast as time). Measured over each window this long (milliseconds)... */
+#define CLIENT_CLOCK_WINDOW_MILLISECONDS 2000
+/* ... faster than this many times as fast as time, and this many ticks
+ahead of the host at its end: its players' predictions not taken (the
+host's copies go as its own ticks have them) ... */
+#define CLIENT_CLOCK_FAST_RATE 1.1f
+#define CLIENT_CLOCK_AHEAD_TICKS 15
+/* ... and so many windows in a row, dropped */
+#define CLIENT_CLOCK_FAST_WINDOWS 5
+/* the longest notice's text (_distributed_message_notice) */
+#define MAXIMUM_NOTICE_LENGTH 160
+/* a Discord user's id and name as kept, with their ends (p2p.h's
+P2P_DISCORD_ID_SIZE and P2P_DISCORD_NAME_SIZE) */
+#define DISCORD_ID_SIZE 24
+#define DISCORD_NAME_SIZE 40
+/* where the host logs the players it dropped for cheating, a line each */
+#define CHEATERS_FILE "d:\\cheaters.txt"
+/* ... and those it bans (by hand, and cheaters): their addresses refused */
+#define BANS_FILE "d:\\bans.txt"
+
+/* a client's Discord user, as told (_distributed_message_client_identity) */
+struct distributed_client_identity
+{
+	char discord_id[DISCORD_ID_SIZE];
+	char discord_name[DISCORD_NAME_SIZE];
+};
 
 enum
 {
@@ -514,6 +559,24 @@ static long distributed_game_state_time;
 /* the latest tick of each kind of unreliable message had from each sender
 (a machine, or the host), NONE for none */
 static long distributed_received_times[MAXIMUM_SENDERS][NUMBER_OF_DISTRIBUTED_MESSAGES];
+/* the host: each client machine's clock, measured (CLIENT_CLOCK_WINDOW_MILLISECONDS):
+its latest tick, and its tick and the host's time as the window began
+(NONE: none begun); how many windows in a row it went fast, and whether
+the last did */
+/* the host: each client machine's Discord user, as it told it, the text
+kept only of what is allowed (p2p_discord_sanitize) */
+static struct distributed_client_identity distributed_client_identities[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+/* a client: its Discord user as last sent this game, and whether it was */
+static struct distributed_client_identity distributed_sent_identity;
+static boolean distributed_identity_sent;
+static struct distributed_client_clock
+{
+	long latest_tick;
+	long window_tick;
+	unsigned long window_time;
+	short fast_windows;
+	boolean fast;
+} distributed_client_clocks[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 /* a client: the host's latest tick it has had a message of */
 static long distributed_host_time = NONE;
 /* the host: each client's round trip, in ticks, and its jitter */
@@ -1108,6 +1171,9 @@ static boolean distributed_machine_loaded(
 		distributed_received_times[machine_index][type] = NONE;
 	csmemset(&distributed_round_trips[machine_index], 0, sizeof(distributed_round_trips[machine_index]));
 	csmemset(distributed_viewers[machine_index], 0, sizeof(distributed_viewers[machine_index]));
+	csmemset(&distributed_client_clocks[machine_index], 0, sizeof(distributed_client_clocks[machine_index]));
+	distributed_client_clocks[machine_index].window_tick = NONE;
+	csmemset(&distributed_client_identities[machine_index], 0, sizeof(distributed_client_identities[machine_index]));
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		distributed_seen[machine_index][player_index] = FALSE;
 	return TRUE;
@@ -2927,6 +2993,15 @@ void network_distributed_new_game(
 	csmemset(distributed_accepted, 0, sizeof(distributed_accepted));
 	csmemset(distributed_host_speeds, 0, sizeof(distributed_host_speeds));
 	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
+	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
+	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
+	distributed_identity_sent = FALSE;
+	{
+		short machine_index;
+
+		for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
+			distributed_client_clocks[machine_index].window_tick = NONE;
+	}
 	csmemset(distributed_seen, 0, sizeof(distributed_seen));
 	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
 	csmemset(distributed_sends, 0, sizeof(distributed_sends));
@@ -3067,6 +3142,379 @@ static boolean distributed_message_stale(
 	return FALSE;
 }
 
+/* (the host) a text shown in red on every machine's console: its own, and
+every client's (_distributed_message_notice) */
+static void distributed_send_notice(
+	char const *text)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		char text[MAXIMUM_NOTICE_LENGTH];
+	} message;
+	long length = csstrlen(text);
+
+	if (length > MAXIMUM_NOTICE_LENGTH - 1)
+		length = MAXIMUM_NOTICE_LENGTH - 1;
+	csmemset(&message, 0, sizeof(message));
+	csmemcpy(message.text, text, length);
+	console_warning("%s", message.text);
+	error(_error_log, "%s", message.text);
+	distributed_send(&message, _distributed_message_notice, 0, (word)(sizeof(message.header) + length + 1),
+		_distributed_to_clients_reliably);
+}
+
+/* (the host) the names of a client machine's players, in ASCII, for a
+notice ("?" for what is not ASCII) */
+static void distributed_machine_player_names(
+	long machine_index,
+	char *names,
+	long size)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long length = 0;
+
+	names[0] = 0;
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		short index;
+
+		if (distributed_player_machine((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)) != machine_index)
+			continue;
+		if (length && length + 2 < size)
+		{
+			names[length++] = ',';
+			names[length++] = ' ';
+		}
+		for (index = 0; index < (short)NUMBEROF(player->name) && player->name[index] && length + 1 < size; index++)
+			names[length++] = player->name[index] >= 32 && player->name[index] < 127 ? (char)player->name[index] : '?';
+		names[length] = 0;
+	}
+	if (!length)
+		snprintf(names, size, "machine #%ld", machine_index);
+}
+
+/* (a client) its Discord user, as its Discord told it (none without one:
+not running, or internet play off), to the host: once it is a machine the
+host takes messages of (its ready sent: network_objects_client_tick), and
+again when it changes (Discord connecting later), looked at once a second */
+void distributed_client_send_identity(
+	void)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_client_identity identity;
+	} message;
+
+	if (distributed_identity_sent && game_time_get() % TICKS_PER_SECOND != 0)
+		return;
+	csmemset(&message, 0, sizeof(message));
+	p2p_discord_identity(message.identity.discord_id, sizeof(message.identity.discord_id),
+		message.identity.discord_name, sizeof(message.identity.discord_name));
+	if (distributed_identity_sent &&
+		!csmemcmp(&message.identity, &distributed_sent_identity, sizeof(distributed_sent_identity)))
+	{
+		return;
+	}
+	distributed_sent_identity = message.identity;
+	distributed_identity_sent = TRUE;
+	distributed_send(&message, _distributed_message_client_identity, 1, (word)sizeof(message),
+		_distributed_to_host_reliably);
+}
+
+/* (the host) a client machine's address as text: its real one, for an
+internet play peer's stand-in (p2p.c) */
+static void distributed_address_text(
+	unsigned long address,
+	char *text,
+	long size)
+{
+	/* 100.64.0.0/10: an internet play peer's, by its real address (network
+	byte order: its first number the lowest byte) */
+	if ((address & 0xFFC00000) == 0x64400000)
+	{
+		unsigned long network = (address >> 24) | ((address >> 8) & 0xFF00) | ((address << 8) & 0xFF0000) |
+			(address << 24);
+		unsigned long real = p2p_peer_endpoint_address(network);
+
+		if (real)
+		{
+			snprintf(text, size, "%lu.%lu.%lu.%lu", real & 255, (real >> 8) & 255, (real >> 16) & 255,
+				(real >> 24) & 255);
+			return;
+		}
+	}
+	if (address)
+	{
+		snprintf(text, size, "%lu.%lu.%lu.%lu", (address >> 24) & 255, (address >> 16) & 255, (address >> 8) & 255,
+			address & 255);
+	}
+	else
+	{
+		snprintf(text, size, "unknown");
+	}
+}
+
+/* (the host) a client machine's address as text (distributed_address_text) */
+static void distributed_machine_address_text(
+	long machine_index,
+	char *text,
+	long size)
+{
+	distributed_address_text(network_game_server_machine_address(machine_index), text, size);
+}
+
+/* text of a player's (their names) kept to printable ASCII, no longer
+than the size: no line of theirs breaks or runs on */
+static void distributed_printable(
+	char *destination,
+	long size,
+	char const *source)
+{
+	long length = 0;
+
+	for (; source && *source && length < size - 1; source++)
+		destination[length++] = *source >= 32 && *source < 127 ? *source : '?';
+	destination[length] = 0;
+}
+
+/* (the host) a line in a list of players (CHEATERS_FILE, BANS_FILE): when,
+their address, Discord user and names, and why; separated by tabs, each
+part kept to the characters allowed and their lengths (what a player could
+tell: their Discord user and names). The Discord user of the machine at
+the index, if it is one in the game (NONE: none) */
+static void distributed_write_player_record(
+	char const *file_name,
+	char const *address,
+	long machine_index,
+	char const *names,
+	char const *reason)
+{
+	char discord_id[DISCORD_ID_SIZE] = "";
+	char discord_name[DISCORD_NAME_SIZE] = "";
+	char hardware_id[40] = "";
+	char kept_names[96];
+	char kept_reason[96];
+	char kept_address[32];
+	char when[32] = "";
+	time_t now = time(NULL);
+	struct tm *local = localtime(&now);
+	FILE *file;
+
+	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES && game_in_progress())
+	{
+		p2p_discord_sanitize(discord_id, sizeof(discord_id), distributed_client_identities[machine_index].discord_id, 0);
+		p2p_discord_sanitize(discord_name, sizeof(discord_name),
+			distributed_client_identities[machine_index].discord_name, 1);
+	}
+	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		p2p_hardware_id_sanitize(hardware_id, 33, network_game_server_machine_hardware_id(machine_index));
+	distributed_printable(kept_names, sizeof(kept_names), names);
+	distributed_printable(kept_reason, sizeof(kept_reason), reason);
+	distributed_printable(kept_address, sizeof(kept_address), address);
+	if (local)
+		strftime(when, sizeof(when), "%Y-%m-%d %H:%M:%S", local);
+	file = fopen(file_name, "a");
+	if (!file)
+	{
+		error(_error_log, "could not open %s to add a player to it", file_name);
+		return;
+	}
+	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s\tdiscord_id=%s\tplayers=%s\treason=%s\n", when,
+		kept_address, hardware_id[0] ? hardware_id : "none", discord_name[0] ? discord_name : "none",
+		discord_id[0] ? discord_id : "none", kept_names, kept_reason);
+	fclose(file);
+}
+
+/* (the host) a player dropped for cheating: in CHEATERS_FILE, and banned
+(BANS_FILE) */
+static void distributed_log_cheater(
+	long machine_index,
+	char const *names,
+	char const *reason)
+{
+	char address[32];
+
+	distributed_machine_address_text(machine_index, address, sizeof(address));
+	distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
+	distributed_write_player_record(BANS_FILE, address, machine_index, names, reason);
+}
+
+/* (the host: network_server_manager.c) whether a machine of this address
+(host byte order; an internet play peer's by its real one) is banned: its
+address one of BANS_FILE's (each line's "ip=", which a host may add or
+take out by hand) */
+boolean network_distributed_banned(
+	unsigned long address,
+	char const *hardware_id)
+{
+	char text[32];
+	char line[512];
+	char kept_hardware_id[40];
+	FILE *file;
+	boolean banned = FALSE;
+
+	p2p_hardware_id_sanitize(kept_hardware_id, 33, hardware_id);
+	if (address)
+		distributed_address_text(address, text, sizeof(text));
+	else
+		text[0] = 0;
+	file = fopen(BANS_FILE, "r");
+	if (!file)
+		return FALSE;
+	while (!banned && fgets(line, sizeof(line), file))
+	{
+		char const *ip = strstr(line, "ip=");
+		char const *hwid = strstr(line, "hwid=");
+		size_t length = csstrlen(text);
+		size_t hardware_id_length = csstrlen(kept_hardware_id);
+
+		/* (the whole address: 1.2.3.4 is not 1.2.3.45) */
+		if (length && ip && !strncmp(ip + 3, text, length) &&
+			(ip[3 + length] == '\t' || ip[3 + length] == '\n' || ip[3 + length] == '\r' ||
+				ip[3 + length] == ' ' || ip[3 + length] == 0))
+		{
+			banned = TRUE;
+		}
+		/* (or the whole hardware id) */
+		if (hardware_id_length && hwid && !strncmp(hwid + 5, kept_hardware_id, hardware_id_length) &&
+			(hwid[5 + hardware_id_length] == '\t' || hwid[5 + hardware_id_length] == '\n' ||
+				hwid[5 + hardware_id_length] == '\r' || hwid[5 + hardware_id_length] == ' ' ||
+				hwid[5 + hardware_id_length] == 0))
+		{
+			banned = TRUE;
+		}
+	}
+	fclose(file);
+	return banned;
+}
+
+/* (the host: network_server_manager.c, its ban command) a machine banned
+by the host: its line in BANS_FILE, and every machine told (the Discord
+user of the machine at the index, if it is one in the game; its address,
+host byte order) */
+void network_distributed_ban(
+	long machine_index,
+	unsigned long address,
+	char const *names)
+{
+	char text[32];
+	char kept_names[64];
+	char discord_id[DISCORD_ID_SIZE] = "";
+	char discord_name[DISCORD_NAME_SIZE] = "";
+	char discord[DISCORD_ID_SIZE + DISCORD_NAME_SIZE + 16] = "";
+	char notice[MAXIMUM_NOTICE_LENGTH];
+
+	distributed_address_text(address, text, sizeof(text));
+	distributed_write_player_record(BANS_FILE, text, machine_index, names, "banned by the host");
+	distributed_printable(kept_names, sizeof(kept_names), names);
+	if (game_in_progress() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+	{
+		p2p_discord_sanitize(discord_id, sizeof(discord_id), distributed_client_identities[machine_index].discord_id, 0);
+		p2p_discord_sanitize(discord_name, sizeof(discord_name),
+			distributed_client_identities[machine_index].discord_name, 1);
+	}
+	if (discord_id[0] || discord_name[0])
+		snprintf(discord, sizeof(discord), " (Discord: %s, %s)", discord_name, discord_id);
+	snprintf(notice, sizeof(notice), "%s%s banned by the host", kept_names, discord);
+	/* (to every client in the game: in the lobby, the host's own) */
+	if (game_in_progress())
+		distributed_send_notice(notice);
+	else
+	{
+		console_warning("%s", notice);
+		error(_error_log, "%s", notice);
+	}
+}
+
+/* (the host) a client machine's tick, which one of its messages is
+stamped with: its clock measured, each window, against the host's; one
+whose game runs fast (distributed_client_clock) has its players'
+predictions refused, and if it goes on, is dropped */
+static void distributed_note_client_clock(
+	long machine_index,
+	long tick)
+{
+	struct distributed_client_clock *clock;
+	unsigned long now = system_milliseconds();
+	unsigned long elapsed;
+
+	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return;
+	clock = &distributed_client_clocks[machine_index];
+	if (clock->window_tick == NONE)
+	{
+		clock->latest_tick = tick;
+		clock->window_tick = tick;
+		clock->window_time = now;
+		return;
+	}
+	if (tick > clock->latest_tick)
+		clock->latest_tick = tick;
+	elapsed = now - clock->window_time;
+	if (elapsed < CLIENT_CLOCK_WINDOW_MILLISECONDS)
+		return;
+	{
+		real rate = (real)(clock->latest_tick - clock->window_tick) /
+			((real)elapsed * (real)TICKS_PER_SECOND / 1000.0f);
+		long ahead = clock->latest_tick - game_time_get();
+
+		clock->fast = rate > CLIENT_CLOCK_FAST_RATE && ahead > CLIENT_CLOCK_AHEAD_TICKS;
+		if (!clock->fast)
+		{
+			clock->fast_windows = 0;
+		}
+		else if (++clock->fast_windows == 1)
+		{
+			error(_error_log, "machine #%ld's game runs %.2f times as fast as this host's (%ld ticks ahead): "
+				"its players' predictions refused", machine_index, rate, ahead);
+		}
+		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS)
+		{
+			error(_error_log, "machine #%ld's game ran %.2f times as fast as this host's for %d seconds "
+				"(%ld ticks ahead): dropped", machine_index, rate,
+				CLIENT_CLOCK_FAST_WINDOWS * CLIENT_CLOCK_WINDOW_MILLISECONDS / 1000, ahead);
+			{
+				char names[64];
+				char discord_id[DISCORD_ID_SIZE];
+				char discord_name[DISCORD_NAME_SIZE];
+				char discord[DISCORD_ID_SIZE + DISCORD_NAME_SIZE + 16] = "";
+				char reason[64];
+				char text[MAXIMUM_NOTICE_LENGTH];
+
+				distributed_machine_player_names(machine_index, names, sizeof(names));
+				p2p_discord_sanitize(discord_id, sizeof(discord_id),
+					distributed_client_identities[machine_index].discord_id, 0);
+				p2p_discord_sanitize(discord_name, sizeof(discord_name),
+					distributed_client_identities[machine_index].discord_name, 1);
+				if (discord_id[0] || discord_name[0])
+					snprintf(discord, sizeof(discord), " (Discord: %s, %s)", discord_name, discord_id);
+				snprintf(reason, sizeof(reason), "speed hack (game ran %.2f times as fast)", rate);
+				snprintf(text, sizeof(text), "%s%s kicked by the host: their game ran %.2f times as fast (a speed hack)",
+					names, discord, rate);
+				distributed_send_notice(text);
+				distributed_log_cheater(machine_index, names, reason);
+			}
+			network_game_server_kick_machine(machine_index);
+			clock->fast_windows = 0;
+		}
+	}
+	clock->window_tick = clock->latest_tick;
+	clock->window_time = now;
+}
+
+/* whether a client machine's game runs fast (distributed_note_client_clock):
+its players' predictions not taken */
+boolean distributed_machine_clock_fast(
+	long machine_index)
+{
+	return machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+		distributed_client_clocks[machine_index].fast;
+}
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
 void network_distributed_handle_message(
@@ -3121,7 +3569,9 @@ void network_distributed_handle_message(
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
 	case _distributed_message_objects_synchronized:
+	case _distributed_message_notice:
 	case _distributed_message_client_ready: entry_size = 0; break;
+	case _distributed_message_client_identity: entry_size = sizeof(struct distributed_client_identity); break;
 	case _distributed_message_damage_events:
 	case _distributed_message_hit_reports: entry_size = network_damage_entry_size(header.type); break;
 	default: entry_size = network_objects_entry_size(header.type); break;
@@ -3138,6 +3588,7 @@ void network_distributed_handle_message(
 	{
 	case _distributed_message_player_prediction:
 	case _distributed_message_client_ready:
+	case _distributed_message_client_identity:
 	case _distributed_message_hit_reports:
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
@@ -3155,6 +3606,18 @@ void network_distributed_handle_message(
 	}
 	if (distributed_message_stale(machine_index, &header))
 		return;
+	/* (the host: a client's clock, by its messages' ticks; and its players'
+	predictions not taken while its game runs fast) */
+	if (machine_index != NONE)
+	{
+		distributed_note_client_clock(machine_index, header.game_time);
+		if ((header.type == _distributed_message_player_prediction ||
+				header.type == _distributed_message_vehicle_prediction) &&
+			distributed_machine_clock_fast(machine_index))
+		{
+			return;
+		}
+	}
 
 	switch (header.type)
 	{
@@ -3194,6 +3657,42 @@ void network_distributed_handle_message(
 	case _distributed_message_objects_synchronized:
 		network_objects_handle_synchronized();
 		break;
+	case _distributed_message_client_identity:
+		/* (a client's Discord user, as it tells it: kept only of what is
+		allowed, whatever it sent) */
+		if (header.count >= 1 && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		{
+			struct distributed_client_identity identity;
+
+			csmemcpy(&identity, entries, sizeof(identity));
+			identity.discord_id[sizeof(identity.discord_id) - 1] = 0;
+			identity.discord_name[sizeof(identity.discord_name) - 1] = 0;
+			p2p_discord_sanitize(distributed_client_identities[machine_index].discord_id,
+				sizeof(distributed_client_identities[machine_index].discord_id), identity.discord_id, 0);
+			p2p_discord_sanitize(distributed_client_identities[machine_index].discord_name,
+				sizeof(distributed_client_identities[machine_index].discord_name), identity.discord_name, 1);
+		}
+		break;
+	case _distributed_message_notice:
+	{
+		/* the host's text, in red on the console: printable, and ended */
+		char text[MAXIMUM_NOTICE_LENGTH];
+		long length = size - sizeof(header);
+		long index;
+
+		if (length > MAXIMUM_NOTICE_LENGTH - 1)
+			length = MAXIMUM_NOTICE_LENGTH - 1;
+		csmemcpy(text, entries, length);
+		text[length] = 0;
+		for (index = 0; index < length && text[index]; index++)
+		{
+			if (text[index] < 32 || text[index] > 126)
+				text[index] = '?';
+		}
+		console_warning("%s", text);
+		error(_error_log, "the host: %s", text);
+		break;
+	}
 	case _distributed_message_client_ready:
 	{
 		boolean loaded = distributed_machine_loaded(machine_index);

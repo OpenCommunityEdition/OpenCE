@@ -148,6 +148,8 @@ desktop client */
 
 /* called from the p2p thread each pass */
 void p2p_discord_update(void);
+/* the Discord user signed in, as told (empty if none): under p2p_lock */
+void p2p_discord_user(char *id, int id_size, char *name, int name_size);
 /* what to show: hosting with an invite link's secret and player counts, or
 not (secret NULL) */
 void p2p_discord_set_hosting(const char *secret, int player_count, int maximum_player_count);

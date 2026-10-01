@@ -390,6 +390,16 @@ Only machines with the invite can find the game:
   last 256 keys. Thus the proof of a player does not need more key work. A
   flood of requests can make players join more slowly. A player asks again
   for 90 seconds.
+- The host drops a player whose game runs faster than time (a speed hack)
+  for ten seconds, and keeps that address out of its games. Each player
+  sees who in red on the console. The host adds a line to `cheaters.txt`
+  (beside `debug.txt`) with the address and hardware id of the player, and
+  the Discord name and id that the game of the player told it (a player can
+  change these). The host also bans the player: it adds the line to
+  `bans.txt`, and refuses a machine whose address or hardware id is in it.
+- The host can ban a player with `ban <player name>` in the developer
+  console (Tab completes the name). Remove a line from `bans.txt` to unban.
+  Refer to `NETCODE.md`.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection

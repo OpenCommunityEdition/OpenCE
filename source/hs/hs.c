@@ -2802,6 +2802,7 @@ symbols in this file:
 #include "memory/data.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h"
 #include "objects/damage.h"
 #include "objects/object_lights.h"
 #include "objects/scenery.h"
@@ -14102,6 +14103,30 @@ boolean hs_compile_and_evaluate(
 	{
 		console_warning("not while playing in another's game: the host decides the game");
 		return FALSE;
+	}
+	/* port: the host's ban command ("ban <player name>", or its start: Tab
+	completes it), which is no script's */
+	{
+		char const *text = expression;
+
+		while (*text == ' ' || *text == '\t' || *text == '(')
+			text++;
+		if ((text[0] == 'b' || text[0] == 'B') && (text[1] == 'a' || text[1] == 'A') &&
+			(text[2] == 'n' || text[2] == 'N') && (text[3] == ' ' || text[3] == '\t' || text[3] == 0))
+		{
+			char name[64];
+			long length = 0;
+
+			text += 3;
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
+				name[length++] = *text++;
+			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
+				length--;
+			name[length] = 0;
+			return network_game_server_ban_player(name);
+		}
 	}
 	csstrncpy(buffer, expression, sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
