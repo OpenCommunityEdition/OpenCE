@@ -776,7 +776,16 @@ static boolean network_game_client_handle_message_server_game_advertise(
 	}
 	else
 	{
-		network_event("ignoring an advertised game because we are not looking for new games");
+		/* port: once a minute at most (every host on the network
+		advertises every few seconds, all game long) */
+		static unsigned long ignored_time = 0;
+		unsigned long now = system_milliseconds();
+
+		if (!ignored_time || now - ignored_time >= 60000)
+		{
+			ignored_time = now ? now : 1;
+			network_event("ignoring an advertised game because we are not looking for new games");
+		}
 	}
 
 	return TRUE;

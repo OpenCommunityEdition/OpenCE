@@ -450,7 +450,8 @@ made and removed and the hits reported, dealt, rejected and replayed, so
 two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
-swap the bots' wandering does not reach, and `debug.network_test_score`
+swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
+picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_latency` and

@@ -48,6 +48,24 @@ static void mark_written(unsigned long page)
 	mprotect((void *)(PLATFORM_CONTIGUOUS_BASE + page * WATCH_PAGE_SIZE), WATCH_PAGE_SIZE, PROT_READ | PROT_WRITE);
 }
 
+/* errors.c's: debug.txt (a player sends it; the terminal's lines may be
+gone) */
+void write_to_error_file(char *string, unsigned char date);
+
+/* a line of a crash report (ending in a newline) to debug.txt too, best
+effort: the crash may be in the middle of writing it */
+static void crash_debug_line(const char *line)
+{
+	char text[200];
+	size_t length = strcspn(line, "\n");
+
+	if (length > sizeof(text) - 3)
+		length = sizeof(text) - 3;
+	memcpy(text, line, length);
+	memcpy(text + length, "\r\n", 3);
+	write_to_error_file(text, 1);
+}
+
 static void segv_handler(int signal_number, siginfo_t *information, void *context)
 {
 	unsigned long address = (unsigned long)information->si_addr;
@@ -74,6 +92,7 @@ static void segv_handler(int signal_number, siginfo_t *information, void *contex
 			information->si_addr, (unsigned)ucontext->uc_mcontext.gregs[REG_EIP],
 			(unsigned)ucontext->uc_mcontext.gregs[REG_EBP], (unsigned)ucontext->uc_mcontext.gregs[REG_ESP]);
 		write(STDERR_FILENO, line, (size_t)length);
+		crash_debug_line(line);
 		{
 			/* the return address a call through a bad pointer left behind */
 			const unsigned *stack = (const unsigned *)ucontext->uc_mcontext.gregs[REG_ESP];
@@ -81,9 +100,19 @@ static void segv_handler(int signal_number, siginfo_t *information, void *contex
 			length = snprintf(line, sizeof(line), "halo-linux: stack %08x %08x %08x %08x %08x %08x\n",
 				stack[0], stack[1], stack[2], stack[3], stack[4], stack[5]);
 			write(STDERR_FILENO, line, (size_t)length);
+			crash_debug_line(line);
 		}
 		count = backtrace(frames, 48);
 		backtrace_symbols_fd(frames, count, STDERR_FILENO);
+		{
+			int frame;
+
+			for (frame = 0; frame < count; frame++)
+			{
+				snprintf(line, sizeof(line), "halo-linux: called from %p\n", frames[frame]);
+				crash_debug_line(line);
+			}
+		}
 	}
 	sigaction(SIGSEGV, &previous_segv_action, NULL);
 	if (previous_segv_action.sa_flags & SA_SIGINFO)

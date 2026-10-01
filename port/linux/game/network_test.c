@@ -50,6 +50,7 @@ Called from the main loop every frame (main.c).
 #include "items/items.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
+#include "tag_files/tag_files.h"
 #include "camera/observer.h"
 
 #include <math.h>
@@ -103,6 +104,7 @@ static struct
 	real shoot_interval;
 	real vehicle_time;
 	real pickup_time;
+	char pickup_weapon[64];
 	long score_to_win;
 	long logged_time;
 } network_test;
@@ -161,6 +163,8 @@ static void network_test_read_settings(
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
+	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
+		config_string("debug.network_test_pickup_weapon"));
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
@@ -696,6 +700,8 @@ static void network_test_pickup(
 
 			carried |= carried_index != NONE && object_get(carried_index)->definition_index == weapon->definition_index;
 		}
+		if (network_test.pickup_weapon[0] && !strstr(tag_get_name(weapon->definition_index), network_test.pickup_weapon))
+			continue;
 		distance = (real)DATUM_INDEX_TO_ABSOLUTE_INDEX(weapons.index);
 		if (!carried && (nearest_index == NONE || distance < nearest_distance))
 		{

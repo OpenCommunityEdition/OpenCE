@@ -339,6 +339,8 @@ static void first_person_weapon_set_state(
 	boolean reset_sounds);
 static void first_person_weapon_switch_weapons(
 	short local_player_index);
+static void first_person_weapon_forget_weapon(
+	short local_player_index);
 static void first_person_weapon_new_unit(
 	short local_player_index,
 	long unit_index);
@@ -728,10 +730,13 @@ void first_person_weapon_message_from_unit(
 	{
 		struct unit_datum *unit= unit_get(unit_index);
 
-		if (unit->unit.current_weapon_index!=NONE)
+		/* port: the weapon in hand's object (not its slot's number, which
+		played some other object's sound) */
+		if (unit->unit.current_weapon_index>=0 &&
+			unit->unit.current_weapon_index<MAXIMUM_WEAPONS_PER_UNIT)
 		{
 			weapon_play_first_person_weapon_sound(
-				unit->unit.current_weapon_index,
+				unit->unit.weapon_object_indices[unit->unit.current_weapon_index],
 				message_type);
 		}
 	}
@@ -768,7 +773,15 @@ struct real_matrix4x3 *first_person_weapon_get_node_matrix(
 		1433,
 		local_player_index>=0 && local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 	first_person_weapon = &first_person_weapons[local_player_index];
-	weapon = weapon_get(first_person_weapon->weapon_index);
+	/* port: the last matrices built when the weapon is gone (an effect or
+	particle on it asking before first_person_weapon_forget_weapon stopped
+	them was a NULL weapon, and a crash) */
+	weapon = first_person_weapon->weapon_index!=NONE ? weapon_try_and_get(first_person_weapon->weapon_index) : NULL;
+	if (!weapon)
+	{
+		return &first_person_weapon->node_matrices[
+			node_index>=0 && node_index<MAXIMUM_NODES_PER_ANIMATION ? node_index : 0];
+	}
 	weapon_definition = weapon_definition_get(weapon->definition_index);
 	animation_graph = animation_graph_definition_get(
 		weapon_definition->weapon.interface_definition.first_person_animations.index);
@@ -834,6 +847,19 @@ static void first_person_weapon_set_visibility(
 		}
 		first_person_weapon->visible= visible;
 	}
+
+	return;
+}
+
+/* port: the weapon dropped or deleted: hidden first, which stops the effects
+and particles that follow it in first person (they asked for the weapon's
+nodes, and found none, until the next update switched weapons; the
+renderer shows the next weapon again) */
+static void first_person_weapon_forget_weapon(
+	short local_player_index)
+{
+	first_person_weapon_set_visibility(local_player_index, FALSE);
+	first_person_weapon_get(local_player_index)->weapon_index= NONE;
 
 	return;
 }
@@ -1072,7 +1098,7 @@ static void first_person_weapon_build_node_matrices(
 			"local player %d, weapon (0x%x), deleted unexpectedly",
 			local_player_index,
 			first_person_weapon->weapon_index);
-		first_person_weapon->weapon_index= NONE;
+		first_person_weapon_forget_weapon(local_player_index);
 	}
 
 	if (first_person_weapon->weapon_index!=NONE)
@@ -1371,7 +1397,7 @@ static void first_person_weapon_message(
 		switch (message_type)
 		{
 			case _first_person_weapon_message_drop:
-				first_person_weapon->weapon_index= NONE;
+				first_person_weapon_forget_weapon(local_player_index);
 				break;
 
 			case _first_person_weapon_message_ready:
@@ -1705,7 +1731,7 @@ static void first_person_weapon_update(
 			"local player %d, weapon (0x%x), deleted unexpectedly",
 			local_player_index,
 			first_person_weapon->weapon_index);
-		first_person_weapon->weapon_index= NONE;
+		first_person_weapon_forget_weapon(local_player_index);
 	}
 
 	if (first_person_weapon->unit_index!=NONE && first_person_weapon->weapon_index!=NONE)
