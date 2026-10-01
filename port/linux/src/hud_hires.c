@@ -6,8 +6,8 @@ uploaded, and each one's GL texture.
 
 Which bitmap is at an address the game knows (from the loaded map's tags:
 port/linux/game/hud_hires_tags.c). Each texture is decoded from its PNG when
-first drawn and kept: up to 66 of them, about 220 MB with their mip levels,
-though a game draws only some (the scopes' masks only when zoomed).
+first drawn and kept: up to 69 of them, about 225 MB with their mip levels,
+though a game draws only some (the scopes' only when zoomed).
 They are drawn with linear filtering and their mip levels (d3d8_gl.c,
 configure_sampler), as they are larger than they appear.
 
@@ -88,6 +88,11 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 		return -1;
 	}
 	return asset;
+}
+
+int hud_hires_override_coverage(long asset)
+{
+	return asset >= 0 && asset < hud_hires_asset_count() && hud_hires_embedded[asset].coverage;
 }
 
 /* ---------- decoding */

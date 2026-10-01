@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="1024" viewBox="0 0 32 1024">
+  <!-- elevation ladder mask: white, fading in over the top 128 px and out over y 800-960 -->
+  <defs>
+    <linearGradient id="fade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1024">
+      <stop offset="0.000000" stop-color="#fff" stop-opacity="0.0000"/>
+      <stop offset="0.007812" stop-color="#fff" stop-opacity="0.0353"/>
+      <stop offset="0.015625" stop-color="#fff" stop-opacity="0.0784"/>
+      <stop offset="0.023438" stop-color="#fff" stop-opacity="0.1412"/>
+      <stop offset="0.031250" stop-color="#fff" stop-opacity="0.2078"/>
+      <stop offset="0.039062" stop-color="#fff" stop-opacity="0.2824"/>
+      <stop offset="0.046875" stop-color="#fff" stop-opacity="0.3608"/>
+      <stop offset="0.054688" stop-color="#fff" stop-opacity="0.4392"/>
+      <stop offset="0.062500" stop-color="#fff" stop-opacity="0.5255"/>
+      <stop offset="0.070312" stop-color="#fff" stop-opacity="0.6078"/>
+      <stop offset="0.078125" stop-color="#fff" stop-opacity="0.6902"/>
+      <stop offset="0.085938" stop-color="#fff" stop-opacity="0.7647"/>
+      <stop offset="0.093750" stop-color="#fff" stop-opacity="0.8353"/>
+      <stop offset="0.101562" stop-color="#fff" stop-opacity="0.8980"/>
+      <stop offset="0.109375" stop-color="#fff" stop-opacity="0.9490"/>
+      <stop offset="0.117188" stop-color="#fff" stop-opacity="0.9922"/>
+      <stop offset="0.125000" stop-color="#fff" stop-opacity="1.0000"/>
+      <stop offset="0.781250" stop-color="#fff" stop-opacity="1.0000"/>
+      <stop offset="0.789062" stop-color="#fff" stop-opacity="0.9922"/>
+      <stop offset="0.796875" stop-color="#fff" stop-opacity="0.9608"/>
+      <stop offset="0.804688" stop-color="#fff" stop-opacity="0.9176"/>
+      <stop offset="0.812500" stop-color="#fff" stop-opacity="0.8706"/>
+      <stop offset="0.820312" stop-color="#fff" stop-opacity="0.8235"/>
+      <stop offset="0.828125" stop-color="#fff" stop-opacity="0.7647"/>
+      <stop offset="0.835938" stop-color="#fff" stop-opacity="0.7059"/>
+      <stop offset="0.843750" stop-color="#fff" stop-opacity="0.6431"/>
+      <stop offset="0.851562" stop-color="#fff" stop-opacity="0.5804"/>
+      <stop offset="0.859375" stop-color="#fff" stop-opacity="0.5137"/>
+      <stop offset="0.867188" stop-color="#fff" stop-opacity="0.4471"/>
+      <stop offset="0.875000" stop-color="#fff" stop-opacity="0.3843"/>
+      <stop offset="0.882812" stop-color="#fff" stop-opacity="0.3176"/>
+      <stop offset="0.890625" stop-color="#fff" stop-opacity="0.2588"/>
+      <stop offset="0.898438" stop-color="#fff" stop-opacity="0.2000"/>
+      <stop offset="0.906250" stop-color="#fff" stop-opacity="0.1451"/>
+      <stop offset="0.914062" stop-color="#fff" stop-opacity="0.0980"/>
+      <stop offset="0.921875" stop-color="#fff" stop-opacity="0.0549"/>
+      <stop offset="0.929688" stop-color="#fff" stop-opacity="0.0235"/>
+      <stop offset="0.937500" stop-color="#fff" stop-opacity="0.0000"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="1024" fill="url(#fade)"/>
+</svg>

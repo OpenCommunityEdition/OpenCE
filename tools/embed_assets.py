@@ -95,7 +95,9 @@ def main() -> None:
         lines.append("};")
         lines.append("")
         tag = asset["tag"].replace("\\", "\\\\")
-        table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, asset{index}, {len(data)} }},')
+        coverage = int(any(cell["kind"] == "meter" for cell in asset["cells"]))
+        table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
+                     f'asset{index}, {len(data)} }},')
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)

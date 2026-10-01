@@ -3101,6 +3101,108 @@
      "score": 0.981
     }
    ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks",
+   "bitmap": 0,
+   "width": 8,
+   "height": 512,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 2469253610,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      512
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      2048
+     ],
+     "kind": "dxt",
+     "score": 0.601
+    }
+   ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks2__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks2",
+   "bitmap": 0,
+   "width": 8,
+   "height": 512,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 2521841759,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      512
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      2048
+     ],
+     "kind": "dxt",
+     "score": 0.601
+    }
+   ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks_mask__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks_mask",
+   "bitmap": 0,
+   "width": 8,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 2933960751,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      256
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks_mask.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      -1
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      1024
+     ],
+     "kind": "a8",
+     "score": 0.996
+    }
+   ]
   }
  ]
 }

@@ -16,13 +16,16 @@ and places the bitmap by its tag, so nothing else changes.
 
 /* an embedded texture: an 8-bit RGBA PNG, and the bitmap it stands for (its
 bitmap group tag's name, its index there, and the CRC-32 of its first mip
-level's pixels as the English maps have them) */
+level's pixels as the English maps have them); coverage: a meter's, whose
+green is how much of each texel its shapes cover (the meter shader reads
+only its blue and alpha) */
 struct hud_hires_embedded
 {
 	const char *tag;
 	int bitmap;
 	unsigned int width, height;
 	unsigned int crc;
+	int coverage;
 	const unsigned int *png;
 	unsigned int png_size;
 };
@@ -40,5 +43,7 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 /* its GL texture (decoded and uploaded, mipmapped, on first use; 0 if it
 could not be), and the number of its mip levels */
 unsigned int hud_hires_override_texture(long asset, unsigned long *levels);
+/* whether its green is its coverage (d3d8_gl.c, nv2a_psh.c: coverage_alpha) */
+int hud_hires_override_coverage(long asset);
 
 #endif

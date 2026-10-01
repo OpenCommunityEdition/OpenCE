@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Makes the high-res HUD textures (port/assets/hud/*.png) from the hand-drawn
-SVG redraws of the Halo PC HUD sheets, laid out as the Xbox maps' sheets:
+SVG redraws of the Halo PC HUD sheets (and of the sniper rifle's scope
+ladder, which its weapon's folder holds), laid out as the Xbox maps' sheets:
 
     python tools/hud_assets.py layout --map assets/maps/bloodgulch.map \\
         --hek ../halo-pc-restored/halopc-restored --svg ../halo-pc-restored/ui-svg-handmade
@@ -59,6 +60,9 @@ FORMATS = {0: "a8", 1: "y8", 2: "ay8", 3: "a8y8", 6: "r5g6b5", 8: "a1r5g5b5", 9:
            10: "x8r8g8b8", 11: "a8r8g8b8", 14: "dxt1", 15: "dxt3", 16: "dxt5"}
 
 HUD = "ui\\hud\\bitmaps\\"
+# the folders of the HUD's bitmaps: the HUD's own, and the sniper rifle's
+# (its scope's elevation ladder)
+FOLDERS = (HUD, "weapons\\sniper rifle\\bitmaps\\")
 # the meter sheets: their redraws in the Xbox channel order (the fill
 # threshold the meter shader reads in the grey, the art in the alpha)
 METERS = {
@@ -95,8 +99,10 @@ UNUSED = {
 # how each redraw's texels are written, by its PC bitmap's format (as the
 # Xbox decodes that format: xbox_textures.c, convert_texel): AY8 is its one
 # value in every channel (the HUD blends premultiplied), A8Y8 grey and alpha,
-# A8 white with alpha, Y8 grey and opaque, colour formats as drawn
-KINDS = {0: "a8", 1: "y8", 2: "alpha", 3: "grey", 6: "colour", 8: "colour", 9: "colour", 10: "colour", 11: "colour"}
+# A8 white with alpha, Y8 grey and opaque, colour formats as drawn; DXT ones
+# as drawn with the colour carried into the transparent texels, as theirs is
+KINDS = {0: "a8", 1: "y8", 2: "alpha", 3: "grey", 6: "colour", 8: "colour", 9: "colour", 10: "colour", 11: "colour",
+         14: "dxt", 15: "dxt", 16: "dxt"}
 
 # how far (in Xbox texels) a redrawn cell may sit from its Xbox one, and how
 # much it must overlap it (the overlap of their shapes over their union: thin
@@ -355,8 +361,10 @@ def redraws(svg_root: Path, hek_root: Path, tag: str) -> list:
     if tag in METERS:
         svg, hek = METERS[tag]
         return [(svg, 0, hek_bitmap_group(hek_root / hek))]
-    relative = Path("hud") / Path(*tag.split("\\")[2:])
-    hek = hek_root / "tags" / Path(*tag.split("\\")).with_suffix(".bitmap")
+    # (the redraws mirror the tags: those under ui from tags/ui, others from tags)
+    parts = tag.split("\\")
+    relative = Path(*parts[1:]) if parts[0] == "ui" else Path(*parts)
+    hek = hek_root / "tags" / Path(*parts).with_suffix(".bitmap")
     if not hek.exists():
         return []
     group = hek_bitmap_group(hek)
@@ -376,7 +384,7 @@ def layout(arguments) -> None:
     entries = []
     sources = {}
     for group_tag, tag in sorted(xbox_map.tags):
-        if group_tag != "bitm" or not tag.startswith(HUD):
+        if group_tag != "bitm" or not tag.startswith(FOLDERS):
             continue
         candidates = redraws(svg_root, hek_root, tag)
         if not candidates:
@@ -384,8 +392,11 @@ def layout(arguments) -> None:
         group = xbox_map.bitmap_group(tag)
         for index, bitmap in enumerate(group["bitmaps"]):
             width, height = bitmap["width"], bitmap["height"]
-            # (the combined sheets by their own names, as before the others)
-            name = tag[len(HUD):].replace("combined\\", "").replace("\\", "__").replace(" ", "_") + f"__{index}"
+            # (the combined sheets by their own names, as before the others;
+            # the weapon's by its name and theirs)
+            stem = tag[len(HUD):].replace("combined\\", "") if tag.startswith(HUD) else \
+                tag.split("\\", 1)[1].replace("\\bitmaps\\", "\\")
+            name = stem.replace("\\", "__").replace(" ", "_") + f"__{index}"
             xbox = decode_bitmap(bitmap)
             # (each cell with the sprites, as sequence and sprite numbers, it is)
             cells = {}
@@ -480,9 +491,9 @@ def layout(arguments) -> None:
 
 
 def bleed(image: np.ndarray) -> np.ndarray:
-    """Gives each transparent texel the grey of the nearest covered one, so
+    """Gives each transparent texel the colour of the nearest covered one: so
     that filtering and mip levels at a meter's edges read its own fill
-    thresholds."""
+    thresholds, and a DXT texture keeps its colour where it is transparent."""
     from scipy import ndimage
 
     covered = image[:, :, 3] > 0
@@ -494,6 +505,24 @@ def bleed(image: np.ndarray) -> np.ndarray:
         result[:, :, channel] = image[rows, columns, channel]
     result[:, :, 3] = image[:, :, 3]
     return result
+
+
+def coverage(alpha: np.ndarray) -> np.ndarray:
+    """How much of each texel a meter's shapes cover: all of it inside them
+    (their dim cells too: their alpha is faint by design), and on their
+    outline (covered texels next to uncovered ones) the share their alpha has
+    of their brightest neighbour's. The meter shader reads only blue and
+    alpha; the game eases the meter's darkening of what is behind it by this
+    (port/linux/src/nv2a_psh.c, coverage_alpha), which on the Xbox stopped at
+    its point-sampled texels' edges, and filtered would leave a dark fringe."""
+    from scipy import ndimage
+
+    covered = alpha > 0
+    outline = covered & ndimage.binary_dilation(~covered, structure=np.ones((3, 3), bool))
+    brightest = ndimage.maximum_filter(alpha, size=3).astype(float)
+    result = np.where(covered, 255.0, 0.0)
+    result[outline] = np.clip(alpha[outline] * 255.0 / np.maximum(brightest[outline], 1.0), 0, 255)
+    return np.round(result).astype(np.uint8)
 
 
 def recipe(texels: np.ndarray, kind: str) -> np.ndarray:
@@ -527,8 +556,10 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
         texels = window(clipped(renders[key], [value * zoom for value in cell["clip"]]),
                         cell["source"][0] * zoom, cell["source"][1] * zoom, width, height)
         image[top * scale:top * scale + height, left * scale:left * scale + width] = recipe(texels, cell["kind"])
-    if any(cell["kind"] == "meter" for cell in entry["cells"]):
+    if any(cell["kind"] in ("meter", "dxt") for cell in entry["cells"]):
         image = bleed(image)
+    if any(cell["kind"] == "meter" for cell in entry["cells"]):
+        image[..., 1] = coverage(image[..., 3])
     return image
 
 

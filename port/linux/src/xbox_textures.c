@@ -710,6 +710,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 		if (texture)
 		{
 			description->hires = TRUE;
+			description->hires_coverage = hud_hires_override_coverage(entry->override);
 			return texture;
 		}
 	}
