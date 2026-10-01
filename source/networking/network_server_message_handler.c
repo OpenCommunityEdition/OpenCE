@@ -556,6 +556,49 @@ static boolean network_game_server_handle_message_client_switch_to_pregame(
 
 /* ---------- private code */
 
+/* port: a name a machine sends (its machine's, or a player's: they come
+from the wire, from anyone joining by any link) kept to what draws as one
+line of text: ended within its field, without control characters (line
+breaks, tabs), Unicode's separators of lines and paragraphs, zero-width
+and right-to-left marks, lone surrogates and non-characters, nor "|" (the
+game's text's own marks), its spaces before and after left out; one with
+nothing left the default given */
+static void network_game_server_clean_name(
+	wchar_t *name,
+	long count,
+	wchar_t const *default_name)
+{
+	long read;
+	long written = 0;
+
+	name[count - 1] = 0;
+	for (read = 0; read < count && name[read]; read++)
+	{
+		unsigned short character = (unsigned short)name[read];
+
+		if (character < 0x20 || (character >= 0x7F && character <= 0x9F) ||
+			(character >= 0x200B && character <= 0x200F) || (character >= 0x2028 && character <= 0x202E) ||
+			(character >= 0x2060 && character <= 0x206F) || character == 0xFEFF ||
+			(character >= 0xD800 && character <= 0xDFFF) || character >= 0xFFF0 || character == '|' ||
+			(character == ' ' && written == 0))
+		{
+			continue;
+		}
+		name[written++] = name[read];
+	}
+	while (written > 0 && name[written - 1] == ' ')
+		written--;
+	name[written] = 0;
+	if (!written)
+	{
+		long index;
+
+		for (index = 0; index < count - 1 && default_name[index]; index++)
+			name[index] = default_name[index];
+		name[index] = 0;
+	}
+}
+
 static boolean network_game_server_write(
 	struct network_connection *connection,
 	void *message,
@@ -1496,7 +1539,7 @@ static void network_game_server_queue_client_player(
 		network_event("client machine #%ld tried to add a player of another machine", machine_index);
 		return;
 	}
-	player->name[NUMBEROF(player->name) - 1] = 0;
+	network_game_server_clean_name(player->name, NUMBEROF(player->name), L"Player");
 	network_game_server_queue_player_for_addition(server, player);
 }
 
@@ -1711,9 +1754,9 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				hardware_id[sizeof(join_game_request.hardware_id)] = 0;
 				network_game_server_set_machine_hardware_id(server_client_machine, hardware_id);
 			}
-			/* (the name comes from the wire, and need not end: in ASCII,
-			for the log) */
-			join_game_request.machine_name[MAXIMUM_MACHINE_NAME_LENGTH - 1] = 0;
+			/* (the name comes from the wire, and need not end, nor be text
+			that draws: kept to what does; then in ASCII, for the log) */
+			network_game_server_clean_name(join_game_request.machine_name, MAXIMUM_MACHINE_NAME_LENGTH, L"Machine");
 			csmemcpy(machine_name, join_game_request.machine_name, sizeof(machine_name));
 			wide_to_ascii(
 				join_game_request.machine_name,
@@ -1985,6 +2028,9 @@ static boolean network_game_server_handle_message_client_add_player_request_preg
 			&packet_version,
 			_network_game_packet_class_client_pregame))
 		{
+			/* (port: its name kept to text that draws, as every name from
+			the wire) */
+			network_game_server_clean_name(player.name, NUMBEROF(player.name), L"Player");
 			if (network_game_server_add_player_to_game(server, client_machine, &player))
 			{
 				if (!network_game_server_send_game_data_pregame(server))
@@ -2113,8 +2159,9 @@ static boolean network_game_server_handle_message_client_settings_request(
 			&packet_version,
 			_network_game_packet_class_client_pregame))
 		{
-			/* (the name comes from the wire, and need not end) */
-			machine_settings.name[NUMBEROF(machine_settings.name) - 1] = 0;
+			/* (the name comes from the wire, and need not end, nor be text
+			that draws: kept to what does) */
+			network_game_server_clean_name(machine_settings.name, NUMBEROF(machine_settings.name), L"Machine");
 			if (network_game_server_adjust_machine_settings(server, client_machine, &machine_settings))
 			{
 				network_event(
@@ -2181,7 +2228,7 @@ static boolean network_game_server_handle_message_client_player_settings_request
 			slot out of the list over the machines), with a name that ends,
 			and on a team of the game's: else the one the host has it on */
 			network_game_server_get_client_machine(server, client_machine, &machine_index);
-			player.name[NUMBEROF(player.name) - 1] = 0;
+			network_game_server_clean_name(player.name, NUMBEROF(player.name), L"Player");
 			if (VALID_INDEX(player.player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) &&
 				(!game->variant.universal_variant.teams ||
 					!VALID_INDEX(player.team_index, NUMBER_OF_MULTIPLAYER_TEAMS)))

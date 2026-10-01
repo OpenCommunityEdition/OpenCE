@@ -196,6 +196,32 @@ static void network_test_log_players(
 	int length = 0;
 
 	line[0] = 0;
+	/* (each player's name, once a game: for tests that name a player, such
+	as the host's ban command) */
+	{
+		static wchar_t named[HALO_PORT_MAXIMUM_NETWORK_PLAYERS][12];
+
+		if (game_time_get() < 2 * TICKS_PER_SECOND)
+			csmemset(named, 0, sizeof(named));
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+			char name[13];
+			short index;
+
+			if (absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
+				!csmemcmp(named[absolute_index], player->name, sizeof(named[absolute_index])))
+			{
+				continue;
+			}
+			csmemcpy(named[absolute_index], player->name, sizeof(named[absolute_index]));
+			for (index = 0; index < 12 && player->name[index]; index++)
+				name[index] = player->name[index] >= 32 && player->name[index] < 127 ? (char)player->name[index] : '?';
+			name[index] = 0;
+			platform_log("network test: player %ld is named %s", absolute_index, name);
+		}
+	}
 	data_iterator_new(&iterator, player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
