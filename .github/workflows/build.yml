@@ -242,7 +242,10 @@ jobs:
           mkdir release
           for build in artifacts/*/; do
             name="$(basename "$build")"
-            (cd "$build" && zip -qr "$GITHUB_WORKSPACE/release/$name.zip" .)
+            # stored, not deflated: the updater in builds up to 57 waits for
+            # an end of stream the game's zlib 1.1 does not always report,
+            # and fails on a deflated entry that unpacked correctly
+            (cd "$build" && zip -0 -qr "$GITHUB_WORKSPACE/release/$name.zip" .)
           done
           ls -l release
 
