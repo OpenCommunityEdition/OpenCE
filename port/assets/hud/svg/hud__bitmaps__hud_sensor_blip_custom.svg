@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <filter id="b" filterUnits="userSpaceOnUse" x="-8" y="-8" width="48" height="48"><feGaussianBlur stdDeviation="0.8"/></filter>
+  </defs>
+  <!-- soft-edged diamond with slightly rounded corners: a dark copy underneath gives the darker fringe -->
+  <polygon points="16.08,4.98 27.18,16.08 16.08,27.18 4.98,16.08" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round" filter="url(#b)"/>
+  <polygon points="16.08,4.98 27.18,16.08 16.08,27.18 4.98,16.08" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round" filter="url(#b)"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="32" viewBox="0 0 512 32">
+  <g transform="matrix(-1 0 0 1 512 0)">
+  <!-- thick bar tapering into a thin crosshair line -->
+  <polygon points="4.00,4.00 160.00,4.00 168.00,12.00 364.00,12.00 364.00,16.00 168.00,16.00 160.00,24.00 4.00,24.00" fill="#fff"/>
+  </g>
+</svg>

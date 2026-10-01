@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <defs>
+    <g id="art">
+      <path d="M7,4 L7.28,4.56 L9.59,9.5 L10.59,11.73 L3.78,11.76 L4.62,13.47 L5.48,15.46 L6.06,16.54 L7.41,19.59 L8.04,20.76 L14.83,20.73 L15.72,22.67 L16.51,24.38 L16.66,24.43 L17.5,26.58 L18.26,28 L28.65,27.99 L27.51,25.51 L27.1,24.62 L25.29,20.75 L33.04,20.73 L29.6,13.42 L28.84,11.74 L21.09,11.76 L17.5,4 Z" fill="#ffffff"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="64"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- solid plus -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="64" fill="none"/><use xlink:href="#art"/></g>
+</svg>

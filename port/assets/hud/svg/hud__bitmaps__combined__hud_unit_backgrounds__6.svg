@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="cone" gradientUnits="userSpaceOnUse" cx="167.994" cy="346.437" r="165.922"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><radialGradient id="coned" gradientUnits="userSpaceOnUse" cx="167.994" cy="346.437" r="165.922"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#878787"/></radialGradient>
+    <g id="art">
+      <path d="M167.994,346.437 L69.695,202.598 L266.292,202.598 Z" fill="url(#cone)"/>
+      <circle cx="167.994" cy="345.987" r="53.201" fill="#878787"/>
+      <path d="M167.994,346.437 L137.767,302.207 A53.201,53.201 0 0 1 198.220,302.207 Z" fill="url(#coned)"/>
+      <!-- "15m" pixel label -->
+      <rect x="4" y="480" width="8" height="4" fill="#fff"/><rect x="16" y="480" width="20" height="4" fill="#fff"/><rect x="0" y="484" width="12" height="4" fill="#fff"/><rect x="16" y="484" width="8" height="4" fill="#fff"/><rect x="4" y="488" width="8" height="4" fill="#fff"/><rect x="16" y="488" width="8" height="4" fill="#fff"/><rect x="40" y="488" width="16" height="4" fill="#fff"/><rect x="60" y="488" width="8" height="4" fill="#fff"/><rect x="4" y="492" width="8" height="4" fill="#fff"/><rect x="16" y="492" width="16" height="4" fill="#fff"/><rect x="40" y="492" width="8" height="4" fill="#fff"/><rect x="52" y="492" width="8" height="4" fill="#fff"/><rect x="64" y="492" width="8" height="4" fill="#fff"/><rect x="4" y="496" width="8" height="8" fill="#fff"/><rect x="28" y="496" width="8" height="8" fill="#fff"/><rect x="40" y="496" width="8" height="8" fill="#fff"/><rect x="52" y="496" width="8" height="8" fill="#fff"/><rect x="64" y="496" width="8" height="8" fill="#fff"/><rect x="4" y="504" width="8" height="4" fill="#fff"/><rect x="16" y="504" width="4" height="4" fill="#fff"/><rect x="28" y="504" width="8" height="4" fill="#fff"/><rect x="40" y="504" width="8" height="4" fill="#fff"/><rect x="52" y="504" width="8" height="4" fill="#fff"/><rect x="64" y="504" width="8" height="4" fill="#fff"/><rect x="4" y="508" width="8" height="4" fill="#fff"/><rect x="20" y="508" width="12" height="4" fill="#fff"/><rect x="40" y="508" width="8" height="4" fill="#fff"/><rect x="52" y="508" width="8" height="4" fill="#fff"/><rect x="64" y="508" width="8" height="4" fill="#fff"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- motion-tracker style disc with fading view cone -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="512" fill="none"/><use xlink:href="#art"/></g>
+</svg>

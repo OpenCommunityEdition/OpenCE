@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="128" viewBox="0 0 512 128">
+  <defs>
+    <g id="art">
+      <path d="M43.75,16.13 A11.55,11.55 0 0 1 54.36,-0.01 L389.09,-0.01 A28.96,28.96 0 0 1 415.15,16.32 L430.74,48.51 A10.79,10.79 0 0 1 421.04,64 L367.68,64 A1.05,1.05 0 0 1 366.73,63.38 L355.27,38.37 A4.07,4.07 0 0 0 351.57,36 L53.56,36 A1.84,1.84 0 0 1 51.87,34.88 Z" fill="#fff"/>
+      <path d="M47.84,14.8 A7.7,7.7 0 0 1 54.9,4.02 L387.98,4.02 A26.17,26.17 0 0 1 411.54,18.78 L426.69,50.06 A6.91,6.91 0 0 1 420.47,59.98 L370.28,59.98 A0.45,0.45 0 0 1 369.87,59.71 L358.8,35.8 A6.54,6.54 0 0 0 352.87,32 L56.33,32 A1.47,1.47 0 0 1 54.98,31.12 Z" fill="#2d2d2d"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="128"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- small shield panel outline -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="128" fill="none"/><use xlink:href="#art"/></g>
+</svg>

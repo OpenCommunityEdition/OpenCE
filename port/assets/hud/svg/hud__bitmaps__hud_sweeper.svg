@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <!-- interior: translucent black at the centre becoming opaque towards the rim -->
+    <radialGradient id="fill" gradientUnits="userSpaceOnUse" cx="31.503" cy="32.502" r="31.55">
+      <stop offset="0.0000" stop-opacity="0.2824"/>
+      <stop offset="0.1902" stop-opacity="0.2824"/>
+      <stop offset="0.2219" stop-opacity="0.2824"/>
+      <stop offset="0.2536" stop-opacity="0.2824"/>
+      <stop offset="0.2853" stop-opacity="0.2824"/>
+      <stop offset="0.3170" stop-opacity="0.2897"/>
+      <stop offset="0.3487" stop-opacity="0.3395"/>
+      <stop offset="0.3803" stop-opacity="0.4052"/>
+      <stop offset="0.4120" stop-opacity="0.4920"/>
+      <stop offset="0.4437" stop-opacity="0.5912"/>
+      <stop offset="0.4754" stop-opacity="0.6791"/>
+      <stop offset="0.5071" stop-opacity="0.7172"/>
+      <stop offset="0.5388" stop-opacity="0.7486"/>
+      <stop offset="0.5705" stop-opacity="0.7805"/>
+      <stop offset="0.6022" stop-opacity="0.8100"/>
+      <stop offset="0.6339" stop-opacity="0.8372"/>
+      <stop offset="0.6656" stop-opacity="0.8628"/>
+      <stop offset="0.6973" stop-opacity="0.8894"/>
+      <stop offset="0.7290" stop-opacity="0.9119"/>
+      <stop offset="0.7607" stop-opacity="0.9320"/>
+      <stop offset="0.7924" stop-opacity="0.9506"/>
+      <stop offset="0.8241" stop-opacity="0.9670"/>
+      <stop offset="0.8558" stop-opacity="0.9800"/>
+      <stop offset="0.8875" stop-opacity="0.9897"/>
+      <stop offset="0.9192" stop-opacity="0.9962"/>
+      <stop offset="0.9509" stop-opacity="1.0000"/>
+      <stop offset="1.0000" stop-opacity="1.0000"/>
+    </radialGradient>
+    <!-- thin grey ring just inside the rim -->
+    <radialGradient id="ring" gradientUnits="userSpaceOnUse" cx="31.875" cy="31.875" r="31.5">
+      <stop offset="0.0000" stop-color="#fff" stop-opacity="0.0000"/>
+      <stop offset="0.7619" stop-color="#fff" stop-opacity="0.0000"/>
+      <stop offset="0.7778" stop-color="#fff" stop-opacity="0.0211"/>
+      <stop offset="0.7937" stop-color="#fff" stop-opacity="0.0297"/>
+      <stop offset="0.8095" stop-color="#fff" stop-opacity="0.0420"/>
+      <stop offset="0.8254" stop-color="#fff" stop-opacity="0.0572"/>
+      <stop offset="0.8413" stop-color="#fff" stop-opacity="0.0806"/>
+      <stop offset="0.8571" stop-color="#fff" stop-opacity="0.1118"/>
+      <stop offset="0.8730" stop-color="#fff" stop-opacity="0.1678"/>
+      <stop offset="0.8889" stop-color="#fff" stop-opacity="0.2333"/>
+      <stop offset="0.9048" stop-color="#fff" stop-opacity="0.2974"/>
+      <stop offset="0.9206" stop-color="#fff" stop-opacity="0.3373"/>
+      <stop offset="0.9365" stop-color="#fff" stop-opacity="0.3349"/>
+      <stop offset="0.9524" stop-color="#fff" stop-opacity="0.2497"/>
+      <stop offset="0.9683" stop-color="#fff" stop-opacity="0.0977"/>
+      <stop offset="0.9841" stop-color="#fff" stop-opacity="0.0190"/>
+      <stop offset="1.0000" stop-color="#fff" stop-opacity="0.0013"/>
+    </radialGradient>
+    <mask id="outside" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <circle cx="31.5" cy="32.5" r="31.55" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="64" height="64" fill="#000" fill-opacity="0.2824" mask="url(#outside)"/>
+  <circle cx="31.5" cy="32.5" r="31.55" fill="url(#fill)"/>
+  <circle cx="31.875" cy="31.875" r="31.5" fill="url(#ring)"/>
+</svg>

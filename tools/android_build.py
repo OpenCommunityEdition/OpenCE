@@ -29,7 +29,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
                           compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, xdk_headers)
-from .embed_assets import hud_asset_inputs, hud_assets_build
+from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -194,7 +194,7 @@ def _musl_sources() -> List[Path]:
 
 
 def android_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "guest" / "runtime", PORT_DIR / "host", LINUX_DIR / "src", *hud_asset_inputs()]
+    return [Path(__file__), PORT_DIR / "guest" / "runtime", PORT_DIR / "host", LINUX_DIR / "src", *hud_configure_inputs()]
 
 
 def generate_android_build(n: Writer, sln: Any) -> None:

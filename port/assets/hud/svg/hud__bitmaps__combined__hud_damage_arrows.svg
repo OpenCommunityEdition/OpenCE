@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="512" viewBox="0 0 1024 512">
+  <defs>
+    <linearGradient id="f1" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="149.89">
+      <stop offset="0.000" stop-color="#262626" stop-opacity="0.1480"/>
+      <stop offset="0.200" stop-color="#2f2f2f" stop-opacity="0.1851"/>
+      <stop offset="0.400" stop-color="#3d3d3d" stop-opacity="0.2392"/>
+      <stop offset="0.600" stop-color="#4c4c4c" stop-opacity="0.2995"/>
+      <stop offset="0.800" stop-color="#5b5b5b" stop-opacity="0.3555"/>
+      <stop offset="1.000" stop-color="#656565" stop-opacity="0.3966"/>
+    </linearGradient>
+    <linearGradient id="f2" gradientUnits="userSpaceOnUse" x1="0" y1="159" x2="0" y2="262.90">
+      <stop offset="0.000" stop-color="#212121" stop-opacity="0.1291"/>
+      <stop offset="0.200" stop-color="#2a2a2a" stop-opacity="0.1636"/>
+      <stop offset="0.400" stop-color="#363636" stop-opacity="0.2108"/>
+      <stop offset="0.600" stop-color="#434343" stop-opacity="0.2622"/>
+      <stop offset="0.800" stop-color="#4f4f4f" stop-opacity="0.3098"/>
+      <stop offset="1.000" stop-color="#585858" stop-opacity="0.3451"/>
+    </linearGradient>
+  </defs>
+  <!-- large damage chevron: translucent grey fill brightening downwards, white slanted edges -->
+  <polygon points="14.61,2.00 905.39,2.00 460.00,149.89" fill="url(#f1)"/>
+  <path d="M1.96,2.00 918.05,2.00 460.00,154.09Z M460.00,149.89 905.39,2.00 14.61,2.00Z" fill="#fff" fill-rule="evenodd"/>
+  <!-- small damage chevron -->
+  <polygon points="14.57,159.00 641.43,159.00 328.01,262.90" fill="url(#f2)"/>
+  <path d="M2.02,159.00 653.99,159.00 328.01,267.06Z M328.01,262.90 641.43,159.00 14.57,159.00Z" fill="#fff" fill-rule="evenodd"/>
+</svg>

@@ -33,7 +33,7 @@ long hud_hires_asset_at(unsigned long address, long width, long height);
 
 enum
 {
-	MAXIMUM_HIRES_BITMAPS = 64,
+	MAXIMUM_HIRES_BITMAPS = 128,
 };
 
 /* ---------- globals */

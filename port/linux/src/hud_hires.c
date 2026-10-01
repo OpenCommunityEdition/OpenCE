@@ -6,7 +6,8 @@ uploaded, and each one's GL texture.
 
 Which bitmap is at an address the game knows (from the loaded map's tags:
 port/linux/game/hud_hires_tags.c). Each texture is decoded from its PNG when
-first drawn and kept: fifteen of them, about 63 MB with their mip levels.
+first drawn and kept: up to 66 of them, about 220 MB with their mip levels,
+though a game draws only some (the scopes' masks only when zoomed).
 They are drawn with linear filtering and their mip levels (d3d8_gl.c,
 configure_sampler), as they are larger than they appear.
 
@@ -27,13 +28,14 @@ read: 8-bit RGBA, not interlaced, its data inflated with the game's zlib.
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
-#define MAXIMUM_TEXTURES 64
+#define MAXIMUM_TEXTURES 128
 
 static struct
 {
 	unsigned int texture;
 	unsigned long levels;
 	int failed;
+	int other_pixels_logged;
 } textures[MAXIMUM_TEXTURES];
 
 long hud_hires_asset_count(void)
@@ -61,15 +63,31 @@ long hud_hires_asset_fits(long asset, long width, long height)
 		embedded->width / width == embedded->height / height && embedded->width / width > 1;
 }
 
-long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height)
+long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
+	unsigned long level0_size)
 {
 	static int enabled = -1;
+	long asset;
 
 	if (enabled < 0)
 		enabled = config_boolean("display.high_res_hud");
 	if (!enabled)
 		return -1;
-	return hud_hires_asset_at(address, (long)width, (long)height);
+	asset = hud_hires_asset_at(address, (long)width, (long)height);
+	if (asset < 0 || asset >= hud_hires_asset_count())
+		return -1;
+	if (crc32(0L, (const Bytef *)address, (uInt)level0_size) != hud_hires_embedded[asset].crc)
+	{
+		if (!textures[asset].other_pixels_logged)
+		{
+			platform_log("high-res hud: %s bitmap %d is not the one its texture was drawn for here "
+				"(another language's or a modified map): drawn as it is",
+				hud_hires_embedded[asset].tag, hud_hires_embedded[asset].bitmap);
+			textures[asset].other_pixels_logged = 1;
+		}
+		return -1;
+	}
+	return asset;
 }
 
 /* ---------- decoding */

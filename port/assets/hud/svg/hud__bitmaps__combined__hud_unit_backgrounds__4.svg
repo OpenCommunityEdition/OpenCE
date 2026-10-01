@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="32" viewBox="0 0 512 32">
+  <defs>
+    <g id="art">
+      <path d="M59.02,-0.55 L61.42,4.54 L67.42,17.43 L68.4,19.56 L72.34,28.01 L468.76,27.98 L467.99,26.49 L467.51,25.48 L466.57,23.43 L460.58,10.54 L459.59,8.44 L456.4,1.56 L455.68,0.01 Z M1.24,-0.08 L3.46,4.6 L9.42,17.46 L10.38,19.5 L14.33,28.01 L22.86,27.99 L30.02,20.92 L30.13,20.96 L31.18,19.99 L54.98,20 L50.6,10.57 L49.4,7.99 L25.48,8.01 L19.89,5.06 L11.79,1.03 L9.74,-0.01 Z" fill="#ffffff"/>
+      <path d="M7.78,3.74 L10.45,9.39 L11.39,11.51 L11.87,12.43 L16.31,22 L17.28,24.03 L20.67,23.96 L28.94,15.98 L48.37,16.01 L47.63,14.56 L46.52,12 L24.03,12.01 L10.03,5.01 Z M65.84,3.97 L67.17,6.62 L68.49,9.49 L69.4,11.55 L69.87,12.45 L74.22,21.78 L75.26,24 L462.14,24 L461.38,22.55 L460.81,21.29 L459.51,18.56 L458.62,16.48 L458.1,15.51 L453.78,6.2 L452.74,4 L65.99,4 Z" fill="#323232"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="32"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- flag icon + meter frame, white rims around dark panels -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="32" fill="none"/><use xlink:href="#art"/></g>
+</svg>

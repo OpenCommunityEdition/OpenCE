@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="128" viewBox="0 0 512 128">
+  <!-- slanted meter frame with rounded top corners (white) -->
+  <path d="M28.69,8.58 A11.67,11.67 0 0 1 39.19,2 H280.64 A7.71,7.71 0 0 1 287.58,13.08 L263.85,62 H2.76 Z" fill="none" stroke="#fff" stroke-width="4.14" stroke-miterlimit="10"/>
+</svg>

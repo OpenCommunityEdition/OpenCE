@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" gradientUnits="userSpaceOnUse" cx="31.5" cy="32.5" r="33">
+      <stop offset="0.0000" stop-color="#ffffff" stop-opacity="1.0000"/>
+      <stop offset="0.5455" stop-color="#ffffff" stop-opacity="1.0000"/>
+      <stop offset="0.5671" stop-color="#ffffff" stop-opacity="1.0000"/>
+      <stop offset="0.5887" stop-color="#ffffff" stop-opacity="1.0000"/>
+      <stop offset="0.6104" stop-color="#ffffff" stop-opacity="0.9994"/>
+      <stop offset="0.6320" stop-color="#ffffff" stop-opacity="0.9791"/>
+      <stop offset="0.6537" stop-color="#ffffff" stop-opacity="0.9480"/>
+      <stop offset="0.6753" stop-color="#ffffff" stop-opacity="0.9091"/>
+      <stop offset="0.6970" stop-color="#ffffff" stop-opacity="0.8724"/>
+      <stop offset="0.7186" stop-color="#ffffff" stop-opacity="0.8261"/>
+      <stop offset="0.7403" stop-color="#ffffff" stop-opacity="0.7756"/>
+      <stop offset="0.7619" stop-color="#ffffff" stop-opacity="0.7271"/>
+      <stop offset="0.7835" stop-color="#ffffff" stop-opacity="0.6676"/>
+      <stop offset="0.8052" stop-color="#ffffff" stop-opacity="0.6135"/>
+      <stop offset="0.8268" stop-color="#ffffff" stop-opacity="0.5585"/>
+      <stop offset="0.8485" stop-color="#ffffff" stop-opacity="0.4984"/>
+      <stop offset="0.8701" stop-color="#ffffff" stop-opacity="0.3916"/>
+      <stop offset="0.8918" stop-color="#ffffff" stop-opacity="0.2819"/>
+      <stop offset="0.9134" stop-color="#ffffff" stop-opacity="0.1904"/>
+      <stop offset="0.9351" stop-color="#ffffff" stop-opacity="0.1028"/>
+      <stop offset="0.9567" stop-color="#ffffff" stop-opacity="0.0330"/>
+      <stop offset="0.9784" stop-color="#ffffff" stop-opacity="0.0000"/>
+      <stop offset="1.0000" stop-color="#ffffff" stop-opacity="0.0000"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" fill="url(#g)"/>
+</svg>

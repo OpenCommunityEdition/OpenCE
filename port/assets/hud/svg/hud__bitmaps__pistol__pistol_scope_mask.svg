@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- soft transparent hole in the black lens -->
+    <radialGradient id="hole" gradientUnits="userSpaceOnUse" cx="515.0" cy="516.8" r="300">
+      <stop offset="0.0000" stop-opacity="0.0000"/>
+      <stop offset="0.0333" stop-opacity="0.0000"/>
+      <stop offset="0.0667" stop-opacity="0.0000"/>
+      <stop offset="0.1000" stop-opacity="0.0039"/>
+      <stop offset="0.1333" stop-opacity="0.0086"/>
+      <stop offset="0.1667" stop-opacity="0.0172"/>
+      <stop offset="0.2000" stop-opacity="0.0302"/>
+      <stop offset="0.2333" stop-opacity="0.0487"/>
+      <stop offset="0.2667" stop-opacity="0.0744"/>
+      <stop offset="0.3000" stop-opacity="0.1082"/>
+      <stop offset="0.3333" stop-opacity="0.1501"/>
+      <stop offset="0.3667" stop-opacity="0.2012"/>
+      <stop offset="0.4000" stop-opacity="0.2609"/>
+      <stop offset="0.4333" stop-opacity="0.3275"/>
+      <stop offset="0.4667" stop-opacity="0.3999"/>
+      <stop offset="0.5000" stop-opacity="0.4754"/>
+      <stop offset="0.5333" stop-opacity="0.5513"/>
+      <stop offset="0.5667" stop-opacity="0.6254"/>
+      <stop offset="0.6000" stop-opacity="0.6950"/>
+      <stop offset="0.6333" stop-opacity="0.7579"/>
+      <stop offset="0.6667" stop-opacity="0.8129"/>
+      <stop offset="0.7000" stop-opacity="0.8598"/>
+      <stop offset="0.7333" stop-opacity="0.8985"/>
+      <stop offset="0.7667" stop-opacity="0.9295"/>
+      <stop offset="0.8000" stop-opacity="0.9537"/>
+      <stop offset="0.8333" stop-opacity="0.9712"/>
+      <stop offset="0.8667" stop-opacity="0.9837"/>
+      <stop offset="0.9000" stop-opacity="0.9918"/>
+      <stop offset="0.9333" stop-opacity="0.9962"/>
+      <stop offset="0.9667" stop-opacity="1.0000"/>
+      <stop offset="1.0000" stop-opacity="1.0000"/>
+    </radialGradient>
+    <mask id="lens" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="512" cy="512" r="481" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" fill="#848484" mask="url(#lens)"/>
+  <circle cx="512" cy="512" r="481" fill="url(#hole)"/>
+  <circle cx="512" cy="512" r="481" fill="none" stroke="#fff" stroke-width="6"/>
+</svg>

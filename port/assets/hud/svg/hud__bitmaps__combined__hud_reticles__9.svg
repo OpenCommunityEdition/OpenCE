@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- left half; the right half is its mirror about x=126 -->
+  <g id="half" fill="#fff">
+    <path d="M68,28 H112 V32 H72 V100 H68 Z"/>
+    <path d="M68,224 H112 V220 H72 V152 H68 Z"/>
+    <polygon points="68,112 100,126 68,140"/>
+    <rect x="24" y="52" width="20" height="4"/>
+    <rect x="24" y="76" width="20" height="4"/>
+    <rect x="24" y="100" width="20" height="4"/>
+    <rect x="24" y="124" width="20" height="4"/>
+    <rect x="24" y="148" width="20" height="4"/>
+    <rect x="24" y="172" width="20" height="4"/>
+    <rect x="24" y="196" width="20" height="4"/>
+  </g>
+  <use href="#half" transform="matrix(-1 0 0 1 252 0)"/>
+</svg>

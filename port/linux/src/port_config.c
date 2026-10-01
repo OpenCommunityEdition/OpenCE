@@ -83,9 +83,9 @@ static const struct config_setting config_settings[] =
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
 	{ "display.high_res_hud", _config_boolean, "true", "HALO_HIGH_RES_HUD", _environment_value, _platform_all,
-		"Draw the HUD's health, shield and ammo meters, ammo counter and their\n"
-		"panels from the high-res assets (8x the maps' bitmaps); false draws the\n"
-		"maps' own bitmaps." },
+		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
+		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
+		"false draws the maps' own bitmaps." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

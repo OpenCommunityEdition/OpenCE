@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="128" height="32" viewBox="0 0 128 32">
+  <!-- shield: lightning bolt, blue at 20% -->
+  <path d="M7.97,3.21 A0.3,0.3 0 0 1 8.5,3.46 L6.95,10 L10.11,10 A0.3,0.3 0 0 1 10.35,10.48 L5.03,17.79 A0.3,0.3 0 0 1 4.5,17.54 L6.05,11 L2.89,11 A0.3,0.3 0 0 1 2.65,10.52 Z" fill="#0088ff" fill-opacity="0.2" stroke-linejoin="round"/>
+  <!-- health: plus, orange at 20% -->
+  <path d="M5,21 H7 V24 H10 V26 H7 V29 H5 V26 H2 V24 H5 Z" fill="#bb6600" fill-opacity="0.2"/>
+</svg>
