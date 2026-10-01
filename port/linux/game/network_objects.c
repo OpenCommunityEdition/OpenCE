@@ -183,6 +183,10 @@ static long objects_client_has[MAXIMUM_TRACKED_OBJECTS];
 /* ... all of them (the host said so), and when it last asked for them */
 static boolean objects_client_synchronized;
 static long objects_client_ready_time;
+/* During reattachment keep the surviving world until the host has replayed
+its current object identities. Then retire only generations absent from it. */
+static boolean objects_client_resynchronizing;
+static boolean objects_client_resync_seen[MAXIMUM_TRACKED_OBJECTS];
 /* ... past loading: its own objects from the upper half */
 static boolean objects_client_local_allocation;
 static short objects_client_local_identifier;
@@ -990,6 +994,8 @@ void network_objects_handle_changes(
 		if (change->change == _object_change_create)
 		{
 			distributed_client_create(change);
+			if (objects_client_resynchronizing && objects_client_has[absolute_index] == change->object_index)
+				objects_client_resync_seen[absolute_index] = TRUE;
 		}
 		else if (objects_client_has[absolute_index] == change->object_index)
 		{
@@ -1003,6 +1009,18 @@ void network_objects_handle_changes(
 void network_objects_handle_synchronized(
 	void)
 {
+	long absolute_index;
+	if (objects_client_resynchronizing)
+	{
+		for (absolute_index = 0; absolute_index < MAXIMUM_TRACKED_OBJECTS; absolute_index++)
+		{
+			if (objects_client_has[absolute_index] == NONE || objects_client_resync_seen[absolute_index])
+				continue;
+			distributed_client_delete(objects_client_has[absolute_index]);
+			objects_client_has[absolute_index] = NONE;
+		}
+		objects_client_resynchronizing = FALSE;
+	}
 	objects_client_synchronized = TRUE;
 }
 
@@ -1266,6 +1284,8 @@ void network_objects_new_game(
 	csmemset(objects_host_vehicle_predictions, 0, sizeof(objects_host_vehicle_predictions));
 	objects_client_synchronized = FALSE;
 	objects_client_ready_time = NONE;
+	objects_client_resynchronizing = FALSE;
+	csmemset(objects_client_resync_seen, 0, sizeof(objects_client_resync_seen));
 	objects_client_local_allocation = FALSE;
 	objects_client_creating_index = NONE;
 	objects_client_creating = FALSE;
@@ -1493,6 +1513,14 @@ retain their canonical object generations and can accept those announcements. */
 	objects_host_resting_cursor = 0;
 	memset(objects_host_inventories, 0, sizeof(objects_host_inventories));
 	memset(objects_host_vehicle_predictions, 0, sizeof(objects_host_vehicle_predictions));
+	if (network_game_distributed_client())
+	{
+		/* The new stream may have missed a spawn or delete. Ask for the
+		existing host's complete object set, without loading a new match. */
+		objects_client_synchronized = FALSE;
+		objects_client_resynchronizing = TRUE;
+		memset(objects_client_resync_seen, 0, sizeof(objects_client_resync_seen));
+	}
 	objects_client_ready_time = NONE;
 	objects_client_creating_index = NONE;
 	objects_client_creating = FALSE;

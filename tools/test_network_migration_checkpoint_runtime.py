@@ -62,6 +62,17 @@ class CheckpointRuntime(unittest.TestCase):
         code += '\n' + ENGINE_MAIN
         self.compile_and_run(code, 'authority timers and score preservation passed')
 
+    def test_client_object_replay_after_late_reattach(self):
+        source = (ROOT / 'port/linux/game/network_objects.c').read_text()
+        code = RESYNC_PREAMBLE
+        for name in ('void network_objects_migration_reset_transport(',
+                     'void network_objects_client_tick(',
+                     'void network_objects_handle_changes(',
+                     'void network_objects_handle_synchronized('):
+            code += '\n' + declaration(source, name)
+        code += '\n' + RESYNC_MAIN
+        self.compile_and_run(code, 'late survivor object replay passed')
+
     def test_membership_and_route_coherence(self):
         header = (ROOT / 'source/networking/network_migration.h').read_text()
         client = (ROOT / 'source/networking/network_client_manager.c').read_text()
@@ -79,6 +90,98 @@ class CheckpointRuntime(unittest.TestCase):
         code += '\n' + MEMBERSHIP_MAIN
         self.compile_and_run(code, 'checkpoint membership and ownership passed')
 
+
+RESYNC_PREAMBLE = r'''
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+typedef unsigned char byte;
+typedef unsigned short word;
+typedef int boolean;
+#define TRUE 1
+#define FALSE 0
+#define NONE (-1L)
+#define MAXIMUM_TRACKED_OBJECTS 16
+#define CLIENT_READY_INTERVAL_TICKS 30
+#define DATUM_INDEX_TO_ABSOLUTE_INDEX(index) ((long)((index) & 0xffffUL))
+enum { _object_change_create, _object_change_delete,
+       _distributed_message_client_ready, _distributed_to_host_reliably };
+struct distributed_message_header { word type; };
+struct distributed_object_change { byte change; long object_index; };
+static long objects_host_told[16], objects_host_resting_cursor;
+static long objects_host_inventories[16], objects_host_vehicle_predictions[16];
+static long objects_client_has[16], objects_client_ready_time;
+static boolean objects_client_synchronized, objects_client_resynchronizing;
+static boolean objects_client_resync_seen[16];
+static long objects_client_creating_index;
+static boolean objects_client_creating, objects_client_deleting;
+static long world[16], tick, requests, removed, vehicles;
+static boolean client = TRUE;
+static boolean network_game_distributed_client(void) { return client; }
+static long game_time_get(void) { return tick; }
+static void distributed_send(void *message, int type, int count, word size, int target) {
+ (void)message;
+ assert(type == _distributed_message_client_ready && count == 0);
+ assert(size == sizeof(struct distributed_message_header) && target == _distributed_to_host_reliably);
+ requests++;
+}
+static void distributed_client_remove_own_objects(void) { removed++; }
+static void distributed_client_send_vehicles(void) { vehicles++; }
+static struct { long deletes; } objects_statistics;
+static void distributed_client_delete(long index) {
+ long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(index);
+ assert(world[slot] == index); world[slot] = NONE;
+}
+static void distributed_client_create(struct distributed_object_change const *change) {
+ long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(change->object_index);
+ world[slot] = objects_client_has[slot] = change->object_index;
+}
+'''
+
+RESYNC_MAIN = r'''
+int main(void) {
+ long survivor_unit = 0x10001L, missed_spawn = 0x20002L, deleted_item = 0x10003L;
+ struct distributed_object_change replay[] = {
+  { _object_change_create, survivor_unit }, { _object_change_create, missed_spawn }
+ };
+ for (int i = 0; i < 16; i++) world[i] = objects_client_has[i] = NONE;
+ world[1] = objects_client_has[1] = survivor_unit;
+ world[3] = objects_client_has[3] = deleted_item;
+ objects_client_synchronized = TRUE;
+ objects_client_ready_time = 100;
+ tick = 200;
+ network_objects_migration_reset_transport();
+ /* No restart or eager world deletion; old canonical objects stay protected. */
+ assert(world[1] == survivor_unit && world[3] == deleted_item);
+ assert(objects_client_has[1] == survivor_unit && objects_client_has[3] == deleted_item);
+ network_objects_client_tick();
+ assert(requests == 1 && removed == 0);
+ tick += 29;
+ network_objects_client_tick();
+ assert(requests == 1);
+ tick++;
+ network_objects_client_tick();
+ assert(requests == 2 && removed == 0); /* Lost first request is retried. */
+ network_objects_handle_changes(replay, 2);
+ assert(world[1] == survivor_unit && objects_client_has[2] == missed_spawn);
+ assert(world[3] == deleted_item); /* Wait for the complete reliable replay. */
+ network_objects_handle_synchronized();
+ assert(world[1] == survivor_unit && world[2] == missed_spawn && world[3] == NONE);
+ assert(objects_client_has[3] == NONE && objects_client_synchronized);
+ network_objects_client_tick();
+ assert(requests == 2 && removed == 1);
+ /* A second repair repeats reconciliation, without retaining earlier seen bits. */
+ network_objects_migration_reset_transport();
+ network_objects_handle_changes(replay, 1);
+ network_objects_handle_synchronized();
+ assert(world[1] == survivor_unit && world[2] == NONE);
+ /* A promoted authority reannounces objects without entering client replay. */
+ client = FALSE;
+ network_objects_migration_reset_transport();
+ assert(!objects_client_resynchronizing && objects_client_synchronized);
+ puts("late survivor object replay passed");
+}
+'''
 
 MEMBERSHIP_PREAMBLE = r'''
 #include <assert.h>
