@@ -1006,9 +1006,9 @@ boolean actor_combat_plan_grenade_trajectory(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_variant_definition *variant_definition =
 		actor_variant_definition_get(actor->meta.variant_definition_index);
-	real_point3d grenade_origin = actor->input.position.head_position;
+	real_point3d origin = actor->input.position.head_position;
 	real_vector3d aim_vector;
-	real_vector3d aim_velocity;
+	real_vector3d arc_initial_velocity;
 	real aim_speed;
 	real aim_ticks;
 	real aim_gravity;
@@ -1016,7 +1016,7 @@ boolean actor_combat_plan_grenade_trajectory(
 
 	if (actor_combat_build_grenade_trajectory(
 			variant_definition->grenade_combat.grenade_type,
-			&grenade_origin,
+			&origin,
 			variant_definition->grenade_combat.grenade_maximum_velocity,
 			grenade_target,
 			NULL,
@@ -1024,13 +1024,13 @@ boolean actor_combat_plan_grenade_trajectory(
 			&aim_vector,
 			&aim_speed,
 			&aim_ticks,
-			&aim_velocity,
+			&arc_initial_velocity,
 			&aim_gravity) &&
 		ai_test_ballistic_line_of_fire(
 			actor_index,
-			&grenade_origin,
+			&origin,
 			aim_ticks,
-			&aim_velocity,
+			&arc_initial_velocity,
 			aim_gravity,
 			grenade_ignore_object_index,
 			actor->input.vehicle_index != NONE))

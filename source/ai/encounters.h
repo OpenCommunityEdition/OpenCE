@@ -153,6 +153,8 @@ struct actor_datum *encounter_actor_iterator_next(
 	struct encounter_actor_iterator *iterator);
 struct actor_datum *encounter_actor_iterator_prev(
 	struct encounter_actor_iterator *iterator);
+struct actor_datum *actor_iterator_next(
+	struct actor_iterator *iterator);
 void encounter_compute_activation_cluster_bit_vector(
 	long encounter_index,
 	boolean update_actor_dormancy,
@@ -239,6 +241,9 @@ void encounter_set_respawn(
 void encounter_set_deaf(
 	long encounter_index,
 	boolean deaf);
+void actor_iterator_new(
+	struct actor_iterator *iterator,
+	boolean active_only);
 void encounter_set_blind(
 	long encounter_index,
 	boolean blind);

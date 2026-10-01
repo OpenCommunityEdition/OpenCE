@@ -3,9 +3,9 @@ SCENARIO.C
 
 symbols in this file:
 0017DA90 0020:
-	_code_0017da90 (0000)
+	_scenario_call_disconnect_from_structure_bsp_procs (0000)
 0017DAB0 0020:
-	_code_0017dab0 (0000)
+	_scenario_call_reconnect_to_structure_bsp_procs (0000)
 0017DAD0 0020:
 	_scenario_initialize (0000)
 0017DAF0 0050:
@@ -91,7 +91,7 @@ symbols in this file:
 0017EE50 0520:
 	_scenario_get_sound_environment (0000)
 0017F370 00a0:
-	_code_0017f370 (0000)
+	_interpolate_real_rgb_color (0000)
 0017F410 0330:
 	_scenario_get_atmospheric_fog (0000)
 002A053C 0011:
@@ -168,13 +168,17 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
 #include "cseries/errors.h"
+#include "effects/contrails.h"
+#include "effects/decals.h"
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "effects/particle_systems.h"
+#include "effects/particles.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "camera/observer.h"
 #include "main/main.h"
+#include "objects/object_lights.h"
 #include "objects/objects.h"
 #include "physics/bsp3d.h"
 #include "physics/collision_usage.h"
@@ -187,6 +191,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "scenario/wind.h"
 #include "sound/sound_definitions.h"
+#include "sound/sound_manager.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 
@@ -194,21 +199,10 @@ symbols in this file:
 
 /* ---------- macros */
 
-#ifdef HALO_LINUX
 /* other compilers do not lay the globals out as MSVC did */
 #define scenario_structure_bsp_reconnect_procs scenario_structure_bsp_reconnect_proc_table
 #define scenario_structure_bsp_disconnect_procs scenario_structure_bsp_disconnect_proc_table
 #define scenario_memory_status_attributed (&scenario_memory_status)
-#else
-#define scenario_structure_bsp_reconnect_procs \
-	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
-		2 * sizeof(global_structure_bsp_index)))
-#define scenario_structure_bsp_disconnect_procs \
-	((scenario_structure_bsp_connection_proc *)((byte *)&global_structure_bsp_index + \
-		2 * sizeof(global_structure_bsp_index) + sizeof(scenario_structure_bsp_reconnect_proc_table)))
-#define scenario_memory_status_attributed \
-	((struct memory_status *)((byte *)&global_structure_bsp_index + 0x60))
-#endif
 
 /* ---------- structures */
 
@@ -223,40 +217,6 @@ struct memory_status
 void _ReadWriteBarrier(
 	void);
 #pragma intrinsic(_ReadWriteBarrier)
-
-void objects_reconnect_to_structure_bsp(
-	void);
-void lights_reconnect_to_structure_bsp(
-	void);
-void particles_reconnect_to_structure_bsp(
-	void);
-void contrails_reconnect_to_structure_bsp(
-	void);
-void decals_reconnect_to_structure_bsp(
-	void);
-void structure_decals_reconnect_to_structure_bsp(
-	void);
-void players_reconnect_to_structure_bsp(
-	void);
-void sound_reconnect_to_structure_bsp(
-	void);
-void object_types_reconnect_to_structure_bsp(
-	void);
-
-void object_types_disconnect_from_structure_bsp(
-	void);
-void objects_disconnect_from_structure_bsp(
-	void);
-void lights_disconnect_from_structure_bsp(
-	void);
-void particles_disconnect_from_structure_bsp(
-	void);
-void contrails_disconnect_from_structure_bsp(
-	void);
-void structure_decals_disconnect_from_structure_bsp(
-	void);
-void decals_disconnect_from_structure_bsp(
-	void);
 
 typedef void (*scenario_structure_bsp_connection_proc)(
 	void);
@@ -314,7 +274,7 @@ static struct memory_status scenario_memory_status =
 struct structure_bsp *global_structure_bsp;
 struct scenario *global_scenario;
 struct collision_bsp *global_collision_bsp;
-byte bss_004c0520[0x375] = { 0 };
+static byte bss_004c0520[0x375] = { 0 };
 #define default_material_definition (*(struct material_definition *)&bss_004c0520[0])
 #define default_material_initialized (*(boolean *)&bss_004c0520[0x374])
 struct bsp3d *global_bsp3d;
@@ -322,7 +282,7 @@ struct game_globals *global_game_globals;
 
 /* ---------- public code */
 
-void code_0017da90(
+static void scenario_call_disconnect_from_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -333,7 +293,7 @@ void code_0017da90(
 	return;
 }
 
-void code_0017dab0(
+static void scenario_call_reconnect_to_structure_bsp_procs(
 	void)
 {
 	short proc_index;
@@ -380,7 +340,6 @@ void scenario_dispose_from_old_map(
 void scenario_frame_update(
 	real delta_time)
 {
-#ifdef HALO_LINUX
 	/* A frame was a tick on the Xbox; the native builds draw several frames
 	per tick (port/linux/game/render_interpolation.c), and the wind steps
 	its random walk once an update: step it once per 30 Hz tick of game
@@ -395,9 +354,6 @@ void scenario_frame_update(
 	{
 		wind_update();
 	}
-#else
-	wind_update();
-#endif
 
 	return;
 }
@@ -1041,7 +997,6 @@ boolean scenario_switch_structure_bsp(
 {
 	boolean result = FALSE;
 	boolean had_old_structure_bsp;
-	short proc_index;
 	struct scenario_structure_bsp_reference *reference;
 
 	if (structure_bsp_index != global_structure_bsp_index &&
@@ -1060,8 +1015,7 @@ boolean scenario_switch_structure_bsp(
 
 		if (global_structure_bsp_index != NONE)
 		{
-			for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_disconnect_proc_table); proc_index++)
-				scenario_structure_bsp_disconnect_procs[proc_index]();
+			scenario_call_disconnect_from_structure_bsp_procs();
 
 			had_old_structure_bsp = TRUE;
 			scenario_structure_bsp_unload(TAG_BLOCK_GET_ELEMENT(
@@ -1088,8 +1042,7 @@ boolean scenario_switch_structure_bsp(
 
 			if (had_old_structure_bsp)
 			{
-				for (proc_index = 0; proc_index < NUMBEROF(scenario_structure_bsp_reconnect_proc_table); proc_index++)
-					scenario_structure_bsp_reconnect_procs[proc_index]();
+				scenario_call_reconnect_to_structure_bsp_procs();
 			}
 			result = TRUE;
 		}
@@ -1330,7 +1283,7 @@ void scenario_get_sound_environment(
 	return;
 }
 
-static void code_0017f370(
+static void interpolate_real_rgb_color(
 	real_rgb_color *current,
 	real_rgb_color const *desired,
 	real maximum_step)
@@ -1464,7 +1417,7 @@ void scenario_get_atmospheric_fog(
 			interpolate_scalar(&fog_state->atmospheric_opaque_distance, fog->opaque_distance, distance);
 			distance *= 0.05f;
 			interpolate_scalar(&fog_state->atmospheric_maximum_density, fog->maximum_density, distance);
-			code_0017f370(&fog_state->atmospheric_color, &fog->color, distance);
+			interpolate_real_rgb_color(&fog_state->atmospheric_color, &fog->color, distance);
 			interpolate_scalar(&fog_state->indoor_fog_scale, indoor_fog_scale, distance);
 		}
 		else

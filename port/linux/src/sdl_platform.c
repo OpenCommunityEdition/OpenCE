@@ -20,6 +20,9 @@ and the debug keyboard that the game's console reads.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_WIN32) && !defined(HALO_ANDROID)
+#include <signal.h>
+#endif
 
 static SDL_Window *platform_window;
 static SDL_GLContext platform_gl_context;
@@ -52,6 +55,12 @@ BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
+#if !defined(_WIN32) && !defined(HALO_ANDROID)
+	/* a write to a connection the other end closed fails instead of ending
+	the game (the game's sockets and Discord's pass MSG_NOSIGNAL, but UPnP's
+	miniupnpc does not, nor does a write to a closed pipe's standard error) */
+	signal(SIGPIPE, SIG_IGN);
+#endif
 	/* a copy of the game started to open an invite link hands it to the
 	one already running, and goes */
 	if (p2p_hand_off_invite())
@@ -234,7 +243,10 @@ static BOOL data_choose_image(char *path, int size)
 	/* the dialog answers through events (and on some systems another
 	thread) */
 	while (!SDL_GetAtomicInt(&choice.done))
-		SDL_WaitEventTimeout(NULL, 50);
+	{
+		SDL_PumpEvents();
+		SDL_Delay(50);
+	}
 	if (!choice.path[0])
 		return FALSE;
 	snprintf(path, (size_t)size, "%s", choice.path);
@@ -576,6 +588,26 @@ BOOL platform_next_keystroke(struct platform_keystroke *keystroke)
 bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset);
 #endif
 
+/* whether the text has an invite link in it (its prefix, in any case) */
+static BOOL platform_text_has_invite_link(const char *text)
+{
+	static const char prefix[] = "halo://join/";
+	size_t length = sizeof(prefix) - 1;
+
+	for (; *text; text++)
+	{
+		size_t index;
+
+		for (index = 0; index < length && text[index] &&
+			(text[index] | 0x20) == prefix[index]; index++)
+		{
+		}
+		if (index == length)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /* puts a new invite on the clipboard, and joins one found there when the
 game comes to the front */
 static void platform_invite_clipboard(BOOL look)
@@ -600,7 +632,9 @@ static void platform_invite_clipboard(BOOL look)
 		if (text && strcmp(text, seen) && strlen(text) < sizeof(seen))
 		{
 			snprintf(seen, sizeof(seen), "%s", text);
-			if (p2p_join_invite(text))
+			/* (a link, not a bare code: 64 hex digits alone are as often a
+			checksum copied for something else) */
+			if (platform_text_has_invite_link(text) && p2p_join_invite(text))
 			{
 #ifdef HALO_ANDROID
 				SDL_ShowAndroidToast("Joining the invite on the clipboard", 1, -1, 0, 0);

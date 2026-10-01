@@ -111,14 +111,12 @@ struct dump_datum
 
 /* ---------- prototypes */
 
-#ifdef HALO_LINUX
 /* port/linux/game/network_objects.c's: a client of the distributed netcode
 makes the host's objects at the host's datum indices, and deletes them only
 on the host's word */
 long network_objects_new_object_index(void);
 boolean network_objects_creating_host_object(void);
 boolean network_objects_may_delete(long object_index);
-#endif
 
 static void object_connect_lights(long object_index, boolean disconnect, boolean reconnect);
 static void object_name_list_allocate(void);
@@ -998,13 +996,9 @@ void objects_initialize(
 	}
 	else
 	{
-#ifdef HALO_LINUX
 		/* five times the native builds' object limit would not fit a data
 		array's short count */
 		object_header_data = data_new("object", SHORT_MAX, sizeof(struct object_header_datum));
-#else
-		object_header_data = data_new("object", MAXIMUM_OBJECTS_PER_MAP*5, sizeof(struct object_header_datum));
-#endif
 		object_memory_pool = memory_pool_new("objects", OBJECT_MEMORY_POOL_SIZE*5);
 	}
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 216, object_header_data && object_memory_pool);
@@ -1250,14 +1244,12 @@ short object_get_first_cluster(
 real_matrix4x3 *object_get_node_matrices(
 	long object_index)
 {
-#ifdef HALO_LINUX
 	/* while a frame is drawn, the pose between the last two ticks
 	(port/linux/game/render_interpolation.c) */
 	real_matrix4x3 *interpolated = render_interpolation_object_node_matrices(object_index);
 
 	if (interpolated)
 		return interpolated;
-#endif
 	return (real_matrix4x3 *)object_header_block_get(object_index, &object_get(object_index)->object.node_matrices);
 }
 
@@ -1749,10 +1741,8 @@ static void object_delete_initial_recursive(
 void object_delete(
 	long object_index)
 {
-#ifdef HALO_LINUX
 	if (!network_objects_may_delete(object_index))
 		return;
-#endif
 	object_delete_initial_recursive(object_index, FALSE);
 
 	return;
@@ -1778,20 +1768,14 @@ void object_reconnect_to_map(
 	}
 	else
 	{
-#ifdef HALO_LINUX
 		/* location may point here after the if below: declared inside it,
 		the location would be read after its lifetime ended, which an
 		optimising compiler is free to break (release builds crashed placing
 		objects at level start, reading a stack slot reused meanwhile) */
 		struct location bounding_sphere_location;
 
-#endif
 		if (!location)
 		{
-#ifndef HALO_LINUX
-			struct location bounding_sphere_location;
-#endif
-
 			scenario_location_from_point(&bounding_sphere_location, &object->object.bounding_sphere_center);
 			location = &bounding_sphere_location;
 
@@ -1854,14 +1838,12 @@ real_matrix4x3 *object_get_node_matrix(
 {
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 1060, object_has_node(object_index, node_index));
 
-#ifdef HALO_LINUX
 	{
 		real_matrix4x3 *interpolated = render_interpolation_object_node_matrices(object_index);
 
 		if (interpolated)
 			return &interpolated[node_index];
 	}
-#endif
 	return &((real_matrix4x3 *)object_header_block_get(object_index, &object_get(object_index)->object.node_matrices))[node_index];
 }
 
@@ -3291,10 +3273,8 @@ long object_new(
 	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\objects\\objects.c", 621, &data->translational_velocity);
 
 	if (game_engine_running() && definition_index!=NONE
-#ifdef HALO_LINUX
 		/* (the host's object, which the host made as the game type has it) */
 		&& !network_objects_creating_host_object()
-#endif
 		)
 	{
 		definition_index = game_engine_remap_object_definition(definition_index);
@@ -3305,12 +3285,8 @@ long object_new(
 		struct object_definition *object_definition = object_definition_get(definition_index);
 		struct object_type_definition *type_definition = object_type_definition_get(object_definition->object.type);
 
-#ifdef HALO_LINUX
 		object_index = object_header_new(object_header_data, network_objects_new_object_index(),
 			type_definition->game_datum_size);
-#else
-		object_index = object_header_new(object_header_data, NONE, type_definition->game_datum_size);
-#endif
 
 		if (object_index!=NONE)
 		{
@@ -3853,17 +3829,14 @@ void objects_scripting_attach(
 void object_delete_immediately(
 	long object_index)
 {
-#ifdef HALO_LINUX
 	if (!network_objects_may_delete(object_index))
 		return;
-#endif
 	object_delete_initial_recursive(object_index, FALSE);
 	object_delete_recursive(object_index, FALSE);
 
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the active garbage limits are per 16 players: a session of up to 128
 keeps proportionally more garbage around, campaign and smaller games the
 Xbox's amount */
@@ -3875,7 +3848,6 @@ static long active_garbage_limit(
 	return limit_per_16_players * MAX(16, player_count) / 16;
 }
 
-#endif
 void objects_garbage_collection(
 	void)
 {
@@ -3902,11 +3874,7 @@ void objects_garbage_collection(
 		}
 		else
 		{
-#ifdef HALO_LINUX
 			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER))
-#else
-			if (object_globals->active_garbage_object_count>=GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER)
-#endif
 			{
 				garbage_collect_mode = _garbage_collect_active_objects;
 			}
@@ -3963,12 +3931,8 @@ void objects_garbage_collection(
 					should_collect = FALSE;
 					break;
 				case _garbage_collect_active_objects:
-#ifdef HALO_LINUX
 					should_collect = object_globals->active_garbage_object_count<=
 						active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET);
-#else
-					should_collect = object_globals->active_garbage_object_count<=GARBAGE_LIMIT_ACTIVE_GARBAGE_TARGET;
-#endif
 					break;
 				case _garbage_collect_for_space:
 					should_collect =

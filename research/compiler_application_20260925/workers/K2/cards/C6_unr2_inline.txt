@@ -1,3 +1,0 @@
-CARD C6  (written 2026-09-26 02:09:34 -0700, before compile)
-Evidence (D, /Od 0x4a011a..0x4a0159): second 'unr %d %d' site, same unnamed temp (-0x1898) and ==NONE-first polarity.
-Correction as C5 at the targets block. Prediction: block unchanged.

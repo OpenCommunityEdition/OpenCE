@@ -1,1 +1,0 @@
-84 consumer TUs; 0 with any difference

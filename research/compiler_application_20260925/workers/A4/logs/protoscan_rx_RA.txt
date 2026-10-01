@@ -1,2 +1,0 @@
-== research/compiler_application_20260925/workers/A4/copies/rasterizer_xbox_RA.c
-    786 defined-here       void SetupSmartStates( void);

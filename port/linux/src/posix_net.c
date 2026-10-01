@@ -9,6 +9,8 @@ with the host ABI.
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
+#include <limits.h>
+#include <net/if.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -19,9 +21,9 @@ with the host ABI.
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/random.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -50,13 +52,16 @@ with the host ABI.
 #define WSAEADDRNOTAVAIL 10049
 #define WSAENETDOWN 10050
 #define WSAENETUNREACH 10051
+#define WSAENETRESET 10052
 #define WSAECONNABORTED 10053
 #define WSAECONNRESET 10054
 #define WSAENOBUFS 10055
 #define WSAEISCONN 10056
 #define WSAENOTCONN 10057
+#define WSAESHUTDOWN 10058
 #define WSAETIMEDOUT 10060
 #define WSAECONNREFUSED 10061
+#define WSAEHOSTDOWN 10064
 #define WSAEHOSTUNREACH 10065
 
 /* Winsock SOL_SOCKET option values (winsockx.h) */
@@ -96,8 +101,13 @@ static int fail(void)
 	case EADDRNOTAVAIL: last_error = WSAEADDRNOTAVAIL; break;
 	case ENETDOWN: last_error = WSAENETDOWN; break;
 	case ENETUNREACH: last_error = WSAENETUNREACH; break;
+	case ENETRESET: last_error = WSAENETRESET; break;
 	case ECONNABORTED: last_error = WSAECONNABORTED; break;
-	case ECONNRESET: last_error = WSAECONNRESET; break;
+	/* a send on a connection the other end reset (with MSG_NOSIGNAL):
+	Winsock's WSAECONNRESET, which the game takes as the connection lost */
+	case ECONNRESET: case EPIPE: last_error = WSAECONNRESET; break;
+	case ESHUTDOWN: last_error = WSAESHUTDOWN; break;
+	case EHOSTDOWN: last_error = WSAEHOSTDOWN; break;
 	case ENOBUFS: case ENOMEM: last_error = WSAENOBUFS; break;
 	case EISCONN: last_error = WSAEISCONN; break;
 	case ENOTCONN: last_error = WSAENOTCONN; break;
@@ -190,12 +200,27 @@ int posix_socket_recv(int socket, void *buffer, int length, int flags)
 int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 	void *address, int *address_length)
 {
-	socklen_t socket_length = address_length ? (socklen_t)*address_length : 0;
-	int result = (int)recvfrom(socket, buffer, (size_t)length, flags, address,
-		address_length ? &socket_length : NULL);
+	struct iovec vector;
+	struct msghdr message;
+	int result;
 
+	vector.iov_base = buffer;
+	vector.iov_len = (size_t)length;
+	memset(&message, 0, sizeof(message));
+	message.msg_name = address && address_length ? address : NULL;
+	message.msg_namelen = address && address_length ? (socklen_t)*address_length : 0;
+	message.msg_iov = &vector;
+	message.msg_iovlen = 1;
+	result = (int)recvmsg(socket, &message, flags);
 	if (address_length)
-		*address_length = (int)socket_length;
+		*address_length = (int)message.msg_namelen;
+	/* a datagram larger than the buffer: both give its start, but Winsock
+	with WSAEMSGSIZE, which the game takes as an error, not as the datagram */
+	if (result >= 0 && (message.msg_flags & MSG_TRUNC))
+	{
+		last_error = WSAEMSGSIZE;
+		return -1;
+	}
 	return succeed(result);
 }
 
@@ -302,82 +327,105 @@ int posix_socket_getpeername(int socket, void *address, int *address_length)
 	return succeed(result);
 }
 
-static int fill_set(fd_set *set, const int *descriptors, int count, int maximum)
-{
-	int index;
-
-	FD_ZERO(set);
-	for (index = 0; index < count; index++)
-	{
-		if (descriptors[index] >= 0 && descriptors[index] < FD_SETSIZE)
-		{
-			FD_SET(descriptors[index], set);
-			if (descriptors[index] > maximum)
-				maximum = descriptors[index];
-		}
-	}
-	return maximum;
-}
-
-static void keep_ready(fd_set *set, int *descriptors, int *count)
-{
-	int index, kept = 0;
-
-	for (index = 0; index < *count; index++)
-	{
-		if (descriptors[index] >= 0 && descriptors[index] < FD_SETSIZE && FD_ISSET(descriptors[index], set))
-			descriptors[kept++] = descriptors[index];
-	}
-	*count = kept;
-}
-
 int posix_socket_select(int *read, int *read_count, int *write, int *write_count,
 	int *error, int *error_count, posix_long timeout_seconds, posix_long timeout_microseconds, int infinite)
 {
-	fd_set read_set, write_set, error_set;
-	struct timeval timeout;
-	int maximum = -1;
+	/* poll, which takes any descriptor (select none from FD_SETSIZE on,
+	which a process allowed more files has), with select's readiness: read
+	for data, the end or an error, write for room or an error, error for
+	urgent data or (as Winsock's) a connect that failed */
+	static const short events[3] = { POLLIN, POLLOUT, POLLPRI };
+	static const short ready[3] = { POLLIN | POLLHUP | POLLERR, POLLOUT | POLLERR, POLLPRI | POLLERR };
+	/* (larger sets, as internet play's thread waits on, in a buffer each
+	thread keeps: not one allocation each time) */
+	static __thread struct pollfd *buffer;
+	static __thread int buffer_size;
+	int *lists[3] = { read, write, error };
+	int *counts[3] = { read_count, write_count, error_count };
+	struct pollfd stack[256];
+	struct pollfd *descriptors = stack;
+	long long milliseconds = (long long)timeout_seconds * 1000 + ((long long)timeout_microseconds + 999) / 1000;
+	int total = 0;
+	int list, index;
 	int result;
 
-	maximum = fill_set(&read_set, read, read ? *read_count : 0, maximum);
-	maximum = fill_set(&write_set, write, write ? *write_count : 0, maximum);
-	maximum = fill_set(&error_set, error, error ? *error_count : 0, maximum);
-	timeout.tv_sec = timeout_seconds;
-	timeout.tv_usec = timeout_microseconds;
-	result = select(maximum + 1, read ? &read_set : NULL, write ? &write_set : NULL,
-		error ? &error_set : NULL, infinite ? NULL : &timeout);
+	for (list = 0; list < 3; list++)
+	{
+		if (!lists[list] || !counts[list])
+			lists[list] = NULL;
+		else
+			total += *counts[list];
+	}
+	if (total > (int)(sizeof(stack) / sizeof(*stack)))
+	{
+		if (total > buffer_size)
+		{
+			struct pollfd *larger = realloc(buffer, sizeof(*buffer) * (size_t)total);
+
+			if (!larger)
+			{
+				errno = ENOMEM;
+				return fail();
+			}
+			buffer = larger;
+			buffer_size = total;
+		}
+		descriptors = buffer;
+	}
+	total = 0;
+	for (list = 0; list < 3; list++)
+	{
+		for (index = 0; lists[list] && index < *counts[list]; index++, total++)
+		{
+			descriptors[total].fd = lists[list][index];
+			descriptors[total].events = events[list];
+			descriptors[total].revents = 0;
+		}
+	}
+	result = poll(descriptors, (nfds_t)total, infinite ? -1 :
+		(int)(milliseconds < 0 ? 0 : milliseconds > INT_MAX ? INT_MAX : milliseconds));
+	for (index = 0; index < total && result > 0; index++)
+	{
+		/* (as select fails on a descriptor that is not open) */
+		if (descriptors[index].revents & POLLNVAL)
+		{
+			errno = EBADF;
+			result = -1;
+		}
+	}
 	if (result < 0)
 		return fail();
-	if (write)
+	result = 0;
+	total = 0;
+	for (list = 0; list < 3; list++)
 	{
-		/* Winsock reports a socket writeable once its connect has succeeded;
-		one whose connect failed is not (it is in the error set), where
-		POSIX reports it writeable with the failure in SO_ERROR. The game
-		takes writeable as connected (connect_endpoint). */
-		int index;
+		int kept = 0;
 
-		for (index = 0; index < *write_count; index++)
+		for (index = 0; lists[list] && index < *counts[list]; index++, total++)
 		{
-			int descriptor = write[index];
+			int descriptor = lists[list][index];
 			int pending = 0;
 			socklen_t length = sizeof(pending);
 
-			if (descriptor >= 0 && descriptor < FD_SETSIZE && FD_ISSET(descriptor, &write_set) &&
-				getsockopt(descriptor, SOL_SOCKET, SO_ERROR, &pending, &length) == 0 && pending)
+			if (!(descriptors[total].revents & ready[list]))
+				continue;
+			/* Winsock reports a socket writeable once its connect has
+			succeeded; one whose connect failed is not (it is in the error
+			set), where POSIX reports it writeable with the failure in
+			SO_ERROR. The game takes writeable as connected
+			(connect_endpoint). */
+			if (list == 1 && getsockopt(descriptor, SOL_SOCKET, SO_ERROR, &pending, &length) == 0 && pending)
 			{
-				FD_CLR(descriptor, &write_set);
-				result--;
 				errno = pending;
 				fail();
+				continue;
 			}
+			lists[list][kept++] = descriptor;
 		}
+		if (lists[list])
+			*counts[list] = kept;
+		result += kept;
 	}
-	if (read)
-		keep_ready(&read_set, read, read_count);
-	if (write)
-		keep_ready(&write_set, write, write_count);
-	if (error)
-		keep_ready(&error_set, error, error_count);
 	/* like Winsock, a select with nothing ready leaves the last error as it
 	was: after a connect under way, still WSAEWOULDBLOCK, which the game
 	reads as not connected yet */
@@ -386,7 +434,9 @@ int posix_socket_select(int *read, int *read_count, int *write, int *write_count
 	return result;
 }
 
-posix_ulong posix_local_ipv4_address(void)
+/* the first IPv4 address of an interface that is up, running, not
+loopback and has these flags; or 0 */
+static posix_ulong interface_address(unsigned int flags)
 {
 	struct ifaddrs *addresses, *entry;
 	posix_ulong result = 0;
@@ -395,11 +445,13 @@ posix_ulong posix_local_ipv4_address(void)
 		return 0;
 	for (entry = addresses; entry; entry = entry->ifa_next)
 	{
-		if (entry->ifa_addr && entry->ifa_addr->sa_family == AF_INET)
+		if (entry->ifa_addr && entry->ifa_addr->sa_family == AF_INET &&
+			(entry->ifa_flags & (IFF_UP | IFF_RUNNING | flags)) == (IFF_UP | IFF_RUNNING | flags) &&
+			!(entry->ifa_flags & IFF_LOOPBACK))
 		{
 			struct sockaddr_in *address = (struct sockaddr_in *)entry->ifa_addr;
 
-			if (address->sin_addr.s_addr != htonl(INADDR_LOOPBACK))
+			if ((ntohl(address->sin_addr.s_addr) >> 24) != 127)
 			{
 				result = address->sin_addr.s_addr;
 				break;
@@ -410,6 +462,44 @@ posix_ulong posix_local_ipv4_address(void)
 	return result;
 }
 
+posix_ulong posix_local_ipv4_address(void)
+{
+	struct sockaddr_in route;
+	socklen_t length = sizeof(route);
+	posix_ulong result = 0;
+	int probe;
+
+#ifdef __ANDROID__
+	/* a phone's default route may be its mobile data (on Wi-Fi without the
+	internet, or sharing its connection), which the local network cannot
+	reach: first the local network's interface (Wi-Fi, or the one it
+	shares its connection on), which alone of them has broadcasts */
+	result = interface_address(IFF_BROADCAST);
+	if (result)
+		return result;
+#endif
+	/* the address the default route leaves from: a UDP socket "connected"
+	to an internet address (a documentation one; nothing is sent) has it */
+	probe = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	if (probe >= 0)
+	{
+		memset(&route, 0, sizeof(route));
+		route.sin_family = AF_INET;
+		route.sin_port = htons(9);
+		route.sin_addr.s_addr = htonl(0xC6336401);
+		if (connect(probe, (struct sockaddr *)&route, sizeof(route)) == 0 &&
+			getsockname(probe, (struct sockaddr *)&route, &length) == 0 &&
+			route.sin_addr.s_addr != htonl(INADDR_ANY) && (ntohl(route.sin_addr.s_addr) >> 24) != 127)
+		{
+			result = route.sin_addr.s_addr;
+		}
+		close(probe);
+	}
+	/* no route out (a network without the internet): the first interface
+	that is up, running and not loopback */
+	return result ? result : interface_address(0);
+}
+
 void posix_random_bytes(void *buffer, posix_ulong size)
 {
 	unsigned char *cursor = buffer;
@@ -418,14 +508,37 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 	{
 		ssize_t count = getrandom(cursor, size, 0);
 
+		if (count < 0 && errno == EINTR)
+			continue;
 		if (count <= 0)
-		{
-			if (count < 0 && errno == EINTR)
-				continue;
 			break;
-		}
 		cursor += count;
 		size -= (posix_ulong)count;
+	}
+	if (size)
+	{
+		/* a kernel without getrandom, or a sandbox that refuses it */
+		int descriptor = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+
+		while (descriptor >= 0 && size)
+		{
+			ssize_t count = read(descriptor, cursor, size);
+
+			if (count < 0 && errno == EINTR)
+				continue;
+			if (count <= 0)
+				break;
+			cursor += count;
+			size -= (posix_ulong)count;
+		}
+		if (descriptor >= 0)
+			close(descriptor);
+	}
+	/* the keys and invites made from these must not be guessable */
+	if (size)
+	{
+		fputs("no random numbers from the system: cannot continue\n", stderr);
+		abort();
 	}
 }
 
@@ -482,6 +595,67 @@ int posix_command_line_argument(int index, char *buffer, posix_ulong size)
 posix_ulong posix_process_id(void)
 {
 	return (posix_ulong)getpid();
+}
+
+int posix_user_secret(unsigned char *secret, int size)
+{
+#ifdef __ANDROID__
+	(void)secret;
+	(void)size;
+	return 0;
+#else
+	/* in the user's runtime directory (theirs alone), else their home */
+	const char *runtime = getenv("XDG_RUNTIME_DIR");
+	const char *home = getenv("HOME");
+	char path[1024];
+	int attempt;
+
+	if (runtime && *runtime)
+		snprintf(path, sizeof(path), "%s/halo-ce-universal.key", runtime);
+	else if (home && *home)
+		snprintf(path, sizeof(path), "%s/.halo-ce-universal.key", home);
+	else
+		return 0;
+	for (attempt = 0; attempt < 3; attempt++)
+	{
+		struct stat status;
+		int descriptor = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+		int ok;
+
+		if (descriptor >= 0)
+		{
+			/* only one of the user's that no one else can read */
+			ok = fstat(descriptor, &status) == 0 && S_ISREG(status.st_mode) && status.st_uid == getuid() &&
+				!(status.st_mode & 077);
+			if (ok && read(descriptor, secret, (size_t)size) != size)
+			{
+				/* a key cut short (a write that failed, or was stopped) is made
+				again, but not one another copy is writing now */
+				ok = 0;
+				if (status.st_mtime + 2 < time(NULL) && unlink(path) == 0)
+				{
+					close(descriptor);
+					continue;
+				}
+			}
+			close(descriptor);
+			return ok;
+		}
+		if (errno != ENOENT)
+			return 0;
+		descriptor = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+		/* (another copy of the game made it first: read that one) */
+		if (descriptor < 0)
+			continue;
+		posix_random_bytes(secret, (posix_ulong)size);
+		ok = write(descriptor, secret, (size_t)size) == size;
+		close(descriptor);
+		if (!ok)
+			unlink(path);
+		return ok;
+	}
+	return 0;
+#endif
 }
 
 #ifndef __ANDROID__
@@ -604,13 +778,27 @@ int posix_discord_connect(void)
 					directories[index], subdirectories[subdirectory], number);
 				if (access(address.sun_path, F_OK) != 0)
 					continue;
-				socket_descriptor = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+				/* (not blocking: a client that does not take connections is
+				passed over) */
+				socket_descriptor = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
 				if (socket_descriptor < 0)
 					return -1;
 				if (connect(socket_descriptor, (struct sockaddr *)&address, sizeof(address)) == 0)
 				{
-					fcntl(socket_descriptor, F_SETFL, fcntl(socket_descriptor, F_GETFL) | O_NONBLOCK);
+#ifdef SO_PEERCRED
+					/* only this user's Discord (in /tmp another user may make
+					the socket, and would be given the invite) */
+					struct ucred credentials;
+					socklen_t length = sizeof(credentials);
+
+					if (getsockopt(socket_descriptor, SOL_SOCKET, SO_PEERCRED, &credentials, &length) == 0 &&
+						credentials.uid == getuid())
+					{
+						return socket_descriptor;
+					}
+#else
 					return socket_descriptor;
+#endif
 				}
 				close(socket_descriptor);
 			}
@@ -622,31 +810,15 @@ int posix_discord_connect(void)
 
 int posix_discord_write(int handle, const void *buffer, int length)
 {
-	const char *cursor = buffer;
-	int remaining = length;
-
-	while (remaining > 0)
+	for (;;)
 	{
-		ssize_t written = send(handle, cursor, (size_t)remaining, MSG_NOSIGNAL);
+		ssize_t written = send(handle, buffer, (size_t)length, MSG_NOSIGNAL | MSG_DONTWAIT);
 
-		if (written < 0)
-		{
-			struct pollfd poll_descriptor;
-
-			if (errno == EINTR)
-				continue;
-			if (errno != EAGAIN)
-				return -1;
-			poll_descriptor.fd = handle;
-			poll_descriptor.events = POLLOUT;
-			if (poll(&poll_descriptor, 1, 1000) <= 0)
-				return -1;
-			continue;
-		}
-		cursor += written;
-		remaining -= (int)written;
+		if (written >= 0)
+			return (int)written;
+		if (errno != EINTR)
+			return errno == EAGAIN ? 0 : -1;
 	}
-	return length;
 }
 
 int posix_discord_read(int handle, void *buffer, int length)

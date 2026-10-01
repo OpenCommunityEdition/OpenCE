@@ -35,7 +35,6 @@ void network_game_client_keep_alive(
 short network_game_client_get_state(
 	struct network_game_client *client,
 	short *state_data);
-#ifdef HALO_LINUX
 boolean network_game_client_join_first_available_game(
 	void);
 boolean network_game_client_set_team(
@@ -46,7 +45,6 @@ boolean network_game_client_advertised_game_compatible(
 	struct network_game_client *client,
 	struct network_advertised_game const *game,
 	boolean tell);
-#endif
 boolean network_game_client_initiate_join_game(
 	struct network_game_client *client,
 	struct network_advertised_game *game,
@@ -109,8 +107,6 @@ void network_game_client_game_shutdown(
 boolean network_game_client_handle_game_update(
 	struct network_game_client *client,
 	struct message_server_game_update *game_update);
-void network_game_client_game_out_of_sync(
-	struct network_game_client *client);
 boolean network_game_client_add_player_to_game(
 	struct network_game_client *client,
 	struct network_player *player);
@@ -127,8 +123,6 @@ boolean network_game_client_request_remove_player(
 boolean network_game_client_request_start_time_change(
 	struct network_game_client *client,
 	short request_type);
-boolean network_game_client_leave_game(
-	struct network_game_client *client);
 void network_game_client_switch_to_postgame(
 	struct network_game_client *client);
 boolean network_game_client_switch_to_pregame(
@@ -149,14 +143,15 @@ boolean network_game_client_server_has_started_game(
 	struct network_game_client *client);
 long network_game_client_get_next_update_number(
 	struct network_game_client *client);
-boolean network_client_get_oos(
-	struct network_game_client *client);
 long unstrip_player_index(
 	long player_index);
 
 /* ---------- globals */
 
 extern boolean allow_out_of_sync;
+/* the host's game time when it told this client to start a game in progress,
+16 bits of it (network_client_message_handler.c sets it) */
+extern long network_game_client_late_join_time;
 extern boolean network_game_client_dont_use_directly_in_use;
 extern struct network_game_client network_game_client_dont_use_directly;
 

@@ -78,6 +78,10 @@ static const struct config_setting config_settings[] =
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
+	{ "display.direct_camera", _config_boolean, "true", "HALO_DIRECT_CAMERA", _environment_value, _platform_desktop,
+		"In first person, point the view where the player aims now instead of\n"
+		"where the last tick left it: the view turns the frame the mouse moves,\n"
+		"not up to two ticks (66 ms) later." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -88,6 +92,18 @@ static const struct config_setting config_settings[] =
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
+	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
+		"Magnetism while aiming with the mouse, as with a controller: the view\n"
+		"slowed and dragged along by a target. The last of the mouse and the\n"
+		"right stick to move decides. The bullets' autoaim (bent toward the\n"
+		"target) stays either way." },
+
+	{ "game.console_log", _config_string, "\"important\"", "HALO_CONSOLE_LOG", _environment_value, _platform_all,
+		"What the game's console shows on screen of what it logs: \"important\"\n"
+		"(bans, players dropped for cheating, what refuses a command, and the\n"
+		"asserts that stop the game), \"all\" (every line, the game's own\n"
+		"chatter too), or \"none\" (the asserts that stop the game only). What\n"
+		"a command prints shows whatever this is, and debug.txt has every line." },
 
 	{ "game.language", _config_string, "\"\"", "HALO_LANGUAGE", _environment_value, _platform_all,
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
@@ -108,11 +124,6 @@ static const struct config_setting config_settings[] =
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
 		"the local network." },
-	{ "network.netcode", _config_string, "\"distributed\"", "HALO_NETCODE", _environment_value, _platform_all,
-		"\"distributed\" (work in progress, port/linux/NETCODE.md) predicts each\n"
-		"player's own moves and lets the host decide the rest; \"lockstep\" plays\n"
-		"system link as the Xbox game did. The host's is played: a machine that\n"
-		"joins a game plays its host's." },
 	{ "network.online", _config_boolean, "true", "HALO_NET_ONLINE", _environment_value, _platform_all,
 		"Internet play: hosting makes an invite link (logged, and put on the\n"
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
@@ -156,15 +167,27 @@ static const struct config_setting config_settings[] =
 		"Seconds after hosting that an automated test game starts." },
 	{ "debug.network_test_kill", _config_real, "0.0", "HALO_NETWORK_TEST_KILL", _environment_value, _platform_all,
 		"Every this many seconds an automated test host kills its last player; 0 never." },
+	{ "debug.network_test_score", _config_integer, "0", "HALO_NETWORK_TEST_SCORE", _environment_value, _platform_all,
+		"The score an automated test host's game type plays to (a short game, to\n"
+		"test the next); 0 the game type's own." },
 	{ "debug.network_test_shoot", _config_real, "0.0", "HALO_NETWORK_TEST_SHOOT", _environment_value, _platform_all,
 		"Every this many seconds each automated test player hits the next with\n"
-		"their weapon; 0 never." },
+		"their weapon, within its reach (the host brings far players near the\n"
+		"first a second before); 0 never." },
 	{ "debug.network_test_vehicle", _config_real, "0.0", "HALO_NETWORK_TEST_VEHICLE", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host seats its last\n"
 		"player as a vehicle's driver (and out 15 seconds on); 0 never." },
 	{ "debug.network_test_pickup", _config_real, "0.0", "HALO_NETWORK_TEST_PICKUP", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host stands its last\n"
 		"player on a weapon, which a joining player then picks up; 0 never." },
+	{ "debug.telnet_console", _config_boolean, "false", "HALO_TELNET_CONSOLE", _environment_set_is_true, _platform_all,
+		"Listen on 127.0.0.1 (port telnet_console_port) for a script console that\n"
+		"runs what it is sent as the game's console does, with no password; false\n"
+		"none." },
+	{ "debug.telnet_console_port", _config_integer, "2323", "HALO_TELNET_CONSOLE_PORT", _environment_value,
+		_platform_all,
+		"The port of the script console (telnet_console); the Xbox's was 23, which\n"
+		"only the administrator can listen on." },
 	{ "debug.network_latency", _config_real, "0.0", "HALO_NETWORK_LATENCY", _environment_value, _platform_all,
 		"Milliseconds everything received is held back (a round trip between two\n"
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
@@ -172,7 +195,8 @@ static const struct config_setting config_settings[] =
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
-		"network tests); empty for none." },
+		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
+		"up and down; empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },

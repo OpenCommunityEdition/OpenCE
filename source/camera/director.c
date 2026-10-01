@@ -129,7 +129,6 @@ symbols in this file:
 #include "orbiting_camera.h"
 
 #include "editor/editor_stubs.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "main/console.h"
@@ -137,6 +136,9 @@ symbols in this file:
 
 #include "units/unit_definitions.h"
 #include "units/units.h"
+
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
 
 /* ---------- constants */
 
@@ -185,7 +187,7 @@ static boolean director_update_controls(
 
 /* ---------- globals */
 
-char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
+static char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
 {
 	"following",
 	"orbiting",
@@ -194,14 +196,14 @@ char const *director_camera_mode_names[NUMBER_OF_DIRECTOR_CAMERA_MODES] =
 	"first person"
 };
 
-short const director_game_camera_modes[3] =
+static short const director_game_camera_modes[3] =
 {
 	_camera_first_person,
 	_camera_flying,
 	_camera_following
 };
 
-short const director_script_camera_record_camera_modes[4] =
+static short const director_script_camera_record_camera_modes[4] =
 {
 	_camera_first_person,
 	_camera_flying,
@@ -209,12 +211,12 @@ short const director_script_camera_record_camera_modes[4] =
 	_camera_orbiting
 };
 
-real const ticks_per_millisecond = 0.03f;
-real const friction = 5.f;
-real const acceleration_scale = 25.f;
-real const genius_boy = 1.3f;
+static real const ticks_per_millisecond = 0.03f;
+static real const friction = 5.f;
+static real const acceleration_scale = 25.f;
+static real const genius_boy = 1.3f;
 
-struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
+static struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
 {
 	{ 5, 4, NONE, { 0, 0 }, 0.15f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } },
 	{ 6, 7, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, FALSE, { 0, 0, 0 } },
@@ -222,9 +224,10 @@ struct director_variable_definition variables[NUMBER_OF_DIRECTOR_VARIABLES] =
 	{ 3, 2, NONE, { 0, 0 }, 0.075f, 0.f, -REAL_MAX, REAL_MAX, TRUE, { 0, 0, 0 } }
 };
 
-struct director_globals director_globals = {0};
+static struct director_globals director_globals = {0};
 boolean director_camera_switch_fast = FALSE;
 static boolean hyper_key_down = FALSE;
+boolean *director_camera_scripted;
 
 /* ---------- public code */
 
@@ -238,8 +241,8 @@ static struct director *director_get(
 void director_initialize(
 	void)
 {
-	director_camera_scripted = game_state_malloc("director scripting", NULL, sizeof(*director_camera_scripted));
-	director_camera_scripted->camera_scripted = FALSE;
+	director_camera_scripted = game_state_malloc("director scripting", NULL, 4);
+	*director_camera_scripted = FALSE;
 	return;
 }
 
@@ -263,7 +266,7 @@ void director_dispose_from_old_map(
 		director->debug_controls = FALSE;
 	}
 
-	director_camera_scripted->camera_scripted = FALSE;
+	*director_camera_scripted = FALSE;
 	return;
 }
 
@@ -654,7 +657,7 @@ void director_script_camera(
 {
 	short local_player_index;
 
-	director_camera_scripted->camera_scripted = scripted;
+	*director_camera_scripted = scripted;
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
@@ -700,9 +703,12 @@ static void director_choose_camera_game(
 		struct player_datum *player = player_get(local_player_get_player_index(local_player_index));
 		boolean use_dead_camera = player->unit_index == NONE && player->statistics.deaths > 0;
 
-		if (key)
+		/* (port: not a client in another's game, the host's rules: a flying
+		camera would see all of it, and one behind the player round its
+		corners) */
+		if (key && !network_game_distributed_client())
 			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
-		if (!director_camera_scripted->camera_scripted)
+		if (!*director_camera_scripted)
 		{
 			director_choose_game_perspective(local_player_index, initialize);
 			if (use_dead_camera)
@@ -803,7 +809,6 @@ static boolean director_update_controls(
 		else
 		{
 			byte ticks = gamepad->buttons[_gamepad_analog_button_black];
-#ifdef HALO_LINUX
 			/* The hold count is in 30 Hz ticks (input_xbox.c) and this runs
 			once a frame, several frames a tick: switch once per second held,
 			on the frame the count reaches it. */
@@ -812,9 +817,6 @@ static boolean director_update_controls(
 			switch_camera = ticks > 0 && ticks % TICKS_PER_SECOND == 0 &&
 				ticks != last_ticks[local_player_index];
 			last_ticks[local_player_index] = ticks;
-#else
-			switch_camera = ticks > 0 && ticks % TICKS_PER_SECOND == 0;
-#endif
 		}
 
 		if (director->camera_proc !=
@@ -1051,7 +1053,7 @@ void director_initialize_for_saved_game(
 	void)
 {
 	director_initialize_for_new_map();
-	director_script_camera(director_camera_scripted->camera_scripted);
+	director_script_camera(*director_camera_scripted);
 
 	return;
 }

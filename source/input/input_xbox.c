@@ -265,10 +265,8 @@ static DWORD WINAPI input_keyboard_thread(
 /* ---------- globals */
 
 static struct input_globals input_globals = {0};
-#ifdef HALO_LINUX
 static long gamepad_button_down_times[MAXIMUM_GAMEPADS][NUMBER_OF_GAMEPAD_BUTTONS];
 static long key_down_times[NUMBER_OF_KEYS];
-#endif
 
 static const byte gamepad_analog_button_indices[NUMBER_OF_GAMEPAD_ANALOG_BUTTONS] =
 {
@@ -389,7 +387,6 @@ void update_ticks(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* The native builds read input once a frame and draw several frames per
 30 Hz tick (port/linux/game/render_interpolation.c), so counting frames would
 make a held button count up as many times too fast: reload would turn into a
@@ -422,15 +419,14 @@ static void update_hold_ticks(
 
 	return;
 }
-#endif
 
-void input_unidentified_noop_1(
+static void acquire_input_mutex(
 	void)
 {
 	return;
 }
 
-void input_unidentified_noop_2(
+static void release_input_mutex(
 	void)
 {
 	return;
@@ -706,6 +702,7 @@ void input_frame_begin(
 	void)
 {
 	input_get_device_states();
+	acquire_input_mutex();
 	input_globals.frame_active = TRUE;
 
 	return;
@@ -715,6 +712,7 @@ void input_frame_end(
 	void)
 {
 	input_globals.frame_active = FALSE;
+	release_input_mutex();
 
 	return;
 }
@@ -940,16 +938,10 @@ static void input_get_device_states(
 				{
 					gamepad_state->analog_buttons[button_index] =
 						input_state.Gamepad.bAnalogButtons[gamepad_analog_button_indices[button_index]];
-#ifdef HALO_LINUX
 					update_hold_ticks(
 						&gamepad_state->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + button_index],
 						&gamepad_button_down_times[gamepad_index][FIRST_GAMEPAD_ANALOG_BUTTON + button_index],
 						gamepad_state->analog_buttons[button_index] > gamepad_state->analog_button_thresholds[button_index]);
-#else
-					update_ticks(
-						&gamepad_state->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + button_index],
-						gamepad_state->analog_buttons[button_index] > gamepad_state->analog_button_thresholds[button_index]);
-#endif
 					input_update_analog_button_state(
 						&gamepad_state->analog_button_thresholds[button_index],
 						gamepad_state->analog_buttons[button_index],
@@ -958,16 +950,10 @@ static void input_get_device_states(
 
 				for (button_index = 0; button_index < NUMBER_OF_GAMEPAD_BINARY_BUTTONS; button_index++)
 				{
-#ifdef HALO_LINUX
 					update_hold_ticks(
 						&gamepad_state->buttons[FIRST_GAMEPAD_BINARY_BUTTON + button_index],
 						&gamepad_button_down_times[gamepad_index][FIRST_GAMEPAD_BINARY_BUTTON + button_index],
 						(input_state.Gamepad.wButtons & gamepad_binary_button_masks[button_index]) != 0);
-#else
-					update_ticks(
-						&gamepad_state->buttons[FIRST_GAMEPAD_BINARY_BUTTON + button_index],
-						(input_state.Gamepad.wButtons & gamepad_binary_button_masks[button_index]) != 0);
-#endif
 				}
 
 				input_globals.raw_gamepad_states[gamepad_index].sticks[_gamepad_stick_left].x = input_state.Gamepad.sThumbLX;
@@ -1061,16 +1047,10 @@ static void input_update_keyboard_devices(
 
 		for (key_code = 0; key_code < NUMBER_OF_KEYS; key_code++)
 		{
-#ifdef HALO_LINUX
 			update_hold_ticks(
 				&input_globals.key_ticks[key_code],
 				&key_down_times[key_code],
 				input_globals.key_latches[key_code]);
-#else
-			update_ticks(
-				&input_globals.key_ticks[key_code],
-				input_globals.key_latches[key_code]);
-#endif
 		}
 	}
 
@@ -1135,9 +1115,7 @@ static void input_update_keyboard_devices(
 					if (input_globals.key_ticks[key.key_code] == 0)
 					{
 						input_globals.key_ticks[key.key_code] = 1;
-#ifdef HALO_LINUX
 						key_down_times[key.key_code] = (long)system_milliseconds();
-#endif
 					}
 				}
 			}
@@ -1189,7 +1167,9 @@ static DWORD WINAPI input_keyboard_thread(
 	for (;;)
 	{
 		WaitForSingleObject(input_globals.update_event_handle, INFINITE);
+		acquire_input_mutex();
 		input_flush_rumble();
+		release_input_mutex();
 	}
 
 	return ERROR_SUCCESS;

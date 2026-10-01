@@ -21,10 +21,6 @@ struct qword_value;
 unsigned long randomprime(
 	unsigned long maximum);
 
-unsigned long *primegen(
-	unsigned long maximum,
-	unsigned long *num_primes);
-
 void probable_prime64(
 	struct qword_value *result);
 

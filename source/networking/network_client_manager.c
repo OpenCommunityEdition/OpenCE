@@ -370,7 +370,6 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
-#include "cache/cache_file_precaching.h"
 #include "cache/cache_files.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
@@ -397,27 +396,21 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
 	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
 	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
-#else
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-	MAXIMUM_NETWORK_ADVERTISED_GAMES = 9,
-	MAXIMUM_NUMBER_OF_PLAYERS = 16,
-#endif
 	MAXIMUM_MACHINE_NAME_LENGTH = 32,
 	NETWORK_GAME_NAME_LENGTH = 16,
 	TRANSPORT_NONCE_LENGTH = 8,
 	NETWORK_PLAYER_NAME_LENGTH = 12,
 	NETWORK_GAME_MAP_NAME_LENGTH = 0x100,
-#ifdef HALO_LINUX
 	/* the client's buffer for any message from the server */
 	MAXIMUM_NETWORK_MESSAGE_SIZE = HALO_PORT_MAXIMUM_NETWORK_MESSAGE_SIZE,
-#else
-	MAXIMUM_NETWORK_MESSAGE_SIZE = 0x800,
-#endif
+	/* how long the network may be down in a game before the game ends (as
+	long as the host waits for a silent machine, network_server_manager.c):
+	network_game_client_network_lost */
+	NETWORK_GAME_CLIENT_LINK_DOWN_TIMEOUT = 15000,
 };
 
 enum network_game_client_state
@@ -482,50 +475,6 @@ enum
 	(machine)->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT)
 
 /* ---------- structures */
-
-struct network_machine
-{
-	byte __unknown0[0x40];
-	char machine_index;
-	byte __padding41[3];
-};
-
-struct network_game_map
-{
-	long __unknown0;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte __padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[16];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte __padding10C;
-	byte game_mode;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte __padding10F;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	short __unknown426;
-	unsigned long random_seed;
-	byte __unknown42C[4];
-	struct network_game_local_data local_data;
-};
 
 struct transport_key_id
 {
@@ -621,23 +570,6 @@ struct message_server_game_update
 	struct player_action player_actions[MAXIMUM_NUMBER_OF_PLAYERS];
 };
 
-struct server_update
-{
-	word local_player_count;
-	byte __padding2[2];
-	struct player_action player_actions[MAXIMUM_NUMBER_OF_PLAYERS];
-};
-
-struct message_client_graceful_game_exit_pregame
-{
-	long opaque;
-};
-
-struct message_client_graceful_game_exit_postgame
-{
-	long opaque;
-};
-
 struct message_client_loaded
 {
 	long opaque;
@@ -657,10 +589,15 @@ struct message_client_ping
 	byte __padding6[2];
 };
 
+/* port/linux/src/p2p.c's */
+void p2p_hardware_id(char *hex, int size);
+
 struct message_client_join_game_request
 {
 	wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
 	byte join_token[0x10];
+	/* port: this machine's hardware id, as hex (p2p.c's p2p_hardware_id) */
+	char hardware_id[0x20];
 };
 
 struct message_client_map_is_precached_pregame
@@ -703,13 +640,11 @@ struct network_game_client
 	unsigned long join_in_progress;
 	unsigned long last_broadcast_search_time;
 	unsigned long next_update_number;
-	unsigned long last_update_time;
-	long last_precache_time;
+	unsigned long last_precache_time;
 	short seconds_to_game_start;
 	word state;
 	short error;
 	word flags;
-	boolean out_of_sync;
 	boolean connection_silent;
 };
 
@@ -717,49 +652,26 @@ typedef char network_machine_size_assert[
 	sizeof(struct network_machine) == 0x44 ? 1 : -1];
 typedef char player_profile_size_assert[
 	sizeof(struct player_profile) == 0x30 ? 1 : -1];
-#ifdef HALO_LINUX
 /* the update and settings layouts follow the session limits
 (port/linux/include/halo_port_limits.h) */
 typedef char message_server_game_update_size_assert[
 	sizeof(struct message_server_game_update) == 0x10 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
-typedef char server_update_size_assert[
-	sizeof(struct server_update) == 4 + MAXIMUM_NUMBER_OF_PLAYERS * 0x20 ? 1 : -1];
-#else
-typedef char message_server_game_update_size_assert[
-	sizeof(struct message_server_game_update) == 0x210 ? 1 : -1];
-typedef char server_update_size_assert[
-	sizeof(struct server_update) == 0x204 ? 1 : -1];
-#endif
 typedef char message_server_machine_accepted_size_assert[
 	sizeof(struct message_server_machine_accepted) == 8 ? 1 : -1];
 typedef char message_client_settings_request_size_assert[
 	sizeof(struct message_client_settings_request) == 0x44 ? 1 : -1];
-#ifdef HALO_LINUX
 typedef char network_game_size_assert[
 	sizeof(struct network_game) == HALO_PORT_NETWORK_GAME_SIZE ? 1 : -1];
-#else
-typedef char network_game_size_assert[
-	sizeof(struct network_game) == 0x434 ? 1 : -1];
-#endif
 typedef char network_game_map_name_offset_assert[
 	offsetof(struct network_game, map.name) == 0x24 ? 1 : -1];
 typedef char network_game_machine_count_offset_assert[
 	offsetof(struct network_game, machine_count) == 0x112 ? 1 : -1];
-#ifdef HALO_LINUX
 typedef char network_game_local_data_offset_assert[
 	offsetof(struct network_game, local_data) == HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET ? 1 : -1];
 typedef char network_game_player_count_offset_assert[
 	offsetof(struct network_game, player_count) == HALO_PORT_NETWORK_GAME_PLAYER_COUNT_OFFSET ? 1 : -1];
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
-#else
-typedef char network_game_local_data_offset_assert[
-	offsetof(struct network_game, local_data) == 0x430 ? 1 : -1];
-typedef char network_game_player_count_offset_assert[
-	offsetof(struct network_game, player_count) == 0x224 ? 1 : -1];
-typedef char network_game_players_offset_assert[
-	offsetof(struct network_game, players) == 0x226 ? 1 : -1];
-#endif
 typedef char network_advertised_game_update_time_offset_assert[
 	offsetof(struct network_advertised_game, update_time) == 0x2C ? 1 : -1];
 typedef char network_advertised_game_size_assert2[
@@ -796,7 +708,6 @@ typedef char network_game_client_join_parameters_offset_assert[
 	offsetof(struct network_game_client, join_parameters) == 0x838 ? 1 : -1];
 typedef char network_game_client_game_offset_assert[
 	offsetof(struct network_game_client, game) == 0x85C ? 1 : -1];
-#ifdef HALO_LINUX
 /* the fields after the game settings record move with its size */
 #define NETWORK_GAME_CLIENT_TAIL_OFFSET (0x85C + HALO_PORT_NETWORK_GAME_SIZE)
 typedef char network_game_client_join_in_progress_offset_assert[
@@ -805,51 +716,22 @@ typedef char network_game_client_next_update_number_offset_assert[
 	offsetof(struct network_game_client, next_update_number) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 8 ? 1 : -1];
 typedef char network_game_client_last_broadcast_search_time_offset_assert[
 	offsetof(struct network_game_client, last_broadcast_search_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 4 ? 1 : -1];
-typedef char network_game_client_last_update_time_offset_assert[
-	offsetof(struct network_game_client, last_update_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0xC ? 1 : -1];
 typedef char network_game_client_flags_offset_assert[
-	offsetof(struct network_game_client, flags) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1A ? 1 : -1];
+	offsetof(struct network_game_client, flags) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x16 ? 1 : -1];
 typedef char network_game_client_last_precache_time_offset_assert[
-	offsetof(struct network_game_client, last_precache_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
-#else
-typedef char network_game_client_join_in_progress_offset_assert[
-	offsetof(struct network_game_client, join_in_progress) == 0xC90 ? 1 : -1];
-typedef char network_game_client_next_update_number_offset_assert[
-	offsetof(struct network_game_client, next_update_number) == 0xC98 ? 1 : -1];
-typedef char network_game_client_last_broadcast_search_time_offset_assert[
-	offsetof(struct network_game_client, last_broadcast_search_time) == 0xC94 ? 1 : -1];
-typedef char network_game_client_last_update_time_offset_assert[
-	offsetof(struct network_game_client, last_update_time) == 0xC9C ? 1 : -1];
-typedef char network_game_client_flags_offset_assert[
-	offsetof(struct network_game_client, flags) == 0xCAA ? 1 : -1];
-typedef char network_game_client_last_precache_time_offset_assert[
-	offsetof(struct network_game_client, last_precache_time) == 0xCA0 ? 1 : -1];
-#endif
+	offsetof(struct network_game_client, last_precache_time) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0xC ? 1 : -1];
 typedef char message_client_broadcast_game_search_size_assert[
 	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
 typedef char message_client_join_game_request_size_assert[
-	sizeof(struct message_client_join_game_request) == 0x50 ? 1 : -1];
-#ifdef HALO_LINUX
+	sizeof(struct message_client_join_game_request) == 0x70 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
-	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x14 ? 1 : -1];
+	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
-	offsetof(struct network_game_client, error) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x18 ? 1 : -1];
-typedef char network_game_client_out_of_sync_offset_assert[
-	offsetof(struct network_game_client, out_of_sync) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1C ? 1 : -1];
+	offsetof(struct network_game_client, error) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x14 ? 1 : -1];
 typedef char network_game_client_connection_silent_offset_assert[
-	offsetof(struct network_game_client, connection_silent) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x1D ? 1 : -1];
-#else
-typedef char network_game_client_seconds_to_game_start_offset_assert[
-	offsetof(struct network_game_client, seconds_to_game_start) == 0xCA4 ? 1 : -1];
-typedef char network_game_client_error_offset_assert[
-	offsetof(struct network_game_client, error) == 0xCA8 ? 1 : -1];
-typedef char network_game_client_out_of_sync_offset_assert[
-	offsetof(struct network_game_client, out_of_sync) == 0xCAC ? 1 : -1];
-typedef char network_game_client_connection_silent_offset_assert[
-	offsetof(struct network_game_client, connection_silent) == 0xCAD ? 1 : -1];
-#endif
+	offsetof(struct network_game_client, connection_silent) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x18 ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -863,8 +745,13 @@ static boolean add_advertised_game(
 	struct message_server_game_advertise *advertisement);
 static boolean network_game_client_process_incoming_messages(
 	struct network_game_client *client);
+static boolean network_game_client_process_last_messages(
+	struct network_game_client *client);
 static void network_game_client_update_precache_status(
 	struct network_game_client *client);
+static boolean network_game_client_map_name_is_valid(
+	char const *map_name,
+	long size);
 static boolean network_game_client_idle_searching(
 	struct network_game_client *client);
 static boolean network_game_client_idle_joining(
@@ -878,12 +765,28 @@ static boolean network_game_client_idle_postgame(
 
 /* ---------- globals */
 
-#ifdef HALO_LINUX
 /* the host's game time when it told this client to start a game in
 progress, 16 bits of it (0 for a game starting); and whether the first game
-update is to bring the rest */
+update is to bring the host's time (at every start) */
 long network_game_client_late_join_time;
 static boolean network_game_client_late_join_clock_pending;
+
+/* whether the automated tests' join has told the player why a host cannot
+be joined (network_game_client_join_first_available_game) */
+static boolean network_game_client_incompatibility_told;
+
+/* when each controller last asked the host for its player in the pregame
+(network_game_client_add_player): the pregame screen asks every frame, and
+is answered once every half second. A removal asked for since lets the next
+ask go at once, so that a quick join again is not taken for a repeat. */
+static unsigned long network_game_client_add_player_request_times[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+static boolean network_game_client_add_player_requested[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+/* since when the network has been down in a game (while
+network_game_client_link_down is set): network_game_client_network_lost */
+static unsigned long network_game_client_link_down_time;
+static unsigned long network_game_client_link_checked_time;
+static boolean network_game_client_link_down;
 
 /* each advertised game's host's network version and netcode, by its place
 in the client's available_games (HALO_PORT_NETWORK_VERSION) */
@@ -893,12 +796,75 @@ static struct
 	byte flags;
 } network_game_client_advertised_versions[MAXIMUM_NETWORK_ADVERTISED_GAMES];
 
-#endif
 struct network_game_client network_game_client_dont_use_directly;
 boolean allow_out_of_sync = FALSE;
 boolean network_game_client_dont_use_directly_in_use = FALSE;
 
 /* ---------- public code */
+
+/* transport_network_available asks the system for its interfaces
+(getifaddrs): asked at most once a second, not every frame */
+static boolean network_game_client_network_available(
+	void)
+{
+	static boolean asked = FALSE;
+	static boolean available;
+	static unsigned long ask_time;
+	unsigned long now = system_milliseconds();
+
+	if (!asked || now - ask_time >= 1000)
+	{
+		available = transport_network_available();
+		ask_time = now;
+		asked = TRUE;
+	}
+
+	return available;
+}
+
+/* port: whether the network has been down too long for a game to go on. In
+a game, a network that goes down for a moment (the IPv4 address lost while
+Wi-Fi roams or DHCP renews) does not end it at once: only one down for as
+long as the host waits for a machine it hears nothing from
+(NETWORK_GAME_CLIENT_LINK_DOWN_TIMEOUT). Out of a game it ends at once
+(check_networking_and_generate_error). */
+static boolean network_game_client_network_lost(
+	void)
+{
+	unsigned long now = system_milliseconds();
+	boolean lost = FALSE;
+
+	/* (a time down from before the last check a moment ago is not counted:
+	the network was not asked in between) */
+	if (now - network_game_client_link_checked_time > 2000)
+	{
+		network_game_client_link_down = FALSE;
+	}
+	network_game_client_link_checked_time = now;
+
+	if (network_game_client_network_available())
+	{
+		if (network_game_client_link_down)
+		{
+			network_event(
+				"the network is back after %lu ms",
+				now - network_game_client_link_down_time);
+			network_game_client_link_down = FALSE;
+		}
+	}
+	else if (!network_game_client_link_down)
+	{
+		network_event("the network went down (in game); waiting for it to come back");
+		network_game_client_link_down = TRUE;
+		network_game_client_link_down_time = now;
+	}
+	else if (now - network_game_client_link_down_time >= NETWORK_GAME_CLIENT_LINK_DOWN_TIMEOUT)
+	{
+		lost = TRUE;
+	}
+
+	return lost;
+}
 
 static boolean check_networking_and_generate_error(
 	void)
@@ -907,7 +873,7 @@ static boolean check_networking_and_generate_error(
 
 	if (!network_game_is_splitscreen_local())
 	{
-		connected = transport_network_available();
+		connected = network_game_client_network_available();
 
 		if (!connected)
 		{
@@ -936,31 +902,6 @@ void network_game_client_dispose(
 	}
 
 	network_event("network client disposed");
-
-	return;
-}
-
-void network_game_client_game_out_of_sync(
-	struct network_game_client *client)
-{
-	short local_player_index;
-
-	if (!allow_out_of_sync)
-	{
-		network_event("local machine is out of sync with the server");
-
-		if (!client->out_of_sync)
-		{
-			for (local_player_index = local_player_get_next(NONE);
-				local_player_index != NONE;
-				local_player_index = local_player_get_next(local_player_index))
-			{
-				display_error(8, local_player_index, TRUE, FALSE);
-			}
-		}
-
-		client->out_of_sync = TRUE;
-	}
 
 	return;
 }
@@ -1021,6 +962,9 @@ boolean network_game_client_set_machine(
 		0x1E1,
 		client && (client->machine_index<MAXIMUM_NETWORK_MACHINE_COUNT) && network_machine_is_valid(machine));
 
+	/* port: the assert is not checked in release builds */
+	if (client->machine_index >= MAXIMUM_NETWORK_MACHINE_COUNT)
+		return FALSE;
 	csmemcpy(
 		&client->game.machines[client->machine_index],
 		machine,
@@ -1058,10 +1002,10 @@ boolean network_game_client_switch_to_pregame(
 		network_connection_keep_alive(client->connection);
 		client->next_update_number = 0;
 		client->join_in_progress = TRUE;
-		client->last_update_time = 0;
 		client->connection_silent = FALSE;
 		client->state = _network_game_client_state_pregame;
-		client->out_of_sync = FALSE;
+		network_game_client_late_join_time = 0;
+		network_game_client_late_join_clock_pending = FALSE;
 		network_event("switching to pregame");
 		network_game_reset_to_pregame_ui();
 		network_connection_keep_alive(client->connection);
@@ -1235,17 +1179,6 @@ long network_game_client_get_next_update_number(
 	return client->next_update_number;
 }
 
-boolean network_client_get_oos(
-	struct network_game_client *client)
-{
-	match_assert(
-		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
-		0x4E5,
-		client);
-
-	return client->out_of_sync;
-}
-
 boolean network_game_client_write(
 	struct network_connection *connection,
 	message_header *message,
@@ -1321,12 +1254,27 @@ boolean network_game_client_game_settings_updated(
 	if (message_packet->machine_count >= 0 &&
 		message_packet->machine_count <= MAXIMUM_NETWORK_MACHINE_COUNT &&
 		message_packet->player_count >= 0 &&
-		message_packet->player_count <= MAXIMUM_NUMBER_OF_PLAYERS)
+		message_packet->player_count <= MAXIMUM_NUMBER_OF_PLAYERS &&
+		network_game_client_map_name_is_valid(message_packet->map.name, sizeof(message_packet->map.name)) &&
+		VALID_INDEX(message_packet->difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS))
 	{
 		struct network_game previous_game;
 
 		if (csstrcmp(message_packet->map.name, client->game.map.name))
 		{
+			char build[0x20];
+
+			/* port: a map of a build this version does not play with others
+			(its objects would not be the host's): said, and the game left */
+			if (!network_game_is_splitscreen_local() &&
+				!cache_files_map_plays_multiplayer(message_packet->map.name, build))
+			{
+				cache_files_show_multiplayer_unavailable(message_packet->map.name, build);
+				/* (the menu's error the join's, not the connection lost that
+				the failure would otherwise give) */
+				display_error_when_main_menu_loaded(_error_network_failed_to_join_game);
+				return FALSE;
+			}
 			network_event("precaching map '%s'...", message_packet->map.name);
 			main_set_multiplayer_map_name(message_packet->map.name);
 		}
@@ -1351,9 +1299,10 @@ boolean network_game_client_game_settings_updated(
 	}
 
 	network_event(
-		"invalid message_server_game_settings_update message received player count %d machine count %d",
+		"invalid message_server_game_settings_update message received player count %d machine count %d difficulty %d",
 		message_packet->player_count,
-		message_packet->machine_count);
+		message_packet->machine_count,
+		message_packet->difficulty);
 
 	return FALSE;
 }
@@ -1372,134 +1321,6 @@ void network_game_client_new_advertised_game(
 	return;
 }
 
-boolean network_game_client_leave_game(
-	struct network_game_client *client)
-{
-	boolean success = TRUE;
-
-	match_assert(
-		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
-		0x179,
-		client && client->connection);
-
-	network_event("leaving network game");
-
-	switch (client->state)
-	{
-	case _network_game_client_state_searching:
-		match_assert(
-			"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
-			0x180,
-			!network_connection_connected(client->connection));
-		break;
-
-	case _network_game_client_state_joining:
-		if (client->connect_process)
-		{
-			cancel_connect_process(client->connect_process);
-			client->connect_process = 0;
-		}
-
-		if ((boolean)network_connection_connected(client->connection))
-		{
-			if (!(success = network_connection_disconnect(client->connection)))
-			{
-				network_event("network_connection_disconnect() failed _network_game_client_state_joining");
-			}
-		}
-		break;
-
-	case _network_game_client_state_pregame:
-	{
-		struct message_client_graceful_game_exit_pregame graceful_game_exit = {0};
-		message_header *message;
-
-		if ((boolean)network_connection_connected(client->connection))
-		{
-			message = create_network_game_message(
-				_message_client_graceful_game_exit_pregame,
-				&graceful_game_exit,
-				sizeof(graceful_game_exit));
-
-			if (message)
-			{
-				if (!network_game_client_write(
-					client->connection,
-					message,
-					GET_MESSAGE_SIZE(*message),
-					NULL,
-					1))
-				{
-					network_event("network_game_client_write() failed while sending a message_client_graceful_game_exit_pregame message");
-				}
-			}
-			else
-			{
-				network_event("failed to create a message_client_graceful_game_exit_pregame message");
-			}
-
-			if (!(success = network_connection_disconnect(client->connection)))
-			{
-				network_event("network_connection_disconnect() failed _network_game_client_state_pregame");
-			}
-		}
-	}
-	break;
-
-	case _network_game_client_state_ingame:
-		if ((boolean)network_connection_connected(client->connection))
-		{
-			if (!(success = network_connection_disconnect(client->connection)))
-			{
-				network_event("network_connection_disconnect() failed _network_game_client_state_ingame");
-			}
-		}
-		break;
-
-	case _network_game_client_state_postgame:
-	{
-		struct message_client_graceful_game_exit_postgame graceful_game_exit = {0};
-		message_header *message;
-
-		if ((boolean)network_connection_connected(client->connection))
-		{
-			message = create_network_game_message(
-				_message_client_graceful_game_exit_postgame,
-				&graceful_game_exit,
-				sizeof(graceful_game_exit));
-
-			if (message)
-			{
-				if (!network_game_client_write(
-					client->connection,
-					message,
-					GET_MESSAGE_SIZE(*message),
-					NULL,
-					1))
-				{
-					network_event("network_game_client_write() failed while sending a message_client_graceful_game_exit_postgame message");
-				}
-			}
-
-			if (!(success = network_connection_disconnect(client->connection)))
-			{
-				network_event("network_connection_disconnect() failed _network_game_client_state_postgame");
-			}
-		}
-	}
-	break;
-
-	default:
-		network_event("client is in an unknown state");
-		break;
-	}
-
-	network_game_invalidate(&client->game);
-	client->state = _network_game_client_state_searching;
-
-	return success;
-}
-
 boolean network_game_client_request_remove_player(
 	struct network_game_client *client,
 	struct network_player *player)
@@ -1515,13 +1336,21 @@ boolean network_game_client_request_remove_player(
 	match_vassert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x209,
-		client->game.machines[client->machine_index].machine_index ==
+		client->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT &&
+			client->game.machines[client->machine_index].machine_index ==
 			player->machine_index,
 		"client's can only remove players from their own machines");
 
 	network_event(
 		"requesting a player removal (controller index #%d)",
 		player->controller_index);
+
+	/* (the controller's next join goes at once: network_game_client_add_player) */
+	if (player->controller_index >= 0 &&
+		player->controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+	{
+		network_game_client_add_player_requested[player->controller_index] = FALSE;
+	}
 
 	switch (client->state)
 	{
@@ -1626,6 +1455,22 @@ boolean network_game_client_add_player(
 		0x530,
 		client && (local_player_index>=0) && (local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS));
 
+	/* port: the pregame screen asks each frame until the host's settings
+	have the player: once every half second, not each frame (the host
+	refused and logged each repeat) */
+	if (client->state == _network_game_client_state_pregame)
+	{
+		unsigned long now = system_milliseconds();
+
+		if (network_game_client_add_player_requested[local_player_index] &&
+			now - network_game_client_add_player_request_times[local_player_index] < 500)
+		{
+			return TRUE;
+		}
+		network_game_client_add_player_requested[local_player_index] = TRUE;
+		network_game_client_add_player_request_times[local_player_index] = now;
+	}
+
 	player_ui_get_active_player_profile(local_player_index, &profile);
 
 	player.controller_index = (char)local_player_index;
@@ -1716,32 +1561,19 @@ boolean network_game_client_handle_game_update(
 	struct network_game_client *client,
 	struct message_server_game_update *message_packet)
 {
-	struct server_update update;
-
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
 		0x40D,
 		client && message_packet);
 
-	if (message_packet->local_player_count < client->game.player_count)
-	{
-		csmemset(
-			&message_packet->player_actions[message_packet->local_player_count],
-			0,
-			(client->game.player_count - message_packet->local_player_count) *
-				sizeof(struct player_action));
-		message_packet->local_player_count = client->game.player_count;
-	}
-
-#ifdef HALO_LINUX
-	/* (the distributed netcode's machines keep their own clocks: a machine
-	that joined the game in progress takes up the host's count where it is) */
-	if (network_game_distributed() && message_packet->update_number != client->next_update_number)
-	{
-		client->next_update_number = message_packet->update_number;
-	}
-	/* (a game in progress past 16 bits of ticks: the host's whole time, if
-	it is ahead; never back, which the host would take for old messages) */
+	/* (every machine ticks on its own clock with the inputs the host relays,
+	network_distributed.c: the host's game update carries no actions, and
+	keeps only the count of updates, which a machine that joined the game in
+	progress takes up where it is) */
+	client->next_update_number = message_packet->update_number + 1;
+	/* (the host's time at the start, and a game in progress's past 16 bits
+	of ticks: the host's whole time, if it is ahead; never back, which the
+	host would take for old messages) */
 	if (network_game_client_late_join_clock_pending)
 	{
 		network_game_client_late_join_clock_pending = FALSE;
@@ -1751,76 +1583,21 @@ boolean network_game_client_handle_game_update(
 			network_event("the game in progress is at game tick #%ld", message_packet->game_time);
 		}
 	}
-#endif
-	if (message_packet->update_number != client->next_update_number)
+	/* port: and whenever the host's time is more than a second ahead: the
+	clock catches up no more than a second (game_time_update), so a stall
+	longer than that (the app in the background, a hitch) left this machine
+	behind the host for the rest of the game. The host's time is when it
+	sent the update, before this machine's by the way there, so a clock in
+	step is never moved; one behind is, at the next update (once a second at
+	least) */
+	else if (message_packet->game_time > game_time_get() + TICKS_PER_SECOND)
 	{
 		network_event(
-			"out of sync: missed a server update (expected #%ld, got #%ld)",
-			client->next_update_number,
-			message_packet->update_number);
-		network_game_client_game_out_of_sync(client);
+			"the host's clock is %ld ticks ahead of this machine's; taking its game tick #%ld",
+			message_packet->game_time - game_time_get(),
+			message_packet->game_time);
+		game_time_set_distributed(message_packet->game_time);
 	}
-	else if (!global_network_game_server_get()
-#ifdef HALO_LINUX
-		/* (the distributed netcode's machines simulate on their own clocks,
-		so the host's seed at a tick says nothing about a client's) */
-		&& !network_game_distributed()
-#endif
-		)
-	{
-		if (game_time_get() == message_packet->update_number &&
-			message_packet->game_time != game_time_get())
-		{
-			network_event(
-				"not a bug, but update %d time %d our time %d",
-				message_packet->update_number,
-				message_packet->game_time,
-				game_time_get());
-		}
-
-		if (game_time_get() == message_packet->game_time)
-		{
-			if (message_packet->random_seed != get_random_seed())
-			{
-				network_event(
-					"out of sync: client/server random seed mismatch, update= #%ld, game time= #%ld (%ld) (#%lx/#%lx)",
-					message_packet->update_number,
-					game_time_get(),
-					message_packet->game_time,
-					get_random_seed(),
-					message_packet->random_seed);
-				network_game_client_game_out_of_sync(client);
-			}
-		}
-
-		if (message_packet->update_number % 30 == 0)
-		{
-			network_event(
-				"client is lagging behind the server by #%d game ticks",
-				message_packet->update_number - game_time_get());
-		}
-	}
-
-	update.local_player_count = message_packet->local_player_count;
-
-	csmemcpy(
-		update.player_actions,
-		message_packet->player_actions,
-		update.local_player_count * sizeof(struct player_action));
-
-#ifdef HALO_LINUX
-	/* port: the distributed netcode's client plays on its own clock with the
-	inputs the host relays (network_distributed.c, update_client_dequeue);
-	the host's game update carries no actions and only keeps the count of
-	updates. There is nothing to queue, and its queue follows this machine's
-	ticks rather than the host's update numbers, so queueing it failed (and
-	logged "failed to get an update") on every tick. */
-	if (!network_game_distributed())
-#endif
-	update_client_handle_server_update(&update, message_packet->update_number);
-
-	client->next_update_number++;
-	client->last_update_time = system_milliseconds();
 
 	return TRUE;
 }
@@ -1828,10 +1605,8 @@ boolean network_game_client_handle_game_update(
 boolean network_game_client_game_has_started(
 	struct network_game_client *client)
 {
-#ifdef HALO_LINUX
 	/* (the host's time came with the start: the loading below is counted) */
 	unsigned long loading_started = system_milliseconds();
-#endif
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
@@ -1845,24 +1620,19 @@ boolean network_game_client_game_has_started(
 	{
 		long network_player_index;
 
+		/* (this machine's players need not be in adjacent slots) */
 		for (network_player_index = 0;
 			network_player_index < MAXIMUM_NUMBER_OF_PLAYERS;
 			network_player_index++)
 		{
-			if (client->game.players[network_player_index].machine_index == client->machine_index)
-			{
-				for (;
-					client->game.players[network_player_index].machine_index == client->machine_index &&
-					network_player_is_valid(&client->game.players[network_player_index]);
-					network_player_index++)
-				{
-					local_player_set_player_index(
-						client->game.players[network_player_index].controller_index,
-						unstrip_player_index(
-							client->game.players[network_player_index].player_list_index));
-				}
+			struct network_player *player = &client->game.players[network_player_index];
 
-				break;
+			if (network_player_is_valid(player) &&
+				player->machine_index == client->machine_index)
+			{
+				local_player_set_player_index(
+					player->controller_index,
+					unstrip_player_index(player->player_list_index));
 			}
 		}
 
@@ -1888,27 +1658,28 @@ boolean network_game_client_game_has_started(
 
 					client->state = _network_game_client_state_ingame;
 					client->next_update_number = 0;
-					client->last_update_time = 0;
 					client->connection_silent = FALSE;
 
 					ui_widgets_close_all();
 					game_time_start();
-#ifdef HALO_LINUX
 					/* (a game in progress: the host's time when it said to start,
 					and the ticks this machine spent loading it) */
-					if (network_game_distributed() && network_game_client_late_join_time > 0)
+					if (network_game_client_late_join_time > 0)
 					{
 						unsigned long elapsed = system_milliseconds() - loading_started;
 						/* (no longer than a minute: a stalled clock counts nothing) */
 						long ticks = elapsed < 60000UL ? (long)(elapsed * TICKS_PER_SECOND / 1000) : 0;
 
 						game_time_set_distributed(network_game_client_late_join_time + ticks);
-						network_game_client_late_join_clock_pending = TRUE;
 						network_event("joined the game in progress at game tick #%ld",
 							network_game_client_late_join_time + ticks);
 					}
 					network_game_client_late_join_time = 0;
-#endif
+					/* (the clock waits for the host's first game update, which
+					brings the host's time, game_time_update: at a start the host
+					ticks only once every machine has loaded) */
+					network_game_client_late_join_clock_pending =
+						game_connection() == _game_connection_network_client;
 					game_initial_pulse();
 				}
 				else
@@ -1967,6 +1738,9 @@ boolean network_game_client_remove_player(
 
 			if (reason != NONE)
 			{
+				/* (a quit time this clock has passed would never be reached,
+				game.c) */
+				reason = MAX(reason, game_time_get() + 1);
 				error(
 					_error_silent,
 					"%x quit of of game at tick %d (now %d)",
@@ -1974,6 +1748,10 @@ boolean network_game_client_remove_player(
 					reason,
 					game_time_get());
 				player_datum->quit_out_of_game_time = reason;
+				/* (and is no longer its machine's: a machine that joins the
+				game in progress at its index fills the list afresh,
+				players.c) */
+				machine_remove_player(player_index);
 			}
 
 			for (network_player_index = 0;
@@ -2133,7 +1911,6 @@ boolean network_game_client_add_player_to_game(
 		{
 			if (client->state == _network_game_client_state_ingame)
 			{
-#ifdef HALO_LINUX
 				/* port: the slot it went in, which in the distributed netcode's
 				games need not be the last (network_game_add_player) */
 				{
@@ -2152,9 +1929,6 @@ boolean network_game_client_add_player_to_game(
 						}
 					}
 				}
-#else
-				player = &client->game.players[client->game.player_count - 1];
-#endif
 
 				success = network_game_spawn_player(player);
 
@@ -2162,7 +1936,6 @@ boolean network_game_client_add_player_to_game(
 				{
 					long player_index = unstrip_player_index(player->player_list_index);
 
-#ifdef HALO_LINUX
 					/* port: a player added to the game in progress gets its team
 					and the game type's data, as the players at the start have
 					(game_initial_pulse); otherwise it keeps player_new's team 1,
@@ -2173,7 +1946,6 @@ boolean network_game_client_add_player_to_game(
 
 						game_engine_player_added(player_index);
 					}
-#endif
 					if (player->machine_index == client->machine_index)
 					{
 						local_player_set_player_index(
@@ -2227,6 +1999,9 @@ boolean network_game_client_initiate_join_game(
 
 	if (success == TRUE)
 	{
+		/* port: the join's wait counted from the connection made, not from
+		before a connect that took seconds (idle_joining) */
+		network_connection_keep_alive(client->connection);
 		client->state = _network_game_client_state_joining;
 		network_event(
 			"attempting to connect to game @ %s",
@@ -2234,6 +2009,7 @@ boolean network_game_client_initiate_join_game(
 	}
 	else
 	{
+		client->join_in_progress = FALSE;
 		display_error_when_main_menu_loaded(7);
 		network_event(
 			"failed attempt to initiate a connection to game @ %s",
@@ -2259,7 +2035,7 @@ void network_game_client_ponged(
 	{
 		unsigned long now = system_milliseconds();
 
-		if (timestamp <= now)
+		if ((long)(now - (unsigned long)timestamp) >= 0)
 		{
 			client->average_ping = (word)((client->average_ping *
 				client->ping_sample_count + now - timestamp) /
@@ -2284,6 +2060,7 @@ boolean network_game_client_address_matches_server(
 	struct transport_address *address)
 {
 	struct transport_address server_address;
+	struct transport_address server_unreliable_address;
 	boolean address_matches;
 
 	match_assert(
@@ -2304,9 +2081,14 @@ boolean network_game_client_address_matches_server(
 		address->address.long_words[0],
 		"address->address.ipv4_address");
 
-	network_connection_get_address(client->connection, &server_address, NULL);
+	network_connection_get_address(client->connection, &server_address, &server_unreliable_address);
 
-	address_matches = server_address.address.long_words[0] == address->address.long_words[0];
+	/* port: the host's stream's peer, or its datagrams' (internet play's
+	tunnel has them at different local addresses: the client's datagram
+	socket is connected to the host, so what comes to it is the host's) */
+	address_matches = server_address.address.long_words[0] == address->address.long_words[0] ||
+		(server_unreliable_address.address.long_words[0] &&
+			server_unreliable_address.address.long_words[0] == address->address.long_words[0]);
 
 	return address_matches;
 }
@@ -2370,11 +2152,11 @@ void network_game_client_reset(
 	client->machine_index = NONE;
 	client->state = _network_game_client_state_searching;
 
+	/* (port: or one that was lost, whose socket stays until it is torn down) */
 	if (teardown_connection && client->connection &&
-		(boolean)network_connection_connected(client->connection))
+		((boolean)network_connection_connected(client->connection) ||
+			!network_connection_active(client->connection)))
 	{
-		client->join_in_progress = TRUE;
-
 		if (network_connection_disconnect(client->connection))
 		{
 			SET_FLAG(
@@ -2393,12 +2175,15 @@ void network_game_client_reset(
 
 	SET_FLAG(client->flags, _network_game_client_join_request_sent_bit, FALSE);
 	client->error = _network_game_client_error_none;
+	client->join_in_progress = FALSE;
 	client->last_broadcast_search_time = 0;
 	client->next_update_number = 0;
-	client->last_update_time = 0;
 	client->connection_silent = FALSE;
-	client->out_of_sync = FALSE;
 	client->seconds_to_game_start = NONE;
+	network_game_client_late_join_time = 0;
+	network_game_client_late_join_clock_pending = FALSE;
+	network_game_client_incompatibility_told = FALSE;
+	csmemset(network_game_client_add_player_requested, 0, sizeof(network_game_client_add_player_requested));
 
 	return;
 }
@@ -2487,12 +2272,34 @@ void network_game_client_rejected_by_game(
 		"unable to join game: reason= #%d/%s",
 		rejection_code,
 		reason);
+	/* port: the join went to the pregame screen at once (and a machine
+	refused a game in progress, network_game_server_refuse_late_joiner, is in
+	it): with no game behind it, it is left for the main menu, which says
+	why, rather than sitting in a lobby that will never start */
+	display_error_when_main_menu_loaded(
+		rejection_code == _rejection_code_game_is_full || rejection_code == _rejection_code_game_is_closed ?
+			_error_network_join_game_closed :
+			_error_network_failed_to_join_game);
+	network_game_abort();
 	network_game_client_reset(client, TRUE);
 
 	return;
 }
 
 /* ---------- private code */
+
+/* a map name from the host ends within its field and names a map in the maps
+folder: it goes into the map's path (cache_files_windows.c) */
+static boolean network_game_client_map_name_is_valid(
+	char const *map_name,
+	long size)
+{
+	/* (a scenario's tag path, of which the cache takes the name after the
+	last backslash) */
+	return memchr(map_name, '\0', size) != NULL &&
+		!strchr(map_name, '/') &&
+		!strstr(map_name, "..");
+}
 
 static boolean add_advertised_game(
 	struct network_advertised_game *available_games,
@@ -2573,7 +2380,6 @@ static boolean add_advertised_game(
 
 		advertised_game->update_time = system_milliseconds();
 		advertised_game->platform = advertisement->platform;
-#ifdef HALO_LINUX
 		/* (a host built before there was a version sends zeros: 0) */
 		{
 			long game_index = advertised_game - available_games;
@@ -2584,7 +2390,6 @@ static boolean add_advertised_game(
 			network_game_client_advertised_versions[game_index].flags =
 				advertisement->__unknown5A[HALO_PORT_ADVERTISED_FLAGS_OFFSET];
 		}
-#endif
 
 		if (advertisement->game_name[0] != L'\0')
 		{
@@ -2608,6 +2413,8 @@ static boolean add_advertised_game(
 			&advertised_game->map,
 			&advertisement->map,
 			sizeof(advertisement->map));
+		/* (from any machine on the network: not trusted to end) */
+		advertised_game->map.name[NUMBEROF(advertised_game->map.name) - 1] = '\0';
 
 		advertised_game->machine_count = advertisement->machine_count;
 		advertised_game->player_count = advertisement->player_count;
@@ -2672,12 +2479,31 @@ static boolean network_game_client_process_incoming_messages(
 	return success;
 }
 
+/* port: the messages the connection has queued when it has just failed or
+closed: the host's last before it closed the connection (a rejection, which
+it follows with the close) came with the close, and the queue holds only
+whole messages. TRUE when they took the client out of its state (a
+rejection, network_game_client_rejected_by_game, which says why and ends the
+game): the connection's failure is then no failure of the client's. */
+static boolean network_game_client_process_last_messages(
+	struct network_game_client *client)
+{
+	short state = client->state;
+
+	if (!network_game_client_process_incoming_messages(client))
+	{
+		network_event("network_game_client_process_incoming_messages() failed after the connection failed");
+	}
+
+	return client->state != state;
+}
+
 static void network_game_client_update_precache_status(
 	struct network_game_client *client)
 {
-	long now = system_milliseconds();
+	unsigned long now = system_milliseconds();
 
-	if (now > client->last_precache_time + 1000)
+	if (now - client->last_precache_time > 1000)
 	{
 		char *map_name = main_get_multiplayer_map_name();
 
@@ -2772,12 +2598,8 @@ static boolean network_game_client_idle_searching(
 				message_header *message;
 
 				broadcast_game_search.port = NETWORK_GAME_CLIENT_PORT;
-#ifdef HALO_LINUX
 				/* the search version: the native builds' games are not the Xbox's */
 				broadcast_game_search.__unknown2 = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION;
-#else
-				broadcast_game_search.__unknown2 = 1;
-#endif
 				transport_get_nonce(
 					broadcast_game_search.nonce,
 					sizeof(broadcast_game_search.nonce));
@@ -2871,6 +2693,14 @@ static boolean network_game_client_idle_joining(
 					join_game_request.join_token,
 					client->join_parameters.join_token,
 					sizeof(join_game_request.join_token));
+				/* (port: and its hardware id, which a host logs and may have
+				banned: all 32 digits, unended) */
+				{
+					char hardware_id[sizeof(join_game_request.hardware_id) + 1];
+
+					p2p_hardware_id(hardware_id, sizeof(hardware_id));
+					csmemcpy(join_game_request.hardware_id, hardware_id, csstrlen(hardware_id));
+				}
 
 				message = create_network_game_message(
 					_message_client_join_game_request,
@@ -2925,6 +2755,7 @@ static boolean network_game_client_idle_joining(
 		else
 		{
 			network_event("network_connection_idle() failed in network_game_client_idle_joining()");
+			success = network_game_client_process_last_messages(client);
 		}
 	}
 
@@ -2946,6 +2777,10 @@ static boolean network_game_client_idle_pregame(
 			if (!(success = network_connection_idle(client->connection, 15000, NULL)))
 			{
 				network_event("network_connection_idle() failed in network_game_client_idle_pregame()");
+				if (network_game_client_process_last_messages(client))
+				{
+					return TRUE;
+				}
 			}
 			else if (!(success = network_game_client_process_incoming_messages(client)))
 			{
@@ -2955,6 +2790,10 @@ static boolean network_game_client_idle_pregame(
 		else
 		{
 			success = FALSE;
+			if (network_game_client_process_last_messages(client))
+			{
+				return TRUE;
+			}
 		}
 	}
 
@@ -2975,6 +2814,11 @@ static boolean network_game_client_idle_ingame(
 	struct network_game_client *client)
 {
 	boolean success = TRUE;
+	/* port: until the host's first update the host may still be loading the
+	map (its main thread, which sends nothing meanwhile), as long as it waits
+	for the other machines to load (network_server_manager.c's
+	NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING) */
+	boolean started = network_game_client_server_has_started_game(client);
 
 	if (!network_connection_active(client->connection) ||
 		!network_connection_connected(client->connection))
@@ -2987,13 +2831,14 @@ static boolean network_game_client_idle_ingame(
 	{
 		boolean connection_stale = network_connection_going_stale(client->connection);
 
-		if (!transport_network_available())
+		/* (port: not at once, network_game_client_network_lost) */
+		if (network_game_client_network_lost())
 		{
 			display_error_when_main_menu_loaded(_error_network_connection_lost);
 			network_event("network connection went down (idle in game)!");
 			success = FALSE;
 		}
-		else if (connection_stale && !client->connection_silent)
+		else if (connection_stale && !client->connection_silent && started)
 		{
 			short local_player_index;
 
@@ -3016,7 +2861,7 @@ static boolean network_game_client_idle_ingame(
 
 	if (success == TRUE)
 	{
-		success = network_connection_idle(client->connection, 15000, NULL);
+		success = network_connection_idle(client->connection, started ? 15000 : 75000, NULL);
 
 		if (success)
 		{
@@ -3047,13 +2892,24 @@ static boolean network_game_client_idle_ingame(
 static boolean network_game_client_idle_postgame(
 	struct network_game_client *client)
 {
-	boolean success = check_networking_and_generate_error();
+	/* (the scores of the game just over: the network may be down for a
+	moment, as in the game, network_game_client_network_lost) */
+	boolean success = network_game_is_splitscreen_local() || !network_game_client_network_lost();
 
-	if (success)
+	if (!success)
+	{
+		error(_error_silent, "network connection went down!");
+		display_error_when_main_menu_loaded(_error_network_connection_lost);
+	}
+	else
 	{
 		if (!(success = network_connection_idle(client->connection, 15000, NULL)))
 		{
 			network_event("network_connection_idle() failed in network_game_client_idle_postgame()");
+			if (network_game_client_process_last_messages(client))
+			{
+				return TRUE;
+			}
 		}
 		else if (!(success = network_game_client_process_incoming_messages(client)))
 		{
@@ -3092,7 +2948,6 @@ static void network_game_client_set_error(
 
 	return;
 }
-#ifdef HALO_LINUX
 
 /* the native ports' automated network tests (port/linux/game/network_test.c):
 joins the first open game the client's search has found, as picking it in
@@ -3101,9 +2956,10 @@ the system link list does (network_game_join_game_from_server_list) */
 void platform_show_message(char const *title, char const *message);
 
 /* whether this client can join the advertised game: its host's network
-version is this machine's (HALO_PORT_NETWORK_VERSION). If so this machine
-plays the host's netcode from now on; if not the player is told (when tell)
-which of the two is the newer, and nothing is joined. */
+version is this machine's (HALO_PORT_NETWORK_VERSION), and it plays the
+distributed netcode (a host of this version built before the lockstep
+netcode was removed may play that). If not the player is told why (when
+tell), and nothing is joined. */
 boolean network_game_client_advertised_game_compatible(
 	struct network_game_client *client,
 	struct network_advertised_game const *game,
@@ -3120,14 +2976,18 @@ boolean network_game_client_advertised_game_compatible(
 	theirs = network_game_client_advertised_versions[game_index].version;
 	distributed = (network_game_client_advertised_versions[game_index].flags &
 		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
-	if (theirs == ours)
+	if (theirs == ours && distributed)
 	{
-		network_event("joining a host of network version %u, with the %s netcode", theirs,
-			distributed ? "distributed" : "lockstep");
-		network_game_follow_host_netcode(distributed);
+		network_event("joining a host of network version %u", theirs);
 		return TRUE;
 	}
-	if (theirs > ours)
+	if (theirs == ours)
+	{
+		csprintf(message,
+			"The host is using the lockstep network code, which this version no longer has.\n\n"
+			"Ask the host to update the game.");
+	}
+	else if (theirs > ours)
 	{
 		csprintf(message,
 			"The host is using a newer version of the network code than you.\n\n"
@@ -3145,7 +3005,8 @@ boolean network_game_client_advertised_game_compatible(
 	}
 	if (tell)
 	{
-		network_event("not joining a host of network version %u (this machine's is %u)", theirs, ours);
+		network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
+			distributed ? "" : " with the lockstep netcode", ours);
 		platform_show_message("Halo: cannot join this game", message);
 	}
 	return FALSE;
@@ -3172,12 +3033,11 @@ boolean network_game_client_join_first_available_game(
 			struct transport_address address = { { { 0 } } };
 			struct network_join_parameters join_parameters;
 
-			/* (the automated tests try every frame: told once) */
-			static boolean told;
-
-			if (!network_game_client_advertised_game_compatible(client, game, !told))
+			/* (the automated tests try every frame: told once until the client resets) */
+			if (!network_game_client_advertised_game_compatible(client, game,
+				!network_game_client_incompatibility_told))
 			{
-				told = TRUE;
+				network_game_client_incompatibility_told = TRUE;
 				return FALSE;
 			}
 
@@ -3194,7 +3054,8 @@ boolean network_game_client_join_first_available_game(
 }
 
 /* ... and puts this machine's players on a team (a team game needs both
-teams), as the pregame screen's team choice does */
+teams), as the pregame screen's team choice does; NONE: the other team from
+another machine's player */
 boolean network_game_client_set_team(
 	char team_index)
 {
@@ -3204,6 +3065,15 @@ boolean network_game_client_set_team(
 
 	if (!client || client->state != _network_game_client_state_pregame)
 		return FALSE;
+	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS && team_index == NONE; player_index++)
+	{
+		struct network_player const *player = &client->game.players[player_index];
+
+		if (network_player_is_valid(player) && player->machine_index != (char)client->machine_index)
+			team_index = player->team_index == 1 ? 0 : 1;
+	}
+	if (team_index == NONE)
+		team_index = 1;
 	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS; player_index++)
 	{
 		struct network_player player = client->game.players[player_index];
@@ -3217,4 +3087,3 @@ boolean network_game_client_set_team(
 	return success;
 }
 
-#endif

@@ -412,6 +412,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "ai/ai_script.h"
 #include "hs/hs.h"
+#include "hs/hs_library_internal.h"
 #include "hs/hs_library_internal_compile.h"
 #include "hs/hs_scenario_definitions.h"
 #include "interface/hud_definitions.h"
@@ -2423,8 +2424,8 @@ static boolean hs_parse_nonprimitive(
 }
 
 boolean hs_compile_postprocess(
-	char const **error_message,
-	char const **error_source)
+	char const **error_message_pointer,
+	char const **error_source_pointer)
 {
 	boolean success = TRUE;
 	long expression_index;
@@ -2436,8 +2437,8 @@ boolean hs_compile_postprocess(
 		global_scenario_get()->hs_string_constants.size - HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES;
 	hs_compile_globals.error = NULL;
 	hs_compile_globals.variables_predetermined = TRUE;
-	*error_message = NULL;
-	*error_source = NULL;
+	*error_message_pointer = NULL;
+	*error_source_pointer = NULL;
 
 	for (expression_index = data_next_index(hs_syntax_data, NONE);
 		success && expression_index != NONE;
@@ -2536,9 +2537,9 @@ boolean hs_compile_postprocess(
 
 	if (!success)
 	{
-		*error_message = hs_compile_globals.error;
+		*error_message_pointer = hs_compile_globals.error;
 		if (hs_compile_globals.error_offset != NONE)
-			*error_source = hs_compile_globals.compiled_source + hs_compile_globals.error_offset;
+			*error_source_pointer = hs_compile_globals.compiled_source + hs_compile_globals.error_offset;
 	}
 
 	hs_compile_globals.compiled_source = NULL;

@@ -120,10 +120,6 @@ typedef char verify_hud_global_default_title_bounds_offset[
 
 /* ---------- prototypes */
 
-void draw_quad(
-	rectangle2d *rectangle,
-	pixel32 color);
-
 /* ---------- globals */
 
 struct cinematic_global_data *cinematic_globals = NULL;
@@ -428,21 +424,21 @@ void cinematic_render(
 			}
 
 			{
-				real_argb_color color;
+				real_argb_color text_color;
 				long shadow_alpha;
 
 				pixel32_to_real_argb_color(
 					title->foreground_color,
-					&color);
-				color.alpha *= fade_amount;
+					&text_color);
+				text_color.alpha *= fade_amount;
 
-				if (fabs(color.red - 1.0f) < _real_epsilon &&
-					fabs(color.green - 1.0f) < _real_epsilon &&
-					fabs(color.blue - 1.0f) < _real_epsilon)
+				if (fabs(text_color.red - 1.0f) < _real_epsilon &&
+					fabs(text_color.green - 1.0f) < _real_epsilon &&
+					fabs(text_color.blue - 1.0f) < _real_epsilon)
 				{
-					color.red = MIN(color.red, 0.8f);
-					color.green = MIN(color.green, 0.8f);
-					color.blue = MIN(color.blue, 0.8f);
+					text_color.red = MIN(text_color.red, 0.8f);
+					text_color.green = MIN(text_color.green, 0.8f);
+					text_color.blue = MIN(text_color.blue, 0.8f);
 				}
 
 				draw_string_set_draw_mode(
@@ -450,7 +446,7 @@ void cinematic_render(
 					title->style - 1,
 					title->justification,
 					title->text_flags,
-					&color);
+					&text_color);
 
 				shadow_alpha = PIN(
 					fast_ftol(
@@ -463,7 +459,6 @@ void cinematic_render(
 					((pixel32)shadow_alpha << 24) |
 					(title->shadow_color & 0x00FFFFFF));
 
-#ifdef HALO_LINUX
 				{
 					/* the bounds are for 640 columns: on a wider screen move
 					them so they keep their place relative to its sides */
@@ -476,7 +471,6 @@ void cinematic_render(
 					wide_bounds.x1 += shift;
 					title_bounds = &wide_bounds;
 				}
-#endif
 				rasterizer_draw_unicode_string(
 					title_bounds,
 					NULL,

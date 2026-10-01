@@ -89,7 +89,7 @@ enum ai_communication_hostility
 /* ---------- macros */
 
 #define ai_conversation_header_get(index) \
-	((struct ai_conversation_datum_header *)datum_get(conversation_data, (index)))
+	((struct conversation_datum *)datum_get(conversation_data, (index)))
 
 /* ---------- structures */
 
@@ -97,7 +97,7 @@ struct ai_information_data;
 struct ai_information_packet;
 
 /* The independently mapped prefix of the 0x64-byte conversation datum. */
-struct ai_conversation_datum_header
+struct conversation_datum
 {
 	short identifier;
 	short scenario_conversation_index;
@@ -110,6 +110,21 @@ struct ai_conversation_datum_header
 	byte reserved0A[2];
 	long creation_time;
 	long triggering_player_unit_index;
+	unsigned long participant_bitmask;
+	short dialogue_indices[8];
+	long actor_indices[8];
+	short line_index;
+	short line_participant_index;
+	short line_delay_timer;
+	word line_flags;
+	long line_actor_index;
+	long line_unit_index;
+	long line_address_unit_index;
+	long line_sound_index;
+	boolean line_unspatialized;
+	boolean line_spoken;
+	boolean line_finished;
+	boolean line_advance;
 };
 
 /* ---------- prototypes/AI_COMMUNICATION.C */
@@ -154,9 +169,6 @@ short actor_communication_team(
 short ai_conversation_status(
 	short scenario_conversation_index);
 boolean ai_conversation(
-	short scenario_conversation_index,
-	boolean scripted);
-long ai_conversation_new(
 	short scenario_conversation_index,
 	boolean scripted);
 short ai_conversation_line(

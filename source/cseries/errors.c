@@ -80,8 +80,8 @@ struct error_suppression_globals
 
 /* ---------- globals */
 
-boolean data_002dcd2c = TRUE;
-struct error_suppression_globals bss_0031df2c = { 0, 0 };
+static boolean data_002dcd2c = TRUE;
+static struct error_suppression_globals bss_0031df2c = { 0, 0 };
 boolean find_all_fucked_up_shit = FALSE;
 long fucked_up_shit_count = 0;
 
@@ -117,7 +117,6 @@ char *error_get(
 	return error_globals.message_buffer;
 }
 
-#ifdef HALO_LINUX
 /* The native builds keep the log open and flush each line: opening and
 closing it per line takes milliseconds on Windows, and a host logs
 thousands of lines when a hundred machines join, load or leave. The file is
@@ -179,7 +178,6 @@ static void write_to_debug_file(
 	fflush(file);
 }
 
-#endif
 void write_to_error_file(
 	char *string,
 	boolean date)
@@ -200,47 +198,13 @@ void write_to_error_file(
 
 	if (error_globals.output_to_debug_file)
 	{
-#ifdef HALO_LINUX
 		write_to_debug_file(string, date);
 	}
-#else
-		FILE *handle = fopen("d:\\debug.txt", "a+b");
-		if (handle)
-		{
-			if (date)
-			{
-				long timeptr;
-				struct tm *_time;
-
-				time(&timeptr);
-				_time = localtime(&timeptr);
-				if (_time)
-				{
-					fprintf(
-						handle,
-						"%02d.%02d.%02d %02d:%02d:%02d  ",
-						_time->tm_mon + 1,
-						_time->tm_mday,
-						_time->tm_year % 100,
-						_time->tm_hour,
-						_time->tm_min,
-						_time->tm_sec);
-				}
-				else
-				{
-					fprintf(handle, "<TIME UNAVAILABLE>  ");
-				}
-			}
-			fprintf(handle, "%s", string);
-			fclose(handle);
-		}
-	}
-#endif
 
 	return;
 }
 
-void reset_error_state(
+static void reset_error_state(
 	void)
 {
 	error_globals.delayed = FALSE;
@@ -254,8 +218,7 @@ void errors_initialize(
 {
 	error_globals.output_to_debug_file = TRUE;
 	error_globals.overflow_suppression = TRUE;
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 	stack_walk_initialize();
 
 	return;
@@ -279,12 +242,12 @@ void error(
 	{
 		long time = system_milliseconds();
 
-		if (time > bss_0031df2c.last_error_time+900)
+		if ((unsigned long)(time - bss_0031df2c.last_error_time) > 900)
 		{
 			bss_0031df2c.error_count = 0;
 		}
 		bss_0031df2c.last_error_time = time;
-		if (bss_0031df2c.error_count == 10)
+		if (bss_0031df2c.error_count == 10 && terminal_shows(_terminal_message_chatter))
 		{
 			terminal_printf(
 				global_real_argb_white,
@@ -314,7 +277,13 @@ void error(
 			va_end(argument_list);
 			csstrcat(string, "\r\n");
 
-			if (priority != _error_log)
+			/* (port: on screen as config.toml's game.console_log says: an
+			assert that stops the game, and what a command someone typed
+			logs (its answer), always; the rest, the game's chatter.
+			debug.txt has it whatever that is) */
+			if (priority != _error_log &&
+				terminal_shows(terminal_command_running || !strncmp(string, "EXCEPTION halt", 14) ||
+					!strncmp(string, "EXCEPTION assert", 16) ? _terminal_message_serious : _terminal_message_chatter))
 			{
 				terminal_printf(global_real_argb_white, "%s", string);
 			}
@@ -391,8 +360,7 @@ boolean errors_handle(
 {
 	boolean delayed = error_globals.delayed;
 
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 
 	return delayed;
 }
@@ -400,8 +368,7 @@ boolean errors_handle(
 void errors_clear(
 	void)
 {
-	error_globals.delayed = FALSE;
-	error_globals.message_buffer_size = 0;
+	reset_error_state();
 
 	return;
 }

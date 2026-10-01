@@ -5,7 +5,7 @@ struct tif_lzw_data {
 	unsigned char lmask[9];
 };
 
-struct tif_lzw_data data_002dad38 = {
+static struct tif_lzw_data data_002dad38 = {
 	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_lzw.c,v 1.37 92/02/12 11:27:28 sam Exp $",
 	{ 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff },
 	{ 0x00, 0x00, 0x00 },

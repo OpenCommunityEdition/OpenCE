@@ -15,7 +15,10 @@ links (p2p.c).
 
 The protocol: frames of a little-endian opcode and length, then JSON. The
 handshake (opcode 0) names the application; commands and events are opcode
-1; 2 closes; 3 and 4 are ping and pong.
+1; 2 closes; 3 and 4 are ping and pong. Nothing here waits for Discord (the
+p2p thread holds its lock, which the game's threads take): what it does not
+take at once waits in a buffer, and a client that lets that fill up is
+disconnected.
 */
 
 #include "platform.h"
@@ -51,6 +54,8 @@ static struct
 	unsigned long nonce;
 	unsigned char input[BUFFER_SIZE];
 	int input_size;
+	unsigned char output[BUFFER_SIZE];
+	int output_size;
 
 	/* what to show; changed marks it for sending */
 	int hosting;
@@ -58,7 +63,40 @@ static struct
 	int player_count;
 	int maximum_player_count;
 	int changed;
+
+	/* the Discord user signed in to the client (its READY), as told: an id
+	of digits, a name of the letters, digits and marks Discord's allow (a
+	host logs them, for a player it drops for cheating) */
+	char user_id[P2P_DISCORD_ID_SIZE];
+	char user_name[P2P_DISCORD_NAME_SIZE];
 } discord = { .handle = -1 };
+
+/* the text kept of a Discord user's id or name: of the characters allowed
+(the rest left out), no longer than the size (and ended) */
+void p2p_discord_sanitize(char *destination, int size, const char *source, int name)
+{
+	int length = 0;
+
+	for (; source && *source && length < size - 1; source++)
+	{
+		char character = *source;
+
+		if ((character >= '0' && character <= '9') ||
+			(name && ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+				character == '_' || character == '.' || character == '-')))
+		{
+			destination[length++] = character;
+		}
+	}
+	destination[length] = 0;
+}
+
+/* the Discord user signed in, as told (empty if none); under p2p_lock */
+void p2p_discord_user(char *id, int id_size, char *name, int name_size)
+{
+	p2p_discord_sanitize(id, id_size, discord.user_id, 0);
+	p2p_discord_sanitize(name, name_size, discord.user_name, 1);
+}
 
 static void discord_close(void)
 {
@@ -67,22 +105,49 @@ static void discord_close(void)
 	discord.handle = -1;
 	discord.ready = 0;
 	discord.input_size = 0;
+	discord.output_size = 0;
+}
+
+/* what can be written now */
+static void discord_flush(void)
+{
+	while (discord.handle >= 0 && discord.output_size > 0)
+	{
+		int written = posix_discord_write(discord.handle, discord.output, discord.output_size);
+
+		if (written < 0)
+		{
+			discord_close();
+			return;
+		}
+		if (!written)
+			return;
+		memmove(discord.output, discord.output + written, (size_t)(discord.output_size - written));
+		discord.output_size -= written;
+	}
 }
 
 static void discord_send(int opcode, const char *json, int size)
 {
-	unsigned char frame[8 + 2048];
+	unsigned char *frame;
 
 	if (discord.handle < 0 || size > 2048)
 		return;
+	if (discord.output_size + 8 + size > BUFFER_SIZE)
+	{
+		platform_log("Internet play: Discord is not responding; disconnected from it");
+		discord_close();
+		return;
+	}
+	frame = discord.output + discord.output_size;
 	frame[0] = (unsigned char)opcode;
 	frame[1] = frame[2] = frame[3] = 0;
 	frame[4] = (unsigned char)size;
 	frame[5] = (unsigned char)(size >> 8);
 	frame[6] = frame[7] = 0;
 	memcpy(frame + 8, json, (size_t)size);
-	if (posix_discord_write(discord.handle, frame, 8 + size) < 0)
-		discord_close();
+	discord.output_size += 8 + size;
+	discord_flush();
 }
 
 static void send_activity(void)
@@ -156,6 +221,18 @@ static void frame_received(int opcode, char *json)
 
 			discord.ready = 1;
 			platform_log("Internet play: connected to Discord");
+			/* (who is signed in: its user, after the configuration) */
+			{
+				const char *user = strstr(json, "\"user\"");
+				char value[128];
+
+				discord.user_id[0] = 0;
+				discord.user_name[0] = 0;
+				if (user && json_string(user, "id", value, sizeof(value)))
+					p2p_discord_sanitize(discord.user_id, sizeof(discord.user_id), value, 0);
+				if (user && json_string(user, "username", value, sizeof(value)))
+					p2p_discord_sanitize(discord.user_name, sizeof(discord.user_name), value, 1);
+			}
 			size = snprintf(command, sizeof(command),
 				"{\"cmd\":\"SUBSCRIBE\",\"evt\":\"ACTIVITY_JOIN\",\"nonce\":\"%lu\"}", ++discord.nonce);
 			discord_send(_opcode_frame, command, size);
@@ -247,6 +324,7 @@ void p2p_discord_update(void)
 			/* how Discord starts the game for an invite when it is not
 			running; the game then receives the invite once connected */
 			snprintf(scheme, sizeof(scheme), "discord-%s", application);
+			/* (it lets go of the p2p lock while it may wait) */
 			p2p_register_url_scheme(scheme, "Halo: Combat Evolved");
 		}
 	}
@@ -257,7 +335,8 @@ void p2p_discord_update(void)
 		char handshake[128];
 		int size;
 
-		if (discord.attempted && (long)(p2p_now() - discord.attempt_time) < RETRY_INTERVAL)
+		/* (unsigned, as the clock wraps) */
+		if (discord.attempted && (unsigned int)(p2p_now() - discord.attempt_time) < (unsigned int)RETRY_INTERVAL)
 			return;
 		discord.attempted = 1;
 		discord.attempt_time = p2p_now();
@@ -269,6 +348,9 @@ void p2p_discord_update(void)
 		if (discord.handle < 0)
 			return;
 	}
+	discord_flush();
+	if (discord.handle < 0)
+		return;
 	discord_read();
 	if (discord.ready && discord.changed)
 	{

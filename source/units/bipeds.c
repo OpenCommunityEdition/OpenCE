@@ -238,7 +238,7 @@ symbols in this file:
 #include "cseries.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "ai/actors.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
@@ -454,12 +454,6 @@ struct vehicle_runtime_datum
 		short reserved;
 		byte airborne_ticks;
 	} vehicle;
-};
-
-struct unit_animation_update_data
-{
-	char state_desired;
-	boolean crouching;
 };
 
 struct scenario_object_datum
@@ -920,10 +914,10 @@ static void biped_start_landing(
 }
 
 void biped_adjust_placement(
-	long biped_index,
+	long object_index,
 	struct object_placement_data *data)
 {
-	struct biped_datum *biped = biped_get(biped_index);
+	struct biped_datum *biped = biped_get(object_index);
 	struct biped_definition *definition = biped_definition_get(biped->definition_index);
 	unsigned long flags = definition->biped.flags;
 
@@ -1656,24 +1650,24 @@ void biped_accelerate(
 			TEST_FLAG(definition->biped.flags, _biped_flying_bit) ||
 			TEST_FLAG(definition->biped.flags, _biped_climbs_anything_bit))
 		{
-			real_vector3d axis;
+			real_vector3d angular_acceleration_axis;
 			real scale;
 
-			cross_product3d(global_up3d, acceleration, &axis);
-			normalize3d(&axis);
+			cross_product3d(global_up3d, acceleration, &angular_acceleration_axis);
+			normalize3d(&angular_acceleration_axis);
 			scale = real_random()*magnitude3d(acceleration)*(_pi/2);
-			biped->object.angular_velocity.i += axis.i*scale;
-			biped->object.angular_velocity.j += axis.j*scale;
-			biped->object.angular_velocity.k += axis.k*scale;
+			biped->object.angular_velocity.i += angular_acceleration_axis.i*scale;
+			biped->object.angular_velocity.j += angular_acceleration_axis.j*scale;
+			biped->object.angular_velocity.k += angular_acceleration_axis.k*scale;
 		}
 
 		if (biped->object.parent_object_index==NONE)
 		{
-			real_vector3d forward = *acceleration;
+			real_vector3d new_forward = *acceleration;
 
-			if (normalize3d(&forward)>0.f)
+			if (normalize3d(&new_forward)>0.f)
 			{
-				biped->object.forward = forward;
+				biped->object.forward = new_forward;
 				biped_snap_facing(biped_index);
 				biped_verify_object_vectors(biped_index, "post-accel");
 			}
@@ -3196,7 +3190,7 @@ static void biped_update_turning(
 		real target_bank;
 		real bank_blend;
 		real bank_time;
-		real_rectangle2d aiming_bounds;
+		real_rectangle2d facing_bounds;
 		real angular_velocity_limit;
 		real angular_acceleration_limit;
 
@@ -3265,10 +3259,10 @@ static void biped_update_turning(
 			biped->biped.bank = target_bank;
 		}
 
-		aiming_bounds.x0 = -_pi;
-		aiming_bounds.x1 = _pi;
-		aiming_bounds.y0 = -_pi/2.f;
-		aiming_bounds.y1 = _pi/2.f;
+		facing_bounds.x0 = -_pi;
+		facing_bounds.x1 = _pi;
+		facing_bounds.y0 = -_pi/2.f;
+		facing_bounds.y1 = _pi/2.f;
 		angular_velocity_limit =
 			definition->biped.flying_angular_velocity/TICKS_PER_SECOND;
 		angular_acceleration_limit =
@@ -3285,7 +3279,7 @@ static void biped_update_turning(
 				&biped->object.forward,
 				&target_facing,
 				&biped->object.angular_velocity,
-				&aiming_bounds,
+				&facing_bounds,
 				angular_velocity_limit,
 				angular_acceleration_limit);
 		}
@@ -3712,7 +3706,7 @@ static void biped_update_moving(
 						&scenario_get_game_globals()->player_information,
 						0,
 						struct game_globals_player_information);
-				struct game_globals_player_information old_player_information;
+				struct game_globals_player_information player_information_block;
 				real body_stun_scale = 1.f;
 				real crouch;
 				real uncrouch;
@@ -3726,13 +3720,13 @@ static void biped_update_moving(
 						definition->biped.flags,
 						_biped_uses_old_player_physics_bit))
 				{
-					old_player_information = *player_information;
-					player_information = &old_player_information;
-					old_player_information.walking_speed = 0.51200002f;
-					old_player_information.run_forward_speed = 2.25f;
-					old_player_information.run_backward_speed = 2.f;
-					old_player_information.run_sideways_speed = 2.f;
-					old_player_information.run_acceleration = 0.31999999f;
+					player_information_block = *player_information;
+					player_information = &player_information_block;
+					player_information_block.walking_speed = 0.51200002f;
+					player_information_block.run_forward_speed = 2.25f;
+					player_information_block.run_backward_speed = 2.f;
+					player_information_block.run_sideways_speed = 2.f;
+					player_information_block.run_acceleration = 0.31999999f;
 				}
 
 				if (biped->unit.player_index != NONE)
@@ -3950,19 +3944,19 @@ static void biped_update_moving(
 	}
 
 	{
-		real_point3d new_position = physics.new_position;
+		real_point3d new_biped_position = physics.new_position;
 		word out_flags = physics.out_flags;
 
 		if (!TEST_FLAG(
 			definition->biped.flags,
 			_biped_pill_centered_at_origin_bit))
 		{
-			new_position.z -= physics.width;
+			new_biped_position.z -= physics.width;
 		}
-		object_translate(biped_index, &new_position, NULL);
+		object_translate(biped_index, &new_biped_position, NULL);
 
 		biped->biped.support_surface_index = physics.support_surface_index;
-		biped->biped.pathfinding_point = new_position;
+		biped->biped.pathfinding_point = new_biped_position;
 		biped->biped.pathfinding_surface_index = NONE;
 		biped->object.translational_velocity = physics.new_velocity;
 		if (!animation->crouching &&
@@ -4018,8 +4012,8 @@ static void biped_update_moving(
 				target->object.bounding_sphere_radius))
 			{
 				struct collision_model_instance instance;
-				struct collision_model_test_vector_result model_result;
-				struct collision_result world_collision;
+				struct collision_model_test_vector_result vector_result;
+				struct collision_result collision;
 
 				if (collision_model_instance_new(
 					&instance,
@@ -4030,37 +4024,37 @@ static void biped_update_moving(
 							FLAG(_collision_test_back_facing_surfaces_bit),
 						&physics.position,
 						&melee_vector,
-						&model_result) &&
+						&vector_result) &&
 					!collision_test_vector(
 						_collision_test_for_bipeds_passthrough_living_flags,
 						&physics.position,
 						&melee_vector,
 						biped_index,
-						&world_collision))
+						&collision))
 				{
-					real_point3d impact_point;
-					real_plane3d impact_plane;
+					real_point3d collision_point;
+					real_plane3d collision_plane;
 
 					point_from_line3d(
 						&physics.position,
 						&melee_vector,
-						model_result.bsp_result.t,
-						&impact_point);
+						vector_result.bsp_result.t,
+						&collision_point);
 					matrix4x3_transform_plane(
-						&instance.matrices[model_result.node_index],
-						model_result.bsp_result.plane,
-						&impact_plane);
-					if (model_result.bsp_result.plane_designator < 0)
-						plane3d_negate(&impact_plane, &impact_plane);
+						&instance.matrices[vector_result.node_index],
+						vector_result.bsp_result.plane,
+						&collision_plane);
+					if (vector_result.bsp_result.plane_designator < 0)
+						plane3d_negate(&collision_plane, &collision_plane);
 					unit_impact_melee_damage(
 						biped_index,
 						biped->biped.impact_target_object_index,
-						model_result.node_index,
-						model_result.region_index,
-						model_result.bsp_result.material_index,
-						&impact_point,
-						&impact_plane.n,
-						&world_collision.location);
+						vector_result.node_index,
+						vector_result.region_index,
+						vector_result.bsp_result.material_index,
+						&collision_point,
+						&collision_plane.n,
+						&collision.location);
 				}
 			}
 

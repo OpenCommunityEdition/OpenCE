@@ -46,7 +46,6 @@ symbols in this file:
 #define PATH_EXTERNAL_FLEE_ROUTINES
 #include "actors.h"
 #undef PATH_EXTERNAL_FLEE_ROUTINES
-#include "actor_perception.h"
 #include "ai.h"
 #include "ai_communication.h"
 #include "ai_scenario_definitions.h"

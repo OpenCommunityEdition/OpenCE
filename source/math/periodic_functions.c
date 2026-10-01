@@ -506,7 +506,7 @@ void periodic_functions_initialize(
 		67,
 		!function_tables_initialized);
 	function_tables_initialized = TRUE;
-	*get_global_random_seed_address() = 0x20F3F660;
+	set_random_seed(0x20F3F660);
 
 	for (function_index = 0; function_index < NUMBER_OF_PERIODIC_FUNCTIONS; function_index++)
 	{

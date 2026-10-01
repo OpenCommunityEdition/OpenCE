@@ -22,6 +22,11 @@ header included in hcex build.
 
 /* ---------- prototypes/EXAMPLE.C */
 
+boolean sound_scenery_new(
+	long object_index);
+void sound_scenery_delete(
+	long object_index);
+
 /* ---------- globals */
 
 /* ---------- public code */

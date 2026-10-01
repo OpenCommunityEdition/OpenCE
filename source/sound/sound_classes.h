@@ -64,6 +64,17 @@ struct sound_class_definition *sound_class_get(
 
 real sound_class_get_gain(
 	short class_index);
+void debug_sound_classes_enable(
+	char const *name,
+	boolean enable);
+void debug_sound_classes_set_distances(
+	char const *name,
+	real minimum_distance,
+	real maximum_distance);
+void sound_class_set_gain(
+	char const *name,
+	real gain,
+	short interpolation_ticks);
 
 void sound_classes_dispose_from_old_map(
 	void);
@@ -71,6 +82,9 @@ void sound_classes_dispose(
 	void);
 void sound_classes_update(
 	long ticks);
+void debug_sound_classes_set_wet(
+	char const *name,
+	real wet);
 
 /* ---------- globals */
 

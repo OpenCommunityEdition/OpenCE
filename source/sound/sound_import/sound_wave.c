@@ -22,8 +22,22 @@ symbols in this file:
 	??_C@_0CG@KPNFGBBJ@info?9?$DOsignificant_bits_per_sampl@ (0000)
 002AA984 002f:
 	??_C@_0CP@HAHMLIOF@c?3?2halo?2SOURCE?2sound?2sound_impor@ (0000)
-003169CC 00b0:
-	_data_003169cc (0000)
+003169CC 0018:
+	_riff_container_chunk_bs_codes (0000)
+003169E4 0014:
+	_riff_container_chunk_bs_definition (0000)
+003169F8 0010:
+	_riff_chunk_type_bs_codes (0000)
+00316A08 0014:
+	_riff_chunk_type_bs_definition (0000)
+00316A1C 0010:
+	_riff_chunk_length_bs_codes (0000)
+00316A2C 0014:
+	_riff_chunk_length_bs_definition (0000)
+00316A40 0028:
+	_riff_format_info_bs_codes (0000)
+00316A68 0014:
+	_riff_format_info_bs_definition (0000)
 */
 
 /* ---------- headers */
@@ -73,80 +87,77 @@ struct riff_format_chunk
 	short extra_data_size;
 };
 
-struct riff_byte_swap_globals
-{
-	byte_swap_code container_chunk_codes[6];
-	struct byte_swap_definition container_chunk_definition;
-	byte_swap_code chunk_type_codes[4];
-	struct byte_swap_definition chunk_type_definition;
-	byte_swap_code chunk_length_codes[4];
-	struct byte_swap_definition chunk_length_definition;
-	byte_swap_code chunk_codes[10];
-	struct byte_swap_definition chunk_definition;
-};
-
-typedef char verify_riff_byte_swap_globals_size[
-	sizeof(struct riff_byte_swap_globals) == 0xB0 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-/* The target .data section is four-byte aligned; XDK 3911 otherwise emits eight. */
-__declspec(align(4)) struct riff_byte_swap_globals riff_bs=
+/* Names and types of these eight file statics are attested by a later first-party build (the 2003 PC demo PDB's
+sound_wave.obj); January's own PDB has no static names. Their offsets and January's single 4-byte-aligned .data
+contribution agree with that build. */
+
+static byte_swap_code riff_container_chunk_bs_codes[6]=
 {
-	{
-		_begin_bs_array, 1,
-		_4byte, _4byte, _4byte,
-		_end_bs_array,
-	},
-	{
-		"riff container chunk",
-		sizeof(struct riff_container_chunk),
-		riff_bs.container_chunk_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
-	{
-		_begin_bs_array, 1,
-		_4byte,
-		_end_bs_array,
-	},
-	{
-		"riff chunk type",
-		sizeof(tag),
-		riff_bs.chunk_type_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
-	{
-		_begin_bs_array, 1,
-		_4byte,
-		_end_bs_array,
-	},
-	{
-		"riff chunk length",
-		sizeof(long),
-		riff_bs.chunk_length_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
-	{
-		_begin_bs_array, 1,
-		_2byte, _2byte, _4byte, _4byte, _2byte, _2byte, _2byte,
-		_end_bs_array,
-	},
-	{
-		"riff chunk",
-		RIFF_FORMAT_CHUNK_SIZE,
-		riff_bs.chunk_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
+	_begin_bs_array, 1,
+	_4byte, _4byte, _4byte,
+	_end_bs_array,
 };
 
-#define riff_container_chunk_byte_swap_definition riff_bs.container_chunk_definition
-#define riff_chunk_type_byte_swap_definition riff_bs.chunk_type_definition
+static struct byte_swap_definition riff_container_chunk_bs_definition=
+{
+	"riff container chunk",
+	sizeof(struct riff_container_chunk),
+	riff_container_chunk_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
+
+static byte_swap_code riff_chunk_type_bs_codes[4]=
+{
+	_begin_bs_array, 1,
+	_4byte,
+	_end_bs_array,
+};
+
+static struct byte_swap_definition riff_chunk_type_bs_definition=
+{
+	"riff chunk type",
+	sizeof(tag),
+	riff_chunk_type_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
+
+static byte_swap_code riff_chunk_length_bs_codes[4]=
+{
+	_begin_bs_array, 1,
+	_4byte,
+	_end_bs_array,
+};
+
+static struct byte_swap_definition riff_chunk_length_bs_definition=
+{
+	"riff chunk length",
+	sizeof(long),
+	riff_chunk_length_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
+
+static byte_swap_code riff_format_info_bs_codes[10]=
+{
+	_begin_bs_array, 1,
+	_2byte, _2byte, _4byte, _4byte, _2byte, _2byte, _2byte,
+	_end_bs_array,
+};
+
+static struct byte_swap_definition riff_format_info_bs_definition=
+{
+	"riff chunk",
+	RIFF_FORMAT_CHUNK_SIZE,
+	riff_format_info_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
 
 /* ---------- public code */
 
@@ -160,7 +171,7 @@ boolean sound_file_is_wave(
 	{
 		if (file_read_from_position(file, 0, sizeof(container), &container))
 		{
-			byte_swap_data(&riff_container_chunk_byte_swap_definition, &container, 1);
+			byte_swap_data(&riff_container_chunk_bs_definition, &container, 1);
 			if (container.signature=='RIFF' && container.form_type=='WAVE')
 				result= TRUE;
 		}
@@ -186,7 +197,7 @@ boolean sound_file_wave_info_get(
 			position+= sizeof(chunk.type);
 			if (file_read_from_position(file, position, sizeof(chunk.data_size), &chunk.data_size))
 			{
-				byte_swap_data(&riff_chunk_type_byte_swap_definition, &chunk.type, 1);
+				byte_swap_data(&riff_chunk_type_bs_definition, &chunk.type, 1);
 				if (chunk.type=='fmt ')
 				{
 					position+= sizeof(chunk.data_size);
@@ -233,7 +244,7 @@ boolean sound_file_wave_raw_data_get(
 			position+= sizeof(chunk.type);
 			if (file_read_from_position(file, position, sizeof(chunk.data_size), &chunk.data_size))
 			{
-				byte_swap_data(&riff_chunk_type_byte_swap_definition, &chunk.type, 1);
+				byte_swap_data(&riff_chunk_type_bs_definition, &chunk.type, 1);
 				if (chunk.type=='data')
 				{
 					*size= chunk.data_size;

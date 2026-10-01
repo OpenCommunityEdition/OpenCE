@@ -11,6 +11,7 @@ COLLISION_MODELS.C
 #include "collision_bsp_definitions.h"
 #include "collision_model_definitions.h"
 #include "collision_models.h"
+#include "collision_features.h"
 #include "collision_usage.h"
 
 #include "objects/object_types.h"
@@ -24,33 +25,6 @@ COLLISION_MODELS.C
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-long bsp3d_test_point(const struct bsp3d *bsp, long node_index, const real_point3d *point);
-boolean collision_bsp_test_vector(
-		unsigned long flags,
-		const struct collision_bsp *bsp,
-		short breakable_surface_count,
-		const byte *breakable_surface_flags,
-		const real_point3d *point,
-		const real_vector3d *vector,
-		real maximum_t,
-		struct collision_bsp_test_vector_result *result);
-boolean collision_bsp_test_pill(
-		const struct collision_bsp *bsp,
-		const real_point3d *point,
-		const real_vector3d *vector,
-		real radius,
-		real maximum_t,
-		struct collision_bsp_test_pill_result *result);
-void collision_bsp_get_features_in_sphere(
-		const struct collision_bsp *bsp,
-		const struct collision_bsp_test_sphere_result *result,
-		const real_matrix4x3 *matrix,
-		real height,
-		real width,
-		long object_index,
-		struct collision_feature_list *features);
-void render_debug_collision_bsp(struct collision_bsp *bsp, const real_matrix4x3 *matrix);
 
 /* ---------- globals */
 

@@ -95,29 +95,36 @@ static unsigned long zip_long(const unsigned char *bytes)
 	return zip_word(bytes) | zip_word(bytes + 2) << 16;
 }
 
-/* an entry's data, unpacked, to the file at path */
+/* an entry's data, unpacked, to the file at path; why it could not be is
+written to reason */
 static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int method,
-	unsigned long packed_size, unsigned long size, unsigned long crc, const char *path)
+	unsigned long packed_size, unsigned long size, unsigned long crc, const char *path,
+	char *reason, size_t reason_size)
 {
 	unsigned char header[30];
 	unsigned char input[16384], output[16384];
 	SDL_IOStream *file;
 	z_stream stream;
 	unsigned long remaining = packed_size, written = 0, checksum = crc32(0L, Z_NULL, 0);
-	int succeeded = 0;
+	int succeeded = 0, ended = 0;
 
 	if (SDL_SeekIO(zip, (Sint64)local_offset, SDL_IO_SEEK_SET) < 0 ||
 		SDL_ReadIO(zip, header, sizeof(header)) != sizeof(header) || zip_long(header) != 0x04034b50 ||
 		SDL_SeekIO(zip, (Sint64)(zip_word(header + 26) + zip_word(header + 28)), SDL_IO_SEEK_CUR) < 0)
 	{
+		snprintf(reason, reason_size, "its header at %lu could not be read (%s)", local_offset, SDL_GetError());
 		return 0;
 	}
 	file = SDL_IOFromFile(path, "wb");
 	if (!file)
+	{
+		snprintf(reason, reason_size, "could not create %s (%s)", path, SDL_GetError());
 		return 0;
+	}
 	memset(&stream, 0, sizeof(stream));
 	if (method == 8 && inflateInit2(&stream, -MAX_WBITS) != Z_OK)
 	{
+		snprintf(reason, reason_size, "zlib would not start (%s)", stream.msg ? stream.msg : "no message");
 		SDL_CloseIO(file);
 		return 0;
 	}
@@ -126,12 +133,18 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 		size_t count = remaining < sizeof(input) ? remaining : sizeof(input);
 
 		if (count && SDL_ReadIO(zip, input, count) != count)
+		{
+			snprintf(reason, reason_size, "the download ended %lu bytes early (%s)", remaining, SDL_GetError());
 			break;
+		}
 		remaining -= (unsigned long)count;
 		if (method == 0)
 		{
 			if (SDL_WriteIO(file, input, count) != count)
+			{
+				snprintf(reason, reason_size, "could not write %s after %lu bytes (%s)", path, written, SDL_GetError());
 				break;
+			}
 			checksum = crc32(checksum, input, (uInt)count);
 			written += (unsigned long)count;
 		}
@@ -153,6 +166,7 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 				produced = sizeof(output) - stream.avail_out;
 				if (SDL_WriteIO(file, output, produced) != produced)
 				{
+					snprintf(reason, reason_size, "could not write %s after %lu bytes (%s)", path, written, SDL_GetError());
 					result = Z_ERRNO;
 					break;
 				}
@@ -160,23 +174,38 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 				written += (unsigned long)produced;
 			} while (stream.avail_out == 0 && result != Z_STREAM_END);
 			if (result == Z_STREAM_END)
+				ended = 1;
+			else if (result != Z_OK && result != Z_BUF_ERROR)
 			{
-				succeeded = written == size && checksum == crc;
+				if (result != Z_ERRNO)
+				{
+					snprintf(reason, reason_size, "zlib stopped with %d after %lu of %lu bytes (%s)", result, written, size,
+						stream.msg ? stream.msg : "no message");
+				}
 				break;
 			}
-			if (result != Z_OK && result != Z_BUF_ERROR)
-				break;
 		}
-		if (!remaining)
+		/* (the game's zlib is 1.1, which can want a byte past the end of a
+		raw stream before it says the stream has ended: all of the input
+		unpacked is enough, as the size and the CRC are checked) */
+		if (ended || !remaining)
 		{
-			succeeded = method == 0 && written == size && checksum == crc;
+			if (written != size)
+				snprintf(reason, reason_size, "it unpacked to %lu bytes, not %lu", written, size);
+			else if (checksum != crc)
+				snprintf(reason, reason_size, "its CRC is %08lx, not %08lx", checksum, crc);
+			else
+				succeeded = 1;
 			break;
 		}
 	}
 	if (method == 8)
 		inflateEnd(&stream);
-	if (!SDL_CloseIO(file))
+	if (!SDL_CloseIO(file) && succeeded)
+	{
+		snprintf(reason, reason_size, "could not finish writing %s (%s)", path, SDL_GetError());
 		succeeded = 0;
+	}
 	return succeeded;
 }
 
@@ -223,6 +252,7 @@ static int zip_extract(const char *zip_path, char names[][256], int *name_count,
 		unsigned long name_length, extra_length, comment_length;
 		Sint64 next;
 		char path[1200];
+		char reason[512] = "";
 
 		if (SDL_ReadIO(zip, header, sizeof(header)) != sizeof(header) || zip_long(header) != 0x02014b50)
 			goto done;
@@ -247,9 +277,9 @@ static int zip_extract(const char *zip_path, char names[][256], int *name_count,
 			}
 			updater_partial_path(path, sizeof(path), name);
 			if (!zip_extract_entry(zip, zip_long(header + 42), method, zip_long(header + 20), zip_long(header + 24),
-				zip_long(header + 16), path))
+				zip_long(header + 16), path, reason, sizeof(reason)))
 			{
-				snprintf(error, error_size, "could not unpack %s", name);
+				snprintf(error, error_size, "could not unpack %s: %s", name, reason);
 				goto done;
 			}
 			snprintf(names[*name_count], 256, "%s", name);

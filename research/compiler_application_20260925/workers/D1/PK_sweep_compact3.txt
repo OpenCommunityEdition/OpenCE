@@ -1,52 +1,0 @@
-ai/action_alert 12/0/0 same w3 14>14  |  ai/action_avoid 6/0/0 same w3 12>12  |  ai/action_charge 21/1/0 same w3 12>12
-ai/action_converse 9/0/0 same w3 12>12  |  ai/action_fight 6/0/0 same w3 12>12  |  ai/action_flee 13/0/0 same w3 12>12
-ai/action_guard 15/0/0 same w3 14>14  |  ai/action_obey 27/0/0 same w3 13>13  |  ai/action_search 9/0/0 same w3 12>12
-ai/action_sleep 1/0/0 same w3 12>12  |  ai/action_uncover 9/0/0 same w3 13>13  |  ai/action_vehicle 17/0/0 same w3 13>13
-ai/action_wait 5/0/0 same w3 12>12  |  ai/actions 62/1/0 same w3 18>18  |  ai/actor_combat 33/1/0 same w3 17>17
-ai/actor_firing_position 27/0/0 same w3 17>17  |  ai/actor_looking 15/1/0 same w3 13>13  |  ai/actor_moving 32/4/0 same w3 12>12
-ai/actor_perception 43/1/0 same w3 14>14  |  ai/actor_stimulus 22/0/0 same w3 13>13  |  ai/actor_type_carrier 1/0/0 same w3 12>12
-ai/actor_type_crew 1/0/0 same w3 12>12  |  ai/actor_type_elite 1/0/0 same w3 12>12  |  ai/actor_type_engineer 1/0/0 same w3 12>12
-ai/actor_type_flood 2/0/0 same w3 12>12  |  ai/actor_type_grunt 1/0/0 same w3 12>12  |  ai/actor_type_hunter 1/0/0 same w3 12>12
-ai/actor_type_infection 5/0/0 same w3 15>15  |  ai/actor_type_jackal 1/0/0 same w3 12>12  |  ai/actor_type_marine 1/0/0 same w3 12>12
-ai/actor_type_mounted_weapon 1/0/0 same w3 12>12  |  ai/actor_type_sentinel 1/0/0 same w3 12>12  |  ai/actor_types 13/0/0 same w3 12>12
-ai/actors 76/0/0 same w3 18>18  |  ai/ai 44/2/0 same w3 19>19  |  ai/ai_communication 46/2/0 same w3 12>12
-ai/ai_debug 59/1/0 same w3 23>23  |  ai/ai_profile 23/0/0 same w3 12>12  |  ai/ai_script 116/0/0 same w3 42>42
-ai/encounters 61/0/0 same w3 20>20  |  ai/path 32/0/0 same w3 13>13  |  ai/path_obstacles 15/1/0 same w3 12>12
-ai/props 17/0/0 same w3 12>12  |  camera/bored_camera 9/0/0 same w3 12>12  |  camera/camera_scripting 13/0/0 same w3 13>13
-camera/dead_camera 3/1/0 same w3 12>12  |  camera/director 28/0/0 same w3 12>12  |  camera/editor_flying_camera 21/0/0 same w3 15>15
-camera/first_person_camera 5/0/0 same w3 12>12  |  camera/flying_camera 3/0/0 same w3 12>12  |  camera/following_camera 8/0/0 same w3 12>12
-camera/observer 25/1/0 same w3 13>13  |  camera/orbiting_camera 2/0/0 same w3 12>12  |  cutscene/cinematics 16/1/0 same w3 12>12
-cutscene/recorded_animations 16/0/0 same w3 12>12  |  devices/device_controls 11/0/0 same w3 12>12  |  devices/device_light_fixtures 8/0/0 same w3 12>12
-devices/device_machines 10/0/0 same w3 12>12  |  devices/devices 30/0/0 same w3 16>16  |  effects/contrails 19/0/0 same w3 12>12
-effects/decals 32/1/0 same w3 12>12  |  effects/effects 38/3/0 same w3 14>14  |  effects/material_effects 3/0/0 same w3 12>12
-effects/particle_systems 25/0/0 same w3 15>15  |  effects/particles 20/0/0 same w3 12>12  |  effects/player_effects 26/3/0 same w3 13>13
-effects/weather_particle_systems 19/1/0 same w3 15>15  |  game/aim_assist 16/0/0 same w3 14>14  |  game/cheats 14/0/0 same w3 13>13
-game/game 26/1/0 same w3 13>13  |  game/game_engine 180/0/0 same w3 21>21  |  game/game_engine_ctf 39/0/0 same w3 16>16
-game/game_engine_king 29/0/0 same w3 14>14  |  game/game_engine_multiplayer_sounds 6/0/0 same w3 12>12  |  game/game_engine_oddball 38/0/0 same w3 12>12
-game/game_engine_race 36/0/0 same w3 16>16  |  game/game_engine_slayer 27/0/0 same w3 15>15  |  game/game_statistics 4/0/0 same w3 16>16
-game/player_control 49/0/0 same w3 18>18  |  game/player_queues_new 23/0/0 same w3 12>12  |  game/players 68/2/0 same w3 18>18
-hs/hs 447/1/0 same w3 58>58  |  hs/hs_library_external 36/0/0 same w3 12>12  |  hs/hs_runtime 66/0/0 same w3 137>137
-input/input_abstraction 10/0/0 same w3 20>20  |  interface/first_person_weapons 34/0/0 same w3 12>12  |  interface/hud 22/0/0 same w3 12>12
-interface/hud_draw 22/0/1 same w3 26>26  |  interface/hud_nav_points 31/1/0 same w3 13>13  |  interface/hud_sounds 1/0/0 same w3 12>12
-interface/hud_unit 22/0/0 same w3 12>12  |  interface/hud_weapon 14/2/0 same w3 14>14  |  interface/interface 17/1/0 same w3 12>12
-interface/motion_sensor 17/2/0 same w3 17>17  |  interface/ui_widget 96/6/0 same w3 17>17  |  items/equipment 3/0/0 same w3 12>12
-items/garbage 2/0/0 same w3 12>12  |  items/items 18/0/0 same w3 12>12  |  items/projectiles 29/1/0 same w3 12>12
-items/weapons 79/0/0 CHANGED w3 20>20  |  main/debug_keys 12/0/0 same w3 12>12  |  main/main 93/1/1 same w3 25>25
-models/model_animations 32/0/0 same w3 27>27  |  models/models 12/0/0 same w3 17>17  |  objects/damage 33/1/0 same w3 12>12
-objects/object_deleted_procs 1/0/0 same w3 12>12  |  objects/object_lights 43/0/0 same w3 14>14  |  objects/object_shadows 3/0/0 same w3 12>12
-objects/object_types 31/0/0 same w3 12>12  |  objects/objects 121/0/0 same w3 32>32  |  objects/scenery 12/0/0 same w3 12>12
-objects/widgets/antenna 11/0/0 same w3 12>12  |  objects/widgets/flags 15/1/0 same w3 12>12  |  objects/widgets/glow 24/1/0 same w3 12>12
-objects/widgets/light_volumes 10/0/0 same w3 13>13  |  objects/widgets/lightning 8/1/0 same w3 12>12  |  objects/widgets/widgets 11/0/0 same w3 12>12
-physics/breakable_surfaces 12/0/0 same w3 17>17  |  physics/collision_bsp 27/3/0 same w3 22>22  |  physics/collision_debug 1/0/0 same w3 12>12
-physics/collision_models 7/0/0 same w3 18>18  |  physics/collisions 19/1/0 same w3 20>20  |  physics/physics 14/3/0 same w3 12>12
-physics/point_physics 6/0/0 same w3 12>12  |  rasterizer/rasterizer 131/0/0 same w3 12>12  |  rasterizer/xbox/rasterizer_xbox_active_camouflage 12/0/0 same w3 12>12
-rasterizer/xbox/rasterizer_xbox_dynavobgeom 17/0/0 same w3 12>12  |  rasterizer/xbox/rasterizer_xbox_environment 42/2/0 same w3 12>12  |  rasterizer/xbox/rasterizer_xbox_environment_fog 26/1/0 same w3 14>14
-rasterizer/xbox/rasterizer_xbox_screen_effect 13/0/0 same w3 12>12  |  rasterizer/xbox/rasterizer_xbox_water 14/0/0 same w3 12>12  |  render/render 13/0/0 same w3 14>14
-render/render_contrails 6/0/0 same w3 13>13  |  render/render_debug 36/0/0 same w3 17>17  |  render/render_objects 22/0/0 same w3 12>12
-render/render_particles 3/0/0 same w3 12>12  |  render/render_sky 1/0/0 same w3 12>12  |  saved games/game_state 24/0/0 same w3 12>12
-scenario/scenario 46/0/0 same w3 12>12  |  scenario/wind 9/0/0 same w3 12>12  |  shaders/shaders 20/0/0 same w3 13>13
-sound/game_sound 31/0/0 same w3 12>12  |  sound/sound_classes 12/0/0 same w3 13>13  |  sound/sound_definitions 7/0/0 same w3 13>13
-sound/sound_dsound_xbox 39/0/0 same w3 13>13  |  sound/sound_manager 65/0/0 same w3 12>12  |  sound/sound_scenery 2/0/0 same w3 12>12
-structures/cluster_partitions 14/0/0 same w3 12>12  |  structures/structure_visibility 21/0/0 same w3 18>18  |  structures/structures 16/1/0 same w3 12>12
-units/biped_limp_noodle 6/0/0 same w3 12>12  |  units/bipeds 43/8/0 same w3 15>15  |  units/unit_dialogue 14/0/0 same w3 12>12
-units/unit_scripting_commands 11/0/0 same w3 12>12  |  units/units 189/0/0 same w3 33>33  |  units/vehicles 38/1/0 same w3 27>27

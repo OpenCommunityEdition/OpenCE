@@ -249,7 +249,6 @@ symbols in this file:
 #include "cseries.h"
 #include "actions.h"
 
-#include "actor_looking.h"
 #include "actors.h"
 #include "ai_communication.h"
 #include "ai_debug.h"

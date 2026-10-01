@@ -104,8 +104,8 @@ enum
 
 /* ---------- globals */
 
-struct profile_section item_update_section = { "item_update", NONE, TRUE };
-real const item_maximum_impact_velocity = 0.1f;
+static struct profile_section item_update_section = { "item_update", NONE, TRUE };
+static real const item_maximum_impact_velocity = 0.1f;
 
 /* ---------- public code */
 

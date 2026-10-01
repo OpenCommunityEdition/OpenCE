@@ -326,6 +326,12 @@ static void glow_update(
 
 /* ---------- globals */
 
+struct
+{
+	struct data_array *glow_data;
+	struct data_array *glow_particle_data;
+} glow_globals;
+
 /* ---------- public code */
 
 void glow_initialize(
@@ -810,10 +816,10 @@ static void get_particle_world_position(
 	real_vector3d side;
 	real_vector3d ups[4];
 	real_vector3d up;
-	real_point3d positions[4];
+	real_point3d traversal_points[4];
 	real_vector3d position_vectors[4];
 	real_vector3d position;
-	real knots[4];
+	real traversal_time_indices[4];
 	real angle;
 	short marker_index;
 	short first_marker_index;
@@ -836,8 +842,8 @@ static void get_particle_world_position(
 	switch (glow->number_of_markers)
 	{
 		case 2:
-			positions[0] = glow->markers[0].matrix.position;
-			positions[3] = glow->markers[1].matrix.position;
+			traversal_points[0] = glow->markers[0].matrix.position;
+			traversal_points[3] = glow->markers[1].matrix.position;
 			ups[0] = glow->markers[0].matrix.up;
 			ups[3] = glow->markers[1].matrix.up;
 			cross_product3d(
@@ -848,15 +854,15 @@ static void get_particle_world_position(
 				&glow->markers[1].matrix.up,
 				&glow->markers[1].matrix.forward,
 				&sides[3]);
-			knots[0] = glow->marker_time_index[0];
-			knots[3] = glow->marker_time_index[1];
+			traversal_time_indices[0] = glow->marker_time_index[0];
+			traversal_time_indices[3] = glow->marker_time_index[1];
 
-			positions[1].x = (positions[3].x - positions[0].x) * 0.25f + positions[0].x;
-			positions[1].y = (positions[3].y - positions[0].y) * 0.25f + positions[0].y;
-			positions[1].z = (positions[3].z - positions[0].z) * 0.25f + positions[0].y;
-			positions[2].x = (positions[3].x - positions[0].x) * 0.75f + positions[0].x;
-			positions[2].y = (positions[3].y - positions[0].y) * 0.75f + positions[0].y;
-			positions[2].z = (positions[3].z - positions[0].z) * 0.75f + positions[0].y;
+			traversal_points[1].x = (traversal_points[3].x - traversal_points[0].x) * 0.25f + traversal_points[0].x;
+			traversal_points[1].y = (traversal_points[3].y - traversal_points[0].y) * 0.25f + traversal_points[0].y;
+			traversal_points[1].z = (traversal_points[3].z - traversal_points[0].z) * 0.25f + traversal_points[0].y;
+			traversal_points[2].x = (traversal_points[3].x - traversal_points[0].x) * 0.75f + traversal_points[0].x;
+			traversal_points[2].y = (traversal_points[3].y - traversal_points[0].y) * 0.75f + traversal_points[0].y;
+			traversal_points[2].z = (traversal_points[3].z - traversal_points[0].z) * 0.75f + traversal_points[0].y;
 
 			ups[1].i = (ups[3].i - ups[0].i) * 0.25f + ups[0].i;
 			ups[1].j = (ups[3].j - ups[0].j) * 0.25f + ups[0].j;
@@ -871,13 +877,13 @@ static void get_particle_world_position(
 			sides[2].j = (sides[3].j - sides[0].j) * 0.75f + sides[0].j;
 			sides[2].k = (sides[3].k - sides[0].k) * 0.75f + sides[0].k;
 
-			knots[1] = (knots[3] - knots[0]) * 0.25f + knots[0];
-			knots[2] = (knots[3] - knots[0]) * 0.75f + knots[0];
+			traversal_time_indices[1] = (traversal_time_indices[3] - traversal_time_indices[0]) * 0.25f + traversal_time_indices[0];
+			traversal_time_indices[2] = (traversal_time_indices[3] - traversal_time_indices[0]) * 0.75f + traversal_time_indices[0];
 			break;
 
 		case 3:
-			positions[0] = glow->markers[0].matrix.position;
-			positions[3] = glow->markers[2].matrix.position;
+			traversal_points[0] = glow->markers[0].matrix.position;
+			traversal_points[3] = glow->markers[2].matrix.position;
 			ups[0] = glow->markers[0].matrix.up;
 			ups[3] = glow->markers[2].matrix.up;
 			cross_product3d(
@@ -888,23 +894,23 @@ static void get_particle_world_position(
 				&glow->markers[2].matrix.up,
 				&glow->markers[2].matrix.forward,
 				&sides[3]);
-			knots[0] = glow->marker_time_index[0];
-			knots[3] = glow->marker_time_index[2];
+			traversal_time_indices[0] = glow->marker_time_index[0];
+			traversal_time_indices[3] = glow->marker_time_index[2];
 
 			switch (particle->parent_marker_index)
 			{
 				case 0:
-					positions[1] = glow->markers[1].matrix.position;
+					traversal_points[1] = glow->markers[1].matrix.position;
 					ups[1] = glow->markers[1].matrix.up;
 					cross_product3d(
 						&glow->markers[1].matrix.up,
 						&glow->markers[1].matrix.forward,
 						&sides[1]);
-					knots[1] = glow->marker_time_index[1];
+					traversal_time_indices[1] = glow->marker_time_index[1];
 
-					positions[2].x = (positions[3].x - positions[1].x) * 0.5f + positions[1].x;
-					positions[2].y = (positions[3].y - positions[1].y) * 0.5f + positions[1].y;
-					positions[2].z = (positions[3].z - positions[1].z) * 0.5f + positions[1].y;
+					traversal_points[2].x = (traversal_points[3].x - traversal_points[1].x) * 0.5f + traversal_points[1].x;
+					traversal_points[2].y = (traversal_points[3].y - traversal_points[1].y) * 0.5f + traversal_points[1].y;
+					traversal_points[2].z = (traversal_points[3].z - traversal_points[1].z) * 0.5f + traversal_points[1].y;
 
 					ups[2].i = (ups[3].i - ups[1].i) * 0.5f + ups[1].i;
 					ups[2].j = (ups[3].j - ups[1].j) * 0.5f + ups[1].j;
@@ -913,20 +919,20 @@ static void get_particle_world_position(
 					sides[2].j = (sides[3].j - sides[1].j) * 0.5f + sides[1].j;
 					sides[2].k = (sides[3].k - sides[1].k) * 0.5f + sides[1].k;
 
-					knots[2] = (knots[3] - knots[1]) * 0.5f + knots[1];
+					traversal_time_indices[2] = (traversal_time_indices[3] - traversal_time_indices[1]) * 0.5f + traversal_time_indices[1];
 					break;
 
 				case 1:
-					positions[2] = glow->markers[1].matrix.position;
+					traversal_points[2] = glow->markers[1].matrix.position;
 					ups[2] = glow->markers[1].matrix.up;
 					cross_product3d(
 						&glow->markers[1].matrix.up,
 						&glow->markers[1].matrix.forward,
 						&sides[2]);
 
-					positions[1].x = (positions[2].x - positions[0].x) * 0.5f + positions[0].x;
-					positions[1].y = (positions[2].y - positions[0].y) * 0.5f + positions[0].y;
-					positions[1].z = (positions[2].z - positions[0].z) * 0.5f + positions[0].y;
+					traversal_points[1].x = (traversal_points[2].x - traversal_points[0].x) * 0.5f + traversal_points[0].x;
+					traversal_points[1].y = (traversal_points[2].y - traversal_points[0].y) * 0.5f + traversal_points[0].y;
+					traversal_points[1].z = (traversal_points[2].z - traversal_points[0].z) * 0.5f + traversal_points[0].y;
 
 					ups[1].i = (ups[2].i - ups[0].i) * 0.5f + ups[0].i;
 					ups[1].j = (ups[2].j - ups[0].j) * 0.5f + ups[0].j;
@@ -935,8 +941,8 @@ static void get_particle_world_position(
 					sides[1].j = (sides[2].j - sides[0].j) * 0.5f + sides[0].j;
 					sides[1].k = (sides[2].k - sides[0].k) * 0.5f + sides[0].k;
 
-					knots[1] = (glow->marker_time_index[1] - knots[0]) * 0.5f + knots[0];
-					knots[2] = glow->marker_time_index[1];
+					traversal_time_indices[1] = (glow->marker_time_index[1] - traversal_time_indices[0]) * 0.5f + traversal_time_indices[0];
+					traversal_time_indices[2] = glow->marker_time_index[1];
 					break;
 			}
 			break;
@@ -963,16 +969,16 @@ static void get_particle_world_position(
 					last_marker_index++;
 			}
 
-			knots[0] = glow->marker_time_index[first_marker_index];
-			knots[1] = glow->marker_time_index[first_marker_index + 1];
-			knots[2] = glow->marker_time_index[first_marker_index + 2];
-			knots[3] = glow->marker_time_index[first_marker_index + 3];
+			traversal_time_indices[0] = glow->marker_time_index[first_marker_index];
+			traversal_time_indices[1] = glow->marker_time_index[first_marker_index + 1];
+			traversal_time_indices[2] = glow->marker_time_index[first_marker_index + 2];
+			traversal_time_indices[3] = glow->marker_time_index[first_marker_index + 3];
 
 			for (index = 0; index < 4; index++)
 			{
 				struct object_marker *marker = &glow->markers[glow->marker_order[first_marker_index + index]];
 
-				positions[index] = marker->matrix.position;
+				traversal_points[index] = marker->matrix.position;
 				ups[index] = marker->matrix.up;
 				cross_product3d(&marker->matrix.up, &marker->matrix.forward, &sides[index]);
 			}
@@ -981,9 +987,9 @@ static void get_particle_world_position(
 
 	for (index = 0; index < NUMBEROF(position_vectors); index++)
 	{
-		position_vectors[index].i = positions[index].x;
-		position_vectors[index].j = positions[index].y;
-		position_vectors[index].k = positions[index].z;
+		position_vectors[index].i = traversal_points[index].x;
+		position_vectors[index].j = traversal_points[index].y;
+		position_vectors[index].k = traversal_points[index].z;
 	}
 
 	nonuniform_cubic_spline_vector3d(
@@ -992,10 +998,10 @@ static void get_particle_world_position(
 		&position_vectors[1],
 		&position_vectors[2],
 		&position_vectors[3],
-		knots[0],
-		knots[1],
-		knots[2],
-		knots[3],
+		traversal_time_indices[0],
+		traversal_time_indices[1],
+		traversal_time_indices[2],
+		traversal_time_indices[3],
 		particle->t);
 	nonuniform_cubic_spline_vector3d(
 		&up,
@@ -1003,10 +1009,10 @@ static void get_particle_world_position(
 		&ups[1],
 		&ups[2],
 		&ups[3],
-		knots[0],
-		knots[1],
-		knots[2],
-		knots[3],
+		traversal_time_indices[0],
+		traversal_time_indices[1],
+		traversal_time_indices[2],
+		traversal_time_indices[3],
 		particle->t);
 	nonuniform_cubic_spline_vector3d(
 		&side,
@@ -1014,10 +1020,10 @@ static void get_particle_world_position(
 		&sides[1],
 		&sides[2],
 		&sides[3],
-		knots[0],
-		knots[1],
-		knots[2],
-		knots[3],
+		traversal_time_indices[0],
+		traversal_time_indices[1],
+		traversal_time_indices[2],
+		traversal_time_indices[3],
 		particle->t);
 
 	particle->position.x = position.i;

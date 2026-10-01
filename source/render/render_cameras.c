@@ -201,7 +201,7 @@ enum
 
 /* ---------- globals */
 
-real previous_projection_coefficients[4]= {0};
+static real previous_projection_coefficients[4]= {0};
 static real render_camera_warning_values[MAXIMUM_RENDER_CAMERA_WARNING_CONDITIONS]= {0};
 static boolean render_camera_warnings_initialized= {0};
 boolean debug_no_frustum_clip= {0};
@@ -1123,10 +1123,10 @@ void render_camera_build_frustum(
 	real field_of_view_tangent;
 	real projection_x_scale;
 	real projection_y_scale;
-	real_vector3d view_left;
-	real_vector3d view_up;
-	real_vector3d view_backward;
-	real_vector3d plane_normal;
+	real_vector3d x_axis;
+	real_vector3d y_axis;
+	real_vector3d z_axis;
+	real_vector3d viewspace_normal;
 	real_plane3d view_plane;
 	real left_plane_z;
 	real bottom_plane_z;
@@ -1209,15 +1209,15 @@ void render_camera_build_frustum(
 		436,
 		camera->viewport_bounds.y0<camera->viewport_bounds.y1);
 
-	cross_product3d(&camera->forward, &camera->up, &view_left);
-	cross_product3d(&view_left, &camera->forward, &view_up);
-	negate_vector3d(&camera->forward, &view_backward);
-	normalize3d(&view_left);
-	normalize3d(&view_up);
-	normalize3d(&view_backward);
-	frustum->view_to_world.forward = view_left;
-	frustum->view_to_world.left = view_up;
-	frustum->view_to_world.up = view_backward;
+	cross_product3d(&camera->forward, &camera->up, &x_axis);
+	cross_product3d(&x_axis, &camera->forward, &y_axis);
+	negate_vector3d(&camera->forward, &z_axis);
+	normalize3d(&x_axis);
+	normalize3d(&y_axis);
+	normalize3d(&z_axis);
+	frustum->view_to_world.forward = x_axis;
+	frustum->view_to_world.left = y_axis;
+	frustum->view_to_world.up = z_axis;
 	frustum->view_to_world.position = camera->position;
 	frustum->view_to_world.scale = 1.0f;
 	matrix4x3_inverse(&frustum->view_to_world, &frustum->world_to_view);
@@ -1230,43 +1230,43 @@ void render_camera_build_frustum(
 		459,
 		valid_real_matrix4x3(&frustum->view_to_world));
 
-	plane_normal.i = -projection_x_scale;
-	plane_normal.j = 0.0f;
+	viewspace_normal.i = -projection_x_scale;
+	viewspace_normal.j = 0.0f;
 	left_plane_z = bounds_center_x + 1.0f;
-	plane_normal.k = left_plane_z;
-	normalize3d(&plane_normal);
-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+	viewspace_normal.k = left_plane_z;
+	normalize3d(&viewspace_normal);
+	plane3d_from_point_and_normal(&view_plane, global_origin3d, &viewspace_normal);
 	matrix4x3_transform_plane(
 		&frustum->view_to_world,
 		&view_plane,
 		&frustum->world_planes[_render_frustum_plane_left]);
 
-	plane_normal.i = projection_x_scale;
-	plane_normal.j = 0.0f;
-	plane_normal.k = 1.0f - bounds_center_x;
-	normalize3d(&plane_normal);
-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+	viewspace_normal.i = projection_x_scale;
+	viewspace_normal.j = 0.0f;
+	viewspace_normal.k = 1.0f - bounds_center_x;
+	normalize3d(&viewspace_normal);
+	plane3d_from_point_and_normal(&view_plane, global_origin3d, &viewspace_normal);
 	matrix4x3_transform_plane(
 		&frustum->view_to_world,
 		&view_plane,
 		&frustum->world_planes[_render_frustum_plane_right]);
 
-	plane_normal.i = 0.0f;
-	plane_normal.j = -projection_y_scale;
+	viewspace_normal.i = 0.0f;
+	viewspace_normal.j = -projection_y_scale;
 	bottom_plane_z = bounds_center_y + 1.0f;
-	plane_normal.k = bottom_plane_z;
-	normalize3d(&plane_normal);
-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+	viewspace_normal.k = bottom_plane_z;
+	normalize3d(&viewspace_normal);
+	plane3d_from_point_and_normal(&view_plane, global_origin3d, &viewspace_normal);
 	matrix4x3_transform_plane(
 		&frustum->view_to_world,
 		&view_plane,
 		&frustum->world_planes[_render_frustum_plane_bottom]);
 
-	plane_normal.i = 0.0f;
-	plane_normal.j = projection_y_scale;
-	plane_normal.k = 1.0f - bounds_center_y;
-	normalize3d(&plane_normal);
-	plane3d_from_point_and_normal(&view_plane, global_origin3d, &plane_normal);
+	viewspace_normal.i = 0.0f;
+	viewspace_normal.j = projection_y_scale;
+	viewspace_normal.k = 1.0f - bounds_center_y;
+	normalize3d(&viewspace_normal);
+	plane3d_from_point_and_normal(&view_plane, global_origin3d, &viewspace_normal);
 	matrix4x3_transform_plane(
 		&frustum->view_to_world,
 		&view_plane,

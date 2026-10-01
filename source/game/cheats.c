@@ -49,6 +49,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cheats.h"
 #include "cache/cache_files.h"
 #include "camera/director.h"
@@ -62,6 +63,7 @@ symbols in this file:
 #include "main/console.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
@@ -87,7 +89,7 @@ enum
 
 /* ---------- globals */
 
-char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
+static char cheat_strings[MAXIMUM_CHEATS][MAXIMUM_CHEAT_LENGTH] = {0};
 /* January emits this otherwise unreferenced byte after cheat_strings.
  * Its original name and purpose are unknown; the name is descriptive only. */
 static boolean cheats_unused_flag = FALSE;
@@ -114,9 +116,89 @@ void cheats_dispose_from_old_map(
 	return;
 }
 
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+/* bipeds.c's, player_control.c's */
+extern boolean rider_ejection;
+extern boolean player_autoaim_flag;
+extern boolean player_magnetism_flag;
+/* game_time.c's */
+boolean game_time_reset_speed(void);
+
+/* port: what the machine draws of the world put back as it draws it for
+everyone: nothing seen through walls (wireframe, a drawing mode, the
+environment or its parts left out), past fog, or under grass and water;
+whether any was other */
+static boolean cheats_network_client_rasterizer_enforce(
+	void)
+{
+	boolean changed = FALSE;
+	boolean *environment_part;
+
+	if (rasterizer_debug_options.wireframe_enabled || rasterizer_debug_options.drawing_mode != 0 ||
+		!rasterizer_debug_options.draw_water || !rasterizer_debug_options.draw_detail_objects ||
+		!rasterizer_debug_options.draw_lens_flares || !rasterizer_debug_options.fog_atmospheric_enabled ||
+		!rasterizer_debug_options.fog_planar_enabled)
+	{
+		changed = TRUE;
+	}
+	rasterizer_debug_options.wireframe_enabled = FALSE;
+	rasterizer_debug_options.drawing_mode = 0;
+	rasterizer_debug_options.draw_water = TRUE;
+	rasterizer_debug_options.draw_detail_objects = TRUE;
+	rasterizer_debug_options.draw_lens_flares = TRUE;
+	rasterizer_debug_options.fog_atmospheric_enabled = TRUE;
+	rasterizer_debug_options.fog_planar_enabled = TRUE;
+	/* (the environment and its parts, lightmaps to screen fog, all drawn,
+	as rasterizer_frame_begin leaves them from its switch: 2, given) */
+	for (environment_part = &rasterizer_debug_options.draw_environment_lightmaps;
+		environment_part <= &rasterizer_debug_options.draw_environment_fog_screen;
+		environment_part++)
+	{
+		if (!*environment_part)
+			changed = TRUE;
+		*environment_part = TRUE;
+	}
+	if (rasterizer_debug_options.draw_environment != 2)
+		changed = TRUE;
+	rasterizer_debug_options.draw_environment = 2;
+
+	return changed;
+}
+
+/* port: a client in another's game plays by the host's rules: none of its
+own cheats, its own game speed or its own changes to how players play, nor
+what its drawing shows it that others' does not, set before it joined too
+(after, hs_compile_and_evaluate refuses them); each frame and each tick */
+void cheats_network_client_enforce(
+	void)
+{
+	static struct cheat_globals const none = { 0 };
+	boolean changed;
+
+	if (!network_game_distributed_client())
+		return;
+	changed = csmemcmp(&cheat, &none, sizeof(cheat)) != 0 || !rider_ejection || !player_autoaim_flag ||
+		!player_magnetism_flag;
+	csmemset(&cheat, 0, sizeof(cheat));
+	rider_ejection = TRUE;
+	player_autoaim_flag = TRUE;
+	player_magnetism_flag = TRUE;
+	changed |= game_time_reset_speed();
+	changed |= cheats_network_client_rasterizer_enforce();
+	if (changed)
+	{
+		console_warning("playing in another's game: its host's rules (cheats, game speed and drawing put back)");
+		error(_error_log, "playing in another's game: cheats, game speed and drawing put back to the host's");
+	}
+
+	return;
+}
+
 void cheats_update(
 	void)
 {
+	cheats_network_client_enforce();
 	if (cheat.controller_enabled)
 	{
 		short local_player_index;

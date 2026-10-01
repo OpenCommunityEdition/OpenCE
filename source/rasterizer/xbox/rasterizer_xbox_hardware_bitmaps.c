@@ -76,7 +76,6 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_mipmap.h"
 #include "cache/texture_cache.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_swizzle.h"

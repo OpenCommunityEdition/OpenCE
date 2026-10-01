@@ -85,9 +85,9 @@ struct packet_header_byte_swap_data
 
 /* ---------- globals */
 
-char const *global_data_packet_groups_error_string = NULL;
+static char const *global_data_packet_groups_error_string = NULL;
 
-struct packet_header_byte_swap_data packet_header_bs =
+static struct packet_header_byte_swap_data packet_header_bs =
 {
 	{ _begin_bs_array, 1, _1byte, _end_bs_array },
 	{ "packet_header", sizeof(struct packet_header), packet_header_bs.codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE }

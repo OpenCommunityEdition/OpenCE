@@ -35,7 +35,7 @@ symbols in this file:
 0007CB60 0010:
 	_system_kill_screen_saver (0000)
 0007CB70 00f0:
-	_code_0007cb70 (0000)
+	_exception_code_get_string (0000)
 0007CC60 0060:
 	_generic_exception_filter (0000)
 002575EC 0029:
@@ -95,12 +95,6 @@ symbols in this file:
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct system_memory_information
-{
-	long available_physical_memory;
-	long total_physical_memory;
-};
 
 /* ---------- globals */
 
@@ -239,8 +233,8 @@ void system_memory_information_get(
 	status.dwLength = sizeof(status);
 	GlobalMemoryStatus(&status);
 	csmemset(information, 0, sizeof(*information));
-	information->available_physical_memory = status.dwAvailPhys;
-	information->total_physical_memory = status.dwTotalPhys;
+	information->free = status.dwAvailPhys;
+	information->total = status.dwTotalPhys;
 	return;
 }
 
@@ -263,7 +257,7 @@ void system_kill_screen_saver(
 	return;
 }
 
-static const char *code_0007cb70(
+static const char *exception_code_get_string(
 	unsigned long exception_code)
 {
 	const char *exception_name = NULL;
@@ -327,7 +321,7 @@ long generic_exception_filter(
 	unsigned long exception_code,
 	PEXCEPTION_POINTERS exception_information)
 {
-	const char *exception_name = code_0007cb70(exception_code);
+	const char *exception_name = exception_code_get_string(exception_code);
 
 	stack_walk_with_context(NULL, 0, exception_information->ContextRecord);
 	if (exception_name)

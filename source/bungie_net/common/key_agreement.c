@@ -40,8 +40,18 @@ symbols in this file:
 	??_C@_0BG@DBBMADFN@msgptr?5?$CG?$CG?5packet_type?$AA@ (0000)
 00255770 0029:
 	??_C@_0CJ@IKOFDDIL@msgptr?5?$CG?$CG?5prime?5?$CG?$CG?5secret?5?$CG?$CG?5pri@ (0000)
-002DCAD4 0088:
-	_key_agreement_packets (0000)
+002DCAD4 0028:
+	_message_initiate_key_agreement_packet_fields (0000)
+002DCAFC 0014:
+	_message_initiate_key_agreement_packet (0000)
+002DCB10 0014:
+	_message_finalize_key_agreement_packet_fields (0000)
+002DCB24 0014:
+	_message_finalize_key_agreement_packet (0000)
+002DCB38 0010:
+	_key_agreement_packets_group_packets (0000)
+002DCB48 0014:
+	_key_agreement_packets_group (0000)
 0031C520 0200:
 	_key_agreement_message_buffer (0000)
 */
@@ -77,8 +87,6 @@ enum key_agreement_packet_type
 #define KEY_AGREEMENT_FILE "c:\\halo\\SOURCE\\bungie_net\\common\\key_agreement.c"
 #define DATA_PACKET_FIELD(type, count) { type, count, 0, 0, 0 }
 #define DATA_PACKET_FIELD_END DATA_PACKET_FIELD(_data_packet_field_end, 0)
-#define KEY_AGREEMENT_PACKET_DEFINITION(member, name, structure) \
-	{ name, 0, sizeof(structure), KEY_AGREEMENT_PACKET_VERSION, key_agreement_packets.member##_fields, FALSE }
 
 /* ---------- structures */
 
@@ -98,16 +106,6 @@ union key_agreement_packet_value
 {
 	long value;
 	short encoded;
-};
-
-struct key_agreement_packet_definitions
-{
-	struct data_packet_field initiate_fields[4];
-	struct data_packet_definition initiate;
-	struct data_packet_field finalize_fields[2];
-	struct data_packet_definition finalize;
-	struct data_packet_entry packets[NUMBER_OF_KEY_AGREEMENT_PACKET_TYPES];
-	struct data_packet_group_definition group;
 };
 
 /* ---------- prototypes */
@@ -145,32 +143,58 @@ static word *build_finalize_key_agreement_message(
 
 /* ---------- globals */
 
-struct key_agreement_packet_definitions key_agreement_packets =
+/* Names and types of these six file statics are attested by a later first-party build (the 2003 PC demo PDB's
+key_agreement.obj; its packet-array tag is data_packet_group_packet, our data_packet_entry); January's own PDB has
+no static names. Their offsets and January's single 4-byte-aligned .data contribution agree with that build. */
+
+static struct data_packet_field message_initiate_key_agreement_packet_fields[4] =
 {
-	{
-		DATA_PACKET_FIELD(_data_packet_field_longs, 2),
-		DATA_PACKET_FIELD(_data_packet_field_longs, 2),
-		DATA_PACKET_FIELD(_data_packet_field_longs, 2),
-		DATA_PACKET_FIELD_END,
-	},
-	KEY_AGREEMENT_PACKET_DEFINITION(initiate, "message_initiate_key_agreement_packet", struct message_initiate_key_agreement),
-	{
-		DATA_PACKET_FIELD(_data_packet_field_longs, 2),
-		DATA_PACKET_FIELD_END,
-	},
-	KEY_AGREEMENT_PACKET_DEFINITION(finalize, "message_finalize_key_agreement_packet", struct message_finalize_key_agreement),
-	{
-		{ 0, 0, &key_agreement_packets.initiate },
-		{ 0, 0, &key_agreement_packets.finalize },
-	},
-	{
-		"key_agreement_packets_group",
-		NUMBER_OF_KEY_AGREEMENT_PACKET_TYPES,
-		1,
-		0x60,
-		KEY_AGREEMENT_ENCODED_PACKET_SIZE,
-		key_agreement_packets.packets,
-	},
+	DATA_PACKET_FIELD(_data_packet_field_longs, 2),
+	DATA_PACKET_FIELD(_data_packet_field_longs, 2),
+	DATA_PACKET_FIELD(_data_packet_field_longs, 2),
+	DATA_PACKET_FIELD_END,
+};
+
+static struct data_packet_definition message_initiate_key_agreement_packet =
+{
+	"message_initiate_key_agreement_packet",
+	0,
+	sizeof(struct message_initiate_key_agreement),
+	KEY_AGREEMENT_PACKET_VERSION,
+	message_initiate_key_agreement_packet_fields,
+	FALSE,
+};
+
+static struct data_packet_field message_finalize_key_agreement_packet_fields[2] =
+{
+	DATA_PACKET_FIELD(_data_packet_field_longs, 2),
+	DATA_PACKET_FIELD_END,
+};
+
+static struct data_packet_definition message_finalize_key_agreement_packet =
+{
+	"message_finalize_key_agreement_packet",
+	0,
+	sizeof(struct message_finalize_key_agreement),
+	KEY_AGREEMENT_PACKET_VERSION,
+	message_finalize_key_agreement_packet_fields,
+	FALSE,
+};
+
+static struct data_packet_entry key_agreement_packets_group_packets[NUMBER_OF_KEY_AGREEMENT_PACKET_TYPES] =
+{
+	{ 0, 0, &message_initiate_key_agreement_packet },
+	{ 0, 0, &message_finalize_key_agreement_packet },
+};
+
+static struct data_packet_group_definition key_agreement_packets_group =
+{
+	"key_agreement_packets_group",
+	NUMBER_OF_KEY_AGREEMENT_PACKET_TYPES,
+	1,
+	0x60,
+	KEY_AGREEMENT_ENCODED_PACKET_SIZE,
+	key_agreement_packets_group_packets,
 };
 
 static byte key_agreement_message_buffer[KEY_AGREEMENT_MESSAGE_BUFFER_SIZE];
@@ -320,7 +344,7 @@ boolean complete_key_exchange(
 void initialize_key_agreement_packets(
 	void)
 {
-	data_packet_group_initialize(&key_agreement_packets.group);
+	data_packet_group_initialize(&key_agreement_packets_group);
 
 	return;
 }
@@ -350,7 +374,7 @@ static boolean key_agreement_decode_packet(
 	short expected_packet_class)
 {
 	return data_packet_group_decode_packet(
-		&key_agreement_packets.group,
+		&key_agreement_packets_group,
 		decoded_packet,
 		encoded_packet,
 		encoded_packet_size,
@@ -367,7 +391,7 @@ static boolean key_agreement_encode_packet(
 	long packet_version)
 {
 	return data_packet_group_encode_packet(
-		&key_agreement_packets.group,
+		&key_agreement_packets_group,
 		decoded_packet,
 		encoded_packet,
 		encoded_packet_size,

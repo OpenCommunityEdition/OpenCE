@@ -5,7 +5,7 @@ struct tif_dirwrite_data
 	char module[18];
 };
 
-struct tif_dirwrite_data data_002b8688 =
+static struct tif_dirwrite_data data_002b8688 =
 {
 	"$Header: /usr/people/sam/tiff/libtiff/RCS/tif_dirwrite.c,v 1.16 92/03/18 09:36:15 sam Exp $",
 	"TIFFLinkDirectory"

@@ -1,2 +1,0 @@
-Review leads only: a finding does not prove fake source, a semantic bug, or an invalid byte match.
-Scanned 1 file(s); 0 review lead(s); skipped 0 vendored path(s).

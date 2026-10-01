@@ -184,7 +184,7 @@ static int symbol_sort_proc(
 
 /* ---------- globals */
 
-struct _stack_walk_globals stack_walk_globals =
+static struct _stack_walk_globals stack_walk_globals =
 {
 	NONE,
 	FALSE
@@ -831,13 +831,8 @@ static void walk_stack(
 {
 	unsigned long level;
 
-#ifdef HALO_LINUX
 	walk_up_current_frame = (unsigned long)__builtin_frame_address(0);
 	old_ebp = (unsigned long *)walk_up_current_frame;
-#else
-	__asm mov walk_up_current_frame, ebp
-	__asm mov old_ebp, esp
-#endif
 
 	if (!is_valid_ebp())
 	{

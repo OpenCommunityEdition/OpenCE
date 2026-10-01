@@ -228,6 +228,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
@@ -261,7 +262,6 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "players.h"
 #include "player_queues_new.h"
-#include "player_control.h"
 #include "objects/objects.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
@@ -276,7 +276,6 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 
-#ifdef HALO_LINUX
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
@@ -301,29 +300,19 @@ enum
 		network_distributed_player_picked_up(player_index, kind, definition_index, count)
 
 static void network_player_log_idle_action(long player_index, unsigned long control_flags);
-boolean network_game_distributed(void);
 
 /* whether this machine decides pickups: not a client of the distributed
 netcode, whose players' weapons, grenades and power-ups are the host's
 (port/linux/game/network_distributed.c) */
 #define players_decide_pickups() (!network_game_distributed_client())
-#else
-#define player_network_picked_up(player, player_index, kind, definition_index, count)
-#define players_decide_pickups() TRUE
-#endif
 
 /* ---------- constants */
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' session limits (port/linux/include/halo_port_limits.h) */
 	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	NETWORK_GAME_MAXIMUM_PLAYER_COUNT = 16,
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-#endif
 	MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED = 183,
 	_collision_test_for_player_teleport_flags =
 		FLAG(_collision_test_front_facing_surfaces_bit) |
@@ -349,15 +338,6 @@ struct scenario_bsp_switch_trigger_volume
 	short source_structure_bsp_index;
 	short destination_structure_bsp_index;
 	short cutscene_flag_index;
-};
-
-struct scenario_cutscene_flag
-{
-	long runtime_unused;
-	char name[TAG_STRING_LENGTH];
-	real_point3d position;
-	real_euler_angles2d facing;
-	byte unused[0x24];
 };
 
 struct unit_control_data
@@ -522,12 +502,8 @@ void players_initialize(
 {
 	player_data = game_state_data_new(
 		"players",
-#ifdef HALO_LINUX
 		/* a player's datum index is also its action slot in every update */
 		NETWORK_GAME_MAXIMUM_PLAYER_COUNT,
-#else
-		16,
-#endif
 		sizeof(struct player_datum));
 	team_data = game_state_data_new(
 		"teams",
@@ -577,11 +553,7 @@ void players_initialize_for_new_map(
 	csmemset(
 		machine_to_player_table,
 		NONE,
-#ifdef HALO_LINUX
 		sizeof(machine_to_player_table));
-#else
-		0x40);
-#endif
 
 	return;
 }
@@ -1155,6 +1127,37 @@ static void machine_add_player(
 	return;
 }
 
+/* port: a player who left the game in progress is no longer its machine's
+(its datum stays until the game ends): a machine that joins at the same index
+fills the list from its first free entry, and the old players' entries left
+it full, or its players taken for the old ones */
+void machine_remove_player(
+	long player_index)
+{
+	long machine_index;
+	long machine_player_index;
+
+	if (player_index == NONE)
+		return;
+	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
+	{
+		for (machine_player_index = 0;
+			machine_player_index < MAXIMUM_LOCAL_PLAYERS;
+			machine_player_index++)
+		{
+			/* (by its absolute index: a datum's slot is one player's) */
+			if (machine_to_player_table[machine_index][machine_player_index] != NONE &&
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(machine_to_player_table[machine_index][machine_player_index]) ==
+					DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index))
+			{
+				machine_to_player_table[machine_index][machine_player_index] = NONE;
+			}
+		}
+	}
+
+	return;
+}
+
 long player_new(
 	long machine_index,
 	long player_index,
@@ -1420,7 +1423,6 @@ static void player_spawn(
 	return;
 }
 
-#ifdef HALO_LINUX
 /* the distributed netcode (port/linux/game/network_distributed.c): a
 client's player takes the unit the host spawned it with (the host's object,
 at the host's index, with the host's weapons), as player_spawn gives a
@@ -1515,6 +1517,7 @@ static void network_player_log_idle_action(
 	long player_index,
 	unsigned long control_flags)
 {
+	/* (a time past this game's is the last game's: game time restarts) */
 	static long logged_times[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 	struct player_datum *player = player_get(player_index);
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
@@ -1523,11 +1526,12 @@ static void network_player_log_idle_action(
 	long nearest_index = NONE;
 	real nearest_distance = 0.0f;
 
-	if (!network_game_distributed() || game_connection() != _game_connection_network_server ||
+	if (game_connection() != _game_connection_network_server ||
 		player->local_player_index != NONE || player->action_result != _player_action_result_reload ||
 		!(control_flags & (FLAG(_unit_control_action_bit) | FLAG(_unit_control_swap_weapons_bit))) ||
 		absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
-		(logged_times[absolute_index] && game_time_get() - logged_times[absolute_index] < 3 * TICKS_PER_SECOND))
+		(logged_times[absolute_index] && logged_times[absolute_index] <= game_time_get() &&
+			game_time_get() - logged_times[absolute_index] < 3 * TICKS_PER_SECOND))
 	{
 		return;
 	}
@@ -1553,6 +1557,52 @@ static void network_player_log_idle_action(
 		absolute_index, player->unit_index, unit->object.position.x, unit->object.position.y, unit->object.position.z,
 		nearest_index, nearest_index != NONE ? tag_get_name(object_get(nearest_index)->definition_index) : "",
 		nearest_distance);
+	/* ... and the nearest vehicle: how far its nearest seat's entrance is
+	(within 1.0 to get in), and whether the unit moves or the vehicle turns
+	too fast (player_examine_nearby_vehicle) */
+	{
+		struct object_iterator vehicles;
+		long vehicle_index = NONE;
+		real vehicle_distance = 0.0f;
+
+		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+		while (object_iterator_next(&vehicles))
+		{
+			real distance = distance3d(&unit->object.position, &object_get(vehicles.index)->object.position);
+
+			if (vehicle_index == NONE || distance < vehicle_distance)
+			{
+				vehicle_index = vehicles.index;
+				vehicle_distance = distance;
+			}
+		}
+		if (vehicle_index != NONE && vehicle_distance < 10.0f)
+		{
+			struct unit_datum *vehicle = unit_get(vehicle_index);
+			short seat_count = unit_definition_get(vehicle->definition_index)->unit.seats.count;
+			short seat_index;
+			real entrance_distance = REAL_MAX;
+
+			for (seat_index = 0; seat_index < seat_count; seat_index++)
+			{
+				real_point3d entrance;
+				real_point3d seat;
+
+				if (unit_get_seat_entrance_point(player->unit_index, vehicle_index, seat_index, &entrance, &seat, NULL))
+				{
+					entrance_distance = MIN(entrance_distance,
+						MIN(distance3d(&entrance, &unit->object.bounding_sphere_center),
+							distance3d(&seat, &unit->object.bounding_sphere_center)));
+				}
+			}
+			error(2, "distributed: ... nearest vehicle %lx %s at %.2f %.2f %.2f (%.2f away), seat entrance %.2f away, "
+				"unit speed %.3f, vehicle turning %.3f, up %.2f",
+				vehicle_index, tag_get_name(vehicle->definition_index), vehicle->object.position.x,
+				vehicle->object.position.y, vehicle->object.position.z, vehicle_distance, entrance_distance,
+				magnitude3d(&unit->object.translational_velocity), magnitude3d(&vehicle->object.angular_velocity),
+				vehicle->object.up.k);
+		}
+	}
 }
 
 /* ... and gives up the one it has (the host's unit for it is another) */
@@ -1572,7 +1622,6 @@ void network_player_detach_unit(
 	if (player->local_player_index != NONE)
 		player_control_new_unit(player->local_player_index, NONE);
 }
-#endif
 
 /* Exact: January emits this private dead-unit replacement helper from the
    reconstructed player_teleport_internal caller below. */
@@ -1741,6 +1790,14 @@ static boolean player_handle_action(
 		break;
 
 	case _player_action_result_swap_for_powerup:
+		/* port: a distributed client's inventories are the host's (the
+		powerup is swapped where the host decides pickups, and the relayed
+		action of a remote player reaches here too): it swaps nothing */
+		if (!players_decide_pickups())
+		{
+			result = TRUE;
+			break;
+		}
 		unit_drop_current_equipment(player->unit_index);
 		if (unit_add_equipment_to_inventory(
 			player->unit_index,
@@ -3198,18 +3255,18 @@ static void player_examine_nearby_device(
 	struct player_datum *player;
 	struct unit_datum *unit;
 	struct device_datum *device;
-	real_point3d camera_position;
+	real_point3d camera;
 
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	device = device_get(device_index);
-	unit_get_camera_position(player->unit_index, &camera_position);
+	unit_get_camera_position(player->unit_index, &camera);
 	if (fast_vector_intersects_sphere(
-		&camera_position,
+		&camera,
 		&unit->unit.aiming_vector,
 		&device->object.bounding_sphere_center,
 		device->object.bounding_sphere_radius) &&
-		device_frontfacing(device_index, &camera_position, &unit->unit.aiming_vector) &&
+		device_frontfacing(device_index, &camera, &unit->unit.aiming_vector) &&
 		device_can_change_position(device_index))
 	{
 		player_set_action_result(
@@ -3618,9 +3675,7 @@ void players_update_before_game(
 					/* (a client of the distributed netcode's players take the units
 					the host spawns them with, network_player_attach_unit) */
 					if (
-#ifdef HALO_LINUX
 						!network_game_distributed_client() &&
-#endif
 						game_engine_should_spawn_player(iterator.datum_index))
 					{
 						game_engine_prespawn_player_update(iterator.datum_index);
@@ -3630,6 +3685,8 @@ void players_update_before_game(
 						else
 							player->respawn_timer = 1;
 					}
+					else if (network_game_distributed_client())
+						game_engine_client_respawn_countdown(iterator.datum_index);
 				}
 				else if (!main_menu_is_active())
 				{
@@ -3645,9 +3702,7 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
-#ifdef HALO_LINUX
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
-#endif
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
 						!player_handle_action(iterator.datum_index))
@@ -3759,6 +3814,31 @@ void players_update_before_game(
 	return;
 }
 
+/* the telefrag message to a local player (port: its own function, which a
+client of the distributed netcode calls with the host's telefrag kill,
+port/linux/game/network_damage.c) */
+void players_show_telefragged(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	long message_list_index;
+
+	if (player->local_player_index == NONE)
+		return;
+	message_list_index = tag_loaded(
+		UNICODE_STRING_LIST_TAG,
+		"ui\\multiplayer_game_text");
+	hud_print_message(
+		player->local_player_index,
+		message_list_index != NONE
+			? unicode_string_list_get_string(
+				message_list_index,
+				MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED)
+			: L"");
+
+	return;
+}
+
 void players_update_after_game(
 	void)
 {
@@ -3770,7 +3850,6 @@ void players_update_after_game(
 	struct scenario_bsp_switch_trigger_volume *bsp_switch_trigger_volume;
 	long telefrag_ticks;
 	long root_object_index;
-	long message_list_index;
 	short bsp_switch_trigger_volume_index;
 
 	profile_enter(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
@@ -3795,25 +3874,17 @@ void players_update_after_game(
 			telefrag_ticks = player->telefrag_timeout;
 			if (telefrag_ticks >= 90)
 			{
-				if (player->unit_index != NONE)
+				/* a client's view of who blocks is a latency late: the
+				host's kill arrives with its damage events, and its message
+				with it (players_show_telefragged) */
+				if (network_game_distributed_client())
+					player_telefrag_effect_stop(iterator.datum_index);
+				else if (player->unit_index != NONE)
 				{
 					unit = unit_get(player->unit_index);
 					if (!TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_bit))
 					{
-						if (player->local_player_index != NONE)
-						{
-							message_list_index = tag_loaded(
-								UNICODE_STRING_LIST_TAG,
-								"ui\\multiplayer_game_text");
-							hud_print_message(
-								player->local_player_index,
-								message_list_index != NONE
-									? unicode_string_list_get_string(
-										message_list_index,
-										MULTIPLAYER_GAME_TEXT_YOU_WERE_TELEFRAGGED)
-									: L"");
-						}
-
+						players_show_telefragged(iterator.datum_index);
 						player_telefrag_effect_stop(iterator.datum_index);
 						unit_kill(player->unit_index);
 					}

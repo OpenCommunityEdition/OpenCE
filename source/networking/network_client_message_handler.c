@@ -198,12 +198,11 @@ symbols in this file:
 #include "game/players.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_client_message_handler.h"
+#include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 
-#ifdef HALO_LINUX
 /* port/linux/game/network_distributed.c's */
 void network_distributed_handle_message(long machine_index, word const *message, word size);
-#endif
 
 /* ---------- constants */
 
@@ -211,7 +210,6 @@ void network_distributed_handle_message(long machine_index, word const *message,
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' protocol and session limits
 	(port/linux/include/halo_port_limits.h) */
 	NETWORK_GAME_MESSAGE_VERSION = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION,
@@ -220,14 +218,6 @@ enum
 	MAXIMUM_NETWORK_MACHINE_COUNT = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
 	NETWORK_GAME_NAME_LENGTH = 16,
 	MAXIMUM_NUMBER_OF_PLAYERS = HALO_PORT_MAXIMUM_NETWORK_PLAYERS,
-#else
-	NETWORK_GAME_MESSAGE_VERSION = 1,
-	TRANSPORT_NONCE_LENGTH = 8,
-	TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH = 0x80,
-	MAXIMUM_NETWORK_MACHINE_COUNT = 4,
-	NETWORK_GAME_NAME_LENGTH = 16,
-	MAXIMUM_NUMBER_OF_PLAYERS = 16,
-#endif
 	JOIN_GAME_TOKEN_LENGTH = 16,
 };
 
@@ -263,51 +253,6 @@ enum network_game_packet_class
 
 struct network_game_client;
 
-struct network_machine
-{
-	wchar_t name[32];
-	char machine_index;
-	byte padding41[3];
-};
-
-struct network_game_map
-{
-	long unknown;
-	char name[0x80];
-};
-
-struct network_game_local_data
-{
-	boolean game_objects_loaded;
-	byte padding431[3];
-};
-
-struct network_game
-{
-	wchar_t name[NETWORK_GAME_NAME_LENGTH];
-	struct network_game_map map;
-	struct game_variant variant;
-	byte unknown10C;
-	char minimum_player_count;
-#ifdef HALO_LINUX
-	/* 128 does not fit a signed char */
-	byte maximum_player_count;
-#else
-	char maximum_player_count;
-#endif
-	byte team_count;
-	short difficulty;
-	short machine_count;
-	struct network_machine machines[MAXIMUM_NETWORK_MACHINE_COUNT];
-	short player_count;
-	struct network_player players[MAXIMUM_NUMBER_OF_PLAYERS];
-	word reserved_after_players;
-	unsigned long random_seed;
-	long number_of_games_played;
-	struct network_game_local_data local_data;
-};
-
-#ifdef HALO_LINUX
 typedef char network_game_players_offset_assert[
 	offsetof(struct network_game, players) == HALO_PORT_NETWORK_GAME_PLAYERS_OFFSET ? 1 : -1];
 typedef char network_game_size_assert[
@@ -323,7 +268,6 @@ struct message_server_game_settings_update
 	word pad;
 	byte data[HALO_PORT_NETWORK_GAME_SETTINGS_FRAGMENT_SIZE];
 };
-#endif
 
 struct message_server_game_advertise
 {
@@ -516,6 +460,15 @@ boolean network_game_client_handle_message(
 	boolean result = TRUE;
 	word message_type;
 	byte packet_type;
+
+	/* (a header and at least the packet type after it, of the size the
+	header says: else the stream is broken) */
+	if (message && (message_size < (short)(sizeof(message_header) + sizeof(byte)) ||
+		message_size != GET_MESSAGE_SIZE(*message)))
+	{
+		network_event("client received a message of a bad size (%d)", message_size);
+		return FALSE;
+	}
 
 	match_assert(
 		NETWORK_CLIENT_MESSAGE_HANDLER_FILE,
@@ -736,12 +689,30 @@ boolean network_game_client_handle_message(
 				break;
 
 			case _message_type_data:
-#ifdef HALO_LINUX
-				/* the distributed netcode's messages (port/linux/NETCODE.md) */
-				network_distributed_handle_message(NONE, message, message_size);
-#else
-				network_event("client received a bad message type (_message_type_data)");
-#endif
+				/* the distributed netcode's messages (port/linux/NETCODE.md),
+				the host's alone: over its connection, or datagrams from its
+				address */
+				if (network_game_client_address_matches_server(client, source_address))
+				{
+					network_distributed_handle_message(NONE, message, message_size);
+				}
+				else
+				{
+					/* (port: once a second at most: anyone can send them,
+					one a tick) */
+					static unsigned long last_logged_time;
+					static boolean logged;
+					unsigned long now = system_milliseconds();
+
+					if (!logged || now - last_logged_time >= 1000)
+					{
+						network_event(
+							"ignoring a distributed message from a system that is not the host @ %s",
+							transport_address_to_string(source_address));
+						last_logged_time = now;
+						logged = TRUE;
+					}
+				}
 				break;
 
 			case _message_type_error:
@@ -750,9 +721,10 @@ boolean network_game_client_handle_message(
 					byte *error_message = (byte *)(message + 1);
 
 					network_event(
-						"client received low-level error message: error= #%d (%s)",
+						"client received low-level error message: error= #%d (%.*s)",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						error_message);
+						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
+						(char const *)error_message);
 				}
 				else
 				{
@@ -881,7 +853,9 @@ static boolean network_game_client_handle_message_server_machine_accepted(
 	else
 	{
 		network_event("ignoring a message_server_machine_accepted message; either a bad machine or we aren't joining");
-		result = FALSE;
+		/* port: ignored, not failed (anyone may send a searching client a
+		datagram, and a failure ends its search) */
+		result = TRUE;
 	}
 
 	return result;
@@ -895,8 +869,11 @@ static boolean network_game_client_handle_message_server_machine_rejected(
 {
 	boolean result = TRUE;
 
+	/* (joining, or accepted into a game in progress that filled up before
+	its players were added: network_game_server_refuse_late_joiner) */
 	if (network_game_client_address_matches_server(client, source_address) &&
-		network_game_client_get_state(client, NULL) == _network_game_client_state_joining)
+		(network_game_client_get_state(client, NULL) == _network_game_client_state_joining ||
+			network_game_client_get_state(client, NULL) == _network_game_client_state_pregame))
 	{
 		struct message_server_machine_rejected rejection;
 		short packet_type = _message_server_machine_rejected;
@@ -922,13 +899,14 @@ static boolean network_game_client_handle_message_server_machine_rejected(
 	else
 	{
 		network_event("ignoring a message_server_machine_rejected message; either a bad machine or we aren't joining");
-		result = FALSE;
+		/* port: ignored, not failed (anyone may send a searching client a
+		datagram, and a failure ends its search) */
+		result = TRUE;
 	}
 
 	return result;
 }
 
-#ifdef HALO_LINUX
 /* the game settings record as its pieces arrive; it is applied once the last
 piece is in */
 static struct network_game network_game_client_settings_staging;
@@ -981,7 +959,6 @@ static boolean network_game_client_receive_game_settings_piece(
 
 	return result;
 }
-#endif
 
 static boolean network_game_client_handle_message_server_game_settings_update(
 	struct network_game_client *client,
@@ -998,7 +975,6 @@ static boolean network_game_client_handle_message_server_game_settings_update(
 	{
 		if (network_game_client_get_state(client, NULL) == _network_game_client_state_pregame)
 		{
-#ifdef HALO_LINUX
 			struct message_server_game_settings_update piece;
 			short packet_type = _message_server_game_settings_update;
 			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
@@ -1018,31 +994,6 @@ static boolean network_game_client_handle_message_server_game_settings_update(
 			{
 				network_event("failed to decode a message_server_game_settings_update packet");
 			}
-#else
-			struct network_game game_settings;
-			short packet_type = _message_server_game_settings_update;
-			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
-
-			message_size -= sizeof(word);
-			if (decode_network_game_message(
-				&game_settings,
-				message + 1,
-				&message_size,
-				&packet_type,
-				&packet_version,
-				_network_game_packet_class_pregame))
-			{
-				result = network_game_client_game_settings_updated(client, &game_settings);
-				if (!result)
-				{
-					network_event("network_game_client_game_settings_updated() failed");
-				}
-			}
-			else
-			{
-				network_event("failed to decode a message_server_game_settings_update packet");
-			}
-#endif
 		}
 		else
 		{
@@ -1205,10 +1156,8 @@ static boolean network_game_client_handle_message_server_begin_game(
 			short packet_type = _message_server_begin_game;
 			short packet_version = NETWORK_GAME_MESSAGE_VERSION;
 
-#ifdef HALO_LINUX
 			/* (it decodes 16 bits of its long: the rest zero) */
 			csmemset(&begin_game, 0, sizeof(begin_game));
-#endif
 			message_size -= sizeof(word);
 			if (decode_network_game_message(
 				&begin_game,
@@ -1218,14 +1167,10 @@ static boolean network_game_client_handle_message_server_begin_game(
 				&packet_version,
 				_network_game_packet_class_pregame))
 			{
-#ifdef HALO_LINUX
-				/* (a game in progress: the host's time, network_client_manager.c) */
-				extern long network_game_client_late_join_time;
-
-				/* (the message carries 16 bits of it: the rest from the first
+				/* (a game in progress: the host's time, network_client_manager.c;
+				the message carries 16 bits of it: the rest from the first
 				game update, network_game_client_handle_game_update) */
 				network_game_client_late_join_time = (long)((unsigned long)begin_game.unused & 0xFFFF);
-#endif
 				result = network_game_client_game_has_started(client);
 				if (!result)
 				{
@@ -1333,17 +1278,13 @@ static boolean network_game_client_handle_message_server_game_update(
 		else
 		{
 			network_event("failed to handle a message_server_game_update message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_game_update message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;
@@ -1374,11 +1315,13 @@ static boolean network_game_client_handle_message_server_add_player_ingame(
 				&packet_version,
 				_network_game_packet_class_ingame))
 			{
-				result = network_game_client_add_player_to_game(client, &player);
-				if (!result)
+				/* (the distributed netcode: a player this machine cannot add
+				does not end its game) */
+				if (!network_game_client_add_player_to_game(client, &player))
 				{
 					network_event("network_game_client_add_player_to_game() failed");
 				}
+				result = TRUE;
 			}
 			else
 			{
@@ -1388,17 +1331,13 @@ static boolean network_game_client_handle_message_server_add_player_ingame(
 		else
 		{
 			network_event("failed to handle a message_server_add_player_ingame message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_add_player_ingame message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;
@@ -1429,11 +1368,12 @@ static boolean network_game_client_handle_message_server_remove_player_ingame(
 				&packet_version,
 				_network_game_packet_class_ingame))
 			{
-				result = network_game_client_remove_player(client, &removal.player, removal.reason);
-				if (!result)
+				/* (nor one it cannot remove) */
+				if (!network_game_client_remove_player(client, &removal.player, removal.reason))
 				{
 					network_event("network_game_client_remove_player() failed");
 				}
+				result = TRUE;
 			}
 			else
 			{
@@ -1443,17 +1383,13 @@ static boolean network_game_client_handle_message_server_remove_player_ingame(
 		else
 		{
 			network_event("failed to handle a message_server_remove_player_ingame message; we are not in game");
+			result = TRUE;
 		}
 	}
 	else
 	{
 		network_event("ignoring a message_server_remove_player_ingame message; came from a bad machine");
 		result = TRUE;
-	}
-
-	if (!result)
-	{
-		network_game_client_game_out_of_sync(client);
 	}
 
 	return result;

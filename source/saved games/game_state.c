@@ -29,9 +29,9 @@ symbols in this file:
 001AF4D0 0020:
 	_game_state_reverted (0000)
 001AF4F0 0160:
-	_code_001af4f0 (0000)
+	_game_state_header_valid (0000)
 001AF650 0070:
-	_code_001af650 (0000)
+	_game_state_allocation_record (0000)
 001AF6C0 0020:
 	_code_001af6c0 (0000)
 001AF6E0 0110:
@@ -125,14 +125,9 @@ symbols in this file:
 
 enum
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger game state (halo_port_capacity.h) */
 	GAME_STATE_CPU_SIZE = HALO_PORT_GAME_STATE_CPU_SIZE,
 	GAME_STATE_GPU_SIZE = HALO_PORT_GAME_STATE_GPU_SIZE,
-#else
-	GAME_STATE_CPU_SIZE = 0x305000,
-	GAME_STATE_GPU_SIZE = 0x40000,
-#endif
 	GAME_STATE_SIZE = GAME_STATE_CPU_SIZE+GAME_STATE_GPU_SIZE
 };
 
@@ -144,10 +139,10 @@ enum
 
 void dummy(
 	void);
-static boolean code_001af4f0(
+static boolean game_state_header_valid(
 	struct game_state_header *header,
 	boolean halt_on_error);
-static void code_001af650(
+static void game_state_allocation_record(
 	const char *name,
 	const char *type,
 	long size,
@@ -161,7 +156,7 @@ boolean recover_saved_games_hack;
 
 static FILE* bss_004d27b0;
 
-struct
+static struct
 {
 	void *base_address; // 0x0
 	long cpu_allocation_size; // 0x4
@@ -212,7 +207,7 @@ void dummy(
 	return;
 }
 
-void game_state_call_before_save_procs(
+static void game_state_call_before_save_procs(
 	void)
 {
 	game_state_before_save_proc *proc = before_save_procs;
@@ -226,7 +221,7 @@ void game_state_call_before_save_procs(
 	return;
 }
 
-void game_state_call_before_load_procs(
+static void game_state_call_before_load_procs(
 	void)
 {
 	game_state_before_load_proc *proc = before_load_procs;
@@ -240,7 +235,7 @@ void game_state_call_before_load_procs(
 	return;
 }
 
-void game_state_call_after_load_procs(
+static void game_state_call_after_load_procs(
 	void)
 {
 	game_state_after_load_proc *proc = after_load_procs;
@@ -331,12 +326,8 @@ void game_state_save_to_persistent_storage(
 			game_state_globals.base_address,
 			&game_state_globals.header->checksum,
 			sizeof(*game_state_globals.header),
-#ifdef HALO_LINUX
 			/* the whole of the native builds' larger game state */
 			GAME_STATE_SIZE);
-#else
-			0x345000);
-#endif
 	}
 
 	return;
@@ -354,12 +345,8 @@ boolean game_state_test_persistent_storage(
 		&header,
 		&header.checksum,
 		sizeof(*game_state_globals.header),
-#ifdef HALO_LINUX
 		/* the whole of the native builds' larger game state */
 		GAME_STATE_SIZE,
-#else
-		0x345000,
-#endif
 		corrupted))
 	{
 		*difficulty = header.difficulty;
@@ -381,12 +368,8 @@ boolean game_state_test_persistent_storage(
 void game_state_save_core(
 	const char *name)
 {
-#ifdef HALO_LINUX
 	/* the whole of the native builds' larger game state */
 	if (game_state_write_core(name, game_state_globals.base_address, GAME_STATE_SIZE))
-#else
-	if (game_state_write_core(name, game_state_globals.base_address, 0x345000))
-#endif
 	{
 		console_printf(FALSE, "saved '%s'", name);
 	}
@@ -404,30 +387,12 @@ boolean game_state_reverted(
 	return (game_state_globals.revert_time==game_time_get());
 }
 
-static boolean code_001af4f0(
+static boolean game_state_header_valid(
 	struct game_state_header *header,
 	boolean halt_on_error)
 {
 	boolean valid = FALSE;
 
-#ifndef HALO_LINUX
-	/* (the native builds take a game state whatever build wrote it; the map,
-	allocation checksum and player count below still have to match) */
-	if (csstrcmp(header->build_number, "01.01.14.2342"))
-	{
-		if (halt_on_error)
-		{
-			// Original bug: %d formats two string pointers. A non-matching bug-fix
-			// build should use %s for both values instead.
-			match_vassert(
-				"c:\\halo\\SOURCE\\saved games\\game_state.c",
-				405,
-				FALSE,
-				csprintf(temporary, "expected build #%d but got #%d", "01.01.14.2342", header->build_number));
-		}
-	}
-	else
-#endif
 	if (csstrcmp(header->map_name, tag_get_name(global_scenario_index)))
 	{
 		if (halt_on_error)
@@ -480,7 +445,7 @@ static boolean code_001af4f0(
 	return valid;
 }
 
-static void code_001af650(
+static void game_state_allocation_record(
 	const char *name,
 	const char *type,
 	long size,
@@ -525,7 +490,7 @@ void *game_state_malloc(
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 156, !game_state_globals.locked);
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 159, game_state_globals.cpu_allocation_size+size<=GAME_STATE_CPU_SIZE);
 
-	code_001af650(name, type, size, FALSE);
+	game_state_allocation_record(name, type, size, FALSE);
 
 	pointer = (byte *)game_state_globals.base_address+game_state_globals.cpu_allocation_size;
 	game_state_globals.cpu_allocation_size+= size;
@@ -546,7 +511,7 @@ void *game_state_gpu_malloc(
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 185, !game_state_globals.locked);
 	match_assert("c:\\halo\\SOURCE\\saved games\\game_state.c", 188, game_state_globals.gpu_allocation_size+size<=GAME_STATE_GPU_SIZE);
 
-	code_001af650(name, type, size, TRUE);
+	game_state_allocation_record(name, type, size, TRUE);
 
 	game_state_globals.gpu_allocation_size+= size;
 	pointer = (byte *)game_state_globals.base_address-game_state_globals.gpu_allocation_size+GAME_STATE_SIZE;
@@ -608,7 +573,7 @@ void game_state_try_and_load_from_persistent_storage(
 			sizeof(header),
 			GAME_STATE_SIZE,
 			NULL)
-		&& code_001af4f0(&header, FALSE)
+		&& game_state_header_valid(&header, FALSE)
 		&& main_get_difficulty() == header.difficulty)
 	{
 		game_state_call_before_load_procs();
@@ -629,7 +594,7 @@ void game_state_load_core(
 	struct game_state_header header;
 
 	if (game_state_read_core_header(name, &header, sizeof(header))
-		&& code_001af4f0(&header, TRUE))
+		&& game_state_header_valid(&header, TRUE))
 	{
 		game_state_call_before_load_procs();
 		game_state_read_core(
@@ -651,13 +616,9 @@ void game_state_initialize(
 	void)
 {
 	crc_new(&game_state_globals.allocation_size_checksum);
-#ifdef HALO_LINUX
 	/* the native builds place their larger game state above the tag cache
 	(halo_port_capacity.h, cache/physical_memory_map.c) */
 	game_state_globals.base_address = game_state_allocate_buffer(HALO_PORT_GAME_STATE_BASE_ADDRESS, GAME_STATE_CPU_SIZE, GAME_STATE_GPU_SIZE);
-#else
-	game_state_globals.base_address = game_state_allocate_buffer(0x80061000, GAME_STATE_CPU_SIZE, 0x40000);
-#endif
 	game_state_create_or_open_file();
 	game_state_globals.header = game_state_malloc("header", NULL, sizeof(*game_state_globals.header));
 

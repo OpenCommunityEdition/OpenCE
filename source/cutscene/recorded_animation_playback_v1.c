@@ -233,30 +233,30 @@ static void apply_throttle(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void apply_facing_vector(
+static void apply_facing_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void apply_aiming_vector(
+static void apply_aiming_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void apply_looking_vector(
+static void apply_looking_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void apply_angle_vector(
+static void apply_angle_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
-void apply_multi_vector(
+static void apply_multi_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *event,
 	byte const **playback_stream);
 
 /* ---------- globals */
 
-struct recorded_animation_playback_v1_data data_002dd030 =
+static struct recorded_animation_playback_v1_data data_002dd030 =
 {
 	{
 		NULL,
@@ -516,7 +516,7 @@ static void apply_throttle(
 	return;
 }
 
-void apply_facing_vector(
+static void apply_facing_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -535,7 +535,7 @@ void apply_facing_vector(
 	return;
 }
 
-void apply_aiming_vector(
+static void apply_aiming_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -554,7 +554,7 @@ void apply_aiming_vector(
 	return;
 }
 
-void apply_looking_vector(
+static void apply_looking_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -573,7 +573,7 @@ void apply_looking_vector(
 	return;
 }
 
-void apply_angle_vector(
+static void apply_angle_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)
@@ -608,7 +608,7 @@ void apply_angle_vector(
 	return;
 }
 
-void apply_multi_vector(
+static void apply_multi_vector(
 	struct recorded_unit_control *control,
 	struct recorded_animation_event_v1 const *anim_event_v1,
 	byte const **playback_stream)

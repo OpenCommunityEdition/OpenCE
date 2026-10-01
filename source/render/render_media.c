@@ -61,7 +61,7 @@ typedef char frame_level_of_detail_size_assert[
 
 /* ---------- globals */
 
-struct render_media_globals bss_004c004c = {0};
+static struct render_media_globals bss_004c004c = {0};
 
 const real media_wave_amplitude = 0.05f;
 

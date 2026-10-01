@@ -36,6 +36,7 @@ symbols in this file:
 /* The January object retains exact out-of-line copies of the two D3D wrappers. */
 #define D3DINLINE static
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox.h"
 
 /* ---------- constants */
 
@@ -52,9 +53,7 @@ void rasterizer_error(
 
 /* ---------- globals */
 
-extern void *global_d3d_device;
-
-unsigned long const vertex_shader_declarations[] =
+static unsigned long const vertex_shader_declarations[] =
 {
 	0x20000000, 0x40320000, 0x40400009, 0xFFFFFFFF,
 	0x20000000, 0x40320000, 0x40210004, 0xFFFFFFFF,
@@ -69,8 +68,8 @@ unsigned long const vertex_shader_declarations[] =
 
 /* ---------- public code */
 
-/* NonMatching: the declaration table and SDK wrappers are exact; VC7 schedules
-the table-address loads differently in the initializer. */
+/* Exact: the declaration table, the SDK wrappers and this initializer match January (an
+earlier note here recorded a table-address load-schedule difference that no longer exists). */
 boolean rasterizer_vertex_shaders_initialize(
 	void)
 {

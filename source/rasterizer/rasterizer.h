@@ -32,13 +32,9 @@ enum
 	RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 = 32,
 	RASTERIZER_MAXIMUM_DYNAMIC_TRIANGLES = 32768,
 	RASTERIZER_MAXIMUM_DYNAMIC_TRIANGLE_BUFFERS = 1024,
-#ifdef HALO_LINUX
 	/* four per particle (build_sprites_begin), for the native builds' larger
 	particle pool (halo_port_capacity.h) */
 	RASTERIZER_MAXIMUM_DYNAMIC_UNLIT_VERTICES = 4 * HALO_PORT_MAXIMUM_PARTICLES,
-#else
-	RASTERIZER_MAXIMUM_DYNAMIC_UNLIT_VERTICES = 8192,
-#endif
 	RASTERIZER_MAXIMUM_DYNAMIC_LIT_VERTICES = 2,
 	RASTERIZER_MAXIMUM_DYNAMIC_SCREEN_VERTICES = 16384,
 	RASTERIZER_MAXIMUM_DYNAMIC_MODEL_VERTICES = 2048,
@@ -124,7 +120,6 @@ struct shader;
 struct triangle_buffer;
 struct vertex_buffer;
 struct rasterizer_dynamic_screen_geometry_parameters;
-struct rasterizer_model_skinning;
 
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 typedef void (*rasterizer_widget_render_proc)(
@@ -211,7 +206,8 @@ struct rasterizer_globals_definition
 			volatile unsigned long previous_vertical_blank_index;
 		};
 	};
-	byte reserved38[4];
+	short push_buffer_size;
+	short kick_off_size;
 	boolean floating_point_zbuffer;
 	boolean framerate_throttle;
 	boolean framerate_throttle_debug;
@@ -222,7 +218,9 @@ struct rasterizer_globals_definition
 	real far_clip_distance;
 	real first_person_weapon_near_clip_distance;
 	real first_person_weapon_far_clip_distance;
-	byte reserved54[0xC];
+	void *default_2d_hardware_format;
+	void *default_3d_hardware_format;
+	void *default_cm_hardware_format;
 	short lightmap_mode;
 	byte reserved62[0x6];
 };
@@ -265,6 +263,129 @@ struct rasterizer_window_begin_parameters
 	struct render_screen_flash screen_flash;
 	struct render_screen_effect screen_effect;
 };
+
+/* January's 0x170-byte linker-common record. Only counters already used by
+ * reconstructed writers are named here; unreviewed interiors stay reserved. */
+struct rasterizer_frame_statistics_globals
+{
+	real frames_per_second;
+	short fps_sample_count;
+	short pad006;
+	real average_frames_per_second;
+	real minimum_frames_per_second;
+	real maximum_frames_per_second;
+	long vertices_by_permutation[4]; /* per model vertex-shader permutation */
+	unsigned long lightmap_dynamic_vertex_count;
+	unsigned long lightmap_dynamic_triangle_count;
+	unsigned long lightmap_dynamic_draw_count;
+	unsigned long shadow_count;
+	unsigned long shadow_vertex_count;
+	unsigned long shadow_triangle_count;
+	unsigned long shadow_draw_count;
+	unsigned long environment_dynamic_vertex_count;
+	unsigned long environment_dynamic_triangle_count;
+	unsigned long environment_dynamic_draw_count;
+	unsigned long decal_vertex_count;
+	unsigned long decal_triangle_count;
+	unsigned long decal_draw_count;
+	unsigned long decal_shader_change_count;
+	unsigned long decal_texture_change_count;
+	unsigned long diffuse_texture_dynamic_vertex_count;
+	unsigned long diffuse_texture_dynamic_triangle_count;
+	unsigned long diffuse_texture_dynamic_draw_count;
+	unsigned long specular_light_dynamic_vertex_count;
+	unsigned long specular_light_dynamic_triangle_count;
+	unsigned long specular_light_dynamic_draw_count;
+	unsigned long specular_lightmap_dynamic_vertex_count;
+	unsigned long specular_lightmap_dynamic_triangle_count;
+	unsigned long specular_lightmap_dynamic_draw_count;
+	unsigned long reflection_mask_dynamic_vertex_count;
+	unsigned long reflection_mask_dynamic_triangle_count;
+	unsigned long reflection_mask_dynamic_draw_count;
+	unsigned long reflection_dynamic_vertex_count;
+	unsigned long reflection_dynamic_triangle_count;
+	unsigned long reflection_dynamic_draw_count;
+	unsigned long transparent_geometry_dynamic_vertex_count;
+	unsigned long transparent_geometry_dynamic_triangle_count;
+	long transparent_geometry_largest_dynamic_triangle_count;
+	unsigned long transparent_geometry_dynamic_draw_count;
+	unsigned long environment_fog_dynamic_vertex_count;
+	unsigned long environment_fog_dynamic_triangle_count;
+	unsigned long environment_fog_dynamic_draw_count;
+	unsigned long environment_fog_screen_dynamic_vertex_count;
+	unsigned long environment_fog_screen_dynamic_triangle_count;
+	unsigned long environment_fog_screen_dynamic_draw_count;
+	unsigned long environment_fog_screen_model_count;
+	unsigned long environment_fog_screen_static_vertex_count;
+	unsigned long environment_fog_screen_static_triangle_count;
+	unsigned long environment_fog_screen_static_draw_count;
+	unsigned long model_count;
+	unsigned long model_vertex_count;
+	unsigned long model_triangle_count;
+	unsigned long model_draw_count;
+	long transparent_model_vertex_count;
+	long transparent_model_triangle_count;
+	long transparent_model_maximum_triangle_count;
+	long transparent_model_submit_count;
+	unsigned long model_shadow_count;
+	unsigned long model_shadow_vertex_count;
+	unsigned long model_shadow_triangle_count;
+	unsigned long model_shadow_draw_count;
+	unsigned long dynamic_unlit_draw_count;
+	unsigned long dynamic_unlit_triangle_count;
+	long largest_dynamic_unlit_triangle_count;
+	unsigned long dynamic_unlit_vertex_count;
+	byte reserved114[0x1C];
+	long dynamic_vertex_count;
+	long dynamic_vertex_buffer_count;
+	long dynamic_triangle_count;
+	long dynamic_triangle_buffer_count;
+	long debug_primitive_count;
+	byte reserved144[4];
+	long dynamic_light_count;
+	long lens_flare_count;
+	long vertex_shader_skinning_constant_bytes;
+	long vertex_shader_lighting_constant_bytes;
+	long vertex_shader_instruction_count;
+	long pixel_shader_pushbuffer_bytes;
+	unsigned long model_skinning_constant_bytes;
+	unsigned long model_lighting_constant_bytes;
+	unsigned long model_vertex_shader_work_accumulated;
+	byte reserved16C[4];
+};
+
+typedef char rasterizer_frame_statistics_globals_size_assert[
+	sizeof(struct rasterizer_frame_statistics_globals) == 0x170 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_vertex_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_vertex_count) == 0xB8 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_triangle_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_triangle_count) == 0xBC ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_dynamic_draw_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_dynamic_draw_count) == 0xC0 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_model_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_model_count) == 0xC4 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_vertex_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_vertex_count) == 0xC8 ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_triangle_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_triangle_count) == 0xCC ? 1 : -1];
+typedef char rasterizer_frame_statistics_environment_fog_screen_static_draw_count_offset_assert[
+	offsetof(
+		struct rasterizer_frame_statistics_globals,
+		environment_fog_screen_static_draw_count) == 0xD0 ? 1 : -1];
+
+struct transparent_geometry_group;
 
 /* ---------- prototypes/RASTERIZER.C */
 
@@ -370,6 +491,8 @@ void rasterizer_decals_end(
 	void);
 void rasterizer_decals_draw(
 	short cluster_index);
+void rasterizer_decals_flush(
+	void);
 void rasterizer_decals_update_function_pointers(void);
 void rasterizer_detail_objects_begin(
 	void);
@@ -575,14 +698,6 @@ void rasterizer_psuedo_dynamic_screen_quad_draw(
 	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
 	struct dynamic_screen_vertex *vertices);
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
-void rasterizer_widget_submit(
-	long object_index,
-	long widget_index,
-	real_point3d const *centroid,
-	rasterizer_widget_render_proc render_proc);
-void rasterizer_widget_begin(
-	short type,
-	word flags);
 #endif
 void rasterizer_profile_enable(
 	boolean enable);
@@ -609,27 +724,6 @@ void rasterizer_environment_fog_screen_draw(
 	long triangle_count,
 	struct vertex_buffer const *vertex_buffer);
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
-boolean rasterizer_widget_set_texture(
-	short stage_index,
-	long bitmap_group_index,
-	short sequence_index);
-void rasterizer_widget_set_tint_factor(
-	long handle);
-long rasterizer_widget_set_zbuffer_enable(
-	long handle,
-	long enable);
-short rasterizer_widget_draw_sprite2d(
-	long dynamic_vertex_buffer_index);
-void rasterizer_widget_draw_sprite3d(
-	real_point3d const *point,
-	real radius,
-	real_vector2d const *scale,
-	real rotation,
-	unsigned long color);
-void rasterizer_widget_submit_occlusion_test(
-	long handle);
-long rasterizer_widget_get_occlusion_test_result(
-	long handle);
 #endif
 
 /* ---------- prototypes/RASTERIZER_XBOX_ACTIVE_CAMOUFLAGE.C */
@@ -670,6 +764,19 @@ boolean rasterizer_frame_statistics_initialize(
 	void);
 void rasterizer_frame_statistics_begin(
 	void);
+void rasterizer_frame_statistics_get_fps(
+	struct rasterizer_frame_statistics_globals *frame_statistics);
+void rasterizer_fps_accumulate(
+	void);
+long rasterizer_frame_statistics_count_static_vertices(
+	struct triangle_buffer const *triangle_buffer,
+	struct vertex_buffer const *vertex_buffer);
+long rasterizer_frame_statistics_count_dynamic_vertices(
+	long dynamic_triangle_buffer_index,
+	long first_triangle_index,
+	long triangle_count);
+void rasterizer_frame_statistics_draw(
+	void);
 void rasterizer_frame_statistics_end(
 	void);
 void rasterizer_frame_statistics_dispose(
@@ -687,15 +794,54 @@ void rasterizer_transparent_geometry_begin(
 	void);
 void rasterizer_transparent_geometry_end(
 	void);
+short rasterizer_transparent_geometry_get_primary_vertex_type(
+	struct transparent_geometry_group const *group);
+void rasterizer_transparent_geometry_set_group_pending_status(
+	struct transparent_geometry_group const *group,
+	boolean pending);
+boolean rasterizer_transparent_geometry_get_group_pending_status(
+	struct transparent_geometry_group const *group);
+short rasterizer_transparent_geometry_get_group_presorted_index(
+	struct transparent_geometry_group const *group);
+void *rasterizer_transparent_geometry_get_group_from_presorted_index(
+	short presorted_index);
+void *rasterizer_transparent_geometry_get_groups2(
+	short *group_count);
+struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
+	struct transparent_geometry_group const *group);
+struct transparent_geometry_group *rasterizer_transparent_geometry_new_group(
+	void);
+struct transparent_geometry_group *rasterizer_transparent_geometry_new_group2(
+	void);
+void rasterizer_transparent_geometry_stop(
+	void);
+void rasterizer_transparent_geometry_dispose(
+	void);
 void rasterizer_transparent_geometry_draw(
 	boolean water);
 
 /* ---------- prototypes/RASTERIZER_DEBUG.C */
 
+boolean rasterizer_debug_initialize(
+	void);
 void rasterizer_debug_begin(
 	void);
 void rasterizer_debug_end(
 	void);
+void rasterizer_debug_dispose(
+	void);
+void rasterizer_debug_draw(
+	void);
+void rasterizer_debug_line_shaded(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_argb_color const *color0,
+	real_argb_color const *color1);
+void rasterizer_debug_triangle(
+	real_point3d const *p0,
+	real_point3d const *p1,
+	real_point3d const *p2,
+	real_argb_color const *color);
 
 /* ---------- prototypes/RASTERIZER_XBOX_DEBUG.C */
 
@@ -755,6 +901,9 @@ extern struct rasterizer_globals_definition rasterizer_globals;
 
 /* comm. not sure where this should be */
 extern struct rasterizer_frame_begin_parameters global_frame_parameters;
+extern struct rasterizer_window_begin_parameters global_window_parameters;
+
+extern struct rasterizer_frame_statistics_globals rasterizer_frame_statistics;
 
 /* ---------- public code */
 

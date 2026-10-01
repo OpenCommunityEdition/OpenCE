@@ -1,3 +1,0 @@
-CARD PAO-12 (A3)  written 2026-09-26 00:42:35 -0700  -- BEFORE its first compile
-PAO-1 + PAO-2 together (coupled repair test A, B, A+B). Each has independent evidence (cards PAO-1, PAO-2).
-prediction: effects are additive and independent: 24/24 exact; +_normalize2d only (if PAO-2 as predicted).

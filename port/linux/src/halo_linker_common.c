@@ -1,20 +1,19 @@
 /*
 HALO_LINKER_COMMON.C
 
-Game definitions the Linux link needs that no reconstructed translation unit
-provides yet. Nothing here is decompiled game code or earns matching credit;
-every definition is weak, so the genuine one takes over automatically once
-its owning unit is reconstructed.
+Game definitions the link needs that no reconstructed translation unit
+provides yet. Nothing here is decompiled game code; every definition is
+weak, so the genuine one takes over automatically once its owning unit is
+reconstructed.
 
 Globals: in the January image these are tentative definitions that the
-linker pooled into one COMMON block (csplit's source/linker_common; see
-docs/linker_common_comparison_base_20260922.md). COMMON storage is zero
-filled, so each is zeroed storage here. The sizes come from the spacing of
-the symbols in config/symbols.json and so are upper bounds of the real
-sizes; the declared type is noted beside each.
+linker pooled into one COMMON block. COMMON storage is zero filled, so each
+is zeroed storage here. The sizes come from the spacing of the symbols in
+the January image and so are upper bounds of the real sizes; the declared
+type is noted beside each.
 
 Functions: fast_ftol_C and main_crash are Halo functions that are still
-missing from the reconstruction (docs/xbox_link_probe_20260924.md).
+missing from the reconstruction.
 */
 
 #include "platform.h"

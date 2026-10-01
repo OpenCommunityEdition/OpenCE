@@ -1,5 +1,0 @@
-ninja rc 0
-objects (389, 468) (base (388, 468))  code (1591710, 1770166) (base (1591226, 1770166), +484)  functions (7461, 7574) (base (7459, 7574), +2)  data 2588903  parks 75
-stable diff rc 0 | ['gained source/math/periodic_functions::section:4 @periodic_function_build_variable_period_x_table@4 -> @periodic_function_build_variable_period_x_table@4 256', 'gained source/tool/connected_geometry::section:5 _connected_geometry_find_or_add_edge -> _connected_geometry_find_or_add_edge 240', 'gained 2 496 bytes; regressions 0']
-admission {'candidates': 11, 'contradicted': 0, 'rejected': 1, 'summary': 4, 'revoked': 0} | fake scan ['Scanned 829 file(s); 26 review lead(s); skipped 2 vendored path(s).'] | pytest 1161 passed, 5 skipped, 26 subtests passed in 13.08s
-new warnings 0 [] | diff --check rc 0

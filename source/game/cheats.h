@@ -34,12 +34,28 @@ void cheats_initialize(
 	void);
 void cheats_initialize_for_new_map(
 	void);
+void cheat_teleport_to_camera(
+	void);
+void cheat_active_camouflage(
+	void);
+void cheat_all_weapons(
+	void);
+void cheat_all_powerups(
+	void);
+void cheat_all_vehicles(
+	void);
 void cheats_dispose(
 	void);
 void cheats_dispose_from_old_map(
 	void);
 void cheats_update(
 	void);
+void cheats_network_client_enforce(
+	void);
+void cheats_load(
+	void);
+void cheat_active_camouflage_local_player(
+	short player_index);
 
 /* ---------- globals */
 

@@ -1,6 +1,0 @@
-CARD PAO-5 (A3)  written 2026-09-26 01:05:03 -0700  -- BEFORE its first compile
-base: pao4. D: /Od 0x4ca487 computes cross_product2d(&opposite->direction, &desired_direction) first (stored
-  [ebp-0x44]/[ebp-0x48]) and cross_product2d(&opposite->direction, &previous->direction) second ([ebp-0x4c]), then
-  multiplies. Ours writes (opposite, previous) * (opposite, direction).
-correction: swap the two factors to the /Od order.
-prediction: uncertain (x87 operand order may follow source order): 50/50. If not exact, keep ours and disclose.

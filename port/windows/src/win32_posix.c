@@ -23,6 +23,11 @@ Xbox memory window uses. Also the process start-up the Windows build needs.
 
 /* ---------- start-up */
 
+/* laptops with a second, faster GPU (NVIDIA Optimus, AMD switchable
+graphics) run a program on the integrated one unless it exports these */
+__declspec(dllexport) DWORD NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+
 __attribute__((constructor))
 static void windows_startup(void)
 {

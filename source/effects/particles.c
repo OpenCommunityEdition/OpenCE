@@ -205,10 +205,9 @@ static boolean particle_update_physics(
 /* ---------- globals */
 
 // {upper, lower} bounds of the collision speed that scales a particle collision effect
-real const particle_collision_effect_scale_bounds[2] = {1.5f, 0.5f};
+static real const particle_collision_effect_scale_bounds[2] = {1.5f, 0.5f};
 
 static struct profile_section particles_update_section = {"particles_update", NONE, TRUE};
-#ifdef HALO_LINUX
 /* A frame was a tick on the Xbox. The native builds draw several frames per
 tick (port/linux/game/render_interpolation.c), so what counted frames counts
 30 Hz ticks of game time instead: particles that animate once a frame step
@@ -219,7 +218,6 @@ static real particles_leftover_ticks = 0.f;
 static long particles_update_ticks = 0;
 static long particles_tick_frame_indices[MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT + 1];
 static long particles_tick_frame_head = 0;
-#endif
 
 static char const *particle_effect_marker_names[NUMBER_OF_PARTICLE_EFFECT_MARKERS] =
 {
@@ -232,14 +230,10 @@ static char const *particle_effect_marker_names[NUMBER_OF_PARTICLE_EFFECT_MARKER
 void particles_initialize(
 	void)
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger particle pool (halo_port_capacity.h);
 	render_particles sizes its unchecked list of visible particles by the same
 	value */
 	particle_data = game_state_data_new("particle", HALO_PORT_MAXIMUM_PARTICLES, 0x70);
-#else
-	particle_data = game_state_data_new("particle", 1024, 0x70);
-#endif
 	if (!particle_data)
 		error(_error_immediate, "couldn't allocate particle globals");
 
@@ -601,11 +595,7 @@ static boolean particle_update_frame_time(
 	{
 		if (TEST_FLAG(definition->flags, _particle_definition_animate_once_per_frame_bit))
 		{
-#ifdef HALO_LINUX
 			if (dt != 0.0f && particles_update_ticks > 0)
-#else
-			if (dt != 0.0f)
-#endif
 				return particle_next_frame(particle_index);
 		}
 		else
@@ -1018,7 +1008,6 @@ void particles_update(
 
 	profile_enter(particles_update_section);
 
-#ifdef HALO_LINUX
 	{
 		long tick;
 
@@ -1035,7 +1024,6 @@ void particles_update(
 		}
 	}
 
-#endif
 	for (particle_index = data_next_index(particle_data, NONE);
 		particle_index != NONE;
 		particle_index = data_next_index(particle_data, particle_index))
@@ -1044,15 +1032,10 @@ void particles_update(
 		struct particle_definition *definition = particle_definition_get(particle->definition_index);
 		boolean was_new = (particle->age == 0.0f);
 
-#ifdef HALO_LINUX
 		if (render.frame_index - particle->last_rendered_frame_index >
 			MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT &&
 			particle->last_rendered_frame_index < particles_tick_frame_indices[
 				(particles_tick_frame_head + 1) % NUMBEROF(particles_tick_frame_indices)])
-#else
-		if (render.frame_index - particle->last_rendered_frame_index >
-			MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT)
-#endif
 		{
 			datum_delete(particle_data, particle_index);
 		}

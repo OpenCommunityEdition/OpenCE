@@ -73,8 +73,8 @@ void DecodeBlockAlpha3(
 	struct s3tc_block_alpha3 *source,
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS]);
 void DecodeBlockRGB__single_pixel(
-	struct s3tc_block_rgb const *source,
-	struct s3tc_color *color,
+	struct s3tc_block_rgb const *pblockSrc,
+	struct s3tc_color *colorDst,
 	short u,
 	short v);
 void DecodeBlockAlpha3__single_pixel(
@@ -89,9 +89,9 @@ void DecodeBlockAlpha4__single_pixel(
 	short v);
 
 void EncodeBlockRGBColorKey(
-	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
-	struct s3tc_block_rgb *block,
-	byte alpha_key);
+	struct s3tc_color colorSrc[S3TC_BLOCK_PIXELS],
+	struct s3tc_block_rgb *pblockDst,
+	byte alphaKey);
 void EncodeBlockRGB(
 	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
 	struct s3tc_block_rgb *block);

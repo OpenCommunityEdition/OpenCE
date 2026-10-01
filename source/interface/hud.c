@@ -83,7 +83,6 @@ symbols in this file:
 #include "devices/device_controls.h"
 #include "game/game_engine.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
@@ -92,6 +91,7 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/interface.h"
 #include "interface/motion_sensor.h"
+#include "interface/weapon_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "memory/data.h"
@@ -153,31 +153,6 @@ enum hud_state_message_type
 
 /* ---------- structures */
 
-struct hud_scripted_globals
-{
-	boolean show_hud;
-	boolean show_hud_help_text;
-	byte reserved2[2];
-};
-
-struct icon_hud_element_definition
-{
-	short sequence_index;
-	short width_offset;
-	point2d offset;
-	unsigned long color;
-	char frame_rate;
-	byte flags;
-	short text_index;
-};
-
-struct weapon_hud_interface_definition
-{
-	byte reserved000[0x13C];
-	struct icon_hud_element_definition messaging_icon;
-	byte reserved14C[0x30];
-};
-
 struct weapon_interface_magazine_state
 {
 	boolean reloading;
@@ -199,9 +174,9 @@ struct weapon_interface_state
 };
 
 typedef char hud_scripted_globals_size_assert[
-	sizeof(struct hud_scripted_globals) == 0x4 ? 1 : -1];
+	sizeof(struct hud_scripted_globals_definition) == 0x4 ? 1 : -1];
 typedef char hud_scripted_globals_show_hud_help_text_offset_assert[
-	offsetof(struct hud_scripted_globals, show_hud_help_text) == 0x1 ? 1 : -1];
+	offsetof(struct hud_scripted_globals_definition, show_hud_help_text) == 0x1 ? 1 : -1];
 typedef char hud_globals_hud_item_messages_index_offset_assert[
 	offsetof(struct hud_globals_definition, messaging.hud_item_messages.index) == 0xA0 ? 1 : -1];
 typedef char hud_globals_loading_begin_index_offset_assert[
@@ -216,14 +191,21 @@ typedef char weapon_interface_state_size_assert[
 	sizeof(struct weapon_interface_state) == 0x20 ? 1 : -1];
 
 /* ---------- prototypes */
+static void hud_draw_players(
+	void);
+static void temporary_hud_draw_reticle(
+	real angle,
+	union real_argb_color const *color);
+static void temporary_hud_draw(
+	void);
 
 /* ---------- globals */
 
 struct hud_globals_definition *hud_globals = NULL;
-struct hud_scripted_globals *hud_scripted_globals = NULL;
-extern boolean temporary_hud;
+struct hud_scripted_globals_definition *hud_scripted_globals = NULL;
+boolean temporary_hud;
 
-wchar_t const *default_string = L"";
+static wchar_t const *default_string = L"";
 
 /* ---------- public code */
 
@@ -816,7 +798,7 @@ void hud_picked_up_powerup(
 	return;
 }
 
-void temporary_hud_draw_reticle(
+static void temporary_hud_draw_reticle(
 	real angle,
 	real_argb_color const *color)
 {
@@ -969,7 +951,7 @@ static void hud_draw_friendly_indicator(
 	return;
 }
 
-void hud_draw_players(
+static void hud_draw_players(
 	void)
 {
 	long player_index = local_player_get_player_index(render.local_player_index);
@@ -977,12 +959,8 @@ void hud_draw_players(
 
 	if (player_index != NONE)
 	{
-#ifdef HALO_LINUX
 		/* the native builds' sessions hold more than 16 players */
 		long teammate_indices[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-#else
-		long teammate_indices[16];
-#endif
 		long teammate_count = 0;
 		struct data_iterator iterator;
 		struct player_datum *player;
@@ -995,13 +973,9 @@ void hud_draw_players(
 				team_index == player->team_index &&
 				player->unit_index != NONE)
 			{
-#ifdef HALO_LINUX
 				/* never write past the buffer, whatever the player data holds */
 				if (teammate_count < (long)NUMBEROF(teammate_indices))
 					teammate_indices[teammate_count++] = iterator.datum_index;
-#else
-				teammate_indices[teammate_count++] = iterator.datum_index;
-#endif
 			}
 		}
 
@@ -1016,7 +990,7 @@ void hud_draw_players(
 	return;
 }
 
-void temporary_hud_draw(
+static void temporary_hud_draw(
 	void)
 {
 	long player_index = local_player_get_player_index(render.local_player_index);

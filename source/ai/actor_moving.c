@@ -210,7 +210,7 @@ symbols in this file:
 #define PATH_EXTERNAL_FLEE_ROUTINES
 #include "ai/actions.h"
 #include "ai/actor_definitions.h"
-#include "ai/actor_looking.h"
+#include "math/real_math.h"
 #include "ai/actor_types.h"
 #include "ai/actors.h"
 #include "ai/ai_communication.h"
@@ -458,9 +458,9 @@ real const avoid_ray_adjacent_fractions[2] =
 };
 real const avoid_ray_fully_obstructed_t = 0.5f;
 
-extern struct vector_avoidance_ray avoidance_rays[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS][2];
-extern real_vector3d avoidance_directions[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS];
-extern struct vector_avoidance_ray sense_rays[9];
+struct vector_avoidance_ray avoidance_rays[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS][2];
+real_vector3d avoidance_directions[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS];
+struct vector_avoidance_ray sense_rays[9];
 
 /* ---------- public code */
 
@@ -830,7 +830,7 @@ static short actor_move_test_avoidance_vector(
 	real *collision_t,
 	byte *collision_timer)
 {
-	struct collision_bsp_test_vector_result collision;
+	struct collision_bsp_test_vector_result collision_result;
 	real_vector3d offset;
 	real_vector3d divergence;
 	real scale;
@@ -874,7 +874,7 @@ static short actor_move_test_avoidance_vector(
 		&avoidance_data->origin,
 		&offset,
 		1.f,
-		&collision))
+		&collision_result))
 	{
 		result = _actor_vector_avoidance_obstructed_structure;
 		*collision_t = 0.f;
@@ -888,10 +888,10 @@ static short actor_move_test_avoidance_vector(
 		ray_origin,
 		ray_direction,
 		1.f,
-		&collision))
+		&collision_result))
 	{
 		result = _actor_vector_avoidance_obstructed_structure;
-		*collision_t = collision.t;
+		*collision_t = collision_result.t;
 	}
 
 	for (object_index = 0;
@@ -1419,7 +1419,7 @@ static void actor_move_vector_avoidance(
 		struct actor_debug_info *debug_info =
 			&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
 		struct vector_avoidance_data avoidance_data;
-		real weights[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS];
+		real avoidance_weights[VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS];
 		real_vector3d movement_vector;
 		real_vector3d local_movement_direction;
 		real maximum_sense_emergency;
@@ -1448,7 +1448,7 @@ static void actor_move_vector_avoidance(
 		actor_move_avoidance_setup(&avoidance_data);
 
 		maximum_sense_emergency = 0.f;
-		csmemset(weights, 0, sizeof(weights));
+		csmemset(avoidance_weights, 0, sizeof(avoidance_weights));
 
 		{
 			short current_direction = actor->control.vector_avoidance_current_direction;
@@ -1460,11 +1460,11 @@ static void actor_move_vector_avoidance(
 				short previous_direction = (current_direction + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 				short second_previous_direction = (current_direction + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 
-				weights[current_direction] += 0.4f;
-				weights[next_direction] += avoid_ray_adjacent_fractions[0]*0.4f;
-				weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*0.4f;
-				weights[previous_direction] += avoid_ray_adjacent_fractions[0]*0.4f;
-				weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*0.4f;
+				avoidance_weights[current_direction] += 0.4f;
+				avoidance_weights[next_direction] += avoid_ray_adjacent_fractions[0]*0.4f;
+				avoidance_weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*0.4f;
+				avoidance_weights[previous_direction] += avoid_ray_adjacent_fractions[0]*0.4f;
+				avoidance_weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*0.4f;
 			}
 		}
 
@@ -1494,7 +1494,7 @@ static void actor_move_vector_avoidance(
 					direction_index < VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 					direction_index++)
 				{
-					weights[direction_index] +=
+					avoidance_weights[direction_index] +=
 						sense_ray_avoidance_weights[ray_index][direction_index]*MIN(sense_weight, 1.f);
 				}
 				maximum_sense_emergency = MAX(maximum_sense_emergency, sense_emergency);
@@ -1505,8 +1505,8 @@ static void actor_move_vector_avoidance(
 			direction_index < VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 			direction_index++)
 		{
-			short avoidance_types[NUMBEROF(avoid_ray_avoidance_weights)];
-			real avoidance_t[NUMBEROF(avoid_ray_avoidance_weights)];
+			short avoid_ray_result[NUMBEROF(avoid_ray_avoidance_weights)];
+			real avoid_ray_t[NUMBEROF(avoid_ray_avoidance_weights)];
 			real direction_weight;
 			boolean obstructed;
 
@@ -1515,17 +1515,17 @@ static void actor_move_vector_avoidance(
 				real_point3d ray_origin;
 				real_vector3d ray_direction;
 
-				avoidance_types[ray_index] = actor_move_test_avoidance_vector(
+				avoid_ray_result[ray_index] = actor_move_test_avoidance_vector(
 					&avoidance_data,
 					&avoidance_rays[direction_index][ray_index],
 					&ray_origin,
 					&ray_direction,
-					&avoidance_t[ray_index],
+					&avoid_ray_t[ray_index],
 					&actor->control.vector_avoidance_clear_times[direction_index][ray_index]);
 				debug_info->field_6358[direction_index][ray_index] = ray_origin;
 				debug_info->field_6418[direction_index][ray_index] = ray_direction;
-				debug_info->field_62F8[direction_index][ray_index] = avoidance_types[ray_index];
-				debug_info->avoid_t[direction_index][ray_index] = avoidance_t[ray_index];
+				debug_info->field_62F8[direction_index][ray_index] = avoid_ray_result[ray_index];
+				debug_info->avoid_t[direction_index][ray_index] = avoid_ray_t[ray_index];
 			}
 
 			direction_weight = 0.f;
@@ -1533,7 +1533,7 @@ static void actor_move_vector_avoidance(
 
 			for (ray_index = NUMBEROF(avoid_ray_avoidance_weights) - 1; ray_index >= 0; ray_index--)
 			{
-				if (avoidance_types[ray_index] == _actor_vector_avoidance_clear)
+				if (avoid_ray_result[ray_index] == _actor_vector_avoidance_clear)
 				{
 					real clear_fraction = 1.f;
 
@@ -1558,7 +1558,7 @@ static void actor_move_vector_avoidance(
 				else
 				{
 					direction_weight -=
-						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoidance_t[ray_index]), 1.f);
+						avoid_ray_avoidance_weights[ray_index]*MIN(2.f*(1.f - avoid_ray_t[ray_index]), 1.f);
 					obstructed = TRUE;
 				}
 			}
@@ -1569,11 +1569,11 @@ static void actor_move_vector_avoidance(
 				short previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 1) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 				short second_previous_direction = (direction_index + VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS - 2) % VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 
-				weights[direction_index] += direction_weight;
-				weights[next_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
-				weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
-				weights[previous_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
-				weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+				avoidance_weights[direction_index] += direction_weight;
+				avoidance_weights[next_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				avoidance_weights[second_next_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
+				avoidance_weights[previous_direction] += avoid_ray_adjacent_fractions[0]*direction_weight;
+				avoidance_weights[second_previous_direction] += avoid_ray_adjacent_fractions[1]*direction_weight;
 			}
 		}
 
@@ -1593,7 +1593,7 @@ static void actor_move_vector_avoidance(
 				actor_move_vector_avoidance_find_direction(
 					VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS,
 					avoidance_directions,
-					weights,
+					avoidance_weights,
 					&velocity_direction,
 					&velocity_approximate_direction,
 					&velocity_approximate_weight) &&
@@ -1607,7 +1607,7 @@ static void actor_move_vector_avoidance(
 						dot_product3d(&avoidance_directions[direction_index], &velocity_direction);
 
 					if (velocity_dot < 0.f)
-						weights[direction_index] += velocity_dot*velocity_weight;
+						avoidance_weights[direction_index] += velocity_dot*velocity_weight;
 				}
 			}
 			else
@@ -1628,9 +1628,9 @@ static void actor_move_vector_avoidance(
 			direction_index < VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS;
 			direction_index++)
 		{
-			if (weights[direction_index] > best_weight)
+			if (avoidance_weights[direction_index] > best_weight)
 			{
-				best_weight = weights[direction_index];
+				best_weight = avoidance_weights[direction_index];
 				best_avoidance_direction = direction_index;
 			}
 		}
@@ -1638,7 +1638,7 @@ static void actor_move_vector_avoidance(
 			"c:\\halo\\SOURCE\\ai\\actor_moving.c",
 			2435,
 			(best_avoidance_direction >= 0) && (best_avoidance_direction < VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS));
-		csmemcpy(debug_info->field_64D8, weights, sizeof(weights));
+		csmemcpy(debug_info->field_64D8, avoidance_weights, sizeof(avoidance_weights));
 
 		movement_vector = *movement_direction;
 		forward_dot = 1.f;
@@ -1656,7 +1656,7 @@ static void actor_move_vector_avoidance(
 				actor_move_vector_avoidance_find_direction(
 					VECTOR_AVOIDANCE_NUMBER_OF_DIRECTIONS,
 					avoidance_directions,
-					weights,
+					avoidance_weights,
 					&local_movement_direction,
 					&movement_direction_approximation,
 					&movement_approximate_weight);
@@ -1710,13 +1710,20 @@ static void actor_move_vector_avoidance(
 
 		if (sharp_turn)
 		{
-			real_vector3d best_direction;
-			real_vector3d rotation_axis;
-
 			if (actor->control.vector_avoidance_sharp_turn_timer == NONE)
 				actor->control.vector_avoidance_sharp_turn_timer = 0;
 			else
 				actor->control.vector_avoidance_sharp_turn_timer++;
+		}
+		else
+		{
+			actor->control.vector_avoidance_sharp_turn_timer = NONE;
+		}
+
+		if (sharp_turn)
+		{
+			real_vector3d best_direction;
+			real_vector3d rotation_axis;
 
 			actor_move_transform_avoidance_vector(
 				&avoidance_data,
@@ -1740,7 +1747,6 @@ static void actor_move_vector_avoidance(
 		}
 		else
 		{
-			actor->control.vector_avoidance_sharp_turn_timer = NONE;
 			if (forward_dot < 0.5f)
 			{
 				if (weight_difference > 1.3f)
@@ -3049,8 +3055,8 @@ void actor_move_update(
 	else if (actor->input.vehicle_driver_type ==
 		_actor_vehicle_driver_directional_flying)
 	{
-		real_vector3d scaled_facing;
-		real_vector3d avoidance_rotation;
+		real_vector3d fake_movement_vector;
+		real_vector3d instantaneous_rotation_vector;
 		real_vector3d const *movement_direction;
 		real emergency_amount;
 		real rotation_magnitude_squared;
@@ -3066,17 +3072,17 @@ void actor_move_update(
 			scale_vector3d(
 				&actor->input.facing_vector,
 				3.f,
-				&scaled_facing);
-			movement_direction = &scaled_facing;
+				&fake_movement_vector);
+			movement_direction = &fake_movement_vector;
 		}
 
 		actor_move_vector_avoidance(
 			actor_index,
 			movement_direction,
-			&avoidance_rotation,
+			&instantaneous_rotation_vector,
 			&emergency_amount);
 
-		rotation_magnitude_squared = magnitude_squared3d(&avoidance_rotation);
+		rotation_magnitude_squared = magnitude_squared3d(&instantaneous_rotation_vector);
 		previous_magnitude_squared =
 			magnitude_squared3d(&actor->control.vector_avoidance_rotation);
 		blend = rotation_magnitude_squared > previous_magnitude_squared
@@ -3087,9 +3093,9 @@ void actor_move_update(
 			&actor->control.vector_avoidance_rotation,
 			1.f - blend,
 			&actor->control.vector_avoidance_rotation);
-		actor->control.vector_avoidance_rotation.i += avoidance_rotation.i * blend;
-		actor->control.vector_avoidance_rotation.j += avoidance_rotation.j * blend;
-		actor->control.vector_avoidance_rotation.k += avoidance_rotation.k * blend;
+		actor->control.vector_avoidance_rotation.i += instantaneous_rotation_vector.i * blend;
+		actor->control.vector_avoidance_rotation.j += instantaneous_rotation_vector.j * blend;
+		actor->control.vector_avoidance_rotation.k += instantaneous_rotation_vector.k * blend;
 
 		if (magnitude_squared3d(&actor->control.vector_avoidance_rotation) <
 			_real_epsilon)
@@ -3107,19 +3113,19 @@ void actor_move_update(
 
 		if (actor->control.moving)
 		{
-			real_vector3d rotation =
+			real_vector3d rotation_vector =
 				actor->control.vector_avoidance_rotation;
-			real angle_squared = magnitude_squared3d(&rotation);
+			real angle_squared = magnitude_squared3d(&rotation_vector);
 
 			if (angle_squared > _real_epsilon)
 			{
 				real angle = square_root(angle_squared);
 				real inverse_angle = 1.f / angle;
 
-				scale_vector3d(&rotation, inverse_angle, &rotation);
+				scale_vector3d(&rotation_vector, inverse_angle, &rotation_vector);
 				rotate_vector_about_axis(
 					&actor->control.moving_towards_vector,
-					&rotation,
+					&rotation_vector,
 					sine(angle),
 					cosine(angle));
 			}
@@ -3209,15 +3215,15 @@ void actor_move_update(
 				allow_jump = TRUE;
 				if (vehicle->object.up.k < 0.8f)
 				{
-					real_vector3d escape_direction;
+					real_vector3d movement_vector;
 
-					escape_direction = vehicle->object.up;
-					escape_direction.k = 0.f;
-					if (normalize3d(&escape_direction) > 0.f)
+					movement_vector = vehicle->object.up;
+					movement_vector.k = 0.f;
+					if (normalize3d(&movement_vector) > 0.f)
 					{
 						actor->control.moving = TRUE;
 						scale_vector3d(
-							&escape_direction,
+							&movement_vector,
 							3.f,
 							&actor->control.moving_towards_vector);
 					}
@@ -3449,26 +3455,26 @@ void actor_move_update(
 		!actor->emotions.played_berserk_sound)
 	{
 		long cause_unit_index = NONE;
-		real_vector2d alignment;
+		real_vector2d alignment_vector;
 
-		alignment.i = actor->input.facing_vector.i;
-		alignment.j = actor->input.facing_vector.j;
+		alignment_vector.i = actor->input.facing_vector.i;
+		alignment_vector.j = actor->input.facing_vector.j;
 		if (actor->target.target_prop_index != NONE)
 		{
 			struct prop_datum *prop =
 				prop_get(actor->target.target_prop_index);
 
 			cause_unit_index = prop->unit_index;
-			alignment.i = prop->actor_to_prop.i;
-			alignment.j = prop->actor_to_prop.j;
-			if (normalize2d(&alignment) == 0.f)
+			alignment_vector.i = prop->actor_to_prop.i;
+			alignment_vector.j = prop->actor_to_prop.j;
+			if (normalize2d(&alignment_vector) == 0.f)
 			{
-				alignment.i = actor->input.facing_vector.i;
-				alignment.j = actor->input.facing_vector.j;
+				alignment_vector.i = actor->input.facing_vector.i;
+				alignment_vector.j = actor->input.facing_vector.j;
 			}
 		}
 
-		actor_move_animation_impulse(actor_index, 0, &alignment);
+		actor_move_animation_impulse(actor_index, 0, &alignment_vector);
 		ai_communication_event(
 			_ai_communication_berserk,
 			actor->meta.unit_index,
@@ -3495,23 +3501,23 @@ void actor_move_update(
 
 		if (actor->orders.move.jump_leap)
 		{
-			real_vector2d alignment;
+			real_vector2d alignment_vector;
 
 			if (actor->orders.move.jump_targeted)
 			{
-				alignment = actor->orders.move.jump_alignment_vector;
+				alignment_vector = actor->orders.move.jump_alignment_vector;
 			}
 			else
 			{
-				alignment.i = actor->input.facing_vector.i;
-				alignment.j = actor->input.facing_vector.j;
-				if (normalize2d(&alignment) == 0.f)
-					alignment = *global_forward2d;
+				alignment_vector.i = actor->input.facing_vector.i;
+				alignment_vector.j = actor->input.facing_vector.j;
+				if (normalize2d(&alignment_vector) == 0.f)
+					alignment_vector = *global_forward2d;
 			}
 
 			leaped = unit_leap_begin(
 				actor->meta.unit_index,
-				&alignment);
+				&alignment_vector);
 		}
 
 		if (leaped)

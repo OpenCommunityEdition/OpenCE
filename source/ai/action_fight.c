@@ -24,7 +24,6 @@ symbols in this file:
 #include "actions.h"
 
 #include "actor_definitions.h"
-#include "actor_perception.h"
 #include "actors.h"
 #include "ai_scenario_definitions.h"
 #include "props.h"

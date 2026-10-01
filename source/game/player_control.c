@@ -184,7 +184,6 @@ symbols in this file:
 #define limit2d limit2d_inline
 #include "game/game.h"
 #undef limit2d
-#include "game/player_control.h"
 #include "game/player_control_runtime.h"
 #include "players.h"
 #include "player_queues_new.h"
@@ -242,6 +241,42 @@ real const MOUSE_YAW_SCALE = 0.0031415927f;
 real const MOUSE_PITCH_SCALE = 0.0031415927f;
 static real const ANALOG_BUTTON_SCALE = 1.f / 255.f;
 
+enum
+{
+	_player_control_action_bit,
+	_player_control_jump_bit,
+	_player_control_accept_bit,
+	_player_control_back_bit,
+	_player_control_primary_trigger_bit,
+	_player_control_grenade_trigger_bit,
+	_player_control_zoom_bit,
+	_player_control_look_relative_up_bit,
+	_player_control_look_relative_down_bit,
+	_player_control_look_relative_left_bit,
+	_player_control_look_relative_right_bit,
+	_player_control_move_relative_forward_bit,
+	_player_control_move_relative_backward_bit,
+	_player_control_move_relative_right_bit,
+	_player_control_move_relative_left_bit,
+};
+
+enum
+{
+	_player_control_camera_control_disabled_bit,
+	_player_control_look_relative_all_directions_flags = 0x780,
+	_player_control_move_relative_all_directions_flags = 0x7800,
+};
+
+enum
+{
+	_player_control_rotate_weapons_bit,
+	_player_control_rotate_grenades_bit,
+	_player_control_input_zoom_bit,
+	_player_control_debug_rotate_units_bit,
+	_player_control_debug_rotate_all_units_bit,
+	_player_control_debug_ninja_rope_bit,
+};
+
 /* ---------- macros */
 
 #define valid_euler_angles2d(angles) ( \
@@ -292,13 +327,32 @@ typedef char mouse_state_size_assert[
 typedef char mouse_state_buttons_offset_assert[
 	offsetof(struct mouse_state, buttons) == 0xC ? 1 : -1];
 
+struct player_control_globals_data
+{
+	unsigned long action_flags;
+	unsigned long action_test_flags;
+	unsigned long suppressed_action_flags;
+	unsigned long flags;
+	struct player_control players[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+};
+
+typedef char player_control_globals_size_assert[
+	sizeof(struct player_control_globals_data) == 0x110 ? 1 : -1];
+typedef char player_control_globals_players_offset_assert[
+	offsetof(struct player_control_globals_data, players) == 0x10 ? 1 : -1];
+typedef char player_control_globals_action_test_flags_offset_assert[
+	offsetof(struct player_control_globals_data, action_test_flags) == 0x4 ? 1 : -1];
+typedef char player_control_globals_suppressed_action_flags_offset_assert[
+	offsetof(struct player_control_globals_data, suppressed_action_flags) == 0x8 ? 1 : -1];
+typedef char player_control_globals_flags_offset_assert[
+	offsetof(struct player_control_globals_data, flags) == 0xC ? 1 : -1];
+
 /* ---------- prototypes */
 
-void player_aiming_vector_from_facing(
-	long player_index,
-	real_vector3d *facing_direction,
-	real_euler_angles2d const *facing_angles);
-
+struct player_control *player_control_get(
+	short local_player_index);
+void player_control_dispose_from_old_map(
+	void);
 static void player_control_modify_desired_angles(
 	short local_player_index,
 	real delta_yaw,
@@ -314,6 +368,11 @@ static void get_local_player_input_blob(
 static void handle_one_player_input(
 	short local_player_index,
 	real time_delta_sec);
+long player_control_get_desired_weapon(
+	short local_player_index,
+	long unit_index);
+static boolean player_control_camera_control_is_active(
+	void);
 
 /* ---------- globals */
 
@@ -331,14 +390,12 @@ real player_look_pitch_rate[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS] = {0};
 boolean controls_enable_crouch = FALSE;
 boolean controls_enable_doubled_spin = FALSE;
 boolean controls_swap_doubled_spin_state = FALSE;
-#ifdef HALO_LINUX
 /* The native builds read input once a frame and draw several frames per
 30 Hz tick (port/linux/game/render_interpolation.c). The pitch autolevel and
 limits were stepped once per input update, a tick on the Xbox, so they step
 by the ticks the frame lasted; an impulse applied from a tick steps by one. */
 static real player_control_angle_step_ticks = 1.f;
 static real player_control_autolevel_time[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
-#endif
 
 /* ---------- public code */
 
@@ -384,7 +441,7 @@ void player_control_dispose_from_old_map(
 	return;
 }
 
-boolean player_control_camera_control_is_active(
+static boolean player_control_camera_control_is_active(
 	void)
 {
 	return (boolean)(!TEST_FLAG(
@@ -675,16 +732,12 @@ static void handle_one_player_input(
 
 		if (!director_inhibited_facing(local_player_index))
 		{
-#ifdef HALO_LINUX
 			player_control_angle_step_ticks = time_delta_sec * TICKS_PER_SECOND;
-#endif
 			player_control_modify_desired_angles(
 				local_player_index,
 				input.facing_delta.yaw,
 				input.facing_delta.pitch);
-#ifdef HALO_LINUX
 			player_control_angle_step_ticks = 1.f;
-#endif
 		}
 
 		if (unit->object.parent_object_index == NONE)
@@ -694,7 +747,6 @@ static void handle_one_player_input(
 				input.facing_delta.pitch < 0.0001f &&
 				player->magnetism_level < 0.0001f)
 			{
-#ifdef HALO_LINUX
 				/* count ticks, not frames (see player_control_angle_step_ticks) */
 				long ticks;
 
@@ -705,20 +757,12 @@ static void handle_one_player_input(
 					player->autolevel_ticks + ticks,
 					0,
 					127);
-#else
-				player->autolevel_ticks = (char)PIN(
-					player->autolevel_ticks + 1,
-					0,
-					127);
-#endif
 				player->use_autolevel =
 					player->autolevel_ticks > constants->minimum_autolevel_enabled_ticks;
 			}
 			else
 			{
-#ifdef HALO_LINUX
 				player_control_autolevel_time[local_player_index] = 0.f;
-#endif
 				player->autolevel_ticks = 0;
 				player->use_autolevel = FALSE;
 			}
@@ -1188,6 +1232,15 @@ static void get_local_player_input_blob(
 							&control->magnetism_level,
 							&target_angular_position,
 							&target_angular_velocity);
+						{
+							/* no magnetism for the mouse (port/linux/src/xinput_sdl.c) */
+							extern int halo_linux_mouse_aiming(short gamepad_index);
+
+							if (halo_linux_mouse_aiming(gamepad_index))
+							{
+								control->magnetism_level = 0.f;
+							}
+						}
 						if (player_magnetism_flag && control->magnetism_level > 0.f &&
 							(fabs(clamped_yaw) > _real_epsilon ||
 							fabs(clamped_pitch) > _real_epsilon ||
@@ -1227,7 +1280,6 @@ static void get_local_player_input_blob(
 						input->facing_delta.yaw = facing_scale * look_delta.yaw;
 						input->facing_delta.pitch = facing_scale * look_delta.pitch;
 					}
-#ifdef HALO_LINUX
 					{
 						/* direct mouse aim (port/linux/src/xinput_sdl.c) */
 						extern int halo_linux_mouse_look(short gamepad_index, real *yaw, real *pitch);
@@ -1249,7 +1301,6 @@ static void get_local_player_input_blob(
 							input->facing_delta.pitch += mouse_pitch;
 						}
 					}
-#endif
 				}
 				else
 				{
@@ -1932,9 +1983,7 @@ static void player_control_modify_desired_angles(
 				"c:\\halo\\SOURCE\\game\\player_control.c",
 				0x4F2,
 				player->desired_angles.pitch);
-#ifdef HALO_LINUX
 			error *= player_control_angle_step_ticks;
-#endif
 			if (pitch_autolevel != 0.f)
 			{
 				interpolate_scalar(
@@ -1957,13 +2006,8 @@ static void player_control_modify_desired_angles(
 		}
 	}
 
-#ifdef HALO_LINUX
 	interpolate_scalar(&player->pitch_minimum, pitch_minimum, _pi / 256.f * player_control_angle_step_ticks);
 	interpolate_scalar(&player->pitch_maximum, pitch_maximum, _pi / 256.f * player_control_angle_step_ticks);
-#else
-	interpolate_scalar(&player->pitch_minimum, pitch_minimum, _pi / 256.f);
-	interpolate_scalar(&player->pitch_maximum, pitch_maximum, _pi / 256.f);
-#endif
 
 	player->desired_angles.pitch += delta_pitch;
 	player->desired_angles.pitch = PIN(

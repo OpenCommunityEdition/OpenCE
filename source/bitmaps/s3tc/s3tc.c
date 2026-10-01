@@ -314,9 +314,9 @@ static void AllSame(
 /* ---------- public code */
 
 void EncodeBlockRGBColorKey(
-	struct s3tc_color colors[S3TC_BLOCK_PIXELS],
-	struct s3tc_block_rgb *block,
-	byte alpha_key)
+	struct s3tc_color colorSrc[S3TC_BLOCK_PIXELS],
+	struct s3tc_block_rgb *pblockDst,
+	byte alphaKey)
 {
 	struct s3tc_fcolor fcolors[S3TC_BLOCK_PIXELS];
 	struct s3tc_fcolor mean;
@@ -349,7 +349,7 @@ void EncodeBlockRGBColorKey(
 	long column;
 	long i;
 
-	if (block == NULL)
+	if (pblockDst == NULL)
 	{
 		return;
 	}
@@ -357,7 +357,7 @@ void EncodeBlockRGBColorKey(
 	for (i = S3TC_BLOCK_PIXELS - 1; i >= 0; --i)
 	{
 		wAlpha <<= 1;
-		if (colors[i].rgba[S3TC_ALPHA] >= alpha_key)
+		if (colorSrc[i].rgba[S3TC_ALPHA] >= alphaKey)
 		{
 			wAlpha |= 1;
 			cOpaque++;
@@ -370,9 +370,9 @@ void EncodeBlockRGBColorKey(
 
 	if (cOpaque == 0)
 	{
-		block->color0 = 0;
-		block->color1 = UNSIGNED_SHORT_MAX;
-		block->bitmap = UNSIGNED_LONG_MAX;
+		pblockDst->color0 = 0;
+		pblockDst->color1 = UNSIGNED_SHORT_MAX;
+		pblockDst->bitmap = UNSIGNED_LONG_MAX;
 		return;
 	}
 
@@ -380,22 +380,22 @@ void EncodeBlockRGBColorKey(
 	for (i = 0; i < S3TC_BLOCK_PIXELS; ++i)
 	{
 		if (same && i > 0 &&
-			(colors[i].rgba[2] != colors[i - 1].rgba[2] ||
-				colors[i].rgba[1] != colors[i - 1].rgba[1] ||
-				colors[i].rgba[0] != colors[i - 1].rgba[0]))
+			(colorSrc[i].rgba[2] != colorSrc[i - 1].rgba[2] ||
+				colorSrc[i].rgba[1] != colorSrc[i - 1].rgba[1] ||
+				colorSrc[i].rgba[0] != colorSrc[i - 1].rgba[0]))
 		{
 			same = FALSE;
 		}
 	}
 	if (same)
 	{
-		AllSame(colors, block, wAlpha);
+		AllSame(colorSrc, pblockDst, wAlpha);
 		return;
 	}
 
 	for (i = 0; i < S3TC_BLOCK_PIXELS; ++i)
 	{
-		ColorToFcolor(&colors[i], &fcolors[i]);
+		ColorToFcolor(&colorSrc[i], &fcolors[i]);
 	}
 
 	scale = 1.0f / cOpaque;
@@ -446,7 +446,7 @@ void EncodeBlockRGBColorKey(
 		trace = m[2][2] + m[1][1] + m[0][0];
 		if (trace == 0.0f)
 		{
-			AllSame(colors, block, wAlpha);
+			AllSame(colorSrc, pblockDst, wAlpha);
 			return;
 		}
 		scale = 3.0f / trace;
@@ -487,7 +487,7 @@ void EncodeBlockRGBColorKey(
 	len2 = x * x + y * y + z * z;
 	if (len2 == 0.0f)
 	{
-		AllSame(colors, block, wAlpha);
+		AllSame(colorSrc, pblockDst, wAlpha);
 		return;
 	}
 
@@ -519,7 +519,7 @@ void EncodeBlockRGBColorKey(
 	upper.rgba[2] = z * max + mean.rgba[2];
 
 	ClipExtrema(&lower, &upper);
-	Quantize(&lower, &upper, block, cOpaque);
+	Quantize(&lower, &upper, pblockDst, cOpaque);
 
 	dr = upper.rgba[0] - lower.rgba[0];
 	dg = upper.rgba[1] - lower.rgba[1];
@@ -527,11 +527,11 @@ void EncodeBlockRGBColorKey(
 	len2 = dr * dr + dg * dg + db * db;
 	if (len2 == 0.0f)
 	{
-		AllSame(colors, block, wAlpha);
+		AllSame(colorSrc, pblockDst, wAlpha);
 		return;
 	}
 
-	block->bitmap = 0;
+	pblockDst->bitmap = 0;
 	bit = 0x8000;
 	for (i = S3TC_BLOCK_PIXELS - 1; i >= 0; --i)
 	{
@@ -554,8 +554,8 @@ void EncodeBlockRGBColorKey(
 				{
 					t = 3.0f;
 				}
-				block->bitmap <<= 2;
-				block->bitmap |= mapRGB4[(long)t];
+				pblockDst->bitmap <<= 2;
+				pblockDst->bitmap |= mapRGB4[(long)t];
 			}
 			else
 			{
@@ -568,14 +568,14 @@ void EncodeBlockRGBColorKey(
 				{
 					t = 2.0f;
 				}
-				block->bitmap <<= 2;
-				block->bitmap |= mapRGB3[(long)t];
+				pblockDst->bitmap <<= 2;
+				pblockDst->bitmap |= mapRGB3[(long)t];
 			}
 		}
 		else
 		{
-			block->bitmap <<= 2;
-			block->bitmap |= 3;
+			pblockDst->bitmap <<= 2;
+			pblockDst->bitmap |= 3;
 		}
 		bit >>= 1;
 	}
@@ -645,25 +645,25 @@ void DecodeBlockRGB(
 }
 
 void DecodeBlockRGB__single_pixel(
-	struct s3tc_block_rgb const *source,
-	struct s3tc_color *color,
+	struct s3tc_block_rgb const *pblockSrc,
+	struct s3tc_color *colorDst,
 	short u,
 	short v)
 {
 	struct s3tc_color colors[4];
 	long channel;
 
-	if (source == NULL)
+	if (pblockSrc == NULL)
 	{
-		memset(color, 0, sizeof(*color));
+		memset(colorDst, 0, sizeof(*colorDst));
 		return;
 	}
 
-	RGBToColor(&source->color0, &colors[0]);
-	RGBToColor(&source->color1, &colors[1]);
+	RGBToColor(&pblockSrc->color0, &colors[0]);
+	RGBToColor(&pblockSrc->color1, &colors[1]);
 	colors[0].rgba[S3TC_ALPHA] = colors[1].rgba[S3TC_ALPHA] = colors[2].rgba[S3TC_ALPHA] = 0xFF;
 
-	if (source->color0 > source->color1)
+	if (pblockSrc->color0 > pblockSrc->color1)
 	{
 		word c0;
 		word c1;
@@ -695,7 +695,7 @@ void DecodeBlockRGB__single_pixel(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 773, u >= 0 && u < 4);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\s3tc\\s3tc.c", 774, v >= 0 && v < 4);
 
-	*color = colors[(source->bitmap >> (2 * (4 * v + u))) & 3];
+	*colorDst = colors[(pblockSrc->bitmap >> (2 * (4 * v + u))) & 3];
 
 	return;
 }

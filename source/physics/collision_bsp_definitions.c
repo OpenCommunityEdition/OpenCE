@@ -136,17 +136,7 @@ typedef char collision_bsp_definition_data_size_assert[
 
 /* ---------- globals */
 
-/* This object's .data is byte-exact against January once csplit resolves the
- * 22 internal pointers correctly.  config/symbols.json lists
- * _global_collision_bsp_definition_data (file_offset 3197376) ahead of
- * _debug_objects_collision_models (3197369) and
- * _breakable_surface_effect_enabled (3197370) -- the file's only descending
- * step in 23,407 entries.  csplit builds its address->symbol map from that
- * order, so the whole blob falls inside breakable_surface_effect_enabled and
- * every internal pointer is emitted as that symbol + 6 + offset.  Restoring
- * ascending order makes the regenerated split .data byte-identical to ours
- * with all 68 relocations equal, and changes no other split object. */
-struct collision_bsp_definition_data global_collision_bsp_definition_data =
+static struct collision_bsp_definition_data global_collision_bsp_definition_data =
 {
 	{
 		{ _tag_field_long_integer, 0, "plane*", NULL },

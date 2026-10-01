@@ -129,14 +129,13 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "effects/decals.h"
 #include "game/game_globals.h"
-#ifdef HALO_LINUX
 #include "main/main.h"
-#endif
 #include "interface/hud_draw.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/common/rasterizer_common.h"
-#include "rasterizer/rasterizer_frame_statistics.h"
 #include "rasterizer/rasterizer_geometry.h"
+#include "rasterizer/rasterizer_model_types.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
 #include "shaders/shader_definitions.h"
@@ -147,6 +146,8 @@ symbols in this file:
 #include <xtl.h>
 
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_water.h"
 
 /* ---------- constants */
@@ -238,17 +239,6 @@ struct real_bounds
 	real upper;
 };
 
-struct rasterizer_environment_fog_debug_options
-{
-	byte reserved00[2];
-	short statistics_mode;
-	short drawing_mode;
-	byte reserved06[0x16];
-	boolean draw_environment_fog;
-	boolean draw_environment_fog_screen;
-	boolean draw_water;
-};
-
 struct fog_screen
 {
 	word flags;
@@ -272,28 +262,6 @@ struct fog_screen
 	struct real_bounds wind_period;
 	real wind_acceleration_weight;
 	real wind_perpendicular_weight;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long constant_1[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long alpha_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long rgb_inputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[NUMBER_OF_PIXEL_SHADER_STAGES];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 struct rasterizer_environment_fog_screen_wind
@@ -333,38 +301,6 @@ struct shader_transparent_chicago_definition
 	struct tag_reference map;
 };
 
-struct rasterizer_model_skinning_parameters
-{
-	real_matrix4x3 const *node_matrices;
-	short node_matrix_count;
-	word pad06;
-};
-
-struct rasterizer_model_effect_parameters
-{
-	short type;
-	word pad02;
-	real intensity;
-	byte reserved08[4];
-	long source_object_index;
-	real_point3d centroid;
-	struct shader *shader;
-	struct render_animation animation;
-};
-
-struct rasterizer_model_begin_parameters
-{
-	unsigned long geometry_flags;
-	long unique_identifier;
-	struct rasterizer_model_skinning_parameters skinning;
-	struct render_lighting lighting;
-	struct render_animation animation;
-	struct rasterizer_model_effect_parameters effect;
-	real_point3d centroid;
-	real radius;
-	real_vector2d base_map_scale;
-};
-
 struct transparent_geometry_group
 {
 	unsigned long geometry_flags;
@@ -373,7 +309,7 @@ struct transparent_geometry_group
 	struct shader *shader;
 	short shader_permutation_index;
 	word pad12;
-	struct rasterizer_model_effect_parameters effect;
+	struct render_model_effect effect;
 	real_vector2d model_base_map_scale;
 	long dynamic_triangle_buffer_index;
 	struct triangle_buffer const *triangle_buffer;
@@ -418,7 +354,7 @@ typedef char rasterizer_environment_fog_screen_window_wind_offset_assert[
 typedef char rasterizer_environment_fog_chicago_map_scale_offset_assert[
 	offsetof(struct shader_transparent_chicago_definition, map_u_scale) == 0x9C ? 1 : -1];
 typedef char rasterizer_environment_fog_model_skinning_size_assert[
-	sizeof(struct rasterizer_model_skinning_parameters) == 0x8 ? 1 : -1];
+	sizeof(struct render_skinning) == 0x8 ? 1 : -1];
 typedef char rasterizer_environment_fog_model_map_scale_offset_assert[
 	offsetof(struct rasterizer_model_begin_parameters, base_map_scale) == 0xC4 ? 1 : -1];
 typedef char rasterizer_environment_fog_transparent_group_size_assert[
@@ -432,7 +368,6 @@ static short cached_node_matrix_count = 0;
 static real_matrix4x3 const *cached_node_matrices = NULL;
 static real_matrix4x3 previous_camera_matrix[MAXIMUM_WINDOWS] = {0};
 
-#ifdef HALO_LINUX
 /* rasterizer_environment_fog_screen_draw initializes a local pointer of the
 same name from this array; MSVC resolved the name in that initializer to
 the array, standard C to the new (uninitialized) local */
@@ -441,7 +376,6 @@ static real_matrix4x3 *previous_camera_matrix_for_window(
 {
 	return &previous_camera_matrix[window_index];
 }
-#endif
 static boolean local_environment_fog_screen_model_flag = FALSE;
 static boolean local_environment_fog_screen_flag = FALSE;
 static word local_fog_screen_layer_bitmap_indices[MAXIMUM_ENVIRONMENT_FOG_SCREEN_LAYERS] = {0};
@@ -461,9 +395,6 @@ static struct render_lighting const *cached_lighting = NULL;
 static struct render_animation const *cached_animation = NULL;
 static boolean reported_too_many_opaque_models = FALSE;
 static boolean local_fog_screen_first_time = TRUE;
-
-extern struct rasterizer_environment_fog_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 static boolean rasterizer_environment_fog_screen_is_active(
 	void);
@@ -935,7 +866,6 @@ static void rasterizer_environment_fog_screen_wind_update(
 	if (screen->wind_velocity.upper > 0.0f)
 	{
 		real_vector2d *target_direction = &wind->target_direction;
-#ifdef HALO_LINUX
 		/* This runs once a frame, several frames per tick on the native
 		builds (port/linux/game/render_interpolation.c): turn toward the
 		target as far per 30 Hz tick as the Xbox turned per frame. */
@@ -947,14 +877,6 @@ static void rasterizer_environment_fog_screen_wind_update(
 		wind->direction.i *= weight;
 		wind->direction.j *= weight;
 		acceleration_weight = 1.0f - weight;
-#else
-		real weight = 1.0f - screen->wind_acceleration_weight;
-		real acceleration_weight;
-
-		wind->direction.i *= weight;
-		wind->direction.j *= weight;
-		acceleration_weight = screen->wind_acceleration_weight;
-#endif
 		wind->direction.i += target_direction->i * acceleration_weight;
 		wind->direction.j += target_direction->j * acceleration_weight;
 		if (normalize2d(&wind->direction) == 0.0f)
@@ -962,19 +884,11 @@ static void rasterizer_environment_fog_screen_wind_update(
 			wind->direction.i = 1.0f;
 			wind->direction.j = 0.0f;
 		}
-#ifdef HALO_LINUX
 		scalars_interpolate(
 			wind->magnitude,
 			wind->target_magnitude,
 			acceleration_weight,
 			&wind->magnitude);
-#else
-		scalars_interpolate(
-			wind->magnitude,
-			wind->target_magnitude,
-			screen->wind_acceleration_weight,
-			&wind->magnitude);
-#endif
 		if (global_frame_parameters.game_time_sec - wind->change_time >= wind->change_period)
 		{
 			real_vector2d perpendicular;
@@ -1040,14 +954,8 @@ void _rasterizer_environment_fog_screen_begin(
 
 		if (pass == 0)
 		{
-#ifdef HALO_LINUX
 			real_matrix4x3 *previous_camera_matrix =
 				previous_camera_matrix_for_window(global_window_parameters.window_index);
-#else
-			real_matrix4x3 *previous_camera_matrix =
-				&previous_camera_matrix[
-					global_window_parameters.window_index];
-#endif
 			real_matrix4x3 wind_matrix = *global_identity4x3;
 			real screen_constants[5][4];
 			real_matrix4x3 matrix;
@@ -1498,7 +1406,7 @@ void _rasterizer_environment_fog_screen_begin(
 				{
 					struct transparent_geometry_group *group =
 						&opaque_model_submit_parameters[group_index];
-					struct rasterizer_model_skinning_parameters skinning;
+					struct render_skinning skinning;
 
 					if (group->shader->base.type == _shader_type_transparent_chicago &&
 						!TEST_FLAG(

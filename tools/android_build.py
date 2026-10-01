@@ -16,8 +16,6 @@ ordinary 64-bit Android app. This graph builds
 
 and stages both, with the SDL3 Java sources, for the Gradle project in
 port/android/app, which ``ninja android_apk`` then assembles.
-
-Like the Linux build, this is independent of the byte-matching graph.
 """
 
 import os
@@ -28,7 +26,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
-                          compile_launcher, miniupnpc_sources, musl_math_sources, pgo_mode, pgo_profile,
+                          compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
+                          musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, xdk_headers)
 from .ninja_syntax import Writer
 
@@ -374,7 +373,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
 
     # the game
     objects: List[Path] = []
-    excluded = set(config.get("exclude_sources", []))
     game_flags = [
         "-std=gnu89", "-D__STRICT_ANSI__", "-w",
         "-Wno-error=incompatible-pointer-types",
@@ -384,29 +382,18 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         "-Wno-error=implicit-int",
         "-Wno-error=return-type",
     ]
-    for proj in sln.projects:
-        if proj.name not in config["projects"]:
-            continue
-        options = proj.options
-        defines = " ".join(f"-D{d}" for d in options.get("defines") or [])
-        includes = " ".join(
-            f"-I{_quote(d)}" for d in options.get("include_dirs") or [] if Path(d) != Path("xbox/include")
-        )
-        game_cflags = " ".join([
-            guest_abi, guest_code, " ".join(game_flags), profile_flags,
-            f"-include {prefix_header}", f"-include {semantics_header}", defines,
-            f"-I{LINUX_DIR}/include", includes, *libc_includes, f"-idirafter {XDK_INCLUDE}",
-        ])
-        for obj in proj.objects:
-            name = str(obj.file_path).replace(os.sep, "/")
-            if obj.status.name == "Missing" or name in excluded or obj.file_path.suffix.lower() != ".c":
-                continue
-            cflags = game_cflags
-            if name in VARIADIC_PROTOTYPE_FILES:
-                cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
-            objects.append(guest_object(obj.file_path, cflags))
-        for source in sorted(Path(config["game_sources"]).glob("*.c")):
-            objects.append(guest_object(source, game_cflags))
+    game_cflags = " ".join([
+        guest_abi, guest_code, " ".join(game_flags), profile_flags,
+        f"-include {prefix_header}", f"-include {semantics_header}",
+        f"-I{LINUX_DIR}/include", game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
+    ])
+    for source in game_sources(config):
+        cflags = game_cflags
+        if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
+            cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
+        objects.append(guest_object(source, cflags))
+    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+        objects.append(guest_object(source, game_cflags))
 
     # the platform layer shared with Linux, and the guest runtime
     platform_cflags = " ".join([

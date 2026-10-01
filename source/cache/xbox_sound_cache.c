@@ -93,7 +93,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
+#include "cache/cache_files.h"
 #include "cache/physical_memory_map.h"
 #include "cache/sound_cache.h"
 #include "interface/terminal.h"
@@ -189,9 +191,9 @@ static void sound_cache_delete_block_proc(
 
 /* ---------- globals */
 
-extern short assertion_count;
-extern boolean debug_sound_cache;
-extern boolean debug_sound_reference_counts;
+short assertion_count;
+boolean debug_sound_cache;
+boolean debug_sound_reference_counts;
 static struct xbox_sound_cache_globals xbox_sound_cache_globals = { 0 };
 
 /* ---------- public code */
@@ -416,6 +418,22 @@ void sound_cache_close(
 	data_iterator_new(&iterator, xbox_sound_cache_globals.cache_sounds);
 	while ((cache_sound = data_iterator_next(&iterator)) != NULL)
 	{
+		/* port: the map is going, every sound stopped and the platform's
+		channels flushed (sound_dispose_from_old_map): a sound still counted
+		as playing is a count never given back, not a sound playing (one, a
+		weapon's charging loop, halted a client as a game ended); let go,
+		not halted on */
+		if (cache_sound->software_reference_count != 0 || cache_sound->hardware_reference_count != 0)
+		{
+			error(
+				_error_silent,
+				"sound %s still counted as playing (%d, %d) as the map closed; let go",
+				cache_sound->sound ? tag_get_name(cache_sound->sound->runtime_tag_index) : "?",
+				cache_sound->software_reference_count,
+				cache_sound->hardware_reference_count);
+			cache_sound->software_reference_count = 0;
+			cache_sound->hardware_reference_count = 0;
+		}
 		sound_cache_sound_delete(cache_sound->sound);
 	}
 	data_make_invalid(xbox_sound_cache_globals.cache_sounds);
@@ -526,15 +544,23 @@ static void sound_cache_start_loading_sound(
 		system_milliseconds() -
 			xbox_sound_cache_globals.last_allocation_failure_time > 10000)
 	{
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		error(
 			_error_silent,
 			"SOUND CACHE BLOWN!!!! double-click \"GETSTABBED.BAT\" on your PC now!!!");
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		lruv_debug_to_file(
 			"d:\\stabbed.txt",
 			sound->name,
@@ -631,34 +657,39 @@ static void render_inverse_transform_screen_point(
 {
 	real screen_x;
 	real screen_y;
-	real_vector3d delta0;
-	real_vector3d delta1;
-	real_point3d point;
+	real_vector3d top_edge;
+	real_vector3d left_edge;
+	real_point3d temp_point;
 
-	screen_x = screen_position->x * (1.0f / 640.0f);
-	screen_y = 1.0f - screen_position->y * (1.0f / 480.0f);
-	add_vectors3d(
-		(real_vector3d const *)&render.frustum.world_vertices[4],
+	screen_x = screen_position->x / 640.0f;
+	screen_y = 1.0f - screen_position->y / 480.0f;
+	point_from_line3d(
+		&render.frustum.world_vertices[4],
 		global_zero_vector3d,
-		(real_vector3d *)world_position);
-
-	delta0.i = render.frustum.world_vertices[1].n[0] - render.frustum.world_vertices[0].n[0];
-	delta0.j = render.frustum.world_vertices[1].n[1] - render.frustum.world_vertices[0].n[1];
-	delta0.k = render.frustum.world_vertices[1].n[2] - render.frustum.world_vertices[0].n[2];
-	delta1.i = render.frustum.world_vertices[2].n[0] - render.frustum.world_vertices[0].n[0];
-	delta1.j = render.frustum.world_vertices[2].n[1] - render.frustum.world_vertices[0].n[1];
-	delta1.k = render.frustum.world_vertices[2].n[2] - render.frustum.world_vertices[0].n[2];
-
-	point.x = delta0.i * screen_x + render.frustum.world_vertices[0].n[0];
-	point.y = delta0.j * screen_x + render.frustum.world_vertices[0].n[1];
-	point.z = delta0.k * screen_x + render.frustum.world_vertices[0].n[2];
-	point.x = delta1.i * screen_y + point.x;
-	point.y = delta1.j * screen_y + point.y;
-	point.z = delta1.k * screen_y + point.z;
-
-	world_vector->i = point.x - world_position->x;
-	world_vector->j = point.y - world_position->y;
-	world_vector->k = point.z - world_position->z;
+		1.0f,
+		world_position);
+	vector_from_points3d(
+		&render.frustum.world_vertices[0],
+		&render.frustum.world_vertices[1],
+		&top_edge);
+	vector_from_points3d(
+		&render.frustum.world_vertices[0],
+		&render.frustum.world_vertices[2],
+		&left_edge);
+	point_from_line3d(
+		&render.frustum.world_vertices[0],
+		&top_edge,
+		screen_x,
+		&temp_point);
+	point_from_line3d(
+		&temp_point,
+		&left_edge,
+		screen_y,
+		&temp_point);
+	vector_from_points3d(
+		world_position,
+		&temp_point,
+		world_vector);
 
 	return;
 }
@@ -666,59 +697,55 @@ static void render_inverse_transform_screen_point(
 void sound_cache_debug_render(
 	void)
 {
-	byte page_usage[1024];
-	real_point3d world_positions[2];
-	real_point2d screen_positions[2];
-	real_argb_color const *colors[4];
-	real_vector3d world_vector;
-	long page_index;
-	long state_index;
-
 	if (debug_sound_cache)
 	{
+		short rows = 1024 / 640;
+		byte page_usage[1024];
+		long x;
+		real_argb_color const *colors[4];
+
 		colors[0] = global_real_argb_red;
 		colors[1] = global_real_argb_green;
 		colors[2] = global_real_argb_blue;
 		colors[3] = global_real_argb_yellow;
-
 		lruv_cache_get_page_usage(xbox_sound_cache_globals.cache, page_usage);
 
-		for (page_index = 0; page_index < 640; page_index++)
+		for (x = 0; x < 640; x++)
 		{
-			for (state_index = 0; state_index < 4; state_index++)
+			short page_index = rows * x;
+			long bit;
+
+			for (bit = 0; bit < 4; bit++)
 			{
-				if (page_usage[(short)page_index] & FLAG(state_index))
+				if (TEST_FLAG(page_usage[page_index], bit))
 				{
-					long row;
-					long point_index;
-					real distance;
-					real scale;
+					real_point3d extent[2];
+					real_point2d line_pt[2];
+					long i;
+					real_vector3d vec;
 
-					row = (state_index + (page_index / 640) * 4) * 10;
-					screen_positions[0].x =
-						screen_positions[1].x = (real)(page_index % 640);
-					screen_positions[0].y = (real)row;
-					screen_positions[1].y = (real)(row + 10);
-					distance = render.camera.z_near + 0.001f;
-
-					for (point_index = 0; point_index < 2; point_index++)
+					line_pt[0].x = (real)(x % 640);
+					line_pt[0].y = (real)((bit + (x / 640) * 4) * 10);
+					line_pt[1].x = (real)(x % 640);
+					line_pt[1].y = (real)((bit + (x / 640) * 4 + 1) * 10);
+					for (i = 0; i < 2; i++)
 					{
 						render_inverse_transform_screen_point(
-							&screen_positions[point_index],
-							&world_positions[point_index],
-							&world_vector);
-						scale = distance /
-							dot_product3d(&render.camera.forward, &world_vector);
-						world_positions[point_index].x += world_vector.i * scale;
-						world_positions[point_index].y += world_vector.j * scale;
-						world_positions[point_index].z += world_vector.k * scale;
+							&line_pt[i],
+							&extent[i],
+							&vec);
+						point_from_line3d(
+							&extent[i],
+							&vec,
+							(render.camera.z_near + 0.001f) / dot_product3d(&vec, &render.camera.forward),
+							&extent[i]);
 					}
 
 					render_debug_line(
 						TRUE,
-						&world_positions[0],
-						&world_positions[1],
-						colors[state_index]);
+						&extent[0],
+						&extent[1],
+						colors[bit]);
 				}
 			}
 		}
