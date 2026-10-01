@@ -638,6 +638,27 @@ for (const role of ['host', 'join']) {
   });
 }
 
+test('the launcher retries a third-player disconnect immediately after replacement resume', async () => {
+  const { fixture, page, module, migrations } = await loadedRoomLauncher();
+  const repairs = [];
+  module._web_quick_play_reconnect = (...args) => repairs.push(args);
+  try {
+    const location = page.context.location.href;
+    await fixture.hostPresence(1); fixture.tick(2000); fixture.tick(3500);
+    assert.deepEqual(migrations, [[2, 0x0201010a, 1]]);
+    module.haloMessage(6, JSON.stringify({ phase: 'playing', message: 'Preserved match resumed.' }));
+    // Deliver a fresh connection error before the page releases its old hold.
+    module.haloMessage(6, JSON.stringify({ phase: 'disconnected', message: 'New connection failed.' }));
+    assert.deepEqual(repairs, [[0x0201010a, 1]], 'the running engine must receive a same-host repair');
+    assert.equal(page.quickCalls[0].signal.aborted, false);
+    assert.equal(page.element('fatal').hidden, true);
+    assert.equal(page.context.Module, module); assert.equal(page.context.location.href, location);
+    assert.equal(fixture.latest().quick.matchId, 500);
+    assert.equal(fixture.latest().quick.epoch, 1);
+    assert.equal(migrations.length, 1, 'repair must preserve the existing replacement authority');
+  } finally { await fixture.close(); }
+});
+
 test('a promoted host connection failure preserves the launcher and reattaches to another host', async () => {
   const { fixture, host, page, module, migrations } = await loadedRoomLauncher();
   try {

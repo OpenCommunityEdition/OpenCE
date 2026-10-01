@@ -1256,7 +1256,10 @@ const HaloNet = (() => {
     // its replacement selection has already been sent to the engine. Consume
     // those old-session receipts without cancelling the preserved match or
     // advancing its authority a second time.
-    if (coordinator.hasMatch && (coordinator.recovering || attempt.held || attempt.migrationPending)) return true;
+    // Native playing completes the handshake before the page's next tick
+    // clears held. A new failure in that interval needs another repair; the
+    // presentation hold alone does not mean native recovery is still pending.
+    if (coordinator.hasMatch && (coordinator.recovering || attempt.migrationPending)) return true;
     if (coordinator.result?.role === 'host') {
       if (!coordinator.hasMatch) return false;
       // A broken host's local native connection cannot serve this authority.

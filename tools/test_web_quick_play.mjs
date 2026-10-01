@@ -422,6 +422,44 @@ test('the first native client loss repairs its player once without changing host
   } finally { await fixture.close(); }
 });
 
+test('a client disconnect immediately after its reconnect ACK starts another repair', async () => {
+  const fixture = await network(), repairs = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onReconnect: value => repairs.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    fixture.net.quickPlayLost();
+    assert.equal(repairs.length, 1);
+    fixture.net.quickPlayPhase('playing');
+    // The ACK has completed native recovery, but the 100ms page timer has
+    // not cleared its held flag. A new EOF belongs to the resumed connection.
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(repairs.length, 2, 'a lingering UI hold must not swallow a fresh native failure');
+    assert.equal(repairs[1].epoch, 0);
+    assert.equal(repairs[1].hostAddress, ADDRESS_B);
+  } finally { await fixture.close(); }
+});
+
+test('the third player retries a replacement host that disconnects immediately after its ACK', async () => {
+  const fixture = await network(), replacements = [], repairs = [];
+  try {
+    const host = await fixture.hostPresence(); host.channels[0].onopen();
+    const attempt = fixture.net.quickPlay({ onFailover: value => replacements.push(value),
+      onReconnect: value => repairs.push(value) });
+    fixture.tick(1500); await attempt;
+    fixture.net.quickPlayPhase('playing'); fixture.checkpoint();
+    await fixture.hostPresence(1); fixture.tick(2000); fixture.tick(3500);
+    assert.equal(replacements.length, 1); assert.equal(replacements[0].role, 'join');
+    fixture.net.quickPlayPhase('playing');
+    assert.equal(fixture.net.quickPlayLost(), true);
+    assert.equal(repairs.length, 1, 'recovery must retry the third player after a new failure');
+    assert.equal(repairs[0].epoch, 1);
+    assert.equal(replacements.length, 1, 'this repair preserves the replacement authority');
+    assert.equal(fixture.latest().quick.matchId, 500);
+  } finally { await fixture.close(); }
+});
+
 for (const role of ['host', 'join']) {
   test(`a delayed native loss after selecting a replacement ${role} preserves that pending epoch`, async () => {
     const fixture = await network(), replacements = [];
