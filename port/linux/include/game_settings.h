@@ -14,6 +14,7 @@ Desktop builds only: Android has no GAME SETTINGS.
 enum
 {
 	_game_setting_fullscreen,
+	_game_setting_resolution,
 	_game_setting_vsync,
 	_game_setting_interpolation,
 	_game_setting_direct_camera,
@@ -29,13 +30,15 @@ enum
 /* whether the menus offer GAME SETTINGS; 0 on Android */
 int game_settings_available(void);
 /* the setting as it is in effect now (fullscreen as F11 last left it), as
-the menu shows it: ON or OFF, a number or a percentage */
+the menu shows it: ON or OFF, a number, a percentage or a resolution
+(1920 X 1080) */
 void game_setting_text(int setting, char *text, int size);
-/* whether the setting is on or off, rather than a number in a range */
+/* whether the setting is on or off, rather than a number in a range or the
+resolution */
 int game_setting_is_switch(int setting);
-/* turns a switch on or off, or steps a number down (direction < 0) or up,
-now and in config.toml; 0 if it could not change (at the end of its range,
-or refused), and is as it was */
+/* turns a switch on or off, or steps a number or the resolution down
+(direction < 0) or up, now and in config.toml; 0 if it could not change (at
+the end of its range, or refused), and is as it was */
 int game_setting_step(int setting, int direction);
 
 #endif

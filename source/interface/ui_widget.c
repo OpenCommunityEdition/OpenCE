@@ -5295,9 +5295,9 @@ and run none of their tags' handlers and game data functions, which expect
 the screens they come from.
 
 Up and down move through a column. A or right on a category moves to its
-settings, and B back. A turns a setting on or off, or steps a number up;
-left and right step either. The settings change at once. B, BACK and START
-go back a column, then to the menu before. */
+settings, and B back. A turns a setting on or off, or steps a number (or
+the resolution) up; left and right step either. The settings change at
+once. B, BACK and START go back a column, then to the menu before. */
 
 #define UI_GAME_SETTINGS_PAUSE_TAG(leaf) "ui\\shell\\solo_game\\pause_game\\" leaf
 #define UI_GAME_SETTINGS_MAIN_MENU_TAG(leaf) "ui\\shell\\main_menu\\" leaf
@@ -5327,7 +5327,7 @@ enum
 	NUMBER_OF_UI_GAME_SETTINGS_WIDGETS = _ui_game_settings_widget_first_setting + NUMBER_OF_GAME_SETTINGS,
 	NUMBER_OF_UI_GAME_SETTINGS_CATEGORIES = _ui_game_settings_widget_input - _ui_game_settings_widget_display + 1,
 	/* DISPLAY's */
-	MAXIMUM_UI_GAME_SETTINGS_OPTIONS = 5
+	MAXIMUM_UI_GAME_SETTINGS_OPTIONS = 6
 };
 
 enum
@@ -5339,10 +5339,10 @@ enum
 
 enum
 {
-	/* the right column's width: its longest label, MOUSE SENSITIVITY: 1.25,
-	is 231 pixels of ui\large_ui, more than either menu's rows (202 and 232)
-	hold */
-	UI_GAME_SETTINGS_OPTION_WIDTH = 250,
+	/* the right column's width: its longest label, RESOLUTION: 3840 X 2160,
+	is 244 pixels of ui\large_ui, 13 in from the main menu's rows' left,
+	more than either menu's rows (202 and 232) hold */
+	UI_GAME_SETTINGS_OPTION_WIDTH = 260,
 
 	/* where the help screens place their box and its caption, the body
 	between the bands of its art, and where their key goes */
@@ -5353,11 +5353,13 @@ enum
 	UI_GAME_SETTINGS_BOX_BODY_TOP = 29,
 	UI_GAME_SETTINGS_BOX_BODY_BOTTOM = 190,
 	UI_GAME_SETTINGS_BOX_KEY_Y = 195,
-	/* ... its sides' art, and the columns' room beside them */
+	/* ... its sides' art, and the columns' room beside them (which leaves
+	10 pixels between the columns) */
 	UI_GAME_SETTINGS_BOX_SIDE = 16,
-	UI_GAME_SETTINGS_BOX_MARGIN = 8,
-	/* the pause menu's rows (27 pixels) as they are spaced there */
-	UI_GAME_SETTINGS_BOX_ROW_PITCH = 28,
+	UI_GAME_SETTINGS_BOX_MARGIN = 4,
+	/* the pause menu's rows (27 pixels), two pixels closer than they are
+	spaced there, so that DISPLAY's six fit the body */
+	UI_GAME_SETTINGS_BOX_ROW_PITCH = 26,
 	/* ... and in the pause menu with GAME SETTINGS, five where four were, the
 	last still above the line over the key (2 pixels clear) */
 	UI_GAME_SETTINGS_PAUSE_ROW_PITCH = 23,
@@ -5391,6 +5393,7 @@ static char const ui_game_settings_widget_names[NUMBER_OF_UI_GAME_SETTINGS_WIDGE
 	"game_settings_audio",
 	"game_settings_input",
 	"game_settings_fullscreen",
+	"game_settings_resolution",
 	"game_settings_vsync",
 	"game_settings_interpolation",
 	"game_settings_direct_camera",
@@ -5416,6 +5419,7 @@ static struct
 } const ui_game_settings_options[NUMBER_OF_GAME_SETTINGS] =
 {
 	{ "FULLSCREEN", _ui_game_settings_widget_display },
+	{ "RESOLUTION", _ui_game_settings_widget_display },
 	{ "VSYNC", _ui_game_settings_widget_display },
 	{ "INTERPOLATION", _ui_game_settings_widget_display },
 	{ "DIRECT CAMERA", _ui_game_settings_widget_display },

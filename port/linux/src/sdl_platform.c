@@ -334,24 +334,154 @@ static BOOL platform_fullscreen_setting(void)
 	return !config_boolean("debug.hidden_window") && config_boolean("display.fullscreen");
 }
 
+/* ---------- the fullscreen resolution
+
+Fullscreen is the display's own mode (borderless: F11, a message box and
+switching to another program change no mode), and the game draws at the
+resolution set (display.resolution_width and _height) or the display's own,
+d3d8_gl.c scaling the picture to the display. A resolution the display the
+game is on has no room for (another monitor, say) falls back to its own. */
+
+/* display.resolution_width and _height, read once; 0 for the display's */
+static int resolution_width = -1, resolution_height;
+/* the display size last fallen back to, logged once */
+static long resolution_fallback_width, resolution_fallback_height;
+
+/* the display the game is on, or will open on */
+static SDL_DisplayID platform_display(void)
+{
+	SDL_DisplayID display = platform_window ? SDL_GetDisplayForWindow(platform_window) : 0;
+
+	return display ? display : SDL_GetPrimaryDisplay();
+}
+
+/* a display's own size in pixels (its desktop mode) */
+static BOOL platform_display_size(SDL_DisplayID display, long *width, long *height)
+{
+	const SDL_DisplayMode *mode = display ? SDL_GetDesktopDisplayMode(display) : NULL;
+
+	if (!mode)
+		return FALSE;
+	*width = (long)(mode->w * mode->pixel_density + 0.5f);
+	*height = (long)(mode->h * mode->pixel_density + 0.5f);
+	return TRUE;
+}
+
+/* whether the game can draw a display of the size at a resolution: the
+Xbox's 640x480 or more, and no more than the display */
+static BOOL platform_resolution_fits(long width, long height, long display_width, long display_height)
+{
+	return width >= 640 && height >= 480 && width <= display_width && height <= display_height;
+}
+
+/* the size the game draws at fullscreen on the display it is on */
+static BOOL platform_resolution_choose(long *width, long *height)
+{
+	long display_width, display_height;
+
+	if (!platform_display_size(platform_display(), &display_width, &display_height))
+		return FALSE;
+	if (resolution_width < 0)
+	{
+		resolution_width = (int)config_integer("display.resolution_width");
+		resolution_height = (int)config_integer("display.resolution_height");
+	}
+	if (platform_resolution_fits(resolution_width, resolution_height, display_width, display_height))
+	{
+		resolution_fallback_width = 0;
+		resolution_fallback_height = 0;
+		*width = resolution_width;
+		*height = resolution_height;
+		return TRUE;
+	}
+	if ((resolution_width > 0 || resolution_height > 0) &&
+		(display_width != resolution_fallback_width || display_height != resolution_fallback_height))
+	{
+		platform_log("display: no room for %dx%d on this display: drawing at its %ldx%ld", resolution_width,
+			resolution_height, display_width, display_height);
+		resolution_fallback_width = display_width;
+		resolution_fallback_height = display_height;
+	}
+	*width = display_width;
+	*height = display_height;
+	return TRUE;
+}
+
 /* whether the game is, or is to be, fullscreen, and if so the size in
-pixels of the display it fills (d3d8_gl.c draws at that resolution) */
+pixels it draws the display at (d3d8_gl.c) */
 BOOL platform_screen_mode(long *width, long *height)
 {
-	SDL_DisplayID display;
-	const SDL_DisplayMode *mode;
-
 	if (platform_window ? !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) :
 		!platform_fullscreen_setting() || !platform_sdl_initialize())
 	{
 		return FALSE;
 	}
-	display = platform_window ? SDL_GetDisplayForWindow(platform_window) : SDL_GetPrimaryDisplay();
-	mode = display ? SDL_GetDesktopDisplayMode(display) : NULL;
-	if (!mode)
+	return platform_resolution_choose(width, height);
+}
+
+void platform_fullscreen_resolution(int *width, int *height)
+{
+	long chosen_width = 640, chosen_height = 480;
+
+	if (platform_sdl_initialize())
+		platform_resolution_choose(&chosen_width, &chosen_height);
+	*width = (int)chosen_width;
+	*height = (int)chosen_height;
+}
+
+int platform_display_resolutions(int *widths, int *heights, int maximum)
+{
+	SDL_DisplayID display;
+	long display_width, display_height;
+	SDL_DisplayMode **modes;
+	int mode_count = 0;
+	int count = 0;
+	int index;
+
+	if (maximum < 1 || !platform_sdl_initialize())
+		return 0;
+	display = platform_display();
+	if (!platform_display_size(display, &display_width, &display_height))
+		return 0;
+	widths[count] = (int)display_width;
+	heights[count] = (int)display_height;
+	count++;
+	/* (largest first, a size once for each of its refresh rates) */
+	modes = SDL_GetFullscreenDisplayModes(display, &mode_count);
+	for (index = 0; modes && index < mode_count && count < maximum; index++)
+	{
+		long width = (long)(modes[index]->w * modes[index]->pixel_density + 0.5f);
+		long height = (long)(modes[index]->h * modes[index]->pixel_density + 0.5f);
+		int found;
+
+		if (!platform_resolution_fits(width, height, display_width, display_height))
+			continue;
+		for (found = 0; found < count && (widths[found] != width || heights[found] != height); found++)
+		{
+		}
+		if (found < count)
+			continue;
+		widths[count] = (int)width;
+		heights[count] = (int)height;
+		count++;
+	}
+	SDL_free(modes);
+	return count;
+}
+
+BOOL platform_set_fullscreen_resolution(int width, int height)
+{
+	long display_width, display_height;
+
+	if (!platform_sdl_initialize() || !platform_display_size(platform_display(), &display_width, &display_height) ||
+		!platform_resolution_fits(width, height, display_width, display_height))
+	{
+		platform_log("cannot draw at %dx%d: the display has no room for it", width, height);
 		return FALSE;
-	*width = (long)(mode->w * mode->pixel_density + 0.5f);
-	*height = (long)(mode->h * mode->pixel_density + 0.5f);
+	}
+	/* (taken up between frames, halo_screen_commit) */
+	resolution_width = width;
+	resolution_height = height;
 	return TRUE;
 }
 

@@ -48,6 +48,16 @@ int platform_window_scale_maximum(void);
 /* resizes the window now, or when it next leaves fullscreen; FALSE if SDL
 refuses */
 BOOL platform_set_window_scale(int scale);
+/* the resolution the game draws at while fullscreen, in pixels
+(display.resolution_width and _height: a size of the display's, or the
+display's own); d3d8_gl.c scales the picture to the display */
+void platform_fullscreen_resolution(int *width, int *height);
+/* the sizes of the display's the game can draw at fullscreen, each once:
+the display's own first, then the rest, largest first; how many there are */
+int platform_display_resolutions(int *widths, int *heights, int maximum);
+/* draws at the size from the next frame on (while fullscreen); FALSE if the
+display has no room for it */
+BOOL platform_set_fullscreen_resolution(int width, int height);
 #endif
 /* display.window_scale as it is now: the window's size as a multiple of
 640x480 */

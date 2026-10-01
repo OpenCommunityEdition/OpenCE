@@ -148,10 +148,12 @@ them to the file at once. It is in the main menu's SETTINGS, next to PROFILE
 SETTINGS, and in the pause menu of a single-player game. Its categories are
 the sections of the file:
 
-- DISPLAY: `display.fullscreen`, `display.vsync`, `display.interpolation`,
-  `display.direct_camera` and `display.window_scale`. A window scale set
-  while the game is fullscreen changes the window when the game leaves
-  fullscreen.
+- DISPLAY: `display.fullscreen`, `display.resolution_width` with
+  `display.resolution_height` (one RESOLUTION), `display.vsync`,
+  `display.interpolation`, `display.direct_camera` and
+  `display.window_scale`. A window scale set while the game is fullscreen
+  changes the window when the game leaves fullscreen. A resolution set
+  while the game is in a window applies when the game is fullscreen.
 - AUDIO: `audio.enabled` and `audio.volume`.
 - INPUT: `input.mouse_sensitivity`, `input.mouse_aim_assist` and
   `input.invert_mouse`.
@@ -166,6 +168,7 @@ the setting for one start of the game. It has priority over the file.
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. F11 changes between the two. |
+| `display.resolution_width`, `display.resolution_height` | `0`, `0` | `HALO_RESOLUTION_WIDTH`, `HALO_RESOLUTION_HEIGHT` | The resolution of the picture when the game is fullscreen, in pixels: one of the modes of the display, for example `1920` and `1080`. The game draws the picture at this resolution and scales it to the display. The display keeps its own mode. `0`: the resolution of the display. If the display has no room for the resolution, the game uses the resolution of the display. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |

@@ -8,8 +8,10 @@ or the window system refuses is neither shown nor kept. When the file cannot
 be written the change still holds for this run, and the log says so.
 
 A number steps through a range on a grid of its step, which a value set in
-the file between two steps joins. F11 still switches fullscreen for the run
-only; GAME SETTINGS shows the window as it is.
+the file between two steps joins. The resolution steps through the sizes
+the display has (platform_display_resolutions), and is two settings in the
+file, a width and a height. F11 still switches fullscreen for the run only;
+GAME SETTINGS shows the window as it is.
 */
 
 #include "platform.h"
@@ -60,6 +62,8 @@ enum game_setting_type
 	/* a real shown as a percentage */
 	_game_setting_type_percentage,
 	_game_setting_type_real,
+	/* a width and a height of the display's (platform_fullscreen_resolution) */
+	_game_setting_type_resolution,
 };
 
 struct game_setting
@@ -73,6 +77,7 @@ struct game_setting
 static const struct game_setting game_settings[NUMBER_OF_GAME_SETTINGS] =
 {
 	{ "display.fullscreen", _game_setting_type_switch, 0.0, 0.0, 0.0 },
+	{ "display.resolution", _game_setting_type_resolution, 0.0, 0.0, 0.0 },
 	{ "display.vsync", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.interpolation", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.direct_camera", _game_setting_type_switch, 0.0, 0.0, 0.0 },
@@ -152,6 +157,81 @@ static BOOL game_setting_apply(int setting, double value)
 	return FALSE;
 }
 
+/* how a change was kept, for the log */
+static void game_setting_log_written(const char *name, const char *text, int written)
+{
+	if (written)
+		platform_log("settings: %s set to %s", name, text);
+	else
+		platform_log("settings: %s set to %s for this run only: cannot write config.toml", name, text);
+}
+
+/* ---------- the resolution */
+
+#define MAXIMUM_DISPLAY_RESOLUTIONS 64
+
+static void game_setting_resolution_format(int width, int height, char *text, int size)
+{
+	snprintf(text, (size_t)size, "%d X %d", width, height);
+}
+
+/* the sizes in order: by their width, then their height */
+static int game_setting_resolution_compare(int width, int height, int other_width, int other_height)
+{
+	return width != other_width ? width - other_width : height - other_height;
+}
+
+/* the size of the display's next larger (direction > 0) or smaller than the
+resolution now; FALSE at the end */
+static BOOL game_setting_resolution_next(int direction, int *width, int *height)
+{
+	int widths[MAXIMUM_DISPLAY_RESOLUTIONS], heights[MAXIMUM_DISPLAY_RESOLUTIONS];
+	int count = platform_display_resolutions(widths, heights, MAXIMUM_DISPLAY_RESOLUTIONS);
+	int current_width, current_height;
+	int index;
+	BOOL found = FALSE;
+
+	platform_fullscreen_resolution(&current_width, &current_height);
+	for (index = 0; index < count; index++)
+	{
+		/* (beyond the resolution now, that way, and nearer than any found) */
+		if (direction * game_setting_resolution_compare(widths[index], heights[index], current_width, current_height) <= 0)
+			continue;
+		if (found && direction * game_setting_resolution_compare(widths[index], heights[index], *width, *height) >= 0)
+			continue;
+		*width = widths[index];
+		*height = heights[index];
+		found = TRUE;
+	}
+	return found;
+}
+
+/* steps the resolution through the display's sizes, now and in config.toml
+(its width and its height); as game_setting_step */
+static int game_setting_resolution_step(int direction)
+{
+	int width, height;
+	char text[16];
+	int written;
+
+	if (!game_setting_resolution_next(direction, &width, &height))
+		return 0;
+	game_setting_resolution_format(width, height, text, (int)sizeof(text));
+	if (!platform_set_fullscreen_resolution(width, height))
+	{
+		platform_fullscreen_resolution(&width, &height);
+		game_setting_resolution_format(width, height, text, (int)sizeof(text));
+		platform_log("settings: display.resolution stays %s", text);
+		return 0;
+	}
+	written = config_write_integer("display.resolution_width", width);
+	written = config_write_integer("display.resolution_height", height) && written;
+	game_setting_log_written("display.resolution", text, written);
+	return 1;
+}
+
+/* ---------- the settings */
+
 static void game_setting_format(int setting, double value, char *text, int size)
 {
 	switch (game_settings[setting].type)
@@ -168,6 +248,11 @@ static void game_setting_format(int setting, double value, char *text, int size)
 	case _game_setting_type_real:
 		/* (two decimals only for a value between the steps) */
 		snprintf(text, (size_t)size, fabs(value * 10.0 - floor(value * 10.0 + 0.5)) < 0.001 ? "%.1f" : "%.2f", value);
+		break;
+	case _game_setting_type_resolution:
+		/* (a width and a height, not a value: game_setting_text's) */
+		if (size > 0)
+			text[0] = 0;
 		break;
 	}
 }
@@ -186,6 +271,14 @@ void game_setting_text(int setting, char *text, int size)
 			text[0] = 0;
 		return;
 	}
+	if (game_settings[setting].type == _game_setting_type_resolution)
+	{
+		int width, height;
+
+		platform_fullscreen_resolution(&width, &height);
+		game_setting_resolution_format(width, height, text, size);
+		return;
+	}
 	game_setting_format(setting, game_setting_value(setting), text, size);
 }
 
@@ -199,6 +292,8 @@ int game_setting_step(int setting, int direction)
 	if (setting < 0 || setting >= NUMBER_OF_GAME_SETTINGS)
 		return 0;
 	definition = &game_settings[setting];
+	if (definition->type == _game_setting_type_resolution)
+		return game_setting_resolution_step(direction);
 	value = game_setting_value(setting);
 	if (definition->type == _game_setting_type_switch)
 	{
@@ -234,10 +329,7 @@ int game_setting_step(int setting, int direction)
 		written = config_write_real(definition->name, next);
 		break;
 	}
-	if (written)
-		platform_log("settings: %s set to %s", definition->name, text);
-	else
-		platform_log("settings: %s set to %s for this run only: cannot write config.toml", definition->name, text);
+	game_setting_log_written(definition->name, text, written);
 	return 1;
 }
 
