@@ -652,7 +652,7 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 /* ---------- camera */
 
 static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
-/* display.direct_camera, read once, then as GAME SETTINGS changes it
+/* display.direct_camera, read once, then as VIDEO SETTINGS changes it
 (port/linux/src/game_settings.c) */
 static int direct_camera_enabled = -1;
 

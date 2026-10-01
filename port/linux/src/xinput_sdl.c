@@ -88,7 +88,7 @@ worn stick's drift */
 #define STICK_AIMING_DEFLECTION 8000
 
 /* input.mouse_sensitivity, input.invert_mouse and input.mouse_aim_assist,
-read once, then as GAME SETTINGS changes them (game_settings.c) */
+read once, then as INPUT SETTINGS changes them (game_settings.c) */
 static float mouse_sensitivity = -1.0f;
 static int mouse_inverted = -1;
 static int mouse_aim_assisted = -1;

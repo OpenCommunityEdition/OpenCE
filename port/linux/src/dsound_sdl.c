@@ -27,7 +27,7 @@ Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.
 
 audio.volume sets the master volume (default 1.0); audio.enabled = false
-skips opening a device (port_config.c). GAME SETTINGS changes both while the
+skips opening a device (port_config.c). AUDIO SETTINGS changes both while the
 game runs: off then silences the device's output, the mixer still running.
 */
 
@@ -431,7 +431,7 @@ static void mix(float *output, unsigned long frames)
 static SDL_AudioStream *audio_stream;
 static BOOL audio_started = FALSE;
 /* a device opened (the silent clock then stops), and its output silenced:
-GAME SETTINGS' AUDIO, which keeps the voices draining (game_settings.c) */
+AUDIO SETTINGS' AUDIO, which keeps the voices draining (game_settings.c) */
 static SDL_AtomicInt audio_device_open;
 static SDL_AtomicInt audio_muted;
 
@@ -515,7 +515,7 @@ static void audio_start(void)
 	}
 }
 
-/* ---------- GAME SETTINGS (game_settings.c) */
+/* ---------- AUDIO SETTINGS (game_settings.c) */
 
 BOOL audio_output_enabled(void)
 {

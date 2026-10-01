@@ -1,7 +1,8 @@
 /*
 GAME_SETTINGS.C
 
-The settings of the menus' GAME SETTINGS (port/linux/include/game_settings.h).
+The settings of the menus' VIDEO, AUDIO and INPUT SETTINGS
+(port/linux/include/game_settings.h).
 A change is made in the running game first, by the part of the port that
 uses the setting, and only then written into config.toml: what the driver
 or the window system refuses is neither shown nor kept. When the file cannot
@@ -11,7 +12,7 @@ A number steps through a range on a grid of its step, which a value set in
 the file between two steps joins. The resolution steps through the sizes
 the display has (platform_display_resolutions), and is two settings in the
 file, a width and a height. F11 still switches fullscreen for the run only;
-GAME SETTINGS shows the window as it is.
+VIDEO SETTINGS shows the window as it is.
 */
 
 #include "platform.h"

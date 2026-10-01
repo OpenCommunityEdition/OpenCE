@@ -38,7 +38,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height);
 #ifndef HALO_ANDROID
 BOOL platform_screen_mode(long *width, long *height);
 /* whether the window is fullscreen now: display.fullscreen at first, then as
-F11 and GAME SETTINGS (game_settings.c) switch it */
+F11 and VIDEO SETTINGS (game_settings.c) switch it */
 BOOL platform_fullscreen(void);
 /* fullscreen or the window (SDL keeps the window's size and place while
 fullscreen); with wait, once the switch is done. FALSE if SDL refuses it */

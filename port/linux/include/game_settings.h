@@ -1,11 +1,13 @@
 /*
 GAME_SETTINGS.H
 
-The settings of the menus' GAME SETTINGS (source/interface/ui_widget.c), each
-one of config.toml's (port/linux/src/port_config.c), in the order of its
-sections: display, audio, input. Changing one changes it in the running game
-at once and writes it into the file (port/linux/src/game_settings.c).
-Desktop builds only: Android has no GAME SETTINGS.
+The settings of the menus' VIDEO, AUDIO and INPUT SETTINGS
+(source/interface/ui_widget.c), each one of config.toml's
+(port/linux/src/port_config.c), in the order of its sections: display (VIDEO
+SETTINGS), audio, input. They are the game's, the same for every player
+profile. Changing one changes it in the running game at once and writes it
+into the file (port/linux/src/game_settings.c). Desktop builds only: Android
+has no settings in its menus.
 */
 
 #ifndef GAME_SETTINGS_H
@@ -27,7 +29,7 @@ enum
 	NUMBER_OF_GAME_SETTINGS
 };
 
-/* whether the menus offer GAME SETTINGS; 0 on Android */
+/* whether the menus offer the settings; 0 on Android */
 int game_settings_available(void);
 /* the setting as it is in effect now (fullscreen as F11 last left it), as
 the menu shows it: ON or OFF, a number, a percentage or a resolution

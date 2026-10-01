@@ -1121,8 +1121,8 @@ struct widget_stack_data
 	long focused_child_parent_widget_tag;
 	short focused_child_index;
 	short local_player_index;
-	/* port: the screen was the main menu's SETTINGS menu, which its tag (that
-	of another screen) does not tell */
+	/* port: the screen was a SETTINGS menu, which its tag (MULTIPLAYER's, or
+	the pause menu's) does not tell */
 	boolean settings_menu;
 };
 
@@ -1424,20 +1424,20 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
-static short ui_game_settings_widget_get(
+static short ui_settings_widget_get(
 	struct widget_instance const *widget);
-static boolean ui_game_settings_widget_set_text(
+static boolean ui_settings_widget_set_text(
 	struct widget_instance *widget);
-static void ui_game_settings_row_widen(
+static void ui_settings_row_widen(
 	struct widget_instance const *widget,
 	rectangle2d *bounds);
-static void ui_game_settings_menu_loaded(
+static void ui_settings_menus_loaded(
 	struct widget_instance *root);
 static boolean ui_settings_menu_is(
 	struct widget_instance const *widget);
 static boolean ui_settings_menu_loads(
 	struct widget_instance *widget);
-static boolean ui_settings_menu_row_render(
+static boolean ui_settings_row_render(
 	struct widget_instance *widget,
 	rectangle2d const *bounds,
 	rectangle2d *clip,
@@ -1473,14 +1473,15 @@ struct stack_memory_pool *widget_memory_pool = &__medium_widget_memory_pool.pool
 
 static boolean main_screen_shell_first_load = TRUE;
 
-/* port: set while GAME SETTINGS loads the widgets it is made of, whose tags'
-created handlers would set them up for the screens they come from (ADVANCED
-CONTROLS' list reads the profile being edited, and there is none) */
-static boolean ui_game_settings_loading = FALSE;
+/* port: set while a settings page loads, and the widgets the settings
+screens are made of, whose tags' created handlers would set them up for the
+screens they come from (ADVANCED CONTROLS' list reads the profile being
+edited: the settings are no profile's) */
+static boolean ui_settings_loading = FALSE;
 
-/* port: set while the main menu's SETTINGS menu loads (or loads again, from
-the history), which is MULTIPLAYER's screen made over: its tags' created
-handlers would set it up for MULTIPLAYER */
+/* port: set while a SETTINGS menu loads (or loads again, from the history),
+which is MULTIPLAYER's screen or the pause menu made over: its tags' created
+handlers would set it up as that */
 static boolean ui_settings_menu_loading = FALSE;
 
 short dashboard_abort_error = NONE;
@@ -2651,9 +2652,9 @@ boolean widget_event_function_list_widget_goto_next_item(
 				child = widget->child;
 				item_index = 0;
 			}
-			/* port: GAME SETTINGS' rows share their tag with another row, which
-			a lookup by tag would find instead */
-			if (child && ui_game_settings_widget_get(child) != NONE)
+			/* port: the settings screens' rows share their tag with another
+			row, which a lookup by tag would find instead */
+			if (child && ui_settings_widget_get(child) != NONE)
 			{
 				widget_instance_give_focus_directly(widget, child);
 				widget->parameters.list.selected_index = (short)item_index;
@@ -2785,7 +2786,7 @@ boolean widget_event_function_list_widget_goto_previous_item(
 				}
 			}
 			/* port: as in widget_event_function_list_widget_goto_next_item */
-			if (ui_game_settings_widget_get(child) != NONE)
+			if (ui_settings_widget_get(child) != NONE)
 			{
 				widget_instance_give_focus_directly(widget, child);
 			}
@@ -3669,10 +3670,9 @@ static void widget_instance_initialize(
 		struct ui_widget_event_handler_reference *handler =
 			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
 
-		/* port: not for the widgets GAME SETTINGS and the SETTINGS menu are made
-		of */
+		/* port: not for the widgets the settings screens are made of */
 		if (handler->event_type == _widget_event_created &&
-			!ui_game_settings_loading &&
+			!ui_settings_loading &&
 			!ui_settings_menu_loads(widget))
 		{
 			struct event_record event = {0};
@@ -3753,7 +3753,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				{
 					previous_local_player_index =
 						widget_globals.active_widgets[widget_stack]->local_player_index;
-					/* port: (the SETTINGS menu, for the history) */
+					/* port: (a SETTINGS menu, for the history) */
 					previous_settings_menu =
 						ui_settings_menu_is(widget_globals.active_widgets[widget_stack]) &&
 						widget_globals.active_widgets[widget_stack]->definition_tag_index == invoking_widget_tag;
@@ -3807,10 +3807,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
-			/* port: GAME SETTINGS in the menus that offer it, unless a created
+			/* port: SETTINGS in the menus that offer it, unless a created
 			handler closed the widget */
 			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
-				ui_game_settings_menu_loaded(widget);
+				ui_settings_menus_loaded(widget);
 		}
 		else
 		{
@@ -4932,8 +4932,8 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	/* port: GAME SETTINGS' text boxes have the code's text */
-	if (!ui_game_settings_widget_set_text(widget) &&
+	/* port: the settings screens' text boxes have the code's text */
+	if (!ui_settings_widget_set_text(widget) &&
 		definition->text_label_string_list.index != NONE)
 	{
 		short string_list_index;
@@ -5014,7 +5014,7 @@ static void widget_instance_render_text_box(
 		return;
 	alpha_modifier = widget_instance_get_cumulative_alpha_modifier(widget);
 	bounds = definition->bounds;
-	ui_game_settings_row_widen(widget, &bounds);
+	ui_settings_row_widen(widget, &bounds);
 	clip = clip_rect ? *clip_rect : definition->bounds;
 	bounds.x1 += offset.x;
 	bounds.y1 += offset.y;
@@ -5266,235 +5266,270 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
-/* ---------- GAME SETTINGS (desktop builds)
+/* ---------- SETTINGS (desktop builds)
 
-The desktop builds' own settings (port/linux/include/game_settings.h) have a
-screen in the menus, opened from the main menu's SETTINGS and from the
-single-player pause menu (after RESUME GAME). They are the game's, not a
-player profile's.
+The desktop builds' own settings (port/linux/include/game_settings.h) are the
+game's, the same for every player profile. Each section of config.toml has a
+page of them in the menus: VIDEO SETTINGS (display), AUDIO SETTINGS and INPUT
+SETTINGS, a row for each setting that shows its value. A SETTINGS menu leads
+to them: the main menu's SETTINGS opens one with PROFILE SETTINGS first, which
+does what SETTINGS did (its tag's handlers open the player profiles' screen),
+and the single-player pause menu gets a SETTINGS row after RESUME GAME, drawn
+from that row's tag, which opens one without it.
 
-The main menu's SETTINGS opens a SETTINGS menu, of two rows: PROFILE
-SETTINGS, which does what SETTINGS did (its tag's handler opens the player
-profiles' screen), and GAME SETTINGS. It is MULTIPLAYER's screen of choices
-made over: a title for its header, its first two rows, and its key. Its
-tag being MULTIPLAYER's, the history marks it, to make it over again on the
-way back to it. The pause menu's list gets a GAME SETTINGS row as its screen
-loads, drawn from the tag of the row it follows.
+No map has screens for these, nor do the two menus share any: the campaign
+maps carry the pause menu and none of the main menu's screens, ui.map the
+reverse. So each is a screen of the map's own, opened as any item opens a
+screen (the history then leads back to the row that opened it), and laid out
+anew. In the main menu, the SETTINGS menu is MULTIPLAYER's screen of choices,
+with its four rows, and a page is ADVANCED CONTROLS' screen with EDIT PROFILE
+SETTINGS' rows (their art only: no profile is read). In the pause menu, both
+are the pause menu itself, in the help screens' box. The SETTINGS menu being
+another screen's tag, the history marks it, to make it over again on the way
+back to it; a page opens nothing, so the history never has one. The widgets
+of these screens answer their buttons in code, and run none of their tags'
+handlers and game data functions, which expect the screens they come from.
 
-No map has a screen for GAME SETTINGS, nor do the two menus share any: the
-campaign maps carry the pause menu and none of the main menu's screens,
-ui.map the reverse. So GAME SETTINGS is a screen of the map's own, opened as
-any item opens a screen (the history then leads back to GAME SETTINGS' row),
-and laid out anew: the pause menu again, in the help screens' box; in the
-main menu, ADVANCED CONTROLS' screen, with EDIT PROFILE SETTINGS' rows and
-description panel. Its left column lists the categories, config.toml's
-sections; its right column the selected category's settings. Both are lists
-of the screen's own tags whose rows are drawn from the menu's row's tag. The
-widgets of GAME SETTINGS and the SETTINGS menu answer their buttons in code,
-and run none of their tags' handlers and game data functions, which expect
-the screens they come from.
+Up and down move through a screen's rows; A (or START) on a row of the
+SETTINGS menu opens its screen. On a page A turns a setting on or off, or
+steps a number (or the resolution) up; left and right step either. The
+settings change at once. B and BACK go back to the screen before (where the
+pause menu's tag would close every menu), and on a page START too; in a game,
+START closes every menu, as it closes the pause menu. */
 
-Up and down move through a column. A or right on a category moves to its
-settings, and B back. A turns a setting on or off, or steps a number (or
-the resolution) up; left and right step either. The settings change at
-once. B, BACK and START go back a column, then to the menu before. */
-
-#define UI_GAME_SETTINGS_PAUSE_TAG(leaf) "ui\\shell\\solo_game\\pause_game\\" leaf
-#define UI_GAME_SETTINGS_MAIN_MENU_TAG(leaf) "ui\\shell\\main_menu\\" leaf
-#define UI_GAME_SETTINGS_MULTIPLAYER_TAG(leaf) "ui\\shell\\main_menu\\multiplayer_type_select\\" leaf
-#define UI_GAME_SETTINGS_PROFILE_TAG(leaf) \
+#define UI_SETTINGS_PAUSE_TAG(leaf) "ui\\shell\\solo_game\\pause_game\\" leaf
+#define UI_SETTINGS_MAIN_MENU_TAG(leaf) "ui\\shell\\main_menu\\" leaf
+#define UI_SETTINGS_MULTIPLAYER_TAG(leaf) "ui\\shell\\main_menu\\multiplayer_type_select\\" leaf
+#define UI_SETTINGS_PROFILE_EDIT_TAG(leaf) \
 	"ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\" leaf
-#define UI_GAME_SETTINGS_ADVANCED_TAG(leaf) \
+#define UI_SETTINGS_ADVANCED_TAG(leaf) \
 	"ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\advanced_controls\\" leaf
 
 enum
 {
-	_ui_game_settings_widget_item,				/* GAME SETTINGS in the pause menu */
-	_ui_game_settings_widget_settings_item,		/* the main menu's SETTINGS */
-	_ui_game_settings_widget_settings_menu,		/* ... the SETTINGS menu it opens */
-	_ui_game_settings_widget_settings_title,
-	_ui_game_settings_widget_settings_list,
-	_ui_game_settings_widget_profile_settings,	/* ... and its rows */
-	_ui_game_settings_widget_settings_menu_item,
-	_ui_game_settings_widget_screen,
-	_ui_game_settings_widget_title,
-	_ui_game_settings_widget_categories,		/* the left column */
-	_ui_game_settings_widget_options,			/* the right column */
-	_ui_game_settings_widget_display,			/* the left column's rows */
-	_ui_game_settings_widget_audio,
-	_ui_game_settings_widget_input,
-	_ui_game_settings_widget_first_setting,		/* game_settings.h's, in order */
-	NUMBER_OF_UI_GAME_SETTINGS_WIDGETS = _ui_game_settings_widget_first_setting + NUMBER_OF_GAME_SETTINGS,
-	NUMBER_OF_UI_GAME_SETTINGS_CATEGORIES = _ui_game_settings_widget_input - _ui_game_settings_widget_display + 1,
-	/* DISPLAY's */
-	MAXIMUM_UI_GAME_SETTINGS_OPTIONS = 6
+	_ui_settings_widget_main_menu_item,			/* the main menu's SETTINGS */
+	_ui_settings_widget_pause_item,				/* the pause menu's SETTINGS */
+	_ui_settings_widget_menu,					/* the SETTINGS menu either opens */
+	_ui_settings_widget_menu_title,
+	_ui_settings_widget_menu_list,
+	_ui_settings_widget_profile_settings,		/* ... and its rows (PROFILE SETTINGS the main menu's only) */
+	_ui_settings_widget_video,
+	_ui_settings_widget_audio,
+	_ui_settings_widget_input,
+	_ui_settings_widget_page,					/* the page each of the last three opens */
+	_ui_settings_widget_page_title,
+	_ui_settings_widget_page_list,
+	_ui_settings_widget_first_setting,			/* ... and its rows: game_settings.h's, in order */
+	NUMBER_OF_UI_SETTINGS_WIDGETS = _ui_settings_widget_first_setting + NUMBER_OF_GAME_SETTINGS,
+	NUMBER_OF_UI_SETTINGS_CATEGORIES = _ui_settings_widget_input - _ui_settings_widget_video + 1,
+	/* the main menu's SETTINGS menu's */
+	NUMBER_OF_UI_SETTINGS_MAIN_MENU_ROWS = _ui_settings_widget_input - _ui_settings_widget_profile_settings + 1,
+	/* VIDEO SETTINGS' */
+	MAXIMUM_UI_SETTINGS_PAGE_ROWS = 6
 };
 
 enum
 {
-	_ui_game_settings_menu_main,
-	_ui_game_settings_menu_pause,
-	NUMBER_OF_UI_GAME_SETTINGS_MENUS
-};
-
-enum
-{
-	/* the right column's width: its longest label, RESOLUTION: 3840 X 2160,
-	is 244 pixels of ui\large_ui, 13 in from the main menu's rows' left,
-	more than either menu's rows (202 and 232) hold */
-	UI_GAME_SETTINGS_OPTION_WIDTH = 260,
+	/* the longest label of a setting's row, RESOLUTION: 3840 X 2160 (or
+	2560 X 1440), is 244 pixels of ui\large_ui, more than either menu's rows
+	(202 and 232) hold */
+	UI_SETTINGS_LABEL_WIDTH = 244,
+	/* ... so the pause menu's rows, which center their text, are this wide
+	(ui_settings_row_width) */
+	UI_SETTINGS_ROW_WIDTH = 260,
 
 	/* where the help screens place their box and its caption, the body
 	between the bands of its art, and where their key goes */
-	UI_GAME_SETTINGS_BOX_X = 64,
-	UI_GAME_SETTINGS_BOX_Y = 132,
-	UI_GAME_SETTINGS_BOX_CAPTION_X = 14,
-	UI_GAME_SETTINGS_BOX_CAPTION_Y = 5,
-	UI_GAME_SETTINGS_BOX_BODY_TOP = 29,
-	UI_GAME_SETTINGS_BOX_BODY_BOTTOM = 190,
-	UI_GAME_SETTINGS_BOX_KEY_Y = 195,
-	/* ... its sides' art, and the columns' room beside them (which leaves
-	10 pixels between the columns) */
-	UI_GAME_SETTINGS_BOX_SIDE = 16,
-	UI_GAME_SETTINGS_BOX_MARGIN = 4,
+	UI_SETTINGS_BOX_X = 64,
+	UI_SETTINGS_BOX_Y = 132,
+	UI_SETTINGS_BOX_CAPTION_X = 14,
+	UI_SETTINGS_BOX_CAPTION_Y = 5,
+	UI_SETTINGS_BOX_BODY_TOP = 29,
+	UI_SETTINGS_BOX_BODY_BOTTOM = 190,
+	UI_SETTINGS_BOX_KEY_Y = 195,
 	/* the pause menu's rows (27 pixels), two pixels closer than they are
-	spaced there, so that DISPLAY's six fit the body */
-	UI_GAME_SETTINGS_BOX_ROW_PITCH = 26,
-	/* ... and in the pause menu with GAME SETTINGS, five where four were, the
+	spaced there, so that VIDEO SETTINGS' six fit the body */
+	UI_SETTINGS_BOX_ROW_PITCH = 26,
+	/* ... and in the pause menu with SETTINGS, five where four were, the
 	last still above the line over the key (2 pixels clear) */
-	UI_GAME_SETTINGS_PAUSE_ROW_PITCH = 23,
+	UI_SETTINGS_PAUSE_ROW_PITCH = 23,
 
-	/* the main menu's screen: the rows where EDIT PROFILE SETTINGS has them,
-	the title's letters in line with theirs where the header was, and the
-	right column inside the description panel */
-	UI_GAME_SETTINGS_MAIN_ROWS_Y = 78,
-	UI_GAME_SETTINGS_MAIN_TITLE_Y = 27,
-	UI_GAME_SETTINGS_MAIN_PANEL_MARGIN = 10
+	/* the main menu's screens: the rows where EDIT PROFILE SETTINGS and
+	MULTIPLAYER have them, and the title's letters in line with theirs where
+	the header was */
+	UI_SETTINGS_MAIN_ROWS_Y = 78,
+	UI_SETTINGS_MAIN_TITLE_Y = 27,
+
+	/* the rows of option_bkds' texture its box takes (the main menu's
+	settings screens' rows, ui_settings_row_render) */
+	UI_SETTINGS_MENU_BOX_HEIGHT = 28
 };
 
-typedef char verify_ui_game_settings_box_rows_fit[
-	(MAXIMUM_UI_GAME_SETTINGS_OPTIONS - 1) * UI_GAME_SETTINGS_BOX_ROW_PITCH + 27 <=
-		UI_GAME_SETTINGS_BOX_BODY_BOTTOM - UI_GAME_SETTINGS_BOX_BODY_TOP ? 1 : -1];
+typedef char verify_ui_settings_box_rows_fit[
+	(MAXIMUM_UI_SETTINGS_PAGE_ROWS - 1) * UI_SETTINGS_BOX_ROW_PITCH + 27 <=
+		UI_SETTINGS_BOX_BODY_BOTTOM - UI_SETTINGS_BOX_BODY_TOP ? 1 : -1];
 
-static char const ui_game_settings_widget_names[NUMBER_OF_UI_GAME_SETTINGS_WIDGETS][32] =
+static char const ui_settings_widget_names[NUMBER_OF_UI_SETTINGS_WIDGETS][32] =
 {
-	"game_settings_item",
-	"game_settings_settings_item",
-	"game_settings_settings_menu",
-	"game_settings_settings_title",
-	"game_settings_settings_list",
-	"game_settings_profile_settings",
-	"game_settings_menu_item",
-	"game_settings_screen",
-	"game_settings_title",
-	"game_settings_categories",
-	"game_settings_options",
-	"game_settings_display",
-	"game_settings_audio",
-	"game_settings_input",
-	"game_settings_fullscreen",
-	"game_settings_resolution",
-	"game_settings_vsync",
-	"game_settings_interpolation",
-	"game_settings_direct_camera",
-	"game_settings_window_scale",
-	"game_settings_audio_enabled",
-	"game_settings_master_volume",
-	"game_settings_mouse_sensitivity",
-	"game_settings_mouse_aim_assist",
-	"game_settings_invert_mouse"
+	"settings_main_menu_item",
+	"settings_pause_item",
+	"settings_menu",
+	"settings_menu_title",
+	"settings_menu_list",
+	"settings_profile_settings",
+	"settings_video",
+	"settings_audio",
+	"settings_input",
+	"settings_page",
+	"settings_page_title",
+	"settings_page_list",
+	"setting_fullscreen",
+	"setting_resolution",
+	"setting_vsync",
+	"setting_interpolation",
+	"setting_direct_camera",
+	"setting_window_scale",
+	"setting_audio_enabled",
+	"setting_master_volume",
+	"setting_mouse_sensitivity",
+	"setting_mouse_aim_assist",
+	"setting_invert_mouse"
 };
 
-static char const *const ui_game_settings_category_labels[NUMBER_OF_UI_GAME_SETTINGS_CATEGORIES] =
+/* the SETTINGS menu's rows that open a page, and the pages' titles */
+static char const *const ui_settings_category_labels[NUMBER_OF_UI_SETTINGS_CATEGORIES] =
 {
-	"DISPLAY",
-	"AUDIO",
-	"INPUT"
+	"VIDEO SETTINGS",
+	"AUDIO SETTINGS",
+	"INPUT SETTINGS"
 };
 
+/* each setting's label, and its page (config.toml's display section is VIDEO
+SETTINGS) */
 static struct
 {
 	char const *label;
 	short category;
-} const ui_game_settings_options[NUMBER_OF_GAME_SETTINGS] =
+} const ui_settings_options[NUMBER_OF_GAME_SETTINGS] =
 {
-	{ "FULLSCREEN", _ui_game_settings_widget_display },
-	{ "RESOLUTION", _ui_game_settings_widget_display },
-	{ "VSYNC", _ui_game_settings_widget_display },
-	{ "INTERPOLATION", _ui_game_settings_widget_display },
-	{ "DIRECT CAMERA", _ui_game_settings_widget_display },
-	{ "WINDOW SCALE", _ui_game_settings_widget_display },
-	{ "AUDIO", _ui_game_settings_widget_audio },
-	{ "MASTER VOLUME", _ui_game_settings_widget_audio },
-	{ "MOUSE SENSITIVITY", _ui_game_settings_widget_input },
-	{ "MOUSE AIM ASSIST", _ui_game_settings_widget_input },
-	{ "INVERT MOUSE", _ui_game_settings_widget_input }
+	{ "FULLSCREEN", _ui_settings_widget_video },
+	{ "RESOLUTION", _ui_settings_widget_video },
+	{ "VSYNC", _ui_settings_widget_video },
+	{ "INTERPOLATION", _ui_settings_widget_video },
+	{ "DIRECT CAMERA", _ui_settings_widget_video },
+	{ "WINDOW SCALE", _ui_settings_widget_video },
+	{ "AUDIO", _ui_settings_widget_audio },
+	{ "MASTER VOLUME", _ui_settings_widget_audio },
+	{ "MOUSE SENSITIVITY", _ui_settings_widget_input },
+	{ "MOUSE AIM ASSIST", _ui_settings_widget_input },
+	{ "INVERT MOUSE", _ui_settings_widget_input }
 };
 
-static short ui_game_settings_widget_get(
+static short ui_settings_widget_get(
 	struct widget_instance const *widget)
 {
 	short index;
 
-	for (index = 0; index < NUMBER_OF_UI_GAME_SETTINGS_WIDGETS; index++)
+	for (index = 0; index < NUMBER_OF_UI_SETTINGS_WIDGETS; index++)
 	{
-		if (widget->name == ui_game_settings_widget_names[index])
+		if (widget->name == ui_settings_widget_names[index])
 			return index;
 	}
 
 	return NONE;
 }
 
-/* a setting's row whose setting is a number */
-static boolean ui_game_settings_row_is_number(
+/* a setting's row whose setting is a number (or the resolution) */
+static boolean ui_settings_row_is_number(
 	struct widget_instance const *widget)
 {
-	short game_settings_widget = ui_game_settings_widget_get(widget);
+	short settings_widget = ui_settings_widget_get(widget);
 
-	return game_settings_widget >= _ui_game_settings_widget_first_setting &&
-		!game_setting_is_switch(game_settings_widget - _ui_game_settings_widget_first_setting);
+	return settings_widget >= _ui_settings_widget_first_setting &&
+		!game_setting_is_switch(settings_widget - _ui_settings_widget_first_setting);
 }
 
-/* the code's text for a text box of GAME SETTINGS'; FALSE for any other */
-static boolean ui_game_settings_widget_set_text(
+/* whether a widget is the pause menu's, or of a screen made of it */
+static boolean ui_settings_in_pause_menu(
 	struct widget_instance *widget)
 {
-	short game_settings_widget = ui_game_settings_widget_get(widget);
+	return widget_instance_get_topmost_parent(widget)->definition_tag_index ==
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PAUSE_TAG("pause_game"));
+}
+
+/* a child of the screen's, by its name, or NULL */
+static struct widget_instance *ui_settings_child(
+	struct widget_instance *screen,
+	short settings_widget)
+{
+	struct widget_instance *child;
+
+	for (child = screen->child; child; child = child->next)
+	{
+		if (ui_settings_widget_get(child) == settings_widget)
+			break;
+	}
+
+	return child;
+}
+
+/* the page a widget is on: its rows', or NONE */
+static short ui_settings_page_category(
+	struct widget_instance *widget)
+{
+	struct widget_instance *list = ui_settings_child(
+		widget_instance_get_topmost_parent(widget),
+		_ui_settings_widget_page_list);
+	short row = list && list->child ? ui_settings_widget_get(list->child) : NONE;
+
+	return row >= _ui_settings_widget_first_setting ?
+		ui_settings_options[row - _ui_settings_widget_first_setting].category :
+		NONE;
+}
+
+/* the code's text for a text box of the settings screens'; FALSE for any
+other */
+static boolean ui_settings_widget_set_text(
+	struct widget_instance *widget)
+{
+	short settings_widget = ui_settings_widget_get(widget);
 	char text[64];
 	unsigned long size;
 
-	/* (the main menu's SETTINGS keeps its own) */
-	if (game_settings_widget == NONE ||
-		game_settings_widget == _ui_game_settings_widget_settings_item ||
-		widget->type != _ui_widget_type_text_box)
-	{
+	if (settings_widget == NONE || widget->type != _ui_widget_type_text_box)
 		return FALSE;
-	}
-	if (game_settings_widget >= _ui_game_settings_widget_first_setting)
+	if (settings_widget >= _ui_settings_widget_first_setting)
 	{
-		short setting = game_settings_widget - _ui_game_settings_widget_first_setting;
+		short setting = settings_widget - _ui_settings_widget_first_setting;
 		char value[16];
 
 		game_setting_text(setting, value, sizeof(value));
-		csstrcpy(text, ui_game_settings_options[setting].label);
+		csstrcpy(text, ui_settings_options[setting].label);
 		csstrcat(text, ": ");
 		csstrcat(text, value);
 	}
-	else if (game_settings_widget >= _ui_game_settings_widget_display)
+	else if (settings_widget >= _ui_settings_widget_video && settings_widget <= _ui_settings_widget_input)
 	{
-		csstrcpy(text, ui_game_settings_category_labels[game_settings_widget - _ui_game_settings_widget_display]);
+		csstrcpy(text, ui_settings_category_labels[settings_widget - _ui_settings_widget_video]);
 	}
-	else if (game_settings_widget == _ui_game_settings_widget_settings_title)
+	else if (settings_widget == _ui_settings_widget_page_title)
 	{
-		csstrcpy(text, "SETTINGS");
+		short category = ui_settings_page_category(widget);
+
+		csstrcpy(text, category == NONE ? "" : ui_settings_category_labels[category - _ui_settings_widget_video]);
 	}
-	else if (game_settings_widget == _ui_game_settings_widget_profile_settings)
+	else if (settings_widget == _ui_settings_widget_profile_settings)
 	{
 		csstrcpy(text, "PROFILE SETTINGS");
 	}
+	else if (settings_widget == _ui_settings_widget_pause_item || settings_widget == _ui_settings_widget_menu_title)
+	{
+		csstrcpy(text, "SETTINGS");
+	}
 	else
 	{
-		csstrcpy(text, "GAME SETTINGS");
+		/* (the main menu's SETTINGS keeps its own) */
+		return FALSE;
 	}
 	size = 2 * csstrlen(text) + 2;
 	widget->parameters.text_box.text = pool_resize_pointer(
@@ -5509,22 +5544,38 @@ static boolean ui_game_settings_widget_set_text(
 	return TRUE;
 }
 
+/* the width of a setting's row drawn from a tag: the pause menu's rows
+center their text in UI_SETTINGS_ROW_WIDTH; the main menu's begin it the
+tag's text offset in from the left, and end as far past the longest label,
+where the box that lights them closes (ui_settings_row_render) */
+static short ui_settings_row_width(
+	long tag_index)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(tag_index);
+
+	return definition->justification == _text_justification_left ?
+		UI_SETTINGS_LABEL_WIDTH + 2 * definition->horizontal_offset :
+		UI_SETTINGS_ROW_WIDTH;
+}
+
 /* the bounds of a setting's row, wider than its tag's */
-static void ui_game_settings_row_widen(
+static void ui_settings_row_widen(
 	struct widget_instance const *widget,
 	rectangle2d *bounds)
 {
-	if (ui_game_settings_widget_get(widget) >= _ui_game_settings_widget_first_setting &&
-		bounds->x1 - bounds->x0 < UI_GAME_SETTINGS_OPTION_WIDTH)
+	if (ui_settings_widget_get(widget) >= _ui_settings_widget_first_setting)
 	{
-		bounds->x1 = bounds->x0 + UI_GAME_SETTINGS_OPTION_WIDTH;
+		short width = ui_settings_row_width(widget->definition_tag_index);
+
+		if (bounds->x1 - bounds->x0 < width)
+			bounds->x1 = bounds->x0 + width;
 	}
 
 	return;
 }
 
 /* the widget, or one under it, drawn from the tag of that name, or NULL */
-static struct widget_instance *ui_game_settings_find(
+static struct widget_instance *ui_settings_find(
 	struct widget_instance *widget,
 	char const *tag_name)
 {
@@ -5533,60 +5584,39 @@ static struct widget_instance *ui_game_settings_find(
 	return tag_index == NONE ? NULL : widget_instance_find_by_tag_index_recursive(widget, tag_index);
 }
 
-/* a child of the screen's, by its GAME SETTINGS name, or NULL */
-static struct widget_instance *ui_game_settings_child(
-	struct widget_instance *screen,
-	short game_settings_widget)
-{
-	struct widget_instance *child;
-
-	for (child = screen->child; child; child = child->next)
-	{
-		if (ui_game_settings_widget_get(child) == game_settings_widget)
-			break;
-	}
-
-	return child;
-}
-
-/* which menu offering GAME SETTINGS a screen is, or NONE */
-static short ui_game_settings_menu_get(
-	struct widget_instance const *root)
-{
-	if (ui_settings_menu_is(root))
-		return _ui_game_settings_menu_main;
-	if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_PAUSE_TAG("pause_game")))
-		return _ui_game_settings_menu_pause;
-
-	return NONE;
-}
-
-/* whether a screen is the SETTINGS menu */
+/* whether a screen is a SETTINGS menu */
 static boolean ui_settings_menu_is(
 	struct widget_instance const *widget)
 {
-	return ui_game_settings_widget_get(widget) == _ui_game_settings_widget_settings_menu;
+	return ui_settings_widget_get(widget) == _ui_settings_widget_menu;
 }
 
-/* whether a widget is (or is under) the SETTINGS menu, as it loads */
+/* whether a widget is (or is under) a SETTINGS menu, as it loads: the screen
+of MULTIPLAYER's or the pause menu's tag that ui_settings_menu_open (or the
+history) loads */
 static boolean ui_settings_menu_loads(
 	struct widget_instance *widget)
 {
-	return ui_settings_menu_loading &&
-		widget_instance_get_topmost_parent(widget)->definition_tag_index ==
-			tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen"));
+	long tag_index;
+
+	if (!ui_settings_menu_loading)
+		return FALSE;
+	tag_index = widget_instance_get_topmost_parent(widget)->definition_tag_index;
+
+	return tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen")) ||
+		tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PAUSE_TAG("pause_game"));
 }
 
 /* a widget for a parent, drawn from a tag without its created handlers, not
 yet among its children */
-static struct widget_instance *ui_game_settings_load(
+static struct widget_instance *ui_settings_load(
 	struct widget_instance *parent,
 	long tag_index)
 {
-	boolean loading = ui_game_settings_loading;
+	boolean loading = ui_settings_loading;
 	struct widget_instance *widget;
 
-	ui_game_settings_loading = TRUE;
+	ui_settings_loading = TRUE;
 	widget = ui_widget_load_by_name_or_tag(
 		NULL,
 		tag_index,
@@ -5595,24 +5625,24 @@ static struct widget_instance *ui_game_settings_load(
 		NONE,
 		NONE,
 		NONE);
-	ui_game_settings_loading = loading;
+	ui_settings_loading = loading;
 
 	return widget;
 }
 
-/* ... one of GAME SETTINGS' own, at a place in the parent */
-static struct widget_instance *ui_game_settings_widget_new(
+/* ... one of the settings screens' own, at a place in the parent */
+static struct widget_instance *ui_settings_widget_new(
 	struct widget_instance *parent,
 	long tag_index,
-	short game_settings_widget,
+	short settings_widget,
 	short horizontal_offset,
 	short vertical_offset)
 {
-	struct widget_instance *widget = ui_game_settings_load(parent, tag_index);
+	struct widget_instance *widget = ui_settings_load(parent, tag_index);
 
 	if (widget)
 	{
-		widget->name = ui_game_settings_widget_names[game_settings_widget];
+		widget->name = ui_settings_widget_names[settings_widget];
 		widget->horizontal_offset = horizontal_offset;
 		widget->vertical_offset = vertical_offset;
 	}
@@ -5621,7 +5651,7 @@ static struct widget_instance *ui_game_settings_widget_new(
 }
 
 /* links a widget made for a parent in among its children, after one */
-static void ui_game_settings_insert_after(
+static void ui_settings_insert_after(
 	struct widget_instance *sibling,
 	struct widget_instance *widget)
 {
@@ -5635,7 +5665,7 @@ static void ui_game_settings_insert_after(
 }
 
 /* deletes a widget's children, and a list's extended description */
-static void ui_game_settings_empty(
+static void ui_settings_empty(
 	struct widget_instance *widget)
 {
 	widget->focused_child = NULL;
@@ -5651,14 +5681,27 @@ static void ui_game_settings_empty(
 	return;
 }
 
-/* the pause menu's GAME SETTINGS row, after RESUME GAME's, drawn from its tag:
+/* the focus on a list's row */
+static void ui_settings_focus(
+	struct widget_instance *screen,
+	struct widget_instance *list,
+	struct widget_instance *row)
+{
+	screen->focused_child = list;
+	list->focused_child = row;
+	list->parameters.list.selected_index = (short)widget_instance_get_child_index_from_parent(row);
+
+	return;
+}
+
+/* the pause menu's SETTINGS row, after RESUME GAME's, drawn from its tag:
 five rows where four were */
-static void ui_game_settings_pause_item_add(
+static void ui_settings_pause_item_add(
 	struct widget_instance *root)
 {
-	struct widget_instance *list = ui_game_settings_find(root, UI_GAME_SETTINGS_PAUSE_TAG("pause_list"));
+	struct widget_instance *list = ui_settings_find(root, UI_SETTINGS_PAUSE_TAG("pause_list"));
 	struct widget_instance *after = list && list->type == _ui_widget_type_column_list ?
-		ui_game_settings_find(list, UI_GAME_SETTINGS_PAUSE_TAG("resume_game_button")) :
+		ui_settings_find(list, UI_SETTINGS_PAUSE_TAG("resume_game_button")) :
 		NULL;
 	struct widget_instance *item;
 	struct widget_instance *row;
@@ -5667,45 +5710,45 @@ static void ui_game_settings_pause_item_add(
 
 	if (!after || after->parent != list || after->type != _ui_widget_type_text_box)
 		return;
-	item = ui_game_settings_widget_new(
+	item = ui_settings_widget_new(
 		list,
 		after->definition_tag_index,
-		_ui_game_settings_widget_item,
+		_ui_settings_widget_pause_item,
 		after->horizontal_offset,
 		after->vertical_offset);
 	if (!item)
 		return;
-	ui_game_settings_insert_after(after, item);
+	ui_settings_insert_after(after, item);
 	top = list->child->vertical_offset;
 	for (row = list->child; row; row = row->next)
-		row->vertical_offset = top + index++ * UI_GAME_SETTINGS_PAUSE_ROW_PITCH;
+		row->vertical_offset = top + index++ * UI_SETTINGS_PAUSE_ROW_PITCH;
 
 	return;
 }
 
 /* the main menu's SETTINGS, to open the SETTINGS menu (where the screen it
 is made of is there to make it) */
-static void ui_settings_menu_item_mark(
+static void ui_settings_main_menu_item_mark(
 	struct widget_instance *root)
 {
-	struct widget_instance *list = ui_game_settings_find(root, UI_GAME_SETTINGS_MAIN_MENU_TAG("main_menu_select_list"));
+	struct widget_instance *list = ui_settings_find(root, UI_SETTINGS_MAIN_MENU_TAG("main_menu_select_list"));
 	struct widget_instance *item = list ?
-		ui_game_settings_find(list, UI_GAME_SETTINGS_MAIN_MENU_TAG("main_menu_item_settings")) :
+		ui_settings_find(list, UI_SETTINGS_MAIN_MENU_TAG("main_menu_item_settings")) :
 		NULL;
 
 	if (item &&
 		item->parent == list &&
-		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen")) != NONE)
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen")) != NONE)
 	{
-		item->name = ui_game_settings_widget_names[_ui_game_settings_widget_settings_item];
+		item->name = ui_settings_widget_names[_ui_settings_widget_main_menu_item];
 	}
 
 	return;
 }
 
-/* a column's rows, from the tag of the other column's first, by the place of
-its rows, and the spacing between them */
-static void ui_game_settings_rows_add(
+/* a list's rows, from a tag, by the place of its first row and the spacing
+between them */
+static void ui_settings_rows_add(
 	struct widget_instance *list,
 	long tag_index,
 	short horizontal_offset,
@@ -5718,7 +5761,7 @@ static void ui_game_settings_rows_add(
 
 	for (index = 0; index < count; index++)
 	{
-		struct widget_instance *row = ui_game_settings_widget_new(
+		struct widget_instance *row = ui_settings_widget_new(
 			list,
 			tag_index,
 			first_widget + index,
@@ -5732,433 +5775,243 @@ static void ui_game_settings_rows_add(
 	return;
 }
 
-/* a second list for the right column, from the left's tag, without its rows */
-static struct widget_instance *ui_game_settings_options_new(
+/* the pause menu as one of the settings screens: in the help screens' box,
+with its caption for the title, in place of its own two boxes, and its key
+under the box. Returns its list, emptied for the screen's rows, or NULL */
+static struct widget_instance *ui_settings_lay_out_pause(
 	struct widget_instance *screen,
-	struct widget_instance *categories)
+	short title_widget)
 {
-	struct widget_instance *options = ui_game_settings_widget_new(
-		screen,
-		categories->definition_tag_index,
-		_ui_game_settings_widget_options,
-		categories->horizontal_offset,
-		categories->vertical_offset);
-
-	if (options)
-	{
-		ui_game_settings_empty(options);
-		ui_game_settings_insert_after(categories, options);
-	}
-
-	return options;
-}
-
-/* the pause menu as GAME SETTINGS: in the help screens' box, with its caption
-for the title, its key, and the columns side by side in its body */
-static boolean ui_game_settings_lay_out_pause(
-	struct widget_instance *screen,
-	struct widget_instance *categories,
-	long row_tag_index)
-{
-	struct widget_instance *background = ui_game_settings_find(screen, UI_GAME_SETTINGS_PAUSE_TAG("pause_dialog_bkd"));
-	struct widget_instance *caption = ui_game_settings_find(screen, UI_GAME_SETTINGS_PAUSE_TAG("mission_objectives_caption"));
-	struct widget_instance *objective = ui_game_settings_find(screen, UI_GAME_SETTINGS_PAUSE_TAG("mission_objective_text"));
-	struct widget_instance *key = ui_game_settings_find(screen, UI_GAME_SETTINGS_MAIN_MENU_TAG("button_key_sm"));
+	struct widget_instance *background = ui_settings_find(screen, UI_SETTINGS_PAUSE_TAG("pause_dialog_bkd"));
+	struct widget_instance *caption = ui_settings_find(screen, UI_SETTINGS_PAUSE_TAG("mission_objectives_caption"));
+	struct widget_instance *objective = ui_settings_find(screen, UI_SETTINGS_PAUSE_TAG("mission_objective_text"));
+	struct widget_instance *key = ui_settings_find(screen, UI_SETTINGS_MAIN_MENU_TAG("button_key_sm"));
+	struct widget_instance *list = ui_settings_find(screen, UI_SETTINGS_PAUSE_TAG("pause_list"));
 	long box_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\player_help\\help_dialog_bkd");
-	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
 	struct widget_instance *box;
-	struct widget_instance *options;
 	rectangle2d box_bounds;
 	rectangle2d key_bounds;
-	short box_width;
 
 	if (!background ||
 		!caption ||
 		caption->type != _ui_widget_type_text_box ||
 		!objective ||
 		!key ||
+		!list ||
+		list->parent != screen ||
+		list->type != _ui_widget_type_column_list ||
 		box_tag_index == NONE)
 	{
-		return FALSE;
+		return NULL;
 	}
-	box = ui_game_settings_load(screen, box_tag_index);
+	box = ui_settings_load(screen, box_tag_index);
 	if (!box)
-		return FALSE;
-	/* (in place of the pause menu's two boxes, drawn before what is on it) */
-	box->horizontal_offset = UI_GAME_SETTINGS_BOX_X;
-	box->vertical_offset = UI_GAME_SETTINGS_BOX_Y;
-	ui_game_settings_insert_after(background, box);
+		return NULL;
+	/* (drawn before what is on it) */
+	box->horizontal_offset = UI_SETTINGS_BOX_X;
+	box->vertical_offset = UI_SETTINGS_BOX_Y;
+	ui_settings_insert_after(background, box);
 	background->visible = FALSE;
 	objective->visible = FALSE;
 	box_bounds = ui_widget_definition_get(box_tag_index)->bounds;
 	key_bounds = ui_widget_definition_get(key->definition_tag_index)->bounds;
-	box_width = box_bounds.x1 - box_bounds.x0;
-	caption->name = ui_game_settings_widget_names[_ui_game_settings_widget_title];
-	caption->horizontal_offset = UI_GAME_SETTINGS_BOX_X + UI_GAME_SETTINGS_BOX_CAPTION_X;
-	caption->vertical_offset = UI_GAME_SETTINGS_BOX_Y + UI_GAME_SETTINGS_BOX_CAPTION_Y;
-	key->horizontal_offset = UI_GAME_SETTINGS_BOX_X + (box_width - (key_bounds.x1 - key_bounds.x0)) / 2;
-	key->vertical_offset = UI_GAME_SETTINGS_BOX_Y + UI_GAME_SETTINGS_BOX_KEY_Y;
-	/* the left column against the box's left side, the right against its
-	right, the tallest in the middle of its body */
-	categories->horizontal_offset = UI_GAME_SETTINGS_BOX_X + UI_GAME_SETTINGS_BOX_SIDE + UI_GAME_SETTINGS_BOX_MARGIN -
-		row_bounds.x0;
-	categories->vertical_offset = UI_GAME_SETTINGS_BOX_Y + UI_GAME_SETTINGS_BOX_BODY_TOP - row_bounds.y0 +
-		(UI_GAME_SETTINGS_BOX_BODY_BOTTOM - UI_GAME_SETTINGS_BOX_BODY_TOP -
-			((MAXIMUM_UI_GAME_SETTINGS_OPTIONS - 1) * UI_GAME_SETTINGS_BOX_ROW_PITCH + (row_bounds.y1 - row_bounds.y0))) / 2;
-	ui_game_settings_rows_add(
-		categories,
-		row_tag_index,
-		0,
-		0,
-		UI_GAME_SETTINGS_BOX_ROW_PITCH,
-		_ui_game_settings_widget_display,
-		NUMBER_OF_UI_GAME_SETTINGS_CATEGORIES);
-	options = ui_game_settings_options_new(screen, categories);
-	if (!options)
-		return FALSE;
-	options->horizontal_offset = UI_GAME_SETTINGS_BOX_X + box_width - UI_GAME_SETTINGS_BOX_SIDE -
-		UI_GAME_SETTINGS_BOX_MARGIN - UI_GAME_SETTINGS_OPTION_WIDTH - row_bounds.x0;
+	caption->name = ui_settings_widget_names[title_widget];
+	caption->horizontal_offset = UI_SETTINGS_BOX_X + UI_SETTINGS_BOX_CAPTION_X;
+	caption->vertical_offset = UI_SETTINGS_BOX_Y + UI_SETTINGS_BOX_CAPTION_Y;
+	key->horizontal_offset = UI_SETTINGS_BOX_X + ((box_bounds.x1 - box_bounds.x0) - (key_bounds.x1 - key_bounds.x0)) / 2;
+	key->vertical_offset = UI_SETTINGS_BOX_Y + UI_SETTINGS_BOX_KEY_Y;
+	ui_settings_empty(list);
 
-	return TRUE;
+	return list;
 }
 
-/* ADVANCED CONTROLS' screen as GAME SETTINGS: a title in place of its header,
-the left column where its list was, with EDIT PROFILE SETTINGS' rows, the
-right in EDIT PROFILE SETTINGS' description panel, and its key, which
-selects rather than accepts */
-static boolean ui_game_settings_lay_out_main_menu(
-	struct widget_instance *screen,
-	struct widget_instance *categories,
-	long row_tag_index)
-{
-	struct widget_instance *header = ui_game_settings_find(screen, UI_GAME_SETTINGS_ADVANCED_TAG("header_advanced_controls"));
-	struct widget_instance *accept = ui_game_settings_find(screen, UI_GAME_SETTINGS_MAIN_MENU_TAG("=accept_new"));
-	long panel_tag_index = tag_loaded(
-		UI_WIDGET_DEFINITION_TAG,
-		UI_GAME_SETTINGS_PROFILE_TAG("profile_edit_extended_description"));
-	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
-	short row_height = row_bounds.y1 - row_bounds.y0;
-	struct widget_instance *title;
-	struct widget_instance *panel;
-	struct widget_instance *options;
-	rectangle2d panel_bounds;
-
-	if (!header ||
-		!accept ||
-		accept->type != _ui_widget_type_text_box ||
-		panel_tag_index == NONE)
-	{
-		return FALSE;
-	}
-	header->visible = FALSE;
-	/* (=SELECT, from the key's own strings) */
-	accept->parameters.text_box.string_list_index = 1;
-	title = ui_game_settings_widget_new(
-		screen,
-		row_tag_index,
-		_ui_game_settings_widget_title,
-		0,
-		UI_GAME_SETTINGS_MAIN_TITLE_Y - row_bounds.y0);
-	if (!title)
-		return FALSE;
-	ui_widget_add_child(screen, title);
-	categories->horizontal_offset = 0;
-	categories->vertical_offset = 0;
-	ui_game_settings_rows_add(
-		categories,
-		row_tag_index,
-		0,
-		UI_GAME_SETTINGS_MAIN_ROWS_Y - row_bounds.y0,
-		row_height,
-		_ui_game_settings_widget_display,
-		NUMBER_OF_UI_GAME_SETTINGS_CATEGORIES);
-	options = ui_game_settings_options_new(screen, categories);
-	if (!options)
-		return FALSE;
-	panel = ui_game_settings_load(screen, panel_tag_index);
-	if (!panel)
-		return FALSE;
-	/* (only the panel's art, drawn before the right column) */
-	ui_game_settings_empty(panel);
-	ui_game_settings_insert_after(categories, panel);
-	panel_bounds = ui_widget_definition_get(panel_tag_index)->bounds;
-	options->horizontal_offset = panel_bounds.x0 - row_bounds.x0 +
-		((panel_bounds.x1 - panel_bounds.x0) - UI_GAME_SETTINGS_OPTION_WIDTH) / 2;
-	options->vertical_offset = UI_GAME_SETTINGS_MAIN_PANEL_MARGIN;
-
-	return TRUE;
-}
-
-/* the left column's selected category's settings in the right column, and
-the rows lit: the left column's selected one always, the right column's
-focused one while it has the focus */
-static void ui_game_settings_sync(
-	struct widget_instance *screen)
-{
-	struct widget_instance *categories = ui_game_settings_child(screen, _ui_game_settings_widget_categories);
-	struct widget_instance *options = ui_game_settings_child(screen, _ui_game_settings_widget_options);
-	struct widget_instance *row;
-	short shown;
-	short selected;
-
-	if (!categories || !options || !categories->child || !categories->child->next)
-		return;
-	shown = options->child ?
-		ui_game_settings_options[ui_game_settings_widget_get(options->child) - _ui_game_settings_widget_first_setting].category :
-		NONE;
-	/* (the mouse's focus on a setting takes the focus from the categories) */
-	if (!categories->focused_child)
-	{
-		for (row = categories->child; row; row = row->next)
-		{
-			if (ui_game_settings_widget_get(row) == shown)
-				break;
-		}
-		categories->focused_child = row ? row : categories->child;
-	}
-	selected = ui_game_settings_widget_get(categories->focused_child);
-	if (selected != shown)
-	{
-		short setting;
-		short count = 0;
-
-		ui_game_settings_empty(options);
-		for (setting = 0; setting < NUMBER_OF_GAME_SETTINGS; setting++)
-		{
-			if (ui_game_settings_options[setting].category != selected)
-				continue;
-			/* (placed as the left column's rows are) */
-			ui_game_settings_rows_add(
-				options,
-				categories->child->definition_tag_index,
-				categories->child->horizontal_offset,
-				categories->child->vertical_offset +
-					count++ * (categories->child->next->vertical_offset - categories->child->vertical_offset),
-				0,
-				_ui_game_settings_widget_first_setting + setting,
-				1);
-		}
-	}
-	if (screen->focused_child != options)
-		options->focused_child = NULL;
-	for (row = categories->child; row; row = row->next)
-		row->animation.current_frame_index = row == categories->focused_child && row->animation.number_of_sprite_frames == 2;
-	for (row = options->child; row; row = row->next)
-		row->animation.current_frame_index = row == options->focused_child && row->animation.number_of_sprite_frames == 2;
-
-	return;
-}
-
-/* the focus on a column's row */
-static void ui_game_settings_focus(
-	struct widget_instance *screen,
+/* the rows of a list of the pause menu's settings screens, drawn from the
+pause menu's rows' tag, in the middle of the help screens' box */
+static void ui_settings_pause_rows_add(
 	struct widget_instance *list,
-	struct widget_instance *row)
+	long row_tag_index,
+	short first_widget,
+	short count,
+	short width)
 {
-	screen->focused_child = list;
-	list->focused_child = row;
-	list->parameters.list.selected_index = (short)widget_instance_get_child_index_from_parent(row);
+	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
+	rectangle2d box_bounds = ui_widget_definition_get(
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\player_help\\help_dialog_bkd"))->bounds;
+
+	list->horizontal_offset = UI_SETTINGS_BOX_X + ((box_bounds.x1 - box_bounds.x0) - width) / 2 - row_bounds.x0;
+	list->vertical_offset = UI_SETTINGS_BOX_Y + UI_SETTINGS_BOX_BODY_TOP - row_bounds.y0 +
+		(UI_SETTINGS_BOX_BODY_BOTTOM - UI_SETTINGS_BOX_BODY_TOP -
+			((count - 1) * UI_SETTINGS_BOX_ROW_PITCH + (row_bounds.y1 - row_bounds.y0))) / 2;
+	ui_settings_rows_add(list, row_tag_index, 0, 0, UI_SETTINGS_BOX_ROW_PITCH, first_widget, count);
 
 	return;
 }
 
-/* GAME SETTINGS in place of the menu that offers it */
-static boolean ui_game_settings_open(
-	struct widget_instance *item,
-	boolean *widget_deleted)
-{
-	struct widget_instance *root = widget_instance_get_topmost_parent(item);
-	short menu = ui_game_settings_menu_get(root);
-	long screen_tag_index = menu == _ui_game_settings_menu_pause ?
-		root->definition_tag_index :
-		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_ADVANCED_TAG("advanced_controls_screen"));
-	long list_tag_index = menu == _ui_game_settings_menu_pause ?
-		item->parent->definition_tag_index :
-		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_ADVANCED_TAG("advanced_controls_menu"));
-	long row_tag_index = menu == _ui_game_settings_menu_pause ?
-		item->definition_tag_index :
-		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_PROFILE_TAG("color_profile_item"));
-	struct widget_instance *screen;
-	struct widget_instance *categories;
-	boolean laid_out = FALSE;
-
-	if (menu == NONE || screen_tag_index == NONE || list_tag_index == NONE || row_tag_index == NONE)
-		return FALSE;
-	/* (this deletes the menu, and the item with it) */
-	ui_game_settings_loading = TRUE;
-	screen = ui_widget_launch_widget(item, screen_tag_index);
-	ui_game_settings_loading = FALSE;
-	if (!screen)
-		return FALSE;
-	*widget_deleted = TRUE;
-	screen->name = ui_game_settings_widget_names[_ui_game_settings_widget_screen];
-	categories = widget_instance_find_by_tag_index_recursive(screen, list_tag_index);
-	if (categories && categories->parent == screen && categories->type == _ui_widget_type_column_list)
-	{
-		categories->name = ui_game_settings_widget_names[_ui_game_settings_widget_categories];
-		ui_game_settings_empty(categories);
-		laid_out = menu == _ui_game_settings_menu_pause ?
-			ui_game_settings_lay_out_pause(screen, categories, row_tag_index) :
-			ui_game_settings_lay_out_main_menu(screen, categories, row_tag_index);
-	}
-	if (!laid_out || !categories->child)
-	{
-		error(_error_silent, "failed to load GAME SETTINGS");
-		widget_instance_go_back_to_previous(screen);
-
-		return FALSE;
-	}
-	ui_game_settings_focus(screen, categories, categories->child);
-	ui_game_settings_sync(screen);
-
-	return TRUE;
-}
-
-/* B, BACK and START on the screen: from the right column to the left, from
-the left to the menu before */
-static short ui_game_settings_back(
-	struct widget_instance *screen,
-	boolean *widget_deleted)
-{
-	struct widget_instance *categories = ui_game_settings_child(screen, _ui_game_settings_widget_categories);
-	struct widget_instance *options = ui_game_settings_child(screen, _ui_game_settings_widget_options);
-
-	if (categories && categories->focused_child && options && screen->focused_child == options)
-	{
-		ui_game_settings_focus(screen, categories, categories->focused_child);
-		options->focused_child = NULL;
-	}
-	else
-	{
-		widget_instance_go_back_to_previous(screen);
-		*widget_deleted = TRUE;
-	}
-
-	return _ui_audio_feedback_back;
-}
-
-/* MULTIPLAYER's screen of choices as the SETTINGS menu: a title in place of
-its header, where GAME SETTINGS has its own, its first two rows as PROFILE
-SETTINGS and GAME SETTINGS, and neither the line under its third row nor its
-description panel, which tells of MULTIPLAYER's rows */
-static boolean ui_settings_menu_lay_out(
+/* MULTIPLAYER's screen of choices as the main menu's SETTINGS menu: a title
+in place of its header, its four rows as PROFILE, VIDEO, AUDIO and INPUT
+SETTINGS, one under the other, and neither the line over its last row nor
+its description panel, which tells of MULTIPLAYER's rows */
+static boolean ui_settings_menu_lay_out_main(
 	struct widget_instance *screen)
 {
-	struct widget_instance *header = ui_game_settings_find(screen, UI_GAME_SETTINGS_MULTIPLAYER_TAG("header_multiplayer"));
-	struct widget_instance *line = ui_game_settings_find(screen, UI_GAME_SETTINGS_MAIN_MENU_TAG("blueline"));
-	struct widget_instance *list = ui_game_settings_find(screen, UI_GAME_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_list"));
-	struct widget_instance *profile_settings;
-	struct widget_instance *game_settings;
+	struct widget_instance *header = ui_settings_find(screen, UI_SETTINGS_MULTIPLAYER_TAG("header_multiplayer"));
+	struct widget_instance *line = ui_settings_find(screen, UI_SETTINGS_MAIN_MENU_TAG("blueline"));
+	struct widget_instance *list = ui_settings_find(screen, UI_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_list"));
+	struct widget_instance *row;
+	struct widget_instance *last = NULL;
 	struct widget_instance *title;
+	short count = 0;
+	short top;
+	short pitch;
 
-	if (!header ||
-		!list ||
-		list->parent != screen ||
-		list->type != _ui_widget_type_column_list ||
-		!list->child ||
-		!list->child->next ||
-		list->child->type != _ui_widget_type_text_box ||
-		list->child->next->type != _ui_widget_type_text_box)
-	{
+	if (!header || !list || list->parent != screen || list->type != _ui_widget_type_column_list)
 		return FALSE;
+	for (row = list->child; row && count < NUMBER_OF_UI_SETTINGS_MAIN_MENU_ROWS; row = row->next, count++)
+	{
+		if (row->type != _ui_widget_type_text_box)
+			return FALSE;
+		last = row;
 	}
-	profile_settings = list->child;
-	game_settings = profile_settings->next;
-	title = ui_game_settings_widget_new(
+	if (count < NUMBER_OF_UI_SETTINGS_MAIN_MENU_ROWS)
+		return FALSE;
+	/* (the first two rows as MULTIPLAYER spaces them) */
+	row = list->child->next;
+	top = ui_widget_definition_get(list->child->definition_tag_index)->bounds.y0 + list->child->vertical_offset;
+	pitch = ui_widget_definition_get(row->definition_tag_index)->bounds.y0 + row->vertical_offset - top;
+	title = ui_settings_widget_new(
 		screen,
-		game_settings->definition_tag_index,
-		_ui_game_settings_widget_settings_title,
+		row->definition_tag_index,
+		_ui_settings_widget_menu_title,
 		0,
-		UI_GAME_SETTINGS_MAIN_TITLE_Y - ui_widget_definition_get(game_settings->definition_tag_index)->bounds.y0);
+		UI_SETTINGS_MAIN_TITLE_Y - ui_widget_definition_get(row->definition_tag_index)->bounds.y0);
 	if (!title)
 		return FALSE;
 	ui_widget_add_child(screen, title);
-	screen->name = ui_game_settings_widget_names[_ui_game_settings_widget_settings_menu];
 	header->visible = FALSE;
 	if (line)
 		line->visible = FALSE;
-	list->name = ui_game_settings_widget_names[_ui_game_settings_widget_settings_list];
 	list->focused_child = NULL;
-	while (game_settings->next)
-		ui_widget_delete(game_settings->next);
+	while (last->next)
+		ui_widget_delete(last->next);
 	if (list->parameters.list.extended_description)
 	{
 		ui_widget_delete(list->parameters.list.extended_description);
 		list->parameters.list.extended_description = NULL;
 	}
-	profile_settings->name = ui_game_settings_widget_names[_ui_game_settings_widget_profile_settings];
-	game_settings->name = ui_game_settings_widget_names[_ui_game_settings_widget_settings_menu_item];
-	ui_game_settings_focus(screen, list, profile_settings);
+	for (row = list->child, count = 0; row; row = row->next, count++)
+	{
+		row->name = ui_settings_widget_names[_ui_settings_widget_profile_settings + count];
+		row->vertical_offset = top + count * pitch - ui_widget_definition_get(row->definition_tag_index)->bounds.y0;
+	}
+	list->name = ui_settings_widget_names[_ui_settings_widget_menu_list];
+	screen->name = ui_settings_widget_names[_ui_settings_widget_menu];
+	ui_settings_focus(screen, list, list->child);
 
 	return TRUE;
 }
 
-enum
+/* the pause menu as its SETTINGS menu: VIDEO, AUDIO and INPUT SETTINGS in the
+help screens' box, under the title */
+static boolean ui_settings_menu_lay_out_pause(
+	struct widget_instance *screen)
 {
-	/* the rows of option_bkds' texture its box takes */
-	UI_SETTINGS_MENU_BOX_HEIGHT = 28
-};
+	long row_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PAUSE_TAG("resume_game_button"));
+	struct widget_instance *list;
+	rectangle2d row_bounds;
 
-/* the art of a row of the SETTINGS menu, at its bounds on the screen: for its
-tag's, which is open on the right, the closed box ADVANCED CONTROLS lights its
-rows with, as the pause menu lights its own (and none for the rows not lit).
+	if (row_tag_index == NONE)
+		return FALSE;
+	list = ui_settings_lay_out_pause(screen, _ui_settings_widget_menu_title);
+	if (!list)
+		return FALSE;
+	row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
+	ui_settings_pause_rows_add(
+		list,
+		row_tag_index,
+		_ui_settings_widget_video,
+		NUMBER_OF_UI_SETTINGS_CATEGORIES,
+		row_bounds.x1 - row_bounds.x0);
+	if (!list->child)
+		return FALSE;
+	list->name = ui_settings_widget_names[_ui_settings_widget_menu_list];
+	screen->name = ui_settings_widget_names[_ui_settings_widget_menu];
+	ui_settings_focus(screen, list, list->child);
+
+	return TRUE;
+}
+
+/* the art of a row of the main menu's settings screens (its SETTINGS menu's,
+and a page's settings'), at its bounds on the screen: for its tag's, which
+is open on the right, the closed box ADVANCED CONTROLS lights its rows with,
+as the pause menu lights its own (its art, menu_bkds, is not in ui.map).
+Not lit, the SETTINGS menu's rows have none, and a setting's its tag's (which
+shows nothing). The box spans the row as it is widened (ui_settings_row_widen).
 Its texture is wider than the row, and the box (the top rows of it) is the
 same turned about: so its left half as it is, and its right that half turned
 about (mirrored only, it would wind the other way, which the screen's quads
 cull). FALSE for any other widget */
-static boolean ui_settings_menu_row_render(
+static boolean ui_settings_row_render(
 	struct widget_instance *widget,
 	rectangle2d const *bounds,
 	rectangle2d *clip,
 	pixel32 color,
 	struct rasterizer_dynamic_screen_geometry_parameters *multitexture_params)
 {
-	short game_settings_widget = ui_game_settings_widget_get(widget);
-	long box_index = tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\option_bkds");
-	struct bitmap_data *box = box_index == NONE ? NULL : bitmap_group_get_bitmap_from_sequence(box_index, 0, 1);
+	short settings_widget = ui_settings_widget_get(widget);
+	boolean setting = settings_widget >= _ui_settings_widget_first_setting;
+	long box_index;
+	struct bitmap_data *box;
+	rectangle2d row;
 	rectangle2d half;
 	rectangle2d source;
 
-	if ((game_settings_widget != _ui_game_settings_widget_profile_settings &&
-		game_settings_widget != _ui_game_settings_widget_settings_menu_item) ||
-		!box)
+	if ((!setting &&
+		(settings_widget < _ui_settings_widget_profile_settings || settings_widget > _ui_settings_widget_input)) ||
+		ui_settings_in_pause_menu(widget))
 	{
 		return FALSE;
 	}
+	box_index = tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\option_bkds");
+	box = box_index == NONE ? NULL : bitmap_group_get_bitmap_from_sequence(box_index, 0, 1);
+	if (!box)
+		return FALSE;
 	if (widget->animation.current_frame_index != 1)
-		return TRUE;
-	half = *bounds;
-	half.x1 = bounds->x0 + (bounds->x1 - bounds->x0) / 2;
-	half.y1 = bounds->y0 + UI_SETTINGS_MENU_BOX_HEIGHT;
+		return !setting;
+	row = *bounds;
+	ui_settings_row_widen(widget, &row);
+	half = row;
+	half.x1 = row.x0 + (row.x1 - row.x0) / 2;
+	half.y1 = row.y0 + UI_SETTINGS_MENU_BOX_HEIGHT;
 	source.x0 = 0;
 	source.y0 = 0;
 	source.x1 = half.x1 - half.x0;
 	source.y1 = UI_SETTINGS_MENU_BOX_HEIGHT;
 	draw_bitmap_in_rect(box, &half, &source, clip, color, multitexture_params, FALSE);
 	/* (from the bottom right corner) */
-	source.x1 = bounds->x1 - half.x1;
-	half.x0 = bounds->x1;
-	half.x1 = bounds->x1 - source.x1;
-	half.y0 = bounds->y0 + UI_SETTINGS_MENU_BOX_HEIGHT;
-	half.y1 = bounds->y0;
+	source.x1 = row.x1 - half.x1;
+	half.x0 = row.x1;
+	half.x1 = row.x1 - source.x1;
+	half.y0 = row.y0 + UI_SETTINGS_MENU_BOX_HEIGHT;
+	half.y1 = row.y0;
 	draw_bitmap_in_rect(box, &half, &source, clip, color, multitexture_params, FALSE);
 
 	return TRUE;
 }
 
-/* the SETTINGS menu in place of the main menu, made over as it loads */
+/* the SETTINGS menu in place of the menu, from its SETTINGS row (made over as
+it loads, ui_settings_menus_loaded) */
 static boolean ui_settings_menu_open(
 	struct widget_instance *item,
 	boolean *widget_deleted)
 {
-	long screen_tag_index = tag_loaded(
-		UI_WIDGET_DEFINITION_TAG,
-		UI_GAME_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen"));
+	long screen_tag_index = ui_settings_in_pause_menu(item) ?
+		widget_instance_get_topmost_parent(item)->definition_tag_index :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_MULTIPLAYER_TAG("multiplayer_type_select_screen"));
 	struct widget_instance *screen;
 
 	if (screen_tag_index == NONE)
 		return FALSE;
-	/* (this deletes the main menu, and the item with it) */
+	/* (this deletes the menu, and the item with it) */
 	ui_settings_menu_loading = TRUE;
 	screen = ui_widget_launch_widget(item, screen_tag_index);
 	ui_settings_menu_loading = FALSE;
@@ -6175,15 +6028,135 @@ static boolean ui_settings_menu_open(
 	return TRUE;
 }
 
+/* ADVANCED CONTROLS' screen as a page of the main menu's: a title in place of
+its header, its key's =ACCEPT as =SELECT, and its list emptied for the page's
+rows, where EDIT PROFILE SETTINGS has its rows. Returns the list, or NULL */
+static struct widget_instance *ui_settings_page_lay_out_main(
+	struct widget_instance *screen,
+	long row_tag_index)
+{
+	struct widget_instance *header = ui_settings_find(screen, UI_SETTINGS_ADVANCED_TAG("header_advanced_controls"));
+	struct widget_instance *accept = ui_settings_find(screen, UI_SETTINGS_MAIN_MENU_TAG("=accept_new"));
+	struct widget_instance *list = ui_settings_find(screen, UI_SETTINGS_ADVANCED_TAG("advanced_controls_menu"));
+	struct widget_instance *title;
+
+	if (!header ||
+		!accept ||
+		accept->type != _ui_widget_type_text_box ||
+		!list ||
+		list->parent != screen ||
+		list->type != _ui_widget_type_column_list)
+	{
+		return NULL;
+	}
+	title = ui_settings_widget_new(
+		screen,
+		row_tag_index,
+		_ui_settings_widget_page_title,
+		0,
+		UI_SETTINGS_MAIN_TITLE_Y - ui_widget_definition_get(row_tag_index)->bounds.y0);
+	if (!title)
+		return NULL;
+	ui_widget_add_child(screen, title);
+	header->visible = FALSE;
+	/* (=SELECT, from the key's own strings) */
+	accept->parameters.text_box.string_list_index = 1;
+	ui_settings_empty(list);
+	list->horizontal_offset = 0;
+	list->vertical_offset = 0;
+
+	return list;
+}
+
+/* a page in place of the SETTINGS menu, from its row: VIDEO, AUDIO or INPUT
+SETTINGS (category) */
+static boolean ui_settings_page_open(
+	struct widget_instance *row,
+	short category,
+	boolean *widget_deleted)
+{
+	boolean pause = ui_settings_in_pause_menu(row);
+	long screen_tag_index = pause ?
+		widget_instance_get_topmost_parent(row)->definition_tag_index :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_ADVANCED_TAG("advanced_controls_screen"));
+	long row_tag_index = pause ?
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PAUSE_TAG("resume_game_button")) :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PROFILE_EDIT_TAG("color_profile_item"));
+	struct widget_instance *screen;
+	struct widget_instance *list;
+	short first_setting = NONE;
+	short count = 0;
+	short setting;
+
+	for (setting = 0; setting < NUMBER_OF_GAME_SETTINGS; setting++)
+	{
+		if (ui_settings_options[setting].category != category)
+			continue;
+		if (first_setting == NONE)
+			first_setting = setting;
+		count++;
+	}
+	if (count == 0 || screen_tag_index == NONE || row_tag_index == NONE)
+		return FALSE;
+	/* (this deletes the SETTINGS menu, and the row with it) */
+	ui_settings_loading = TRUE;
+	screen = ui_widget_launch_widget(row, screen_tag_index);
+	ui_settings_loading = FALSE;
+	if (!screen)
+		return FALSE;
+	*widget_deleted = TRUE;
+	screen->name = ui_settings_widget_names[_ui_settings_widget_page];
+	list = pause ?
+		ui_settings_lay_out_pause(screen, _ui_settings_widget_page_title) :
+		ui_settings_page_lay_out_main(screen, row_tag_index);
+	if (list)
+	{
+		/* (a page's settings are one after the other, game_settings.h) */
+		list->name = ui_settings_widget_names[_ui_settings_widget_page_list];
+		if (pause)
+		{
+			ui_settings_pause_rows_add(
+				list,
+				row_tag_index,
+				_ui_settings_widget_first_setting + first_setting,
+				count,
+				UI_SETTINGS_ROW_WIDTH);
+		}
+		else
+		{
+			rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
+
+			ui_settings_rows_add(
+				list,
+				row_tag_index,
+				0,
+				UI_SETTINGS_MAIN_ROWS_Y - row_bounds.y0,
+				row_bounds.y1 - row_bounds.y0,
+				_ui_settings_widget_first_setting + first_setting,
+				count);
+		}
+	}
+	if (!list || !list->child)
+	{
+		error(_error_silent, "failed to load %s", ui_settings_category_labels[category - _ui_settings_widget_video]);
+		widget_instance_go_back_to_previous(screen);
+
+		return FALSE;
+	}
+	ui_settings_focus(screen, list, list->child);
+
+	return TRUE;
+}
+
 /* PROFILE SETTINGS: what the main menu's SETTINGS does, by its tag's handlers
 for the button (which open the player profiles' screen); FALSE if it has
 none */
-static boolean ui_settings_menu_profile_settings(
+static boolean ui_settings_profile_settings(
 	struct widget_instance *row,
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	long tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_MAIN_MENU_TAG("main_menu_item_settings"));
+	long tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_MAIN_MENU_TAG("main_menu_item_settings"));
 	struct ui_widget_definition *definition;
 	long handler_index;
 	boolean handled = FALSE;
@@ -6208,31 +6181,54 @@ static boolean ui_settings_menu_profile_settings(
 	return handled;
 }
 
-static void ui_game_settings_menu_loaded(
+/* a menu offering SETTINGS, or a SETTINGS menu, as it loads (or loads again,
+from the history) */
+static void ui_settings_menus_loaded(
 	struct widget_instance *root)
 {
-	if (!game_settings_available())
+	/* (not for the pages, which ui_settings_page_open lays out) */
+	if (!game_settings_available() || ui_settings_loading)
 		return;
 	if (ui_settings_menu_loads(root))
 	{
-		if (!ui_settings_menu_lay_out(root))
+		boolean laid_out = ui_settings_in_pause_menu(root) ?
+			ui_settings_menu_lay_out_pause(root) :
+			ui_settings_menu_lay_out_main(root);
+
+		if (!laid_out)
 			error(_error_silent, "failed to load the SETTINGS menu");
 	}
-	else if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_MAIN_MENU_TAG("main_menu")))
+	else if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_MAIN_MENU_TAG("main_menu")))
 	{
-		ui_settings_menu_item_mark(root);
+		ui_settings_main_menu_item_mark(root);
 	}
-	else if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_GAME_SETTINGS_PAUSE_TAG("pause_game")))
+	else if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_SETTINGS_PAUSE_TAG("pause_game")))
 	{
-		ui_game_settings_pause_item_add(root);
+		ui_settings_pause_item_add(root);
 	}
 
 	return;
 }
 
-/* the button an event presses on GAME SETTINGS' widgets, the left stick's
-sideways push as the d-pad's, or NONE */
-static short ui_game_settings_event_button(
+/* whether a button goes back from a settings screen to the screen before: B
+and BACK on a SETTINGS menu, and on a page START too */
+static boolean ui_settings_back_button(
+	struct widget_instance const *widget,
+	short button_index)
+{
+	short settings_widget = ui_settings_widget_get(widget);
+
+	if (settings_widget != _ui_settings_widget_menu && settings_widget != _ui_settings_widget_page)
+		return FALSE;
+
+	return button_index == _widget_event_b_button ||
+		button_index == _widget_event_back_button ||
+		(settings_widget == _ui_settings_widget_page && button_index == _widget_event_start_button);
+}
+
+/* the button an event presses on the settings screens' widgets, the left
+stick's sideways push as the d-pad's, or NONE */
+static short ui_settings_event_button(
 	struct event_record const *event)
 {
 	if (event->type == _event_type_button && event->data.button.value == 1)
@@ -6245,62 +6241,49 @@ static short ui_game_settings_event_button(
 	return NONE;
 }
 
-/* a button pressed on a widget of GAME SETTINGS': the sound it makes, or NONE
-for a button the widget leaves to the others */
-static short ui_game_settings_button_press(
+/* a button pressed on a widget of the settings screens': the sound it makes,
+or NONE for a button the widget leaves to the others */
+static short ui_settings_button_press(
 	struct widget_instance *widget,
 	struct event_record *event,
 	short button_index,
 	boolean *widget_deleted)
 {
-	short game_settings_widget = ui_game_settings_widget_get(widget);
-	struct widget_instance *screen = widget_instance_get_topmost_parent(widget);
+	short settings_widget = ui_settings_widget_get(widget);
 	short setting;
 	short direction;
 
-	switch (game_settings_widget)
+	switch (settings_widget)
 	{
-	case _ui_game_settings_widget_settings_item:
+	case _ui_settings_widget_main_menu_item:
+	case _ui_settings_widget_pause_item:
 		if (button_index != _widget_event_a_button && button_index != _widget_event_start_button)
 			return NONE;
 
 		return ui_settings_menu_open(widget, widget_deleted) ?
 			_ui_audio_feedback_forward :
 			_ui_audio_feedback_flag_failure;
-	case _ui_game_settings_widget_profile_settings:
+	case _ui_settings_widget_profile_settings:
 		if (button_index != _widget_event_a_button && button_index != _widget_event_start_button)
 			return NONE;
 
 		/* (the handlers make their own sound) */
-		return ui_settings_menu_profile_settings(widget, event, widget_deleted) ?
+		return ui_settings_profile_settings(widget, event, widget_deleted) ?
 			_ui_audio_feedback_none :
 			_ui_audio_feedback_flag_failure;
-	case _ui_game_settings_widget_item:
-	case _ui_game_settings_widget_settings_menu_item:
+	case _ui_settings_widget_video:
+	case _ui_settings_widget_audio:
+	case _ui_settings_widget_input:
 		if (button_index != _widget_event_a_button && button_index != _widget_event_start_button)
 			return NONE;
 
-		return ui_game_settings_open(widget, widget_deleted) ?
+		return ui_settings_page_open(widget, settings_widget, widget_deleted) ?
 			_ui_audio_feedback_forward :
 			_ui_audio_feedback_flag_failure;
-	case _ui_game_settings_widget_display:
-	case _ui_game_settings_widget_audio:
-	case _ui_game_settings_widget_input:
-	{
-		struct widget_instance *options = ui_game_settings_child(screen, _ui_game_settings_widget_options);
-
-		if (button_index != _widget_event_a_button && button_index != _widget_event_dpad_right)
-			return NONE;
-		if (!options || !options->child)
-			return _ui_audio_feedback_flag_failure;
-		ui_game_settings_focus(screen, options, options->child);
-
-		return _ui_audio_feedback_forward;
 	}
-	}
-	if (game_settings_widget < _ui_game_settings_widget_first_setting)
+	if (settings_widget < _ui_settings_widget_first_setting)
 		return NONE;
-	setting = game_settings_widget - _ui_game_settings_widget_first_setting;
+	setting = settings_widget - _ui_settings_widget_first_setting;
 	switch (button_index)
 	{
 	case _widget_event_a_button:
@@ -6493,7 +6476,7 @@ static void ui_mouse_note_target(
 	{
 		return;
 	}
-	ui_game_settings_row_widen(widget, &bounds);
+	ui_settings_row_widen(widget, &bounds);
 	bounds.x0 += offset.x;
 	bounds.x1 += offset.x;
 	bounds.y0 += offset.y;
@@ -6553,9 +6536,9 @@ static void ui_mouse_note_target(
 			return;
 		kind = _ui_mouse_target_value;
 	}
-	else if (ui_game_settings_row_is_number(widget))
+	else if (ui_settings_row_is_number(widget))
 	{
-		/* (a number of GAME SETTINGS' steps as a spinner does) */
+		/* (a setting that is a number steps as a spinner does) */
 		kind = _ui_mouse_target_value;
 	}
 	else if (ui_mouse_widget_is_item(widget))
@@ -6635,7 +6618,7 @@ static void ui_mouse_list_directions(
 
 	if (TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_list_items_bit) ||
 		TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_children_bit) ||
-		ui_game_settings_row_is_number(widget))
+		ui_settings_row_is_number(widget))
 	{
 		*back = _widget_event_dpad_left;
 		*forward = _widget_event_dpad_right;
@@ -6864,9 +6847,9 @@ static void widget_instance_render_recursive(
 	}
 	offset.x += widget->horizontal_offset;
 	offset.y += widget->vertical_offset;
-	/* port: GAME SETTINGS' widgets run none of their tags' game data
+	/* port: the settings screens' widgets run none of their tags' game data
 	functions, which expect the screens the tags come from */
-	for (input_index = ui_game_settings_widget_get(widget) == NONE ? 0 : definition->game_data_inputs.count;
+	for (input_index = ui_settings_widget_get(widget) == NONE ? 0 : definition->game_data_inputs.count;
 		input_index < definition->game_data_inputs.count;
 		input_index++)
 	{
@@ -6958,12 +6941,13 @@ static void widget_instance_render_recursive(
 				alpha_modifier;
 		}
 		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
-		/* port: the SETTINGS menu's rows have the pause menu's kind of box,
-		and GAME SETTINGS' stretch their tag's art */
-		if (!ui_settings_menu_row_render(widget, &bounds, clip, color, &multitexture_params))
+		/* port: the main menu's settings screens light their rows with a
+		closed box, as the pause menu does, and the settings' rows stretch
+		their tag's art */
+		if (!ui_settings_row_render(widget, &bounds, clip, color, &multitexture_params))
 		{
 			drawn_bounds = bounds;
-			ui_game_settings_row_widen(widget, &drawn_bounds);
+			ui_settings_row_widen(widget, &drawn_bounds);
 			draw_bitmap_in_rect(
 				bitmap,
 				&drawn_bounds,
@@ -7506,18 +7490,11 @@ static void widget_instance_process_one_event_recursive(
 			{
 				handled_by_event_handler = TRUE;
 			}
-			/* port: B, BACK and START go back a column of GAME SETTINGS, then
-			to the menu before (where the pause menu's tag would close every
-			menu) */
-			if (ui_game_settings_widget_get(widget) == _ui_game_settings_widget_screen &&
-				(event->data.button.index == _widget_event_b_button ||
-				event->data.button.index == _widget_event_back_button ||
-				event->data.button.index == _widget_event_start_button))
-			{
-				audio_feedback = ui_game_settings_back(widget, &widget_deleted);
-				event_handled = TRUE;
-			}
-			else if (!handled_by_event_handler)
+			/* port: B and BACK go back from a settings screen to the screen
+			before (where the pause menu's tag would close every menu), and
+			from a page START too */
+			if (ui_settings_back_button(widget, event->data.button.index) ||
+				!handled_by_event_handler)
 			{
 				widget_instance_go_back_to_previous(widget);
 				audio_feedback = _ui_audio_feedback_back;
@@ -7760,17 +7737,17 @@ static void widget_instance_process_one_event_recursive(
 			}
 		}
 	}
-	/* port: GAME SETTINGS' widgets answer their buttons in code, not with the
-	handlers of the tags they are drawn from */
+	/* port: the settings screens' widgets answer their buttons in code, not
+	with the handlers of the tags they are drawn from */
 	if (event_for_this_widget &&
 		!widget_deleted &&
-		ui_game_settings_widget_get(widget) != NONE)
+		ui_settings_widget_get(widget) != NONE)
 	{
-		short button_index = ui_game_settings_event_button(event);
+		short button_index = ui_settings_event_button(event);
 
 		if (button_index != NONE)
 		{
-			short sound = ui_game_settings_button_press(
+			short sound = ui_settings_button_press(
 				widget,
 				event,
 				button_index,
@@ -7922,9 +7899,6 @@ static void widget_instance_process_one_event_recursive(
 			[event->data.button.index - _widget_event_dpad_up] =
 			widget_globals.current_system_milliseconds;
 	}
-	/* port: GAME SETTINGS' right column follows its left */
-	if (!widget_deleted && ui_game_settings_widget_get(widget) == _ui_game_settings_widget_screen)
-		ui_game_settings_sync(widget);
 	ui_play_audio_feedback_sound(audio_feedback);
 	*return_widget_deleted = widget_deleted;
 
