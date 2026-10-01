@@ -89,7 +89,59 @@ each datagram, sends damage and pickups only to the machines they concern,
 stamps a hit with the host's tick the client had heard of, and checks hits
 and a client's own player's moves more closely; version 7 sends with a
 killing blow its killer's score after it, and with a body's state that it
-is dead.
+is dead; version 8 is the first whose clients play by the host's rules
+(below), so a build without them joins no host of it; version 9 tells
+every machine of a player the host dropped for cheating, each client
+tells the host its Discord user, and a machine's join request carries its
+hardware id.
+
+A client plays by its host's rules: in another's game (searching for it,
+in its lobby, or playing it) the developer console, the telnet console
+and the cheat buttons run only commands that change nothing of the game
+(what the machine shows and how its controls feel: `hs_compile_and_evaluate`),
+and each frame and tick the game's cheats, speed, autoaim, magnetism and
+rider ejection are put back to the host's, and what it draws of the world
+to what everyone's draws (no wireframe, debug drawing mode, environment
+left out, fog, grass or water off), as set before joining too
+(`cheats_network_client_enforce`); its camera stays the player's own
+(no flying or following camera). The host keeps its own.
+
+The host also finds a client whose game runs faster than time (a speed
+hack, which speeds up the machine's own clock, so that nothing on it can
+tell): every two seconds it measures how fast the ticks the client's
+messages are stamped with go by against its own clock's time, and how far
+ahead of its own time they are. A client's clock starts at the host's and
+only ever jumps forward to it when behind, so an honest one is never ahead
+while going faster (one that caught up, or a host that stalled, is one or
+the other, not both). One more than a tenth faster and half a second ahead
+has its players' predictions refused at once (the host's copies go as its
+own ticks have them), and after ten seconds of it is dropped, its address
+kept out of the host's games while the host runs, and every machine is
+told who, in red on its console and in its `debug.txt`
+(`distributed_note_client_clock`, `network_game_server_kick_machine`,
+`_distributed_message_notice`). The host also adds a line to
+`cheaters.txt` beside its `debug.txt`: when, the player's address (an
+internet play peer's real one), their Discord user and their players'
+names, and why. A client tells the host its Discord user as the Discord
+client signed in on its machine says (its id and name, none without one:
+not running, or internet play off), once it is in the game and again
+when it changes; it says what it likes, so the host keeps of it only digits
+in the id and letters, digits, "_", "." and "-" in the name, 23 and 39 of
+them at most (`p2p_discord_sanitize`), and names it as the player said.
+A joining machine tells the host its hardware id: a keyed hash (HMAC-SHA-256,
+16 bytes as hex) of what its machine is known by (Windows' SMBIOS UUID, else
+its MachineGuid; Linux's `/etc/machine-id`; Android's `ANDROID_ID`, which the
+launcher writes to `hardware_id.txt`: `p2p_hardware_id`), kept by the host
+as hex only. A player dropped for cheating, and one the host bans with the
+console's `ban <player name>` (Tab completes the name; the host's alone), is
+added to `bans.txt` beside `debug.txt` (a line each, as in `cheaters.txt`,
+with `ip=` and `hwid=`): the host refuses a machine joining whose address or
+hardware id is in it (a line taken out unbans). Both are as the player's
+machine tells them: anyone with administrator or root access can change
+them, and players behind one address share it.
+A speed hack of less than a tenth is let be: the host's bounds on how far
+and how fast a client's player moves and fires hold it to the host's time
+anyway.
 
 ## Joining a game in progress
 
@@ -213,7 +265,9 @@ a pregame keep-alive every five seconds from the host
    higher above where it left the ground than a thing thrown up as fast
    as it went up then, and a tenth of a world unit a tick, falls to since
    (less the client's round trip, half a second at most, and jitter), with
-   2 world units more (as a player on foot). The host sends the client its own
+   2 world units more (as a player on foot); a copy at rest that the
+   client's word moves wakes, so that it falls and counts its time in the
+   air. The host sends the client its own
    vehicle every third tick, with the client's tick it took the vehicle at
    (`_distributed_object_predicted_bit` and a 16-bit time in the object's
    state); the client compares that with where it had the vehicle at that
@@ -396,7 +450,8 @@ made and removed and the hits reported, dealt, rejected and replayed, so
 two machines' views of one game can be compared. `debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
-swap the bots' wandering does not reach, and `debug.network_test_score`
+swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
+picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_latency` and

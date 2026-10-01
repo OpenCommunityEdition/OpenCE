@@ -1290,6 +1290,13 @@ static boolean network_client_reliable_connection_read(
 				*buffer_size);
 			close_connection = TRUE;
 		}
+		/* port: a message marked encrypted, which the game never sends
+		(anyone may: the assert below halted a debug build) */
+		else if (TEST_FLAG(header, 0))
+		{
+			error(_error_silent, "got a message marked encrypted; closing the connection");
+			close_connection = TRUE;
+		}
 		else if (message_size <= circular_queue_size(connection->reliable_incoming_queue) &&
 			circular_queue_dequeue_data(connection->reliable_incoming_queue, message, message_size, TRUE))
 		{
@@ -1926,7 +1933,9 @@ static void network_connection_flush_reliable_last(
 	}
 }
 
-/* the length a received datagram's header (in network byte order) says */
+/* the length a received datagram's header (in network byte order) says;
+NONE for one marked encrypted, which the game never sends (anyone may: the
+read asserts none is, network_client_unreliable_connection_read) */
 static long network_connection_datagram_size(
 	byte const *datagram)
 {
@@ -1934,6 +1943,8 @@ static long network_connection_datagram_size(
 
 	csmemcpy(&header, datagram, sizeof(header));
 	byte_swap_message_header(&header, _byte_order_host);
+	if (TEST_FLAG(header, 0))
+		return NONE;
 
 	return GET_MESSAGE_SIZE(header);
 }

@@ -50,6 +50,7 @@ Called from the main loop every frame (main.c).
 #include "items/items.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
+#include "tag_files/tag_files.h"
 #include "camera/observer.h"
 
 #include <math.h>
@@ -103,6 +104,7 @@ static struct
 	real shoot_interval;
 	real vehicle_time;
 	real pickup_time;
+	char pickup_weapon[64];
 	long score_to_win;
 	long logged_time;
 } network_test;
@@ -161,6 +163,8 @@ static void network_test_read_settings(
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
 	network_test.vehicle_time = (real)config_real("debug.network_test_vehicle");
 	network_test.pickup_time = (real)config_real("debug.network_test_pickup");
+	snprintf(network_test.pickup_weapon, sizeof(network_test.pickup_weapon), "%s",
+		config_string("debug.network_test_pickup_weapon"));
 	network_test.score_to_win = (long)config_integer("debug.network_test_score");
 	if (network_test.mode != _network_test_off)
 		platform_log("network test: %s", setting);
@@ -196,6 +200,32 @@ static void network_test_log_players(
 	int length = 0;
 
 	line[0] = 0;
+	/* (each player's name, once a game: for tests that name a player, such
+	as the host's ban command) */
+	{
+		static wchar_t named[HALO_PORT_MAXIMUM_NETWORK_PLAYERS][12];
+
+		if (game_time_get() < 2 * TICKS_PER_SECOND)
+			csmemset(named, 0, sizeof(named));
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+			char name[13];
+			short index;
+
+			if (absolute_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS ||
+				!csmemcmp(named[absolute_index], player->name, sizeof(named[absolute_index])))
+			{
+				continue;
+			}
+			csmemcpy(named[absolute_index], player->name, sizeof(named[absolute_index]));
+			for (index = 0; index < 12 && player->name[index]; index++)
+				name[index] = player->name[index] >= 32 && player->name[index] < 127 ? (char)player->name[index] : '?';
+			name[index] = 0;
+			platform_log("network test: player %ld is named %s", absolute_index, name);
+		}
+	}
 	data_iterator_new(&iterator, player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
@@ -670,6 +700,8 @@ static void network_test_pickup(
 
 			carried |= carried_index != NONE && object_get(carried_index)->definition_index == weapon->definition_index;
 		}
+		if (network_test.pickup_weapon[0] && !strstr(tag_get_name(weapon->definition_index), network_test.pickup_weapon))
+			continue;
 		distance = (real)DATUM_INDEX_TO_ABSOLUTE_INDEX(weapons.index);
 		if (!carried && (nearest_index == NONE || distance < nearest_distance))
 		{

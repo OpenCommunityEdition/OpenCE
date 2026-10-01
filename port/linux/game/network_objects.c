@@ -191,6 +191,9 @@ fourth (as it sends players, network_distributed.c) */
 #define REMOTE_OBJECT_TOLERANCE 0.05f
 /* ... and the cosine of the angle (an object at rest turned) */
 #define REMOTE_OBJECT_ANGLE_TOLERANCE 0.98f
+/* how far a client's vehicle prediction moves the host's copy for the copy
+at rest to wake, world units */
+#define VEHICLE_PREDICTION_STILL_DISTANCE 0.01f
 #define LOCAL_VEHICLE_TOLERANCE 4.0f
 /* (the host takes further than a client puts right: between the two they
 would disagree for good) */
@@ -372,6 +375,10 @@ static struct
 	fast up it went as it left it, and when (network_objects_note_vehicle_ground) */
 	long ground_vehicle_index;
 	long ground_time;
+	/* the vehicle whose copy was at rest when it last took its word (NONE:
+	none), and where it came to rest */
+	long rest_vehicle_index;
+	real_point3d rest_position;
 	real ground_height;
 	real ground_rise_speed;
 } objects_host_vehicle_predictions[MAXIMUM_TRACKED_PLAYERS];
@@ -1570,8 +1577,38 @@ void network_objects_apply_vehicle_predictions(
 		distributed_vector_clamp(&angular_velocity, MAXIMUM_PREDICTED_VEHICLE_ANGULAR_SPEED);
 		if (!distributed_transform_valid(&state->position, &forward, &up, &velocity, &angular_velocity, &forward, &up))
 			continue;
-		network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity, &angular_velocity,
-			HOST_VEHICLE_BLEND_DISTANCE);
+		{
+			real_point3d previous_position = vehicle->object.position;
+
+			network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
+				&angular_velocity, HOST_VEHICLE_BLEND_DISTANCE);
+			/* (a copy at rest runs no physics, and so neither falls nor
+			counts its ticks in the air: one the client moved from where it
+			came to rest (a little at a time too), or says moves, wakes, and
+			settles again if it is still) */
+			if (!TEST_FLAG(vehicle->object.flags, _object_at_rest_bit))
+			{
+				objects_host_vehicle_predictions[player_index].rest_vehicle_index = NONE;
+			}
+			else
+			{
+				if (objects_host_vehicle_predictions[player_index].rest_vehicle_index != state->object_index)
+				{
+					objects_host_vehicle_predictions[player_index].rest_vehicle_index = state->object_index;
+					objects_host_vehicle_predictions[player_index].rest_position = previous_position;
+				}
+				dx = vehicle->object.position.x - objects_host_vehicle_predictions[player_index].rest_position.x;
+				dy = vehicle->object.position.y - objects_host_vehicle_predictions[player_index].rest_position.y;
+				dz = vehicle->object.position.z - objects_host_vehicle_predictions[player_index].rest_position.z;
+				if (!(dx * dx + dy * dy + dz * dz <=
+						VEHICLE_PREDICTION_STILL_DISTANCE * VEHICLE_PREDICTION_STILL_DISTANCE) ||
+					velocity.i != 0.0f || velocity.j != 0.0f || velocity.k != 0.0f)
+				{
+					SET_FLAG(vehicle->object.flags, _object_at_rest_bit, FALSE);
+					objects_host_vehicle_predictions[player_index].rest_vehicle_index = NONE;
+				}
+			}
+		}
 		objects_host_vehicle_predictions[player_index].accepted_vehicle_index = state->object_index;
 		objects_host_vehicle_predictions[player_index].accepted_time = (word)state->time;
 		objects_host_vehicle_predictions[player_index].accepted_host_time = now;
@@ -2514,6 +2551,10 @@ void network_objects_client_tick(
 		objects_client_check_all = TRUE;
 	distributed_client_note_own_inventories();
 	distributed_client_send_vehicles();
+	/* (who it is, as its Discord told it: once its ready went, which makes
+	it a machine the host takes messages of) */
+	if (objects_client_ready_time != NONE)
+		distributed_client_send_identity();
 }
 
 /* ---------- the game */
@@ -2546,6 +2587,7 @@ void network_objects_new_game(
 	{
 		objects_host_vehicle_predictions[index].accepted_vehicle_index = NONE;
 		objects_host_vehicle_predictions[index].ground_vehicle_index = NONE;
+		objects_host_vehicle_predictions[index].rest_vehicle_index = NONE;
 	}
 	objects_client_synchronized = FALSE;
 	objects_client_ready_time = NONE;

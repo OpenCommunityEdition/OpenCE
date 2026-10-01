@@ -418,6 +418,22 @@ void sound_cache_close(
 	data_iterator_new(&iterator, xbox_sound_cache_globals.cache_sounds);
 	while ((cache_sound = data_iterator_next(&iterator)) != NULL)
 	{
+		/* port: the map is going, every sound stopped and the platform's
+		channels flushed (sound_dispose_from_old_map): a sound still counted
+		as playing is a count never given back, not a sound playing (one, a
+		weapon's charging loop, halted a client as a game ended); let go,
+		not halted on */
+		if (cache_sound->software_reference_count != 0 || cache_sound->hardware_reference_count != 0)
+		{
+			error(
+				_error_silent,
+				"sound %s still counted as playing (%d, %d) as the map closed; let go",
+				cache_sound->sound ? tag_get_name(cache_sound->sound->runtime_tag_index) : "?",
+				cache_sound->software_reference_count,
+				cache_sound->hardware_reference_count);
+			cache_sound->software_reference_count = 0;
+			cache_sound->hardware_reference_count = 0;
+		}
 		sound_cache_sound_delete(cache_sound->sound);
 	}
 	data_make_invalid(xbox_sound_cache_globals.cache_sounds);
@@ -528,15 +544,23 @@ static void sound_cache_start_loading_sound(
 		system_milliseconds() -
 			xbox_sound_cache_globals.last_allocation_failure_time > 10000)
 	{
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		error(
 			_error_silent,
 			"SOUND CACHE BLOWN!!!! double-click \"GETSTABBED.BAT\" on your PC now!!!");
-		terminal_printf(
-			global_real_argb_purple,
-			"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		/* (port: chatter, shown as config.toml's game.console_log says) */
+		if (terminal_shows(_terminal_message_chatter))
+		{
+			terminal_printf(
+				global_real_argb_purple,
+				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		}
 		lruv_debug_to_file(
 			"d:\\stabbed.txt",
 			sound->name,

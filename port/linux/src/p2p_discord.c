@@ -63,7 +63,40 @@ static struct
 	int player_count;
 	int maximum_player_count;
 	int changed;
+
+	/* the Discord user signed in to the client (its READY), as told: an id
+	of digits, a name of the letters, digits and marks Discord's allow (a
+	host logs them, for a player it drops for cheating) */
+	char user_id[P2P_DISCORD_ID_SIZE];
+	char user_name[P2P_DISCORD_NAME_SIZE];
 } discord = { .handle = -1 };
+
+/* the text kept of a Discord user's id or name: of the characters allowed
+(the rest left out), no longer than the size (and ended) */
+void p2p_discord_sanitize(char *destination, int size, const char *source, int name)
+{
+	int length = 0;
+
+	for (; source && *source && length < size - 1; source++)
+	{
+		char character = *source;
+
+		if ((character >= '0' && character <= '9') ||
+			(name && ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+				character == '_' || character == '.' || character == '-')))
+		{
+			destination[length++] = character;
+		}
+	}
+	destination[length] = 0;
+}
+
+/* the Discord user signed in, as told (empty if none); under p2p_lock */
+void p2p_discord_user(char *id, int id_size, char *name, int name_size)
+{
+	p2p_discord_sanitize(id, id_size, discord.user_id, 0);
+	p2p_discord_sanitize(name, name_size, discord.user_name, 1);
+}
 
 static void discord_close(void)
 {
@@ -188,6 +221,18 @@ static void frame_received(int opcode, char *json)
 
 			discord.ready = 1;
 			platform_log("Internet play: connected to Discord");
+			/* (who is signed in: its user, after the configuration) */
+			{
+				const char *user = strstr(json, "\"user\"");
+				char value[128];
+
+				discord.user_id[0] = 0;
+				discord.user_name[0] = 0;
+				if (user && json_string(user, "id", value, sizeof(value)))
+					p2p_discord_sanitize(discord.user_id, sizeof(discord.user_id), value, 0);
+				if (user && json_string(user, "username", value, sizeof(value)))
+					p2p_discord_sanitize(discord.user_name, sizeof(discord.user_name), value, 1);
+			}
 			size = snprintf(command, sizeof(command),
 				"{\"cmd\":\"SUBSCRIBE\",\"evt\":\"ACTIVITY_JOIN\",\"nonce\":\"%lu\"}", ++discord.nonce);
 			discord_send(_opcode_frame, command, size);

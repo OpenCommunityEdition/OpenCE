@@ -42,6 +42,23 @@ void network_game_server_pause_countdown(
 	boolean pause_countdown);
 void network_game_generate_join_game_token(
 	byte *join_token);
+void network_game_server_kick_machine(
+	long machine_index);
+/* the host's ban command (console.c, hs.c) */
+enum
+{
+	NETWORK_GAME_SERVER_NAME_TEXT_SIZE = 16,
+};
+boolean network_game_server_ban_player(
+	char const *text);
+short network_game_server_matching_player_names(
+	char const *text,
+	char (*names)[NETWORK_GAME_SERVER_NAME_TEXT_SIZE],
+	short maximum_count);
+unsigned long network_game_server_machine_address(
+	long machine_index);
+char const *network_game_server_machine_hardware_id(
+	long machine_index);
 void network_game_server_update_ticks(
 	struct network_game_server *server,
 	short tick_count);

@@ -77,4 +77,32 @@ are shown). The game's server calls it as they change (calling it with the
 same counts again costs little) */
 void p2p_set_game_player_counts(int count, int maximum);
 
+/* the sizes of a Discord user's id and name as kept (with their end), and
+the text kept of either as told: only the characters allowed (digits in an
+id; letters, digits, "_", "." and "-" in a name), no longer than that */
+enum
+{
+	P2P_DISCORD_ID_SIZE = 24,
+	P2P_DISCORD_NAME_SIZE = 40,
+};
+void p2p_discord_sanitize(char *destination, int size, const char *source, int name);
+/* the Discord user signed in to the client on this machine, as its
+READY told (empty if none, or internet play is off) */
+void p2p_discord_identity(char *id, int id_size, char *name, int name_size);
+/* this machine's hardware id, as hex (empty if none), a host told it when
+joining (a keyed hash of what the machine is known by: p2p.c); and the hex
+kept of one told: lowercase hex digits only, P2P_HARDWARE_ID_BYTES' worth */
+enum
+{
+	P2P_HARDWARE_ID_BYTES = 16,
+	P2P_HARDWARE_ID_SIZE = 2 * P2P_HARDWARE_ID_BYTES + 1,
+};
+void p2p_hardware_id(char *hex, int size);
+void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
+
+/* the real address (network byte order) of the internet play peer of this
+virtual address (network byte order): where its packets come from; 0 if
+it is no peer's */
+unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
+
 #endif

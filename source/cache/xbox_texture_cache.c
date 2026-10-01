@@ -974,15 +974,23 @@ void *_texture_cache_bitmap_get_hardware_format(
 	{
 		if (system_milliseconds() - texture_cache_last_failure_time > 10000)
 		{
-			terminal_printf(
-				global_real_argb_purple,
-				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			/* (port: chatter, shown as config.toml's game.console_log says) */
+			if (terminal_shows(_terminal_message_chatter))
+			{
+				terminal_printf(
+					global_real_argb_purple,
+					"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			}
 			error(
 				_error_silent,
 				"YOU GOT STABBED!!!! double-click \"GETSTABBED.BAT\" on your PC now!!!");
-			terminal_printf(
-				global_real_argb_purple,
-				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			/* (port: chatter, shown as config.toml's game.console_log says) */
+			if (terminal_shows(_terminal_message_chatter))
+			{
+				terminal_printf(
+					global_real_argb_purple,
+					"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			}
 			lruv_debug_to_file(
 				"d:\\stabbed.txt",
 				tag_get_name(bitmap->tag_index),

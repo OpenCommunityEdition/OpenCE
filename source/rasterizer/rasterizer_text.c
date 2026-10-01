@@ -156,6 +156,8 @@ static void hardware_character_cache_get_origin(
 	short hardware_character_index,
 	short *x0,
 	short *y0);
+static short hardware_character_padding(
+	struct font_character const *font_character);
 static void flush_hardware_character(
 	struct hardware_character *hardware_character);
 static void cache_hardware_format_character(
@@ -622,10 +624,25 @@ hardware_character_cache_get_origin(
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 598, hardware_character_index>=0 && hardware_character_index<MAXIMUM_HARDWARE_CHARACTERS);
 	match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 599, x0 && y0);
 
-	*x0 = hardware_character->x0;
-	*y0 = hardware_character->y0;
+	*x0 = hardware_character->x0 + hardware_character_padding(hardware_character->character);
+	*y0 = hardware_character->y0 + hardware_character_padding(hardware_character->character);
 
 	return;
+}
+
+/* port: the clear texels around a character in the cache (its cell is that
+much larger each side). The cache packs characters edge to edge, which the
+Xbox's 640x480 sampled texel for pixel; drawn larger (a fullscreen
+display's resolution), each edge pixel blends in half a texel past the
+character, from the next character or one the cache dropped, and the text
+and its drop shadow showed the cells' borders. A character too large for
+the border goes without. */
+static short hardware_character_padding(
+	struct font_character const *font_character)
+{
+	return font_character &&
+		font_character->bitmap_width + 2 <= HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH &&
+		font_character->bitmap_height + 2 <= HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT ? 1 : 0;
 }
 
 static void
@@ -666,20 +683,23 @@ cache_hardware_format_character(
 		short y0, y1;
 		short x, y;
 		short next_write_index;
+		short padding = hardware_character_padding(font_character);
+		short cell_width = font_character->bitmap_width + 2 * padding;
+		short cell_height = font_character->bitmap_height + 2 * padding;
 
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 645, font_character->bitmap_width<=HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH);
 		match_assert("c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 646, font_character->bitmap_height<=HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT);
 
 		font_character->pad = magic_number;
 
-		if (font_character->bitmap_width + hardware_character_cache.x0 > HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH)
+		if (cell_width + hardware_character_cache.x0 > HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH)
 		{
 			hardware_character_cache.x0 = 0;
 			hardware_character_cache.y0 += hardware_character_cache.maximum_character_height;
 			hardware_character_cache.maximum_character_height = 0;
 		}
 
-		if (font_character->bitmap_height + hardware_character_cache.y0 > HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT)
+		if (cell_height + hardware_character_cache.y0 > HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT)
 		{
 			hardware_character_cache.y0 = 0;
 			hardware_character_cache.x0 = 0;
@@ -698,10 +718,10 @@ cache_hardware_format_character(
 			}
 		}
 
-		if (font_character->bitmap_height > hardware_character_cache.maximum_character_height)
+		if (cell_height > hardware_character_cache.maximum_character_height)
 		{
 			y0 = hardware_character_cache.y0 + hardware_character_cache.maximum_character_height;
-			y1 = hardware_character_cache.y0 + font_character->bitmap_height;
+			y1 = hardware_character_cache.y0 + cell_height;
 
 			for (;
 				hardware_character_cache.read_index != hardware_character_cache.write_index;
@@ -715,7 +735,7 @@ cache_hardware_format_character(
 				flush_hardware_character(hardware_character);
 			}
 
-			hardware_character_cache.maximum_character_height = font_character->bitmap_height;
+			hardware_character_cache.maximum_character_height = cell_height;
 		}
 
 		next_write_index = (hardware_character_cache.write_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
@@ -734,7 +754,9 @@ cache_hardware_format_character(
 
 		source = (byte *)font->pixels.address + font_character->pixels_offset;
 
-		for (y = 0; y < font_character->bitmap_height; y++)
+		/* (port: the border clear, white with no alpha as the character's
+		own clear texels are) */
+		for (y = 0; y < cell_height; y++)
 		{
 			word *destination = (word *)bitmap_2d_address(
 				hardware_character_cache.bitmap,
@@ -742,13 +764,23 @@ cache_hardware_format_character(
 				(short)(hardware_character->y0 + y),
 				0);
 
-			for (x = 0; x < font_character->bitmap_width; x++)
-				*destination++ = (word)((*source++ << 8) | 0x0FFF);
+			for (x = 0; x < cell_width; x++)
+			{
+				if (y < padding || y >= padding + font_character->bitmap_height ||
+					x < padding || x >= padding + font_character->bitmap_width)
+				{
+					*destination++ = 0x0FFF;
+				}
+				else
+				{
+					*destination++ = (word)((*source++ << 8) | 0x0FFF);
+				}
+			}
 		}
 
 		rasterizer_bitmap_changed(hardware_character_cache.bitmap);
 
-		hardware_character_cache.x0 += font_character->bitmap_width;
+		hardware_character_cache.x0 += cell_width;
 		hardware_character_cache.write_index = (hardware_character_cache.write_index + 1) & (MAXIMUM_HARDWARE_CHARACTERS - 1);
 	}
 

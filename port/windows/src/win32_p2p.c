@@ -9,6 +9,7 @@ links, the user's secret, and Discord's local pipe.
 
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "posix.h"
@@ -172,6 +173,76 @@ static int pipe_server_is_this_user(HANDLE pipe)
 	CloseHandle(process);
 	result = our_user && their_user && EqualSid(our_user, their_user);
 	return result;
+}
+
+/* this machine's SMBIOS system UUID (its type 1 structure's), which a
+reinstall keeps; else the registry's MachineGuid, which it does not (the
+64-bit registry's: this process is 32-bit); as text, 0 if neither
+(p2p.c's hardware id) */
+int posix_hardware_id_source(char *text, int size)
+{
+	DWORD table_size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
+	HKEY key;
+
+	if (table_size > 8 && table_size < 1024 * 1024)
+	{
+		BYTE *table = (BYTE *)malloc(table_size);
+
+		if (table && GetSystemFirmwareTable('RSMB', 0, table, table_size) == table_size)
+		{
+			/* (a RawSMBIOSData: 8 bytes of header, its length, the structures) */
+			DWORD length = *(DWORD *)(table + 4);
+			BYTE *structure = table + 8;
+			BYTE *end = table + 8 + (length < table_size - 8 ? length : table_size - 8);
+
+			while (structure + 4 <= end && structure[1] >= 4)
+			{
+				BYTE *strings = structure + structure[1];
+
+				if (structure[0] == 1 && structure[1] >= 0x18)
+				{
+					BYTE *uuid = structure + 8;
+					int zeros = 1, ones = 1, index;
+
+					for (index = 0; index < 16; index++)
+					{
+						zeros &= uuid[index] == 0x00;
+						ones &= uuid[index] == 0xFF;
+					}
+					if (!zeros && !ones && size >= 33)
+					{
+						for (index = 0; index < 16; index++)
+							snprintf(text + 2 * index, 3, "%02x", uuid[index]);
+						free(table);
+						return 1;
+					}
+					break;
+				}
+				if (structure[0] == 127)
+					break;
+				/* (past its strings, which end with two zeros) */
+				while (strings + 1 < end && (strings[0] || strings[1]))
+					strings++;
+				structure = strings + 2;
+			}
+		}
+		free(table);
+	}
+	if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_READ | KEY_WOW64_64KEY,
+		&key) == ERROR_SUCCESS)
+	{
+		DWORD type = 0;
+		DWORD value_size = (DWORD)size - 1;
+		LONG result = RegQueryValueExA(key, "MachineGuid", NULL, &type, (BYTE *)text, &value_size);
+
+		RegCloseKey(key);
+		if (result == ERROR_SUCCESS && type == REG_SZ && value_size > 0)
+		{
+			text[value_size < (DWORD)size ? value_size : (DWORD)size - 1] = 0;
+			return text[0] != 0;
+		}
+	}
+	return 0;
 }
 
 int posix_discord_connect(void)

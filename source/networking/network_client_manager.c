@@ -589,10 +589,15 @@ struct message_client_ping
 	byte __padding6[2];
 };
 
+/* port/linux/src/p2p.c's */
+void p2p_hardware_id(char *hex, int size);
+
 struct message_client_join_game_request
 {
 	wchar_t machine_name[MAXIMUM_MACHINE_NAME_LENGTH];
 	byte join_token[0x10];
+	/* port: this machine's hardware id, as hex (p2p.c's p2p_hardware_id) */
+	char hardware_id[0x20];
 };
 
 struct message_client_map_is_precached_pregame
@@ -720,7 +725,7 @@ typedef char message_client_broadcast_game_search_size_assert[
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
 typedef char message_client_join_game_request_size_assert[
-	sizeof(struct message_client_join_game_request) == 0x50 ? 1 : -1];
+	sizeof(struct message_client_join_game_request) == 0x70 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -2688,6 +2693,14 @@ static boolean network_game_client_idle_joining(
 					join_game_request.join_token,
 					client->join_parameters.join_token,
 					sizeof(join_game_request.join_token));
+				/* (port: and its hardware id, which a host logs and may have
+				banned: all 32 digits, unended) */
+				{
+					char hardware_id[sizeof(join_game_request.hardware_id) + 1];
+
+					p2p_hardware_id(hardware_id, sizeof(hardware_id));
+					csmemcpy(join_game_request.hardware_id, hardware_id, csstrlen(hardware_id));
+				}
 
 				message = create_network_game_message(
 					_message_client_join_game_request,

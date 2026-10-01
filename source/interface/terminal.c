@@ -314,6 +314,33 @@ boolean terminal_update(
 	return result;
 }
 
+/* port/linux/src/port_config.c's */
+const char *config_string(const char *name);
+
+boolean terminal_command_running = FALSE;
+
+/* port: whether the console shows a kind of what is logged on screen, as
+config.toml's game.console_log says: "all", everything; "important" (and
+anything else), the serious and the important; "none", the serious only
+(the asserts that stop the game). debug.txt has every line whatever it is */
+boolean terminal_shows(
+	short kind)
+{
+	static short level = NONE;
+
+	if (level == NONE)
+	{
+		const char *setting = config_string("game.console_log");
+
+		level = _terminal_message_important;
+		if (setting && !csstrcmp(setting, "all"))
+			level = _terminal_message_chatter;
+		else if (setting && !csstrcmp(setting, "none"))
+			level = _terminal_message_serious;
+	}
+	return kind <= level;
+}
+
 void terminal_printf(
 	real_argb_color const *color,
 	char const *format,

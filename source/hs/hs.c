@@ -2802,6 +2802,7 @@ symbols in this file:
 #include "memory/data.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h"
 #include "objects/damage.h"
 #include "objects/object_lights.h"
 #include "objects/scenery.h"
@@ -14005,7 +14006,104 @@ boolean hs_scenario_postprocess(
 	return success;
 }
 
+/* port: whether this machine plays in another's game (joined to its lobby
+or in its game), whose host decides the game */
+static boolean hs_playing_in_anothers_game(
+	void)
+{
+	return network_game_distributed_client() ||
+		(global_network_game_client_get() && !global_network_game_server_get());
+}
+
+/* port: whether an expression typed at the console (or the telnet console,
+or a cheat button's) changes nothing of the game: every name in it one of
+these (what the machine shows its player, and how its controls feel), the
+rest numbers, strings and true or false */
+static boolean hs_expression_changes_no_game(
+	char const *expression)
+{
+	static char const *const allowed[] = {
+		"set", "cls", "help", "print", "script_doc",
+		"display_framerate", "framerate_throttle", "framerate_lock", "rasterizer_fps_accumulate",
+		"console_dump_to_file", "terminal_render", "screenshot_size", "screenshot_count",
+		"show_hud", "show_hud_help_text", "show_hud_timer", "hud_show_crosshair", "hud_show_health",
+		"hud_show_motion_sensor", "hud_show_shield", "sound_enable", "sound_set_gain",
+		"controls_swapped", "controls_enable_crouch", "controls_enable_doubled_spin",
+		"controls_swap_doubled_spin_state",
+		"player0_look_yaw_rate", "player1_look_yaw_rate", "player2_look_yaw_rate", "player3_look_yaw_rate",
+		"player0_look_pitch_rate", "player1_look_pitch_rate", "player2_look_pitch_rate",
+		"player3_look_pitch_rate",
+		"true", "false", "on", "off",
+	};
+	char const *character = expression;
+
+	while (*character)
+	{
+		char token[64];
+		size_t length = 0;
+		boolean number = TRUE;
+		short index;
+
+		if (isspace((unsigned char)*character) || *character == '(' || *character == ')')
+		{
+			character++;
+			continue;
+		}
+		/* (a string, as print takes) */
+		if (*character == '"')
+		{
+			character = strchr(character + 1, '"');
+			if (!character)
+				return FALSE;
+			character++;
+			continue;
+		}
+		while (*character && !isspace((unsigned char)*character) && *character != '(' && *character != ')' &&
+			*character != '"')
+		{
+			if (length + 1 >= sizeof(token))
+				return FALSE;
+			if (!(*character >= '0' && *character <= '9') && *character != '.' && *character != '-' &&
+				*character != '+')
+			{
+				number = FALSE;
+			}
+			token[length++] = (char)(*character >= 'A' && *character <= 'Z' ? *character - 'A' + 'a' : *character);
+			character++;
+		}
+		token[length] = 0;
+		if (number)
+			continue;
+		for (index = 0; index < (short)NUMBEROF(allowed); index++)
+		{
+			if (!csstrcmp(token, allowed[index]))
+				break;
+		}
+		if (index >= (short)NUMBEROF(allowed))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static boolean hs_compile_and_evaluate_command(
+	char const *expression);
+
+/* port: a command someone typed (the console, the telnet console, a cheat
+button, init.txt): what it logs is its answer, shown whatever
+config.toml's game.console_log is (terminal_command_running) */
 boolean hs_compile_and_evaluate(
+	char const *expression)
+{
+	boolean was_running = terminal_command_running;
+	boolean result;
+
+	terminal_command_running = TRUE;
+	result = hs_compile_and_evaluate_command(expression);
+	terminal_command_running = was_running;
+	return result;
+}
+
+static boolean hs_compile_and_evaluate_command(
 	char const *expression)
 {
 	boolean success = FALSE;
@@ -14015,6 +14113,39 @@ boolean hs_compile_and_evaluate(
 	char buffer[1024];
 	char expanded[1024];
 
+	/* port: playing in another's game, the host decides the game: no
+	cheats, no game speed, nothing else a command changes of the game (the
+	game run each tick also puts back what was changed before joining,
+	cheats_network_client_enforce) */
+	if (hs_playing_in_anothers_game() && !hs_expression_changes_no_game(expression))
+	{
+		console_warning("not while playing in another's game: the host decides the game");
+		return FALSE;
+	}
+	/* port: the host's ban command ("ban <player name>", or its start: Tab
+	completes it), which is no script's */
+	{
+		char const *text = expression;
+
+		while (*text == ' ' || *text == '\t' || *text == '(')
+			text++;
+		if ((text[0] == 'b' || text[0] == 'B') && (text[1] == 'a' || text[1] == 'A') &&
+			(text[2] == 'n' || text[2] == 'N') && (text[3] == ' ' || text[3] == '\t' || text[3] == 0))
+		{
+			char name[64];
+			long length = 0;
+
+			text += 3;
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
+				name[length++] = *text++;
+			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
+				length--;
+			name[length] = 0;
+			return network_game_server_ban_player(name);
+		}
+	}
 	csstrncpy(buffer, expression, sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 	if (strchr(buffer, ';'))

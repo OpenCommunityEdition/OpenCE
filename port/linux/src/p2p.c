@@ -578,6 +578,126 @@ static struct peer *find_peer_by_address(unsigned long address)
 	return NULL;
 }
 
+/* ---------- this machine's hardware id */
+
+#ifdef _WIN32
+/* win32_p2p.c's: the SMBIOS system UUID, else the registry's MachineGuid */
+int posix_hardware_id_source(char *text, int size);
+#endif
+
+/* what this machine is known by, as text (none: 0): Windows' SMBIOS UUID or
+MachineGuid (win32_p2p.c); Linux's /etc/machine-id; Android's ANDROID_ID,
+which only the app's Java can read and puts in hardware_id.txt
+(LauncherActivity.java) */
+static int hardware_id_source(char *text, int size)
+{
+#ifdef _WIN32
+	return posix_hardware_id_source(text, size);
+#else
+	static const char *const linux_paths[] = { "/etc/machine-id", "/var/lib/dbus/machine-id" };
+	char android_path[1024];
+	const char *paths[2];
+	int path_count = 0;
+	int index;
+
+#ifdef HALO_ANDROID
+	snprintf(android_path, sizeof(android_path), "%s/hardware_id.txt", platform_data_root());
+	paths[path_count++] = android_path;
+#else
+	(void)android_path;
+	paths[path_count++] = linux_paths[0];
+	paths[path_count++] = linux_paths[1];
+#endif
+	for (index = 0; index < path_count; index++)
+	{
+		FILE *file = fopen(paths[index], "rb");
+		size_t length;
+
+		if (!file)
+			continue;
+		length = fread(text, 1, (size_t)size - 1, file);
+		fclose(file);
+		text[length] = 0;
+		/* (the line, without its end) */
+		text[strcspn(text, "\r\n")] = 0;
+		if (text[0])
+			return 1;
+	}
+	return 0;
+#endif
+}
+
+/* this machine's hardware id, as hex (empty if it has none to tell): a hash
+of what it is known by (hardware_id_source) keyed for this game, so that
+what is told is no raw serial and is this game's alone; a host it joins
+logs it, and refuses one it banned. Anyone with administrator or root can
+change what it is known by: a stable id, not a proof */
+void p2p_hardware_id(char *hex, int size)
+{
+	static const char key[] = "halo-ce-universal hardware id v1";
+	static char cached[2 * P2P_HARDWARE_ID_BYTES + 1];
+	static int computed;
+
+	if (!computed)
+	{
+		char source[256];
+		unsigned char digest[P2P_SHA256_SIZE];
+
+		computed = 1;
+		cached[0] = 0;
+		if (hardware_id_source(source, sizeof(source)))
+		{
+			p2p_hmac_sha256((const unsigned char *)key, (int)sizeof(key) - 1, source, (int)strlen(source), digest);
+			p2p_hex(digest, P2P_HARDWARE_ID_BYTES, cached);
+		}
+	}
+	snprintf(hex, (size_t)size, "%s", cached);
+}
+
+void p2p_hardware_id_sanitize(char *destination, int size, const char *source)
+{
+	int length = 0;
+
+	for (; source && *source && length < size - 1 && length < 2 * P2P_HARDWARE_ID_BYTES; source++)
+	{
+		char character = *source >= 'A' && *source <= 'F' ? *source - 'A' + 'a' : *source;
+
+		if ((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'))
+			destination[length++] = character;
+	}
+	if (size > 0)
+		destination[length] = 0;
+}
+
+void p2p_discord_identity(char *id, int id_size, char *name, int name_size)
+{
+	if (id_size > 0)
+		id[0] = 0;
+	if (name_size > 0)
+		name[0] = 0;
+	if (!p2p.running || id_size <= 0 || name_size <= 0)
+		return;
+	pthread_mutex_lock(&p2p_lock);
+	p2p_discord_user(id, id_size, name, name_size);
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+unsigned long p2p_peer_endpoint_address(unsigned long virtual_address)
+{
+	struct peer *peer;
+	unsigned long address = 0;
+
+	if (!p2p.running)
+		return 0;
+	pthread_mutex_lock(&p2p_lock);
+	peer = find_peer_by_address(virtual_address);
+	if (peer)
+		address = peer->endpoint.address ? peer->endpoint.address :
+			(peer->candidate_count > 0 ? peer->candidates[0].address : 0);
+	pthread_mutex_unlock(&p2p_lock);
+	return address;
+}
+
 static int is_virtual_address(unsigned long address)
 {
 	/* 100.64.0.0/10 */

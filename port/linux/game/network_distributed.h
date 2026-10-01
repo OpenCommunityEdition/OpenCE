@@ -56,6 +56,12 @@ enum
 	_distributed_message_relayed_actions,
 	/* the unreliable messages of a tick to one machine, in one datagram */
 	_distributed_message_batch,
+	/* the host's text to every client, which shows it in red on its
+	console (a player dropped for cheating: distributed_note_client_clock) */
+	_distributed_message_notice,
+	/* a client's Discord user, as its Discord told it (reliable, with its
+	ready: distributed_client_send_identity) */
+	_distributed_message_client_identity,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -131,6 +137,7 @@ a longer message is split where a batch is full */
 /* sends a message (its header filled in here) where destination says: the
 unreliable ones gathered into one datagram a machine each tick */
 void distributed_send(void *message, byte type, short count, word size, short destination);
+void distributed_client_send_identity(void);
 /* ... unreliably to one client (the host) */
 void distributed_send_to_machine(long machine_index, void *message, byte type, short count, word size);
 /* ... reliably to one client (the host) */

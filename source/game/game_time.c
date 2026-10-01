@@ -284,6 +284,10 @@ real game_time_get_speed(
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 555, game_time_globals);
 
+	/* port: a client of another's game runs at the host's speed (its own
+	set before it joined too: cheats_network_client_enforce) */
+	if (network_game_distributed_client())
+		return 1.0f;
 	return game_time_globals->speed;
 }
 
@@ -295,6 +299,21 @@ void game_time_set_speed(
 	game_time_globals->speed = speed;
 
 	return;
+}
+
+/* port: the game's own speed put back; whether it was another
+(cheats_network_client_enforce) */
+boolean game_time_reset_speed(
+	void)
+{
+	boolean changed;
+
+	if (!game_time_globals)
+		return FALSE;
+	changed = game_time_globals->speed != 1.0f;
+	game_time_globals->speed = 1.0f;
+
+	return changed;
 }
 
 /* whether a client's clock waits for the host's first game update, which
