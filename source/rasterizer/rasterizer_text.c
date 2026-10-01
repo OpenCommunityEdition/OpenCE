@@ -99,6 +99,13 @@ enum
 
 /* ---------- macros */
 
+/* The glyphs are point sampled (rasterizer_draw_string). Where the screen
+has more pixels than 480 lines, a pixel centre can fall exactly on a glyph's
+edge, and rounding would then pick the next glyph in the cache; texture
+coordinates this fraction of a texel inside the edges keep every sample on
+the glyph. */
+#define GLYPH_TEXEL_INSET (1.0f / 32.0f)
+
 /* ---------- structures */
 
 struct font_character
@@ -323,10 +330,10 @@ rasterizer_draw_character(
 		vertices[0].position.y = vertices[1].position.y = (real)y0;
 		vertices[2].position.y = vertices[3].position.y = (real)(y0 + dy);
 
-		vertices[0].texture_coordinates.x = vertices[3].texture_coordinates.x = (real)u0;
-		vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = (real)(u0 + dx);
-		vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0;
-		vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy);
+		vertices[0].texture_coordinates.x = vertices[3].texture_coordinates.x = (real)u0 + GLYPH_TEXEL_INSET;
+		vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = (real)(u0 + dx) - GLYPH_TEXEL_INSET;
+		vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0 + GLYPH_TEXEL_INSET;
+		vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy) - GLYPH_TEXEL_INSET;
 
 		rasterizer_text_draw_character(vertices);
 	}
@@ -411,7 +418,12 @@ rasterizer_draw_string(
 			parameters.map_texture_scale[0].j = 1.0f / (real)bitmap->height;
 			parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 			parameters.meter_parameters = NULL;
-			parameters.point_sampled = FALSE;
+			/* point sampled: at one texel per pixel, as on the Xbox, this
+			draws the same, but where the screen has more pixels than 480
+			lines (port/linux/src/d3d8_gl.c) the glyphs are magnified, and
+			linear filtering would blur them and blend in the neighbouring
+			glyphs of the cache, which has no gaps between them */
+			parameters.point_sampled = TRUE;
 			parameters.framebuffer_blend_function = _shader_framebuffer_blend_function_alpha_blend;
 			parameters.map[0] = bitmap;
 
@@ -507,7 +519,8 @@ rasterizer_draw_unicode_string(
 			parameters.map_texture_scale[0].j = 1.0f / (real)bitmap->height;
 			parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 			parameters.meter_parameters = NULL;
-			parameters.point_sampled = FALSE;
+			/* point sampled, as in rasterizer_draw_string */
+			parameters.point_sampled = TRUE;
 			parameters.framebuffer_blend_function = _shader_framebuffer_blend_function_alpha_blend;
 			parameters.map[0] = bitmap;
 
@@ -574,10 +587,10 @@ rasterizer_draw_character_with_dropshadow(
 			vertices[0].position.y = vertices[1].position.y = top + y_offset;
 			vertices[2].position.y = vertices[3].position.y = bottom + y_offset;
 
-			vertices[0].texture_coordinates.x = vertices[3].texture_coordinates.x = (real)u0;
-			vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = (real)(u0 + dx);
-			vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0;
-			vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy);
+			vertices[0].texture_coordinates.x = vertices[3].texture_coordinates.x = (real)u0 + GLYPH_TEXEL_INSET;
+			vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = (real)(u0 + dx) - GLYPH_TEXEL_INSET;
+			vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0 + GLYPH_TEXEL_INSET;
+			vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy) - GLYPH_TEXEL_INSET;
 
 			rasterizer_text_draw_character(vertices);
 
