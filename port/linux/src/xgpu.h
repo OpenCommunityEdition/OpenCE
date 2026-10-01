@@ -100,7 +100,9 @@ struct nv2a_pixel_shader_key
 	unsigned char fog_table_mode;
 	/* inside a visibility test: count the samples that pass (Android) */
 	unsigned char count_samples;
-	unsigned char pad;
+	/* stage 0 is a glyph of the text cache drawn larger than its texels,
+	sampled inside glyph_rect only (d3d8_gl.c, nv2a_psh.c) */
+	unsigned char glyph;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);

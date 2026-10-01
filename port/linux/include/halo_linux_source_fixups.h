@@ -43,6 +43,9 @@ long halo_screen_width(void);
 long halo_screen_commit(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* while TRUE, each immediate-mode draw is one glyph of the text cache
+(source/rasterizer/rasterizer_text.c) */
+void halo_screen_glyphs(unsigned char drawing);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

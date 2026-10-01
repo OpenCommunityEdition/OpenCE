@@ -347,6 +347,11 @@ static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *k
 			);
 		break;
 	default:
+		if (stage == 0 && key->glyph)
+		{
+			xgpu_text_append(text, "glyph_sample(tex0, (%s).xy * texture_scale[0].xy)", coordinates);
+			break;
+		}
 		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy" SAMPLE_BIAS ")", stage, coordinates, stage
 #ifdef HALO_ANDROID
 			, stage
@@ -565,7 +570,30 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"vec3 signed_bytes(vec3 x)\n"
 		"{\n"
 		"	return vec3(signed_byte(x.r), signed_byte(x.g), signed_byte(x.b));\n"
-		"}\n"
+		"}\n");
+	if (key->glyph)
+	{
+		/* A glyph of the text cache drawn larger than its texels, where the
+		screen has more pixels than 480 lines. Linear filtering blurs it and
+		blends in the glyphs next to it in the cache, point sampling leaves
+		blocky texels. Here each texel is flat and its edges blend over half
+		a texel (at least a pixel), and texels outside the glyph's rectangle
+		(glyph_rect, in texels) are transparent. */
+		xgpu_text_append(&text,
+			"uniform vec4 glyph_rect;\n"
+			"vec4 glyph_sample(sampler2D map, vec2 coordinates)\n"
+			"{\n"
+			"	vec2 size = vec2(textureSize(map, 0));\n"
+			"	vec2 texel = coordinates * size;\n"
+			"	vec2 seam = floor(texel + 0.5);\n"
+			"	vec2 blend = max(vec2(0.5), fwidth(texel));\n"
+			"	texel = seam + clamp((texel - seam) / blend, -0.5, 0.5);\n"
+			"	vec2 inside = clamp(texel - glyph_rect.xy + 0.5, 0.0, 1.0) * clamp(glyph_rect.zw - texel + 0.5, 0.0, 1.0);\n"
+			"	vec4 color = textureLod(map, clamp(texel, glyph_rect.xy + 0.5, glyph_rect.zw - 0.5) / size, 0.0);\n"
+			"	return vec4(color.rgb, color.a * inside.x * inside.y);\n"
+			"}\n");
+	}
+	xgpu_text_append(&text,
 		"void main()\n"
 		"{\n"
 		"\tvec4 v0 = xD0;\n"

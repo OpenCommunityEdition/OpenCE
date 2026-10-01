@@ -134,6 +134,18 @@ void halo_screen_ui_offset(unsigned char centered)
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
 }
 
+/* The text draws each character as a quad of a 128x128 cache of glyphs,
+packed with no gaps between them (source/rasterizer/rasterizer_text.c). On
+a target with more pixels than its units the glyphs are magnified, and the
+quad's texture coordinates bound the glyph: such a draw samples inside them
+only (glyph_sample, nv2a_psh.c). */
+static BOOL glyphs_drawing;
+
+void halo_screen_glyphs(unsigned char drawing)
+{
+	glyphs_drawing = drawing != 0;
+}
+
 /* ---------- state the XDK header's inline functions read and write */
 
 DWORD D3D__RenderState[D3DRS_MAX];
@@ -196,6 +208,8 @@ struct draw_uniforms
 	float texture_scale[4][4];
 	float screen_offset;
 	float texture_lod_bias[4];
+	/* set by each glyph's draw (D3DDevice_End), not with the others */
+	float glyph_rect[4];
 };
 
 struct program_entry
@@ -213,6 +227,7 @@ struct program_entry
 	GLint bump_matrix, bump_luminance, texture_scale;
 	GLint texture_lod_bias;
 	GLint screen_offset;
+	GLint glyph_rect;
 
 	/* the vertex constants c[0..constant_count) the program uses; with
 	consecutive locations, a changed range is uploaded by itself */
@@ -1954,6 +1969,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->texture_scale = glGetUniformLocation(entry->program, "texture_scale");
 	entry->texture_lod_bias = glGetUniformLocation(entry->program, "texture_lod_bias");
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
+	entry->glyph_rect = glGetUniformLocation(entry->program, "glyph_rect");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		char name[8];
@@ -2512,6 +2528,10 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #ifdef HALO_ANDROID
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
 #endif
+	/* a magnified glyph (halo_screen_glyphs); at one texel per pixel the
+	game's own sampling is exact */
+	key.glyph = immediate && glyphs_drawing && key.sampler_type[0] == _xgpu_sampler_2d &&
+		(target_scale[0] > 1.0f || target_scale[1] > 1.0f);
 
 	entry = program_get(vertex_shader_get(program, immediate), fragment_shader_get(&key));
 	if (!entry)
@@ -3391,15 +3411,43 @@ static void immediate_emit(void)
 	device.immediate_count++;
 }
 
+/* the rectangle a glyph's quad spans in the cache: its texture coordinates,
+register 4, in texels (rasterizer_text.c) */
+static void glyph_rect_set(struct program_entry *entry, unsigned long count)
+{
+	const unsigned long floats = XGPU_VERTEX_ATTRIBUTE_COUNT * 4;
+	const float *coordinates = device.immediate_vertices + 4 * 4;
+	float rect[4];
+	unsigned long index;
+
+	rect[0] = rect[2] = coordinates[0];
+	rect[1] = rect[3] = coordinates[1];
+	for (index = 1; index < count; index++)
+	{
+		const float *vertex = coordinates + index * floats;
+
+		rect[0] = fminf(rect[0], vertex[0]);
+		rect[1] = fminf(rect[1], vertex[1]);
+		rect[2] = fmaxf(rect[2], vertex[0]);
+		rect[3] = fmaxf(rect[3], vertex[1]);
+	}
+	uniform_vec4(entry->glyph_rect, entry->uniforms.glyph_rect, rect, 1);
+}
+
 void WINAPI D3DDevice_End(void)
 {
 	unsigned long stride = XGPU_VERTEX_ATTRIBUTE_COUNT * 4 * sizeof(float);
 	unsigned long offset, index, count = device.immediate_count;
 	D3DPRIMITIVETYPE type = device.immediate_type;
+	struct program_entry *entry;
 
 	device.immediate_active = FALSE;
-	if (!count || !prepare_draw(TRUE))
+	entry = count ? prepare_draw(TRUE) : NULL;
+	if (!entry)
 		return;
+	/* only the programs of glyphs (prepare_draw) have the uniform */
+	if (entry->glyph_rect >= 0)
+		glyph_rect_set(entry, count);
 	trace_draw("immediate", type, count, device.immediate_vertices);
 	offset = stream_upload(device.immediate_vertices, count * stride);
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
