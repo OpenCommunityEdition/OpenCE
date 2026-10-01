@@ -37,6 +37,10 @@ static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
 /* the menus' pointer (platform_ui_pointer_set_active), under input_lock */
 static struct platform_ui_pointer ui_pointer;
 static float ui_pointer_wheel;
+/* where on the desktop the cursor was at the last motion: the mouse moved
+only if that changed */
+static float ui_pointer_desktop_x, ui_pointer_desktop_y;
+static BOOL ui_pointer_desktop_known;
 #endif
 static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -301,13 +305,25 @@ BOOL platform_offer_game_data(const char *destination)
 }
 #endif
 
+/* port/linux/game/render_interpolation.c */
+void render_interpolation_reset(void);
+
+/* display.interpolation, read once */
+static int interpolation_enabled = -1;
+
 int halo_interpolation_enabled(void)
 {
-	static int enabled = -1;
+	if (interpolation_enabled < 0)
+		interpolation_enabled = config_boolean("display.interpolation");
+	return interpolation_enabled;
+}
 
-	if (enabled < 0)
-		enabled = config_boolean("display.interpolation");
-	return enabled;
+/* turned back on, nothing is blended with what was kept before it was off */
+void halo_interpolation_set_enabled(int enabled)
+{
+	if (enabled && !halo_interpolation_enabled())
+		render_interpolation_reset();
+	interpolation_enabled = enabled != 0;
 }
 
 #ifndef HALO_ANDROID
@@ -339,18 +355,97 @@ BOOL platform_screen_mode(long *width, long *height)
 	return TRUE;
 }
 
+BOOL platform_fullscreen(void)
+{
+	return platform_window && (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+BOOL platform_set_fullscreen(BOOL fullscreen, BOOL wait)
+{
+	if (!platform_window || !SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false))
+	{
+		platform_log("cannot switch to %s: %s", fullscreen ? "fullscreen" : "the window", SDL_GetError());
+		return FALSE;
+	}
+	/* (some systems switch later) */
+	if (wait)
+		SDL_SyncWindow(platform_window);
+	return TRUE;
+}
+
+#endif
+/* display.window_scale, read once */
+static int window_scale = 0;
+
+int platform_window_scale(void)
+{
+	if (window_scale < 1)
+	{
+		window_scale = (int)config_integer("display.window_scale");
+		if (window_scale < 1)
+			window_scale = 1;
+	}
+	return window_scale;
+}
+
+#ifndef HALO_ANDROID
+/* a scale set while fullscreen, which only a window can take */
+static BOOL window_scale_pending = FALSE;
+
+int platform_window_scale_maximum(void)
+{
+	SDL_Rect usable;
+	int maximum;
+
+	if (!platform_window || !SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(platform_window), &usable))
+		return platform_window_scale();
+	maximum = usable.w / 640 < usable.h / 480 ? usable.w / 640 : usable.h / 480;
+	return maximum > 1 ? maximum : 1;
+}
+
+/* the window at the scale, in the middle of its display */
+static BOOL platform_apply_window_scale(void)
+{
+	SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
+
+	window_scale_pending = FALSE;
+	if (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_MAXIMIZED)
+		SDL_RestoreWindow(platform_window);
+	if (!SDL_SetWindowSize(platform_window, 640 * window_scale, 480 * window_scale))
+	{
+		platform_log("cannot resize the window: %s", SDL_GetError());
+		return FALSE;
+	}
+	SDL_SetWindowPosition(platform_window, SDL_WINDOWPOS_CENTERED_DISPLAY(display),
+		SDL_WINDOWPOS_CENTERED_DISPLAY(display));
+	return TRUE;
+}
+
+BOOL platform_set_window_scale(int scale)
+{
+	if (!platform_window || scale < 1)
+		return FALSE;
+	window_scale = scale;
+	/* (SDL leaves a fullscreen window's size alone: the window takes the scale
+	when it is one again, platform_pump_events) */
+	if (platform_fullscreen())
+	{
+		window_scale_pending = TRUE;
+		return TRUE;
+	}
+	return platform_apply_window_scale();
+}
+
 #endif
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
-	int scale = (int)config_integer("display.window_scale");
+	int scale = platform_window_scale();
 	int version;
 
 	if (platform_window)
 		return TRUE;
 	if (!platform_sdl_initialize())
 		return FALSE;
-	if (scale < 1)
-		scale = 1;
 
 #ifdef HALO_ANDROID
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -428,6 +523,25 @@ void platform_video_drawable_size(int *width, int *height)
 void platform_video_swap(void)
 {
 	SDL_GL_SwapWindow(platform_window);
+}
+
+BOOL platform_vsync(void)
+{
+	int interval = 0;
+
+	if (!platform_gl_context || !SDL_GL_GetSwapInterval(&interval))
+		return config_boolean("display.vsync");
+	return interval != 0;
+}
+
+BOOL platform_set_vsync(BOOL vsync)
+{
+	if (!platform_gl_context || !SDL_GL_SetSwapInterval(vsync ? 1 : 0))
+	{
+		platform_log("cannot turn vsync %s: %s", vsync ? "on" : "off", SDL_GetError());
+		return FALSE;
+	}
+	return TRUE;
 }
 
 void platform_mouse_capture(BOOL capture)
@@ -752,13 +866,10 @@ void platform_pump_events(void)
 				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
 			}
 #ifndef HALO_ANDROID
-			/* F11 switches between fullscreen and the window (SDL keeps the
-			window's size and place while fullscreen) */
+			/* F11 switches between fullscreen and the window for this run
+			only (config.toml keeps display.fullscreen) */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
-			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
-			}
+				platform_set_fullscreen(!platform_fullscreen(), FALSE);
 #endif
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
@@ -766,9 +877,20 @@ void platform_pump_events(void)
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
+				float desktop_x, desktop_y;
+
+				/* (the window changing under a still cursor, fullscreen or a
+				new size, moves it in the window but not on the desktop: the
+				pointer follows without the hover of a movement, so the menus
+				keep their focus) */
+				SDL_GetGlobalMouseState(&desktop_x, &desktop_y);
 				ui_pointer.x = event.motion.x;
 				ui_pointer.y = event.motion.y;
-				ui_pointer.moved = TRUE;
+				if (!ui_pointer_desktop_known || desktop_x != ui_pointer_desktop_x || desktop_y != ui_pointer_desktop_y)
+					ui_pointer.moved = TRUE;
+				ui_pointer_desktop_x = desktop_x;
+				ui_pointer_desktop_y = desktop_y;
+				ui_pointer_desktop_known = TRUE;
 				break;
 			}
 #endif
@@ -836,6 +958,12 @@ void platform_pump_events(void)
 		case SDL_EVENT_GAMEPAD_ADDED:
 			SDL_OpenGamepad(event.gdevice.which);
 			break;
+#ifndef HALO_ANDROID
+		case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+			if (window_scale_pending)
+				platform_apply_window_scale();
+			break;
+#endif
 		default:
 			break;
 		}
@@ -859,6 +987,7 @@ void platform_ui_pointer_set_active(BOOL active)
 	input_state.ui_pointer = active;
 	memset(&ui_pointer, 0, sizeof(ui_pointer));
 	ui_pointer_wheel = 0.0f;
+	ui_pointer_desktop_known = FALSE;
 	input_state.mouse_dx = 0.0f;
 	input_state.mouse_dy = 0.0f;
 	input_state.mouse_wheel = 0.0f;

@@ -873,7 +873,9 @@ enum
 {
 	/* the button event types are the gamepad button indices; the enumeration
 	runs 0..33 and only the types this file names are listed */
+	_widget_event_a_button = _gamepad_analog_button_a,
 	_widget_event_b_button = _gamepad_analog_button_b,
+	_widget_event_start_button = _gamepad_binary_button_start,
 	_widget_event_dpad_up = _gamepad_binary_button_dpad_up,
 	_widget_event_dpad_down = _gamepad_binary_button_dpad_down,
 	_widget_event_dpad_left = _gamepad_binary_button_dpad_left,
@@ -1419,6 +1421,15 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+static short ui_halo_settings_widget_get(
+	struct widget_instance const *widget);
+static boolean ui_halo_settings_widget_set_text(
+	struct widget_instance *widget);
+static void ui_halo_settings_row_widen(
+	struct widget_instance const *widget,
+	rectangle2d *bounds);
+static void ui_halo_settings_menu_loaded(
+	struct widget_instance *root);
 
 /* ---------- globals */
 
@@ -1448,6 +1459,11 @@ static struct stack_memory_pool_medium __medium_widget_memory_pool =
 struct stack_memory_pool *widget_memory_pool = &__medium_widget_memory_pool.pool;
 
 static boolean main_screen_shell_first_load = TRUE;
+
+/* port: set while HALO SETTINGS loads the widgets it is made of, whose tags'
+created handlers would set them up for the screens they come from (ADVANCED
+CONTROLS' list reads the profile being edited, and there is none) */
+static boolean ui_halo_settings_loading = FALSE;
 
 short dashboard_abort_error = NONE;
 
@@ -2617,7 +2633,14 @@ boolean widget_event_function_list_widget_goto_next_item(
 				child = widget->child;
 				item_index = 0;
 			}
-			if (child)
+			/* port: HALO SETTINGS' rows share their tag with another row, which
+			a lookup by tag would find instead */
+			if (child && ui_halo_settings_widget_get(child) != NONE)
+			{
+				widget_instance_give_focus_directly(widget, child);
+				widget->parameters.list.selected_index = (short)item_index;
+			}
+			else if (child)
 			{
 				widget_instance_give_focus_by_tag(
 					widget,
@@ -2743,10 +2766,18 @@ boolean widget_event_function_list_widget_goto_previous_item(
 					item_index++;
 				}
 			}
-			widget_instance_give_focus_by_tag(
-				widget,
-				child->definition_tag_index,
-				widget->local_player_index);
+			/* port: as in widget_event_function_list_widget_goto_next_item */
+			if (ui_halo_settings_widget_get(child) != NONE)
+			{
+				widget_instance_give_focus_directly(widget, child);
+			}
+			else
+			{
+				widget_instance_give_focus_by_tag(
+					widget,
+					child->definition_tag_index,
+					widget->local_player_index);
+			}
 			widget->parameters.list.selected_index = (short)item_index;
 		}
 	}
@@ -3615,7 +3646,8 @@ static void widget_instance_initialize(
 		struct ui_widget_event_handler_reference *handler =
 			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
 
-		if (handler->event_type == _widget_event_created)
+		/* port: not for the widgets HALO SETTINGS is made of */
+		if (handler->event_type == _widget_event_created && !ui_halo_settings_loading)
 		{
 			struct event_record event = {0};
 			boolean widget_deleted;
@@ -3743,6 +3775,10 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
+			/* port: HALO SETTINGS in the menus that offer it, unless a created
+			handler closed the widget */
+			if (!parent && widget_globals.active_widgets[widget_stack] == widget)
+				ui_halo_settings_menu_loaded(widget);
 		}
 		else
 		{
@@ -4864,7 +4900,9 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	/* port: HALO SETTINGS' text boxes have the code's text */
+	if (!ui_halo_settings_widget_set_text(widget) &&
+		definition->text_label_string_list.index != NONE)
 	{
 		short string_list_index;
 		wchar_t *string;
@@ -4944,6 +4982,7 @@ static void widget_instance_render_text_box(
 		return;
 	alpha_modifier = widget_instance_get_cumulative_alpha_modifier(widget);
 	bounds = definition->bounds;
+	ui_halo_settings_row_widen(widget, &bounds);
 	clip = clip_rect ? *clip_rect : definition->bounds;
 	bounds.x1 += offset.x;
 	bounds.y1 += offset.y;
@@ -5195,6 +5234,908 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
+/* ---------- HALO SETTINGS (desktop builds)
+
+The desktop builds' own settings (port/linux/include/halo_settings.h) have a
+screen in the menus, opened from the main menu (after SETTINGS, which is the
+player profiles') and from the single-player pause menu (after RESUME GAME).
+Each of those lists gets a HALO SETTINGS row as its screen loads, drawn from
+the tag of the row it follows.
+
+No map has a screen for it, nor do the two menus share any: the campaign
+maps carry the pause menu and none of the main menu's screens, ui.map the
+reverse. So HALO SETTINGS is a screen of the map's own, opened as any item
+opens a screen (the history then leads back to HALO SETTINGS' row), and laid
+out anew: the pause menu again, in the help screens' box; in the main menu,
+ADVANCED CONTROLS' screen, with EDIT PROFILE SETTINGS' rows and description
+panel. Its left column lists the categories, config.toml's sections; its
+right column the selected category's settings. Both are lists of the
+screen's own tags whose rows are drawn from the menu's row's tag. The
+widgets of HALO SETTINGS answer their buttons in code, and run none of their
+tags' handlers and game data functions, which expect the screens they come
+from.
+
+Up and down move through a column. A or right on a category moves to its
+settings, and B back. A turns a setting on or off, or steps a number up;
+left and right step either. The settings change at once. B, BACK and START
+go back a column, then to the menu before. */
+
+#define UI_HALO_SETTINGS_PAUSE_TAG(leaf) "ui\\shell\\solo_game\\pause_game\\" leaf
+#define UI_HALO_SETTINGS_MAIN_MENU_TAG(leaf) "ui\\shell\\main_menu\\" leaf
+#define UI_HALO_SETTINGS_PROFILE_TAG(leaf) \
+	"ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\" leaf
+#define UI_HALO_SETTINGS_ADVANCED_TAG(leaf) \
+	"ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\advanced_controls\\" leaf
+
+enum
+{
+	_ui_halo_settings_widget_item,				/* HALO SETTINGS in the pause menu */
+	_ui_halo_settings_widget_main_menu_item,	/* ... and in the main menu */
+	_ui_halo_settings_widget_screen,
+	_ui_halo_settings_widget_title,
+	_ui_halo_settings_widget_categories,		/* the left column */
+	_ui_halo_settings_widget_options,			/* the right column */
+	_ui_halo_settings_widget_display,			/* the left column's rows */
+	_ui_halo_settings_widget_audio,
+	_ui_halo_settings_widget_input,
+	_ui_halo_settings_widget_first_setting,		/* halo_settings.h's, in order */
+	NUMBER_OF_UI_HALO_SETTINGS_WIDGETS = _ui_halo_settings_widget_first_setting + NUMBER_OF_HALO_SETTINGS,
+	NUMBER_OF_UI_HALO_SETTINGS_CATEGORIES = _ui_halo_settings_widget_input - _ui_halo_settings_widget_display + 1,
+	/* DISPLAY's */
+	MAXIMUM_UI_HALO_SETTINGS_OPTIONS = 5
+};
+
+enum
+{
+	_ui_halo_settings_menu_main,
+	_ui_halo_settings_menu_pause,
+	NUMBER_OF_UI_HALO_SETTINGS_MENUS
+};
+
+enum
+{
+	/* the right column's width: its longest label, MOUSE SENSITIVITY: 1.25,
+	is 231 pixels of ui\large_ui, more than either menu's rows (202 and 232)
+	hold */
+	UI_HALO_SETTINGS_OPTION_WIDTH = 250,
+
+	/* where the help screens place their box and its caption, the body
+	between the bands of its art, and where their key goes */
+	UI_HALO_SETTINGS_BOX_X = 64,
+	UI_HALO_SETTINGS_BOX_Y = 132,
+	UI_HALO_SETTINGS_BOX_CAPTION_X = 14,
+	UI_HALO_SETTINGS_BOX_CAPTION_Y = 5,
+	UI_HALO_SETTINGS_BOX_BODY_TOP = 29,
+	UI_HALO_SETTINGS_BOX_BODY_BOTTOM = 190,
+	UI_HALO_SETTINGS_BOX_KEY_Y = 195,
+	/* ... its sides' art, and the columns' room beside them */
+	UI_HALO_SETTINGS_BOX_SIDE = 16,
+	UI_HALO_SETTINGS_BOX_MARGIN = 8,
+	/* the pause menu's rows (27 pixels) as they are spaced there */
+	UI_HALO_SETTINGS_BOX_ROW_PITCH = 28,
+	/* ... and in the pause menu with HALO SETTINGS, five where four were, the
+	last still above the line over the key (2 pixels clear) */
+	UI_HALO_SETTINGS_PAUSE_ROW_PITCH = 23,
+
+	/* the main menu's screen: the rows where EDIT PROFILE SETTINGS has them,
+	the title's letters in line with theirs where the header was, and the
+	right column inside the description panel */
+	UI_HALO_SETTINGS_MAIN_ROWS_Y = 78,
+	UI_HALO_SETTINGS_MAIN_TITLE_Y = 27,
+	UI_HALO_SETTINGS_MAIN_PANEL_MARGIN = 10
+};
+
+typedef char verify_ui_halo_settings_box_rows_fit[
+	(MAXIMUM_UI_HALO_SETTINGS_OPTIONS - 1) * UI_HALO_SETTINGS_BOX_ROW_PITCH + 27 <=
+		UI_HALO_SETTINGS_BOX_BODY_BOTTOM - UI_HALO_SETTINGS_BOX_BODY_TOP ? 1 : -1];
+
+static char const ui_halo_settings_widget_names[NUMBER_OF_UI_HALO_SETTINGS_WIDGETS][32] =
+{
+	"halo_settings_item",
+	"halo_settings_main_menu_item",
+	"halo_settings_screen",
+	"halo_settings_title",
+	"halo_settings_categories",
+	"halo_settings_options",
+	"halo_settings_display",
+	"halo_settings_audio",
+	"halo_settings_input",
+	"halo_settings_fullscreen",
+	"halo_settings_vsync",
+	"halo_settings_interpolation",
+	"halo_settings_direct_camera",
+	"halo_settings_window_scale",
+	"halo_settings_audio_enabled",
+	"halo_settings_master_volume",
+	"halo_settings_mouse_sensitivity",
+	"halo_settings_mouse_aim_assist",
+	"halo_settings_invert_mouse"
+};
+
+static char const *const ui_halo_settings_category_labels[NUMBER_OF_UI_HALO_SETTINGS_CATEGORIES] =
+{
+	"DISPLAY",
+	"AUDIO",
+	"INPUT"
+};
+
+static struct
+{
+	char const *label;
+	short category;
+} const ui_halo_settings_options[NUMBER_OF_HALO_SETTINGS] =
+{
+	{ "FULLSCREEN", _ui_halo_settings_widget_display },
+	{ "VSYNC", _ui_halo_settings_widget_display },
+	{ "INTERPOLATION", _ui_halo_settings_widget_display },
+	{ "DIRECT CAMERA", _ui_halo_settings_widget_display },
+	{ "WINDOW SCALE", _ui_halo_settings_widget_display },
+	{ "AUDIO", _ui_halo_settings_widget_audio },
+	{ "MASTER VOLUME", _ui_halo_settings_widget_audio },
+	{ "MOUSE SENSITIVITY", _ui_halo_settings_widget_input },
+	{ "MOUSE AIM ASSIST", _ui_halo_settings_widget_input },
+	{ "INVERT MOUSE", _ui_halo_settings_widget_input }
+};
+
+struct ui_halo_settings_menu
+{
+	char const *screen;
+	char const *list;
+	/* the row HALO SETTINGS follows, whose tag it is drawn from */
+	char const *row;
+	short item;
+};
+
+static struct ui_halo_settings_menu const ui_halo_settings_menus[NUMBER_OF_UI_HALO_SETTINGS_MENUS] =
+{
+	{
+		UI_HALO_SETTINGS_MAIN_MENU_TAG("main_menu"),
+		UI_HALO_SETTINGS_MAIN_MENU_TAG("main_menu_select_list"),
+		UI_HALO_SETTINGS_MAIN_MENU_TAG("main_menu_item_settings"),
+		_ui_halo_settings_widget_main_menu_item
+	},
+	{
+		UI_HALO_SETTINGS_PAUSE_TAG("pause_game"),
+		UI_HALO_SETTINGS_PAUSE_TAG("pause_list"),
+		UI_HALO_SETTINGS_PAUSE_TAG("resume_game_button"),
+		_ui_halo_settings_widget_item
+	}
+};
+
+/* the main menu's other items' art: their letters blue and less than half
+opaque, and the focused item's white in a blue glow (each copy of the
+letters that make the glow adds this much) */
+static real_argb_color const ui_halo_settings_label_color = { { 119.0f / 255.0f, 35.0f / 255.0f, 149.0f / 255.0f, 1.0f } };
+static real_argb_color const ui_halo_settings_glow_color = { { 0.12f, 41.0f / 255.0f, 149.0f / 255.0f, 1.0f } };
+
+enum
+{
+	/* where the main menu row's label begins, its capitals then on the rows
+	the other items' letters take (6 to 26 of 33), and how far the focused
+	label's glow reaches */
+	UI_HALO_SETTINGS_LABEL_TOP = 6,
+	UI_HALO_SETTINGS_GLOW_RADIUS = 2
+};
+
+static short ui_halo_settings_widget_get(
+	struct widget_instance const *widget)
+{
+	short index;
+
+	for (index = 0; index < NUMBER_OF_UI_HALO_SETTINGS_WIDGETS; index++)
+	{
+		if (widget->name == ui_halo_settings_widget_names[index])
+			return index;
+	}
+
+	return NONE;
+}
+
+/* a setting's row whose setting is a number */
+static boolean ui_halo_settings_row_is_number(
+	struct widget_instance const *widget)
+{
+	short halo_settings_widget = ui_halo_settings_widget_get(widget);
+
+	return halo_settings_widget >= _ui_halo_settings_widget_first_setting &&
+		!halo_setting_is_switch(halo_settings_widget - _ui_halo_settings_widget_first_setting);
+}
+
+/* the code's text for a text box of HALO SETTINGS'; FALSE for any other */
+static boolean ui_halo_settings_widget_set_text(
+	struct widget_instance *widget)
+{
+	short halo_settings_widget = ui_halo_settings_widget_get(widget);
+	char text[64];
+	unsigned long size;
+
+	if (halo_settings_widget == NONE || widget->type != _ui_widget_type_text_box)
+		return FALSE;
+	if (halo_settings_widget >= _ui_halo_settings_widget_first_setting)
+	{
+		short setting = halo_settings_widget - _ui_halo_settings_widget_first_setting;
+		char value[16];
+
+		halo_setting_text(setting, value, sizeof(value));
+		csstrcpy(text, ui_halo_settings_options[setting].label);
+		csstrcat(text, ": ");
+		csstrcat(text, value);
+	}
+	else if (halo_settings_widget >= _ui_halo_settings_widget_display)
+	{
+		csstrcpy(text, ui_halo_settings_category_labels[halo_settings_widget - _ui_halo_settings_widget_display]);
+	}
+	else
+	{
+		csstrcpy(text, "HALO SETTINGS");
+	}
+	size = 2 * csstrlen(text) + 2;
+	widget->parameters.text_box.text = pool_resize_pointer(
+		widget_memory_pool,
+		widget->parameters.text_box.text,
+		size,
+		__FILE__,
+		__LINE__);
+	if (widget->parameters.text_box.text)
+		ascii_to_wide(text, widget->parameters.text_box.text, size);
+
+	return TRUE;
+}
+
+/* the bounds of a setting's row, wider than its tag's */
+static void ui_halo_settings_row_widen(
+	struct widget_instance const *widget,
+	rectangle2d *bounds)
+{
+	if (ui_halo_settings_widget_get(widget) >= _ui_halo_settings_widget_first_setting &&
+		bounds->x1 - bounds->x0 < UI_HALO_SETTINGS_OPTION_WIDTH)
+	{
+		bounds->x1 = bounds->x0 + UI_HALO_SETTINGS_OPTION_WIDTH;
+	}
+
+	return;
+}
+
+/* the widget, or one under it, drawn from the tag of that name, or NULL */
+static struct widget_instance *ui_halo_settings_find(
+	struct widget_instance *widget,
+	char const *tag_name)
+{
+	long tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, tag_name);
+
+	return tag_index == NONE ? NULL : widget_instance_find_by_tag_index_recursive(widget, tag_index);
+}
+
+/* a child of the screen's, by its HALO SETTINGS name, or NULL */
+static struct widget_instance *ui_halo_settings_child(
+	struct widget_instance *screen,
+	short halo_settings_widget)
+{
+	struct widget_instance *child;
+
+	for (child = screen->child; child; child = child->next)
+	{
+		if (ui_halo_settings_widget_get(child) == halo_settings_widget)
+			break;
+	}
+
+	return child;
+}
+
+/* which menu offering HALO SETTINGS a screen is, or NONE */
+static short ui_halo_settings_menu_get(
+	struct widget_instance const *root)
+{
+	short menu;
+
+	for (menu = 0; menu < NUMBER_OF_UI_HALO_SETTINGS_MENUS; menu++)
+	{
+		if (root->definition_tag_index == tag_loaded(UI_WIDGET_DEFINITION_TAG, ui_halo_settings_menus[menu].screen))
+			return menu;
+	}
+
+	return NONE;
+}
+
+/* where a row of a list is drawn from, in the list */
+static short ui_halo_settings_row_top(
+	struct widget_instance const *row)
+{
+	return ui_widget_definition_get(row->definition_tag_index)->bounds.y0 + row->vertical_offset;
+}
+
+/* a widget for a parent, drawn from a tag without its created handlers, not
+yet among its children */
+static struct widget_instance *ui_halo_settings_load(
+	struct widget_instance *parent,
+	long tag_index)
+{
+	boolean loading = ui_halo_settings_loading;
+	struct widget_instance *widget;
+
+	ui_halo_settings_loading = TRUE;
+	widget = ui_widget_load_by_name_or_tag(
+		NULL,
+		tag_index,
+		parent,
+		parent->local_player_index,
+		NONE,
+		NONE,
+		NONE);
+	ui_halo_settings_loading = loading;
+
+	return widget;
+}
+
+/* ... one of HALO SETTINGS' own, at a place in the parent */
+static struct widget_instance *ui_halo_settings_widget_new(
+	struct widget_instance *parent,
+	long tag_index,
+	short halo_settings_widget,
+	short horizontal_offset,
+	short vertical_offset)
+{
+	struct widget_instance *widget = ui_halo_settings_load(parent, tag_index);
+
+	if (widget)
+	{
+		widget->name = ui_halo_settings_widget_names[halo_settings_widget];
+		widget->horizontal_offset = horizontal_offset;
+		widget->vertical_offset = vertical_offset;
+	}
+
+	return widget;
+}
+
+/* links a widget made for a parent in among its children, after one */
+static void ui_halo_settings_insert_after(
+	struct widget_instance *sibling,
+	struct widget_instance *widget)
+{
+	widget->previous = sibling;
+	widget->next = sibling->next;
+	if (sibling->next)
+		sibling->next->previous = widget;
+	sibling->next = widget;
+
+	return;
+}
+
+/* deletes a widget's children, and a list's extended description */
+static void ui_halo_settings_empty(
+	struct widget_instance *widget)
+{
+	widget->focused_child = NULL;
+	while (widget->child)
+		ui_widget_delete(widget->child);
+	if ((widget->type == _ui_widget_type_column_list || widget->type == _ui_widget_type_spinner_list) &&
+		widget->parameters.list.extended_description)
+	{
+		ui_widget_delete(widget->parameters.list.extended_description);
+		widget->parameters.list.extended_description = NULL;
+	}
+
+	return;
+}
+
+static void ui_halo_settings_menu_loaded(
+	struct widget_instance *root)
+{
+	short menu = ui_halo_settings_menu_get(root);
+	struct widget_instance *list;
+	struct widget_instance *after;
+	struct widget_instance *item;
+	struct widget_instance *row;
+	short pitch;
+
+	if (menu == NONE || !halo_settings_available())
+		return;
+	list = ui_halo_settings_find(root, ui_halo_settings_menus[menu].list);
+	after = list && list->type == _ui_widget_type_column_list ?
+		ui_halo_settings_find(list, ui_halo_settings_menus[menu].row) :
+		NULL;
+	if (!after ||
+		after->parent != list ||
+		after->type != _ui_widget_type_text_box ||
+		(!after->previous && !after->next))
+	{
+		return;
+	}
+	pitch = after->previous ?
+		ui_halo_settings_row_top(after) - ui_halo_settings_row_top(after->previous) :
+		ui_halo_settings_row_top(after->next) - ui_halo_settings_row_top(after);
+	item = ui_halo_settings_widget_new(
+		list,
+		after->definition_tag_index,
+		ui_halo_settings_menus[menu].item,
+		after->horizontal_offset,
+		after->vertical_offset + pitch);
+	if (!item)
+		return;
+	ui_halo_settings_insert_after(after, item);
+	if (menu == _ui_halo_settings_menu_pause)
+	{
+		short top = list->child->vertical_offset;
+		short index = 0;
+
+		for (row = list->child; row; row = row->next)
+			row->vertical_offset = top + index++ * UI_HALO_SETTINGS_PAUSE_ROW_PITCH;
+	}
+	else
+	{
+		for (row = item->next; row; row = row->next)
+			row->vertical_offset += pitch;
+	}
+
+	return;
+}
+
+/* the main menu's row: its label in the other items' style, not the SETTINGS
+art of the tag it is drawn from */
+static void ui_halo_settings_main_menu_item_render(
+	struct widget_instance *widget,
+	struct ui_widget_definition *definition,
+	rectangle2d *clip_rect,
+	point2d offset,
+	boolean focus)
+{
+	static wchar_t const label[] = L"HALO SETTINGS";
+	long font_index = tag_loaded(FONT_GROUP_TAG, "ui\\large_ui");
+	real alpha_modifier = widget_instance_get_cumulative_alpha_modifier(widget);
+	rectangle2d bounds = definition->bounds;
+	rectangle2d clip = clip_rect ? *clip_rect : definition->bounds;
+	real_argb_color color;
+
+	if (font_index == NONE)
+		return;
+	bounds.x0 += offset.x;
+	bounds.x1 += offset.x;
+	bounds.y0 += offset.y + UI_HALO_SETTINGS_LABEL_TOP;
+	bounds.y1 += offset.y;
+	if (focus)
+	{
+		short dx, dy;
+
+		color = ui_halo_settings_glow_color;
+		color.alpha *= alpha_modifier;
+		draw_string_set_draw_mode(font_index, NONE, _text_justification_center, 0, &color);
+		for (dy = -UI_HALO_SETTINGS_GLOW_RADIUS; dy <= UI_HALO_SETTINGS_GLOW_RADIUS; dy++)
+		{
+			for (dx = -UI_HALO_SETTINGS_GLOW_RADIUS; dx <= UI_HALO_SETTINGS_GLOW_RADIUS; dx++)
+			{
+				rectangle2d glow_bounds = bounds;
+
+				/* (a rounded square about the letters) */
+				if ((!dx && !dy) || ABS(dx) + ABS(dy) > UI_HALO_SETTINGS_GLOW_RADIUS + 1)
+					continue;
+				glow_bounds.x0 += dx;
+				glow_bounds.x1 += dx;
+				glow_bounds.y0 += dy;
+				glow_bounds.y1 += dy;
+				rasterizer_draw_unicode_string(&glow_bounds, &clip, NULL, 0, label);
+			}
+		}
+		color = *global_real_argb_white;
+		color.alpha = alpha_modifier;
+	}
+	else
+	{
+		color = ui_halo_settings_label_color;
+		color.alpha *= alpha_modifier;
+	}
+	draw_string_set_draw_mode(font_index, NONE, _text_justification_center, 0, &color);
+	rasterizer_draw_unicode_string(&bounds, &clip, NULL, 0, label);
+
+	return;
+}
+
+/* a column's rows, from the tag of the other column's first, by the place of
+its rows, and the spacing between them */
+static void ui_halo_settings_rows_add(
+	struct widget_instance *list,
+	long tag_index,
+	short horizontal_offset,
+	short vertical_offset,
+	short pitch,
+	short first_widget,
+	short count)
+{
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		struct widget_instance *row = ui_halo_settings_widget_new(
+			list,
+			tag_index,
+			first_widget + index,
+			horizontal_offset,
+			vertical_offset + index * pitch);
+
+		if (row)
+			ui_widget_add_child(list, row);
+	}
+
+	return;
+}
+
+/* a second list for the right column, from the left's tag, without its rows */
+static struct widget_instance *ui_halo_settings_options_new(
+	struct widget_instance *screen,
+	struct widget_instance *categories)
+{
+	struct widget_instance *options = ui_halo_settings_widget_new(
+		screen,
+		categories->definition_tag_index,
+		_ui_halo_settings_widget_options,
+		categories->horizontal_offset,
+		categories->vertical_offset);
+
+	if (options)
+	{
+		ui_halo_settings_empty(options);
+		ui_halo_settings_insert_after(categories, options);
+	}
+
+	return options;
+}
+
+/* the pause menu as HALO SETTINGS: in the help screens' box, with its caption
+for the title, its key, and the columns side by side in its body */
+static boolean ui_halo_settings_lay_out_pause(
+	struct widget_instance *screen,
+	struct widget_instance *categories,
+	long row_tag_index)
+{
+	struct widget_instance *background = ui_halo_settings_find(screen, UI_HALO_SETTINGS_PAUSE_TAG("pause_dialog_bkd"));
+	struct widget_instance *caption = ui_halo_settings_find(screen, UI_HALO_SETTINGS_PAUSE_TAG("mission_objectives_caption"));
+	struct widget_instance *objective = ui_halo_settings_find(screen, UI_HALO_SETTINGS_PAUSE_TAG("mission_objective_text"));
+	struct widget_instance *key = ui_halo_settings_find(screen, UI_HALO_SETTINGS_MAIN_MENU_TAG("button_key_sm"));
+	long box_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\player_help\\help_dialog_bkd");
+	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
+	struct widget_instance *box;
+	struct widget_instance *options;
+	rectangle2d box_bounds;
+	rectangle2d key_bounds;
+	short box_width;
+
+	if (!background ||
+		!caption ||
+		caption->type != _ui_widget_type_text_box ||
+		!objective ||
+		!key ||
+		box_tag_index == NONE)
+	{
+		return FALSE;
+	}
+	box = ui_halo_settings_load(screen, box_tag_index);
+	if (!box)
+		return FALSE;
+	/* (in place of the pause menu's two boxes, drawn before what is on it) */
+	box->horizontal_offset = UI_HALO_SETTINGS_BOX_X;
+	box->vertical_offset = UI_HALO_SETTINGS_BOX_Y;
+	ui_halo_settings_insert_after(background, box);
+	background->visible = FALSE;
+	objective->visible = FALSE;
+	box_bounds = ui_widget_definition_get(box_tag_index)->bounds;
+	key_bounds = ui_widget_definition_get(key->definition_tag_index)->bounds;
+	box_width = box_bounds.x1 - box_bounds.x0;
+	caption->name = ui_halo_settings_widget_names[_ui_halo_settings_widget_title];
+	caption->horizontal_offset = UI_HALO_SETTINGS_BOX_X + UI_HALO_SETTINGS_BOX_CAPTION_X;
+	caption->vertical_offset = UI_HALO_SETTINGS_BOX_Y + UI_HALO_SETTINGS_BOX_CAPTION_Y;
+	key->horizontal_offset = UI_HALO_SETTINGS_BOX_X + (box_width - (key_bounds.x1 - key_bounds.x0)) / 2;
+	key->vertical_offset = UI_HALO_SETTINGS_BOX_Y + UI_HALO_SETTINGS_BOX_KEY_Y;
+	/* the left column against the box's left side, the right against its
+	right, the tallest in the middle of its body */
+	categories->horizontal_offset = UI_HALO_SETTINGS_BOX_X + UI_HALO_SETTINGS_BOX_SIDE + UI_HALO_SETTINGS_BOX_MARGIN -
+		row_bounds.x0;
+	categories->vertical_offset = UI_HALO_SETTINGS_BOX_Y + UI_HALO_SETTINGS_BOX_BODY_TOP - row_bounds.y0 +
+		(UI_HALO_SETTINGS_BOX_BODY_BOTTOM - UI_HALO_SETTINGS_BOX_BODY_TOP -
+			((MAXIMUM_UI_HALO_SETTINGS_OPTIONS - 1) * UI_HALO_SETTINGS_BOX_ROW_PITCH + (row_bounds.y1 - row_bounds.y0))) / 2;
+	ui_halo_settings_rows_add(
+		categories,
+		row_tag_index,
+		0,
+		0,
+		UI_HALO_SETTINGS_BOX_ROW_PITCH,
+		_ui_halo_settings_widget_display,
+		NUMBER_OF_UI_HALO_SETTINGS_CATEGORIES);
+	options = ui_halo_settings_options_new(screen, categories);
+	if (!options)
+		return FALSE;
+	options->horizontal_offset = UI_HALO_SETTINGS_BOX_X + box_width - UI_HALO_SETTINGS_BOX_SIDE -
+		UI_HALO_SETTINGS_BOX_MARGIN - UI_HALO_SETTINGS_OPTION_WIDTH - row_bounds.x0;
+
+	return TRUE;
+}
+
+/* ADVANCED CONTROLS' screen as HALO SETTINGS: a title in place of its header,
+the left column where its list was, with EDIT PROFILE SETTINGS' rows, the
+right in EDIT PROFILE SETTINGS' description panel, and its key, which
+selects rather than accepts */
+static boolean ui_halo_settings_lay_out_main_menu(
+	struct widget_instance *screen,
+	struct widget_instance *categories,
+	long row_tag_index)
+{
+	struct widget_instance *header = ui_halo_settings_find(screen, UI_HALO_SETTINGS_ADVANCED_TAG("header_advanced_controls"));
+	struct widget_instance *accept = ui_halo_settings_find(screen, UI_HALO_SETTINGS_MAIN_MENU_TAG("=accept_new"));
+	long panel_tag_index = tag_loaded(
+		UI_WIDGET_DEFINITION_TAG,
+		UI_HALO_SETTINGS_PROFILE_TAG("profile_edit_extended_description"));
+	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
+	short row_height = row_bounds.y1 - row_bounds.y0;
+	struct widget_instance *title;
+	struct widget_instance *panel;
+	struct widget_instance *options;
+	rectangle2d panel_bounds;
+
+	if (!header ||
+		!accept ||
+		accept->type != _ui_widget_type_text_box ||
+		panel_tag_index == NONE)
+	{
+		return FALSE;
+	}
+	header->visible = FALSE;
+	/* (=SELECT, from the key's own strings) */
+	accept->parameters.text_box.string_list_index = 1;
+	title = ui_halo_settings_widget_new(
+		screen,
+		row_tag_index,
+		_ui_halo_settings_widget_title,
+		0,
+		UI_HALO_SETTINGS_MAIN_TITLE_Y - row_bounds.y0);
+	if (!title)
+		return FALSE;
+	ui_widget_add_child(screen, title);
+	categories->horizontal_offset = 0;
+	categories->vertical_offset = 0;
+	ui_halo_settings_rows_add(
+		categories,
+		row_tag_index,
+		0,
+		UI_HALO_SETTINGS_MAIN_ROWS_Y - row_bounds.y0,
+		row_height,
+		_ui_halo_settings_widget_display,
+		NUMBER_OF_UI_HALO_SETTINGS_CATEGORIES);
+	options = ui_halo_settings_options_new(screen, categories);
+	if (!options)
+		return FALSE;
+	panel = ui_halo_settings_load(screen, panel_tag_index);
+	if (!panel)
+		return FALSE;
+	/* (only the panel's art, drawn before the right column) */
+	ui_halo_settings_empty(panel);
+	ui_halo_settings_insert_after(categories, panel);
+	panel_bounds = ui_widget_definition_get(panel_tag_index)->bounds;
+	options->horizontal_offset = panel_bounds.x0 - row_bounds.x0 +
+		((panel_bounds.x1 - panel_bounds.x0) - UI_HALO_SETTINGS_OPTION_WIDTH) / 2;
+	options->vertical_offset = UI_HALO_SETTINGS_MAIN_PANEL_MARGIN;
+
+	return TRUE;
+}
+
+/* the left column's selected category's settings in the right column, and
+the rows lit: the left column's selected one always, the right column's
+focused one while it has the focus */
+static void ui_halo_settings_sync(
+	struct widget_instance *screen)
+{
+	struct widget_instance *categories = ui_halo_settings_child(screen, _ui_halo_settings_widget_categories);
+	struct widget_instance *options = ui_halo_settings_child(screen, _ui_halo_settings_widget_options);
+	struct widget_instance *row;
+	short shown;
+	short selected;
+
+	if (!categories || !options || !categories->child || !categories->child->next)
+		return;
+	shown = options->child ?
+		ui_halo_settings_options[ui_halo_settings_widget_get(options->child) - _ui_halo_settings_widget_first_setting].category :
+		NONE;
+	/* (the mouse's focus on a setting takes the focus from the categories) */
+	if (!categories->focused_child)
+	{
+		for (row = categories->child; row; row = row->next)
+		{
+			if (ui_halo_settings_widget_get(row) == shown)
+				break;
+		}
+		categories->focused_child = row ? row : categories->child;
+	}
+	selected = ui_halo_settings_widget_get(categories->focused_child);
+	if (selected != shown)
+	{
+		short setting;
+		short count = 0;
+
+		ui_halo_settings_empty(options);
+		for (setting = 0; setting < NUMBER_OF_HALO_SETTINGS; setting++)
+		{
+			if (ui_halo_settings_options[setting].category != selected)
+				continue;
+			/* (placed as the left column's rows are) */
+			ui_halo_settings_rows_add(
+				options,
+				categories->child->definition_tag_index,
+				categories->child->horizontal_offset,
+				categories->child->vertical_offset +
+					count++ * (categories->child->next->vertical_offset - categories->child->vertical_offset),
+				0,
+				_ui_halo_settings_widget_first_setting + setting,
+				1);
+		}
+	}
+	if (screen->focused_child != options)
+		options->focused_child = NULL;
+	for (row = categories->child; row; row = row->next)
+		row->animation.current_frame_index = row == categories->focused_child && row->animation.number_of_sprite_frames == 2;
+	for (row = options->child; row; row = row->next)
+		row->animation.current_frame_index = row == options->focused_child && row->animation.number_of_sprite_frames == 2;
+
+	return;
+}
+
+/* the focus on a column's row */
+static void ui_halo_settings_focus(
+	struct widget_instance *screen,
+	struct widget_instance *list,
+	struct widget_instance *row)
+{
+	screen->focused_child = list;
+	list->focused_child = row;
+	list->parameters.list.selected_index = (short)widget_instance_get_child_index_from_parent(row);
+
+	return;
+}
+
+/* HALO SETTINGS in place of the menu that offers it */
+static boolean ui_halo_settings_open(
+	struct widget_instance *item,
+	boolean *widget_deleted)
+{
+	struct widget_instance *root = widget_instance_get_topmost_parent(item);
+	short menu = ui_halo_settings_menu_get(root);
+	long screen_tag_index = menu == _ui_halo_settings_menu_pause ?
+		root->definition_tag_index :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_HALO_SETTINGS_ADVANCED_TAG("advanced_controls_screen"));
+	long list_tag_index = menu == _ui_halo_settings_menu_pause ?
+		item->parent->definition_tag_index :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_HALO_SETTINGS_ADVANCED_TAG("advanced_controls_menu"));
+	long row_tag_index = menu == _ui_halo_settings_menu_pause ?
+		item->definition_tag_index :
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_HALO_SETTINGS_PROFILE_TAG("color_profile_item"));
+	struct widget_instance *screen;
+	struct widget_instance *categories;
+	boolean laid_out = FALSE;
+
+	if (menu == NONE || screen_tag_index == NONE || list_tag_index == NONE || row_tag_index == NONE)
+		return FALSE;
+	/* (this deletes the menu, and the item with it) */
+	ui_halo_settings_loading = TRUE;
+	screen = ui_widget_launch_widget(item, screen_tag_index);
+	ui_halo_settings_loading = FALSE;
+	if (!screen)
+		return FALSE;
+	*widget_deleted = TRUE;
+	screen->name = ui_halo_settings_widget_names[_ui_halo_settings_widget_screen];
+	categories = widget_instance_find_by_tag_index_recursive(screen, list_tag_index);
+	if (categories && categories->parent == screen && categories->type == _ui_widget_type_column_list)
+	{
+		categories->name = ui_halo_settings_widget_names[_ui_halo_settings_widget_categories];
+		ui_halo_settings_empty(categories);
+		laid_out = menu == _ui_halo_settings_menu_pause ?
+			ui_halo_settings_lay_out_pause(screen, categories, row_tag_index) :
+			ui_halo_settings_lay_out_main_menu(screen, categories, row_tag_index);
+	}
+	if (!laid_out || !categories->child)
+	{
+		error(_error_silent, "failed to load HALO SETTINGS");
+		widget_instance_go_back_to_previous(screen);
+
+		return FALSE;
+	}
+	ui_halo_settings_focus(screen, categories, categories->child);
+	ui_halo_settings_sync(screen);
+
+	return TRUE;
+}
+
+/* B, BACK and START on the screen: from the right column to the left, from
+the left to the menu before */
+static short ui_halo_settings_back(
+	struct widget_instance *screen,
+	boolean *widget_deleted)
+{
+	struct widget_instance *categories = ui_halo_settings_child(screen, _ui_halo_settings_widget_categories);
+	struct widget_instance *options = ui_halo_settings_child(screen, _ui_halo_settings_widget_options);
+
+	if (categories && categories->focused_child && options && screen->focused_child == options)
+	{
+		ui_halo_settings_focus(screen, categories, categories->focused_child);
+		options->focused_child = NULL;
+	}
+	else
+	{
+		widget_instance_go_back_to_previous(screen);
+		*widget_deleted = TRUE;
+	}
+
+	return _ui_audio_feedback_back;
+}
+
+/* the button an event presses on HALO SETTINGS' widgets, the left stick's
+sideways push as the d-pad's, or NONE */
+static short ui_halo_settings_event_button(
+	struct event_record const *event)
+{
+	if (event->type == _event_type_button && event->data.button.value == 1)
+		return event->data.button.index;
+	if (event->type == _event_type_left_stick && event->data.stick.x == SHORT_MIN)
+		return _widget_event_dpad_left;
+	if (event->type == _event_type_left_stick && event->data.stick.x == SHORT_MAX)
+		return _widget_event_dpad_right;
+
+	return NONE;
+}
+
+/* a button pressed on a widget of HALO SETTINGS': the sound it makes, or NONE
+for a button the widget leaves to the others */
+static short ui_halo_settings_button_press(
+	struct widget_instance *widget,
+	short button_index,
+	boolean *widget_deleted)
+{
+	short halo_settings_widget = ui_halo_settings_widget_get(widget);
+	struct widget_instance *screen = widget_instance_get_topmost_parent(widget);
+	short setting;
+	short direction;
+
+	switch (halo_settings_widget)
+	{
+	case _ui_halo_settings_widget_item:
+	case _ui_halo_settings_widget_main_menu_item:
+		if (button_index != _widget_event_a_button && button_index != _widget_event_start_button)
+			return NONE;
+
+		return ui_halo_settings_open(widget, widget_deleted) ?
+			_ui_audio_feedback_forward :
+			_ui_audio_feedback_flag_failure;
+	case _ui_halo_settings_widget_display:
+	case _ui_halo_settings_widget_audio:
+	case _ui_halo_settings_widget_input:
+	{
+		struct widget_instance *options = ui_halo_settings_child(screen, _ui_halo_settings_widget_options);
+
+		if (button_index != _widget_event_a_button && button_index != _widget_event_dpad_right)
+			return NONE;
+		if (!options || !options->child)
+			return _ui_audio_feedback_flag_failure;
+		ui_halo_settings_focus(screen, options, options->child);
+
+		return _ui_audio_feedback_forward;
+	}
+	}
+	if (halo_settings_widget < _ui_halo_settings_widget_first_setting)
+		return NONE;
+	setting = halo_settings_widget - _ui_halo_settings_widget_first_setting;
+	switch (button_index)
+	{
+	case _widget_event_a_button:
+	case _widget_event_dpad_right:
+		direction = 1;
+		break;
+	case _widget_event_dpad_left:
+		direction = -1;
+		break;
+	default:
+		return NONE;
+	}
+	if (!halo_setting_step(setting, direction))
+		return _ui_audio_feedback_flag_failure;
+
+	return button_index == _widget_event_a_button ? _ui_audio_feedback_forward : _ui_audio_feedback_cursor;
+}
+
 /* ---------- the mouse (desktop builds)
 
 The menus were made for a controller: the d-pad moves the focus through a
@@ -5369,6 +6310,7 @@ static void ui_mouse_note_target(
 	{
 		return;
 	}
+	ui_halo_settings_row_widen(widget, &bounds);
 	bounds.x0 += offset.x;
 	bounds.x1 += offset.x;
 	bounds.y0 += offset.y;
@@ -5426,6 +6368,11 @@ static void ui_mouse_note_target(
 		/* a list showing several items is picked through them */
 		if (!parent || ui_mouse_list_shows_several(widget) || !widget_instance_can_receive_events(widget))
 			return;
+		kind = _ui_mouse_target_value;
+	}
+	else if (ui_halo_settings_row_is_number(widget))
+	{
+		/* (a number of HALO SETTINGS' steps as a spinner does) */
 		kind = _ui_mouse_target_value;
 	}
 	else if (ui_mouse_widget_is_item(widget))
@@ -5504,7 +6451,8 @@ static void ui_mouse_list_directions(
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 
 	if (TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_list_items_bit) ||
-		TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_children_bit))
+		TEST_FLAG(definition->flags, _widget_dpad_leftright_tabs_thru_children_bit) ||
+		ui_halo_settings_row_is_number(widget))
 	{
 		*back = _widget_event_dpad_left;
 		*forward = _widget_event_dpad_right;
@@ -5733,7 +6681,9 @@ static void widget_instance_render_recursive(
 	}
 	offset.x += widget->horizontal_offset;
 	offset.y += widget->vertical_offset;
-	for (input_index = 0;
+	/* port: HALO SETTINGS' widgets run none of their tags' game data
+	functions, which expect the screens the tags come from */
+	for (input_index = ui_halo_settings_widget_get(widget) == NONE ? 0 : definition->game_data_inputs.count;
 		input_index < definition->game_data_inputs.count;
 		input_index++)
 	{
@@ -5747,6 +6697,19 @@ static void widget_instance_render_recursive(
 	if (!widget->visible)
 		return;
 	ui_mouse_note_target(widget, definition, offset);
+	/* port: HALO SETTINGS' label in the main menu is the code's, not the
+	SETTINGS art of the tag it is drawn from */
+	if (ui_halo_settings_widget_get(widget) == _ui_halo_settings_widget_main_menu_item)
+	{
+		ui_halo_settings_main_menu_item_render(
+			widget,
+			definition,
+			clip_rect,
+			offset,
+			widget_instance_text_box_is_focused(widget));
+
+		return;
+	}
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -5755,6 +6718,7 @@ static void widget_instance_render_recursive(
 	{
 		real alpha = alpha_modifier;
 		rectangle2d bounds = definition->bounds;
+		rectangle2d drawn_bounds;
 		rectangle2d *clip = clip_rect;
 		rectangle2d local_clip;
 		pixel32 color;
@@ -5824,9 +6788,12 @@ static void widget_instance_render_recursive(
 				alpha_modifier;
 		}
 		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
+		/* port: HALO SETTINGS' rows stretch their tag's art */
+		drawn_bounds = bounds;
+		ui_halo_settings_row_widen(widget, &drawn_bounds);
 		draw_bitmap_in_rect(
 			bitmap,
-			&bounds,
+			&drawn_bounds,
 			&bounds,
 			clip,
 			color,
@@ -6365,7 +7332,18 @@ static void widget_instance_process_one_event_recursive(
 			{
 				handled_by_event_handler = TRUE;
 			}
-			if (!handled_by_event_handler)
+			/* port: B, BACK and START go back a column of HALO SETTINGS, then
+			to the menu before (where the pause menu's tag would close every
+			menu) */
+			if (ui_halo_settings_widget_get(widget) == _ui_halo_settings_widget_screen &&
+				(event->data.button.index == _widget_event_b_button ||
+				event->data.button.index == _widget_event_back_button ||
+				event->data.button.index == _widget_event_start_button))
+			{
+				audio_feedback = ui_halo_settings_back(widget, &widget_deleted);
+				event_handled = TRUE;
+			}
+			else if (!handled_by_event_handler)
 			{
 				widget_instance_go_back_to_previous(widget);
 				audio_feedback = _ui_audio_feedback_back;
@@ -6608,7 +7586,29 @@ static void widget_instance_process_one_event_recursive(
 			}
 		}
 	}
-	if (event_for_this_widget)
+	/* port: HALO SETTINGS' widgets answer their buttons in code, not with the
+	handlers of the tags they are drawn from */
+	if (event_for_this_widget &&
+		!widget_deleted &&
+		ui_halo_settings_widget_get(widget) != NONE)
+	{
+		short button_index = ui_halo_settings_event_button(event);
+
+		if (button_index != NONE)
+		{
+			short sound = ui_halo_settings_button_press(
+				widget,
+				button_index,
+				&widget_deleted);
+
+			if (sound != NONE)
+			{
+				audio_feedback = sound;
+				event_handled = TRUE;
+			}
+		}
+	}
+	else if (event_for_this_widget)
 	{
 		long handler_index;
 
@@ -6747,6 +7747,9 @@ static void widget_instance_process_one_event_recursive(
 			[event->data.button.index - _widget_event_dpad_up] =
 			widget_globals.current_system_milliseconds;
 	}
+	/* port: HALO SETTINGS' right column follows its left */
+	if (!widget_deleted && ui_halo_settings_widget_get(widget) == _ui_halo_settings_widget_screen)
+		ui_halo_settings_sync(widget);
 	ui_play_audio_feedback_sound(audio_feedback);
 	*return_widget_deleted = widget_deleted;
 

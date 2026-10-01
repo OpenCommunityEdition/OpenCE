@@ -143,6 +143,22 @@ The game reads the file one time, at start-up. If a key is not correct, or
 a value has the wrong type, the game writes the line to the log and uses the
 default value.
 
+HALO SETTINGS in the menus changes settings while the game runs, and writes
+them to the file at once. It is in the main menu, and in the pause menu of a
+single-player game. Its categories are the sections of the file:
+
+- DISPLAY: `display.fullscreen`, `display.vsync`, `display.interpolation`,
+  `display.direct_camera` and `display.window_scale`. A window scale set
+  while the game is fullscreen changes the window when the game leaves
+  fullscreen.
+- AUDIO: `audio.enabled` and `audio.volume`.
+- INPUT: `input.mouse_sensitivity`, `input.mouse_aim_assist` and
+  `input.invert_mouse`.
+
+A changes a setting that is on or off, and steps a number up. Left and right
+step a number. The settings are the same for all profiles. F11 changes
+fullscreen only until the game stops.
+
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
