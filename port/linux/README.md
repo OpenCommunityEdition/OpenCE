@@ -143,9 +143,10 @@ The game reads the file one time, at start-up. If a key is not correct, or
 a value has the wrong type, the game writes the line to the log and uses the
 default value.
 
-HALO SETTINGS in the menus changes settings while the game runs, and writes
-them to the file at once. It is in the main menu, and in the pause menu of a
-single-player game. Its categories are the sections of the file:
+GAME SETTINGS in the menus changes settings while the game runs, and writes
+them to the file at once. It is in the main menu's SETTINGS, next to PROFILE
+SETTINGS, and in the pause menu of a single-player game. Its categories are
+the sections of the file:
 
 - DISPLAY: `display.fullscreen`, `display.vsync`, `display.interpolation`,
   `display.direct_camera` and `display.window_scale`. A window scale set

@@ -652,8 +652,8 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 /* ---------- camera */
 
 static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
-/* display.direct_camera, read once, then as HALO SETTINGS changes it
-(port/linux/src/halo_settings.c) */
+/* display.direct_camera, read once, then as GAME SETTINGS changes it
+(port/linux/src/game_settings.c) */
 static int direct_camera_enabled = -1;
 
 int render_interpolation_direct_camera_enabled(void)
