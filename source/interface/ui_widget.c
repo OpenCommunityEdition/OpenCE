@@ -5765,18 +5765,19 @@ static void widget_instance_render_recursive(
 			&bitmap_group->sequences,
 			0,
 			struct bitmap_group_sequence);
-#ifdef HALO_LINUX
-		/* a widget whose bounds cover the whole 640x480 design space (the
+		/* port: a widget whose bounds cover the whole 640x480 design space (the
 		 * pause menu's dim, for example) should cover the whole screen too,
 		 * not just the centered 640 columns -- same as the fade_to_black
 		 * quad in render_ui_widgets(). Both the bounds and the clip are
 		 * widened symmetrically below, before the centering offset is
-		 * added. */
+		 * added. Only flat fills (the dims, and the menus' vertical
+		 * gradient, at most 16 texels wide): a picture is drawn texel for
+		 * texel, so wider bounds would shift it (the loading screen). */
 		boolean widen_to_screen =
 			bounds.x0 <= 0 && bounds.y0 <= 0 &&
 			bounds.x1 >= 640 && bounds.y1 >= 480 &&
+			bitmap->width <= 16 &&
 			halo_screen_width() > 640;
-#endif
 
 		if (use_nifty_plasma_fx)
 		{
@@ -5785,14 +5786,12 @@ static void widget_instance_render_recursive(
 			ui_plasma_effect_color.green = 0.05f;
 			ui_plasma_effect_color.blue = 0.05f;
 		}
-#ifdef HALO_LINUX
 		if (widen_to_screen)
 		{
 			long extra = (halo_screen_width() - 640) / 2;
 			bounds.x0 -= (short)extra;
 			bounds.x1 = (short)(640 + extra);
 		}
-#endif
 		bounds.x0 += offset.x;
 		bounds.x1 += offset.x;
 		bounds.y0 += offset.y;
@@ -5806,8 +5805,7 @@ static void widget_instance_render_recursive(
 			clip->y0 += offset.y;
 			clip->y1 += offset.y;
 		}
-#ifdef HALO_LINUX
-		if (widen_to_screen)
+		if (widen_to_screen && clip)
 		{
 			/* widen the clip by the same amount (it is offset-shifted but
 			 * still 640-wide at the edges) so the dim is not clipped back
@@ -5818,7 +5816,6 @@ static void widget_instance_render_recursive(
 			if (clip->x1 >= 640)
 				clip->x1 = (short)(clip->x1 + extra);
 		}
-#endif
 		if (TEST_FLAG(definition->flags, _widget_flash_background_bitmap_bit))
 		{
 			alpha = (((real)cos(
