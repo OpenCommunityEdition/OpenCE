@@ -5324,8 +5324,8 @@ enum
 	NUMBER_OF_UI_SETTINGS_CATEGORIES = _ui_settings_widget_input - _ui_settings_widget_video + 1,
 	/* the main menu's SETTINGS menu's */
 	NUMBER_OF_UI_SETTINGS_MAIN_MENU_ROWS = _ui_settings_widget_input - _ui_settings_widget_profile_settings + 1,
-	/* VIDEO SETTINGS' */
-	MAXIMUM_UI_SETTINGS_PAGE_ROWS = 7
+	/* VIDEO SETTINGS', the longest page: game_settings.h's display section */
+	MAXIMUM_UI_SETTINGS_PAGE_ROWS = _game_setting_audio - _game_setting_fullscreen
 };
 
 enum

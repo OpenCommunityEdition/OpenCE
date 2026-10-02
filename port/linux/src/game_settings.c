@@ -75,7 +75,7 @@ struct game_setting
 	const char *name;
 	enum game_setting_type type;
 	/* a number's range (window_scale's top is the display's,
-	anisotropic_filtering's the GPU's) and step */
+	anisotropic_filtering's the GPU's: game_setting_maximum) and step */
 	double minimum, maximum, step;
 };
 
@@ -166,6 +166,19 @@ static BOOL game_setting_apply(int setting, double value)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+/* the top of a number's range */
+static double game_setting_maximum(int setting)
+{
+	switch (setting)
+	{
+	case _game_setting_window_scale:
+		return platform_window_scale_maximum();
+	case _game_setting_anisotropic_filtering:
+		return video_anisotropic_filtering_maximum();
+	}
+	return game_settings[setting].maximum;
 }
 
 /* how a change was kept, for the log */
@@ -318,9 +331,7 @@ int game_setting_step(int setting, int direction)
 	}
 	else
 	{
-		double maximum = setting == _game_setting_window_scale ? platform_window_scale_maximum() :
-			setting == _game_setting_anisotropic_filtering ? video_anisotropic_filtering_maximum() :
-			definition->maximum;
+		double maximum = game_setting_maximum(setting);
 
 		if (definition->type == _game_setting_type_multiple)
 		{

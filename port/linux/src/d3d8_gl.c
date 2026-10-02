@@ -886,12 +886,19 @@ static BOOL bind_targets(BOOL *has_depth)
 
 int video_anisotropic_filtering(void)
 {
-	return (int)device.anisotropy;
+	long level;
+
+	if (device.gl_ready)
+		return (int)device.anisotropy;
+	/* (no renderer yet, or none: config.toml's level) */
+	level = config_integer("display.anisotropic_filtering");
+	return level > 1 ? (int)level : 1;
 }
 
 int video_anisotropic_filtering_maximum(void)
 {
-	return (int)device.maximum_anisotropy;
+	/* (no renderer yet, or none: 16, the most GPUs have) */
+	return device.gl_ready ? (int)device.maximum_anisotropy : 16;
 }
 
 void video_set_anisotropic_filtering(int level)
