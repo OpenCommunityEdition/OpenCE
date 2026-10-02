@@ -98,8 +98,8 @@ static const struct config_setting config_settings[] =
 		"\"allies\", \"enemies\" or \"none\". An enemy's shows only while in sight\n"
 		"and not camouflaged." },
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
-		"How large the players' names are drawn: 1.0 the size of the HUD's text,\n"
-		"0.25 to 4." },
+		"How large the players' names are drawn: 1.0 three quarters of the size of\n"
+		"the HUD's text, 0.25 to 4." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

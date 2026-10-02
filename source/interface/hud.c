@@ -1036,14 +1036,14 @@ static short hud_player_names_setting(
 }
 
 /* display.player_name_scale: how large the names are drawn, 0.25 to 4 times
-the HUD's text */
+three quarters of the HUD's text */
 static real hud_player_name_scale(
 	void)
 {
 	static real scale = 0.0f;
 
 	if (scale == 0.0f)
-		scale = PIN((real)config_real("display.player_name_scale"), 0.25f, 4.0f);
+		scale = 0.75f * PIN((real)config_real("display.player_name_scale"), 0.25f, 4.0f);
 
 	return scale;
 }
@@ -1080,10 +1080,15 @@ static boolean hud_player_name_in_sight(
 	return in_sight;
 }
 
+/* the farthest an enemy's name is shown, in world units (the sniper rifle's
+at 2x; its 8x would reach across most maps) */
+#define MAXIMUM_ENEMY_NAME_RANGE 70.0f
+
 /* how far away enemies' names are shown: as far as the local player's
 weapon turns its reticle red over an enemy (its autoaim distance, times its
-zoom; a vehicle's gun when seated at one), and never less than the motion
-sensor's reach */
+zoom; a vehicle's gun when seated at one, none for a weapon that aims only
+when zoomed, unzoomed), never less than the motion sensor's reach and never
+more than MAXIMUM_ENEMY_NAME_RANGE */
 static real hud_player_name_enemy_range(
 	void)
 {
@@ -1102,14 +1107,19 @@ static real hud_player_name_enemy_range(
 		if (weapon_index != NONE)
 		{
 			struct weapon_definition *definition = weapon_definition_get(weapon_get(weapon_index)->definition_index);
-			real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
-				weapon_get_zoom_magnification(weapon_index, player_control_get_zoom_level(render.local_player_index));
+			short zoom_level = player_control_get_zoom_level(render.local_player_index);
 
-			range = MAX(range, weapon_range);
+			if (zoom_level != NONE || !TEST_FLAG(definition->weapon.flags, _weapon_aim_assists_only_when_zoomed_bit))
+			{
+				real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
+					weapon_get_zoom_magnification(weapon_index, zoom_level);
+
+				range = MAX(range, weapon_range);
+			}
 		}
 	}
 
-	return range;
+	return MIN(range, MAXIMUM_ENEMY_NAME_RANGE);
 }
 
 static void hud_draw_player_name(
