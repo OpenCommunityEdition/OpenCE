@@ -636,25 +636,6 @@ struct game_options
 typedef char game_options_size_assert[
 	sizeof(struct game_options) == 0x10C ? 1 : -1];
 
-#pragma pack(push, 1)
-struct _screenshot_and_framerate_globals
-{
-	short count;
-	byte reserved002[6];
-	struct render_window windows[MAXIMUM_WINDOWS + 1];
-	real framerate_samples[8];
-	word framerate_flags;
-	char framerate_sample_index;
-	boolean framerate_active;
-	char framerate_counter;
-	boolean framerate_reset;
-	boolean halt_recursion_lock;
-};
-#pragma pack(pop)
-
-typedef char screenshot_and_framerate_globals_size_assert[
-	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
-
 /* ---------- prototypes */
 
 static long sort_desired_local_player_controllers(
@@ -675,6 +656,8 @@ static void main_new_map(
 	struct game_options *options);
 static void main_game_render(
 	double time_delta_since_tick_sec);
+static void screenshot_render(
+	struct render_window *windows);
 
 /* ---------- globals */
 
@@ -705,7 +688,7 @@ boolean debug_frame_rate = FALSE;
 boolean display_framerate = FALSE;
 boolean display_vblank_deltas = FALSE;
 boolean display_precache_progress = FALSE;
-struct _screenshot_and_framerate_globals global_screenshot_count = { 0 };
+short global_screenshot_count = 0;
 boolean debug_render_freeze;
 
 /* ---------- public code */
@@ -1180,7 +1163,7 @@ void main_present_frame(
 	char path[512];
 
 	render_frame_present(NULL, main_globals.movie);
-	if (global_screenshot_count.count <= 0 && main_globals.movie)
+	if (global_screenshot_count <= 0 && main_globals.movie)
 	{
 		_snprintf(
 			path,
@@ -1406,6 +1389,110 @@ short main_get_window_count(
 	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
 }
 
+static void main_game_render(
+	double time_delta_since_tick_sec)
+{
+	/* Name, type and function scope from the 2003 PC demo PDB and the HCEX PDB (static local
+	   struct render_window window[local players + 1] of main_game_render: two and three elements
+	   there, five in January). January corroborates: .bss +0x6E0, 0x35C bytes, referenced only by
+	   this function, declared after global_screenshot_count and before main_frame_rate_debug's
+	   statics, with an explicit zero initialiser (an uninitialised static is placed first, by name
+	   hash). That order, and January emitting this function a sweep after screenshot_render, put
+	   the definition before both; its exact line is inferred. */
+	static struct render_window window[MAXIMUM_LOCAL_PLAYERS + 1] = { 0 };
+	boolean force_single_screen;
+	long window_index;
+	struct render_window *current_window; /* descriptive name; no PDB records this local */
+	struct observer_result const *observer;
+	long player_window_count;
+	long window_count;
+	short last_local_player_index;
+
+	lock_global_random_seed();
+	collision_log_continue_period(TRUE);
+	sound_render();
+	force_single_screen = game_engine_force_single_screen();
+	last_local_player_index = NONE;
+
+	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
+	player_window_count = window_count;
+	if (force_single_screen || cinematic_in_progress())
+	{
+		window_count = 1;
+		player_window_count = 1;
+	}
+
+	for (window_index = 0; window_index < player_window_count; window_index++)
+	{
+		current_window = &window[window_index];
+		observer = NULL;
+
+		compute_window_bounds(
+			window_index,
+			player_window_count,
+			&current_window->rasterizer_camera.viewport_bounds,
+			&current_window->rasterizer_camera.window_bounds);
+		if (force_single_screen)
+		{
+			current_window->local_player_index = NONE;
+		}
+		else if (window_index < window_count)
+		{
+			if (!rasterizer_debug_options.force_all_player_views_to_default_player ||
+				last_local_player_index == NONE)
+			{
+				if (game_connection() == _game_connection_film_playback)
+				{
+					last_local_player_index = 0;
+				}
+				else
+				{
+					last_local_player_index = local_player_get_next(last_local_player_index);
+				}
+			}
+
+			current_window->local_player_index = last_local_player_index;
+			observer = observer_get_camera(current_window->local_player_index);
+		}
+		else
+		{
+			current_window->local_player_index = NONE;
+		}
+
+		set_window_camera_values(current_window, observer);
+		current_window->console_window = FALSE;
+	}
+
+	current_window = &window[player_window_count];
+	compute_window_bounds(
+		0,
+		1,
+		&current_window->rasterizer_camera.viewport_bounds,
+		&current_window->rasterizer_camera.window_bounds);
+	current_window->local_player_index = NONE;
+	current_window->console_window = TRUE;
+	set_window_camera_values(current_window, NULL);
+
+	if (global_screenshot_count <= 0)
+	{
+		render_frame(
+			window,
+			player_window_count + 1,
+			NULL,
+			NULL,
+			main_globals.movie,
+			(real)time_delta_since_tick_sec);
+	}
+	else
+	{
+		screenshot_render(window);
+	}
+
+	collision_log_end_period();
+	unlock_global_random_seed();
+	return;
+}
+
 static void main_new_map(
 	struct game_options *options)
 {
@@ -1615,7 +1702,7 @@ void main_queue_map_name(
 boolean main_taking_screenshot(
 	void)
 {
-	return global_screenshot_count.count > 0 || main_globals.movie != NULL;
+	return global_screenshot_count > 0 || main_globals.movie != NULL;
 }
 
 void main_movie_start(
@@ -1998,69 +2085,67 @@ static void main_run_demos_private(
 static void main_frame_rate_debug(
 	void)
 {
-	char sample_index;
+	/* NUMBER_OF_FRAME_SAMPLES, RUNS_BEFORE_RESET and the six static names below are inferred
+	   descriptive names, not recovered Bungie names: no later build keeps this function's body.
+	   The values 8 and 60 are January's (a 0x20-byte sample array, a signed modulo by 8, a
+	   compare with 60). So are the six objects: .bss +0xA3C..+0xA61 in this order, these types,
+	   referenced only by this function, each with an explicit zero initialiser. Their function
+	   scope is inferred from that and from the two attested static locals beside them. */
+	enum
+	{
+		NUMBER_OF_FRAME_SAMPLES = 8,
+		RUNS_BEFORE_RESET = 60
+	};
 
-	if (global_screenshot_count.framerate_reset)
+	static real last_spf[NUMBER_OF_FRAME_SAMPLES] = { 0 };
+	static word bad_frame_flags = 0;
+	static char current_spf_index = 0;
+	static boolean wait_for_good_framerate = FALSE;
+	static char good_framerate_count = 0;
+	static boolean need_to_initialize = FALSE;
+
+	if (need_to_initialize && !debug_frame_rate)
 	{
-		if (debug_frame_rate)
-		{
-			sample_index = global_screenshot_count.framerate_sample_index;
-		}
-		else
-		{
-			global_screenshot_count.framerate_reset = FALSE;
-			csmemset(
-				global_screenshot_count.framerate_samples,
-				0,
-				sizeof(global_screenshot_count.framerate_samples));
-			sample_index = 0;
-			global_screenshot_count.framerate_flags = 0;
-			global_screenshot_count.framerate_sample_index = sample_index;
-			global_screenshot_count.framerate_active = FALSE;
-			global_screenshot_count.framerate_counter = 0;
-			global_screenshot_count.framerate_reset = FALSE;
-		}
-	}
-	else
-	{
-		sample_index = global_screenshot_count.framerate_sample_index;
+		need_to_initialize = FALSE;
+		csmemset(last_spf, 0, sizeof(last_spf));
+		bad_frame_flags = 0;
+		current_spf_index = 0;
+		wait_for_good_framerate = FALSE;
+		good_framerate_count = 0;
+		need_to_initialize = FALSE; /* January stores the flag a second time here */
 	}
 
 	if (debug_frame_rate)
 	{
-		global_screenshot_count.framerate_samples[sample_index] =
-			main_globals.seconds_elapsed;
+		last_spf[current_spf_index] = main_globals.seconds_elapsed;
 		SET_FLAG(
-			global_screenshot_count.framerate_flags,
-			sample_index,
+			bad_frame_flags,
+			current_spf_index,
 			main_globals.seconds_elapsed > 1.08/TICKS_PER_SECOND);
 
-		sample_index++;
-		sample_index = (char)(sample_index % (long)NUMBEROF(global_screenshot_count.framerate_samples));
-		global_screenshot_count.framerate_sample_index = sample_index;
-		global_screenshot_count.framerate_reset = TRUE;
+		current_spf_index++;
+		current_spf_index %= NUMBER_OF_FRAME_SAMPLES;
+		need_to_initialize = TRUE;
 
-		if (global_screenshot_count.framerate_active)
+		if (wait_for_good_framerate)
 		{
-			if (global_screenshot_count.framerate_sample_index == 0)
+			if (current_spf_index == 0)
 			{
-				if (global_screenshot_count.framerate_flags == 0)
+				if (bad_frame_flags == 0)
 				{
-					if (++global_screenshot_count.framerate_counter >= 60)
+					if (++good_framerate_count >= RUNS_BEFORE_RESET)
 					{
-						global_screenshot_count.framerate_counter = 0;
-						global_screenshot_count.framerate_active = FALSE;
-						return;
+						good_framerate_count = 0;
+						wait_for_good_framerate = FALSE;
 					}
 				}
 				else
 				{
-					global_screenshot_count.framerate_counter = 0;
-					return;
+					good_framerate_count = 0;
 				}
 			}
 		}
-		else if (global_screenshot_count.framerate_flags == 0xFF)
+		else if (bad_frame_flags == 0xFF)
 		{
 			SYSTEMTIME system_time;
 			char core_name[256];
@@ -2098,7 +2183,7 @@ static void main_frame_rate_debug(
 			fprintf(file, ";core_load_name_at_startup %s\n", core_name);
 			fflush(file);
 			fclose(file);
-			global_screenshot_count.framerate_active = TRUE;
+			wait_for_good_framerate = TRUE;
 		}
 	}
 
@@ -2593,11 +2678,11 @@ static void screenshot_render(
 		console_close();
 
 		for (screenshot_page_index.y = 0;
-			screenshot_page_index.y < global_screenshot_count.count;
+			screenshot_page_index.y < global_screenshot_count;
 			screenshot_page_index.y++)
 		{
 			for (screenshot_page_index.x = 0;
-				screenshot_page_index.x < global_screenshot_count.count;
+				screenshot_page_index.x < global_screenshot_count;
 				screenshot_page_index.x++)
 			{
 				for (screenshot_index.y = 0;
@@ -2608,7 +2693,7 @@ static void screenshot_render(
 						screenshot_index.x < global_screenshot_size;
 						screenshot_index.x++)
 					{
-						if (global_screenshot_count.count > 1 ||
+						if (global_screenshot_count > 1 ||
 							global_screenshot_size > 1)
 						{
 							render_frame(
@@ -2643,7 +2728,7 @@ static void screenshot_render(
 		bitmap_delete(bitmap);
 	}
 
-	global_screenshot_count.count = 0;
+	global_screenshot_count = 0;
 	return;
 }
 
@@ -2764,16 +2849,20 @@ void main_framerate_render(
 void halt_and_catch_fire(
 	void)
 {
+	/* Name, type and function scope from the HCEX PDB (static local unsigned char recursion_lock
+	   of halt_and_catch_fire). January corroborates: .bss +0xA62, the last byte of the section,
+	   referenced only by this function, explicitly zero-initialised. */
+	static boolean recursion_lock = FALSE;
 	short gamepad_index;
 	long font_tag_index;
 	struct scenario *scenario;
 	struct rasterizer_frame_begin_parameters frame_parameters;
 	struct rasterizer_window_begin_parameters window_parameters;
 
-	if (!global_screenshot_count.halt_recursion_lock)
+	if (!recursion_lock)
 	{
 		scenario = global_scenario_try_and_get();
-		global_screenshot_count.halt_recursion_lock = TRUE;
+		recursion_lock = TRUE;
 		for (gamepad_index = 0; gamepad_index < MAXIMUM_GAMEPADS; gamepad_index++)
 		{
 			if (input_has_gamepad(gamepad_index))
@@ -2892,102 +2981,6 @@ void main_loop_of_death(
 		input_frame_end();
 	}
 
-	return;
-}
-
-static void main_game_render(
-	double time_delta_since_tick_sec)
-{
-	boolean force_single_screen;
-	long window_index;
-	struct render_window *window;
-	struct observer_result const *observer;
-	long player_window_count;
-	long window_count;
-	short last_local_player_index;
-
-	lock_global_random_seed();
-	collision_log_continue_period(TRUE);
-	sound_render();
-	force_single_screen = game_engine_force_single_screen();
-	last_local_player_index = NONE;
-
-	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
-	player_window_count = window_count;
-	if (force_single_screen || cinematic_in_progress())
-	{
-		window_count = 1;
-		player_window_count = 1;
-	}
-
-	for (window_index = 0; window_index < player_window_count; window_index++)
-	{
-		window = &global_screenshot_count.windows[window_index];
-		observer = NULL;
-
-		compute_window_bounds(
-			window_index,
-			player_window_count,
-			&window->rasterizer_camera.viewport_bounds,
-			&window->rasterizer_camera.window_bounds);
-		if (force_single_screen)
-		{
-			window->local_player_index = NONE;
-		}
-		else if (window_index < window_count)
-		{
-			if (!rasterizer_debug_options.force_all_player_views_to_default_player ||
-				last_local_player_index == NONE)
-			{
-				if (game_connection() == _game_connection_film_playback)
-				{
-					last_local_player_index = 0;
-				}
-				else
-				{
-					last_local_player_index = local_player_get_next(last_local_player_index);
-				}
-			}
-
-			window->local_player_index = last_local_player_index;
-			observer = observer_get_camera(window->local_player_index);
-		}
-		else
-		{
-			window->local_player_index = NONE;
-		}
-
-		set_window_camera_values(window, observer);
-		window->console_window = FALSE;
-	}
-
-	window = &global_screenshot_count.windows[player_window_count];
-	compute_window_bounds(
-		0,
-		1,
-		&window->rasterizer_camera.viewport_bounds,
-		&window->rasterizer_camera.window_bounds);
-	window->local_player_index = NONE;
-	window->console_window = TRUE;
-	set_window_camera_values(window, NULL);
-
-	if (global_screenshot_count.count <= 0)
-	{
-		render_frame(
-			global_screenshot_count.windows,
-			player_window_count + 1,
-			NULL,
-			NULL,
-			main_globals.movie,
-			(real)time_delta_since_tick_sec);
-	}
-	else
-	{
-		screenshot_render(global_screenshot_count.windows);
-	}
-
-	collision_log_end_period();
-	unlock_global_random_seed();
 	return;
 }
 
