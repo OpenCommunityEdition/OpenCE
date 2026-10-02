@@ -918,17 +918,6 @@
       }
     },
     {
-      "unit": "source/main/main",
-      "function": "_main_frame_rate_debug",
-      "class": "unclassified",
-      "evidence": "Complete natural frame-rate diagnostic state machine retained from the 2026-09-09 Main packet. It uses the authenticated Main state, project types, and ordinary file/time APIs. The candidate is 528 padded bytes with 51 relocations versus January's 544 bytes and 52 relocations; the remaining code-generation difference is explicitly fuzzy. No barrier, volatile carrier, fake dependency, raw address, or exact-only branch is retained. Zero exact credit. See docs/object_matching_logs/main_obj_natural_state_and_render_packet_20260909.md.  2026-09-22: two January-attested corrections landed. The sample-index wrap is a SIGNED modulo in January (movsx/and 0x80000007/jns fixup), so NUMBEROF (size_t) was wrong and the divisor is a signed 8; this closed the whole 16-byte size gap and the candidate is now 544 padded bytes, exactly January's size. The slow-frame threshold literal is 0.036000000000000004 (__real@3fa26e978d4fdf3c), one ULP above the decimal 0.036 we had, so January's source folds an expression rather than writing the decimal; spelled 1.08/TICKS_PER_SECOND, which reproduces the constant exactly. The remaining residual is one duplicated framerate_sample_index load that January's jump-threading emits on the debug-true edge (51 vs 52 relocations) plus the register assignment that follows from it.  2026-09-24 (fifty-objects lane batch 4b): re-baselined after the reviewed zero-credit packet; see docs/object_matching_logs/claude_fifty_objects_20260925.md.",
-      "measurements": {
-        "target": { "size": 544, "relocation_count": 52, "normalized_sha256": "17546b1f02410f30e6fc728300d275c40d65bf6cb6a35a096a8d735f96512d83" },
-        "base": { "size": 544, "relocation_count": 51, "normalized_sha256": "3c132f904203944a7f5f7c3b746a7458964f073c1fc4374aba0988bb5f3db4ff" },
-        "objdiff_percent": 98.65385
-      }
-    },
-    {
       "unit": "source/interface/motion_sensor",
       "function": "_motion_sensor_update",
       "class": "unclassified",
