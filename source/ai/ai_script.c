@@ -446,15 +446,13 @@ symbols in this file:
 
 #include "cseries.h"
 #include "ai/ai.h"
-#include "ai/ai_runtime.h"
 #include "ai/actions.h"
-#include "ai/actor_iterators.h"
 #include "ai/actor_definitions.h"
 #include "ai/actor_types.h"
-#include "ai/actor_looking.h"
 #include "ai/actors.h"
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
+#include "ai/ai_globals.h"
 #include "ai/ai_scenario_definitions.h"
 #include "ai/encounters.h"
 #include "ai/props.h"
@@ -472,7 +470,6 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
-#include "units/vehicle_scripting.h"
 
 /* ---------- constants */
 
@@ -563,26 +560,6 @@ enum
 
 /* ---------- structures */
 
-struct ai_script_vehicle_enterable_data
-{
-	long vehicle_index;
-	real radius;
-	short team_bitmask;
-	short actor_type_bitmask;
-	short ai_indices_count;
-	word __pad0E;
-	long ai_indices[MAXIMUM_AI_INDICES_PER_ENTERABLE_VEHICLE];
-};
-
-struct ai_script_globals_data
-{
-	boolean ai_active;
-	boolean ai_initialized_for_map;
-	byte __unknown2[0x3B4];
-	short enterable_vehicle_count;
-	struct ai_script_vehicle_enterable_data enterable_vehicles[MAXIMUM_AI_ENTERABLE_VEHICLES];
-};
-
 typedef char ai_script_squad_iterator_size_assert[
 	sizeof(struct ai_script_squad_iterator) == 0x14 ? 1 : -1];
 
@@ -611,32 +588,24 @@ struct ai_script_vehicle_candidate
 	byte pad[3];
 };
 
-struct ai_script_conversation_definition
-{
-	char name[32];
-	byte unknown[84];
-};
-
 typedef char ai_script_actor_iterator_size_assert[
 	sizeof(struct actor_iterator) == 0x1C ? 1 : -1];
 typedef char ai_script_actor_reference_iterator_size_assert[
 	sizeof(struct ai_script_actor_reference_iterator) == 0x18 ? 1 : -1];
 typedef char ai_script_actor_reference_iterator_actor_index_offset_assert[
 	offsetof(struct ai_script_actor_reference_iterator, actor_index) == 0x10 ? 1 : -1];
-typedef char ai_script_vehicle_enterable_size_assert[
-	sizeof(struct ai_script_vehicle_enterable) == 0xC ? 1 : -1];
 typedef char ai_script_vehicle_enterable_radius_offset_assert[
-	offsetof(struct ai_script_vehicle_enterable, radius) == 0x4 ? 1 : -1];
+	offsetof(struct ai_vehicle_enterable, radius) == 0x4 ? 1 : -1];
 typedef char ai_script_vehicle_enterable_team_offset_assert[
-	offsetof(struct ai_script_vehicle_enterable, team_bitmask) == 0x8 ? 1 : -1];
+	offsetof(struct ai_vehicle_enterable, team_bitmask) == 0x8 ? 1 : -1];
 typedef char ai_script_vehicle_enterable_actor_type_offset_assert[
-	offsetof(struct ai_script_vehicle_enterable, actor_type_bitmask) == 0xA ? 1 : -1];
+	offsetof(struct ai_vehicle_enterable, actor_type_bitmask) == 0xA ? 1 : -1];
 typedef char ai_script_vehicle_enterable_data_size_assert[
-	sizeof(struct ai_script_vehicle_enterable_data) == 0x28 ? 1 : -1];
+	sizeof(struct ai_vehicle_enterable) == 0x28 ? 1 : -1];
 typedef char ai_script_globals_enterable_vehicle_count_offset_assert[
-	offsetof(struct ai_script_globals_data, enterable_vehicle_count) == 0x3B6 ? 1 : -1];
+	offsetof(struct ai_globals, enterable_vehicle_count) == 0x3B6 ? 1 : -1];
 typedef char ai_script_globals_enterable_vehicles_offset_assert[
-	offsetof(struct ai_script_globals_data, enterable_vehicles) == 0x3B8 ? 1 : -1];
+	offsetof(struct ai_globals, enterable_vehicles) == 0x3B8 ? 1 : -1];
 typedef char ai_script_platoon_iterator_size_assert[
 	sizeof(struct ai_script_platoon_iterator) == 0xC ? 1 : -1];
 typedef char ai_script_vehicle_candidate_size_assert[
@@ -694,8 +663,6 @@ static short ai_scripting_command_list_status_internal(
 	struct obey_individual_complex_control *complex_control);
 
 /* ---------- globals */
-
-extern struct ai_script_globals_data *ai_globals;
 
 char const ai_script_squad_separator = '/';
 
@@ -1767,10 +1734,10 @@ void ai_scripting_set_blind(
 	return;
 }
 
-struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
+struct ai_vehicle_enterable *ai_scripting_find_vehicle_enterable(
 	long vehicle_index)
 {
-	struct ai_script_vehicle_enterable_data *vehicle_enterable = NULL;
+	struct ai_vehicle_enterable *vehicle_enterable = NULL;
 
 	if (vehicle_index != NONE)
 	{
@@ -1805,7 +1772,7 @@ struct ai_script_vehicle_enterable *ai_scripting_find_vehicle_enterable(
 		}
 	}
 
-	return (struct ai_script_vehicle_enterable *)vehicle_enterable;
+	return (struct ai_vehicle_enterable *)vehicle_enterable;
 }
 
 void ai_scripting_vehicle_enterable_distance(
@@ -1822,7 +1789,7 @@ void ai_scripting_vehicle_enterable_distance(
 
 	if (unit_index != NONE)
 	{
-		struct ai_script_vehicle_enterable *vehicle_enterable =
+		struct ai_vehicle_enterable *vehicle_enterable =
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
 			vehicle_enterable->radius = distance;
@@ -1833,25 +1800,23 @@ void ai_scripting_vehicle_enterable_distance(
 
 void ai_scripting_vehicle_enterable_team(
 	long unit_index,
-	long team_index)
+	short team_index)
 {
-	short team = team_index;
-
 	if (ai_debug.print_scripting)
 	{
 		error(
 			_error_silent,
 			"%s: ai_vehicle_enterable_team <some vehicle> %d",
 			hs_runtime_get_executing_thread_name(),
-			team);
+			team_index);
 	}
 
 	if (unit_index != NONE)
 	{
-		struct ai_script_vehicle_enterable *vehicle_enterable =
+		struct ai_vehicle_enterable *vehicle_enterable =
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
-			vehicle_enterable->team_bitmask |= 1 << team;
+			vehicle_enterable->team_bitmask |= 1 << team_index;
 	}
 
 	return;
@@ -1859,25 +1824,23 @@ void ai_scripting_vehicle_enterable_team(
 
 void ai_scripting_vehicle_enterable_actor_type(
 	long unit_index,
-	long actor_type)
+	short actor_type)
 {
-	short type = actor_type;
-
 	if (ai_debug.print_scripting)
 	{
 		error(
 			_error_silent,
 			"%s: ai_vehicle_enterable_actor_type <some vehicle> %d",
 			hs_runtime_get_executing_thread_name(),
-			type);
+			actor_type);
 	}
 
 	if (unit_index != NONE)
 	{
-		struct ai_script_vehicle_enterable *vehicle_enterable =
+		struct ai_vehicle_enterable *vehicle_enterable =
 			ai_scripting_find_vehicle_enterable(unit_index);
 		if (vehicle_enterable)
-			vehicle_enterable->actor_type_bitmask |= 1 << type;
+			vehicle_enterable->actor_type_bitmask |= 1 << actor_type;
 	}
 
 	return;
@@ -1905,8 +1868,8 @@ void ai_scripting_vehicle_enterable_actors(
 
 	if (unit_index != NONE && ai_reference != NONE)
 	{
-		struct ai_script_vehicle_enterable_data *vehicle_enterable =
-			(struct ai_script_vehicle_enterable_data *)ai_scripting_find_vehicle_enterable(unit_index);
+		struct ai_vehicle_enterable *vehicle_enterable =
+			(struct ai_vehicle_enterable *)ai_scripting_find_vehicle_enterable(unit_index);
 
 		if (vehicle_enterable)
 		{
@@ -2848,10 +2811,8 @@ boolean ai_scripting_allegiance_broken(
 }
 
 boolean ai_scripting_conversation(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2859,12 +2820,12 @@ boolean ai_scripting_conversation(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
-				struct ai_script_conversation_definition)->name;
+				conversation_index,
+				struct ai_conversation)->name;
 		}
 
 		error(
@@ -2874,14 +2835,12 @@ boolean ai_scripting_conversation(
 			conversation_name);
 	}
 
-	return ai_conversation(conversation, TRUE);
+	return ai_conversation(conversation_index, TRUE);
 }
 
 void ai_scripting_conversation_stop(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2889,12 +2848,12 @@ void ai_scripting_conversation_stop(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
-				struct ai_script_conversation_definition)->name;
+				conversation_index,
+				struct ai_conversation)->name;
 		}
 
 		error(
@@ -2904,16 +2863,14 @@ void ai_scripting_conversation_stop(
 			conversation_name);
 	}
 
-	ai_conversation_stop(conversation);
+	ai_conversation_stop(conversation_index);
 
 	return;
 }
 
 void ai_scripting_conversation_advance(
-	long conversation_index)
+	short conversation_index)
 {
-	short conversation = conversation_index;
-
 	if (ai_debug.print_scripting)
 	{
 		struct scenario *scenario;
@@ -2921,12 +2878,12 @@ void ai_scripting_conversation_advance(
 
 		scenario = global_scenario_get();
 		conversation_name = "<error>";
-		if (VALID_INDEX(conversation, scenario->ai_conversations.count))
+		if (VALID_INDEX(conversation_index, scenario->ai_conversations.count))
 		{
 			conversation_name = TAG_BLOCK_GET_ELEMENT(
 				&scenario->ai_conversations,
-				conversation,
-				struct ai_script_conversation_definition)->name;
+				conversation_index,
+				struct ai_conversation)->name;
 		}
 
 		error(
@@ -2936,7 +2893,7 @@ void ai_scripting_conversation_advance(
 			conversation_name);
 	}
 
-	ai_conversation_advance(conversation);
+	ai_conversation_advance(conversation_index);
 
 	return;
 }

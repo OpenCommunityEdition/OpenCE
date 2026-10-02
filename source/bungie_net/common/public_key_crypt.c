@@ -37,8 +37,10 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "bungie_net/common/64bit_math.h"
 #include "bungie_net/common/public_key_crypt.h"
+#include "bungie_net/common/prime_numbers.h"
 #include "bungie_net/common/random_numbers.h"
 #include "memory/byte_swapping.h"
 
@@ -49,9 +51,6 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
-
-unsigned long randomprime(
-	unsigned long maximum);
 
 static unsigned long x_exp_y_mod_n(
 	unsigned long base,

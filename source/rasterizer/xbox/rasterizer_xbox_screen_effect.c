@@ -97,13 +97,13 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmaps_inlines.h"
-#include "main/main_runtime.h"
+#include "main/main.h"
 #include "math/integer_math.h"
 #include "math/real_math.h"
 #include "render/render_cameras.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
-#include "rasterizer/rasterizer_debug_options.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include <stddef.h>
 #include <xtl.h>
 #include "rasterizer_xbox.h"
@@ -168,9 +168,9 @@ enum
 /* ---------- structures */
 
 typedef char rasterizer_screen_effect_debug_options_flashes_offset_assert[
-	offsetof(struct rasterizer_debug_options_definition, screen_flashes) == 0x47 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options, screen_flash_enabled) == 0x47 ? 1 : -1];
 typedef char rasterizer_screen_effect_debug_options_effects_offset_assert[
-	offsetof(struct rasterizer_debug_options_definition, screen_effects) == 0x48 ? 1 : -1];
+	offsetof(struct rasterizer_debug_options, screen_effects_enabled) == 0x48 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_mask_offset_assert[
 	offsetof(struct rasterizer_cinematic_screen_effect_parameters, convolution_mask) == 0x08 ? 1 : -1];
 typedef char rasterizer_screen_effect_parameters_tint_offset_assert[
@@ -192,7 +192,6 @@ typedef char rasterizer_screen_effect_pixel_shader_size_assert[
 
 /* ---------- globals */
 
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 
 /* ---------- private code */
 
@@ -432,7 +431,6 @@ static void rasterizer_screen_effect_set_texture_transforms(
 				223,
 				main_get_window_count()<=1);
 
-#ifdef HALO_LINUX
 			/* The native builds draw several frames per tick
 			(port/linux/game/render_interpolation.c): move the noise 30 times
 			a second, as the Xbox did once a frame, not every frame. */
@@ -448,12 +446,6 @@ static void rasterizer_screen_effect_set_texture_transforms(
 				random_value = real_seed_random(&noise_seed);
 				constants[5][3] += noise_scale.j * random_value * noise_size.j;
 			}
-#else
-			random_value = real_seed_random(get_global_local_random_seed_address());
-			constants[4][3] += noise_scale.i * random_value * noise_size.i;
-			random_value = real_seed_random(get_global_local_random_seed_address());
-			constants[5][3] += noise_scale.j * random_value * noise_size.j;
-#endif
 		}
 
 		IDirect3DDevice8_SetVertexShaderConstant(
@@ -487,7 +479,7 @@ void _rasterizer_screen_effect(
 		parameters->filter_light_enhancement_intensity > 0.0f ||
 		parameters->filter_desaturation_intensity > 0.0f ||
 		parameters->video_on) &&
-		rasterizer_debug_options.screen_effects &&
+		rasterizer_debug_options.screen_effects_enabled &&
 		global_window_parameters.rasterizer_target == _rasterizer_target_render_primary)
 	{
 		short pass_count = (parameters->convolution_extra_passes + 1) * 2;
@@ -994,17 +986,10 @@ void _rasterizer_screen_effect(
 
 			if (pass == 0 && main_get_window_count() > 1 && pass_count != 1)
 			{
-#ifdef HALO_LINUX
 				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
 					(1.0f / (real)halo_screen_width()) - 1.0f;
 				vertex_bounds.x1 = 2 * global_window_parameters.camera.viewport_bounds.x1 *
 					(1.0f / (real)halo_screen_width()) - 1.0f;
-#else
-				vertex_bounds.x0 = 2 * global_window_parameters.camera.viewport_bounds.x0 *
-					(1.0f / 640.0f) - 1.0f;
-				vertex_bounds.x1 = 2 * global_window_parameters.camera.viewport_bounds.x1 *
-					(1.0f / 640.0f) - 1.0f;
-#endif
 				vertex_bounds.y0 = -2 * global_window_parameters.camera.viewport_bounds.y0 *
 					(1.0f / 480.0f) + 1.0f;
 				vertex_bounds.y1 = -2 * global_window_parameters.camera.viewport_bounds.y1 *
@@ -1207,7 +1192,7 @@ void _rasterizer_screen_flash(
 
 	rasterizer_profile_begin(_rasterizer_profile_screen_flash);
 
-	if (rasterizer_debug_options.screen_flashes &&
+	if (rasterizer_debug_options.screen_flash_enabled &&
 		global_window_parameters.screen_flash.type != _render_screen_flash_type_none)
 	{
 		flash_color.alpha = global_window_parameters.screen_flash.intensity *

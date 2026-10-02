@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="64" viewBox="0 0 128 64">
+  <!-- ammo type icon: plasma charge - solid round core with soft radial falloff (rgb = alpha) -->
+  <defs>
+    <radialGradient id="g" gradientUnits="userSpaceOnUse" cx="29.3" cy="28.1" r="26.2">
+      <stop offset="0.0000" stop-color="#ffffff" stop-opacity="1.000"/>
+      <stop offset="0.4122" stop-color="#ffffff" stop-opacity="1.000"/>
+      <stop offset="0.4389" stop-color="#f1f1f1" stop-opacity="0.945"/>
+      <stop offset="0.4771" stop-color="#dbdbdb" stop-opacity="0.857"/>
+      <stop offset="0.5534" stop-color="#b0b0b0" stop-opacity="0.688"/>
+      <stop offset="0.6298" stop-color="#898989" stop-opacity="0.537"/>
+      <stop offset="0.7061" stop-color="#656565" stop-opacity="0.396"/>
+      <stop offset="0.7824" stop-color="#454545" stop-opacity="0.272"/>
+      <stop offset="0.8588" stop-color="#292929" stop-opacity="0.160"/>
+      <stop offset="0.9351" stop-color="#101010" stop-opacity="0.064"/>
+      <stop offset="0.9771" stop-color="#030303" stop-opacity="0.012"/>
+      <stop offset="1.0000" stop-color="#000000" stop-opacity="0.000"/>
+    </radialGradient>
+  </defs>
+  <circle cx="29.3" cy="28.1" r="26.2" fill="url(#g)"/>
+</svg>

@@ -1,5 +1,5 @@
 #ifndef lint
-char tif_packbits_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
+static char tif_packbits_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packbits.c,v 1.23 92/03/30 18:29:40 sam Exp $";
 #endif
 
 /*
@@ -35,17 +35,17 @@ char tif_packbits_rcsid[] = "$Header: /usr/people/sam/tiff/libtiff/RCS/tif_packb
 #include <stdio.h>
 
 #if USE_PROTOTYPES
-int	PackBitsPreEncode(TIFF *);
-int	PackBitsEncode(TIFF *, u_char *, int, u_int);
-int	PackBitsDecode(TIFF *, u_char *, int, u_int);
-int	PackBitsEncodeChunk(TIFF *, u_char *, int, u_int);
+static int	PackBitsPreEncode(TIFF *);
+static int	PackBitsEncode(TIFF *, u_char *, int, u_int);
+static int	PackBitsDecode(TIFF *, u_char *, int, u_int);
+static int	PackBitsEncodeChunk(TIFF *, u_char *, int, u_int);
 #else
-int	PackBitsPreEncode();
-int	PackBitsEncode(), PackBitsDecode();
-int	PackBitsEncodeChunk();
+static int	PackBitsPreEncode();
+static int	PackBitsEncode(), PackBitsDecode();
+static int	PackBitsEncodeChunk();
 #endif
 
-int
+static int
 PackBitsPreEncode(tif)
 	TIFF *tif;
 {
@@ -59,7 +59,7 @@ PackBitsPreEncode(tif)
 /*
  * Encode a run of pixels.
  */
-int
+static int
 PackBitsEncode(tif, bp, cc, s)
 	TIFF *tif;
 	u_char *bp;
@@ -167,7 +167,7 @@ PackBitsEncode(tif, bp, cc, s)
 	return (1);
 }
 
-int
+static int
 PackBitsDecode(tif, op, occ, s)
 	TIFF *tif;
 	register u_char *op;
@@ -215,7 +215,7 @@ PackBitsDecode(tif, op, occ, s)
  * the decoder if data is read, for example, by scanlines
  * when it was encoded by strips.
  */
-int
+static int
 PackBitsEncodeChunk(tif, bp, cc, s)
 	TIFF *tif;
 	u_char *bp;

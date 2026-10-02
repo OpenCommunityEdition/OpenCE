@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="128" viewBox="0 0 512 128">
+  <!-- 3 rows x 20 slanted bullet rounds (alpha mask) -->
+  <defs>
+    <path id="b" d="M51.34,0 H51.79 L54.02,6 L42.83,30 H32.47 L43.71,5.89 Z" fill="#fff"/>
+  </defs>
+  <use href="#b"/>
+  <use href="#b" x="20.63" y="0"/>
+  <use href="#b" x="41.26" y="0"/>
+  <use href="#b" x="61.89" y="0"/>
+  <use href="#b" x="82.52" y="0"/>
+  <use href="#b" x="103.16" y="0"/>
+  <use href="#b" x="123.79" y="0"/>
+  <use href="#b" x="144.42" y="0"/>
+  <use href="#b" x="165.05" y="0"/>
+  <use href="#b" x="185.68" y="0"/>
+  <use href="#b" x="206.31" y="0"/>
+  <use href="#b" x="226.94" y="0"/>
+  <use href="#b" x="247.57" y="0"/>
+  <use href="#b" x="268.20" y="0"/>
+  <use href="#b" x="288.83" y="0"/>
+  <use href="#b" x="309.47" y="0"/>
+  <use href="#b" x="330.10" y="0"/>
+  <use href="#b" x="350.73" y="0"/>
+  <use href="#b" x="371.36" y="0"/>
+  <use href="#b" x="391.99" y="0"/>
+  <use href="#b" x="-15.85" y="34"/>
+  <use href="#b" x="4.78" y="34"/>
+  <use href="#b" x="25.41" y="34"/>
+  <use href="#b" x="46.04" y="34"/>
+  <use href="#b" x="66.67" y="34"/>
+  <use href="#b" x="87.30" y="34"/>
+  <use href="#b" x="107.93" y="34"/>
+  <use href="#b" x="128.56" y="34"/>
+  <use href="#b" x="149.19" y="34"/>
+  <use href="#b" x="169.82" y="34"/>
+  <use href="#b" x="190.46" y="34"/>
+  <use href="#b" x="211.09" y="34"/>
+  <use href="#b" x="231.72" y="34"/>
+  <use href="#b" x="252.35" y="34"/>
+  <use href="#b" x="272.98" y="34"/>
+  <use href="#b" x="293.61" y="34"/>
+  <use href="#b" x="314.24" y="34"/>
+  <use href="#b" x="334.87" y="34"/>
+  <use href="#b" x="355.50" y="34"/>
+  <use href="#b" x="376.14" y="34"/>
+  <use href="#b" x="-31.71" y="68"/>
+  <use href="#b" x="-11.08" y="68"/>
+  <use href="#b" x="9.55" y="68"/>
+  <use href="#b" x="30.19" y="68"/>
+  <use href="#b" x="50.82" y="68"/>
+  <use href="#b" x="71.45" y="68"/>
+  <use href="#b" x="92.08" y="68"/>
+  <use href="#b" x="112.71" y="68"/>
+  <use href="#b" x="133.34" y="68"/>
+  <use href="#b" x="153.97" y="68"/>
+  <use href="#b" x="174.60" y="68"/>
+  <use href="#b" x="195.23" y="68"/>
+  <use href="#b" x="215.86" y="68"/>
+  <use href="#b" x="236.49" y="68"/>
+  <use href="#b" x="257.13" y="68"/>
+  <use href="#b" x="277.76" y="68"/>
+  <use href="#b" x="298.39" y="68"/>
+  <use href="#b" x="319.02" y="68"/>
+  <use href="#b" x="339.65" y="68"/>
+  <use href="#b" x="360.28" y="68"/>
+</svg>

@@ -181,6 +181,27 @@ real sound_permutation_get_real_mouth_aperture(
 		return aperture * oo_unsigned_char_max;
 	}
 
+	/* port: each permutation once (asked every frame of every sound of a
+	speech class, a few such sounds logged hundreds of lines a second, a
+	line written and flushed each, and slowed the game) */
+	{
+		enum
+		{
+			MAXIMUM_SILENT_MOUTHS = 32,
+		};
+		static struct sound_permutation *silent_mouths[MAXIMUM_SILENT_MOUTHS];
+		static long silent_mouth_count = 0;
+		long index;
+
+		for (index = 0; index < silent_mouth_count; index++)
+		{
+			if (silent_mouths[index] == permutation)
+				return 0.f;
+		}
+		if (silent_mouth_count >= MAXIMUM_SILENT_MOUTHS)
+			return 0.f;
+		silent_mouths[silent_mouth_count++] = permutation;
+	}
 	error(
 		_error_silent,
 		"but how can you speak if you have no mouth data? (permutation %s)",

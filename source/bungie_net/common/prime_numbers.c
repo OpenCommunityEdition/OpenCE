@@ -32,6 +32,9 @@ symbols in this file:
 /* ---------- structures */
 
 /* ---------- prototypes */
+static unsigned long *primegen(
+	unsigned long maximum,
+	unsigned long *num_primes);
 
 /* ---------- globals */
 
@@ -68,7 +71,7 @@ static int compare_ulongs_descending(
 	return left_value > right_value ? -1 : 0;
 }
 
-unsigned long *primegen(
+static unsigned long *primegen(
 	unsigned long maximum,
 	unsigned long *num_primes)
 {

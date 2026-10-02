@@ -34,7 +34,6 @@ struct _projectile_datum
 	real detonation_timer;
 	real detonation_timer_delta;
 	real arming_time;
-#ifdef HALO_LINUX
 	/* The complete runtime tail (projectiles.c keeps the same layout). */
 	real arming_time_delta;
 	real odometer;
@@ -45,7 +44,6 @@ struct _projectile_datum
 	real_vector3d rotation_axis;
 	real rotation_sine;
 	real rotation_cosine;
-#endif
 };
 
 struct projectile_datum
@@ -127,9 +125,7 @@ boolean projectile_aim_ballistic(
 void projectile_accelerate(
 	long projectile_index,
 	union real_vector3d const *acceleration);
-#ifdef HALO_LINUX
 boolean projectile_update(long projectile_index);
-#endif
 
 /* ---------- globals */
 

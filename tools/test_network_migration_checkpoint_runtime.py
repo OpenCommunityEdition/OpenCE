@@ -102,7 +102,11 @@ typedef int boolean;
 #define FALSE 0
 #define NONE (-1L)
 #define MAXIMUM_TRACKED_OBJECTS 16
+#define MAXIMUM_CLIENT_NEW_OBJECTS 16
 #define CLIENT_READY_INTERVAL_TICKS 30
+#define CLIENT_READY_MAXIMUM_INTERVAL_TICKS 120
+#define CLIENT_RETRY_TICKS 330
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define DATUM_INDEX_TO_ABSOLUTE_INDEX(index) ((long)((index) & 0xffffUL))
 enum { _object_change_create, _object_change_delete,
        _distributed_message_client_ready, _distributed_to_host_reliably };
@@ -111,6 +115,10 @@ struct distributed_object_change { byte change; long object_index; };
 static long objects_host_told[16], objects_host_resting_cursor;
 static long objects_host_inventories[16], objects_host_vehicle_predictions[16];
 static long objects_client_has[16], objects_client_ready_time;
+static long objects_client_ready_interval = CLIENT_READY_INTERVAL_TICKS;
+static long objects_client_failed_time = NONE, objects_client_retry_ticks = CLIENT_RETRY_TICKS;
+static short objects_client_new_object_count;
+static boolean objects_client_check_all, objects_client_ask_again;
 static boolean objects_client_synchronized, objects_client_resynchronizing;
 static boolean objects_client_resync_seen[16];
 static long objects_client_creating_index;
@@ -118,6 +126,7 @@ static boolean objects_client_creating, objects_client_deleting;
 static long world[16], tick, requests, removed, vehicles;
 static boolean client = TRUE;
 static boolean network_game_distributed_client(void) { return client; }
+static boolean distributed_object_index_valid(long index) { return index != NONE; }
 static long game_time_get(void) { return tick; }
 static void distributed_send(void *message, int type, int count, word size, int target) {
  (void)message;
@@ -126,6 +135,8 @@ static void distributed_send(void *message, int type, int count, word size, int 
  requests++;
 }
 static void distributed_client_remove_own_objects(void) { removed++; }
+static void distributed_client_note_own_inventories(void) {}
+static void distributed_client_send_identity(void) {}
 static void distributed_client_send_vehicles(void) { vehicles++; }
 static struct { long deletes; } objects_statistics;
 static void distributed_client_delete(long index) {

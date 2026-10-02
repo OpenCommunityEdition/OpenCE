@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -49,6 +50,7 @@ public class LauncherActivity extends Activity {
         // readable (a directory adb creates there belongs to the shell user)
         if (dataRoot != null)
             new File(dataRoot, "maps").mkdirs();
+        passOnHardwareId();
         passOnInvite(getIntent());
         if (haveData()) {
             startGame();
@@ -66,11 +68,47 @@ public class LauncherActivity extends Activity {
         if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null
             || dataRoot == null)
             return;
-        try (OutputStream out = new FileOutputStream(new File(dataRoot, "join_link.txt"))) {
+        // written whole under another name, then renamed: the game never
+        // reads it half written
+        File partial = new File(dataRoot, "join_link.txt.tmp");
+        try (OutputStream out = new FileOutputStream(partial)) {
             out.write(intent.getData().toString().getBytes("UTF-8"));
         } catch (java.io.IOException e) {
             // the link is lost; the player can copy it instead
+            partial.delete();
+            return;
         }
+        if (!partial.renameTo(new File(dataRoot, "join_link.txt")))
+            partial.delete();
+    }
+
+    /**
+     * This device's ANDROID_ID (the app's own: one per app signing key and
+     * user, until a factory reset), which native code cannot read: the game
+     * (port/linux/src/p2p.c) hashes it from hardware_id.txt into the
+     * hardware id a host it joins is told.
+     */
+    private void passOnHardwareId() {
+        String id;
+
+        if (dataRoot == null)
+            return;
+        try {
+            id = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        } catch (RuntimeException e) {
+            return;
+        }
+        if (id == null || id.isEmpty())
+            return;
+        File partial = new File(dataRoot, "hardware_id.txt.tmp");
+        try (OutputStream out = new FileOutputStream(partial)) {
+            out.write(id.getBytes("UTF-8"));
+        } catch (java.io.IOException e) {
+            partial.delete();
+            return;
+        }
+        if (!partial.renameTo(new File(dataRoot, "hardware_id.txt")))
+            partial.delete();
     }
 
     private boolean haveData() {

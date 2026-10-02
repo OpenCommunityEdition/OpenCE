@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="32" height="2048" viewBox="0 0 32 2048">
+  <!-- sniper scope elevation ladder: colour #2895ff throughout, the art in the alpha -->
+  <defs>
+    <rect id="long" x="0" width="32" height="4"/>
+    <rect id="short" x="0" width="16" height="4"/>
+  </defs>
+  <!-- ticks every 36 px, alternating long and short -->
+  <g fill="#2895ff">
+    <use xlink:href="#long" y="52"/>
+    <use xlink:href="#short" y="88"/>
+    <use xlink:href="#long" y="124"/>
+    <use xlink:href="#short" y="160"/>
+    <use xlink:href="#long" y="196"/>
+    <use xlink:href="#short" y="232"/>
+    <use xlink:href="#long" y="268"/>
+    <use xlink:href="#short" y="304"/>
+    <use xlink:href="#long" y="340"/>
+    <use xlink:href="#short" y="376"/>
+    <use xlink:href="#long" y="412"/>
+    <use xlink:href="#short" y="448"/>
+    <use xlink:href="#long" y="484"/>
+    <use xlink:href="#short" y="520"/>
+    <use xlink:href="#long" y="556"/>
+    <use xlink:href="#short" y="592"/>
+    <use xlink:href="#long" y="628"/>
+    <use xlink:href="#short" y="664"/>
+    <use xlink:href="#long" y="700"/>
+    <use xlink:href="#short" y="736"/>
+    <use xlink:href="#long" y="772"/>
+    <use xlink:href="#short" y="808"/>
+    <use xlink:href="#long" y="844"/>
+    <use xlink:href="#short" y="880"/>
+    <use xlink:href="#long" y="916"/>
+    <use xlink:href="#short" y="952"/>
+    <use xlink:href="#long" y="988"/>
+    <use xlink:href="#long" y="1060"/>
+    <use xlink:href="#short" y="1096"/>
+    <use xlink:href="#long" y="1132"/>
+    <use xlink:href="#short" y="1168"/>
+    <use xlink:href="#long" y="1204"/>
+    <use xlink:href="#short" y="1240"/>
+    <use xlink:href="#long" y="1276"/>
+    <use xlink:href="#short" y="1312"/>
+    <use xlink:href="#long" y="1348"/>
+    <use xlink:href="#short" y="1384"/>
+    <use xlink:href="#long" y="1420"/>
+    <use xlink:href="#short" y="1456"/>
+    <use xlink:href="#long" y="1492"/>
+    <use xlink:href="#short" y="1528"/>
+    <use xlink:href="#long" y="1564"/>
+    <use xlink:href="#short" y="1600"/>
+    <use xlink:href="#long" y="1636"/>
+    <use xlink:href="#short" y="1672"/>
+    <use xlink:href="#long" y="1708"/>
+    <use xlink:href="#short" y="1744"/>
+    <use xlink:href="#long" y="1780"/>
+    <use xlink:href="#short" y="1816"/>
+    <use xlink:href="#long" y="1852"/>
+    <use xlink:href="#short" y="1888"/>
+    <use xlink:href="#long" y="1924"/>
+    <use xlink:href="#short" y="1960"/>
+    <use xlink:href="#long" y="1996"/>
+    <use xlink:href="#short" y="2032"/>
+  </g>
+  <!-- pointer on the left edge, pointing right: translucent fill (119/255) inside a 4 px outline -->
+  <polygon points="4,1005.5 24.5,1026 4,1046.5" fill="#2895ff" fill-opacity="0.4667"/>
+  <path d="M0,996.5 L29.5,1026 L0,1055.5 Z M4,1005.5 L24.5,1026 L4,1046.5 Z" fill="#2895ff" fill-rule="evenodd"/>
+</svg>

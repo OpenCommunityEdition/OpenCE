@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="1024" viewBox="0 0 256 1024">
+  <g transform="matrix(-1 0 0 1 256 0)">
+  <!-- chamfered side bracket: translucent grey with a white edge -->
+  <polygon points="104.00,158.25 144.00,198.25 144.00,825.75 104.00,865.75" fill="#838383" fill-opacity="0.514"/>
+  <path d="M104.00,144.00 152.00,192.00 152.00,832.00 104.00,880.00Z M104.00,865.75 144.00,825.75 144.00,198.25 104.00,158.25Z" fill="#fff" fill-rule="evenodd"/>
+  <!-- range ticks, alternating long and short -->
+  <g fill="#fff">
+    <rect x="204" y="220" width="44" height="4"/>
+    <rect x="204" y="256" width="20" height="4"/>
+    <rect x="204" y="292" width="44" height="4"/>
+    <rect x="204" y="328" width="20" height="4"/>
+    <rect x="204" y="364" width="44" height="4"/>
+    <rect x="204" y="400" width="20" height="4"/>
+    <rect x="204" y="436" width="44" height="4"/>
+    <rect x="204" y="472" width="20" height="4"/>
+    <rect x="204" y="508" width="44" height="4"/>
+    <rect x="204" y="544" width="20" height="4"/>
+    <rect x="204" y="580" width="44" height="4"/>
+    <rect x="204" y="616" width="20" height="4"/>
+    <rect x="204" y="652" width="44" height="4"/>
+    <rect x="204" y="688" width="20" height="4"/>
+    <rect x="204" y="724" width="44" height="4"/>
+    <rect x="204" y="760" width="20" height="4"/>
+    <rect x="204" y="796" width="44" height="4"/>
+  </g>
+  </g>
+</svg>

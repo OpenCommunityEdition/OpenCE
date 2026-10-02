@@ -103,7 +103,7 @@ symbols in this file:
 #include "effects/material_effect_definitions.h"
 #include "game/game.h"
 #include "game/game_globals.h"
-#include "math/matrix_math.h"
+#include "math/real_math.h"
 #include "objects/damage.h"
 #include "objects/object_definitions.h"
 #include "objects/object_types.h"
@@ -713,11 +713,11 @@ void physics_compute_new(
 			&mass_point->position);
 		if (powered_mass_point)
 		{
-			real_matrix4x3 powered_matrix;
+			real_matrix4x3 powered_world_matrix;
 
-			matrix4x3_multiply(&instance->world_matrix, &powered_mass_point->rotation_matrix, &powered_matrix);
-			matrix4x3_transform_normal(&powered_matrix, &mass_point_definition->forward, &mass_point->forward);
-			matrix4x3_transform_normal(&powered_matrix, &mass_point_definition->up, &mass_point->up);
+			matrix4x3_multiply(&instance->world_matrix, &powered_mass_point->rotation_matrix, &powered_world_matrix);
+			matrix4x3_transform_normal(&powered_world_matrix, &mass_point_definition->forward, &mass_point->forward);
+			matrix4x3_transform_normal(&powered_world_matrix, &mass_point_definition->up, &mass_point->up);
 		}
 		else
 		{
@@ -798,8 +798,8 @@ void physics_compute_new(
 
 		if (mass_point->water_depth > 0.0f)
 		{
-			real depth_fraction = mass_point->water_depth >= physics->water_depth ?
-				1.0f : mass_point->water_depth/physics->water_depth;
+			real depth_fraction = mass_point->water_depth < physics->water_depth ?
+				mass_point->water_depth/physics->water_depth : 1.0f;
 			real water_scale = -mass_point_definition->mass*physics->water_friction;
 
 			if (mass_point_definition->density > 0.0f && physics->water_depth > 0.0f)
@@ -834,7 +834,7 @@ void physics_compute_new(
 				TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_water_lift_bit) &&
 				powered_mass_point->water_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->water_lift_ratio*physics->mass*depth_fraction;
 				real_vector3d lift_force;
 
@@ -871,7 +871,7 @@ void physics_compute_new(
 				TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_air_lift_bit) &&
 				powered_mass_point->air_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					physics->mass*powered_mass_point->air_lift_ratio;
 				real_vector3d lift_force;
 
@@ -897,7 +897,7 @@ void physics_compute_new(
 			if (TEST_FLAG(powered_mass_point_definition->flags, _powered_mass_point_antigrav_bit))
 			{
 				real probe_length = mass_point_definition->radius + powered_mass_point_definition->antigrav_height;
-				real_point3d probe_point = mass_point->position;
+				real_point3d point = mass_point->position;
 				real_vector3d probe_vector;
 				struct collision_result collision;
 
@@ -905,7 +905,7 @@ void physics_compute_new(
 
 				if (collision_test_vector(
 						_collision_test_for_bipeds_dead_flags,
-						&probe_point,
+						&point,
 						&probe_vector,
 						instance->object_index,
 						&collision))
@@ -915,8 +915,8 @@ void physics_compute_new(
 						mass_point->up.k,
 						powered_mass_point_definition->antigrav_normal_k0,
 						powered_mass_point_definition->antigrav_normal_k1);
-					real ground_effect = height <= 0.0f ?
-						1.0f : 1.0f - height/powered_mass_point_definition->antigrav_height;
+					real ground_effect = height > 0.0f ?
+						1.0f - height/powered_mass_point_definition->antigrav_height : 1.0f;
 					real magnitude = (ground_effect*ground_effect*global_gravity -
 						dot_product3d(&collision.plane.n, &mass_point->velocity)*
 							powered_mass_point_definition->antigrav_damp_fraction)*
@@ -1532,7 +1532,7 @@ void physics_update_new(
 	return;
 }
 
-/* NonMatching: the owner-safe natural reconstruction is 0x14A0 bytes with 114
+/* NonMatching: the owner-safe natural reconstruction is 0x1500 bytes with 116
  * relocations versus the January target's 0x1430 bytes and 115 relocations.
  * Its final axes predicate also falls out of line after the earlier codegen
  * divergence, so this coherent candidate is parked without schedule tuning. */
@@ -1636,18 +1636,18 @@ static void physics_update_old(
 
 		if (powered_mass_point)
 		{
-			real_matrix4x3 powered_matrix;
+			real_matrix4x3 powered_world_matrix;
 
 			matrix4x3_multiply(
 				&world_matrix,
 				&powered_mass_point->rotation_matrix,
-				&powered_matrix);
+				&powered_world_matrix);
 			matrix4x3_transform_normal(
-				&powered_matrix,
+				&powered_world_matrix,
 				&mass_point_definition->forward,
 				&mass_point->forward);
 			matrix4x3_transform_normal(
-				&powered_matrix,
+				&powered_world_matrix,
 				&mass_point_definition->up,
 				&mass_point->up);
 		}
@@ -1765,8 +1765,8 @@ static void physics_update_old(
 
 		if (mass_point->water_depth > 0.0f)
 		{
-			real depth_fraction = mass_point->water_depth >= physics->water_depth ?
-				1.0f : mass_point->water_depth/physics->water_depth;
+			real depth_fraction = mass_point->water_depth < physics->water_depth ?
+				mass_point->water_depth/physics->water_depth : 1.0f;
 			real water_scale = -mass_point_definition->mass*physics->water_friction;
 
 			if (mass_point_definition->density > 0.0f && physics->water_depth > 0.0f)
@@ -1821,7 +1821,7 @@ static void physics_update_old(
 					_powered_mass_point_water_lift_bit) &&
 				powered_mass_point->water_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->water_lift_ratio*physics->mass*depth_fraction;
 				real_vector3d lift_force;
 
@@ -1873,7 +1873,7 @@ static void physics_update_old(
 					_powered_mass_point_air_lift_bit) &&
 				powered_mass_point->air_lift_ratio != 0.0f)
 			{
-				real lift = ABS(dot_product3d(&mass_point->forward, &mass_point->velocity))*
+				real lift = fabs(dot_product3d(&mass_point->forward, &mass_point->velocity))*
 					powered_mass_point->air_lift_ratio*physics->mass;
 				real_vector3d lift_force;
 
@@ -1916,14 +1916,14 @@ static void physics_update_old(
 			{
 				real probe_length =
 					mass_point_definition->radius + powered_mass_point_definition->antigrav_height;
-				real_point3d probe_point = mass_point->position;
+				real_point3d point = mass_point->position;
 				real_vector3d probe_vector;
 				struct collision_result collision;
 
 				scale_vector3d(global_down3d, probe_length, &probe_vector);
 				if (collision_test_vector(
 						_collision_test_for_bipeds_dead_flags,
-						&probe_point,
+						&point,
 						&probe_vector,
 						object_index,
 						&collision))
@@ -1933,8 +1933,8 @@ static void physics_update_old(
 						mass_point->up.k,
 						powered_mass_point_definition->antigrav_normal_k0,
 						powered_mass_point_definition->antigrav_normal_k1);
-					real ground_effect = height <= 0.0f ?
-						1.0f : 1.0f - height/powered_mass_point_definition->antigrav_height;
+					real ground_effect = height > 0.0f ?
+						1.0f - height/powered_mass_point_definition->antigrav_height : 1.0f;
 					real magnitude = (ground_effect*ground_effect*global_gravity -
 						dot_product3d(&collision.plane.n, &mass_point->velocity)*
 							powered_mass_point_definition->antigrav_damp_fraction)*

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <mask id="hole" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <circle cx="512" cy="512" r="310" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- translucent grey surround with a clear circular window and a white rim -->
+  <rect width="1024" height="1024" fill="#848484" fill-opacity="0.5176" mask="url(#hole)"/>
+  <circle cx="512" cy="512" r="310" fill="none" stroke="#fff" stroke-width="4"/>
+</svg>

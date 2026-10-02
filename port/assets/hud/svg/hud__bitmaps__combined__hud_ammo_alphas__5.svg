@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <!-- 12 tilted shotgun shells (alpha mask): tapered body with rim + separate tip -->
+  <defs>
+    <path id="s" transform="translate(15.87,38.77) rotate(25)" fill="#fff"
+          d="M-8.04,-18.2 H8.04 V4.82 L6.23,12.94 H9.78 V17.06 H-9.78 V12.94 H-6.23 L-8.04,4.82 Z
+             M-8.08,-21.95 H8.08 L4.93,-40.72 H-4.93 Z"/>
+  </defs>
+  <use href="#s" x="0.000"/>
+  <use href="#s" x="35.273"/>
+  <use href="#s" x="70.546"/>
+  <use href="#s" x="105.819"/>
+  <use href="#s" x="141.092"/>
+  <use href="#s" x="176.365"/>
+  <use href="#s" x="211.638"/>
+  <use href="#s" x="246.911"/>
+  <use href="#s" x="282.184"/>
+  <use href="#s" x="317.457"/>
+  <use href="#s" x="352.730"/>
+  <use href="#s" x="388.003"/>
+</svg>

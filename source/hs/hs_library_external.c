@@ -19,7 +19,7 @@ symbols in this file:
 000B8BE0 00a0:
 	_hs_objects_can_see_flag (0000)
 000B8C80 00b0:
-	_code_000b8c80 (0000)
+	_object_is_or_contains_player (0000)
 000B8D30 0050:
 	_hs_object_create (0000)
 000B8D80 0040:
@@ -29,7 +29,7 @@ symbols in this file:
 000B8DF0 00c0:
 	_hs_object_destroy_all (0000)
 000B8EB0 0080:
-	_code_000b8eb0 (0000)
+	_hs_object_iterate_names_containing (0000)
 000B8F30 0020:
 	_hs_object_create_containing (0000)
 000B8F50 0020:
@@ -53,7 +53,7 @@ symbols in this file:
 000B92D0 0060:
 	_hs_damage_object (0000)
 000B9330 0080:
-	_code_000b9330 (0000)
+	_hs_sound_get_gain_reference (0000)
 000B93B0 0020:
 	_hs_sound_get_gain (0000)
 000B93D0 0020:
@@ -67,7 +67,7 @@ symbols in this file:
 000B94E0 0020:
 	_hs_object_create_anew_containing (0000)
 000B9500 0290:
-	_code_000b9500 (0000)
+	_hs_object_orient (0000)
 000B9790 0020:
 	_hs_object_teleport (0000)
 000B97B0 0020:
@@ -90,19 +90,20 @@ symbols in this file:
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "interface/terminal.h"
 #include "main/console.h"
 #include "memory/data.h"
 #include "models/model_definitions.h"
 #include "objects/damage.h"
 #include "objects/objects.h"
 #include "effects/effects.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "items/items.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_definitions.h"
 #include "units/units.h"
+#include "object_lists.h"
 
 /* ---------- constants */
 
@@ -116,15 +117,6 @@ symbols in this file:
 	((struct item_datum *)(object))
 
 /* ---------- structures */
-
-struct scenario_cutscene_flag
-{
-	long runtime_unused;
-	char name[TAG_STRING_LENGTH];
-	real_point3d position;
-	real_euler_angles2d facing;
-	byte unused[0x24];
-};
 
 struct hs_sound_definition
 {
@@ -147,19 +139,6 @@ struct hs_looping_sound_definition
 
 /* ---------- prototypes */
 
-long object_index_from_name_index(
-	short name_index);
-long object_list_new(
-	void);
-void object_list_add(
-	long object_list_index,
-	long object_index);
-long object_list_get_first(
-	long object_list_index,
-	long *reference_index);
-long object_list_get_next(
-	long object_list_index,
-	long *reference_index);
 boolean hs_trigger_volume_test_objects(
 	short trigger_volume_index,
 	long object_list_index,
@@ -170,19 +149,6 @@ void hs_object_create_anew(
 	short object_name_index);
 void hs_object_destroy(
 	long object_index);
-void terminal_printf(
-	union real_argb_color const *color,
-	char const *format,
-	...);
-void area_of_effect_cause_damage(
-	struct damage_data *damage,
-	long unlucky_object_index);
-boolean player_teleport(
-	long player_index,
-	long source_unit_index,
-	real_point3d const *position);
-void unit_exit_seat_end(
-	long unit_index);
 
 /* ---------- globals */
 
@@ -370,7 +336,7 @@ boolean hs_objects_can_see_flag(
 	return FALSE;
 }
 
-boolean code_000b8c80(
+static boolean object_is_or_contains_player(
 	long object_index)
 {
 	struct object_datum *object;
@@ -388,7 +354,7 @@ boolean code_000b8c80(
 			struct object_datum *child_object;
 
 			child_object = object_get(child_object_index);
-			if (code_000b8c80(child_object_index))
+			if (object_is_or_contains_player(child_object_index))
 			{
 				result = TRUE;
 				break;
@@ -463,7 +429,7 @@ void hs_object_destroy(
 {
 	if (object_index != NONE)
 	{
-		if (!code_000b8c80(object_index))
+		if (!object_is_or_contains_player(object_index))
 		{
 			object_delete(object_index);
 			return;
@@ -523,7 +489,7 @@ void hs_object_destroy_all(
 			object = object_iterator_next(&iterator))
 		{
 			if (object->object.parent_object_index == NONE &&
-				!code_000b8c80(iterator.index))
+				!object_is_or_contains_player(iterator.index))
 			{
 				object_delete(iterator.index);
 			}
@@ -533,7 +499,7 @@ void hs_object_destroy_all(
 	return;
 }
 
-static void code_000b8eb0(
+static void hs_object_iterate_names_containing(
 	char const *name_string,
 	void (*iterator)(short object_name_index))
 {
@@ -567,7 +533,7 @@ static void code_000b8eb0(
 void hs_object_create_containing(
 	char const *name_string)
 {
-	code_000b8eb0(name_string, hs_object_create);
+	hs_object_iterate_names_containing(name_string, hs_object_create);
 
 	return;
 }
@@ -575,7 +541,7 @@ void hs_object_create_containing(
 void hs_object_destroy_containing(
 	char const *name_string)
 {
-	code_000b8eb0(name_string, hs_object_destroy_by_name);
+	hs_object_iterate_names_containing(name_string, hs_object_destroy_by_name);
 
 	return;
 }
@@ -620,7 +586,7 @@ void hs_object_set_shield(
 void hs_object_set_permutation(
 	long object_index,
 	char const *region_name,
-	char *permutation_name)
+	char const *permutation_name)
 {
 	if (object_index != NONE)
 	{
@@ -810,7 +776,7 @@ void hs_damage_object(
 	return;
 }
 
-static real *code_000b9330(
+static real *hs_sound_get_gain_reference(
 	char const *tag_name)
 {
 	long sound_index;
@@ -848,7 +814,7 @@ real hs_sound_get_gain(
 {
 	real *gain_reference;
 
-	gain_reference = code_000b9330(tag_name);
+	gain_reference = hs_sound_get_gain_reference(tag_name);
 	if (gain_reference)
 		return *gain_reference;
 
@@ -861,7 +827,7 @@ void hs_sound_set_gain(
 {
 	real *gain_reference;
 
-	gain_reference = code_000b9330(tag_name);
+	gain_reference = hs_sound_get_gain_reference(tag_name);
 	if (gain_reference)
 		*gain_reference = gain;
 
@@ -908,12 +874,12 @@ void hs_object_create_anew(
 void hs_object_create_anew_containing(
 	char const *name_string)
 {
-	code_000b8eb0(name_string, hs_object_create_anew);
+	hs_object_iterate_names_containing(name_string, hs_object_create_anew);
 
 	return;
 }
 
-static void code_000b9500(
+static void hs_object_orient(
 	long object_index,
 	short cutscene_flag_index,
 	boolean set_position,
@@ -1013,7 +979,7 @@ void hs_object_teleport(
 	long object_index,
 	short cutscene_flag_index)
 {
-	code_000b9500(object_index, cutscene_flag_index, TRUE, TRUE);
+	hs_object_orient(object_index, cutscene_flag_index, TRUE, TRUE);
 
 	return;
 }
@@ -1022,7 +988,7 @@ void hs_object_set_facing(
 	long object_index,
 	short cutscene_flag_index)
 {
-	code_000b9500(object_index, cutscene_flag_index, FALSE, TRUE);
+	hs_object_orient(object_index, cutscene_flag_index, FALSE, TRUE);
 
 	return;
 }
@@ -1045,7 +1011,7 @@ void hs_teleport_players_not_in_trigger_volume(
 				trigger_volume_index,
 				player->unit_index))
 		{
-			code_000b9500(
+			hs_object_orient(
 				player->unit_index,
 				cutscene_flag_index,
 				TRUE,

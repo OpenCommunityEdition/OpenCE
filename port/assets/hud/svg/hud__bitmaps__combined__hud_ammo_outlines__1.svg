@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="32" viewBox="0 0 512 32">
+  <!-- thin slanted meter frame, light grey (rgb = alpha) -->
+  <path d="M9.24,2 H406.76 L400.76,14 H3.24 Z" fill="none" stroke="#ccc" stroke-opacity=".8" stroke-width="4" stroke-miterlimit="10"/>
+</svg>

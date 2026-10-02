@@ -74,7 +74,7 @@ extern struct byte_swap_definition long_bs_definition;
 
 /* ---------- globals */
 
-struct recorded_animation_layout_data real_vector2d_bs_codes =
+static struct recorded_animation_layout_data real_vector2d_bs_codes =
 {
 	{ _4byte, _4byte },
 	{ "real_vector2d", sizeof(real_vector2d), real_vector2d_bs_codes.real_vector2d_codes, BYTE_SWAP_DEFINITION_SIGNATURE, FALSE },

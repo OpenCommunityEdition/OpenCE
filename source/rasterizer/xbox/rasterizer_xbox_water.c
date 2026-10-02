@@ -55,6 +55,7 @@ symbols in this file:
 #include "math/real_math.h"
 #include "rasterizer/common/rasterizer_common.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include "tag_files/tag_groups.h"
@@ -65,6 +66,7 @@ symbols in this file:
  * nine of them; the real calls below are what instantiates them. */
 #include <xtl.h>
 #include "rasterizer_xbox.h"
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer_xbox_water.h"
 
@@ -110,12 +112,6 @@ enum
 		(shader), _shader_type_transparent_water))
 
 /* ---------- structures */
-
-struct rasterizer_water_debug_options
-{
-	byte reserved00[0x1E];
-	boolean water;
-};
 
 struct transparent_geometry_group
 {
@@ -166,28 +162,6 @@ struct shader_transparent_water_definition
 	struct tag_block ripples;
 };
 
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
-
 typedef char verify_water_ripple_size[
 	sizeof(struct water_ripple) == 0x4C ? 1 : -1];
 typedef char verify_water_ripple_animation_angle_offset[
@@ -221,11 +195,8 @@ typedef char verify_pixel_shader_definition_size[
 
 /* ---------- globals */
 
-boolean water_needs_update_flag = FALSE;
-boolean water_visible_for_window_flag = FALSE;
-
-extern struct rasterizer_water_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
+static boolean water_needs_update_flag = FALSE;
+static boolean water_visible_for_window_flag = FALSE;
 
 /* ---------- public code */
 
@@ -275,7 +246,7 @@ void rasterizer_water_build_bumpmap(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_water.c",
 		48,
 		global_d3d_device);
-	if (rasterizer_debug_options.water)
+	if (rasterizer_debug_options.draw_water)
 	{
 		water = SHADER_GET_TRANSPARENT_WATER(shader);
 		mipmap_level_count = MIN(water->ripple_mipmap_levels, NUMBER_OF_WATER_RIPPLES);
@@ -640,7 +611,7 @@ void rasterizer_water_draw(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_water.c",
 		239,
 		global_d3d_device);
-	if (rasterizer_debug_options.water)
+	if (rasterizer_debug_options.draw_water)
 	{
 		water = SHADER_GET_TRANSPARENT_WATER(group->shader);
 		permutation_index = shader_get_vertex_shader_permutation(group->shader);

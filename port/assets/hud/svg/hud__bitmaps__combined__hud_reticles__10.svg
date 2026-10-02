@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- ring of 13 small grey wedges: on each axis and 21 degrees either side, plus the diagonals -->
+  <g fill="#979797" fill-opacity="0.592">
+    <polygon id="s" points="128.00,72.00 134.00,48.00 122.00,48.00"/>
+    <use href="#s" transform="rotate(-21 128 114)"/>
+    <use href="#s" transform="rotate(21 128 114)"/>
+    <use href="#s" transform="rotate(270 128 114)"/>
+    <use href="#s" transform="rotate(249 128 114)"/>
+    <use href="#s" transform="rotate(-69 128 114)"/>
+    <use href="#s" transform="rotate(90 128 114)"/>
+    <use href="#s" transform="rotate(111 128 114)"/>
+    <use href="#s" transform="rotate(69 128 114)"/>
+    <use href="#s" transform="rotate(225 128 114)"/>
+    <use href="#s" transform="rotate(135 128 114)"/>
+    <use href="#s" transform="rotate(201 128 114)"/>
+    <use href="#s" transform="rotate(159 128 114)"/>
+  </g>
+  <!-- three large white wedges -->
+  <g fill="#fff">
+    <polygon points="128.00,152.00 147.00,232.00 109.00,232.00"/>
+    <polygon points="99.11,85.25 55.92,15.22 29.07,42.07"/>
+    <polygon points="156.89,85.25 200.08,15.22 226.93,42.07"/>
+  </g>
+</svg>

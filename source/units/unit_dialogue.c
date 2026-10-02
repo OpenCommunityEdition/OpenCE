@@ -81,7 +81,7 @@ symbols in this file:
 
 #include "ai/ai_communication.h"
 #include "ai/ai_debug.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "ai/actors.h"
 #include "dialogue_definitions.h"
 #include "game/game.h"

@@ -43,7 +43,11 @@ union real_rectangle2d;
 
 void interface_initialize(
 	void);
+void interface_dispose(
+	void);
 void interface_initialize_for_new_map(
+	void);
+void interface_dispose_from_old_map(
 	void);
 long interface_get_tag_index(
 	short interface_tag_index);
@@ -59,6 +63,8 @@ void interface_set_bitmap_text_draw_mode(
 	short color_table_index,
 	short color_index);
 void interface_draw_screen(
+	void);
+void interface_draw_fullscreen_overlays(
 	void);
 void interface_draw_bitmap(
 	struct bitmap_data const *bitmap,

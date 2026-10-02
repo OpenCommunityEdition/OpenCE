@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <!-- soft disc: smoothstep fade from r=10.167 to r=15.408, colour darkening with the alpha -->
+    <radialGradient id="g" gradientUnits="userSpaceOnUse" cx="16.502" cy="15.501" r="15.408">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="0.6599" stop-color="#ffffff" stop-opacity="1.0000"/>
+      <stop offset="0.6882" stop-color="#fafafa" stop-opacity="0.9803"/>
+      <stop offset="0.7165" stop-color="#ececec" stop-opacity="0.9259"/>
+      <stop offset="0.7449" stop-color="#d7d7d7" stop-opacity="0.8438"/>
+      <stop offset="0.7732" stop-color="#bdbdbd" stop-opacity="0.7407"/>
+      <stop offset="0.8016" stop-color="#9f9f9f" stop-opacity="0.6238"/>
+      <stop offset="0.8299" stop-color="#808080" stop-opacity="0.5000"/>
+      <stop offset="0.8583" stop-color="#606060" stop-opacity="0.3762"/>
+      <stop offset="0.8866" stop-color="#424242" stop-opacity="0.2593"/>
+      <stop offset="0.9150" stop-color="#282828" stop-opacity="0.1562"/>
+      <stop offset="0.9433" stop-color="#131313" stop-opacity="0.0741"/>
+      <stop offset="0.9717" stop-color="#050505" stop-opacity="0.0197"/>
+      <stop offset="1.0000" stop-color="#000000" stop-opacity="0.0000"/>
+    </radialGradient>
+  </defs>
+  <circle cx="16.502" cy="15.501" r="15.408" fill="url(#g)"/>
+</svg>

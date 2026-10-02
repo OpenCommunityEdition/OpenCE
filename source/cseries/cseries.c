@@ -168,7 +168,7 @@ enum
 
 char temporary[256];
 
-const real_argb_color global_real_argb_color_table[17] =
+static const real_argb_color global_real_argb_color_table[17] =
 {
 	{ 1.f, 1.f,		1.f,	1.f  },
 	{ 1.f, .5f,		.5f,	.5f  },
@@ -613,7 +613,6 @@ not_equal:
 	return c1 > c2 ? 1 : -1;
 }
 
-#ifdef HALO_LINUX
 char *stristr(
 	const char *haystack,
 	const char *needle)
@@ -633,71 +632,6 @@ char *stristr(
 	}
 	return NULL;
 }
-#else
-__declspec(naked) char *stristr(
-	const char *haystack,
-	const char *needle)
-{
-	/* parameters are addressed through the hand-built frame: clang rejects
-	named parameter references inside naked functions */
-	__asm
-	{
-		push ebp
-		mov ebp, esp
-		push ebx
-		push esi
-		push edi
-		mov edi, dword ptr [ebp+12] /* needle */
-		mov bl, byte ptr [edi]
-		inc edi
-		test bl, bl
-		je empty_needle
-		push edi
-		call csstrlen
-		mov esi, dword ptr [ebp+8] /* haystack */
-		add esp, 4
-		mov dword ptr [ebp+12], eax /* needle */
-		nop
-	search:
-		mov al, byte ptr [esi]
-		inc esi
-		test al, al
-		je no_match
-		cmp al, bl
-		jne search
-		mov eax, dword ptr [ebp+12] /* needle */
-		push eax
-		push edi
-		push esi
-		call _strnicmp
-		add esp, 12
-		test eax, eax
-		jne search
-		dec esi
-		pop edi
-		mov eax, esi
-		pop esi
-		pop ebx
-		pop ebp
-		ret
-	no_match:
-		pop edi
-		pop esi
-		xor eax, eax
-		pop ebx
-		pop ebp
-		ret
-	empty_needle:
-		mov esi, dword ptr [ebp+8] /* haystack */
-		pop edi
-		mov eax, esi
-		pop esi
-		pop ebx
-		pop ebp
-		ret
-	}
-}
-#endif
 
 unsigned long string_hash(
 	const char *string)

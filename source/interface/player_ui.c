@@ -167,7 +167,6 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_NUMBER_OF_LOCAL_PLAYERS = 4,
 	_variant_is_system_default_bit = 0
 };
 

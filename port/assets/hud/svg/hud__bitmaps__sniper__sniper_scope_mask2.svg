@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1024" viewBox="0 0 2048 1024">
+  <defs>
+    <filter id="b0" filterUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1024"><feGaussianBlur stdDeviation="28.05"/></filter>
+    <filter id="b1" filterUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1024"><feGaussianBlur stdDeviation="47.33"/></filter>
+    <filter id="b2" filterUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1024"><feGaussianBlur stdDeviation="63.32"/></filter>
+    <!-- soft rectangular see-through window: three blurred rectangles multiplied together -->
+    <mask id="hole" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1024">
+      <rect width="2048" height="1024" fill="#fff"/>
+      <rect x="615.55" y="390.89" width="816.89" height="242.21" fill="#000" fill-opacity="1.000" filter="url(#b0)"/>
+      <rect x="551.45" y="327.90" width="945.10" height="368.19" fill="#000" fill-opacity="0.391" filter="url(#b1)"/>
+      <rect x="479.35" y="255.34" width="1089.30" height="513.31" fill="#000" fill-opacity="0.285" filter="url(#b2)"/>
+    </mask>
+    <mask id="outside" maskUnits="userSpaceOnUse" x="0" y="0" width="2048" height="1024">
+      <rect width="2048" height="1024" fill="#fff"/>
+      <rect x="248" y="28" width="1552" height="968" rx="64" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="2048" height="1024" fill="#808080" mask="url(#outside)"/>
+  <rect x="248" y="28" width="1552" height="968" rx="64" fill="#000" mask="url(#hole)"/>
+  <rect x="248" y="28" width="1552" height="968" rx="64" fill="none" stroke="#fff" stroke-width="8"/>
+</svg>

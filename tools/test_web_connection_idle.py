@@ -31,6 +31,9 @@ typedef unsigned char byte;
 #define RELIABLE_MESSAGE_MAXIMUM_SIZE 1024
 #define MILLISECONDS_PER_SECOND 1000
 #define IPV4_ADDRESS_LENGTH 4
+#define NETWORK_CONNECTION_MAXIMUM_CLIENTS 16
+#define MAXIMUM_SKIPPED_DATAGRAMS_PER_IDLE 64
+typedef unsigned short message_header;
 #define FLAG(b) (1U<<(b))
 #define TEST_FLAG(f,b) ((f)&FLAG(b))
 #define SET_FLAG(f,b,v) ((f)=(v)?(f)|FLAG(b):(f)&~FLAG(b))
@@ -42,14 +45,16 @@ enum { _connection_going_stale_bit, _connection_create_server_bit,
  _connection_create_clientside_client_bit, _connection_create_serverside_client_bit, _connection_closed_bit };
 enum { _error_silent, _transport_error_none, _network_connection_traffic_event_datagram_received,
  _network_connection_traffic_event_stream_bytes_received };
-enum { _transport_result_operation_would_block=-1, _transport_error_connection_lost=-2 };
+enum { _transport_result_operation_would_block=-1, _transport_error_connection_lost=-2,
+ _transport_error_endpoint_io=-3 };
 struct transport_address { short address_length; union { unsigned long long_words[1]; } address; };
 struct transport_endpoint { int pending; };
 struct circular_queue { int count; };
 struct network_connection { unsigned long flags,last_keep_alive_time;
  struct transport_endpoint *reliable_endpoint,*unreliable_endpoint;
  struct circular_queue *reliable_incoming_queue,*unreliable_incoming_queue; };
-struct network_server_connection { struct network_connection connection; };
+struct network_server_connection { struct network_connection connection;
+ struct network_connection *client_list[NETWORK_CONNECTION_MAXIMUM_CLIENTS]; };
 static unsigned long now=30000;
 static int global_connection_dont_timeout;
 static unsigned long system_milliseconds(void) { return now; }
@@ -57,12 +62,21 @@ static long circular_queue_free_space(struct circular_queue *q) { return 1024-q-
 static boolean circular_queue_queue_data(struct circular_queue *q, void *b, long n) { (void)b; q->count+=n; return TRUE; }
 static boolean endpoint_readable(struct transport_endpoint *e, int timeout) { (void)timeout; return e->pending; }
 static boolean endpoint_connected(struct transport_endpoint *e) { (void)e; return TRUE; }
+static boolean endpoint_blocking(struct transport_endpoint *e) { (void)e; return FALSE; }
 static long read_endpoint(struct transport_endpoint *e, void *b, long n) {
- (void)n; if (!e->pending) return 0; e->pending=0; *(byte *)b=1; return 1; }
+ (void)n; if (!e->pending) return _transport_result_operation_would_block;
+ e->pending=0; *(byte *)b=1; return 1; }
 static long read_from_endpoint(struct transport_endpoint *e, void *b, long n, struct transport_address *a) {
  (void)a; return read_endpoint(e,b,n); }
 static short get_endpoint_address(struct transport_endpoint *e, struct transport_address *a) {
  (void)e; a->address.long_words[0]=1; return _transport_error_none; }
+static void network_connection_get_address(struct network_connection *c,
+ struct transport_address *reliable, struct transport_address *unreliable) {
+ (void)c; if (reliable) reliable->address.long_words[0]=1;
+ if (unreliable) unreliable->address.long_words[0]=1; }
+static boolean network_connection_flush_reliable(struct network_connection *c)
+{ (void)c; return TRUE; }
+static long network_connection_datagram_size(byte const *buffer) { (void)buffer; return 0; }
 static const char *transport_error_to_string(short error) { (void)error; return "test"; }
 static void network_connection_log_traffic_event(int event, long size, struct network_connection *c) {
  (void)event; (void)size; (void)c; }

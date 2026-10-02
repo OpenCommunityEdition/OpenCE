@@ -253,61 +253,26 @@ enum
 
 /* ---------- macros */
 
-#define projectile_runtime_get(index) \
-	((struct projectile_runtime_datum *)object_get_and_verify_type( \
-		(index), \
-		_object_mask_projectile))
-
 /* ---------- structures */
 
-struct _projectile_runtime_datum
-{
-	unsigned long flags;
-	short action;
-	short hit_material_type;
-	long ignore_object_index;
-	long target_object_index;
-	long tracer_attachment_index;
-	real detonation_timer;
-	real detonation_timer_delta;
-	real arming_time;
-	real arming_time_delta;
-	real odometer;
-	real deceleration_timer;
-	real deceleration_timer_delta;
-	real deceleration;
-	real maximum_damage_distance;
-	real_vector3d rotation_axis;
-	real rotation_sine;
-	real rotation_cosine;
-};
-
-struct projectile_runtime_datum
-{
-	long definition_index;
-	struct _object_datum object;
-	struct _item_datum item;
-	struct _projectile_runtime_datum projectile;
-};
-
 typedef char projectile_runtime_arming_time_delta_offset_assert[
-	offsetof(struct projectile_runtime_datum, projectile.arming_time_delta) == 0x1FC
+	offsetof(struct projectile_datum, projectile.arming_time_delta) == 0x1FC
 		? 1
 		: -1];
 typedef char projectile_runtime_odometer_offset_assert[
-	offsetof(struct projectile_runtime_datum, projectile.odometer) == 0x200
+	offsetof(struct projectile_datum, projectile.odometer) == 0x200
 		? 1
 		: -1];
 typedef char projectile_runtime_deceleration_offset_assert[
-	offsetof(struct projectile_runtime_datum, projectile.deceleration) == 0x20C
+	offsetof(struct projectile_datum, projectile.deceleration) == 0x20C
 		? 1
 		: -1];
 typedef char projectile_runtime_rotation_axis_offset_assert[
-	offsetof(struct projectile_runtime_datum, projectile.rotation_axis) == 0x214
+	offsetof(struct projectile_datum, projectile.rotation_axis) == 0x214
 		? 1
 		: -1];
 typedef char projectile_runtime_rotation_cosine_offset_assert[
-	offsetof(struct projectile_runtime_datum, projectile.rotation_cosine) == 0x224
+	offsetof(struct projectile_datum, projectile.rotation_cosine) == 0x224
 		? 1
 		: -1];
 
@@ -502,11 +467,11 @@ boolean dangerous_projectiles_near_player(
 void projectile_export_function_values(
 	long projectile_index)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 	short function_index;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 
 	for (function_index = 0; function_index < NUMBEROF(definition->projectile.function_inputs); function_index++)
@@ -560,7 +525,7 @@ void projectile_export_function_values(
 boolean projectile_new(
 	long projectile_index)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 	struct tag_block const *attachments;
 	real detonation_ticks;
@@ -569,7 +534,7 @@ boolean projectile_new(
 	short attachment_index;
 	boolean underwater;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 
 	SET_FLAG(projectile->object.flags, _object_dynamic_lighting_recompute_bit, TRUE);
@@ -649,9 +614,9 @@ void projectile_accelerate(
 	long projectile_index,
 	real_vector3d const *acceleration)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	projectile_definition_get(projectile->definition_index);
 
 	match_assert_valid_real_vector3d(
@@ -702,14 +667,14 @@ void projectile_accelerate(
 boolean projectile_update(
 	long projectile_index)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 	real time_remaining;
 	short collision_count;
 	boolean flyby_sound_played;
 	boolean detonation_timer_running;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 	time_remaining = 1.0f;
 	collision_count = 0;
@@ -1167,10 +1132,10 @@ static real projectile_calculate_deceleration_from_distances(
 static void projectile_adjust_for_angular_velocity_change(
 	long projectile_index)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	real angular_velocity_magnitude;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	angular_velocity_magnitude = magnitude3d(&projectile->object.angular_velocity);
 
 	if (angular_velocity_magnitude != 0.f)
@@ -1202,10 +1167,10 @@ static void projectile_adjust_for_angular_velocity_change(
 static void projectile_calculate_deceleration(
 	long projectile_index)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 
 	if (TEST_FLAG(projectile->object.flags, _object_wholly_under_media_bit))
@@ -1256,9 +1221,9 @@ static void projectile_set_action(
 	long projectile_index,
 	short action)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	if (action > projectile->projectile.action)
 		projectile->projectile.action = action;
 
@@ -1315,7 +1280,7 @@ static boolean projectile_collision_test_line(
 	real_point3d const *new_position,
 	struct collision_result *collision)
 {
-	struct projectile_runtime_datum *projectile = projectile_runtime_get(projectile_index);
+	struct projectile_datum *projectile = projectile_get(projectile_index);
 	struct projectile_definition const *definition = projectile_definition_get(projectile->definition_index);
 
 	if (collision_test_line(
@@ -1378,7 +1343,7 @@ static void projectile_detonate(
 	boolean first_collision,
 	real time_left)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 	char const *marker_names[2];
 	real_point3d marker_points[2];
@@ -1386,7 +1351,7 @@ static void projectile_detonate(
 	real_vector3d up;
 	long effect_definition_index;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 
 	marker_names[0] = "";
@@ -1408,7 +1373,7 @@ static void projectile_detonate(
 		{
 			child = object_get(child_index);
 			if (child->definition_index == projectile->definition_index &&
-				!TEST_FLAG(projectile_runtime_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
+				!TEST_FLAG(projectile_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
 			{
 				combining_projectile_count++;
 			}
@@ -1427,9 +1392,9 @@ static void projectile_detonate(
 			{
 				child = object_get(child_index);
 				if (child->definition_index == projectile->definition_index &&
-					!TEST_FLAG(projectile_runtime_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
+					!TEST_FLAG(projectile_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
 				{
-					struct projectile_runtime_datum *child_projectile = projectile_runtime_get(child_index);
+					struct projectile_datum *child_projectile = projectile_get(child_index);
 
 					if (combining_projectile_count <= MAXIMUM_COMBINING_PROJECTILES)
 					{
@@ -1544,7 +1509,7 @@ static void projectile_collision(
 	real_vector3d *new_velocity,
 	real time_left)
 {
-	struct projectile_runtime_datum *projectile;
+	struct projectile_datum *projectile;
 	struct projectile_definition const *definition;
 	struct projectile_material_response_definition const *material_response;
 	real_vector3d direction;
@@ -1559,7 +1524,7 @@ static void projectile_collision(
 	short material_type;
 	short response;
 
-	projectile = projectile_runtime_get(projectile_index);
+	projectile = projectile_get(projectile_index);
 	definition = projectile_definition_get(projectile->definition_index);
 	material_type = collision->material_type;
 	effect_scale = 1.0f;
@@ -1848,9 +1813,9 @@ static void projectile_collision(
 				struct object_datum *child = object_get(child_index);
 
 				if (child->definition_index == projectile->definition_index &&
-					!TEST_FLAG(projectile_runtime_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
+					!TEST_FLAG(projectile_get(child_index)->projectile.flags, _projectile_already_super_exploded_bit))
 				{
-					struct projectile_runtime_datum *child_projectile = projectile_runtime_get(child_index);
+					struct projectile_datum *child_projectile = projectile_get(child_index);
 
 					child_projectile->projectile.arming_time = 0.0f;
 					child_projectile->projectile.detonation_timer = 0.0f;

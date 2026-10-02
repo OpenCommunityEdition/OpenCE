@@ -46,6 +46,7 @@ typedef unsigned short word;
 #define _error_silent 0
 #define DATUM_INDEX_TO_ABSOLUTE_INDEX(index) ((long)(index) & 0xffff)
 #define VALID_INDEX(index, count) ((index) >= 0 && (index) < (count))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define match_assert(file, line, condition) assert(condition)
 #define csmemcpy memcpy
 #define ustrncpy wcsncpy
@@ -65,7 +66,7 @@ struct player_datum {
 struct datum_header { short identifier; };
 struct data_array { short next_identifier, maximum_count; long size; boolean valid; void *data; };
 struct network_game {
-    int player_count, maximum_player_count;
+    int player_count, maximum_players;
     struct network_player players[128];
     struct { boolean game_objects_loaded; } local_data;
 };
@@ -78,6 +79,9 @@ static boolean distributed = TRUE;
 static int local_quits, machine_overflows, allocation_fails;
 static boolean network_game_distributed(void) { return distributed; }
 static boolean game_in_progress(void) { return TRUE; }
+static boolean game_engine_running(void) { return TRUE; }
+static long game_time_get(void) { return 100; }
+static void machine_remove_player(long index) { (void)index; }
 static long datum_new_at_index(struct data_array *data, long index) {
     long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(index);
     if (allocation_fails || slot >= data->maximum_count || datums[slot].identifier) return NONE;
@@ -139,7 +143,7 @@ static void reset(struct network_game_client *client) {
     memset(machine_to_player_table, 0xff, sizeof(machine_to_player_table));
     array.next_identifier = 0x100;
     client->machine_index = 0;
-    client->game.maximum_player_count = 128;
+    client->game.maximum_players = 128;
     client->game.local_data.game_objects_loaded = TRUE;
     for (int i = 0; i < 128; i++) network_game_invalidate_player(&client->game.players[i]);
     local_quits = machine_overflows = allocation_fails = 0;
@@ -230,8 +234,8 @@ with tempfile.TemporaryDirectory(prefix="halo-player-rejoin-") as directory:
     for name, original, mutant in (
         ("missing-detach", "network_player_remove_from_machine(player_datum->network_player_data.machine_index, player_index);",
          "((void)0);"),
-        ("failed-allocation-mapping", "if (player_index != NONE)\n#endif\n\t\tmachine_add_player",
-         "if (TRUE)\n#endif\n\t\tmachine_add_player"),
+        ("failed-allocation-mapping", "if (player_index != NONE)\n\t\tmachine_add_player",
+         "if (TRUE)\n\t\tmachine_add_player"),
     ):
         assert original in FUNCTIONS, name
         control = run(name, FUNCTIONS.replace(original, mutant))

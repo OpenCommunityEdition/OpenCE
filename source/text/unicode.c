@@ -271,7 +271,7 @@ enum
 #ifndef HALO_ANDROID /* Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
-wchar_t bss_004c1a08[0x100];
+static wchar_t bss_004c1a08[0x100];
 #ifndef HALO_ANDROID
 #pragma bss_seg()
 #endif

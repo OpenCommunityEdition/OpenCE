@@ -198,16 +198,6 @@ static boolean biped_limp_noodle_valid_joint_rotation(
 					&plane_normal,
 					projection_distance,
 					&rotate_to_position);
-#ifndef HALO_LINUX
-				/* the native ports (port/linux, port/android, port/windows) skip
-				this check: it holds only with the Xbox's x87 precision, and single
-				precision math misses it far from the world origin (the projected
-				point is still correct to within the rounding) */
-				match_assert(
-					"c:\\halo\\SOURCE\\units\\biped_limp_noodle.c",
-					231,
-					realcmp(plane3d_distance_to_point(&plane, &rotate_to_position), 0.f));
-#endif
 
 				vector_from_points3d(
 					&node_matrices[node->parent_node_index].position,

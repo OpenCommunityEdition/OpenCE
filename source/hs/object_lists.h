@@ -46,18 +46,14 @@ void object_list_remove_reference(
 	long object_list_index);
 void object_list_gc(
 	void);
+short object_list_count(
+	long object_list_index);
 
 
 /* ---------- globals */
 
-#ifdef HALO_WEB
-/* one definition (object_lists.c): WebAssembly has no common symbols */
 extern struct data_array *object_list_header_data;
 extern struct data_array *object_list_data;
-#else
-struct data_array *object_list_header_data;
-struct data_array *object_list_data;
-#endif
 
 /* ---------- public code */
 

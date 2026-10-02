@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <mask id="arcs" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="56" y="56" width="148" height="148" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- assault rifle reticle: ring cut into four arcs, with four outward ticks -->
+  <circle cx="130" cy="130" r="90.00" fill="none" stroke="#fff" stroke-width="8.10" mask="url(#arcs)"/>
+  <g fill="#fff">
+    <rect id="t" x="128" y="20" width="4" height="20"/>
+    <use href="#t" transform="rotate(90 130 130)"/>
+    <use href="#t" transform="rotate(180 130 130)"/>
+    <use href="#t" transform="rotate(270 130 130)"/>
+  </g>
+  <!-- small thin ring with four semi-opaque grey inward ticks (the lower one longer) -->
+  <circle cx="318" cy="54" r="48.00" fill="none" stroke="#fff" stroke-width="4.18"/>
+  <g fill="#ccc" fill-opacity="0.8">
+    <rect id="u" x="316" y="8" width="4" height="10"/>
+    <use href="#u" transform="rotate(90 318 54)"/>
+    <use href="#u" transform="rotate(270 318 54)"/>
+    <rect x="316" y="80" width="4" height="20"/>
+  </g>
+  <!-- tiny crosshair with corner brackets -->
+  <path fill="#fff" d="M420,40h4v8h-8v-4h4z M440,40h-4v8h8v-4h-4z M420,68h4v-8h-8v4h4z M440,68h-4v-8h8v4h-4z
+           M428,48h4v4h4v4h-4v4h-4v-4h-4v-4h4z"/>
+  <!-- chevron -->
+  <polygon fill="#fff" points="4,284 36,268 68,284 68,288 36,272 4,288"/>
+</svg>

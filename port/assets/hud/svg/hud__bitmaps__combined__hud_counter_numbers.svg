@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="256" viewBox="0 0 512 256">
+  <!-- HUD counter font: italic segment digits 0-9 . : - and the unit glyphs m / Km.
+       Digits are drawn upright from shared segment rects, then sheared (25.4 deg) about each row's baseline. -->
+  <defs>
+    <path id="d0" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z M0.00,-39.90 h5.35 v39.90 h-5.35 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z"/>
+    <path id="d2" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M18.52,-39.90 h5.35 v21.91 h-5.35 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M0.00,-21.94 h5.35 v21.94 h-5.35 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z"/>
+    <path id="d3" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z"/>
+    <path id="d4" d="M0.00,-39.90 h5.35 v21.91 h-5.35 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z"/>
+    <path id="d5" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-39.90 h5.35 v21.91 h-5.35 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M18.52,-21.94 h5.35 v21.94 h-5.35 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z"/>
+    <path id="d6" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-39.90 h5.35 v39.90 h-5.35 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M18.52,-21.94 h5.35 v21.94 h-5.35 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z"/>
+    <path id="d7" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z"/>
+    <path id="d8" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z M0.00,-39.90 h5.35 v39.90 h-5.35 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z"/>
+    <path id="d9" d="M0.00,-39.90 h23.87 v3.95 h-23.87 Z M0.00,-39.90 h5.35 v21.91 h-5.35 Z M0.00,-21.94 h23.87 v3.95 h-23.87 Z M18.52,-39.90 h5.35 v39.90 h-5.35 Z M0.00,-3.95 h23.87 v3.95 h-23.87 Z"/>
+    <path id="dash" d="M0.00,-21.94 h23.87 v3.95 h-23.87 Z"/>
+    <path id="d1" d="M18.52,-39.90 h5.35 v39.90 h-5.35 Z M16.09,-39.90 h2.93 v3.95 h-2.93 Z"/>
+    <path id="dot" d="M0.00,-3.95 h5.35 v3.95 h-5.35 Z"/>
+    <path id="colon" d="M0.00,-3.95 h5.35 v3.95 h-5.35 Z M0.00,-21.94 h5.35 v3.95 h-5.35 Z"/>
+    <g id="m" fill="none" stroke="#fff" stroke-linecap="round">
+      <path d="M461.43,69.45 L451.71,89.49 M486.86,69.43 L477.21,89.48 M474.52,70.65 L469.24,81.29" stroke-width="4.39"/>
+      <path d="M465.87,66.26 L484.85,66.0" stroke-width="4.18"/>
+    </g>
+  </defs>
+  <g fill="#fff">
+  <g transform="matrix(1 0 -0.474 1 0 44)">
+    <use href="#d0" x="16.08"/>
+    <use href="#d1" x="74.12"/>
+    <use href="#d2" x="160.09"/>
+    <use href="#d3" x="232.07"/>
+    <use href="#d4" x="304.11"/>
+    <use href="#d5" x="376.09"/>
+    <use href="#d6" x="448.09"/>
+  </g>
+  <g transform="matrix(1 0 -0.474 1 0 92)">
+    <use href="#d7" x="16.11"/>
+    <use href="#d8" x="88.09"/>
+    <use href="#d9" x="160.08"/>
+    <use href="#dot" x="232.10"/>
+    <use href="#colon" x="304.10"/>
+    <use href="#dash" x="376.10"/>
+  </g>
+  </g>
+  <use href="#m"/>
+  <!-- Km -->
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <path d="M34.06,103.38 L26.93,117.73 M24.78,123.28 L17.61,137.56 M31.29,117.76 L55.45,102.57 M45.79,123.73 L39.24,137.49" stroke-width="4.09"/>
+    <path d="M26.22,121.6 L43.02,121.35" stroke-width="4.39"/>
+  </g>
+  <use href="#m" x="-398" y="48"/>
+</svg>

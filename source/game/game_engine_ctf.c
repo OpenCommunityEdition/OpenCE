@@ -122,7 +122,6 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game_engine.h"
-#include "game_engine_runtime.h"
 #include "players.h"
 #include "players_runtime.h"
 #include "items/weapons.h"
@@ -232,6 +231,8 @@ typedef char verify_ctf_globals_size[
 
 /* ---------- prototypes */
 
+void ctf_state_message_update_warning(
+	long team_index);
 static long ctf_create_flag_object(
 	struct scenario_netgame_flag *flag);
 
@@ -274,6 +275,32 @@ static boolean ctf_position_near_flag(
 
 static struct ctf_globals ctf_globals = { 0 };
 extern long timeout_for_endgame_sound;
+
+/* network_game_globals.c's */
+boolean network_game_distributed_client(void);
+/* port/linux/game/network_distributed.c's */
+byte distributed_player_to_byte(long player_index);
+long distributed_player_from_byte(byte player_index);
+
+/* port: the host's events a client of the distributed netcode shows (each
+counts them, a client as it last had them from the host), by the flag's
+team: the last player to capture with that team, grab or return the
+flag (NONE for returning when untouched) */
+static struct
+{
+	byte captures[NUMBER_OF_CTF_TEAMS];
+	byte capturers[NUMBER_OF_CTF_TEAMS];
+	byte grabs[NUMBER_OF_CTF_TEAMS];
+	byte grabbers[NUMBER_OF_CTF_TEAMS];
+	byte returns[NUMBER_OF_CTF_TEAMS];
+	byte returners[NUMBER_OF_CTF_TEAMS];
+} ctf_events;
+
+static void ctf_show_capture(long player_index, long team_index);
+static void ctf_show_grab(long player_index);
+static void ctf_client_flag_failure_update(long player_index);
+static void ctf_show_touch_return(long player_index);
+static void ctf_show_untouched_return(long team_index);
 
 /* ---------- code */
 
@@ -435,6 +462,7 @@ static boolean ctf_engine_initialize_for_new_map(
 	}
 
 	csmemset(&ctf_globals, 0, sizeof(ctf_globals));
+	csmemset(&ctf_events, 0, sizeof(ctf_events));
 	ctf_globals.weapon_indices[0] = NONE;
 	ctf_globals.weapon_indices[1] = NONE;
 	timeout_for_endgame_sound = CTF_ENDGAME_SOUND_TIMEOUT;
@@ -548,6 +576,15 @@ static void ctf_engine_player_update(
 	if (game_engine_player_has_flag(player_index))
 		game_engine_player_depower_active_camo(player_index);
 
+	/* (a client of the distributed netcode has the host's captures and
+	scores: game_engine_ctf_read_network_state; it sounds the failure
+	its own players hear) */
+	if (network_game_distributed_client())
+	{
+		ctf_client_flag_failure_update(player_index);
+		return;
+	}
+
 	unit_index = player->unit_index;
 	if (unit_index != NONE)
 	{
@@ -619,7 +656,10 @@ static void ctf_engine_weapon_update(
 		0x261,
 		weapon_is_flag(weapon_index));
 
-	if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
+	/* (a client of the distributed netcode has the flag where the host puts
+	it, and its team: game_engine_ctf_read_network_state) */
+	if (!network_game_distributed_client() &&
+		game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
 	{
 		if (ctf_globals.flag_swap_timer > 0)
 			ctf_globals.flag_swap_timer--;
@@ -647,7 +687,8 @@ static void ctf_engine_weapon_update(
 	}
 
 	ticks = game_time_get();
-	if ((unsigned long)(ticks - weapon->item.last_owned_time) > CTF_FLAG_RETURN_TIME &&
+	if (!network_game_distributed_client() &&
+		(unsigned long)(ticks - weapon->item.last_owned_time) > CTF_FLAG_RETURN_TIME &&
 		weapon_is_flag(weapon_index))
 	{
 		boolean connected_to_map = TEST_FLAG(
@@ -657,17 +698,15 @@ static void ctf_engine_weapon_update(
 		if (connected_to_map && weapon->object.parent_object_index == NONE)
 		{
 			long return_team_index = weapon->object.owner_team_index;
-			long return_other_team_index = (weapon->object.owner_team_index + 1) % 2;
 
 			if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit))
 			{
-				game_engine_play_multiplayer_sound(
-					return_team_index == _team_red ?
-						_multiplayer_sound_red_team_flag_returned :
-						_multiplayer_sound_blue_team_flag_returned);
-				ctf_set_flag_warning(weapon->object.owner_team_index, FALSE);
-				game_show_score_team(return_team_index, _ctf_message_your_flag_was_returned);
-				game_show_score_team(return_other_team_index, _ctf_message_enemy_flag_was_returned);
+				ctf_show_untouched_return(return_team_index);
+				if (VALID_INDEX(return_team_index, NUMBER_OF_CTF_TEAMS))
+				{
+					ctf_events.returns[return_team_index]++;
+					ctf_events.returners[return_team_index] = distributed_player_to_byte(NONE);
+				}
 			}
 			ctf_reset_flag(weapon_index);
 		}
@@ -729,18 +768,13 @@ static boolean ctf_weapon_pickup(
 				if (TEST_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit) &&
 					game_engine_can_score())
 				{
-					ctf_set_flag_warning(weapon->object.owner_team_index, FALSE);
 					player->statistics.multiplayer_statistics.ctf_statistics.flag_returns++;
-					game_show_score_you_ally_enemy(
-						player_index,
-						_ctf_message_you_returned_the_flag,
-						_ctf_message_good_guys_returned_the_flag,
-						_ctf_message_enemy_returned_the_flag,
-						player_index);
-					game_engine_play_multiplayer_sound(
-						player->team_index == _team_red ?
-							_multiplayer_sound_red_team_flag_returned :
-							_multiplayer_sound_blue_team_flag_returned);
+					ctf_show_touch_return(player_index);
+					if (VALID_INDEX(weapon->object.owner_team_index, NUMBER_OF_CTF_TEAMS))
+					{
+						ctf_events.returns[weapon->object.owner_team_index]++;
+						ctf_events.returners[weapon->object.owner_team_index] = distributed_player_to_byte(player_index);
+					}
 				}
 				ctf_reset_flag(weapon_index);
 			}
@@ -758,17 +792,13 @@ static boolean ctf_weapon_pickup(
 				player->statistics.multiplayer_statistics.ctf_statistics.flag_grabs++;
 				if (!game_engine_get_variant()->game_engine_variant.ctf.assault)
 				{
-					game_engine_play_multiplayer_sound(
-						player->team_index == _team_red ?
-							_multiplayer_sound_red_team_has_the_flag :
-							_multiplayer_sound_blue_team_has_the_flag);
 					ctf_set_flag_warning(weapon->object.owner_team_index, TRUE);
-					game_show_score_you_ally_enemy(
-						player_index,
-						NONE,
-						_ctf_message_good_guys_have_the_flag,
-						_ctf_message_enemy_has_the_flag,
-						player_index);
+					ctf_show_grab(player_index);
+					if (VALID_INDEX(weapon->object.owner_team_index, NUMBER_OF_CTF_TEAMS))
+					{
+						ctf_events.grabs[weapon->object.owner_team_index]++;
+						ctf_events.grabbers[weapon->object.owner_team_index] = distributed_player_to_byte(player_index);
+					}
 				}
 			}
 			SET_FLAG(weapon->weapon.flags, _ctf_weapon_handled_bit, TRUE);
@@ -801,7 +831,8 @@ static void ctf_engine_update(
 			game_over = TRUE;
 	}
 
-	if (game_over)
+	/* (a client ends the game when the host has) */
+	if (game_over && !network_game_distributed_client())
 		game_engine_end_game();
 
 	ctf_sound_update_warning(_team_red);
@@ -1190,16 +1221,88 @@ static void ctf_award_capture(
 
 	ctf_globals.scores[team_index]++;
 	player->statistics.multiplayer_statistics.ctf_statistics.flag_scores++;
+	ctf_show_capture(player_index, player->team_index);
+	if (VALID_INDEX(team_index, NUMBER_OF_CTF_TEAMS))
+	{
+		ctf_events.captures[team_index]++;
+		ctf_events.capturers[team_index] = distributed_player_to_byte(player_index);
+	}
+
+	return;
+}
+
+/* port: what the host's events show every machine's players (the host's
+from the event, a client's from the host's state) */
+static void ctf_show_capture(
+	long player_index,
+	long team_index)
+{
 	game_engine_play_multiplayer_sound(
-		player->team_index == _team_red ?
+		team_index == _team_red ?
 			_multiplayer_sound_red_team_score :
 			_multiplayer_sound_blue_team_score);
+	if (player_index != NONE)
+	{
+		game_show_score_you_ally_enemy(
+			player_index,
+			_ctf_message_you_scored,
+			_ctf_message_good_guys_scored,
+			_ctf_message_enemy_scored,
+			player_index);
+	}
+
+	return;
+}
+
+static void ctf_show_grab(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	game_engine_play_multiplayer_sound(
+		player->team_index == _team_red ?
+			_multiplayer_sound_red_team_has_the_flag :
+			_multiplayer_sound_blue_team_has_the_flag);
 	game_show_score_you_ally_enemy(
 		player_index,
-		_ctf_message_you_scored,
-		_ctf_message_good_guys_scored,
-		_ctf_message_enemy_scored,
+		NONE,
+		_ctf_message_good_guys_have_the_flag,
+		_ctf_message_enemy_has_the_flag,
 		player_index);
+
+	return;
+}
+
+static void ctf_show_touch_return(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+
+	ctf_set_flag_warning(player->team_index, FALSE);
+	game_show_score_you_ally_enemy(
+		player_index,
+		_ctf_message_you_returned_the_flag,
+		_ctf_message_good_guys_returned_the_flag,
+		_ctf_message_enemy_returned_the_flag,
+		player_index);
+	game_engine_play_multiplayer_sound(
+		player->team_index == _team_red ?
+			_multiplayer_sound_red_team_flag_returned :
+			_multiplayer_sound_blue_team_flag_returned);
+
+	return;
+}
+
+static void ctf_show_untouched_return(
+	long team_index)
+{
+	game_engine_play_multiplayer_sound(
+		team_index == _team_red ?
+			_multiplayer_sound_red_team_flag_returned :
+			_multiplayer_sound_blue_team_flag_returned);
+	ctf_set_flag_warning(team_index, FALSE);
+	game_show_score_team(team_index, _ctf_message_your_flag_was_returned);
+	game_show_score_team((team_index + 1) % 2, _ctf_message_enemy_flag_was_returned);
 
 	return;
 }
@@ -1217,6 +1320,49 @@ static void ctf_flag_failure_sound(
 				game_time_get() + CTF_FLAG_FAILURE_SOUND_INTERVAL;
 		}
 	}
+
+	return;
+}
+
+/* port: a client of the distributed netcode: the failure its own player
+hears who brings the enemy flag home while their own is away, as
+ctf_engine_player_update sounds it on the host (from the flag warning the host
+sends, its record of the flag taken). The failure
+of touching one's own flag away from home when it must be reset
+(ctf_weapon_pickup) is not sounded: the pickup is the host's */
+static void ctf_client_flag_failure_update(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	struct unit_datum *unit;
+	long weapon_index;
+	long team_index = player->team_index;
+
+	if (player->local_player_index == NONE ||
+		player->unit_index == NONE ||
+		!VALID_INDEX(team_index, NUMBER_OF_CTF_TEAMS) ||
+		!game_engine_can_score() ||
+		!game_engine_get_variant()->game_engine_variant.ctf.flag_at_home_to_score ||
+		game_engine_get_variant()->game_engine_variant.ctf.single_flag_time != 0)
+	{
+		return;
+	}
+	unit = unit_get(player->unit_index);
+	if (unit->unit.current_weapon_index == NONE)
+		return;
+	weapon_index = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
+	if (weapon_index == NONE ||
+		!weapon_is_flag(weapon_index) ||
+		weapon_get(weapon_index)->object.owner_team_index == team_index ||
+		!ctf_position_near_flag(team_index, &unit->object.position, 1.0f))
+	{
+		return;
+	}
+	/* the player's own flag taken and not yet back: the host's word, its
+	warning (set by the enemy's grab, cleared by the flag's return, as its
+	handled bit), in the same state as the captures */
+	if (ctf_globals.flag_warnings[team_index])
+		ctf_flag_failure_sound(player_index);
 
 	return;
 }
@@ -1378,7 +1524,6 @@ struct game_engine ctf_engine =
 	NULL,
 };
 
-#ifdef HALO_LINUX
 /* the parts of ctf_globals that are the same on every machine (the flag
 objects are the host's, at the same indices everywhere: the flags' scenario
 places are each machine's own pointers) */
@@ -1389,7 +1534,21 @@ struct ctf_network_state
 	boolean flag_warnings[NUMBER_OF_CTF_TEAMS];
 	long flag_warning_ticks[NUMBER_OF_CTF_TEAMS];
 	long flag_swap_timer;
+	/* the flags and their teams (single flag swaps the flag's team,
+	ctf_engine_weapon_update), NONE for none */
+	long flag_indices[NUMBER_OF_CTF_TEAMS];
+	short flag_team_indices[NUMBER_OF_CTF_TEAMS];
+	/* the host's events (ctf_events) */
+	byte captures[NUMBER_OF_CTF_TEAMS];
+	byte capturers[NUMBER_OF_CTF_TEAMS];
+	byte grabs[NUMBER_OF_CTF_TEAMS];
+	byte grabbers[NUMBER_OF_CTF_TEAMS];
+	byte returns[NUMBER_OF_CTF_TEAMS];
+	byte returners[NUMBER_OF_CTF_TEAMS];
 };
+
+typedef char verify_ctf_network_state_size[
+	sizeof(struct ctf_network_state) == 0x38 ? 1 : -1];
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients, which take it as it is */
@@ -1398,6 +1557,8 @@ long game_engine_ctf_write_network_state(
 	long size)
 {
 	struct ctf_network_state state;
+	struct object_iterator iterator;
+	short flag_count = 0;
 
 	if (size < (long)sizeof(state))
 		return 0;
@@ -1407,23 +1568,112 @@ long game_engine_ctf_write_network_state(
 	csmemcpy(state.flag_warnings, ctf_globals.flag_warnings, sizeof(state.flag_warnings));
 	csmemcpy(state.flag_warning_ticks, ctf_globals.flag_warning_ticks, sizeof(state.flag_warning_ticks));
 	state.flag_swap_timer = ctf_globals.flag_swap_timer;
+	csmemcpy(state.captures, ctf_events.captures, sizeof(state.captures));
+	csmemcpy(state.capturers, ctf_events.capturers, sizeof(state.capturers));
+	csmemcpy(state.grabs, ctf_events.grabs, sizeof(state.grabs));
+	csmemcpy(state.grabbers, ctf_events.grabbers, sizeof(state.grabbers));
+	csmemcpy(state.returns, ctf_events.returns, sizeof(state.returns));
+	csmemcpy(state.returners, ctf_events.returners, sizeof(state.returners));
+	state.flag_indices[0] = NONE;
+	state.flag_indices[1] = NONE;
+	object_iterator_new(&iterator, _object_mask_weapon, 0);
+	while (flag_count < NUMBER_OF_CTF_TEAMS && object_iterator_next(&iterator))
+	{
+		if (weapon_is_flag(iterator.index))
+		{
+			state.flag_indices[flag_count] = iterator.index;
+			state.flag_team_indices[flag_count] = weapon_get(iterator.index)->object.owner_team_index;
+			flag_count++;
+		}
+	}
 	csmemcpy(buffer, &state, sizeof(state));
 	return sizeof(state);
 }
 
-void game_engine_ctf_read_network_state(
+boolean game_engine_ctf_read_network_state(
 	byte const *buffer,
-	long size)
+	long size,
+	boolean first)
 {
 	struct ctf_network_state state;
+	short flag_index;
 
 	if (size != (long)sizeof(state))
-		return;
+		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	/* the scores first: a capture's message shows them (ctf_show_capture) */
 	csmemcpy(ctf_globals.weapon_indices, state.weapon_indices, sizeof(state.weapon_indices));
 	csmemcpy(ctf_globals.scores, state.scores, sizeof(state.scores));
-	csmemcpy(ctf_globals.flag_warnings, state.flag_warnings, sizeof(state.flag_warnings));
-	csmemcpy(ctf_globals.flag_warning_ticks, state.flag_warning_ticks, sizeof(state.flag_warning_ticks));
 	ctf_globals.flag_swap_timer = state.flag_swap_timer;
+	/* the flags' teams: a single flag the host swapped shows as the host's
+	swap did (ctf_engine_weapon_update) */
+	for (flag_index = 0; flag_index < NUMBER_OF_CTF_TEAMS; flag_index++)
+	{
+		long weapon_index = state.flag_indices[flag_index];
+		short team_index = state.flag_team_indices[flag_index];
+		struct weapon_datum *weapon;
+
+		if (weapon_index == NONE || team_index < 0 || team_index >= NUMBER_OF_CTF_TEAMS)
+			continue;
+		weapon = (struct weapon_datum *)object_try_and_get_and_verify_type(weapon_index, _object_mask_weapon);
+		if (!weapon || !weapon_is_flag(weapon_index) || weapon->object.owner_team_index == team_index)
+			continue;
+		weapon->object.owner_team_index = team_index;
+		if (game_engine_get_variant()->game_engine_variant.ctf.single_flag_time > 0)
+		{
+			if (!first)
+			{
+				game_show_score(NONE, _ctf_message_time_expired);
+				game_engine_play_multiplayer_sound(
+					team_index == _team_red ?
+						_multiplayer_sound_blue_team_ctf :
+						_multiplayer_sound_red_team_ctf);
+			}
+			game_engine_clear_goal_position(0);
+			game_engine_clear_goal_position(1);
+			game_engine_clear_goal_position(2);
+			game_engine_clear_goal_position(3);
+			/* (the first corrects what this machine's own start said) */
+			ctf_single_flag_what_is_up_message(team_index);
+		}
+	}
+	/* the host's events since the last state, shown as the host showed
+	them (by flag's team: the flag's grab, return, then the capture) */
+	for (flag_index = 0; flag_index < NUMBER_OF_CTF_TEAMS && !first; flag_index++)
+	{
+		if (state.grabs[flag_index] != ctf_events.grabs[flag_index])
+		{
+			long player_index = distributed_player_from_byte(state.grabbers[flag_index]);
+
+			if (player_index != NONE)
+				ctf_show_grab(player_index);
+		}
+		if (state.returns[flag_index] != ctf_events.returns[flag_index])
+		{
+			long player_index = distributed_player_from_byte(state.returners[flag_index]);
+
+			if (player_index != NONE)
+				ctf_show_touch_return(player_index);
+			else
+				ctf_show_untouched_return(flag_index);
+		}
+		if (state.captures[flag_index] != ctf_events.captures[flag_index])
+			ctf_show_capture(distributed_player_from_byte(state.capturers[flag_index]), flag_index);
+	}
+	csmemcpy(ctf_events.captures, state.captures, sizeof(ctf_events.captures));
+	csmemcpy(ctf_events.capturers, state.capturers, sizeof(ctf_events.capturers));
+	csmemcpy(ctf_events.grabs, state.grabs, sizeof(ctf_events.grabs));
+	csmemcpy(ctf_events.grabbers, state.grabbers, sizeof(ctf_events.grabbers));
+	csmemcpy(ctf_events.returns, state.returns, sizeof(ctf_events.returns));
+	csmemcpy(ctf_events.returners, state.returners, sizeof(ctf_events.returners));
+	/* the flags taken: the warnings' sounds this machine times itself
+	(ctf_sound_update_warning) */
+	for (flag_index = 0; flag_index < NUMBER_OF_CTF_TEAMS; flag_index++)
+	{
+		boolean warning = state.flag_warnings[flag_index] ? TRUE : FALSE;
+
+		if (warning != ctf_globals.flag_warnings[flag_index])
+			ctf_set_flag_warning(flag_index, warning);
+	}
+	return TRUE;
 }
-#endif

@@ -57,7 +57,6 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/cseries_windows.h"
 #include "game/game_globals.h"
-#include "game/player_control.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "input/input_abstraction.h"

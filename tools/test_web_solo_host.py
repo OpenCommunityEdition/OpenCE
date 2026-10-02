@@ -33,6 +33,8 @@ typedef int boolean;
 #define NONE (-1)
 #define match_assert(file, line, condition) assert(condition)
 enum { game_engine_ctf = 1, game_engine_slayer, game_engine_oddball, game_engine_king, game_engine_race };
+enum { game_engine_mode_active, game_engine_mode_postgame_delay };
+enum { _multiplayer_sound_game_over = 1 };
 struct player_datum { boolean quit_out_of_game; long unit_index, team_index; };
 struct data_iterator { int next; long datum_index; };
 static struct player_datum players[20];

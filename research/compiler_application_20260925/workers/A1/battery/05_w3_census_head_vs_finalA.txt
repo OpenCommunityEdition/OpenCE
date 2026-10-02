@@ -1,6 +1,0 @@
-DIFF source/game/game_engine
-   + 1x game_engine.c C4244: 'return' : conversion from 'double' to 'real', possible loss of data
-   - 1x game_engine.c C4013: 'console_printf' undefined; assuming extern returning int
-   - 2x game_engine.c C4244: 'function' : conversion from 'long' to 'short', possible loss of data
-   - 1x game_engine.c C4244: 'return' : conversion from 'double' to 'float', possible loss of data
-== 447 units: 1 with a different warning multiset; total warnings head 4040, candidate 4037

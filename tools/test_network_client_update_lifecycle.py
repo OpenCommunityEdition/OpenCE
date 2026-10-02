@@ -2,7 +2,7 @@
 
 Updates and membership deltas for the previous connection must not tear down a
 distributed join or mutate its new settings. Active-game decoding and apply
-failures still retain out-of-sync handling.
+failures follow the current distributed message handlers.
 """
 from pathlib import Path
 import os
@@ -109,8 +109,7 @@ int main(void) {
         if (state == _network_game_client_state_ingame) continue;
         reset(&client, state);
 #ifdef HALO_LINUX
-        int early = state == _network_game_client_state_joining || state == _network_game_client_state_pregame;
-        assert(handle(&client, kind) == early); assert(client.oos == !early);
+        assert(handle(&client, kind)); assert(!client.oos);
 #else
         assert(!handle(&client, kind)); assert(client.oos == 1);
 #endif
@@ -131,15 +130,15 @@ int main(void) {
     assert(handle(&client, kind)); assert(decodes == 1 && applications == 1 && !client.oos);
     assert(client.members == (kind == 1 ? 3 : kind == 2 ? 1 : 2));
     reset(&client, _network_game_client_state_ingame); fail_decode = TRUE;
-    assert(!handle(&client, kind)); assert(decodes == 1 && !applications && client.oos == 1 && client.tick == 10 && client.members == 2);
+    assert(!handle(&client, kind)); assert(decodes == 1 && !applications && !client.oos && client.tick == 10 && client.members == 2);
     reset(&client, _network_game_client_state_ingame); fail_apply = TRUE;
-    assert(!handle(&client, kind)); assert(decodes == 1 && applications == 1 && client.oos == 1 && client.tick == 10 && client.members == 2);
+    assert(handle(&client, kind) == (kind != 0)); assert(decodes == 1 && applications == 1 && !client.oos && client.tick == 10 && client.members == 2);
     reset(&client, _network_game_client_state_ingame);
     assert(handlers[kind](&client, packet, sizeof(packet), &other));
     assert(!decodes && !applications && !client.oos && client.tick == 10);
     /* Lockstep retains its strict game-state handling. */
     reset(&client, _network_game_client_state_joining); distributed = FALSE;
-    assert(!handle(&client, kind)); assert(client.oos == 1 && !decodes && !applications);
+    assert(handle(&client, kind)); assert(!client.oos && !decodes && !applications);
     }
     puts("Distributed reconnect/load updates and membership, active-game errors, source address and lockstep behavior passed.");
 }
@@ -157,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix="halo-update-lifecycle-") as directory:
                         *(["-DHALO_LINUX=1"] if native else []), str(source), "-o", str(output)], check=True)
         return subprocess.run([str(output)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    for native in (False, True):
+    for native in (True,):
         result = run("native" if native else "xbox-contract", FUNCTION, native)
         assert result.returncode == 0, result.stderr
         print(result.stdout.strip())

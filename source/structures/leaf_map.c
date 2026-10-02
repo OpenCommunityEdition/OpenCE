@@ -140,6 +140,7 @@ symbols in this file:
 #include "cseries/profile.h"
 #include "physics/bsp3d.h"
 #include "math/geometry.h"
+#include "render/render_debug.h"
 #include "render/render_debug_geometry.h"
 
 #ifdef HALO_WEB

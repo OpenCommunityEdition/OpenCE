@@ -16,6 +16,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "actions.h"
 
 #include "actor_definitions.h"

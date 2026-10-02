@@ -74,7 +74,10 @@ void byte_swap_message_header(word *header, enum message_header_byte_order byte_
 #define IPV4_ADDRESS_LENGTH 4
 #define _network_connection_type_client 1
 #define _connection_create_server_bit 0
+#define _network_game_server_state_pregame 0
 #define _network_game_server_state_ingame 1
+#define _network_game_server_state_postgame 2
+#define MAXIMUM_WAITING_CONNECTIONS_PER_ADDRESS 2
 #define _network_game_client_state_ingame 3
 #define _network_game_server_game_valid_bit 1
 #define _network_game_server_game_open_bit 0
@@ -88,18 +91,19 @@ struct network_connection { unsigned long address; int connected, active; boolea
 struct network_machine { byte name[0x40]; char machine_index; byte pad[3]; };
 struct network_player { short machine_index, player_list_index, controller_index, team_index; };
 struct player_datum { unsigned short identifier; long quit_out_of_game_time; int score; float position[3]; };
-struct network_game { unsigned long random_seed; short machine_count, player_count, maximum_player_count;
+struct network_game { unsigned long random_seed; short machine_count, player_count, maximum_players;
  struct network_machine machines[128]; struct network_player players[128]; };
 struct network_game_client { word machine_index; struct network_game game;
  struct network_connection *connection; void *connect_process; short state,error;
  boolean out_of_sync,connection_silent; unsigned long next_update_number,last_update_time; };
 struct network_game_server_client_machine { struct network_connection *connection;
- unsigned long last_received_update_sequence_number; short machine_index; word flags; };
+ unsigned long last_received_update_sequence_number, last_heard_time; short machine_index; word flags; };
 struct network_game_server { struct network_connection *connection; word state,flags;
  struct network_game game; struct network_game_server_client_machine client_machines[128];
  boolean sent_start_game_message; long next_update_number,time_of_last_keep_alive; };
 static struct network_game_server network_game_server_memory_do_not_use_directly;
 static boolean network_game_server_memory_do_not_use_directly_in_use;
+static unsigned long network_game_server_client_machine_addresses[128];
 static struct { boolean reconnecting,acknowledged; unsigned long epoch,target,retry_at,attach_at;
  short host_machine; unsigned long owner_addresses[128]; } client_migration;
 static struct { boolean adopting; unsigned long epoch; short host_machine,departed_machine;
@@ -138,7 +142,6 @@ static unsigned long web_quick_play_address(void) { return 0x64563811UL; }
 static boolean network_distributed_migration_ready(void) { return TRUE; }
 static boolean web_match_migration_enabled(void) { return TRUE; }
 static boolean network_distributed_migration_promote(void) { promotions++; return TRUE; }
-static void network_game_follow_host_netcode(boolean enabled) { assert(enabled); }
 static void game_connection_set(short connection) { assert(connection==_game_connection_network_server); }
 static void network_game_server_send_player_quit_messages_ingame(struct network_game_server *s,
  struct network_game_server_client_machine *m) { (void)s; datums[m->machine_index].quit_out_of_game_time=tick+1; }
@@ -180,7 +183,6 @@ static void update_queues_migrate(void) { queue_rebases++; }
 static long unstrip_player_index(long p) { return p>=0 && p<128 && datums[p].identifier?p:NONE; }
 static struct player_datum *player_try_and_get(long p) { return p>=0 && p<128?&datums[p]:NULL; }
 static long *machine_get_player_list(long machine) { return machine_to_player_table[machine]; }
-static boolean network_game_distributed(void) { return TRUE; }
 static boolean network_game_player_slot_held(long slot) { return datums[slot].identifier!=0; }
 static boolean network_game_spawn_player(struct network_player *p) {
  long slot=p->player_list_index; assert(slot>=0 && slot<128 && !datums[slot].identifier);
@@ -201,6 +203,14 @@ static boolean network_game_server_remove_machine_from_game(struct network_game_
 static boolean network_game_server_remove_client_machine_from_game(struct network_game_server *s,
  struct network_game_server_client_machine *m) {
  (void)s; m->connection=NULL; m->machine_index=NONE; m->flags=0; return TRUE; }
+static boolean network_game_server_client_machine_is_joined_to_game(
+ struct network_game_server *s, struct network_game_server_client_machine *m)
+{ (void)s; return TEST_FLAG(m->flags, _network_client_machine_validated_bit); }
+static boolean network_game_server_drop_client_machine(struct network_game_server *s,
+ struct network_game_server_client_machine *m) {
+ if (network_game_server_client_machine_is_joined_to_game(s,m) &&
+     network_game_server_remove_machine_from_game(s,&s->game.machines[m->machine_index])) return TRUE;
+ return network_game_server_remove_client_machine_from_game(s,m); }
 '''
 FUNCTIONS = "\n".join((
     function(HEADERS, "build_message_header"),
@@ -248,7 +258,7 @@ static void setup(void) {
  bss_004566dc.accept_remote_connections=FALSE; admissions=0;
  local_client.machine_index=1; local_client.state=_network_game_client_state_ingame;
  local_client.game.random_seed=42; local_client.game.machine_count=3; local_client.game.player_count=3;
- local_client.game.maximum_player_count=128;
+ local_client.game.maximum_players=128;
  for(int i=0;i<128;i++) { local_client.game.machines[i].machine_index=NONE; local_client.game.players[i].machine_index=NONE;
  local_client.game.players[i].player_list_index=NONE; }
  for(int i=0;i<3;i++) { local_client.game.machines[i].machine_index=i; local_client.game.players[i].machine_index=i;

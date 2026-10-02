@@ -14,16 +14,16 @@ header included in hcex build.
 
 enum
 {
-	_game_engine_allow_dynamic_lighting_bit = 0,
-	_game_engine_allow_integrated_lights_bit,
-	_game_engine_disable_infinite_grenades_bit,
+	_game_engine_disable_dynamic_light_bit = 0,
+	_game_engine_disable_integrated_lights_bit,
+	_game_engine_5_or_more_players_bit,
 };
 
 enum
 {
 	_game_variant_draw_object_in_motion_sensor_bit = 0,
-	_game_variant_unknown1_bit = 1,
-	_game_variant_infinite_grenades_bit = 2,
+	_game_variant_allow_friendly_navpoints_bit,
+	_game_variant_infinite_grenades_bit,
 	_game_variant_no_shields_bit,
 	_game_variant_always_invisible_bit,
 };
@@ -104,6 +104,12 @@ struct king_variant
 	boolean moving_hill;
 };
 
+/* the balls of an oddball game */
+enum
+{
+	MAXIMUM_ODDBALLS = 16,
+};
+
 struct oddball_variant
 {
 	boolean random_start;
@@ -154,7 +160,7 @@ struct game_engine
 	void (*statistics_append)(long statistic);
 	void (*handle_client_message)(void *message);
 	void (*handle_server_message)(void *message);
-	void (*unknown2C)(void);
+	void (*pregame_post_rasterize)(void);
 	void (*post_rasterize_objects)(void);
 	void (*player_update_each_tick)(
 		long player_index);
@@ -166,7 +172,7 @@ struct game_engine
 		long player_index);
 	void (*weapon_dropped)(
 		long weapon_index);
-	void (*unknown44)(void);
+	void (*update)(void);
 	long (*get_player_score)(
 		long player_index,
 		enum get_score_type score_type);
@@ -192,11 +198,11 @@ struct game_engine
 		boolean friendly_fire);
 	boolean (*format_message)(
 		long player_index,
-		long parameter1,
-		long parameter2,
-		wchar_t *message,
-		long message_character_count);
-	float (*starting_location_rating)(
+		long message,
+		long message_data,
+		wchar_t *buffer,
+		long buffer_size);
+	real (*starting_location_rating)(
 		long player_index,
 		struct player_starting_location const *starting_location);
 	void (*prespawn_player_update)(
@@ -231,6 +237,11 @@ typedef char verify_game_engine_format_message_offset[
 	offsetof(struct game_engine, format_message) == 0x64 ? 1 : -1];
 typedef char verify_game_engine_player_update_offset[
 	offsetof(struct game_engine, player_update) == 0x70 ? 1 : -1];
+
+/* port: the most a game type's state for the distributed netcode's clients
+may take (port/linux/game/network_distributed.c's MAXIMUM_GAME_STATE_SIZE,
+less the postgame state game_engine_write_network_state puts first) */
+#define GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE (0xF00 - 4)
 
 /* ---------- prototypes/GAME_ENGINE.C */
 
@@ -268,7 +279,7 @@ long game_engine_get_team_score(
 long players_in_game(
 	void);
 
-float get_blink_alpha(
+real get_blink_alpha(
 	void);
 
 long game_engine_player_get_team_index(
@@ -290,6 +301,8 @@ void get_postgame_hilite_colors(
 	union real_argb_color *hilite_color);
 
 boolean game_engine_running(
+	void);
+boolean game_engine_showing_postgame(
 	void);
 
 boolean game_engine_get_state_message(
@@ -329,22 +342,29 @@ void game_engine_post_rasterize(
 
 void game_engine_nonplayer_post_rasterize(
 	void);
+void game_engine_update(
+	void);
 
 void game_engine_update_non_deterministic(
-	float delta_seconds);
+	real delta_seconds);
 
 boolean match_game_type(
 	long game_type,
 	long count,
 	short const *game_types);
+void game_engine_flag_reset(
+	long weapon_index,
+	union real_point3d const *position);
 
 void game_engine_initialize(
 	struct game_variant *variant);
 
 void game_engine_initialize_for_new_map(
 	void);
+void game_engine_player_added(
+	long player_index);
 
-float game_engine_get_distance_rating_for_spawn(
+real game_engine_get_distance_rating_for_spawn(
 	long player_index,
 	union real_point3d const *position);
 
@@ -362,10 +382,8 @@ real game_engine_get_starting_location_rating(
 	struct player_starting_location const *starting_location);
 boolean game_engine_should_spawn_player(
 	long player_index);
-#ifdef HALO_LINUX
 void game_engine_client_respawn_countdown(
 	long player_index);
-#endif
 void game_engine_postspawn_player_update(
 	long player_index);
 
@@ -389,6 +407,8 @@ void game_engine_prespawn_player_update(
 
 long game_engine_did_player_win(
 	long player_index);
+long game_engine_did_player_win_default(
+	long player_index);
 
 struct game_variant *game_engine_get_variant(
 	void);
@@ -399,15 +419,18 @@ struct game_variant *game_engine_get_variant_by_name(
 
 boolean game_engine_get_goal_in_use(
 	short goal_index);
+real_point3d *game_engine_get_goal_position(
+	real_point3d *position,
+	short goal_index);
 
 void game_engine_set_goal_position(
 	short goal_index,
 	union real_point3d const *position,
-	float height,
+	real height,
 	char const *name,
-	long target_object_index,
+	long player_index,
 	short team_index,
-	long player_index);
+	long ignore_player_index);
 
 boolean game_engine_has_teams(
 	void);
@@ -443,7 +466,7 @@ short game_engine_player_get_custom_motion_sensor_positions(
 	short maximum_count);
 
 void game_engine_render_nav_points(
-	long local_player_index);
+	short local_player_index);
 
 union real_rgb_color *game_engine_player_get_change_color(
 	union real_rgb_color *change_color,
@@ -517,11 +540,28 @@ boolean game_engine_force_autopickup(
 
 void game_engine_play_multiplayer_sound(
 	long sound_index);
+void game_engine_update_multiplayer_sound(
+	void);
+void game_engine_intialize_queued_sounds(
+	void);
 
 long game_engine_remap_object_definition(long definition_index);
 
 long game_engine_remap_vehicle(long vehicle_definition_index);
 long game_engine_remap_equipment(long equipment_definition_index);
+void game_show_score_team(
+	long team_index,
+	long score);
+void game_show_score_you_ally_enemy(
+	long player_index,
+	long you_score,
+	long ally_score,
+	long enemy_score,
+	long other_player_index);
+void game_show_score_extended(
+	long player_index,
+	long score,
+	long team_index);
 long game_engine_remap_weapon(long weapon_definition_index);
 
 
@@ -537,11 +577,9 @@ void game_engine_player_killed(
 /* ---------- globals */
 
 extern struct game_engine *game_engine;
-#ifdef HALO_LINUX
 long game_engine_write_migration_state(byte *buffer, long size);
 boolean game_engine_validate_migration_state(byte const *buffer, long size);
 boolean game_engine_read_migration_state(byte const *buffer, long size, boolean restore_game_type);
-#endif
 
 /* ---------- public code */
 

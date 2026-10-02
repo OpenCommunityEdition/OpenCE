@@ -37,6 +37,8 @@ typedef char verify_game_input_preferences_size[
 
 void input_abstraction_initialize(
 	void);
+void input_abstraction_dispose(
+	void);
 void input_abstraction_update(
 	void);
 void input_abstraction_update_device_changes(

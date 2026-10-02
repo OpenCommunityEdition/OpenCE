@@ -234,6 +234,8 @@ symbols in this file:
 #include "actor_definitions.h"
 #include "actor_types.h"
 #include "ai.h"
+#include "ai/ai_globals.h"
+#include "ai/ai_scenario_definitions.h"
 #include "ai_communication.h"
 #include "ai_debug.h"
 #include "ai_profile.h"
@@ -322,37 +324,8 @@ enum
 
 /* ---------- structures */
 
-/* The fields used here from the 0x74-byte scenario conversation record. */
-struct scenario_conversation_action_definition
-{
-	char name[TAG_STRING_LENGTH + 1];
-	word flags;
-	byte __unknown22[0x52];
-};
-
 typedef char scenario_conversation_action_definition_size_assert[
-	sizeof(struct scenario_conversation_action_definition) == 0x74 ? 1 : -1];
-
-/* Only the January-proven field consumed by this translation unit is named. */
-struct ai_vehicle_enterable
-{
-	long vehicle_index;
-	real radius;
-	short team_bitmask;
-	short actor_type_bitmask;
-	short ai_indices_count;
-	word __pad0E;
-	long ai_indices[6];
-};
-
-struct ai_globals_action_data
-{
-	byte __unknown0[0x3B4];
-	boolean grenades_enabled;
-	byte __unknown3B5;
-	short enterable_vehicle_count;
-	struct ai_vehicle_enterable enterable_vehicles[32];
-};
+	sizeof(struct ai_conversation) == 0x74 ? 1 : -1];
 
 /* The January iterator is exactly three datum indices; callers consume the
  * current actor index after encounter_actor_iterator_next advances it. */
@@ -383,11 +356,9 @@ struct vehicle_definition
 typedef char ai_globals_action_vehicle_size_assert[
 	sizeof(struct ai_vehicle_enterable) == 0x28 ? 1 : -1];
 typedef char ai_globals_action_grenades_enabled_offset_assert[
-	offsetof(struct ai_globals_action_data, grenades_enabled) == 0x3B4 ? 1 : -1];
+	offsetof(struct ai_globals, grenades_enabled) == 0x3B4 ? 1 : -1];
 typedef char ai_globals_action_enterable_vehicles_offset_assert[
-	offsetof(struct ai_globals_action_data, enterable_vehicles) == 0x3B8 ? 1 : -1];
-typedef char ai_globals_action_data_size_assert[
-	sizeof(struct ai_globals_action_data) == 0x8B8 ? 1 : -1];
+	offsetof(struct ai_globals, enterable_vehicles) == 0x3B8 ? 1 : -1];
 typedef char actions_prop_enemy_offset_assert[
 	offsetof(struct prop_datum, enemy) == 0x60 ? 1 : -1];
 typedef char actions_prop_dead_offset_assert[
@@ -416,41 +387,6 @@ typedef char firing_position_evaluation_context_size_assert[
 
 /* ---------- prototypes */
 
-boolean action_guard_setup_from_fleeing(
-	long actor_index,
-	struct flee_state_data *flee_state,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_from_combat_transition(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_current_position(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_find_position(
-	long actor_index,
-	long wait_ticks,
-	struct guard_state_data *state_data);
-
-boolean action_guard_setup_postcombat(
-	long actor_index,
-	struct guard_state_data *state_data);
-
-void actor_action_change(
-	long actor_index,
-	long new_action_type,
-	struct action_state_data *new_action_data);
-
-long actor_perception_find_recent_damaging_prop_index(
-	long actor_index,
-	boolean enemies_only);
-
-long ai_get_responsible_unit(
-	long object_index,
-	boolean include_self);
-
 boolean actor_action_handle_combat_selection(
 	long actor_index);
 
@@ -460,34 +396,6 @@ boolean actor_action_handle_lost_contact(
 boolean actor_action_allow_cover_seeking(
 	long actor_index,
 	boolean unopposable);
-
-short vehicle_scripting_find_available_seats(
-	long vehicle_index,
-	char const *seat_substring_name,
-	short seat_desire_type,
-	short *seat_indices,
-	short maximum_seat_count);
-
-boolean action_vehicle_setup_specific(
-	long actor_index,
-	long vehicle_index,
-	short seat_index,
-	struct vehicle_state_data *state_data);
-
-void actor_perception_tried_to_uncover(
-	long actor_index,
-	long prop_index);
-
-void actor_perception_tried_to_search(
-	long actor_index,
-	long prop_index);
-
-void actor_perception_abandoned_search(
-	long actor_index,
-	long prop_index);
-
-boolean actor_action_consider_grenade(
-	long actor_index);
 
 boolean actor_action_test_grenade(
 	long actor_index);
@@ -507,63 +415,6 @@ boolean actor_action_try_to_throw_grenade(
 	long actor_index,
 	boolean known_trajectory);
 
-boolean action_vehicle_setup_impromptu(
-	long actor_index,
-	long vehicle_index,
-	real attempt_distance,
-	real continue_distance,
-	struct vehicle_state_data *state_data);
-
-boolean action_charge_setup(
-	long actor_index,
-	short goal,
-	struct charge_state_data *state_data);
-
-boolean action_fight_setup(
-	long actor_index,
-	struct fight_state_data *state_data);
-
-boolean action_uncover_setup_target(
-	long actor_index,
-	boolean able_to_search,
-	struct uncover_state_data *state_data);
-
-boolean action_uncover_setup_pursuit(
-	long actor_index,
-	short firing_position_index,
-	struct uncover_state_data *state_data);
-
-boolean action_search_setup_target(
-	long actor_index,
-	boolean must_charge,
-	struct search_state_data *state_data);
-
-boolean action_search_setup_pursuit(
-	long actor_index,
-	short firing_position_index,
-	boolean tenacious,
-	struct search_state_data *state_data);
-
-boolean action_search_setup_undirected(
-	long actor_index,
-	boolean tenacious,
-	struct search_state_data *state_data);
-
-boolean action_wait_setup(
-	long actor_index,
-	boolean was_actively_searching,
-	struct wait_state_data *state_data);
-
-boolean action_avoid_setup(
-	long actor_index,
-	struct avoid_state_data *state_data);
-
-real vector_to_line_distance_squared3d(
-	real_point3d const *point,
-	real_vector3d const *vector,
-	real_point3d const *base,
-	real_vector3d const *height);
-
 boolean actor_move_try_evasion_direction(
 	long actor_index,
 	real_vector2d *alignment_vector,
@@ -581,122 +432,6 @@ boolean actor_move_try_evasion_vector(
 	boolean *is_ledge,
 	void *collision_result);
 
-void actor_stimulus_was_surprised(
-	long actor_index);
-
-boolean actor_situation_try_new_target(
-	long actor_index,
-	long prop_index);
-
-void action_sleep_control(
-	long actor_index);
-
-void action_fight_begin(
-	long actor_index);
-boolean action_fight_perform(
-	long actor_index);
-void action_fight_update(
-	long actor_index);
-void action_fight_control(
-	long actor_index);
-void action_fight_end(
-	long actor_index);
-
-void action_uncover_begin(
-	long actor_index);
-boolean action_uncover_perform(
-	long actor_index);
-void action_uncover_update(
-	long actor_index);
-void action_uncover_control(
-	long actor_index);
-void action_uncover_modify_color(
-	long actor_index,
-	real_argb_color *color);
-void action_uncover_flush_position_indices(
-	long actor_index);
-
-void action_guard_begin(
-	long actor_index);
-boolean action_guard_perform(
-	long actor_index);
-void action_guard_update(
-	long actor_index);
-void action_guard_control(
-	long actor_index);
-void action_guard_end(
-	long actor_index);
-void action_guard_modify_color(
-	long actor_index,
-	real_argb_color *color);
-void action_guard_replace_prop(
-	long actor_index,
-	long invalid_prop_index,
-	long replacement_prop_index);
-void action_guard_flush_position_indices(
-	long actor_index);
-void action_guard_flush_structure_indices(
-	long actor_index);
-
-void action_search_begin(
-	long actor_index);
-boolean action_search_perform(
-	long actor_index);
-void action_search_update(
-	long actor_index);
-void action_search_control(
-	long actor_index);
-void action_search_flush_position_indices(
-	long actor_index);
-
-void action_wait_begin(
-	long actor_index);
-boolean action_wait_perform(
-	long actor_index);
-void action_wait_update(
-	long actor_index);
-void action_wait_control(
-	long actor_index);
-
-boolean action_vehicle_perform(
-	long actor_index);
-void action_vehicle_update(
-	long actor_index);
-
-void action_charge_begin(
-	long actor_index);
-boolean action_charge_perform(
-	long actor_index);
-void action_charge_update(
-	long actor_index);
-void action_charge_control(
-	long actor_index);
-
-void action_converse_begin(
-	long actor_index);
-boolean action_converse_perform(
-	long actor_index);
-void action_converse_update(
-	long actor_index);
-void action_converse_control(
-	long actor_index);
-void action_converse_end(
-	long actor_index);
-void action_converse_replace_prop(
-	long actor_index,
-	long invalid_prop_index,
-	long replacement_prop_index);
-
-void action_avoid_begin(
-	long actor_index);
-boolean action_avoid_perform(
-	long actor_index);
-void action_avoid_update(
-	long actor_index);
-void action_avoid_control(
-	long actor_index);
-void action_avoid_end(
-	long actor_index);
 
 static boolean actor_action_allowed_to_enter_vehicle(
 	long actor_index,
@@ -704,7 +439,7 @@ static boolean actor_action_allowed_to_enter_vehicle(
 
 /* ---------- globals */
 
-extern struct ai_globals_action_data *ai_globals;
+real_argb_color global_temporary_render_color;
 
 struct action_specification const global_action_functions[NUMBER_OF_ACTOR_ACTIONS] =
 {
@@ -1770,13 +1505,13 @@ boolean actor_action_can_stop_conversing(
 	if (conversation_index != NONE)
 	{
 		word flags;
-		struct ai_conversation_datum_header *conversation =
+		struct conversation_datum *conversation =
 			ai_conversation_header_get(conversation_index);
-		struct scenario_conversation_action_definition *definition =
+		struct ai_conversation *definition =
 			TAG_BLOCK_GET_ELEMENT(
 				&global_scenario_get()->ai_conversations,
 				conversation->scenario_conversation_index,
-				struct scenario_conversation_action_definition);
+				struct ai_conversation);
 
 		flags = definition->flags;
 
@@ -4061,7 +3796,7 @@ boolean actor_action_handle_vehicle_entry(
 	long best_vehicle_index;
 	real attempt_distance;
 	real continue_distance;
-	struct action_state_data state;
+	struct action_state_data new_state_data;
 
 	if (actor->state.action == _actor_action_flee &&
 		actor->state.action_data.flee.panic_type > _actor_panic_none)
@@ -4111,13 +3846,13 @@ boolean actor_action_handle_vehicle_entry(
 				if (vehicle &&
 					vehicle->unit.driver_object_index == prop->unit_index)
 				{
-					real_point3d origin;
+					real_point3d vehicle_origin;
 					real distance_squared;
 
-					object_get_origin(prop->vehicle_index, &origin);
+					object_get_origin(prop->vehicle_index, &vehicle_origin);
 					distance_squared = distance_squared3d(
 						&actor->input.position.body_position,
-						&origin);
+						&vehicle_origin);
 
 					if (distance_squared < 100.0f &&
 						distance_squared < best_distance_squared)
@@ -4152,7 +3887,7 @@ boolean actor_action_handle_vehicle_entry(
 		{
 			struct ai_vehicle_enterable *enterable =
 				&ai_globals->enterable_vehicles[(short)slot];
-			real_point3d origin;
+			real_point3d position;
 			real distance_squared;
 			short team_bitmask;
 			short actor_type_bitmask;
@@ -4163,9 +3898,9 @@ boolean actor_action_handle_vehicle_entry(
 				continue;
 			}
 
-			object_get_origin(enterable->vehicle_index, &origin);
+			object_get_origin(enterable->vehicle_index, &position);
 			distance_squared = distance_squared3d(
-				&origin,
+				&position,
 				&actor->input.position.body_position);
 
 			if (!(distance_squared < best_distance_squared) ||
@@ -4247,9 +3982,9 @@ setup_entry:
 		best_vehicle_index,
 		attempt_distance,
 		continue_distance,
-		&state.vehicle))
+		&new_state_data.vehicle))
 	{
-		actor_action_change(actor_index, _actor_action_vehicle, &state);
+		actor_action_change(actor_index, _actor_action_vehicle, &new_state_data);
 		result = TRUE;
 	}
 	else

@@ -39,47 +39,22 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cache/texture_cache.h"
 #include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "game/players.h"
 #include "interface/interface.h"
 #include "math/real_math.h"
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
 /* ---------- macros */
 
 /* ---------- structures */
-
-struct motion_sensor_debug_options
-{
-	byte reserved00[0x23];
-	boolean motion_sensor;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
-};
 
 /* ---------- prototypes */
 
@@ -149,11 +124,9 @@ void SetRenderStateSmart(
 /* ---------- globals */
 
 extern void *global_d3d_device;
-extern struct motion_sensor_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
-boolean bss_00465e27 = {0};
+static boolean bss_00465e27 = {0};
 
 /* ---------- public code */
 
@@ -177,7 +150,7 @@ void _rasterizer_hud_motion_sensor_blip_begin(
 		global_d3d_device);
 
 	bss_00465e27 = FALSE;
-	if (rasterizer_debug_options.motion_sensor &&
+	if (rasterizer_debug_options.draw_hud_motion_sensor &&
 		_texture_cache_bitmap_get_hardware_format(blip_bitmap, FALSE, TRUE) &&
 		_texture_cache_bitmap_get_hardware_format(large_blip_bitmap, FALSE, TRUE))
 	{
@@ -315,7 +288,7 @@ void _rasterizer_hud_motion_sensor_blip_draw(
 	rasterizer_set_texture_bitmap_data(
 		0,
 		large_blip ? large_blip_bitmap : blip_bitmap);
-	if (rasterizer_debug_options.motion_sensor && bss_00465e27)
+	if (rasterizer_debug_options.draw_hud_motion_sensor && bss_00465e27)
 	{
 		radius = size * 0.0625f;
 		scaled_position.x = position->x * -0.03125f;
@@ -385,7 +358,7 @@ void _rasterizer_hud_motion_sensor_blip_end(
 		156,
 		global_d3d_device);
 
-	if (rasterizer_debug_options.motion_sensor)
+	if (rasterizer_debug_options.draw_hud_motion_sensor)
 	{
 		if (bss_00465e27 &&
 			_texture_cache_bitmap_get_hardware_format(sweep_bitmap, FALSE, TRUE) &&
@@ -655,7 +628,7 @@ void _rasterizer_hud_motion_sensor_blip_end(
 		}
 	}
 
-	if (rasterizer_debug_options.motion_sensor && bss_00465e27)
+	if (rasterizer_debug_options.draw_hud_motion_sensor && bss_00465e27)
 	{
 		rasterizer_set_target(
 			global_window_parameters.rasterizer_target,

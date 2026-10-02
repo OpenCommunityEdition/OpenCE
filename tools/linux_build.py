@@ -1,10 +1,8 @@
 """Ninja rules for the native Linux build (``ninja linux``).
 
-This is independent of the byte-matching graph: it compiles the same game
-sources with clang for 32-bit x86 Linux, adds the platform layer in
-``port/linux/src``, and links an ELF executable at ``build/linux/halo``.
-Nothing here changes the MSVC objects, objdiff configuration or progress.
-See port/linux/README.md for the design.
+It compiles the game sources with clang for 32-bit x86 Linux, adds the
+platform layer in ``port/linux/src``, and links an ELF executable at
+``build/linux/halo``. See port/linux/README.md for the design.
 """
 
 import json
@@ -15,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux")
@@ -26,6 +25,26 @@ XDK_INCLUDE = Path("port/include/xdk")
 
 def xdk_headers() -> List[Path]:
     return sorted(XDK_INCLUDE.glob("*.h"))
+
+
+def game_sources(config: Dict[str, Any]) -> List[Path]:
+    """the game's C sources (port.json "game"): every one under its root but
+    those excluded"""
+    game = config["game"]
+    excluded = set(game.get("exclude", []))
+    return sorted(
+        source for source in Path(game["root"]).rglob("*.c")
+        if source.as_posix() not in excluded
+    )
+
+
+def game_defines_and_includes(config: Dict[str, Any]) -> str:
+    """the game sources' defines and include directories (port.json "game")"""
+    game = config["game"]
+    return " ".join(
+        [f"-D{define}" for define in game.get("defines", [])]
+        + [f"-I{_quote(Path(directory))}" for directory in game.get("include_dirs", [])]
+    )
 
 
 def compile_launcher(sln: Any) -> str:
@@ -62,8 +81,8 @@ LINUX_ABI_FLAGS = [
     # the game keeps EBP frames (MSVC /Oy-): get_return_eip and the stack
     # walker follow the frame chain
     "-fno-omit-frame-pointer",
-    # the same floating point results on every port (system link games run
-    # in lockstep, and a machine whose results differ goes out of sync): no
+    # the same floating point results on every port (every machine in a
+    # system link game simulates it from the same inputs): no
     # fused multiply-adds, which -march=native and ARM64 would otherwise
     # emit (port/include/halo_math.h)
     "-ffp-contract=off",
@@ -263,7 +282,11 @@ def linux_configure_inputs() -> List[Path]:
     """Files whose change must re-run configure.py."""
     if not PORT_CONFIG.is_file():
         return [Path(__file__)]
-    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE]
+    # (the folders of the game's sources, so that adding or removing one
+    # re-runs it)
+    game_folders = sorted({source.parent for source in game_sources(_load_port_config())})
+    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE, *game_folders,
+            *hud_configure_inputs()]
 
 
 def _quote(path: Any) -> str:
@@ -337,10 +360,12 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         pool="console",
     )
 
+    # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
+    embedded_assets = hud_assets_build(n, "linux", build_dir / "generated" / "hud_hires_assets.c")
+
     abi = " ".join(LINUX_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
-    excluded = set(config.get("exclude_sources", []))
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
@@ -367,37 +392,21 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 variables={"cflags": f"{cflags} {posix_extra if posix else extra}"},
             )
 
-        for proj in sln.projects:
-            if proj.name not in config["projects"]:
-                continue
-            options = proj.options
-            defines = " ".join(f"-D{d}" for d in options.get("defines") or [])
-            includes = " ".join(
-                f"-I{_quote(d)}"
-                for d in options.get("include_dirs") or []
-                if Path(d) != Path("xbox/include")
-            )
-            game_cflags = " ".join([
-                abi,
-                " ".join(GAME_FLAGS),
-                f"-include {prefix_header}",
-                f"-include {semantics_header}",
-                defines,
-                f"-I{port_include}",
-                includes,
-                sdk_flags,
-            ])
-            for obj in proj.objects:
-                name = str(obj.file_path).replace(os.sep, "/")
-                if obj.status.name == "Missing" or name in excluded:
-                    continue
-                if obj.file_path.suffix.lower() not in (".c",):
-                    continue
-                add_object(obj.file_path, game_cflags)
-            # Port-specific units that must see the game exactly as its own
-            # sources do (port/linux/game).
-            for source in sorted(Path(config["game_sources"]).glob("*.c")):
-                add_object(source, game_cflags)
+        game_cflags = " ".join([
+            abi,
+            " ".join(GAME_FLAGS),
+            f"-include {prefix_header}",
+            f"-include {semantics_header}",
+            f"-I{port_include}",
+            game_defines_and_includes(config),
+            sdk_flags,
+        ])
+        for source in game_sources(config):
+            add_object(source, game_cflags)
+        # Port-specific units that must see the game exactly as its own
+        # sources do (port/linux/game).
+        for source in sorted(Path(config["game_sources"]).glob("*.c")):
+            add_object(source, game_cflags)
 
         platform_dir = Path(config["platform_sources"])
         platform_cflags = " ".join([
@@ -425,6 +434,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
+        for source in embedded_assets:
+            add_object(source, platform_cflags)
         # the self-updater's TLS (port/third_party/mbedtls), with the host's
         # ABI as the posix_*.c that use it (and no loop turned into glibc's
         # wcslen, which linux_link_check.py rejects: the game's wchar_t is

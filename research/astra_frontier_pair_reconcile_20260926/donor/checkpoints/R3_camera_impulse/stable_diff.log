@@ -1,7 +1,0 @@
-COMMAND: C:\Users\isabe\AppData\Local\Programs\Python\Python312\python.exe -B -m tools.campaign.stable_verdicts diff C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R2_render_recursive\stable.json C:\halo-worktrees\claude-remaining-frontier-20260926\scratch\rf\checkpoints\R3_camera_impulse\stable.json
-EXIT: 0
---- stdout ---
-gained source/effects/player_effects::section:28 _player_effect_update_camera_impulse -> _player_effect_update_camera_impulse 752
-gained 1 752 bytes; regressions 0
-
---- stderr ---

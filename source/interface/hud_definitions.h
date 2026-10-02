@@ -153,6 +153,42 @@ struct hud_globals_definition
 	long unused2[24];
 };
 
+struct icon_hud_element_definition
+{
+	short sequence_index;
+	short width_offset;
+	point2d offset;
+	unsigned long color;
+	char frame_rate;
+	byte flags;
+	short text_index;
+};
+
+struct hud_screen_effect_definition
+{
+	long unused1[1];
+	word mask_flags;
+	word mask_pad;
+	long mask_unused[4];
+	struct tag_reference mask_fullscreen;
+	struct tag_reference mask_splitscreen;
+	long unused2[2];
+	word convolution_flags;
+	word convolution_pad;
+	real convolution_radius_in_bounds[2];
+	real convolution_radius_out_bounds[2];
+	long unused3[6];
+	word light_enhancement_flags;
+	short light_enhancement_script_source;
+	real light_enhancement_intensity;
+	long unused4[6];
+	word desaturation_flags;
+	short desaturation_script_source;
+	real desaturation_intensity;
+	real_rgb_color desaturation_tint;
+	long unused5[6];
+};
+
 typedef char hud_absolute_placement_definition_size_assert[
 	sizeof(struct hud_absolute_placement_definition) == 0x24 ? 1 : -1];
 typedef char hud_placement_definition_size_assert[

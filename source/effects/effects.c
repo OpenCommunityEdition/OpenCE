@@ -357,30 +357,6 @@ struct effect_datum
 	byte particle_counts[MAXIMUM_EFFECT_EVENTS];
 };
 
-struct effect_definition
-{
-	long flags;
-	short loop_start_index;
-	short loop_stop_index;
-	real runtime_danger_radius;
-	real unused00c[7];
-	struct tag_block locations;
-	struct tag_block events;
-};
-
-struct effect_event_definition
-{
-	long flags;
-	real skip_fraction;
-	real delay_lower_bound;
-	real delay_upper_bound;
-	real duration_lower_bound;
-	real duration_upper_bound;
-	real unused018[5];
-	struct tag_block parts;
-	struct tag_block particles;
-};
-
 struct effect_marker_list
 {
 	short node_index;
@@ -396,34 +372,6 @@ typedef char effect_marker_list_size_assert[
 typedef char effect_marker_list_names_offset_assert[
 	offsetof(struct effect_marker_list, names) == 0x0C ? 1 : -1];
 
-struct effect_part_definition
-{
-	short environment;
-	short disposition;
-	short location_index;
-	word flags;
-	long unused008[3];
-	unsigned long runtime_base_class_tag;
-	struct tag_reference reference;
-	long unused028[6];
-	real velocity_lower_bound;
-	real velocity_upper_bound;
-	real velocity_cone_angle;
-	real angular_velocity_lower_bound;
-	real angular_velocity_upper_bound;
-	real radius_modifier_lower_bound;
-	real radius_modifier_upper_bound;
-	long unused05c;
-	unsigned long scale_a_flags;
-	unsigned long scale_b_flags;
-};
-
-typedef char effect_part_definition_size_assert[
-	sizeof(struct effect_part_definition) == 0x68 ? 1 : -1];
-typedef char effect_part_definition_reference_offset_assert[
-	offsetof(struct effect_part_definition, reference) == 0x18 ? 1 : -1];
-typedef char effect_part_definition_velocity_offset_assert[
-	offsetof(struct effect_part_definition, velocity_lower_bound) == 0x40 ? 1 : -1];
 
 struct effect_particles_definition
 {
@@ -509,7 +457,7 @@ typedef char effect_event_definition_size_assert[
 
 /* ---------- prototypes */
 
-struct effect_location_datum *effect_location_get_next_instance(
+static struct effect_location_datum *effect_location_get_next_instance(
 	struct effect_datum const *effect,
 	long *location_datum_index,
 	short camera_mode);
@@ -546,7 +494,7 @@ static void impulse_effect_initialize(
 // effect_generate_part: the part definition and the location instance are passed in registers
 static void effect_generate_part(
 	struct effect_datum const *effect,
-	struct effect_part_definition const *part,
+	struct effect_part_definition const *part_definition,
 	struct effect_location_datum const *instance,
 	real_point3d const *world_point,
 	real_vector3d const *world_forward,
@@ -651,7 +599,7 @@ static void effect_set_event(
 /* ---------- globals */
 
 extern struct data_array *effect_data;
-extern struct data_array *effect_location_data;
+struct data_array *effect_location_data;
 
 boolean effects_corpse_nonviolent = TRUE;
 
@@ -668,15 +616,10 @@ static struct profile_section effects_update_section = {"effects_update", NONE, 
 void effects_initialize(
 	void)
 {
-#ifdef HALO_LINUX
 	/* the native builds' larger effect pools (halo_port_capacity.h); a full
 	pool drops deterministic effects, damage included */
 	effect_data = game_state_data_new("effect", HALO_PORT_MAXIMUM_EFFECTS, 0xFC);
 	effect_location_data = game_state_data_new("effect location", HALO_PORT_MAXIMUM_EFFECT_LOCATIONS, 0x3C);
-#else
-	effect_data = game_state_data_new("effect", 0x100, 0xFC);
-	effect_location_data = game_state_data_new("effect location", 0x200, 0x3C);
-#endif
 	if (!effect_data || !effect_location_data)
 		error(_error_immediate, "couldn't allocate effect globals");
 
@@ -1230,7 +1173,7 @@ void effects_reconnect_to_structure_bsp(
 	return;
 }
 
-struct effect_location_datum *effect_location_get_next_instance(
+static struct effect_location_datum *effect_location_get_next_instance(
 	struct effect_datum const *effect,
 	long *location_datum_index,
 	short camera_mode)
@@ -1612,7 +1555,7 @@ static void impulse_effect_initialize(
 
 static void effect_generate_part(
 	struct effect_datum const *effect,
-	struct effect_part_definition const *part,
+	struct effect_part_definition const *part_definition,
 	struct effect_location_datum const *instance,
 	real_point3d const *world_point,
 	real_vector3d const *world_forward,
@@ -1622,14 +1565,14 @@ static void effect_generate_part(
 	real_vector3d direction;
 	real_vector3d velocity;
 
-	switch (part->runtime_base_class_tag)
+	switch (part_definition->runtime_base_class_tag)
 	{
 		case PARTICLE_SYSTEM_DEFINITION_TAG:
 		{
-			real_argb_color color;
+			real_argb_color tint;
 
-			color.alpha = 1.0f;
-			color.rgb = effect->color;
+			tint.alpha = 1.0f;
+			tint.rgb = effect->color;
 
 			effect_random_translational_velocity(
 				get_global_local_random_seed_address(),
@@ -1637,21 +1580,21 @@ static void effect_generate_part(
 				world_forward,
 				&direction,
 				&velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
 			velocity.i += effect->velocity.i;
 			velocity.j += effect->velocity.j;
 			velocity.k += effect->velocity.k;
 
 			particle_system_new_unattached(
-				part->reference.index,
+				part_definition->reference.index,
 				world_point,
 				&velocity,
-				&color,
+				&tint,
 				scale);
 			break;
 		}
@@ -1666,7 +1609,7 @@ static void effect_generate_part(
 
 				object_impulse_sound_new(
 					effect->object_index,
-					part->reference.index,
+					part_definition->reference.index,
 					node_index,
 					&instance->matrix.position,
 					&instance->matrix.forward,
@@ -1682,7 +1625,7 @@ static void effect_generate_part(
 				location.game_location = effect->location;
 
 				unattached_impulse_sound_new(
-					part->reference.index,
+					part_definition->reference.index,
 					&location,
 					scale);
 			}
@@ -1690,45 +1633,45 @@ static void effect_generate_part(
 
 		case OBJECT_DEFINITION_TAG:
 		{
-			struct object_placement_data placement;
+			struct object_placement_data data;
 			unsigned long *seed;
 
 			object_placement_data_new(
-				&placement,
-				part->reference.index,
+				&data,
+				part_definition->reference.index,
 				effect->owner_object_index);
 
-			placement.position = *world_point;
-			placement.forward = *world_forward;
-			placement.up = *world_up;
+			data.position = *world_point;
+			data.forward = *world_forward;
+			data.up = *world_up;
 
 			effect_random_translational_velocity(
 				get_global_random_seed_address(),
 				effect,
 				world_forward,
 				&direction,
-				&placement.translational_velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				&data.translational_velocity,
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
-			placement.translational_velocity.i += effect->velocity.i;
-			placement.translational_velocity.j += effect->velocity.j;
-			placement.translational_velocity.k += effect->velocity.k;
+			data.translational_velocity.i += effect->velocity.i;
+			data.translational_velocity.j += effect->velocity.j;
+			data.translational_velocity.k += effect->velocity.k;
 
 			seed = get_global_random_seed_address();
 			effect_random_angular_velocity(
 				seed,
 				effect,
-				&placement.angular_velocity,
-				part->angular_velocity_lower_bound,
-				part->angular_velocity_upper_bound,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				&data.angular_velocity,
+				part_definition->angular_velocity_lower_bound,
+				part_definition->angular_velocity_upper_bound,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
-			object_new(&placement);
+			object_new(&data);
 			break;
 		}
 
@@ -1742,19 +1685,19 @@ static void effect_generate_part(
 				world_forward,
 				&direction,
 				&velocity,
-				part->velocity_lower_bound,
-				part->velocity_upper_bound,
-				part->velocity_cone_angle,
-				part->scale_a_flags,
-				part->scale_b_flags);
+				part_definition->velocity_lower_bound,
+				part_definition->velocity_upper_bound,
+				part_definition->velocity_cone_angle,
+				part_definition->scale_a_flags,
+				part_definition->scale_b_flags);
 
 			radius_modifier = real_seed_random_range(
 				get_global_local_random_seed_address(),
-				part->radius_modifier_lower_bound,
-				part->radius_modifier_upper_bound);
+				part_definition->radius_modifier_lower_bound,
+				part_definition->radius_modifier_upper_bound);
 
 			decal_new(
-				part->reference.index,
+				part_definition->reference.index,
 				world_point,
 				&velocity,
 				radius_modifier,
@@ -1770,7 +1713,7 @@ static void effect_generate_part(
 			struct object_datum *owner =
 				object_try_and_get(effect->owner_object_index);
 
-			damage_data_new(&damage, part->reference.index);
+			damage_data_new(&damage, part_definition->reference.index);
 
 			if (owner)
 			{
@@ -1797,7 +1740,7 @@ static void effect_generate_part(
 				node_index &= (short)(FLAG(_effect_location_first_person_bit) - 1);
 
 			light_new_unattached(
-				part->reference.index,
+				part_definition->reference.index,
 				effect->object_index,
 				node_index,
 				&instance->matrix.position,
@@ -1815,7 +1758,7 @@ static void effect_generate_part(
 					temporary,
 					"effect %s has a bad part %s",
 					tag_get_name(effect->definition_index),
-					part->reference.name));
+					part_definition->reference.name));
 			break;
 	}
 
@@ -2002,9 +1945,9 @@ static void effect_generate_particles(
 				instance_particle_index++)
 			{
 				struct new_particle_data data;
-				real_vector3d random_direction;
-				real_vector3d emission_offset;
-				real_point3d world_position;
+				real_vector3d random_offset;
+				real_vector3d relative_offset;
+				real_point3d world_point;
 				real_vector3d world_direction;
 				real_vector3d world_velocity;
 				real emission_radius = effect_real_random_range(
@@ -2016,18 +1959,18 @@ static void effect_generate_particles(
 					particles->scale_b_flags,
 					_effect_particle_distribution_radius_bit);
 
-				local_random_direction3d(&random_direction);
+				local_random_direction3d(&random_offset);
 				matrix4x3_transform_vector(
 					&instance->matrix,
 					&particles->offset,
-					&emission_offset);
+					&relative_offset);
 
 				data.position.x = instance->matrix.position.x +
-					random_direction.i * emission_radius + emission_offset.i;
+					random_offset.i * emission_radius + relative_offset.i;
 				data.position.y = instance->matrix.position.y +
-					random_direction.j * emission_radius + emission_offset.j;
+					random_offset.j * emission_radius + relative_offset.j;
 				data.position.z = instance->matrix.position.z +
-					random_direction.k * emission_radius + emission_offset.k;
+					random_offset.k * emission_radius + relative_offset.k;
 
 				effect_random_translational_velocity(
 					get_global_local_random_seed_address(),
@@ -2059,7 +2002,7 @@ static void effect_generate_particles(
 					matrix4x3_transform_point(
 						node_matrix,
 						&data.position,
-						&world_position);
+						&world_point);
 					matrix4x3_transform_normal(
 						node_matrix,
 						&data.direction,
@@ -2071,7 +2014,7 @@ static void effect_generate_particles(
 				}
 				else
 				{
-					world_position = data.position;
+					world_point = data.position;
 					world_direction = data.direction;
 					world_velocity = data.velocity;
 				}
@@ -2079,7 +2022,7 @@ static void effect_generate_particles(
 				if (effect_allowed_by_environment(
 					particles->environment,
 					&effect->location,
-					&world_position))
+					&world_point))
 				{
 					data.definition_index = particles->particle.index;
 
@@ -2100,7 +2043,7 @@ static void effect_generate_particles(
 						{
 							effect->impulse_field.translational_function(
 								&data.initial_impulse,
-								&world_position,
+								&world_point,
 								effect->impulse_field.user_data);
 						}
 						else
@@ -2109,7 +2052,7 @@ static void effect_generate_particles(
 						}
 
 						data.object_index = NONE;
-						data.position = world_position;
+						data.position = world_point;
 						data.direction = world_direction;
 						data.velocity.i = world_velocity.i + effect->velocity.i * 30.0f;
 						data.velocity.j = world_velocity.j + effect->velocity.j * 30.0f;
@@ -2603,7 +2546,7 @@ static boolean effect_allowed_by_environment(
 	struct location const *location,
 	real_point3d const *world_point)
 {
-	boolean allowed = FALSE;
+	boolean allowed;
 
 	switch (environment)
 	{
@@ -2620,6 +2563,7 @@ static boolean effect_allowed_by_environment(
 			break;
 
 		case _effect_environment_vacuum:
+			allowed = FALSE;
 			break;
 
 		default:
@@ -2628,6 +2572,16 @@ static boolean effect_allowed_by_environment(
 				888,
 				FALSE,
 				NULL);
+			/* BUG (original, preserved for exact matching): this arm leaves allowed
+			 * unassigned, and January returns it after the fatal assertion: 0x48b160 +0x5f mov al,[ebp-1]
+			 * reads the never-written byte slot. The later /Od+/RTC build attests the uninitialised
+			 * declaration: its single exit calls _RTC_UninitUse("allowed").
+			 * The read is not executed in January: display_assert returns into an unconditional
+			 * system_exit, which never returns (it jumps to halt_and_catch_fire, which loops, or calls
+			 * _exit on re-entry), and no other path reaches the read. The arm itself is entered only for
+			 * an environment value outside the four cases above, each of which assigns allowed; the
+			 * value comes from effect tag data, so this arm is not proven unreachable. A corrected build
+			 * assigns allowed in this arm. */
 			break;
 	}
 

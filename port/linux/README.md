@@ -79,7 +79,7 @@ These files are in the data root:
 
 | File | Contents |
 | --- | --- |
-| `debug.txt` | The log of the game. At start-up, the game shows the data root in the terminal. |
+| `debug.txt` | The log of the game. At start-up, the game shows the data root in the terminal. A crash writes its report (the faulting address and the calls that led to it) here as well; the `reference address` line at the top of each session places those addresses in the build. |
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
 
 The settings are in `config.toml` next to the executable. Refer to
@@ -151,15 +151,25 @@ the setting for one start of the game. It has priority over the file.
 | `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen at the resolution of the display. The picture has 480 lines of the game and the width of the display. `false`: a window with the 640x480 picture of the Xbox. F11 changes between the two. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480. You can change the size of the window. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
+| `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
+| `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
+| `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
+| `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the display's resolution, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |
+| `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only while the enemy is in sight and not camouflaged, so it never shows where an enemy hides, and only as far away as the weapon in hand turns its reticle red over an enemy (at least 20 world units, the motion sensor's reach, and at most 70). |
+| `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
+| `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or F1) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
+| `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or F1) has a panel behind its text, for clearer text. |
+| `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
+| `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
+| `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
-| `network.netcode` | `"distributed"` | `HALO_NETCODE` | `"distributed"`: each machine moves its own player at once, and the host makes the decisions (refer to `NETCODE.md`). `"lockstep"`: as on the Xbox. The host's setting applies: a machine that joins a game uses the netcode of the host. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -176,8 +186,9 @@ the setting for one start of the game. It has priority over the file.
 | `debug.hidden_window`, `debug.null_renderer` | `false` | `HALO_HIDDEN_WINDOW`, `HALO_NULL_RENDERER` | `true`: no visible window, or no graphics. |
 | `debug.gpu_stats`, `debug.gpu_trace_frame`, `debug.gpu_trace_constants`, `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | Tools to find problems in the graphics: counts for each frame, all the GL state of one frame, the GLSL code, the textures. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
-| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
+| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
+| `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
@@ -227,12 +238,23 @@ Each frame shows the world between the last two ticks
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
 
+The direction of the view is an exception. The game reads the mouse and the
+sticks in each frame. In first person, on foot, each frame points the view
+where the player aims at that time (`display.direct_camera`). Thus the view
+turns in the frame that the mouse moves. In a vehicle and in cinematics, the
+view mixes as the other things do. On Android, the view mixes as before.
+
 To get 30 frames each second, set `display.interpolation = false`.
 
 To see the frame rate:
 
 1. Push \` to open the developer console.
 2. Enter `display_framerate true`.
+
+In the game of another host, the console runs only the commands that change
+nothing of the game (such as `display_framerate`), and the game puts back
+cheats, the game speed and the settings of the drawing that show more of
+the world (such as `rasterizer_wireframe`). Refer to `NETCODE.md`.
 
 The frame rate shows at the bottom right of the screen. It is the mean over
 half a second.
@@ -247,8 +269,6 @@ have up to 4 players (split screen).
 - `include/halo_port_capacity.h` sets the memory for the limits. The game
   state is 16 MB at `0x81A00000` (3.3 MB on the Xbox). The pools of objects,
   effects, particles, contrails, lights and sounds are also larger.
-- The byte-matching build keeps the limits of the Xbox. All the changes are
-  in `#ifdef HALO_LINUX`.
 
 Obey these rules:
 
@@ -271,9 +291,10 @@ These are the differences from the Xbox:
   The other machines are also in the game.
 - In free-for-all games, each player is a team.
 
-Linux, Windows and Android machines can play in the same game. With the
-netcode `"lockstep"`, each machine must calculate the same floating-point
-results. Thus all the ports:
+Linux, Windows and Android machines can play in the same game. Each machine
+simulates the players from the same inputs, and the host does not correct
+all of the game. Thus each machine must calculate the same floating-point
+results, and all the ports:
 
 - Compile without fused multiply-add (`-ffp-contract=off`).
 - Use the math functions of musl (`port/include/halo_math.h`,
@@ -300,8 +321,8 @@ interface.
 ### Test with many machines
 
 `tools/system_link_bots.py` adds simple machines to a game. Each machine has
-one player. The machines obey the system link protocol and send input, but
-they do not calculate the game.
+one player. The machines obey the system link protocol, but they do not
+calculate the game or move their players.
 
 1. Start a game on the host.
 2. Enter `python tools/system_link_bots.py --host 127.0.0.200 --machines 127 --start`.
@@ -316,14 +337,20 @@ Machines with an invite link can play system link on the internet. This
 project has no server.
 
 When a copy of the game starts to host a system link game, it makes an
-invite link: `halo://join/<44 hexadecimal digits>`. The game writes the link
-to the standard error and puts it on the clipboard.
+invite link: `halo://join/<64 hexadecimal digits>`. The game writes the link
+to the standard error and puts it on the clipboard. The links of older
+versions of the game (44 digits) do not operate. The game writes a message
+when it gets one.
 
 To join a game, do one of these steps:
 
 - Open the link. The game is the handler of `halo://` links. If the game
-  already operates, the new copy gives the link to it and stops.
-- Copy the link (or the 44 digits) and go to the game.
+  already operates, the new copy gives the link to it and stops. A key in a
+  file that only the user can read (`halo-ce-universal.key` in
+  `$XDG_RUNTIME_DIR`, else `~/.halo-ce-universal.key`; on Windows in
+  `%LOCALAPPDATA%`) encrypts the link, so the programs of other users cannot
+  read it.
+- Copy the link (or the 64 digits) and go to the game.
 - Enter `halo <link>`.
 - Accept a Discord invite. Refer to "Discord".
 
@@ -335,13 +362,59 @@ network does not need an invite.
 
 Only machines with the invite can find the game:
 
-- The link contains the identifier of the host and a random 16-byte token.
-- The machines exchange their addresses through public MQTT brokers
-  (`network.signalling_brokers`). The topics are HMACs of the token. A key
-  from the token encrypts and authenticates the messages
-  (`src/p2p_signal.c`, `src/p2p_crypto.c`).
-- A key from the host encrypts and authenticates each packet between two
-  machines.
+- Each copy of the game makes an X25519 key pair when it starts. Its
+  identifier is from the hash of its public key.
+- The link contains a 16-byte hash of the public key of the host and a
+  random 16-byte token. The identifier of the host is from the first 6
+  bytes of the hash.
+- The machines exchange their public keys and addresses through public MQTT
+  brokers (`network.signalling_brokers`). The topics are HMACs of the token.
+  A key from the token encrypts and authenticates the messages
+  (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
+  with a key that only it and the player can calculate. Its public key must
+  agree with the hash in the link. The hash is long, so no other machine can
+  find a key with the same hash.
+- Then the player shows in the same way that it has the private key of its
+  public key. Only then does the host make a session for the player. Thus
+  other machines with the invite cannot make sessions in the name of a
+  player (such a session would keep the player out).
+- Each two machines get the keys of their packets from their key pairs and
+  a random number from each. The keys do not go through the brokers. Thus
+  other machines with the invite cannot read or change the packets.
+- Each packet is encrypted and authenticated, with a different key in each
+  direction. A machine ignores a packet that it already received.
+- A machine can send only to the ports of the game on the other machine.
+- The host makes one session from each request of a player. If a person
+  sends a copy of an old request again, the host ignores it. A player that
+  must ask again sends a new request.
+- The host tries to reach at most 8 new players at the same time. The
+  other players ask again.
+- The host answers a request that is not proven at most one time each
+  second through each broker. It answers at most 20 of these requests each
+  second, after a first 32. Each answer goes only through the broker that
+  brought the request. Thus a flood of requests does not use much of the
+  bandwidth of the host.
+- The host does the key work of at most 20 requests each second from keys
+  that it does not know, after a first 32. It keeps the key work of the
+  last 256 keys. Thus the proof of a player does not need more key work. A
+  flood of requests can make players join more slowly. A player asks again
+  for 90 seconds.
+- The host drops a player whose game runs faster than time (a speed hack)
+  for ten seconds, and keeps that address out of its games. Each player
+  sees who in red on the console. The host adds a line to `cheaters.txt`
+  (beside `debug.txt`) with the address and hardware id of the player, and
+  the Discord name and id that the game of the player told it (a player can
+  change these). The host also bans the player: it adds the line to
+  `bans.txt`, and refuses a machine whose address or hardware id is in it.
+- The host can ban a player with `ban <player name>` in the developer
+  console (Tab completes the name). Remove a line from `bans.txt` to unban.
+  Refer to `NETCODE.md`. So that every player can be named, the host trims
+  the spaces around a name and removes characters that draw as nothing. A
+  letter with a mark is typed as the plain letter (`ban jose` for "José").
+  A name with nothing left to type becomes "Player", and a name that another
+  player already has gets a number ("Player 2"). The game refuses a profile
+  name that is blank, and a multiplayer game refuses a profile whose name was
+  made blank before this check.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection
@@ -364,7 +437,12 @@ The game can ask the router to forward the port (UPnP,
 - The forwarded port is one more address that the machine gives to the
   other machine.
 - The forward has a duration of one hour. The game makes it longer while
-  it operates, and removes it when the game stops.
+  it operates. When the game stops normally, it removes the forward. It
+  does not remove the forward after a crash, or if a request to the router
+  is still under way 3 seconds after the game starts to stop. Some routers only make forwards without a duration.
+- When the game finds the router, it removes the forwards to this machine
+  that have the description "Halo internet play" and that no copy of the
+  game uses now (forwards that a copy of the game did not remove).
 - UPnP does not help behind a second NAT, for example the NAT of a mobile
   network provider. Then the router has a private address, and the game
   does not ask.
@@ -373,8 +451,12 @@ To stop all UPnP requests, set `network.allow_upnp` to `false`.
 
 In the game, each machine has an address in 100.64.0.0/10:
 
-- `src/xnet.c` sends the traffic of the game to such an address through
-  local sockets on 127.0.0.1 (or `network.address`).
+- `src/xnet.c` gives the datagrams that the bound UDP sockets of the game
+  send to such an address to `src/p2p.c`. Other datagrams (of sockets that
+  are not bound yet, or that are connected to the address) and the TCP
+  connections of the game go through local sockets on 127.0.0.1 (or
+  `network.address`). The traffic from the other machines comes to the
+  game from local sockets too.
 - `src/p2p.c` sends that traffic through one UDP socket. UDP datagrams go
   as they are. TCP connections go as KCP streams (`port/third_party/kcp`).
 - The broadcasts of the game go to all the machines. Thus the game of the
@@ -387,6 +469,7 @@ Discord (through the application of `discord.application_id`). The activity
 has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
+The game sends the activity only to a Discord client of the same user.
 
 ## What operates
 
@@ -394,6 +477,8 @@ person joins the game. If the game does not operate, Discord starts it.
 | --- | --- |
 | Game code | All 466 C files of the game. The changes are in "Game source changes". |
 | Graphics | Direct3D 8 on OpenGL 4.5 core through SDL3 (`src/d3d8_gl.c`). The port translates the NV2A vertex shaders and register combiners to GLSL. It decodes all the Xbox texture formats. The vertex and index buffers come from a GL copy of the Xbox memory. |
+| High-res HUD | The HUD is drawn from high-res assets: redraws at 8x the size of the maps' bitmaps (4x for the largest), in `port/assets/hud`. They cover the meters, counters, panels and their outlines, the motion sensor, reticles, waypoints and scopes, but no bitmap with English text. `tools/hud_assets.py` makes them from the SVG redraws, and the build embeds them in the executable. When the game uploads one of those bitmaps, `src/hud_hires.c` gives the high-res texture in its place, if the bitmap's pixels are those of the English maps: another language's maps keep their own. The game sizes and places the HUD from its tags as before. `display.high_res_hud = false` turns this off. |
+| High-res text | The menus' and HUD's text is drawn with Overpass (`port/assets/fonts`, SIL Open Font License) in place of the maps' bitmap fonts, which are Interstate. `src/text_hires.c` rasterizes each glyph with stb_truetype (`port/third_party/stb`) at the display's resolution, into an atlas that a placeholder bitmap of the game stands for. The game lays the text out from its font tags as before. The menus' titles (the screens' headers and the main menu's items) are pictures of text in the maps, so they are drawn as the high-res HUD is: `tools/title_assets.py` sets each one again in OpenCE, Roger White's public-domain Newtown respaced to match the maps' commercial title typeface (`tools/title_font.py`), at 4x the bitmap's size over its own plate or glow, each letter placed where the map's letter is, in `port/assets/titles`. The postgame carnage report's title is set over a hand-made SVG redraw of its panel (`port/assets/titles/svg`) instead. `display.high_res_text = false` turns it off. |
 | Sound | Xbox DirectSound on SDL3 audio (`src/dsound_sdl.c`): PCM and Xbox ADPCM, mixed at 48 kHz, with volume, pitch, mix bins, distance, stereo pan, occlusion and obstruction. There is no Doppler effect, no cones and no reverb. |
 | Input | XInput on SDL3 (`src/xinput_sdl.c`): keyboard, mouse, gamepads with rumble, and the debug keyboard for the console. |
 | Files | The Win32 file functions and the MSVC file functions on POSIX, with the translation of Xbox paths. |
@@ -467,8 +552,7 @@ code or data.
 with the function in `effects/decals.c`. clang used the copy, and parts of
 levels were not visible. The copy now agrees with the function.
 
-Other changes are in `#ifdef HALO_LINUX`. All the native ports define
-`HALO_LINUX`. The byte-matching build does not define it.
+Other changes:
 
 | File | Change |
 | --- | --- |
@@ -479,10 +563,12 @@ Other changes are in `#ifdef HALO_LINUX`. All the native ports define
 | `cseries/errors.c` | `debug.txt` stays open between lines. |
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
+| `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`). |
+| `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |
+| `rasterizer/rasterizer_text.c`, `text/draw_string.c` | Text is drawn from an atlas of the fonts' glyphs, rasterized at the display's resolution (`src/text_hires.c`), when the font has every character of the string. Text can be drawn scaled about a point (`rasterizer_text_set_scale`), as the players' names are. Each glyph's advance is centred on the font tag character's, so the layout is the same, and a glyph is cut at a text box only where the font tag's character visibly was. |
 
-The x86 inline assembly of the game has C replacements in
-`#ifdef HALO_LINUX`. Thus the compiler can optimize that code for each
-processor:
+The x86 inline assembly of the game is replaced by C. Thus the compiler
+can optimize that code for each processor:
 
 | File | Assembly | Replacement |
 | --- | --- | --- |

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <mask id="outside" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <rect x="42" y="210" width="940" height="604" rx="26" fill="#000"/>
+    </mask>
+  </defs>
+  <!-- translucent grey surround, clear rounded window with a white rim -->
+  <rect width="1024" height="1024" fill="#808080" fill-opacity="0.502" mask="url(#outside)"/>
+  <rect x="42" y="210" width="940" height="604" rx="26" fill="none" stroke="#fff" stroke-width="4"/>
+</svg>

@@ -1,0 +1,3208 @@
+{
+ "assets": [
+  {
+   "name": "hud_ammo_alphas__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 0,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1455074177,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__0.svg",
+     "source_scale": 4,
+     "source": [
+      4,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.931
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 1,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 281856709,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__1.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.683
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 2,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1291176456,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.828
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 3,
+   "width": 128,
+   "height": 16,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 1267611360,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__3.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.965
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 4,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 824663116,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__4.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.733
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__5",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 5,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 606768921,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__5.svg",
+     "source_scale": 4,
+     "source": [
+      2,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.749
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__6",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 6,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3907189060,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__6.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.853
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_alphas__7",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_alphas",
+   "bitmap": 7,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1136077017,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_alphas__7.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.814
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_meters__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_meters",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 3125035463,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      114,
+      27
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      456,
+      108
+     ],
+     "kind": "meter",
+     "score": 0.683
+    },
+    {
+     "xbox": [
+      0,
+      27,
+      130,
+      45
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      -34,
+      108
+     ],
+     "clip": [
+      0,
+      108,
+      448,
+      180
+     ],
+     "kind": "meter",
+     "score": 0.676
+    },
+    {
+     "xbox": [
+      0,
+      45,
+      108,
+      62
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      2,
+      180
+     ],
+     "clip": [
+      0,
+      180,
+      436,
+      248
+     ],
+     "kind": "meter",
+     "score": 0.747
+    },
+    {
+     "xbox": [
+      0,
+      62,
+      105,
+      78
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      4,
+      248
+     ],
+     "clip": [
+      0,
+      248,
+      424,
+      312
+     ],
+     "kind": "meter",
+     "score": 0.924
+    },
+    {
+     "xbox": [
+      0,
+      78,
+      130,
+      88
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      -25,
+      312
+     ],
+     "clip": [
+      0,
+      312,
+      432,
+      352
+     ],
+     "kind": "meter",
+     "score": 0.8
+    },
+    {
+     "xbox": [
+      105,
+      62,
+      210,
+      75
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      424,
+      248
+     ],
+     "clip": [
+      424,
+      248,
+      856,
+      300
+     ],
+     "kind": "meter",
+     "score": 0.944
+    },
+    {
+     "xbox": [
+      108,
+      45,
+      219,
+      62
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      436,
+      180
+     ],
+     "clip": [
+      436,
+      180,
+      880,
+      248
+     ],
+     "kind": "meter",
+     "score": 0.721
+    },
+    {
+     "xbox": [
+      114,
+      0,
+      221,
+      22
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      456,
+      0
+     ],
+     "clip": [
+      456,
+      0,
+      884,
+      88
+     ],
+     "kind": "meter",
+     "score": 0.852
+    },
+    {
+     "xbox": [
+      130,
+      27,
+      239,
+      45
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
+     "source_scale": 4,
+     "source": [
+      448,
+      108
+     ],
+     "clip": [
+      448,
+      108,
+      884,
+      180
+     ],
+     "kind": "meter",
+     "score": 0.82
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_outlines__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 3377190271,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_outlines__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.663
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_outlines__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 1,
+   "width": 128,
+   "height": 8,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 1986065523,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      8
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_outlines__1.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.677
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_outlines__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 2,
+   "width": 128,
+   "height": 32,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 509096992,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_outlines__2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.649
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_outlines__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_outlines",
+   "bitmap": 3,
+   "width": 128,
+   "height": 32,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 769767709,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_outlines__3.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.618
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 0,
+   "width": 32,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1010457345,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_type_icons__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.746
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 1,
+   "width": 64,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1619219584,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_type_icons__1.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.788
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 2,
+   "width": 32,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 956975439,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_type_icons__2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.713
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 3,
+   "width": 32,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 940439092,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_type_icons__3.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      -1
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.842
+    }
+   ]
+  },
+  {
+   "name": "hud_ammo_type_icons__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_ammo_type_icons",
+   "bitmap": 4,
+   "width": 32,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 787997131,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_ammo_type_icons__4.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.836
+    }
+   ]
+  },
+  {
+   "name": "hud_counter_numbers__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_counter_numbers",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 3729686865,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      18,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      72,
+      0
+     ],
+     "clip": [
+      72,
+      0,
+      144,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.551
+    },
+    {
+     "xbox": [
+      0,
+      12,
+      34,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      96
+     ],
+     "clip": [
+      0,
+      96,
+      136,
+      144
+     ],
+     "kind": "alpha",
+     "score": 0.512
+    },
+    {
+     "xbox": [
+      0,
+      24,
+      18,
+      36
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      2,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      72,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.558
+    },
+    {
+     "xbox": [
+      18,
+      0,
+      36,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      145,
+      0
+     ],
+     "clip": [
+      144,
+      0,
+      216,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.504
+    },
+    {
+     "xbox": [
+      18,
+      24,
+      36,
+      36
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      48
+     ],
+     "clip": [
+      0,
+      48,
+      72,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.547
+    },
+    {
+     "xbox": [
+      34,
+      12,
+      53,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      289,
+      0
+     ],
+     "clip": [
+      288,
+      0,
+      360,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.549
+    },
+    {
+     "xbox": [
+      36,
+      0,
+      54,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      217,
+      0
+     ],
+     "clip": [
+      216,
+      0,
+      288,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.505
+    },
+    {
+     "xbox": [
+      53,
+      12,
+      71,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      286,
+      49
+     ],
+     "clip": [
+      288,
+      48,
+      360,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.261
+    },
+    {
+     "xbox": [
+      54,
+      0,
+      72,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      144,
+      48
+     ],
+     "clip": [
+      144,
+      48,
+      216,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.536
+    },
+    {
+     "xbox": [
+      71,
+      12,
+      89,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      361,
+      0
+     ],
+     "clip": [
+      360,
+      0,
+      432,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.506
+    },
+    {
+     "xbox": [
+      72,
+      0,
+      90,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      214,
+      50
+     ],
+     "clip": [
+      216,
+      48,
+      288,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.27
+    },
+    {
+     "xbox": [
+      89,
+      12,
+      107,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      431,
+      52
+     ],
+     "clip": [
+      432,
+      48,
+      504,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.492
+    },
+    {
+     "xbox": [
+      90,
+      0,
+      108,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      368,
+      49
+     ],
+     "clip": [
+      360,
+      48,
+      432,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.431
+    },
+    {
+     "xbox": [
+      107,
+      12,
+      125,
+      24
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      432,
+      0
+     ],
+     "clip": [
+      432,
+      0,
+      504,
+      48
+     ],
+     "kind": "alpha",
+     "score": 0.531
+    },
+    {
+     "xbox": [
+      108,
+      0,
+      126,
+      12
+     ],
+     "svg": "hud__bitmaps__combined__hud_counter_numbers.svg",
+     "source_scale": 4,
+     "source": [
+      72,
+      48
+     ],
+     "clip": [
+      72,
+      48,
+      144,
+      96
+     ],
+     "kind": "alpha",
+     "score": 0.56
+    }
+   ]
+  },
+  {
+   "name": "hud_damage_arrows__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_damage_arrows",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 3282263230,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      231,
+      40
+     ],
+     "svg": "hud__bitmaps__combined__hud_damage_arrows.svg",
+     "source_scale": 4,
+     "source": [
+      -2,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      920,
+      156
+     ],
+     "kind": "alpha",
+     "score": 0.869
+    },
+    {
+     "xbox": [
+      0,
+      40,
+      165,
+      69
+     ],
+     "svg": "hud__bitmaps__combined__hud_damage_arrows.svg",
+     "source_scale": 4,
+     "source": [
+      -2,
+      155
+     ],
+     "clip": [
+      0,
+      157,
+      656,
+      269
+     ],
+     "kind": "alpha",
+     "score": 0.819
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1034409523,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      66,
+      66
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      264,
+      264
+     ],
+     "kind": "alpha",
+     "score": 0.627
+    },
+    {
+     "xbox": [
+      0,
+      66,
+      18,
+      76
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      264
+     ],
+     "clip": [
+      0,
+      264,
+      72,
+      304
+     ],
+     "kind": "alpha",
+     "score": 0.486
+    },
+    {
+     "xbox": [
+      66,
+      0,
+      94,
+      28
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__0.svg",
+     "source_scale": 4,
+     "source": [
+      264,
+      0
+     ],
+     "clip": [
+      264,
+      0,
+      376,
+      112
+     ],
+     "kind": "alpha",
+     "score": 0.547
+    },
+    {
+     "xbox": [
+      94,
+      0,
+      122,
+      28
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__0.svg",
+     "source_scale": 4,
+     "source": [
+      376,
+      0
+     ],
+     "clip": [
+      376,
+      0,
+      488,
+      112
+     ],
+     "kind": "alpha",
+     "score": 0.548
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 1,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3034165081,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__1.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.741
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 2,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2848680138,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__2.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.574
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 3,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1926691188,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__3.svg",
+     "source_scale": 4,
+     "source": [
+      2,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.752
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 4,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2347455588,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__4.svg",
+     "source_scale": 4,
+     "source": [
+      -2,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.753
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__5",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 5,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2641044529,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__5.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.446
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__6",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 6,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3714907019,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__6.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.68
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__8",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 8,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3220337555,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__8.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.46
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__9",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 9,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 4249802896,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__9.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.604
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__10",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 10,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 413416008,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__10.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.763
+    }
+   ]
+  },
+  {
+   "name": "hud_reticles__11",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticles",
+   "bitmap": 11,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2080670409,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_reticles__11.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      -1
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.69
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1284573461,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.798
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 1,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 536140224,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__1.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.783
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 2,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 441490842,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__2.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.43
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 3,
+   "width": 128,
+   "height": 16,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1249972192,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__3.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "kind": "alpha",
+     "score": 0.727
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 4,
+   "width": 128,
+   "height": 8,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2211521319,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      8
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__4.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.766
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__5",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 5,
+   "width": 128,
+   "height": 8,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1826001649,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      8
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__5.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.683
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__6",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 6,
+   "width": 128,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 797732990,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      128
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__6.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      -1
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.808
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__7",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 7,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3403623121,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_unit_backgrounds__7.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      -3
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.806
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_meters__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_meters",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 2295564106,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      130,
+      34
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      520,
+      136
+     ],
+     "kind": "meter",
+     "score": 0.737
+    },
+    {
+     "xbox": [
+      0,
+      34,
+      122,
+      65
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      136
+     ],
+     "clip": [
+      0,
+      136,
+      488,
+      260
+     ],
+     "kind": "meter",
+     "score": 0.934
+    },
+    {
+     "xbox": [
+      0,
+      65,
+      88,
+      79
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      490,
+      136
+     ],
+     "clip": [
+      488,
+      136,
+      840,
+      192
+     ],
+     "kind": "meter",
+     "score": 0.728
+    },
+    {
+     "xbox": [
+      0,
+      79,
+      130,
+      89
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      2,
+      356
+     ],
+     "clip": [
+      0,
+      356,
+      520,
+      396
+     ],
+     "kind": "meter",
+     "score": 0.918
+    },
+    {
+     "xbox": [
+      88,
+      65,
+      176,
+      79
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      351,
+      260
+     ],
+     "clip": [
+      352,
+      260,
+      704,
+      316
+     ],
+     "kind": "meter",
+     "score": 0.738
+    },
+    {
+     "xbox": [
+      122,
+      34,
+      210,
+      48
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      260
+     ],
+     "clip": [
+      0,
+      260,
+      352,
+      316
+     ],
+     "kind": "meter",
+     "score": 0.738
+    },
+    {
+     "xbox": [
+      122,
+      48,
+      252,
+      58
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      316
+     ],
+     "clip": [
+      0,
+      316,
+      520,
+      356
+     ],
+     "kind": "meter",
+     "score": 0.873
+    },
+    {
+     "xbox": [
+      130,
+      0,
+      252,
+      31
+     ],
+     "svg": "hud_xbox_order__bitmaps__combined__hud_unit_meters.svg",
+     "source_scale": 4,
+     "source": [
+      520,
+      0
+     ],
+     "clip": [
+      520,
+      0,
+      1008,
+      124
+     ],
+     "kind": "meter",
+     "score": 0.901
+    }
+   ]
+  },
+  {
+   "name": "hud_waypoints__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_waypoints",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2479509871,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      34,
+      34
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      -2,
+      -2
+     ],
+     "clip": [
+      0,
+      0,
+      132,
+      132
+     ],
+     "kind": "alpha",
+     "score": 0.731
+    },
+    {
+     "xbox": [
+      0,
+      34,
+      34,
+      68
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      -3,
+      132
+     ],
+     "clip": [
+      0,
+      133,
+      132,
+      265
+     ],
+     "kind": "alpha",
+     "score": 0.716
+    },
+    {
+     "xbox": [
+      0,
+      68,
+      34,
+      102
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      -2,
+      263
+     ],
+     "clip": [
+      0,
+      266,
+      132,
+      398
+     ],
+     "kind": "alpha",
+     "score": 0.691
+    },
+    {
+     "xbox": [
+      34,
+      0,
+      68,
+      34
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      129,
+      -3
+     ],
+     "clip": [
+      132,
+      0,
+      264,
+      132
+     ],
+     "kind": "alpha",
+     "score": 0.705
+    },
+    {
+     "xbox": [
+      34,
+      34,
+      68,
+      68
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      129,
+      131
+     ],
+     "clip": [
+      132,
+      133,
+      264,
+      265
+     ],
+     "kind": "alpha",
+     "score": 0.652
+    },
+    {
+     "xbox": [
+      68,
+      0,
+      102,
+      34
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      261,
+      -2
+     ],
+     "clip": [
+      264,
+      0,
+      396,
+      132
+     ],
+     "kind": "alpha",
+     "score": 0.648
+    },
+    {
+     "xbox": [
+      68,
+      34,
+      102,
+      68
+     ],
+     "svg": "hud__bitmaps__combined__hud_waypoints.svg",
+     "source_scale": 4,
+     "source": [
+      262,
+      131
+     ],
+     "clip": [
+      264,
+      133,
+      396,
+      265
+     ],
+     "kind": "alpha",
+     "score": 0.579
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 52328909,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__0.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.806
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__1",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 1,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 4260370540,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__1.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.917
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__2",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 2,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 4229275219,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__2.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      1
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 0.835
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__3",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 3,
+   "width": 128,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1729500150,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      128
+     ],
+     "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__3.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.978
+    }
+   ]
+  },
+  {
+   "name": "hud_weapon_backgrounds__4",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_weapon_backgrounds",
+   "bitmap": 4,
+   "width": 64,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 688078002,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__combined__hud_weapon_backgrounds__4.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.976
+    }
+   ]
+  },
+  {
+   "name": "hud_health_base__0",
+   "tag": "ui\\hud\\bitmaps\\hud_health_base",
+   "bitmap": 0,
+   "width": 128,
+   "height": 32,
+   "format": "a4r4g4b4",
+   "scale": 8,
+   "crc": 2334111445,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud__bitmaps__hud_health_base.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "kind": "colour",
+     "score": 0.914
+    }
+   ]
+  },
+  {
+   "name": "hud_multiplayer__0",
+   "tag": "ui\\hud\\bitmaps\\hud_multiplayer",
+   "bitmap": 0,
+   "width": 64,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 279669690,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      32
+     ],
+     "svg": "hud__bitmaps__hud_multiplayer.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      128
+     ],
+     "kind": "colour",
+     "score": 0.804
+    }
+   ]
+  },
+  {
+   "name": "hud_sensor_blip__0",
+   "tag": "ui\\hud\\bitmaps\\hud_sensor_blip",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 2905414509,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      32
+     ],
+     "svg": "hud__bitmaps__hud_sensor_blip.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.968
+    }
+   ]
+  },
+  {
+   "name": "hud_sensor_blip_custom__0",
+   "tag": "ui\\hud\\bitmaps\\hud_sensor_blip_custom",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt1",
+   "scale": 8,
+   "crc": 2318551224,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      32
+     ],
+     "svg": "hud__bitmaps__hud_sensor_blip_custom.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.922
+    }
+   ]
+  },
+  {
+   "name": "hud_sweeper__0",
+   "tag": "ui\\hud\\bitmaps\\hud_sweeper",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 1530348706,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__hud_sweeper.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "kind": "grey",
+     "score": 0.974
+    }
+   ]
+  },
+  {
+   "name": "hud_sweeper_mask__0",
+   "tag": "ui\\hud\\bitmaps\\hud_sweeper_mask",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 3264958306,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "svg": "hud__bitmaps__hud_sweeper_mask.svg",
+     "source_scale": 1,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      64,
+      64
+     ],
+     "kind": "a8",
+     "score": 0.987
+    }
+   ]
+  },
+  {
+   "name": "pistol__pistol_scope_mask__0",
+   "tag": "ui\\hud\\bitmaps\\pistol\\pistol_scope_mask",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 569967484,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "svg": "hud__bitmaps__pistol__pistol_scope_mask.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      1024,
+      1024
+     ],
+     "kind": "grey",
+     "score": 0.999
+    }
+   ]
+  },
+  {
+   "name": "pistol__pistol_scope_mask_split__0",
+   "tag": "ui\\hud\\bitmaps\\pistol\\pistol_scope_mask split",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1293154366,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "svg": "hud__bitmaps__pistol__pistol_scope_mask_split.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      1024,
+      1024
+     ],
+     "kind": "alpha",
+     "score": 0.989
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs2__0",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 256,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 209641845,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      256
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs2__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      1024
+     ],
+     "kind": "alpha",
+     "score": 0.872
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs2__1",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 1,
+   "width": 64,
+   "height": 256,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 2722852741,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      64,
+      256
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs2__1.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      256,
+      1024
+     ],
+     "kind": "alpha",
+     "score": 0.872
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs2__2",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 2,
+   "width": 128,
+   "height": 8,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 3861268408,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      8
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs2__2.svg",
+     "source_scale": 4,
+     "source": [
+      -1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.782
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs2__3",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 3,
+   "width": 128,
+   "height": 8,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 1258906277,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      8
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs2__3.svg",
+     "source_scale": 4,
+     "source": [
+      1,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      32
+     ],
+     "kind": "alpha",
+     "score": 0.782
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs2__4",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs2",
+   "bitmap": 4,
+   "width": 8,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1014426050,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      128
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs2__4.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.793
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs_sm__0",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 0,
+   "width": 32,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3143520414,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      128
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs_sm__0.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      2
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.764
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs_sm__1",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 1,
+   "width": 32,
+   "height": 128,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 4052599401,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      32,
+      128
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs_sm__1.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      2
+     ],
+     "clip": [
+      0,
+      0,
+      128,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.745
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs_sm__2",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 2,
+   "width": 128,
+   "height": 4,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 107155862,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      4
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs_sm__2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      16
+     ],
+     "kind": "alpha",
+     "score": 0.811
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs_sm__3",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 3,
+   "width": 128,
+   "height": 4,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1167134316,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      4
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs_sm__3.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      16
+     ],
+     "kind": "alpha",
+     "score": 0.811
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_crosshairs_sm__4",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_crosshairs_sm",
+   "bitmap": 4,
+   "width": 4,
+   "height": 64,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 154511842,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      4,
+      64
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_crosshairs_sm__4.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      16,
+      256
+     ],
+     "kind": "alpha",
+     "score": 0.819
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_mask2__0",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_mask2",
+   "bitmap": 0,
+   "width": 512,
+   "height": 256,
+   "format": "a8y8",
+   "scale": 4,
+   "crc": 2814291311,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      512,
+      256
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_mask2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      2048,
+      1024
+     ],
+     "kind": "grey",
+     "score": 0.998
+    }
+   ]
+  },
+  {
+   "name": "sniper__sniper_scope_mask_sm__0",
+   "tag": "ui\\hud\\bitmaps\\sniper\\sniper_scope_mask_sm",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3567173922,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "svg": "hud__bitmaps__sniper__sniper_scope_mask_sm.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      1024,
+      1024
+     ],
+     "kind": "alpha",
+     "score": 0.981
+    }
+   ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks",
+   "bitmap": 0,
+   "width": 8,
+   "height": 512,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 2469253610,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      512
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      2048
+     ],
+     "kind": "dxt",
+     "score": 0.601
+    }
+   ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks2__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks2",
+   "bitmap": 0,
+   "width": 8,
+   "height": 512,
+   "format": "dxt3",
+   "scale": 4,
+   "crc": 2521841759,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      512
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks2.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      2048
+     ],
+     "kind": "dxt",
+     "score": 0.601
+    }
+   ]
+  },
+  {
+   "name": "sniper_rifle__angle_ticks_mask__0",
+   "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks_mask",
+   "bitmap": 0,
+   "width": 8,
+   "height": 256,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 2933960751,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      8,
+      256
+     ],
+     "svg": "weapons__sniper_rifle__bitmaps__angle_ticks_mask.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      -1
+     ],
+     "clip": [
+      0,
+      0,
+      32,
+      1024
+     ],
+     "kind": "a8",
+     "score": 0.996
+    }
+   ]
+  }
+ ]
+}

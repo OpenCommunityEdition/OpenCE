@@ -292,22 +292,14 @@ enum
 {
 	_transport_type_udp = 0x11,
 	_transport_type_tcp,
-#ifdef HALO_LINUX
 	/* every machine of a session may connect at once */
 	MAXIMUM_PENDING_CONNECTIONS = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
-#else
-	MAXIMUM_PENDING_CONNECTIONS = 32,
-#endif
 	MAXIMUM_ENDPOINT_THREADS = 64,
-#ifdef HALO_LINUX
 	/* a host's connection to a machine holds the updates that machine has
 	not acknowledged, up to 128 ticks of 3.9 KB with 128 players, and the
 	host's connection to its own client all it sends in one frame; a full
 	buffer blocks the host (network_connection_write) */
 	MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE = 1024 * 1024,
-#else
-	MINIMUM_ENDPOINT_SOCKET_BUFFER_SIZE = 16 * 1024,
-#endif
 };
 
 /* ---------- macros */
@@ -507,7 +499,9 @@ long read_endpoint(
 
 		ep->error = (word)result;
 	}
-	else if (result == 0)
+	/* (port: a stream's end; an empty datagram is only empty, which anyone
+	may send: skipped, network_connection_idle) */
+	else if (result == 0 && ep->type != _transport_type_udp)
 	{
 		result = _transport_error_connection_lost;
 	}
@@ -1236,27 +1230,35 @@ short connect_endpoint(
 				do
 				{
 					fd_set writeable;
+					fd_set failed;
 
 					writeable.fd_array[0] = ep->socket;
 					writeable.fd_count = 1;
+					failed.fd_array[0] = ep->socket;
+					failed.fd_count = 1;
 
-					if (select(1, NULL, &writeable, NULL, &timeval) == 1)
+					/* port: a connect that failed is in the error set (not
+					writeable, and its would-block left as it was) */
+					if (select(1, NULL, &writeable, &failed, &timeval) > 0)
 					{
-						error = 0;
+						error = failed.fd_count ? WSAECONNREFUSED : 0;
 					}
 					else
 					{
 						error = WSAGetLastError();
 					}
 
-					if (system_milliseconds() > timeout)
+					/* port: a select that ends with the connection still being
+					made leaves the connect's would-block: waited on, as in
+					progress is, until the timeout (a connection made after a
+					SYN sent again takes a second or three) */
+					if ((error == WSAEINPROGRESS || error == WSAEWOULDBLOCK) &&
+						(long)(system_milliseconds() - timeout) > 0)
 					{
-						error = WSAEINPROGRESS;
-						closesocket(ep->socket);
 						break;
 					}
 				}
-				while (error == WSAEINPROGRESS);
+				while (error == WSAEINPROGRESS || error == WSAEWOULDBLOCK);
 			}
 		}
 
@@ -1264,6 +1266,12 @@ short connect_endpoint(
 		{
 			winsock_error_to_string(error);
 			result = _transport_error_connect_failed;
+			/* port: none of the attempt kept (its socket half made and not
+			blocking, which the next would reuse): the next makes a new one,
+			and its number is not closed again when the endpoint is */
+			closesocket(ep->socket);
+			ep->socket = INVALID_SOCKET;
+			SET_FLAG(ep->flags, _transport_endpoint_nonblocking_bit, FALSE);
 		}
 		else
 		{
@@ -1712,7 +1720,7 @@ static SOCKET create_socket(
 			winsock_error_to_string(WSAGetLastError());
 		}
 
-#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+#ifndef HALO_WINDOWS
 		/* Linux (and Android) grow a stream socket's buffers as far as the
 		connection needs, to several megabytes; setting a size would fix them,
 		at no more than the system's limit (about 416 KB by default) */
@@ -1756,7 +1764,7 @@ static SOCKET create_socket(
 		{
 			winsock_error_to_string(WSAGetLastError());
 		}
-#if defined(HALO_LINUX) && !defined(HALO_WINDOWS)
+#ifndef HALO_WINDOWS
 		}
 #endif
 	}

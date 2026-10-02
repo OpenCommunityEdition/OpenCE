@@ -211,7 +211,7 @@ symbols in this file:
 #include "projectiles.h"
 
 #include "ai/actors.h"
-#include "ai/ai_runtime.h"
+#include "ai/ai.h"
 #include "cache/cache_files.h"
 #include "cseries/profile.h"
 #include "effects/effect_definitions.h"
@@ -221,6 +221,7 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
+#include "math/periodic_functions.h"
 #include "models/model_animation_definitions.h"
 #include "objects/damage.h"
 #include "scenario/scenario.h"
@@ -229,10 +230,8 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 
-#ifdef HALO_LINUX
 /* port/linux/game/pal_tags.c's */
 short pal_tags_first_person_frames(long graph_index, short animation_index, short frames);
-#endif
 
 /* ---------- constants */
 
@@ -362,13 +361,6 @@ struct trigger_firing_effect
 
 /* ---------- prototypes */
 
-real transition_function_evaluate(
-	short function_type,
-	real value);
-void unit_handle_weapon_state_change(
-	long object_index,
-	short new_state);
-
 static struct weapon_trigger *weapon_trigger_get(
 	struct weapon_datum *weapon,
 	short trigger_index);
@@ -496,7 +488,7 @@ struct weapons_globals
 	struct profile_section update_profile;
 };
 
-struct weapons_globals data_00307140 =
+static struct weapons_globals data_00307140 =
 {
 	{"~primary-blur", "~secondary-blur"},
 	{"weapon_update", NONE, TRUE}
@@ -1254,11 +1246,9 @@ short weapon_get_first_person_animation_time(
 					{
 					case _weapon_first_person_animation_time_frame_count:
 						time = animation->frame_count;
-#ifdef HALO_LINUX
 						/* port: a PAL map's animation, the NTSC maps' frame count (port/linux/game/pal_tags.c) */
 						time = pal_tags_first_person_frames(weapon_definition->weapon.interface_definition.first_person_animations.index,
 							animation_index, time);
-#endif
 						break;
 
 					case _weapon_first_person_animation_time_private_key_frame:
@@ -1289,7 +1279,6 @@ short weapon_get_first_person_animation_time(
 							time = shotgun_enter->frame_count;
 							break;
 						}
-#ifdef HALO_LINUX
 						/* port: the NTSC maps' frame count, as above */
 						if ((shotgun_reload_type == _shotgun_reload_type_first_round ||
 							shotgun_reload_type == _shotgun_reload_type_first_and_last_round) &&
@@ -1300,7 +1289,6 @@ short weapon_get_first_person_animation_time(
 								animation_graph_animation_index_get(&weapon_animations->animations)[_first_person_weapon_animation_shotgun_enter].animation_index,
 								time);
 						}
-#endif
 					}
 				}
 			}
@@ -2040,13 +2028,8 @@ static boolean weapon_state_interruptable(
 }
 
 void weapon_preprocess_node_orientations(
-	long weapon_index
-#ifdef HALO_WEB
-	/* (unused) the object type's callback signature, which a WebAssembly call
-	through object_type_definition must match */
-	, struct real_orientation *node_orientations
-#endif
-	)
+	long weapon_index,
+	struct real_orientation *node_orientations)
 {
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);

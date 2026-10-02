@@ -32,6 +32,7 @@ typedef int boolean;
 #define NONE (-1)
 #define NUMBEROF(a) (sizeof(a) / sizeof((a)[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define VALID_INDEX(index, count) ((index) >= 0 && (index) < (count))
 #define MAXIMUM_NETWORK_PLAYER_COUNT 128
 #define MAXIMUM_UNIQUE_NAME_ATTEMPTS 64
 #define NETWORK_PLAYER_NAME_LENGTH 12
@@ -68,7 +69,6 @@ static short seed_random_range(unsigned int *seed, int minimum, int maximum) {
     random_calls++; return (short)(minimum + (*seed)++ % (unsigned int)(maximum - minimum + 1));
 }
 static boolean network_player_is_valid(struct network_player *player) { return player->machine_index >= 0; }
-static boolean network_game_distributed(void) { return TRUE; }
 static void get_unique_random_color(struct network_game_server *server, struct network_player *player) {
     (void)server; player->primary_color_index = 1;
 }

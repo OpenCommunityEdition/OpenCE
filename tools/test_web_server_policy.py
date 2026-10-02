@@ -80,6 +80,10 @@ boolean game_engine_get_current_stage(struct game_variant *variant, char *name)
 { (void)variant; (void)name; return TRUE; }
 void network_game_generate_local_machine_name(wchar_t *name) { wcscpy(name, L"Host"); }
 void network_game_server_open_game(struct network_game_server *server) { (void)server; opened++; }
+boolean network_game_server_client_machine_is_joined_to_game(
+    struct network_game_server *server, struct network_game_server_client_machine *machine)
+{ (void)server; return machine->machine_index >= 0; }
+static void network_game_server_countdown_started(struct network_game_server *server) { (void)server; }
 '''
 
 gates = "\n".join(function(name) for name in (

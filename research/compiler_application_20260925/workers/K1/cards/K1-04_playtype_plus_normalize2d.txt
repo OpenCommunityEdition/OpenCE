@@ -1,3 +1,0 @@
-CARD K1-04  (pre-registered 2026-09-26 02:01:59 -0700; rewritten before any compile because backticks were shell-expanded in the first write)
-Base: k01. Change: K1-02 + K1-03 together (coupled test A+B).
-Prediction: independent regions; hunks = k01 - (K1-02 reduction) - (K1-03 reduction) within +-2; frame 0x1274, 8096.

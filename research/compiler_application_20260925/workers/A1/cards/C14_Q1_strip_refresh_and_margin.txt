@@ -1,7 +1,0 @@
-CARD C14 - LAB refresh of the Q1 strip test at HEAD fe283cc5 (neither the alias nor the view cast) + count margin of finalA
-written: 2026-09-26 01:45:28 -0700 (BEFORE the compiles)
-Prediction (from fifty-objects pick_game_engine S4 at cdc8ebd3): direct component copies
-`positions[count].x = global_goal[goal_index].position.x; .y = ...` make
-_game_engine_player_get_custom_motion_sensor_positions RESIDUAL (strength-reduced IV base +4 instead of +0), all
-else exact -> 179/180. Count oracle on finalA: populate's 5-wide band sits below (removing ~5-9 names flips it),
-K=0..40 added names exact (as c3).

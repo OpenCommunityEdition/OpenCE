@@ -98,11 +98,9 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cseries/sort.h"
 #include "bitmaps/bitmap_group.h"
-#include "bitmaps/bitmaps_internal.h"
-#include "bitmaps/bitmaps_mipmap.h"
+#include "bitmaps/bitmaps.h"
 #include "cache/cache_files.h"
 #include "cache/texture_cache.h"
-#include "cache/xbox_texture_cache.h"
 #include "cache/physical_memory_map.h"
 #include "interface/interface.h"
 #include "interface/terminal.h"
@@ -262,6 +260,12 @@ static void texture_cache_delete_block_proc(
 	long block_index);
 static const char *texture_cache_name_block_proc(
 	long block_index);
+long bitmap_format_to_d3d_format(
+	short format,
+	word flags);
+long bitmap_format_to_d3d_linear_format(
+	short format,
+	word flags);
 static boolean compare(
 	struct bitmap_data *first,
 	struct bitmap_data *second);
@@ -970,15 +974,23 @@ void *_texture_cache_bitmap_get_hardware_format(
 	{
 		if (system_milliseconds() - texture_cache_last_failure_time > 10000)
 		{
-			terminal_printf(
-				global_real_argb_purple,
-				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			/* (port: chatter, shown as config.toml's game.console_log says) */
+			if (terminal_shows(_terminal_message_chatter))
+			{
+				terminal_printf(
+					global_real_argb_purple,
+					"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			}
 			error(
 				_error_silent,
 				"YOU GOT STABBED!!!! double-click \"GETSTABBED.BAT\" on your PC now!!!");
-			terminal_printf(
-				global_real_argb_purple,
-				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			/* (port: chatter, shown as config.toml's game.console_log says) */
+			if (terminal_shows(_terminal_message_chatter))
+			{
+				terminal_printf(
+					global_real_argb_purple,
+					"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			}
 			lruv_debug_to_file(
 				"d:\\stabbed.txt",
 				tag_get_name(bitmap->tag_index),

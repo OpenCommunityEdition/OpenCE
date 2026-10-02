@@ -16,8 +16,18 @@ symbols in this file:
 	??_C@_0L@GBBDAFEP@aiff?5chunk?$AA@ (0000)
 002AA8C8 0015:
 	??_C@_0BF@EADPPKIJ@aiff?5container?5chunk?$AA@ (0000)
-00316944 0088:
-	_aiff_byte_swap_globals (0000)
+00316944 0018:
+	_aiff_container_chunk_bs_codes (0000)
+0031695C 0014:
+	_aiff_container_chunk_bs_definition (0000)
+00316970 0014:
+	_aiff_chunk_bs_codes (0000)
+00316984 0014:
+	_aiff_chunk_bs_definition (0000)
+00316998 0020:
+	_aiff_format_info_bs_codes (0000)
+003169B8 0014:
+	_aiff_format_info_bs_definition (0000)
 */
 
 /* ---------- headers */
@@ -65,66 +75,61 @@ struct aiff_common_chunk
 	byte compression_type[4];
 };
 
-struct aiff_byte_swap_globals
-{
-	byte_swap_code container_chunk_codes[6];
-	struct byte_swap_definition container_chunk_definition;
-	byte_swap_code chunk_codes[5];
-	struct byte_swap_definition chunk_definition;
-	byte_swap_code common_chunk_codes[8];
-	struct byte_swap_definition common_chunk_definition;
-};
-
-typedef char verify_aiff_byte_swap_globals_size[
-	sizeof(struct aiff_byte_swap_globals) == 0x88 ? 1 : -1];
-
 /* ---------- prototypes */
 
 /* ---------- globals */
 
-struct aiff_byte_swap_globals aiff_byte_swap_globals =
+/* Names and types of these six file statics are attested by a later first-party build (the 2003 PC demo PDB's
+sound_aiff.obj); January's own PDB has no static names. Their offsets and January's single 4-byte-aligned .data
+contribution agree with that build. */
+
+static byte_swap_code aiff_container_chunk_bs_codes[6] =
 {
-	{
-		_begin_bs_array, 1,
-		_4byte, _4byte, _4byte,
-		_end_bs_array,
-	},
-	{
-		"aiff container chunk",
-		sizeof(struct aiff_container_chunk),
-		aiff_byte_swap_globals.container_chunk_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
-	{
-		_begin_bs_array, 1,
-		_4byte, _4byte,
-		_end_bs_array,
-	},
-	{
-		"aiff chunk",
-		sizeof(struct aiff_chunk),
-		aiff_byte_swap_globals.chunk_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
-	{
-		_begin_bs_array, 1,
-		_2byte, _4byte, _2byte, 10, _4byte,
-		_end_bs_array,
-	},
-	{
-		"aiff format info p1",
-		AIFC_COMMON_CHUNK_SIZE,
-		aiff_byte_swap_globals.common_chunk_codes,
-		BYTE_SWAP_DEFINITION_SIGNATURE,
-		FALSE,
-	},
+	_begin_bs_array, 1,
+	_4byte, _4byte, _4byte,
+	_end_bs_array,
 };
 
-#define aiff_container_chunk_byte_swap_definition aiff_byte_swap_globals.container_chunk_definition
-#define aiff_chunk_byte_swap_definition aiff_byte_swap_globals.chunk_definition
-#define aiff_common_chunk_byte_swap_definition aiff_byte_swap_globals.common_chunk_definition
+static struct byte_swap_definition aiff_container_chunk_bs_definition =
+{
+	"aiff container chunk",
+	sizeof(struct aiff_container_chunk),
+	aiff_container_chunk_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
+
+static byte_swap_code aiff_chunk_bs_codes[5] =
+{
+	_begin_bs_array, 1,
+	_4byte, _4byte,
+	_end_bs_array,
+};
+
+static struct byte_swap_definition aiff_chunk_bs_definition =
+{
+	"aiff chunk",
+	sizeof(struct aiff_chunk),
+	aiff_chunk_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
+
+static byte_swap_code aiff_format_info_bs_codes[8] =
+{
+	_begin_bs_array, 1,
+	_2byte, _4byte, _2byte, 10, _4byte,
+	_end_bs_array,
+};
+
+static struct byte_swap_definition aiff_format_info_bs_definition =
+{
+	"aiff format info p1",
+	AIFC_COMMON_CHUNK_SIZE,
+	aiff_format_info_bs_codes,
+	BYTE_SWAP_DEFINITION_SIGNATURE,
+	FALSE,
+};
 
 /* ---------- public code */
 
@@ -138,7 +143,7 @@ boolean sound_file_is_aiff(
 	{
 		if (file_read_from_position(file, 0, sizeof(container), &container))
 		{
-			byte_swap_data(&aiff_container_chunk_byte_swap_definition, &container, 1);
+			byte_swap_data(&aiff_container_chunk_bs_definition, &container, 1);
 			if (container.signature=='FORM' &&
 				(container.form_type=='AIFF' || container.form_type=='AIFC'))
 			{
@@ -164,7 +169,7 @@ boolean sound_file_aiff_info_get(
 	{
 		while (file_read_from_position(file, position, sizeof(chunk), &chunk))
 		{
-			byte_swap_data(&aiff_chunk_byte_swap_definition, &chunk, 1);
+			byte_swap_data(&aiff_chunk_bs_definition, &chunk, 1);
 			if (chunk.signature=='COMM')
 			{
 				position+= sizeof(chunk);
@@ -176,7 +181,7 @@ boolean sound_file_aiff_info_get(
 					byte sample_rate_22050[10]= { 0x40, 0x0d, 0xac, 0x44, 0, 0, 0, 0, 0, 0 };
 					byte sample_rate_44100[10]= { 0x40, 0x0e, 0xac, 0x44, 0, 0, 0, 0, 0, 0 };
 
-				byte_swap_data(&aiff_common_chunk_byte_swap_definition, &common, 1);
+				byte_swap_data(&aiff_format_info_bs_definition, &common, 1);
 				if (csmemcmp(sample_rate_11025, common.sample_rate, sizeof(common.sample_rate))==0)
 				{
 					info->samples_per_second= 11025;
@@ -228,7 +233,7 @@ boolean sound_file_aiff_raw_data_get(
 	{
 		while (file_read_from_position(file, position, sizeof(chunk), &chunk))
 		{
-			byte_swap_data(&aiff_chunk_byte_swap_definition, &chunk, 1);
+			byte_swap_data(&aiff_chunk_bs_definition, &chunk, 1);
 			if (chunk.signature=='SSND')
 			{
 				*size= chunk.data_size-AIFF_SOUND_DATA_HEADER_SIZE;

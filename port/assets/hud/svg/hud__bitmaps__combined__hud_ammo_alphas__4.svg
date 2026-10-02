@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="64" viewBox="0 0 512 64">
+  <!-- 20 slanted blade ticks (alpha mask) -->
+  <defs>
+    <path id="t" d="M28.03,0 H40.39 L17.73,48.6 L0.58,59.39 L1.03,57.87 Z" fill="#fff"/>
+  </defs>
+  <use href="#t" x="0.000"/>
+  <use href="#t" x="20.704"/>
+  <use href="#t" x="41.408"/>
+  <use href="#t" x="62.112"/>
+  <use href="#t" x="82.816"/>
+  <use href="#t" x="103.520"/>
+  <use href="#t" x="124.224"/>
+  <use href="#t" x="144.928"/>
+  <use href="#t" x="165.632"/>
+  <use href="#t" x="186.336"/>
+  <use href="#t" x="207.040"/>
+  <use href="#t" x="227.744"/>
+  <use href="#t" x="248.448"/>
+  <use href="#t" x="269.152"/>
+  <use href="#t" x="289.856"/>
+  <use href="#t" x="310.560"/>
+  <use href="#t" x="331.264"/>
+  <use href="#t" x="351.968"/>
+  <use href="#t" x="372.672"/>
+  <use href="#t" x="393.376"/>
+</svg>

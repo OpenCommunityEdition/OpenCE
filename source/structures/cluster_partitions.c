@@ -23,7 +23,7 @@ symbols in this file:
 00180F50 0050:
 	_cluster_partition_copy (0000)
 00180FA0 0050:
-	_code_00180fa0 (0000)
+	_cluster_partition_get_first_reference (0000)
 00180FF0 0200:
 	_cluster_partition_reconnect (0000)
 001811F0 00b0:
@@ -89,7 +89,7 @@ void reference_list_copy(
 	struct data_array *result,
 	struct data_array *source);
 
-static long *code_00180fa0(
+static long *cluster_partition_get_first_reference(
 	struct cluster_partition *partition,
 	short cluster_index);
 
@@ -174,20 +174,12 @@ void cluster_partition_new(
 		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->cluster_first_data_references));
 
 	sprintf(cluster_name, "cluster %s", name);
-#ifdef HALO_LINUX
 	/* the native builds' longer reference lists (halo_port_capacity.h): an
 	object or light that cannot be referenced drops out of its clusters */
 	partition->data_reference_data = reference_list_new(cluster_name, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES);
-#else
-	partition->data_reference_data = reference_list_new(cluster_name, 2048);
-#endif
 
 	sprintf(cluster_name, "%s cluster", name);
-#ifdef HALO_LINUX
 	partition->cluster_reference_data = reference_list_new(cluster_name, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES);
-#else
-	partition->cluster_reference_data = reference_list_new(cluster_name, 2048);
-#endif
 
 	if (!partition->cluster_first_data_references ||
 		!partition->cluster_reference_data ||
@@ -323,7 +315,7 @@ void cluster_partition_reconnect(
 
 		reference_list_add(
 			partition->data_reference_data,
-			code_00180fa0(partition, cluster_index),
+			cluster_partition_get_first_reference(partition, cluster_index),
 			datum_index);
 	}
 
@@ -348,7 +340,7 @@ void cluster_partition_disconnect(
 
 		reference_list_remove(
 			partition->data_reference_data,
-			code_00180fa0(partition, cluster_index),
+			cluster_partition_get_first_reference(partition, cluster_index),
 			datum_index);
 
 		cluster_reference_index = cluster_reference->next_reference_index;
@@ -364,14 +356,14 @@ long cluster_partition_get_first_datum(
 	long *reference_index,
 	short cluster_index)
 {
-	*reference_index = *code_00180fa0((struct cluster_partition *)partition, cluster_index);
+	*reference_index = *cluster_partition_get_first_reference((struct cluster_partition *)partition, cluster_index);
 
 	return reference_list_get_next_datum_index(partition->data_reference_data, reference_index);
 }
 
 /* ---------- private code */
 
-static long *code_00180fa0(
+static long *cluster_partition_get_first_reference(
 	struct cluster_partition *partition,
 	short cluster_index)
 {

@@ -83,7 +83,6 @@ symbols in this file:
 #include "cseries/cseries.h"
 
 #include "ai/actors.h"
-#include "ai/actor_iterators.h"
 #include "ai/encounters.h"
 #include "ai/props.h"
 
@@ -116,7 +115,7 @@ enum
 
 /* ---------- structures */
 
-/* The iterator's public API is in actor_iterators.h. This concrete layout
+/* The iterator's public API is in encounters.h. This concrete layout
  * agrees with its ACTORS.C owner and the January 28-byte caller frame. */
 struct actor_iterator
 {

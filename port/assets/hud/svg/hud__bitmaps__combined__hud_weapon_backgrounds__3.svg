@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <g id="art">
+      <circle cx="168" cy="346" r="164.18" fill="#fff"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- white disc -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="512" fill="none"/><use xlink:href="#art"/></g>
+</svg>

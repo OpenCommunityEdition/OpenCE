@@ -134,6 +134,9 @@ void display_error_deferred(
 	short local_player_index,
 	boolean modal,
 	boolean pause_game_time);
+void display_error_text_deferred(
+	wchar_t const *text,
+	short local_player_index);
 void display_error_abort_to_dashboard_deferred(
 	short error_code,
 	boolean optional);

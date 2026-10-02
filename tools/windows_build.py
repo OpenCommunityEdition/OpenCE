@@ -1,8 +1,7 @@
 """Ninja rules for the native Windows build (``ninja windows``).
 
-Like the Linux build (tools/linux_build.py), this is independent of the
-byte-matching graph: it compiles the same game sources with clang for 32-bit
-x86 Windows (i686-pc-windows-msvc), adds the platform layer shared with
+Like the Linux build (tools/linux_build.py), it compiles the game sources
+with clang for 32-bit x86 Windows (i686-pc-windows-msvc), adds the platform layer shared with
 Linux (``port/linux/src``) and the Windows parts in ``port/windows``, and
 links ``build/windows/halo.exe`` with lld. It is generated only when
 configure.py runs on Windows. See port/windows/README.md for the design.
@@ -20,8 +19,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode,
-                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, musl_math_cflags,
-                          musl_math_sources, pgo_profile, profile_use_flags, xdk_headers)
+                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, game_defines_and_includes,
+                          game_sources, musl_math_cflags, musl_math_sources, pgo_profile, profile_use_flags,
+                          xdk_headers)
+from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
 
 LINUX_DIR = Path("port/linux")
@@ -69,8 +70,8 @@ WINDOWS_ABI_FLAGS = [
     "-fwrapv",
     "-fno-delete-null-pointer-checks",
     "-fno-omit-frame-pointer",
-    # the same floating point results on every port (system link games run
-    # in lockstep, and a machine whose results differ goes out of sync): no
+    # the same floating point results on every port (every machine in a
+    # system link game simulates it from the same inputs): no
     # fused multiply-adds (port/include/halo_math.h)
     "-ffp-contract=off",
     OPTIMISATION,
@@ -132,7 +133,7 @@ def _load_config() -> Dict[str, Any]:
 
 def windows_configure_inputs() -> List[Path]:
     """Files whose change must re-run configure.py."""
-    return [Path(__file__), PORT_CONFIG, PORT_DIR / "src", LINUX_DIR / "src", LINUX_DIR / "game"]
+    return [Path(__file__), PORT_CONFIG, PORT_DIR / "src", LINUX_DIR / "src", LINUX_DIR / "game", *hud_configure_inputs()]
 
 
 def _quote(path: Any) -> str:
@@ -287,9 +288,11 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         description="WINDOWS COPY $out",
     )
 
+    # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
+    embedded_assets = hud_assets_build(n, "windows", BUILD / "generated" / "hud_hires_assets.c")
+
     abi = " ".join(WINDOWS_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
     sdl_include = SDL_DIR / "include"
-    excluded = set(linux_config.get("exclude_sources", []))
     libs = " ".join(
         [_quote(SDL_DIR / "lib" / "x86" / "SDL3.lib")]
         + [f"-l{lib}" for lib in config.get("libraries", [])]
@@ -323,38 +326,22 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
                 variables={"cflags": f"{cflags} {extra}"},
             )
 
-        for proj in sln.projects:
-            if proj.name not in linux_config["projects"]:
-                continue
-            options = proj.options
-            defines = " ".join(f"-D{d}" for d in options.get("defines") or [])
-            includes = " ".join(
-                f"-I{_quote(d)}"
-                for d in options.get("include_dirs") or []
-                if Path(d) != Path("xbox/include")
-            )
-            game_cflags = " ".join([
-                abi,
-                " ".join(GAME_FLAGS),
-                f"-include {prefix_header}",
-                f"-include {tags_header}",
-                defines,
-                f"-I{crt_include}",
-                f"-I{PORT_DIR / 'include'}",
-                includes,
-                # the Xbox SDK declarations (port/include/xdk) come before the
-                # Windows SDK, which has headers of the same names
-                f"-I{XDK_INCLUDE}",
-            ])
-            for obj in proj.objects:
-                name = str(obj.file_path).replace(os.sep, "/")
-                if obj.status.name == "Missing" or name in excluded:
-                    continue
-                if obj.file_path.suffix.lower() != ".c":
-                    continue
-                add_object(obj.file_path, game_cflags)
-            for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
-                add_object(source, game_cflags)
+        game_cflags = " ".join([
+            abi,
+            " ".join(GAME_FLAGS),
+            f"-include {prefix_header}",
+            f"-include {tags_header}",
+            f"-I{crt_include}",
+            f"-I{PORT_DIR / 'include'}",
+            game_defines_and_includes(linux_config),
+            # the Xbox SDK declarations (port/include/xdk) come before the
+            # Windows SDK, which has headers of the same names
+            f"-I{XDK_INCLUDE}",
+        ])
+        for source in game_sources(linux_config):
+            add_object(source, game_cflags)
+        for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
+            add_object(source, game_cflags)
 
         linux_platform = Path(linux_config["platform_sources"])
         platform_cflags = " ".join([
@@ -400,6 +387,8 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         for source in miniupnpc_sources():
             add_object(source, " ".join([abi, *WIN32_FLAGS, miniupnpc_include, f"-I{MINIUPNPC_DIR / 'src'}",
                                          "-D_CRT_SECURE_NO_WARNINGS", "-D_WINSOCK_DEPRECATED_NO_WARNINGS", "-w"]))
+        for source in embedded_assets:
+            add_object(source, platform_cflags)
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))

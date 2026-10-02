@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- 24 radial ticks, 15 degrees apart -->
+  <g fill="#fff">
+    <rect id="t" x="124" y="24" width="4" height="24"/>
+    <use href="#t" transform="rotate(15 126 130)"/>
+    <use href="#t" transform="rotate(30 126 130)"/>
+    <use href="#t" transform="rotate(45 126 130)"/>
+    <use href="#t" transform="rotate(60 126 130)"/>
+    <use href="#t" transform="rotate(75 126 130)"/>
+    <use href="#t" transform="rotate(90 126 130)"/>
+    <use href="#t" transform="rotate(105 126 130)"/>
+    <use href="#t" transform="rotate(120 126 130)"/>
+    <use href="#t" transform="rotate(135 126 130)"/>
+    <use href="#t" transform="rotate(150 126 130)"/>
+    <use href="#t" transform="rotate(165 126 130)"/>
+    <use href="#t" transform="rotate(180 126 130)"/>
+    <use href="#t" transform="rotate(195 126 130)"/>
+    <use href="#t" transform="rotate(210 126 130)"/>
+    <use href="#t" transform="rotate(225 126 130)"/>
+    <use href="#t" transform="rotate(240 126 130)"/>
+    <use href="#t" transform="rotate(255 126 130)"/>
+    <use href="#t" transform="rotate(270 126 130)"/>
+    <use href="#t" transform="rotate(285 126 130)"/>
+    <use href="#t" transform="rotate(300 126 130)"/>
+    <use href="#t" transform="rotate(315 126 130)"/>
+    <use href="#t" transform="rotate(330 126 130)"/>
+    <use href="#t" transform="rotate(345 126 130)"/>
+  </g>
+</svg>

@@ -5,7 +5,7 @@ symbols in this file:
 0010F530 0040:
 	_texture_page_fraction_used (0000)
 0010F570 0060:
-	_code_0010f570 (0000)
+	_texture_page_verify (0000)
 0010F5D0 00d0:
 	_texture_page_new (0000)
 0010F6A0 0030:
@@ -15,9 +15,9 @@ symbols in this file:
 0010F710 0020:
 	_texture_page_texture_get (0000)
 0010F730 0060:
-	_code_0010f730 (0000)
+	_qsort_texture_indexes (0000)
 0010F790 02e0:
-	_code_0010f790 (0000)
+	_texture_page_resort (0000)
 0010FA70 00f0:
 	_texture_page_texture_new (0000)
 0010FB60 00c0:
@@ -85,12 +85,12 @@ typedef char texture_page_channel_size_assert[
 
 /* ---------- prototypes */
 
-static void code_0010f570(
+static void texture_page_verify(
 	struct texture_page *texture_page);
-static boolean code_0010f730(
+static boolean qsort_texture_indexes(
 	short texture_index_a,
 	short texture_index_b);
-boolean code_0010f790(
+static boolean texture_page_resort(
 	struct texture_page *texture_page);
 void qsort_2byte(
 	short *elements,
@@ -99,7 +99,7 @@ void qsort_2byte(
 
 /* ---------- globals */
 
-struct texture_page *bss_00456628 = NULL;
+static struct texture_page *bss_00456628 = NULL;
 
 /* ---------- public code */
 
@@ -141,7 +141,7 @@ struct texture_page *texture_page_new(
 		if (texture_page->textures)
 		{
 			data_make_valid(texture_page->textures);
-			code_0010f570(texture_page);
+			texture_page_verify(texture_page);
 			return texture_page;
 		}
 
@@ -158,7 +158,7 @@ struct texture_page *texture_page_new(
 void texture_page_delete(
 	struct texture_page *texture_page)
 {
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	data_dispose(texture_page->textures);
 	match_free("c:\\halo\\SOURCE\\memory\\texture_page.c", 69, texture_page);
 	return;
@@ -167,7 +167,7 @@ void texture_page_delete(
 void texture_page_textures_begin(
 	struct texture_page *texture_page)
 {
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 78, !texture_page->contains_unsorted_textures);
 	texture_page->contains_unsorted_textures = TRUE;
 	return;
@@ -177,7 +177,7 @@ struct texture_page_texture *texture_page_texture_get(
 	struct texture_page *texture_page,
 	long texture_index)
 {
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	return datum_get(texture_page->textures, texture_index);
 }
 
@@ -191,7 +191,7 @@ long texture_page_texture_new(
 	long texture_pixel_count;
 	struct texture_page_texture *texture;
 
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		96,
@@ -211,7 +211,7 @@ long texture_page_texture_new(
 				texture->height = height;
 				texture->sorted = !texture_page->contains_unsorted_textures;
 				texture_page->texture_pixel_count += texture_pixel_count;
-				if (immediate && !code_0010f790(texture_page))
+				if (immediate && !texture_page_resort(texture_page))
 				{
 					texture_page->texture_pixel_count -= texture_pixel_count;
 					datum_delete(texture_page->textures, texture_index);
@@ -231,7 +231,7 @@ void texture_page_textures_cancel(
 	struct texture_page_texture *texture;
 	boolean resort_succeeded;
 
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		138,
@@ -246,7 +246,7 @@ void texture_page_textures_cancel(
 		}
 	}
 	texture_page->contains_unsorted_textures = FALSE;
-	resort_succeeded = code_0010f790(texture_page);
+	resort_succeeded = texture_page_resort(texture_page);
 	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 157, resort_succeeded);
 	return;
 }
@@ -258,12 +258,12 @@ boolean texture_page_textures_end(
 	struct texture_page_texture *texture;
 	boolean resort_succeeded;
 
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	match_assert(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		170,
 		texture_page->contains_unsorted_textures);
-	resort_succeeded = code_0010f790(texture_page);
+	resort_succeeded = texture_page_resort(texture_page);
 	if (resort_succeeded)
 	{
 		texture = texture_page->textures->data;
@@ -281,9 +281,9 @@ void texture_page_texture_delete(
 	struct texture_page *texture_page,
 	long texture_index)
 {
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	datum_delete(texture_page->textures, texture_index);
-	code_0010f790(texture_page);
+	texture_page_resort(texture_page);
 	return;
 }
 
@@ -295,23 +295,23 @@ boolean texture_page_resize(
 	short old_width;
 	short old_height;
 
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	old_width = texture_page->width;
 	old_height = texture_page->height;
 	texture_page->width = width;
 	texture_page->height = height;
-	if (code_0010f790(texture_page))
+	if (texture_page_resort(texture_page))
 		return TRUE;
 
 	texture_page->width = old_width;
 	texture_page->height = old_height;
-	code_0010f790(texture_page);
+	texture_page_resort(texture_page);
 	return FALSE;
 }
 
 /* ---------- private code */
 
-static void code_0010f570(
+static void texture_page_verify(
 	struct texture_page *texture_page)
 {
 	match_assert("c:\\halo\\SOURCE\\memory\\texture_page.c", 260, texture_page);
@@ -323,11 +323,11 @@ static void code_0010f570(
 static __inline struct texture_page *texture_page_verify_and_return(
 	struct texture_page *texture_page)
 {
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 	return texture_page;
 }
 
-static boolean code_0010f730(
+static boolean qsort_texture_indexes(
 	short texture_index_a,
 	short texture_index_b)
 {
@@ -346,7 +346,7 @@ static boolean code_0010f730(
 	return height_difference > 0;
 }
 
-boolean code_0010f790(
+static boolean texture_page_resort(
 	struct texture_page *texture_page)
 {
 	short texture_indices[MAXIMUM_TEXTURE_PAGE_INDICES];
@@ -365,7 +365,7 @@ boolean code_0010f790(
 		"c:\\halo\\SOURCE\\memory\\texture_page.c",
 		292,
 		texture_page->spacing==0 || ceiling_power2(texture_page->spacing)==texture_page->spacing);
-	code_0010f570(texture_page);
+	texture_page_verify(texture_page);
 
 	texture_count = 0;
 	{
@@ -380,7 +380,7 @@ boolean code_0010f790(
 	}
 
 	bss_00456628 = texture_page;
-	qsort_2byte(texture_indices, texture_count, code_0010f730);
+	qsort_2byte(texture_indices, texture_count, qsort_texture_indexes);
 	spacing = texture_count>1 ? texture_page->spacing : 0;
 	spacing_mask = spacing ? ceiling_power2((word)spacing)-1 : 0;
 

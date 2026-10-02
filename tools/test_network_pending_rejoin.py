@@ -43,7 +43,7 @@ typedef unsigned short word;
 struct network_connection { boolean active, idle_ok; };
 struct network_machine { int machine_index; };
 struct network_game_server_client_machine {
-    int machine_index;
+    int machine_index; unsigned long flags;
     struct network_connection *connection;
 };
 struct network_game_server {
@@ -85,13 +85,16 @@ static boolean network_game_server_remove_machine_from_game(struct network_game_
     machine->machine_index = NONE;
     return TRUE;
 }
+static boolean network_game_server_drop_client_machine(struct network_game_server *server,
+    struct network_game_server_client_machine *client) {
+    if ((client->flags & 2) && network_machine_is_valid(&server->game.machines[client->machine_index]))
+        return network_game_server_remove_machine_from_game(server, &server->game.machines[client->machine_index]);
+    return network_game_server_remove_client_machine_from_game(server, client);
+}
 static void network_game_server_dump(struct network_game_server *server) { (void)server; }
 '''
 
-FUNCTIONS = "\n".join(function(name) for name in (
-    "network_game_server_remove_disconnected_client",
-    "network_game_server_handle_client_machines",
-))
+FUNCTIONS = function("network_game_server_remove_disconnected_client")
 
 CASES = r'''
 int main(void) {
@@ -110,9 +113,9 @@ int main(void) {
                 connection.idle_ok = FALSE;
                 server.client_machines[1].machine_index = 1;
                 server.client_machines[1].connection = &connection;
-                if (validated) server.game.machines[1].machine_index = 1;
+                if (validated) { server.game.machines[1].machine_index = 1; server.client_machines[1].flags = 2; }
                 closed_endpoints = removed_machines = 0;
-                assert(network_game_server_handle_client_machines(&server));
+                assert(network_game_server_remove_disconnected_client(&server, &server.client_machines[1]));
                 assert(closed_endpoints == 1);
                 assert(removed_machines == validated);
                 assert(server.client_machines[1].connection == NULL);
@@ -124,15 +127,13 @@ int main(void) {
 }
 '''
 
-WEB_BOUNDARY = BOUNDARY.replace(
-    "int machine_index;\n    struct network_connection *connection;",
-    "int machine_index; unsigned long flags;\n    struct network_connection *connection;",
-).replace("struct network_game_server {", "struct network_game_server { int state;") + r'''
+WEB_BOUNDARY = BOUNDARY.replace("struct network_game_server {", "struct network_game_server { int state;") + r'''
 #define HALO_WEB 1
 #define _network_game_server_state_ingame 1
 #define _network_client_machine_validated_bit 1
 #define TEST_FLAG(flags,bit) ((flags)&(1UL<<(bit)))
 static struct { unsigned long epoch; } server_migration;
+static unsigned long network_game_server_client_machine_addresses[128];
 boolean web_match_migration_enabled(void) { return TRUE; }
 static void network_game_server_migration_detach(struct network_game_server *server,
     struct network_game_server_client_machine *client) {
@@ -160,7 +161,7 @@ int main(void) {
                 server.client_machines[1].flags = validated ? 2 : 0;
                 server.client_machines[1].connection = &connection;
                 closed_endpoints = removed_machines = 0;
-                assert(network_game_server_handle_client_machines(&server));
+                assert(network_game_server_remove_disconnected_client(&server, &server.client_machines[1]));
                 assert(closed_endpoints == 1 && removed_machines == 0);
                 assert(server.client_machines[1].connection == NULL);
                 assert(server.game.machines[1].machine_index == 1);
@@ -178,17 +179,17 @@ with tempfile.TemporaryDirectory(prefix="halo-pending-rejoin-") as directory:
         source = path / f"{name}.c"
         source.write_text(boundary + functions + cases)
         output = path / name
-        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror",
+        subprocess.run([os.environ.get("CC", "clang"), "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-variable",
                         "-fsanitize=address,undefined", str(source), "-o", str(output)], check=True)
         return subprocess.run([str(output)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     fixed = run("fixed", FUNCTIONS)
     assert fixed.returncode == 0, fixed.stderr
     print(fixed.stdout.strip())
-    fallback = ("if (!network_machine_is_valid(&server->game.machines[client->machine_index]))\n"
-                "\t\treturn network_game_server_remove_client_machine_from_game(server, client);")
+    fallback = "return network_game_server_drop_client_machine(server, client);"
     assert fallback in FUNCTIONS
-    control = run("missing-unvalidated-cleanup", FUNCTIONS.replace(fallback, "((void)0);"))
+    control = run("missing-unvalidated-cleanup", FUNCTIONS.replace(fallback,
+        "return network_game_server_remove_machine_from_game(server, &server->game.machines[client->machine_index]);"))
     assert control.returncode != 0, "Original accepted-peer leak must fail the regression"
     assert "Assertion" in control.stderr, control.stderr
     print("Original-defect control rejected: missing unvalidated endpoint cleanup")

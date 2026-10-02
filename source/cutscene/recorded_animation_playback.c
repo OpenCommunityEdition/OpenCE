@@ -228,12 +228,12 @@ static void apply_throttle(
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_vector_char_difference(
+static void apply_vector_char_difference(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
 	byte const **playback_stream);
-void apply_vector_short_difference(
+static void apply_vector_short_difference(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -241,7 +241,7 @@ void apply_vector_short_difference(
 
 /* ---------- globals */
 
-struct recorded_animation_playback_data data_002dcf20 =
+static struct recorded_animation_playback_data data_002dcf20 =
 {
 	{
 		NULL,
@@ -597,7 +597,7 @@ static void uncompress_vector_from_controller(
 	return;
 }
 
-void apply_vector_char_difference(
+static void apply_vector_char_difference(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,
@@ -659,7 +659,7 @@ void apply_vector_char_difference(
 	return;
 }
 
-void apply_vector_short_difference(
+static void apply_vector_short_difference(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	struct animation_event_header const *header,

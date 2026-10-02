@@ -25,7 +25,7 @@ symbols in this file:
 
 /* ---------- globals */
 
-struct sound_preferences default_sound_preferences =
+static struct sound_preferences default_sound_preferences =
 {
 	0,
 	{ 10, 51, 10, 10 },

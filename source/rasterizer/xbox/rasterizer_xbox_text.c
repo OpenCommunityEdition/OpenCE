@@ -64,7 +64,9 @@ symbols in this file:
  * code_00163380 = IDirect3DDevice8_End
  */
 #include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_console_vars.h"
 #include <xtl.h>
+#include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 
 /* ---------- constants */
 
@@ -79,12 +81,6 @@ struct rasterizer_text_vertex
 	real u;
 	real v;
 	unsigned long color;
-};
-
-struct rasterizer_text_debug_options
-{
-	byte reserved00[0x22];
-	boolean render_text;
 };
 
 struct bitmap_data;
@@ -109,28 +105,6 @@ struct rasterizer_text_begin_parameters
 	short framebuffer_blend_function;
 	boolean point_filtering;
 	byte pad8B;
-};
-
-struct pixel_shader_definition
-{
-	unsigned long alpha_inputs[8];
-	unsigned long final_combiner_inputs_abcd;
-	unsigned long final_combiner_inputs_efg;
-	unsigned long constant_0[8];
-	unsigned long constant_1[8];
-	unsigned long alpha_outputs[8];
-	unsigned long rgb_inputs[8];
-	unsigned long compare_mode;
-	unsigned long final_combiner_constant_0;
-	unsigned long final_combiner_constant_1;
-	unsigned long rgb_outputs[8];
-	unsigned long combiner_count;
-	unsigned long texture_modes;
-	unsigned long dot_mapping;
-	unsigned long input_texture;
-	unsigned long c0_mapping;
-	unsigned long c1_mapping;
-	unsigned long final_combiner_constants;
 };
 
 /* ---------- prototypes */
@@ -167,8 +141,6 @@ void rasterizer_set_pixel_shader(
 /* ---------- globals */
 
 extern void *global_d3d_device;
-extern struct rasterizer_text_debug_options rasterizer_debug_options;
-extern struct rasterizer_window_begin_parameters global_window_parameters;
 extern struct pixel_shader_definition pixel_shader;
 
 /* ---------- public code */
@@ -193,7 +165,7 @@ void rasterizer_text_begin(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_text.c",
 		13,
 		global_d3d_device);
-	if (rasterizer_debug_options.render_text &&
+	if (rasterizer_debug_options.draw_dynamic_screen_geometry &&
 		global_window_parameters.rasterizer_target == 0)
 	{
 		match_assert(
@@ -440,7 +412,7 @@ void rasterizer_text_draw_character(
 		216,
 		global_d3d_device);
 
-	if (rasterizer_debug_options.render_text &&
+	if (rasterizer_debug_options.draw_dynamic_screen_geometry &&
 		global_window_parameters.rasterizer_target == 0)
 	{
 		success = IDirect3DDevice8_Begin(

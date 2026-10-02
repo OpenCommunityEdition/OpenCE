@@ -1128,14 +1128,14 @@ short convex_polygon2d_clip_to_plane(
 	real_plane2d const *plane,
 	short maximum_count,
 	real_point2d *result,
-	long *clip_flags,
+	unsigned long *clip_flags,
 	boolean *clipped,
 	real epsilon)
 {
-	real_point2d local_points[CLIP_BUFFER_SIZE];
+	real_point2d storage[CLIP_BUFFER_SIZE];
 	boolean any_in_front = FALSE;
 	boolean any_behind = FALSE;
-	long result_clip_flags = 0;
+	unsigned long result_clip_flags = 0;
 	short result_count = 0;
 	real_point2d const *previous_point;
 	boolean previous_in_front;
@@ -1154,8 +1154,8 @@ short convex_polygon2d_clip_to_plane(
 	if (points == result)
 	{
 		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1357, count<=CLIP_BUFFER_SIZE);
-		csmemcpy(local_points, points, sizeof(real_point2d)*count);
-		points = local_points;
+		csmemcpy(storage, points, sizeof(real_point2d)*count);
+		points = storage;
 	}
 
 	previous_point = points + count - 1;
@@ -1296,9 +1296,9 @@ short convex_polygon3d_clip_to_plane(
 	real_point3d *result,
 	boolean *clipped,
 	real epsilon,
-	boolean keep_degenerate)
+	boolean keep_coplanar)
 {
-	real_point3d local_points[CLIP_BUFFER_SIZE];
+	real_point3d storage[CLIP_BUFFER_SIZE];
 	boolean any_in_front = FALSE;
 	boolean any_behind = FALSE;
 	short result_count = 0;
@@ -1319,8 +1319,8 @@ short convex_polygon3d_clip_to_plane(
 	if (points == result)
 	{
 		match_assert("c:\\halo\\SOURCE\\math\\geometry.c", 1500, count<=CLIP_BUFFER_SIZE);
-		csmemcpy(local_points, points, sizeof(real_point3d)*count);
-		points = local_points;
+		csmemcpy(storage, points, sizeof(real_point3d)*count);
+		points = storage;
 	}
 
 	previous_point = points + count - 1;
@@ -1417,7 +1417,7 @@ short convex_polygon3d_clip_to_plane(
 
 		if (!any_in_front)
 		{
-			if (any_behind || !keep_degenerate)
+			if (any_behind || !keep_coplanar)
 			{
 				return 0;
 			}

@@ -51,26 +51,31 @@ union real_rgb_color *pixel32_to_real_rgb_color(
 	pixel32 color,
 	union real_rgb_color *result);
 
-struct rgb_color
+union rgb_color
 {
-	word red;
-	word green;
-	word blue;
+	word n[3];
+	struct { word red, green, blue; };
+};
+typedef union rgb_color rgb_color;
+
+union hsv_color
+{
+	word n[3];
+	struct { word hue, saturation, value; };
 };
 
-struct hsv_color
+union argb_color
 {
-	word hue;
-	word saturation;
-	word value;
-};
-
-struct argb_color
-{
-	word alpha;
-	word red;
-	word green;
-	word blue;
+	word n[4];
+	struct
+	{
+		word alpha;
+		union
+		{
+			rgb_color rgb;
+			struct { word red, green, blue; };
+		};
+	};
 };
 
 union real_hsv_color
@@ -84,12 +89,12 @@ union real_hsv_color
 	};
 };
 
-struct hsv_color *rgb_color_to_hsv_color(
-	struct rgb_color const *rgb,
-	struct hsv_color *hsv);
-struct rgb_color *hsv_color_to_rgb_color(
-	struct hsv_color const *hsv,
-	struct rgb_color *rgb);
+union hsv_color *rgb_color_to_hsv_color(
+	union rgb_color const *rgb,
+	union hsv_color *hsv);
+union rgb_color *hsv_color_to_rgb_color(
+	union hsv_color const *hsv,
+	union rgb_color *rgb);
 union real_hsv_color *real_rgb_color_to_real_hsv_color(
 	union real_rgb_color const *rgb,
 	union real_hsv_color *hsv);
@@ -97,10 +102,10 @@ union real_rgb_color *real_hsv_color_to_real_rgb_color(
 	union real_hsv_color *hsv,
 	union real_rgb_color *rgb);
 union real_argb_color *argb_color_to_real_argb_color(
-	struct argb_color const *source,
+	union argb_color const *source,
 	union real_argb_color *result);
 union real_rgb_color *rgb_color_to_real_rgb_color(
-	struct rgb_color const *source,
+	union rgb_color const *source,
 	union real_rgb_color *result);
 
 #endif /* __BITMAP_UTILITIES_H */

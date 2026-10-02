@@ -25,6 +25,7 @@ symbols in this file:
 #include "cseries.h"
 
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
 #include "tag_files/files.h"
 
 /* ---------- constants */
@@ -58,8 +59,6 @@ struct targa_header
 #pragma pack(pop)
 
 /* ---------- prototypes */
-
-void *bitmap_2d_address(struct bitmap_data *bitmap, short x, short y, short mipmap_index);
 
 /* ---------- globals */
 

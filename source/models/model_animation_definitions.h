@@ -258,6 +258,13 @@ short animation_update_internal(
 	long animation_graph_index,
 	struct animation_state *state,
 	long *sound_index);
+void animation_graph_node_matrices_from_orientations(
+	long animation_graph_index,
+	struct real_matrix4x3 *node_matrices,
+	struct real_orientation const *node_orientations,
+	real_point3d const *origin,
+	real_vector3d const *forward,
+	real_vector3d const *up);
 
 void animation_get_node_orientations(
 	struct model const *model,
@@ -287,6 +294,17 @@ void inverse_kinematics_adjust_matrices(
 	struct real_matrix4x3 *shoulder_matrix,
 	struct real_matrix4x3 *elbow_matrix,
 	struct real_matrix4x3 *hand_matrix);
+void overlay_animation_apply_continuous_scaled(
+	struct animation const *animation,
+	real real_frame_index,
+	real animation_scale,
+	struct real_orientation *node_orientations);
+void aiming_screen_apply(
+	struct animation const *animation,
+	struct animation_aiming_screen_bounds const *aiming_screen_bounds,
+	real yaw,
+	real pitch,
+	struct real_orientation *node_orientations);
 
 void interpolate_node_orientations(
 	short node_count,

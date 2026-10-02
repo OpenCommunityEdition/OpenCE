@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="128" viewBox="0 0 512 128">
+  <!-- ammo meter outline: rounded slanted frame (white) with a faint inner grid -->
+  <defs>
+    <path id="frame" d="M25.24,2 H411.34 A9.84,9.84 0 0 1 420.27,15.97 L398.97,62 H9.4 A7.61,7.61 0 0 1 2.48,51.19 Z"/>
+    <mask id="inside" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="128">
+      <use href="#frame" fill="#fff"/>
+    </mask>
+  </defs>
+  <path mask="url(#inside)" fill="#404040" fill-opacity=".251" d="M28,0 h4 v64 h-4 Z M56,0 h4 v64 h-4 Z M84,0 h4 v64 h-4 Z M112,0 h4 v64 h-4 Z M140,0 h4 v64 h-4 Z M168,0 h4 v64 h-4 Z M196,0 h4 v64 h-4 Z M224,0 h4 v64 h-4 Z M252,0 h4 v64 h-4 Z M280,0 h4 v64 h-4 Z M308,0 h4 v64 h-4 Z M336,0 h4 v64 h-4 Z M364,0 h4 v64 h-4 Z M392,0 h4 v64 h-4 Z M420,0 h4 v64 h-4 Z M0,16 h430 v4 h-430 Z M0,32 h430 v4 h-430 Z M0,48 h430 v4 h-430 Z"/>
+  <use href="#frame" fill="none" stroke="#fff" stroke-width="4.04" stroke-miterlimit="10"/>
+</svg>

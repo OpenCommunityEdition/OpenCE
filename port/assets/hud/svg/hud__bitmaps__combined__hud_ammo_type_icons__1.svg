@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">
+  <!-- ammo type icon: pixel "x" glyph + battery cell (skewed capsule, two stripes) + terminal -->
+  <path d="M16,16 h8 v8 h-8 Z M32,16 h8 v8 h-8 Z M20,24 h12 v4 h-12 Z M16,28 h12 v4 h-12 Z M8,32 h8 v8 h-8 Z M24,32 h8 v8 h-8 Z" transform="translate(-4,8)" fill="#fff"/>
+  <g transform="translate(0,28) skewX(-25.08) translate(0,-28)" stroke="#fdfdfd">
+    <rect x="51.95" y="10.06" width="86.72" height="35.88" rx="17.94" fill="#9d9d9d" fill-opacity=".616" stroke-width="4.19"/>
+    <path d="M99.24,10.06 V45.94 M111.05,10.06 V45.94" stroke-width="3.9"/>
+  </g>
+  <path d="M148.17,20 H159.98 L152.68,36 H140.87 Z" fill="#f5f5f5"/>
+</svg>

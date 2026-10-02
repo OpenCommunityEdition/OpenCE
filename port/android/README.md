@@ -129,6 +129,17 @@ To join a game, do one of these steps:
   `files/join_link.txt`, and the game reads it.
 - Copy the link and go to the game.
 
+On the local network:
+
+- The game uses the address of the Wi-Fi (or of the hotspot of the
+  phone), not the address of the mobile data.
+- The app holds a Wi-Fi multicast lock while the game operates. Some
+  phones otherwise drop the broadcasts that find system link games.
+
+Keep the game in the front during a network game. When the app goes to the
+background, Android stops the game. After 15 seconds the other machines
+drop it, and when it hosts, its players leave.
+
 ## Updates
 
 The app from GitHub Actions can update itself, as on Linux (refer to
@@ -157,7 +168,8 @@ the Xbox:
 - The HUD stays at the edges of the screen.
 - The menus, the loading bar and the screens after a game have 640
   columns, at the center of the screen.
-- Black bars and fades cover all of the screen.
+- Black bars and fades cover all of the screen, and so do the menus' dims
+  and backgrounds (the pause menu's dim, dialogs, the menus' gradient).
 
 The changes are in `#ifdef HALO_ANDROID` in `rasterizer_xbox.c`, `render.c`,
 `ui_widget.c`, `cinematics.c`, `main.c` and
@@ -262,8 +274,8 @@ floating-point contraction, as on x86.
 
 ### Game source changes
 
-The C replacements of the x86 inline assembly are in `#ifdef HALO_LINUX`
-(refer to [port/linux/README.md](../linux/README.md#game-source-changes)).
+The x86 inline assembly is replaced by C (refer to
+[port/linux/README.md](../linux/README.md#game-source-changes)).
 These changes are in `#ifdef HALO_ANDROID`:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does

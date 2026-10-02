@@ -98,7 +98,7 @@ static void circle_tangents(
 
 /* ---------- globals */
 
-real_argb_color global_obstacle_colors[MAXIMUM_DISC_COUNT] =
+static real_argb_color global_obstacle_colors[MAXIMUM_DISC_COUNT] =
 {
 	{ { 1.f, 1.f, 1.f, 0.5f } },
 	{ { 1.f, 1.f, 1.f, 0.f } },

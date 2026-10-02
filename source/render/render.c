@@ -60,12 +60,15 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "render.h"
 #include "render_cameras_internal.h"
 #include "render_particles.h"
 #include "objects.h"
+#include "render_sprite.h"
 #include "scenario.h"
 #include "structure_bsp_definitions.h"
+#include "effects/player_effects.h"
 #include "structures/structure_visibility.h"
 #include "rasterizer.h"
 #include "rasterizer/rasterizer_lights.h"
@@ -76,11 +79,14 @@ symbols in this file:
 #include "game.h"
 #include "game_engine.h"
 #include "interface/first_person_weapons.h"
+#include "interface/interface.h"
 #include "editor_stubs.h"
 #include "render_debug.h"
 #include "objects/object_lights_rendering.h"
 #include "effects/particle_systems.h"
 #include "effects/weather_particle_systems.h"
+#include "main/main.h"
+#include "structures/structures.h"
 
 /* ---------- constants */
 
@@ -106,11 +112,7 @@ enum
 
 /* ---------- macros */
 
-#ifdef HALO_LINUX
 #define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH halo_screen_width()
-#else
-#define RASTERIZER_TARGET_RENDER_PRIMARY_WIDTH 640
-#endif
 #define RASTERIZER_TARGET_RENDER_PRIMARY_HEIGHT 480
 
 /* ---------- structures */
@@ -132,31 +134,7 @@ static void render_player_frame(
 	struct render_window *window,
 	const point2d *screenshot_combined_index);
 
-void structure_get_planar_fog(
-	short cluster_index,
-	struct render_fog *fog);
-void player_effect_get_screen_flash(
-	short local_player_index,
-	struct render_screen_flash *screen_flash);
-void build_sprite_prepare_for_window(
-	void);
 void render_sky(
-	void);
-void render_objects(
-	void);
-void render_object_shadows(
-	void);
-void rasterizer_transparent_geometry_stop(
-	void);
-void interface_draw_fullscreen_overlays(
-	void);
-void rasterizer_debug_draw(
-	void);
-void render_debug(
-	void);
-void progress_bar_eachframe(
-	void);
-short main_get_window_count(
 	void);
 
 /* ---------- globals */
@@ -166,7 +144,6 @@ struct render_globals render;
 static boolean render_invalid_fog_warning_displayed;
 
 extern short global_screenshot_count;
-extern short global_screenshot_size;
 
 boolean render_contrails_enabled = TRUE;
 boolean render_particles_enabled = TRUE;
@@ -238,13 +215,9 @@ static void render_nonplayer_frame(
 		break;
 
 	case 1:
-#ifdef HALO_LINUX
 		halo_screen_ui_offset(TRUE);
 		game_engine_nonplayer_post_rasterize();
 		halo_screen_ui_offset(FALSE);
-#else
-		game_engine_nonplayer_post_rasterize();
-#endif
 		break;
 
 	default:
@@ -282,13 +255,9 @@ void render_frame_pregame(
 	rasterizer_parameters.rasterizer_target = 0;
 	rasterizer_window_begin(&rasterizer_parameters);
 
-#ifdef HALO_LINUX
 	halo_screen_ui_offset(TRUE);
 	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
 	halo_screen_ui_offset(FALSE);
-#else
-	render_ui_widgets(0, &window->rasterizer_camera.viewport_bounds);
-#endif
 	bink_playback_render();
 
 	{
@@ -441,13 +410,9 @@ static void render_window(
 		rasterizer_lens_flares_draw();
 		interface_draw_screen();
 		rasterizer_screen_flash();
-#ifdef HALO_LINUX
 		halo_screen_ui_offset(TRUE);
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
 		halo_screen_ui_offset(FALSE);
-#else
-		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
-#endif
 	}
 
 	bink_playback_render();
@@ -628,12 +593,8 @@ void render_frame(
 	render.frame_index++;
 	render.time_delta_since_tick_sec = time_delta_since_tick_sec;
 	memset(&parameters, 0, sizeof(parameters));
-#ifdef HALO_LINUX
 	/* continuous between ticks (render_interpolation.c) */
 	parameters.game_time_sec = render_interpolation_game_time_sec(game_time_get());
-#else
-	parameters.game_time_sec = (real)game_time_get() * (1.0f / TICKS_PER_SECOND);
-#endif
 	rasterizer_frame_begin(&parameters);
 	rasterizer_windows_begin();
 
@@ -670,13 +631,9 @@ void render_frame(
 		render_nonplayer_frame(window, window_type);
 	}
 
-#ifdef HALO_LINUX
 	halo_screen_ui_offset(TRUE);
 	progress_bar_eachframe();
 	halo_screen_ui_offset(FALSE);
-#else
-	progress_bar_eachframe();
-#endif
 	rasterizer_windows_end();
 	rasterizer_frame_end();
 

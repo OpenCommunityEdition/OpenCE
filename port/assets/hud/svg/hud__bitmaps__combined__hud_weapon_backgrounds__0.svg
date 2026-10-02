@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="128" viewBox="0 0 512 128">
+  <defs>
+    <linearGradient id="g0" gradientUnits="userSpaceOnUse" x1="0" y1="4.019" x2="0" y2="59.998"><stop offset="0" stop-color="#c1c1c1"/><stop offset="1" stop-color="#848484"/></linearGradient>
+    <g id="art">
+      <path d="M26.81,4.03 A0.02,0.02 0 0 1 26.83,4.02 L138.32,4.02 A5.78,5.78 0 0 1 143.56,12.24 L121.35,59.91 A0.15,0.15 0 0 1 121.22,60 L10.15,60 A5.99,5.99 0 0 1 4.72,51.48 Z" fill="url(#g0)"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="128"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- slanted rounded panel, grey vertical gradient -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="128" fill="none"/><use xlink:href="#art"/></g>
+</svg>

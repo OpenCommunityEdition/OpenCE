@@ -180,15 +180,15 @@ short local_time_get_elapsed(void);
 boolean game_predicting(void);
 boolean game_in_progress(void);
 boolean game_time_get_paused(void);
+/* whether a client's clock waits for the host's first game update */
+boolean game_time_held(void);
 void game_time_set_paused(boolean paused);
 real game_time_get_speed(void);
 void game_time_set_speed(real speed);
 void game_time_start(void);
-#ifdef HALO_LINUX
 /* the game time set, before the first tick (a distributed game joined in
 progress: the host's) */
 void game_time_set_distributed(long time);
-#endif
 void game_time_update(real time_delta_sec);
 
 /* ---------- prototypes/MAIN.C */

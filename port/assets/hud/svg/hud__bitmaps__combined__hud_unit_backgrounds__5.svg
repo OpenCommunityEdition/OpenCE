@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="32" viewBox="0 0 512 32">
+  <defs>
+    <g id="art">
+      <path d="M1.92,-0.52 L2.9,1.77 L5.15,6.54 L6.11,8.65 L9.55,16.01 L16.1,15.98 L22.16,11.99 L42.02,12 L41.36,10.43 L40.86,9.49 L39.85,7.3 L38.32,3.99 L18.67,4.01 L13.63,2.01 L13.72,2.08 L11.34,1.04 L11.23,1.07 L8.92,0.04 Z" fill="#ffffff"/>
+      <path d="M42.76,-968.64 L44.51,0.7 L49.51,11.45 L50.53,13.63 L51.67,16.01 L419.78,15.98 L414.48,4.52 L413.48,2.42 L412.81,1.02 Z" fill="#cccccc"/>
+      <path d="M50.72,3.99 L53.32,9.56 L54.48,12.01 L413.24,11.98 L412.54,10.39 L410.67,6.4 L409.51,4 L23.39,4 Z" fill="#000000"/>
+    </g>
+    <mask id="lum" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="32"><use xlink:href="#art"/></mask>
+  </defs>
+  <!-- solid flag icon + grey meter frame -->
+  <!-- colour = alpha = grey level: art masked by itself -->
+  <g mask="url(#lum)"><rect width="512" height="32" fill="none"/><use xlink:href="#art"/></g>
+</svg>

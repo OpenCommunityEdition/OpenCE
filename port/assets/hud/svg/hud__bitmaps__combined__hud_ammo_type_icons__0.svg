@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="64" viewBox="0 0 128 64">
+  <!-- ammo type icon: pixel "x" multiplier glyph + slanted blade round -->
+  <path d="M16,16 h8 v8 h-8 Z M32,16 h8 v8 h-8 Z M20,24 h12 v4 h-12 Z M16,28 h12 v4 h-12 Z M8,32 h8 v8 h-8 Z M24,32 h8 v8 h-8 Z" fill="#fff"/>
+  <path d="M78.7,0 H80 V16 L68,40 H48 L60,16 Z" fill="#fafafa"/>
+</svg>

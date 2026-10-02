@@ -19,7 +19,7 @@ symbols in this file:
 001B5790 00c0:
 	_code_001b5790 (0000)
 001B5850 0010:
-	_code_001b5850 (0000)
+	_bink_decompress_audio_frame (0000)
 001B5860 0390:
 	_code_001b5860 (0000)
 001B5BF0 0010:
@@ -127,7 +127,6 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
 #include "main/main.h"
-#include "main/main_internal.h"
 #include "math/integer_math.h"
 #include "rasterizer/rasterizer.h"
 #include "sound/sound_dsound.h"
@@ -382,7 +381,7 @@ static void * __stdcall bink_alloc(
 	unsigned long size_in_bytes);
 static void __stdcall bink_free(
 	void *memory);
-void code_001b5850(
+void bink_decompress_audio_frame(
 	void);
 static void bink_draw_frame(
 	void);
@@ -666,7 +665,7 @@ void bink_playback_update(
 
 /* ---------- private code */
 
-void code_001b5850(
+void bink_decompress_audio_frame(
 	void)
 {
 	return;
@@ -877,11 +876,7 @@ static void * __stdcall bink_alloc(
 			!"bink memory allocation should not fail");
 		/* January emits a site-local int3 here; the intrinsic form sinks into the
 		   epilogue, so the original text was an inline-assembly breakpoint. */
-#ifdef HALO_LINUX
 		__builtin_trap();
-#else
-		__asm { int 3 }
-#endif
 	}
 	else
 	{

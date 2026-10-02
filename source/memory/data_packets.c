@@ -59,13 +59,13 @@ symbols in this file:
 
 /* ---------- prototypes */
 
-void _data_packet_verify(
+static void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
 	short *field_count);
 
-void _data_packet_encode(
+static void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -74,7 +74,7 @@ void _data_packet_encode(
 	struct data_packet_field *fields,
 	short *field_count);
 
-void _data_packet_decode(
+static void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -205,7 +205,7 @@ boolean data_packet_decode(
 
 /* ---------- private code */
 
-void _data_packet_verify(
+static void _data_packet_verify(
 	struct data_packet_definition *packet_definition,
 	short *packet_size,
 	struct data_packet_field *fields,
@@ -303,7 +303,7 @@ void _data_packet_verify(
 	return;
 }
 
-void _data_packet_encode(
+static void _data_packet_encode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -349,8 +349,12 @@ void _data_packet_encode(
 				byte const *data = decoded_data + sizeof(short);
 
 				match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 253, data_size>=0 && data_size<=field->count);
+				/* (a bad size fails the packet: port) */
 				if (data_size < 0 || data_size > field->count)
+				{
+					state->overflow = TRUE;
 					data_size = 0;
+				}
 				data_encode_integer(state, data_size, field->count);
 				data_encode_memory(state, data, data_size, 1);
 				break;
@@ -370,8 +374,12 @@ void _data_packet_encode(
 					field + 1,
 					&element_field_count);
 				match_assert("c:\\halo\\SOURCE\\memory\\data_packets.c", 281, element_count>=0 && element_count<=field->count);
+				/* (a bad count fails the packet: port) */
 				if (element_count < 0 || element_count > field->count)
+				{
+					state->overflow = TRUE;
 					element_count = 0;
+				}
 				data_encode_integer(state, element_count, field->count);
 				while (element_count-- > 0)
 				{
@@ -438,7 +446,7 @@ void _data_packet_encode(
 	return;
 }
 
-void _data_packet_decode(
+static void _data_packet_decode(
 	struct data_packet_definition *packet_definition,
 	struct data_encoding_state *state,
 	short packet_version,
@@ -502,6 +510,13 @@ void _data_packet_decode(
 				void *source;
 
 				data_size = (short)data_decode_integer(state, field->count);
+				/* port: no more than the field holds (the rest of the packet is
+				not to be read then) */
+				if (data_size < 0 || data_size > field->count)
+				{
+					state->overflow = TRUE;
+					data_size = 0;
+				}
 				*(short *)decoded_data = data_size;
 				source = data_decode_memory(state, data_size, 1);
 				if (source)
@@ -524,8 +539,13 @@ void _data_packet_decode(
 
 				element_count = (short)data_decode_integer(state, field->count);
 				_data_packet_verify(packet_definition, NULL, field + 1, &element_field_count);
+				/* port: no more than the field holds (the rest of the packet is
+				not to be read then) */
 				if (element_count < 0 || element_count > field->count)
+				{
+					state->overflow = TRUE;
 					element_count = 0;
+				}
 				*(short *)decoded_data = element_count;
 				element = decoded_data + sizeof(short);
 				while (element_count-- > 0)

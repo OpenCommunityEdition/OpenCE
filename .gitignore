@@ -9,36 +9,23 @@ __pycache__
 
 # Build files
 build/
-projects/
 .ninja_*
 build.ninja
-*.vcxproj*
-*.sln*
-
-# decompctx output
-ctx.*
-*.ctx
 
 # Generated configs
-objdiff.json
 compile_commands.json
 
-# Miscellaneous
+# The January build and the Xbox SDK (tools/xdk_headers.py reads the
+# build's PDB); never commit
 *.exe
 *.pdb
-*.idb
-*.i64
-*.id0
-*.id1
-*.id2
-*.nam
-*.til
-*.bndb
 xbox/
 !source/**/xbox/
 
 # Locally extracted proprietary game data (never commit)
 assets/
+# (but the high-res assets, drawn for the port: tools/hud_assets.py)
+!port/assets/
 original/
 
 # CI build outputs (tools/ci_build.py)

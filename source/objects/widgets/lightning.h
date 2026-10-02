@@ -60,7 +60,7 @@ void lightning_delete(
 
 void lightning_submit(
 	long object_index,
-	long lightning_index,
+	long widget_index,
 	struct render_lighting const *lighting,
 	struct render_animation const *animation);
 

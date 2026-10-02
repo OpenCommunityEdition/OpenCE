@@ -122,6 +122,6 @@ static void clean_up_for_image_launch(
 	}
 
 	match_vassert("c:\\halo\\SOURCE\\interface\\marketing_and_strategic_business_development.c", 64,
-		SUCCEEDED(IDirect3DDevice8_PersistDisplay(&global_d3d_device)),
+		SUCCEEDED(IDirect3DDevice8_PersistDisplay(global_d3d_device)),
 		"IDirect3DDevice8_PersistDisplay() failed in clean_up_for_image_launch()");
 }

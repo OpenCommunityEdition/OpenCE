@@ -110,7 +110,7 @@ real build_sprite_compute_vertex_fade(
 void build_sprite_rotational(
 	struct build_sprite_data *data,
 	unsigned long flags,
-	short sequence_index,
+	short first_sequence_index,
 	short sprite_index,
 	real_point3d const *untransformed_origin,
 	real_vector3d const *untransformed_axis_of_rotation,
