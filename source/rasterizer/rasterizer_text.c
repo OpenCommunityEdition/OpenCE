@@ -76,6 +76,22 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "text/font_group.h"
 #include "text/unicode.h"
+#include "tag_files/tag_files.h"
+
+/* port: the high-res text (port/linux/src/text_hires.c): the text drawn with
+fonts at the display's resolution, laid out as before. Characters are drawn
+from an atlas of the fonts' glyphs that a placeholder bitmap stands for. */
+struct text_hires_glyph
+{
+	float left, top, right, bottom;
+	float u0, v0, u1, v1;
+	float advance;
+};
+
+long text_hires_font(char const *tag_name, float cap_height);
+int text_hires_covers(long font, unsigned long code);
+int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
+void text_hires_register_atlas(unsigned long const *texture, unsigned long width, unsigned long height);
 
 /* ---------- constants */
 
@@ -84,6 +100,10 @@ enum
 	HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH = 128,
 	HARDWARE_CHARACTER_CACHE_BITMAP_HEIGHT = 128,
 	MAXIMUM_HARDWARE_CHARACTERS = 256,
+	/* port: the high-res text atlas's placeholder (its texels are the units
+	of the atlas's glyphs), and the fonts remembered */
+	HIRES_TEXT_ATLAS_BITMAP_SIZE = 256,
+	MAXIMUM_HIRES_TEXT_FONTS = 8,
 };
 
 enum
@@ -185,11 +205,37 @@ static void rasterizer_draw_character_with_dropshadow(
 	short y,
 	short dx,
 	short dy);
+static long hires_text_font_get(
+	long font_index);
+static void rasterizer_draw_hires_character(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *font_character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy);
+static void rasterizer_draw_hires_character_with_dropshadow(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *font_character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy);
 
 /* ---------- globals */
 
 
 static struct hardware_character_cache hardware_character_cache;
+static struct bitmap_data *hires_text_atlas = NULL;
+static long hires_text_font = NONE;
 static pixel32 global_shadow_color = 0;
 static short rasterizer_text_unused = 0;
 static short magic_number= 12;
@@ -231,6 +277,25 @@ rasterizer_text_cache_initialize(
 		{
 			hardware_character_cache.bitmap = bitmap;
 			hardware_character_cache.initialized = TRUE;
+
+			/* port: the high-res text atlas's placeholder */
+			hires_text_atlas = bitmap_2d_new(
+				HIRES_TEXT_ATLAS_BITMAP_SIZE,
+				HIRES_TEXT_ATLAS_BITMAP_SIZE,
+				0,
+				_bitmap_format_a4r4g4b4);
+			if (hires_text_atlas && !rasterizer_bitmap_new(hires_text_atlas))
+			{
+				bitmap_delete(hires_text_atlas);
+				hires_text_atlas = NULL;
+			}
+			if (hires_text_atlas)
+			{
+				text_hires_register_atlas(
+					(unsigned long const *)hires_text_atlas->hardware_format,
+					HIRES_TEXT_ATLAS_BITMAP_SIZE,
+					HIRES_TEXT_ATLAS_BITMAP_SIZE);
+			}
 		}
 		else
 		{
@@ -288,6 +353,12 @@ rasterizer_text_cache_dispose(
 		rasterizer_text_cache_flush();
 		bitmap_delete(hardware_character_cache.bitmap);
 		hardware_character_cache.initialized = FALSE;
+		if (hires_text_atlas)
+		{
+			text_hires_register_atlas(NULL, 0, 0);
+			bitmap_delete(hires_text_atlas);
+			hires_text_atlas = NULL;
+		}
 	}
 
 	return;
@@ -375,6 +446,29 @@ rasterizer_draw_string(
 			{
 				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL;
 				draw_character = rasterizer_draw_character;
+			}
+
+			/* port: from the font's atlas, when it has every character */
+			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font()) : NONE;
+			if (hires_text_font != NONE)
+			{
+				long character_index;
+
+				for (character_index = 0; character_index < length; character_index++)
+				{
+					if (!text_hires_covers(hires_text_font, (unsigned char)string[character_index]))
+					{
+						hires_text_font = NONE;
+						break;
+					}
+				}
+			}
+			if (hires_text_font != NONE)
+			{
+				bitmap = hires_text_atlas;
+				draw_character = drop_shadow ?
+					rasterizer_draw_hires_character_with_dropshadow :
+					rasterizer_draw_hires_character;
 			}
 
 			if (!bounds)
@@ -471,6 +565,29 @@ rasterizer_draw_unicode_string(
 			{
 				vertex_count = length * NUMBER_OF_VERTICES_PER_QUADRILATERAL;
 				draw_character = rasterizer_draw_character;
+			}
+
+			/* port: from the font's atlas, when it has every character */
+			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font()) : NONE;
+			if (hires_text_font != NONE)
+			{
+				long character_index;
+
+				for (character_index = 0; character_index < length; character_index++)
+				{
+					if (!text_hires_covers(hires_text_font, (word)string[character_index]))
+					{
+						hires_text_font = NONE;
+						break;
+					}
+				}
+			}
+			if (hires_text_font != NONE)
+			{
+				bitmap = hires_text_atlas;
+				draw_character = drop_shadow ?
+					rasterizer_draw_hires_character_with_dropshadow :
+					rasterizer_draw_hires_character;
 			}
 
 			if (!bounds)
@@ -595,6 +712,242 @@ rasterizer_draw_character_with_dropshadow(
 }
 
 /* ---------- private code */
+
+/* port: the high-res text's font for a font tag, sized by the height of its
+capital H (its rows with ink), or NONE */
+static long hires_text_font_get(
+	long font_index)
+{
+	static struct
+	{
+		struct font_header *font;
+		long hires_font;
+	} fonts[MAXIMUM_HIRES_TEXT_FONTS];
+	static short next_font = 0;
+	struct font_header *font;
+	struct font_character *capital;
+	short font_slot;
+	short top = NONE;
+	short bottom = NONE;
+	short row;
+	long hires_font;
+
+	if (font_index == NONE)
+		return NONE;
+	font = font_definition_get(font_index);
+	for (font_slot = 0; font_slot < MAXIMUM_HIRES_TEXT_FONTS; font_slot++)
+	{
+		if (fonts[font_slot].font == font)
+			return fonts[font_slot].hires_font;
+	}
+	capital = font_get_character_by_ascii_code(font, 'H');
+	if (capital)
+	{
+		byte const *pixels = (byte const *)font->pixels.address + capital->pixels_offset;
+
+		for (row = 0; row < capital->bitmap_height; row++)
+		{
+			short column;
+
+			for (column = 0; column < capital->bitmap_width; column++)
+			{
+				if (pixels[row * capital->bitmap_width + column])
+				{
+					if (top == NONE)
+						top = row;
+					bottom = row;
+					break;
+				}
+			}
+		}
+	}
+	hires_font = top == NONE ? NONE :
+		text_hires_font(tag_get_name(font_index), (float)(bottom - top + 1));
+	if (hires_font < 0)
+		hires_font = NONE;
+	fonts[next_font].font = font;
+	fonts[next_font].hires_font = hires_font;
+	next_font = (short)((next_font + 1) % MAXIMUM_HIRES_TEXT_FONTS);
+
+	return hires_font;
+}
+
+/* port: the font tag's character's ink in its bitmap's columns x0 to x1 and
+rows y0 to y1 (its pixels' coverage, added) */
+static long font_character_ink(
+	struct font_header *font,
+	struct font_character *font_character,
+	short x0,
+	short x1,
+	short y0,
+	short y1)
+{
+	byte const *pixels = (byte const *)font->pixels.address + font_character->pixels_offset;
+	short row, column;
+	long ink = 0;
+
+	for (row = MAX(y0, 0); row < MIN(y1, font_character->bitmap_height); row++)
+	{
+		for (column = MAX(x0, 0); column < MIN(x1, font_character->bitmap_width); column++)
+			ink += pixels[row * font_character->bitmap_width + column];
+	}
+
+	return ink;
+}
+
+/* port: whether draw_string's cut of the font tag's character took a part
+of it that shows: more than an eighth of its ink (a cut through its edge's
+faint pixels, or its bitmap's empty columns, leaves it whole to the eye) */
+static boolean font_character_cut(
+	struct font_header *font,
+	struct font_character *font_character,
+	short x0,
+	short x1,
+	short y0,
+	short y1)
+{
+	long all = font_character_ink(font, font_character, 0, font_character->bitmap_width, 0, font_character->bitmap_height);
+
+	return font_character_ink(font, font_character, x0, x1, y0, y1) * 8 > all;
+}
+
+/* port: a character from the high-res text's atlas: the font's glyph on the
+baseline, its advance centred on the font tag's character's, cut where
+draw_string cut a part of the font tag's character that shows (to the
+text's box). Where it cut only the character's bitmap's empty columns or
+rows, or its edge's faint pixels, the character looked whole, and so does
+the glyph. */
+static void rasterizer_draw_hires_glyph(
+	struct font_header *font,
+	struct font_character *font_character,
+	unsigned long color,
+	unsigned long shadow_color,
+	boolean shadow,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy)
+{
+	struct text_hires_glyph glyph;
+	struct dynamic_screen_vertex vertices[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
+	real pen_x = (real)(x0 - x + font_character->bitmap_origin_x);
+	real baseline = (real)(y0 - y + font_character->bitmap_origin_y);
+	real clip_left = x > 0 ? (real)x0 : -32768.0f;
+	real clip_top = y > 0 ? (real)y0 : -32768.0f;
+	real clip_right = x + dx < font_character->bitmap_width ? (real)(x0 + dx) : 32767.0f;
+	real clip_bottom = y + dy < font_character->bitmap_height ? (real)(y0 + dy) : 32767.0f;
+	real left, top, right, bottom, u0, v0, u1, v1;
+	short pass;
+
+	if (!text_hires_glyph(hires_text_font, font_character->character, &glyph))
+		return;
+	/* (the font's advance centred on the tag's, so that its letters keep
+	their own spacing) */
+	left = pen_x + (font_character->character_width - glyph.advance) * 0.5f + glyph.left;
+	right = left + (glyph.right - glyph.left);
+	if (x > 0 && !font_character_cut(font, font_character, 0, x, 0, font_character->bitmap_height))
+		clip_left = -32768.0f;
+	if (x + dx < font_character->bitmap_width &&
+		!font_character_cut(font, font_character, x + dx, font_character->bitmap_width, 0, font_character->bitmap_height))
+	{
+		clip_right = 32767.0f;
+	}
+	if (y > 0 && !font_character_cut(font, font_character, 0, font_character->bitmap_width, 0, y))
+		clip_top = -32768.0f;
+	if (y + dy < font_character->bitmap_height &&
+		!font_character_cut(font, font_character, 0, font_character->bitmap_width, y + dy, font_character->bitmap_height))
+	{
+		clip_bottom = 32767.0f;
+	}
+	top = baseline + glyph.top;
+	bottom = baseline + glyph.bottom;
+	u0 = glyph.u0;
+	u1 = glyph.u1;
+	v0 = glyph.v0;
+	v1 = glyph.v1;
+	if (left < clip_left)
+	{
+		u0 += (clip_left - left) * (u1 - u0) / (right - left);
+		left = clip_left;
+	}
+	if (right > clip_right)
+	{
+		u1 -= (right - clip_right) * (u1 - u0) / (right - left);
+		right = clip_right;
+	}
+	if (top < clip_top)
+	{
+		v0 += (clip_top - top) * (v1 - v0) / (bottom - top);
+		top = clip_top;
+	}
+	if (bottom > clip_bottom)
+	{
+		v1 -= (bottom - clip_bottom) * (v1 - v0) / (bottom - top);
+		bottom = clip_bottom;
+	}
+	if (right <= left || bottom <= top)
+		return;
+
+	/* (the drop shadow first, a unit down and right, as the font tags') */
+	for (pass = shadow ? 0 : 1; pass < 2; pass++)
+	{
+		real offset = pass ? 0.0f : 1.0f;
+		unsigned long vertex_color = pass ? color : shadow_color;
+
+		vertices[0].color = vertices[1].color = vertices[2].color = vertices[3].color = vertex_color;
+		vertices[0].position.x = vertices[3].position.x = left + offset;
+		vertices[1].position.x = vertices[2].position.x = right + offset;
+		vertices[0].position.y = vertices[1].position.y = top + offset;
+		vertices[2].position.y = vertices[3].position.y = bottom + offset;
+		vertices[0].texture_coordinates.x = vertices[3].texture_coordinates.x = u0;
+		vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = u1;
+		vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = v0;
+		vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = v1;
+		rasterizer_text_draw_character(vertices);
+	}
+
+	return;
+}
+
+static void rasterizer_draw_hires_character(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *font_character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy)
+{
+	rasterizer_draw_hires_glyph(font, font_character, color, 0, FALSE, x0, y0, x, y, dx, dy);
+
+	return;
+}
+
+static void rasterizer_draw_hires_character_with_dropshadow(
+	struct parse_string_state *state,
+	struct font_header *font,
+	struct font_character *font_character,
+	unsigned long color,
+	short x0,
+	short y0,
+	short x,
+	short y,
+	short dx,
+	short dy)
+{
+	unsigned long shadow_color = global_shadow_color ?
+		global_shadow_color :
+		(color & 0xFF000000);
+
+	rasterizer_draw_hires_glyph(font, font_character, color, shadow_color, TRUE, x0, y0, x, y, dx, dy);
+
+	return;
+}
 
 static struct bitmap_data *
 hardware_character_cache_get_bitmap(

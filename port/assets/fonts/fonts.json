@@ -1,0 +1,8 @@
+{
+ "comment": "Which font draws each of the maps' font tags (port/linux/src/text_hires.c).",
+ "fonts": [
+  {"tag": "ui\\large_ui", "file": "Overpass-900.ttf"},
+  {"tag": "ui\\interstate", "file": "Overpass-900.ttf"},
+  {"tag": "ui\\small_ui", "file": "Overpass-750.ttf"}
+ ]
+}

@@ -56,6 +56,8 @@ void draw_string_get_color(
 	real_argb_color *color);
 void draw_string_set_font(
 	long font_index);
+long draw_string_get_font(
+	void);
 void draw_string_set_format(
 	short style,
 	short justification,

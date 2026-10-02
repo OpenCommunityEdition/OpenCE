@@ -86,6 +86,10 @@ static const struct config_setting config_settings[] =
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
 		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
 		"false draws the maps' own bitmaps." },
+	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
+		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
+		"(Overpass) at the display's resolution, and the menus' titles from\n"
+		"port/assets/titles; false draws the maps' bitmap fonts and titles." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

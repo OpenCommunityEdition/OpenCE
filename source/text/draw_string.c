@@ -452,6 +452,14 @@ void draw_string_set_font(
 	return;
 }
 
+/* port: the font the next string is drawn with (rasterizer_text.c's
+high-res text) */
+long draw_string_get_font(
+	void)
+{
+	return font_drawing_globals.current_font_index;
+}
+
 void draw_string_set_format(
 	short style,
 	short justification,
