@@ -405,7 +405,13 @@ Only machines with the invite can find the game:
   `bans.txt`, and refuses a machine whose address or hardware id is in it.
 - The host can ban a player with `ban <player name>` in the developer
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
-  Refer to `NETCODE.md`.
+  Refer to `NETCODE.md`. So that every player can be named, the host trims
+  the spaces around a name and removes characters that draw as nothing. A
+  letter with a mark is typed as the plain letter (`ban jose` for "José").
+  A name with nothing left to type becomes "Player", and a name that another
+  player already has gets a number ("Player 2"). The game refuses a profile
+  name that is blank, and a multiplayer game refuses a profile whose name was
+  made blank before this check.
 - An invite operates while the copy of the game that made it operates.
 
 ### Connection

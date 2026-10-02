@@ -84,6 +84,7 @@ symbols in this file:
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
+#include "game/players.h"
 #include "interface/event_manager.h"
 #include "interface/ui_widget.h"
 #include "interface/virtual_keyboard.h"
@@ -972,6 +973,14 @@ static boolean virtual_keyboard_select(
 	switch (keycode)
 	{
 	case _vkey_done:
+		/* port: a name kept to one the host's ban command can name: its
+		spaces before and after dropped, and one without a character it can
+		type (player_name_clean) empty, which is refused below */
+		if (!player_name_clean(virtual_keyboard_globals.text_buffer,
+			virtual_keyboard_globals.buffer_size / (long)sizeof(wchar_t)))
+		{
+			virtual_keyboard_globals.text_buffer[0] = 0;
+		}
 		if (ustrcmp(virtual_keyboard_globals.saved_text, virtual_keyboard_globals.text_buffer) != 0)
 		{
 			if (virtual_keyboard_globals.text_buffer[0])
