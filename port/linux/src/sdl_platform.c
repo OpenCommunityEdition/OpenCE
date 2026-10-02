@@ -425,9 +425,51 @@ void platform_video_drawable_size(int *width, int *height)
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
 }
 
+/* with vsync off, the time between frames display.max_fps asks for (0:
+twice the display's refresh rate), or 0 for no limit. A GPU never left idle
+can hang (Intel's Raptor Lake graphics, whose reset then takes the desktop
+with it); the limit gives it a rest every frame. */
+static Uint64 frame_interval_ns(void)
+{
+	static int vsync = -1;
+	static long maximum;
+	float rate;
+
+	if (vsync < 0)
+	{
+		vsync = config_boolean("display.vsync");
+		maximum = config_integer("display.max_fps");
+	}
+	if (vsync || maximum < 0)
+		return 0;
+	rate = (float)maximum;
+	if (!maximum)
+	{
+		SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
+		const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
+
+		rate = 2.0f * (mode && mode->refresh_rate > 0.0f ? mode->refresh_rate : 60.0f);
+	}
+	return (Uint64)(1e9f / rate);
+}
+
 void platform_video_swap(void)
 {
+	static Uint64 next_frame;
+	Uint64 interval, now;
+
 	SDL_GL_SwapWindow(platform_window);
+	interval = frame_interval_ns();
+	if (!interval)
+		return;
+	now = SDL_GetTicksNS();
+	if (next_frame > now)
+	{
+		SDL_DelayPrecise(next_frame - now);
+		now = next_frame;
+	}
+	/* (a frame more than an interval late starts the count again) */
+	next_frame = now - next_frame > interval ? now + interval : next_frame + interval;
 }
 
 void platform_mouse_capture(BOOL capture)
