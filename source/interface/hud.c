@@ -1080,10 +1080,43 @@ static boolean hud_player_name_in_sight(
 	return in_sight;
 }
 
+/* how far away enemies' names are shown: as far as the local player's
+weapon turns its reticle red over an enemy (its autoaim distance, times its
+zoom; a vehicle's gun when seated at one), and never less than the motion
+sensor's reach */
+static real hud_player_name_enemy_range(
+	void)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	real range = hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
+	long unit_index;
+
+	if (player_index == NONE || player_get(player_index)->unit_index == NONE)
+		return range;
+	unit_index = unit_get_aiming_unit_index(player_get(player_index)->unit_index);
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+
+		if (weapon_index != NONE)
+		{
+			struct weapon_definition *definition = weapon_definition_get(weapon_get(weapon_index)->definition_index);
+			real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
+				weapon_get_zoom_magnification(weapon_index, player_control_get_zoom_level(render.local_player_index));
+
+			range = MAX(range, weapon_range);
+		}
+	}
+
+	return range;
+}
+
 static void hud_draw_player_name(
 	long player_index,
 	boolean ally,
-	boolean indicator)
+	boolean indicator,
+	real enemy_range)
 {
 	struct player_datum const *player = player_get(player_index);
 	long font_index = hud_get_font_index();
@@ -1096,10 +1129,14 @@ static void hud_draw_player_name(
 	struct font_header *font;
 	short x, y, index;
 	real depth_factor;
+	real distance;
 
 	if (font_index == NONE)
 		return;
 	unit_get_head_position(player->unit_index, &head_position);
+	distance = distance3d(&render.camera.position, &head_position);
+	if (!ally && distance >= enemy_range)
+		return;
 	if (!ally &&
 		(unit_get(player->unit_index)->unit.active_camouflage > 0.5f ||
 		!hud_player_name_in_sight(player->unit_index, &head_position)))
@@ -1130,19 +1167,21 @@ static void hud_draw_player_name(
 	for (index = 0; index < (short)NUMBEROF(player->name); index++)
 		name[index] = player->name[index];
 	name[NUMBEROF(player->name)] = 0;
-	/* (whole up to 15 world units away, then fading to 0.4 at 75) */
-	depth_factor = 1.0f - (-view_position.z - 15.0f) / 60.0f;
 	if (ally)
 	{
 		hud_get_text_color(&color);
+		/* (whole up to 15 world units away, then fading to 0.4 at 75) */
+		depth_factor = 1.0f - (-view_position.z - 15.0f) / 60.0f;
+		color.alpha = PIN(depth_factor, 0.4f, 1.0f);
 	}
 	else
 	{
 		color.red = 1.0f;
 		color.green = 0.3f;
 		color.blue = 0.25f;
+		/* (whole up to four fifths of the range, then fading out) */
+		color.alpha = PIN((enemy_range - distance) / (0.2f * enemy_range), 0.0f, 1.0f);
 	}
-	color.alpha = PIN(depth_factor, 0.4f, 1.0f);
 	/* (centred: 2; scaled about its bottom's middle, over the head) */
 	draw_string_set_draw_mode(font_index, NONE, 2, 0, &color);
 	rasterizer_text_set_scale(hud_player_name_scale(), (real)x, (real)y);
@@ -1161,11 +1200,13 @@ static void hud_draw_player_names(
 	struct player_datum *player;
 	boolean indicators;
 	long team_index;
+	real enemy_range;
 
 	if (setting == _player_names_none || player_index == NONE)
 		return;
 	team_index = player_get(player_index)->team_index;
 	indicators = game_engine_display_team_indicators();
+	enemy_range = hud_player_name_enemy_range();
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
@@ -1176,7 +1217,7 @@ static void hud_draw_player_names(
 			continue;
 		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies))
 			continue;
-		hud_draw_player_name(iterator.datum_index, ally, ally && indicators);
+		hud_draw_player_name(iterator.datum_index, ally, ally && indicators, enemy_range);
 	}
 
 	return;
