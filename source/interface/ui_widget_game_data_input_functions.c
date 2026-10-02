@@ -2303,11 +2303,23 @@ static void game_options_menu_update_text_desc(
 
 			if (column == widget->focused_child)
 			{
+				/* port: an extra item's own description (ui_widget.c) */
+				short extra_description = ui_widget_spinner_extra_description(spinner_list,
+					spinner_list->parameters.list.selected_list_item_index);
+
+				if (extra_description != NONE)
+				{
+					widget->parameters.list.extended_description->parameters.text_box.string_list_index =
+						extra_description;
+					return;
+				}
 				description_index += spinner_list->parameters.list.selected_list_item_index;
 				break;
 			}
 
-			description_index += spinner_list->parameters.list.number_of_items;
+			/* port: only the items of a spinner's string list's own have
+			descriptions in its tag */
+			description_index += ui_widget_spinner_own_item_count(spinner_list);
 			column = column->next;
 		}
 	}
@@ -2370,11 +2382,13 @@ static void game_options_menu_update_pic_desc(
 
 			if (column == widget->focused_child)
 			{
-				description_index += spinner_list->parameters.list.selected_list_item_index;
+				/* port: an extra item shows its spinner's last picture of its own */
+				description_index += MIN(spinner_list->parameters.list.selected_list_item_index,
+					ui_widget_spinner_own_item_count(spinner_list) - 1);
 				break;
 			}
 
-			description_index += spinner_list->parameters.list.number_of_items;
+			description_index += ui_widget_spinner_own_item_count(spinner_list);
 			column = column->next;
 		}
 	}

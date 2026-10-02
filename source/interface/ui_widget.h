@@ -158,6 +158,13 @@ real_argb_color get_ui_argb_white(
 pixel32 modulate_pixel32_by_real_alpha(
 	pixel32 argb,
 	real alpha);
+/* port: a spinner's items of its string list's own, and the description of
+an extra item (ui_widget.c) */
+short ui_widget_spinner_own_item_count(
+	struct widget_instance *spinner);
+short ui_widget_spinner_extra_description(
+	struct widget_instance *spinner,
+	short item_index);
 void ui_widget_delete(
 	struct widget_instance *widget);
 void ui_widgets_close_all(
