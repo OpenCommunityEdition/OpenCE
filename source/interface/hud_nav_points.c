@@ -668,109 +668,67 @@ short hud_get_nav_point_render_type(
 
 void custom_render_nav_point(
 	short local_player_index,
-	real_point3d const *position,
+	real_point3d const *position_pointer,
 	short nav_index,
 	short waypoint_type)
 {
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct hud_waypoint_arrow *arrow;
-	real_point3d view_point;
+	real_point3d position;
 	real distance;
-	real arrow_scale;
+	real scale;
 	real_point2d screen_position;
-	real horizontal_radius;
-	real vertical_radius;
-	real vertical_component;
-	real horizontal_component;
-	real radius_product;
+	real a, b, ab, bx, ay;
 	real theta;
 
-	csmemset(stack_buffer, 0x62, sizeof(stack_buffer));
-
-	arrow = TAG_BLOCK_GET_ELEMENT(
-		&hud_globals->waypoint.arrows,
-		nav_index,
-		struct hud_waypoint_arrow);
-	view_point = *position;
+	memset(stack_buffer, 0x62, sizeof(stack_buffer));
+	arrow = TAG_BLOCK_GET_ELEMENT(&hud_globals->waypoint.arrows, nav_index, struct hud_waypoint_arrow);
+	position = *position_pointer;
 
 	{
-		long unit_index = local_player_get_player_index(local_player_index)==NONE ?
-			NONE :
-			player_get(local_player_get_player_index(local_player_index))->unit_index;
 		real_point3d cam_pos;
-		real delta_x;
-		real delta_y;
-		real delta_z;
 
-		unit_get_camera_position(unit_index, &cam_pos);
-
-		delta_x = position->x-cam_pos.x;
-		delta_y = position->y-cam_pos.y;
-		delta_z = position->z-cam_pos.z;
-		distance = square_root(
-			delta_x*delta_x + (delta_y*delta_y + delta_z*delta_z));
+		unit_get_camera_position(local_player_get_player_index(local_player_index) == NONE ? NONE : player_get(local_player_get_player_index(local_player_index))->unit_index, &cam_pos);
+		distance = distance3d(&cam_pos, position_pointer);
 	}
 
-	if (distance>15.0f)
+	if (distance > 15.f)
 	{
-		arrow_scale = 0.5f;
+		scale = 0.5f;
 	}
 	else
 	{
-		arrow_scale = (real)pow(
-			1.0f-distance*(1.0f/15.0f),
-			0.7) + 0.5f;
+		scale = (real)pow(1.f - distance / 15.f, 0.7) + 0.5f;
 	}
 
-	matrix4x3_transform_point(
-		&render.frustum.world_to_view,
-		&view_point,
-		&view_point);
-
-	if (waypoint_type==_waypoint_off_screen ||
-		!render_camera_view_to_screen(
-			&render.camera,
-			&render.frustum,
-			&view_point,
-			&screen_position))
+	matrix4x3_transform_point(&render.frustum.world_to_view, &position, &position);
+	if (waypoint_type == _waypoint_off_screen || !render_camera_view_to_screen(&render.camera, &render.frustum, &position, &screen_position))
 	{
-		screen_position.x = view_point.x;
-		screen_position.y = -view_point.y;
+		screen_position.x = position.x;
+		screen_position.y = -position.y;
 		waypoint_type = _waypoint_off_screen;
 	}
 	else
 	{
-		screen_position.x -= (real)(
-			((render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2) +
-			render.camera.viewport_bounds.x0);
-		screen_position.y -= (real)(
-			((render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2) +
-			render.camera.viewport_bounds.y0);
+		screen_position.x -= render.camera.viewport_bounds.x0 + (render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0) / 2;
+		screen_position.y -= render.camera.viewport_bounds.y0 + (render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) / 2;
 	}
 
-	horizontal_radius =
-		((real)(render.camera.window_bounds.x1-render.camera.window_bounds.x0) -
-		(hud_globals->waypoint.right_offset+hud_globals->waypoint.left_offset))*0.5f;
-	vertical_radius =
-		((real)(render.camera.window_bounds.y1-render.camera.window_bounds.y0) -
-		(hud_globals->waypoint.bottom_offset+hud_globals->waypoint.top_offset))*0.5f;
-	radius_product = vertical_radius*horizontal_radius;
-	vertical_component = vertical_radius*screen_position.x;
-	horizontal_component = horizontal_radius*screen_position.y;
-	theta = 0.0f;
+	a = ((render.camera.window_bounds.x1 - render.camera.window_bounds.x0) - (hud_globals->waypoint.right_offset + hud_globals->waypoint.left_offset)) / 2.f;
+	b = ((render.camera.window_bounds.y1 - render.camera.window_bounds.y0) - (hud_globals->waypoint.bottom_offset + hud_globals->waypoint.top_offset)) / 2.f;
+	ab = a * b;
+	bx = b * screen_position.x;
+	ay = a * screen_position.y;
+	theta = 0.f;
 
-	if (waypoint_type==_waypoint_off_screen ||
-		radius_product*radius_product <=
-		vertical_component*vertical_component + horizontal_component*horizontal_component)
+	if (waypoint_type == _waypoint_off_screen || ab * ab <= bx * bx + ay * ay)
 	{
-		real scale = square_root(
-			(radius_product*radius_product) /
-			(vertical_component*vertical_component + horizontal_component*horizontal_component));
+		real factor = square_root(ab * ab / (bx * bx + ay * ay));
 
+		screen_position.x *= factor;
+		screen_position.y *= factor;
 		waypoint_type = _waypoint_off_screen;
-		screen_position.x *= scale;
-		screen_position.y *= scale;
 
 		if (!TEST_FLAG(arrow->flags, _hud_waypoint_dont_rotate_offscreen_bit))
 		{
@@ -778,112 +736,64 @@ void custom_render_nav_point(
 		}
 	}
 
-	screen_position.x += (real)(
-		(render.camera.viewport_bounds.x1-render.camera.viewport_bounds.x0)/2);
-	screen_position.y += (real)(
-		(render.camera.viewport_bounds.y1-render.camera.viewport_bounds.y0)/2);
-
-	match_assert(
-		"c:\\halo\\SOURCE\\interface\\hud_nav_points.c",
-		615,
-		waypoint_type!=NONE);
-
+	screen_position.x += (render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0) / 2;
+	screen_position.y += (render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) / 2;
+	match_assert("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 615, waypoint_type!=NONE);
 	{
-		long bitmap_group_index = hud_globals->waypoint.arrow_bitmap.index;
+		long bitmap_index = hud_globals->waypoint.arrow_bitmap.index;
 		struct bitmap_data const *bitmap = NULL;
 		real_rectangle2d const *clip = NULL;
 
-		hud_retrieve_bitmap_and_bounding_rect(
-			bitmap_group_index,
-			arrow->sequence_indices[waypoint_type],
-			0,
-			&bitmap,
-			&clip);
-
-		if (bitmap && _texture_cache_bitmap_get_hardware_format(
-			(struct bitmap_data *)bitmap, FALSE, TRUE))
+		hud_retrieve_bitmap_and_bounding_rect(bitmap_index, arrow->sequence_indices[waypoint_type], 0, &bitmap, &clip);
+		if (bitmap && _texture_cache_bitmap_get_hardware_format((struct bitmap_data *)bitmap, FALSE, TRUE))
 		{
-			point2d point;
-			real_rgb_color rgb_temp;
+			point2d corner;
 			byte alpha;
-			real fade;
+			real_rgb_color rgb_temp;
 
-			point.x = (short)(long)screen_position.x;
-			point.y = (short)(long)screen_position.y;
-			alpha = (byte)PIN(fast_ftol_C(arrow->opacity)*255, 0, 255);
+			corner.x = (short)screen_position.x;
+			corner.y = (short)screen_position.y;
+			alpha = PIN(255 * fast_ftol_C(arrow->opacity), 0, 255);
 			pixel32_to_real_rgb_color(arrow->color, &rgb_temp);
-			fade = 1.0f-arrow->fade;
-			rgb_temp.red *= PIN(fade, 0.0f, 1.0f);
-			rgb_temp.green *= PIN(fade, 0.0f, 1.0f);
-			rgb_temp.blue *= PIN(fade, 0.0f, 1.0f);
+			rgb_temp.red *= PIN(1.f - arrow->fade, 0.f, 1.f);
+			rgb_temp.green *= PIN(1.f - arrow->fade, 0.f, 1.f);
+			rgb_temp.blue *= PIN(1.f - arrow->fade, 0.f, 1.f);
+			hud_draw_bitmap_direct(bitmap, _hud_anchor_center, &corner, clip, scale, theta, ((pixel32)alpha << 24) | real_rgb_color_to_pixel32(&rgb_temp), FALSE);
 
-			hud_draw_bitmap_direct(
-				bitmap,
-				_hud_anchor_center,
-				&point,
-				clip,
-				arrow_scale,
-				theta,
-				((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp),
-				FALSE);
-
-			if (waypoint_type!=_waypoint_off_screen)
+			if (waypoint_type != _waypoint_off_screen)
 			{
-				struct number_hud_element_definition numbers;
 				struct hud_absolute_placement_definition placement;
-				real decimal_modulus;
-				real bitmap_extent;
+				struct number_hud_element_definition numbers;
+				real fractional_value;
 
-				distance *= 3.0480001f;
-				csmemset(&placement, 0, sizeof(placement));
-				csmemset(&numbers, 0, sizeof(numbers));
-
+				distance *= 3.048f;
+				memset(&placement, 0, sizeof(struct hud_absolute_placement_definition));
+				memset(&numbers, 0, sizeof(struct number_hud_element_definition));
 				placement.corner = _hud_anchor_top_left;
-				numbers.colors.color =
-					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp);
-				numbers.colors.flash_color =
-					((pixel32)alpha<<24) | real_rgb_color_to_pixel32(&rgb_temp);
+				numbers.colors.color = ((pixel32)alpha << 24) | real_rgb_color_to_pixel32(&rgb_temp);
+				numbers.colors.flash_color = ((pixel32)alpha << 24) | real_rgb_color_to_pixel32(&rgb_temp);
 				numbers.digits = 3;
 				numbers.fractional_digits = 1;
-				numbers.number_flags =
-					FLAG(_hud_number_show_all_leading_zeros_bit) |
-					FLAG(_hud_number_show_trailing_m_bit);
+				numbers.number_flags = FLAG(_hud_number_show_all_leading_zeros_bit) | FLAG(_hud_number_show_trailing_m_bit);
 
-				bitmap_extent =
-					((clip->x1-clip->x0)*(real)bitmap->width)*0.5f;
-				numbers.placement.offset.x = (short)(long)(
-					bitmap_extent*arrow_scale*0.33000001f + (real)point.x);
-				bitmap_extent =
-					((clip->y1-clip->y0)*(real)bitmap->height)*0.5f;
-				numbers.placement.offset.y = (short)(long)(
-					bitmap_extent*arrow_scale*0.66000003f + (real)point.y);
-				numbers.placement.offset.x -= render.camera.window_bounds.x0;
-				numbers.placement.offset.x += render.camera.viewport_bounds.x0;
-				numbers.placement.offset.y -= render.camera.window_bounds.y0;
-				numbers.placement.offset.y += render.camera.viewport_bounds.y0;
+				numbers.placement.offset.x = corner.x + (bitmap->width * (clip->x1 - clip->x0) / 2.f) * scale * 0.33f;
+				numbers.placement.offset.y = corner.y + (bitmap->height * (clip->y1 - clip->y0) / 2.f) * scale * 0.66f;
+				numbers.placement.offset.x -= render.camera.window_bounds.x0 - render.camera.viewport_bounds.x0;
+				numbers.placement.offset.y -= render.camera.window_bounds.y0 - render.camera.viewport_bounds.y0;
 
-				decimal_modulus = (real)pow(10.0, 4.0);
-				{
-					short decimal_value = (short)fast_ftol(
-						(real)fmod(
-							fabs(decimal_modulus*distance),
-							decimal_modulus));
-
-					hud_draw_numbers(
-						local_player_index,
-						&placement,
-						&numbers,
-						(short)fast_ftol_C(distance),
-						decimal_value,
-						0,
-						0,
-						0.0f);
-				}
+				fractional_value = power(10.f, 4.f);
+				hud_draw_numbers(local_player_index, &placement, &numbers,
+					fast_ftol_C(distance), fast_ftol(fmod(fabs((real)(fractional_value * distance)), fractional_value)),
+					0, 0, 0.f);
 			}
 		}
 	}
 
-	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 675);
+	{
+		short corrupt_index = check_stack_buffer(stack_buffer);
+		match_vassert("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 675, return_eip == get_return_eip(), "corrupt return address!");
+		match_vassert("c:\\halo\\SOURCE\\interface\\hud_nav_points.c", 675, corrupt_index == NONE, csprintf(temporary, "corrupt stack at %d!", corrupt_index));
+	}
 
 	return;
 }
