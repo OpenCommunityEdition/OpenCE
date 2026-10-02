@@ -5624,14 +5624,19 @@ static void ui_mouse_note_target(
 }
 
 /**
- * @brief Makes a setting row its value: a row (an item) whose child is a
+ * @brief Makes a setting row its value: an item whose only value child is a
  * value stops being a target, and the value takes the row's height. The row
  * is where the thin value box sits among a label and empty space, and a tap
  * anywhere else on it would press A on the row, which on a setting screen
  * is ACCEPT. The value keeps its width, and so its left half / right half
  * rule. Only the value's parent is the row: that is how the controller and
- * gametype screens nest them (op_* row, *_spinner child), and a nearer match
- * than "any ancestor", which could take a whole panel for a row.
+ * gametype screens nest them (op_* row, *_spinner child). An item holding
+ * several values (a panel, a list of spinners) is not a row: it and its
+ * values keep their own areas, since growing each value to the item's height
+ * would pile up boxes of which only the last noted could be tapped.
+ * Runs after ui_mouse_fit_button_targets so that the legends are fitted
+ * against the whole row, as before: a legend growing up into a row's label
+ * area would press ACCEPT there.
  */
 static void ui_mouse_merge_setting_rows(
 	void)
@@ -5642,31 +5647,27 @@ static void ui_mouse_merge_setting_rows(
 
 	for (index = 0; index < ui_mouse_target_count; index++)
 	{
-		struct ui_mouse_target *value = &ui_mouse_targets[index];
+		struct ui_mouse_target *row = &ui_mouse_targets[index];
+		struct ui_mouse_target *only_value = NULL;
+		long value_count = 0;
 
-		if (value->kind != _ui_mouse_target_value)
+		if (row->kind != _ui_mouse_target_item)
 			continue;
 		for (other = 0; other < ui_mouse_target_count; other++)
 		{
-			struct ui_mouse_target const *row = &ui_mouse_targets[other];
-
-			if (row->kind == _ui_mouse_target_item && row->widget == value->widget->parent)
-			{
-				value->bounds.y0 = row->bounds.y0;
-				value->bounds.y1 = row->bounds.y1;
-			}
-		}
-	}
-	for (index = 0; index < ui_mouse_target_count; index++)
-	{
-		struct ui_mouse_target *row = &ui_mouse_targets[index];
-
-		for (other = 0; other < ui_mouse_target_count && row->kind == _ui_mouse_target_item; other++)
-		{
-			struct ui_mouse_target const *value = &ui_mouse_targets[other];
+			struct ui_mouse_target *value = &ui_mouse_targets[other];
 
 			if (value->kind == _ui_mouse_target_value && value->widget->parent == row->widget)
-				row->kind = NONE;
+			{
+				only_value = value;
+				value_count++;
+			}
+		}
+		if (value_count == 1)
+		{
+			only_value->bounds.y0 = row->bounds.y0;
+			only_value->bounds.y1 = row->bounds.y1;
+			row->kind = NONE;
 		}
 	}
 	/* in place, in order: the last target noted wins an overlap */
@@ -6666,8 +6667,8 @@ void render_ui_widgets(
 				}
 			}
 		}
-		ui_mouse_merge_setting_rows();
 		ui_mouse_fit_button_targets();
+		ui_mouse_merge_setting_rows();
 		if (widget_globals.fade_to_black >= 0.0f &&
 			widget_globals.fade_to_black <= 1.0f)
 		{
