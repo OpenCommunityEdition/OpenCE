@@ -12,6 +12,9 @@ White's public-domain Newtown respaced to set them as the maps do
 title keeps the rest of its picture: the text is taken out of the map's
 bitmap (filled in from around it), that background (soft plates and glows)
 is enlarged, and the text set in the font, in its colour, goes over it.
+Where the project has a hand-made SVG redraw of the picture (BACKGROUNDS,
+port/assets/titles/svg, needing rsvg-convert), the text goes over the redraw
+instead.
 Each letter is placed where the old one is (Layout): the text is set with
 the font's spacing, moved and tracked as a whole to cover the old text
 best, and then each letter is moved by up to four texels, in eighths of a
@@ -41,7 +44,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hud_assets import FORMATS, XboxMap, decode_bitmap, level0_size  # noqa: E402
+from hud_assets import FORMATS, XboxMap, decode_bitmap, level0_size, render_svg  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 TITLES = ROOT / "port/assets/titles"
@@ -108,6 +111,23 @@ TEXTS = {
     MENU + "settings_select\\player_setup\\player_profile_edit\\header_edit_profile_settings": ["EDIT PROFILE SETTINGS"],
     MENU + "settings_select\\player_setup\\player_profile_edit\\name_edit\\header_profile_name": ["PROFILE NAME"],
     MENU + "solo_level_select\\header_load_level": ["LOAD LEVEL"],
+    # (in every map: the multiplayer maps show it after a game)
+    "ui\\shell\\bitmaps\\postgame_carnage_report": ["POSTGAME CARNAGE REPORT"],
+}
+
+# where the text is, in the pictures that hold more than their title (texels:
+# left, top, right, bottom, the right and bottom past it): only that part's
+# text is set again, the rest of the picture enlarged as a plate is
+TEXT_BOXES = {
+    # (the report's panel, its border line at row 68 under the title)
+    "ui\\shell\\bitmaps\\postgame_carnage_report": (58, 36, 556, 67),
+}
+
+# the pictures whose rest is drawn from a hand-made SVG redraw of it (in
+# port/assets/titles/svg, without its text) rather than enlarged from the map's
+# picture: sharper, and the project's own drawing
+BACKGROUNDS = {
+    "ui\\shell\\bitmaps\\postgame_carnage_report": "postgame_carnage_report.svg",
 }
 
 # a text the game draws in a title's bitmap in place of the map's, by bitmap:
@@ -550,15 +570,24 @@ def bleed(image: np.ndarray) -> np.ndarray:
     return result
 
 
-def build_title(bitmap: dict, text: str, scale: int, layout=None, margin: int = 1) -> tuple:
+def build_title(bitmap: dict, text: str, scale: int, layout=None, region=None, svg=None, margin: int = 1) -> tuple:
     """The title's picture, and its letters' layout (layout: one to use, the
-    same text's in another picture of the same group; margin: how far around
-    the old text, in texels, is taken out with it)."""
+    same text's in another picture of the same group; region: where the text
+    is, if not all over the picture, TEXT_BOXES; svg: the picture's redraw to
+    set the text over, BACKGROUNDS; margin: how far around the old text, in
+    texels, is taken out with it)."""
     from scipy import ndimage
 
     image = decode_bitmap(bitmap)
-    mask = text_mask(image)
-    coverage_old = text_coverage(image)
+    if region:
+        left, top, right, bottom = region
+        mask = np.zeros(image.shape[:2], bool)
+        coverage_old = np.zeros(image.shape[:2], float)
+        mask[top:bottom, left:right] = text_mask(image[top:bottom, left:right])
+        coverage_old[top:bottom, left:right] = text_coverage(image[top:bottom, left:right])
+    else:
+        mask = text_mask(image)
+        coverage_old = text_coverage(image)
     ys, xs = np.where(coverage_old >= 0.5)
     box = (xs.min(), ys.min(), xs.max(), ys.max())
     # the text's colour and alpha: those of its solid texels
@@ -570,7 +599,12 @@ def build_title(bitmap: dict, text: str, scale: int, layout=None, margin: int = 
         layout = Layout(text, coverage_old, box).fit().match_gaps()
     letters = layout.render(scale, (image.shape[0] * scale, image.shape[1] * scale))
     edge = ndimage.binary_dilation(mask, iterations=margin)
-    if colour.min() > 200:
+    if svg:
+        # the redraw, drawn at the title's size
+        background = render_svg(TITLES / "svg" / svg, scale).astype(float)
+        if background.shape[:2] != (image.shape[0] * scale, image.shape[1] * scale):
+            raise SystemExit(f"{svg}: not {scale}x its bitmap's {image.shape[1]}x{image.shape[0]}")
+    elif colour.min() > 200 and not region:
         # white text: its glow grown again around the new letters
         sigma, gain = fit_glow(image, mask)
         glow_colour = np.median(image[~edge & (image[..., 3] > 32)][:, :3].astype(float), axis=0)
@@ -611,7 +645,8 @@ def main() -> None:
             # (a selected menu item's text is its unselected picture's, which
             # is read more surely: flat, where the selected one's white blurs
             # into its glow)
-            image, layout = build_title(bitmap, text, scale, layouts.get((tag, text)))
+            image, layout = build_title(bitmap, text, scale, layouts.get((tag, text)), TEXT_BOXES.get(tag),
+                                        BACKGROUNDS.get(tag))
             layouts.setdefault((tag, text), layout)
             Image.fromarray(image, "RGBA").save(TITLES / f"{name}.png", optimize=True)
             entries.append({
@@ -636,7 +671,7 @@ def main() -> None:
                 # (the game's own text there, standing for its own pixels)
                 variant, crc = VARIANTS[tag][index]
                 variant_name = f"{stem}__{variant.lower().replace(' ', '_')}__{index}"
-                image, placed = build_title(bitmap, variant, scale, layout.in_place(variant), HALO)
+                image, placed = build_title(bitmap, variant, scale, layout.in_place(variant), margin=HALO)
                 Image.fromarray(image, "RGBA").save(TITLES / f"{variant_name}.png", optimize=True)
                 entries.append({**entries[-1], "name": variant_name, "crc": crc, "text": variant,
                                 "lefts": placed.lefts(), "cap": placed.cap / SUPER, "in_place_of": text})

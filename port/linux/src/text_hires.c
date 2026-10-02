@@ -40,6 +40,8 @@ static struct
 	stbtt_fontinfo info;
 	/* font units to units of the 480 lines */
 	float scale;
+	/* how many times the display's pixels its glyphs are rasterized with */
+	float oversample;
 } fonts[MAXIMUM_FONTS];
 static long font_count;
 
@@ -97,7 +99,7 @@ static void atlas_reset(float scale)
 	dirty_bottom = ATLAS_SIZE;
 }
 
-long text_hires_font(char const *tag_name, float cap_height)
+long text_hires_font(char const *tag_name, float cap_height, float oversample)
 {
 	unsigned int index;
 	long font;
@@ -105,9 +107,12 @@ long text_hires_font(char const *tag_name, float cap_height)
 
 	if (!text_enabled() || !tag_name || cap_height <= 0.0f)
 		return -1;
+	/* (text is never drawn with fewer pixels than the display's) */
+	if (oversample < 1.0f)
+		oversample = 1.0f;
 	for (font = 0; font < font_count; font++)
 	{
-		if (!names_differ(fonts[font].tag, tag_name))
+		if (!names_differ(fonts[font].tag, tag_name) && fonts[font].oversample == oversample)
 			return fonts[font].scale > 0.0f ? font : -1;
 	}
 	if (font_count >= MAXIMUM_FONTS)
@@ -115,6 +120,7 @@ long text_hires_font(char const *tag_name, float cap_height)
 	font = font_count++;
 	snprintf(fonts[font].tag, sizeof(fonts[font].tag), "%s", tag_name);
 	fonts[font].scale = 0.0f;
+	fonts[font].oversample = oversample;
 	for (index = 0; index < text_hires_embedded_count; index++)
 	{
 		const struct text_hires_embedded *embedded = &text_hires_embedded[index];
@@ -146,6 +152,7 @@ int text_hires_covers(long font, unsigned long code)
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph)
 {
 	float scale = halo_screen_pixel_scale();
+	float pixel_scale;
 	unsigned long slot;
 	long probe;
 
@@ -169,7 +176,7 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 	if (glyphs[slot].font == -1)
 	{
 		/* rasterized now */
-		float pixels = fonts[font].scale * scale;
+		float pixels = fonts[font].scale * scale * fonts[font].oversample;
 		int index = stbtt_FindGlyphIndex(&fonts[font].info, (int)code);
 		int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 		int width, height, advance = 0, bearing = 0;
@@ -222,10 +229,11 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 	}
 	if (!glyphs[slot].width || !glyphs[slot].height)
 		return 0;
-	glyph->left = glyphs[slot].left / scale;
-	glyph->top = glyphs[slot].top / scale;
-	glyph->right = (glyphs[slot].left + glyphs[slot].width) / scale;
-	glyph->bottom = (glyphs[slot].top + glyphs[slot].height) / scale;
+	pixel_scale = scale * fonts[font].oversample;
+	glyph->left = glyphs[slot].left / pixel_scale;
+	glyph->top = glyphs[slot].top / pixel_scale;
+	glyph->right = (glyphs[slot].left + glyphs[slot].width) / pixel_scale;
+	glyph->bottom = (glyphs[slot].top + glyphs[slot].height) / pixel_scale;
 	glyph->advance = glyphs[slot].advance;
 	glyph->u0 = (float)glyphs[slot].x * placeholder_width / ATLAS_SIZE;
 	glyph->v0 = (float)glyphs[slot].y * placeholder_height / ATLAS_SIZE;

@@ -861,8 +861,9 @@ static short *network_game_server_ingame_addition_count(
 	return NULL;
 }
 
-/* port: a player's name in ASCII (what is not ASCII, "?"), for the host's
-ban command */
+/* port: a player's name in ASCII (player_name_character_ascii: a letter
+with a mark its plain one, what is not ASCII else "?"), for the host's ban
+command */
 static void network_game_server_player_name_text(
 	struct network_player const *player,
 	char *text,
@@ -871,7 +872,7 @@ static void network_game_server_player_name_text(
 	long index;
 
 	for (index = 0; index < (long)NUMBEROF(player->name) && player->name[index] && index < size - 1; index++)
-		text[index] = player->name[index] >= 32 && player->name[index] < 127 ? (char)player->name[index] : '?';
+		text[index] = player_name_character_ascii(player->name[index]);
 	text[index] = 0;
 }
 
@@ -930,6 +931,8 @@ boolean network_game_server_ban_player(
 	struct network_game_server *server = global_network_game_server_get();
 	long found_index = NONE;
 	long match_count = 0;
+	long exact_index = NONE;
+	long exact_count = 0;
 	long index;
 	long machine_index;
 	char names[96] = "";
@@ -950,15 +953,25 @@ boolean network_game_server_ban_player(
 		/* (the whole name first) */
 		if (network_game_server_name_begins_with(name, text) && csstrlen(name) == csstrlen(text))
 		{
-			found_index = index;
-			match_count = 1;
-			break;
+			exact_index = index;
+			exact_count++;
 		}
 		if (network_game_server_name_begins_with(name, text))
 		{
 			found_index = index;
 			match_count++;
 		}
+	}
+	if (exact_count > 1)
+	{
+		/* (the host numbers players of the same name: network_server_message_handler.c) */
+		console_warning("ban: %ld players are named \"%s\"", exact_count, text);
+		return FALSE;
+	}
+	if (exact_count == 1)
+	{
+		found_index = exact_index;
+		match_count = 1;
 	}
 	if (!text[0])
 	{

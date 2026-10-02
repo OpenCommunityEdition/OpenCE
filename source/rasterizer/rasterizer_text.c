@@ -88,7 +88,7 @@ struct text_hires_glyph
 	float advance;
 };
 
-long text_hires_font(char const *tag_name, float cap_height);
+long text_hires_font(char const *tag_name, float cap_height, float oversample);
 int text_hires_covers(long font, unsigned long code);
 int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *glyph);
 void text_hires_register_atlas(unsigned long const *texture, unsigned long width, unsigned long height);
@@ -206,7 +206,10 @@ static void rasterizer_draw_character_with_dropshadow(
 	short dx,
 	short dy);
 static long hires_text_font_get(
-	long font_index);
+	long font_index,
+	real oversample);
+static void rasterizer_text_draw_scaled_character(
+	struct dynamic_screen_vertex const *vertices);
 static void rasterizer_draw_hires_character(
 	struct parse_string_state *state,
 	struct font_header *font,
@@ -236,6 +239,10 @@ static void rasterizer_draw_hires_character_with_dropshadow(
 static struct hardware_character_cache hardware_character_cache;
 static struct bitmap_data *hires_text_atlas = NULL;
 static long hires_text_font = NONE;
+/* port: the text's scale about a point (rasterizer_text_set_scale) */
+static real text_scale = 1.0f;
+static real text_scale_origin_x = 0.0f;
+static real text_scale_origin_y = 0.0f;
 static pixel32 global_shadow_color = 0;
 static short rasterizer_text_unused = 0;
 static short magic_number= 12;
@@ -401,7 +408,7 @@ rasterizer_draw_character(
 		vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0;
 		vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy);
 
-		rasterizer_text_draw_character(vertices);
+		rasterizer_text_draw_scaled_character(vertices);
 	}
 
 	return;
@@ -449,7 +456,7 @@ rasterizer_draw_string(
 			}
 
 			/* port: from the font's atlas, when it has every character */
-			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font()) : NONE;
+			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font(), MAX(text_scale, 1.0f)) : NONE;
 			if (hires_text_font != NONE)
 			{
 				long character_index;
@@ -500,6 +507,16 @@ rasterizer_draw_string(
 					FLOOR(clip->y0, 0),
 					MIN(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0, clip->x1),
 					MIN(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0, clip->y1));
+			}
+			/* port: text drawn scaled (rasterizer_text_set_scale) clipped where
+			it reaches the viewport once scaled: the clip as it is before the
+			scale */
+			if (text_scale != 1.0f)
+			{
+				viewport_bounds.x0 = (short)(text_scale_origin_x + (viewport_bounds.x0 - text_scale_origin_x) / text_scale);
+				viewport_bounds.x1 = (short)(text_scale_origin_x + (viewport_bounds.x1 - text_scale_origin_x) / text_scale);
+				viewport_bounds.y0 = (short)(text_scale_origin_y + (viewport_bounds.y0 - text_scale_origin_y) / text_scale);
+				viewport_bounds.y1 = (short)(text_scale_origin_y + (viewport_bounds.y1 - text_scale_origin_y) / text_scale);
 			}
 
 			memset(&parameters, 0, sizeof(parameters));
@@ -568,7 +585,7 @@ rasterizer_draw_unicode_string(
 			}
 
 			/* port: from the font's atlas, when it has every character */
-			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font()) : NONE;
+			hires_text_font = hires_text_atlas ? hires_text_font_get(draw_string_get_font(), MAX(text_scale, 1.0f)) : NONE;
 			if (hires_text_font != NONE)
 			{
 				long character_index;
@@ -619,6 +636,16 @@ rasterizer_draw_unicode_string(
 					FLOOR(clip->y0, 0),
 					MIN(render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0, clip->x1),
 					MIN(render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0, clip->y1));
+			}
+			/* port: text drawn scaled (rasterizer_text_set_scale) clipped where
+			it reaches the viewport once scaled: the clip as it is before the
+			scale */
+			if (text_scale != 1.0f)
+			{
+				viewport_bounds.x0 = (short)(text_scale_origin_x + (viewport_bounds.x0 - text_scale_origin_x) / text_scale);
+				viewport_bounds.x1 = (short)(text_scale_origin_x + (viewport_bounds.x1 - text_scale_origin_x) / text_scale);
+				viewport_bounds.y0 = (short)(text_scale_origin_y + (viewport_bounds.y0 - text_scale_origin_y) / text_scale);
+				viewport_bounds.y1 = (short)(text_scale_origin_y + (viewport_bounds.y1 - text_scale_origin_y) / text_scale);
 			}
 
 			memset(&parameters, 0, sizeof(parameters));
@@ -698,7 +725,7 @@ rasterizer_draw_character_with_dropshadow(
 			vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = (real)v0;
 			vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = (real)(v0 + dy);
 
-			rasterizer_text_draw_character(vertices);
+			rasterizer_text_draw_scaled_character(vertices);
 
 			if (!shadow)
 				break;
@@ -713,14 +740,57 @@ rasterizer_draw_character_with_dropshadow(
 
 /* ---------- private code */
 
+/* port: text drawn scale times larger about a point (in screen units), until
+it is set back to 1: the characters' quads are laid out as before, and
+scaled about it as they are drawn */
+void rasterizer_text_set_scale(
+	real scale,
+	real origin_x,
+	real origin_y)
+{
+	text_scale = scale > 0.0f ? scale : 1.0f;
+	text_scale_origin_x = origin_x;
+	text_scale_origin_y = origin_y;
+
+	return;
+}
+
+/* port: a character's quad, scaled (rasterizer_text_set_scale) */
+static void rasterizer_text_draw_scaled_character(
+	struct dynamic_screen_vertex const *vertices)
+{
+	struct dynamic_screen_vertex scaled[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
+	short vertex_index;
+
+	if (text_scale == 1.0f)
+	{
+		rasterizer_text_draw_character(vertices);
+		return;
+	}
+	for (vertex_index = 0; vertex_index < NUMBER_OF_VERTICES_PER_QUADRILATERAL; vertex_index++)
+	{
+		scaled[vertex_index] = vertices[vertex_index];
+		scaled[vertex_index].position.x =
+			text_scale_origin_x + (vertices[vertex_index].position.x - text_scale_origin_x) * text_scale;
+		scaled[vertex_index].position.y =
+			text_scale_origin_y + (vertices[vertex_index].position.y - text_scale_origin_y) * text_scale;
+	}
+	rasterizer_text_draw_character(scaled);
+
+	return;
+}
+
 /* port: the high-res text's font for a font tag, sized by the height of its
-capital H (its rows with ink), or NONE */
+capital H (its rows with ink), its glyphs drawn with oversample times the
+pixels (for text scaled up), or NONE */
 static long hires_text_font_get(
-	long font_index)
+	long font_index,
+	real oversample)
 {
 	static struct
 	{
 		struct font_header *font;
+		real oversample;
 		long hires_font;
 	} fonts[MAXIMUM_HIRES_TEXT_FONTS];
 	static short next_font = 0;
@@ -737,7 +807,7 @@ static long hires_text_font_get(
 	font = font_definition_get(font_index);
 	for (font_slot = 0; font_slot < MAXIMUM_HIRES_TEXT_FONTS; font_slot++)
 	{
-		if (fonts[font_slot].font == font)
+		if (fonts[font_slot].font == font && fonts[font_slot].oversample == oversample)
 			return fonts[font_slot].hires_font;
 	}
 	capital = font_get_character_by_ascii_code(font, 'H');
@@ -762,10 +832,11 @@ static long hires_text_font_get(
 		}
 	}
 	hires_font = top == NONE ? NONE :
-		text_hires_font(tag_get_name(font_index), (float)(bottom - top + 1));
+		text_hires_font(tag_get_name(font_index), (float)(bottom - top + 1), (float)oversample);
 	if (hires_font < 0)
 		hires_font = NONE;
 	fonts[next_font].font = font;
+	fonts[next_font].oversample = oversample;
 	fonts[next_font].hires_font = hires_font;
 	next_font = (short)((next_font + 1) % MAXIMUM_HIRES_TEXT_FONTS);
 
@@ -905,7 +976,7 @@ static void rasterizer_draw_hires_glyph(
 		vertices[1].texture_coordinates.x = vertices[2].texture_coordinates.x = u1;
 		vertices[0].texture_coordinates.y = vertices[1].texture_coordinates.y = v0;
 		vertices[2].texture_coordinates.y = vertices[3].texture_coordinates.y = v1;
-		rasterizer_text_draw_character(vertices);
+		rasterizer_text_draw_scaled_character(vertices);
 	}
 
 	return;

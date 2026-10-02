@@ -97,6 +97,8 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/object_definitions.h"
 #include "objects/objects.h"
+#include "physics/collision_usage.h"
+#include "physics/collisions.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_camera_projection.h"
@@ -105,6 +107,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
+#include "text/font_group.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
@@ -990,6 +993,246 @@ static void hud_draw_players(
 	return;
 }
 
+/* port: in multiplayer, players' names above their heads
+(display.player_names: "all", "allies", "enemies" or "none"). An ally's goes
+above the triangle the game draws over teammates; an enemy's only while the
+view sees them and they are not camouflaged, so that it never gives away
+where they hide. */
+
+/* the platform layer's (port/linux/src/port_config.c) */
+const char *config_string(const char *name);
+double config_real(const char *name);
+
+enum
+{
+	_player_names_none,
+	_player_names_all,
+	_player_names_allies,
+	_player_names_enemies,
+};
+
+static short hud_player_names_setting(
+	void)
+{
+	static short setting = NONE;
+
+	if (setting == NONE)
+	{
+		const char *value = config_string("display.player_names");
+
+		setting = _player_names_all;
+		if (value)
+		{
+			if (!csstrcmp(value, "none"))
+				setting = _player_names_none;
+			else if (!csstrcmp(value, "allies") || !csstrcmp(value, "allys"))
+				setting = _player_names_allies;
+			else if (!csstrcmp(value, "enemies"))
+				setting = _player_names_enemies;
+		}
+	}
+
+	return setting;
+}
+
+/* display.player_name_scale: how large the names are drawn, 0.25 to 4 times
+three quarters of the HUD's text */
+static real hud_player_name_scale(
+	void)
+{
+	static real scale = 0.0f;
+
+	if (scale == 0.0f)
+		scale = 0.75f * PIN((real)config_real("display.player_name_scale"), 0.25f, 4.0f);
+
+	return scale;
+}
+
+/* whether the view sees the unit's head: nothing between them but the unit,
+or what it rides in */
+static boolean hud_player_name_in_sight(
+	long unit_index,
+	real_point3d const *head_position)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	long ignore_index = player_index == NONE ? NONE : player_get(player_index)->unit_index;
+	struct collision_result result;
+	real_vector3d vector;
+	boolean in_sight = TRUE;
+
+	if (global_current_collision_user_depth >= MAXIMUM_COLLISION_USER_STACK_DEPTH)
+		return FALSE;
+	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_ui;
+	vector.i = head_position->x - render.camera.position.x;
+	vector.j = head_position->y - render.camera.position.y;
+	vector.k = head_position->z - render.camera.position.z;
+	if (collision_test_vector(_collision_test_for_line_of_sight_flags, &render.camera.position, &vector,
+		ignore_index, &result))
+	{
+		long parent_index = unit_get(unit_index)->object.parent_object_index;
+
+		/* (an object: 3) */
+		in_sight = result.type == 3 &&
+			(result.object_index == unit_index || (parent_index != NONE && result.object_index == parent_index));
+	}
+	--global_current_collision_user_depth;
+
+	return in_sight;
+}
+
+/* the farthest an enemy's name is shown, in world units (the sniper rifle's
+at 2x; its 8x would reach across most maps) */
+#define MAXIMUM_ENEMY_NAME_RANGE 70.0f
+
+/* how far away enemies' names are shown: as far as the local player's
+weapon turns its reticle red over an enemy (its autoaim distance, times its
+zoom; a vehicle's gun when seated at one, none for a weapon that aims only
+when zoomed, unzoomed), never less than the motion sensor's reach and never
+more than MAXIMUM_ENEMY_NAME_RANGE */
+static real hud_player_name_enemy_range(
+	void)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	real range = hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
+	long unit_index;
+
+	if (player_index == NONE || player_get(player_index)->unit_index == NONE)
+		return range;
+	unit_index = unit_get_aiming_unit_index(player_get(player_index)->unit_index);
+	if (unit_index != NONE)
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+
+		if (weapon_index != NONE)
+		{
+			struct weapon_definition *definition = weapon_definition_get(weapon_get(weapon_index)->definition_index);
+			short zoom_level = player_control_get_zoom_level(render.local_player_index);
+
+			if (zoom_level != NONE || !TEST_FLAG(definition->weapon.flags, _weapon_aim_assists_only_when_zoomed_bit))
+			{
+				real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
+					weapon_get_zoom_magnification(weapon_index, zoom_level);
+
+				range = MAX(range, weapon_range);
+			}
+		}
+	}
+
+	return MIN(range, MAXIMUM_ENEMY_NAME_RANGE);
+}
+
+static void hud_draw_player_name(
+	long player_index,
+	boolean ally,
+	boolean indicator,
+	real enemy_range)
+{
+	struct player_datum const *player = player_get(player_index);
+	long font_index = hud_get_font_index();
+	real_point3d head_position;
+	real_point3d view_position;
+	real_point2d screen_position;
+	wchar_t name[NUMBEROF(player->name) + 1];
+	real_argb_color color;
+	rectangle2d bounds;
+	struct font_header *font;
+	short x, y, index;
+	real depth_factor;
+	real distance;
+
+	if (font_index == NONE)
+		return;
+	unit_get_head_position(player->unit_index, &head_position);
+	distance = distance3d(&render.camera.position, &head_position);
+	if (!ally && distance >= enemy_range)
+		return;
+	if (!ally &&
+		(unit_get(player->unit_index)->unit.active_camouflage > 0.5f ||
+		!hud_player_name_in_sight(player->unit_index, &head_position)))
+	{
+		return;
+	}
+	/* (where the game draws a teammate's triangle) */
+	head_position.z += 0.30000001f;
+	matrix4x3_transform_point(&render.frustum.world_to_view, &head_position, &view_position);
+	if (!render_camera_view_to_screen(&render.camera, &render.frustum, &view_position, &screen_position))
+		return;
+	x = (short)fast_ftol(screen_position.x) - render.camera.viewport_bounds.x0;
+	y = (short)fast_ftol(screen_position.y) - render.camera.viewport_bounds.y0;
+	if (indicator)
+	{
+		struct bitmap_data *bitmap = bitmap_group_get_bitmap_from_sequence(
+			interface_get_tag_index(_interface_bitmap_multiplayer_hud), 0, 0);
+
+		if (bitmap)
+			y -= bitmap->registration_point.y;
+	}
+	y -= 2;
+	font = font_definition_get(font_index);
+	bounds.x0 = x - 160;
+	bounds.x1 = x + 160;
+	bounds.y1 = y;
+	bounds.y0 = y - (font->ascending_height + font->descending_height);
+	for (index = 0; index < (short)NUMBEROF(player->name); index++)
+		name[index] = player->name[index];
+	name[NUMBEROF(player->name)] = 0;
+	if (ally)
+	{
+		hud_get_text_color(&color);
+		/* (whole up to 15 world units away, then fading to 0.4 at 75) */
+		depth_factor = 1.0f - (-view_position.z - 15.0f) / 60.0f;
+		color.alpha = PIN(depth_factor, 0.4f, 1.0f);
+	}
+	else
+	{
+		color.red = 1.0f;
+		color.green = 0.3f;
+		color.blue = 0.25f;
+		/* (whole up to four fifths of the range, then fading out) */
+		color.alpha = PIN((enemy_range - distance) / (0.2f * enemy_range), 0.0f, 1.0f);
+	}
+	/* (centred: 2; scaled about its bottom's middle, over the head) */
+	draw_string_set_draw_mode(font_index, NONE, 2, 0, &color);
+	rasterizer_text_set_scale(hud_player_name_scale(), (real)x, (real)y);
+	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, name);
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
+
+	return;
+}
+
+static void hud_draw_player_names(
+	void)
+{
+	short setting = hud_player_names_setting();
+	long player_index = local_player_get_player_index(render.local_player_index);
+	struct data_iterator iterator;
+	struct player_datum *player;
+	boolean indicators;
+	long team_index;
+	real enemy_range;
+
+	if (setting == _player_names_none || player_index == NONE)
+		return;
+	team_index = player_get(player_index)->team_index;
+	indicators = game_engine_display_team_indicators();
+	enemy_range = hud_player_name_enemy_range();
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		/* (allies as the game's triangles tell them: the same team) */
+		boolean ally = player->team_index == team_index;
+
+		if (iterator.datum_index == player_index || player->unit_index == NONE)
+			continue;
+		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies))
+			continue;
+		hud_draw_player_name(iterator.datum_index, ally, ally && indicators, enemy_range);
+	}
+
+	return;
+}
+
 static void temporary_hud_draw(
 	void)
 {
@@ -1136,6 +1379,10 @@ void hud_draw_screen(
 		{
 			hud_draw_players();
 		}
+
+		/* port: players' names above their heads, in multiplayer */
+		if (game_engine_running() && !cinematic_in_progress())
+			hud_draw_player_names();
 
 		if (!game_time_get_paused() &&
 			render.local_player_index == local_player_get_next(NONE))

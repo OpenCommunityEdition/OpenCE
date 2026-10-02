@@ -39,6 +39,16 @@ static struct platform_ui_pointer ui_pointer;
 static float ui_pointer_wheel;
 #endif
 static pthread_mutex_t input_lock = PTHREAD_MUTEX_INITIALIZER;
+/* the multiplayer scoreboard is open (platform_scoreboard_scroll): the wheel
+and Page Up/Down scroll it, and the wheel switches no weapon; how far they
+have moved it since the game last asked (notches down, pages down). Open
+until the game stops saying so for SCOREBOARD_OPEN_MS (a game that ends with
+it open never says it closed). */
+#define SCOREBOARD_OPEN_MS 250
+static Uint64 scoreboard_open_until_ms;
+static float scoreboard_wheel;
+static long scoreboard_notches;
+static long scoreboard_pages;
 
 /* debug keyboard queue */
 #define KEYSTROKE_QUEUE_SIZE 64
@@ -425,9 +435,57 @@ void platform_video_drawable_size(int *width, int *height)
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
 }
 
+#ifndef HALO_ANDROID
+/* with vsync off, the time between frames display.max_fps asks for (0:
+twice the display's refresh rate), or 0 for no limit. A GPU never left idle
+can hang (Intel's Raptor Lake graphics, whose reset then takes the desktop
+with it); the limit gives it a rest every frame. */
+static Uint64 frame_interval_ns(void)
+{
+	static int vsync = -1;
+	static long maximum;
+	float rate;
+
+	if (vsync < 0)
+	{
+		vsync = config_boolean("display.vsync");
+		maximum = config_integer("display.max_fps");
+	}
+	if (vsync || maximum < 0)
+		return 0;
+	rate = (float)maximum;
+	if (!maximum)
+	{
+		SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
+		const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
+
+		rate = 2.0f * (mode && mode->refresh_rate > 0.0f ? mode->refresh_rate : 60.0f);
+	}
+	return (Uint64)(1e9f / rate);
+}
+
+#endif
 void platform_video_swap(void)
 {
+#ifndef HALO_ANDROID
+	static Uint64 next_frame;
+	Uint64 interval, now;
+
+#endif
 	SDL_GL_SwapWindow(platform_window);
+#ifndef HALO_ANDROID
+	interval = frame_interval_ns();
+	if (!interval)
+		return;
+	now = SDL_GetTicksNS();
+	if (next_frame > now)
+	{
+		SDL_DelayPrecise(next_frame - now);
+		now = next_frame;
+	}
+	/* (a frame more than an interval late starts the count again) */
+	next_frame = now - next_frame > interval ? now + interval : next_frame + interval;
+#endif
 }
 
 void platform_mouse_capture(BOOL capture)
@@ -701,6 +759,27 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
+void platform_scoreboard_scroll(int open, long *notches, long *pages)
+{
+	Uint64 now = SDL_GetTicks();
+
+	pthread_mutex_lock(&input_lock);
+	if (!open || now >= scoreboard_open_until_ms)
+	{
+		scoreboard_wheel = 0.0f;
+		scoreboard_notches = 0;
+		scoreboard_pages = 0;
+	}
+	scoreboard_open_until_ms = open ? now + SCOREBOARD_OPEN_MS : 0;
+	if (notches)
+		*notches = scoreboard_notches;
+	if (pages)
+		*pages = scoreboard_pages;
+	scoreboard_notches = 0;
+	scoreboard_pages = 0;
+	pthread_mutex_unlock(&input_lock);
+}
+
 void platform_pump_events(void)
 {
 	/* debug.exit_after (seconds) ends the game that long after the window
@@ -745,6 +824,11 @@ void platform_pump_events(void)
 					keys_pressed[event.key.scancode] = 1;
 			}
 			queue_keystroke(&event.key);
+			if (SDL_GetTicks() < scoreboard_open_until_ms && event.key.down &&
+				(event.key.scancode == SDL_SCANCODE_PAGEUP || event.key.scancode == SDL_SCANCODE_PAGEDOWN))
+			{
+				scoreboard_pages += event.key.scancode == SDL_SCANCODE_PAGEDOWN ? 1 : -1;
+			}
 			/* F12 releases or recaptures the mouse */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
 			{
@@ -800,6 +884,22 @@ void platform_pump_events(void)
 				input_state.mouse_buttons[event.button.button] = event.button.down;
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
+			if (SDL_GetTicks() < scoreboard_open_until_ms)
+			{
+				/* whole notches, up (away) scrolling up */
+				scoreboard_wheel -= event.wheel.y;
+				while (scoreboard_wheel >= 1.0f)
+				{
+					scoreboard_notches++;
+					scoreboard_wheel -= 1.0f;
+				}
+				while (scoreboard_wheel <= -1.0f)
+				{
+					scoreboard_notches--;
+					scoreboard_wheel += 1.0f;
+				}
+				break;
+			}
 #ifndef HALO_ANDROID
 			if (input_state.ui_pointer)
 			{

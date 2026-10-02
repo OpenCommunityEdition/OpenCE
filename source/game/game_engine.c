@@ -548,6 +548,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group_lookup.h"
 #include "effects/player_effects.h"
 #include "game_allegiance.h"
+#include "game.h"
 #include "game_globals.h"
 #include "interface/interface.h"
 #include "interface/hud.h"
@@ -1637,6 +1638,425 @@ static long select_players_to_display(
 	return MIN(maximum_count, player_count);
 }
 
+/* port: the scoreboard of a full-screen view (game_engine_rasterize_in_game_score;
+a split-screen view's keeps the Xbox's six rows): SCOREBOARD_SCALE times the
+HUD's text, centred, on a panel (display.scoreboard_background). A team game's
+players in a column for each team (display.scoreboard_team_layout), else in
+order of score in one column, or two when one has too few rows; each with
+the player's ping in a network game (the host's measure:
+network_distributed.c). More players than a page are scrolled to with the
+mouse wheel and Page Up/Down (platform_scoreboard_scroll), a footer telling
+which are shown; opened, it shows the viewer's own player's page. */
+enum
+{
+	/* the rows' widths (in the scoreboard's text, before it is scaled):
+	place, name, score, ping (the last as wide as "Ping" or three digits,
+	so that the columns centred are their text centred) */
+	SCOREBOARD_PLACE_WIDTH = 55,
+	SCOREBOARD_NAME_WIDTH = 150,
+	SCOREBOARD_SCORE_WIDTH = 95,
+	SCOREBOARD_PING_WIDTH = 40,
+	SCOREBOARD_COLUMN_WIDTH = SCOREBOARD_PLACE_WIDTH + SCOREBOARD_NAME_WIDTH + SCOREBOARD_SCORE_WIDTH + SCOREBOARD_PING_WIDTH,
+	SCOREBOARD_COLUMN_GAP = 40,
+	/* the rows a column has: as many as fit between 6 rows of the screen
+	from its top and 2 from its bottom (the motion sensor); the scoreboard
+	is centred on the screen, but never nearer its top than 4 rows (the
+	HUD's shields and health; its messages, such as "hold BACK for score",
+	are hidden while the scoreboard shows) */
+	SCOREBOARD_LAYOUT_TOP_ROWS = 6,
+	SCOREBOARD_BOTTOM_ROWS = 2,
+	SCOREBOARD_MINIMUM_TOP_ROWS = 4,
+	/* the entries (or a team column's rows) a notch of the wheel scrolls */
+	SCOREBOARD_WHEEL_STEP = 3,
+};
+
+#define SCOREBOARD_SCALE 0.75f
+
+/* network_distributed.c's */
+long distributed_player_ping(short player_index);
+/* port_config.c's */
+int config_boolean(const char *name);
+const char *config_string(const char *name);
+/* cinematics.c's */
+void draw_quad(rectangle2d *rectangle, pixel32 color);
+
+/* display.scoreboard_background(_color): the panel behind the scoreboard's
+text, its colour "red, green, blue, alpha" (0 to 255 each), or 0 for none */
+static pixel32 scoreboard_background_color(
+	void)
+{
+	static boolean read = FALSE;
+	static pixel32 color = 0;
+
+	if (!read)
+	{
+		char const *text = config_string("display.scoreboard_background_color");
+		long parts[4] = { 16, 16, 16, 150 };
+		short part;
+
+		read = TRUE;
+		if (!config_boolean("display.scoreboard_background"))
+			return color;
+		for (part = 0; part < 4 && text && *text; part++)
+		{
+			long value = 0;
+			boolean digits = FALSE;
+
+			while (*text == ' ' || *text == ',')
+				text++;
+			while (*text >= '0' && *text <= '9')
+			{
+				value = value * 10 + (*text++ - '0');
+				digits = TRUE;
+			}
+			if (digits)
+				parts[part] = PIN(value, 0, 255);
+			while (*text && *text != ',')
+				text++;
+		}
+		color = ((pixel32)parts[3] << 24) | ((pixel32)parts[0] << 16) | ((pixel32)parts[1] << 8) | (pixel32)parts[2];
+	}
+
+	return color;
+}
+
+/* a row of the scoreboard: its text (tab separated) from the column's left
+(tabs: the column's stops), on the row below the title's (at top) */
+static void scoreboard_draw_row(
+	wchar_t const *string,
+	boolean brighten,
+	real_argb_color const *row_color,
+	long row_index,
+	short top,
+	short left,
+	boolean tabs)
+{
+	rectangle2d bounds = render.camera.window_bounds;
+	long font_index = hud_get_font_index();
+	/* (brightened as a copy: the team colours serve every row) */
+	real_argb_color color = *row_color;
+	short tab_stops[4];
+	struct font_header *font;
+	long line_height;
+
+	if (font_index == NONE)
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	font = font_definition_get(font_index);
+	line_height = font->leading_height + font->descending_height + font->ascending_height;
+	if (brighten)
+	{
+		color.red = MIN(color.red + 0.4f, 1.0f);
+		color.green = MIN(color.green + 0.4f, 1.0f);
+		color.blue = MIN(color.blue + 0.4f, 1.0f);
+	}
+	tab_stops[0] = left;
+	tab_stops[1] = (short)(left + SCOREBOARD_PLACE_WIDTH);
+	tab_stops[2] = (short)(tab_stops[1] + SCOREBOARD_NAME_WIDTH);
+	tab_stops[3] = (short)(tab_stops[2] + SCOREBOARD_SCORE_WIDTH);
+	draw_string_set_tab_stops(tabs ? tab_stops : NULL, tabs ? 4 : 0);
+	/* (the row as wide as the screen once scaled) */
+	bounds.x1 = (short)(bounds.x0 + (bounds.x1 - bounds.x0) / SCOREBOARD_SCALE);
+	if (!tabs)
+		bounds.x0 = left;
+	bounds.y0 = (short)(top + row_index * line_height);
+	bounds.y1 = (short)(bounds.y0 + line_height);
+	draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
+	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, string);
+	draw_string_set_tab_stops(NULL, 0);
+
+	return;
+}
+
+/* sdl_platform.c's: the wheel's and Page Up/Down's moves of the open
+scoreboard (notches and pages, down positive) */
+void platform_scoreboard_scroll(int open, long *notches, long *pages);
+
+/* the scoreboard's scroll (entries of one list, or rows of the team
+columns), and whether it showed last frame (opened, it shows the viewer's
+own player) */
+static long scoreboard_scroll = 0;
+static boolean scoreboard_open = FALSE;
+
+/* display.scoreboard_team_layout: a team game's players in a column for each
+team ("teams", the red team's on the left), or all in order of score
+("score") */
+static boolean scoreboard_team_columns(
+	void)
+{
+	static short setting = NONE;
+
+	if (setting == NONE)
+	{
+		char const *value = config_string("display.scoreboard_team_layout");
+
+		setting = value && !csstrcmp(value, "score") ? FALSE : TRUE;
+	}
+
+	return (boolean)setting;
+}
+
+/* the scoreboard closed: its scroll forgotten, the wheel the weapons' again */
+static void game_engine_scoreboard_closed(
+	void)
+{
+	if (scoreboard_open)
+	{
+		scoreboard_open = FALSE;
+		platform_scoreboard_scroll(FALSE, NULL, NULL);
+	}
+}
+
+static void game_engine_rasterize_scoreboard(
+	long player_index,
+	real alpha)
+{
+	struct statistic_buffer ranked[MULTIPLAYER_MAXIMUM_PLAYERS];
+	/* (the players of each column's list, as indices into ranked: a team
+	game's by team, else all in one list over both columns) */
+	short lists[2][MULTIPLAYER_MAXIMUM_PLAYERS];
+	long list_counts[2] = { 0, 0 };
+	wchar_t row_string[256];
+	wchar_t score_string[256];
+	wchar_t title_string[80];
+	wchar_t ping_string[16];
+	real_argb_color text_color;
+	real_argb_color team_colors[2];
+	real_argb_color color;
+	rectangle2d bounds = render.camera.window_bounds;
+	boolean has_teams = game_engine_has_teams();
+	boolean network = game_connection() == _game_connection_network_client ||
+		game_connection() == _game_connection_network_server;
+	boolean team_columns;
+	long font_index = hud_get_font_index();
+	long string_list_index;
+	long line_height;
+	long rows;
+	long columns;
+	long ranked_count;
+	long total;
+	long page;
+	long shown_rows;
+	long index;
+	short width;
+	short left;
+	short top;
+	wchar_t *column_name;
+	wchar_t *score_name;
+
+	if (font_index == NONE)
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	{
+		struct font_header *font = font_definition_get(font_index);
+
+		line_height = font->leading_height + font->descending_height + font->ascending_height;
+	}
+	if (line_height <= 0)
+		return;
+	/* (laid out at full size, then drawn scaled about the title's top left:
+	the screen holds 1/SCOREBOARD_SCALE as much) */
+	width = (short)((bounds.x1 - bounds.x0) / SCOREBOARD_SCALE);
+	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
+		SCOREBOARD_BOTTOM_ROWS;
+	rows = MAX(rows, 1);
+	ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
+	team_columns = has_teams && scoreboard_team_columns() && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP;
+	for (index = 0; index < ranked_count; index++)
+	{
+		struct player_datum *player = player_try_and_get(ranked[index].player_index);
+		short list = team_columns && player ? (short)PIN(player->team_index, 0, 1) : 0;
+
+		lists[list][list_counts[list]++] = (short)index;
+	}
+	/* (a page: the rows of both team columns, or both columns of one list;
+	the scroll in rows of the team columns, or entries of the list) */
+	if (team_columns)
+	{
+		columns = 2;
+		total = MAX(list_counts[0], list_counts[1]);
+		page = rows;
+	}
+	else
+	{
+		columns = list_counts[0] > rows && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP ? 2 : 1;
+		total = list_counts[0];
+		page = rows * columns;
+	}
+	/* (opened, at the viewer's own player's page; then where the wheel and
+	Page Up/Down take it) */
+	{
+		long notches = 0;
+		long pages = 0;
+
+		platform_scoreboard_scroll(TRUE, &notches, &pages);
+		if (!scoreboard_open)
+		{
+			scoreboard_open = TRUE;
+			scoreboard_scroll = 0;
+			for (index = 0; index < 2; index++)
+			{
+				long position;
+
+				for (position = 0; position < list_counts[index]; position++)
+				{
+					if (ranked[lists[index][position]].player_index == player_index)
+						scoreboard_scroll = position / page * page;
+				}
+			}
+		}
+		scoreboard_scroll += notches * SCOREBOARD_WHEEL_STEP + pages * page;
+		scoreboard_scroll = PIN(scoreboard_scroll, 0, MAX(total - page, 0));
+	}
+	left = (short)(bounds.x0 + (width - (columns * SCOREBOARD_COLUMN_WIDTH + (columns - 1) * SCOREBOARD_COLUMN_GAP)) / 2);
+	/* (centred on the rows shown: the title's, the heading's, the longest
+	column's, and the footer telling where the scroll is) */
+	shown_rows = MIN(rows, total);
+	if (total > page)
+		shown_rows++;
+	{
+		real height = (2 + shown_rows) * line_height * SCOREBOARD_SCALE;
+
+		top = (short)(bounds.y0 + ((bounds.y1 - bounds.y0) - height) / 2);
+		top = MAX(top, (short)(SCOREBOARD_MINIMUM_TOP_ROWS * line_height));
+		/* (the panel behind it, half a row beyond its text, fading with it) */
+		{
+			pixel32 background = scoreboard_background_color();
+			real padding = 0.5f * line_height * SCOREBOARD_SCALE;
+			real block_width = (columns * SCOREBOARD_COLUMN_WIDTH + (columns - 1) * SCOREBOARD_COLUMN_GAP) * SCOREBOARD_SCALE;
+			real block_left = bounds.x0 + (left - bounds.x0) * SCOREBOARD_SCALE;
+
+			if (background >> 24)
+			{
+				rectangle2d panel;
+				long panel_alpha = (long)((background >> 24) * PIN(alpha, 0.0f, 1.0f) + 0.5f);
+
+				panel.x0 = (short)(block_left - padding);
+				/* (the ping, nearly as wide as its column, given room) */
+				panel.x1 = (short)(block_left + block_width + padding + 8.0f * SCOREBOARD_SCALE);
+				panel.y0 = (short)(top - padding);
+				panel.y1 = (short)(top + height + padding);
+				draw_quad(&panel, ((pixel32)panel_alpha << 24) | (background & 0x00FFFFFF));
+			}
+		}
+	}
+	rasterizer_text_set_scale(SCOREBOARD_SCALE, (real)bounds.x0, (real)top);
+
+	team_colors[0].alpha = alpha;
+	team_colors[0].red = 0.6f;
+	team_colors[0].green = 0.3f;
+	team_colors[0].blue = 0.3f;
+	team_colors[1].alpha = alpha;
+	team_colors[1].red = 0.3f;
+	team_colors[1].green = 0.3f;
+	team_colors[1].blue = 0.6f;
+
+	game_engine_generate_title_string(title_string, player_index);
+	color.alpha = alpha;
+	color.red = color.green = color.blue = 0.7f;
+	scoreboard_draw_row(title_string, FALSE, &color, 0, top, left, FALSE);
+
+	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+	column_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x43) : L"";
+	score_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x44) : L"";
+	game_engine->format_score_name(score_string);
+	usprintf(row_string, L"\t%s\t%s\t%s\t%s", column_name, score_name, score_string, network ? L"Ping" : L"");
+	{
+		long column;
+
+		for (column = 0; column < columns; column++)
+		{
+			/* (a team column's heading in its team's colour, brightened) */
+			if (team_columns)
+			{
+				color = team_colors[column];
+				color.red = MIN(color.red + 0.25f, 1.0f);
+				color.green = MIN(color.green + 0.25f, 1.0f);
+				color.blue = MIN(color.blue + 0.25f, 1.0f);
+			}
+			else
+			{
+				color.alpha = alpha;
+				color.red = color.green = color.blue = 0.5f;
+			}
+			scoreboard_draw_row(row_string, FALSE, &color, 1, top,
+				(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)), TRUE);
+		}
+	}
+
+	/* each slot of the page: a team column's row, or a place in the list */
+	for (index = 0; index < rows * columns; index++)
+	{
+		long column = team_columns ? index % 2 : index / rows;
+		long row = team_columns ? index / 2 : index % rows;
+		long list = team_columns ? column : 0;
+		long position = scoreboard_scroll + (team_columns ? row : index);
+		struct statistic_buffer *entry;
+		struct player_datum *player;
+		wchar_t *status_string;
+		real_argb_color *row_color;
+
+		if (row >= rows || position >= list_counts[list])
+			continue;
+		entry = &ranked[lists[list][position]];
+		player = player_try_and_get(entry->player_index);
+		if (!player)
+			continue;
+		color = *hud_get_text_color(&text_color);
+		color.alpha = alpha;
+		game_engine->format_player_score(entry->player_index, score_string);
+		if (game_engine_player_is_out_of_lives(entry->player_index))
+			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8A) : L"";
+		else if (player->quit_out_of_game)
+			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8B) : L"";
+		else
+			status_string = score_string;
+		ping_string[0] = 0;
+		if (network)
+		{
+			long ping = distributed_player_ping((short)DATUM_INDEX_TO_ABSOLUTE_INDEX(entry->player_index));
+
+			/* (three digits at most: its column's width) */
+			if (ping == NONE)
+				usprintf(ping_string, L"-");
+			else if (ping > 999)
+				usprintf(ping_string, L"999+");
+			else
+				usprintf(ping_string, L"%ld", ping);
+		}
+		usprintf(
+			row_string,
+			L"\t%s\t%s\t%s\t%s",
+			get_place_string(entry),
+			player->name,
+			status_string,
+			ping_string);
+		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
+		scoreboard_draw_row(
+			row_string,
+			player_index == entry->player_index,
+			row_color,
+			2 + row,
+			top,
+			(short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP)),
+			TRUE);
+	}
+	/* (where the scroll is, and how to move it) */
+	if (total > page)
+	{
+		long first = scoreboard_scroll + 1;
+		long last = MIN(scoreboard_scroll + page, total);
+
+		color.alpha = alpha;
+		color.red = color.green = color.blue = 0.6f;
+		usprintf(row_string, L"%ld-%ld of %ld   (Page Up / Page Down, mouse wheel)", first, last, total);
+		scoreboard_draw_row(row_string, FALSE, &color, 2 + rows, top, left, FALSE);
+	}
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
+
+	return;
+}
+
 static void game_engine_rasterize_in_game_score(
 	long player_index,
 	real alpha)
@@ -1656,6 +2076,12 @@ static void game_engine_rasterize_in_game_score(
 	wchar_t *column_name;
 	wchar_t *score_name;
 
+	/* port: a full-screen view's its own (game_engine_rasterize_scoreboard) */
+	if (local_player_count() <= 1)
+	{
+		game_engine_rasterize_scoreboard(player_index, alpha);
+		return;
+	}
 	game_engine_generate_title_string(title_string, player_index);
 	entry_count = select_players_to_display(
 		_postgame_statistic_ranking,
@@ -3059,6 +3485,11 @@ static void game_engine_post_rasterize_in_game(
 		real alpha = linear_to_non_linear_alpha(fade);
 
 		game_engine_rasterize_in_game_score(player_index, alpha);
+	}
+	else if (local_player_count() <= 1)
+	{
+		/* (port: the full-screen scoreboard's scroll forgotten) */
+		game_engine_scoreboard_closed();
 	}
 
 	game_engine_globals.hud_message_timers[local_player_index] = fade;
