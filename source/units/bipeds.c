@@ -1838,11 +1838,11 @@ static boolean biped_jump(
 
 			if (upward_velocity<jump_magnitude)
 			{
-				real velocity_delta = jump_magnitude-upward_velocity;
-
-				jump_velocity.i += biped->object.up.i*velocity_delta;
-				jump_velocity.j += biped->object.up.j*velocity_delta;
-				jump_velocity.k += biped->object.up.k*velocity_delta;
+				point_from_line3d(
+					(real_point3d *)&jump_velocity,
+					&biped->object.up,
+					jump_magnitude-upward_velocity,
+					(real_point3d *)&jump_velocity);
 			}
 		}
 
