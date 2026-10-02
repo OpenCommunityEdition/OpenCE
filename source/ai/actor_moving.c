@@ -204,7 +204,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #define PATH_EXTERNAL_FLEE_ROUTINES
@@ -235,7 +234,6 @@ symbols in this file:
 #include "objects/objects.h"
 #include "physics/collision_model_definitions.h"
 #undef PATH_EXTERNAL_FLEE_ROUTINES
-#undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 /* ---------- constants */
 
@@ -655,24 +653,10 @@ void actor_move_transform_avoidance_vector(
 	real_vector3d const *avoidance_vector,
 	real_vector3d *direction_vector)
 {
-	real component;
-
 	*direction_vector = *global_zero_vector3d;
-
-	component = avoidance_vector->i;
-	direction_vector->i += component * avoidance_data->forward.i;
-	direction_vector->j += component * avoidance_data->forward.j;
-	direction_vector->k += component * avoidance_data->forward.k;
-
-	component = avoidance_vector->j;
-	direction_vector->i += component * avoidance_data->left.i;
-	direction_vector->j += component * avoidance_data->left.j;
-	direction_vector->k += component * avoidance_data->left.k;
-
-	component = avoidance_vector->k;
-	direction_vector->i += component * avoidance_data->up.i;
-	direction_vector->j += component * avoidance_data->up.j;
-	direction_vector->k += component * avoidance_data->up.k;
+	point_from_line3d((real_point3d *)direction_vector, &avoidance_data->forward, (avoidance_vector->i), (real_point3d *)direction_vector);
+	point_from_line3d((real_point3d *)direction_vector, &avoidance_data->left, (avoidance_vector->j), (real_point3d *)direction_vector);
+	point_from_line3d((real_point3d *)direction_vector, &avoidance_data->up, (avoidance_vector->k), (real_point3d *)direction_vector);
 
 	return;
 }
