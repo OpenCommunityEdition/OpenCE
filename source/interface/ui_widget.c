@@ -5325,14 +5325,15 @@ enum
 	/* the main menu's SETTINGS menu's */
 	NUMBER_OF_UI_SETTINGS_MAIN_MENU_ROWS = _ui_settings_widget_input - _ui_settings_widget_profile_settings + 1,
 	/* VIDEO SETTINGS' */
-	MAXIMUM_UI_SETTINGS_PAGE_ROWS = 6
+	MAXIMUM_UI_SETTINGS_PAGE_ROWS = 7
 };
 
 enum
 {
 	/* the longest label of a setting's row, RESOLUTION: 3840 X 2160 (or
 	2560 X 1440), is 244 pixels of ui\large_ui, more than either menu's rows
-	(202 and 232) hold */
+	(202 and 232) hold (ANISOTROPIC FILTERING: OFF would be 268, so that row
+	is ANISOTROPIC FILTER) */
 	UI_SETTINGS_LABEL_WIDTH = 244,
 	/* ... so the pause menu's rows, which center their text, are this wide
 	(ui_settings_row_width) */
@@ -5348,8 +5349,11 @@ enum
 	UI_SETTINGS_BOX_BODY_BOTTOM = 190,
 	UI_SETTINGS_BOX_KEY_Y = 195,
 	/* the pause menu's rows (27 pixels), two pixels closer than they are
-	spaced there, so that VIDEO SETTINGS' six fit the body */
+	spaced there, so that six fit the body */
 	UI_SETTINGS_BOX_ROW_PITCH = 26,
+	/* ... and on a page with more, VIDEO SETTINGS' seven, closer still (2
+	pixels clear) */
+	UI_SETTINGS_BOX_CLOSE_ROW_PITCH = 22,
 	/* ... and in the pause menu with SETTINGS, five where four were, the
 	last still above the line over the key (2 pixels clear) */
 	UI_SETTINGS_PAUSE_ROW_PITCH = 23,
@@ -5366,7 +5370,7 @@ enum
 };
 
 typedef char verify_ui_settings_box_rows_fit[
-	(MAXIMUM_UI_SETTINGS_PAGE_ROWS - 1) * UI_SETTINGS_BOX_ROW_PITCH + 27 <=
+	(MAXIMUM_UI_SETTINGS_PAGE_ROWS - 1) * UI_SETTINGS_BOX_CLOSE_ROW_PITCH + 27 <=
 		UI_SETTINGS_BOX_BODY_BOTTOM - UI_SETTINGS_BOX_BODY_TOP ? 1 : -1];
 
 static char const ui_settings_widget_names[NUMBER_OF_UI_SETTINGS_WIDGETS][32] =
@@ -5389,6 +5393,7 @@ static char const ui_settings_widget_names[NUMBER_OF_UI_SETTINGS_WIDGETS][32] =
 	"setting_interpolation",
 	"setting_direct_camera",
 	"setting_window_scale",
+	"setting_anisotropic_filtering",
 	"setting_audio_enabled",
 	"setting_master_volume",
 	"setting_mouse_sensitivity",
@@ -5418,6 +5423,7 @@ static struct
 	{ "INTERPOLATION", _ui_settings_widget_video },
 	{ "DIRECT CAMERA", _ui_settings_widget_video },
 	{ "WINDOW SCALE", _ui_settings_widget_video },
+	{ "ANISOTROPIC FILTER", _ui_settings_widget_video },
 	{ "AUDIO", _ui_settings_widget_audio },
 	{ "MASTER VOLUME", _ui_settings_widget_audio },
 	{ "MOUSE SENSITIVITY", _ui_settings_widget_input },
@@ -5837,12 +5843,17 @@ static void ui_settings_pause_rows_add(
 	rectangle2d row_bounds = ui_widget_definition_get(row_tag_index)->bounds;
 	rectangle2d box_bounds = ui_widget_definition_get(
 		tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\player_help\\help_dialog_bkd"))->bounds;
+	/* (closer only for a page with more rows than fit the body otherwise) */
+	short pitch = (count - 1) * UI_SETTINGS_BOX_ROW_PITCH + (row_bounds.y1 - row_bounds.y0) <=
+		UI_SETTINGS_BOX_BODY_BOTTOM - UI_SETTINGS_BOX_BODY_TOP ?
+		UI_SETTINGS_BOX_ROW_PITCH :
+		UI_SETTINGS_BOX_CLOSE_ROW_PITCH;
 
 	list->horizontal_offset = UI_SETTINGS_BOX_X + ((box_bounds.x1 - box_bounds.x0) - width) / 2 - row_bounds.x0;
 	list->vertical_offset = UI_SETTINGS_BOX_Y + UI_SETTINGS_BOX_BODY_TOP - row_bounds.y0 +
 		(UI_SETTINGS_BOX_BODY_BOTTOM - UI_SETTINGS_BOX_BODY_TOP -
-			((count - 1) * UI_SETTINGS_BOX_ROW_PITCH + (row_bounds.y1 - row_bounds.y0))) / 2;
-	ui_settings_rows_add(list, row_tag_index, 0, 0, UI_SETTINGS_BOX_ROW_PITCH, first_widget, count);
+			((count - 1) * pitch + (row_bounds.y1 - row_bounds.y0))) / 2;
+	ui_settings_rows_add(list, row_tag_index, 0, 0, pitch, first_widget, count);
 
 	return;
 }

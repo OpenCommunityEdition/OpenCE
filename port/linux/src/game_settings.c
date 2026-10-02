@@ -65,13 +65,17 @@ enum game_setting_type
 	_game_setting_type_real,
 	/* a width and a height of the display's (platform_fullscreen_resolution) */
 	_game_setting_type_resolution,
+	/* a whole number that steps by doubling and halving, shown as 2X, 4X and
+	so on, and its minimum (1) as OFF */
+	_game_setting_type_multiple,
 };
 
 struct game_setting
 {
 	const char *name;
 	enum game_setting_type type;
-	/* a number's range (window_scale's top is the display's) and step */
+	/* a number's range (window_scale's top is the display's,
+	anisotropic_filtering's the GPU's) and step */
 	double minimum, maximum, step;
 };
 
@@ -83,6 +87,7 @@ static const struct game_setting game_settings[NUMBER_OF_GAME_SETTINGS] =
 	{ "display.interpolation", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.direct_camera", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.window_scale", _game_setting_type_integer, 1.0, 0.0, 1.0 },
+	{ "display.anisotropic_filtering", _game_setting_type_multiple, 1.0, 0.0, 0.0 },
 	{ "audio.enabled", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "audio.volume", _game_setting_type_percentage, 0.0, 1.0, 0.1 },
 	{ "input.mouse_sensitivity", _game_setting_type_real, 0.1, 10.0, 0.1 },
@@ -109,6 +114,8 @@ static double game_setting_value(int setting)
 		return render_interpolation_direct_camera_enabled();
 	case _game_setting_window_scale:
 		return platform_window_scale();
+	case _game_setting_anisotropic_filtering:
+		return video_anisotropic_filtering();
 	case _game_setting_audio:
 		return audio_output_enabled();
 	case _game_setting_master_volume:
@@ -140,6 +147,9 @@ static BOOL game_setting_apply(int setting, double value)
 		return TRUE;
 	case _game_setting_window_scale:
 		return platform_set_window_scale((int)value);
+	case _game_setting_anisotropic_filtering:
+		video_set_anisotropic_filtering((int)value);
+		return TRUE;
 	case _game_setting_audio:
 		return audio_set_output_enabled(value != 0.0);
 	case _game_setting_master_volume:
@@ -255,6 +265,12 @@ static void game_setting_format(int setting, double value, char *text, int size)
 		if (size > 0)
 			text[0] = 0;
 		break;
+	case _game_setting_type_multiple:
+		if (value > 1.0)
+			snprintf(text, (size_t)size, "%ldX", lround(value));
+		else
+			snprintf(text, (size_t)size, "OFF");
+		break;
 	}
 }
 
@@ -302,11 +318,27 @@ int game_setting_step(int setting, int direction)
 	}
 	else
 	{
-		double maximum = setting == _game_setting_window_scale ? platform_window_scale_maximum() : definition->maximum;
-		double steps = direction > 0 ? floor(value / definition->step + 0.001) + 1.0 :
-			ceil(value / definition->step - 0.001) - 1.0;
+		double maximum = setting == _game_setting_window_scale ? platform_window_scale_maximum() :
+			setting == _game_setting_anisotropic_filtering ? video_anisotropic_filtering_maximum() :
+			definition->maximum;
 
-		next = steps * definition->step;
+		if (definition->type == _game_setting_type_multiple)
+		{
+			/* (the power of two past the value that way: a value between two
+			joins them) */
+			next = 1.0;
+			while (direction > 0 ? next <= value + 0.001 : next * 2.0 < value - 0.001)
+				next *= 2.0;
+			if (direction < 0 && next >= value - 0.001)
+				next /= 2.0;
+		}
+		else
+		{
+			double steps = direction > 0 ? floor(value / definition->step + 0.001) + 1.0 :
+				ceil(value / definition->step - 0.001) - 1.0;
+
+			next = steps * definition->step;
+		}
 		/* (from beyond the range, only back toward it) */
 		if (next < definition->minimum - 0.001 || (direction > 0 && next > maximum + 0.001))
 			return 0;
@@ -324,6 +356,7 @@ int game_setting_step(int setting, int direction)
 		written = config_write_boolean(definition->name, next != 0.0);
 		break;
 	case _game_setting_type_integer:
+	case _game_setting_type_multiple:
 		written = config_write_integer(definition->name, lround(next));
 		break;
 	default:

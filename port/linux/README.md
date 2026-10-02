@@ -152,10 +152,12 @@ these three has the settings of a section of the file:
 
 - VIDEO SETTINGS: `display.fullscreen`, `display.resolution_width` with
   `display.resolution_height` (one RESOLUTION), `display.vsync`,
-  `display.interpolation`, `display.direct_camera` and
-  `display.window_scale`. A window scale set while the game is fullscreen
-  changes the window when the game leaves fullscreen. A resolution set
-  while the game is in a window applies when the game is fullscreen.
+  `display.interpolation`, `display.direct_camera`,
+  `display.window_scale` and `display.anisotropic_filtering` (ANISOTROPIC
+  FILTER: OFF, 2X, 4X, 8X or 16X, up to the maximum of the GPU). A window
+  scale set while the game is fullscreen changes the window when the game
+  leaves fullscreen. A resolution set while the game is in a window
+  applies when the game is fullscreen.
 - AUDIO SETTINGS: `audio.enabled` and `audio.volume`.
 - INPUT SETTINGS: `input.mouse_sensitivity`, `input.mouse_aim_assist` and
   `input.invert_mouse`.

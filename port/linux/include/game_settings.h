@@ -21,6 +21,7 @@ enum
 	_game_setting_interpolation,
 	_game_setting_direct_camera,
 	_game_setting_window_scale,
+	_game_setting_anisotropic_filtering,
 	_game_setting_audio,
 	_game_setting_master_volume,
 	_game_setting_mouse_sensitivity,

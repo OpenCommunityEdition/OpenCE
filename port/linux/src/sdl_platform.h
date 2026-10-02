@@ -92,6 +92,12 @@ BOOL audio_output_enabled(void);
 BOOL audio_set_output_enabled(BOOL enabled);
 float audio_master_volume(void);
 void audio_set_master_volume(float volume);
+/* display.anisotropic_filtering as the renderer has it (d3d8_gl.c): the
+level (1 for none), the most the GPU filters with, and a level for the
+textures drawn from now on (more than the most is the most) */
+int video_anisotropic_filtering(void);
+int video_anisotropic_filtering_maximum(void);
+void video_set_anisotropic_filtering(int level);
 #ifndef HALO_ANDROID
 /* the pointer in the menus (d3d8_gl.c, halo_ui_pointer_update) */
 struct platform_ui_pointer

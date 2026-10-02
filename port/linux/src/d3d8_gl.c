@@ -884,6 +884,24 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+int video_anisotropic_filtering(void)
+{
+	return (int)device.anisotropy;
+}
+
+int video_anisotropic_filtering_maximum(void)
+{
+	return (int)device.maximum_anisotropy;
+}
+
+void video_set_anisotropic_filtering(int level)
+{
+	/* (the samplers take it up as they are next configured) */
+	device.anisotropy = level > 1 ? (float)level : 1.0f;
+	if (device.anisotropy > device.maximum_anisotropy)
+		device.anisotropy = device.maximum_anisotropy;
+}
+
 /* display.anisotropic_filtering, within what the GPU can do */
 static void anisotropy_initialize(void)
 {
@@ -899,9 +917,7 @@ static void anisotropy_initialize(void)
 	glGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &maximum);
 #endif
 	device.maximum_anisotropy = maximum > 1 ? (float)maximum : 1.0f;
-	device.anisotropy = level > 1 ? (float)level : 1.0f;
-	if (device.anisotropy > device.maximum_anisotropy)
-		device.anisotropy = device.maximum_anisotropy;
+	video_set_anisotropic_filtering((int)level);
 	platform_log("anisotropic filtering: %.0fx (setting %ld, the GPU's most %.0fx)",
 		device.anisotropy, level, device.maximum_anisotropy);
 }
