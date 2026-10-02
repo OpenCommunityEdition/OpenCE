@@ -14,11 +14,12 @@ runs on SDL's audio thread; for every voice it resamples to the output rate
 	- the front left and right mix bin volumes of 2D voices,
 	- for 3D voices, DirectSound's inverse distance rolloff between the
 	  minimum and maximum distance, an equal power pan from the source's
-	  direction in listener space, and the low frequency part of the I3DL2
-	  direct path, obstruction and occlusion levels.
+	  direction in listener space, and the I3DL2 direct path, obstruction
+	  and occlusion levels, their high frequency levels a low pass at the
+	  environment's HF reference: a sound behind a wall is muffled.
 3D voices also send to an I3DL2 reverb of the environment the listener is in
-(reverb). Doppler, the direct path's high frequency filters and cones are not
-modelled. A look-ahead limiter keeps the sum under full scale (limit).
+(reverb). Doppler and cones are not modelled. A look-ahead limiter keeps the
+sum under full scale (limit).
 
 Packets the mixer has finished are completed from DirectSoundDoWork, which
 the game calls every frame, and from Flush, never from the audio thread:
@@ -88,7 +89,9 @@ struct sdl_stream
 	DWORD mode;
 	float position[3];
 	float minimum_distance, maximum_distance;
-	float i3dl2_gain;
+	/* the I3DL2 direct path's level and high frequency level, in millibels
+	with obstruction and occlusion (SetI3DL2Source) */
+	LONG direct, direct_hf;
 	/* the I3DL2 room (reverb) send's level and high frequency level, in
 	millibels with occlusion, and its rolloff factor (SetI3DL2Source) */
 	LONG room, room_hf;
@@ -104,7 +107,8 @@ struct sdl_stream
 	/* gains the mixer is ramping from, to avoid clicks */
 	float current_left, current_right, current_room;
 	BOOL gains_valid;
-	/* the room send's low pass */
+	/* the direct path's low pass, for each channel, and the room send's */
+	float direct_lowpass[2];
 	float room_lowpass;
 };
 
@@ -323,23 +327,30 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 		*left = cosf(angle) * 1.41421356f * 0.70710678f;
 		*right = sinf(angle) * 1.41421356f * 0.70710678f;
 	}
-	*left *= attenuation * stream->i3dl2_gain;
-	*right *= attenuation * stream->i3dl2_gain;
+	*left *= attenuation * gain_from_millibels(stream->direct);
+	*right *= attenuation * gain_from_millibels(stream->direct);
 }
 
 /* the voice's gains to the left and right, and to the reverb (only 3D voices
-send to it, as their I3DL2 mix bin did on the Xbox), with the coefficient of
-the send's low pass */
+send to it, as their I3DL2 mix bin did on the Xbox), with the coefficients of
+the low passes of its direct path (3D voices: obstruction and occlusion
+muffle it) and of the send */
 static void voice_gains(const struct sdl_stream *stream, float *left, float *right, float *room,
-	float *room_lowpass)
+	float *direct_lowpass, float *room_lowpass)
 {
 	*room = 0.0f;
+	*direct_lowpass = 0.0f;
 	*room_lowpass = 0.0f;
 	if (stream->has_3d && stream->mode != DS3DMODE_DISABLE)
 	{
 		float rolloff;
 
 		spatialize(stream, left, right, &rolloff);
+		if (stream->direct_hf < stream->direct)
+		{
+			*direct_lowpass = lowpass_coefficient(gain_from_millibels(stream->direct_hf - stream->direct),
+				frequency_cosine(environment.flHFReference));
+		}
 		if (reverb_enabled)
 		{
 			LONG level = environment.lRoom + stream->room;
@@ -377,18 +388,19 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 {
 	double step;
 	float target_left, target_right, target_room, left, right, room, ramp_left, ramp_right, ramp_room;
-	float room_lowpass;
+	float direct_lowpass, room_lowpass;
 	unsigned long frame;
 
 	if (stream->paused || !stream->packet_count || !stream->sample_rate)
 		return;
 	step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE;
-	voice_gains(stream, &target_left, &target_right, &target_room, &room_lowpass);
+	voice_gains(stream, &target_left, &target_right, &target_room, &direct_lowpass, &room_lowpass);
 	if (!stream->gains_valid)
 	{
 		stream->current_left = target_left;
 		stream->current_right = target_right;
 		stream->current_room = target_room;
+		stream->direct_lowpass[0] = stream->direct_lowpass[1] = 0.0f;
 		stream->room_lowpass = 0.0f;
 		stream->gains_valid = TRUE;
 	}
@@ -458,16 +470,19 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			sample_left = a0 + (b0 - a0) * fraction;
 			sample_right = a1 + (b1 - a1) * fraction;
 		}
+		/* the direct path, muffled (the send has its own low pass) */
+		stream->direct_lowpass[0] = sample_left + direct_lowpass * (stream->direct_lowpass[0] - sample_left);
+		stream->direct_lowpass[1] = sample_right + direct_lowpass * (stream->direct_lowpass[1] - sample_right);
 		if (stream->channels == 1)
 		{
 			/* a mono voice's mix bins or pan split it across the speakers */
-			output[frame * 2] += sample_left * left;
-			output[frame * 2 + 1] += sample_left * right;
+			output[frame * 2] += stream->direct_lowpass[0] * left;
+			output[frame * 2 + 1] += stream->direct_lowpass[0] * right;
 		}
 		else
 		{
-			output[frame * 2] += sample_left * left;
-			output[frame * 2 + 1] += sample_right * right;
+			output[frame * 2] += stream->direct_lowpass[0] * left;
+			output[frame * 2 + 1] += stream->direct_lowpass[1] * right;
 		}
 		if (room > 0.0f || ramp_room != 0.0f)
 		{
@@ -1241,7 +1256,6 @@ HRESULT WINAPI IDirectSound_CreateSoundStream(LPDIRECTSOUND sound, LPCDSSTREAMDE
 	stream->mode = DS3DMODE_NORMAL;
 	stream->minimum_distance = DS3D_DEFAULTMINDISTANCE;
 	stream->maximum_distance = DS3D_DEFAULTMAXDISTANCE;
-	stream->i3dl2_gain = 1.0f;
 	pthread_mutex_lock(&mixer_lock);
 	stream->next = streams;
 	streams = stream;
@@ -1340,22 +1354,26 @@ HRESULT WINAPI IDirectSoundStream_SetMaxDistance(LPDIRECTSOUNDSTREAM stream, FLO
 
 HRESULT WINAPI IDirectSoundStream_SetI3DL2Source(LPDIRECTSOUNDSTREAM stream, LPCDSI3DL2BUFFER source, DWORD apply)
 {
-	LONG direct, room, room_hf;
+	LONG direct, direct_hf, room, room_hf;
 
 	(void)apply;
-	/* the low frequency part of the direct path */
+	/* the direct path: at low frequencies obstruction and occlusion take
+	their LF ratio of their high frequency levels, which (with the source's
+	own) muffle it above the HF reference */
 	direct = source->lDirect +
 		(LONG)(source->Obstruction.lHFLevel * source->Obstruction.flLFRatio) +
 		(LONG)(source->Occlusion.lHFLevel * source->Occlusion.flLFRatio);
 	if (direct > 0)
 		direct = 0;
+	direct_hf = source->lDirect + source->lDirectHF + source->Obstruction.lHFLevel + source->Occlusion.lHFLevel;
 	/* the room send: occlusion muffles it as it does the direct path, and
 	obstruction does not reach it */
 	room = source->lRoom + (LONG)(source->Occlusion.lHFLevel * source->Occlusion.flLFRatio);
 	room_hf = source->lRoom + source->lRoomHF + source->Occlusion.lHFLevel;
 	{
 		STREAM_SETTER(
-			record->i3dl2_gain = gain_from_millibels(direct);
+			record->direct = direct;
+			record->direct_hf = direct_hf;
 			record->room = room;
 			record->room_hf = room_hf;
 			record->room_rolloff_factor = source->flRoomRolloffFactor)
