@@ -5682,6 +5682,55 @@ static void ui_mouse_merge_setting_rows(
 }
 
 /**
+ * @brief Doubles the width of each value (a setting), around its centre: its
+ * arrows are small for a finger. Each half grows outward by half the box's
+ * width, so the previous / next split stays at the middle. A box is not held
+ * to its row (the last arrow of a row sits near the row's end), but stops at
+ * the edge of a non-button target beside it that it overlaps vertically,
+ * and at the menu's drawable area. Runs after ui_mouse_merge_setting_rows,
+ * once the rows have gone, and once a frame: the widths come from the boxes
+ * as noted.
+ */
+static void ui_mouse_widen_values(
+	void)
+{
+	long index;
+	long other;
+	short screen_width = (short)halo_screen_width();
+
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *value = &ui_mouse_targets[index];
+		short half = (short)((value->bounds.x1 - value->bounds.x0) / 2);
+		short left = (short)(value->bounds.x0 - half);
+		short right = (short)(value->bounds.x1 + half);
+
+		if (value->kind != _ui_mouse_target_value)
+			continue;
+		left = MAX(left, (short)(-(screen_width - 640) / 2));
+		right = MIN(right, (short)(640 + (screen_width - 640) / 2));
+		for (other = 0; other < ui_mouse_target_count; other++)
+		{
+			struct ui_mouse_target const *beside = &ui_mouse_targets[other];
+
+			if (other == index || beside->kind == _ui_mouse_target_button ||
+				beside->bounds.y0 >= value->bounds.y1 || beside->bounds.y1 <= value->bounds.y0)
+			{
+				continue;
+			}
+			if (beside->bounds.x1 <= value->bounds.x0)
+				left = MAX(left, beside->bounds.x1);
+			else if (beside->bounds.x0 >= value->bounds.x1)
+				right = MIN(right, beside->bounds.x0);
+		}
+		value->bounds.x0 = left;
+		value->bounds.x1 = right;
+	}
+
+	return;
+}
+
+/**
  * @brief The right edge of a legend label's text as the game draws it, or
  * NONE when it cannot be measured (no text, no font, or icons in the string,
  * which the measuring does not account for).
@@ -6669,6 +6718,7 @@ void render_ui_widgets(
 		}
 		ui_mouse_fit_button_targets();
 		ui_mouse_merge_setting_rows();
+		ui_mouse_widen_values();
 		if (widget_globals.fade_to_black >= 0.0f &&
 			widget_globals.fade_to_black <= 1.0f)
 		{
