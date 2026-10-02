@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="512" viewBox="0 0 1024 512">
+  <!-- the postgame carnage report's panel, redrawn by hand: the high-res
+       title picture's base (tools/title_assets.py) -->
+  <defs>
+    <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="0" y1="69" x2="0" y2="407">
+      <stop offset="0" stop-color="#072852"/>
+      <stop offset="0.12" stop-color="#07264c"/>
+      <stop offset="0.24" stop-color="#062143"/>
+      <stop offset="0.39" stop-color="#051b37"/>
+      <stop offset="0.54" stop-color="#04152a"/>
+      <stop offset="0.68" stop-color="#030f1e"/>
+      <stop offset="0.83" stop-color="#020a13"/>
+      <stop offset="1" stop-color="#02060c"/>
+    </linearGradient>
+    <filter id="halo" filterUnits="userSpaceOnUse" x="0" y="-40" width="640" height="160">
+      <feGaussianBlur stdDeviation="13.4"/>
+    </filter>
+  </defs>
+  <!-- dark halo behind the title -->
+  <rect x="64.2" y="38" width="492.6" height="38" fill="#011930" fill-opacity="0.96" filter="url(#halo)"/>
+  <!-- panel body: vertical gradient, blue rules top and bottom, dark footer strip -->
+  <rect x="0" y="69" width="640" height="338" fill="url(#panel)" fill-opacity="0.875"/>
+  <rect x="0" y="68" width="640" height="1" fill="#36afff"/>
+  <rect x="0" y="407" width="640" height="1" fill="#2896ff"/>
+  <rect x="0" y="408" width="640" height="34" fill="#000000" fill-opacity="0.878"/>
+  <!-- (the title is set over the panel by tools/title_assets.py) -->
+</svg>
