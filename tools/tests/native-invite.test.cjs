@@ -118,7 +118,7 @@ async function launcher(useTransport = async () => {}, options = {}) {
   const elements = new Map();
   const storage = options.storage || new Map(), joins = [], listeners = [];
   const quickCalls = [], phases = [], checkpoints = [], windowEvents = new Map(), uiActive = [];
-  const inspections = [], downloads = [];
+  const inspections = [], imports = [];
   let room = null;
   function element(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -150,6 +150,14 @@ async function launcher(useTransport = async () => {}, options = {}) {
     crossOriginIsolated: true,
     OffscreenCanvas: class { getContext() { return {}; } },
     WebAssembly: { Memory: options.Memory || class {} }, fetch: options.fetch || (async () => { throw new Error('Offline'); }),
+    Worker: class {
+      postMessage(message) {
+        imports.push(message.file);
+        options.onImport?.(message.file);
+        queueMicrotask(() => this.onmessage({ data: { type: 'done', files: 24, bytes: 1_856_530_432 } }));
+      }
+      terminate() {}
+    },
     HALO_BROWSER_CONFIG: { relayUrl: options.relayUrl ?? 'ws://localhost:8781/join',
       ...('defaultRoom' in options ? { defaultRoom: options.defaultRoom } : {}) },
     HaloInvite: Invite, HaloGateway: Gateway,
@@ -189,16 +197,13 @@ async function launcher(useTransport = async () => {}, options = {}) {
         inspections.push(Array.from(request.required));
         return options.mapsState ? options.mapsState(request) : fullMaps();
       },
-      download: request => {
-        downloads.push(request);
-        return options.download(request);
-      } },
+      withLock: task => task() },
   };
   context.window = context;
   vm.runInNewContext(fs.readFileSync(require.resolve('../../port/web/site/app.js'), 'utf8'), context);
   await new Promise(setImmediate);
   if (!options.mapsState) assert.equal(element('step-play').hidden, false, 'launcher reached the cached-data ready state');
-  return { element, context, storage, joins, quickCalls, phases, checkpoints, windowEvents, uiActive, inspections, downloads,
+  return { element, context, storage, joins, quickCalls, phases, checkpoints, windowEvents, uiActive, inspections, imports,
     emitNetwork: (type, detail) => listeners.forEach(listener => listener(type, detail)) };
 }
 
@@ -864,70 +869,69 @@ test('an unavailable legacy log does not display an unrelated stale root log', a
   assert.equal(page.element('log-view').hidden, false, 'page diagnostics remain readable');
 });
 
-test('browser room downloads remain ineligible until both bootstrap maps are ready, then launch automatically', async () => {
-  let finishMaps;
-  const cached = new Set(['ui.map', 'bloodgulch.map']);
-  const loading = await launcher(undefined, {
-    mapsState: async ({ required }) => required.every(name => cached.has(name)) ? quickMaps() : null,
-    download: () => new Promise(resolve => { finishMaps = resolve; }),
+test('browser room waits for a user disc import, then launches automatically', async () => {
+  let imported = false;
+  const page = await launcher(undefined, {
+    mapsState: async ({ required }) => imported && required.every(name => EXPECTED_MAPS.includes(name)) ? fullMaps() : null,
+    onImport: () => { imported = true; },
     quickPlay: async ({ room }) => ({ role: 'host', room }),
   });
-  assert.deepEqual(loading.inspections, [QUICK_MAPS]);
-  assert.deepEqual(Array.from(loading.downloads[0].required), QUICK_MAPS);
-  assert.equal(loading.quickCalls.length, 0);
-  assert.equal(loading.context.Module, undefined);
-  cached.add('beavercreek.map');
-  finishMaps(quickMaps());
+  assert.deepEqual(page.inspections[0], QUICK_MAPS);
+  assert.equal(page.element('step-data').hidden, false);
+  assert.equal(page.quickCalls.length, 0);
+  assert.equal(page.context.Module, undefined);
+  await page.element('iso-file').onchange({ target: { files: [{ name: 'my-disc.iso' }], value: '' } });
   await new Promise(setImmediate);
-  assert.equal(loading.quickCalls.length, 1);
-  assert.ok(loading.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
+  assert.equal(page.imports.length, 1);
+  assert.equal(page.quickCalls.length, 1);
+  assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
 });
 
-test('map requirements follow browser room, manual menu, and native invite scope', async () => {
+test('map requirements follow browser room, manual menu, and native invite scope without downloading', async () => {
   for (const [url, relayUrl, expected] of [
     ['http://localhost:8780/?room=FQLX01', undefined, QUICK_MAPS],
     ['http://localhost:8780/?room=FQLX01&menu=1', undefined, EXPECTED_MAPS],
     ['http://localhost:8780/?room=FQLX01#join=' + TOKEN, '', EXPECTED_MAPS],
   ]) {
-    const page = await launcher(undefined, { url, relayUrl,
-      mapsState: async () => null, download: () => new Promise(() => {}) });
-    assert.deepEqual(page.inspections, [expected], url);
-    assert.deepEqual(Array.from(page.downloads[0].required), expected, url);
-    assert.equal(page.context.Module, undefined, 'preparing data does not start a runtime');
-    assert.equal(page.quickCalls.length, 0, 'preparing data does not begin host election');
+    const page = await launcher(undefined, { url, relayUrl, mapsState: async () => null });
+    assert.deepEqual(page.inspections[0], expected, url);
+    assert.equal(page.element('step-data').hidden, false);
+    assert.equal(page.imports.length, 0);
+    assert.equal(page.context.Module, undefined);
+    assert.equal(page.quickCalls.length, 0);
   }
 });
 
-test('a cached bootstrap pair opens a room without downloading unrelated maps', async () => {
+test('a cached bootstrap pair opens a room without importing unrelated maps', async () => {
   const page = await launcher(undefined, {
     url: 'http://localhost:8780/?room=FQLX01', mapsState: async () => quickMaps(),
-    download: () => assert.fail('bootstrap cache must be reused'),
     quickPlay: async ({ room }) => ({ role: 'host', room }),
   });
-  assert.deepEqual(page.inspections, [QUICK_MAPS]);
-  assert.equal(page.downloads.length, 0);
+  assert.deepEqual(page.inspections[0], QUICK_MAPS);
+  assert.equal(page.imports.length, 0);
   assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
-  assert.match(page.element('download-detail').textContent, /36\.3 MB/);
+  assert.match(page.element('data-summary').textContent, /2 maps/);
 });
 
-test('pasting a native invite into a bootstrap cache prepares full maps before opening the relay', async () => {
-  let finishFullDownload;
+test('a native invite waits for full user-imported maps before opening the relay', async () => {
+  let imported = false;
   const previousSocket = FakeSocket.latest;
   const page = await launcher(undefined, {
-    url: 'http://localhost:8780/?room=FQLX01', mapsState: async () => quickMaps(),
-    download: () => new Promise(resolve => { finishFullDownload = resolve; }),
+    url: 'http://localhost:8780/?room=FQLX01',
+    mapsState: async () => imported ? fullMaps() : quickMaps(),
+    onImport: () => { imported = true; },
   });
   page.element('invite-input').value = TOKEN;
   page.element('relay-access').value = 'test-private-access';
   await page.element('invite-connect').onclick();
-  assert.equal(page.quickCalls[0].signal.aborted, true, 'native invite supersedes browser host election');
-  assert.deepEqual(Array.from(page.downloads[0].required), EXPECTED_MAPS);
-  assert.equal(FakeSocket.latest, previousSocket, 'do not contact the native host with incomplete data');
+  assert.equal(page.quickCalls[0].signal.aborted, true);
+  assert.equal(page.element('step-data').hidden, false);
+  assert.match(page.element('invite-status').textContent, /Import your disc image/);
+  assert.equal(FakeSocket.latest, previousSocket);
   assert.equal(page.context.Module, undefined);
-  assert.equal(page.element('relay-access').value, 'test-private-access', 'credential survives the in-page map transition');
+  await page.element('iso-file').onchange({ target: { files: [{ name: 'my-disc.iso' }], value: '' } });
+  assert.equal(page.element('relay-access').value, 'test-private-access');
   assert.equal(page.context.location.href.includes('test-private-access'), false);
-  finishFullDownload(fullMaps());
-  await new Promise(setImmediate);
   const socket = FakeSocket.latest;
   assert.notEqual(socket, previousSocket);
   socket.onopen();
@@ -939,34 +943,7 @@ test('pasting a native invite into a bootstrap cache prepares full maps before o
   assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
 });
 
-test('a native invite queued behind the bootstrap download waits for a second full-map download', async () => {
-  const completions = [];
-  const previousSocket = FakeSocket.latest;
-  const page = await launcher(undefined, {
-    url: 'http://localhost:8780/?room=FQLX01', mapsState: async () => null,
-    download: () => new Promise(resolve => completions.push(resolve)),
-  });
-  page.element('invite-input').value = TOKEN;
-  await page.element('invite-connect').onclick();
-  assert.deepEqual(Array.from(page.downloads[0].required), QUICK_MAPS);
-  completions[0](quickMaps());
-  await new Promise(setImmediate);
-  assert.equal(page.downloads.length, 2);
-  assert.deepEqual(Array.from(page.downloads[1].required), EXPECTED_MAPS);
-  assert.equal(FakeSocket.latest, previousSocket);
-  assert.equal(page.quickCalls.length, 0);
-  assert.equal(page.context.Module, undefined);
-  completions[1](fullMaps());
-  await new Promise(setImmediate);
-  const socket = FakeSocket.latest;
-  assert.notEqual(socket, previousSocket);
-  socket.json({ type: 'ready', identifier: '010203040506', address: ADDRESS });
-  await new Promise(setImmediate);
-  socket.json({ type: 'peer', identifier: TOKEN.slice(0, 12), address: ADDRESS + 0x1000000, connected: true });
-  assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=join'));
-});
-
-test('Main menu from a bootstrap cache reloads for full maps and ignores a stale elected host', async () => {
+test('Main menu from a bootstrap cache reloads and waits for the remaining maps from a disc', async () => {
   let choose;
   const page = await launcher(undefined, {
     url: 'http://localhost:8780/?room=FQLX01&fps=1', mapsState: async () => quickMaps(),
@@ -975,22 +952,20 @@ test('Main menu from a bootstrap cache reloads for full maps and ignores a stale
   page.element('main-menu').onclick();
   assert.equal(page.context.location.search, '?room=FQLX01&fps=1&menu=1');
   assert.equal(page.quickCalls[0].signal.aborted, true);
-  assert.equal(page.context.Module, undefined);
   choose();
   await new Promise(setImmediate);
-  assert.equal(page.context.Module, undefined, 'stale election cannot start the outgoing document');
+  assert.equal(page.context.Module, undefined);
 
-  let finishFullDownload;
+  let imported = false;
   const menu = await launcher(undefined, {
-    url: page.context.location.href,
-    mapsState: async ({ required }) => required.every(name => QUICK_MAPS.includes(name)) ? quickMaps() : null,
-    download: () => new Promise(resolve => { finishFullDownload = resolve; }),
+    url: page.context.location.href, mapsState: async () => imported ? fullMaps() : null,
+    onImport: () => { imported = true; },
   });
-  assert.deepEqual(menu.inspections, [EXPECTED_MAPS]);
-  assert.deepEqual(Array.from(menu.downloads[0].required), EXPECTED_MAPS);
-  finishFullDownload(fullMaps());
-  await new Promise(setImmediate);
-  assert.equal(menu.context.Module, undefined, 'manual mode waits for its Play action');
+  assert.deepEqual(menu.inspections[0], EXPECTED_MAPS);
+  assert.equal(menu.element('step-data').hidden, false);
+  assert.equal(menu.element('play').disabled, true);
+  await menu.element('iso-file').onchange({ target: { files: [{ name: 'my-disc.iso' }], value: '' } });
+  assert.equal(menu.context.Module, undefined, 'manual mode waits for Play');
   assert.equal(menu.element('play').disabled, false);
   await menu.element('play').onclick();
   assert.ok(menu.context.Module);
@@ -1007,37 +982,33 @@ test('a bootstrap-only match ending reloads to the full menu without using the n
   page.context.Module.haloMessage(6, JSON.stringify({ phase: 'menu', message: 'The match ended.' }));
   assert.equal(page.context.location.searchParams.get('menu'), '1');
   assert.equal(page.quickCalls[0].signal.aborted, true);
-  assert.equal(cancellations, 0, 'outgoing document must release OPFS by reloading');
+  assert.equal(cancellations, 0);
 });
 
-test('a bootstrap-only match error blocks menu interaction until remaining maps are prepared', async () => {
+test('a bootstrap-only match error prompts full map import for the main menu', async () => {
   const page = await launcher(undefined, {
     url: 'http://localhost:8780/?room=FQLX01', mapsState: async () => quickMaps(),
     quickPlay: async ({ room }) => ({ role: 'host', room }),
   });
   page.context.Module.haloMessage(6, JSON.stringify({ phase: 'error', message: 'Match failed.' }));
   assert.equal(page.element('fatal').hidden, false);
-  assert.match(page.element('fatal-text').textContent, /Main menu.*remaining maps/);
-  assert.equal(page.quickCalls[0].signal.aborted, true);
+  assert.match(page.element('fatal-text').textContent, /Main menu.*import your disc image/);
   page.element('fatal-menu').onclick();
   assert.equal(page.context.location.searchParams.get('menu'), '1');
 });
 
-test('choosing a room during a full-menu download reloads and cannot launch a late full download', async () => {
-  let finishMaps;
+test('choosing a room with a cached bootstrap pair rechecks the room map scope', async () => {
   const page = await launcher(undefined, {
-    url: 'http://localhost:8780/?menu=1&fps=1', mapsState: async () => null,
-    download: () => new Promise(resolve => { finishMaps = resolve; }),
+    url: 'http://localhost:8780/?menu=1&fps=1',
+    mapsState: async ({ required }) => required.every(name => QUICK_MAPS.includes(name)) ? quickMaps() : null,
     quickPlay: async ({ room }) => ({ role: 'host', room }),
   });
+  assert.equal(page.element('step-data').hidden, false);
   page.element('online-input').value = 'FRIENDS9';
   await page.element('online-enter').onclick();
   assert.equal(page.context.location.search, '?fps=1&room=FRIENDS9');
-  assert.equal(page.downloads[0].signal.aborted, true);
-  finishMaps(fullMaps());
-  await new Promise(setImmediate);
-  assert.equal(page.context.Module, undefined, 'outgoing document cannot launch after the scope changes');
-  assert.equal(page.quickCalls.length, 0);
+  assert.deepEqual(page.inspections.at(-1), QUICK_MAPS);
+  assert.ok(page.context.Module.arguments.includes('--HALO_QUICK_PLAY=host'));
 });
 
 test('Main menu supersedes a delayed game lock without starting an outgoing runtime or retaining the lock', async () => {
@@ -1138,22 +1109,4 @@ test('Main menu during native transport installation reloads manual mode before 
   assert.equal(socket.readyState, 3);
   assert.equal(manual.element('quick-panel').hidden, true);
   assert.equal(manual.element('quick-status').textContent, 'Main menu selected.');
-});
-
-test('Main menu clears an invite queued behind the map download and prevents a stale worker launch', async () => {
-  let finishMaps;
-  const before = FakeSocket.latest;
-  const manual = await launcher(undefined, {
-    mapsState: async () => null,
-    download: () => new Promise(resolve => { finishMaps = resolve; }),
-  });
-  manual.element('invite-input').value = TOKEN;
-  await manual.element('invite-connect').onclick();
-  manual.element('main-menu').onclick();
-  assert.equal(manual.context.location.searchParams.get('menu'), '1');
-  assert.equal(manual.downloads[0].signal.aborted, true);
-  finishMaps(fullMaps());
-  await new Promise(setImmediate);
-  assert.equal(FakeSocket.latest, before);
-  assert.equal(manual.context.Module, undefined, 'the old document cannot launch a late completed worker');
 });

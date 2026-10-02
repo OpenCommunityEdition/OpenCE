@@ -161,10 +161,10 @@ system link. The launcher joins the public **FQLX01** room on a first visit.
 Both hosted domains use that same room. Share a link ending in
 `?room=FQLX01` to enter it directly.
 
-Browser rooms prepare only the UI and Beaver Creek maps (about 36 MB) before
-entering multiplayer automatically. The remaining maps download only when
-the full main menu is selected; existing completed maps are reused. Desktop
-invites retain the full-map download because they can join other scenarios.
+Browser rooms need the UI and Beaver Creek maps before entering
+multiplayer automatically. The full main menu and desktop invites need all
+maps because they can use other scenarios. Import your own Xbox disc image
+in the launcher; existing completed maps are reused on later visits.
 The first ready player hosts Beaver Creek Slayer; the others join that host
 without navigating the game's System Link menus. The public room does not
 run a permanent game server.
@@ -218,8 +218,8 @@ including hosting a non-team game while waiting for other players. The host
 continues simulating in background tabs. Team readiness checks and lockstep
 requirements still apply.
 
-Quick play starts only when the maps and room are ready. Idle or downloading
-tabs do not participate in host selection.
+Quick play starts only when the maps and room are ready. Idle tabs and tabs
+importing a disc image do not participate in host selection.
 
 Everyone in a room is on one network, as on a LAN: up to the game's limits
 of machines and players, split screen on each machine included.

@@ -46,20 +46,11 @@
         If Silent Mode isn't in Control Center, use your Ring/Silent switch or Action button.</p>
     </div>
 
-    <section id="download-panel" class="download-panel" aria-label="Game download" hidden>
-      <div class="download-heading"><strong id="download-title">Checking game download</strong>
-        <strong id="download-percent">0%</strong></div>
-      <progress id="download-progress" max="1" value="0" aria-label="Game download progress"></progress>
-      <p id="download-detail" class="small" role="status"></p>
-      <button id="download-cancel" type="button" class="button small-button" hidden>Pause download</button>
-      <button id="download-retry" type="button" class="button small-button" hidden>Resume download</button>
-    </section>
-
     <div id="step-data" class="step" hidden>
       <h2>Game data</h2>
-      <p>Browser multiplayer downloads the UI and Beaver Creek first (about 36 MB), then saves them in this browser.
-        Opening the full main menu downloads the remaining maps (about 1.9 GB total). You can also
-        choose your Halo: Combat Evolved Xbox disc image (<code>.iso</code> or <code>.xiso</code>).</p>
+      <p>Choose your own Halo: Combat Evolved Xbox disc image (<code>.iso</code> or <code>.xiso</code>).
+        The maps are copied into this browser and reused on later visits. This site does not provide
+        a disc image or game maps.</p>
       <label class="button primary" for="iso-file">Choose disc image…</label>
       <input id="iso-file" type="file" accept=".iso,.xiso,application/octet-stream,application/x-iso9660-image" hidden>
       <div id="progress" class="progress" hidden>

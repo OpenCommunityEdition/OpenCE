@@ -38,7 +38,7 @@ an older build from that page.
 
 ## Game data
 
-The port does not include the game data. Download an Xbox disc image
+The port does not include the game data. Use your own Xbox disc image
 (`.xiso` or `.iso`) of Halo: Combat Evolved. All versions of the game
 operate. The maps of the European (PAL) version were made for a slower
 console. The port changes them to play as the North American (NTSC) maps do,

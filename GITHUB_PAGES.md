@@ -13,7 +13,7 @@ are combined with the Chrome/macOS presentation and repeated-rejoin fixes.
 Use each site's `deployment.json` for its current source commit, runtime and
 packaged file hashes. Cached launchers remain compatible with the prompt-free
 page while the service worker updates. Existing visitors can reload and choose
-**Update**; downloaded maps and saves are retained.
+**Update**; imported maps and saves are retained.
 
 Chrome-family browsers on macOS use owned RGBA frame transfers instead of the
 ImageBitmap serialization path that crashed in Chrome 153. Frame queues are
@@ -40,20 +40,15 @@ with the same UI map in the September 29, 2026 test. Touch controls are
 available; startup and gameplay on a physical iPhone remain unverified.
 See [port/web/README.md](port/web/README.md) for requirements and controls.
 
-Browser rooms download only `ui.map` and `beavercreek.map` before starting:
-36,268,032 bytes (about 36 MB), instead of all 1.86 GB of maps. The progress
-bar measures that required download. Other maps wait until **Main menu** or
-`?menu=1` is selected, when only the missing maps are downloaded before the
-full menu opens. Desktop invites also prepare all maps, because their host
-may choose any supported map. Returning visitors reuse completed maps.
-Completed maps survive cancellation and reloads.
-The September 29 local Chrome check started a host and joined its running
-Blood Gulch match from a second fresh origin, with only `ui.map` and `bloodgulch.map` in
-each browser's storage. Each player downloaded 36,716,544 map bytes. This
-verifies the smaller startup set, not a measured Internet join time.
+Browser rooms need `ui.map` and `beavercreek.map` before starting. The full
+main menu and desktop invites need the complete map set. Each player imports
+their own Xbox disc image through the launcher; the site does not provide
+maps or an ISO. Returning visitors reuse maps already stored in that browser.
+The September 29 local Chrome check used a previous version that downloaded
+only `ui.map` and `bloodgulch.map`; it does not verify the current import flow.
 Existing Apollo maps and saves are reused in place under `halo/data` and
 `halo/save`. Each browser and domain has a separate cache. Browser storage
-can be cleared or evicted. Manual disc import remains available.
+can be cleared or evicted.
 
 ## Default browser room
 
@@ -67,7 +62,7 @@ until the player opens a room link or chooses **Join default room**.
 After the UI and Beaver Creek maps are ready, the launcher starts multiplayer automatically.
 The first ready participant hosts **Beaver Creek Slayer**; later participants
 join that host, including while the match is running. Only players preparing
-to launch participate in host selection, so an idle tab or a download does
+to launch participate in host selection, so an idle tab or a disc import does
 not become the host. The public room is not a persistent game server.
 
 The source migration path preserves the loaded match when its host leaves.
@@ -96,8 +91,8 @@ needed. Manual browser System Link also allows a single player to start a
 non-team game with distributed networking; the game stays open for later
 players. Team readiness and the two-machine requirement for lockstep remain.
 **Main menu** opts out of quick play; `?menu=1` opens the normal
-launcher and prepares the remaining maps before the game menu. Leaving a
-quick-play match for the menu also prepares those maps, so other scenarios
+launcher and asks for a disc image if the full map set is missing. Leaving a
+quick-play match for the menu also checks for those maps, so other scenarios
 cannot be selected before their data is available. A failed attempt shows an error instead of repeatedly
 restarting the game. Private room links use the same quick-play flow.
 
@@ -137,22 +132,9 @@ relay is ready; an unset relay leaves desktop joining unavailable.
 Use `--default-room CODE` to choose a different public room or
 `--default-room ''` to disable automatic room entry.
 
-The downloader uses a commit-pinned manifest on the fork's separate
-`fqlx/game-data` branch. It streams chunks into browser storage, verifies
-each map's SHA-256, checks storage capacity and retries interruptions twice.
-The page checks browser features before downloading. Worker-based OPFS
-writes support browsers that do not implement `createWritable`.
-
-To prepare a compatible map manifest from a supported disc image:
-
-```sh
-python3 tools/package_browser_maps.py /path/to/Halo.xiso.iso --output build/map-data
-```
-
-This extracts the 24 maps into chunks of at most 48 MiB. The ISO is not
-required after extraction. Map downloads come directly from GitHub; the
-multiplayer relay does not serve assets. Game assets retain their own
-copyrights and are not covered by the source-code license.
+The launcher copies maps from each player's own disc image into browser
+storage. The public package and multiplayer relay do not serve game assets.
+Game assets retain their own copyrights and are not covered by the source-code license.
 
 ## Publish
 
@@ -167,7 +149,7 @@ must be available. The service worker supplies cross-origin isolation
 headers that GitHub Pages cannot configure directly, and caches each
 runtime version together. Reload after deployment and apply an offered
 update. Do not clear website data just to update the runtime, since that
-also removes downloaded maps and saves.
+also removes imported maps and saves.
 
 Use the direct play URL when sharing. An iframe's parent also needs
 cross-origin isolation and appropriate permissions; embedding the link
@@ -190,6 +172,6 @@ Run `node tools/test_source_cache.mjs` and
 available for reproducing the older hash-pinned Apollo runtime and its
 rendering wrappers. That packager outputs `dist/github-pages`; it is
 separate from the source-built runtime now hosted on the public sites.
-Its optional `--data-source` enables the same manifest-based download flow.
+It packages no game data and has no automatic map download option.
 Apollo performance measurements do not establish performance of the newer
 source-built engine, and its original runtime has no multiplayer sockets.

@@ -1,370 +1,150 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { webcrypto } from 'node:crypto';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../port/web/site/cache.js', import.meta.url), 'utf8');
-const hashSource = readFileSync(new URL('../port/web/site/vendor/sha256.js', import.meta.url), 'utf8');
-const bytes = new Uint8Array(2048).fill(7);
-bytes.set(new TextEncoder().encode('daeh'), 0);
-bytes.set(new TextEncoder().encode('toof'), 2044);
-
-async function scenario(options = {}) {
-  const content = options.bytes || bytes;
-  const hash = Buffer.from(await webcrypto.subtle.digest('SHA-256', content)).toString('hex');
-  const split = Math.ceil(content.length / 2);
-  const reads = [], readBuffers = new Set();
-  const files = new Map(), directories = new Set(['']), writes = [], requests = [], progress = [], reservations = [], workerMessages = [];
-  const abort = new AbortController();
-  const absent = () => new DOMException('missing', 'NotFoundError');
-  const put = (path, data) => {
-    const pieces = path.split('/');
-    for (let n = 1; n < pieces.length; n++) directories.add(pieces.slice(0, n).join('/'));
-    files.set(path, typeof data === 'string' ? new TextEncoder().encode(data) : data.slice());
-  };
-  const fileHandle = path => ({
-    kind: 'file',
-    async getFile() { const blob = new Blob([files.get(path)]); blob.name = path.split('/').at(-1); return blob; },
-    async createSyncAccessHandle() {
-      let data = files.get(path);
-      return {
-        truncate(size) {
-          if (path.endsWith('space-check')) {
-            reservations.push(size);
-            if (options.quota === false) throw new DOMException('full', 'QuotaExceededError');
-            return;
-          }
-          data = data.slice(0, size);
-          writes.push(path);
-        },
-        write(value, { at }) {
-          const next = new Uint8Array(Math.max(data.length, at + value.length));
-          next.set(data); next.set(value, at); data = next;
-          return value.length;
-        },
-        getSize() { return data.length; },
-        read(value, { at }) {
-          const count = Math.min(value.length, data.length - at, options.shortReads ? 317 : Infinity);
-          value.set(data.subarray(at, at + count));
-          reads.push({ at, requested: value.length, count });
-          readBuffers.add(value.buffer);
-          if (options.cancelVerification) abort.abort();
-          return count;
-        },
-        flush() {
-          if (options.corruptWritten && path.endsWith('.map')) data[100] ^= 1;
-          files.set(path, data);
-        },
-        close() { files.set(path, data); },
-      };
-    },
-  });
-  const directoryHandle = path => ({
-    kind: 'directory',
-    async getDirectoryHandle(name, { create = false } = {}) {
-      const child = path ? path + '/' + name : name;
-      if (!directories.has(child) && !create) throw absent();
-      directories.add(child); return directoryHandle(child);
-    },
-    async getFileHandle(name, { create = false } = {}) {
-      const child = path ? path + '/' + name : name;
-      if (!files.has(child)) { if (!create) throw absent(); files.set(child, new Uint8Array()); }
-      return fileHandle(child);
-    },
-    async removeEntry(name) {
-      const child = path ? path + '/' + name : name;
-      files.delete(child);
-    },
-    async *entries() {
-      const prefix = path ? path + '/' : '';
-      for (const dir of directories) {
-        if (dir.startsWith(prefix) && dir !== path && !dir.slice(prefix.length).includes('/')) {
-          yield [dir.slice(prefix.length), directoryHandle(dir)];
-        }
-      }
-      for (const file of files.keys()) {
-        if (file.startsWith(prefix) && !file.slice(prefix.length).includes('/')) yield [file.slice(prefix.length), fileHandle(file)];
-      }
-    },
-  });
-  const context = {
-    Uint8Array, URL, Blob, TextEncoder, AbortController, DOMException, crypto: webcrypto,
-    setTimeout: (callback, milliseconds) => setTimeout(callback, milliseconds >= 600000 ? milliseconds : 0), clearTimeout,
-    navigator: {
-      storage: { getDirectory: async () => directoryHandle(''), persist: async () => true },
-      locks: { request: async (name, settings, fn) => fn(options.locked ? null : {}) },
-    },
-    Worker: class {
-      constructor() { workerMessages.push('created'); }
-      postMessage(message) {
-        workerMessages.push(message);
-        if (message.type === 'cache') queueMicrotask(() => this.onmessage({ data: { type: 'cache-done', maps: { required: message.required } } }));
-      }
-      terminate() { workerMessages.push('terminated'); }
-    },
-    fetch: async url => {
-      requests.push(String(url));
-      if (String(url).endsWith('manifest.json')) {
-        const manifest = { version: 2, files: context.HaloCache.expected.map(name => ({
-          name: 'maps/' + name, size: content.length, sha256: hash,
-          chunks: [0, 1].map(index => ({ path: `chunks/${name}.part00${index}`, size: index ? content.length - split : split })),
-        })) };
-        if (options.badManifest) manifest.files[1].chunks[0].path = 'https://unexpected.example/steal';
-        return new Response(JSON.stringify(manifest));
-      }
-      if (options.cancel || (options.cancelMap && String(url).includes(options.cancelMap))) abort.abort();
-      const index = String(url).endsWith('000') ? 0 : 1;
-      const block = content.slice(index ? split : 0, index ? content.length : split);
-      if (options.corrupt) block.fill(0);
-      return new Response(options.truncated ? block.slice(0, 512) : block);
-    },
-  };
-  context.self = context;
-  vm.runInNewContext(hashSource, context);
-  vm.runInNewContext(source, context);
-  const names = context.HaloCache.expected;
-  const cached = Array.isArray(options.cached) ? options.cached : options.cached === 'partial' ? names.slice(1) : options.cached ? names : [];
-  const root = options.native ? 'maps' : 'halo/data/maps';
-  for (const name of cached) put(root + '/' + name, content);
-  if (cached.length && !options.native && !options.noMarker) {
-    put('halo/data/maps.json', JSON.stringify(Object.fromEntries(cached.map(name => [name, content.length]))));
-  }
-  if (cached.length && options.native && !options.noMarker) {
-    put('maps/.complete', JSON.stringify({ files: cached, bytes: cached.length * content.length }));
-  }
-  if (options.corruptCached) put(root + '/ui.map', new Uint8Array(2048));
-  if (options.badMarker && options.native) put('maps/.complete', JSON.stringify({ files: cached, bytes: 1 }));
-  for (const [path, data] of Object.entries(options.extraFiles || {})) put(path, data);
-  const initialState = options.inspectInitial ? await context.HaloCache.mapsState({ required: options.required }) : undefined;
-  let result, error;
-  try { result = await context.HaloCache.ensure({ required: options.required, signal: abort.signal, onProgress: entry => progress.push(entry) }); }
-  catch (caught) { error = caught; }
-  return { result, error, requests, writes, files, progress, names, reservations, context, workerMessages, initialState, reads, readBuffers };
-}
-
-let r = await scenario({ cached: 'all' });
-assert.equal(r.result.dataRoot, '/data/halo/data');
-assert.equal(r.result.saveRoot, '/data/halo/save');
-assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
-assert.equal(r.progress.at(-1).fraction, 1);
-console.log('PASS production maps and saves reused in place, zero network or writes, progress 100%');
-r = await scenario({ cached: 'all', noMarker: true });
-assert.equal(r.requests.length, 0); assert.equal(r.result.files.length, 24);
-console.log('PASS older production cache without maps.json remains compatible');
-r = await scenario({ cached: 'all', native: true });
-assert.equal(r.result.dataRoot, '/data'); assert.equal(r.requests.length, 0);
-console.log('PASS new source-port disc import remains compatible');
-r = await scenario({ cached: 'partial' });
-assert.equal(r.result.files.length, 24); assert.equal(r.requests.length, 3);
-assert.deepEqual([...r.files.get('halo/data/maps/ui.map')], [...bytes]);
-assert.equal(JSON.parse(new TextDecoder().decode(r.files.get('halo/data/maps.json')))['ui.map'], bytes.length);
-console.log('PASS resume downloads only missing map, concatenates chunks and commits after SHA256');
-r = await scenario({ cached: 'partial', shortReads: true });
-assert.equal(r.error, undefined);
-assert.ok(r.reads.length > 1, 'short reads must continue until the entire saved file is hashed');
-assert.equal(r.readBuffers.size, 1, 'every read reuses the same backing buffer');
-const large = new Uint8Array(2 * 1024 * 1024 + 67).fill(19);
-large.set(bytes.subarray(0, 4), 0); large.set(bytes.subarray(2044), 2044);
-r = await scenario({ cached: 'partial', bytes: large });
-assert.equal(r.error, undefined);
-assert.equal(r.reads.length, 3);
-assert.equal(r.readBuffers.size, 1);
-assert.equal(Math.max(...r.reads.map(read => read.requested)), 1024 * 1024);
-assert.equal(r.reads.at(-1).count, 67);
-console.log('PASS large-map SHA256 reads back every byte with one buffer bounded to 1 MiB, including short reads');
-r = await scenario({ cached: 'partial', corruptWritten: true });
-assert.match(r.error.message, /integrity/);
-assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-console.log('PASS SHA256 detects corruption in the stored file, not just incoming network bytes');
-r = await scenario({ cached: 'partial', cancelVerification: true });
-assert.equal(r.error.name, 'AbortError');
-assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-console.log('PASS cancellation during verification never commits a partially checked map');
-r = await scenario({ cached: 'all', corruptCached: true });
-assert.equal(r.result.files.length, 24); assert.equal(r.requests.length, 3);
-console.log('PASS damaged cache header triggers repair of only that map');
-r = await scenario({ cached: 'partial', corrupt: true });
-assert.match(r.error.message, /integrity/); assert.equal(r.requests.length, 7);
-assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-assert.equal(Object.keys(JSON.parse(new TextDecoder().decode(r.files.get('halo/data/maps.json')))).length, 23);
-console.log('PASS corrupt download retries twice and never becomes a completed map');
-r = await scenario({ cached: 'partial', truncated: true });
-assert.match(r.error.message, /Incomplete/); assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-console.log('PASS truncated chunks are removed and uncommitted');
-r = await scenario({ quota: false });
-assert.equal(r.error.name, 'QuotaExceededError'); assert.equal(r.requests.length, 1);
-console.log('PASS quota is checked before game-data requests');
-r = await scenario({ badManifest: true });
-assert.match(r.error.message, /manifest/); assert.equal(r.requests.length, 1);
-console.log('PASS off-site chunk URL rejected before downloads');
-r = await scenario({ cached: 'partial', cancel: true });
-assert.equal(r.error.name, 'AbortError'); assert.equal(r.progress.at(-1).state, 'paused');
-assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-assert.equal(r.files.has('halo/data/maps/a10.map'), true);
-console.log('PASS cancellation keeps previously completed maps and removes partial map');
-r = await scenario({ cached: 'partial', locked: true });
-assert.match(r.error.message, /another tab/); assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
-console.log('PASS running production game prevents competing writes');
-
-const roomMaps = ['ui.map', 'beavercreek.map'];
-const runtimeBytes = 2 * 0x11600000 + 0x02300000 + 3 * 0x02f00000 + (64 << 20);
-r = await scenario({ required: roomMaps });
-assert.equal(r.error, undefined);
-assert.deepEqual(Array.from(r.result.files), roomMaps);
-assert.equal(r.result.requiredBytes, bytes.length * 2);
-assert.equal(r.requests.length, 5);
-assert.deepEqual(r.requests.slice(1).map(url => url.split('/').at(-1)), [
-  'ui.map.part000', 'ui.map.part001', 'beavercreek.map.part000', 'beavercreek.map.part001',
-]);
-assert.equal(r.reservations[0], runtimeBytes + bytes.length * 2);
-assert.equal(r.progress.at(-1).total, bytes.length * 2);
-assert.equal(r.progress.at(-1).done, bytes.length * 2);
-assert.equal(r.progress.at(-1).fraction, 1);
-console.log('PASS cold room download fetches only manifest plus four chunks, UI first, reserves and reports required bytes');
-
-const unrelated = await scenario({ required: roomMaps, cached: ['a10.map', 'a30.map', 'a50.map'],
-  extraFiles: { 'halo/save/profile.dat': new Uint8Array(32768), 'halo/data/notes.txt': new Uint8Array(8192) } });
-assert.equal(unrelated.reservations[0], runtimeBytes + bytes.length * 2);
-assert.equal(unrelated.requests.length, 5);
-const withRuntimeCache = await scenario({ required: roomMaps, cached: ['a10.map'],
-  extraFiles: { 'halo/save/z/cache000.map': new Uint8Array(8192), 'halo/save/z/notes.txt': new Uint8Array(32768) } });
-assert.equal(withRuntimeCache.reservations[0], runtimeBytes + bytes.length * 2 - 8192);
-console.log('PASS unrelated maps, saves, and notes cannot reduce required storage; only existing runtime cache allocations count');
-
-const requestCount = r.requests.length, writeCount = r.writes.length;
-const cachedRoom = await r.context.HaloCache.mapsState({ required: roomMaps });
-assert.equal(cachedRoom.requiredBytes, bytes.length * 2);
-assert.equal(await r.context.HaloCache.mapsState(), null);
-await r.context.HaloCache.ensure({ required: roomMaps });
-assert.equal(r.requests.length, requestCount);
-assert.equal(r.writes.length, writeCount);
-console.log('PASS room subset is launch-ready on reload with zero network or writes, full game still needs remaining maps');
-
-const full = await r.context.HaloCache.ensure();
-assert.equal(full.files.length, 24);
-assert.equal(r.requests.length - requestCount, 1 + 22 * 2);
-assert.equal(r.writes.filter(path => path === 'halo/data/maps/ui.map').length, 1);
-assert.equal(r.writes.filter(path => path === 'halo/data/maps/beavercreek.map').length, 1);
-assert.equal((await r.context.HaloCache.mapsState()).files.length, 24);
-console.log('PASS upgrading a room subset to the full game downloads remaining 22 maps without rewriting completed room maps');
-
-for (const native of [false, true]) {
-  r = await scenario({ cached: 'all', native, required: roomMaps });
-  assert.equal(r.error, undefined);
-  assert.equal(r.result.files.length, 24);
-  assert.equal(r.result.bytes, bytes.length * 24);
-  assert.equal(r.result.requiredBytes, bytes.length * 2);
-  assert.equal(r.progress.at(-1).total, bytes.length * 2);
-  assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
-}
-console.log('PASS full production and native .complete caches satisfy room subsets with no fetch or writes');
-
-r = await scenario({ cached: roomMaps, required: roomMaps, noMarker: true, inspectInitial: true });
-assert.equal(r.initialState, null);
-assert.equal(r.requests.length, 5);
-assert.equal(r.result.requiredBytes, bytes.length * 2);
-assert.equal(r.writes.includes('halo/data/maps.json'), true);
-assert.equal((await r.context.HaloCache.mapsState({ required: roomMaps })).requiredBytes, bytes.length * 2);
-console.log('PASS unmarked legacy subset becomes ready only after redownloading and SHA-verifying both requested maps');
-
-const oversizedHeaderMap = new Uint8Array(bytes.length + 1024);
-oversizedHeaderMap.set(bytes);
-r = await scenario({ cached: roomMaps, required: roomMaps, noMarker: true, inspectInitial: true,
-  extraFiles: { 'halo/data/maps/ui.map': oversizedHeaderMap } });
-assert.equal(r.initialState, null);
-assert.equal(r.requests.length, 5);
-assert.equal(r.result.requiredBytes, bytes.length * 2);
-assert.equal(r.files.get('halo/data/maps/ui.map').length, bytes.length);
-assert.equal(r.writes.includes('halo/data/maps/beavercreek.map'), true);
-console.log('PASS unmarked legacy partial with valid header and wrong size is repaired through verified downloads');
-
-const corruptUnmarked = bytes.slice();
-corruptUnmarked[100] ^= 1;
-r = await scenario({ cached: roomMaps, required: roomMaps, noMarker: true, inspectInitial: true,
-  extraFiles: { 'halo/data/maps/ui.map': corruptUnmarked } });
-assert.equal(r.initialState, null);
-assert.equal(r.requests.length, 5);
-assert.deepEqual([...r.files.get('halo/data/maps/ui.map')], [...bytes]);
-console.log('PASS same-size unmarked map with valid header and corrupted body is replaced before completion metadata');
-
-r = await scenario({ cached: roomMaps, required: roomMaps, native: true });
-assert.equal(r.result.dataRoot, '/data');
-assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
-const nativeFull = await r.context.HaloCache.ensure();
-assert.equal(nativeFull.dataRoot, '/data');
-assert.equal(nativeFull.files.length, 24);
-assert.equal(r.requests.length, 1 + 22 * 2);
-assert.equal(r.writes.includes('maps/ui.map'), false);
-assert.equal(r.writes.includes('maps/beavercreek.map'), false);
-assert.equal(JSON.parse(new TextDecoder().decode(r.files.get('maps/.complete'))).files.length, 24);
-console.log('PASS completed native subset grows in place and preserves original maps and native completion marker');
-
-for (const options of [{ cached: roomMaps, noMarker: true }, { cached: 'all', noMarker: true }, { cached: roomMaps, badMarker: true }]) {
-  r = await scenario({ ...options, native: true, required: roomMaps, inspectInitial: true });
-  assert.equal(r.initialState, null);
-  assert.equal(r.result.dataRoot, '/data/halo/data');
-  assert.equal(r.requests.length, 5);
-}
-console.log('PASS interrupted or malformed native imports cannot satisfy a requested subset without a valid completion marker');
-
-r = await scenario({ required: roomMaps, badManifest: true });
-assert.match(r.error.message, /manifest/);
-assert.equal(r.requests.length, 1); assert.equal(r.writes.length, 0);
-console.log('PASS subset requests validate the entire pinned manifest including unrequested maps');
-
-r = await scenario({ required: roomMaps, cached: roomMaps, corruptCached: true });
-assert.equal(r.error, undefined);
-assert.equal(r.requests.length, 3);
-assert.equal(r.writes.includes('halo/data/maps/beavercreek.map'), false);
-console.log('PASS damaged requested map is repaired without fetching or rewriting the other completed room map');
-
-r = await scenario({ required: roomMaps, corrupt: true });
-assert.match(r.error.message, /integrity/);
-assert.equal(r.requests.length, 7);
-assert.equal(r.files.has('halo/data/maps/ui.map'), false);
-assert.equal(await r.context.HaloCache.mapsState({ required: roomMaps }), null);
-console.log('PASS subset integrity failures retry twice and never become launch-ready');
-
-r = await scenario({ required: roomMaps, cancelMap: 'beavercreek.map' });
-assert.equal(r.error.name, 'AbortError');
-assert.equal(r.progress.at(-1).state, 'paused');
-assert.equal(r.files.has('halo/data/maps/ui.map'), true);
-assert.equal(r.files.has('halo/data/maps/beavercreek.map'), false);
-const cancelledRequests = r.requests.length;
-const resumed = await r.context.HaloCache.ensure({ required: roomMaps });
-assert.equal(resumed.requiredBytes, bytes.length * 2);
-assert.equal(r.requests.length - cancelledRequests, 3);
-console.log('PASS cancelling the second room map preserves completed UI and resumes with only the missing map');
-
-const invalidRequired = [[], ['ui.map', 'ui.map'], ['ui'], ['UI.map'], ['../ui.map'], ['maps/ui.map'], ['nope.map'], null, 'ui.map', {}];
-for (const required of invalidRequired) {
-  r = await scenario({ required });
-  assert.equal(r.error.name, 'TypeError');
-  assert.equal(r.requests.length, 0); assert.equal(r.writes.length, 0);
-  await assert.rejects(r.context.HaloCache.mapsState({ required }), { name: 'TypeError' });
-  assert.throws(() => r.context.HaloCache.download({ required }), { name: 'TypeError' });
-  assert.equal(r.workerMessages.length, 0);
-}
-console.log('PASS every public map API rejects invalid required names before network, writes, or worker creation');
-
-r = await scenario({ cached: 'all' });
-const requested = roomMaps.slice();
-const workerDownload = r.context.HaloCache.download({ required: requested });
-requested.pop();
-const workerResult = await workerDownload;
-assert.deepEqual(Array.from(workerResult.required), roomMaps);
-assert.deepEqual(Array.from(r.workerMessages.find(message => message.type === 'cache').required), roomMaps);
-console.log('PASS download worker receives an independent copy of the validated required map list');
-
+const cacheSource = readFileSync(new URL('../port/web/site/cache.js', import.meta.url), 'utf8');
 const workerSource = readFileSync(new URL('../port/web/site/xiso-worker.js', import.meta.url), 'utf8');
-const workerOptions = [], workerOutput = [];
-const workerContext = {
-  AbortController, onmessage: null, importScripts() {},
-  HaloCache: { async ensure(options) { workerOptions.push(options); return { files: options.required }; } },
-  postMessage(message) { workerOutput.push(message); },
-};
-vm.runInNewContext(workerSource, workerContext);
-await workerContext.onmessage({ data: { type: 'cache', required: roomMaps } });
-assert.deepEqual(workerOptions[0].required, roomMaps);
-assert.equal(workerOutput.at(-1).type, 'cache-done');
-console.log('PASS cache worker forwards requested subset to the verified downloader');
+const map = new Uint8Array(2048);
+map.set(new TextEncoder().encode('daeh'), 0);
+map.set(new TextEncoder().encode('toof'), 2044);
+
+function storage() {
+  const files = new Map(), directories = new Set(['']);
+  const absent = () => new DOMException('missing', 'NotFoundError');
+  function put(path, data) {
+    const parts = path.split('/');
+    for (let i = 1; i < parts.length; i++) directories.add(parts.slice(0, i).join('/'));
+    files.set(path, typeof data === 'string' ? new TextEncoder().encode(data) : data.slice());
+  }
+  function directory(path) {
+    return {
+      async getDirectoryHandle(name, { create = false } = {}) {
+        const child = path ? `${path}/${name}` : name;
+        if (!directories.has(child)) {
+          if (!create) throw absent();
+          directories.add(child);
+        }
+        return directory(child);
+      },
+      async getFileHandle(name, { create = false } = {}) {
+        const child = path ? `${path}/${name}` : name;
+        if (!files.has(child)) {
+          if (!create) throw absent();
+          files.set(child, new Uint8Array());
+        }
+        return {
+          async getFile() { return new Blob([files.get(child)]); },
+          async createSyncAccessHandle() {
+            let data = files.get(child);
+            return {
+              async truncate(size) { data = data.slice(0, size); },
+              async write(value, { at }) {
+                const next = new Uint8Array(Math.max(data.length, at + value.length));
+                next.set(data); next.set(value, at); data = next;
+                return value.length;
+              },
+              async flush() { files.set(child, data); },
+              async close() { files.set(child, data); },
+            };
+          },
+        };
+      },
+      async removeEntry(name) {
+        const child = path ? `${path}/${name}` : name;
+        for (const key of files.keys()) if (key === child || key.startsWith(child + '/')) files.delete(key);
+        for (const key of directories) if (key === child || key.startsWith(child + '/')) directories.delete(key);
+      },
+    };
+  }
+  return { files, put, getDirectory: async () => directory('') };
+}
+
+function launcher(data = storage(), locked = false) {
+  let requests = 0;
+  const context = {
+    Uint8Array, Blob, DOMException, TextEncoder,
+    navigator: { storage: data, locks: { request: async (_name, _options, use) => use(locked ? null : {}) } },
+    fetch() { requests++; throw new Error('Game-data network request is forbidden'); },
+  };
+  vm.runInNewContext(cacheSource, context);
+  return { cache: context.HaloCache, requests: () => requests, data };
+}
+
+const cold = launcher();
+assert.equal(await cold.cache.mapsState(), null);
+assert.equal(await cold.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] }), null);
+assert.equal(cold.requests(), 0);
+assert.equal(typeof cold.cache.download, 'undefined');
+assert.equal(typeof cold.cache.ensure, 'undefined');
+console.log('PASS missing maps require user import and cause no network request');
+
+const native = launcher();
+const names = [...native.cache.expected];
+for (const name of names) native.data.put(`maps/${name}`, map);
+native.data.put('maps/.complete', JSON.stringify({ files: names, bytes: map.length * names.length }));
+const nativeRoom = await native.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] });
+assert.equal(nativeRoom.dataRoot, '/data');
+assert.equal(nativeRoom.requiredBytes, map.length * 2);
+assert.equal(nativeRoom.files.length, names.length);
+assert.equal((await native.cache.mapsState()).files.length, names.length);
+assert.equal(native.requests(), 0);
+console.log('PASS imported maps satisfy both room and full-menu launch without network');
+
+const legacy = launcher();
+for (const name of names) legacy.data.put(`halo/data/maps/${name}`, map);
+assert.equal((await legacy.cache.mapsState()).dataRoot, '/data/halo/data');
+assert.equal((await legacy.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] })).saveRoot, '/data/halo/save');
+console.log('PASS complete older browser cache remains compatible without a manifest');
+
+const partial = launcher();
+for (const name of ['ui.map', 'beavercreek.map']) partial.data.put(`halo/data/maps/${name}`, map);
+assert.equal(await partial.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] }), null);
+partial.data.put('halo/data/maps.json', JSON.stringify({ 'ui.map': map.length, 'beavercreek.map': map.length }));
+assert.equal((await partial.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] })).files.length, 2);
+assert.equal(await partial.cache.mapsState(), null);
+partial.data.put('halo/data/maps/beavercreek.map', new Uint8Array(2048));
+assert.equal(await partial.cache.mapsState({ required: ['ui.map', 'beavercreek.map'] }), null);
+console.log('PASS marked room cache is reused, but unmarked or damaged partial data cannot launch');
+
+const interrupted = launcher();
+interrupted.data.put('maps/ui.map', map);
+interrupted.data.put('maps/.complete', JSON.stringify({ files: ['ui.map'], bytes: 1 }));
+assert.equal(await interrupted.cache.mapsState({ required: ['ui.map'] }), null);
+for (const required of [[], ['ui.map', 'ui.map'], ['../ui.map'], ['missing.map'], 'ui.map']) {
+  await assert.rejects(cold.cache.mapsState({ required }), { name: 'TypeError' });
+}
+const busy = launcher(storage(), true);
+await assert.rejects(busy.cache.withLock(async () => {}), /another tab/);
+console.log('PASS incomplete import markers and invalid cache requests remain blocked');
+
+// Minimal synthetic XDVDFS image exercises the real local ISO extraction path.
+const sector = 2048;
+const iso = new Uint8Array(44 * sector);
+const descriptor = 0x10000;
+const magic = new TextEncoder().encode('MICROSOFT*XBOX*MEDIA');
+iso.set(magic, descriptor);
+iso.set(magic, descriptor + 0x7ec);
+const view = new DataView(iso.buffer);
+view.setUint32(descriptor + 20, 41, true);
+view.setUint32(descriptor + 24, sector, true);
+function entry(at, name, fileSector, size, attributes) {
+  view.setUint32(at + 4, fileSector, true);
+  view.setUint32(at + 8, size, true);
+  iso[at + 12] = attributes;
+  iso[at + 13] = name.length;
+  iso.set(new TextEncoder().encode(name), at + 14);
+}
+entry(41 * sector, 'maps', 42, sector, 0x10);
+entry(42 * sector, 'ui.map', 43, sector, 0);
+iso.set(map, 43 * sector);
+const imported = launcher();
+const messages = [];
+const worker = { Uint8Array, Blob, TextEncoder, navigator: { storage: imported.data },
+  postMessage: message => messages.push(message) };
+vm.runInNewContext(workerSource, worker);
+await worker.onmessage({ data: { file: new Blob([iso]) } });
+assert.equal(messages.at(-1).type, 'done');
+assert.deepEqual([...imported.data.files.get('maps/ui.map')], [...map]);
+assert.equal(JSON.parse(new TextDecoder().decode(imported.data.files.get('maps/.complete'))).bytes, sector);
+assert.equal((await imported.cache.mapsState({ required: ['ui.map'] })).dataRoot, '/data');
+console.log('PASS user-supplied ISO still imports maps and commits its completion marker');
