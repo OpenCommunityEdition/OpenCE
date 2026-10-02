@@ -92,6 +92,13 @@ BOOL audio_output_enabled(void);
 BOOL audio_set_output_enabled(BOOL enabled);
 float audio_master_volume(void);
 void audio_set_master_volume(float volume);
+/* display.anti_aliasing as the renderer has it (d3d8_gl.c), by its place
+among its values: the one in effect, a value's name in config.toml (NULL
+past the last), and a change of it while the game runs (supersampling from
+the next frame) */
+int video_anti_aliasing(void);
+const char *video_anti_aliasing_name(int value);
+void video_set_anti_aliasing(int value);
 #ifndef HALO_ANDROID
 /* the pointer in the menus (d3d8_gl.c, halo_ui_pointer_update) */
 struct platform_ui_pointer

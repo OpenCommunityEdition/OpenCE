@@ -181,9 +181,11 @@ struct xgpu_render_target
 	float scale[2];
 	unsigned long gl_width, gl_height;
 	/* with multisampling, the screen's targets' multisampled renderbuffer,
-	which draws go to, and whether it has been drawn into since the texture
-	last had its pixels (render_target_resolve) */
+	which draws go to, its samples a pixel (0 when not multisampling), and
+	whether it has been drawn into since the texture last had its pixels
+	(render_target_resolve) */
 	GLuint multisample;
+	int samples;
 	BOOL unresolved;
 };
 

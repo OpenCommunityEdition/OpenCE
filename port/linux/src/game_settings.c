@@ -20,6 +20,7 @@ VIDEO SETTINGS shows the window as it is.
 #include "port_config.h"
 #include "game_settings.h"
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -65,6 +66,9 @@ enum game_setting_type
 	_game_setting_type_real,
 	/* a width and a height of the display's (platform_fullscreen_resolution) */
 	_game_setting_type_resolution,
+	/* one of display.anti_aliasing's values, by its place among them, shown
+	by its name (video_anti_aliasing_name: "msaa4x" as MSAA 4X) */
+	_game_setting_type_choice,
 };
 
 struct game_setting
@@ -83,6 +87,7 @@ static const struct game_setting game_settings[NUMBER_OF_GAME_SETTINGS] =
 	{ "display.interpolation", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.direct_camera", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "display.window_scale", _game_setting_type_integer, 1.0, 0.0, 1.0 },
+	{ "display.anti_aliasing", _game_setting_type_choice, 0.0, 0.0, 0.0 },
 	{ "audio.enabled", _game_setting_type_switch, 0.0, 0.0, 0.0 },
 	{ "audio.volume", _game_setting_type_percentage, 0.0, 1.0, 0.1 },
 	{ "input.mouse_sensitivity", _game_setting_type_real, 0.1, 10.0, 0.1 },
@@ -109,6 +114,8 @@ static double game_setting_value(int setting)
 		return render_interpolation_direct_camera_enabled();
 	case _game_setting_window_scale:
 		return platform_window_scale();
+	case _game_setting_anti_aliasing:
+		return video_anti_aliasing();
 	case _game_setting_audio:
 		return audio_output_enabled();
 	case _game_setting_master_volume:
@@ -140,6 +147,9 @@ static BOOL game_setting_apply(int setting, double value)
 		return TRUE;
 	case _game_setting_window_scale:
 		return platform_set_window_scale((int)value);
+	case _game_setting_anti_aliasing:
+		video_set_anti_aliasing((int)value);
+		return TRUE;
 	case _game_setting_audio:
 		return audio_set_output_enabled(value != 0.0);
 	case _game_setting_master_volume:
@@ -255,6 +265,22 @@ static void game_setting_format(int setting, double value, char *text, int size)
 		if (size > 0)
 			text[0] = 0;
 		break;
+	case _game_setting_type_choice:
+	{
+		const char *name = video_anti_aliasing_name((int)value);
+		int length = 0;
+
+		/* in capitals, a space before its number */
+		for (; name && *name && length + 2 < size; name++)
+		{
+			if (isdigit((unsigned char)*name) && length && !isdigit((unsigned char)text[length - 1]))
+				text[length++] = ' ';
+			text[length++] = (char)toupper((unsigned char)*name);
+		}
+		if (size > 0)
+			text[length] = 0;
+		break;
+	}
 	}
 }
 
@@ -300,6 +326,12 @@ int game_setting_step(int setting, int direction)
 	{
 		next = value == 0.0;
 	}
+	else if (definition->type == _game_setting_type_choice)
+	{
+		next = value + (direction > 0 ? 1.0 : -1.0);
+		if (!video_anti_aliasing_name((int)next))
+			return 0;
+	}
 	else
 	{
 		double maximum = setting == _game_setting_window_scale ? platform_window_scale_maximum() : definition->maximum;
@@ -325,6 +357,9 @@ int game_setting_step(int setting, int direction)
 		break;
 	case _game_setting_type_integer:
 		written = config_write_integer(definition->name, lround(next));
+		break;
+	case _game_setting_type_choice:
+		written = config_write_string(definition->name, video_anti_aliasing_name((int)next));
 		break;
 	default:
 		written = config_write_real(definition->name, next);

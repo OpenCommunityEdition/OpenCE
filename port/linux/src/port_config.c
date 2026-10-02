@@ -838,7 +838,18 @@ static int config_write(const char *name, enum config_type type, const char *val
 	/* (the file read first, as the other settings are) */
 	config_value(name, type);
 	pthread_mutex_lock(&config_lock);
-	config_set_from_text(&config_values[index], type, value);
+	if (type == _config_string)
+	{
+		/* (without the quotes the file has) */
+		char unquoted[64];
+
+		snprintf(unquoted, sizeof(unquoted), "%.*s", (int)strlen(value) - 2, value + 1);
+		config_set_from_text(&config_values[index], type, unquoted);
+	}
+	else
+	{
+		config_set_from_text(&config_values[index], type, value);
+	}
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
 	snprintf(line_text, sizeof(line_text), "%s = %s\n", key, value);
@@ -909,6 +920,15 @@ int config_write_integer(const char *name, long value)
 
 	snprintf(text, sizeof(text), "%ld", value);
 	return config_write(name, _config_integer, text);
+}
+
+/* (a value with no quote or backslash in it, which would need escaping) */
+int config_write_string(const char *name, const char *value)
+{
+	char text[64];
+
+	snprintf(text, sizeof(text), "\"%s\"", value);
+	return config_write(name, _config_string, text);
 }
 
 int config_write_real(const char *name, double value)

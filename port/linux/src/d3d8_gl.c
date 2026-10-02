@@ -82,8 +82,10 @@ static float screen_scale[2] = { 1.0f, 1.0f };
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
-/* display.anti_aliasing (xgpu.h), and the samples a pixel it asks for
-(multisampling's, at most the GPU's: gl_initialize) */
+/* display.anti_aliasing (xgpu.h): its values, the one in effect (its place
+among them, which VIDEO SETTINGS changes while the game runs:
+video_set_anti_aliasing), and the samples a pixel it asks for
+(multisampling's, at most the GPU's: anti_aliasing_initialize) */
 enum
 {
 	_anti_aliasing_off,
@@ -93,47 +95,46 @@ enum
 	_anti_aliasing_msaa,
 };
 
-static int anti_aliasing_mode = -1;
+static const struct
+{
+	const char *name;
+	int mode;
+	int samples;
+} anti_aliasing_values[] =
+{
+	{ "off", _anti_aliasing_off, 0 },
+	{ "fxaa", _anti_aliasing_fxaa, 0 },
+	{ "smaa", _anti_aliasing_smaa, 0 },
+	{ "ssaa2x", _anti_aliasing_ssaa, 0 },
+	{ "msaa2x", _anti_aliasing_msaa, 2 },
+	{ "msaa4x", _anti_aliasing_msaa, 4 },
+	{ "msaa8x", _anti_aliasing_msaa, 8 },
+};
+
+#define NUMBER_OF_ANTI_ALIASING_VALUES ((int)(sizeof(anti_aliasing_values) / sizeof(anti_aliasing_values[0])))
+
+static int anti_aliasing_value = -1;
 static int anti_aliasing_samples;
 
 static int anti_aliasing(void)
 {
-	static const struct
-	{
-		const char *name;
-		int mode;
-		int samples;
-	} modes[] =
-	{
-		{ "off", _anti_aliasing_off, 0 },
-		{ "fxaa", _anti_aliasing_fxaa, 0 },
-		{ "smaa", _anti_aliasing_smaa, 0 },
-		{ "ssaa2x", _anti_aliasing_ssaa, 0 },
-		{ "msaa2x", _anti_aliasing_msaa, 2 },
-		{ "msaa4x", _anti_aliasing_msaa, 4 },
-		{ "msaa8x", _anti_aliasing_msaa, 8 },
-	};
-
-	if (anti_aliasing_mode < 0)
+	if (anti_aliasing_value < 0)
 	{
 		const char *setting = config_string("display.anti_aliasing");
-		unsigned long index;
 
-		anti_aliasing_mode = _anti_aliasing_off;
-		for (index = 0; index < sizeof(modes) / sizeof(modes[0]) && strcmp(setting, modes[index].name); index++)
-			;
-		if (index < sizeof(modes) / sizeof(modes[0]))
+		/* (none of them: the first, off) */
+		for (anti_aliasing_value = NUMBER_OF_ANTI_ALIASING_VALUES - 1;
+			anti_aliasing_value > 0 && strcmp(setting, anti_aliasing_values[anti_aliasing_value].name);
+			anti_aliasing_value--)
 		{
-			anti_aliasing_mode = modes[index].mode;
-			anti_aliasing_samples = modes[index].samples;
-			platform_log("anti-aliasing: %s", setting);
 		}
-		else
-		{
+		anti_aliasing_samples = anti_aliasing_values[anti_aliasing_value].samples;
+		if (strcmp(setting, anti_aliasing_values[anti_aliasing_value].name))
 			platform_log("anti-aliasing: \"%s\" is unknown, so off", setting);
-		}
+		else
+			platform_log("anti-aliasing: %s", setting);
 	}
-	return anti_aliasing_mode;
+	return anti_aliasing_values[anti_aliasing_value].mode;
 }
 
 static void screen_mode_choose(long *width, float scale[2])
@@ -309,6 +310,10 @@ struct render_target_entry
 	struct render_target_entry *next_in_bucket;
 	struct xgpu_render_target target;
 	unsigned long last_rendered;
+	/* the back buffer or its depth buffer, which the 3D view is drawn into:
+	multisampled with multisampling (the screen's other targets, the screen
+	effects', only take full-screen quads) */
+	BOOL screen_buffer;
 };
 
 /* every draw looks up its targets and whether its textures are render
@@ -879,18 +884,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	else
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-	/* multisampling: the back buffer and its depth buffer, which the 3D view
-	is drawn into, are drawn into multisampled renderbuffers (the screen's
-	other targets, the screen effects', only take full-screen quads) */
-	if (anti_aliasing() == _anti_aliasing_msaa &&
-		surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data))
-	{
-		glGenRenderbuffers(1, &entry->target.multisample);
-		glBindRenderbuffer(GL_RENDERBUFFER, entry->target.multisample);
-		glRenderbufferStorageMultisample(GL_RENDERBUFFER, anti_aliasing_samples,
-			depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8, (GLsizei)entry->target.gl_width,
-			(GLsizei)entry->target.gl_height);
-	}
+	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -957,6 +951,9 @@ static GLuint framebuffer_get(GLuint color, GLuint depth)
 	return framebuffer_find(color, depth, FALSE);
 }
 
+/* the targets drawn into multisampled since their textures had their pixels */
+static int unresolved_targets;
+
 /* the multisampled pixels of a target drawn into since into its texture,
 before anything reads it (a draw's textures, the display blit) */
 static void render_target_resolve(struct xgpu_render_target *target)
@@ -964,12 +961,32 @@ static void render_target_resolve(struct xgpu_render_target *target)
 	if (!target->unresolved)
 		return;
 	target->unresolved = FALSE;
+	unresolved_targets--;
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_find(target->multisample, 0, TRUE));
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer_get(target->texture, 0));
 	glDisable(GL_SCISSOR_TEST);
 	glBlitFramebuffer(0, 0, (GLint)target->gl_width, (GLint)target->gl_height,
 		0, 0, (GLint)target->gl_width, (GLint)target->gl_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	xgpu_gl_state_invalidate();
+}
+
+/* a screen buffer's multisampled renderbuffer as display.anti_aliasing asks
+now (VIDEO SETTINGS changes it while the game runs): made, or its storage
+made again, its pixels resolved first; without multisampling its storage is
+a pixel, and the renderbuffer is kept for the framebuffers made of it */
+static void render_target_multisample(struct render_target_entry *entry)
+{
+	int samples = entry->screen_buffer && anti_aliasing() == _anti_aliasing_msaa ? anti_aliasing_samples : 0;
+
+	if (entry->target.samples == samples)
+		return;
+	render_target_resolve(&entry->target);
+	if (!entry->target.multisample)
+		glGenRenderbuffers(1, &entry->target.multisample);
+	glBindRenderbuffer(GL_RENDERBUFFER, entry->target.multisample);
+	glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, entry->target.depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8,
+		samples ? (GLsizei)entry->target.gl_width : 1, samples ? (GLsizei)entry->target.gl_height : 1);
+	entry->target.samples = samples;
 }
 
 /* the pixels per unit of the bound targets (render_target_get), and their
@@ -1007,13 +1024,20 @@ static BOOL bind_targets(BOOL *has_depth)
 	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
 	/* multisampled when every target is (the back buffer and its depth
 	buffer, with multisampling) */
-	if ((!color || color->target.multisample) && (!depth || depth->target.multisample))
+	if (color)
+		render_target_multisample(color);
+	if (depth)
+		render_target_multisample(depth);
+	if ((!color || color->target.samples) && (!depth || depth->target.samples))
 	{
 		state_framebuffer(framebuffer_find(color ? color->target.multisample : 0,
 			depth ? depth->target.multisample : 0, TRUE));
-		if (color)
+		if (color && !color->target.unresolved)
+		{
 			color->target.unresolved = TRUE;
-		target_samples = anti_aliasing_samples;
+			unresolved_targets++;
+		}
+		target_samples = color ? color->target.samples : depth->target.samples;
 	}
 	else
 	{
@@ -1040,6 +1064,26 @@ static void anti_aliasing_initialize(void)
 	if (anti_aliasing_samples > maximum)
 		anti_aliasing_samples = maximum;
 	platform_log("anti-aliasing: %d samples a pixel (the GPU's most %d)", anti_aliasing_samples, (int)maximum);
+}
+
+int video_anti_aliasing(void)
+{
+	anti_aliasing();
+	return anti_aliasing_value;
+}
+
+const char *video_anti_aliasing_name(int value)
+{
+	return value >= 0 && value < NUMBER_OF_ANTI_ALIASING_VALUES ? anti_aliasing_values[value].name : NULL;
+}
+
+void video_set_anti_aliasing(int value)
+{
+	if (value < 0 || value >= NUMBER_OF_ANTI_ALIASING_VALUES)
+		return;
+	anti_aliasing_value = value;
+	anti_aliasing_samples = anti_aliasing_values[value].samples;
+	anti_aliasing_initialize();
 }
 
 static void gl_initialize(void)
@@ -2659,7 +2703,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	}
 	/* multisampling: the render targets the draw samples resolved before
 	its own are bound (the back buffer can be both) */
-	if (anti_aliasing() == _anti_aliasing_msaa)
+	if (unresolved_targets)
 	{
 		for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 		{

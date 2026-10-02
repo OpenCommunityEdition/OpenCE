@@ -23,5 +23,6 @@ on success */
 int config_write_boolean(const char *name, int value);
 int config_write_integer(const char *name, long value);
 int config_write_real(const char *name, double value);
+int config_write_string(const char *name, const char *value);
 
 #endif
