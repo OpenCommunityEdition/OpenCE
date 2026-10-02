@@ -889,6 +889,11 @@ void rasterizer_draw_unicode_string(
 	point2d *cursor_reference,
 	short height_adjust,
 	wchar_t const *string);
+/* port: text drawn scale times larger about a point, until set back to 1 */
+void rasterizer_text_set_scale(
+	real scale,
+	real origin_x,
+	real origin_y);
 void rasterizer_text_cache_flush(
 	void);
 void rasterizer_text_cache_dispose(
