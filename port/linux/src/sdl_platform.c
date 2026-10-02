@@ -425,6 +425,7 @@ void platform_video_drawable_size(int *width, int *height)
 	SDL_GetWindowSizeInPixels(platform_window, width, height);
 }
 
+#ifndef HALO_ANDROID
 /* with vsync off, the time between frames display.max_fps asks for (0:
 twice the display's refresh rate), or 0 for no limit. A GPU never left idle
 can hang (Intel's Raptor Lake graphics, whose reset then takes the desktop
@@ -453,12 +454,16 @@ static Uint64 frame_interval_ns(void)
 	return (Uint64)(1e9f / rate);
 }
 
+#endif
 void platform_video_swap(void)
 {
+#ifndef HALO_ANDROID
 	static Uint64 next_frame;
 	Uint64 interval, now;
 
+#endif
 	SDL_GL_SwapWindow(platform_window);
+#ifndef HALO_ANDROID
 	interval = frame_interval_ns();
 	if (!interval)
 		return;
@@ -470,6 +475,7 @@ void platform_video_swap(void)
 	}
 	/* (a frame more than an interval late starts the count again) */
 	next_frame = now - next_frame > interval ? now + interval : next_frame + interval;
+#endif
 }
 
 void platform_mouse_capture(BOOL capture)
