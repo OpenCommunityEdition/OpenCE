@@ -1438,6 +1438,8 @@ static boolean ui_cheats_render_box_piece(
 	rectangle2d const *bounds,
 	rectangle2d *clip,
 	pixel32 color);
+static short ui_cheats_row_widening(
+	struct widget_instance const *widget);
 
 /* ---------- globals */
 
@@ -1633,12 +1635,14 @@ static __inline real compute_offset_coordinate(
 		1.0);
 }
 
-/* port: draw_bitmap_in_rect from the bitmap's row source_y0 down, not its top
-(the cheats menu's taller boxes, ui_cheats_render_box_piece) */
+/* port: draw_bitmap_in_rect from the bitmap's row source_y0 down, and its
+column source_x0 across, not its top left (the cheats menu's taller boxes and
+wider rows, ui_cheats_render_box_piece) */
 static void draw_bitmap_rows_in_rect(
 	struct bitmap_data *bitmap,
 	rectangle2d *rect,
 	rectangle2d *bitmap_rect,
+	short source_x0,
 	short source_y0,
 	rectangle2d *clip_rect,
 	pixel32 argb,
@@ -1658,6 +1662,7 @@ static void draw_bitmap_rows_in_rect(
 		real bitmap_height;
 		real texture_width;
 		real texture_height;
+		real texture_x0;
 		real texture_y0;
 		real_point2d map0_offset;
 		real_point2d map1_offset;
@@ -1714,9 +1719,10 @@ static void draw_bitmap_rows_in_rect(
 		}
 
 		bitmap_width = MAX(1.0f, (real)bitmap->width);
+		texture_x0 = (real)source_x0 / bitmap_width;
 		texture_width = MIN(
 			(real)source_width / bitmap_width,
-			1.0f);
+			1.0f - texture_x0);
 		bitmap_height = MAX(1.0f, (real)bitmap->height);
 		texture_y0 = (real)source_y0 / bitmap_height;
 		texture_height = MIN(
@@ -1728,8 +1734,8 @@ static void draw_bitmap_rows_in_rect(
 			vertex_index++)
 		{
 			vertices[vertex_index].color = argb;
-			vertices[vertex_index].texture_coordinates.x =
-				(vertex_index % 3) ? texture_width : 0.0f;
+			vertices[vertex_index].texture_coordinates.x = texture_x0 +
+				((vertex_index % 3) ? texture_width : 0.0f);
 			vertices[vertex_index].texture_coordinates.y = texture_y0 +
 				((vertex_index > 1) ? texture_height : 0.0f);
 			vertices[vertex_index].position = points[vertex_index];
@@ -1818,6 +1824,7 @@ void draw_bitmap_in_rect(
 		bitmap,
 		rect,
 		bitmap_rect,
+		0,
 		0,
 		clip_rect,
 		argb,
@@ -5018,6 +5025,9 @@ static void widget_instance_render_text_box(
 	bounds.y0 += offset.y;
 	bounds.x0 += definition->horizontal_offset;
 	bounds.y0 += definition->vertical_offset;
+	/* port: the cheats menu's wider rows */
+	bounds.x0 -= ui_cheats_row_widening(widget);
+	bounds.x1 += ui_cheats_row_widening(widget);
 	if (focus)
 	{
 		color = get_ui_argb_white();
@@ -5302,7 +5312,12 @@ enum
 	/* the boxes grow over their art's rows from here to the line above the
 	key, where the borders are straight and the body a smooth gradient (the
 	right pause box, which has no such line, grows over the same rows) */
-	UI_CHEATS_BOX_STRETCH_TOP = 42
+	UI_CHEATS_BOX_STRETCH_TOP = 42,
+
+	/* the menu's rows wider on each side than the pause menu's 202: ACTIVE
+	CAMOUFLAGE is 200, and a centered line leaves out of its width the glyphs
+	whose bitmaps reach the right edge (draw_string), so it drew off center */
+	UI_CHEATS_ROW_WIDENING = 12
 };
 
 /* the layout of the pause screen as the maps have it, which the cheats
@@ -5703,8 +5718,69 @@ static short ui_cheats_button_press(
 	return pressed ? _ui_audio_feedback_forward : _ui_audio_feedback_flag_failure;
 }
 
+/* the columns a row of the cheats menu's is widened by on each side; 0 for any
+other widget */
+static short ui_cheats_row_widening(
+	struct widget_instance const *widget)
+{
+	short cheats_widget = ui_cheats_widget_get(widget);
+
+	if (cheats_widget == _ui_cheats_widget_return ||
+		cheats_widget == _ui_cheats_widget_resume ||
+		cheats_widget >= _ui_cheats_widget_first_cheat)
+	{
+		return UI_CHEATS_ROW_WIDENING;
+	}
+
+	return 0;
+}
+
+/* a row's art drawn wider: its ends 1:1, its middle over the extra columns
+(the clip, which begins at the widget's left edge, moved left with it) */
+static void ui_cheats_render_row_piece(
+	struct bitmap_data *bitmap,
+	rectangle2d const *bounds,
+	short widening,
+	rectangle2d *clip,
+	pixel32 color)
+{
+	short width = bounds->x1 - bounds->x0;
+	short end = MIN(bounds->y1 - bounds->y0, width / 2);
+	short source_x0[3];
+	short source_x1[3];
+	short x = bounds->x0 - widening;
+	short slice;
+	rectangle2d wide_clip;
+
+	if (clip)
+	{
+		wide_clip = *clip;
+		wide_clip.x0 -= widening;
+		clip = &wide_clip;
+	}
+	source_x0[0] = 0;
+	source_x1[0] = source_x0[1] = end;
+	source_x1[1] = source_x0[2] = width - end;
+	source_x1[2] = width;
+	for (slice = 0; slice < 3; slice++)
+	{
+		rectangle2d rect = *bounds;
+		rectangle2d source = *bounds;
+
+		source.x0 = source_x0[slice];
+		source.x1 = source_x1[slice];
+		rect.x0 = x;
+		rect.x1 = x + (source.x1 - source.x0) + (slice == 1 ? 2 * widening : 0);
+		x = rect.x1;
+		draw_bitmap_rows_in_rect(bitmap, &rect, &source, source.x0, 0, clip, color, NULL, FALSE);
+	}
+
+	return;
+}
+
 /* a piece of a box's art drawn taller: its corners, line and key band 1:1,
-the gradient between them over the extra rows; FALSE for any other widget */
+the gradient between them over the extra rows; a row's drawn wider; FALSE for
+any other widget */
 static boolean ui_cheats_render_box_piece(
 	struct widget_instance const *widget,
 	struct bitmap_data *bitmap,
@@ -5721,6 +5797,12 @@ static boolean ui_cheats_render_box_piece(
 	short source_y1[3];
 	short y;
 
+	if (ui_cheats_row_widening(widget))
+	{
+		ui_cheats_render_row_piece(bitmap, bounds, ui_cheats_row_widening(widget), clip, color);
+
+		return TRUE;
+	}
 	if (cheats_widget == _ui_cheats_widget_pause_box)
 	{
 		stretch_bottom = UI_CHEATS_PAUSE_BOX_BODY_BOTTOM;
@@ -5753,7 +5835,7 @@ static boolean ui_cheats_render_box_piece(
 		rect.y0 = y;
 		rect.y1 = y + (source.y1 - source.y0) + (band == 1 ? stretch : 0);
 		y = rect.y1;
-		draw_bitmap_rows_in_rect(bitmap, &rect, &source, source.y0, clip, color, NULL, FALSE);
+		draw_bitmap_rows_in_rect(bitmap, &rect, &source, 0, source.y0, clip, color, NULL, FALSE);
 	}
 
 	return TRUE;
@@ -5933,8 +6015,8 @@ static void ui_mouse_note_target(
 	{
 		return;
 	}
-	bounds.x0 += offset.x;
-	bounds.x1 += offset.x;
+	bounds.x0 += offset.x - ui_cheats_row_widening(widget);
+	bounds.x1 += offset.x + ui_cheats_row_widening(widget);
 	bounds.y0 += offset.y;
 	bounds.y1 += offset.y;
 	button_index = ui_mouse_key_button(widget);
