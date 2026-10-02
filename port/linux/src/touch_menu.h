@@ -27,6 +27,19 @@ struct touch_menu_settings
 	/* at most this many steps per read: the rest waits, so that a fast
 	swipe moves a list gradually, as fast as the menus take the steps */
 	int steps_per_read;
+	/* Android's system gesture zones, in pixels of the window (all 0: none).
+	With the system bars hidden the first edge swipe only shows them, and
+	Android hands that swipe to the game as an ordinary finger, so a finger
+	that begins in a zone must not act as a menu touch:
+	- in the left or right zone it is ignored for its whole life, a corner
+	included; it does not keep another finger from being used;
+	- in the top or bottom zone it still taps (the A/B legends sit in the
+	bottom zone) but never scrolls: once it moves beyond the slop it is
+	neither a tap nor a scroll. */
+	float edge_left, edge_top, edge_right, edge_bottom;
+	/* the window's size, for the right and bottom zones: 0 means those two
+	zones do not exist, so that a size not yet known cannot fill the screen */
+	float width, height;
 };
 
 struct touch_menu_output
@@ -55,6 +68,10 @@ struct touch_menu
 	float down_x, down_y;
 	float last_x, last_y;
 	int scrolling;
+	/* the finger began in the top or bottom zone: it may tap, not scroll */
+	int no_scroll;
+	/* a no_scroll finger moved beyond the slop: no tap and no scroll */
+	int void_tap;
 	/* 0: vertical, 1: horizontal */
 	int axis;
 	/* drag not yet a whole step */

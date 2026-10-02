@@ -3,7 +3,10 @@ package com.halo.decomp;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.graphics.Insets;
+import android.os.Build;
 import android.view.Display;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 
 import org.libsdl.app.SDLActivity;
@@ -37,6 +40,26 @@ public class HaloActivity extends SDLActivity {
             multicastLock.release();
         multicastLock = null;
         super.onDestroy();
+    }
+
+    /**
+     * The edges of the screen where Android keeps its gestures. In sticky
+     * full screen the first swipe from an edge only shows the system bars,
+     * and Android hands that swipe to the game as an ordinary finger, so the
+     * game (port/linux/src/touch_input.c) must ignore touches that begin
+     * there. The game's thread calls this through JNI at startup.
+     *
+     * @return {left, top, right, bottom} in pixels; all 0 before Android 10,
+     *         which has no such insets, and while the window has none yet
+     */
+    public int[] getSystemGestureInsetsPixels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            return new int[] { 0, 0, 0, 0 };
+        WindowInsets root = getWindow().getDecorView().getRootWindowInsets();
+        if (root == null)
+            return new int[] { 0, 0, 0, 0 };
+        Insets gesture = root.getSystemGestureInsets();
+        return new int[] { gesture.left, gesture.top, gesture.right, gesture.bottom };
     }
 
     /**

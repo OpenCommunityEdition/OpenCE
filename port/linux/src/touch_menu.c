@@ -22,9 +22,41 @@ void touch_menu_reset(struct touch_menu *menu)
 	touch_menu_init(menu, &settings);
 }
 
+/**
+ * @brief Whether x is in the left or right gesture zone: [0, edge_left) and
+ * [width - edge_right, width). Without a window size the right one does not
+ * exist, since it would otherwise start at a negative x and cover the screen.
+ * @param menu the state (the zones are in its settings)
+ * @param x the finger's x, in pixels
+ */
+static int in_side_zone(const struct touch_menu *menu, float x)
+{
+	const struct touch_menu_settings *s = &menu->settings;
+
+	return x < s->edge_left || (s->width > 0.0f && x >= s->width - s->edge_right);
+}
+
+/**
+ * @brief Whether y is in the top or bottom gesture zone; as the side zones,
+ * the bottom one needs the window's height.
+ * @param menu the state (the zones are in its settings)
+ * @param y the finger's y, in pixels
+ */
+static int in_top_or_bottom_zone(const struct touch_menu *menu, float y)
+{
+	const struct touch_menu_settings *s = &menu->settings;
+
+	return y < s->edge_top || (s->height > 0.0f && y >= s->height - s->edge_bottom);
+}
+
 void touch_menu_down(struct touch_menu *menu, unsigned long long finger, float x, float y)
 {
 	if (menu->finger_down)
+		return;
+	/* no state for an ignored finger: its moves and its lift find no finger
+	down, or another finger's id, and do nothing. It must not set
+	finger_down, or it would shut out the next finger. */
+	if (in_side_zone(menu, x))
 		return;
 	menu->finger_down = 1;
 	menu->finger = finger;
@@ -34,6 +66,8 @@ void touch_menu_down(struct touch_menu *menu, unsigned long long finger, float x
 	menu->output.down_x = x;
 	menu->output.down_y = y;
 	menu->scrolling = 0;
+	menu->no_scroll = in_top_or_bottom_zone(menu, y);
+	menu->void_tap = 0;
 	menu->remainder = 0.0f;
 	/* a finger on the screen stops a list still scrolling, so that a tap
 	hits what the finger sees */
@@ -52,6 +86,15 @@ void touch_menu_move(struct touch_menu *menu, unsigned long long finger, float x
 
 		if (dx * dx + dy * dy <= menu->settings.slop * menu->settings.slop)
 			return;
+		/* a finger from the top or bottom zone may be Android's own edge swipe,
+		which reaches the game too. It may tap (the legends sit in the bottom
+		zone), but beyond the slop it is neither a scroll nor a tap, so that
+		its lift does not click where it began. */
+		if (menu->no_scroll)
+		{
+			menu->void_tap = 1;
+			return;
+		}
 		/* the steps count from the slop's edge on the axis: the slop is not
 		a step, and a fast first sample is not lost */
 		menu->scrolling = 1;
@@ -82,7 +125,7 @@ void touch_menu_up(struct touch_menu *menu, unsigned long long finger, float x, 
 	if (!menu->finger_down || finger != menu->finger)
 		return;
 	touch_menu_move(menu, finger, x, y);
-	if (!menu->scrolling)
+	if (!menu->scrolling && !menu->void_tap)
 	{
 		menu->output.moved = 1;
 		menu->output.x = menu->output.click_x = menu->down_x;
@@ -91,12 +134,14 @@ void touch_menu_up(struct touch_menu *menu, unsigned long long finger, float x, 
 	}
 	menu->finger_down = 0;
 	menu->scrolling = 0;
+	menu->void_tap = 0;
 }
 
 void touch_menu_cancel(struct touch_menu *menu)
 {
 	menu->finger_down = 0;
 	menu->scrolling = 0;
+	menu->void_tap = 0;
 	menu->remainder = 0.0f;
 	menu->pending_steps = 0;
 	menu->output.downs = 0;

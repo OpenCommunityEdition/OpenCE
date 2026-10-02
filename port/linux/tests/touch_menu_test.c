@@ -25,9 +25,29 @@ static int failures;
 test the limit (the game uses 1) */
 static void setup(struct touch_menu *menu)
 {
-	struct touch_menu_settings settings = { 36.0f, 120.0f, 2 };
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
 	touch_menu_init(menu, &settings);
+}
+
+/* the S23's system gesture insets, as dumpsys window reports them, on its
+2340x1080 window: 90 px at the sides, 40 above (the status bar), 96 below */
+static void setup_zones(struct touch_menu *menu)
+{
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 90.0f, 40.0f, 90.0f, 96.0f, 2340.0f, 1080.0f };
+
+	touch_menu_init(menu, &settings);
+}
+
+/* a finger from (x0, y0) to (x1, y1) in 12 samples, lifted at the end */
+static void swipe(struct touch_menu *menu, unsigned long long finger, float x0, float y0, float x1, float y1)
+{
+	int i;
+
+	touch_menu_down(menu, finger, x0, y0);
+	for (i = 1; i <= 12; i++)
+		touch_menu_move(menu, finger, x0 + (x1 - x0) * i / 12.0f, y0 + (y1 - y0) * i / 12.0f);
+	touch_menu_up(menu, finger, x1, y1);
 }
 
 /* first, so that a unit that lost its settings (a step of 0 never ends its
@@ -40,6 +60,16 @@ static void test_init_stores_the_settings(void)
 	CHECK(menu.settings.slop == 36.0f);
 	CHECK(menu.settings.step == 120.0f);
 	CHECK(menu.settings.steps_per_read == 2);
+	CHECK(menu.settings.edge_left == 0.0f && menu.settings.edge_top == 0.0f);
+	CHECK(menu.settings.edge_right == 0.0f && menu.settings.edge_bottom == 0.0f);
+	CHECK(menu.settings.width == 0.0f && menu.settings.height == 0.0f);
+	setup_zones(&menu);
+	CHECK(menu.settings.edge_left == 90.0f);
+	CHECK(menu.settings.edge_top == 40.0f);
+	CHECK(menu.settings.edge_right == 90.0f);
+	CHECK(menu.settings.edge_bottom == 96.0f);
+	CHECK(menu.settings.width == 2340.0f);
+	CHECK(menu.settings.height == 1080.0f);
 }
 
 static void test_tap_clicks_where_the_finger_went_down(void)
@@ -506,7 +536,7 @@ static void test_one_step_a_read(void)
 {
 	struct touch_menu menu;
 	struct touch_menu_output out;
-	struct touch_menu_settings settings = { 36.0f, 120.0f, 1 };
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 1, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 	int index;
 
 	touch_menu_init(&menu, &settings);
@@ -608,6 +638,416 @@ static void test_reset_and_cancel_drop_the_unread_downs(void)
 	CHECK(out.downs == 0);
 }
 
+static void test_a_tap_in_the_left_zone_is_ignored(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.moved == 0);
+	CHECK(out.downs == 0);
+	CHECK(out.wheel_steps == 0);
+}
+
+static void test_the_left_zone_ends_at_the_inset(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 89.0f, 500.0f);
+	touch_menu_up(&menu, 1, 89.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.downs == 0);
+	touch_menu_down(&menu, 1, 90.0f, 500.0f);
+	touch_menu_up(&menu, 1, 90.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	CHECK(out.click_x == 90.0f);
+}
+
+static void test_the_right_zone_begins_at_width_minus_the_inset(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 2250.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2250.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.downs == 0);
+	touch_menu_down(&menu, 1, 2249.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2249.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	CHECK(out.click_x == 2249.0f);
+}
+
+/* the reported bug: the first edge swipe in immersive mode scrolled the list */
+static void test_an_edge_swipe_does_not_scroll_or_click(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	int i, steps = 0;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	for (i = 1; i <= 14; i++)
+	{
+		touch_menu_move(&menu, 1, 10.0f + 50.0f * i, 500.0f);
+		touch_menu_read(&menu, &out);
+		steps += out.wheel_steps;
+		CHECK(out.clicks == 0);
+	}
+	touch_menu_up(&menu, 1, 710.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	steps += out.wheel_steps;
+	CHECK(steps == 0);
+	CHECK(out.clicks == 0);
+	CHECK(out.moved == 0);
+	CHECK(out.downs == 0);
+}
+
+static void test_an_ignored_finger_does_not_stick(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	swipe(&menu, 1, 10.0f, 500.0f, 700.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	touch_menu_down(&menu, 1, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 1, 1170.0f, 540.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+}
+
+static void test_an_edge_finger_does_not_block_a_second_finger(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_down(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	CHECK(out.click_x == 1170.0f);
+}
+
+/* an edge finger must not stop the steps of a scroll by another finger */
+static void test_an_edge_finger_leaves_another_fingers_scroll_alone(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 2, 1170.0f, 800.0f);
+	touch_menu_move(&menu, 2, 1170.0f, 500.0f);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_move(&menu, 1, 400.0f, 500.0f);
+	touch_menu_up(&menu, 1, 400.0f, 500.0f);
+	touch_menu_up(&menu, 2, 1170.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	CHECK(out.clicks == 0);
+}
+
+/* a finger in a zone is no finger on the screen: the list goes on scrolling */
+static void test_an_edge_finger_keeps_the_pending_steps(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	swipe(&menu, 1, 1170.0f, 800.0f, 1170.0f, 100.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	touch_menu_down(&menu, 2, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+}
+
+static void test_a_tap_in_the_bottom_zone_clicks(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 1050.0f);
+	touch_menu_up(&menu, 1, 1170.0f, 1050.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	CHECK(out.click_x == 1170.0f && out.click_y == 1050.0f);
+}
+
+static void test_a_swipe_up_from_the_bottom_zone_does_nothing(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	int i, steps = 0;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 1060.0f);
+	for (i = 1; i <= 12; i++)
+	{
+		touch_menu_move(&menu, 1, 1170.0f, 1060.0f - 50.0f * i);
+		touch_menu_read(&menu, &out);
+		steps += out.wheel_steps;
+	}
+	touch_menu_up(&menu, 1, 1170.0f, 460.0f);
+	touch_menu_read(&menu, &out);
+	steps += out.wheel_steps;
+	CHECK(steps == 0);
+	CHECK(out.clicks == 0);
+	CHECK(out.moved == 0);
+}
+
+static void test_a_swipe_down_from_the_top_zone_does_nothing(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	int i, steps = 0;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 10.0f);
+	for (i = 1; i <= 12; i++)
+	{
+		touch_menu_move(&menu, 1, 1170.0f, 10.0f + 50.0f * i);
+		touch_menu_read(&menu, &out);
+		steps += out.wheel_steps;
+	}
+	touch_menu_up(&menu, 1, 1170.0f, 610.0f);
+	touch_menu_read(&menu, &out);
+	steps += out.wheel_steps;
+	CHECK(steps == 0);
+	CHECK(out.clicks == 0);
+	CHECK(out.moved == 0);
+}
+
+/* a sample past the slop voids the tap for good: coming back to the start
+must not bring it back */
+static void test_a_no_scroll_finger_stays_void_after_returning(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 1050.0f);
+	touch_menu_move(&menu, 1, 1170.0f, 900.0f);
+	touch_menu_up(&menu, 1, 1170.0f, 1050.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.moved == 0);
+}
+
+/* a no-scroll finger may still wobble inside the slop and tap */
+static void test_a_no_scroll_finger_taps_within_the_slop(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 1050.0f);
+	touch_menu_move(&menu, 1, 1190.0f, 1040.0f);
+	touch_menu_up(&menu, 1, 1190.0f, 1040.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.click_x == 1170.0f && out.click_y == 1050.0f);
+}
+
+static void test_just_outside_the_zones_scrolls_as_usual(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 900.0f);
+	touch_menu_move(&menu, 1, 1170.0f, 840.0f);
+	touch_menu_move(&menu, 1, 1170.0f, 300.0f);
+	touch_menu_up(&menu, 1, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	CHECK(out.clicks == 0);
+}
+
+static void test_the_bottom_and_top_zones_end_at_their_insets(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	/* 1080 - 96 = 984 is the first y of the bottom zone */
+	setup_zones(&menu);
+	swipe(&menu, 1, 1170.0f, 984.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 0);
+	swipe(&menu, 1, 1170.0f, 983.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	/* 39 is the last y of the top zone */
+	setup_zones(&menu);
+	swipe(&menu, 1, 1170.0f, 39.0f, 1170.0f, 700.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 0);
+	swipe(&menu, 1, 1170.0f, 40.0f, 1170.0f, 700.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 2);
+}
+
+/* a no-scroll finger must not leave its state to the next finger */
+static void test_a_scroll_after_a_no_scroll_finger_still_scrolls(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	swipe(&menu, 1, 1170.0f, 1060.0f, 1170.0f, 700.0f);
+	touch_menu_read(&menu, &out);
+	swipe(&menu, 1, 1170.0f, 800.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	CHECK(out.clicks == 0);
+}
+
+/* the side zones win over the bottom: a corner touch is ignored */
+static void test_a_corner_touch_is_ignored(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 10.0f, 1060.0f);
+	touch_menu_up(&menu, 1, 10.0f, 1060.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.downs == 0);
+	touch_menu_down(&menu, 1, 2300.0f, 10.0f);
+	touch_menu_up(&menu, 1, 2300.0f, 10.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.downs == 0);
+}
+
+/* no insets (button navigation, desktop, unreadable): the edges count */
+static void test_without_zones_the_edges_work(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup(&menu);
+	touch_menu_down(&menu, 1, 0.0f, 500.0f);
+	touch_menu_up(&menu, 1, 0.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	touch_menu_down(&menu, 1, 500.0f, 0.0f);
+	touch_menu_up(&menu, 1, 500.0f, 0.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	swipe(&menu, 1, 0.0f, 500.0f, 500.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 2);
+	CHECK(out.clicks == 0);
+}
+
+/* insets without a window size: the right and bottom zones do not exist */
+static void test_without_a_size_only_the_left_and_top_zones_exist(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 90.0f, 40.0f, 90.0f, 96.0f, 0.0f, 0.0f };
+
+	touch_menu_init(&menu, &settings);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	swipe(&menu, 1, 5000.0f, 2000.0f, 5000.0f, 1000.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+}
+
+/* the S23's insets are symmetric, so only unequal ones tell the two sides
+(and the top and the bottom) apart */
+static void test_each_side_has_its_own_inset(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 30.0f, 20.0f, 200.0f, 150.0f, 2340.0f, 1080.0f };
+
+	touch_menu_init(&menu, &settings);
+	touch_menu_down(&menu, 1, 29.0f, 500.0f);
+	touch_menu_up(&menu, 1, 29.0f, 500.0f);
+	touch_menu_down(&menu, 1, 2140.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2140.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	touch_menu_down(&menu, 1, 30.0f, 500.0f);
+	touch_menu_up(&menu, 1, 30.0f, 500.0f);
+	touch_menu_down(&menu, 1, 2139.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2139.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 2);
+	/* above 1080 - 150 = 930 and from 20 down a swipe scrolls; the top
+	zone is 20 high and the bottom one 150 */
+	swipe(&menu, 1, 1170.0f, 929.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	swipe(&menu, 1, 1170.0f, 930.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 0);
+	swipe(&menu, 1, 1170.0f, 19.0f, 1170.0f, 700.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 0);
+	swipe(&menu, 1, 1170.0f, 20.0f, 1170.0f, 700.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == 2);
+}
+
+static void test_reset_and_cancel_drop_a_zone_finger(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_reset(&menu);
+	touch_menu_down(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	/* a bottom finger that moved on is void; after a cancel the next
+	finger taps */
+	touch_menu_down(&menu, 1, 1170.0f, 1060.0f);
+	touch_menu_move(&menu, 1, 1170.0f, 800.0f);
+	touch_menu_cancel(&menu);
+	touch_menu_down(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	/* and after a reset */
+	touch_menu_down(&menu, 1, 1170.0f, 1060.0f);
+	touch_menu_move(&menu, 1, 1170.0f, 800.0f);
+	touch_menu_reset(&menu);
+	touch_menu_down(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_up(&menu, 2, 1170.0f, 540.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+}
+
 int main(void)
 {
 	test_init_stores_the_settings();
@@ -648,6 +1088,27 @@ int main(void)
 	test_two_downs_between_reads_count_twice();
 	test_a_second_finger_is_no_down();
 	test_reset_and_cancel_drop_the_unread_downs();
+	test_a_tap_in_the_left_zone_is_ignored();
+	test_the_left_zone_ends_at_the_inset();
+	test_the_right_zone_begins_at_width_minus_the_inset();
+	test_an_edge_swipe_does_not_scroll_or_click();
+	test_an_ignored_finger_does_not_stick();
+	test_an_edge_finger_does_not_block_a_second_finger();
+	test_an_edge_finger_leaves_another_fingers_scroll_alone();
+	test_an_edge_finger_keeps_the_pending_steps();
+	test_a_tap_in_the_bottom_zone_clicks();
+	test_a_swipe_up_from_the_bottom_zone_does_nothing();
+	test_a_swipe_down_from_the_top_zone_does_nothing();
+	test_a_no_scroll_finger_stays_void_after_returning();
+	test_a_no_scroll_finger_taps_within_the_slop();
+	test_just_outside_the_zones_scrolls_as_usual();
+	test_the_bottom_and_top_zones_end_at_their_insets();
+	test_a_scroll_after_a_no_scroll_finger_still_scrolls();
+	test_a_corner_touch_is_ignored();
+	test_without_zones_the_edges_work();
+	test_without_a_size_only_the_left_and_top_zones_exist();
+	test_each_side_has_its_own_inset();
+	test_reset_and_cancel_drop_a_zone_finger();
 	if (failures)
 		printf("%d failures\n", failures);
 	else
