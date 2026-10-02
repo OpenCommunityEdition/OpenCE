@@ -388,25 +388,6 @@
       }
     },
     {
-      "unit": "source/tool/connected_geometry",
-      "function": "_triangle_coplanar",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after recovering the natural typed C predicate from the independently corroborating Stian reconstruction and HCEA geometry types. Target and current candidate have the same 384-byte padded envelope, 11 relocation destinations and addresses, and 151 decoded instructions. The 2026-09-15 and 2026-09-24 remeasurements corrected an earlier stale claim: this production body differs in three x87 scheduling hunks (10 decoded instructions), not one operand pair. A scratch dot_product3d helper form reduces that to four instructions but introduces three point-to-vector view casts and remains residual, so it earns zero credit and is not in production. The retained source uses real_point3d/real_plane3d, typed dynamic-array records, and authenticated private symbols, with no assembly, volatile access, fake dependency, raw address name, undefined offset access, or nonsensical control flow. Reopen for first-party source/local records or a natural same-compiler x87 scheduling donor; see connected_geometry_obj_opus5_next150_n2_20260915.md.",
-      "measurements": {
-        "target": {
-          "size": 384,
-          "relocation_count": 11,
-          "normalized_sha256": "02acd868e062aee29df8e260c3fbd62221e3f2ced5e5f43573a1a288e6129d54"
-        },
-        "base": {
-          "size": 384,
-          "relocation_count": 11,
-          "normalized_sha256": "4a01cf6dc779006e22869160f05e1640de65f3f9559f720f03f2ab716e7eff99"
-        },
-        "objdiff_percent": 99.87755
-      }
-    },
-    {
       "unit": "source/ai/actions",
       "function": "_actor_action_handle_vehicle_entry",
       "class": "register-allocation",
@@ -423,25 +404,6 @@
           "normalized_sha256": "80e7bf257e70635f1a9a668d895ab372d01671ab05db2a55b2db8afbb8866ac3"
         },
         "objdiff_percent": 96.54422
-      }
-    },
-    {
-      "unit": "source/interface/hud_nav_points",
-      "function": "_custom_render_nav_point",
-      "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete January four-argument waypoint renderer from the January target and the later HCEA semantic donor. The retained ordinary C implements camera-distance scaling, view projection, ellipse clamping and optional rotation, typed waypoint bitmap retrieval, opacity/fade color packing, the on-screen meter readout, and January's full stack guard. Target and candidate have the same 1632-byte padded envelope, all 95 relocation identities at the same addresses, and the same instruction boundaries throughout. Only eight normalized bytes remain at +0x58A: January pushes the zero override-scale argument before loading decimal_value and distance, while VC7 hoists those two independent loads before that push. Direct and block-local decimal expressions, explicit and implicit short conversion, and literal/local zero spellings reproduce the same schedule. The complete Git/worktree/COFF census, HCEA commit 570c83fd9c365dad6f2a3e7041705d5b84c7847c, and Marathon commit ce4fdc63f20f6fa39616a86e717118f4d8bdf25c provide no closer source. No volatile access, compiler barrier, artificial alias, forced inlining, pragma, fake dependency, assembly, undefined behavior, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler donor explaining that final argument-load schedule.",
-      "measurements": {
-        "target": {
-          "size": 1632,
-          "relocation_count": 95,
-          "normalized_sha256": "287a20cd338648964303d1f60b46e9cdf94753f43718b48f8c648a0dd9e60306"
-        },
-        "base": {
-          "size": 1632,
-          "relocation_count": 95,
-          "normalized_sha256": "ad77c226edfd32a6644d9d531123945d71c2341f7b2aaa929edef572045157ca"
-        },
-        "objdiff_percent": 99.579155
       }
     },
     {

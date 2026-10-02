@@ -46,6 +46,8 @@ enum
 
 /* ---------- macros */
 
+#define CONNECTED_GEOMETRY_COPLANAR_EPSILON 0.01f
+
 /* ---------- structures */
 
 struct intermediate_geometry_triangle
@@ -458,13 +460,12 @@ long connected_geometry_add_triangle(
 }
 
 static boolean triangle_coplanar(
-	void *predicate_data,
+	void *data,
 	struct connected_geometry *geometry,
 	struct connected_geometry_triangle *triangle,
 	long group_index)
 {
-	real_plane3d *plane = predicate_data;
-	real_point3d *point0 = dynamic_array_get_element(
+	real_point3d const *point0= dynamic_array_get_element(
 		&geometry->points,
 		((struct connected_geometry_edge *)dynamic_array_get_element(
 			&geometry->edges,
@@ -472,7 +473,7 @@ static boolean triangle_coplanar(
 			sizeof(struct connected_geometry_edge)))->point_indices[
 				(triangle->edge_designators[0] & LONG_MIN) != 0],
 		sizeof(real_point3d));
-	real_point3d *point1 = dynamic_array_get_element(
+	real_point3d const *point1= dynamic_array_get_element(
 		&geometry->points,
 		((struct connected_geometry_edge *)dynamic_array_get_element(
 			&geometry->edges,
@@ -480,48 +481,31 @@ static boolean triangle_coplanar(
 			sizeof(struct connected_geometry_edge)))->point_indices[
 				(triangle->edge_designators[1] & LONG_MIN) != 0],
 		sizeof(real_point3d));
-	real_point3d *point2 = dynamic_array_get_element(
+	real_point3d const *point2= dynamic_array_get_element(
 		&geometry->points,
 		((struct connected_geometry_edge *)dynamic_array_get_element(
 			&geometry->edges,
 			triangle->edge_designators[2] & LONG_MAX,
 			sizeof(struct connected_geometry_edge)))->point_indices[
 				(triangle->edge_designators[2] & LONG_MIN) != 0],
-		 sizeof(real_point3d));
+		sizeof(real_point3d));
 	real_plane3d triangle_plane;
-	real point_distance;
-	real point_product;
-	real facing;
+	boolean coplanar;
 
-	if (fabs(
-		point0->y*plane->n.j +
-		point0->z*plane->n.k +
-		point0->x*plane->n.i -
-		plane->d) < 0.01f &&
-		fabs(
-			point1->y*plane->n.j +
-			point1->z*plane->n.k +
-			point1->x*plane->n.i -
-			plane->d) < 0.01f)
+	if (fabs(plane3d_distance_to_point((real_plane3d const *)data, point0))<CONNECTED_GEOMETRY_COPLANAR_EPSILON &&
+		fabs(plane3d_distance_to_point((real_plane3d const *)data, point1))<CONNECTED_GEOMETRY_COPLANAR_EPSILON &&
+		fabs(plane3d_distance_to_point((real_plane3d const *)data, point2))<CONNECTED_GEOMETRY_COPLANAR_EPSILON &&
+		plane3d_from_points(&triangle_plane, point0, point2, point1) &&
+		dot_product3d(&triangle_plane.n, &((real_plane3d const *)data)->n)>0.f)
 	{
-		point_distance = point2->y*plane->n.j;
-		point_distance += point2->z*plane->n.k;
-		point_product = point2->x*plane->n.i;
-		point_distance += point_product;
-		if (fabs(point_distance - plane->d) < 0.01f &&
-			plane3d_from_points(&triangle_plane, point0, point2, point1) != NULL)
-		{
-			facing = triangle_plane.n.i*plane->n.i;
-			facing += triangle_plane.n.k*plane->n.k;
-			facing += triangle_plane.n.j*plane->n.j;
-			if (facing > 0.0f)
-			{
-				return TRUE;
-			}
-		}
+		coplanar= TRUE;
+	}
+	else
+	{
+		coplanar= FALSE;
 	}
 
-	return FALSE;
+	return coplanar;
 }
 
 void connected_geometry_add_intermediate_triangle(
