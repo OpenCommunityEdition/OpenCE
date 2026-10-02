@@ -5228,6 +5228,11 @@ struct ui_mouse_target
 	rectangle2d bounds;
 	short kind;
 	short button_index;
+	/* where a value splits into previous / next: the middle of the box as
+	drawn, which ui_mouse_widen_values keeps when a neighbour or the screen's
+	edge holds the widened box to one side */
+	short split_x;
+	short split_y;
 	/* a button's parts, kept so its area can be settled once the whole frame's
 	buttons are known (ui_mouse_fit_button_targets) */
 	rectangle2d icon_bounds;
@@ -5616,6 +5621,8 @@ static void ui_mouse_note_target(
 	target->bounds = bounds;
 	target->kind = kind;
 	target->button_index = button_index;
+	target->split_x = (bounds.x0 + bounds.x1) / 2;
+	target->split_y = (bounds.y0 + bounds.y1) / 2;
 	target->icon_bounds = icon_bounds;
 	target->label = target_label;
 	target->label_bounds = target_label_bounds;
@@ -5684,47 +5691,58 @@ static void ui_mouse_merge_setting_rows(
 /**
  * @brief Doubles the width of each value (a setting), around its centre: its
  * arrows are small for a finger. Each half grows outward by half the box's
- * width, so the previous / next split stays at the middle. A box is not held
- * to its row (the last arrow of a row sits near the row's end), but stops at
- * the edge of a non-button target beside it that it overlaps vertically,
- * and at the menu's drawable area. Runs after ui_mouse_merge_setting_rows,
- * once the rows have gone, and once a frame: the widths come from the boxes
- * as noted.
+ * width. A box is not held to its row (the last arrow of a row sits near
+ * the row's end), but stops at the edge of a non-button target beside it
+ * that it overlaps vertically, at the midpoint of the gap to another value
+ * facing it (so neither takes the other's room, whatever the order they
+ * were noted in: every measure is against the boxes as noted, not as already
+ * widened), and at the menu's drawable area. A box never shrinks. Where a
+ * limit holds one side back, the split between previous and next stays at
+ * the original centre, where the arrows are. Runs after
+ * ui_mouse_merge_setting_rows, once the rows have gone, and once a frame.
  */
 static void ui_mouse_widen_values(
 	void)
 {
+	rectangle2d noted[UI_MOUSE_MAXIMUM_TARGETS];
 	long index;
 	long other;
 	short screen_width = (short)halo_screen_width();
 
 	for (index = 0; index < ui_mouse_target_count; index++)
+		noted[index] = ui_mouse_targets[index].bounds;
+	for (index = 0; index < ui_mouse_target_count; index++)
 	{
 		struct ui_mouse_target *value = &ui_mouse_targets[index];
-		short half = (short)((value->bounds.x1 - value->bounds.x0) / 2);
-		short left = (short)(value->bounds.x0 - half);
-		short right = (short)(value->bounds.x1 + half);
+		rectangle2d const *box = &noted[index];
+		short half = (short)((box->x1 - box->x0) / 2);
+		short left = (short)(box->x0 - half);
+		short right = (short)(box->x1 + half);
 
 		if (value->kind != _ui_mouse_target_value)
 			continue;
+		value->split_x = (box->x0 + box->x1) / 2;
+		value->split_y = (box->y0 + box->y1) / 2;
 		left = MAX(left, (short)(-(screen_width - 640) / 2));
 		right = MIN(right, (short)(640 + (screen_width - 640) / 2));
 		for (other = 0; other < ui_mouse_target_count; other++)
 		{
 			struct ui_mouse_target const *beside = &ui_mouse_targets[other];
+			rectangle2d const *beside_box = &noted[other];
+			boolean is_value = beside->kind == _ui_mouse_target_value;
 
 			if (other == index || beside->kind == _ui_mouse_target_button ||
-				beside->bounds.y0 >= value->bounds.y1 || beside->bounds.y1 <= value->bounds.y0)
+				beside_box->y0 >= box->y1 || beside_box->y1 <= box->y0)
 			{
 				continue;
 			}
-			if (beside->bounds.x1 <= value->bounds.x0)
-				left = MAX(left, beside->bounds.x1);
-			else if (beside->bounds.x0 >= value->bounds.x1)
-				right = MIN(right, beside->bounds.x0);
+			if (beside_box->x1 <= box->x0)
+				left = MAX(left, is_value ? (short)((beside_box->x1 + box->x0) / 2) : beside_box->x1);
+			else if (beside_box->x0 >= box->x1)
+				right = MIN(right, is_value ? (short)((box->x1 + beside_box->x0) / 2) : beside_box->x0);
 		}
-		value->bounds.x0 = left;
-		value->bounds.x1 = right;
+		value->bounds.x0 = MIN(left, box->x0);
+		value->bounds.x1 = MAX(right, box->x1);
 	}
 
 	return;
@@ -6313,8 +6331,8 @@ static void ui_widgets_process_mouse(
 					ui_mouse_give_focus(target->widget);
 					ui_mouse_list_directions(target->widget, &back, &forward);
 					first_half = back == _widget_event_dpad_left ?
-						ui_mouse_click_x < (target->bounds.x0 + target->bounds.x1) / 2 :
-						ui_mouse_click_y < (target->bounds.y0 + target->bounds.y1) / 2;
+						ui_mouse_click_x < target->split_x :
+						ui_mouse_click_y < target->split_y;
 					ui_mouse_press(first_half ? back : forward);
 					break;
 				}
