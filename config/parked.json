@@ -5,7 +5,7 @@
       "unit": "source/render/render_cameras",
       "function": "_render_camera_build_frustum",
       "class": "unclassified",
-      "evidence": "Complete typed ordinary-C January frustum reconstruction retained after one natural house-rule pass. It builds the view/world transforms, six named clip planes, five world vertices, midpoint, world bounds, optional projection state, and all 22 integrity checks using project real/math types and owned helpers. The equivalent PC reverse-engineering corpus independently names the private warning helper render_camera_check_warning_condition and confirms its 64-entry state and behavior. A narrow per-object /Ob1 option is required by January's 22 real helper calls: default /O2 duplicates the ordinary private helper at every site, whereas /Ob1 preserves the target boundary while retaining all 12 inherited exact functions and still permits explicitly inline math helpers. Under that independently evidenced schedule the target is 3,376 padded bytes and 113 relocations versus 3,408 and 112 at 88.98603 percent objdiff; differences remain distributed x87/local scheduling plus one zero-literal relocation and the current project _pi folding bit. No constant tuning, raw array/offset lift, address name, local foreign prototype, source-pressure steering, UB, pragma, barrier, or fake dependency is retained. The separately emitted 160-byte semantic helper has equal normalized bytes and relocation shape after the January-proven >= threshold correction, but still receives no credit until the renamed private globals are regenerated into the split target. This main body remains zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor. See docs/object_matching_logs/render_cameras_obj_frustum_natural_reconstruction_20260913.md.  2026-09-25 R3 batch 3: base refreshed after the attested real_math.h plane3d_negate body (negate_vector3d + d) landed with bipeds P1+P2+P3; the render_cameras.c build_frustum site is not a plane3d_negate caller in /Od; size/relocs unchanged.",
+      "evidence": "Complete typed ordinary-C January frustum reconstruction retained after one natural house-rule pass. It builds the view/world transforms, six named clip planes, five world vertices, midpoint, world bounds, optional projection state, and all 22 integrity checks using project real/math types and owned helpers. The equivalent PC reverse-engineering corpus independently names the private warning helper render_camera_check_warning_condition and confirms its 64-entry state and behavior. A narrow per-object /Ob1 option is required by January's 22 real helper calls: default /O2 duplicates the ordinary private helper at every site, whereas /Ob1 preserves the target boundary while retaining all 12 inherited exact functions and still permits explicitly inline math helpers. Under that independently evidenced schedule the target is 3,376 padded bytes and 113 relocations versus 3,408 and 112 at 88.98603 percent objdiff; differences remain distributed x87/local scheduling plus one zero-literal relocation and the current project _pi folding bit. No constant tuning, raw array/offset lift, address name, local foreign prototype, source-pressure steering, UB, pragma, barrier, or fake dependency is retained. The separately emitted 160-byte semantic helper has equal normalized bytes and relocation shape after the January-proven >= threshold correction, but still receives no credit until the renamed private globals are regenerated into the split target. This main body remains zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural same-compiler donor. See docs/object_matching_logs/render_cameras_obj_frustum_natural_reconstruction_20260913.md.  2026-09-25 R3 batch 3: base refreshed after the attested real_math.h plane3d_negate body (negate_vector3d + d) landed with bipeds P1+P2+P3; the render_cameras.c build_frustum site is not a plane3d_negate caller in /Od; size/relocs unchanged.  2026-10-02 canonical reconciliation of approved plane-helper packet 78294dd3: outer helper parentheses removed with the independently attested item_accelerate repair; this existing residual body is otherwise untouched. Fresh canonical measurement, not donor measurement; prior rejection/reopen evidence and measurement retained. Zero exact credit; pill-parenthesis and other recorded holds remain in force.",
       "measurements": {
         "target": {
           "size": 3376,
@@ -15,10 +15,25 @@
         "base": {
           "size": 3408,
           "relocation_count": 112,
-          "normalized_sha256": "d42e420f90156644a2ebac2bc234df8017efbb0c8c8fe22fb79a7a02e3ad3e07"
+          "normalized_sha256": "bee4fcbd93e3bc0fb0e25a7b68c5e19273ab6d61f05a26b1a784fdba4b0c8e8d"
         },
-        "objdiff_percent": 88.8082
-      }
+        "objdiff_percent": 90.11173
+      },
+      "previous_measurements": [
+        {
+          "target": {
+            "size": 3376,
+            "relocation_count": 113,
+            "normalized_sha256": "3ce4fcfdbd126174185b73ca92843cb6f68335fafddd54599a1b8cbf392748ef"
+          },
+          "base": {
+            "size": 3408,
+            "relocation_count": 112,
+            "normalized_sha256": "d42e420f90156644a2ebac2bc234df8017efbb0c8c8fe22fb79a7a02e3ad3e07"
+          },
+          "objdiff_percent": 88.8082
+        }
+      ]
     },
     {
       "unit": "source/units/bipeds",
@@ -323,7 +338,7 @@
       "unit": "source/structures/structure_lens_flares",
       "function": "_build_structure_lens_flares",
       "class": "instruction-scheduling",
-      "evidence": "Fuzzy-parked under the current house rule after retaining the coherent Fable witness topology and authenticating the private name compare_temp_markers from the September 2001 cachebeta linker map in the local Halo symbol atlas. Target and candidate have the same 4336-byte padded envelope, 156 relocations, and 1327 decoded instructions; three sibling functions and all owned data are strict exact. The remaining differences are instruction scheduling and local/register lifetime choices in the recovered plane/grid packet, which also move several relocation positions while preserving the call and constant topology. The retained source uses project real/plane types, named shader enum constants, the witnessed scoped ds_x temporary, and the late offset assignment. It expands the three scalar point updates directly to preserve the January inline schedule without emitting a point_from_line3d COMDAT. The candidate-only 32-byte fast_ftol helper COMDAT is authenticated shared helper code but receives no object-completion credit. The closest shared structures header was rejected because the correct void prototype regressed protected units.obj from 189/189 to 188/189 through VC7 definition-position sensitivity; a dedicated natural owner header preserves both units.obj and hs.obj while removing the use-site prototype. No volatile access, compiler barrier, artificial alias, wrong fi4 cast, address-derived name, fake dependency, undefined behavior, assembly, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.",
+      "evidence": "Fuzzy-parked under the current house rule after retaining the coherent Fable witness topology and authenticating the private name compare_temp_markers from the September 2001 cachebeta linker map in the local Halo symbol atlas. Target and candidate have the same 4336-byte padded envelope, 156 relocations, and 1327 decoded instructions; three sibling functions and all owned data are strict exact. The remaining differences are instruction scheduling and local/register lifetime choices in the recovered plane/grid packet, which also move several relocation positions while preserving the call and constant topology. The retained source uses project real/plane types, named shader enum constants, the witnessed scoped ds_x temporary, and the late offset assignment. It expands the three scalar point updates directly to preserve the January inline schedule without emitting a point_from_line3d COMDAT. The candidate-only 32-byte fast_ftol helper COMDAT is authenticated shared helper code but receives no object-completion credit. The closest shared structures header was rejected because the correct void prototype regressed protected units.obj from 189/189 to 188/189 through VC7 definition-position sensitivity; a dedicated natural owner header preserves both units.obj and hs.obj while removing the use-site prototype. No volatile access, compiler barrier, artificial alias, wrong fi4 cast, address-derived name, fake dependency, undefined behavior, assembly, or nonsensical control flow is retained. Reopen only for authoritative January source/local records or a natural same-compiler scheduling donor.  2026-10-02 canonical reconciliation of approved plane-helper packet 78294dd3: outer helper parentheses removed with the independently attested item_accelerate repair; this existing residual body is otherwise untouched. Fresh canonical measurement, not donor measurement; prior rejection/reopen evidence and measurement retained. Zero exact credit; pill-parenthesis and other recorded holds remain in force.",
       "measurements": {
         "target": {
           "size": 4336,
@@ -333,10 +348,25 @@
         "base": {
           "size": 4336,
           "relocation_count": 156,
-          "normalized_sha256": "57d6f033f379373528ec40ed132b8af7db73b6f1a087be9ddc3ad2f30d55fc46"
+          "normalized_sha256": "fc22b7884f6f4762052a743b00dbd529c8112843538187404db2af8dd18e9a5e"
         },
-        "objdiff_percent": 99.29274
-      }
+        "objdiff_percent": 99.198944
+      },
+      "previous_measurements": [
+        {
+          "target": {
+            "size": 4336,
+            "relocation_count": 156,
+            "normalized_sha256": "40aa8e486e52fe258065ae9cc9bd892679b15fd7845008cc0ebe1651788cf33b"
+          },
+          "base": {
+            "size": 4336,
+            "relocation_count": 156,
+            "normalized_sha256": "57d6f033f379373528ec40ed132b8af7db73b6f1a087be9ddc3ad2f30d55fc46"
+          },
+          "objdiff_percent": 99.29274
+        }
+      ]
     },
     {
       "unit": "source/tool/connected_geometry",
@@ -663,28 +693,9 @@
     },
     {
       "unit": "source/physics/collision_bsp",
-      "function": "_bsp3d_test_sphere_recursive",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after reconstructing the complete typed recursive 3D BSP sphere traversal and recovering its semantic private name from independent HCEA and Stian evidence. January COFF remains the sole byte authority. The retained function descends single-sided nodes, recursively visits both sides while maintaining the authenticated 128-entry signed plane stack, records overlapping leaves, resolves matching 2D references, projects the sphere center, and invokes the reconstructed 2D walker. Audit retracted the earlier claim that the residual was three equivalent unordered-value branch encodings: the shared projection_from_vector3d body actually selected the wrong axis for x- or y-dominant vectors, and different x87 unordered branches are not generally equivalent for NaNs. The retained named-axis conditional implements the HCEA semantics and matches January's dominant-axis comparisons instruction-for-instruction, including their unordered/NaN behavior, while direct projected-point and sign expressions avoid non-target _point_from_line3d, _projection_from_vector3d, and _projection_sign_from_vector3d COMDATs. January's embedded real_math.h assertion string and line prove that projection-sign logic was expanded in this caller even though no helper section exists in the target. Target and candidate both occupy 800 padded bytes and carry the same 22 ordered relocation identities; the candidate has 290 instructions versus January's 287 and objdiff reports 99.08602 percent similarity. The remaining aligned differences are a commutative y/z plane-distance evaluation order and the natural byte boolean's mov al/xor al sequence versus January's 32-bit mov eax/xor eax sequence; the latter shifts the final two call relocations three bytes earlier and leaves three bytes of alignment padding. The conservative unclassified label reflects that this is not instruction scheduling alone. No forced inline, shared-header edit, optimizer control, representation cast, assembly, fake dependency, undefined behavior, or nonsensical branch is retained. Reopen for authoritative January source or a natural type/helper context that accounts for the 32-bit boolean materialization without reintroducing non-target COMDATs or changing the protected January inline schedule. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed to the helper-form reconstruction with January's 287-instruction count (800 bytes, 22 relocations), still fuzzy, alongside the exact bsp2d sphere/pill reopens. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
-      "measurements": {
-        "target": {
-          "size": 800,
-          "relocation_count": 22,
-          "normalized_sha256": "35304d9cd3dbf061092fc383fa53e18c78003d1c12cb9cddce7cf9b6e69381ed"
-        },
-        "base": {
-          "size": 800,
-          "relocation_count": 22,
-          "normalized_sha256": "947b581780131f4c0dd9d48e75bd08ef8a29d7e7c9b07aac8df7adaff8665574"
-        },
-        "objdiff_percent": 99.985664
-      }
-    },
-    {
-      "unit": "source/physics/collision_bsp",
       "function": "_bsp3d_test_pill_recursive",
       "class": "unclassified",
-      "evidence": "Complete typed private 3D BSP pill traversal reconstructed from January disassembly with independent HCEA corroboration. It preserves the authenticated traversal stack, real_math assertion, semantic projection state, leaf/reference walks, surface/edge tests and global projection mapping while expanding natural math at call sites so no target-absent helper or point_from_line3d owner is emitted. The target is 1504 padded bytes with 31 relocations; the natural candidate is 1472 with 28 relocations and objdiff is 85.46875 percent. The structural schedule remains fuzzy and receives zero exact credit. Reopen only for authoritative January source or genuine compiler-context evidence, never fake dependencies, forced inlining, raw offsets or nonsensical logic. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed with the projection_sign helper and a third project_point3d call (size and relocation count now equal the target, 1504 bytes, 31 relocations), still fuzzy. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.",
+      "evidence": "Complete typed private 3D BSP pill traversal reconstructed from January disassembly with independent HCEA corroboration. It preserves the authenticated traversal stack, real_math assertion, semantic projection state, leaf/reference walks, surface/edge tests and global projection mapping while expanding natural math at call sites so no target-absent helper or point_from_line3d owner is emitted. The target is 1504 padded bytes with 31 relocations; the natural candidate is 1472 with 28 relocations and objdiff is 85.46875 percent. The structural schedule remains fuzzy and receives zero exact credit. Reopen only for authoritative January source or genuine compiler-context evidence, never fake dependencies, forced inlining, raw offsets or nonsensical logic. On September 14 (lane opus/100k-consolidated-20260914, wave D, adversarially verified) the parked body was refreshed with the projection_sign helper and a third project_point3d call (size and relocation count now equal the target, 1504 bytes, 31 relocations), still fuzzy. See docs/object_matching_logs/collision_bsp_obj_opus5_100k_waveD_20260914.md.  2026-10-02 canonical reconciliation of approved plane-helper packet 78294dd3: outer helper parentheses removed with the independently attested item_accelerate repair; this existing residual body is otherwise untouched. Fresh canonical measurement, not donor measurement; prior rejection/reopen evidence and measurement retained. Zero exact credit; pill-parenthesis and other recorded holds remain in force.",
       "measurements": {
         "target": {
           "size": 1504,
@@ -694,10 +705,25 @@
         "base": {
           "size": 1504,
           "relocation_count": 31,
-          "normalized_sha256": "0f9c2342ca7c0c0dc86469278e10d2526e247e35eb5dc2b1be4a923e2e196019"
+          "normalized_sha256": "031415cd3980a89088bc4236acd786b07efd74a6907ca74cb342453430536358"
         },
-        "objdiff_percent": 97.21691
-      }
+        "objdiff_percent": 98.086395
+      },
+      "previous_measurements": [
+        {
+          "target": {
+            "size": 1504,
+            "relocation_count": 31,
+            "normalized_sha256": "057a2c8bfb82a96726d0e834b8c8724e71bfa42180cb31b7dab6f725f154667c"
+          },
+          "base": {
+            "size": 1504,
+            "relocation_count": 31,
+            "normalized_sha256": "0f9c2342ca7c0c0dc86469278e10d2526e247e35eb5dc2b1be4a923e2e196019"
+          },
+          "objdiff_percent": 97.21691
+        }
+      ]
     },
     {
       "unit": "source/units/bipeds",
@@ -746,17 +772,6 @@
         "target": { "size": 400, "relocation_count": 10, "normalized_sha256": "a9a57924652aa5132cd73ed04e0134d620360c9b1d98a2a15db8c042541f356e" },
         "base": { "size": 400, "relocation_count": 10, "normalized_sha256": "fc5f1986b1e544036cf811a6a80c8023dabd3b9c1e5a520d5329cf4290ebae6d" },
         "objdiff_percent": 54.791668
-      }
-    },
-    {
-      "unit": "source/physics/physics",
-      "function": "_compute_ground_plane",
-      "class": "instruction-scheduling",
-      "evidence": "Complete typed ground-plane reconstruction retained at 336 padded bytes and 14 relocations on both sides. January/HCEA behavior, named collision flags, typed definition access, and cseries flag macros are preserved. The remaining normalized-code delta is ordinary instruction scheduling; no raw layout, compiler anchor, or fake branch is retained. Zero exact credit. See docs/object_matching_logs/claude_fable_opus_reconciliation_checkpoint_20260908.md.",
-      "measurements": {
-        "target": { "size": 336, "relocation_count": 14, "normalized_sha256": "edeff771d101548840cb5f3b2949765f5455b6e452e22f5f4ba90d79ca918ad2" },
-        "base": { "size": 336, "relocation_count": 14, "normalized_sha256": "ea2976dc239424a039b1757b5205221fb153ff5c44f73a792260dae2868c6aa4" },
-        "objdiff_percent": 96.61404
       }
     },
     {
@@ -977,12 +992,35 @@
       "unit": "source/math/geometry",
       "function": "_convex_polygon3d_clip_to_plane",
       "class": "unclassified",
-      "evidence": "Complete typed 3D convex-polygon plane clipping reconstruction retained from the reconciled Fable geometry packet with its declarations in the Geometry owner header. Target and candidate share the 1120-byte extent and all 26 relocations but remain normalized-code residuals. No representation punning, artificial branch shape, or helper-ownership trick is admitted; zero credit. Donor provenance: commit f9dd42218.",
+      "evidence": "Complete typed 3D convex-polygon plane clipping reconstruction retained from the reconciled Fable geometry packet with its declarations in the Geometry owner header. Target and candidate share the 1120-byte extent and all 26 relocations but remain normalized-code residuals. No representation punning, artificial branch shape, or helper-ownership trick is admitted; zero credit. Donor provenance: commit f9dd42218.  2026-10-02 canonical reconciliation of approved plane-helper packet 78294dd3: outer helper parentheses removed with the independently attested item_accelerate repair; this existing residual body is otherwise untouched. Fresh canonical measurement, not donor measurement; prior rejection/reopen evidence and measurement retained. Zero exact credit; pill-parenthesis and other recorded holds remain in force.",
       "measurements": {
-        "target": { "size": 1120, "relocation_count": 26, "normalized_sha256": "0d106198b6d9ccb8c0d74d8af566876f04b2610ae714fb5cabb28254b33e0d20" },
-        "base": { "size": 1120, "relocation_count": 26, "normalized_sha256": "9c1611d216717b6d0ba6792f37f6dde55d3fbbffac81c875f48a0e934072f6a3" },
-        "objdiff_percent": 80.76382
-      }
+        "target": {
+          "size": 1120,
+          "relocation_count": 26,
+          "normalized_sha256": "0d106198b6d9ccb8c0d74d8af566876f04b2610ae714fb5cabb28254b33e0d20"
+        },
+        "base": {
+          "size": 1120,
+          "relocation_count": 26,
+          "normalized_sha256": "e9f7ac9898e8768f75c696cbc236a6a03de61a2e69f61329d47b321ea4d113ad"
+        },
+        "objdiff_percent": 82.37186
+      },
+      "previous_measurements": [
+        {
+          "target": {
+            "size": 1120,
+            "relocation_count": 26,
+            "normalized_sha256": "0d106198b6d9ccb8c0d74d8af566876f04b2610ae714fb5cabb28254b33e0d20"
+          },
+          "base": {
+            "size": 1120,
+            "relocation_count": 26,
+            "normalized_sha256": "9c1611d216717b6d0ba6792f37f6dde55d3fbbffac81c875f48a0e934072f6a3"
+          },
+          "objdiff_percent": 80.76382
+        }
+      ]
     },
     {
       "unit": "libs/libcmt/frnd",
