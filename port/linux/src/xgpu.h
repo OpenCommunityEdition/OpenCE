@@ -180,6 +180,11 @@ struct xgpu_render_target
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
 	unsigned long gl_width, gl_height;
+	/* the texture's GL format, which its multisampled renderbuffer and the
+	anti-aliasing passes' copy of its pixels (xgpu_post.c) are made with too:
+	the blits between them copy the pixels exactly only between the same
+	formats */
+	GLenum format;
 	/* with multisampling, the screen's targets' multisampled renderbuffer,
 	which draws go to, and whether it has been drawn into since the texture
 	last had its pixels (render_target_resolve) */
@@ -190,6 +195,10 @@ struct xgpu_render_target
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
 
+/* level 0 of the bound 2D texture, width by height, made as a render target's
+color texture of this format */
+void xgpu_render_target_image(GLenum format, unsigned long width, unsigned long height);
+
 /* ---------- anti-aliasing
 
 display.anti_aliasing (d3d8_gl.c): FXAA or SMAA antialias each window's 3D
@@ -199,8 +208,9 @@ resolution, scaled down as the frame is shown, and multisampling draws them
 with several samples a pixel. */
 
 /* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
-target's framebuffer, width by height; FALSE if its programs do not build */
-BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
-	const GLint corners[4]);
+target's framebuffer, width by height, its color of this format; FALSE if its
+programs do not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, GLenum format, unsigned long width,
+	unsigned long height, const GLint corners[4]);
 
 #endif

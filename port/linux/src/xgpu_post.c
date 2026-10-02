@@ -7,8 +7,9 @@ Each pass draws one triangle covering the rectangle (its corners from
 gl_VertexID, with no vertex data) and finds its texels from gl_FragCoord: a
 target's rows are the picture's from the top, as the passes' own textures'
 are, so no coordinate is turned over. The target's pixels are copied first,
-so that no pass reads what it writes, and only colour is written back: the
-game keeps values of its own in destination alpha.
+into a texture of the target's format, so that no pass reads what it writes,
+and only colour is written back: the game keeps values of its own in
+destination alpha.
 
 FXAA is written here, after Timothy Lottes' description: the direction of an
 edge from the luma around a pixel, the edge's ends found by stepping along
@@ -47,8 +48,9 @@ static struct
 	/* each program's metrics uniform, and FXAA's bounds */
 	GLint metrics[NUMBER_OF_POST_PROGRAMS];
 	GLint bounds;
-	/* the size of the textures below */
+	/* the size of the textures below, and the format of color: the target's */
 	unsigned long width, height;
+	GLenum format;
 	/* the target's pixels before the pass, and SMAA's edges and blending
 	weights */
 	GLuint color, edges, weights;
@@ -301,6 +303,19 @@ static GLuint texture_new(GLenum format, unsigned long width, unsigned long heig
 	return texture;
 }
 
+/* a texture made as a render target's color texture of this format, for a
+copy of the target's pixels */
+static GLuint target_texture_new(GLenum format, unsigned long width, unsigned long height)
+{
+	GLuint texture;
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	xgpu_render_target_image(format, width, height);
+	return texture;
+}
+
 static GLuint framebuffer_new(GLuint texture)
 {
 	GLuint framebuffer;
@@ -313,10 +328,11 @@ static GLuint framebuffer_new(GLuint texture)
 	return framebuffer;
 }
 
-/* the passes' textures, of the target's size (SMAA's only for SMAA) */
-static void textures_fit(BOOL smaa, unsigned long width, unsigned long height)
+/* the passes' textures, of the target's size, and color of its format (SMAA's
+only for SMAA) */
+static void textures_fit(BOOL smaa, GLenum format, unsigned long width, unsigned long height)
 {
-	if (post.width != width || post.height != height)
+	if (post.width != width || post.height != height || post.format != format)
 	{
 		GLuint textures[3] = { post.color, post.edges, post.weights };
 		GLuint framebuffers[3] = { post.color_framebuffer, post.edges_framebuffer, post.weights_framebuffer };
@@ -326,7 +342,8 @@ static void textures_fit(BOOL smaa, unsigned long width, unsigned long height)
 		post.color = post.edges = post.weights = 0;
 		post.width = width;
 		post.height = height;
-		post.color = texture_new(GL_RGBA8, width, height, GL_RGBA, NULL);
+		post.format = format;
+		post.color = target_texture_new(format, width, height);
 		post.color_framebuffer = framebuffer_new(post.color);
 	}
 	if (smaa && !post.edges)
@@ -399,8 +416,8 @@ static void intermediate_clear(GLuint framebuffer)
 	glClear(GL_COLOR_BUFFER_BIT);
 }
 
-BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
-	const GLint corners[4])
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, GLenum format, unsigned long width,
+	unsigned long height, const GLint corners[4])
 {
 	int first = smaa ? _post_program_smaa_edges : _post_program_fxaa;
 	int last = smaa ? _post_program_smaa_blend : _post_program_fxaa;
@@ -433,7 +450,7 @@ BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, un
 		glSamplerParameteri(post.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glGenVertexArrays(1, &post.vertex_array);
 	}
-	textures_fit(smaa, width, height);
+	textures_fit(smaa, format, width, height);
 
 	glDisable(GL_SCISSOR_TEST);
 	glDisable(GL_DEPTH_TEST);

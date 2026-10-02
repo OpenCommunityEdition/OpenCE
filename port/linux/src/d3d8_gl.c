@@ -870,6 +870,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[1] = scale[1];
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
+	entry->target.format = depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8;
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
@@ -877,8 +878,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)entry->target.gl_width,
 			(GLsizei)entry->target.gl_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 	else
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
-			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+		xgpu_render_target_image(entry->target.format, entry->target.gl_width, entry->target.gl_height);
 	/* multisampling: the back buffer and its depth buffer, which the 3D view
 	is drawn into, are drawn into multisampled renderbuffers (the screen's
 	other targets, the screen effects', only take full-screen quads) */
@@ -887,9 +887,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	{
 		glGenRenderbuffers(1, &entry->target.multisample);
 		glBindRenderbuffer(GL_RENDERBUFFER, entry->target.multisample);
-		glRenderbufferStorageMultisample(GL_RENDERBUFFER, anti_aliasing_samples,
-			depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8, (GLsizei)entry->target.gl_width,
-			(GLsizei)entry->target.gl_height);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, anti_aliasing_samples, entry->target.format,
+			(GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height);
 	}
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
@@ -897,6 +896,12 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->next_in_bucket = *render_target_bucket(entry->target.data);
 	*render_target_bucket(entry->target.data) = entry;
 	return entry;
+}
+
+void xgpu_render_target_image(GLenum format, unsigned long width, unsigned long height)
+{
+	glTexImage2D(GL_TEXTURE_2D, 0, (GLint)format, (GLsizei)width, (GLsizei)height, 0, GL_BGRA, GL_UNSIGNED_BYTE,
+		NULL);
 }
 
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
@@ -3765,7 +3770,7 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 	corners[2] = scaled_pixel(x1, target->target.scale[0]);
 	corners[3] = scaled_pixel(y1, target->target.scale[1]);
 	if (!xgpu_post_anti_alias(mode == _anti_aliasing_smaa, framebuffer_get(target->target.texture, 0),
-		target->target.gl_width, target->target.gl_height, corners))
+		target->target.format, target->target.gl_width, target->target.gl_height, corners))
 	{
 		platform_log("anti-aliasing: its programs do not build, so the 3D view is not antialiased");
 		failed = TRUE;
