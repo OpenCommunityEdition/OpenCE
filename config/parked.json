@@ -726,25 +726,6 @@
       ]
     },
     {
-      "unit": "source/units/bipeds",
-      "function": "_biped_adjust_placement",
-      "class": "unclassified",
-      "evidence": "Fuzzy-parked under the current house rule after restoring the complete typed placement correction in ordinary C. The retained public function obtains the biped and its definition through the owning typed accessors, applies the named pill-centered-at-origin and non-flying flag predicates, loads the semantic collision_radius field, and adds up*radius to all three placement-position components. January disassembly independently confirms those flags, offsets, direct component arithmetic, and the two call relocations; the later HCEA implementation and independent Stian/Pastudan lifts corroborate the behavior. Target and candidate are both 96 padded / 88 meaningful bytes with the same two relocation identities and objdiff reports 98.3871 percent. The only emitted-code difference is the equivalent choice of ECX in January versus EAX in the candidate for the data pointer across the three coordinate updates. The fail-closed classifier returns UNKNOWN, so no compiler recipe or exact credit is claimed. No declaration-order search, register/volatile forcing, barrier, pragma, assembly, raw offset, fake dependency, forced inline, undefined behavior, nonsensical branch, extra code/data/COMMON owner, or point_from_line3d COMDAT is retained. Reopen only for authoritative January source/local records or a natural compatible-compiler donor explaining the pointer-register allocation.",
-      "measurements": {
-        "target": {
-          "size": 96,
-          "relocation_count": 2,
-          "normalized_sha256": "41db59000f9eb782eedfa45b2457e16898749fd2a3bc25a0e687c762181a40d4"
-        },
-        "base": {
-          "size": 96,
-          "relocation_count": 2,
-          "normalized_sha256": "5fb478d5414138003fa6ec1126c191fe0383f3c68c42523b28e455dd62e39f10"
-        },
-        "objdiff_percent": 98.3871
-      }
-    },
-    {
       "unit": "source/bink/bink_playback",
       "function": "_bink_query_analog_controller_buttons",
       "class": "register-allocation",
@@ -794,17 +775,6 @@
         "target": { "size": 5168, "relocation_count": 115, "normalized_sha256": "bee483283d8e9c3aa3c752e1a6097b5322604fc5c9379bf60528256d2dab08ed" },
         "base": { "size": 5376, "relocation_count": 116, "normalized_sha256": "554e213985002aae7c1dac6d5c4f84186a8500b3559e11522bc088a863a04f59" },
         "objdiff_percent": 82.79332
-      }
-    },
-    {
-      "unit": "source/units/bipeds",
-      "function": "_biped_get_sight_position",
-      "class": "unclassified",
-      "evidence": "Best complete typed sight-position reconstruction retained using biped/tag access macros, project real types, named estimate modes, and existing vector helpers. Target and candidate now share the 416-byte padded envelope and all 19 relocation identities, scoring 97.74286% objdiff; the remaining difference is an x87/local-spill choice with no proved source-level compiler mechanism. No fake dependency, barrier, volatile/register steering, pragma, assembly or nonsensical logic is retained. This is zero-credit fuzzy source. Reopen only with authoritative January source/local records or a natural compatible-compiler donor explaining the spill schedule. See docs/object_matching_logs/bipeds_obj_batch7_exact_and_fuzzy_20260912.md.",
-      "measurements": {
-        "target": { "size": 416, "relocation_count": 19, "normalized_sha256": "59e27e5e5b6f7a7ca3ec56c3ff8f347e70de4848ad52d8c8dfe257e7ef3dffc8" },
-        "base": { "size": 416, "relocation_count": 19, "normalized_sha256": "46b593827ea2de5386183bd8c60fdaab2c986990dbde4e7ec9e6fa33edc9e951" },
-        "objdiff_percent": 97.74286
       }
     },
     {

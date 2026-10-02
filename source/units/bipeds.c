@@ -233,7 +233,6 @@ symbols in this file:
 
 /* ---------- headers */
 
-#define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #define REAL_MATH_EXTERNAL_REAL_RANDOM_RANGE
 #include "cseries.h"
 #include "ai/ai_communication.h"
@@ -924,11 +923,7 @@ void biped_adjust_placement(
 	if (TEST_FLAG(flags, _biped_pill_centered_at_origin_bit) &&
 		!TEST_FLAG(flags, _biped_flying_bit))
 	{
-		real height_offset = definition->biped.collision_radius;
-
-		data->position.x += data->up.i*height_offset;
-		data->position.y += data->up.j*height_offset;
-		data->position.z += data->up.k*height_offset;
+		point_from_line3d(&data->position, &data->up, (definition->biped.collision_radius), &data->position);
 	}
 
 	return;
@@ -997,20 +992,8 @@ void biped_get_sight_position(
 		left.j = desired_facing->i;
 		left.k = 0.f;
 
-		{
-			real forward_distance = desired_gun_offset->i;
-
-			sight_position->x += desired_facing->i*forward_distance;
-			sight_position->y += desired_facing->j*forward_distance;
-			sight_position->z += desired_facing->k*forward_distance;
-			{
-				real sideways_distance = desired_gun_offset->j;
-
-				sight_position->x += left.i*sideways_distance;
-				sight_position->y += left.j*sideways_distance;
-				sight_position->z += left.k*sideways_distance;
-			}
-		}
+		point_from_line3d(sight_position, desired_facing, (desired_gun_offset->i), sight_position);
+		point_from_line3d(sight_position, &left, (desired_gun_offset->j), sight_position);
 		sight_position->z += desired_gun_offset->k;
 	}
 	else
@@ -1453,10 +1436,7 @@ static long biped_find_ground_surface(
 	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_bipeds;
 
 	object_get_origin(object_index, &origin);
-	/* Preserve January's inline schedule without owning point_from_line3d here. */
-	origin.x = global_up3d->i*0.4f + origin.x;
-	origin.y = global_up3d->j*0.4f + origin.y;
-	origin.z = global_up3d->k*0.4f + origin.z;
+	point_from_line3d(&origin, global_up3d, 0.4f, &origin);
 	scale_vector3d(direction, distance, &vector);
 
 	if (collision_bsp_test_vector(
@@ -1471,15 +1451,7 @@ static long biped_find_ground_surface(
 	{
 		surface_index = result.surface_index;
 		if (point)
-		{
-			real_point3d const *line_point = &origin;
-			real_vector3d const *line_vector = &vector;
-			real line_t = result.t;
-
-			point->x = line_vector->i*line_t + line_point->x;
-			point->y = line_vector->j*line_t + line_point->y;
-			point->z = line_vector->k*line_t + line_point->z;
-		}
+			point_from_line3d(&origin, &vector, result.t, point);
 		if (normal)
 			*normal = result.plane->n;
 	}
@@ -2213,6 +2185,11 @@ static void biped_update_jumping(
 	if (cheat.jetpack && biped->unit.player_index != NONE)
 	{
 		struct player_datum *player = player_get(biped->unit.player_index);
+		/* inferred, descriptive names (not recovered Bungie identifiers): no PDB records the locals of this block */
+		const real minimum_acceleration = 0.01f;
+		const real maximum_acceleration = 0.05f;
+		const real maximum_velocity = 1.4f;
+		const real damping = 0.8f;
 		boolean impulse = FALSE;
 
 		if (TEST_FLAG(biped->unit.control_flags, _unit_control_weapon_primary_trigger_bit) &&
@@ -2223,7 +2200,7 @@ static void biped_update_jumping(
 				dot_product3d(
 					&biped->object.translational_velocity,
 					&biped->unit.aiming_vector));
-			real acceleration_scale = PIN(forward_velocity * 0.71428573f, 0.f, 1.f);
+			real acceleration_scale = PIN(forward_velocity / maximum_velocity, 0.f, 1.f);
 			real_vector3d lateral_velocity;
 
 			point_from_line3d(
@@ -2234,25 +2211,24 @@ static void biped_update_jumping(
 			point_from_line3d(
 				(real_point3d *)&biped->object.translational_velocity,
 				&lateral_velocity,
-				0.8f - 1.f,
+				damping - 1.f,
 				(real_point3d *)&biped->object.translational_velocity);
 			point_from_line3d(
 				(real_point3d *)&biped->object.translational_velocity,
 				&biped->unit.aiming_vector,
-				acceleration_scale * 0.04f -
-					acceleration_scale * acceleration_scale * 0.05f + 0.01f,
+				acceleration_scale * (maximum_acceleration - minimum_acceleration) -
+					acceleration_scale * acceleration_scale * maximum_acceleration + minimum_acceleration,
 				(real_point3d *)&biped->object.translational_velocity);
 			SET_FLAG(biped->biped.flags, _biped_airborne_bit, TRUE);
 			impulse = TRUE;
 		}
-
-		if (!impulse &&
-			TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit) &&
+		else if (TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit) &&
 			TEST_FLAG(biped->biped.flags, _biped_airborne_bit))
 		{
-			real_vector3d *velocity = &biped->object.translational_velocity;
-
-			scale_vector3d(velocity, 0.8f - 1.f, velocity);
+			scale_vector3d(
+				&biped->object.translational_velocity,
+				damping - 1.f,
+				&biped->object.translational_velocity);
 		}
 
 		if (player->local_player_index != NONE && impulse)
