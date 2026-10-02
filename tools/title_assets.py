@@ -19,7 +19,10 @@ texel, to cover its old letter best; letters left nearly touching where the
 old ones have a gap between them are parted to the old gap. A selected menu
 item uses its unselected picture's layout (the same letters, read more
 surely). titles.json records where each letter went, which
-tools/title_font.py's spacing is measured from.
+tools/title_font.py's spacing is measured from. QUIT, which the desktop
+builds draw in GAME DEMOS's frames (source/interface/ui_widget.c), is set in
+its place with the font's spacing alone, for those frames (VARIANTS), its Q
+the O with a short foot as Halo PC's is (FEET).
 
 The pictures are drawn in place of the maps' bitmaps as the high-res HUD's
 are (port/linux/src/hud_hires.c), and only for the bitmaps of the English
@@ -28,6 +31,7 @@ tools/embed_assets.py embeds with them. Needs Pillow, NumPy and SciPy.
 """
 
 import argparse
+import copy
 import json
 import sys
 import zlib
@@ -62,6 +66,15 @@ GAP_TOLERANCE = 0.05
 GAP_NEAR = 0.5
 # how much a plate is blurred (in the map's texels) before it is enlarged
 SMOOTHING = 1.0
+# how far (texels) around a text set in the map's place the old text is taken
+# out: with the halo DXT3 leaves around its letters, which nothing covers then
+HALO = 2
+# a letter set as another's shape with a foot: QUIT's Q is the O with a short
+# foot at its bottom right, as Halo PC's is (OpenCE's Q has a diagonal tail):
+# over the last FOOT of the capitals' height, the bowl's right edge runs
+# straight down to its bottom instead of curving in
+FEET = {"Q": "O"}
+FOOT = 0.16
 
 MENU = "ui\\shell\\main_menu\\"
 # each title bitmap's text, by bitmap (as the English maps' pictures read)
@@ -95,6 +108,15 @@ TEXTS = {
     MENU + "settings_select\\player_setup\\player_profile_edit\\header_edit_profile_settings": ["EDIT PROFILE SETTINGS"],
     MENU + "settings_select\\player_setup\\player_profile_edit\\name_edit\\header_profile_name": ["PROFILE NAME"],
     MENU + "solo_level_select\\header_load_level": ["LOAD LEVEL"],
+}
+
+# a text the game draws in a title's bitmap in place of the map's, by bitmap:
+# the text, and the CRC-32 (zlib's) of the pixels the game draws, which its
+# picture stands for instead of the map's. QUIT in GAME DEMOS's frames, in the
+# builds of a desktop application (source/interface/ui_widget.c, whose
+# ui_exit_game_label_checksums are these inverted)
+VARIANTS = {
+    MENU + "menu_game_demos": [("QUIT", 0x6713993C), ("QUIT", 0xDE2B7763)],
 }
 
 
@@ -187,6 +209,30 @@ def text_coverage(image: np.ndarray) -> np.ndarray:
     return np.clip(alpha / np.median(alpha[solid]), 0, 1)
 
 
+def draw_glyph(font, character: str) -> tuple:
+    """A character's ink (0 to 1), and its left and top from the pen on the
+    baseline (the font's box has its spacing too: the ink is cut from it); a
+    letter in FEET as the other's shape with its foot."""
+    shape = FEET.get(character, character)
+    left, top, right, bottom = font.getbbox(shape, anchor="ls")
+    image = Image.new("L", (max(1, right - left), max(1, bottom - top)), 0)
+    ImageDraw.Draw(image).text((-left, -top), shape, font=font, fill=255, anchor="ls")
+    box = image.getbbox()
+    if box:
+        image = image.crop(box)
+        left, top = left + box[0], top + box[1]
+    ink = np.asarray(image, np.float32) / 255
+    if character in FEET:
+        _, cap_top, _, cap_bottom = font.getbbox("H", anchor="ls")
+        solid = ink >= 0.5
+        rows = np.nonzero(solid.any(axis=1))[0]
+        widest = np.nonzero(solid.any(axis=0))[0].max()
+        for row in range(max(rows.min(), rows.max() + 1 - round(FOOT * (cap_bottom - cap_top))), rows.max() + 1):
+            if solid[row].any():
+                ink[row, np.nonzero(solid[row])[0].max():widest + 1] = 1
+    return ink, left, top
+
+
 class Layout:
     """The text's letters placed where the old ones are. Each glyph is first
     put where the font's spacing (with kerning) puts it, the whole spread to
@@ -208,6 +254,18 @@ class Layout:
         self.baseline = (bottom + 1) * SUPER
         self.load()
         # the font's spacing, spread to the old text's width
+        pens = self.spacing()
+        natural_left, natural_right = self.extent(pens)
+        gaps = max(1, len(pens) - 1)
+        track = ((right + 1 - left) * SUPER - (natural_right - natural_left)) / gaps
+        self.base = [left * SUPER - natural_left + pen for pen in pens]
+        self.spread(0.0, track)
+        self.natural = list(self.pens)
+
+    def spacing(self) -> list:
+        """Each letter's pen at the font's spacing (with its kerning), from
+        the first's (a letter in FEET spaced as the shape it is set as)."""
+        text = "".join(FEET.get(character, character) for character in self.text)
         pens, pen = [], 0.0
         for index, character in enumerate(text):
             if character != " ":
@@ -216,14 +274,28 @@ class Layout:
             if index + 1 < len(text):
                 pair = text[index:index + 2]
                 pen += self.font.getlength(pair) - self.font.getlength(pair[0]) - self.font.getlength(pair[1])
-        glyphs = self.glyphs
-        natural_left = pens[0] + glyphs[0][1]
-        natural_right = pens[-1] + glyphs[-1][1] + glyphs[-1][0].shape[1]
-        gaps = max(1, len(pens) - 1)
-        track = ((right + 1 - left) * SUPER - (natural_right - natural_left)) / gaps
-        self.base = [left * SUPER - natural_left + pen for pen in pens]
-        self.spread(0.0, track)
-        self.natural = list(self.pens)
+        return pens
+
+    def extent(self, pens: list) -> tuple:
+        """The ink's left and right with the glyphs at pens."""
+        return (pens[0] + self.glyphs[0][1],
+                pens[-1] + self.glyphs[-1][1] + self.glyphs[-1][0].shape[1])
+
+    def in_place(self, text: str) -> "Layout":
+        """text set in this text's place (a text the game draws in the bitmap
+        instead of the map's: QUIT): at its capitals' height and baseline,
+        with the font's spacing alone, centred on its ink."""
+        old_left, old_right = self.extent(self.pens)
+        result = copy.copy(self)
+        result.text = text
+        result.spaced = [index > 0 and text[index - 1] == " " for index, character in enumerate(text) if character != " "]
+        result.load()
+        pens = result.spacing()
+        natural_left, natural_right = result.extent(pens)
+        result.base = [(old_left + old_right - natural_left - natural_right) / 2 + pen for pen in pens]
+        result.spread(0.0, 0.0)
+        result.natural = list(result.pens)
+        return result
 
     def spread(self, offset: float, track: float):
         """The glyphs at the font's spacing, moved offset and tracking track
@@ -238,16 +310,8 @@ class Layout:
         self.glyphs = [self.glyph(character) for character in self.text if character != " "]
 
     def glyph(self, character):
-        """The glyph's ink, and its left and top from the pen on the baseline
-        (the font's box has its spacing too: the ink is cut from it)."""
-        left, top, right, bottom = self.font.getbbox(character, anchor="ls")
-        image = Image.new("L", (max(1, right - left), max(1, bottom - top)), 0)
-        ImageDraw.Draw(image).text((-left, -top), character, font=self.font, fill=255, anchor="ls")
-        ink = image.getbbox()
-        if ink:
-            image = image.crop(ink)
-            left, top = left + ink[0], top + ink[1]
-        return np.asarray(image, np.float32) / 255, left, top
+        """The glyph's ink, and its left and top from the pen on the baseline."""
+        return draw_glyph(self.font, character)
 
     def compose(self, first: int, last: int, skip: int = -1, moved: tuple = None, only=None) -> np.ndarray:
         """The text's coverage over the map's columns first to last (and the
@@ -440,10 +504,7 @@ class Layout:
         baseline = round(self.baseline / SUPER * factor)
         characters = [character for character in self.text if character != " "]
         for character, pen in zip(characters, self.pens):
-            left, glyph_top, right, glyph_bottom = font.getbbox(character, anchor="ls")
-            image = Image.new("L", (max(1, right - left), max(1, glyph_bottom - glyph_top)), 0)
-            ImageDraw.Draw(image).text((-left, -glyph_top), character, font=font, fill=255, anchor="ls")
-            ink = np.asarray(image, np.float32) / 255
+            ink, left, glyph_top = draw_glyph(font, character)
             x0, y0 = round(pen / SUPER * factor) + left, baseline + glyph_top
             x1, y1 = x0 + ink.shape[1], y0 + ink.shape[0]
             cx0, cy0, cx1, cy1 = max(0, x0), max(0, y0), min(canvas.shape[1], x1), min(canvas.shape[0], y1)
@@ -489,9 +550,10 @@ def bleed(image: np.ndarray) -> np.ndarray:
     return result
 
 
-def build_title(bitmap: dict, text: str, scale: int, layout=None) -> tuple:
+def build_title(bitmap: dict, text: str, scale: int, layout=None, margin: int = 1) -> tuple:
     """The title's picture, and its letters' layout (layout: one to use, the
-    same text's in another picture of the same group)."""
+    same text's in another picture of the same group; margin: how far around
+    the old text, in texels, is taken out with it)."""
     from scipy import ndimage
 
     image = decode_bitmap(bitmap)
@@ -507,7 +569,7 @@ def build_title(bitmap: dict, text: str, scale: int, layout=None) -> tuple:
     if layout is None:
         layout = Layout(text, coverage_old, box).fit().match_gaps()
     letters = layout.render(scale, (image.shape[0] * scale, image.shape[1] * scale))
-    edge = ndimage.binary_dilation(mask, iterations=1)
+    edge = ndimage.binary_dilation(mask, iterations=margin)
     if colour.min() > 200:
         # white text: its glow grown again around the new letters
         sigma, gain = fit_glow(image, mask)
@@ -544,7 +606,8 @@ def main() -> None:
             scale = SCALE
             while max(width, height) * scale > MAXIMUM_SIZE:
                 scale //= 2
-            name = tag.split("\\")[-2] + "__" + tag.split("\\")[-1] + f"__{index}"
+            stem = tag.split("\\")[-2] + "__" + tag.split("\\")[-1]
+            name = f"{stem}__{index}"
             # (a selected menu item's text is its unselected picture's, which
             # is read more surely: flat, where the selected one's white blurs
             # into its glow)
@@ -569,6 +632,15 @@ def main() -> None:
             moved = np.abs(layout.corrections())
             print(f"{name}: '{text}' {width}x{height} at {scale}x, covers {layout.overlap():.3f}; "
                   f"letters moved {moved.mean():.2f} texels on average, {moved.max():.2f} at most")
+            if tag in VARIANTS:
+                # (the game's own text there, standing for its own pixels)
+                variant, crc = VARIANTS[tag][index]
+                variant_name = f"{stem}__{variant.lower().replace(' ', '_')}__{index}"
+                image, placed = build_title(bitmap, variant, scale, layout.in_place(variant), HALO)
+                Image.fromarray(image, "RGBA").save(TITLES / f"{variant_name}.png", optimize=True)
+                entries.append({**entries[-1], "name": variant_name, "crc": crc, "text": variant,
+                                "lefts": placed.lefts(), "cap": placed.cap / SUPER, "in_place_of": text})
+                print(f"{variant_name}: '{variant}' set in '{text}''s place")
     (TITLES / "titles.json").write_text(json.dumps({"font": FONT.name, "assets": entries}, indent=1) + "\n")
 
 

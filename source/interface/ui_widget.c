@@ -5224,7 +5224,11 @@ menu's GAME DEMOS item, hidden on every computer (xbox_demos_available), is
 QUIT instead. The menu's labels are bitmaps, so QUIT's two frames (normal and
 focused) are made of the stock menu artwork when the main menu loads
 (ui_exit_game_compose_label); on a map without the expected artwork the item
-stays GAME DEMOS, hidden.
+stays GAME DEMOS, hidden. Where the menus' titles are drawn from their
+high-res pictures (display.high_res_text: port/linux/src/hud_hires.c), the
+platform layer draws QUIT's (port/assets/titles, set in OpenCE by
+tools/title_assets.py as the other items' are) in place of the frames, which
+it knows by their checksums; the frames made here are what is seen without.
 
 A asks first, on the question screen of a profile's deletion
 (ui\shell\error\confirm_delete_profile, without its fullscreen wrapper, whose
@@ -5305,7 +5309,9 @@ static struct
 
 /* each frame's crc_checksum_buffer: GAME DEMOS's and MULTIPLAYER's in the
 English ui.map, where the pieces are measured, and QUIT's as drawn from them
-(it changes with the pieces) */
+(it changes with the pieces, and with it the CRCs QUIT's high-res pictures
+stand for, port/assets/titles/titles.json: these inverted, as zlib's are;
+tools/title_assets.py, VARIANTS) */
 static unsigned long const ui_exit_game_label_checksums[UI_EXIT_GAME_LABEL_FRAMES][NUMBER_OF_UI_EXIT_GAME_LABEL_PICTURES] =
 {
 	{ 0x6788AD73, 0xED12A321, 0x98EC66C3 },
