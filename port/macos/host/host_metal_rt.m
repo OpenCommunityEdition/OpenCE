@@ -817,14 +817,15 @@ static NSString *const kernel_source = @
 	/* (with the traced light, a level pixel's occlusion is in it) */
 	"	bool traced_level = gi_ready != 0u && c[42] > 0.5 && level_pixel;\n"
 	"	float occlusion = 0.0;\n"
-	"	for (uint i = 0; i < ((level_pixel && !near_objects) || traced_level ? 0u : 4u); i++)\n"
+	"	for (uint i = 0; i < ((level_pixel && !near_objects) || traced_level ? 0u : 1u); i++)\n"
 	"	{\n"
-	/* stratified, in a pattern that repeats every 4x4 pixels: the guest's
-	   4x4 blur takes in all 16 of its sets of directions (64 in all), so the
-	   result is smooth and holds still from frame to frame */
+	/* one ray a pixel, stratified in a pattern that repeats every 4x4
+	   pixels: the guest's 4x4 blur takes in all 16 of its directions, so the
+	   result is smooth and holds still from frame to frame (four a pixel
+	   cost a third of the rays' time with characters in view) */
 	"		uint k = (id.x & 3u) + 4u * (id.y & 3u);\n"
-	"		float u = (float(i) + (float(k) + 0.5) / 16.0) / 4.0;\n"
-	"		float v = fract(float(i) * 0.61803399 + float(k) / 16.0);\n"
+	"		float u = (float(k) + 0.5) / 16.0;\n"
+	"		float v = fract(float(k) * 0.61803399 + 0.25);\n"
 	"		ray occlusion_ray(P + N * bias, cosine_direction(N, u, v), 0.0, radius);\n"
 	/* (an object's occlusion: the level's and the other objects'; the
 	   level's: the objects' but the player's body, inside which the camera is) */
@@ -842,7 +843,7 @@ static NSString *const kernel_source = @
 	"		if (distance_hit >= 0.0)\n"
 	"			occlusion += 1.0 - distance_hit / radius;\n"
 	"	}\n"
-	"	float visibility = 1.0 - occlusion / 4.0;\n"
+	"	float visibility = 1.0 - occlusion;\n"
 	/* the sun's shadow, on what the level's lightmaps do not shade: an
 	   object's pixel (the guest marks them: its depth negative) facing the
 	   sun, whose ray to it the level blocks. The sun is a small disc: the
@@ -996,6 +997,9 @@ static NSString *const kernel_source = @
 	"		{\n"
 	/* (c[93] rays a pixel, their light averaged: the setting's) */
 	"		uint spp = uint(clamp(c[93], 1.0, 8.0));\n"
+	/* (what the traced light's rays find: the level, and the objects
+	   with c[94]) */
+	"		uint gi_mask = c[94] > 0.5 ? 3u : 1u;\n"
 	"		for (uint spp_k = 0u; spp_k < spp; spp_k++)\n"
 	"		{\n"
 	/* (the sequence's place: the samples, and past the most it counts, on
@@ -1006,7 +1010,7 @@ static NSString *const kernel_source = @
 	"		float3 sky_dir;\n"
 	"		float3 sky = sky_fill(c, seed, sky_dir);\n"
 	"		float facing = dot(N, sky_dir);\n"
-	"		if (facing > 0.0 && !blocked(ray(P + N * bias, sky_dir, 0.0, 2000.0), world, 7u, CUT_ARGS))\n"
+	"		if (facing > 0.0 && !blocked(ray(P + N * bias, sky_dir, 0.0, 2000.0), world, gi_mask, CUT_ARGS))\n"
 	"			indirect += sky * facing;\n"
 	/* the bounce: a path over the half sphere, cosine-weighted. Where it
 	   lands on the level, the light there - with the lightmaps (c[42] 1),
@@ -1024,7 +1028,7 @@ static NSString *const kernel_source = @
 	"			uint depth = c[42] > 2.5 ? uint(clamp(c[85], 1.0, 4.0)) : 1u;\n"
 	"			for (uint bounce_index = 0; bounce_index < depth; bounce_index++)\n"
 	"			{\n"
-	"				hit_info h = closest_hit(ray(origin, d, 0.0, 600.0), world, 3u, CUT_ARGS);\n"
+	"				hit_info h = closest_hit(ray(origin, d, 0.0, 600.0), world, gi_mask, CUT_ARGS);\n"
 	"				if (h.type == intersection_type::none)\n"
 	"				{\n"
 	"					L += throughput * float3(c[39], c[40], c[41]);\n"
@@ -1037,6 +1041,16 @@ static NSString *const kernel_source = @
 	"				{\n"
 	"					Nh = object_normal(h.instance_id, h.geometry_id, h.primitive_id, d, object_tris, instance_tris);\n"
 	"					throughput *= object_albedo(h.instance_id, h.geometry_id, h.primitive_id, object_tris, instance_tris);\n"
+	/* (with the lightmaps: no more rays from it - the sun on its facing,
+	   unshadowed, and the sky's and the level's average light: a bounce onto
+	   a Pelican overhead traced three more, the most of the frame) */
+	"					if (c[42] < 1.5)\n"
+	"					{\n"
+	"						float lit = max(dot(Nh, float3(c[24], c[25], c[26])), 0.0) * c[35];\n"
+	"						L += throughput * (float3(c[36], c[37], c[38]) * c[45] * lit + float3(c[39], c[40], c[41]) +\n"
+	"							float3(c[80], c[81], c[82]) * 0.5) * c[43];\n"
+	"						break;\n"
+	"					}\n"
 	"				}\n"
 	"				else\n"
 	"				{\n"
@@ -1078,7 +1092,7 @@ static NSString *const kernel_source = @
 	"		{\n"
 	"			float2 g = spread01(id, n, 1.0);\n"
 	"			float r2 = random01(seed);\n"
-	"			indirect += sample_glow(P + N * bias, N, 0.0, g.x, g.y, r2, 3u, c, world, glowing, glowing_count, GRID_ARGS,\n"
+	"			indirect += sample_glow(P + N * bias, N, 0.0, g.x, g.y, r2, gi_mask, c, world, glowing, glowing_count, GRID_ARGS,\n"
 	"				CUT_ARGS).light;\n"
 	"		}\n"
 	"		}\n"
@@ -1132,7 +1146,8 @@ static NSString *const kernel_source = @
 	"	float3 R = reflect(V, N);\n"
 	"	float fresnel = mix(0.04, 1.0, pow(1.0 - clamp(dot(-V, N), 0.0, 1.0), 5.0));\n"
 	"	float fade = smoothstep(0.05, 0.1, fresnel);\n"
-	"	if (fade <= 0.0) { result.write(float4(visibility, 0.0, 0.0, 0.0), id); return; }\n"
+	/* (none when the governor has stepped twice: c[95]) */
+	"	if (fade <= 0.0 || c[95] > 0.5) { result.write(float4(visibility, 0.0, 0.0, 0.0), id); return; }\n"
 	"	intersector<triangle_data> closest;\n"
 	"	closest.assume_geometry_type(geometry_type::triangle);\n"
 	"	closest.force_opacity(forced_opacity::opaque);\n"
@@ -2259,6 +2274,10 @@ uint32_t host_rt_texture(int which, int width, int height)
 statistics (host_sdl.c) */
 uint64_t host_rt_finish_ns, host_rt_trace_ns, host_rt_traces;
 
+/* the rays' time on the GPU a frame the governor keeps to: of a 60 Hz
+frame's 16.7 ms, what the game's own drawing leaves */
+#define RAY_BUDGET_MS 11.0
+
 int host_rt_trace(const float *camera, int width, int height)
 {
 	uint64_t start, finished;
@@ -2274,7 +2293,7 @@ int host_rt_trace(const float *camera, int width, int height)
 		return 0;
 	}
 	/* the governor (the last trace's time, a frame or so behind - the rays'
-	own, not the wait for GL): over 22 ms it steps up, under 16 ms for a
+	own, not the wait for GL): over RAY_BUDGET_MS it steps up, under 70% of it for a
 	second it steps back - the first two steps thin the traced light's new
 	samples (every 8th frame a pixel, then 16th), the rest halve the lights
 	and the emitters; a quarter of a second, ten frames in a row, and the
@@ -2296,13 +2315,13 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* (7 steps, and one more for each halving of the rays a pixel) */
 		int most = 7 + (camera[93] >= 8.0f ? 3 : camera[93] >= 4.0f ? 2 : camera[93] >= 2.0f ? 1 : 0);
 
-		if (ms > 22.0 && rt.shed < most)
+		if (ms > RAY_BUDGET_MS && rt.shed < most)
 		{
 			rt.shed++;
 			rt.calm = 0;
 			rt.gpu_ms = 0.0;
 		}
-		else if (ms < 16.0 && rt.shed > 0 && ++rt.calm >= 60)
+		else if (ms < RAY_BUDGET_MS * 0.7 && rt.shed > 0 && ++rt.calm >= 60)
 		{
 			rt.shed--;
 			rt.calm = 0;
@@ -2411,6 +2430,9 @@ int host_rt_trace(const float *camera, int width, int height)
 		/* (the settings' bounces and rays a pixel, 92 and 93) */
 		constants[92] = camera[92];
 		constants[93] = shed_rays;
+		constants[94] = 0.0f;
+		/* (the reflections' rays: none from the governor's second step on) */
+		constants[95] = shed_rest >= 2 ? 1.0f : 0.0f;
 		/* (the exposure and the white balance, 1 until they are measured) */
 		if (!(rt.exposure > 0.0f))
 			rt.exposure = 1.0f;

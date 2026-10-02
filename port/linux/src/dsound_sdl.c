@@ -481,7 +481,10 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 
-	if (config_boolean("audio.enabled") && platform_sdl_initialize())
+	/* Automated hidden/headless runs never open a playback device. Keep
+	the saved audio preference intact for the next visible game. */
+	if (config_boolean("audio.enabled") && !config_boolean("debug.hidden_window") &&
+		!config_boolean("debug.null_renderer") && platform_sdl_initialize())
 	{
 		spec.format = SDL_AUDIO_F32;
 		spec.channels = OUTPUT_CHANNELS;

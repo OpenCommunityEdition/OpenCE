@@ -264,7 +264,7 @@ enum
 };
 
 /* the objects nearer the camera than this (world units) are in the rays */
-#define RAY_TRACED_OBJECT_DISTANCE 25.0f
+#define RAY_TRACED_OBJECT_DISTANCE 12.0f
 /* how far the camera goes before the objects near it are chosen again */
 #define RAY_TRACED_OBJECT_ANCHOR_STEP 4.0f
 static const float *ray_object_anchor;
@@ -1346,8 +1346,10 @@ boolean halo_ray_tracing_mask(long *index, const unsigned char **alpha, long *wi
 		{
 			mipmap++;
 		}
+		/* A partial chain can reach its final mip before fitting the mask
+		atlas. The fractional bias must not pass a negative bitmap LOD. */
 		if (bitmap->mipmap_count > 0)
-			lod = 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count;
+			lod = MAX(0.0f, 1.0f - ((float)mipmap + 0.25f) / (float)bitmap->mipmap_count);
 		w = MAX(bitmap->width >> mipmap, 1);
 		h = MAX(bitmap->height >> mipmap, 1);
 		if (w > 128 || h > 128)
