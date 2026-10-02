@@ -138,21 +138,21 @@ struct environment
 
 /**
  * @brief Asks the activity for Android's system gesture insets, in pixels
- * (HaloActivity.getSystemGestureInsetsPixels), as the value of
- * HALO_GESTURE_INSETS. The method is found on the activity's own class: the
- * game's native thread has the system's class loader, which does not know
- * the app's classes.
- * @param text receives "left,top,right,bottom"
- * @param size the size of text
- * @return 1 when text is set, 0 on any failure (the touch controls then use
- * the whole screen)
+ * (HaloActivity.getSystemGestureInsetsPixels). The guest calls it at every
+ * finger down: the insets change when the phone rotates. The method is
+ * found on the activity's own class: the game's native thread has the
+ * system's class loader, which does not know the app's classes. A change is
+ * logged, so that the log shows the value the game works with.
+ * @param insets receives left, top, right, bottom; all 0 on any failure (the
+ * touch controls then use the whole screen)
  */
-static int gesture_insets(char *text, size_t size)
+void host_gesture_insets(int *insets)
 {
+	static int logged[4] = { -1, -1, -1, -1 };
 	JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
 	jobject activity = (jobject)SDL_GetAndroidActivity();
 	jint values[4] = { 0, 0, 0, 0 };
-	int ok = 0;
+	int index;
 
 	if (env && activity)
 	{
@@ -161,24 +161,28 @@ static int gesture_insets(char *text, size_t size)
 		jintArray array = method ? (jintArray)(*env)->CallObjectMethod(env, activity, method) : NULL;
 
 		if (array && !(*env)->ExceptionCheck(env) && (*env)->GetArrayLength(env, array) == 4)
-		{
 			(*env)->GetIntArrayRegion(env, array, 0, 4, values);
-			ok = !(*env)->ExceptionCheck(env);
-		}
 		/* a Java exception left pending would break the next JNI call of the
-		thread */
+		thread, and a failed read must leave zeros */
 		if ((*env)->ExceptionCheck(env))
+		{
 			(*env)->ExceptionClear(env);
+			for (index = 0; index < 4; index++)
+				values[index] = 0;
+		}
 		if (array)
 			(*env)->DeleteLocalRef(env, array);
 		if (activity_class)
 			(*env)->DeleteLocalRef(env, activity_class);
-	}
-	if (env && activity)
 		(*env)->DeleteLocalRef(env, activity);
-	if (ok)
-		snprintf(text, size, "%d,%d,%d,%d", (int)values[0], (int)values[1], (int)values[2], (int)values[3]);
-	return ok;
+	}
+	for (index = 0; index < 4; index++)
+		insets[index] = (int)values[index];
+	if (memcmp(logged, insets, sizeof(logged)))
+	{
+		memcpy(logged, insets, sizeof(logged));
+		host_logf(HOST_LOG_INFO, "system gesture insets %d,%d,%d,%d", insets[0], insets[1], insets[2], insets[3]);
+	}
 }
 
 static void environment_set(struct environment *environment, const char *name, const char *value)
@@ -343,19 +347,6 @@ static void *game_main(void *unused)
 				environment_set(&environment, "HALO_DISPLAY_DENSITY", text);
 				host_logf(HOST_LOG_INFO, "display density %s", text);
 			}
-		}
-		{
-			/* edges where Android keeps its gestures: touches that begin there
-			are ignored (port/linux/src/touch_input.c) */
-			char insets[64];
-
-			if (gesture_insets(insets, sizeof(insets)))
-			{
-				environment_set(&environment, "HALO_GESTURE_INSETS", insets);
-				host_logf(HOST_LOG_INFO, "system gesture insets %s", insets);
-			}
-			else
-				host_log(HOST_LOG_INFO, "system gesture insets unavailable");
 		}
 	}
 	time_zone(zone, sizeof(zone));

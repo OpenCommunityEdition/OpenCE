@@ -38,7 +38,9 @@ struct touch_menu_settings
 	neither a tap nor a scroll. */
 	float edge_left, edge_top, edge_right, edge_bottom;
 	/* the window's size, for the right and bottom zones: 0 means those two
-	zones do not exist, so that a size not yet known cannot fill the screen */
+	zones do not exist, so that a size not yet known cannot fill the screen.
+	A zone with a 0 inset does not exist either. The zones may change
+	between two fingers (the phone rotates): they are read at a down. */
 	float width, height;
 };
 

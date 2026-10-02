@@ -4,16 +4,20 @@ TOUCH_INPUT.C
 The touchscreen of the Android build. SDL's finger events become the
 menus' pointer (touch_menu.c) while a menu is up, as the desktop mouse
 does (sdl_platform.c, platform_ui_pointer_read). Sizes are in dp, from the
-display density the app passes (HALO_DISPLAY_DENSITY, host_main.c), and the
-edges of the screen where Android keeps its gestures
-(HALO_GESTURE_INSETS, host_main.c).
+display density the app passes (HALO_DISPLAY_DENSITY, host_main.c). The edges
+of the screen where Android keeps its gestures are asked of the host at every
+finger down (host_gesture_insets).
 */
 
 #include "touch_input.h"
 #include "touch_menu.h"
 
-#include <stdio.h>
 #include <stdlib.h>
+
+#ifdef HALO_ANDROID
+/* port/android/guest/runtime/guest_host.h */
+void host_gesture_insets(int *insets);
+#endif
 
 /* the game's (port/linux/game/touch_game.c) */
 int touch_game_cinematic_skippable(void);
@@ -52,25 +56,6 @@ static float pixels_per_dp(void)
 }
 
 /**
- * @brief Reads the system gesture insets the app passes.
- * @param left,top,right,bottom receive the insets in pixels; all 0 when the
- * variable is missing or malformed, so that the whole screen works
- */
-static void gesture_insets(float *left, float *top, float *right, float *bottom)
-{
-	const char *text = getenv("HALO_GESTURE_INSETS");
-	int l, t, r, b;
-
-	*left = *top = *right = *bottom = 0.0f;
-	if (!text || sscanf(text, "%d,%d,%d,%d", &l, &t, &r, &b) != 4 || l < 0 || t < 0 || r < 0 || b < 0)
-		return;
-	*left = (float)l;
-	*top = (float)t;
-	*right = (float)r;
-	*bottom = (float)b;
-}
-
-/**
  * @brief Sets the gestures' sizes up, once they can be known; until then a
  * dp is a pixel, there are no gesture zones and the next call tries again.
  */
@@ -87,14 +72,36 @@ static void menu_setup(void)
 		settings.slop = TOUCH_TAP_SLOP_DP * (dp > 0.0f ? dp : 1.0f);
 		settings.step = TOUCH_SCROLL_STEP_DP * (dp > 0.0f ? dp : 1.0f);
 		settings.steps_per_read = TOUCH_STEPS_PER_READ;
-		/* the zones are measured against the window: without its size the
-		right and bottom zones would be set up against 0 */
-		gesture_insets(&settings.edge_left, &settings.edge_top, &settings.edge_right, &settings.edge_bottom);
+		/* no zones until a finger goes down: touch_input_event reads them */
+		settings.edge_left = settings.edge_top = settings.edge_right = settings.edge_bottom = 0.0f;
 		settings.width = (float)width;
 		settings.height = (float)height;
 		touch_menu_init(&menu, &settings);
 		menu_ready = dp > 0.0f && width > 0 && height > 0;
 	}
+}
+
+/**
+ * @brief Brings the gesture zones and the window's size up to date. It runs
+ * at every finger down, not once at startup: the phone rotates after the app
+ * has started, and the insets of the portrait screen would stay. The zones
+ * matter only at a down, so changing them between two fingers is safe.
+ * Without Android's insets (desktop) there are no zones.
+ * @param width,height the window's size in pixels
+ */
+static void refresh_zones(int width, int height)
+{
+#ifdef HALO_ANDROID
+	int insets[4];
+
+	host_gesture_insets(insets);
+	menu.settings.edge_left = (float)insets[0];
+	menu.settings.edge_top = (float)insets[1];
+	menu.settings.edge_right = (float)insets[2];
+	menu.settings.edge_bottom = (float)insets[3];
+#endif
+	menu.settings.width = (float)width;
+	menu.settings.height = (float)height;
 }
 
 void touch_input_event(unsigned int type, const SDL_TouchFingerEvent *finger)
@@ -110,6 +117,7 @@ void touch_input_event(unsigned int type, const SDL_TouchFingerEvent *finger)
 	switch (type)
 	{
 	case SDL_EVENT_FINGER_DOWN:
+		refresh_zones(width, height);
 		touch_menu_down(&menu, finger->fingerID, x, y);
 		break;
 	case SDL_EVENT_FINGER_MOTION:

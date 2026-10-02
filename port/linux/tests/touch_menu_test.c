@@ -1016,6 +1016,76 @@ static void test_each_side_has_its_own_inset(void)
 	CHECK(out.wheel_steps == 2);
 }
 
+/* a window size without insets: its far edge is not a zone */
+static void test_without_insets_the_far_edges_are_no_zones(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 0.0f, 0.0f, 0.0f, 0.0f, 2340.0f, 1080.0f };
+
+	touch_menu_init(&menu, &settings);
+	touch_menu_down(&menu, 1, 2340.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2340.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	CHECK(out.downs == 1);
+	swipe(&menu, 1, 1170.0f, 1080.0f, 1170.0f, 300.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+}
+
+/* the phone rotates after the app started: the zones the host reads at a
+down replace the old ones, for the next finger on */
+static void test_zones_changed_between_fingers_apply_at_the_next_down(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+	struct touch_menu_settings settings = { 36.0f, 120.0f, 2, 0.0f, 0.0f, 0.0f, 0.0f, 1080.0f, 2340.0f };
+
+	touch_menu_init(&menu, &settings);
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+	menu.settings.edge_left = 90.0f;
+	menu.settings.edge_right = 90.0f;
+	menu.settings.width = 2340.0f;
+	menu.settings.height = 1080.0f;
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	CHECK(out.downs == 0);
+	touch_menu_down(&menu, 1, 2300.0f, 500.0f);
+	touch_menu_up(&menu, 1, 2300.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 0);
+	menu.settings.edge_left = 0.0f;
+	menu.settings.edge_right = 0.0f;
+	touch_menu_down(&menu, 1, 10.0f, 500.0f);
+	touch_menu_up(&menu, 1, 10.0f, 500.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.clicks == 1);
+}
+
+/* a zone is judged at the down only: a finger already down keeps its kind
+when the zones change under it */
+static void test_zones_changed_under_a_finger_do_not_touch_it(void)
+{
+	struct touch_menu menu;
+	struct touch_menu_output out;
+
+	setup_zones(&menu);
+	touch_menu_down(&menu, 1, 1170.0f, 540.0f);
+	menu.settings.edge_top = 600.0f;
+	menu.settings.edge_left = 2000.0f;
+	touch_menu_move(&menu, 1, 1170.0f, 100.0f);
+	touch_menu_up(&menu, 1, 1170.0f, 100.0f);
+	touch_menu_read(&menu, &out);
+	CHECK(out.wheel_steps == -2);
+	CHECK(out.clicks == 0);
+}
+
 static void test_reset_and_cancel_drop_a_zone_finger(void)
 {
 	struct touch_menu menu;
@@ -1108,6 +1178,9 @@ int main(void)
 	test_without_zones_the_edges_work();
 	test_without_a_size_only_the_left_and_top_zones_exist();
 	test_each_side_has_its_own_inset();
+	test_without_insets_the_far_edges_are_no_zones();
+	test_zones_changed_between_fingers_apply_at_the_next_down();
+	test_zones_changed_under_a_finger_do_not_touch_it();
 	test_reset_and_cancel_drop_a_zone_finger();
 	if (failures)
 		printf("%d failures\n", failures);
