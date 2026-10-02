@@ -5624,6 +5624,63 @@ static void ui_mouse_note_target(
 }
 
 /**
+ * @brief Makes a setting row its value: a row (an item) whose child is a
+ * value stops being a target, and the value takes the row's height. The row
+ * is where the thin value box sits among a label and empty space, and a tap
+ * anywhere else on it would press A on the row, which on a setting screen
+ * is ACCEPT. The value keeps its width, and so its left half / right half
+ * rule. Only the value's parent is the row: that is how the controller and
+ * gametype screens nest them (op_* row, *_spinner child), and a nearer match
+ * than "any ancestor", which could take a whole panel for a row.
+ */
+static void ui_mouse_merge_setting_rows(
+	void)
+{
+	long index;
+	long other;
+	long kept = 0;
+
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *value = &ui_mouse_targets[index];
+
+		if (value->kind != _ui_mouse_target_value)
+			continue;
+		for (other = 0; other < ui_mouse_target_count; other++)
+		{
+			struct ui_mouse_target const *row = &ui_mouse_targets[other];
+
+			if (row->kind == _ui_mouse_target_item && row->widget == value->widget->parent)
+			{
+				value->bounds.y0 = row->bounds.y0;
+				value->bounds.y1 = row->bounds.y1;
+			}
+		}
+	}
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		struct ui_mouse_target *row = &ui_mouse_targets[index];
+
+		for (other = 0; other < ui_mouse_target_count && row->kind == _ui_mouse_target_item; other++)
+		{
+			struct ui_mouse_target const *value = &ui_mouse_targets[other];
+
+			if (value->kind == _ui_mouse_target_value && value->widget->parent == row->widget)
+				row->kind = NONE;
+		}
+	}
+	/* in place, in order: the last target noted wins an overlap */
+	for (index = 0; index < ui_mouse_target_count; index++)
+	{
+		if (ui_mouse_targets[index].kind != NONE)
+			ui_mouse_targets[kept++] = ui_mouse_targets[index];
+	}
+	ui_mouse_target_count = kept;
+
+	return;
+}
+
+/**
  * @brief The right edge of a legend label's text as the game draws it, or
  * NONE when it cannot be measured (no text, no font, or icons in the string,
  * which the measuring does not account for).
@@ -6609,6 +6666,7 @@ void render_ui_widgets(
 				}
 			}
 		}
+		ui_mouse_merge_setting_rows();
 		ui_mouse_fit_button_targets();
 		if (widget_globals.fade_to_black >= 0.0f &&
 			widget_globals.fade_to_black <= 1.0f)
