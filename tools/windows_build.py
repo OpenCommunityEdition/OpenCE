@@ -335,6 +335,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             f"-include {tags_header}",
             f"-I{crt_include}",
             f"-I{PORT_DIR / 'include'}",
+            # the port's headers the game's units include (halo_keyboard.h,
+            # halo_menus.h), but not the Linux build's C runtime wrappers
+            # next to them, which no game unit includes in quotes
+            f"-iquote {LINUX_DIR / 'include'}",
             game_defines_and_includes(linux_config),
             # the Xbox SDK declarations (port/include/xdk) come before the
             # Windows SDK, which has headers of the same names
