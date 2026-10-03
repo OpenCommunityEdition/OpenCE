@@ -69,7 +69,7 @@ jobs:
       - name: Test
         run: |
           python -m pytest -q tools/test_linux_port.py
-          python -m unittest tools.test_custom_maps
+          python -m unittest tools.test_custom_maps tools.test_virtual_keyboard_input
 
       - name: Compile cache
         run: ccache --show-stats
