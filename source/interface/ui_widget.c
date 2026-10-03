@@ -3827,6 +3827,10 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		/* port: the sprite from a high-res texture, if it has one (port/linux/game/hud_hires_tags.c) */
+		extern struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *sheet, short sequence_index);
+
+		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = hud_globals_get_scale(local_player_count() > 1);
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0 + 1.0f);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale - 2.0f);

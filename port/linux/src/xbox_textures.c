@@ -714,6 +714,17 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 			return atlas;
 		}
 	}
+	/* (a high-res texture drawn for some sprites, for the placeholder the
+	game draws them from: hud_hires.h) */
+	{
+		GLuint texture = hud_hires_placeholder_texture(entry->data, &description->levels);
+
+		if (texture)
+		{
+			description->hires = TRUE;
+			return texture;
+		}
+	}
 	if (entry->override >= 0)
 	{
 		GLuint texture = hud_hires_override_texture(entry->override, &description->levels);
