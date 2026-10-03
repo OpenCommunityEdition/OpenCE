@@ -2813,7 +2813,9 @@ static struct gametype_option const gametype_options[] =
 	{ "kill_penalty_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.slayer.kill_in_order), 0, 2, { 1, 0 } },
 	{ "kill_in_order_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.slayer.no_kill_penalty), 0, 2,
 		{ 0, 1 } },
-	{ "kills_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 5, { 5, 10, 15, 25, 50 } },
+	/* (up to 500, for big games: tools/port_settings.py's STRING_INSERTS) */
+	{ "kills_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 11,
+		{ 5, 10, 15, 25, 50, 75, 100, 150, 200, 250, 500 } },
 	/* team options */
 	{ "friendly_fire_spinner", _option_short, OPTIONS_FIELD(friendly_fire), 0, 4,
 		{ _friendly_fire_off, _friendly_fire_on, _friendly_fire_shields_only, _friendly_fire_explosives_only } },

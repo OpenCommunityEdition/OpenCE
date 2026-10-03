@@ -963,6 +963,12 @@
 		<string text="At the end of this game there will be fifteen angry\nmen. Angry because the winning player killed them."/>
 		<string text="You'll need to secure twenty-five kills in order to\nwin the game."/>
 		<string text="We hope you've got plenty of time, because you'll\nneed to make a full fifty kills to win this one."/>
+		<string text="Seventy-five kills to win. Settle in for a long\nfight."/>
+		<string text="A hundred kills to win. Made for big games."/>
+		<string text="A hundred and fifty kills to win. Only a crowded\nserver gets there."/>
+		<string text="Two hundred kills to win. Bring friends. Lots of\nthem."/>
+		<string text="Two hundred and fifty kills to win."/>
+		<string text="Five hundred kills to win. You'll be here a while."/>
 		<string text="This is a team game."/>
 		<string text="It's every man for himself."/>
 		<string text="The game will have no time limit.  It will only end\nwhen someone wins."/>
@@ -994,6 +1000,12 @@
 		<string text="15"/>
 		<string text="25"/>
 		<string text="50"/>
+		<string text="75"/>
+		<string text="100"/>
+		<string text="150"/>
+		<string text="200"/>
+		<string text="250"/>
+		<string text="500"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit/var_team_play">
 		<string text="YES"/>

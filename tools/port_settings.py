@@ -315,6 +315,25 @@ def replaced(folder: str) -> bool:
 
 MT = "main_menu/multiplayer_type_select"
 
+# strings added to the PC version's lists: (at, strings) of each list. Slayer's
+# kills to win goes up to 500, for big games (the Xbox editor's are
+# source/interface/ui_widget.c's kills_to_win_extra_strings): the values,
+# and their helps after the five of its own (its helps are the rows' values'
+# in turn: menu_functions.c's gametype_option_help)
+SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
+STRING_INSERTS = {
+    f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
+    f"{SLAYER_EDIT}/cap_slayer": [(11, [
+        "Seventy-five kills to win. Settle in for a long\\nfight.",
+        "A hundred kills to win. Made for big games.",
+        "A hundred and fifty kills to win. Only a crowded\\nserver gets there.",
+        "Two hundred kills to win. Bring friends. Lots of\\nthem.",
+        "Two hundred and fifty kills to win.",
+        "Five hundred kills to win. You'll be here a while.",
+    ])],
+}
+
+
 # a custom loadout's weapons (game_engine.h's _loadout_weapon_*)
 LOADOUT_WEAPONS = ["NONE", "RANDOM", "ASSAULT RIFLE", "PISTOL", "SHOTGUN", "SNIPER RIFLE", "ROCKET LAUNCHER",
                    "PLASMA PISTOL", "PLASMA RIFLE", "NEEDLER", "FUEL ROD", "FLAMETHROWER"]

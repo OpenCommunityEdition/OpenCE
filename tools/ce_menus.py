@@ -575,6 +575,8 @@ def main() -> None:
     for tag in sorted(string_lists):
         strings = [text_value(item["string"]) for item in tags.load(tag, "unicode_string_list")["strings"]]
         strings = port_settings.STRING_OVERRIDES.get(our_name(tag), strings)
+        for index, texts in port_settings.STRING_INSERTS.get(our_name(tag), []):
+            strings = strings[:index] + texts + strings[index:]
         lines.append(f"\t<strings{attributes([('name', our_name(tag))])}>")
         lines += [f"\t\t<string{attributes([('text', text)])}/>" for text in strings]
         lines.append("\t</strings>")
