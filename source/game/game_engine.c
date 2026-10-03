@@ -2655,12 +2655,11 @@ long game_engine_remap_equipment(
 			break;
 		}
 
-		if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
+		/* (port: whatever the number of players, as
+		game_engine_infinite_grenades_internal) */
+		if (game_engine_infinite_grenades_internal())
 		{
-			if (game_engine_infinite_grenades_internal())
-			{
-				weapon_list_index = NONE;
-			}
+			weapon_list_index = NONE;
 		}
 
 		if (TEST_FLAG(game_engine_globals.flags, _game_engine_9_or_more_players_bit))
@@ -3182,12 +3181,9 @@ boolean match_game_type(
 static boolean game_engine_infinite_grenades_internal(
 	void)
 {
-	boolean infinite_grenades = FALSE;
-
-	if (!TEST_FLAG(game_engine_globals.flags, _game_engine_5_or_more_players_bit))
-		infinite_grenades = TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
-
-	return infinite_grenades;
+	/* port: whatever the number of players (the Xbox game's had none with
+	five or more) */
+	return TEST_FLAG(global_variant.universal_variant.flags, _game_variant_infinite_grenades_bit);
 }
 
 static boolean find_closest_player_callback(

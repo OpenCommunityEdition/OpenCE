@@ -725,6 +725,9 @@ boolean unit_add_equipment_to_inventory(
 	long unit_index,
 	long equipment_index,
 	short replace);
+/* port: the melee damage of a unit with no weapon (units.c) */
+long unit_unarmed_melee_damage(
+	long unit_index);
 boolean unit_add_weapon_to_inventory(
 	long unit_index,
 	long weapon_index,
