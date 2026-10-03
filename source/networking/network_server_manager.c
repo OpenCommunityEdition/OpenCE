@@ -1803,6 +1803,14 @@ boolean network_game_server_game_is_open(
 	return game_is_open;
 }
 
+/* port: whether the host's game is being played (not its lobby, before or
+after one) */
+boolean network_game_server_playing(
+	struct network_game_server *server)
+{
+	return server->state == _network_game_server_state_ingame;
+}
+
 /* port: whether the machines are loading the game (its start sent, still
 in the pregame) */
 boolean network_game_server_game_is_loading(
