@@ -362,7 +362,8 @@ STRING_OVERRIDES.update({
     # (the PC's weapon sets, then the Xbox's NO GRENADES: menu_functions.c's
     # gametype_options maps them to the engine's)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": ["INFINITE GRENADES:", "WEAPON SET:", "VEHICLE SET:", "STARTING EQUIPMENT:",
-                                  "VEHICLE RESPAWN TIME:", "LOADOUT:", "PRIMARY WEAPON:", "SECONDARY WEAPON:"],
+                                  "VEHICLE RESPAWN TIME:", "LOADOUT:", "PRIMARY WEAPON:", "SECONDARY WEAPON:",
+                                  "MAP WEAPONS:"],
     # (the helps of each option's values in turn: menu_functions.c's
     # gametype_option_help)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options": [
@@ -384,6 +385,8 @@ STRING_OVERRIDES.update({
         "The map's weapons, without any grenades.",
         "You will start the game with the weapon set that the \\nmap designers custom tailored for it.",
         "Use the generic starting weapons across all maps.",
+        "The map's weapons appear where its designers\\nplaced them.",
+        "No weapons appear on the map: with a loadout of\\nNONE and NONE, melee and grenades only.",
         "The weapons follow the weapon set above.",
         "Everyone starts with the primary and secondary\\nweapons below; the map's weapons are its own.",
         *LOADOUT_HELPS("primary"),
@@ -424,9 +427,10 @@ WIDGET_PATCHES = {
     # (Item Options' loadout rows, over its buttons)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_menu": {"insert_before": {
         "main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_bar": [
-            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="163"/>',
-            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="193"/>',
-            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="223"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_map_weapons" x="54" y="163"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="193"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
     # (the PC's Vehicles row's Start opened Item Options)
     "main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item": {"handlers": [
@@ -696,12 +700,14 @@ def _lobby() -> list:
 
 
 def _item_options_extras() -> list:
-    """Item Options' loadout rows: CATEGORY (the weapon set) or CUSTOM (each
-    player's primary and secondary weapons)"""
+    """Item Options' rows of the port's: the map's weapons (YES or NO), and
+    the loadout, CATEGORY (the weapon set) or CUSTOM (each player's primary
+    and secondary weapons)"""
     base = "main_menu/settings_select/multiplayer_setup/item_options_edit"
     lines = []
-    for index, (key, strings) in enumerate((("loadout", "var_loadout"), ("primary_weapon", "var_loadout_weapon"),
-                                             ("secondary_weapon", "var_loadout_weapon"))):
+    for key, strings, label in (("map_weapons", "var_map_weapons", 8), ("loadout", "var_loadout", 5),
+                                ("primary_weapon", "var_loadout_weapon", 6),
+                                ("secondary_weapon", "var_loadout_weapon", 7)):
         lines += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
                                                ("flags", "pass_unhandled_to_focused_child"),
                                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -709,7 +715,7 @@ def _item_options_extras() -> list:
                           f'<child widget="{base}/{key}_spinner" x="286" y="1"/>'])
         lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                                                    ("string_list", f"{base}/item_options_labels"),
-                                                   ("string_index", 5 + index), ("font", "ui\\large_ui"),
+                                                   ("string_index", label), ("font", "ui\\large_ui"),
                                                    ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
         lines += _widget(f"{base}/{key}_spinner",
                          [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
@@ -719,6 +725,7 @@ def _item_options_extras() -> list:
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                           ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
                          ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    lines += _strings(f"{base}/var_map_weapons", ["YES", "NO"])
     lines += _strings(f"{base}/var_loadout", ["CATEGORY", "CUSTOM"])
     lines += _strings(f"{base}/var_loadout_weapon", LOADOUT_WEAPONS)
     return lines

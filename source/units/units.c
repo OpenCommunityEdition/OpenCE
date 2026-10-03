@@ -4268,7 +4268,9 @@ boolean unit_throw_grenade_begin(
 			break;
 
 		default:
-			if (!weapon_prevents_grenade_throwing(weapon_index))
+			/* port: and with no weapon (a loadout of none), as melee
+			(bipeds.c), which weapon_prevents_grenade_throwing(NONE) prevents */
+			if (weapon_index == NONE || !weapon_prevents_grenade_throwing(weapon_index))
 			{
 				struct animation_graph *animation_graph;
 				struct animation *animation;

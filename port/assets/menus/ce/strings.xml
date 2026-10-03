@@ -498,6 +498,8 @@
 		<string text="The map's weapons, without any grenades."/>
 		<string text="You will start the game with the weapon set that the \nmap designers custom tailored for it."/>
 		<string text="Use the generic starting weapons across all maps."/>
+		<string text="The map's weapons appear where its designers\nplaced them."/>
+		<string text="No weapons appear on the map: with a loadout of\nNONE and NONE, melee and grenades only."/>
 		<string text="The weapons follow the weapon set above."/>
 		<string text="Everyone starts with the primary and secondary\nweapons below; the map's weapons are its own."/>
 		<string text="No primary weapon."/>
@@ -530,6 +532,7 @@
 		<string text="LOADOUT:"/>
 		<string text="PRIMARY WEAPON:"/>
 		<string text="SECONDARY WEAPON:"/>
+		<string text="MAP WEAPONS:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_infinite_grenades">
 		<string text="YES"/>
