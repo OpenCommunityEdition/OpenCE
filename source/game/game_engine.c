@@ -4396,6 +4396,9 @@ void game_engine_player_killed(
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
 		&friendly_fire);
+	/* port: a killer who has left the game since is no one's kill */
+	if (killing_player_index != NONE && !player_try_and_get(killing_player_index))
+		killing_player_index = NONE;
 	/* the host's kill of a player who quit, ahead of this client's clock
 	(game_update_quit_players has not come to its time yet) */
 	if (network_game_distributed_client() && dead_player->quit_out_of_game_time != NONE &&
