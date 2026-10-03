@@ -754,7 +754,12 @@ boolean network_game_create_game_objects(
 	game_precache_new_map(options.map_name, TRUE);
 	main_menu_unload();
 
-	if (game_in_progress())
+	/* port: and whenever a map is loaded. After a game the client is back in
+	the main menu's map with its clock ended (network_game_dispose_game_objects),
+	so not in progress: the next game's map was loaded over it, and the
+	texture cache, opened again, lost the menu's loaded textures (a crash in
+	lruv_block_new) */
+	if (game_in_progress() || game_map_loaded())
 	{
 		game_dispose_from_old_map();
 		game_unload();

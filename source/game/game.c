@@ -655,6 +655,14 @@ void game_initialize_for_new_map(
 	return;
 }
 
+/* port: whether a map is loaded, the main menu's too: game_in_progress()
+is not, once game_time_end() stops its clock */
+boolean game_map_loaded(
+	void)
+{
+	return game_globals->map_loaded;
+}
+
 boolean game_map_loading_in_progress(
 	real *progress)
 {
