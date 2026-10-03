@@ -6488,10 +6488,9 @@ static void ui_widgets_process_mouse(
 				case _ui_mouse_target_list_slot:
 					ui_mouse_step_list_to_slot(target->widget);
 					break;
-				/* stepping takes a click, and the click gives the focus itself:
-				a hover that gave it to a list off the focus path would clear
-				the slot the list had focused (widget_instance_give_focus_directly),
-				just for passing over its side */
+				/* stepping is a click's action: hovering a band does nothing, so
+				that passing a finger over a list's side never moves its focus or
+				its items */
 				case _ui_mouse_target_list_back:
 				case _ui_mouse_target_list_forward:
 					break;
@@ -6538,9 +6537,11 @@ static void ui_widgets_process_mouse(
 					short back, forward;
 
 					ui_mouse_give_focus(target->widget);
-					/* as ui_mouse_step_list_to_slot: a list with nothing focused
-					(a mod's empty list) has no item to step from, and a d-pad
-					press would move the focus off the list instead */
+					/* as ui_mouse_step_list_to_slot: a list with no focused item
+					(empty, or one the focus left, which cleared its focused_child)
+					has no item to step from, so the first tap on its band only
+					gives it the focus, and a d-pad press would move the focus off
+					the list instead */
 					if (!target->widget->focused_child)
 						break;
 					ui_mouse_list_directions(target->widget, &back, &forward);
