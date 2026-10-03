@@ -682,7 +682,9 @@ struct widget_instance;
 
 enum
 {
-	WIDGET_MEMORY_POOL_SIZE = 0x4000,
+	/* port: 16 KB on the Xbox; the PC version's screens (port/assets/menus)
+	have many more widgets */
+	WIDGET_MEMORY_POOL_SIZE = 0x40000,
 	MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS = 4096
 };
 
@@ -1360,6 +1362,9 @@ static void event_handler_dispatch(
 static boolean ui_widget_load_children_recursive(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition);
+/* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
+boolean pc_menu_tag(
+	long tag_index);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -2429,6 +2434,17 @@ static __inline boolean widget_instance_can_handle_events(
 	return FALSE;
 }
 
+/* port: a label in the PC version's lists (port/assets/menus): an item that
+takes no events and has nothing in it that does, which its game passes over
+(its rows of settings take none themselves, but their spinners do), or one
+hidden (a list's rows past its items: port/linux/game/menu_functions.c) or
+disabled (the server browser's column titles, which sort nothing) */
+static boolean widget_instance_port_is_label(
+	struct widget_instance *widget)
+{
+	return (!widget_instance_can_handle_events(widget) && !widget->child) || !widget->visible || widget->disabled;
+}
+
 static struct widget_instance *widget_instance_find_by_tag_index_recursive(
 	struct widget_instance *widget,
 	long tag_index)
@@ -2628,6 +2644,25 @@ boolean widget_event_function_list_widget_goto_next_item(
 				child = widget->child;
 				item_index = 0;
 			}
+			/* port: the PC version's lists (port/assets/menus) pass over the
+			children that take no events (their labels and lines), as its
+			game does */
+			if (child && widget->type == _ui_widget_type_column_list &&
+				pc_menu_tag(widget->definition_tag_index))
+			{
+				long tries = 0;
+
+				while (widget_instance_port_is_label(child) && tries++ < 256)
+				{
+					child = child->next;
+					item_index++;
+					if (!child)
+					{
+						child = widget->child;
+						item_index = 0;
+					}
+				}
+			}
 			if (child)
 			{
 				widget_instance_give_focus_by_tag(
@@ -2752,6 +2787,27 @@ boolean widget_event_function_list_widget_goto_previous_item(
 				{
 					child = child->next;
 					item_index++;
+				}
+			}
+			/* port: as goto_next_item, over the PC version's labels */
+			if (widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index))
+			{
+				long tries = 0;
+
+				while (widget_instance_port_is_label(child) && tries++ < 256)
+				{
+					child = child->previous;
+					item_index--;
+					if (!child)
+					{
+						child = widget->child;
+						item_index = 0;
+						while (child->next)
+						{
+							child = child->next;
+							item_index++;
+						}
+					}
 				}
 			}
 			widget_instance_give_focus_by_tag(
@@ -3554,17 +3610,27 @@ static boolean ui_widget_load_children_recursive(
 		if (focus_a_child)
 		{
 			struct widget_instance *child;
+			/* port: the PC version's lists (port/assets/menus) start on their
+			first child that takes events, past their labels */
+			boolean skip_labels = widget->type == _ui_widget_type_column_list &&
+				pc_menu_tag(widget->definition_tag_index);
+			short index = 0;
 
-			for (child = widget->child; child; child = child->next)
+			for (child = widget->child; child; child = child->next, index++)
 			{
-				if (widget->type == _ui_widget_type_spinner_list ||
-					widget->type == _ui_widget_type_column_list ||
+				if (((widget->type == _ui_widget_type_spinner_list ||
+					widget->type == _ui_widget_type_column_list) &&
+					(!skip_labels || !widget_instance_port_is_label(child))) ||
 					widget_instance_can_handle_events(child))
 				{
 					widget->focused_child = child;
+					if (skip_labels)
+						widget->parameters.list.selected_index = index;
 					break;
 				}
 			}
+			if (!widget->focused_child && skip_labels)
+				widget->focused_child = widget->child;
 		}
 	}
 
@@ -3658,6 +3724,79 @@ static void widget_instance_initialize(
 	}
 
 	return;
+}
+
+/* port: the PC version's events that this engine never sends (its custom
+activation), for the menus' functions (port/linux/game/menu_functions.c):
+runs the widget's handlers for the event, else the first descendant's that
+has any (depth first); FALSE if none has */
+boolean ui_widget_port_dispatch_event(
+	struct widget_instance *widget,
+	short event_type,
+	short controller_index,
+	boolean *deleted)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+	struct widget_instance *child;
+	boolean found = FALSE;
+	long handler_index;
+
+	/* (deleted: a handler deleted the widget's screen, opening another or
+	going back; the callers' widgets are gone with it) */
+	*deleted = FALSE;
+
+	for (handler_index = 0; handler_index < definition->event_handlers.count; handler_index++)
+	{
+		struct ui_widget_event_handler_reference *handler =
+			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+
+		if (handler->event_type == event_type)
+		{
+			struct event_record event = {0};
+			boolean widget_deleted = FALSE;
+
+			event.controller_index = controller_index;
+			event_handler_dispatch(widget, definition, &event, handler, &widget_deleted);
+			found = TRUE;
+			if (widget_deleted)
+			{
+				*deleted = TRUE;
+				return TRUE;
+			}
+		}
+	}
+	for (child = widget->child; child && !found; child = child->next)
+	{
+		found = ui_widget_port_dispatch_event(child, event_type, controller_index, deleted);
+		if (*deleted)
+			break;
+	}
+	return found;
+}
+
+/* port: the number of a list's focused item: among all its children, but
+in the PC version's lists (port/assets/menus) among those that take events,
+past their labels, as its game counts them */
+short ui_widget_port_list_index(
+	struct widget_instance *list_widget)
+{
+	boolean skip_labels = pc_menu_tag(list_widget->definition_tag_index);
+	struct widget_instance *child;
+	short index = 0;
+
+	for (child = list_widget->child; child && child != list_widget->focused_child; child = child->next)
+	{
+		if (!skip_labels || !widget_instance_port_is_label(child))
+			index++;
+	}
+	return index;
+}
+
+/* port: back to the screen before, for the menus' functions */
+void ui_widget_port_go_back(
+	struct widget_instance *widget)
+{
+	widget_instance_go_back_to_previous(widget);
 }
 
 struct widget_instance *ui_widget_load_by_name_or_tag(
@@ -4393,6 +4532,9 @@ void display_error_damaged_media(
 	return;
 }
 
+/* port: menu_tags.c's */
+char const *pc_menus_screen(char const *name);
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4423,8 +4565,9 @@ void network_game_reset_to_pregame_ui(
 		if (global_network_game_server_get())
 		{
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
+			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
 			if (!ui_widget_load_by_name_or_tag(
-				"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper",
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load map select postgame screen");
@@ -4433,7 +4576,7 @@ void network_game_reset_to_pregame_ui(
 		else
 		{
 			if (!ui_widget_load_by_name_or_tag(
-				"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen"),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load networked pregame status screen");
@@ -4684,8 +4827,13 @@ void main_screen_shell_load(
 	{
 		attract_mode_reset_timer();
 		ui_widgets_close_all();
-		if (!ui_widget_load_by_name_or_tag("ui\\shell\\main_menu\\main_menu", NONE, NULL, NONE, NONE, NONE, NONE))
-			error(_error_silent, "failed to load main screen shell window");
+		/* port: the menus' main menu, when they are there (port/linux/game/menu_tags.c) */
+		{
+			extern char const *pc_menus_root_name(void);
+
+			if (!ui_widget_load_by_name_or_tag(pc_menus_root_name(), NONE, NULL, NONE, NONE, NONE, NONE))
+				error(_error_silent, "failed to load main screen shell window");
+		}
 		if (widget_globals.main_menu_deferred_error_code != NONE)
 		{
 			display_error(widget_globals.main_menu_deferred_error_code, NONE, TRUE, FALSE);
@@ -5628,11 +5776,22 @@ static boolean ui_mouse_menus_active(
 	if (widget_globals.initialization_thread || progress_bar_is_active())
 		return FALSE;
 
-	return virtual_keyboard_active() || ui_mouse_menu() != NULL;
+	/* (and the scores after a game, which take A and B like the menus:
+	game_engine_update_non_deterministic) */
+	return virtual_keyboard_active() || ui_mouse_menu() != NULL || game_engine_showing_postgame();
 }
 
 /* the pointer's motion, clicks and wheel since the last frame, as the first
 player's controller events */
+/* port: a row of a list to choose from (the PC version's menus' lists of
+gametypes, maps, profiles, levels and games: port/assets/menus) */
+static boolean ui_mouse_selection_row(
+	struct widget_instance *widget)
+{
+	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
+		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
+}
+
 static void ui_widgets_process_mouse(
 	void)
 {
@@ -5684,7 +5843,10 @@ static void ui_widgets_process_mouse(
 				{
 				case _ui_mouse_target_item:
 				case _ui_mouse_target_value:
-					ui_mouse_give_focus(target->widget);
+					/* (a selection list's row is chosen by a click, not
+					by passing over it on the way to its buttons) */
+					if (!ui_mouse_selection_row(target->widget))
+						ui_mouse_give_focus(target->widget);
 					break;
 				case _ui_mouse_target_list_slot:
 					ui_mouse_step_list_to_slot(target->widget);
@@ -5701,6 +5863,14 @@ static void ui_widgets_process_mouse(
 				switch (target->kind)
 				{
 				case _ui_mouse_target_item:
+					/* (a selection list's row: chosen by a click, used by
+					a click on it chosen) */
+					if (ui_mouse_selection_row(target->widget) && target->widget->parent &&
+						target->widget->parent->focused_child != target->widget)
+					{
+						ui_mouse_give_focus(target->widget);
+						break;
+					}
 					ui_mouse_give_focus(target->widget);
 					ui_mouse_press(_gamepad_analog_button_a);
 					break;
@@ -6243,10 +6413,13 @@ static void widget_instance_tab_to_next_valid_widget(
 		struct ui_widget_definition *definition =
 			ui_widget_definition_get(child->definition_tag_index);
 
-		if (definition->event_handlers.count > 0 ||
+		if ((definition->event_handlers.count > 0 ||
 			TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
 			widget->type == _ui_widget_type_spinner_list ||
-			widget->type == _ui_widget_type_column_list)
+			widget->type == _ui_widget_type_column_list) &&
+			/* port: over the PC version's labels and hidden rows */
+			!(widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index) &&
+				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
 			break;
@@ -6282,10 +6455,13 @@ static void widget_instance_tab_to_previous_valid_widget(
 		struct ui_widget_definition *definition =
 			ui_widget_definition_get(child->definition_tag_index);
 
-		if (definition->event_handlers.count > 0 ||
+		if ((definition->event_handlers.count > 0 ||
 			TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
 			widget->type == _ui_widget_type_spinner_list ||
-			widget->type == _ui_widget_type_column_list)
+			widget->type == _ui_widget_type_column_list) &&
+			/* port: over the PC version's labels and hidden rows */
+			!(widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index) &&
+				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
 			break;

@@ -137,7 +137,9 @@ enum
 		FLAG(_unit_control_integrated_light_bit) |
 		FLAG(_unit_control_action_bit) |
 		FLAG(_unit_control_use_equipment_bit) |
-		FLAG(_unit_control_weapon_reload_bit),
+		FLAG(_unit_control_weapon_reload_bit) |
+		/* port: latched with the action it goes with (units.h) */
+		FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT),
 };
 
 /* ---------- macros */

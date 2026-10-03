@@ -957,6 +957,13 @@ void virtual_keyboard_render(
 void virtual_keyboard_process(
 	void)
 {
+	/* port: while it is up the computer's keyboard types into it
+	(port/linux/src/xinput_sdl.c) */
+	{
+		extern void platform_text_typing(int typing);
+
+		platform_text_typing(virtual_keyboard_globals.active);
+	}
 	if (virtual_keyboard_globals.active)
 		virtual_keyboard_process_internal();
 
@@ -1150,6 +1157,50 @@ static boolean virtual_keyboard_select(
 	return TRUE;
 }
 
+/* port: the characters and backspaces typed on the computer's keyboard,
+as its keys would put them (the first replacing the text it began with) */
+static void virtual_keyboard_port_type(
+	void)
+{
+	struct key_stroke key;
+
+	while (input_get_key(&key))
+	{
+		boolean backspace = key.key_code == _key_backspace;
+
+		if (!backspace && ((unsigned char)key.ascii_code < ' ' || (unsigned char)key.ascii_code > '~'))
+			continue;
+		if (virtual_keyboard_globals.first_key_replaces_buffer == TRUE)
+		{
+			csmemset(virtual_keyboard_globals.text_buffer, 0, virtual_keyboard_globals.buffer_size);
+			virtual_keyboard_globals.cursor = virtual_keyboard_globals.text_buffer;
+			virtual_keyboard_globals.first_key_replaces_buffer = FALSE;
+			if (backspace)
+				continue;
+		}
+		if (backspace)
+		{
+			virtual_keyboard_backspace();
+		}
+		else if (virtual_keyboard_free_space_in_text_buffer() >= 2)
+		{
+			csmemmove(
+				virtual_keyboard_globals.cursor + 1,
+				virtual_keyboard_globals.cursor,
+				virtual_keyboard_globals.buffer_size -
+					((byte *)virtual_keyboard_globals.cursor - (byte *)virtual_keyboard_globals.text_buffer) -
+					sizeof(wchar_t));
+			*virtual_keyboard_globals.cursor++ = (wchar_t)(unsigned char)key.ascii_code;
+			ui_play_audio_feedback_sound(_ui_audio_feedback_forward);
+		}
+		else
+		{
+			ui_play_audio_feedback_sound(_ui_audio_feedback_flag_failure);
+		}
+	}
+	return;
+}
+
 static void virtual_keyboard_process_internal(
 	void)
 {
@@ -1158,6 +1209,8 @@ static void virtual_keyboard_process_internal(
 	struct event_record event;
 	long action = NONE;
 	boolean handled = FALSE;
+
+	virtual_keyboard_port_type();
 
 	while (get_next_event(&event, NONE))
 	{
