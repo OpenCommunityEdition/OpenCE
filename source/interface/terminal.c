@@ -347,7 +347,7 @@ void terminal_printf(
 	...)
 {
 	real_argb_color default_terminal_printf_color;
-	char *arglist;
+	va_list arglist;
 
 	va_start(arglist, format);
 
