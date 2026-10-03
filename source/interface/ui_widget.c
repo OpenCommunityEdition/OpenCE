@@ -6409,6 +6409,24 @@ static struct widget_instance *ui_mouse_wheel_widget(
 }
 
 /**
+ * @brief Whether the focus passes over a child of a list, which gives a
+ * press no place to land. The PC version's lists skip their labels and
+ * hidden rows (widget_instance_port_is_label) at both ends and wrap past
+ * them, so counting one would let a drag step past the last usable row.
+ *
+ * @param list the list the child is in
+ * @param child the child
+ * @return TRUE if the PC list's focus skips the child
+ */
+static boolean ui_mouse_wheel_skips_child(
+	struct widget_instance *list,
+	struct widget_instance *child)
+{
+	return list->type == _ui_widget_type_column_list && pc_menu_tag(list->definition_tag_index) &&
+		widget_instance_port_is_label(child);
+}
+
+/**
  * @brief How many presses of a d-pad button can step the focus before it
  * would wrap around to the other end.
  *
@@ -6456,9 +6474,10 @@ static long ui_mouse_wheel_room(
 			{
 				struct ui_widget_definition *child_definition = ui_widget_definition_get(child->definition_tag_index);
 
-				if (child_definition->event_handlers.count > 0 ||
+				if ((child_definition->event_handlers.count > 0 ||
 					TEST_FLAG(child_definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
-					list)
+					list) &&
+					!ui_mouse_wheel_skips_child(widget, child))
 				{
 					room++;
 				}
@@ -6489,7 +6508,7 @@ static long ui_mouse_wheel_room(
 					child;
 					child = forward ? child->next : child->previous)
 				{
-					if (!child->disabled)
+					if (!child->disabled && !ui_mouse_wheel_skips_child(widget, child))
 						room++;
 				}
 				if (forward && widget->parameters.list.number_of_items > 0)
