@@ -1002,6 +1002,7 @@ where they hide. */
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(const char *name);
 double config_real(const char *name);
+unsigned long config_changes(void);
 
 enum
 {
@@ -1015,11 +1016,14 @@ static short hud_player_names_setting(
 	void)
 {
 	static short setting = NONE;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (setting == NONE)
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
 	{
 		const char *value = config_string("display.player_names");
 
+		read_at = config_changes();
 		setting = _player_names_all;
 		if (value)
 		{
@@ -1041,9 +1045,13 @@ static real hud_player_name_scale(
 	void)
 {
 	static real scale = 0.0f;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (scale == 0.0f)
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
 		scale = 0.75f * PIN((real)config_real("display.player_name_scale"), 0.25f, 4.0f);
+	}
 
 	return scale;
 }

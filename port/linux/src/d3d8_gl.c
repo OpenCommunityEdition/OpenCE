@@ -1154,8 +1154,8 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 #ifdef HALO_ANDROID
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
-	(void)menus_active;
 	(void)pointer;
+	platform_menus_set_active(menus_active != 0);
 	return 0;
 }
 #else
@@ -1194,6 +1194,7 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
 	struct platform_ui_pointer state;
 
+	platform_menus_set_active(menus_active != 0);
 	platform_ui_pointer_set_active(menus_active != 0);
 	if (!menus_active || !device.gl_ready || !platform_ui_pointer_read(&state))
 		return 0;
