@@ -44,6 +44,9 @@ struct hud_hires_embedded
 	int point_threshold; /* red: exact discrete meter thresholds, zero elsewhere */
 	int title;
 	unsigned int sprites;
+	/* drawn for a Custom Edition map's stock bitmap of its name too, whose
+	layout is its own (port/assets/hud/custom_edition.json) */
+	int custom_edition;
 	const unsigned int *png;
 	unsigned int png_size;
 };
