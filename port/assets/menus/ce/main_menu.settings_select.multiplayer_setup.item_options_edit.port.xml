@@ -43,7 +43,5 @@
 		<string text="PLASMA PISTOL"/>
 		<string text="PLASMA RIFLE"/>
 		<string text="NEEDLER"/>
-		<string text="FUEL ROD"/>
-		<string text="FLAMETHROWER"/>
 	</strings>
 </menus>

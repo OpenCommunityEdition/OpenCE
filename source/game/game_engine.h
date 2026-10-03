@@ -192,8 +192,6 @@ enum
 	_loadout_weapon_plasma_pistol,
 	_loadout_weapon_plasma_rifle,
 	_loadout_weapon_needler,
-	_loadout_weapon_fuel_rod,
-	_loadout_weapon_flamethrower,
 	NUMBER_OF_LOADOUT_WEAPONS
 };
 

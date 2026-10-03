@@ -7196,12 +7196,14 @@ long game_engine_remap_weapon(
 		return weapon_definition_index;
 	}
 
+	/* (port: and the gravity rifle, a cut weapon, as the flamethrower,
+	which the Xbox's maps have unfinished: neither is a multiplayer weapon) */
+	if (weapon_list_index == _weapon_list_flamethrower || weapon_list_index == _weapon_list_gravity_rifle)
+		weapon_list_index = _weapon_list_rocket_launcher;
+
 	/* port: a custom loadout (game_variant_options) has no weapon set */
 	if (game_variant_options_get()->loadout == _loadout_custom)
-		return weapon_definition_index;
-
-	if (weapon_list_index == _weapon_list_flamethrower)
-		weapon_list_index = _weapon_list_rocket_launcher;
+		return list_index_to_weapon_definition_index(weapon_list_index);
 
 	switch (global_variant.universal_variant.weapon_set)
 	{
@@ -7299,7 +7301,7 @@ long game_engine_remap_weapon(
 		break;
 
 	/* port: the PC version's sets. Covenant: the Covenant's weapons (the
-	fuel rod, where the map has one, for the rocket launcher) */
+	needler for the rocket launcher: the Xbox's maps have no fuel rod) */
 	case _game_engine_weapons_covenant:
 		switch (weapon_list_index)
 		{
@@ -7317,26 +7319,19 @@ long game_engine_remap_weapon(
 			break;
 
 		case _weapon_list_rocket_launcher:
-			weapon_list_index = list_index_to_weapon_definition_index(_weapon_list_gravity_rifle) != NONE ?
-				_weapon_list_gravity_rifle : _weapon_list_needler;
+			weapon_list_index = _weapon_list_needler;
 			break;
 		}
 		break;
 
-	/* classic: the Xbox game's weapons (no fuel rod: the flamethrower is
-	already a rocket launcher) */
+	/* classic: the Xbox game's weapons (the flamethrower and the gravity
+	rifle are already rocket launchers) */
 	case _game_engine_weapons_classic:
-		if (weapon_list_index == _weapon_list_gravity_rifle)
-			weapon_list_index = _weapon_list_rocket_launcher;
 		break;
 
-	/* heavy weapons: rocket launchers, and fuel rods where the map has them */
+	/* heavy weapons: rocket launchers */
 	case _game_engine_weapons_heavy:
-		if (weapon_list_index != _weapon_list_gravity_rifle ||
-			list_index_to_weapon_definition_index(_weapon_list_gravity_rifle) == NONE)
-		{
-			weapon_list_index = _weapon_list_rocket_launcher;
-		}
+		weapon_list_index = _weapon_list_rocket_launcher;
 		break;
 	}
 
@@ -8412,8 +8407,7 @@ static long game_engine_loadout_weapon_definition(
 	static short const list_indices[] =
 	{
 		_weapon_list_assault_rifle, _weapon_list_pistol, _weapon_list_shotgun, _weapon_list_sniper_rifle,
-		_weapon_list_rocket_launcher, _weapon_list_plasma_pistol, _weapon_list_plasma_rifle, _weapon_list_needler,
-		_weapon_list_gravity_rifle, _weapon_list_flamethrower
+		_weapon_list_rocket_launcher, _weapon_list_plasma_pistol, _weapon_list_plasma_rifle, _weapon_list_needler
 	};
 	short index;
 

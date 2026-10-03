@@ -918,6 +918,13 @@ static boolean playlist_profile_options_from_block(
 	csmemcpy(options, data + sizeof(header), sizeof(*options));
 	options->friendly_fire = (short)PIN(options->friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1);
 	options->radar_players = (byte)PIN(options->radar_players, 0, NUMBER_OF_RADAR_PLAYERS - 1);
+	options->loadout = (byte)PIN(options->loadout, 0, NUMBER_OF_LOADOUTS - 1);
+	/* (the gravity rifle, a cut weapon, and the flamethrower, once loadout
+	weapons: rocket launchers, as the game makes them) */
+	if (options->primary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+		options->primary_weapon = _loadout_weapon_rocket_launcher;
+	if (options->secondary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+		options->secondary_weapon = _loadout_weapon_rocket_launcher;
 	return TRUE;
 }
 

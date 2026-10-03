@@ -336,7 +336,7 @@ STRING_INSERTS = {
 
 # a custom loadout's weapons (game_engine.h's _loadout_weapon_*)
 LOADOUT_WEAPONS = ["NONE", "RANDOM", "ASSAULT RIFLE", "PISTOL", "SHOTGUN", "SNIPER RIFLE", "ROCKET LAUNCHER",
-                   "PLASMA PISTOL", "PLASMA RIFLE", "NEEDLER", "FUEL ROD", "FLAMETHROWER"]
+                   "PLASMA PISTOL", "PLASMA RIFLE", "NEEDLER"]
 
 
 def LOADOUT_HELPS(slot: str) -> list:

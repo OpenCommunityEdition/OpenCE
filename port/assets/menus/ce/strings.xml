@@ -510,8 +510,6 @@
 		<string text="Everyone spawns with a plasma pistol as their primary\nweapon (where the map has one)."/>
 		<string text="Everyone spawns with a plasma rifle as their primary\nweapon (where the map has one)."/>
 		<string text="Everyone spawns with a needler as their primary\nweapon (where the map has one)."/>
-		<string text="Everyone spawns with a fuel rod as their primary\nweapon (where the map has one)."/>
-		<string text="Everyone spawns with a flamethrower as their primary\nweapon (where the map has one)."/>
 		<string text="No secondary weapon."/>
 		<string text="A random secondary weapon, of those the map has,\neach time you spawn."/>
 		<string text="Everyone spawns with a assault rifle as their secondary\nweapon (where the map has one)."/>
@@ -522,8 +520,6 @@
 		<string text="Everyone spawns with a plasma pistol as their secondary\nweapon (where the map has one)."/>
 		<string text="Everyone spawns with a plasma rifle as their secondary\nweapon (where the map has one)."/>
 		<string text="Everyone spawns with a needler as their secondary\nweapon (where the map has one)."/>
-		<string text="Everyone spawns with a fuel rod as their secondary\nweapon (where the map has one)."/>
-		<string text="Everyone spawns with a flamethrower as their secondary\nweapon (where the map has one)."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels">
 		<string text="INFINITE GRENADES:"/>
