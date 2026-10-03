@@ -5219,7 +5219,12 @@ enum ui_mouse_target_kind
 	list steps to it, and a click then presses A */
 	_ui_mouse_target_list_slot,
 	/* a button's icon and label in a screen's key: a click presses it */
-	_ui_mouse_target_button
+	_ui_mouse_target_button,
+	/* the band of a list's slot rows left of its first slot (a list showing
+	several items): a click steps the list back by one */
+	_ui_mouse_target_list_back,
+	/* the band right of its last slot: a click steps it forward by one */
+	_ui_mouse_target_list_forward
 };
 
 struct ui_mouse_target
@@ -5394,10 +5399,12 @@ static void ui_debug_draw_targets(
 	{
 		for (index = 0; index < ui_mouse_target_count; index++)
 		{
-			static pixel32 const colors[] = { 0xc000ff00, 0xc04080ff, 0xc0ffff00, 0xc0ff0000 };
+			/* in the order of enum ui_mouse_target_kind; the band's two sides
+			share orange, which no other kind uses */
+			static pixel32 const colors[] = { 0xc000ff00, 0xc04080ff, 0xc0ffff00, 0xc0ff0000, 0xc0ff8000, 0xc0ff8000 };
 			short kind = ui_mouse_targets[index].kind;
 
-			ui_debug_draw_outline(&ui_mouse_targets[index].bounds, colors[PIN(kind, 0, 3)]);
+			ui_debug_draw_outline(&ui_mouse_targets[index].bounds, colors[PIN(kind, 0, 5)]);
 		}
 	}
 	ui_debug_draw_mark(&ui_debug_down_mark, 0xffff00ff);
@@ -5450,6 +5457,11 @@ static long ui_mouse_child_index(
 
 	return NONE;
 }
+
+static void ui_mouse_list_directions(
+	struct widget_instance *widget,
+	short *back,
+	short *forward);
 
 /* a list that shows several of its items at once */
 static boolean ui_mouse_list_shows_several(
@@ -5532,9 +5544,122 @@ static boolean ui_mouse_widget_is_item(
 }
 
 /**
+ * @brief Notes a target that steps a list by one, unless it is empty or the
+ * targets are full.
+ * @param widget the list the target steps
+ * @param bounds where the target is, render offset included
+ * @param kind _ui_mouse_target_list_back or _ui_mouse_target_list_forward
+ */
+static void ui_mouse_note_list_step(
+	struct widget_instance *widget,
+	rectangle2d const *bounds,
+	short kind)
+{
+	struct ui_mouse_target *target;
+
+	if (ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS ||
+		bounds->x0 >= bounds->x1 ||
+		bounds->y0 >= bounds->y1)
+	{
+		return;
+	}
+	target = &ui_mouse_targets[ui_mouse_target_count++];
+	target->widget = widget;
+	target->bounds = *bounds;
+	target->kind = kind;
+	target->button_index = NONE;
+	/* as ui_mouse_note_target sets them for any target that is not a
+	button: only a value's split and a button's parts are read, and no stale
+	field of an earlier frame's target stays in the slot */
+	target->split_x = (bounds->x0 + bounds->x1) / 2;
+	target->split_y = (bounds->y0 + bounds->y1) / 2;
+	target->icon_bounds = *bounds;
+	target->label = NULL;
+	target->label_bounds = *bounds;
+
+	return;
+}
+
+/**
+ * @brief Notes the band that steps a list showing several items side by
+ * side: the band of the slots' rows (from the top of the highest slot to
+ * the bottom of the lowest) left of the first slot, which steps back, and
+ * right of the last, which steps forward, out to the list's own bounds.
+ *
+ * A stock several-items list (the map list, the profile slots) covers the
+ * whole 640x480 screen, so a tap anywhere beside its slots cannot mean
+ * "step": the band is limited to the slots' rows, and a tap on the title,
+ * between slots or under them does nothing. The caller notes nothing for
+ * the list itself, and widget_instance_render_recursive notes the slots
+ * after this; ui_mouse_target_at takes the last target noted under a point,
+ * so a slot would win over the band, which never covers one anyway. A list
+ * the d-pad steps up and down has no side to tap and gets no band (no stock
+ * list does).
+ *
+ * @param widget the list
+ * @param definition its definition
+ * @param offset the render offset, the list's own offset included (as
+ * ui_mouse_note_target gets it)
+ */
+static void ui_mouse_note_slot_band(
+	struct widget_instance *widget,
+	struct ui_widget_definition const *definition,
+	point2d offset)
+{
+	struct widget_instance *child;
+	rectangle2d bounds;
+	rectangle2d slots;
+	short back, forward;
+	boolean found = FALSE;
+
+	ui_mouse_list_directions(widget, &back, &forward);
+	if (back != _widget_event_dpad_left)
+		return;
+	for (child = widget->child; child; child = child->next)
+	{
+		rectangle2d slot;
+
+		if (!child->visible)
+			continue;
+		/* where widget_instance_render_recursive draws the child: the
+		list's offset plus the child's own */
+		slot = ui_widget_definition_get(child->definition_tag_index)->bounds;
+		slot.x0 += offset.x + child->horizontal_offset;
+		slot.x1 += offset.x + child->horizontal_offset;
+		slot.y0 += offset.y + child->vertical_offset;
+		slot.y1 += offset.y + child->vertical_offset;
+		if (!found)
+		{
+			slots = slot;
+			found = TRUE;
+		}
+		else
+		{
+			slots.x0 = MIN(slots.x0, slot.x0);
+			slots.x1 = MAX(slots.x1, slot.x1);
+			slots.y0 = MIN(slots.y0, slot.y0);
+			slots.y1 = MAX(slots.y1, slot.y1);
+		}
+	}
+	if (!found)
+		return;
+	bounds.y0 = slots.y0;
+	bounds.y1 = slots.y1;
+	bounds.x0 = definition->bounds.x0 + offset.x;
+	bounds.x1 = slots.x0;
+	ui_mouse_note_list_step(widget, &bounds, _ui_mouse_target_list_back);
+	bounds.x0 = slots.x1;
+	bounds.x1 = definition->bounds.x1 + offset.x;
+	ui_mouse_note_list_step(widget, &bounds, _ui_mouse_target_list_forward);
+
+	return;
+}
+
+/**
  * @brief Notes a widget as a tap target of this frame, if it is one: an
  * item, a value, a list slot, or a legend button (kept in parts, which
- * ui_mouse_fit_button_targets settles into the tap area).
+ * ui_mouse_fit_button_targets settles into the tap area). A list showing
+ * several items notes the band beside its slots (ui_mouse_note_slot_band).
  * @param widget the widget being rendered
  * @param definition the widget's definition
  * @param offset where the widget's parent is drawn, in menu coordinates
@@ -5612,8 +5737,16 @@ static void ui_mouse_note_target(
 	}
 	else if (widget->type == _ui_widget_type_spinner_list)
 	{
-		/* a list showing several items is picked through them */
-		if (!parent || ui_mouse_list_shows_several(widget) || !widget_instance_can_receive_events(widget))
+		if (!widget_instance_can_receive_events(widget))
+			return;
+		/* a list showing several items is picked through them, and stepped
+		by the band beside them */
+		if (ui_mouse_list_shows_several(widget))
+		{
+			ui_mouse_note_slot_band(widget, definition, offset);
+			return;
+		}
+		if (!parent)
 			return;
 		kind = _ui_mouse_target_value;
 	}
@@ -6177,11 +6310,12 @@ static void ui_debug_log_click(
 	struct ui_mouse_target const *target,
 	long frames)
 {
-	static char const *const kinds[] = { "item", "value", "list slot", "button" };
+	/* in the order of enum ui_mouse_target_kind */
+	static char const *const kinds[] = { "item", "value", "list slot", "button", "list back", "list forward" };
 
 	if (target)
 	{
-		char const *kind = kinds[PIN(target->kind, 0, 3)];
+		char const *kind = kinds[PIN(target->kind, 0, 5)];
 		char const *name = tag_get_name(target->widget->definition_tag_index);
 
 		/* a value steps by the side of its split the tap is on, and once
@@ -6248,8 +6382,9 @@ static void ui_debug_log_keyboard_tap(
  * for a finger only (ui_mouse_fit_button_targets). With debug.touch_targets
  * on it also notes the finger-down and tap points for the debug view, and
  * logs each tap: a menu click where it is resolved, a keyboard click where
- * it is taken. It forgets the frame's targets at the end, so that the next
- * frame's render notes and settles them anew.
+ * it is taken. A click on the band beside a list's slots steps the list
+ * by one; hovering it does nothing. It forgets the frame's targets at the
+ * end, so that the next frame's render notes and settles them anew.
  */
 static void ui_widgets_process_mouse(
 	void)
@@ -6353,6 +6488,13 @@ static void ui_widgets_process_mouse(
 				case _ui_mouse_target_list_slot:
 					ui_mouse_step_list_to_slot(target->widget);
 					break;
+				/* stepping takes a click, and the click gives the focus itself:
+				a hover that gave it to a list off the focus path would clear
+				the slot the list had focused (widget_instance_give_focus_directly),
+				just for passing over its side */
+				case _ui_mouse_target_list_back:
+				case _ui_mouse_target_list_forward:
+					break;
 				}
 			}
 		}
@@ -6390,6 +6532,21 @@ static void ui_widgets_process_mouse(
 				case _ui_mouse_target_button:
 					ui_mouse_press(target->button_index);
 					break;
+				case _ui_mouse_target_list_back:
+				case _ui_mouse_target_list_forward:
+				{
+					short back, forward;
+
+					ui_mouse_give_focus(target->widget);
+					/* as ui_mouse_step_list_to_slot: a list with nothing focused
+					(a mod's empty list) has no item to step from, and a d-pad
+					press would move the focus off the list instead */
+					if (!target->widget->focused_child)
+						break;
+					ui_mouse_list_directions(target->widget, &back, &forward);
+					ui_mouse_press(target->kind == _ui_mouse_target_list_back ? back : forward);
+					break;
+				}
 				}
 			}
 			else
