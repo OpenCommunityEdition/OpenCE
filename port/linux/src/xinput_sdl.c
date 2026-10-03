@@ -808,6 +808,65 @@ void test_input_press(unsigned long buttons)
 	test_input_pressed = buttons;
 }
 
+/* debug.test_input "menu:<buttons>": the buttons pressed one a second, from
+the first poll, for testing the menus: a, b, x, y, up, down, left, right,
+start, back, or wait (none), separated by spaces or commas */
+static char test_input_menu[512];
+static Uint64 test_input_menu_since;
+
+static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static const struct
+	{
+		const char *name;
+		int analog;
+		WORD digital;
+	} buttons[] =
+	{
+		{ "a", XINPUT_GAMEPAD_A, 0 },
+		{ "b", XINPUT_GAMEPAD_B, 0 },
+		{ "x", XINPUT_GAMEPAD_X, 0 },
+		{ "y", XINPUT_GAMEPAD_Y, 0 },
+		{ "up", -1, XINPUT_GAMEPAD_DPAD_UP },
+		{ "down", -1, XINPUT_GAMEPAD_DPAD_DOWN },
+		{ "left", -1, XINPUT_GAMEPAD_DPAD_LEFT },
+		{ "right", -1, XINPUT_GAMEPAD_DPAD_RIGHT },
+		{ "start", -1, XINPUT_GAMEPAD_START },
+		{ "back", -1, XINPUT_GAMEPAD_BACK },
+	};
+	Uint64 elapsed = SDL_GetTicks() - test_input_menu_since;
+	Uint64 step = elapsed / 1000;
+	const char *token = test_input_menu;
+	size_t length;
+	unsigned int index;
+
+	/* (pressed for the first 150 ms of its second) */
+	if (elapsed % 1000 >= 150)
+		return;
+	for (;;)
+	{
+		token += strspn(token, " ,");
+		length = strcspn(token, " ,");
+		if (!length)
+			return;
+		if (!step)
+			break;
+		step--;
+		token += length;
+	}
+	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
+	{
+		if (strlen(buttons[index].name) == length && !strncmp(token, buttons[index].name, length))
+		{
+			if (buttons[index].analog >= 0)
+				pad->bAnalogButtons[buttons[index].analog] = 255;
+			else
+				pad->wButtons |= buttons[index].digital;
+			return;
+		}
+	}
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static const WORD digital[] =
@@ -846,7 +905,12 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		const char *setting = config_string("debug.test_input");
 
 		checked = 1;
-		if (!strncmp(setting, "bot:", 4))
+		if (!strncmp(setting, "menu:", 5))
+		{
+			snprintf(test_input_menu, sizeof(test_input_menu), "%s", setting + 5);
+			test_input_menu_since = SDL_GetTicks();
+		}
+		else if (!strncmp(setting, "bot:", 4))
 			seed = atoi(setting + 4);
 		else if (!strcmp(setting, "bot"))
 			seed = 0;
@@ -855,6 +919,11 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+	}
+	if (test_input_menu[0])
+	{
+		test_input_menu_gamepad(pad);
+		return;
 	}
 	if (seed < 0)
 		return;
