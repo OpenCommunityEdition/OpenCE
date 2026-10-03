@@ -814,10 +814,8 @@ static short actor_move_test_avoidance_vector(
 	real *collision_t,
 	byte *collision_timer)
 {
-	struct collision_bsp_test_vector_result collision_result;
-	real_vector3d offset;
-	real_vector3d divergence;
-	real scale;
+	real_vector3d divergence_direction;
+	real_vector3d origin_offset;
 	short result = _actor_vector_avoidance_clear;
 	short object_index;
 
@@ -836,46 +834,51 @@ static short actor_move_test_avoidance_vector(
 
 	*collision_t = REAL_MAX;
 
-	actor_move_transform_avoidance_vector(avoidance_data, &avoidance_ray->offset, &offset);
-	actor_move_transform_avoidance_vector(avoidance_data, &avoidance_ray->divergence, &divergence);
+	origin_offset = *global_zero_vector3d;
+	point_from_line3d((real_point3d *)&origin_offset, &avoidance_data->forward, (avoidance_ray->offset.i), (real_point3d *)&origin_offset);
+	point_from_line3d((real_point3d *)&origin_offset, &avoidance_data->left, (avoidance_ray->offset.j), (real_point3d *)&origin_offset);
+	point_from_line3d((real_point3d *)&origin_offset, &avoidance_data->up, (avoidance_ray->offset.k), (real_point3d *)&origin_offset);
+	divergence_direction = *global_zero_vector3d;
+	point_from_line3d((real_point3d *)&divergence_direction, &avoidance_data->forward, (avoidance_ray->divergence.i), (real_point3d *)&divergence_direction);
+	point_from_line3d((real_point3d *)&divergence_direction, &avoidance_data->left, (avoidance_ray->divergence.j), (real_point3d *)&divergence_direction);
+	point_from_line3d((real_point3d *)&divergence_direction, &avoidance_data->up, (avoidance_ray->divergence.k), (real_point3d *)&divergence_direction);
 
-	ray_origin->x = offset.i*avoidance_data->avoid_width + avoidance_data->origin.x;
-	ray_origin->y = offset.j*avoidance_data->avoid_width + avoidance_data->origin.y;
-	ray_origin->z = offset.k*avoidance_data->avoid_width + avoidance_data->origin.z;
+	point_from_line3d(&avoidance_data->origin, &origin_offset, (avoidance_data->avoid_width), ray_origin);
+	scale_vector3d(&divergence_direction, avoidance_ray->length*avoidance_data->avoid_distance, ray_direction);
 
-	scale = avoidance_data->avoid_distance*avoidance_ray->length;
-	ray_direction->i = divergence.i*scale;
-	ray_direction->j = divergence.j*scale;
-	ray_direction->k = divergence.k*scale;
-
-	vector_from_points3d(&avoidance_data->origin, ray_origin, &offset);
-	if (collision_bsp_test_vector(
-		FLAG(_collision_test_front_facing_surfaces_bit) |
-			FLAG(_collision_test_back_facing_surfaces_bit),
-		avoidance_data->bsp,
-		0,
-		NULL,
-		&avoidance_data->origin,
-		&offset,
-		1.f,
-		&collision_result))
 	{
-		result = _actor_vector_avoidance_obstructed_structure;
-		*collision_t = 0.f;
-	}
-	else if (collision_bsp_test_vector(
-		FLAG(_collision_test_front_facing_surfaces_bit) |
-			FLAG(_collision_test_back_facing_surfaces_bit),
-		avoidance_data->bsp,
-		0,
-		NULL,
-		ray_origin,
-		ray_direction,
-		1.f,
-		&collision_result))
-	{
-		result = _actor_vector_avoidance_obstructed_structure;
-		*collision_t = collision_result.t;
+		real_vector3d vector_to_origin;
+		struct collision_bsp_test_vector_result collision_result;
+
+		vector_from_points3d(&avoidance_data->origin, ray_origin, &vector_to_origin);
+		if (collision_bsp_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_back_facing_surfaces_bit),
+			avoidance_data->bsp,
+			0,
+			NULL,
+			&avoidance_data->origin,
+			&vector_to_origin,
+			1.f,
+			&collision_result))
+		{
+			result = _actor_vector_avoidance_obstructed_structure;
+			*collision_t = 0.f;
+		}
+		else if (collision_bsp_test_vector(
+			FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_back_facing_surfaces_bit),
+			avoidance_data->bsp,
+			0,
+			NULL,
+			ray_origin,
+			ray_direction,
+			1.f,
+			&collision_result))
+		{
+			result = _actor_vector_avoidance_obstructed_structure;
+			*collision_t = collision_result.t;
+		}
 	}
 
 	for (object_index = 0;
@@ -884,7 +887,8 @@ static short actor_move_test_avoidance_vector(
 	{
 		struct vehicle_avoidance_cylinder *cylinder =
 			&avoidance_data->avoidance_objects[object_index];
-		real object_t;
+		real_vector3d dummy_normal;
+		real intersect_t;
 
 		if (pill_test_vector3d(
 			&cylinder->base,
@@ -892,12 +896,12 @@ static short actor_move_test_avoidance_vector(
 			cylinder->width,
 			ray_origin,
 			ray_direction,
-			&object_t,
-			&offset) &&
-			object_t < *collision_t)
+			&intersect_t,
+			&dummy_normal) &&
+			intersect_t < *collision_t)
 		{
 			result = _actor_vector_avoidance_obstructed_object;
-			*collision_t = object_t;
+			*collision_t = intersect_t;
 		}
 	}
 
