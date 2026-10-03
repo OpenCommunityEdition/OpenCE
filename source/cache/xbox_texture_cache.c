@@ -621,8 +621,12 @@ static void texture_cache_initialize_hardware_format(
 			(2 << D3DFORMAT_DIMENSION_SHIFT) |
 			D3DFORMAT_BORDERSOURCE_COLOR |
 			D3DFORMAT_DMACHANNEL_A;
+		/* port: the pitch rounded up, as rasterizer_xbox_bitmap_rebuild_hardware_format
+		pads the rows (an Xbox map's linear rows are whole multiples of it; a
+		Custom Edition map's need not be) */
 		texture->Size =
-			((bitmap_mipmap_get_row_pitch(bitmap, 0) / D3DTEXTURE_PITCH_ALIGNMENT - 1) << D3DSIZE_PITCH_SHIFT) |
+			(((bitmap_mipmap_get_row_pitch(bitmap, 0) + D3DTEXTURE_PITCH_ALIGNMENT - 1) / D3DTEXTURE_PITCH_ALIGNMENT - 1)
+				<< D3DSIZE_PITCH_SHIFT) |
 			((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) |
 			(bitmap->width - 1);
 	}
