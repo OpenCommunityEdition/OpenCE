@@ -476,15 +476,12 @@ void flag_update_attachment(
 	delta.j = attachment_points->y - flag->first_attachment.y;
 	delta.k = attachment_points->z - flag->first_attachment.z;
 
-	/*
-	 * BUG (original): integer truncation makes this an effective two-unit
-	 * threshold, as in antenna_update_attachment. A non-matching correctness
-	 * fix would compare fabs(delta.i), fabs(delta.j), and fabs(delta.k)
-	 * directly against 1.0f.
-	 */
-	if ((real)abs((long)delta.i) > 1.0f ||
-		(real)abs((long)delta.j) > 1.0f ||
-		(real)abs((long)delta.k) > 1.0f)
+	/* port: the movement compared as it is, as in antenna_update_attachment
+	(it was truncated to whole units first, so it took two units of movement
+	to move the vertices along) */
+	if (fabsf(delta.i) > 1.0f ||
+		fabsf(delta.j) > 1.0f ||
+		fabsf(delta.k) > 1.0f)
 	{
 		short x;
 

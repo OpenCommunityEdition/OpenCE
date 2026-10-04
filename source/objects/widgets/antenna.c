@@ -347,14 +347,11 @@ static void antenna_update_attachment(
 	delta.i = attachment_point->x - antenna->last_attachment_location.x;
 	delta.j = attachment_point->y - antenna->last_attachment_location.y;
 	delta.k = attachment_point->z - antenna->last_attachment_location.z;
-	/*
-	 * BUG (original): integer truncation makes this an effective two-unit
-	 * threshold. A non-matching correctness fix would compare fabs(delta.i),
-	 * fabs(delta.j), and fabs(delta.k) directly against 1.0f.
-	 */
-	if ((real)abs((long)delta.i) > 1.0f ||
-		(real)abs((long)delta.j) > 1.0f ||
-		(real)abs((long)delta.k) > 1.0f)
+	/* port: the movement compared as it is (it was truncated to whole units
+	first, so it took two units of movement to move the vertices along) */
+	if (fabsf(delta.i) > 1.0f ||
+		fabsf(delta.j) > 1.0f ||
+		fabsf(delta.k) > 1.0f)
 	{
 		short vertex_index;
 
