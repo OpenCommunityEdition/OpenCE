@@ -232,6 +232,15 @@ static const struct config_setting config_settings[] =
 		"networks whose NAT stops connections: when a player joins this\n"
 		"machine's game, and when joining a game takes too long. False never\n"
 		"asks." },
+	{ "network.public_lobby", _config_boolean, "true", "HALO_NET_PUBLIC_LOBBY", _environment_value, _platform_all,
+		"The server browser: public games are listed through the signalling\n"
+		"brokers, and Join Game > Server Browser shows them. False lists no\n"
+		"game of this machine's and shows none." },
+	{ "network.host_public", _config_boolean, "true", "HALO_NET_HOST_PUBLIC", _environment_value, _platform_all,
+		"Whether a new game of Create Game > Internet starts as PUBLIC (listed\n"
+		"in everyone's server browser: anyone can see and join it) or, false,\n"
+		"PRIVATE (only players with its invite link can join). Server Setup's\n"
+		"LISTING changes it for each game." },
 	{ "network.signalling_brokers", _config_string,
 		"\"broker.emqx.io:1883,broker.hivemq.com:1883,test.mosquitto.org:1883\"",
 		"HALO_NET_BROKERS", _environment_value, _platform_all,

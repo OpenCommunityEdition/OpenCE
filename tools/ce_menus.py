@@ -137,7 +137,8 @@ INCOMPATIBLE = set()
 WIRED = {
     "main menu quit game", "profile set edit begin", "mouse emit accept event", "mouse emit back event",
     "mouse emit x event", "emit custom activation event", "single prev cl item activated", "controls back handler",
-    "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init", "mp type set mode",
+    "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init",
+    "gamespy screen dispose", "mp type set mode",
     "campaign menu init", "campaign menu continue", "difficulty item select", "solo map list update",
     "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
     "load game menu delete request", "load game menu delete finish",

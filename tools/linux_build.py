@@ -117,6 +117,7 @@ TOML_DIR = Path("port/third_party/tomlc17")
 EXPAT_DIR = Path("port/third_party/expat")
 EXPAT_SOURCES = ("xmlparse.c", "xmlrole.c", "xmltok.c")
 KCP_DIR = Path("port/third_party/kcp")
+MONOCYPHER_DIR = Path("port/third_party/monocypher")
 MUSL_MATH_DIR = Path("port/third_party/musl-math")
 # the self-updater's TLS (port/linux/src/posix_update.c)
 MBEDTLS_DIR = Path("port/third_party/mbedtls")
@@ -421,6 +422,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{TOML_DIR}",
             f"-I{EXPAT_DIR}",
             f"-I{KCP_DIR}",
+            f"-I{MONOCYPHER_DIR}",
             "-Isource -Isource/cseries",
             sdk_flags,
         ])
@@ -461,6 +463,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             add_object(EXPAT_DIR / name, " ".join([abi, "-std=gnu11", f"-I{EXPAT_DIR}", "-w"]))
         # internet play's reliable streams (port/third_party/kcp; p2p.c)
         add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
+        # internet play's signatures, for public games' listings
+        # (port/third_party/monocypher; p2p_crypto.c)
+        for name in ("monocypher.c", "monocypher-ed25519.c"):
+            add_object(MONOCYPHER_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
         # the game's sin, pow and the rest, the same on every port
         # (port/include/halo_math.h)
         for source in musl_math_sources():

@@ -219,7 +219,9 @@ the setting for one start of the game. It has priority over the file.
 | `network.join_from_clipboard` | `true` | `HALO_NET_JOIN_FROM_CLIPBOARD` | `true`: when the game comes to the front, it joins the game of an invite link on the clipboard. |
 | `network.tunnel_port` | `0` | `HALO_NET_TUNNEL_PORT` | The UDP port for internet play. `0`: the game selects a port. Refer to "Internet play". |
 | `network.allow_upnp` | `true` | `HALO_NET_ALLOW_UPNP` | `true`: internet play can ask the router to forward its port (UPnP). `false`: the game does not ask. Refer to "Internet play". |
-| `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other. |
+| `network.public_lobby` | `true` | `HALO_NET_PUBLIC_LOBBY` | `true`: the server browser. Public games are listed, and Join Game > Server Browser shows them. `false`: no games are listed or shown. Refer to "Server browser". |
+| `network.host_public` | `true` | `HALO_NET_HOST_PUBLIC` | `true`: a new game of Create Game > Internet starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in Server Setup changes it for each game. Refer to "Server browser". |
+| `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other, and that carry the listings of the server browser. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
@@ -402,12 +404,62 @@ When the machines connect, the game of the host shows in Multiplayer,
 System Link. Join the game as on a local network. System link on a local
 network does not need an invite.
 
+### Server browser
+
+Server Setup in Create Game > Internet has a LISTING row:
+
+- PUBLIC (the default): the game also shows in Join Game > Server Browser
+  on every machine. Anyone can see and join the game.
+- PRIVATE: only players with the invite link can join.
+
+Each new game starts as PUBLIC (`network.host_public = false` makes new
+games start as PRIVATE). A LAN game is never listed. `network.public_lobby = false` turns the server browser off.
+
+In the Server Browser, select a game to join it. The game joins the invite
+of the game, as for a link. When it reaches the host, it opens the lobby.
+If it cannot reach the host in 30 seconds, it marks the game FAILED. REFRESH
+asks the hosts for their listings again.
+
+How it operates (`src/p2p_lobby.c`):
+
+- The host of a public game publishes a listing: the invite, and the name,
+  map, gametype and player counts of the game. The listing goes to the
+  same MQTT brokers as the invites (`network.signalling_brokers`), retained,
+  to a topic of the host (`hceu/3/lobby/s/<hash of its key>`).
+- The key of the host signs the listing (Ed25519). The key is the key of the
+  invite, so no other machine can list the invite of the host, change its
+  listing, or list a game with false details.
+- The host publishes the listing again every 30 seconds, when the game
+  changes, and when a browser asks. If the topic of the host is empty or
+  holds another listing, the host publishes again in 5 seconds or less. Thus
+  a broker that deletes the listing does not remove the game.
+- When the host stops (it stops hosting, the game becomes private, or the
+  game quits), it publishes a closed listing, and then empties its topic.
+  If the host loses its connection, the broker empties its topic (the will
+  of the connection). A browser removes a game that it does not hear for 90
+  seconds.
+- When a public game becomes private, the host makes a new invite. Thus a
+  player who saw the listing cannot join with the old invite.
+
+A public game does not publish the address of the host. But any machine
+with the invite can ask the host to connect, and the host then sends its
+addresses. Thus anyone can learn the address of the host of a public game,
+as for any public server.
+
+To use a broker of your own, add it to `network.signalling_brokers`. All the
+players must use the same broker to see each other's games. The game uses
+MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
+retained messages, or does not let clients subscribe with wildcards, carries
+only invites, not listings.
+
 ### Security
 
 Only machines with the invite can find the game:
 
-- Each copy of the game makes an X25519 key pair when it starts. Its
-  identifier is from the hash of its public key.
+- Each copy of the game makes an Ed25519 key pair when it starts, and from
+  it an X25519 key pair (Monocypher, `port/third_party/monocypher`). Its
+  identifier is from the hash of its X25519 public key. The Ed25519 key
+  signs the listing of a public game.
 - The link contains a 16-byte hash of the public key of the host and a
   random 16-byte token. The identifier of the host is from the first 6
   bytes of the hash.
