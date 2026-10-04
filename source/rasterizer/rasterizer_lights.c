@@ -88,6 +88,7 @@ symbols in this file:
 #include "math/periodic_functions.h"
 #include "objects/widgets/widget_types.h"
 #include "render.h"
+#include "render/render_cameras_internal.h" /* port: render_frustum_sphere_visible */
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "rasterizer_widgets.h"
@@ -559,9 +560,16 @@ void rasterizer_lens_flare_submit(
 				&camera_offset);
 			camera_distance= dot_product3d(&global_window_parameters.camera.forward, &camera_offset);
 
+			/* port: none out of view either (behind the camera, off the
+			screen): its occlusion test would count no pixels, so it would not
+			be drawn, and a level of many lights (Halo PC's maps) tested
+			hundreds a frame, each a draw of its own (the sphere takes in the
+			test's offset point and size, rasterizer_lens_flares_submit_occlusion_tests) */
 			if ((parameters->definition->far_fade_distance==0.0f ||
 				camera_distance<parameters->definition->far_fade_distance) &&
-				(parameters->compressed_light_color&LENS_FLARE_LIGHT_COLOR_ALPHA_MASK)>0)
+				(parameters->compressed_light_color&LENS_FLARE_LIGHT_COLOR_ALPHA_MASK)>0 &&
+				render_frustum_sphere_visible(&global_window_parameters.frustum, &parameters->position,
+					3.0f * parameters->definition->occlusion_radius))
 			{
 				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters=
 					lens_flare_parameters_get((short)local_lens_flare_count++);
