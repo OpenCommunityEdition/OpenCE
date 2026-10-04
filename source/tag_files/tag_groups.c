@@ -122,12 +122,19 @@ void *tag_block_get_element_with_size(
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3085, block->count>=0);
 	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3086, !block->definition || block->definition->element_size==element_size);
 
-	match_vassert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3089, index>=0 && index<block->count,
-		csprintf(temporary,
-			"#%d is not a valid %s index in [#0,#%d)",
-			index,
-			block->definition ? block->definition->name : "<unknown>", block->count));
-	match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3090, block->address);
+	/* port: as tag_data_get_pointer, a Custom Edition map's index past a
+	block's end (which Halo PC never checked: foundation@ce, 13 seconds in)
+	gets the empty data below without an assertion. This build's maps keep
+	theirs */
+	if (!custom_edition_cache_tags_loaded())
+	{
+		match_vassert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3089, index>=0 && index<block->count,
+			csprintf(temporary,
+				"#%d is not a valid %s index in [#0,#%d)",
+				index,
+				block->definition ? block->definition->name : "<unknown>", block->count));
+		match_assert("c:\\halo\\SOURCE\\tag_files\\tag_groups.c", 3090, block->address);
+	}
 	/* port: an element past the block (an index a map's data gave, which
 	nothing checked) is the empty data (tag_empty_data), not whatever lies
 	past the block */
