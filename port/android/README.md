@@ -6,7 +6,7 @@
 
 The game shows its graphics with OpenGL ES 3. It plays sound through SDL3
 (AAudio). It accepts input from game controllers, for example a PlayStation
-5 DualSense on Bluetooth. The app needs Android 9 (API 28) or later. It
+5 DualSense on Bluetooth, and from the touchscreen (refer to "Controls"). The app needs Android 9 (API 28) or later. It
 operates on 64-bit-only devices, for example the Pixel 9 Pro XL.
 
 The Android build uses the platform layer of the Linux build
@@ -136,12 +136,57 @@ scroll a list (down or right steps back, up or left steps forward). A drag
 stops at the first and the last item, and it does not change a setting's
 value. Touches that start in the edge-gesture zones of Android do not tap
 or scroll at the sides, and do not scroll at the top and bottom, because the
-first swipe from an edge in full screen only shows the system bars. Apart
-from skipping cinematics, the gameplay does not accept touch input.
+first swipe from an edge in full screen only shows the system bars.
 
 A tap during a cinematic that can be skipped skips it, as A does. On the
 on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
 "A =ENTER" to accept the name.
+
+### Touch controls
+
+In a game, the app shows touch controls over the picture. They are a
+controller for player 1:
+
+| Control | Function in the game |
+| --- | --- |
+| stick (lower left) | move |
+| swipe on the screen away from the buttons | look |
+| Fire | right trigger |
+| Grenade | left trigger |
+| A / Jump, B / Melee, X / Reload, Y / Weapon | A, B, X, Y |
+| Crouch, Zoom | left and right stick clicks |
+| Light, Gren. type | white, black |
+| Pause, Back | start, back |
+| Up, Down, Left, Right | D-pad |
+
+A finger that holds a button can also swipe to look, so you can fire and
+aim with one thumb. A short tap reaches the game even when it is shorter
+than one frame. Swipes that start in the edge-gesture zones of Android do
+not turn the view. The view does not use the mouse settings: the swipe
+keeps the aim assist of the controller.
+
+The touch controls show only in a game. In the menus and during
+cinematics they hide, and the touchscreen operates the menus as described
+above. They also hide when a controller is connected, for example the
+built-in controller of a handheld. A device without a touchscreen (a TV)
+never shows them. The setting `input.touch_controls` changes this (refer
+to "Settings").
+
+The buttons at the top of the screen:
+
+- "Hide" removes the controls until you push "Touch".
+- "Options" opens these items:
+  - "General": the phone's vibration (on by default; it follows the
+    vibration setting of the game's profile), aiming with the gyroscope
+    (off by default), "Hide or add buttons" (hide a button, add a copy of
+    a button) and "Edit buttons size".
+  - "Edit buttons layout": drag the controls to new positions, then push
+    "Save and exit". "Export" and "Import" write and read a layout file
+    with the file picker of the system.
+  - "Look sensitivity".
+
+The app keeps the layout in its own preferences, not in `config.toml`.
+Removing the app's data or the app removes the layout.
 
 ## Settings
 
@@ -161,6 +206,7 @@ These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps with each value. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
@@ -365,8 +411,9 @@ assembly of the port is necessary:
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to approximately `0x89000000`. If the addresses are not
   available, the app shows a message.
-- Touch operates the menus and skips cinematics. In the game, use a controller
-  or a keyboard.
+- Touch operates the menus and skips cinematics. In the game, the touch
+  controls appear when no controller is connected; their size follows the
+  height of the screen, so they are larger on a tablet than on a phone.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.
 - The x86 Android emulator runs the app through its ARM translation. The

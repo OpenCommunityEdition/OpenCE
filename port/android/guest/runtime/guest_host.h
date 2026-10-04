@@ -117,4 +117,16 @@ void host_android_path(int which, char *buffer, unsigned int size);
 in pixels of the current orientation, into insets[4]; all 0 when unknown */
 void host_gesture_insets(int *insets);
 
+/* ---------- the on-screen touch controls (host_touch.c) */
+
+/* the overlay's controller: the SDL axes (left x, y, right x, y, left
+trigger, right trigger) and the SDL button bits, into state[7] */
+void host_touch_read(int *state);
+/* the overlay's view swipe since the last read, into delta[2] */
+void host_touch_look_read(float *delta);
+/* port 0's motors, for the phone's vibration */
+void host_touch_rumble(unsigned int low, unsigned int high);
+/* tells the overlay when to show: HALO_TOUCH_SCENE_* (xinput_sdl.c) */
+void host_touch_scene(int scene);
+
 #endif

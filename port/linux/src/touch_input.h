@@ -35,4 +35,18 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer);
 presses A for a few polls when a cinematic can be skipped */
 void touch_input_gamepad(XINPUT_GAMEPAD *pad);
 
+#ifdef HALO_ANDROID
+/* the on-screen touch controls (port/android/app/.../TouchControls.java),
+an Android view over the game: tells them whether a menu is up and
+input.touch_controls, and adds their stick and buttons to port 0's state */
+void touch_input_controls(XINPUT_GAMEPAD *pad, int menus);
+
+/* adds the touch controls' view swipe since the last call to yaw and
+pitch, in radians at `scale` radians per pixel */
+void touch_input_look(float scale, float *yaw, float *pitch);
+
+/* port 0's motors, for the phone's vibration while the touch controls show */
+void touch_input_rumble(unsigned int left, unsigned int right);
+#endif
+
 #endif

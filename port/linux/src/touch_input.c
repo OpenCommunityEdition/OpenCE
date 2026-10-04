@@ -11,16 +11,23 @@ finger down (host_gesture_insets).
 
 #include "touch_input.h"
 #include "touch_menu.h"
+#include "port_config.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef HALO_ANDROID
 /* port/android/guest/runtime/guest_host.h */
 void host_gesture_insets(int *insets);
+void host_touch_read(int *state);
+void host_touch_look_read(float *delta);
+void host_touch_rumble(unsigned int low, unsigned int high);
+void host_touch_scene(int scene);
 #endif
 
 /* the game's (port/linux/game/touch_game.c) */
 int touch_game_cinematic_skippable(void);
+int touch_game_cinematic_playing(void);
 
 /* a tap moves at most this far; a drag of this length is one wheel step */
 #define TOUCH_TAP_SLOP_DP 12.0f
@@ -176,3 +183,111 @@ void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 		skip_polls--;
 	}
 }
+
+#ifdef HALO_ANDROID
+/* ---------- the on-screen touch controls
+
+The overlay (port/android/app/.../TouchControls.java) draws and reads its
+own fingers on Android's UI thread; port/android/host/host_touch.c hands
+its state over. These bits tell it when to show: */
+enum
+{
+	/* the game has read its controller: the other bits are known */
+	_touch_scene_known = 1 << 0,
+	/* a menu or a cinematic is up: the overlay hides and lets the fingers
+	through to the menus' pointer above */
+	_touch_scene_menus = 1 << 1,
+	/* input.touch_controls: "on" and "off" (none: "auto", shown when the
+	device has a touchscreen and no controller) */
+	_touch_scene_on = 1 << 2,
+	_touch_scene_off = 1 << 3,
+};
+
+/* input.touch_controls as _touch_scene_on, _touch_scene_off or 0 */
+static int touch_controls_setting(void)
+{
+	static int setting;
+	static unsigned long read_at = (unsigned long)-1;
+
+	if (read_at != config_changes())
+	{
+		const char *value = config_string("input.touch_controls");
+
+		read_at = config_changes();
+		setting = 0;
+		if (value && !strcmp(value, "on"))
+			setting = _touch_scene_on;
+		else if (value && !strcmp(value, "off"))
+			setting = _touch_scene_off;
+	}
+	return setting;
+}
+
+void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
+{
+	/* SDL's gamepad buttons, in order (SDL_GamepadButton); the first four
+	are the analog A, B, X and Y */
+	static const WORD digital[] =
+	{
+		0, 0, 0, 0, XINPUT_GAMEPAD_BACK, 0, XINPUT_GAMEPAD_START,
+		XINPUT_GAMEPAD_LEFT_THUMB, XINPUT_GAMEPAD_RIGHT_THUMB,
+		0, 0, XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_DOWN,
+		XINPUT_GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_RIGHT
+	};
+	static const int analog[] =
+	{
+		XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y
+	};
+	SHORT *sticks[4];
+	int state[7];
+	int index;
+
+	host_touch_scene(_touch_scene_known | touch_controls_setting() |
+		(menus || touch_game_cinematic_playing() ? _touch_scene_menus : 0));
+	sticks[0] = &pad->sThumbLX;
+	sticks[1] = &pad->sThumbLY;
+	sticks[2] = &pad->sThumbRX;
+	sticks[3] = &pad->sThumbRY;
+	host_touch_read(state);
+	for (index = 0; index < 4; index++)
+	{
+		/* SDL's y runs down, the Xbox's up */
+		int value = index == 1 || index == 3 ? -state[index] - 1 : state[index];
+
+		if (value < -32768) value = -32768;
+		if (value > 32767) value = 32767;
+		if (abs(value) > abs(*sticks[index]))
+			*sticks[index] = (SHORT)value;
+		if (state[6] & (1 << index))
+			pad->bAnalogButtons[analog[index]] = 0xff;
+	}
+	for (index = 0; index < (int)(sizeof(digital) / sizeof(digital[0])); index++)
+	{
+		if (state[6] & (1 << index))
+			pad->wButtons |= digital[index];
+	}
+	/* the shoulders are white and black, as a DualSense's L1 and R1 */
+	if (state[6] & (1 << 9))
+		pad->bAnalogButtons[XINPUT_GAMEPAD_WHITE] = 0xff;
+	if (state[6] & (1 << 10))
+		pad->bAnalogButtons[XINPUT_GAMEPAD_BLACK] = 0xff;
+	if (state[4])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 0xff;
+	if (state[5])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 0xff;
+}
+
+void touch_input_look(float scale, float *yaw, float *pitch)
+{
+	float delta[2];
+
+	host_touch_look_read(delta);
+	*yaw -= delta[0] * scale;
+	*pitch -= delta[1] * scale;
+}
+
+void touch_input_rumble(unsigned int left, unsigned int right)
+{
+	host_touch_rumble(left, right);
+}
+#endif

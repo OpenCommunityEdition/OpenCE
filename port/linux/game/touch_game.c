@@ -20,3 +20,10 @@ int touch_game_cinematic_skippable(void)
 	return cinematic_globals && game_in_progress() && cinematic_in_progress() &&
 		cinematic_can_be_skipped();
 }
+
+/* asks whether a cinematic is playing, skippable or not: the player has no
+controls, so the on-screen touch controls hide (touch_input.c) */
+int touch_game_cinematic_playing(void)
+{
+	return cinematic_globals && game_in_progress() && cinematic_in_progress();
+}
