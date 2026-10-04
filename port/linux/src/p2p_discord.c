@@ -315,7 +315,10 @@ void p2p_discord_update(void)
 		const char *application = config_string("discord.application_id");
 
 		discord.checked = 1;
-		if (*application && strlen(application) < sizeof(discord.application))
+		/* (an application's id is digits: it goes into a file's path and
+		the handshake's JSON) */
+		if (*application && strlen(application) < sizeof(discord.application) &&
+			strspn(application, "0123456789") == strlen(application))
 		{
 			char scheme[48];
 
