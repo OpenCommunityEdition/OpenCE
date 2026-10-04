@@ -498,6 +498,8 @@ static void service_doorbell(struct host_vcpu *vcpu)
 		host_fatal("doorbell %u has no import (built images out of step?)", (unsigned)index);
 	registers_load(vcpu, &registers);
 	host_vcpu_dispatch_begin(&registers);
+	host_logf(HOST_LOG_INFO, "doorbell %u (%s) x0=%x x1=%x x2=%x", (unsigned)index,
+		host_import_table[index].name, registers.x[0], registers.x[1], registers.x[2]);
 	host_import_table[index].function(); /* reads/writes the registers */
 	/* (the wrapper got them through host_vcpu_registers()) */
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_PC, vcpu->pc_after_exit);
@@ -550,10 +552,37 @@ static void run_until_stops(struct host_vcpu *vcpu)
 					return;
 				continue;
 			}
-			host_fatal("guest exception: syndrome %llx at guest %llx (pc %llx)",
+		{
+			struct guest_registers registers;
+
+			registers_load(vcpu, &registers);
+			host_logf(HOST_LOG_ERROR, "guest exception: syndrome %llx at guest %llx (pc %llx)",
 				(unsigned long long)vcpu->exit->exception.syndrome,
 				(unsigned long long)vcpu->exit->exception.physical_address,
 				(unsigned long long)vcpu->pc_after_exit);
+			host_logf(HOST_LOG_ERROR, "  x30 %x sp %x x29(fp) %x x17 %x x16 %x x0 %x",
+				registers.x[30], registers.sp, registers.x[29], registers.x[17], registers.x[16], registers.x[0]);
+			{
+				uint32_t fp = registers.x[29];
+				int depth;
+
+				for (depth = 0; depth < 12 && fp; depth++)
+				{
+					uint8_t *frame = host_guest_pointer(fp);
+					uint32_t next, pc;
+
+					if (!frame)
+						break;
+					memcpy(&next, frame, 4);
+					memcpy(&pc, frame + 8, 4);
+					host_logf(HOST_LOG_ERROR, "  frame %d: return %x", depth, pc);
+					if (!next || next <= fp)
+						break;
+					fp = next;
+				}
+			}
+			host_fatal("guest exception (see debug.txt)");
+		}
 		}
 		if (vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
 			return;
