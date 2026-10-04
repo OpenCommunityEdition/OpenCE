@@ -704,6 +704,15 @@ short local_player_count(
 	return players_globals->local_player_count;
 }
 
+/* port: local_player_count, 0 before the players' globals are made (the
+input's first polls ask it: port/linux/game/menu_functions.c's
+pc_menu_split_players) */
+short players_port_local_player_count(
+	void)
+{
+	return players_globals ? players_globals->local_player_count : 0;
+}
+
 short local_player_get_next(
 	short local_player_index)
 {

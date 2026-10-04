@@ -342,6 +342,8 @@ static char const *const port_function_names[] =
 	"port setup edit",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
+	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
+	"port lobby player list initialize", "port lobby player choose",
 	/* (the gametype editor's: the Xbox's walk their rows by place, which the
 	PC version's screens changed) */
 	"mp profile begin editing", "mp profile save changes", "request del playlist profile", "final del playlist profile",

@@ -54,9 +54,9 @@ drive the controller.
 
 /* main/console.c */
 extern unsigned char console_is_active(void);
-/* port/linux/game/menu_functions.c: two players on this machine (the
-campaign's co-op) */
-extern unsigned char pc_menu_coop_players(void);
+/* port/linux/game/menu_functions.c: two or more players on this machine
+(co-op, or split screen in a network game) */
+extern unsigned char pc_menu_split_players(void);
 
 /* ---------- device tables */
 
@@ -637,13 +637,43 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 	return found;
 }
 
+/* whether one gamepad is port 1's (port_gamepad) */
+static BOOL lone_gamepad_split;
+
+/* no button of the gamepad held, its sticks and triggers at rest */
+static BOOL gamepad_idle(SDL_Gamepad *gamepad)
+{
+	int index;
+
+	for (index = 0; index < SDL_GAMEPAD_BUTTON_COUNT; index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)index))
+			return FALSE;
+	}
+	for (index = 0; index < SDL_GAMEPAD_AXIS_COUNT; index++)
+	{
+		if (abs(SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)index)) > 8000)
+			return FALSE;
+	}
+	return TRUE;
+}
+
 /* the gamepad of a port: the first shares port 0 with the keyboard, but for
-two players with one gamepad (co-op), port 1 has it (the keyboard's player
-is 1, the gamepad's 2) */
+two or more players with one gamepad (co-op, split screen), port 1 has it
+(the keyboard's player is 1, the gamepad's 2). It changes port only at rest:
+a button held across the change would be pressed again on the other port
+(the B that leaves a profile screen leaving the game as player 1's) */
 static SDL_Gamepad *port_gamepad(SDL_Gamepad *gamepads[PORT_COUNT], int count, int port)
 {
-	if (count == 1 && pc_menu_coop_players())
-		return port == 1 ? gamepads[0] : NULL;
+	if (count == 1)
+	{
+		BOOL split = pc_menu_split_players() != 0;
+
+		if (split != lone_gamepad_split && gamepad_idle(gamepads[0]))
+			lone_gamepad_split = split;
+		if (lone_gamepad_split)
+			return port == 1 ? gamepads[0] : NULL;
+	}
 	return port < count ? gamepads[port] : NULL;
 }
 
