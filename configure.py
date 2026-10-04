@@ -91,6 +91,12 @@ parser.add_argument(
     help="clang (with the arm64_32 target) for `ninja linux_arm64`, the 64-bit ARM Linux build (default: clang)",
 )
 parser.add_argument(
+    "--linux-arm64-gl",
+    choices=["gles", "desktop"],
+    default="gles",
+    help="the renderer of `ninja linux_arm64`: OpenGL ES 3 (the default, as on Android) or desktop OpenGL 4.5",
+)
+parser.add_argument(
     "--web-emcc",
     type=str,
     help="Emscripten's emcc for `ninja web` (default: emcc on the PATH, then EMSDK's or ~/emsdk's)",
@@ -115,6 +121,7 @@ sln = SimpleNamespace(
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
     linux_arm64_cc=args.linux_arm64_cc,
+    linux_arm64_gl=args.linux_arm64_gl,
     web_emcc=args.web_emcc,
 )
 
