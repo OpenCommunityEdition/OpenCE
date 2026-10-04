@@ -787,14 +787,10 @@ static int controller_port(HANDLE device)
 	return -1;
 }
 
-/**
- * @brief Reads a controller's state. For port 0 the keyboard, the mouse,
- * the debug input and the touchscreen are merged into the first gamepad's.
- * Runs on the game's main thread (touch_input_gamepad relies on it).
- * @param device the controller's handle
- * @param state receives the state (cleared first)
- * @return ERROR_SUCCESS, or ERROR_DEVICE_NOT_CONNECTED for an unknown port
- */
+/* reads a controller's state; for port 0 the keyboard, mouse, debug input
+and touchscreen are merged into the first gamepad's; runs on the game's main
+thread (touch_input_gamepad relies on it); returns ERROR_SUCCESS or
+ERROR_DEVICE_NOT_CONNECTED for an unknown port */
 DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 {
 	int port = controller_port(device);

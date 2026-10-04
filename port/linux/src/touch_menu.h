@@ -82,65 +82,31 @@ struct touch_menu
 	struct touch_menu_output output;
 };
 
-/**
- * @brief Prepares a menu pointer; the settings are copied.
- * @param menu the state to set up (all of it is cleared)
- * @param settings the gesture sizes, in pixels, and the steps a read
- */
+/* prepares a menu pointer; the state is cleared and settings are copied */
 void touch_menu_init(struct touch_menu *menu, const struct touch_menu_settings *settings);
 
-/**
- * @brief Forgets the finger, the pending steps and the unread taps but
- * keeps the settings: what a finger began before a menu opened or closed
- * must not act in the other one.
- * @param menu the state to clear
- */
+/* forgets the finger, pending steps and taps but keeps settings: what a
+finger began before a menu opened or closed must not act in the other one */
 void touch_menu_reset(struct touch_menu *menu);
 
-/**
- * @brief A finger went down. A second finger is ignored while one is
- * down. The steps still waiting are dropped, so that a tap hits what the
- * finger sees on a list still scrolling. The down is counted and its point
- * kept for the next read (downs, down_x, down_y), even when the finger goes
- * on to scroll.
- * @param menu the state
- * @param finger the finger's id
- * @param x,y where it went down, in pixels
- */
+/* a finger went down; a second finger is ignored, and pending steps are
+dropped so a tap hits what the finger sees on a list still scrolling */
 void touch_menu_down(struct touch_menu *menu, unsigned long long finger, float x, float y);
 
-/**
- * @brief The finger moved. Once it is further than the slop it scrolls;
- * the steps count from the slop's edge, so that the slop is not a step
- * and a fast first sample is not lost.
- * @param menu the state
- * @param finger the finger's id; other fingers are ignored
- * @param x,y where it is, in pixels
- */
+/* the finger moved; once further than the slop it scrolls, with steps
+counted from the slop's edge so the slop is not a step and a fast first
+sample is not lost */
 void touch_menu_move(struct touch_menu *menu, unsigned long long finger, float x, float y);
 
-/**
- * @brief The finger went up: a tap if it never scrolled, at the place
- * where it went down.
- * @param menu the state
- * @param finger the finger's id; other fingers are ignored
- * @param x,y where it went up, in pixels (the last part of a drag counts)
- */
+/* the finger went up; a tap if it never scrolled, at the place where it
+went down (the last part of a drag counts) */
 void touch_menu_up(struct touch_menu *menu, unsigned long long finger, float x, float y);
 
-/**
- * @brief The system took the touch away: the gesture neither taps nor
- * scrolls.
- * @param menu the state
- */
+/* the system took the touch away: the gesture neither taps nor scrolls */
 void touch_menu_cancel(struct touch_menu *menu);
 
-/**
- * @brief Hands out what happened since the last read. At most
- * steps_per_read wheel steps come out; the rest waits for the next reads.
- * @param menu the state
- * @param output receives the pointer, the taps and the wheel steps
- */
+/* hands out what happened since the last read; at most steps_per_read
+wheel steps come out; the rest waits for the next read */
 void touch_menu_read(struct touch_menu *menu, struct touch_menu_output *output);
 
 #endif

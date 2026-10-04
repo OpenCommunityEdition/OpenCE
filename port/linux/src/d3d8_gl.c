@@ -1151,14 +1151,10 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 
 /* ---------- the menus' pointer */
 
-/**
- * @brief Turns a point in the window, as SDL reports it, into the menus'
- * coordinates: the inverse of the letterboxed display blit at presentation,
- * the screen's width and the menus' centering (halo_screen_ui_offset).
- * @param window_x,window_y the point, in the window's units
- * @param x,y receive the point in 640x480 menu units; -1 if there is no
- * back buffer or window yet
- */
+/* a point in the window, as SDL reports it, in the menus' coordinates: the
+inverse of the letterboxed display blit at presentation, the screen's
+width and the menus' centering (halo_screen_ui_offset); x and y are -1 if
+there is no back buffer or window yet */
 static void ui_point_from_window(float window_x, float window_y, short *x, short *y)
 {
 	struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);

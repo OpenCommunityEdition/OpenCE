@@ -37,12 +37,8 @@ game must see the press */
 static int skip_polls;
 #define TOUCH_PRESS_POLLS 2
 
-/**
- * @brief The pixels in a dp: Android's densityDpi / 160, or else a guess
- * from the height.
- * @return pixels a dp; 0 while neither is known (the window does not exist
- * yet)
- */
+/* returns pixels per dp; 0 only while neither the density
+(HALO_DISPLAY_DENSITY) nor the window's size is known */
 static float pixels_per_dp(void)
 {
 	const char *density = getenv("HALO_DISPLAY_DENSITY");
@@ -55,10 +51,7 @@ static float pixels_per_dp(void)
 	return height > 0 ? (float)height / 360.0f : 0.0f;
 }
 
-/**
- * @brief Sets the gestures' sizes up, once they can be known; until then a
- * dp is a pixel, there are no gesture zones and the next call tries again.
- */
+/* sets up gesture sizes once they can be known; tries again until they are */
 static void menu_setup(void)
 {
 	if (!menu_ready)
@@ -81,14 +74,8 @@ static void menu_setup(void)
 	}
 }
 
-/**
- * @brief Brings the gesture zones and the window's size up to date. It runs
- * at every finger down, not once at startup: the phone rotates after the app
- * has started, and the insets of the portrait screen would stay. The zones
- * matter only at a down, so changing them between two fingers is safe.
- * Without Android's insets (desktop) there are no zones.
- * @param width,height the window's size in pixels
- */
+/* updates gesture zones at every finger down: the phone rotates after startup
+and zones matter only at a down, so changing them between two fingers is safe */
 static void refresh_zones(int width, int height)
 {
 #ifdef HALO_ANDROID

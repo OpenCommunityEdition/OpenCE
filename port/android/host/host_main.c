@@ -136,16 +136,13 @@ struct environment
 	int count;
 };
 
-/**
- * @brief Asks the activity for Android's system gesture insets, in pixels
- * (HaloActivity.getSystemGestureInsetsPixels). The guest calls it at every
- * finger down: the insets change when the phone rotates. The method is
- * found on the activity's own class: the game's native thread has the
- * system's class loader, which does not know the app's classes. A change is
- * logged, so that the log shows the value the game works with.
- * @param insets receives left, top, right, bottom; all 0 on any failure (the
- * touch controls then use the whole screen)
- */
+/* asks the activity for Android's system gesture insets via JNI
+(HaloActivity.getSystemGestureInsetsPixels); the guest calls it at every
+finger down because the insets change when the phone rotates; the method is
+found on the activity's own class because the game's native thread has the
+system's class loader, which does not know the app's classes; a change is
+logged so the log shows the value the game works with; all 0 on any failure
+(the touch controls then use the whole screen) */
 void host_gesture_insets(int *insets)
 {
 	static int logged[4] = { -1, -1, -1, -1 };
@@ -283,13 +280,9 @@ static uint32_t make_boot(const struct environment *environment)
 
 #define MAIN_STACK_SIZE (16 * 1024 * 1024)
 
-/**
- * @brief The thread that runs the game: passes the display and its density,
- * the time zone and the data and save folders to the guest through its
- * environment, and runs the guest's main.
- * @param unused the thread argument, not used
- * @return never returns normally
- */
+/* the thread that runs the game: passes the display and its density, the
+time zone and the data and save folders to the guest through its
+environment, and runs the guest's main; never returns normally */
 static void *game_main(void *unused)
 {
 	struct environment environment = { { 0 }, 0 };

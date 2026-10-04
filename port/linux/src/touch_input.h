@@ -17,36 +17,22 @@ on the game's main thread: a call from any other thread needs the lock.
 
 #include <SDL3/SDL_events.h>
 
-/**
- * @brief Feeds one finger event to the menus' pointer.
- * @param type SDL_EVENT_FINGER_DOWN, _MOTION, _UP or _CANCELED
- * @param finger the event; its x and y are 0..1 of the window
- */
+/* feeds one finger event to the menus' pointer; x and y are 0..1 of the window */
 void touch_input_event(unsigned int type, const SDL_TouchFingerEvent *finger);
 
-/**
- * @brief The window lost the focus: every touch ends without effect.
- */
+/* the window lost the focus: every touch ends without effect */
 void touch_input_cancel(void);
 
-/**
- * @brief Says whether the menus' pointer is used (a menu is up). Any
- * touch in progress is dropped, so that it does not act in the other mode.
- * @param active nonzero while a menu is up
- */
+/* sets whether the menus' pointer is used (a menu is up); any touch in
+progress is dropped so it does not act in the other mode */
 void touch_input_menu_set_active(int active);
 
-/**
- * @brief What the fingers did in the menus since the last read.
- * @param pointer receives the taps and the wheel steps; marked as touch
- */
+/* reads what the fingers did in the menus since the last read; pointer is
+marked as touch */
 void touch_input_menu_read(struct platform_ui_pointer *pointer);
 
-/**
- * @brief Adds the touch controls to controller 1's state. Outside the menus
- * a tap presses A for a few polls when a cinematic can be skipped.
- * @param pad the state XInputGetState is about to return
- */
+/* adds the touch controls to the gamepad state; outside the menus a tap
+presses A for a few polls when a cinematic can be skipped */
 void touch_input_gamepad(XINPUT_GAMEPAD *pad);
 
 #endif

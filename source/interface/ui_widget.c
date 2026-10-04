@@ -5538,10 +5538,8 @@ static long ui_debug_frame, ui_debug_click_frame;
 void platform_log(char const *format, ...);
 int config_boolean(char const *name);
 
-/**
- * @brief Whether debug.touch_targets is on. Read once: the settings do not
- * change while the game runs.
- */
+/* whether debug.touch_targets is on; read once: settings do not change
+while the game runs */
 static boolean ui_debug_targets_enabled(
 	void)
 {
@@ -5553,13 +5551,10 @@ static boolean ui_debug_targets_enabled(
 	return enabled != 0;
 }
 
-/**
- * @brief Outlines a rectangle, 2 menu pixels thick, with the game's own quad
- * drawing, in the menus' coordinates (the caller has the menus' centering
- * offset on).
- * @param bounds the rectangle to outline, in menu coordinates
- * @param color the outline's ARGB color
- */
+/* outlines a rectangle, 2 menu pixels thick, in menu coordinates; the
+caller has the menus' centering offset on (render.c sets
+halo_screen_ui_offset(TRUE) around it; adding the offset inside would
+double it) */
 static void ui_debug_draw_outline(
 	rectangle2d const *bounds,
 	pixel32 color)
@@ -5582,12 +5577,7 @@ static void ui_debug_draw_outline(
 	return;
 }
 
-/**
- * @brief Draws a cross of about 8 menu pixels at a mark that is still
- * within its 3 seconds.
- * @param mark the remembered point and when it happened
- * @param color the cross's ARGB color
- */
+/* draws a cross of about 8 menu pixels at a mark that is still within its 3 seconds */
 static void ui_debug_draw_mark(
 	struct ui_debug_mark const *mark,
 	pixel32 color)
@@ -5613,14 +5603,10 @@ static void ui_debug_draw_mark(
 	return;
 }
 
-/**
- * @brief Outlines the targets the pointer code collected this frame (or
- * the virtual keyboard's keys while it is up), and the last finger-down and
- * tap points. Only for the render that notes the targets (the first
- * player's): a split-screen viewport that is not hit-tested shows nothing,
- * or it would show outlines that no tap uses.
- * @param first_players_render whether this render is the one that notes targets
- */
+/* outlines the targets the pointer code collected this frame and the last
+finger-down and tap points; only for the render that notes the targets
+(the first player's): a split-screen viewport that is not hit-tested shows
+nothing or it would show outlines that no tap uses */
 static void ui_debug_draw_targets(
 	boolean first_players_render)
 {
@@ -5654,13 +5640,8 @@ static void ui_debug_draw_targets(
 	return;
 }
 
-/**
- * @brief Remembers a finger-down or tap point for the debug view, to show
- * it for 3 seconds.
- * @param mark receives the point and the time
- * @param x horizontal position, in menu coordinates
- * @param y vertical position, in menu coordinates
- */
+/* remembers a finger-down or tap point for the debug view, to show it
+for 3 seconds */
 static void ui_debug_set_mark(
 	struct ui_debug_mark *mark,
 	short x,
@@ -5784,13 +5765,8 @@ static boolean ui_mouse_widget_is_item(
 		widget->type == _ui_widget_type_column_list;
 }
 
-/**
- * @brief Notes a target that steps a list by one, unless it is empty or the
- * targets are full.
- * @param widget the list the target steps
- * @param bounds where the target is, render offset included
- * @param kind _ui_mouse_target_list_back or _ui_mouse_target_list_forward
- */
+/* notes a target that steps a list by one, unless it is empty or the
+targets are full */
 static void ui_mouse_note_list_step(
 	struct widget_instance *widget,
 	rectangle2d const *bounds,
@@ -5821,27 +5797,15 @@ static void ui_mouse_note_list_step(
 	return;
 }
 
-/**
- * @brief Notes the band that steps a list showing several items side by
- * side: the band of the slots' rows (from the top of the highest slot to
- * the bottom of the lowest) left of the first slot, which steps back, and
- * right of the last, which steps forward, out to the list's own bounds.
- *
- * A stock several-items list (the map list, the profile slots) covers the
- * whole 640x480 screen, so a tap anywhere beside its slots cannot mean
- * "step": the band is limited to the slots' rows, and a tap on the title,
- * between slots or under them does nothing. The caller notes nothing for
- * the list itself, and widget_instance_render_recursive notes the slots
- * after this; ui_mouse_target_at takes the last target noted under a point,
- * so a slot would win over the band, which never covers one anyway. A list
- * the d-pad steps up and down has no side to tap and gets no band (no stock
- * list does).
- *
- * @param widget the list
- * @param definition its definition
- * @param offset the render offset, the list's own offset included (as
- * ui_mouse_note_target gets it)
- */
+/* notes the band that steps a list showing several items side by side:
+left of the first slot (steps back), right of the last (steps forward). A
+stock several-items list covers the whole 640x480 screen, so a tap beside
+its slots cannot mean "step"; the band is limited to the slots' rows, and a
+tap on the title, between slots or under them does nothing. The caller notes
+nothing for the list itself, and widget_instance_render_recursive notes the
+slots after this; ui_mouse_target_at takes the last target noted under a
+point, so a slot would win over the band. A list the d-pad steps up and down
+has no side to tap and gets no band */
 static void ui_mouse_note_slot_band(
 	struct widget_instance *widget,
 	struct ui_widget_definition const *definition,
@@ -5896,15 +5860,10 @@ static void ui_mouse_note_slot_band(
 	return;
 }
 
-/**
- * @brief Notes a widget as a tap target of this frame, if it is one: an
- * item, a value, a list slot, or a legend button (kept in parts, which
- * ui_mouse_fit_button_targets settles into the tap area). A list showing
- * several items notes the band beside its slots (ui_mouse_note_slot_band).
- * @param widget the widget being rendered
- * @param definition the widget's definition
- * @param offset where the widget's parent is drawn, in menu coordinates
- */
+/* notes a widget as a tap target of this frame, if it is one: an item,
+a value, a list slot, or a legend button (kept in parts that
+ui_mouse_fit_button_targets settles into the tap area); a list showing
+several items notes the band beside its slots */
 static void ui_mouse_note_target(
 	struct widget_instance *widget,
 	struct ui_widget_definition const *definition,
@@ -6013,21 +5972,16 @@ static void ui_mouse_note_target(
 	return;
 }
 
-/**
- * @brief Makes a setting row its value: an item whose only value child is a
- * value stops being a target, and the value takes the row's height. The row
- * is where the thin value box sits among a label and empty space, and a tap
- * anywhere else on it would press A on the row, which on a setting screen
- * is ACCEPT. The value keeps its width, and so its left half / right half
- * rule. Only the value's parent is the row: that is how the controller and
- * gametype screens nest them (op_* row, *_spinner child). An item holding
- * several values (a panel, a list of spinners) is not a row: it and its
- * values keep their own areas, since growing each value to the item's height
- * would pile up boxes of which only the last noted could be tapped.
- * Runs after ui_mouse_fit_button_targets so that the legends are fitted
- * against the whole row, as before: a legend growing up into a row's label
- * area would press ACCEPT there.
- */
+/* makes a setting row its value: an item whose only value child is a value
+stops being a target, and the value takes the row's height. A tap anywhere
+else on the row would press A, which on a setting screen is ACCEPT. The
+value keeps its width and left/right half rule. Only the value's parent is
+the row; an item holding several values (a panel, a list of spinners) is not
+a row and keeps its own area. Only exactly one value merges because growing
+several values to the item's height would pile up boxes of which only the
+last noted could be tapped. Runs after ui_mouse_fit_button_targets so the
+legends are fitted against the whole row: a legend growing up into a row's
+label area would press ACCEPT there */
 static void ui_mouse_merge_setting_rows(
 	void)
 {
@@ -6071,19 +6025,17 @@ static void ui_mouse_merge_setting_rows(
 	return;
 }
 
-/**
- * @brief Doubles the width of each value (a setting), around its centre: its
- * arrows are small for a finger. Each half grows outward by half the box's
- * width. A box is not held to its row (the last arrow of a row sits near
- * the row's end), but stops at the edge of a non-button target beside it
- * that it overlaps vertically, at the midpoint of the gap to another value
- * facing it (so neither takes the other's room, whatever the order they
- * were noted in: every measure is against the boxes as noted, not as already
- * widened), and at the menu's drawable area. A box never shrinks. Where a
- * limit holds one side back, the split between previous and next stays at
- * the original centre, where the arrows are. Runs after
- * ui_mouse_merge_setting_rows, once the rows have gone, and once a frame.
- */
+/* doubles the width of each value (a setting) around its centre: its arrows
+are small for a finger. Each half grows outward by half the box's width.
+The noted[] snapshot holds the boxes as noted; every measure is against them,
+not as already widened, so two neighbours never take each other's room
+whatever the order they were noted in. A box is not held to its row (the
+last arrow of a row sits near the row's end) but stops at the edge of a
+non-button target beside it that it overlaps vertically, at the midpoint of
+the gap to another value facing it, and at the menu's drawable area. A box
+never shrinks. Where a limit holds one side back, the split between previous
+and next stays at the original centre where the arrows are. Runs after
+ui_mouse_merge_setting_rows, once the rows have gone, and once a frame */
 static void ui_mouse_widen_values(
 	void)
 {
@@ -6131,13 +6083,9 @@ static void ui_mouse_widen_values(
 	return;
 }
 
-/**
- * @brief The right edge of a legend label's text as the game draws it, or
- * NONE when it cannot be measured (no text, no font, or icons in the string,
- * which the measuring does not account for).
- * @param label the label's text box widget
- * @param label_bounds the text box's bounds where it is drawn, in menu coordinates
- */
+/* the right edge of a legend label's text as the game draws it, or NONE
+when it cannot be measured (no text, no font, or icons in the string, which
+the measuring does not account for) */
 static short ui_mouse_label_text_right(
 	struct widget_instance *label,
 	rectangle2d const *label_bounds)
@@ -6170,16 +6118,12 @@ static short ui_mouse_label_text_right(
 	return text_bounds.x1 == SHORT_MIN ? NONE : text_bounds.x1;
 }
 
-/**
- * @brief Settles the areas of the frame's legend buttons: each reaches its
- * label's drawn text (the text box can be far wider than the text, and would
- * cover the next legend), stops before the next legend's icon on its row,
- * and, for a touchscreen only, grows up to 8 units upward (not past an item,
- * value or list slot above it) and in the screen's bottom strip runs down to
- * the screen's edge (not past an item, value or list slot below it).
- * Recomputed from the parts kept at noting, so running it
- * again changes nothing.
- */
+/* settles the areas of the frame's legend buttons: each reaches its label's
+drawn text (the text box can be far wider), stops before the next legend's
+icon on its row, and for a touchscreen only grows up to 8 units upward (not
+past an item, value or list slot above it) and in the screen's bottom strip
+runs down to the screen's edge (not past an item, value or list slot below
+it); recomputed from the parts kept at noting, so running again changes nothing */
 static void ui_mouse_fit_button_targets(
 	void)
 {
@@ -6370,19 +6314,11 @@ static void ui_mouse_step_list_to_slot(
 	return;
 }
 
-/**
- * @brief The widget the wheel steps: the innermost on the focus's way that
- * the d-pad steps through.
- *
- * A touch drag skips a list showing one value at a time (a setting): it
- * moves between the rows, around the setting, so a drag never changes a
- * value; that takes a tap on one of its halves. The desktop wheel keeps the
- * game's own d-pad reach and steps a setting's value.
- *
- * @param root the menu
- * @param skip_settings TRUE for a touch drag
- * @return the widget, or NULL when none takes the d-pad
- */
+/* the widget the wheel steps: the innermost on the focus's way that the
+d-pad steps through; a touch drag skips a list showing one value at a time
+(a setting), moving between the rows, so a drag never changes a value; that
+takes a tap on one of its halves; the desktop wheel keeps the game's own
+d-pad reach and steps a setting's value */
 static struct widget_instance *ui_mouse_wheel_widget(
 	struct widget_instance *root,
 	boolean skip_settings)
@@ -6408,16 +6344,10 @@ static struct widget_instance *ui_mouse_wheel_widget(
 	return result;
 }
 
-/**
- * @brief Whether the focus passes over a child of a list, which gives a
- * press no place to land. The PC version's lists skip their labels and
- * hidden rows (widget_instance_port_is_label) at both ends and wrap past
- * them, so counting one would let a drag step past the last usable row.
- *
- * @param list the list the child is in
- * @param child the child
- * @return TRUE if the PC list's focus skips the child
- */
+/* whether the focus passes over a child of a list, which gives a press no
+place to land; the PC version's lists skip their labels and hidden rows
+(widget_instance_port_is_label) at both ends and wrap past them, so
+counting one would let a drag step past the last usable row */
 static boolean ui_mouse_wheel_skips_child(
 	struct widget_instance *list,
 	struct widget_instance *child)
@@ -6426,25 +6356,13 @@ static boolean ui_mouse_wheel_skips_child(
 		widget_instance_port_is_label(child);
 }
 
-/**
- * @brief How many presses of a d-pad button can step the focus before it
- * would wrap around to the other end.
- *
- * The game's lists wrap (widget_event_function_list_widget_goto_next_item
- * and _previous_item, and widget_instance_tab_to_next_valid_widget and
- * _previous_), so a long touch drag would lap a short list and stop
- * anywhere: the drag stops at the ends. The press goes down from the
- * screen to the first widget on the focus's way that tabs in its direction
- * (widget_instance_process_one_event_recursive), and the ends are that
- * widget's.
- *
- * @param root the menu
- * @param button the d-pad button that would be pressed
- * @param forward TRUE to count toward the end after the focus, FALSE toward
- * the start
- * @return the presses that step before the end, 0 at the end or for a
- * setting (changed by clicks only), NONE when no widget tabs that way
- */
+/* how many presses of a d-pad button can step the focus before it would
+wrap around to the other end; the game's lists wrap, so a long touch drag
+would lap a short list: the drag stops at the ends; the press goes down from
+the screen to the first widget on the focus's way that tabs in its direction
+(widget_instance_process_one_event_recursive), and the ends are that
+widget's; 0 at the end or for a setting (changed by clicks only), NONE when
+no widget tabs that way */
 static long ui_mouse_wheel_room(
 	struct widget_instance *root,
 	short button,
@@ -6562,19 +6480,12 @@ static boolean ui_mouse_selection_row(
 		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
 }
 
-/**
- * @brief Logs a tap the menus resolved: where it was and the target the
- * click acts on. A click waits for the presses the mouse queued (a list
- * slot's hover steps the list first), so it is resolved against the
- * targets of a later frame than the one the tap arrived in; the frames
- * between are logged so the target can be read against the screen that
- * showed then. A value's line also gives the point where it splits into
- * previous and next.
- * @param x horizontal position of the tap, in menu coordinates
- * @param y vertical position of the tap, in menu coordinates
- * @param target what the click acts on, or NULL for none
- * @param frames frames between the tap's arrival and its resolution
- */
+/* logs a tap the menus resolved: where it was and the target the click acts
+on; a click waits for the presses the mouse queued, so it is resolved
+against the targets of a later frame than the one the tap arrived in; the
+frames between are logged so the target can be read against the screen that
+showed then; a value's line also gives the point where it splits into
+previous and next */
 static void ui_debug_log_click(
 	short x,
 	short y,
@@ -6612,14 +6523,7 @@ static void ui_debug_log_click(
 	return;
 }
 
-/**
- * @brief Logs a tap while the virtual keyboard is up: the key or legend
- * that took it.
- * @param x horizontal position of the tap, in menu coordinates
- * @param y vertical position of the tap, in menu coordinates
- * @param hit what virtual_keyboard_click matched (an index into
- * virtual_keyboard_target_rectangles), or NONE
- */
+/* logs a tap while the virtual keyboard is up: the key or legend that took it */
 static void ui_debug_log_keyboard_tap(
 	short x,
 	short y,
@@ -6642,23 +6546,18 @@ static void ui_debug_log_keyboard_tap(
 	return;
 }
 
-/**
- * @brief Turns the pointer's motion, clicks and wheel since the last frame
- * into the first player's controller events. While the virtual keyboard is
- * up it gets the clicks and the menu behind gets nothing. A touch drag
- * stops at the list's ends and skips settings (ui_mouse_wheel_widget,
- * ui_mouse_wheel_room); the desktop wheel wraps as the d-pad does. It
- * records whether the pointer read is the touchscreen
- * (ui_mouse_pointer_is_touch), because the legends' taller tap areas are
- * for a finger only (ui_mouse_fit_button_targets). With debug.touch_targets
- * on it also notes the finger-down and tap points for the debug view, and
- * logs each tap: a menu click where it is resolved, a keyboard click where
- * it is taken. A click on the band beside a list's slots steps the list
- * by one; hovering it does nothing. A PC list's row (ui_mouse_selection_row)
- * is selected by its first click and used by a click on the selected row,
- * a finger's as well as the mouse's. It forgets the frame's targets at the
- * end, so that the next frame's render notes and settles them anew.
- */
+/* turns the pointer's motion, clicks and wheel since the last frame into the
+first player's controller events; while the virtual keyboard is up it gets
+the clicks and the menu behind gets nothing; a touch drag stops at the list's
+ends and skips settings; the desktop wheel wraps as the d-pad does; it
+records whether the pointer read is the touchscreen because the legends'
+taller tap areas are for a finger only; with debug.touch_targets on it also
+notes the finger-down and tap points for the debug view, and logs each tap: a
+menu click where it is resolved, a keyboard click where it is taken; a click
+on the band beside a list's slots steps the list by one; a PC list's row is
+selected by its first click and used by a click on the selected row; it
+forgets the frame's targets at the end, so that the next frame's render notes
+and settles them anew */
 static void ui_widgets_process_mouse(
 	void)
 {
@@ -6727,9 +6626,9 @@ static void ui_widgets_process_mouse(
 
 			if (widget)
 				ui_mouse_list_directions(widget, &back, &forward);
-			/* a PC screen's button bar steps sideways only, and the d-pad's up
-			and down pass over it to the list that holds it, so a touch drag
-			leaves the bar the same way */
+			/* a sideways PC widget (typically a screen's button bar) steps
+			sideways only, and the d-pad's up and down pass over it to a widget
+			above it on the focus's way, so a touch drag leaves it the same way */
 			if (touch && widget && back == _widget_event_dpad_left && pc_menu_tag(widget->definition_tag_index) &&
 				ui_mouse_wheel_room(ui_mouse_menu(), _widget_event_dpad_up, FALSE) != NONE)
 			{
@@ -7128,14 +7027,10 @@ void render_ui_widgets_postgame(
 	return;
 }
 
-/**
- * @brief Renders the active widgets for one local player's viewport (or the
- * whole screen), noting and settling the first player's tap targets in the
- * frame's first render that can (ui_mouse_targets_settled), and draws the
- * debug view of the targets and the virtual keyboard when they are up.
- * @param local_player_index the viewport's player, or NONE for the whole screen
- * @param window_bounds the viewport's bounds on the screen
- */
+/* renders the active widgets for one local player's viewport (or the whole
+screen), noting and settling the first player's tap targets in the frame's
+first render that can, and draws the debug view of the targets and the
+virtual keyboard when they are up */
 void render_ui_widgets(
 	short local_player_index,
 	rectangle2d const *window_bounds)
@@ -7238,6 +7133,9 @@ void render_ui_widgets(
 		}
 		if (first_players_render && !ui_mouse_targets_settled)
 		{
+			/* fit the legends while the rows are still targets (merging
+			removes them); widen after merging (the merged values are
+			row-tall) */
 			ui_mouse_fit_button_targets();
 			ui_mouse_merge_setting_rows();
 			ui_mouse_widen_values();

@@ -32,15 +32,10 @@ struct halo_ui_pointer
 	short down_x, down_y;
 };
 
-/**
- * @brief Gives the menus the pointer. Frees the mouse for the menus while
- * menus_active and captures it again for aiming when not (the
- * touchscreen: taps and drags go to the menus while menus_active).
- * @param menus_active nonzero while a menu is up
- * @param pointer receives what the pointer did since the last call, in the
- * menus' 640x480 coordinates
- * @return nonzero while menus are active and the pointer could be read
- */
+/* gives the menus the pointer; frees the mouse for the menus while
+menus_active and captures it for aiming when not (touchscreen: taps and
+drags go to the menus while menus_active); returns nonzero while menus are
+active and the pointer could be read */
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer);
 
 #endif

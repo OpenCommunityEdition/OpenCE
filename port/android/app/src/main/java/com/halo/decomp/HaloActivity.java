@@ -20,9 +20,9 @@ public class HaloActivity extends SDLActivity {
     /** lets system link's broadcasts in over Wi-Fi while the game runs */
     private WifiManager.MulticastLock multicastLock;
     /**
-     * The latest system gesture insets {left, top, right, bottom}, in pixels
-     * of the current orientation. Written on the UI thread, read by the
-     * game's thread: replaced as a whole, never changed in place.
+     * the latest system gesture insets {left, top, right, bottom}, in pixels;
+     * written on the UI thread, read by the game's thread: replaced as a
+     * whole, never changed in place
      */
     private volatile int[] gestureInsets = new int[] { 0, 0, 0, 0 };
 
@@ -51,11 +51,11 @@ public class HaloActivity extends SDLActivity {
     }
 
     /**
-     * Keeps gestureInsets current. Android sends the insets again when the
-     * activity rotates, which happens after the game's native code has
-     * started on a phone launched from portrait, so a single read at startup
-     * would keep the portrait values. The listener hands the insets on, so
-     * that SDL's own handling (on its surface) still sees them.
+     * keeps gestureInsets current; Android sends the insets again when the
+     * activity rotates (after the game's native code has started on a phone
+     * launched from portrait), so a single read at startup would keep the
+     * portrait values; the listener hands the insets on so SDL's own
+     * handling still sees them
      */
     private void trackGestureInsets() {
         getWindow().getDecorView().setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
@@ -81,15 +81,16 @@ public class HaloActivity extends SDLActivity {
     }
 
     /**
-     * The edges of the screen where Android keeps its gestures. In sticky
+     * the edges of the screen where Android keeps its gestures; in sticky
      * full screen the first swipe from an edge only shows the system bars,
-     * and Android hands that swipe to the game as an ordinary finger, so the
-     * game (port/linux/src/touch_input.c) must ignore touches that begin
-     * there. The game's thread calls this through JNI at every finger down.
-     *
-     * @return a copy of {left, top, right, bottom} in pixels; all 0 before
-     *         Android 10, which has no such insets, and until the first
-     *         insets arrive
+     * and Android hands that swipe to the game as an ordinary finger, so
+     * the game (port/linux/src/touch_input.c) must ignore touches that
+     * begin there; returns a copy of {left, top, right, bottom} in pixels:
+     * all 0 before Android 10 (which has no insets) and until the first
+     * insets arrive. The game's native code calls this through JNI by name
+     * and signature (host_main.c GetMethodID(...,
+     * "getSystemGestureInsetsPixels", "()[I")), at every finger down, so
+     * it must not be renamed, retyped or removed as unused
      */
     public int[] getSystemGestureInsetsPixels() {
         return gestureInsets.clone();

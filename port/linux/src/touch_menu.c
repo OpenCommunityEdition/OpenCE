@@ -22,14 +22,8 @@ void touch_menu_reset(struct touch_menu *menu)
 	touch_menu_init(menu, &settings);
 }
 
-/**
- * @brief Whether x is in the left or right gesture zone: [0, edge_left) and
- * [width - edge_right, width). A zone with no inset does not exist (x at the
- * window's edge is not in it), and neither does the right one without a
- * window size: it would start at a negative x and cover the screen.
- * @param menu the state (the zones are in its settings)
- * @param x the finger's x, in pixels
- */
+/* checks whether x is in the left or right gesture zone; a zone with no inset
+does not exist, and the right zone needs a window size */
 static int in_side_zone(const struct touch_menu *menu, float x)
 {
 	const struct touch_menu_settings *s = &menu->settings;
@@ -37,12 +31,8 @@ static int in_side_zone(const struct touch_menu *menu, float x)
 	return x < s->edge_left || (s->edge_right > 0.0f && s->width > 0.0f && x >= s->width - s->edge_right);
 }
 
-/**
- * @brief Whether y is in the top or bottom gesture zone; as the side zones,
- * the bottom one needs an inset and the window's height.
- * @param menu the state (the zones are in its settings)
- * @param y the finger's y, in pixels
- */
+/* checks whether y is in the top or bottom gesture zone; like the side zones,
+the bottom one needs an inset and the window's height */
 static int in_top_or_bottom_zone(const struct touch_menu *menu, float y)
 {
 	const struct touch_menu_settings *s = &menu->settings;
