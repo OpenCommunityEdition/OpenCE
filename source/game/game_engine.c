@@ -1456,6 +1456,11 @@ static void rasterize_in_game_score_draw_line(
 	return;
 }
 
+/* port: the in-game scoreboard's lists (game_engine_rasterize_scoreboard,
+game_engine_rasterize_in_game_score): the players in the game, not those who
+quit, ranked and placed among themselves */
+static boolean statistic_buffer_in_game_only = FALSE;
+
 long populate_statistic_buffer(
 	struct statistic_buffer *statistic_buffer,
 	enum postgame_statistic statistic,
@@ -1474,6 +1479,8 @@ long populate_statistic_buffer(
 			"c:\\halo\\SOURCE\\game\\game_engine.c",
 			0x2C8,
 			player_count < MULTIPLAYER_MAXIMUM_PLAYERS);
+		if (statistic_buffer_in_game_only && player->quit_out_of_game)
+			continue;
 		if (player_count < MULTIPLAYER_MAXIMUM_PLAYERS)
 		{
 			statistic_buffer[player_count].player_index = player_iterator.datum_index;
@@ -1886,7 +1893,9 @@ static void game_engine_rasterize_scoreboard(
 	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
 		SCOREBOARD_BOTTOM_ROWS;
 	rows = MAX(rows, 1);
+	statistic_buffer_in_game_only = TRUE;
 	ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
+	statistic_buffer_in_game_only = FALSE;
 	team_columns = has_teams && scoreboard_team_columns() && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP;
 	for (index = 0; index < ranked_count; index++)
 	{
@@ -2109,11 +2118,13 @@ static void game_engine_rasterize_in_game_score(
 		return;
 	}
 	game_engine_generate_title_string(title_string, player_index);
+	statistic_buffer_in_game_only = TRUE;
 	entry_count = select_players_to_display(
 		_postgame_statistic_ranking,
 		player_index,
 		entries,
 		NUMBEROF(entries));
+	statistic_buffer_in_game_only = FALSE;
 
 	color.alpha = alpha;
 	color.red = 0.7f;
