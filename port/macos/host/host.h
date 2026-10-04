@@ -38,7 +38,7 @@ this header to type each wrapper.
 #define GUEST_WINDOW_SIZE HALO_GUEST_WINDOW_SIZE
 
 #define GUEST_IMAGE_BASE HALO_GUEST_IMAGE_BASE
-#define GUEST_IMAGE_MAXIMUM (16u * 1024 * 1024)
+#define GUEST_IMAGE_MAXIMUM (32u * 1024 * 1024)
 
 /* pools: guest stacks and the guest's malloc mappings */
 #define GUEST_POOLS_BASE 0x90000000u
@@ -156,6 +156,8 @@ int host_low_owns(uintptr_t address, size_t size);
 void host_mirror_install(uint32_t guest, void *host);
 /* the host address of a guest address, or NULL */
 uint8_t *host_guest_pointer(unsigned int guest);
+/* the inverse for pool memory */
+uint32_t host_guest_address(const void *host);
 
 int host_vm_start(void);
 int host_vm_map_window(void);
@@ -209,6 +211,8 @@ struct guest_registers
 };
 
 struct guest_registers *host_vcpu_dispatch_registers(void);
+/* the run loop points the wrappers at the current vCPU's registers */
+void host_vcpu_dispatch_begin(struct guest_registers *registers);
 
 extern const struct import_entry host_import_table[];
 extern const unsigned host_import_count;

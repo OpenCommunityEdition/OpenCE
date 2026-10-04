@@ -180,7 +180,7 @@ static uint32_t make_boot(const struct environment *environment)
 	environ_list = argv + 2;
 	strings = (char *)(environ_list + ENVIRONMENT_MAXIMUM + 1);
 	strcpy(strings, "halo");
-	argv[0] = (uint32_t)(uintptr_t)strings;
+	argv[0] = host_guest_address(strings);
 	argv[1] = 0;
 	strings += strlen(strings) + 1;
 	for (index = 0; index < environment->count; index++)
@@ -190,16 +190,16 @@ static uint32_t make_boot(const struct environment *environment)
 		if (strings + length > memory + size)
 			break;
 		memcpy(strings, environment->entries[index], length);
-		environ_list[index] = (uint32_t)(uintptr_t)strings;
+		environ_list[index] = host_guest_address(strings);
 		strings += length;
 	}
 	environ_list[index] = 0;
 	boot->argc = 1;
-	boot->argv = (uint32_t)(uintptr_t)argv;
-	boot->environment = (uint32_t)(uintptr_t)environ_list;
+	boot->argv = host_guest_address(argv);
+	boot->environment = host_guest_address(environ_list);
 	boot->page_size = 4096; /* what the guest's musl expects (its own
 	                           structures use 4 KiB pages) */
-	return (uint32_t)(uintptr_t)boot;
+	return host_guest_address(boot);
 }
 
 /* ---------- the game's thread */

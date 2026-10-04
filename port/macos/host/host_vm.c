@@ -456,8 +456,33 @@ static void service_doorbell(struct host_vcpu *vcpu)
 
 	if (ipa < GUEST_DOORBELL_BASE || ipa >= GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE)
 	{
-		host_logf(HOST_LOG_ERROR, "guest data abort at guest %llx (pc %llx, not a doorbell)",
-			(unsigned long long)ipa, (unsigned long long)vcpu->exit->exception.physical_address);
+		struct guest_registers registers;
+
+		registers_load(vcpu, &registers);
+		{
+			uint64_t syndrome = vcpu->exit->exception.syndrome;
+			unsigned is_write = (unsigned)((syndrome >> 6) & 1);
+			uint64_t far_value = 0;
+			int depth;
+			uint32_t fp = registers.x[29];
+
+			hv_vcpu_get_sys_reg(vcpu->vcpu, HV_SYS_REG_FAR_EL1, &far_value);
+			host_logf(HOST_LOG_ERROR, "guest data abort: %s at guest %llx (pc %llx, sp %x, lr %x)",
+				is_write ? "write" : "read", (unsigned long long)far_value,
+				(unsigned long long)vcpu->pc_after_exit, registers.sp, registers.x[30]);
+			for (depth = 0; depth < 12 && fp && host_guest_pointer(fp) && depth < 12; depth++)
+			{
+				uint8_t *frame = host_guest_pointer(fp);
+				uint32_t next, pc;
+
+				memcpy(&next, frame, 4);
+				memcpy(&pc, frame + 8, 4);
+				host_logf(HOST_LOG_ERROR, "  frame %d: return %x", depth, pc);
+				if (!next || next <= fp)
+					break;
+				fp = next;
+			}
+		}
 		host_fatal("the guest touched memory the host has not mapped");
 	}
 	index = (uint32_t)(ipa - GUEST_DOORBELL_BASE) / 4;
@@ -472,6 +497,7 @@ static void service_doorbell(struct host_vcpu *vcpu)
 	if (index >= host_import_count)
 		host_fatal("doorbell %u has no import (built images out of step?)", (unsigned)index);
 	registers_load(vcpu, &registers);
+	host_vcpu_dispatch_begin(&registers);
 	host_import_table[index].function(); /* reads/writes the registers */
 	/* (the wrapper got them through host_vcpu_registers()) */
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_PC, vcpu->pc_after_exit);
@@ -630,7 +656,9 @@ void host_vcpu_run_forever(void)
 
 uint8_t *host_guest_pointer(uint32_t guest)
 {
-	return mirror[MIRROR_INDEX(guest)];
+	uint8_t *page = mirror[MIRROR_INDEX(guest)];
+
+	return page ? page + (guest & (GUEST_PAGE_SIZE - 1)) : NULL;
 }
 
 void host_mirror_install(unsigned int guest, void *host)
@@ -654,4 +682,28 @@ void host_run_guest_main(uint32_t boot)
 	registers.sp = vcpu->stack_top;
 	registers_store(vcpu, &registers);
 	host_vcpu_run_forever();
+}
+
+/* the guest address of a host pointer from the pools (host_main.c's boot
+block, host_sdl.c's nothing else), or 0 */
+uint32_t host_guest_address(const void *pointer)
+{
+	uintptr_t host = (uintptr_t)pointer;
+	uint32_t result = 0;
+	int index;
+
+	if (host >= GUEST_WINDOW_BASE && host < GUEST_WINDOW_BASE + GUEST_WINDOW_SIZE)
+		return (uint32_t)host; /* (the window is not a pool; unreachable) */
+	pthread_mutex_lock(&vm_lock);
+	for (index = 0; index < pool_count && !result; index++)
+	{
+		struct pool_region *pool = pools[index];
+		uintptr_t start = (uintptr_t)pool->host;
+		uintptr_t end = start + (uintptr_t)pool->size;
+
+		if (host >= start && host < end)
+			result = pool->base + (uint32_t)(host - start);
+	}
+	pthread_mutex_unlock(&vm_lock);
+	return result;
 }

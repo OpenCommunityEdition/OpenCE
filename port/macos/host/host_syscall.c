@@ -35,6 +35,8 @@ structures and no futexes, so this file translates:
 #include <time.h>
 #include <unistd.h>
 
+uint32_t host_guest_address(const void *host);
+
 /* the guest's structures */
 struct guest_timespec
 {
@@ -266,19 +268,23 @@ static long guest_futex(uint32_t address, int operation, uint32_t value, uint64_
 
 static long guest_mmap(uint64_t address, uint32_t size, int protection, int flags, int fd, int64_t offset)
 {
-	void *mapping;
-
 	(void)protection;
 	(void)flags;
 	(void)fd;
 	(void)offset;
+	/* the Xbox window: already mapped (host_vm.c); succeed */
+	if (address == GUEST_WINDOW_BASE && size <= GUEST_WINDOW_SIZE)
+		return (long)GUEST_WINDOW_BASE;
 	if (address)
-		host_fatal("the guest's mmap asked for %llx specifically (the pools decide addresses)",
+		host_fatal("the guest's mmap asked for %llx specifically (only the window is fixed)",
 			(unsigned long long)address);
-	mapping = host_low_map(size);
-	if (!mapping)
-		return -ENOMEM;
-	return (long)(uintptr_t)mapping;
+	{
+		void *mapping = host_low_map(size);
+
+		if (!mapping)
+			return -ENOMEM;
+		return (long)(uintptr_t)host_guest_address(mapping);
+	}
 }
 
 /* ---------- structures the guest's musl reads
@@ -516,6 +522,35 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case SYS_get_robust_list:
 		return 0;
 
+	case SYS_brk:
+	{
+		/* one contiguous region for musl's brk (its malloc grows
+		through here; the pools back it); growth past the region
+		fails and musl falls back to mmap */
+		static uint32_t brk_base, brk_cursor, brk_end;
+
+		if (!brk_base)
+		{
+			void *region = host_low_map(0x4000000); /* 64 MB */
+
+			if (!region)
+				return -ENOMEM;
+			brk_base = host_guest_address(region);
+			brk_cursor = brk_base;
+			brk_end = brk_base + 0x4000000;
+			host_logf(HOST_LOG_INFO, "guest brk at %x", brk_base);
+		}
+		if (!a)
+			return brk_cursor;
+		{
+			uint32_t want = (uint32_t)a;
+
+			if (want < brk_base || want > brk_end)
+				return brk_cursor; /* refuse: musl falls back to mmap */
+			brk_cursor = want;
+			return brk_cursor;
+		}
+	}
 	case SYS_mmap:
 		return guest_mmap((uint64_t)a, (uint32_t)b, (int)c, (int)d, (int)e, (int64_t)f);
 	case SYS_munmap:
@@ -525,8 +560,6 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 		return 0; /* the write tracker owns the window's protections */
 	case SYS_madvise:
 		return 0;
-	case SYS_brk:
-		return -ENOMEM; /* musl falls back to mmap */
 
 	case SYS_exit:
 	case SYS_exit_group:

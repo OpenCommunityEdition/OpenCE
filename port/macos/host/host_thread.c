@@ -51,8 +51,9 @@ static int stack_allocate(size_t size, void **mapping, size_t *mapping_size, uin
 	memset(base, 0, GUARD_SIZE);
 	*mapping = base;
 	*mapping_size = total;
-	/* the guest's stacks grow down from the top of the range */
-	*guest_top = (uint32_t)(uintptr_t)base + total - 64;
+	/* the guest's stacks grow down from the top of the range (the
+	guest address of the host mapping, not the host pointer) */
+	*guest_top = host_guest_address(base) + (uint32_t)total - 64;
 	return 0;
 }
 

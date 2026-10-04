@@ -18,7 +18,7 @@ table's names identify each index for the host's dispatch table).
 /* (macOS has no <elf.h>; only what the guest image's own header needs) */
 typedef struct { unsigned char e_ident[16]; unsigned short e_type, e_machine;
 	unsigned e_version; unsigned long long e_entry, e_phoff, e_shoff;
-	unsigned e_flags, e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx; } Elf64_Ehdr;
+	unsigned e_flags; unsigned short e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx; } Elf64_Ehdr;
 typedef struct { unsigned p_type, p_flags; unsigned long long p_offset, p_vaddr, p_paddr,
 	p_filesz, p_memsz, p_align; } Elf64_Phdr;
 #define EI_CLASS 4
@@ -71,6 +71,14 @@ int host_load_image(const void *file, size_t size)
 		host_logf(HOST_LOG_ERROR, "the guest image is not an AArch64 executable");
 		return -1;
 	}
+	host_logf(HOST_LOG_INFO, "image %zu bytes, phoff %llu phnum %u phentsize %u", size,
+		(unsigned long long)elf->e_phoff, elf->e_phnum, elf->e_phentsize);
+	if (elf->e_phentsize != sizeof(Elf64_Phdr) || !elf->e_phnum ||
+		elf->e_phoff + elf->e_phnum * sizeof(Elf64_Phdr) > size)
+	{
+		host_logf(HOST_LOG_ERROR, "the guest image's program headers are out of bounds");
+		return -1;
+	}
 	segments = (const Elf64_Phdr *)((const char *)file + elf->e_phoff);
 	for (index = 0; index < elf->e_phnum; index++)
 	{
@@ -120,7 +128,15 @@ int host_load_image(const void *file, size_t size)
 		}
 	}
 
-	header = (const struct halo_guest_header *)low;
+	/* the header lives in guest memory (guest address low); reach it
+	through the mirror */
+	{
+		uint8_t *header_host = host_guest_pointer((uint32_t)low);
+
+		if (!header_host)
+			return -1;
+		header = (const struct halo_guest_header *)header_host;
+	}
 	if (header->magic != HALO_GUEST_MAGIC || header->abi_version != HALO_GUEST_ABI_VERSION)
 	{
 		host_logf(HOST_LOG_ERROR, "the guest image header does not match this host");
@@ -129,21 +145,31 @@ int host_load_image(const void *file, size_t size)
 	host_image.header = header;
 	host_image.base = (uint32_t)low;
 	host_image.end = (uint32_t)high;
+	host_logf(HOST_LOG_INFO, "header: image_end %x import_table %x import_names %x import_count %x",
+		header->image_end, header->import_table, header->import_names, header->import_count);
 
 	/* the import table: the names tell the host which doorbell index is
-	which function (the stubs hard-code their indexes) */
-	table = (uint64_t *)(uintptr_t)header->import_table;
-	name = (const char *)(uintptr_t)header->import_names;
-	count = *(const uint32_t *)(uintptr_t)header->import_count;
-	if (count != host_import_count)
-		host_fatal("the image imports %u functions, the host serves %u", (unsigned)count,
-			(unsigned)host_import_count);
+	which function. Everything here is guest memory (the table and names
+	are guest addresses), reached through the mirror. */
 	{
+		uint8_t *table_host = host_guest_pointer(header->import_table);
+		const uint8_t *names_host = host_guest_pointer(header->import_names);
+		const uint32_t *count_host = host_guest_pointer(header->import_count);
+		uint64_t *table;
 		const char *dispatch_name;
-		unsigned table_index;
+		unsigned index2;
 
-		for (index = 0, dispatch_name = (const char *)(uintptr_t)header->import_names;
-			index < count; index++)
+		if (!table_host || !names_host || !count_host)
+			return -1;
+		table = (uint64_t *)table_host;
+		count = *count_host;
+		host_logf(HOST_LOG_INFO, "import table host %p names %p count %p -> %u",
+			(void *)table_host, (const void *)names_host, (const void *)count_host, count);
+		if (count != host_import_count)
+			host_fatal("the image imports %u functions, the host serves %u", (unsigned)count,
+				(unsigned)host_import_count);
+		dispatch_name = (const char *)names_host;
+		for (index2 = 0; index2 < count; index2++)
 		{
 			void *function = host_resolve_import(dispatch_name);
 
@@ -151,20 +177,19 @@ int host_load_image(const void *file, size_t size)
 				function = host_gl_resolve(dispatch_name + 7);
 			/* (the stubs doorbell by index, never through this table;
 			it exists so a debugger can name each doorbell) */
-			table[index] = (uint64_t)(uintptr_t)function;
+			table[index2] = (uint64_t)(uintptr_t)function;
 			if (!function)
 			{
 				host_logf(HOST_LOG_WARN, "guest import %s is not available", dispatch_name);
 				missing++;
 			}
-			/* the host's dispatch order must be the image's import order */
-			if (strcmp(host_import_table[index].name, dispatch_name))
-				host_fatal("import %u is %s here, %s in the image", (unsigned)index,
-					host_import_table[index].name, dispatch_name);
+			if (strcmp(host_import_table[index2].name, dispatch_name))
+				host_fatal("import %u is %s here, %s in the image", (unsigned)index2,
+					host_import_table[index2].name, dispatch_name);
 			dispatch_name += strlen(dispatch_name) + 1;
 		}
+		(void)index;
 		(void)name;
-		(void)table_index;
 	}
 	host_logf(HOST_LOG_INFO, "guest image %08llx-%08llx, %u imports (%d unavailable)",
 		(unsigned long long)low, (unsigned long long)high, count, missing);
