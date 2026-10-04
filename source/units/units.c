@@ -5102,20 +5102,16 @@ void unit_render_debug(
 		struct object_marker marker;
 		real mouth_aperture;
 
-		/*
-		 * BUG (original): January ignores the marker count and consumes the
-		 * output even when the requested head marker is absent. A safe,
-		 * intentionally nonmatching build should render only when this call
-		 * returns a value greater than zero.
-		 */
-		object_get_marker_by_name(unit_index, "head", &marker, 1);
-		mouth_aperture = unit->unit.mouth_aperture;
-		origin = marker.matrix.position;
-		render_debug_string_at_point(
-			FALSE,
-			&origin,
-			csprintf(temporary, "%.2f", mouth_aperture),
-			global_real_argb_orange);
+		if (object_get_marker_by_name(unit_index, "head", &marker, 1) > 0)
+		{
+			mouth_aperture = unit->unit.mouth_aperture;
+			origin = marker.matrix.position;
+			render_debug_string_at_point(
+				FALSE,
+				&origin,
+				csprintf(temporary, "%.2f", mouth_aperture),
+				global_real_argb_orange);
+		}
 	}
 
 	return;
