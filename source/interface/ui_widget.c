@@ -6727,6 +6727,15 @@ static void ui_widgets_process_mouse(
 
 			if (widget)
 				ui_mouse_list_directions(widget, &back, &forward);
+			/* a PC screen's button bar steps sideways only, and the d-pad's up
+			and down pass over it to the list that holds it, so a touch drag
+			leaves the bar the same way */
+			if (touch && widget && back == _widget_event_dpad_left && pc_menu_tag(widget->definition_tag_index) &&
+				ui_mouse_wheel_room(ui_mouse_menu(), _widget_event_dpad_up, FALSE) != NONE)
+			{
+				back = _widget_event_dpad_up;
+				forward = _widget_event_dpad_down;
+			}
 			button = going_forward ? forward : back;
 			/* only a touch drag stops at the ends, and does nothing with no list
 			to step; the desktop wheel wraps as the d-pad does, and falls back
