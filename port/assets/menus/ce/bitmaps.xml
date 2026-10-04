@@ -309,6 +309,9 @@
 	<bitmap name="main_menu/solo_level_select/header_load_level">
 		<frame png="ce/shell/main_menu/solo_level_select/header_load_level__0.png" width="512" height="64"/>
 	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/coop/header_player_2">
+		<frame png="ce/port/main_menu/multiplayer_type_select/coop/header_player_2.png" width="512" height="64"/>
+	</bitmap>
 	<bitmap name="main_menu/multiplayer_type_select/join_game/header_direct_link">
 		<frame png="ce/port/main_menu/multiplayer_type_select/join_game/header_direct_link.png" width="512" height="64"/>
 	</bitmap>

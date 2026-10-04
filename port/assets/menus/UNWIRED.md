@@ -10,7 +10,7 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 
 | Function | Uses | |
 | --- | --- | --- |
-| `common button bar update` | 24 | PC function |
+| `common button bar update` | 25 | PC function |
 | `direct ip connect init` | 1 | PC function |
 | `direct ip connect update` | 1 | PC function |
 | `direct ip edit field` | 4 | PC function |

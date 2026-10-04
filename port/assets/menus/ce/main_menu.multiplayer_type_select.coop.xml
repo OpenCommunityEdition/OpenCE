@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/multiplayer_type_coop_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/multiplayer_type_select/multiplayer_options" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="port coop begin" open="main_menu/multiplayer_type_select/coop/player_2_profile_screen" branch="true"/>
+		<on event="start" run="port coop begin" open="main_menu/multiplayer_type_select/coop/player_2_profile_screen" branch="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/player_2_profile_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/multiplayer_type_select/coop/player_2_profile_list"/>
+		<child widget="main_menu/multiplayer_type_select/coop/header_player_2"/>
+		<child widget="main_menu/multiplayer_type_select/coop/player_2_help" x="20" y="416"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/header_player_2" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/coop/header_player_2">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/player_2_profile_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/profile_manager/player_profile_extended_desc">
+		<data input="3wide player profile list update"/>
+		<on event="created" run="port coop player 2 list initialize"/>
+		<on event="deleted" run="player profile list dispose"/>
+		<on event="custom_activation" run="port coop player 2" open="main_menu/solo_level_select/solo_level_select_screen" branch="true"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_0" x="20" y="73"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/multiplayer_type_select/coop/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/multiplayer_type_select/coop/player_2_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_0" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd_top" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_1" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_2" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_3" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_4" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_5" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_6" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_7" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_8" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_9" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/list_item_10" width="390" height="28" bitmap="bitmaps/sel_list_item_bkd" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<on event="a" run="single prev cl item activated"/>
+		<on event="start" run="single prev cl item activated"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/new_select/list_item_text" x="25"/>
+		<child widget="main_menu/new_select/list_item_arrows"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/player_2_help" type="text" width="350" height="24" text="Player 2: choose with your controller." font="ui\small_ui" color="#FF2896FF" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/coop/player_2_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/profile_manager/profile_manager_button_ok" x="380" y="1"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+</menus>

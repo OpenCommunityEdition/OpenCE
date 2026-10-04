@@ -95,8 +95,10 @@ The keyboard and the mouse are a control scheme of their own for the player
 of controller 1: each action has up to two keys or mouse buttons, which
 Settings > Controls Setup (or `[controls]` in `config.toml`) changes. The
 game adds the input of the first gamepad to controller 1. The other
-gamepads operate controllers 2 to 4. The profile's button layout (Settings >
-Gamepads) is the gamepads' only.
+gamepads operate controllers 2 to 4. In co-op with only one gamepad, that
+gamepad is controller 2 (player 2) and the keyboard and mouse stay
+controller 1. The profile's button layout (Settings > Gamepads) is the
+gamepads' only.
 
 | Action | Keys and buttons (default) |
 | --- | --- |
@@ -156,6 +158,13 @@ servers, key bindings) are empty, and the settings they change do not
 change. The screens open, close and move between each other as the PC
 version's. `display.menus = "xbox"` gives the Xbox's menus, which start every
 kind of game.
+
+Multiplayer > CO-OP CAMPAIGN is the Xbox's cooperative play, which the PC
+version does not have: two players on this computer play the campaign in
+split screen. Player 1 is the player who chose it, on the current profile.
+Player 2 then chooses a profile with their own controller (a gamepad), and
+New Game's levels are those either profile has reached. A co-op game does
+not continue a saved game of one player.
 
 In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
 the profile's settings while the game goes on, and for the host END GAME.
@@ -671,7 +680,7 @@ Other changes:
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 | `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), and adds the tags of the menus to the menus' map (`game/menu_tags.c`). |
-| `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB. |
+| `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB; the main menu and Multiplayer clear co-op's controllers, so that a gamepad going back to controller 1 is not a controller unplugged. |
 | `input/input_abstraction.c`, `game/player_control.c`, `game/players.c`, `game/player_queues_new.c`, `units/units.h` | The keyboard and mouse's actions (`src/xinput_sdl.c`, `include/halo_keyboard.h`) join controller 1's game controls; their reload key reloads on its own, and their action key only acts (a control flag of the port's, sent with the player's action, stops the reload the controller's X falls back to). |
 | `sound/sound_manager.c`, `interface/hud.c`, `game/game_engine.c` | The music's and the other sounds' volumes; the HUD's and the scoreboard's settings are read again when Settings changes them. |
 | `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |

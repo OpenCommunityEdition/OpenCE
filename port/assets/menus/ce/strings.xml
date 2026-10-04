@@ -374,6 +374,7 @@
 		<string text="Join a game by its invite link,\nor one a Discord invite\nreached."/>
 		<string text="Host a game on the Internet:\nplayers join by its invite\nlink or Discord."/>
 		<string text="Host a game on your LAN\nonly."/>
+		<string text="Play the campaign with a\nfriend in split screen:\nplayer 2 on a gamepad."/>
 		<string text="Set all the attributes for your \nmultiplayer gametypes and\nkeep them for future use."/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/multiplayer_options">
@@ -384,6 +385,7 @@
 		<string text="DIRECT LINK"/>
 		<string text="EDIT GAMETYPES"/>
 		<string text="SERVER BROWSER"/>
+		<string text="CO-OP CAMPAIGN"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/cap_server_settings_options">
 		<string text="Enter a name for your server."/>

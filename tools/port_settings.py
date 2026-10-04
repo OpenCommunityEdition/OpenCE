@@ -350,13 +350,14 @@ def LOADOUT_HELPS(slot: str) -> list:
 
 STRING_OVERRIDES.update({
     f"{MT}/multiplayer_options": ["JOIN GAME", "CREATE GAME", "INTERNET", "LAN", "DIRECT LINK", "EDIT GAMETYPES",
-                                  "SERVER BROWSER"],
+                                  "SERVER BROWSER", "CO-OP CAMPAIGN"],
     f"{MT}/multiplayer_option_descriptions": [
         "Browse the games on the\\nInternet.",
         "Join a multiplayer game on\\nyour LAN.",
         "Join a game by its invite link,\\nor one a Discord invite\\nreached.",
         "Host a game on the Internet:\\nplayers join by its invite\\nlink or Discord.",
         "Host a game on your LAN\\nonly.",
+        "Play the campaign with a\\nfriend in split screen:\\nplayer 2 on a gamepad.",
         "Set all the attributes for your \\nmultiplayer gametypes and\\nkeep them for future use.",
     ],
     "main_menu/gametype_select/var_gametype_banks": ["STANDARD", "CUSTOM"],
@@ -418,6 +419,10 @@ WIDGET_PATCHES = {
         f'<on event="start" run="mp type set mode" open="{MT}/join_game/join_game_screen"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
+    # (Co-op, after Create Game's: _coop)
+    f"{MT}/multiplayer_type_select_list": {"insert_before": {
+        f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
+    }},
     f"{MT}/join_game/header_join_game": {"children": [
         f'<child widget="{MT}/join_game/header_server_browser"/>',
         f'<child widget="{MT}/join_game/header_direct_link"/>',
@@ -455,6 +460,7 @@ TITLES = {
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "DIRECT LINK",
     f"{MT}/lobby/header_lobby": "GAME LOBBY",
+    f"{MT}/coop/header_player_2": "PLAYER 2 PROFILE",
 }
 
 
@@ -760,6 +766,61 @@ def _lobby() -> list:
     return lines
 
 
+def _coop() -> list:
+    """Co-op, the campaign for two players on this machine in split screen
+    (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
+    2's profile, chosen with player 2's controller (its rows take any
+    controller's presses, as the shared rows do only controller 1's), then
+    New Game's levels and difficulty (menu_functions.c's coop_begin)"""
+    base = f"{MT}/coop"
+    lines = _widget(f"{MT}/multiplayer_type_coop_item",
+                    [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
+                     ("string_list", f"{MT}/multiplayer_options"), ("string_index", 7), ("font", "ui\\large_ui"),
+                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
+                    [f'<on event="a" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
+                     f'<on event="start" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
+                     '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _widget(f"{base}/player_2_profile_screen", [("width", 640), ("height", 480),
+                                                         ("flags", "pass_unhandled_to_focused_child"),
+                                                         ("bitmap", "bitmaps/gradient")],
+                     ['<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
+                      f'<child widget="{base}/player_2_profile_list"/>',
+                      f'<child widget="{base}/header_player_2"/>',
+                      f'<child widget="{base}/player_2_help" x="20" y="416"/>'])
+    lines += _header(f"{base}/header_player_2", f"{base}/header_player_2")
+    rows = [f'<child widget="{base}/list_item_{index}" x="20" y="{73 + 30 * index}"/>' for index in range(11)]
+    lines += _widget(f"{base}/player_2_profile_list",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", "main_menu/profile_manager/player_profile_extended_desc")],
+                     ['<data input="3wide player profile list update"/>',
+                      '<on event="created" run="port coop player 2 list initialize"/>',
+                      '<on event="deleted" run="player profile list dispose"/>',
+                      '<on event="custom_activation" run="port coop player 2" '
+                      'open="main_menu/solo_level_select/solo_level_select_screen" branch="true"/>',
+                      *rows, f'<child widget="{base}/player_2_button_bar" y="414"/>'])
+    for index in range(11):
+        lines += _widget(f"{base}/list_item_{index}",
+                         [("width", 390), ("height", 28),
+                          ("bitmap", "bitmaps/sel_list_item_bkd_top" if index == 0 else "bitmaps/sel_list_item_bkd"),
+                          ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)],
+                         ['<on event="a" run="single prev cl item activated"/>',
+                          '<on event="start" run="single prev cl item activated"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          '<child widget="main_menu/new_select/list_item_text" x="25"/>',
+                          '<child widget="main_menu/new_select/list_item_arrows"/>'])
+    lines += _widget(f"{base}/player_2_help", [("type", "text"), ("width", 350), ("height", 24),
+                                               ("text", "Player 2: choose with your controller."),
+                                               ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("text_y", 5),
+                                               ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/player_2_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                     ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     ['<data input="common button bar update"/>',
+                      '<child widget="main_menu/profile_manager/profile_manager_button_ok" x="380" y="1"/>',
+                      '<child widget="common_button_back" x="510" y="1"/>'])
+    return lines
+
+
 def _item_options_extras() -> list:
     """Item Options' rows of the port's: the map's weapons (YES or NO), and
     the loadout, CATEGORY (the weapon set) or CUSTOM (each player's primary
@@ -801,6 +862,7 @@ def multiplayer_files() -> dict:
         f"{MT}/join_game".replace("/", ".") + ".port.xml": head + _join_game_extras() + ["</menus>", ""],
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
+        f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
     }
 
