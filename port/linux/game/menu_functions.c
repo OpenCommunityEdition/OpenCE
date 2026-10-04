@@ -2321,8 +2321,17 @@ static void browser_focus(struct widget_instance *list)
 {
 	char const *const choices[] = { "server_item_1", "join_game_button_bar" };
 	struct widget_instance *focused = list->focused_child;
+	struct widget_instance *row;
 	short index;
 
+	/* (the rows' backgrounds: the focused one's outlined frame. The engine
+	shows a list item's focus only on a bitmap of two frames, and theirs has
+	three: normal, focused, selected) */
+	for (row = list->child; row; row = row->next)
+	{
+		if (browser_row_index(row) != NONE)
+			row->animation.current_frame_index = row == focused ? 1 : 0;
+	}
 	focus_off_hidden(named(list, "join_game_button_bar", 0));
 	if (focused && focused->visible && !focused->disabled)
 		return;
