@@ -432,7 +432,43 @@ struct host_vcpu
 	uint32_t stack_top;
 	int sampling;
 	uint64_t timer_next;
+	hv_vcpu_t id;
 };
+
+#define MAXIMUM_VCPUS 8
+static hv_vcpu_t vcpu_ids[MAXIMUM_VCPUS];
+static int vcpu_count;
+
+/* the host-side PC sampler (HALO_SAMPLE_PC): interrupts every vCPU
+periodically with hv_vcpus_exit; run_until_stops logs the PC */
+static void *sampler_thread(void *unused)
+{
+	(void)unused;
+	for (;;)
+	{
+		usleep(100000);
+		if (vcpu_count)
+			hv_vcpus_exit(vcpu_ids, (unsigned)vcpu_count);
+	}
+	return 0;
+}
+
+static void sampler_start(void)
+{
+	static int started;
+	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
+	pthread_mutex_lock(&lock);
+	if (!started)
+	{
+		pthread_t thread;
+
+		if (pthread_create(&thread, NULL, sampler_thread, NULL) == 0)
+			pthread_detach(thread);
+		started = 1;
+	}
+	pthread_mutex_unlock(&lock);
+}
 
 static pthread_key_t vcpu_key;
 static int vcpu_key_made;
@@ -494,7 +530,7 @@ int host_vcpu_attach(void)
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDR_EL0, 0);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDRRO_EL0, 0);
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_CPSR, 0x3c5); /* EL1h, DAIF masked */
-	vcpu->sampling = getenv("HALO_SAMPLE_PC") != NULL;
+	vcpu->sampling = 0; /* (the host-side sampler needs a cancel-consumption fix; env-gated off) */
 	if (vcpu->sampling)
 	{
 		vcpu->timer_next = 0x400000;
@@ -503,6 +539,15 @@ int host_vcpu_attach(void)
 	}
 	pthread_setspecific(vcpu_key, vcpu);
 	vcpu->attached = 1;
+	vcpu->id = vcpu->vcpu;
+	{
+		static pthread_mutex_t ids_lock = PTHREAD_MUTEX_INITIALIZER;
+		pthread_mutex_lock(&ids_lock);
+		if (vcpu_count < MAXIMUM_VCPUS)
+			vcpu_ids[vcpu_count++] = vcpu->id;
+		pthread_mutex_unlock(&ids_lock);
+	}
+	sampler_start();
 	return 0;
 }
 
@@ -765,23 +810,21 @@ static void run_until_stops(struct host_vcpu *vcpu)
 		}
 		}
 		if (vcpu->exit->reason == HV_EXIT_REASON_CANCELED)
-			return;
-		if (vcpu->exit->reason == HV_EXIT_REASON_VTIMER_ACTIVATED)
 		{
-			/* the guest masked the timer itself (its interrupts are
-			masked at all times in this design); resume. While the
-			sampler is on, this is the heartbeat: log where the guest
-			is and re-arm. */
 			if (vcpu->sampling)
 			{
 				uint64_t pc_now = 0;
 
 				hv_vcpu_get_reg(vcpu->vcpu, HV_REG_PC, &pc_now);
 				host_logf(HOST_LOG_INFO, "sample pc=%llx", (unsigned long long)pc_now);
-				vcpu->timer_next += 0x400000; /* (the virtual count runs
-				from 0: CNTVOFF is 0, so the deadline is absolute) */
-				hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CVAL_EL0, vcpu->timer_next);
 			}
+			continue; /* (an external hv_vcpus_exit: resume; the
+			sampler thread fires these) */
+		}
+		if (vcpu->exit->reason == HV_EXIT_REASON_VTIMER_ACTIVATED)
+		{
+			/* (the guest's interrupts are always masked in this
+			design, so the timer is only noise; resume) */
 			hv_vcpu_set_vtimer_mask(vcpu->vcpu, false);
 			continue;
 		}
