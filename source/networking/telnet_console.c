@@ -319,6 +319,27 @@ static void telnet_client_disconnect(
 	return;
 }
 
+/* port: whether a line is part of an HTTP request. A web page can make the
+browser send one to this machine's port, whose lines would otherwise run as
+scripts: such a client is dropped at its first line. No script starts with
+a request's method and a path, nor holds " HTTP/". */
+static boolean telnet_line_is_http(
+	char const *line)
+{
+	static char const *const methods[] =
+	{
+		"GET ", "POST ", "PUT ", "HEAD ", "DELETE ", "OPTIONS ", "PATCH ", "CONNECT ", "TRACE ",
+	};
+	long index;
+
+	for (index = 0; index < (long)NUMBEROF(methods); index++)
+	{
+		if (!csstrncmp(line, methods[index], csstrlen(methods[index])))
+			return TRUE;
+	}
+	return strstr(line, " HTTP/") != NULL;
+}
+
 /* FALSE when the client was lost (it is then dropped) */
 static boolean process_telnet_client_buffer(
 	char *buffer,
@@ -367,6 +388,12 @@ static boolean process_telnet_client_buffer(
 					expression[TELNET_CLIENT_BUFFER_SIZE-1] = 0;
 					client->buffer[0] = 0;
 
+					if (telnet_line_is_http(expression))
+					{
+						telnet_client_disconnect(client);
+						error(2, "dropped a telnet client that sent an HTTP request");
+						return TRUE;
+					}
 					if (hs_compile_and_evaluate(expression))
 					{
 						telnet_client_write(client, "\r\n", 2);
