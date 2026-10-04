@@ -272,6 +272,52 @@ struct framebuffer_entry
 static struct render_target_entry *render_targets;
 static struct framebuffer_entry *framebuffers;
 
+/* A depth texture of a size, for a color target whose own depth is another
+size: the game pairs the reflection's target with the screen's depth
+(rasterizer_set_target), which Direct3D allowed, but GL will not attach a
+depth of one size to a color of another. */
+struct depth_texture_entry
+{
+	struct depth_texture_entry *next;
+	unsigned long width, height;
+	GLuint texture;
+};
+
+static struct depth_texture_entry *depth_textures;
+
+static GLuint depth_texture_for_size(unsigned long width, unsigned long height)
+{
+	struct depth_texture_entry *entry;
+
+	for (entry = depth_textures; entry; entry = entry->next)
+	{
+		if (entry->width == width && entry->height == height)
+			return entry->texture;
+	}
+	entry = calloc(1, sizeof(*entry));
+	if (!entry)
+		return 0;
+	entry->width = width;
+	entry->height = height;
+	glGenTextures(1, &entry->texture);
+	glBindTexture(GL_TEXTURE_2D, entry->texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_DEPTH24_STENCIL8,
+		(GLsizei)width,
+		(GLsizei)height,
+		0,
+		GL_DEPTH_STENCIL,
+		GL_UNSIGNED_INT_24_8,
+		NULL);
+	xgpu_gl_state_invalidate();
+	entry->next = depth_textures;
+	depth_textures = entry;
+	return entry->texture;
+}
+
 /* ---------- the device */
 
 #ifdef HALO_ANDROID
@@ -755,6 +801,16 @@ static void surface_dimensions(const D3DSurface *surface, unsigned long *width, 
 		format == D3DFMT_LIN_D24S8 || format == D3DFMT_LIN_F24S8 || format == D3DFMT_LIN_D16 || format == D3DFMT_LIN_F16;
 }
 
+/* The Xbox's reflection target (rasterizer_xbox.c's RASTERIZER_TARGET_RENDER_
+SECONDARY_WIDTH/HEIGHT): the game draws the mirror into it at this size, and
+gives its shaders this size, so it stays the game's; render_target_get makes
+the texture it is drawn into the display's size. */
+enum
+{
+	mirror_target_width = 320,
+	mirror_target_height = 240
+};
+
 static struct render_target_entry *render_target_get(const D3DSurface *surface)
 {
 	struct render_target_entry *entry;
@@ -766,8 +822,15 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	float scale[2] = { 1.0f, 1.0f };
 
 	surface_dimensions(surface, &width, &height, &depth);
-	/* the screen's targets are drawn at the screen's scale */
-	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
+	/* The screen's targets are drawn at the screen's scale, and the scene the
+	reflection draws is drawn at it too: the game's reflection target is
+	mirror_target_width x mirror_target_height, a quarter of the picture's
+	linear resolution at 1080p, which is the low quality the reflection has
+	had. Its size stays the game's, so the constants the game gives its
+	reflection shaders (rasterizer_xbox_environment.c) keep matching it; only
+	the texture it is drawn into is bigger. */
+	if ((width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT) ||
+		(width == mirror_target_width && height == mirror_target_height))
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
@@ -862,6 +925,7 @@ static BOOL bind_targets(BOOL *has_depth)
 {
 	struct render_target_entry *color = render_target_get(device.render_target);
 	struct render_target_entry *depth = render_target_get(device.depth_stencil);
+	GLuint depth_texture = 0;
 
 	if (depth && !depth->target.depth)
 		depth = NULL;
@@ -869,10 +933,23 @@ static BOOL bind_targets(BOOL *has_depth)
 		return FALSE;
 	if (color)
 		color->last_rendered = device.frame + 1;
+	/* A depth of another size than the color it is drawn with (the screen's,
+	which the game pairs the reflection's target with) cannot be attached in
+	GL: draw into a depth of the color's own size instead. The game clears
+	the depth of every target it draws the scene into (rasterizer_set_target),
+	so a depth of its own behaves as the shared one did. */
+	if (depth)
+	{
+		depth_texture = depth->target.texture;
+		if (color &&
+			(color->target.gl_width != depth->target.gl_width ||
+			color->target.gl_height != depth->target.gl_height))
+			depth_texture = depth_texture_for_size(color->target.gl_width, color->target.gl_height);
+	}
 	/* viewports and clears are in the targets' units (render_target_get) */
 	target_scale[0] = color ? color->target.scale[0] : depth->target.scale[0];
 	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
-	state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
+	state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth_texture));
 	*has_depth = depth != NULL;
 	return TRUE;
 }
