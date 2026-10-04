@@ -135,6 +135,20 @@ final class XisoExtractor {
         return true;
     }
 
+    /** whether a name is one to write in the maps folder: no path, no "." or
+     * "..", and only printable ASCII that every file system takes as a plain
+     * name (a disc's maps folder holds .map files and loading.tga) */
+    static boolean isPlainName(String name) {
+        if (name.isEmpty() || name.equals(".") || name.equals(".."))
+            return false;
+        for (int index = 0; index < name.length(); index++) {
+            char c = name.charAt(index);
+            if (c < 0x20 || c > 0x7E || "/\\:*?\"<>|".indexOf(c) >= 0)
+                return false;
+        }
+        return true;
+    }
+
     /** the partition's volume descriptor: the root directory's sector and size */
     private long[] findVolume() throws IOException {
         for (long offset : PARTITION_OFFSETS) {
@@ -190,8 +204,9 @@ final class XisoExtractor {
             for (int index = 0; index < nameLength; index++)
                 bytes[index] = table.get(at + ENTRY_HEADER_SIZE + index);
             String name = new String(bytes, StandardCharsets.ISO_8859_1);
-            /* (as extract-xiso refuses them: no name may leave the folder) */
-            if (!name.equals(".") && !name.equals("..") && name.indexOf('/') < 0 && name.indexOf('\\') < 0)
+            /* (as extract-xiso refuses them: no name may leave the folder, and
+            none but a plain file name is written) */
+            if (isPlainName(name))
                 out.add(new Entry(name, table.getInt(at + 4) & 0xFFFFFFFFL, table.getInt(at + 8) & 0xFFFFFFFFL));
         }
         if (right != 0)

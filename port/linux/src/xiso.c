@@ -76,6 +76,9 @@ includes software developed by in <in@fishtank.com>.
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 #endif
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW 0
+#endif
 
 enum
 {
@@ -109,6 +112,8 @@ struct xiso_image
 	char *error;
 	int error_size;
 };
+
+static int name_is_plain(const char *name);
 
 static unsigned long read_u32(const unsigned char *bytes)
 {
@@ -224,15 +229,34 @@ static void walk_directory(struct directory_walk *walk, unsigned long offset, in
 		file->name[name_length] = 0;
 		file->sector = read_u32(entry + 4);
 		file->size = read_u32(entry + 8);
-		/* (as extract-xiso refuses them: no name may leave the folder) */
-		if (strcmp(file->name, ".") && strcmp(file->name, "..") && !strchr(file->name, '/') &&
-			!strchr(file->name, '\\'))
+		/* (as extract-xiso refuses them: no name may leave the folder, and
+		none but a plain file name is written) */
+		if (name_is_plain(file->name))
 		{
 			walk->entry_count++;
 		}
 	}
 	if (right)
 		walk_directory(walk, right, depth + 1);
+}
+
+/* whether a name is one to write in the maps folder: no path, no "." or
+"..", and only printable ASCII that every desktop file system takes as a
+plain name (a disc's maps folder holds .map files and loading.tga) */
+static int name_is_plain(const char *name)
+{
+	const char *at;
+
+	if (!*name || !strcmp(name, ".") || !strcmp(name, ".."))
+		return 0;
+	for (at = name; *at; at++)
+	{
+		unsigned char c = (unsigned char)*at;
+
+		if (c < 0x20 || c > 0x7e || strchr("/\\:*?\"<>|", c))
+			return 0;
+	}
+	return 1;
 }
 
 static int names_match(const char *a, const char *b)
@@ -254,7 +278,8 @@ static int copy_file(struct xiso_image *image, const struct xiso_file *file, con
 {
 	unsigned long long offset = image->partition + (unsigned long long)file->sector * SECTOR_SIZE;
 	unsigned long remaining = file->size;
-	int output = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+	/* (not through a link left in the folder) */
+	int output = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
 
 	if (output < 0)
 		return fail(image, "Could not write %s.", path);
