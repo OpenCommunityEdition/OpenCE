@@ -94,12 +94,7 @@ boolean rasterizer_vertex_buffer_new(
 	void const *vertices,
 	long buffer_size)
 {
-	/* BUG: The January XDK CreateVertexBuffer failure returns without writing
-	 * the output pointer (0x5de713..0x5de719); the original caller then tests
-	 * that uninitialized output (January function +0xb3). This inherited
-	 * failure-path bug is preserved; the Unlock restoration does not add it.
-	 */
-	D3DVertexBuffer *d3d_vertex_buffer;
+	D3DVertexBuffer *d3d_vertex_buffer = NULL;
 	byte *locked_vertices;
 	boolean success;
 	short vertex_size;
