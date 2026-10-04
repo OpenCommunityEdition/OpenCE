@@ -73,8 +73,6 @@ answered it in a while.
 #include "port_config.h"
 #include "p2p_internal.h"
 
-#include <SDL3/SDL.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1534,7 +1532,7 @@ static void brokers_list(char *text, size_t size)
 		config_folder(path, sizeof(path));
 		snprintf(path + strlen(path), sizeof(path) - strlen(path), "%s", name);
 	}
-	file = (char *)SDL_LoadFile(path, &file_size);
+	file = config_file_read(path, &file_size);
 	if (!file)
 	{
 		platform_log("Internet play: the brokers' file %s cannot be read (network.brokers_file)", path);
@@ -1552,7 +1550,7 @@ static void brokers_list(char *text, size_t size)
 			text[length++] = character == '\n' || character == '\r' || character == '\t' ? ',' : character;
 	}
 	text[length] = 0;
-	SDL_free(file);
+	free(file);
 }
 
 void p2p_signal_start(void)

@@ -1075,6 +1075,11 @@ void config_folder(char *path, size_t size)
 
 /* ---------- public code */
 
+char *config_file_read(const char *path, size_t *size)
+{
+	return config_read_file(path, size);
+}
+
 unsigned long config_changes(void)
 {
 	return config_change_count;
