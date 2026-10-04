@@ -337,6 +337,8 @@ struct host_vcpu
 	int in_call;
 	/* the guest stack of this thread (host_thread.c) */
 	uint32_t stack_top;
+	int sampling;
+	uint64_t timer_next;
 };
 
 static pthread_key_t vcpu_key;
@@ -383,6 +385,13 @@ int host_vcpu_attach(void)
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDR_EL0, 0);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDRRO_EL0, 0);
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_CPSR, 0x3c5); /* EL1h, DAIF masked */
+	vcpu->sampling = getenv("HALO_SAMPLE_PC") != NULL;
+	if (vcpu->sampling)
+	{
+		vcpu->timer_next = 0x400000;
+		hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CVAL_EL0, vcpu->timer_next);
+		hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CTL_EL0, 1); /* enable, no mask */
+	}
 	pthread_setspecific(vcpu_key, vcpu);
 	vcpu->attached = 1;
 	return 0;
@@ -597,7 +606,19 @@ static void run_until_stops(struct host_vcpu *vcpu)
 		if (vcpu->exit->reason == HV_EXIT_REASON_VTIMER_ACTIVATED)
 		{
 			/* the guest masked the timer itself (its interrupts are
-			masked at all times in this design); resume */
+			masked at all times in this design); resume. While the
+			sampler is on, this is the heartbeat: log where the guest
+			is and re-arm. */
+			if (vcpu->sampling)
+			{
+				uint64_t pc_now = 0;
+
+				hv_vcpu_get_reg(vcpu->vcpu, HV_REG_PC, &pc_now);
+				host_logf(HOST_LOG_INFO, "sample pc=%llx", (unsigned long long)pc_now);
+				vcpu->timer_next += 0x400000; /* (the virtual count runs
+				from 0: CNTVOFF is 0, so the deadline is absolute) */
+				hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CVAL_EL0, vcpu->timer_next);
+			}
 			hv_vcpu_set_vtimer_mask(vcpu->vcpu, false);
 			continue;
 		}
