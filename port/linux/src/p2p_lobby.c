@@ -35,8 +35,10 @@ one deletes or keeps is no authority, so
   keeps the newest of each host (by sequence), drops one not heard in
   GAME_EXPIRY (on its own clock; a retained copy is taken only if its time
   is within RETAINED_WINDOW of this machine's, from a host that died and
-  left it), takes a host's closing listing (a tombstone) as its end, and
-  ignores an emptied slot (a wipe is not a delete).
+  left it, and a live one only within LIVE_WINDOW, so an old listing
+  published again by someone else does not list a game long gone), takes
+  a host's closing listing (a tombstone) as its end, and ignores an
+  emptied slot (a wipe is not a delete).
 A host that stops publishes a tombstone, then clears its slot. Going private
 makes a new invite (p2p.c), so a listing seen before lets no one in.
 
@@ -94,6 +96,8 @@ enum
 	VERIFY_BUDGET = 2,
 	/* seconds */
 	RETAINED_WINDOW = 600,
+	/* (wide: a host whose clock is off is still listed) */
+	LIVE_WINDOW = 3600,
 };
 
 static const char signature_label[] = "hceu-lobby-1";
@@ -668,12 +672,13 @@ static void update_browsing(void)
 			continue;
 		}
 		/* a slot's retained copy: only one of about now (a host that died
-		left it, and nothing cleared it) */
-		if (queued.retained)
+		left it, and nothing cleared it); a live one: not one long gone,
+		published again by someone who kept it */
 		{
 			long difference = (long)(listing.time - (unsigned long)time(NULL));
+			long window = queued.retained ? RETAINED_WINDOW : LIVE_WINDOW;
 
-			if (difference > RETAINED_WINDOW || difference < -RETAINED_WINDOW)
+			if (difference > window || difference < -window)
 				continue;
 		}
 		/* (the work, without the lock: the game's threads need not wait) */

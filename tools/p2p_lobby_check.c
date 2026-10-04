@@ -19,6 +19,7 @@ alone. Prints PASS or the failures.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ---------- stand-ins for the rest of internet play */
 
@@ -192,6 +193,25 @@ static int games(struct p2p_listing *listing)
 	return count;
 }
 
+/* a copy of a listing with another time, signed again (as its host would
+have, then) */
+static void restamp(const unsigned char *payload, int size, long offset, unsigned char *copy)
+{
+	static const char label[] = "hceu-lobby-1";
+	unsigned char data[sizeof(label) - 1 + 512];
+	unsigned long when = (unsigned long)time(NULL) + (unsigned long)offset;
+	int signed_size = size - P2P_SIGNATURE_SIZE;
+
+	memcpy(copy, payload, (size_t)size);
+	copy[10] = (unsigned char)(when >> 24);
+	copy[11] = (unsigned char)(when >> 16);
+	copy[12] = (unsigned char)(when >> 8);
+	copy[13] = (unsigned char)when;
+	memcpy(data, label, sizeof(label) - 1);
+	memcpy(data + sizeof(label) - 1, copy, (size_t)signed_size);
+	p2p_sign(data, (int)(sizeof(label) - 1) + signed_size, copy + signed_size);
+}
+
 /* a payload heard on the host's slot (or another), then the browser's pass */
 static void hear(const unsigned char *payload, int size, int retained, const char *slot)
 {
@@ -209,7 +229,7 @@ static void hear(const unsigned char *payload, int size, int retained, const cha
 static void lobby_checks(void)
 {
 	static const unsigned char token[P2P_TOKEN_SIZE] = { 7, 7, 7 };
-	unsigned char first[512], tampered[512];
+	unsigned char first[512], tampered[512], old[512];
 	int first_size, count;
 	struct p2p_listing listing;
 	char expected_invite[P2P_LINK_SIZE];
@@ -271,6 +291,19 @@ static void lobby_checks(void)
 	clock_now += 91000;
 	lobby_update(token, 3, 16);
 	check(games(NULL) == 0, "a listing unheard for 90 s expires");
+	/* signed long ago, published again by someone who kept it: ignored,
+	live or retained */
+	restamp(published, published_size, -2 * 3600, old);
+	hear(old, published_size, 0, NULL);
+	check(games(NULL) == 0, "a live listing of long ago is ignored");
+	hear(old, published_size, 1, NULL);
+	check(games(NULL) == 0, "a retained listing of long ago is ignored");
+	/* a host whose clock is half an hour off: still listed live */
+	restamp(published, published_size, -1800, old);
+	hear(old, published_size, 0, NULL);
+	check(games(NULL) == 1, "a live listing half an hour off is taken");
+	clock_now += 91000;
+	lobby_update(token, 3, 16);
 	/* the slot's retained copy, of about now: taken (the host published it
 	again on its 30 s) */
 	lobby_update(token, 3, 16);
