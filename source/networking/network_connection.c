@@ -486,6 +486,15 @@ boolean network_connection_connect(
 		return FALSE;
 	}
 	success = TRUE;
+	/* port: a connection made is open, whatever came before it. A write
+	made before connecting (while searching for games, to no socket yet)
+	marked it closed, and every write of the join request then failed. */
+	SET_FLAG(connection->flags, _connection_closed_bit, FALSE);
+	SET_FLAG(connection->flags, _connection_going_stale_bit, FALSE);
+	if (connection->reliable_outgoing_queue)
+	{
+		circular_queue_reset(connection->reliable_outgoing_queue);
+	}
 
 	if (connection->unreliable_endpoint)
 	{
