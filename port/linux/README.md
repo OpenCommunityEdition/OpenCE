@@ -157,6 +157,17 @@ change. The screens open, close and move between each other as the PC
 version's. `display.menus = "xbox"` gives the Xbox's menus, which start every
 kind of game.
 
+In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
+the profile's settings while the game goes on, and for the host END GAME.
+END GAME ends the game as its time limit does: the players stay, and after
+the carnage report the host picks the next map and gametype (PICK GAME).
+LEAVE GAME of the host still ends the game for everyone. The buttons go into
+the map's own pause menu, before LEAVE GAME, so the buttons of a custom map
+stay. The Xbox's pause box is drawn taller to hold them (a redraw,
+`port/assets/menus/port_svg/pause`); a custom map's box keeps its size, and
+what is below its list moves down. The few pictures of the settings that
+come from the main menu's map are not drawn there.
+
 The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
 them from the PC version's tags), which the game contains. To change them,
 put files in a `menus` folder next to `config.toml`: a file with the same

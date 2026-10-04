@@ -3332,7 +3332,11 @@ static void event_handler_dispatch(
 		{
 			close_all = TRUE;
 		}
+		/* port: not from a widget its function deleted (it went back:
+		menu_functions.c's profile_save_changes), which the Xbox's opened
+		from regardless */
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted &&
 			handler->widget_tag.index != NONE)
 		{
 			if (!ui_widget_launch_widget(widget, handler->widget_tag.index))

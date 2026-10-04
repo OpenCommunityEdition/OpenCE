@@ -1733,6 +1733,8 @@ boolean network_player_is_valid(struct network_player *player);
 boolean playlist_profile_get(long index, struct game_variant *variant);
 boolean playlist_profile_get_display_name(long index, wchar_t *name);
 boolean input_get_key(struct key_stroke *key);
+boolean game_engine_running(void);
+void game_engine_end_game(void);
 /* the platform layer's */
 int p2p_join_invite(char const *text);
 int p2p_invite_link(char *link, int size);
@@ -2894,6 +2896,38 @@ static boolean browser_select(struct widget_instance *widget, struct event_recor
 	return TRUE;
 }
 
+/* "player profile save changes" (Settings' OK, the profile being edited):
+saved if it has changes, as the Xbox's (the saving screen follows); if it
+has none (the settings' own screens write theirs to config.toml as their OK
+is chosen), editing ends and the previous screen comes back, as CANCEL
+(the Xbox's called that a failure, and closed every screen) */
+static boolean profile_save_changes(struct widget_instance *widget, boolean *widget_deleted)
+{
+	if (player_ui_edit_profile_is_dirty())
+	{
+		if (player_ui_save_profile())
+			return TRUE;
+		platform_log("menus: could not save the profile's changes");
+		return campaign_fail();
+	}
+	player_ui_end_editing_profile();
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* "port pause end game" (the in-game pause menu's END GAME, the host's:
+menu_tags.c's pause_patch): the game ends as its time limit would, its
+players staying for the next (the carnage report, then the host's PICK GAME) */
+static boolean pause_end_game(void)
+{
+	if (!global_network_game_server_get() || !game_engine_running())
+		return campaign_fail();
+	game_engine_end_game();
+	return TRUE;
+}
+
 /* ---- the lobby: the game's players (up to the port's 128), its map and
 gametype, the countdown */
 
@@ -3865,6 +3899,14 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "gamespy screen dispose"))
 		{
 			lobby_browser_end();
+		}
+		else if (!strcmp(name, "port pause end game"))
+		{
+			return pause_end_game();
+		}
+		else if (!strcmp(name, "player profile save changes"))
+		{
+			return profile_save_changes(widget, widget_deleted);
 		}
 		else if (!strcmp(name, "direct ip connect go"))
 		{

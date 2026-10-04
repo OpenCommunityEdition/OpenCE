@@ -474,6 +474,39 @@ def title_backdrop(width: float) -> str:
         "  </g>", "</svg>", ""])
 
 
+# the in-game pause menu's box, taller for the buttons this port adds
+# (menu_tags.c's pause_patch: SETTINGS, and the host's END GAME): the
+# pausebox5 redraw's rounded box (ui-svg-handmade/shell/bitmaps), drawn to
+# hold each number of buttons, one frame each (the Xbox's 2-button box is
+# 159 units high, and each button 35 more)
+PAUSE_BOX_BUTTONS = [3, 4]
+
+
+def pause_box_height(buttons: int) -> int:
+    return 159 + (buttons - 2) * 35
+
+
+def pause_box_svg(piece: str, height: int) -> str:
+    """a piece of the pause box (left cap, centre strip, right cap; 9-slice:
+    the strip tiles across), height units high in its 256-high texture"""
+    width = 4 if piece == "center" else 16
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="256" viewBox="0 0 {width} 256">']
+    if piece == "center":
+        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="#0a2649" fill-opacity="0.75"/>',
+                  '  <rect x="0" y="0" width="4" height="2" fill="#2896ff"/>',
+                  f'  <rect x="0" y="{height - 2}" width="4" height="2" fill="#2896ff"/>']
+    else:
+        bottom, corner = height - 1, height - 9.5
+        cap = [f'    <path d="M9.5,1 H17 V{bottom} H9.5 A8.5,8.5 0 0 1 1,{corner} V9.5 A8.5,8.5 0 0 1 9.5,1 Z" '
+               'fill="#0a2649" fill-opacity="0.75" fill-rule="evenodd"/>',
+               f'    <path d="M17,1 H9.5 A8.5,8.5 0 0 0 1,9.5 V{corner} A8.5,8.5 0 0 0 9.5,{bottom} H17" fill="none" '
+               'stroke="#2896ff" stroke-width="2"/>']
+        lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
+            [line[2:] for line in cap]
+    lines += ["</svg>", ""]
+    return "\n".join(lines)
+
+
 # where the PC headers' text is (units of their 512x64), and its colour
 TITLE_LEFT, TITLE_TOP, TITLE_CAP = 30.68, 33.5, 21.5
 TITLE_COLOR = (0x29, 0x95, 0xFD, 255)
