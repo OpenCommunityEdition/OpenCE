@@ -1711,9 +1711,12 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 	boolean result = TRUE;
 	/* port: the advertisement is broadcast (to every internet play peer
 	too): one each so often answers every machine searching, and a flood of
-	searches no more */
+	searches no more. A searcher not on the client port hears no broadcast,
+	so it is answered directly every time. */
 	static unsigned long last_advertised_time = 0;
 	unsigned long now = system_milliseconds();
+	boolean broadcast_due = !last_advertised_time || now - last_advertised_time >= GAME_ADVERTISEMENT_INTERVAL;
+	boolean answer_directly = source_address && source_address->port != NETWORK_GAME_CLIENT_PORT;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
@@ -1724,7 +1727,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 		struct network_game *game = network_game_server_get_game(server);
 
 		/* (the time taken only by a search answered) */
-		if (game && last_advertised_time && now - last_advertised_time < GAME_ADVERTISEMENT_INTERVAL)
+		if (game && !broadcast_due && !answer_directly)
 			return TRUE;
 		if (game)
 		{
@@ -1800,35 +1803,24 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 				sizeof(advertisement));
 			if (reply)
 			{
-				word message_size = GET_MESSAGE_SIZE(reply->header);
 				struct network_connection *connection =
 					network_game_server_get_connection(server);
 
-				last_advertised_time = now ? now : 1;
-				result = network_game_server_write(
-					connection,
-					reply,
-					message_size,
-					&address,
-					0);
-				if (!result)
+				if (broadcast_due)
 				{
-					network_event(
-						"network_game_server_write() failed in handle_message_client_broadcast_game_search()");
-				}
-				/* port: also answer a searcher that isn't on the client port */
-				else if (source_address->port != NETWORK_GAME_CLIENT_PORT)
-				{
-					reply = create_network_game_message(
-						_message_server_game_advertise,
-						&advertisement,
-						sizeof(advertisement));
-					if (reply)
+					last_advertised_time = now ? now : 1;
+					result = network_game_server_write(connection, reply, GET_MESSAGE_SIZE(reply->header), &address, 0);
+					if (!result)
 					{
-						network_game_server_write(connection, reply, GET_MESSAGE_SIZE(reply->header),
-							source_address, 0);
+						network_event(
+							"network_game_server_write() failed in handle_message_client_broadcast_game_search()");
 					}
+					/* (the write swapped the header in place: a fresh copy for the next) */
+					reply = answer_directly ? create_network_game_message(_message_server_game_advertise,
+						&advertisement, sizeof(advertisement)) : NULL;
 				}
+				if (answer_directly && reply)
+					network_game_server_write(connection, reply, GET_MESSAGE_SIZE(reply->header), source_address, 0);
 			}
 			else
 			{
