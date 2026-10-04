@@ -297,8 +297,38 @@ int host_vm_start(void)
 	return 0;
 }
 
+/* the guest's vectors: 16 slots of the diag stub (mrs esr; mrs far;
+doorbell; spin), so any guest exception reports itself before the guest
+double-faults into unmapped vector space */
+static int map_vectors(void)
+{
+	static const uint32_t stub[] = {
+		0xD5385200, /* mrs x0, ESR_EL1 */
+		0xD5386001, /* mrs x1, FAR_EL1 */
+		0xD29FFF11, /* mov x17, #0xfff8 */
+		0xF2A20011, /* movk x17, #0x1000, lsl #16 */
+		0xB900023F, /* str wzr, [x17] */
+		0x14000000, /* b . */
+	};
+	static uint8_t *page;
+
+	if (page)
+		return 0;
+	page = mmap(NULL, GUEST_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (page == MAP_FAILED)
+		return -1;
+	for (unsigned slot = 0; slot < 16; slot++)
+		memcpy(page + slot * 0x80, stub, sizeof(stub));
+	if (hv_vm_map(page, GUEST_VECTORS_BASE, GUEST_PAGE_SIZE,
+		HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC) != HV_SUCCESS)
+		return -1;
+	return 0;
+}
+
 int host_vm_map_window(void)
 {
+	if (map_vectors() != 0)
+		return -1;
 	/* the Xbox window: one mapping, lazily backed by the kernel (the
 	guest zeroes or streams into it) */
 	static uint8_t *window;
@@ -381,7 +411,7 @@ int host_vcpu_attach(void)
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CPACR_EL1, 0x300000);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CTL_EL0, 0);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTVOFF_EL2, 0);
-	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_VBAR_EL1, 0);
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_VBAR_EL1, GUEST_VECTORS_BASE);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDR_EL0, 0);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TPIDRRO_EL0, 0);
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_CPSR, 0x3c5); /* EL1h, DAIF masked */
@@ -463,6 +493,18 @@ static void service_doorbell(struct host_vcpu *vcpu)
 	uint32_t index;
 	struct guest_registers registers;
 
+	if (ipa == GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 8)
+	{
+		/* the guest's exception vector: it reports the original
+		exception's ESR and FAR through x0/x1 */
+		struct guest_registers diag;
+
+		registers_load(vcpu, &diag);
+		host_logf(HOST_LOG_ERROR, "GUEST EXCEPTION: esr %x%08x far %x%08x (pc %llx)",
+			(unsigned)(diag.x[1] >> 0), diag.x[0], (unsigned)0, diag.x[1],
+			(unsigned long long)vcpu->pc_after_exit);
+		host_fatal("the guest took an exception (see the line above)");
+	}
 	if (ipa < GUEST_DOORBELL_BASE || ipa >= GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE)
 	{
 		struct guest_registers registers;

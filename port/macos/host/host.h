@@ -48,6 +48,10 @@ this header to type each wrapper.
 #define GUEST_DOORBELL_BASE 0x10000000u
 #define GUEST_DOORBELL_SIZE 0x10000u
 
+/* the guest's exception vector page (the host writes the stubs; the
+guest's VBAR points here, so its exceptions doorbell ESR/FAR to us) */
+#define GUEST_VECTORS_BASE 0x20000000u
+
 /* everything the guest can address */
 #define GUEST_LOW_LIMIT 0x100000000ull
 
