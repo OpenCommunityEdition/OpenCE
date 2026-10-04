@@ -1540,8 +1540,12 @@ static void particle_system_render(
 					}
 
 					bitmap = bitmap_group_get(state_definition->bitmaps.index);
+					/* port: rotational sprites use the sequence after the state's. Some
+					Custom Edition bitmaps don't have one (on foundation), so those
+					draw from the state's own sequence. */
 					if (type_definition->complex_sprite_render_mode ==
-						_particle_system_type_complex_sprite_render_mode_rotational)
+						_particle_system_type_complex_sprite_render_mode_rotational &&
+						state_definition->sequence_index + 1 < bitmap->sequences.count)
 					{
 						sequence_index = state_definition->sequence_index + 1;
 					}
