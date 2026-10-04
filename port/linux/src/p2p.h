@@ -78,6 +78,10 @@ void p2p_set_hosting_allowed(int allowed);
 /* the invite link of the game this machine hosts (empty, 0: none, or LAN
 only) */
 int p2p_invite_link(char *link, int size);
+/* an invite (a link or a code, or any text holding one) as the log shows
+it: its first digits only, since players post their logs and an invite lets
+anyone join; the dedicated server's log, its operator's, has it whole */
+const char *p2p_invite_log_text(const char *invite, char *text, int size);
 
 /* the hosted game's players and the most it takes, which Discord shows
 (0, 0: not hosting; until the game says, the machines the tunnel reaches

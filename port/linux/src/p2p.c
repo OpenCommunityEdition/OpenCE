@@ -2515,6 +2515,33 @@ static int join_invite(const char *text)
 	return 1;
 }
 
+/* (p2p.h) */
+const char *p2p_invite_log_text(const char *invite, char *text, int size)
+{
+	enum { SHOWN_DIGITS = 8 };
+	const char *start = invite;
+	const char *search;
+	size_t kept;
+
+	/* (after "halo://join/" or "halo://key/", if there is one) */
+	for (search = invite; *search; search++)
+	{
+		if (!strncmp(search, "://", 3))
+		{
+			const char *slash = strchr(search + 3, '/');
+
+			start = slash ? slash + 1 : search + 3;
+			break;
+		}
+	}
+	kept = (size_t)(start - invite) + SHOWN_DIGITS;
+	if (strlen(invite) <= kept)
+		snprintf(text, (size_t)size, "%s", invite);
+	else
+		snprintf(text, (size_t)size, "%.*s... (the rest is left out of the log)", (int)kept, invite);
+	return text;
+}
+
 int p2p_join_invite(const char *text)
 {
 	int result;
@@ -2689,8 +2716,12 @@ void p2p_new_invite_if_listed(void)
 	if (!p2p.has_token || !p2p.token_listed)
 		return;
 	make_invite();
-	platform_log("Internet play: a new invite, so that the one listed lets no one in (private, or a new password): %s",
-		p2p.invite);
+	{
+		char shown[128];
+
+		platform_log("Internet play: a new invite, so that the one listed lets no one in (private, or a new password): %s",
+			p2p_invite_log_text(p2p.invite, shown, sizeof(shown)));
+	}
 	if (p2p.hosting)
 	{
 		p2p_signal_host(p2p.token);
@@ -2723,8 +2754,14 @@ static void update_hosting(void)
 		p2p.stun_started = 1;
 		p2p_signal_start();
 		p2p_signal_host(p2p.token);
-		platform_log("Internet play: hosting. Invite players with this link (it only works while this "
-			"copy of the game runs): %s", p2p.invite);
+		{
+			char shown[128];
+
+			/* (whole on the clipboard and in the menus) */
+			platform_log("Internet play: hosting. Invite players with this link (it only works while this "
+				"copy of the game runs; it is on the clipboard): %s",
+				p2p_invite_log_text(p2p.invite, shown, sizeof(shown)));
+		}
 		if (!p2p.invite_copied)
 		{
 			memcpy(p2p.clipboard, p2p.invite, sizeof(p2p.clipboard));
