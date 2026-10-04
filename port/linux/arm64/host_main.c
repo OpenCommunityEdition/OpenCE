@@ -240,6 +240,10 @@ int main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
+	/* Mesa's GL thread, as the x86 build asks for it (sdl_platform.c): the
+	guest's environment is its own copy, so the guest's request cannot reach
+	the driver, which reads this process's. An explicit setting stays. */
+	setenv("mesa_glthread", "true", 0);
 	host_install_signal_handlers();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");

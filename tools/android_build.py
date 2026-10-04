@@ -234,7 +234,7 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
                          third_party: Path, guest_cc: str, gl_headers: Path, ar: str, ld: str, builtins: str,
                          asm_target: str, abi_flags: List[str] = GUEST_ABI_FLAGS,
                          extra_runtime: List[Path] = [], extra_imports: List[Path] = [],
-                         updater_cflags: str = "") -> Dict[str, Path]:
+                         updater_cflags: str = "", desktop_gl: bool = False) -> Dict[str, Path]:
     """The guest image (build/halo_guest.elf) and the host's import table, for
     the builds that run the game as ILP32 AArch64 code: Android, and Linux
     arm64 (tools/linux_arm64_build.py). The caller sets ${prefix}_guest_cc to
@@ -244,7 +244,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
     extra_runtime are more guest runtime sources, and extra_imports more
     lists of the host functions they import; updater_cflags are the desktop
     self-updater's defines (port/linux/src/updater.c), for a guest that has
-    it."""
+    it. desktop_gl gives the guest desktop OpenGL's entry points (from
+    gl_headers' GL/glcorearb.h) in place of OpenGL ES's, for a guest without
+    HALO_GLES (the Linux arm64 build's desktop renderer)."""
     musl_dir = third_party / f"musl-{MUSL_VERSION}"
     sdl_dir = third_party / "SDL3"
     guest_dir = build / "guest"
@@ -291,17 +293,23 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, prefix:
         name=f"{prefix}_gl_include",
         command=(f"mkdir -p {gl_include} && ln -sfn {gl_headers}/GLES2 {gl_include}/GLES2 && "
                  f"ln -sfn {gl_headers}/GLES3 {gl_include}/GLES3 && "
-                 f"ln -sfn {gl_headers}/KHR {gl_include}/KHR && touch $out"),
+                 f"ln -sfn {gl_headers}/KHR {gl_include}/KHR && "
+                 f"ln -sfn {gl_headers}/GL {gl_include}/GL && touch $out"),
         description=f"{label} GL HEADERS",
     )
     n.build(outputs=gl_stamp, rule=f"{prefix}_gl_include")
 
     guest_gl_c = gen_dir / "guest_gl.c"
     gl_imports = gen_dir / "gl_imports.list"
+    if desktop_gl:
+        gl_stubs_command = (f"{python} tools/android_gl_stubs.py --desktop {LINUX_DIR}/src/gl.h "
+                            f"{gl_headers}/GL/glcorearb.h {guest_gl_c} {gl_imports}")
+    else:
+        gl_stubs_command = (f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {gl_headers}/GLES3/gl32.h "
+                            f"{gl_headers}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}")
     n.rule(
         name=f"{prefix}_gl_stubs",
-        command=(f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {gl_headers}/GLES3/gl32.h "
-                 f"{gl_headers}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"),
+        command=gl_stubs_command,
         description=f"{label} GL STUBS",
     )
     n.build(outputs=[guest_gl_c, gl_imports], rule=f"{prefix}_gl_stubs",

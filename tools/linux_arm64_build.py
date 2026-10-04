@@ -69,6 +69,19 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         return
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
     cc = getattr(sln, "linux_arm64_cc", None) or "clang"
+    # the renderer: OpenGL ES 3 (HALO_GLES, as on Android), or desktop OpenGL
+    # 4.5 (--linux-arm64-gl=desktop, which the VR build needs: the OpenXR
+    # runtime takes a desktop GL context)
+    vr = getattr(sln, "port_vr", False)
+    desktop_gl = vr or getattr(sln, "linux_arm64_gl", "gles") == "desktop"
+    abi_flags = list(LINUX_ARM64_GUEST_ABI_FLAGS)
+    host_defines: List[str] = []
+    if desktop_gl:
+        abi_flags.remove("-DHALO_GLES=1")
+        host_defines.append("-DHALO_DESKTOP_GL=1")
+    if vr:
+        abi_flags.append("-DHALO_VR=1")
+        host_defines.append("-DHALO_VR=1")
 
     n.comment("64-bit ARM Linux build (ninja linux_arm64); see port/linux/README.md")
     n.variable("linux_arm64_guest_cc", cc)
@@ -78,9 +91,9 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         n, sln, config, prefix="linux_arm64", label="LINUX ARM64", build=BUILD, third_party=THIRD_PARTY,
         guest_cc=cc, gl_headers=GL_HEADERS, ar="llvm-ar", ld="ld.lld",
         builtins="$$($linux_arm64_cc -print-libgcc-file-name)", asm_target="aarch64-linux-gnu",
-        abi_flags=LINUX_ARM64_GUEST_ABI_FLAGS, extra_runtime=[PORT_DIR / "guest_desktop.c"],
+        abi_flags=abi_flags, extra_runtime=[PORT_DIR / "guest_desktop.c"],
         extra_imports=[PORT_DIR / "host_imports.list"],
-        updater_cflags=updater_defines(getattr(sln, "port_release", False)))
+        updater_cflags=updater_defines(getattr(sln, "port_release", False)), desktop_gl=desktop_gl)
 
     # ---------- SDL3, built from the same source as the guest's headers
 
@@ -110,7 +123,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
     host_cflags = " ".join([
         "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
         f"-I{ANDROID_DIR}/include", f"-I{ANDROID_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
-        f"-I{TOML_DIR}",
+        f"-I{TOML_DIR}", *host_defines,
     ])
     host_sources = [source for source in sorted((ANDROID_DIR / "host").glob("*.c")) if source.name != "host_main.c"]
     host_sources += [

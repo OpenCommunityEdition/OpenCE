@@ -79,6 +79,18 @@ parser.add_argument(
     type=str,
     help="clang (with the arm64_32 target) for `ninja linux_arm64`, the 64-bit ARM Linux build (default: clang)",
 )
+parser.add_argument(
+    "--linux-arm64-gl",
+    choices=["gles", "desktop"],
+    default="gles",
+    help="the renderer of `ninja linux_arm64`: OpenGL ES 3 (the default, as on Android) or desktop OpenGL 4.5",
+)
+parser.add_argument(
+    "--vr",
+    action="store_true",
+    help="the VR mode (OpenXR) in `ninja linux_arm64`, with the desktop OpenGL renderer; "
+    "refer to port/linux/VR.md",
+)
 args = parser.parse_args()
 
 # the settings the builds read
@@ -94,6 +106,8 @@ sln = SimpleNamespace(
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
     linux_arm64_cc=args.linux_arm64_cc,
+    linux_arm64_gl=args.linux_arm64_gl,
+    port_vr=args.vr,
 )
 
 
