@@ -664,9 +664,19 @@ void updater_start(void)
 	updater_clean_up();
 	/* (not for builds without a number, the player's no, or runs nobody is
 	watching, but for a test with its answer) */
-	if (HALO_BUILD_NUMBER <= 0 || !config_boolean("update.auto") ||
-		(!config_string("debug.update_answer")[0] && (config_boolean("debug.hidden_window") ||
-			config_real("debug.exit_after") > 0.0 || config_string("debug.network_test")[0])))
+	if (HALO_BUILD_NUMBER <= 0)
+	{
+		platform_log("update: not looked for: only the builds CI numbers update themselves (this one has no "
+			"number)");
+		return;
+	}
+	if (!config_boolean("update.auto"))
+	{
+		platform_log("update: not looked for: update.auto is false");
+		return;
+	}
+	if (!config_string("debug.update_answer")[0] && (config_boolean("debug.hidden_window") ||
+		config_real("debug.exit_after") > 0.0 || config_string("debug.network_test")[0]))
 	{
 		return;
 	}
