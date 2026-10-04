@@ -81,7 +81,7 @@ struct finished_thread
 };
 
 static pthread_mutex_t reaper_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t reaper_condition = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t reaper_condition = PTHREAD_COND_INITIALIZER;
 static struct finished_thread *finished_threads;
 static int reaper_started;
 

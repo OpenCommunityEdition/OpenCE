@@ -93,7 +93,7 @@ static struct pool_region *pool_create(uint32_t size)
 		return NULL;
 	pool->size = round_page(size);
 	pool->host = mmap(NULL, pool->size, PROT_READ | PROT_WRITE,
-		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+		MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (pool->host == MAP_FAILED)
 	{
 		free(pool);
@@ -305,6 +305,9 @@ static int map_vectors(void)
 	static const uint32_t stub[] = {
 		0xD5385200, /* mrs x0, ESR_EL1 */
 		0xD5386001, /* mrs x1, FAR_EL1 */
+		0xD5381002, /* mrs x2, SCTLR_EL1 */
+		0xD5382003, /* mrs x3, TTBR0_EL1 */
+		0xD5384024, /* mrs x4, ELR_EL1 */
 		0xD29FFF11, /* mov x17, #0xfff8 */
 		0xF2A20011, /* movk x17, #0x1000, lsl #16 */
 		0xB900023F, /* str wzr, [x17] */
@@ -319,6 +322,18 @@ static int map_vectors(void)
 		return -1;
 	for (unsigned slot = 0; slot < 16; slot++)
 		memcpy(page + slot * 0x80, stub, sizeof(stub));
+	/* the return stub of host-to-guest calls (host_call_guest aims x30
+	here; its doorbell store carries the "call returned" signal) */
+	{
+		static const uint32_t ret_stub[] = {
+			0xD29FFF17, /* mov x17, #0xfff4 */
+			0xF2A20011, /* movk x17, #0x1000, lsl #16 */
+			0xB900023F, /* str wzr, [x17] */
+			0xD65F03C0, /* ret */
+		};
+
+		memcpy(page + 0x7C0, ret_stub, sizeof(ret_stub));
+	}
 	if (hv_vm_map(page, GUEST_VECTORS_BASE, GUEST_PAGE_SIZE,
 		HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC) != HV_SUCCESS)
 		return -1;
@@ -329,6 +344,7 @@ int host_vm_map_window(void)
 {
 	if (map_vectors() != 0)
 		return -1;
+	build_identity_tables();
 	/* the Xbox window: one mapping, lazily backed by the kernel (the
 	guest zeroes or streams into it) */
 	static uint8_t *window;
@@ -350,6 +366,53 @@ int host_vm_map_window(void)
 		}
 	}
 	return 0;
+}
+
+
+/* ---------- the guest's identity page tables
+
+The guest runs with its stage-1 MMU ON over flat identity tables (every
+virtual address == its physical address, all Normal Cacheable, RWX). With
+the MMU off, every access is Device memory, and unaligned stores (musl's
+vectorized memset) take synchronous external aborts on Device — the Linux
+and Android builds run with the MMU on, and the game's code assumes it.
+
+Two 4 KiB tables in guest RAM: an L0 with one entry (virtual 0-512 GB)
+pointing at an L1 whose first four entries are 1 GiB blocks covering the
+low 4 GB. The guest never touches them (its mmaps come from the host). */
+
+struct guest_identity_tables
+{
+	uint64_t l0[512];
+	uint64_t l1[512];
+};
+
+#define PTE_VALID 0x1ull
+#define PTE_BLOCK (0x1ull)          /* level 1: block */
+#define PTE_TABLE (0x3ull)          /* level 0: table pointer */
+#define PTE_AF (0x1ull << 10)
+#define PTE_ATTR_NORMAL (0x0ull << 2) /* MAIR index 0: Normal WB (0xFF) */
+#define PTE_ATTR_DEVICE (0x0ull << 2) /* MAIR index 0 */
+#define PTE_RW (0x0ull << 6)          /* AP[2:1] = 00: EL1 rw, EL0 none */
+#define PTE_XN (0x0ull)               /* executable everywhere */
+
+static uint32_t identity_tables_guest;
+
+void build_identity_tables(void)
+{
+	struct guest_identity_tables *tables =
+		(struct guest_identity_tables *)host_low_map(sizeof(*tables));
+
+	if (!tables)
+		host_fatal("cannot allocate the guest's identity page tables");
+	identity_tables_guest = host_guest_address(tables);
+	memset(tables, 0, sizeof(*tables));
+	tables->l0[0] = ((uint64_t)identity_tables_guest + sizeof(tables->l0)) | PTE_TABLE;
+	for (unsigned block = 0; block < 4; block++)
+	{
+		tables->l1[block] = ((uint64_t)block << 30) | PTE_BLOCK | PTE_ATTR_NORMAL |
+			PTE_AF | PTE_RW | PTE_XN;
+	}
 }
 
 /* ---------- vCPUs */
@@ -406,8 +469,24 @@ int host_vcpu_attach(void)
 		free(vcpu);
 		return -1;
 	}
-	/* a bare ARM machine: MMU off, FP/SIMD on, timers quiet, no vectors */
-	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_SCTLR_EL1, 0);
+	/* identity-mapped Normal memory (build_identity_tables), MMU on */
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TTBR0_EL1, identity_tables_guest);
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TTBR1_EL1, identity_tables_guest);
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_TCR_EL1,
+		(16ull << 0) |          /* T0SZ=16: walk starts at L0 */
+		(16ull << 32) |         /* T1SZ=16 */
+		(0x2ull << 10) |        /* IRGN0: WB cache */
+		(0x2ull << 12) |        /* ORGN0: WB cache */
+		(0x2ull << 26) |        /* IRGN1 */
+		(0x2ull << 28) |        /* ORGN1 */
+		(0x2ull << 30));        /* T1SZ/EPD1? (T1 in place) */
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_MAIR_EL1,
+		0x00000000FFull);       /* attr0 Normal WB, attr1 Device-nGnRE */
+	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_SCTLR_EL1,
+		0x10000000 |            /* EOS? no: bit28=1 compat */
+		(1ull << 2) |           /* C: data cache */
+		(1ull << 12) |          /* I: instruction cache */
+		(1ull << 0));           /* M: MMU on */
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CPACR_EL1, 0x300000);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTV_CTL_EL0, 0);
 	hv_vcpu_set_sys_reg(vcpu->vcpu, HV_SYS_REG_CNTVOFF_EL2, 0);
@@ -493,6 +572,13 @@ static void service_doorbell(struct host_vcpu *vcpu)
 	uint32_t index;
 	struct guest_registers registers;
 
+	if (vcpu->in_call && ipa == GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 12)
+	{
+		/* the guest function returned from a host_call_guest: the
+		caller reads x0 (and friends) from the registers */
+		vcpu->in_call = 0;
+		return;
+	}
 	if (ipa == GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 8)
 	{
 		/* the guest's exception vector: it reports the original
@@ -500,9 +586,37 @@ static void service_doorbell(struct host_vcpu *vcpu)
 		struct guest_registers diag;
 
 		registers_load(vcpu, &diag);
-		host_logf(HOST_LOG_ERROR, "GUEST EXCEPTION: esr %x%08x far %x%08x (pc %llx)",
-			(unsigned)(diag.x[1] >> 0), diag.x[0], (unsigned)0, diag.x[1],
-			(unsigned long long)vcpu->pc_after_exit);
+		{
+			uint8_t *far_host = host_guest_pointer((unsigned)diag.x[1]);
+			int host_writable = far_host ? 1 : 0;
+
+			if (far_host)
+			{
+				*far_host = *far_host; /* (a host write to the same byte) */
+			}
+			host_logf(HOST_LOG_ERROR, "GUEST EXCEPTION: esr %08x far %08x sctlr %08x ttbr0 %08x hostmap %p w%d elr %08x (pc %llx)",
+							diag.x[0], diag.x[1], diag.x[2], diag.x[3], (void *)far_host, host_writable, diag.x[4],
+							(unsigned long long)vcpu->pc_after_exit);
+						{
+							uint32_t fp = diag.x[29];
+							int depth;
+
+							for (depth = 0; depth < 6 && fp; depth++)
+							{
+								uint8_t *frame = host_guest_pointer(fp);
+								uint32_t next, pc;
+
+								if (!frame)
+									break;
+								memcpy(&next, frame, 4);
+								memcpy(&pc, frame + 8, 4);
+								host_logf(HOST_LOG_ERROR, "  frame %d: return %x", depth, pc);
+								if (!next || next <= fp)
+									break;
+								fp = next;
+							}
+						}
+		}
 		host_fatal("the guest took an exception (see the line above)");
 	}
 	if (ipa < GUEST_DOORBELL_BASE || ipa >= GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE)
@@ -605,10 +719,17 @@ static void run_until_stops(struct host_vcpu *vcpu)
 			{
 				if (host_memory_watch_fault(vcpu->exit->exception.physical_address))
 					continue; /* the store re-executes (the page is writable now) */
+				{
+					uint64_t ipa = vcpu->exit->exception.physical_address;
+
+					if (vcpu->in_call && ipa == GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 12)
+					{
+						vcpu->in_call = 0;
+						hv_vcpu_set_reg(vcpu->vcpu, HV_REG_PC, vcpu->pc_after_exit);
+						return;
+					}
+				}
 				service_doorbell(vcpu);
-				if (vcpu->in_call == 0 && vcpu->return_doorbell &&
-					vcpu->exit->exception.physical_address == vcpu->return_doorbell)
-					return;
 				continue;
 			}
 		{
@@ -704,10 +825,11 @@ uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, 
 		runs on this thread's guest stack) */
 		memset(&registers, 0, sizeof(registers));
 		registers.pc = host_image.header->thread_attach;
+		registers.x[30] = GUEST_VECTORS_BASE + 0x7C0;
 		registers.sp = vcpu->stack_top;
 		registers_store(vcpu, &registers);
 		return_doorbell_map();
-		vcpu->return_doorbell = RETURN_DOORBELL;
+		vcpu->return_doorbell = GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 12;
 		vcpu->in_call = 1;
 		run_until_stops(vcpu);
 		/* (x0 = the new thread pointer; guest_tp reads it in
@@ -718,11 +840,12 @@ uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, 
 	registers.x[1] = b;
 	registers.x[2] = c;
 	registers.x[3] = d;
+	registers.x[30] = GUEST_VECTORS_BASE + 0x7C0; /* the return stub */
 	registers.pc = function;
 	registers.sp = vcpu->stack_top;
 	registers_store(vcpu, &registers);
 	return_doorbell_map();
-	vcpu->return_doorbell = RETURN_DOORBELL;
+	vcpu->return_doorbell = GUEST_DOORBELL_BASE + GUEST_DOORBELL_SIZE - 12;
 	vcpu->in_call = 1;
 	run_until_stops(vcpu);
 	registers_load(vcpu, &registers);
@@ -806,4 +929,9 @@ uint32_t host_guest_address(const void *pointer)
 	}
 	pthread_mutex_unlock(&vm_lock);
 	return result;
+}
+
+void *guest_to_host(unsigned int guest)
+{
+	return host_guest_pointer(guest);
 }

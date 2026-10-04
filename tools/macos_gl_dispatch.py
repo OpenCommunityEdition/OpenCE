@@ -80,7 +80,7 @@ def main():
                 simd.append(f"\t{ptype} a{index}; memcpy(&a{index}, &q[{index}], sizeof(a{index}));")
                 call_args.append(f"a{index}")
             elif "*" in ptype:
-                call_args.append(f"(void *)(uintptr_t)R->x[{index}]")
+                call_args.append(f"(void *)guest_to_host((unsigned)R->x[{index}])")
             elif ptype in ("GLsizeiptr", "GLintptr", "GLint64", "GLuint64"):
                 call_args.append(f"(long long)R->x[{index}]")
             else:

@@ -100,7 +100,7 @@ def main():
         for index, (ptype, pname) in enumerate(plist):
             reg = f"x[{index}]"
             if "*" in ptype:
-                call_args.append(f"({ptype})(uintptr_t)R->{reg}")
+                call_args.append(f"({ptype})guest_to_host((unsigned)R->{reg})")
             elif ptype in ("long long", "unsigned long long", "int64_t", "uint64_t"):
                 call_args.append(f"({ptype})R->{reg}")
             elif ptype in ("float", "double"):

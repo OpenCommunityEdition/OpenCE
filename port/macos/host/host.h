@@ -160,11 +160,14 @@ int host_low_owns(uintptr_t address, size_t size);
 void host_mirror_install(uint32_t guest, void *host);
 /* the host address of a guest address, or NULL */
 uint8_t *host_guest_pointer(unsigned int guest);
+/* the same, for the syscall shim */
+void *guest_to_host(unsigned int guest);
 /* the inverse for pool memory */
 uint32_t host_guest_address(const void *host);
 
 int host_vm_start(void);
 int host_vm_map_window(void);
+void build_identity_tables(void);
 
 /* vCPUs */
 int host_vcpu_attach(void);

@@ -50,7 +50,9 @@ struct guest_iovec
 	uint32_t length;
 };
 
-#define GUEST(type, value) ((type)(uintptr_t)(uint32_t)(value))
+/* a guest address -> host pointer, through the mirror (host_vm.c) */
+void *guest_to_host(unsigned int guest);
+#define GUEST(type, value) ((type)guest_to_host((unsigned int)(value)))
 
 static int timespec_in(uint64_t address, struct timespec *result)
 {
@@ -114,15 +116,22 @@ static void log_bytes(int fd, const char *bytes, size_t size)
 
 static long guest_writev(int fd, uint64_t vector, int count)
 {
-	const struct guest_iovec *guest_vector = GUEST(const struct guest_iovec *, vector);
+	const struct guest_iovec *guest_vector;
 	int index;
 	long total = 0;
 
 	if (count < 0 || count > 64)
 		return -EINVAL;
+	guest_vector = (const struct guest_iovec *)host_guest_pointer((unsigned)vector);
+	if (!guest_vector)
+		return -EFAULT;
 	for (index = 0; index < count; index++)
 	{
-		log_bytes(fd, GUEST(const char *, guest_vector[index].base), guest_vector[index].length);
+		const char *bytes = (const char *)host_guest_pointer(guest_vector[index].base);
+
+		if (!bytes)
+			return -EFAULT;
+		log_bytes(fd, bytes, guest_vector[index].length);
 		total += (long)guest_vector[index].length;
 	}
 	return total;
@@ -131,15 +140,20 @@ static long guest_writev(int fd, uint64_t vector, int count)
 static long guest_readv(int fd, uint64_t vector, int count)
 {
 	struct iovec host_vector[64];
-	const struct guest_iovec *guest_vector = GUEST(const struct guest_iovec *, vector);
+	const struct guest_iovec *guest_vector;
 	int index;
 
 	if (count < 0 || count > 64)
 		return -EINVAL;
+	guest_vector = (const struct guest_iovec *)host_guest_pointer((unsigned)vector);
+	if (!guest_vector)
+		return -EFAULT;
 	for (index = 0; index < count; index++)
 	{
-		host_vector[index].iov_base = GUEST(void *, guest_vector[index].base);
+		host_vector[index].iov_base = host_guest_pointer(guest_vector[index].base);
 		host_vector[index].iov_len = guest_vector[index].length;
+		if (!host_vector[index].iov_base)
+			return -EFAULT;
 	}
 	return result_of((long)readv(fd, host_vector, (int)count));
 }
@@ -275,8 +289,12 @@ static long guest_mmap(uint64_t address, uint32_t size, int protection, int flag
 	/* the Xbox window: already mapped (host_vm.c); succeed */
 	if (address == GUEST_WINDOW_BASE && size <= GUEST_WINDOW_SIZE)
 		return (long)GUEST_WINDOW_BASE;
+	/* musl's malloc grows with fixed mmaps over its brk region: that
+	memory exists (the pools back it), so succeed */
+	if (address && host_low_owns((uintptr_t)address, size))
+		return (long)(uint32_t)address;
 	if (address)
-		host_fatal("the guest's mmap asked for %llx specifically (only the window is fixed)",
+		host_fatal("the guest's mmap asked for %llx specifically (only the window and its brk are fixed)",
 			(unsigned long long)address);
 	{
 		void *mapping = host_low_map(size);
