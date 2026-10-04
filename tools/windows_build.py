@@ -310,8 +310,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         "-Wl,/STACK:0x800000",
     ]
     if getattr(sln, "port_release", False):
-        # no console window: the log is debug.txt, and under Wine (Proton,
-        # gamescope) the console window can hide the game's window
+        # no console window (the port's log goes to halo.log instead,
+        # win32_posix.c): under Wine (Proton, gamescope) the console window
+        # can hide the game's window
         base_ldflags += ["-Wl,/SUBSYSTEM:WINDOWS", "-Wl,/ENTRY:mainCRTStartup"]
     else:
         base_ldflags += ["-Wl,/SUBSYSTEM:CONSOLE"]
