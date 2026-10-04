@@ -20,6 +20,10 @@
     <!-- installing a new version of the game (Updater) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- enableOnBackInvokedCallback: the back button and the back gesture
+         stay KEYCODE_BACK, which SDL passes to the game as B; with
+         predictive back (the default once an app targets Android 16) the
+         system would take them and the game would never see them -->
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -27,7 +31,8 @@
         android:isGame="true"
         android:appCategory="game"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:enableOnBackInvokedCallback="false">
 
         <!-- a game, for the system (isGame and appCategory above; the game
              modes' configuration) and for launchers that look for this -->
