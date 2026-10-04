@@ -210,6 +210,8 @@ from guest memory as needed; *target receives GL_TEXTURE_2D etc. */
 GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *target,
 	struct xgpu_texture_description *description);
 void xgpu_texture_cache_begin_frame(void);
+/* (debug.gpu_stats) a texture of this many bytes uploaded to GL (d3d8_gl.c) */
+void xgpu_statistics_texture_upload(unsigned long bytes);
 
 /* ---------- render targets */
 

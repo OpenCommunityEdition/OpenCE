@@ -633,7 +633,19 @@ static struct
 	unsigned long target_changes;
 	/* vertex and index bytes drawn from the mirror, and streamed */
 	unsigned long mirrored_bytes, streamed_bytes;
+	/* the textures uploaded, and the most draws and the longest time (ms)
+	of one frame: the averages hide a frame that stalls */
+	unsigned long texture_uploads, texture_upload_bytes;
+	unsigned long most_draws, slowest_frame;
+	/* (draws counted when this frame began) */
+	unsigned long frame_first_draw;
 } stats;
+
+void xgpu_statistics_texture_upload(unsigned long bytes)
+{
+	stats.texture_uploads++;
+	stats.texture_upload_bytes += bytes;
+}
 
 static D3DDevice *device_pointer(void)
 {
@@ -5991,13 +6003,34 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	}
 	device.frame++;
 	stats.presents++;
+	if (debug_settings.statistics)
+	{
+		static struct timespec last_present;
+		struct timespec now;
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		if (last_present.tv_sec)
+		{
+			unsigned long milliseconds = (unsigned long)((now.tv_sec - last_present.tv_sec) * 1000 +
+				(now.tv_nsec - last_present.tv_nsec) / 1000000);
+
+			if (milliseconds > stats.slowest_frame)
+				stats.slowest_frame = milliseconds;
+		}
+		last_present = now;
+		if (stats.draws - stats.frame_first_draw > stats.most_draws)
+			stats.most_draws = stats.draws - stats.frame_first_draw;
+		stats.frame_first_draw = stats.draws;
+	}
 	if (debug_settings.statistics && device.frame % 60 == 0)
 	{
 		platform_log("frame %lu: %lu draws, %lu immediate, %lu clears, %lu target changes; skipped %lu no program, %lu no target, %lu link; "
-			"%lu KB mirrored, %lu KB streamed",
+			"%lu KB mirrored, %lu KB streamed; in 60 frames, %lu textures uploaded (%lu KB), at most %lu draws "
+			"and %lu ms in a frame",
 			device.frame, stats.draws / stats.presents, stats.immediate_draws / stats.presents, stats.clears / stats.presents,
 			stats.target_changes / stats.presents, stats.skipped_no_program, stats.skipped_no_target, stats.skipped_link,
-			stats.mirrored_bytes / stats.presents / 1024, stats.streamed_bytes / stats.presents / 1024);
+			stats.mirrored_bytes / stats.presents / 1024, stats.streamed_bytes / stats.presents / 1024,
+			stats.texture_uploads, stats.texture_upload_bytes / 1024, stats.most_draws, stats.slowest_frame);
 		memset(&stats, 0, sizeof(stats));
 	}
 	platform_pump_events();

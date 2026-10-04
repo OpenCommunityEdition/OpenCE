@@ -1138,6 +1138,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			}
 			upload(entry->texture, entry->target, &entry->description, (const unsigned char *)entry->address, palette,
 				custom_edition_texels_order(entry->address));
+			xgpu_statistics_texture_upload(entry->size);
 		}
 	}
 	entry->last_used_frame = texture_frame;
