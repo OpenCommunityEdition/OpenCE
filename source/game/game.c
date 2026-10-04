@@ -162,6 +162,7 @@ struct game_options;
 #include "networking/network_messages.h"
 #include "networking/telnet_console.h"
 #include "objects/objects.h"
+#include "objects/widgets/antenna.h"
 #include "objects/widgets/widgets.h"
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_usage.h"
@@ -331,6 +332,12 @@ void game_tick(
 		? 1.0f / (2 * TICKS_PER_SECOND)
 		: 1.0f / TICKS_PER_SECOND;
 	effects_update(seconds_per_tick);
+	/* An antenna's chain is a simulation of the Xbox's own step, an update a
+	tick: stepped a frame at a time, its springs, its carry and its points'
+	physics act against the frames' own movement of it, and a vehicle at
+	speed swings it far wider than a tick's step does. The frames between the
+	ticks are drawn from what each tick leaves (antenna.c). */
+	antennas_update(seconds_per_tick);
 	lock_global_random_seed();
 	rumble_update();
 	first_person_weapons_update();
