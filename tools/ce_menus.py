@@ -137,7 +137,8 @@ INCOMPATIBLE = set()
 WIRED = {
     "main menu quit game", "profile set edit begin", "mouse emit accept event", "mouse emit back event",
     "mouse emit x event", "emit custom activation event", "single prev cl item activated", "controls back handler",
-    "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init", "mp type set mode",
+    "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init",
+    "gamespy screen dispose", "mp type set mode",
     "campaign menu init", "campaign menu continue", "difficulty item select", "solo map list update",
     "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
     "load game menu delete request", "load game menu delete finish",
@@ -309,6 +310,22 @@ class Art:
         return "\n".join([f"\t<bitmap{attributes([('name', name)])}>",
                           f"\t\t<frame{attributes([('png', png), ('width', 512), ('height', 64)])}/>",
                           "\t</bitmap>"])
+
+    def port_picture(self, name: str, frames: list) -> str:
+        """a <bitmap> of this port's own drawing: each frame an SVG (text,
+        width, height) written to port_svg/ and drawn"""
+        lines = [f"\t<bitmap{attributes([('name', name)])}>"]
+        for index, (text, width, height) in enumerate(frames):
+            svg = MENUS / "port_svg" / f"{name}__{index}.svg"
+            svg.parent.mkdir(parents=True, exist_ok=True)
+            svg.write_text(text)
+            png = f"ce/port/{name}__{index}.png"
+            (MENUS / png).parent.mkdir(parents=True, exist_ok=True)
+            Image.fromarray(render_svg(svg, SCALE), "RGBA").save(MENUS / png, optimize=True)
+            self.pngs.append(png)
+            lines.append(f"\t\t<frame{attributes([('png', png), ('width', width), ('height', height)])}/>")
+        lines.append("\t</bitmap>")
+        return "\n".join(lines)
 
     def frame_sources(self, relative: str, index: int, count: int) -> list:
         return [relative, f"{relative}__0"] if count == 1 else [f"{relative}__{index}"]
@@ -588,6 +605,15 @@ def main() -> None:
              " (NON_HANDDRAWN.md; tools/ce_menus.py) -->", "<menus>"]
     lines += [art.bitmap(tag) for tag in sorted(bitmaps)]
     lines += [art.title(name, text) for name, text in sorted(port_settings.TITLES.items())]
+    # (the in-game pause menu's taller box: menu_tags.c's pause_patch)
+    for piece in ("left", "center", "right"):
+        lines.append(art.port_picture(f"pause/pausebox_{piece}", [
+            (port_settings.pause_box_svg(piece, port_settings.pause_box_height(buttons)), 4 if piece == "center" else 16,
+             256) for buttons in port_settings.PAUSE_BOX_BUTTONS]))
+    # (nothing: what a game map draws for a frame of ui.map's it has not,
+    # menu_tags.c)
+    lines.append(art.port_picture("blank", [
+        ('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"/>\n', 4, 4)]))
     lines.append("</menus>")
     (CE / "bitmaps.xml").write_text("\n".join(lines) + "\n")
     # what is not hand-drawn

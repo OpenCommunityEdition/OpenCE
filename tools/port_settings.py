@@ -186,7 +186,8 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
                       f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
     lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", 11), ("width", 605), ("height", 59),
                                           ("bitmap", header_bitmap)], [])
-    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68), ("top", 350), ("width", 482),
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
+                                      ("top", spec.get("help_top", 350)), ("width", 482),
                                       ("height", 60), ("string_list", f"{base}/help_strings"),
                                       ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
@@ -439,10 +440,12 @@ WIDGET_PATCHES = {
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
     # (Direct Link's clipboard button in the place of the PC version's
-    # Refresh, which this port has not: the lists update themselves; "swap"
-    # puts another widget in a child's place)
+    # Refresh, and Refresh in Get List's: the Server Browser's only, which
+    # asks the public games' hosts again; "swap" puts another widget in a
+    # child's place)
     f"{MT}/join_game/join_game_button_bar": {"swap": {
         f"{MT}/join_game/join_game_button_refresh": f"{MT}/join_game/button_clipboard",
+        f"{MT}/join_game/join_game_button_update": f"{MT}/join_game/join_game_button_refresh",
     }},
 }
 
@@ -469,6 +472,39 @@ def title_backdrop(width: float) -> str:
         f'    <rect x="29.08" y="28.05" width="{width + 28:.2f}" height="40.95" fill="#021931" fill-opacity="0.893" '
         'filter="url(#soft)"/>',
         "  </g>", "</svg>", ""])
+
+
+# the in-game pause menu's box, taller for the buttons this port adds
+# (menu_tags.c's pause_patch: SETTINGS, and the host's END GAME): the
+# pausebox5 redraw's rounded box (ui-svg-handmade/shell/bitmaps), drawn to
+# hold each number of buttons, one frame each (the Xbox's 2-button box is
+# 159 units high, and each button 35 more)
+PAUSE_BOX_BUTTONS = [3, 4]
+
+
+def pause_box_height(buttons: int) -> int:
+    return 159 + (buttons - 2) * 35
+
+
+def pause_box_svg(piece: str, height: int) -> str:
+    """a piece of the pause box (left cap, centre strip, right cap; 9-slice:
+    the strip tiles across), height units high in its 256-high texture"""
+    width = 4 if piece == "center" else 16
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="256" viewBox="0 0 {width} 256">']
+    if piece == "center":
+        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="#0a2649" fill-opacity="0.75"/>',
+                  '  <rect x="0" y="0" width="4" height="2" fill="#2896ff"/>',
+                  f'  <rect x="0" y="{height - 2}" width="4" height="2" fill="#2896ff"/>']
+    else:
+        bottom, corner = height - 1, height - 9.5
+        cap = [f'    <path d="M9.5,1 H17 V{bottom} H9.5 A8.5,8.5 0 0 1 1,{corner} V9.5 A8.5,8.5 0 0 1 9.5,1 Z" '
+               'fill="#0a2649" fill-opacity="0.75" fill-rule="evenodd"/>',
+               f'    <path d="M17,1 H9.5 A8.5,8.5 0 0 0 1,9.5 V{corner} A8.5,8.5 0 0 0 9.5,{bottom} H17" fill="none" '
+               'stroke="#2896ff" stroke-width="2"/>']
+        lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
+            [line[2:] for line in cap]
+    lines += ["</svg>", ""]
+    return "\n".join(lines)
 
 
 # where the PC headers' text is (units of their 512x64), and its colour
@@ -521,9 +557,12 @@ def _join_game_extras() -> list:
 
 def _server_settings() -> list:
     """Create Game's server settings (in the PC version's place): the game's
-    name, the most players (up to the port's 128), and its invite link"""
+    name, the most players (up to the port's 128), its invite link, and
+    whether the server browser lists it (PUBLIC or PRIVATE: an internet
+    game's)"""
     base = f"{MT}/server_settings"
-    spec = {"screen": "server_settings_screen", "spacing": 30,
+    # (ten rows: closer together, the help lower)
+    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 358,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -547,6 +586,25 @@ def _server_settings() -> list:
     rows.append((f"{base}/op_max_players", None))
     extra += _value_row(base, "invite", 2, "ss copy invite")
     rows.append((f"{base}/op_invite", None))
+    # (PUBLIC or PRIVATE: menu_functions.c's server_settings_update)
+    extra += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
+                                            ("flags", "pass_unhandled_to_focused_child"),
+                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                     [f'<child widget="{base}/listing_label"/>',
+                      f'<child widget="{base}/listing_spinner" x="320" y="1"/>'])
+    extra += _widget(f"{base}/listing_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                               ("height", 22), ("string_list", f"{base}/labels"),
+                                               ("string_index", 9), ("font", "ui\\large_ui"),
+                                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    extra += _widget(f"{base}/listing_spinner",
+                     [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147), ("height", 20),
+                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                      ("strings", "PUBLIC|PRIVATE"), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                      ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
+                     ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    rows.append((f"{base}/op_listing", None))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -576,7 +634,7 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:"])
+                                         "TEAMPLAY OPTIONS:", "LISTING:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -588,6 +646,9 @@ def _server_settings() -> list:
         "Each team's vehicles and their respawn time, for\\nthis game.",
         "The motion tracker and nav points, for this game.",
         "Friendly fire and team balance, for this game.",
+        # (LISTING's, by its choice)
+        "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
+        "Only players with your invite link can join.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
