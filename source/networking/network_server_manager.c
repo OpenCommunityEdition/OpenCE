@@ -1315,13 +1315,15 @@ static boolean network_game_server_network_lost(
 	return now - down_time > NETWORK_GAME_SERVER_CLIENT_TIMEOUT;
 }
 
-/* port: wide text as the listing has it: ASCII ('?' for the rest) */
+/* port: wide text as the listing has it: ASCII, a Latin letter with a mark
+its plain letter ('?' for the rest: player_name_character_ascii, as the
+server browser validates the name as a player's) */
 static void listing_text(char *text, int size, wchar_t const *wide, int length)
 {
 	int index;
 
 	for (index = 0; index < size - 1 && index < length && wide[index]; index++)
-		text[index] = wide[index] >= 0x20 && wide[index] < 0x7F ? (char)wide[index] : '?';
+		text[index] = player_name_character_ascii(wide[index]);
 	text[index] = 0;
 }
 
