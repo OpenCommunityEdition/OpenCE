@@ -40,6 +40,7 @@ Called from the main loop every frame (main.c).
 
 #include "cseries.h"
 #include "main/main.h"
+#include "bink/bink_playback.h"
 #include "interface/player_ui.h"
 #include "saved games/player_profile.h"
 #include "interface/ui_widget.h"
@@ -1283,6 +1284,16 @@ void network_test_update(
 
 	if (!main_menu_loaded)
 		return;
+	/* the intro movie skipped first, as a button press does: the movie
+	holds the texture cache's spare memory, which starting the map
+	takes too (texture_cache_steal_memory's assertion) */
+	if (bink_playback_in_progress())
+	{
+		bink_playback_stop();
+		network_test.menu_seconds = 0.0f;
+		platform_log("network test: skipped the movie");
+		return;
+	}
 	network_test.menu_seconds += seconds;
 	/* (the main menu settling first) */
 	if (network_test.menu_seconds < 2.0f)
