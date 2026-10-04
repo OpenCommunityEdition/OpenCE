@@ -325,7 +325,7 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	"precision highp samplerCube;\n"
 #else
 #define SAMPLE_BIAS ""
-#define SHADER_VERSION "#version 450 core\n"
+#define SHADER_VERSION "#version 420 core\n"
 #endif
 
 static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage, const char *coordinates)

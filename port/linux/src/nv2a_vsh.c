@@ -145,7 +145,7 @@ static const char shader_prologue[] =
 	"precision highp float;\n"
 	"precision highp int;\n"
 #else
-	"#version 450 core\n"
+	"#version 420 core\n"
 #endif
 	"uniform vec4 c[192];\n"
 	"uniform vec4 viewport_scale;\n"
