@@ -25,6 +25,7 @@
          predictive back (the default once an app targets Android 16) the
          system would take them and the game would never see them -->
     <application
+        android:name=".HaloApplication"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -67,8 +68,10 @@
             </intent-filter>
         </activity>
 
+        <!-- in a process of its own, with a fresh Java heap (HaloApplication) -->
         <activity
             android:name=".HaloActivity"
+            android:process=":game"
             android:exported="false"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleInstance"

@@ -328,7 +328,7 @@ and supplies the thread pointer and TLS.
 
 - Reserves the address space of the guest below 4 GB: the Xbox memory at
   `0x80000000`, the image, and pools for the memory of the guest
-  (`host/host_memory.c`).
+  (`host/host_memory.c`). Refer to "The fixed addresses".
 - Loads the image and fills its import table (`host/host_loader.c`).
 - Starts the `main` of the game and each guest thread on a stack in guest
   memory, because ILP32 code keeps stack addresses in 32-bit registers
@@ -344,6 +344,45 @@ two ABIs use the same registers for 32-bit integers, floats and pointers.
 `tools/android_gl_stubs.py` makes the OpenGL ES stubs from
 `port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
 `posix_*` functions, which copy the `errno` of the host.
+
+### The fixed addresses
+
+The guest needs the Xbox memory at `0x80000000` to `0x88000000` and the
+image above it, to `0x8c000000`. The cache files contain pointers to these
+addresses. The Java runtime of Android (ART) also reserves its spaces below
+4 GB. On some devices, for example handhelds with a large Java heap (the
+AYN Thor, the Retroid Pocket), ART's large object space covers
+`0x80000000`. ART fills that space from its bottom, so the part at
+`0x80000000` is usually empty.
+
+Thus:
+
+1. The game operates in a process of its own (`:game`), with a fresh Java
+   heap. The launcher, the import of a disc image and an earlier game do
+   not leave objects there.
+2. At the start of that process, `HaloApplication` loads `libmain.so`. Its
+   `JNI_OnLoad` reserves the fixed addresses before the Java side
+   allocates large objects.
+3. If ART's large object space is in the way, the host takes back only the
+   part that covers the fixed addresses, and only if no page of it is in
+   use (`/proc/self/pagemap`, or `mincore` and the swap total of the space
+   if the device refuses `pagemap`). The host never takes the other spaces
+   of ART.
+
+If the addresses are not available, the game shows a message, and writes
+the mappings below 4 GB to `memory_map.txt` in the data folder and to the
+log.
+
+To test the reclaim on any device, set a system property before you start
+the game. The app then puts a stand-in for ART's large object space over
+the fixed addresses:
+
+- `adb shell setprop debug.halo.art_overlap idle`: the stand-in is empty
+  at `0x80000000`. The log shows `reclaimed idle ART range`, and the game
+  starts.
+- `adb shell setprop debug.halo.art_overlap busy`: a page at `0x80100000`
+  is in use. The game shows the message and writes `memory_map.txt`.
+- `adb shell setprop debug.halo.art_overlap ""`: normal operation.
 
 ### OpenGL ES
 
@@ -433,8 +472,8 @@ assembly of the port is necessary:
 
 - Bink video is not available. The game skips the movies.
 - The device must let the app reserve the fixed guest addresses, from
-  `0x80000000` to approximately `0x89000000`. If the addresses are not
-  available, the app shows a message.
+  `0x80000000` to `0x8c000000`. If ART uses them, the app shows a message
+  (refer to "The fixed addresses").
 - Touch operates the menus and skips cinematics. In the game, the touch
   controls appear when no controller is connected; their size follows the
   height of the screen (larger on a tablet than on a phone), never smaller

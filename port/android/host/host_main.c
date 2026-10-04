@@ -396,7 +396,21 @@ static void *game_main(void *unused)
 	if (!image)
 		host_fatal("cannot read the game image from the APK: %s", SDL_GetError());
 	if (host_load_image(image, image_size) != 0)
-		host_fatal("cannot load the game image; see logcat (tag \"halo\") for details");
+	{
+		FILE *report;
+
+		if (!host_memory_fixed_unavailable())
+			host_fatal("cannot load the game image; see logcat (tag \"halo\") for details");
+
+		snprintf(path, sizeof(path), "%s/memory_map.txt", data_root);
+		report = fopen(path, "w");
+		host_memory_report_low_mappings(report);
+		if (report)
+			fclose(report);
+		host_fatal("The game cannot start: the memory it needs at 0x80000000 is taken by Android's "
+			"Java runtime on this device.\n\nRestarting the device may help. Please report it with "
+			"memory_map.txt from\n%s\n(or adb logcat -s halo).", data_root);
+	}
 	SDL_free(image);
 
 	{
@@ -422,6 +436,18 @@ static void *game_main(void *unused)
 	boot = make_boot(&environment);
 	host_logf(HOST_LOG_INFO, "data %s, saves %s", data_root, save_root);
 	host_run_guest_main(boot);
+}
+
+/* Called when HaloApplication loads this library at the start of the
+game's own process (":game"), before its Java side has allocated anything
+large: ART's large object space, which on some devices covers the Xbox
+window, is then idle there and can be reclaimed (host_memory.c). */
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
+{
+	(void)vm;
+	(void)reserved;
+	host_memory_reserve_early();
+	return JNI_VERSION_1_6;
 }
 
 int main(int argc, char *argv[])

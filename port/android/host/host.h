@@ -12,6 +12,7 @@ port/android/include/halo_android_abi.h for the guest contract.
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "halo_android_abi.h"
 
@@ -35,8 +36,17 @@ Xbox window and the image's range at start-up, and hands out pages for
 everything else (the guest's malloc arenas, thread stacks, anonymous
 mappings) from pools of address space it reserves below 4 GB on demand. */
 
-/* reserves the fixed ranges; returns 0 on success */
+/* reserves the fixed ranges (the Xbox window and the image's) as early as
+the process allows: from JNI_OnLoad, before the Java side of the game's
+process allocates much (host_main.c); a failure is reported again by
+host_memory_initialize */
+void host_memory_reserve_early(void);
+/* takes the fixed ranges for the image; returns 0 on success */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
+/* 1 if the fixed ranges could not be reserved (something else holds them) */
+int host_memory_fixed_unavailable(void);
+/* lists the mappings below 4 GB in logcat and, if file is not NULL, in it */
+void host_memory_report_low_mappings(FILE *file);
 /* Makes the write tracking compare page contents instead of catching page
 faults (host_watch_hash.h), for when the app cannot receive its own
 SIGSEGV (ARM translation). Call before the guest starts. */
