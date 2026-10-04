@@ -2225,13 +2225,14 @@ static void CALLBACK dsound_channel_callback(
 	{
 		struct sound_channel *channel= channel_get(channel_index);
 
+
 		if (status==XMEDIAPACKET_STATUS_SUCCESS || status==XMEDIAPACKET_STATUS_FLUSHED)
 		{
 			sound_cache_sound_hardware_unlock(packet_context);
 
 			channel->packet_count--;
 
-			if (!dsound_globals.paused)
+			if (!dsound_globals.paused && !channel->stopping)
 			{
 				if (channel->packet_count==0)
 				{
@@ -2655,6 +2656,7 @@ static void dsound_channel_queue_sound(
 {
 	struct sound_channel *channel= channel_get(index);
 
+
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_dsound_xbox.c",
 		1111,
@@ -2878,16 +2880,19 @@ static void channel_stop(
 {
 	struct sound_channel *channel= channel_get(index);
 
-	if (channel->state!=_sound_channel_idle)
-	{
-		DirectSoundStopStream(channel->stream);
 
-		channel->stopping= TRUE;
-		channel->state= _sound_channel_idle;
-	}
-
+	/* The SDL backend completes packets synchronously during StopStream.
+	   Retire the producer before flushing: a SUCCESS callback for an already
+	   mixed packet must not refill the stream we are cancelling. */
 	channel->playing_permutation= NULL;
 	channel->queued_permutation= NULL;
+
+	if (channel->state!=_sound_channel_idle || channel->packet_count!=0)
+	{
+		channel->stopping= TRUE;
+		DirectSoundStopStream(channel->stream);
+		channel->state= _sound_channel_idle;
+	}
 
 	return;
 }
