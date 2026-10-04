@@ -501,6 +501,7 @@ static void service_doorbell(struct host_vcpu *vcpu)
 	host_logf(HOST_LOG_INFO, "doorbell %u (%s) x0=%x x1=%x x2=%x (from %x)", (unsigned)index,
 		host_import_table[index].name, registers.x[0], registers.x[1], registers.x[2], registers.x[30]);
 	host_import_table[index].function(); /* reads/writes the registers */
+	registers_store(vcpu, &registers); /* the wrapper's result reaches the guest */
 	host_logf(HOST_LOG_INFO, "  -> x0=%x x1=%x", registers.x[0], registers.x[1]);
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_PC, vcpu->pc_after_exit);
 }
@@ -531,6 +532,13 @@ static void run_until_stops(struct host_vcpu *vcpu)
 		if (vcpu->exit->reason == HV_EXIT_REASON_EXCEPTION)
 		{
 			unsigned ec = (unsigned)((vcpu->exit->exception.syndrome >> 26) & 0x3f);
+			uint64_t exit_pc_now = 0;
+
+			hv_vcpu_get_reg(vcpu->vcpu, HV_REG_PC, &exit_pc_now);
+			host_logf(HOST_LOG_INFO, "exit ec=%x syndrome=%llx pc=%llx ipa=%llx", ec,
+				(unsigned long long)vcpu->exit->exception.syndrome,
+				(unsigned long long)exit_pc_now,
+				(unsigned long long)vcpu->exit->exception.physical_address);
 
 			/* remember the faulting PC: the doorbell store re-executes
 			as a plain store after the call (stage 2 grants the page
