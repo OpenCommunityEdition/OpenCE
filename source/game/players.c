@@ -280,6 +280,8 @@ symbols in this file:
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
 void network_distributed_player_picked_up(long player_index, short kind, long definition_index, short count);
+/* port/linux/game/network_objects.c's */
+void network_objects_client_picked_up_weapon(short local_player_index, long unit_index, long definition_index);
 /* game_sound.c's */
 long unspatialized_impulse_sound_new(long sound_definition_index, real scale);
 
@@ -1472,7 +1474,11 @@ void network_player_show_pickup(
 		{
 			hud_picked_up_weapon(player->local_player_index, definition_index);
 			if (player->unit_index != NONE)
+			{
 				player_control_unzoom(player->unit_index);
+				network_objects_client_picked_up_weapon(player->local_player_index, player->unit_index,
+					definition_index);
+			}
 		}
 		break;
 	case _network_pickup_ammunition:
@@ -2608,8 +2614,9 @@ boolean unit_should_autopick_weapon(
 	if ((unit_approve_weapon_pickup(unit_index, weapon_index) &&
 		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) ||
 		weapon_count == 0 ||
-		(!game_engine_running() &&
-			unit_approve_weapon_pickup(unit_index, weapon_index) &&
+		/* port: and in multiplayer (campaign's only), a second weapon into
+		the empty slot, readied (unit_add_weapon_to_inventory) */
+		(unit_approve_weapon_pickup(unit_index, weapon_index) &&
 			weapon_count < 2) ||
 		game_engine_force_autopickup(unit_index, weapon_index))
 	{
@@ -2669,7 +2676,7 @@ static boolean player_handle_weapon_swap(
 	switch (player->action_result)
 	{
 	case _player_action_result_swap_for_weapon:
-		if (unit_drop_current_weapon(player->unit_index, TRUE) &&
+		if (unit_drop_selected_weapon(player->unit_index) &&
 			unit_add_weapon_to_inventory(
 				player->unit_index,
 				player->action_object_index,

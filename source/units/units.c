@@ -7454,6 +7454,34 @@ boolean unit_drop_current_weapon(
 	return result;
 }
 
+/* port: a swap's weapon out: the one the player chose, though the weapon
+in hand is still being put away for it (a network player's choice gets to
+the host before the switch is done), not that one, their backup */
+boolean unit_drop_selected_weapon(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short slot = unit->unit.desired_weapon_index;
+	long weapon_index = unit_inventory_get_weapon(unit_index, slot);
+
+	if (weapon_index == NONE || slot == unit->unit.current_weapon_index ||
+		TEST_FLAG(weapon_definition_get(weapon_get(weapon_index)->definition_index)->weapon.flags,
+			_weapon_doesnt_count_toward_maximum_bit))
+	{
+		return unit_drop_current_weapon(unit_index, TRUE);
+	}
+	unit_drop_item(unit_index, weapon_index);
+	unit->unit.weapon_object_indices[slot] = NONE;
+	unit->unit.desired_weapon_index = unit->unit.current_weapon_index!=NONE ?
+		unit->unit.current_weapon_index : unit_weapon_next_index(unit_index, NONE, 0);
+	if (!weapon_can_be_fired(weapon_index))
+	{
+		object_delete(weapon_index);
+	}
+
+	return TRUE;
+}
+
 /* ---------- private code */
 
 char const *base_seat_labels[NUMBER_OF_UNIT_BASE_SEATS] = {"asleep", "alert", "stand", "crouch", "flee", "flaming"};
