@@ -3521,6 +3521,27 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 	return client_machine;
 }
 
+struct network_game_server_client_machine *network_game_server_get_remote_client_machine_at_address(
+	struct network_game_server *server,
+	unsigned long ip_address)
+{
+	long i;
+
+	for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
+	{
+		struct network_game_server_client_machine *client_machine = &server->client_machines[i];
+
+		if (network_game_server_client_machine_addresses[i] == ip_address &&
+			network_game_server_client_machine_is_joined_to_game(server, client_machine) &&
+			!network_game_server_client_machine_is_local(server, client_machine))
+		{
+			return client_machine;
+		}
+	}
+
+	return network_game_server_get_client_machine_at_address(server, ip_address);
+}
+
 boolean network_game_server_game_can_start(
 	struct network_game_server *server)
 {

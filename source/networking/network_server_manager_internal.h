@@ -123,6 +123,11 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 struct network_game_server_client_machine *network_game_server_get_client_machine_at_address(
 	struct network_game_server *server,
 	unsigned long address);
+/* port: the machine at an address, preferring one that isn't the host's own
+(a second game on the host's computer shares its address) */
+struct network_game_server_client_machine *network_game_server_get_remote_client_machine_at_address(
+	struct network_game_server *server,
+	unsigned long address);
 struct network_game *network_game_server_get_game(
 	struct network_game_server *server);
 boolean network_game_server_remove_machine_from_game(
