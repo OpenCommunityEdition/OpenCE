@@ -9,6 +9,10 @@ port/android/include/halo_android_abi.h for the guest contract.
 #ifndef __HALO_ANDROID_HOST_H
 #define __HALO_ANDROID_HOST_H
 
+#ifdef HALO_MACOS
+#include "../../macos/host/host.h"
+#else
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -93,4 +97,7 @@ void *host_resolve_import(const char *name);
 
 void *host_gl_resolve(const char *name);
 
+#define guest_code_pointer(address) ((void *)(uintptr_t)(address))
+
+#endif /* HALO_MACOS */
 #endif
