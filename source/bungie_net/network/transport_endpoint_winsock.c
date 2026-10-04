@@ -525,7 +525,17 @@ long write_endpoint(
 	result = send(ep->socket, buffer, length, 0);
 	if (result == INVALID_SOCKET)
 	{
-		switch (WSAGetLastError())
+		/* port: the Winsock error a send failed with, which the transport's
+		errors don't say (logged once for each different one) */
+		static int logged_error;
+		int code = WSAGetLastError();
+
+		if (code != 0x2733 && code != logged_error)
+		{
+			error(_error_silent, "write_endpoint: Winsock error %d", code);
+			logged_error = code;
+		}
+		switch (code)
 		{
 		case 0x2733:
 			ep->error = _transport_result_operation_would_block;
@@ -1224,24 +1234,30 @@ short connect_endpoint(
 				unsigned long timeout = system_milliseconds() + 10 * MILLISECONDS_PER_SECOND;
 				struct timeval timeval;
 
-				timeval.tv_sec = 1;
-				timeval.tv_usec = 0;
-
 				do
 				{
 					fd_set writeable;
 					fd_set failed;
+					long ready;
 
+					/* (set each time: select may leave what is left of it) */
+					timeval.tv_sec = 1;
+					timeval.tv_usec = 0;
 					writeable.fd_array[0] = ep->socket;
 					writeable.fd_count = 1;
 					failed.fd_array[0] = ep->socket;
 					failed.fd_count = 1;
 
-					/* port: a connect that failed is in the error set (not
-					writeable, and its would-block left as it was) */
-					if (select(1, NULL, &writeable, &failed, &timeval) > 0)
+					/* port: a failed connect is in the error set, and a select
+					that times out (0) means the connection is still being made */
+					ready = select(1, NULL, &writeable, &failed, &timeval);
+					if (ready > 0)
 					{
 						error = failed.fd_count ? WSAECONNREFUSED : 0;
+					}
+					else if (ready == 0)
+					{
+						error = WSAEWOULDBLOCK;
 					}
 					else
 					{
