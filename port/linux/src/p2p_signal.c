@@ -3,9 +3,10 @@ P2P_SIGNAL.C
 
 Internet play's signalling (p2p.c): how a joiner and the host of an invite
 tell each other where they can be reached, through public MQTT brokers
-(network.signalling_brokers; MQTT 5 over TCP, or 3.1.1 with a broker that
-refuses 5). Every broker is used at once, so any one of them working is
-enough (an answer goes back through each broker a request came through).
+(those in brokers.txt, network.brokers_file; MQTT 5 over TCP, or 3.1.1 with
+a broker that refuses 5). Every broker is used at once, so any one of them
+working is enough (an answer goes back through each broker a request came
+through).
 They also carry the server browser's listings of public games (p2p_lobby.c):
 retained in each host's slot, published at least once (QoS 1, sent again
 until the broker acknowledges them), expiring at the broker after
@@ -71,6 +72,8 @@ answered it in a while.
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"
+
+#include <SDL3/SDL.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1511,8 +1514,50 @@ static void broker_readable(struct broker *broker)
 
 /* ---------- p2p.c's side */
 
+/* the brokers in network.brokers_file (beside config.toml, unless a full
+path: port/assets/network/brokers.txt, which the builds put there), one on
+each line, "#" starting a comment, into text: host:port entries separated by
+commas; empty if the file cannot be read */
+static void brokers_list(char *text, size_t size)
+{
+	const char *name = config_string("network.brokers_file");
+	char path[1024];
+	char *file;
+	size_t file_size = 0, index, length = 0;
+	int comment = 0;
+
+	text[0] = 0;
+	if (name[0] == '/' || name[0] == '\\' || (name[0] && name[1] == ':'))
+		snprintf(path, sizeof(path), "%s", name);
+	else
+	{
+		config_folder(path, sizeof(path));
+		snprintf(path + strlen(path), sizeof(path) - strlen(path), "%s", name);
+	}
+	file = (char *)SDL_LoadFile(path, &file_size);
+	if (!file)
+	{
+		platform_log("Internet play: the brokers' file %s cannot be read (network.brokers_file)", path);
+		return;
+	}
+	for (index = 0; index < file_size && length + 1 < size; index++)
+	{
+		char character = file[index];
+
+		if (character == '\n' || character == '\r')
+			comment = 0;
+		else if (character == '#')
+			comment = 1;
+		if (!comment)
+			text[length++] = character == '\n' || character == '\r' || character == '\t' ? ',' : character;
+	}
+	text[length] = 0;
+	SDL_free(file);
+}
+
 void p2p_signal_start(void)
 {
+	char list[1024];
 	const char *text;
 	unsigned char random[8];
 	char hex[17];
@@ -1529,7 +1574,8 @@ void p2p_signal_start(void)
 		p2p_key_hash(p2p_public_key(), hash);
 		p2p_lobby_slot_topic(hash, signalling.own_slot, sizeof(signalling.own_slot));
 	}
-	text = config_string("network.signalling_brokers");
+	brokers_list(list, sizeof(list));
+	text = list;
 	while (*text && signalling.broker_count < MAXIMUM_BROKERS)
 	{
 		const char *end = text + strcspn(text, ",");
@@ -1561,7 +1607,9 @@ void p2p_signal_start(void)
 		text = *end ? end + 1 : end;
 	}
 	if (!signalling.broker_count)
-		platform_log("Internet play: no signalling brokers (network.signalling_brokers), so invites cannot work");
+		platform_log("Internet play: no signalling brokers (network.brokers_file), so invites cannot work");
+	else if (text[strspn(text, ", ")])
+		platform_log("Internet play: only the first %d signalling brokers are used", MAXIMUM_BROKERS);
 }
 
 void p2p_signal_select_sets(int *read, int *read_count, int *write, int *write_count, int maximum_count)

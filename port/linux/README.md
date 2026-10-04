@@ -83,7 +83,8 @@ These files are in the data root:
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
 
 The settings are in `config.toml` next to the executable. Refer to
-"Settings".
+"Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
+(`network.brokers_file`).
 
 If the game stops because of a fatal signal, it writes the address and a
 backtrace to the standard error. To find the function at the address, enter
@@ -254,7 +255,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.allow_upnp` | `true` | `HALO_NET_ALLOW_UPNP` | `true`: internet play can ask the router to forward its port (UPnP). `false`: the game does not ask. Refer to "Internet play". |
 | `network.public_lobby` | `true` | `HALO_NET_PUBLIC_LOBBY` | `true`: the server browser. Public games are listed, and Join Game > Server Browser shows them. `false`: no games are listed or shown. Refer to "Server browser". |
 | `network.host_public` | `true` | `HALO_NET_HOST_PUBLIC` | `true`: a new game of Create Game > Internet starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in Server Setup changes it for each game. Refer to "Server browser". |
-| `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other, and that carry the listings of the server browser. |
+| `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
@@ -457,7 +458,7 @@ How it operates (`src/p2p_lobby.c`):
 
 - The host of a public game publishes a listing: the invite, and the name,
   map, gametype and player counts of the game. The listing goes to the
-  same MQTT brokers as the invites (`network.signalling_brokers`), retained,
+  same MQTT brokers as the invites (`network.brokers_file`), retained,
   to a topic of the host (`hceu/3/lobby/s/<hash of its key>`).
 - The key of the host signs the listing (Ed25519). The key is the key of the
   invite, so no other machine can list the invite of the host, change its
@@ -479,8 +480,13 @@ with the invite can ask the host to connect, and the host then sends its
 addresses. Thus anyone can learn the address of the host of a public game,
 as for any public server.
 
-To use a broker of your own, add it to `network.signalling_brokers`. All the
-players must use the same broker to see each other's games. The game uses
+The brokers are in `brokers.txt` next to the executable (from
+`port/assets/network/brokers.txt`; on Android, the app writes it next to
+`config.toml` at each start), one `host:port` on each line. The game uses
+all of them at once (up to 4), so one that works is enough. An update
+replaces `brokers.txt`: to use brokers of your own, put them in another
+file and name it in `network.brokers_file`. All the players must use the
+same broker to see each other's games. The game uses
 MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
 retained messages, or does not let clients subscribe with wildcards, carries
 only invites, not listings.
@@ -497,7 +503,7 @@ Only machines with the invite can find the game:
   random 16-byte token. The identifier of the host is from the first 6
   bytes of the hash.
 - The machines exchange their public keys and addresses through public MQTT
-  brokers (`network.signalling_brokers`). The topics are HMACs of the token.
+  brokers (`network.brokers_file`). The topics are HMACs of the token.
   A key from the token encrypts and authenticates the messages
   (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
   with a key that only it and the player can calculate. Its public key must

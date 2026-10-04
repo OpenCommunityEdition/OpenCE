@@ -243,11 +243,12 @@ static const struct config_setting config_settings[] =
 		"in everyone's server browser: anyone can see and join it) or, false,\n"
 		"PRIVATE (only players with its invite link can join). Server Setup's\n"
 		"LISTING changes it for each game." },
-	{ "network.signalling_brokers", _config_string,
-		"\"broker.emqx.io:1883,broker.hivemq.com:1883,test.mosquitto.org:1883\"",
-		"HALO_NET_BROKERS", _environment_value, _platform_all,
-		"Public MQTT brokers through which the machines of an invite find each\n"
-		"other (its messages are encrypted); comma-separated host:port." },
+	{ "network.brokers_file", _config_string, "\"brokers.txt\"",
+		"HALO_NET_BROKERS_FILE", _environment_value, _platform_all,
+		"The file of the public MQTT brokers through which the machines of an\n"
+		"invite find each other (its messages are encrypted), beside this file\n"
+		"unless a full path: one host:port on each line, up to 4. Updates\n"
+		"replace brokers.txt: keep a list of your own under another name." },
 	{ "network.stun_servers", _config_string, "\"stun.l.google.com:19302,stun.cloudflare.com:3478\"",
 		"HALO_NET_STUN", _environment_value, _platform_all,
 		"Public STUN servers that tell this machine its internet address;\n"

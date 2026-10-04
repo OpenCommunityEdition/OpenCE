@@ -503,5 +503,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     cflags, ldflags = lto_flags(sln, build_dir / "thinlto-cache")
     cflags += profile_use_flags(profile)
     emit(obj_dir, output, cflags, ldflags, [profile] if profile else [])
-    n.build(outputs="linux", rule="phony", inputs=output)
+    # internet play's MQTT brokers, a file beside the game (network.brokers_file)
+    brokers = build_dir / "brokers.txt"
+    n.rule(name="linux_copy", command="cp $in $out", description="LINUX COPY $out")
+    n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
+    n.build(outputs="linux", rule="phony", inputs=[output, brokers])
     n.newline()
