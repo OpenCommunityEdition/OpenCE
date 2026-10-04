@@ -518,6 +518,16 @@ boolean network_game_client_start_frame(
 		main_goto_main_menu();
 		result = TRUE;
 	}
+	else if (!global_network_game_client)
+	{
+		/* port: no client (the menus let it go, as a lobby's last player
+		leaving does, without changing the connection): no network game, as
+		network_game_client_end_frame has it, which only a frame in a game
+		reaches */
+		game_connection_set(0);
+		main_menu_ensure_player_queues_exist();
+		result = TRUE;
+	}
 	else
 	{
 		result = network_game_client_idle(global_network_game_client);
