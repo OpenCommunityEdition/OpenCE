@@ -5672,6 +5672,10 @@ static short ui_mouse_presses[UI_MOUSE_MAXIMUM_PRESSES];
 static long ui_mouse_press_count = 0;
 static boolean ui_mouse_hover_pending = FALSE;
 static boolean ui_mouse_click_pending = FALSE;
+/* whether the pointer moved the focus last (the d-pad clears it): a list
+then doesn't scroll on at its end, which the pointer, moving, would make it
+do every frame (menu_functions.c) */
+static boolean ui_mouse_focused_last = FALSE;
 static short ui_mouse_hover_x, ui_mouse_hover_y;
 static short ui_mouse_click_x, ui_mouse_click_y;
 /* whether the latest pointer read was the touchscreen: the taller legend
@@ -6420,6 +6424,7 @@ static void ui_mouse_give_focus(
 {
 	struct widget_instance *ancestor;
 
+	ui_mouse_focused_last = TRUE;
 	if (ui_mouse_widget_has_focus(widget))
 		return;
 	widget_instance_give_focus_directly(widget_instance_get_topmost_parent(widget), widget);
@@ -6431,6 +6436,14 @@ static void ui_mouse_give_focus(
 	ui_play_audio_feedback_sound(_ui_audio_feedback_cursor);
 
 	return;
+}
+
+/* port: whether the pointer moved the menus' focus last, rather than the
+d-pad (menu_functions.c's lists) */
+boolean ui_widget_port_pointer_focused(
+	void)
+{
+	return ui_mouse_focused_last;
 }
 
 /* the d-pad buttons that step a widget back and forward */
@@ -7665,6 +7678,12 @@ static void widget_instance_process_one_event_recursive(
 		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 		3067,
 		widget && definition && event && return_widget_deleted);
+	if (event->type == _event_type_button &&
+		event->data.button.index >= _widget_event_dpad_up &&
+		event->data.button.index <= _widget_event_dpad_right)
+	{
+		ui_mouse_focused_last = FALSE;
+	}
 	if (event->type == _event_type_button &&
 		event->data.button.value > 1 &&
 		event->controller_index >= 0 &&
