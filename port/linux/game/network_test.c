@@ -1274,6 +1274,9 @@ void network_test_update(
 			holds the countdown) */
 			if (global_network_game_server_get())
 				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+			/* a join that arrived as the last game ended would refuse every
+			later one, the server holding it behind the queued player */
+			network_game_server_port_clear_queued_players(global_network_game_server_get());
 			platform_log("network test: the next game");
 		}
 	}
