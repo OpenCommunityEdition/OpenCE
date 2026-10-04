@@ -50,6 +50,8 @@ final class Updater {
     private static final String REPOSITORY = "OpenCommunityEdition/OpenCE";
     private static final String USER_AGENT = "halo-ce-universal-updater";
     private static final int TIMEOUT_MILLISECONDS = 20000;
+    /** the most a download (a release's zip, about 35 MB) or the app in it may be */
+    private static final long MAXIMUM_UPDATE_SIZE = 256L * 1024 * 1024;
 
     private Updater() {
     }
@@ -302,8 +304,10 @@ final class Updater {
                 int count;
 
                 while ((count = in.read(buffer)) > 0) {
-                    out.write(buffer, 0, count);
                     received += count;
+                    if (received > MAXIMUM_UPDATE_SIZE)
+                        throw new IOException("the download is larger than expected");
+                    out.write(buffer, 0, count);
                     if (received - reported >= 256 * 1024 || received == total) {
                         progress.report(received, total);
                         reported = received;
@@ -327,10 +331,15 @@ final class Updater {
                     continue;
                 try (OutputStream out = new FileOutputStream(apk)) {
                     byte[] buffer = new byte[65536];
+                    long written = 0;
                     int count;
 
-                    while ((count = in.read(buffer)) > 0)
+                    while ((count = in.read(buffer)) > 0) {
+                        written += count;
+                        if (written > MAXIMUM_UPDATE_SIZE)
+                            throw new IOException("the app in the download is larger than expected");
                         out.write(buffer, 0, count);
+                    }
                 }
                 return;
             }
