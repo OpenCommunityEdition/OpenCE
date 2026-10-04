@@ -553,6 +553,7 @@ symbols in this file:
 #include "interface/interface.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
+#include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
 #include "interface/player_ui.h"
 #include "interface/terminal.h"
@@ -3461,6 +3462,245 @@ void game_engine_rasterize_message(
 	return;
 }
 
+/* port: a score display in the bottom-right corner, like the PC version's,
+drawn with the HUD's number digits (the same ones the grenade count uses).
+It shows while the scoreboard is closed:
+- team games: red's score above blue's, with the player's team brighter
+- free for all: the player's score above the leader's
+- the time left under the scores, when the game has a time limit
+- a small "First to ..." line at the bottom with the score needed to win
+The two structs below copy the HUD's own definitions (see hud_draw.c). */
+struct number_hud_element_definition
+{
+	struct hud_placement_definition placement;
+	struct hud_color_definition colors;
+	char digits;
+	byte number_flags;
+	char fractional_digits;
+	byte pad;
+	long unused[3];
+};
+
+struct hud_number_definition
+{
+	struct tag_reference number_bitmap;
+	char character_width;
+	char screen_width;
+	char x_offset;
+	char y_offset;
+	char decimal_point_width;
+	char colon_width;
+	short pad;
+	long unused[19];
+};
+
+enum
+{
+	/* the corner's margin and its rows' height (the HUD's units) */
+	CORNER_SCORE_MARGIN = 12,
+	CORNER_SCORE_ROW_HEIGHT = 16,
+	CORNER_SCORE_SHOW_ALL_LEADING_ZEROS = 1,
+};
+
+/* a number in the corner's row (0 the lowest), its right edge offset from
+the window's by right_offset, in that colour faded by alpha */
+static void corner_score_draw_number(
+	long local_player_index,
+	short row,
+	short right_offset,
+	long value,
+	short digits,
+	unsigned long color,
+	real alpha)
+{
+	struct hud_absolute_placement_definition placement;
+	struct number_hud_element_definition numbers;
+
+	csmemset(&placement, 0, sizeof(placement));
+	csmemset(&numbers, 0, sizeof(numbers));
+	placement.corner = _hud_anchor_bottom_right;
+	numbers.placement.offset.x = (short)(CORNER_SCORE_MARGIN + right_offset);
+	numbers.placement.offset.y = (short)(CORNER_SCORE_MARGIN + row * CORNER_SCORE_ROW_HEIGHT);
+	numbers.placement.scale.i = 1.0f;
+	numbers.placement.scale.j = 1.0f;
+	numbers.colors.color = (color & 0x00FFFFFF) | ((unsigned long)(((color >> 24) & 0xFF) * PIN(alpha, 0.0f, 1.0f)) << 24);
+	/* (as many digits as it has, 0 drawn too) */
+	numbers.digits = (char)digits;
+	numbers.number_flags = CORNER_SCORE_SHOW_ALL_LEADING_ZEROS;
+	hud_draw_numbers((short)local_player_index, &placement, &numbers, (short)PIN(value, -999, 999), NONE,
+		FLAG(_hud_draw_in_multiplayer_bit), 0, 0.0f);
+}
+
+static short corner_score_digits(
+	long value)
+{
+	short digits = 1;
+
+	value = labs(value);
+	while (value >= 10 && digits < 3)
+	{
+		value /= 10;
+		digits++;
+	}
+	return digits;
+}
+
+/* a time (ticks) in the corner's row, its minutes and seconds apart */
+static void corner_score_draw_time(
+	long local_player_index,
+	short row,
+	long ticks,
+	unsigned long color,
+	real alpha)
+{
+	long seconds = (MAX(ticks, 0) + TICKS_PER_SECOND - 1) / TICKS_PER_SECOND;
+	long hud_number_index = interface_get_tag_index(_interface_hud_digits);
+	short gap = 0;
+
+	if (hud_number_index != NONE)
+	{
+		struct hud_number_definition const *hud_number =
+			(struct hud_number_definition const *)tag_get('hud#', hud_number_index);
+
+		gap = (short)(hud_number->screen_width * 5 / 2);
+	}
+	corner_score_draw_number(local_player_index, row, 0, seconds % 60, 2, color, alpha);
+	corner_score_draw_number(local_player_index, row, gap, seconds / 60, corner_score_digits(seconds / 60),
+		color, alpha);
+}
+
+/* whether the game type scores time (king of the hill's on the hill,
+oddball's with the ball: its test_flag(1), its scores counts instead) */
+static boolean corner_score_timed(
+	void)
+{
+	long type = game_engine->type;
+
+	return type == game_engine_king || (type == game_engine_oddball && !game_engine_test_flag(1));
+}
+
+/* a score in the corner's row: a time where the game type scores time, else
+a number */
+static void corner_score_draw_score(
+	long local_player_index,
+	short row,
+	long score,
+	unsigned long color,
+	real alpha)
+{
+	if (corner_score_timed())
+		corner_score_draw_time(local_player_index, row, score, color, alpha);
+	else
+		corner_score_draw_number(local_player_index, row, 0, score, corner_score_digits(score), color, alpha);
+}
+
+/* the goal under the corner's rows, in their margin (they stay where they
+are), in the HUD's text, small and dim: "First to 15", or a time ("First to
+3:00": king of the hill's minutes, oddball's minutes of the ball) */
+static void corner_score_draw_goal(
+	real alpha)
+{
+	enum
+	{
+		/* (how large, of the HUD's text) */
+		GOAL_TEXT_SCALE_PERCENT = 60,
+	};
+	long goal = game_engine_get_variant()->universal_variant.score_to_win;
+	long font_index = hud_get_font_index();
+	real scale = hud_globals_get_scale(TRUE);
+	rectangle2d bounds = render.camera.window_bounds;
+	real_argb_color color;
+	struct font_header *font;
+	wchar_t text[48];
+	short line_height;
+
+	if (goal <= 0 || font_index == NONE)
+		return;
+	if (corner_score_timed())
+	{
+		wchar_t time_string[32];
+
+		ticks_to_unicode_time_string(goal * TICKS_PER_MINUTE, NUMBEROF(time_string), time_string);
+		usnprintf(text, NUMBEROF(text), L"First to %s", time_string);
+	}
+	else
+	{
+		usnprintf(text, NUMBEROF(text), L"First to %ld", goal);
+	}
+	text[NUMBEROF(text) - 1] = 0;
+
+	font = font_definition_get(font_index);
+	line_height = font->ascending_height + font->descending_height + font->leading_height;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	/* (its top under the lowest row's digits, which stand on the margin;
+	scaled about its top right, so that it stays right aligned with them) */
+	bounds.x1 = (short)(bounds.x1 - CORNER_SCORE_MARGIN * scale);
+	bounds.y0 = (short)(bounds.y1 - (CORNER_SCORE_MARGIN - 4) * scale);
+	bounds.y1 = (short)(bounds.y0 + line_height);
+	color.alpha = 0.8f * alpha;
+	color.red = color.green = color.blue = 0.85f;
+	draw_string_set_tab_stops(NULL, 0);
+	draw_string_set_draw_mode(font_index, NONE, 1 /* right */, 0, &color);
+	rasterizer_text_set_scale(GOAL_TEXT_SCALE_PERCENT / 100.0f, (real)bounds.x1, (real)bounds.y0);
+	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, text);
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
+}
+
+static void game_engine_rasterize_corner_score(
+	long player_index,
+	real alpha)
+{
+	long local_player_index = render.local_player_index;
+	struct player_datum *player = player_get(player_index);
+	short row = 0;
+
+	if (alpha <= 0.0f || game_engine_globals.postgame_state != game_engine_mode_active)
+		return;
+
+	/* (the time left lowest, the scores above it, and the goal under them all) */
+	if (game_variant_options_get()->time_limit > 0)
+	{
+		corner_score_draw_time(local_player_index, row++,
+			game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get(), 0xB08C9BAA, alpha);
+	}
+
+	if (game_engine_has_teams())
+	{
+		long blue_score = game_engine_get_team_score(1);
+		long red_score = game_engine_get_team_score(0);
+
+		corner_score_draw_score(local_player_index, row++, blue_score,
+			player->team_index == 1 ? 0xFF6E96FF : 0xB04A64AA, alpha);
+		corner_score_draw_score(local_player_index, row++, red_score,
+			player->team_index == 0 ? 0xFFFF5A5A : 0xB0AA3C3C, alpha);
+	}
+	else
+	{
+		struct data_iterator iterator;
+		struct player_datum *other_player;
+		long own_score = game_engine->get_player_score(player_index, _get_score_individual);
+		long best_score = LONG_MIN;
+
+		data_iterator_new(&iterator, player_data);
+		while ((other_player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			long score;
+
+			if (iterator.datum_index == player_index)
+				continue;
+			score = game_engine->get_player_score(iterator.datum_index, _get_score_individual);
+			if (score > best_score)
+				best_score = score;
+		}
+		/* (the leader's under the player's) */
+		if (best_score != LONG_MIN)
+			corner_score_draw_score(local_player_index, row++, best_score, 0xB08C9BAA, alpha);
+		corner_score_draw_score(local_player_index, row++, own_score, 0xFFB4D7FF, alpha);
+	}
+
+	corner_score_draw_goal(alpha);
+}
+
 static void game_engine_post_rasterize_in_game(
 	void)
 {
@@ -3502,6 +3742,9 @@ static void game_engine_post_rasterize_in_game(
 	}
 
 	fade = PIN(fade, 0.0f, 1.0f);
+	/* port: and the score in its corner, gone as the scoreboard comes */
+	if (player && fade < 1.0f)
+		game_engine_rasterize_corner_score(player_index, 1.0f - fade);
 	if (fade > 0.0f)
 	{
 		real alpha = linear_to_non_linear_alpha(fade);
