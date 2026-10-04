@@ -3669,7 +3669,8 @@ unsigned long distributed_machine_real_address(
 }
 
 /* (the host) a client machine's address as text: its real one, for an
-internet play peer's stand-in (p2p.c) */
+internet play peer's stand-in (p2p.c). Whole, for the host's own CHEATERS_FILE
+and BANS_FILE, which match on it: never for the log (log_address.h) */
 static void distributed_address_text(
 	unsigned long address,
 	char *text,
