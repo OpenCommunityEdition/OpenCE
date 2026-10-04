@@ -2589,9 +2589,14 @@ long sound_new_impulse(
 		}
 		else
 		{
+			/* (port: which sound, and what it is) */
 			error(
 				_error_silent,
-				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
+				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound: %s (compression %d, encoding %d, sample rate %d)",
+				tag_get_name(definition_index),
+				definition->compression,
+				definition->encoding,
+				definition->sample_rate);
 		}
 	}
 
