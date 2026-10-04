@@ -57,6 +57,10 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #define UPDATE_ASSET "halo-" UPDATE_PLATFORM "-" HALO_BUILD_FLAVOR ".zip"
 #define UPDATE_DIRECTORY "update.partial"
 #define MAXIMUM_UPDATE_FILES 32
+/* the most a download may be: GitHub's answer about the latest release, a
+release's zip (about 30 MB) */
+#define MAXIMUM_CHECK_SIZE (1024ULL * 1024)
+#define MAXIMUM_UPDATE_SIZE (256ULL * 1024 * 1024)
 
 enum
 {
@@ -140,6 +144,12 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 		remaining -= (unsigned long)count;
 		if (method == 0)
 		{
+			/* (no more than the entry says it holds) */
+			if (count > size - written)
+			{
+				snprintf(reason, reason_size, "it unpacks to more than %lu bytes", size);
+				break;
+			}
 			if (SDL_WriteIO(file, input, count) != count)
 			{
 				snprintf(reason, reason_size, "could not write %s after %lu bytes (%s)", path, written, SDL_GetError());
@@ -216,10 +226,29 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 	return succeeded;
 }
 
-/* the zip's files (a flat folder) into update.partial/, their names in names */
-static int zip_extract(const char *zip_path, char names[][256], int *name_count, char *error, size_t error_size)
+/* whether an entry's name is one of a release's files, which are all at the
+zip's top, named with letters, digits and . _ + - (a folder, or a name that
+could leave update.partial/ or mean something else to the system, is not) */
+static int zip_name_allowed(const char *name)
 {
-	SDL_IOStream *zip = SDL_IOFromFile(zip_path, "rb");
+	const char *c;
+
+	if (!*name || *name == '.')
+		return 0;
+	for (c = name; *c; c++)
+	{
+		if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '.' ||
+			*c == '_' || *c == '+' || *c == '-'))
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* the zip's files (a flat folder) into update.partial/, their names in names */
+static int zip_extract(SDL_IOStream *zip, char names[][256], int *name_count, char *error, size_t error_size)
+{
 	unsigned char tail[65536 + 22];
 	Sint64 size;
 	size_t tail_size, index;
@@ -227,11 +256,6 @@ static int zip_extract(const char *zip_path, char names[][256], int *name_count,
 	int found = 0, succeeded = 0;
 
 	*name_count = 0;
-	if (!zip)
-	{
-		snprintf(error, error_size, "could not open the download");
-		return 0;
-	}
 	/* the end of the central directory, in the last 64 KB */
 	size = SDL_GetIOSize(zip);
 	tail_size = size < (Sint64)sizeof(tail) ? (size_t)size : sizeof(tail);
@@ -272,8 +296,14 @@ static int zip_extract(const char *zip_path, char names[][256], int *name_count,
 		next = SDL_TellIO(zip) + (Sint64)(extra_length + comment_length);
 		/* (a folder, or a name that would leave the game's folder, is left
 		out: the release's files are all at its top) */
-		if (name_length && name[name_length - 1] != '/' && !strchr(name, '/') && !strchr(name, '\\') &&
-			strcmp(name, "..") && strcmp(name, ".") && *name_count < MAXIMUM_UPDATE_FILES)
+		if (memchr(name, 0, name_length))
+			goto done;
+		if (!zip_name_allowed(name))
+		{
+			if (name_length && name[name_length - 1] != '/')
+				platform_log("update: left out %s (not one of a release's names)", name);
+		}
+		else if (*name_count < MAXIMUM_UPDATE_FILES)
 		{
 			int method = (int)zip_word(header + 10);
 
@@ -300,7 +330,6 @@ static int zip_extract(const char *zip_path, char names[][256], int *name_count,
 done:
 	if (!succeeded && !error[0])
 		snprintf(error, error_size, "the download is not a zip file this build can read");
-	SDL_CloseIO(zip);
 	return succeeded;
 }
 
@@ -317,8 +346,8 @@ static long updater_latest_release(void)
 	long build = 0;
 
 	updater_path(path, sizeof(path), "update-check.json");
-	if (!update_download("https://api.github.com/repos/" UPDATE_REPOSITORY "/releases/latest", path, NULL, NULL,
-		error, sizeof(error)))
+	if (!update_download("https://api.github.com/repos/" UPDATE_REPOSITORY "/releases/latest", path,
+		MAXIMUM_CHECK_SIZE, NULL, NULL, error, sizeof(error)))
 	{
 		platform_log("update: could not check for a new version: %s", error);
 		return 0;
@@ -385,8 +414,8 @@ static int SDLCALL updater_download_thread(void *context)
 {
 	struct updater_download *download = context;
 	char error[512] = "";
-	int succeeded = update_download(download->url, download->zip_path, updater_download_progress, download, error,
-		sizeof(error));
+	int succeeded = update_download(download->url, download->zip_path, MAXIMUM_UPDATE_SIZE, updater_download_progress,
+		download, error, sizeof(error));
 
 	SDL_LockMutex(download->lock);
 	download->succeeded = succeeded;
@@ -470,6 +499,35 @@ static int updater_download_zip(const char *zip_path, char *error, size_t error_
 	return download.succeeded;
 }
 
+/* the downloaded zip, read once and unpacked from that copy; the zip is
+deleted either way */
+static int updater_unpack(const char *zip_path, char names[][256], int *name_count, char *error, size_t error_size)
+{
+	size_t zip_size = 0;
+	unsigned char *zip = SDL_LoadFile(zip_path, &zip_size);
+	SDL_IOStream *stream;
+	int succeeded = 0;
+
+	update_delete_file(zip_path);
+	if (!zip || zip_size > MAXIMUM_UPDATE_SIZE)
+	{
+		snprintf(error, error_size, "could not read the download");
+		goto done;
+	}
+	stream = SDL_IOFromConstMem(zip, zip_size);
+	if (!stream)
+	{
+		snprintf(error, error_size, "could not read the download");
+		goto done;
+	}
+	succeeded = zip_extract(stream, names, name_count, error, error_size);
+	SDL_CloseIO(stream);
+
+done:
+	SDL_free(zip);
+	return succeeded;
+}
+
 /* downloads, unpacks and puts in place the new build, and starts it; returns
 only if something failed */
 static void updater_update(void)
@@ -486,9 +544,8 @@ static void updater_update(void)
 		snprintf(error, sizeof(error), "could not make %s (is the game's folder read-only?)", partial);
 	}
 	else if (updater_download_zip(zip_path, error, sizeof(error)) &&
-		zip_extract(zip_path, names, &name_count, error, sizeof(error)))
+		updater_unpack(zip_path, names, &name_count, error, sizeof(error)))
 	{
-		update_delete_file(zip_path);
 		/* the new files in place of the old ones */
 		for (index = 0; index < name_count; index++)
 		{
