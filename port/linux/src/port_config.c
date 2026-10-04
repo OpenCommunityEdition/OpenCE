@@ -136,6 +136,11 @@ static const struct config_setting config_settings[] =
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 three quarters of the size of\n"
 		"the HUD's text, 0.25 to 4." },
+	{ "display.match_timer", _config_boolean, "true", "HALO_MATCH_TIMER", _environment_value, _platform_all,
+		"Draw the match clock at the bottom right in multiplayer. It counts up\n"
+		"from the game's first tick, which the items' respawn periods count from\n"
+		"too: a weapon is back on the map at every multiple of its period on the\n"
+		"clock." },
 	{ "display.scoreboard_team_layout", _config_string, "\"teams\"", "HALO_SCOREBOARD_TEAM_LAYOUT", _environment_value,
 		_platform_all,
 		"How the scoreboard lists a team game's players: \"teams\" in a column for\n"

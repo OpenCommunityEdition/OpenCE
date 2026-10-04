@@ -82,6 +82,8 @@ SCREENS = {
              None),
             ("PER-PIXEL LIGHTING:", "display.per_pixel_lighting", ON_OFF,
              "Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex.", None),
+            ("MATCH TIMER:", "display.match_timer", ON_OFF,
+             "Draw a clock at the bottom right in multiplayer,\ncounting up from the start of the game.", None),
         ],
     },
     "mouse_settings": {
