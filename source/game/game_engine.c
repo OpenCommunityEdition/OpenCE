@@ -3523,10 +3523,22 @@ static void corner_score_draw_number(
 	numbers.placement.offset.y = (short)(CORNER_SCORE_MARGIN + row * CORNER_SCORE_ROW_HEIGHT);
 	numbers.placement.scale.i = 1.0f;
 	numbers.placement.scale.j = 1.0f;
-	numbers.colors.color = (color & 0x00FFFFFF) | ((unsigned long)(((color >> 24) & 0xFF) * PIN(alpha, 0.0f, 1.0f)) << 24);
 	/* (as many digits as it has, 0 drawn too) */
 	numbers.digits = (char)digits;
 	numbers.number_flags = CORNER_SCORE_SHOW_ALL_LEADING_ZEROS;
+
+	/* a drop shadow first, a unit down and to the right, so the coloured
+	digits stand out against bright backgrounds (the HUD's blend darkens what
+	is under a black digit) */
+	numbers.placement.offset.x--;
+	numbers.placement.offset.y--;
+	numbers.colors.color = (unsigned long)(0xC0 * PIN(alpha, 0.0f, 1.0f)) << 24;
+	hud_draw_numbers((short)local_player_index, &placement, &numbers, (short)PIN(value, -999, 999), NONE,
+		FLAG(_hud_draw_in_multiplayer_bit), 0, 0.0f);
+
+	numbers.placement.offset.x++;
+	numbers.placement.offset.y++;
+	numbers.colors.color = (color & 0x00FFFFFF) | ((unsigned long)(((color >> 24) & 0xFF) * PIN(alpha, 0.0f, 1.0f)) << 24);
 	hud_draw_numbers((short)local_player_index, &placement, &numbers, (short)PIN(value, -999, 999), NONE,
 		FLAG(_hud_draw_in_multiplayer_bit), 0, 0.0f);
 }
