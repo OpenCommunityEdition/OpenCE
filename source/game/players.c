@@ -4744,6 +4744,27 @@ void player_aiming_vector_from_facing(
 	return;
 }
 
+/* port: the main menu's scene takes no input (game_time.c's
+game_time_menu_scene), so the queues may have none for it: its players
+stand idle. Returns whether that is the case. */
+static boolean players_idle_actions(
+	struct player_action *actions)
+{
+	short index;
+
+	if (!game_time_menu_scene())
+		return FALSE;
+	for (index = 0; index < NETWORK_GAME_MAXIMUM_PLAYER_COUNT; index++)
+	{
+		csmemset(&actions[index], 0, sizeof(actions[index]));
+		actions[index].desired_weapon_index = NONE;
+		actions[index].desired_grenade_index = NONE;
+		actions[index].desired_zoom_level = NONE;
+	}
+
+	return TRUE;
+}
+
 void players_update_before_game(
 	void)
 {
@@ -4759,7 +4780,7 @@ void players_update_before_game(
 	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
 	players_coop_note_on_foot();
 	players_coop_rescue_stranded();
-	if (update_client_dequeue(actions))
+	if (update_client_dequeue(actions) || players_idle_actions(actions))
 	{
 		data_iterator_new(&iterator, player_data);
 		while (player = data_iterator_next(&iterator))

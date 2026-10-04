@@ -3816,7 +3816,10 @@ static void widget_instance_initialize(
 	if (widget->pause_game_time == TRUE)
 	{
 		widget_globals.pause_game_time_count++;
-		if (!game_time_get_paused())
+		/* port: not at the main menu, where the clock only runs the menu's
+		scene, which stopped behind the screen and started again from its
+		beginning as it closed */
+		if (!game_time_get_paused() && !we_are_at_the_main_menu)
 			game_time_set_paused(TRUE);
 		if (!widget_globals.sound_paused && !we_are_at_the_main_menu)
 		{
@@ -4577,7 +4580,8 @@ void display_error(
 							widget_globals.pause_game_time_count>=0,
 							"widget pause counter is out of whack");
 						widget_globals.pause_game_time_count++;
-						if (!game_time_get_paused())
+						/* port: not at the main menu (above) */
+						if (!game_time_get_paused() && !we_are_at_the_main_menu)
 							game_time_set_paused(TRUE);
 						if (!widget_globals.sound_paused && !we_are_at_the_main_menu)
 						{
