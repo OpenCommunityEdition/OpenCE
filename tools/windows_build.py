@@ -7,6 +7,7 @@ links ``build/windows/halo.exe`` with lld. It is generated only when
 configure.py runs on Windows. See port/windows/README.md for the design.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -36,6 +37,8 @@ SDL_URL = (
     f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL_VERSION}/"
     f"SDL3-devel-{SDL_VERSION}-VC.zip"
 )
+# (its SHA-256 when it was pinned: the DLL ships in the builds)
+SDL_SHA256 = "1a784cb2a5c64d56fe7a62090fe9d242d9865f235e4ea9678f1a6ba4e693e7de"
 THIRD_PARTY = BUILD / "third_party"
 SDL_DIR = THIRD_PARTY / f"SDL3-{SDL_VERSION}"
 
@@ -164,6 +167,10 @@ def fetch_sdl() -> None:
     print(f"Downloading {SDL_URL}")
     with urllib.request.urlopen(SDL_URL) as response, open(archive, "wb") as f:
         shutil.copyfileobj(response, f)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    if digest != SDL_SHA256:
+        archive.unlink()
+        raise SystemExit(f"{SDL_URL}: SHA-256 {digest}, not the pinned {SDL_SHA256}")
     with zipfile.ZipFile(archive) as z:
         z.extractall(THIRD_PARTY)
     archive.unlink()
