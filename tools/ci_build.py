@@ -29,6 +29,7 @@ OUTPUTS = {
     "linux": ["build/linux/halo"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
+    "macos": ["build/macos/halo", "build/macos/halo_guest.elf"],
 }
 APKS = {
     "debug": "port/android/app/build/outputs/apk/debug/app-debug.apk",

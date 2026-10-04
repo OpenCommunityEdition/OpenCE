@@ -176,8 +176,8 @@ def fetch_third_party() -> None:
                        check=True)
 
 
-def _musl_sources() -> List[Path]:
-    src = MUSL_DIR / "src"
+def _musl_sources(musl_dir: Optional[Path] = None) -> List[Path]:
+    src = (musl_dir or MUSL_DIR) / "src"
     result = set()
     for directory in MUSL_DIRECTORIES:
         for path in (src / directory).glob("*.c"):

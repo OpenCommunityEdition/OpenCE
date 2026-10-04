@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
+from tools.macos_build import generate_macos_build, macos_configure_inputs
 from tools.linux_build import generate_linux_build, linux_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
 
@@ -112,6 +113,7 @@ n.newline()
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
 generate_windows_build(n, sln)
+generate_macos_build(n, sln)
 
 n.comment("Reconfigure on change")
 n.rule(
@@ -129,6 +131,7 @@ n.build(
         *linux_configure_inputs(),
         *android_configure_inputs(),
         *windows_configure_inputs(),
+        *macos_configure_inputs(),
     ],
 )
 n.newline()
