@@ -392,12 +392,9 @@ void render_particles(
 						rendered_particle++;
 					}
 
-					/* BUG (original): a fully culled group divides zero by zero.
-					 * A corrected non-matching build would store 0.0f when
-					 * built_particle_count is zero. */
 					((struct shader_effect_definition *)sprite_data.shader)->
-						secondary_map_radius =
-						total_radius / built_particle_count;
+						secondary_map_radius = built_particle_count ?
+						total_radius / built_particle_count : 0.0f;
 					build_sprites_end(&sprite_data);
 				}
 			}
