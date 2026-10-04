@@ -215,12 +215,64 @@ jobs:
           path: dist/halo-windows-release
           retention-days: 3
 
+  macos:
+    # The runner image has LLVM (clang with the arm64_32 backend the guest
+    # needs), Python and the SDL build's dependencies. lld and its LLVM-ar
+    # come from the llvm/lld taps (the guest image links with ld.lld).
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      HALO_MACOS_LLD: /opt/homebrew/opt/lld/bin/ld.lld
+      HALO_MACOS_LLVM_AR: /opt/homebrew/opt/llvm/bin/llvm-ar
+    steps:
+      - name: Install the toolchain
+        run: |
+          brew install ninja ccache lld llvm
+          echo "/opt/homebrew/opt/llvm/bin" >> "$GITHUB_PATH"
+          echo "/opt/homebrew/opt/lld/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-macos-${{ github.sha }}
+          restore-keys: ccache-macos-
+
+      # musl and SDL, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build/macos/third_party
+          key: macos-third-party-${{ hashFiles('tools/macos_build.py') }}
+
+      - name: Debug
+        run: python3 tools/ci_build.py macos debug
+
+      - name: Release
+        run: python3 tools/ci_build.py macos release
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-macos-debug
+          path: dist/halo-macos-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-macos-release
+          path: dist/halo-macos-release
+          retention-days: 3
+
   release:
     # The six builds as a release, tagged build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
     # latest/download links); then all but the newest five build-* releases
     # go, tags and all. Only for main, and only when every platform built.
-    needs: [linux, android, windows]
+    needs: [linux, android, windows, macos]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -285,6 +337,7 @@ jobs:
           LINUX: ${{ needs.linux.result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
+          MACOS: ${{ needs.macos.result }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
           SERVER: ${{ github.server_url }}
           REPOSITORY: ${{ github.repository }}
@@ -307,13 +360,13 @@ jobs:
               *) echo "➖ Skipped" ;;
             esac
           }
-          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
+          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ] && [ "$MACOS" = success ]; then
             title="Build succeeded"; color=5763719
           else
             title="Build failed"; color=15548997
           fi
           latest="$SERVER/$REPOSITORY/releases/latest"
-          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) · [macOS]($latest/download/halo-macos-release.zip) ([all builds]($latest))"
           if [ -n "$RELEASE_TAG" ]; then
             release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
           else
@@ -332,6 +385,7 @@ jobs:
                 {name: "Linux", value: $linux, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
+                {name: "macOS", value: $macos, inline: true},
                 {name: "Release", value: $release},
                 {name: "Latest release builds", value: $downloads}
               ]
