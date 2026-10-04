@@ -556,103 +556,51 @@ long long host_syscall(long long number, long long a, long long b, long long c,
 	case SYS_munmap:
 		host_low_unmap(GUEST(void *, a), (size_t)(uint32_t)b);
 		return 0;
-	case SYS_mprotect:
-		return 0; /* the write tracker owns the window's protections */
-	case SYS_madvise:
-		return 0;
+
 
 	case SYS_exit:
 	case SYS_exit_group:
 		host_exit((int)a);
 
 	case SYS_set_tid_address:
-		return (uint32_t)pthread_mach_thread_np(pthread_self());
+		return (long)pthread_mach_thread_np(pthread_self());
+	case SYS_gettid:
+		return (long)pthread_mach_thread_np(pthread_self());
+	case SYS_getpid:
+		return (long)getpid();
+	case SYS_getppid:
+		return (long)getppid();
+	case SYS_getuid:
+		return (long)getuid();
+	case SYS_geteuid:
+		return (long)geteuid();
+	case SYS_getgid:
+		return (long)getgid();
+	case SYS_getegid:
+		return (long)getegid();
+	case SYS_sched_yield:
+		return sched_yield();
 	case SYS_rt_sigaction:
 	case SYS_sigaltstack:
 	case SYS_rt_sigprocmask:
 		return 0; /* the host owns signals */
 	case SYS_ioctl:
 		return -ENOTTY;
-	case SYS_statx:
-	case SYS_fstat:
-	case SYS_newfstatat:
-	{
-		/* (fstatat with an empty path and AT_EMPTY_PATH is fstat; the
-		guest's musl also sends bare fstat) */
-		if (number == SYS_fstat)
-			return guest_fstat((int)a, (uint64_t)b);
-		if (number == SYS_newfstatat && ((int)d & 0x1000)) /* AT_EMPTY_PATH */
-			return guest_fstat((int)a, (uint64_t)b);
-		return -ENOSYS;
-	}
 	case SYS_getrandom:
-	{
-		/* (arc4random_buf never fails) */
 		arc4random_buf(GUEST(void *, b), (size_t)(uint32_t)c);
 		return (uint32_t)c;
-	}
 	case SYS_membarrier:
-		return 0;
 	case SYS_syslog:
+	case SYS_madvise:
+	case SYS_mprotect:
 		return 0;
 	case SYS_kill:
 	case SYS_tkill:
 	case SYS_tgkill:
-		return 0; /* the host owns signals; the guest's aborts go through
-		             the doorbells (host_abort) */
-	case SYS_getdents64:
-	case SYS_openat:
-	case SYS_close:
-	case SYS_unlinkat:
-	case SYS_renameat:
-	case SYS_renameat2:
-	case SYS_mkdirat:
-	case SYS_fchmod:
-	case SYS_fchmodat:
-	case SYS_ftruncate:
-	case SYS_faccessat:
-	case SYS_chdir:
-	case SYS_getcwd:
-	case SYS_fcntl:
-	case SYS_flock:
-	case SYS_fsync:
-	case SYS_fdatasync:
-	case SYS_dup:
-	case SYS_dup3:
-	case SYS_sched_yield:
-	case SYS_getpid:
-	case SYS_getppid:
-	case SYS_getuid:
-	case SYS_geteuid:
-	case SYS_getgid:
-	case SYS_getegid:
-	case SYS_gettid:
-	case SYS_getrlimit:
-	case SYS_umask:
-	case SYS_getrusage:
-	case SYS_uname:
-	case SYS_socket:
-	case SYS_socketpair:
-	case SYS_bind:
-	case SYS_listen:
-	case SYS_accept:
-	case SYS_connect:
-	case SYS_getsockname:
-	case SYS_getpeername:
-	case SYS_sendto:
-	case SYS_recvfrom:
-	case SYS_setsockopt:
-	case SYS_getsockopt:
-	case SYS_shutdown:
-	case SYS_sendmsg:
-	case SYS_recvmsg:
-	case SYS_readlinkat:
-	case SYS_prlimit64:
-		return -ENOSYS; /* (the file and socket functions run in the host
-		                    directly, through the hostposix_* doorbells of
-		                    posix_files.c and posix_net.c; only the C
-		                    library's own few calls come here) */
+		return 0;
 
+	/* everything else the guest's musl might ask (the platform's file
+	and socket work goes through the hostposix_* doorbells) */
 	default:
 		host_logf(HOST_LOG_WARN, "guest system call %lld is not supported", number);
 		return -ENOSYS;

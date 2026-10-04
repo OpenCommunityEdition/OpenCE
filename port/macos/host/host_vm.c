@@ -498,10 +498,10 @@ static void service_doorbell(struct host_vcpu *vcpu)
 		host_fatal("doorbell %u has no import (built images out of step?)", (unsigned)index);
 	registers_load(vcpu, &registers);
 	host_vcpu_dispatch_begin(&registers);
-	host_logf(HOST_LOG_INFO, "doorbell %u (%s) x0=%x x1=%x x2=%x", (unsigned)index,
-		host_import_table[index].name, registers.x[0], registers.x[1], registers.x[2]);
+	host_logf(HOST_LOG_INFO, "doorbell %u (%s) x0=%x x1=%x x2=%x (from %x)", (unsigned)index,
+		host_import_table[index].name, registers.x[0], registers.x[1], registers.x[2], registers.x[30]);
 	host_import_table[index].function(); /* reads/writes the registers */
-	/* (the wrapper got them through host_vcpu_registers()) */
+	host_logf(HOST_LOG_INFO, "  -> x0=%x x1=%x", registers.x[0], registers.x[1]);
 	hv_vcpu_set_reg(vcpu->vcpu, HV_REG_PC, vcpu->pc_after_exit);
 }
 
