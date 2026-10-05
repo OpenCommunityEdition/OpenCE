@@ -256,7 +256,11 @@ enum
 	NUMBER_OF_ACTOR_PERCEPTION_TYPES,
 };
 
-#define MAXIMUM_NUMBER_OF_ACTORS 256
+/* port: the debug information's actors (ai_debug.c's actor_debug_array,
+by actor index): every actor of the native builds' larger pool
+(halo_port_capacity.h), else one past the Xbox's 256 is written past its
+end */
+#define MAXIMUM_NUMBER_OF_ACTORS HALO_PORT_MAXIMUM_ACTORS
 #define MAXIMUM_NUMBER_OF_ACTOR_PATHS 32
 
 #define MAXIMUM_UNIT_INDICES_PER_SWARM 16
