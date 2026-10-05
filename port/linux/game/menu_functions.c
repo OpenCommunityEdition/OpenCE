@@ -1805,6 +1805,7 @@ typedef char verify_advertised_game_open_offset[offsetof(struct advertised_game,
 /* the engine's (port) */
 short ui_widget_port_multiplayer_maps(char const *const **names, short *last_used);
 boolean ui_widget_port_multiplayer_map_choose(short level_index);
+boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
 short ui_widget_port_gametypes(long *indices, short maximum, short *last_used);
 boolean ui_widget_port_gametype_choose(long profile_index);
 boolean ui_widget_port_host(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted);
@@ -2027,9 +2028,9 @@ first offer CO-OP CAMPAIGN or MULTIPLAYER, then that kind's categories, then
 the levels (and a level's difficulty) or the maps: each a step that B goes
 back from. Split screen starts at the multiplayer categories.
 
-CUSTOM CAMPAIGN and CUSTOM MAPS list Custom Edition maps, and a co-op level
-is hosted as a network co-op game. This build has neither yet: those lists
-are empty, and a co-op level cannot be hosted (cooperative_level_host). */
+A co-op level is hosted as a network co-op game, and goes to Server Setup.
+CUSTOM CAMPAIGN and CUSTOM MAPS list Custom Edition maps, which this build
+has none of yet, so those lists are empty. */
 
 enum
 {
@@ -2060,14 +2061,7 @@ static struct
 	short category, level;
 } map_list;
 
-/* hosts the campaign level `level_name` as a co-op game at `difficulty`;
-FALSE when it cannot be */
-static boolean cooperative_level_host(char const *level_name, short difficulty)
-{
-	(void)level_name;
-	(void)difficulty;
-	return FALSE;
-}
+#define SERVER_SETUP_NAME "pc\\main_menu\\multiplayer_type_select\\server_settings\\server_settings_screen"
 
 static short map_step_count(void)
 {
@@ -2173,7 +2167,7 @@ static void map_list_update(struct widget_instance *list)
 
 /* "mp level select" (the list's OK): the next step, or the map or level
 chosen. FALSE stays on the Map screen (the gametypes open on TRUE). */
-static boolean map_list_choose(struct widget_instance *list)
+static boolean map_list_choose(struct widget_instance *list, boolean *widget_deleted)
 {
 	short chosen = map_list.chosen;
 
@@ -2202,9 +2196,10 @@ static boolean map_list_choose(struct widget_instance *list)
 		map_step_open(list, MAP_STEP_DIFFICULTIES, (short)PIN(main_get_difficulty(), 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1));
 		return FALSE;
 	case MAP_STEP_DIFFICULTIES:
-		if (!cooperative_level_host(main_get_solo_level_name(map_list.level), chosen))
+		/* the co-op game set up, then Server Setup in the gametypes' place */
+		if (!ui_widget_port_cooperative_level_choose(main_get_solo_level_name(map_list.level), chosen))
 			return campaign_fail();
-		return TRUE;
+		return ui_widget_port_open(list, SERVER_SETUP_NAME, widget_deleted);
 	default:
 		if (chosen >= map_list.count)
 			return campaign_fail();
@@ -2408,6 +2403,28 @@ static void game_name_done(char const *text)
 	multiplayer.game_name[index] = 0;
 }
 
+/* Whether a network game is co-op: a campaign level with no game engine
+(set up by ui_widget_port_cooperative_level_choose). */
+static boolean game_cooperative(struct network_game const *game)
+{
+	return game && !game->variant.game_engine_index && main_get_solo_level_from_name(game->map.name) != NONE;
+}
+
+/* the same, for the game this machine is hosting */
+static boolean hosting_cooperative(void)
+{
+	void *server = global_network_game_server_get();
+
+	return server && game_cooperative(network_game_server_get_game(server));
+}
+
+/* Server Setup's gametype rows, which co-op hides */
+static char const *const server_settings_gametype_rows[] =
+{
+	"op_game_type", "op_player_options", "op_item_options", "op_vehicle_options", "op_indicator_options",
+	"op_team_options",
+};
+
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
 again on coming back from an option's screen) */
@@ -2415,7 +2432,12 @@ static boolean server_settings_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 
-	gametype_setup_begin();
+	/* co-op has no gametype to edit, and allows the most players unless set
+	lower */
+	if (hosting_cooperative())
+		multiplayer.maximum_players_index = NUMBEROF(maximum_players) - 1;
+	else
+		gametype_setup_begin();
 	if (!multiplayer.game_name[0] && player_ui_get_active_player_profile_index(0) != NONE)
 	{
 		struct player_profile profile;
@@ -2467,6 +2489,13 @@ static void server_settings_update(struct widget_instance *list)
 		text_set(named(list, "game_type_value", 0), type);
 	}
 	settings_help(list);
+	{
+		boolean cooperative = hosting_cooperative();
+		short row;
+
+		for (row = 0; row < NUMBEROF(server_settings_gametype_rows); row++)
+			visible_set(named(list, server_settings_gametype_rows[row], 0), !cooperative);
+	}
 	/* LISTING (an internet game's): PUBLIC, listed in everyone's server
 	browser, or PRIVATE, for this game. Its help is its choice's */
 	visible_set(named(list, "op_listing", 0), multiplayer.mode == _multiplayer_mode_host_internet &&
@@ -2517,8 +2546,10 @@ static boolean server_start(void)
 		text_field_end(TRUE);
 	network_game_server_port_set_settings(multiplayer.game_name,
 		maximum_players[PIN(multiplayer.maximum_players_index, 0, NUMBEROF(maximum_players) - 1)]);
-	/* (the gametype as Server Setup's options left it) */
-	if (!gametype_setup_apply())
+	/* the gametype as Server Setup's options left it (co-op keeps its own) */
+	if (hosting_cooperative())
+		gametype_setup_end();
+	else if (!gametype_setup_apply())
 		return campaign_fail();
 	return global_network_game_server_get() != NULL;
 }
@@ -4540,7 +4571,7 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "mp level select"))
 		{
-			return map_list_choose(widget);
+			return map_list_choose(widget, widget_deleted);
 		}
 		else if (!strcmp(name, "port map list back"))
 		{

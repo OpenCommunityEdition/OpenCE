@@ -21,6 +21,37 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
   until a newer arrives.
+- **Actors driven.** Only the host runs the AI. Each tick it sends its
+  clients the control its actors gave their units (how they move, where
+  they face, aim and look, their trigger and buttons, their animation
+  impulses) with the units' state, those near a client's players every
+  tick and others less often; a client drives each unit with the latest
+  it has, as it drives a remote player's, until it hears nothing of it for
+  two seconds (`port/linux/game/network_actors.c`).
+- **Co-op.** A network game on a campaign level with no game engine
+  (Create Game > COOPERATIVE > CAMPAIGN) is co-op. Only the host runs the
+  level's scripts and spawns players. `network_coop.c` sends the clients
+  everything the scripts do that they would otherwise miss:
+  - every tick: the cinematic, camera, screen fade, the HUD settings the
+    scripts control (what is shown, the mission timer) and the skip vote;
+  - once each, numbered so nothing is applied twice: script sounds,
+    chapter titles, help and objective text, "Checkpoint" messages, screen
+    shake, nav points, and custom animations on units and scenery;
+  - device groups (doors, elevators, switches; a client sets none itself,
+    and its player's use of one is relayed to the host);
+  - which named objects exist, so scripted creates and deletes match.
+
+  Every machine follows the host's structure BSP. A dead player watches a
+  living teammate (`coop_spectate.c`) and comes back beside one once it is
+  safe. With everyone dead they come back where they were at the last
+  checkpoint, since only the host could revert. A level won ends the round
+  as in multiplayer, and the next round is the campaign's next level.
+
+  Cutscenes are skipped by vote: more than half the machines must press
+  skip. The host then reverts as single player does, but keeps its clock
+  moving forward (the netcode depends on that) and moves the script
+  threads' wake times along with it. The object, device and name syncs
+  bring the clients up to date.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
@@ -94,6 +125,17 @@ is dead; version 8 is the first whose clients play by the host's rules
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
 hardware id; version 10 sends every player's ping for the scoreboard.
+
+A host never checks a joining client's version: the client reads the
+host's from its advertisement and joins only a version it plays with. That
+is its own, or one of a range (HALO_PORT_NETWORK_VERSION_MINIMUM to
+HALO_PORT_NETWORK_VERSION_MAXIMUM, halo_port_limits.h) of versions that
+differ from it only in messages the other machine drops, not knowing them:
+version 10 (OpenCE's build-73) adds the host's message of the players'
+pings, which a machine of version 9 drops. This build has version 10, as
+OpenCE's current builds (so their clients join its hosts), without that
+message (its hosts do not send it, its clients drop it), and joins hosts of
+9 and 10. The game browser lists the range's games.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

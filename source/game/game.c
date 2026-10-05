@@ -180,9 +180,12 @@ struct game_options;
 #include "structures/structures.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* port: a client drives the host's actors' units as the host sent them (port/linux/game/network_actors.c) */
+void network_actors_drive(void);
 
 /* ---------- constants */
 
@@ -326,6 +329,8 @@ void game_tick(
 	positions, and could place objects of their own) */
 	if (!network_game_distributed_client())
 		ai_update();
+	else
+		network_actors_drive();
 	players_update_before_game();
 
 	seconds_per_tick = game_globals->players_are_double_speed
@@ -344,7 +349,11 @@ void game_tick(
 	unlock_global_random_seed();
 	game_engine_update();
 	editor_update();
-	hs_update();
+	/* port: in network co-op only the host runs the scripts. A client running
+	them would place the map's actors and objects a second time and make
+	decisions that belong to the host. */
+	if (!(network_game_distributed_client() && network_coop_active()))
+		hs_update();
 	recorded_animations_update();
 	objects_update();
 	players_update_after_game();
@@ -932,7 +941,9 @@ void remove_quitting_players_from_game(
 	struct player_datum *player;
 	long current_time;
 
-	if (!game_engine_running())
+	/* port: also in network co-op, which has no game engine. Without this a
+	player who left kept their unit, and it respawned. */
+	if (!game_engine_running() && !network_coop_active())
 		return;
 
 	current_time = game_time_get();

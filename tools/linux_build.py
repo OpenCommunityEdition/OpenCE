@@ -401,6 +401,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-include {prefix_header}",
             f"-include {semantics_header}",
             f"-I{port_include}",
+            # the headers of the port's own game units (port/linux/game), for
+            # the game sources that call them
+            f"-iquote {Path(config['game_sources'])}",
             game_defines_and_includes(config),
             sdk_flags,
         ])
