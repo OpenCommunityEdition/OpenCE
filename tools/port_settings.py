@@ -702,9 +702,12 @@ def _lobby() -> list:
     128 players, scrolling; the game's map and gametype; the countdown"""
     base = f"{MT}/lobby"
     # (split screen: another controller's START joins it, its B leaves alone:
-    # menu_functions.c's lobby_join)
+    # menu_functions.c's lobby_join. After a game it is the only screen,
+    # network_game_reset_to_pregame_ui opening it in place of the Xbox's
+    # pregame: leaving it goes to the main menu, as the PC version's postgame
+    # screens do)
     lines = _widget(f"{base}/lobby_screen", [("width", 640), ("height", 480),
-                                             ("flags", "pass_unhandled_to_focused_child"),
+                                             ("flags", "pass_unhandled_to_focused_child main_menu_if_no_history"),
                                              ("bitmap", "bitmaps/gradient")],
                     ['<on event="created" run="port lobby open"/>',
                      '<on event="created" run="net server accept conx"/>',
