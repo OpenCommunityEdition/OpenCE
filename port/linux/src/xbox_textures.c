@@ -16,6 +16,7 @@ memory_watch.c detects that by write-protecting the pages.
 
 #include "xgpu.h"
 #include "hud_hires.h"
+#include "menu_files.h"
 #include "text_hires.h"
 #include "port_config.h"
 
@@ -697,8 +698,8 @@ static unsigned long palette_hash(const D3DCOLOR *palette)
 	return hash ? hash : 1;
 }
 
-/* an entry's GL texture and description: its high-res HUD texture's, if it has
-one, with the bitmap's own size (which its coordinates are in) */
+/* an entry's GL texture and description: its replacement's, if it has one,
+with the bitmap's own size (which its coordinates are in) */
 static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	struct xgpu_texture_description *description)
 {
@@ -712,6 +713,18 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 		{
 			description->levels = 1;
 			return atlas;
+		}
+	}
+	/* (a menu's bitmap: menu_files.h) */
+	{
+		unsigned long levels;
+		GLuint art = menu_art_texture(entry->data, &levels);
+
+		if (art)
+		{
+			description->levels = levels;
+			description->hires = TRUE;
+			return art;
 		}
 	}
 	/* (a high-res texture drawn for some sprites, for the placeholder the

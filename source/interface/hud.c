@@ -995,13 +995,16 @@ static void hud_draw_players(
 
 /* port: in multiplayer, players' names above their heads
 (display.player_names: "all", "allies", "enemies" or "none"). An ally's goes
-above the triangle the game draws over teammates; an enemy's only while the
-view sees them and they are not camouflaged, so that it never gives away
-where they hide. */
+above the triangle the game draws over teammates; an enemy's only within the
+motion sensor's reach, while the view sees them and they are not
+camouflaged, so that it never gives away where they hide. Whose names show
+follows the gametype's motion tracker: none if it shows no players, only
+allies' if it shows only friends (game_engine_draw_object_in_motion_sensor). */
 
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(const char *name);
 double config_real(const char *name);
+unsigned long config_changes(void);
 
 enum
 {
@@ -1015,11 +1018,14 @@ static short hud_player_names_setting(
 	void)
 {
 	static short setting = NONE;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (setting == NONE)
+	/* (read again when Settings changes it) */
+	if (read_at != config_changes())
 	{
 		const char *value = config_string("display.player_names");
 
+		read_at = config_changes();
 		setting = _player_names_all;
 		if (value)
 		{
@@ -1041,9 +1047,13 @@ static real hud_player_name_scale(
 	void)
 {
 	static real scale = 0.0f;
+	static unsigned long read_at = (unsigned long)-1;
 
-	if (scale == 0.0f)
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
 		scale = 0.75f * PIN((real)config_real("display.player_name_scale"), 0.25f, 4.0f);
+	}
 
 	return scale;
 }
@@ -1080,46 +1090,11 @@ static boolean hud_player_name_in_sight(
 	return in_sight;
 }
 
-/* the farthest an enemy's name is shown, in world units (the sniper rifle's
-at 2x; its 8x would reach across most maps) */
-#define MAXIMUM_ENEMY_NAME_RANGE 70.0f
-
-/* how far away enemies' names are shown: as far as the local player's
-weapon turns its reticle red over an enemy (its autoaim distance, times its
-zoom; a vehicle's gun when seated at one, none for a weapon that aims only
-when zoomed, unzoomed), never less than the motion sensor's reach and never
-more than MAXIMUM_ENEMY_NAME_RANGE */
+/* how far away enemies' names are shown: the motion sensor's reach */
 static real hud_player_name_enemy_range(
 	void)
 {
-	long player_index = local_player_get_player_index(render.local_player_index);
-	real range = hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
-	long unit_index;
-
-	if (player_index == NONE || player_get(player_index)->unit_index == NONE)
-		return range;
-	unit_index = unit_get_aiming_unit_index(player_get(player_index)->unit_index);
-	if (unit_index != NONE)
-	{
-		struct unit_datum *unit = unit_get(unit_index);
-		long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
-
-		if (weapon_index != NONE)
-		{
-			struct weapon_definition *definition = weapon_definition_get(weapon_get(weapon_index)->definition_index);
-			short zoom_level = player_control_get_zoom_level(render.local_player_index);
-
-			if (zoom_level != NONE || !TEST_FLAG(definition->weapon.flags, _weapon_aim_assists_only_when_zoomed_bit))
-			{
-				real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
-					weapon_get_zoom_magnification(weapon_index, zoom_level);
-
-				range = MAX(range, weapon_range);
-			}
-		}
-	}
-
-	return MIN(range, MAXIMUM_ENEMY_NAME_RANGE);
+	return hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
 }
 
 static void hud_draw_player_name(
@@ -1217,6 +1192,8 @@ static void hud_draw_player_names(
 	team_index = player_get(player_index)->team_index;
 	indicators = game_engine_display_team_indicators();
 	enemy_range = hud_player_name_enemy_range();
+	/* (the players the motion tracker would show this local player) */
+	game_engine_motion_sensor_viewer(render.local_player_index);
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
@@ -1225,8 +1202,11 @@ static void hud_draw_player_names(
 
 		if (iterator.datum_index == player_index || player->unit_index == NONE)
 			continue;
-		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies))
+		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies) ||
+			!game_engine_draw_object_in_motion_sensor(player->unit_index))
+		{
 			continue;
+		}
 		hud_draw_player_name(iterator.datum_index, ally, ally && indicators, enemy_range);
 	}
 
