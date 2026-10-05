@@ -53,6 +53,8 @@ machine (their datum identifiers need not be).
 
 #include "cseries.h"
 #include "cseries/errors.h"
+#include "cache/cache_files.h"
+#include "models/model_animation_definitions.h"
 #include "game/game.h"
 #include "game/game_globals.h"
 #include "game/players.h"
@@ -238,11 +240,8 @@ before the host takes it no longer, and before the client is put where the
 host has it (no further than that: between the two they would disagree for
 good, the host's player somewhere its own is not) */
 #define HOST_ACCEPT_TOLERANCE 3.5f
-#define REMOTE_CORRECTION_TOLERANCE 0.05f
 #define LOCAL_CORRECTION_TOLERANCE 3.0f
-/* how far from the origin a unit is (world units), and how fast a client's
-own player's unit moves at most (world units a tick) */
-#define UNIT_WORLD_BOUND 32768.0f
+/* how fast a client's own player's unit moves at most (world units a tick) */
 #define MAXIMUM_PREDICTED_SPEED 2.0f
 /* ... on foot: this many times as fast as a player runs and jumps, or as
 fast as the host's ticks threw its copy lately, whichever is more; and how
@@ -666,6 +665,40 @@ boolean distributed_point_valid(
 	return fabsf(point->x) <= bound && fabsf(point->y) <= bound && fabsf(point->z) <= bound;
 }
 
+/* whether a tag index from the host really is a tag of that group */
+boolean distributed_tag_of_group(
+	long tag_index,
+	unsigned long group_tag)
+{
+	struct tag_iterator iterator;
+	long index;
+
+	tag_iterator_new(&iterator, group_tag);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+	{
+		if (index == tag_index)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/* the graph's animation, if the graph tag and index are valid */
+struct animation *distributed_graph_animation(
+	long animation_graph_index,
+	short animation_index)
+{
+	struct animation_graph *graph;
+
+	if (!distributed_tag_of_group(animation_graph_index, ANIMATION_GRAPH_TAG))
+		return NULL;
+	graph = animation_graph_definition_get(animation_graph_index);
+	if (animation_index < 0 || animation_index >= graph->animations.count)
+		return NULL;
+
+	return TAG_BLOCK_GET_ELEMENT(&graph->animations, animation_index, struct animation);
+}
+
 boolean distributed_object_index_valid(
 	long object_index)
 {
@@ -749,7 +782,7 @@ void distributed_unit_vector_unpack(
 	}
 }
 
-static word distributed_vitality_pack(
+word distributed_vitality_pack(
 	real value)
 {
 	value *= VITALITY_SCALE;
@@ -757,15 +790,13 @@ static word distributed_vitality_pack(
 	return (word)(long)floor(value + 0.5f);
 }
 
-static real distributed_vitality_unpack(
+real distributed_vitality_unpack(
 	word value)
 {
 	return (real)value / VITALITY_SCALE;
 }
 
-/* an angle as a 16-bit fraction of a turn, and back (yaw from 0 to 2 pi,
-pitch from -pi to pi) */
-static short distributed_angle_pack(
+short distributed_angle_pack(
 	real angle)
 {
 	real turns = angle / (2.0f * _pi);
@@ -774,7 +805,7 @@ static short distributed_angle_pack(
 	return (short)(word)((long)floor(turns * 65536.0f + 0.5f) & 0xFFFF);
 }
 
-static real distributed_angle_unpack(
+real distributed_angle_unpack(
 	short value,
 	boolean signed_angle)
 {
@@ -3134,6 +3165,7 @@ void network_distributed_new_game(
 	update_queues_distributed_reset();
 	network_objects_new_game();
 	network_damage_new_game();
+	network_actors_new_game();
 }
 
 /* after each tick (game_time.c) */
@@ -3177,6 +3209,7 @@ void network_distributed_tick(
 		if (game_time_get() % PING_INTERVAL_TICKS == 0)
 			distributed_send_pings();
 		distributed_host_send_players();
+		network_actors_host_tick();
 		distributed_send_pickups();
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)
 			distributed_send_game_state(NONE);
@@ -3215,6 +3248,9 @@ static boolean distributed_message_stale(
 	case _distributed_message_relayed_actions:
 	case _distributed_message_damage_events:
 	case _distributed_message_pings:
+	case _distributed_message_actor_states:
+	case _distributed_message_actor_damage:
+	case _distributed_message_damage_animations:
 		break;
 	default:
 		return FALSE;
@@ -3652,6 +3688,9 @@ void network_distributed_handle_message(
 	case _distributed_message_unit_states: entry_size = DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE; break;
 	case _distributed_message_player_statistics: entry_size = sizeof(struct distributed_player_statistics); break;
 	case _distributed_message_pings: entry_size = sizeof(struct distributed_player_ping); break;
+	case _distributed_message_actor_states: entry_size = network_actors_entry_size(); break;
+	case _distributed_message_actor_damage: entry_size = network_actors_damage_entry_size(); break;
+	case _distributed_message_damage_animations: entry_size = network_objects_damage_animation_entry_size(); break;
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
@@ -3715,6 +3754,15 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_unit_states:
 		distributed_handle_unit_states((byte const *)entries, (byte const *)message + size, header.count);
+		break;
+	case _distributed_message_actor_states:
+		network_actors_handle_states(entries, header.count);
+		break;
+	case _distributed_message_actor_damage:
+		network_actors_handle_damage(entries, header.count);
+		break;
+	case _distributed_message_damage_animations:
+		network_objects_handle_damage_animations(entries, header.count);
 		break;
 	case _distributed_message_player_statistics:
 	{

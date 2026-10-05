@@ -65,6 +65,18 @@ enum
 	/* every player's ping as the host measures it, every two seconds, for
 	the scoreboard (unreliable) */
 	_distributed_message_pings,
+	/* the host's actors' units: their control and state (network_actors.c).
+	A number of its own, clear of the kinds upstream adds: a build without
+	it drops the message as a kind it does not know, so the network version
+	stays upstream's and its players join as before */
+	_distributed_message_actor_states = 64,
+	/* (65 to 72 and 74 are kept for network co-op's messages) */
+	/* the damage the host's AI units are taking, which their shields'
+	flares are drawn by (network_actors.c) */
+	_distributed_message_actor_damage = 73,
+	/* the flinch and death animations the host picked for its units, which a
+	client plays rather than its own picks (network_objects.c) */
+	_distributed_message_damage_animations = 75,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -86,6 +98,10 @@ tick, drawn as it goes; further, it is put there, drawn gliding
 #define HOST_BLEND_DISTANCE 0.25f
 #define HOST_VEHICLE_BLEND_DISTANCE 0.5f
 #define REMOTE_BLEND_DISTANCE 1.0f
+/* world units: how far a remote unit may be from where the host says
+before it is put there, and how far from the origin a unit can be */
+#define REMOTE_CORRECTION_TOLERANCE 0.05f
+#define UNIT_WORLD_BOUND 32768.0f
 #define REMOTE_VEHICLE_BLEND_DISTANCE 2.0f
 
 enum
@@ -183,6 +199,10 @@ never 0, which any object at the index matches) */
 boolean distributed_real_valid(real value);
 boolean distributed_point_valid(real_point3d const *point, real bound);
 boolean distributed_object_index_valid(long object_index);
+/* whether a tag index from the host really is a tag of that group */
+boolean distributed_tag_of_group(long tag_index, unsigned long group_tag);
+/* the graph's animation, if a graph tag and animation index from the host are valid */
+struct animation *distributed_graph_animation(long animation_graph_index, short animation_index);
 /* ... an orientation's two axes (unpacked): TRUE when they are one long
 and about square, then made exactly so */
 boolean distributed_axes_make_valid(real_vector3d *forward, real_vector3d *up);
@@ -193,12 +213,37 @@ void distributed_unit_vector_unpack(struct distributed_vector const *vector, rea
 #define DISTRIBUTED_UNIT_SCALE 32767.0f
 #define DISTRIBUTED_VELOCITY_SCALE 1024.0f
 #define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
+/* an angle as a 16-bit fraction of a turn, and back (yaw from 0 to 2 pi,
+pitch from -pi to pi) */
+short distributed_angle_pack(real angle);
+real distributed_angle_unpack(short value, boolean signed_angle);
+/* shields and health in 16 bits */
+word distributed_vitality_pack(real value);
+real distributed_vitality_unpack(word value);
+
+/* ---------- prototypes/NETWORK_ACTORS.C */
+
+void network_actors_new_game(void);
+/* (the host, after each tick) the units its actors drove this tick, to
+each client */
+void network_actors_host_tick(void);
+/* (a client) the host's word on its actors' units */
+void network_actors_handle_states(void const *entries, short count);
+word network_actors_entry_size(void);
+/* (a client, in its tick where the host runs its actors) each actor's unit
+given the control the host last sent for it */
+void network_actors_drive(void);
+
+word network_actors_damage_entry_size(void);
+void network_actors_handle_damage(void const *entries, short count);
 
 /* ---------- prototypes/NETWORK_OBJECTS.C */
 
 void network_objects_new_game(void);
 /* after each tick */
 void network_objects_host_tick(void);
+word network_objects_damage_animation_entry_size(void);
+void network_objects_handle_damage_animations(void const *entries, short count);
 void network_objects_client_tick(void);
 /* (the host) a client has loaded the game and asks for the host's objects:
 again, having failed to make one of them */
@@ -225,6 +270,9 @@ boolean network_objects_reconcile(long object_index, real_point3d const *positio
 	real blend_distance);
 /* a unit in the vehicle's seat as the host has it (NONE: in none) */
 void network_objects_set_seat(long unit_index, long vehicle_index, short seat_index);
+/* (the host) the ticks between sends to a machine of a unit at position, by
+how near that machine's players are (network_actors.c) */
+short network_objects_send_period(long machine_index, real_point3d const *position);
 
 /* ---------- prototypes/NETWORK_DAMAGE.C */
 
