@@ -18,6 +18,7 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_max_players" x="54" y="101"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_invite" x="54" y="129"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="157"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_friendly_fire" x="54" y="185"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="185"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="213"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="241"/>
@@ -72,6 +73,17 @@
 	<widget name="main_menu/multiplayer_type_select/server_settings/listing_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/listing_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PUBLIC|PRIVATE" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_friendly_fire" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/friendly_fire_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/friendly_fire_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/friendly_fire_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/friendly_fire_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|ON|SHIELD ONLY|EXPLOSIVES ONLY" setting="network.coop_friendly_fire" values="off|on|shields_only|explosives_only" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/op_game_type" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -159,6 +171,7 @@
 		<string text="INDICATOR OPTIONS:"/>
 		<string text="TEAMPLAY OPTIONS:"/>
 		<string text="LISTING:"/>
+		<string text="FRIENDLY FIRE:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/help_strings">
 		<string text=""/>
@@ -173,5 +186,9 @@
 		<string text="Friendly fire and team balance, for this game."/>
 		<string text="Anyone can see and join your game: it is listed\nin everyone's Server Browser."/>
 		<string text="Only players with your invite link can join."/>
+		<string text="Players can not be hurt by weapons and explosives\nfired by the other players."/>
+		<string text="Players can be hurt by weapons or explosives\nfired by the other players."/>
+		<string text="Damage from the other players will only reduce\nshields. Health will be unaffected."/>
+		<string text="Players can be hurt by damage from explosives\nfired by the other players."/>
 	</strings>
 </menus>

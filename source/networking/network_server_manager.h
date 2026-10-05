@@ -64,10 +64,14 @@ multiplayer; the next round is on next_map (NULL repeats the level). */
 void network_game_server_port_cooperative_won(
 	char const *next_map);
 /* port: co-op server settings: the difficulty, sent to clients, and the
-build's maximum players (Server Setup's player count is for PvP) */
+most players a co-op game starts with (Server Setup sets its own) */
 void network_game_server_port_set_cooperative(
 	struct network_game_server *server,
 	short difficulty);
+/* port: co-op's friendly fire between its players (a _friendly_fire_ mode:
+Server Setup's FRIENDLY FIRE), kept for the levels after */
+void network_game_server_port_set_cooperative_friendly_fire(
+	short friendly_fire);
 boolean network_game_server_ban_player(
 	char const *text);
 short network_game_server_matching_player_names(

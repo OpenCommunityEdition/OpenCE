@@ -3875,6 +3875,7 @@ static void network_game_server_cooperative_round(
 	struct network_game_server *server)
 {
 	struct game_variant variant;
+	short friendly_fire = server->game.variant_options.friendly_fire;
 
 	if (!network_game_server_cooperative_next_map[0])
 		return;
@@ -3883,6 +3884,8 @@ static void network_game_server_cooperative_round(
 		NUMBEROF(variant.human_readable_game_description) - 1);
 	csmemcpy(&server->game.variant, &variant, sizeof(server->game.variant));
 	network_game_server_variant_options(&server->game.variant, &server->game.variant_options);
+	/* (Server Setup's FRIENDLY FIRE, for every level of the game) */
+	server->game.variant_options.friendly_fire = friendly_fire;
 	csstrncpy(server->game.map.name, network_game_server_cooperative_next_map, sizeof(server->game.map.name) - 1);
 	server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
 	main_set_multiplayer_map_name(server->game.map.name);
@@ -3904,6 +3907,18 @@ void network_game_server_port_set_cooperative(
 		network_event("network_game_server_port_set_cooperative() failed to send updated game settings to clients");
 
 	return;
+}
+
+void network_game_server_port_set_cooperative_friendly_fire(
+	short friendly_fire)
+{
+	struct network_game_server *server = global_network_game_server_get();
+
+	if (!server || friendly_fire < 0 || friendly_fire >= NUMBER_OF_FRIENDLY_FIRE_MODES)
+		return;
+	server->game.variant_options.friendly_fire = friendly_fire;
+	if (server->state == _network_game_server_state_pregame && !network_game_server_send_game_data_pregame(server))
+		network_event("network_game_server_port_set_cooperative_friendly_fire() failed to send updated game settings to clients");
 }
 
 /* port: a gametype's PC options: the menus' (player_ui_set_game_variant_options)

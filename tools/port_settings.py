@@ -657,6 +657,30 @@ def _server_settings() -> list:
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
                      ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     rows.append((f"{base}/op_listing", None))
+    # co-op's FRIENDLY FIRE (between its players), in the place of the
+    # gametype's rows, which co-op hides as multiplayer hides it, laid out
+    # as Teamplay Options' (menu_functions.c's server_settings_update); its
+    # choice kept in network.coop_friendly_fire
+    extra += _widget(f"{base}/op_friendly_fire", [("width", 512), ("height", 28),
+                                                  ("flags", "pass_unhandled_to_focused_child"),
+                                                  ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                     [f'<child widget="{base}/friendly_fire_label"/>',
+                      f'<child widget="{base}/friendly_fire_spinner" x="286" y="1"/>'])
+    extra += _widget(f"{base}/friendly_fire_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                                     ("height", 22), ("string_list", f"{base}/labels"),
+                                                     ("string_index", 10), ("font", "ui\\large_ui"),
+                                                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    extra += _widget(f"{base}/friendly_fire_spinner",
+                     [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
+                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                      ("strings", "OFF|ON|SHIELD ONLY|EXPLOSIVES ONLY"), ("setting", "network.coop_friendly_fire"),
+                      ("values", "|".join(COOP_FRIENDLY_FIRE_VALUES)), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                      ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
+                     ['<on event="created" run="port setting load"/>', '<on event="deleted" run="port setting save"/>',
+                      '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    rows.append((f"{base}/op_friendly_fire", None, 4))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -675,7 +699,7 @@ def _server_settings() -> list:
         extra += _widget(f"{base}/{key}_value", [("type", "text"), ("controller", 1), ("width", 280), ("height", 22),
                                                  ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("align", "center"),
                                                  ("text_y", 5), ("text_flags", "no_focus_test")], [])
-        rows.append((f"{base}/op_{key}", None))
+        rows.append((f"{base}/op_{key}", None, 4 + index))
     extra += _button(f"{base}/button_defaults", 3, [])
     extra += _widget(f"{base}/button_ok", [("type", "text"), ("width", 128), ("height", 24),
                                            ("bitmap", "bitmaps/text_button_background"), ("text", "START GAME"),
@@ -686,7 +710,7 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:", "LISTING:"])
+                                         "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -701,6 +725,11 @@ def _server_settings() -> list:
         # (LISTING's, by its choice)
         "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
         "Only players with your invite link can join.",
+        # (FRIENDLY FIRE's, by its choice, as Teamplay Options' words them)
+        "Players can not be hurt by weapons and explosives\\nfired by the other players.",
+        "Players can be hurt by weapons or explosives\\nfired by the other players.",
+        "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
+        "Players can be hurt by damage from explosives\\nfired by the other players.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
@@ -713,6 +742,9 @@ def _server_settings() -> list:
 
 
 MAXIMUM_PLAYERS = [2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
+# network.coop_friendly_fire's values, as Server Setup's FRIENDLY FIRE shows
+# them (menu_functions.c's cooperative_friendly_fire_modes, in this order)
+COOP_FRIENDLY_FIRE_VALUES = ["off", "on", "shields_only", "explosives_only"]
 # Server Setup's rows of the gametype's options: the gametype editor's
 # screens
 SETUP_OPTION_SCREENS = [
