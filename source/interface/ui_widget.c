@@ -683,7 +683,9 @@ struct widget_instance;
 
 enum
 {
-	WIDGET_MEMORY_POOL_SIZE = 0x4000,
+	/* port: 16 KB on the Xbox; the PC version's screens (port/assets/menus)
+	have many more widgets */
+	WIDGET_MEMORY_POOL_SIZE = 0x40000,
 	MAXIMUM_WIDGET_MEMORY_POOL_BLOCKS = 4096
 };
 
@@ -1362,6 +1364,9 @@ static void event_handler_dispatch(
 static boolean ui_widget_load_children_recursive(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition);
+/* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
+boolean pc_menu_tag(
+	long tag_index);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -1440,8 +1445,45 @@ static boolean ui_cheats_render_box_piece(
 	pixel32 color);
 static short ui_cheats_row_widening(
 	struct widget_instance const *widget);
+static long spinner_string_list_extra_count(
+	long string_list_index);
+static wchar_t *spinner_string_list_get_string(
+	long string_list_index,
+	short string_index);
 
 /* ---------- globals */
+
+/* port: text boxes' string list indices from here are the descriptions of
+spinners' extra items (kills_to_win_extra_descriptions) */
+#define SPINNER_EXTRA_DESCRIPTION_BASE 0x5000
+/* ... and the pixels a spinner with extra items is wider (for three digits) */
+#define SPINNER_EXTRA_WIDTH 12
+
+/* port: the strings a spinner's string list has past the tag's own, as more
+items: the higher kills to win of the Slayer game type editor
+(ui_widget_event_handler_functions.c saves and loads them) */
+static wchar_t const *const kills_to_win_extra_strings[] =
+{
+	L"75", L"100", L"150", L"200", L"250", L"500",
+};
+
+/* ... their descriptions, as a text box's string list index of
+SPINNER_EXTRA_DESCRIPTION_BASE and up (ui_widget_spinner_extra_description) */
+static wchar_t const *const kills_to_win_extra_descriptions[] =
+{
+	L"Seventy-five kills to win. Settle in for a long\r\nfight.",
+	L"A hundred kills to win. Made for big games.",
+	L"A hundred and fifty kills to win. Only a crowded\r\nserver gets there.",
+	L"Two hundred kills to win. Bring friends. Lots of\r\nthem.",
+	L"Two hundred and fifty kills to win.",
+	L"Five hundred kills to win. You'll be here a while.",
+};
+
+/* port: an error message of the port's own text (display_error_text_deferred):
+the text waiting for its dialog, then the dialog's text box showing it */
+static wchar_t const *ui_widget_port_error_pending_text = NULL;
+static wchar_t const *ui_widget_port_error_text = NULL;
+static struct widget_instance *ui_widget_port_error_text_box = NULL;
 
 static struct ui_widget_bss_prefix ui_widget_globals_storage;
 
@@ -2296,6 +2338,11 @@ void ui_widget_delete(
 	case _ui_widget_type_text_box:
 		if (widget->parameters.text_box.text)
 			dispose_pointer(widget_memory_pool, widget->parameters.text_box.text);
+		if (widget == ui_widget_port_error_text_box)
+		{
+			ui_widget_port_error_text_box = NULL;
+			ui_widget_port_error_text = NULL;
+		}
 		break;
 	case _ui_widget_type_spinner_list:
 	case _ui_widget_type_column_list:
@@ -2469,6 +2516,17 @@ static __inline boolean widget_instance_can_handle_events(
 	}
 
 	return FALSE;
+}
+
+/* port: a label in the PC version's lists (port/assets/menus): an item that
+takes no events and has nothing in it that does, which its game passes over
+(its rows of settings take none themselves, but their spinners do), or one
+hidden (a list's rows past its items: port/linux/game/menu_functions.c) or
+disabled (the server browser's column titles, which sort nothing) */
+static boolean widget_instance_port_is_label(
+	struct widget_instance *widget)
+{
+	return (!widget_instance_can_handle_events(widget) && !widget->child) || !widget->visible || widget->disabled;
 }
 
 static struct widget_instance *widget_instance_find_by_tag_index_recursive(
@@ -2670,8 +2728,26 @@ boolean widget_event_function_list_widget_goto_next_item(
 				child = widget->child;
 				item_index = 0;
 			}
-			/* port: a row of the cheats menu shares its tag with another row,
-			which a lookup by tag would find instead */
+			/* port: the PC version's lists (port/assets/menus) pass over the
+			children that take no events (their labels and lines), as its
+			game does */
+			if (child && widget->type == _ui_widget_type_column_list &&
+				pc_menu_tag(widget->definition_tag_index))
+			{
+				long tries = 0;
+
+				while (widget_instance_port_is_label(child) && tries++ < 256)
+				{
+					child = child->next;
+					item_index++;
+					if (!child)
+					{
+						child = widget->child;
+						item_index = 0;
+					}
+				}
+			}
+			/* port: cheats rows can share a tag, so focus them directly */
 			if (child && ui_cheats_widget_get(child) != NONE)
 			{
 				widget_instance_give_focus_directly(widget, child);
@@ -2803,12 +2879,33 @@ boolean widget_event_function_list_widget_goto_previous_item(
 					item_index++;
 				}
 			}
-			/* port: as in widget_event_function_list_widget_goto_next_item */
-			if (ui_cheats_widget_get(child) != NONE)
+			/* port: as goto_next_item, over the PC version's labels */
+			if (widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index))
+			{
+				long tries = 0;
+
+				while (widget_instance_port_is_label(child) && tries++ < 256)
+				{
+					child = child->previous;
+					item_index--;
+					if (!child)
+					{
+						child = widget->child;
+						item_index = 0;
+						while (child->next)
+						{
+							child = child->next;
+							item_index++;
+						}
+					}
+				}
+			}
+			/* port: cheats rows can share a tag, so focus them directly */
+			if (child && ui_cheats_widget_get(child) != NONE)
 			{
 				widget_instance_give_focus_directly(widget, child);
 			}
-			else
+			else if (child)
 			{
 				widget_instance_give_focus_by_tag(
 					widget,
@@ -3302,7 +3399,11 @@ static void event_handler_dispatch(
 		{
 			close_all = TRUE;
 		}
+		/* port: not from a widget its function deleted (it went back:
+		menu_functions.c's profile_save_changes), which the Xbox's opened
+		from regardless */
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted &&
 			handler->widget_tag.index != NONE)
 		{
 			if (!ui_widget_launch_widget(widget, handler->widget_tag.index))
@@ -3508,7 +3609,8 @@ static boolean ui_widget_load_children_recursive(
 		string_list = unicode_string_list_definition_get(definition->text_label_string_list.index);
 		widget_globals.dont_load_children_recursive = TRUE;
 		for (string_index = 0;
-			string_index < string_list->strings.count;
+			string_index < string_list->strings.count +
+				spinner_string_list_extra_count(definition->text_label_string_list.index);
 			string_index++)
 		{
 			struct widget_instance *child = ui_widget_load_by_name_or_tag(
@@ -3611,17 +3713,27 @@ static boolean ui_widget_load_children_recursive(
 		if (focus_a_child)
 		{
 			struct widget_instance *child;
+			/* port: the PC version's lists (port/assets/menus) start on their
+			first child that takes events, past their labels */
+			boolean skip_labels = widget->type == _ui_widget_type_column_list &&
+				pc_menu_tag(widget->definition_tag_index);
+			short index = 0;
 
-			for (child = widget->child; child; child = child->next)
+			for (child = widget->child; child; child = child->next, index++)
 			{
-				if (widget->type == _ui_widget_type_spinner_list ||
-					widget->type == _ui_widget_type_column_list ||
+				if (((widget->type == _ui_widget_type_spinner_list ||
+					widget->type == _ui_widget_type_column_list) &&
+					(!skip_labels || !widget_instance_port_is_label(child))) ||
 					widget_instance_can_handle_events(child))
 				{
 					widget->focused_child = child;
+					if (skip_labels)
+						widget->parameters.list.selected_index = index;
 					break;
 				}
 			}
+			if (!widget->focused_child && skip_labels)
+				widget->focused_child = widget->child;
 		}
 	}
 
@@ -3715,6 +3827,79 @@ static void widget_instance_initialize(
 	}
 
 	return;
+}
+
+/* port: the PC version's events that this engine never sends (its custom
+activation), for the menus' functions (port/linux/game/menu_functions.c):
+runs the widget's handlers for the event, else the first descendant's that
+has any (depth first); FALSE if none has */
+boolean ui_widget_port_dispatch_event(
+	struct widget_instance *widget,
+	short event_type,
+	short controller_index,
+	boolean *deleted)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+	struct widget_instance *child;
+	boolean found = FALSE;
+	long handler_index;
+
+	/* (deleted: a handler deleted the widget's screen, opening another or
+	going back; the callers' widgets are gone with it) */
+	*deleted = FALSE;
+
+	for (handler_index = 0; handler_index < definition->event_handlers.count; handler_index++)
+	{
+		struct ui_widget_event_handler_reference *handler =
+			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + handler_index;
+
+		if (handler->event_type == event_type)
+		{
+			struct event_record event = {0};
+			boolean widget_deleted = FALSE;
+
+			event.controller_index = controller_index;
+			event_handler_dispatch(widget, definition, &event, handler, &widget_deleted);
+			found = TRUE;
+			if (widget_deleted)
+			{
+				*deleted = TRUE;
+				return TRUE;
+			}
+		}
+	}
+	for (child = widget->child; child && !found; child = child->next)
+	{
+		found = ui_widget_port_dispatch_event(child, event_type, controller_index, deleted);
+		if (*deleted)
+			break;
+	}
+	return found;
+}
+
+/* port: the number of a list's focused item: among all its children, but
+in the PC version's lists (port/assets/menus) among those that take events,
+past their labels, as its game counts them */
+short ui_widget_port_list_index(
+	struct widget_instance *list_widget)
+{
+	boolean skip_labels = pc_menu_tag(list_widget->definition_tag_index);
+	struct widget_instance *child;
+	short index = 0;
+
+	for (child = list_widget->child; child && child != list_widget->focused_child; child = child->next)
+	{
+		if (!skip_labels || !widget_instance_port_is_label(child))
+			index++;
+	}
+	return index;
+}
+
+/* port: back to the screen before, for the menus' functions */
+void ui_widget_port_go_back(
+	struct widget_instance *widget)
+{
+	widget_instance_go_back_to_previous(widget);
 }
 
 struct widget_instance *ui_widget_load_by_name_or_tag(
@@ -4125,6 +4310,22 @@ void display_error_deferred(
 	return;
 }
 
+/* port: an error message of the port's own text (the maps have only the
+Xbox's), in the dialog of an error whose text it takes the place of */
+void display_error_text_deferred(
+	wchar_t const *text,
+	short local_player_index)
+{
+	short index = local_player_index == NONE ? 0 : local_player_index;
+
+	if (!VALID_INDEX(index, MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) || widget_globals.deferred_errors[index].error_code != NONE)
+		return;
+	ui_widget_port_error_pending_text = text;
+	display_error_deferred(_error_cannot_create_saved_game_file_with_empty_name, local_player_index, TRUE, FALSE);
+
+	return;
+}
+
 void display_errors_deferred_until_cinematic_stop(
 	void)
 {
@@ -4221,7 +4422,15 @@ void display_error(
 		struct widget_instance *top_widget;
 		long top_widget_tag_index;
 		struct widget_instance *widget;
+		/* (port: the port's own text for this error, taken whether or not its
+		dialog opens, so that it is never another's) */
+		wchar_t const *port_text = NULL;
 
+		if (error_code == _error_cannot_create_saved_game_file_with_empty_name)
+		{
+			port_text = ui_widget_port_error_pending_text;
+			ui_widget_port_error_pending_text = NULL;
+		}
 		if (local_player_index != NONE)
 		{
 			short index;
@@ -4334,6 +4543,12 @@ void display_error(
 					text_box->type == _ui_widget_type_text_box,
 					"expected a text box widget in the error widget");
 				text_box->parameters.text_box.string_list_index = PIN(error_code, 0, NUMBER_OF_ERROR_CODES - 1);
+				/* (port: the port's own text in place of the error's) */
+				if (port_text)
+				{
+					ui_widget_port_error_text_box = text_box;
+					ui_widget_port_error_text = port_text;
+				}
 				widget->widget_is_error_dialog = TRUE;
 				if (!widget->pause_game_time)
 				{
@@ -4424,6 +4639,9 @@ void display_error_damaged_media(
 	return;
 }
 
+/* port: menu_tags.c's */
+char const *pc_menus_screen(char const *name);
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4454,8 +4672,9 @@ void network_game_reset_to_pregame_ui(
 		if (global_network_game_server_get())
 		{
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
+			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
 			if (!ui_widget_load_by_name_or_tag(
-				"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper",
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load map select postgame screen");
@@ -4464,7 +4683,7 @@ void network_game_reset_to_pregame_ui(
 		else
 		{
 			if (!ui_widget_load_by_name_or_tag(
-				"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen"),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load networked pregame status screen");
@@ -4715,8 +4934,13 @@ void main_screen_shell_load(
 	{
 		attract_mode_reset_timer();
 		ui_widgets_close_all();
-		if (!ui_widget_load_by_name_or_tag("ui\\shell\\main_menu\\main_menu", NONE, NULL, NONE, NONE, NONE, NONE))
-			error(_error_silent, "failed to load main screen shell window");
+		/* port: the menus' main menu, when they are there (port/linux/game/menu_tags.c) */
+		{
+			extern char const *pc_menus_root_name(void);
+
+			if (!ui_widget_load_by_name_or_tag(pc_menus_root_name(), NONE, NULL, NONE, NONE, NONE, NONE))
+				error(_error_silent, "failed to load main screen shell window");
+		}
 		if (widget_globals.main_menu_deferred_error_code != NONE)
 		{
 			display_error(widget_globals.main_menu_deferred_error_code, NONE, TRUE, FALSE);
@@ -4948,9 +5172,15 @@ static void widget_instance_render_text_box(
 			string_list_index = definition->string_list_index;
 		else
 			string_list_index = widget->parameters.text_box.string_list_index;
-		string = unicode_string_list_get_string(
-			definition->text_label_string_list.index,
-			string_list_index);
+		string = widget == ui_widget_port_error_text_box && ui_widget_port_error_text ?
+			(wchar_t *)ui_widget_port_error_text :
+			unicode_string_list_get_string(definition->text_label_string_list.index, string_list_index);
+		/* port: the description of a spinner's extra item */
+		if (string_list_index >= SPINNER_EXTRA_DESCRIPTION_BASE &&
+			string_list_index < SPINNER_EXTRA_DESCRIPTION_BASE + (short)NUMBEROF(kills_to_win_extra_descriptions))
+		{
+			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
+		}
 		length = ustrlen(string);
 		widget->parameters.text_box.text = pool_resize_pointer(
 			widget_memory_pool,
@@ -5107,6 +5337,13 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_header_bounds;
+		/* port: a spinner with extra items is wider, to the left, its arrow
+		with it */
+		if (spinner_string_list_extra_count(definition->text_label_string_list.index))
+		{
+			bounds.x0 -= SPINNER_EXTRA_WIDTH;
+			bounds.x1 -= SPINNER_EXTRA_WIDTH;
+		}
 		bounds.x0 += offset.x;
 		bounds.y0 += offset.y;
 		bounds.x1 += offset.x;
@@ -5151,7 +5388,7 @@ static void widget_instance_render_spinner_list(
 		if (definition->text_label_string_list.index != NONE)
 		{
 			short string_index = widget->parameters.list.selected_index;
-			wchar_t *string = unicode_string_list_get_string(
+			wchar_t *string = spinner_string_list_get_string(
 				definition->text_label_string_list.index,
 				string_index);
 			unsigned long length = ustrlen(string);
@@ -5226,6 +5463,13 @@ static void widget_instance_render_spinner_list(
 				bounds.y1 += offset.y;
 				bounds.x0 += offset.x;
 				bounds.y0 += offset.y;
+				/* port: a spinner with extra items (three digits) is wider, to the
+				left */
+				if (spinner_string_list_extra_count(definition->text_label_string_list.index))
+				{
+					bounds.x0 -= SPINNER_EXTRA_WIDTH;
+					clip.x0 -= SPINNER_EXTRA_WIDTH;
+				}
 				if (focus)
 				{
 					color.alpha = definition->text_color.alpha;
@@ -6233,11 +6477,39 @@ static boolean ui_mouse_menus_active(
 	if (widget_globals.initialization_thread || progress_bar_is_active())
 		return FALSE;
 
-	return virtual_keyboard_active() || ui_mouse_menu() != NULL;
+	/* (and the scores after a game, which take A and B like the menus:
+	game_engine_update_non_deterministic) */
+	return virtual_keyboard_active() || ui_mouse_menu() != NULL || game_engine_showing_postgame();
 }
 
 /* the pointer's motion, clicks and wheel since the last frame, as the first
 player's controller events */
+/* port: a row of a list to choose from (the PC version's menus' lists of
+gametypes, maps, profiles, levels and games: port/assets/menus) */
+static boolean ui_mouse_selection_row(
+	struct widget_instance *widget)
+{
+	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
+		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
+}
+
+/* port: a press the menus post from their updates (menu_functions.c: the
+server browser's join, once its game is reached), posted where the mouse's
+are: one posted while the widgets update or draw would be overwritten by the
+next frame's events (queue_event keeps the latest) */
+static short ui_widget_port_press_controller = NONE;
+static short ui_widget_port_press_button;
+
+void ui_widget_port_post_button(
+	short controller_index,
+	short button_index)
+{
+	ui_widget_port_press_controller = controller_index;
+	ui_widget_port_press_button = button_index;
+
+	return;
+}
+
 static void ui_widgets_process_mouse(
 	void)
 {
@@ -6289,7 +6561,10 @@ static void ui_widgets_process_mouse(
 				{
 				case _ui_mouse_target_item:
 				case _ui_mouse_target_value:
-					ui_mouse_give_focus(target->widget);
+					/* (a selection list's row is chosen by a click, not
+					by passing over it on the way to its buttons) */
+					if (!ui_mouse_selection_row(target->widget))
+						ui_mouse_give_focus(target->widget);
 					break;
 				case _ui_mouse_target_list_slot:
 					ui_mouse_step_list_to_slot(target->widget);
@@ -6306,6 +6581,14 @@ static void ui_widgets_process_mouse(
 				switch (target->kind)
 				{
 				case _ui_mouse_target_item:
+					/* (a selection list's row: chosen by a click, used by
+					a click on it chosen) */
+					if (ui_mouse_selection_row(target->widget) && target->widget->parent &&
+						target->widget->parent->focused_child != target->widget)
+					{
+						ui_mouse_give_focus(target->widget);
+						break;
+					}
 					ui_mouse_give_focus(target->widget);
 					ui_mouse_press(_gamepad_analog_button_a);
 					break;
@@ -6742,6 +7025,57 @@ void render_ui_widgets(
 
 /* ---------- private code */
 
+
+static long spinner_string_list_extra_count(
+	long string_list_index)
+{
+	if (string_list_index != NONE && !csstrcmp(tag_get_name(string_list_index),
+		"ui\\shell\\main_menu\\settings_select\\multiplayer_setup\\playlist_edit\\slayer_edit\\var_kills_to_win"))
+	{
+		return NUMBEROF(kills_to_win_extra_strings);
+	}
+	return 0;
+}
+
+/* a spinner's items of its string list's own (the descriptions of a list of
+spinners count those: ui_widget_game_data_input_functions.c) */
+short ui_widget_spinner_own_item_count(
+	struct widget_instance *spinner)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(spinner->definition_tag_index);
+
+	return (short)(spinner->parameters.list.number_of_items -
+		spinner_string_list_extra_count(definition->text_label_string_list.index));
+}
+
+/* the string list index of the description of a spinner's extra item, or
+NONE for an item of its own */
+short ui_widget_spinner_extra_description(
+	struct widget_instance *spinner,
+	short item_index)
+{
+	short own = ui_widget_spinner_own_item_count(spinner);
+
+	if (item_index < own)
+		return NONE;
+	return (short)(SPINNER_EXTRA_DESCRIPTION_BASE + item_index - own);
+}
+
+/* a string of a string list, or of its extra strings past the tag's own */
+static wchar_t *spinner_string_list_get_string(
+	long string_list_index,
+	short string_index)
+{
+	struct string_list *string_list = unicode_string_list_definition_get(string_list_index);
+
+	if (string_list && string_index >= string_list->strings.count &&
+		string_index - string_list->strings.count < spinner_string_list_extra_count(string_list_index))
+	{
+		return (wchar_t *)kills_to_win_extra_strings[string_index - string_list->strings.count];
+	}
+	return unicode_string_list_get_string(string_list_index, string_index);
+}
+
 static void widget_instance_render_column_list(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -6852,10 +7186,13 @@ static void widget_instance_tab_to_next_valid_widget(
 		struct ui_widget_definition *definition =
 			ui_widget_definition_get(child->definition_tag_index);
 
-		if (definition->event_handlers.count > 0 ||
+		if ((definition->event_handlers.count > 0 ||
 			TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
 			widget->type == _ui_widget_type_spinner_list ||
-			widget->type == _ui_widget_type_column_list)
+			widget->type == _ui_widget_type_column_list) &&
+			/* port: over the PC version's labels and hidden rows */
+			!(widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index) &&
+				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
 			break;
@@ -6891,10 +7228,13 @@ static void widget_instance_tab_to_previous_valid_widget(
 		struct ui_widget_definition *definition =
 			ui_widget_definition_get(child->definition_tag_index);
 
-		if (definition->event_handlers.count > 0 ||
+		if ((definition->event_handlers.count > 0 ||
 			TEST_FLAG(definition->flags, _widget_pass_unhandled_events_to_children_bit) ||
 			widget->type == _ui_widget_type_spinner_list ||
-			widget->type == _ui_widget_type_column_list)
+			widget->type == _ui_widget_type_column_list) &&
+			/* port: over the PC version's labels and hidden rows */
+			!(widget->type == _ui_widget_type_column_list && pc_menu_tag(widget->definition_tag_index) &&
+				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
 			break;
@@ -7643,6 +7983,11 @@ void process_ui_widgets(
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
 	ui_widgets_process_mouse();
+	if (ui_widget_port_press_controller != NONE)
+	{
+		event_manager_post_button(ui_widget_port_press_controller, ui_widget_port_press_button);
+		ui_widget_port_press_controller = NONE;
+	}
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))

@@ -280,6 +280,8 @@ symbols in this file:
 boolean network_game_distributed_client(void);
 /* port/linux/game/network_distributed.c's */
 void network_distributed_player_picked_up(long player_index, short kind, long definition_index, short count);
+/* port/linux/game/network_objects.c's */
+void network_objects_client_picked_up_weapon(short local_player_index, long unit_index, long definition_index);
 /* game_sound.c's */
 long unspatialized_impulse_sound_new(long sound_definition_index, real scale);
 
@@ -700,6 +702,15 @@ short local_player_count(
 	void)
 {
 	return players_globals->local_player_count;
+}
+
+/* port: local_player_count, 0 before the players' globals are made (the
+input's first polls ask it: port/linux/game/menu_functions.c's
+pc_menu_split_players) */
+short players_port_local_player_count(
+	void)
+{
+	return players_globals ? players_globals->local_player_count : 0;
 }
 
 short local_player_get_next(
@@ -1434,6 +1445,10 @@ void network_player_attach_unit(
 	struct player_datum *player = player_get(player_index);
 	struct unit_datum *unit = unit_get(unit_index);
 
+	/* port: the host's team for the player (auto team balance moves a
+	player to the other team at his death: game_engine_player_killed) */
+	if (game_engine_has_teams() && unit->object.owner_team_index >= 0 && unit->object.owner_team_index < 2)
+		player->team_index = unit->object.owner_team_index;
 	unit->object.owner_player_index = player_index;
 	unit->object.owner_team_index = (short)player->team_index;
 	unit->unit.player_index = player_index;
@@ -1468,7 +1483,11 @@ void network_player_show_pickup(
 		{
 			hud_picked_up_weapon(player->local_player_index, definition_index);
 			if (player->unit_index != NONE)
+			{
 				player_control_unzoom(player->unit_index);
+				network_objects_client_picked_up_weapon(player->local_player_index, player->unit_index,
+					definition_index);
+			}
 		}
 		break;
 	case _network_pickup_ammunition:
@@ -2604,8 +2623,9 @@ boolean unit_should_autopick_weapon(
 	if ((unit_approve_weapon_pickup(unit_index, weapon_index) &&
 		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) ||
 		weapon_count == 0 ||
-		(!game_engine_running() &&
-			unit_approve_weapon_pickup(unit_index, weapon_index) &&
+		/* port: and in multiplayer (campaign's only), a second weapon into
+		the empty slot, readied (unit_add_weapon_to_inventory) */
+		(unit_approve_weapon_pickup(unit_index, weapon_index) &&
 			weapon_count < 2) ||
 		game_engine_force_autopickup(unit_index, weapon_index))
 	{
@@ -2665,7 +2685,7 @@ static boolean player_handle_weapon_swap(
 	switch (player->action_result)
 	{
 	case _player_action_result_swap_for_weapon:
-		if (unit_drop_current_weapon(player->unit_index, TRUE) &&
+		if (unit_drop_selected_weapon(player->unit_index) &&
 			unit_add_weapon_to_inventory(
 				player->unit_index,
 				player->action_object_index,
@@ -3703,9 +3723,12 @@ void players_update_before_game(
 				if (!players_globals->input_disabled)
 				{
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
+					/* port: not for the keyboard's action key, which only acts
+					(units.h, UNIT_CONTROL_PORT_ACTION_ONLY_BIT) */
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
-						!player_handle_action(iterator.datum_index))
+						!player_handle_action(iterator.datum_index) &&
+						!TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT))
 					{
 						SET_FLAG(action->control_flags, _unit_control_weapon_reload_bit, TRUE);
 					}
@@ -3743,7 +3766,8 @@ void players_update_before_game(
 						action->desired_weapon_index = unit->unit.current_weapon_index;
 					}
 
-					control_data.control_flags = (word)action->control_flags;
+					control_data.control_flags =
+						(word)(action->control_flags & ~FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT));
 					player_aiming_vector_from_facing(
 						iterator.datum_index,
 						&control_data.aiming_vector,
@@ -3977,6 +4001,98 @@ void players_update_after_game(
 	profile_exit(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
 
 	return;
+}
+
+/* port: a character of a player's name as the host's ban command reads it
+(typed in ASCII): itself in ASCII, a Latin letter with a mark its plain
+letter (an English keyboard has no "é"), else "?" */
+char player_name_character_ascii(
+	wchar_t character)
+{
+	static char const latin[] =
+		"AAAAAAACEEEEIIIIDNOOOOO?OUUUUYTs"
+		"aaaaaaaceeeeiiiidnooooo?ouuuuyty"
+		"AaAaAaCcCcCcCcDdDdEeEeEeEeEeGgGgGgGgHhHhIiIiIiIiIiIiJjKkkLlLlLlL"
+		"lLlNnNnNnnNnOoOoOoOoRrRrRrSsSsSsSsTtTtTtUuUuUuUuUuUuWwYyYZzZzZzs";
+	unsigned short code = (unsigned short)character;
+
+	if (code >= 0x20 && code < 0x7F)
+		return (char)code;
+	if (code >= 0xC0 && code < 0x180)
+		return latin[code - 0xC0];
+	return '?';
+}
+
+/* port: a player's name kept to what draws as one line of text: Unicode's
+spaces made plain ones; control characters, ones that draw as nothing
+(zero-width spaces and joiners, direction marks, the Hangul fillers, the
+Braille blank, variation selectors, the soft hyphen), lone surrogates,
+non-characters and "|" (the game's text's own marks) left out; its spaces
+before and after dropped. TRUE if what is left has a character the host's
+ban command (typed in ASCII) can name it by: a visible one of ASCII, or a
+Latin letter with a mark (player_name_character_ascii). */
+boolean player_name_clean(
+	wchar_t *name,
+	long count)
+{
+	long read;
+	long written = 0;
+	boolean visible = FALSE;
+
+	name[count - 1] = 0;
+	for (read = 0; read < count && name[read]; read++)
+	{
+		unsigned short character = (unsigned short)name[read];
+
+		if (character == 0xA0 || character == 0x1680 || (character >= 0x2000 && character <= 0x200A) ||
+			character == 0x202F || character == 0x205F || character == 0x3000)
+		{
+			character = ' ';
+		}
+		if (character < 0x20 || (character >= 0x7F && character <= 0x9F) || character == 0xAD ||
+			character == 0x34F || character == 0x115F || character == 0x1160 || character == 0x17B4 ||
+			character == 0x17B5 || (character >= 0x180B && character <= 0x180E) ||
+			(character >= 0x200B && character <= 0x200F) || (character >= 0x2028 && character <= 0x202E) ||
+			(character >= 0x2060 && character <= 0x206F) || character == 0x2800 || character == 0x3164 ||
+			(character >= 0xD800 && character <= 0xDFFF) || (character >= 0xFE00 && character <= 0xFE0F) ||
+			character == 0xFEFF || character == 0xFFA0 || character >= 0xFFF0 || character == '|' ||
+			(character == ' ' && written == 0))
+		{
+			continue;
+		}
+		if (character != ' ' && player_name_character_ascii((wchar_t)character) != '?')
+			visible = TRUE;
+		name[written++] = (wchar_t)character;
+	}
+	while (written > 0 && name[written - 1] == ' ')
+		written--;
+	name[written] = 0;
+
+	return visible;
+}
+
+/* port: whether a name is one player_name_clean leaves as it is, with a
+character the ban command can name it by */
+boolean player_name_valid(
+	wchar_t const *name,
+	long count)
+{
+	wchar_t cleaned[32];
+	long index;
+
+	if (count > NUMBEROF(cleaned))
+		count = NUMBEROF(cleaned);
+	for (index = 0; index < count; index++)
+		cleaned[index] = name[index];
+	if (!player_name_clean(cleaned, count))
+		return FALSE;
+	for (index = 0; index < count && (cleaned[index] || name[index]); index++)
+	{
+		if (cleaned[index] != name[index])
+			return FALSE;
+	}
+
+	return TRUE;
 }
 
 /* ---------- private code */

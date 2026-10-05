@@ -281,6 +281,18 @@ static void *game_main(void *unused)
 	}
 	time_zone(zone, sizeof(zone));
 	environment_set(&environment, "TZ", zone);
+	/* internet play's MQTT brokers (network.brokers_file): the APK's list,
+	written beside config.toml at each start, as a desktop update replaces
+	the file beside its game */
+	{
+		size_t brokers_size = 0;
+		void *brokers = SDL_LoadFile("brokers.txt", &brokers_size);
+
+		snprintf(path, sizeof(path), "%s/brokers.txt", data_root);
+		if (!brokers || !SDL_SaveFile(path, brokers, brokers_size))
+			host_logf(HOST_LOG_ERROR, "cannot write %s: %s", path, SDL_GetError());
+		SDL_free(brokers);
+	}
 	snprintf(path, sizeof(path), "%s/config.toml", data_root);
 
 	image = SDL_LoadFile("halo_guest.elf", &image_size);

@@ -62,6 +62,9 @@ enum
 	/* a client's Discord user, as its Discord told it (reliable, with its
 	ready: distributed_client_send_identity) */
 	_distributed_message_client_identity,
+	/* every player's ping as the host measures it, every two seconds, for
+	the scoreboard (unreliable) */
+	_distributed_message_pings,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -164,6 +167,10 @@ long distributed_latest_host_time(void);
 /* (a client) how long the host takes to have this machine's players and
 tell it back, in ticks (0 before it is measured) */
 real distributed_own_round_trip_ticks(void);
+/* a player's ping (the round trip of its machine's messages to the host and
+back, as the host measures it) in milliseconds: 0 for the host's own
+players, NONE before it is known */
+long distributed_player_ping(short player_index);
 /* (the host, in its tick) the client machine a player is on, NONE for none
 (the host's own players') */
 long distributed_player_machine(short player_index);
@@ -200,6 +207,8 @@ void network_objects_handle_changes(void const *entries, short count);
 void network_objects_handle_synchronized(void);
 void network_objects_handle_states(void const *entries, short count);
 void network_objects_handle_inventories(void const *entries, short count);
+/* (a client) its own player picked up the weapon, to ready once its unit has it */
+void network_objects_client_picked_up_weapon(short local_player_index, long unit_index, long definition_index);
 void network_objects_handle_vehicle_prediction(long machine_index, void const *entries, short count);
 /* (the host) the vehicle predictions come in since the last tick, taken */
 void network_objects_apply_vehicle_predictions(void);

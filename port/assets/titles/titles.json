@@ -941,6 +941,41 @@
     205.0
    ],
    "cap": 21.875
+  },
+  {
+   "name": "bitmaps__postgame_carnage_report__0",
+   "tag": "ui\\shell\\bitmaps\\postgame_carnage_report",
+   "bitmap": 0,
+   "width": 1024,
+   "height": 512,
+   "format": "dxt5",
+   "scale": 2,
+   "crc": 785159061,
+   "text": "POSTGAME CARNAGE REPORT",
+   "lefts": [
+    66.0,
+    87.0,
+    110.25,
+    132.0,
+    151.25,
+    172.125,
+    196.625,
+    224.375,
+    255.75,
+    274.125,
+    298.625,
+    321.0,
+    341.5,
+    364.75,
+    387.375,
+    420.125,
+    441.375,
+    463.125,
+    483.5,
+    508.625,
+    529.0
+   ],
+   "cap": 21.875
   }
  ]
 }
