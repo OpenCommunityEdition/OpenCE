@@ -92,8 +92,29 @@ void reference_list_copy(
 static long *cluster_partition_get_first_reference(
 	struct cluster_partition *partition,
 	short cluster_index);
+static void cluster_partition_port_forget(
+	struct cluster_partition *partition);
+static long cluster_partition_port_add(
+	struct data_array *array,
+	long *first_reference_index,
+	long datum_index,
+	long *previous_references);
+static void cluster_partition_port_remove(
+	struct cluster_partition *partition,
+	long *first_reference_index,
+	long datum_index,
+	long found_reference_index);
 
 /* ---------- globals */
+
+/* port: the partitions (cluster_partition_new), whose references' places
+cluster_partitions_port_forget forgets */
+enum
+{
+	MAXIMUM_PORT_CLUSTER_PARTITIONS = 8,
+};
+static struct cluster_partition *cluster_partitions_port[MAXIMUM_PORT_CLUSTER_PARTITIONS];
+static short cluster_partitions_port_count;
 
 /* ---------- public code */
 
@@ -188,6 +209,16 @@ void cluster_partition_new(
 		error(_error_immediate, "couldn't allocate %s cluster partition globals", name);
 	}
 
+	/* port: where its references are (cluster_partition_port_remove); none
+	known yet */
+	partition->port_previous_references = debug_malloc(HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long), FALSE,
+		__FILE__, __LINE__);
+	partition->port_cluster_data_references = debug_malloc(HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long), FALSE,
+		__FILE__, __LINE__);
+	cluster_partition_port_forget(partition);
+	if (cluster_partitions_port_count < MAXIMUM_PORT_CLUSTER_PARTITIONS)
+		cluster_partitions_port[cluster_partitions_port_count++] = partition;
+
 	return;
 }
 
@@ -200,6 +231,7 @@ void cluster_partition_make_valid(
 		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->cluster_first_data_references));
 	data_make_valid(partition->cluster_reference_data);
 	data_make_valid(partition->data_reference_data);
+	cluster_partition_port_forget(partition);
 
 	return;
 }
@@ -245,8 +277,18 @@ void cluster_partition_copy(
 	reference_list_copy(
 		result->data_reference_data,
 		source->data_reference_data);
+	cluster_partition_port_forget(result);
 
 	return;
+}
+
+void cluster_partitions_port_forget(
+	void)
+{
+	short index;
+
+	for (index = 0; index < cluster_partitions_port_count; index++)
+		cluster_partition_port_forget(cluster_partitions_port[index]);
 }
 
 long cluster_partition_get_next_datum(
@@ -307,16 +349,24 @@ void cluster_partition_reconnect(
 	for (cluster_index_index = 0; cluster_index_index < cluster_count; cluster_index_index++)
 	{
 		short const cluster_index = cluster_indices[cluster_index_index];
-
-		reference_list_add(
+		/* port: reference_list_add's, noting where the references are */
+		long cluster_reference_index = cluster_partition_port_add(
 			partition->cluster_reference_data,
 			first_cluster_reference,
-			cluster_index);
-
-		reference_list_add(
+			cluster_index,
+			NULL);
+		long data_reference_index = cluster_partition_port_add(
 			partition->data_reference_data,
 			cluster_partition_get_first_reference(partition, cluster_index),
-			datum_index);
+			datum_index,
+			partition->port_previous_references);
+
+		partition->port_modification_count++;
+		if (cluster_reference_index != NONE && partition->port_cluster_data_references)
+		{
+			partition->port_cluster_data_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(cluster_reference_index)] =
+				data_reference_index;
+		}
 	}
 
 	return;
@@ -335,13 +385,18 @@ void cluster_partition_disconnect(
 			partition->cluster_reference_data,
 			cluster_reference_index);
 		short const cluster_index = (short)cluster_reference->datum_index;
+		long data_reference_index = partition->port_cluster_data_references ?
+			partition->port_cluster_data_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(cluster_reference_index)] : NONE;
 
 		datum_delete(partition->cluster_reference_data, cluster_reference_index);
 
-		reference_list_remove(
-			partition->data_reference_data,
+		/* port: reference_list_remove's, starting where the reference was
+		put */
+		cluster_partition_port_remove(
+			partition,
 			cluster_partition_get_first_reference(partition, cluster_index),
-			datum_index);
+			datum_index,
+			data_reference_index);
 
 		cluster_reference_index = cluster_reference->next_reference_index;
 	}
@@ -362,6 +417,131 @@ long cluster_partition_get_first_datum(
 }
 
 /* ---------- private code */
+
+/* port: Where each reference is in its cluster's list, so a datum leaving
+a cluster is found there at once. Every moving object and light leaves its
+clusters and joins them again each tick (reference_list_add puts it first),
+and reference_list_remove walked the list from its start: with hundreds of
+lights in a few clusters (network co-op's extra enemies) those walks took
+much of the tick. Each reference's place is checked before it is used, and
+the list walked as before when it is wrong: the lists come out as they did,
+every reference in the same place. The places are not in the game state, so
+they are forgotten when it is loaded (cluster_partitions_port_forget) or a
+new map makes the lists anew. */
+
+static void cluster_partition_port_forget(
+	struct cluster_partition *partition)
+{
+	partition->port_modification_count++;
+	if (partition->port_previous_references)
+		csmemset(partition->port_previous_references, 0xFF, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long));
+	if (partition->port_cluster_data_references)
+		csmemset(partition->port_cluster_data_references, 0xFF, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long));
+}
+
+/* reference_list_add's, and the new reference's place: first, before the
+one that was (previous_references, if given) */
+static long cluster_partition_port_add(
+	struct data_array *array,
+	long *first_reference_index,
+	long datum_index,
+	long *previous_references)
+{
+	long reference_index = datum_new(array);
+
+	if (reference_index != NONE)
+	{
+		struct data_reference *reference = (struct data_reference *)datum_get(array, reference_index);
+
+		reference->datum_index = datum_index;
+		reference->next_reference_index = *first_reference_index;
+		if (previous_references)
+		{
+			previous_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(reference_index)] = NONE;
+			if (*first_reference_index != NONE)
+				previous_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(*first_reference_index)] = reference_index;
+		}
+		*first_reference_index = reference_index;
+	}
+	else
+	{
+		error(_error_silent, "WARNING: maximum %ss per map (%d) exceeded.", array->name, array->maximum_count);
+	}
+
+	return reference_index;
+}
+
+/* reference_list_remove's on a cluster's list, at found_reference_index
+(where the datum's reference was put) if it is there */
+static void cluster_partition_port_remove(
+	struct cluster_partition *partition,
+	long *first_reference_index,
+	long datum_index,
+	long found_reference_index)
+{
+	struct data_array *array = partition->data_reference_data;
+	long *previous_references = partition->port_previous_references;
+	long reference_index = NONE;
+	long previous_index = NONE;
+	struct data_reference *reference;
+	long next_index;
+
+	/* (the reference put there, still this datum's, and first in this
+	cluster's list or after the one noted before it) */
+	if (previous_references && found_reference_index != NONE)
+	{
+		reference = (struct data_reference *)datum_try_and_get(array, found_reference_index);
+		if (reference && reference->datum_index == datum_index)
+		{
+			long noted_previous = previous_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(found_reference_index)];
+			struct data_reference *previous = noted_previous != NONE ?
+				(struct data_reference *)datum_try_and_get(array, noted_previous) : NULL;
+
+			if (noted_previous == NONE ? *first_reference_index == found_reference_index :
+				previous && previous->next_reference_index == found_reference_index)
+			{
+				reference_index = found_reference_index;
+				previous_index = noted_previous;
+			}
+		}
+	}
+	/* (else the list walked, as reference_list_remove does) */
+	if (reference_index == NONE)
+	{
+		long index = *first_reference_index;
+
+		while (index != NONE)
+		{
+			reference = (struct data_reference *)datum_get(array, index);
+			if (reference->datum_index == datum_index)
+			{
+				reference_index = index;
+				break;
+			}
+			previous_index = index;
+			index = reference->next_reference_index;
+		}
+	}
+	if (reference_index == NONE)
+	{
+		match_vassert(
+			"..\\objects\\reference_lists.h",
+			0x6d,
+			FALSE,
+			csprintf(temporary, "attempt to remove invalid element %ld from reference list", datum_index));
+		return;
+	}
+	partition->port_modification_count++;
+	reference = (struct data_reference *)datum_get(array, reference_index);
+	next_index = reference->next_reference_index;
+	datum_delete(array, reference_index);
+	if (previous_index == NONE)
+		*first_reference_index = next_index;
+	else
+		((struct data_reference *)datum_get(array, previous_index))->next_reference_index = next_index;
+	if (previous_references && next_index != NONE)
+		previous_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(next_index)] = previous_index;
+}
 
 static long *cluster_partition_get_first_reference(
 	struct cluster_partition *partition,

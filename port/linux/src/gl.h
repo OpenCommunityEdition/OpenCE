@@ -205,6 +205,11 @@ this list to generate the guest's entry points */
 	X(glDisableVertexAttribArray) \
 	X(glVertexAttribPointer) \
 	X(glVertexAttribIPointer) \
+	X(glVertexAttribFormat) \
+	X(glVertexAttribIFormat) \
+	X(glVertexAttribBinding) \
+	X(glBindVertexBuffer) \
+	X(glGetQueryBufferObjectuiv) \
 	X(glVertexAttrib4fv) \
 	X(glVertexAttribI4ui) \
 	X(glDrawArrays) \
@@ -419,6 +424,11 @@ pointers, sees the declarations without these aliases */
 #define glDisableVertexAttribArray halo_glDisableVertexAttribArray
 #define glVertexAttribPointer halo_glVertexAttribPointer
 #define glVertexAttribIPointer halo_glVertexAttribIPointer
+#define glVertexAttribFormat halo_glVertexAttribFormat
+#define glVertexAttribIFormat halo_glVertexAttribIFormat
+#define glVertexAttribBinding halo_glVertexAttribBinding
+#define glBindVertexBuffer halo_glBindVertexBuffer
+#define glGetQueryBufferObjectuiv halo_glGetQueryBufferObjectuiv
 #define glVertexAttrib4fv halo_glVertexAttrib4fv
 #define glVertexAttribI4ui halo_glVertexAttribI4ui
 #define glDrawArrays halo_glDrawArrays
