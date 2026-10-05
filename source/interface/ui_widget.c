@@ -6599,6 +6599,33 @@ static void widget_instance_tab_to_previous_valid_widget(
 	return;
 }
 
+/* port: whether a widget of the local player (NONE: any) takes the
+controller's events. In co-op's menus (Multiplayer's CO-OP CAMPAIGN,
+port/linux/game/menu_functions.c) the screens it shares with one player's
+campaign, New Game's levels and the difficulty, are player 1's (their rows
+the first controller's), and either player's controller uses them: player 1's
+is the one that chose co-op, player 2's the one that chose their profile */
+static boolean widget_takes_events_of_controller(
+	struct widget_instance const *widget,
+	short controller_index)
+{
+	short player;
+
+	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
+		return TRUE;
+	if (widget->local_player_index != 0 || !we_are_at_the_main_menu || player_spawn_count < 2 ||
+		controller_index < 0 || controller_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+	{
+		return FALSE;
+	}
+	for (player = 0; player < 2; player++)
+	{
+		if (player_ui_get_single_player_local_player_controller(player) == controller_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static void widget_instance_process_one_event_recursive(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -6607,8 +6634,7 @@ static void widget_instance_process_one_event_recursive(
 {
 	boolean event_handled = FALSE;
 	boolean widget_deleted = FALSE;
-	boolean event_for_this_widget = widget->local_player_index == NONE ||
-		widget->local_player_index == event->controller_index;
+	boolean event_for_this_widget = widget_takes_events_of_controller(widget, event->controller_index);
 	long audio_feedback = _ui_audio_feedback_none;
 
 	match_assert(
@@ -7035,8 +7061,7 @@ static void widget_instance_process_one_event_recursive(
 
 			for (child = widget->child; child; child = child->next)
 			{
-				if (child->local_player_index == NONE ||
-					child->local_player_index == event->controller_index)
+				if (widget_takes_events_of_controller(child, event->controller_index))
 				{
 					widget_instance_process_one_event_recursive(
 						child,
@@ -7050,8 +7075,7 @@ static void widget_instance_process_one_event_recursive(
 		}
 		else if (widget->focused_child)
 		{
-			if (widget->focused_child->local_player_index == NONE ||
-				widget->focused_child->local_player_index == event->controller_index)
+			if (widget_takes_events_of_controller(widget->focused_child, event->controller_index))
 			{
 				widget_instance_process_one_event_recursive(
 					widget->focused_child,

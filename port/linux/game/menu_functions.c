@@ -1422,8 +1422,10 @@ static boolean profile_delete(void)
 screen (the Xbox's Cooperative Play, which the PC version has not):
 Multiplayer's CO-OP CAMPAIGN ("port coop begin"), player 2's profile, chosen
 with player 2's controller ("port coop player 2"), then New Game's levels
-(those either has reached) and difficulty. The main menu and Multiplayer
-go back to one player (main_menu_initialize, multiplayer_type_menu_initialize).
+(those either has reached) and difficulty, with either player's controller
+(ui_widget.c, widget_takes_events_of_controller). The main menu and
+Multiplayer go back to one player (main_menu_initialize,
+multiplayer_type_menu_initialize).
 With one gamepad, it is player 2's (pc_menu_split_players) */
 
 /* "port coop begin": two players, player 1 on its profile (campaign_profile)

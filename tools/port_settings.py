@@ -831,7 +831,9 @@ def _coop() -> list:
     (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
     2's profile, chosen with player 2's controller (its rows take any
     controller's presses, as the shared rows do only controller 1's), then
-    New Game's levels and difficulty (menu_functions.c's coop_begin)"""
+    New Game's levels and difficulty, which either player's controller uses
+    (ui_widget.c's widget_takes_events_of_controller; menu_functions.c's
+    coop_begin)"""
     base = f"{MT}/coop"
     lines = _widget(f"{MT}/multiplayer_type_coop_item",
                     [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),

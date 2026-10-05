@@ -166,7 +166,8 @@ Multiplayer > CO-OP CAMPAIGN is the Xbox's cooperative play, which the PC
 version does not have: two players on this computer play the campaign in
 split screen. Player 1 is the player who chose it, on the current profile.
 Player 2 then chooses a profile with their own controller (a gamepad), and
-New Game's levels are those either profile has reached. A co-op game does
+New Game's levels are those either profile has reached. Either player's
+controller chooses the level and the difficulty. A co-op game does
 not continue a saved game of one player.
 
 Network games have split screen too: up to 4 players on each computer. In
