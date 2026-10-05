@@ -3013,8 +3013,9 @@ static void client_presentation_apply(
 	a dead camera at the world origin. */
 	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted &&
 		!coop_spectate_watching_rider(0)) || coop_spectate_nothing_to_watch(0));
-	if (coop_presentation.cinematic_started)
-		cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
+	/* (also outside a cinematic: a cutscene that leaves the players their
+	controls shows the bars too) */
+	cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
 	objects_port_set_activating_cluster((short)(presentation->activating_cluster - 1));
 	if (coop_presentation.host_camera)
 	{
