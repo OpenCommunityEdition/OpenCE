@@ -37,9 +37,12 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     scripts control (what is shown, the mission timer) and the skip vote;
   - once each, numbered so nothing is applied twice: script sounds,
     chapter titles, help and objective text, "Checkpoint" messages, screen
-    shake, nav points, and custom animations on units and scenery;
+    shake, nav points, custom animations on units and scenery, and units
+    opening and closing (dropships' doors);
   - device groups (doors, elevators, switches; a client sets none itself,
-    and its player's use of one is relayed to the host);
+    and its player's use of one is relayed to the host), and each device's
+    position and power as it changes: a client puts its device where the
+    host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
   Every machine follows the host's structure BSP. A dead player watches a
@@ -140,7 +143,8 @@ version 11 sends with the game's settings its gametype's PC options;
 version 12 plays the campaign together (co-op, above), drives the host's
 actors on its clients and sends the flinches and deaths the host picked;
 version 13 drives up to 1056 of the host's AI units on its clients (co-op's
-extra enemies), where 12 drove 288.
+extra enemies), where 12 drove 288; version 14 sends co-op's device positions
+and its units opening and closing.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
