@@ -2774,8 +2774,9 @@ someone who is only crossing a seam or riding over a gap. */
 it while the players are brought into the new one */
 #define COOP_BSP_SWITCH_SETTLE_TICKS (2 * TICKS_PER_SECOND)
 
-/* How near the player on a switch trigger the rest of the team must be to
-go back to a BSP they have already been in (world units) */
+/* Going back to a BSP the team has already been in needs two thirds of the
+living players at the trigger: inside it, or this near the player in it
+(world units) */
 #define COOP_BACKTRACK_GATHER_DISTANCE 4.0f
 
 /* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
@@ -2988,8 +2989,8 @@ static boolean players_coop_in_bsp_switch_trigger(
 
 /* port: whether a network co-op host lets the unit on this trigger switch
 the BSP, which brings the whole team along. Anyone can lead the team into a
-BSP it hasn't been in; going back to one needs every living player there,
-so one player can't drag everyone back through the level. */
+BSP it hasn't been in; going back to one needs two thirds of the team
+there, so one player can't drag everyone back through the level. */
 static boolean players_coop_bsp_switch_allowed(
 	short bsp_switch_trigger_volume_index,
 	long unit_index)
@@ -3000,6 +3001,8 @@ static boolean players_coop_bsp_switch_allowed(
 	real_point3d const *center = &object_get(unit_index)->object.bounding_sphere_center;
 	struct data_iterator iterator;
 	struct player_datum *player;
+	short living_count = 0;
+	short gathered_count = 0;
 
 	if (!VALID_INDEX(volume->destination_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO) ||
 		!TEST_FLAG(players_coop_state.visited_structure_bsps, volume->destination_structure_bsp_index))
@@ -3011,16 +3014,18 @@ static boolean players_coop_bsp_switch_allowed(
 	{
 		struct object_datum *teammate = object_try_and_get(player->unit_index);
 
-		if (teammate && !TEST_FLAG(teammate->object.damage_flags, _object_dead_bit) &&
-			!scenario_trigger_volume_test_object(volume->trigger_volume_index, player->unit_index) &&
-			distance_squared3d(center, &teammate->object.bounding_sphere_center) >
+		if (!teammate || TEST_FLAG(teammate->object.damage_flags, _object_dead_bit))
+			continue;
+		living_count++;
+		if (scenario_trigger_volume_test_object(volume->trigger_volume_index, player->unit_index) ||
+			distance_squared3d(center, &teammate->object.bounding_sphere_center) <=
 				COOP_BACKTRACK_GATHER_DISTANCE * COOP_BACKTRACK_GATHER_DISTANCE)
 		{
-			return FALSE;
+			gathered_count++;
 		}
 	}
 
-	return TRUE;
+	return gathered_count * 3 >= living_count * 2;
 }
 
 static void player_teleport_on_bsp_switch(
