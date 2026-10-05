@@ -11,9 +11,10 @@ each squad is that many times as large, for any number of players.
 
 Extra enemies are placed in widening rings around the squad's starting
 locations, on a spot on the same floor, reachable without passing through
-a wall, crate or machine, with room to stand and nobody already there. A starting location with no room left passes
-its enemy to the squad's next one; if none has room, the enemy isn't
-placed rather than being stacked on top of another.
+a wall, crate or machine, with room to stand and nobody already there. A
+starting location with no room left passes its enemy to the squad's next
+one; if none has room, the enemy isn't placed rather than stacked on
+another.
 
 A squad a script loads into a dropship (vehicle_load_magic) can be larger
 than the dropship's seats. The riders left without a seat are erased, and
@@ -76,17 +77,17 @@ enum
 	RIDER_RELEASE_TICKS = 4,
 };
 
-/* the distance between rings; the height above the ground at which the way
-to a spot is checked (and a unit there looked for); how far above or below
-the starting location's floor a spot's floor may be (a step, not a ledge);
-and the room a spot needs above its floor */
+/* distance between rings */
 #define SPREAD_SPACING 0.8f
+/* height above the floor at which the way to a spot is checked */
 #define SPREAD_STEP_HEIGHT 0.6f
+/* how far a spot's floor may be above or below the starting location's:
+a step, not a ledge */
 #define SPREAD_FLOOR_DIFFERENCE 0.5f
+/* room a spot needs above its floor */
 #define SPREAD_HEADROOM 1.6f
-/* how close, across the ground, a spot may be to a biped already standing
-there (about two bipeds' collision radius), and how far around a spot
-units are looked for */
+/* how close across the ground a spot may be to a biped already there
+(about two bipeds' collision radius), and how far around it to look */
 #define SPREAD_CLEARANCE 0.6f
 #define SPREAD_SEARCH_RADIUS 1.0f
 /* a kept rider's place beside a rider who got out, each a little apart */
@@ -206,11 +207,48 @@ static boolean coop_enemies_floor(
 	return TRUE;
 }
 
-/* whether an enemy can be placed at `spot`, `floor_height` being the
-starting location's floor: reachable from `from` (beside the starting
-location) with nothing in the way, a floor within a step of the starting
-location's, and room to stand; the floor goes in `position` */
-static boolean coop_enemies_standable(
+/* whether a biped stands within SPREAD_CLEARANCE of a spot on the floor,
+or the spot is inside a vehicle */
+static boolean coop_enemies_occupied(
+	real_point3d const *floor)
+{
+	real_point3d body = { floor->x, floor->y, floor->z + SPREAD_STEP_HEIGHT };
+	struct location location;
+	long object_indices[32];
+	short object_count;
+	short index;
+
+	scenario_location_from_point(&location, &body);
+	if (location.cluster_index == NONE)
+		return TRUE;
+	object_count = objects_in_sphere(0, _object_mask_biped | _object_mask_vehicle, &location, &body,
+		SPREAD_SEARCH_RADIUS, object_indices, NUMBEROF(object_indices));
+	for (index = 0; index < object_count; index++)
+	{
+		struct object_datum *object = object_get(object_indices[index]);
+
+		if (object->object.type == _object_type_vehicle)
+		{
+			if (point_in_sphere(&body, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius))
+				return TRUE;
+		}
+		else
+		{
+			real dx = object->object.position.x - floor->x;
+			real dy = object->object.position.y - floor->y;
+
+			if (dx * dx + dy * dy < SPREAD_CLEARANCE * SPREAD_CLEARANCE)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/* Whether an enemy can stand at `spot`: reachable from `from` (beside the
+starting location) with nothing in the way, a floor within a step of
+`floor_height` (the starting location's), room above it, and nobody there.
+The floor goes in `position`. */
+static boolean coop_enemies_spot_free(
 	real_point3d const *from,
 	real_point3d const *spot,
 	real floor_height,
@@ -226,48 +264,14 @@ static boolean coop_enemies_standable(
 	{
 		return FALSE;
 	}
+	/* (headroom is checked from just above the floor, so the floor itself
+	doesn't count as in the way) */
 	feet = floor;
 	feet.z += 0.1f;
-	if (coop_enemies_blocked(&feet, &up))
+	if (coop_enemies_blocked(&feet, &up) || coop_enemies_occupied(&floor))
 		return FALSE;
 	*position = floor;
 	return TRUE;
-}
-
-/* whether a biped or vehicle already stands at a spot on the ground */
-static boolean coop_enemies_occupied(
-	real_point3d const *ground)
-{
-	real_point3d body = *ground;
-	struct location location;
-	long object_indices[32];
-	short object_count;
-	short index;
-
-	body.z += SPREAD_STEP_HEIGHT;
-	scenario_location_from_point(&location, &body);
-	if (location.cluster_index == NONE)
-		return TRUE;
-	object_count = objects_in_sphere(0, _object_mask_biped | _object_mask_vehicle, &location, &body,
-		SPREAD_SEARCH_RADIUS, object_indices, NUMBEROF(object_indices));
-	for (index = 0; index < object_count; index++)
-	{
-		struct object_datum *object = object_get(object_indices[index]);
-		real dx = object->object.position.x - ground->x;
-		real dy = object->object.position.y - ground->y;
-
-		if (object->object.type == _object_type_vehicle)
-		{
-			/* (inside a vehicle's bounding sphere) */
-			if (point_in_sphere(&body, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius))
-				return TRUE;
-		}
-		else if (dx * dx + dy * dy < SPREAD_CLEARANCE * SPREAD_CLEARANCE)
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
 }
 
 static struct coop_riding_vehicle *coop_enemies_riding_vehicle(
@@ -468,7 +472,7 @@ boolean coop_enemies_spread_position(
 			spot.x += (real)cos(angle) * radius;
 			spot.y += (real)sin(angle) * radius;
 			spot.z = floor_height;
-			if (coop_enemies_standable(&from, &spot, floor_height, position) && !coop_enemies_occupied(position))
+			if (coop_enemies_spot_free(&from, &spot, floor_height, position))
 				return TRUE;
 		}
 	}
