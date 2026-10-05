@@ -60,17 +60,19 @@ struct xgpu_capabilities xgpu_capabilities;
 The Xbox screen is 640x480. The native ports can draw a wider one: 480
 lines, and as many columns as the display's shape gives. On Android that is
 display.screen_width (port_config.c; 640 keeps 4:3); on the desktop, the
-display's shape while the game is fullscreen, and 640 in a window. The
-game's camera derives its horizontal field of view from the viewport, so the
-3D view simply widens. The menus and full-screen overlays are laid out for
-640 columns; while they draw (halo_screen_ui_offset), everything shifts right
-to center them.
+shape of the window (of the display while the game is fullscreen, or of
+display.resolution), and 640 where display.resolution_scaling is "original".
+The game's camera derives its horizontal field of view from the viewport, so
+the 3D view simply widens. The menus and full-screen overlays are laid out
+for 640 columns; while they draw (halo_screen_ui_offset), everything shifts
+right to center them.
 
-Fullscreen on the desktop also draws at the display's resolution: render
+The desktop also draws at that resolution (platform_screen_mode): render
 targets the size of the screen get that many pixels (screen_scale), and
 viewports, clears and visibility counts are scaled to match, so the game
-still works in its 480 lines. The width and the scale change only between
-frames, after one is presented (halo_screen_commit). */
+still works in its 480 lines; "original" draws 640x480, scaled up at
+presentation. The width and the scale change only between frames, after one
+is presented (halo_screen_commit). */
 
 #define SCREEN_HEIGHT 480
 #define SCREEN_MAXIMUM_WIDTH 1920

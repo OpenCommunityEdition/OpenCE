@@ -62,6 +62,15 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height);
 #ifndef HALO_ANDROID
 BOOL platform_screen_mode(long *width, long *height);
 #endif
+/* Video Setup's resolutions (port/linux/game/menu_tags.c), in pixels: the
+display's modes the game can draw at, largest first, each once, but the
+display's own (Native), and display.resolution's where it is none of them;
+how many. None on Android. */
+int platform_display_resolutions(long *widths, long *heights, int maximum);
+/* Video Setup's window sizes: those of each shape (4:3, 16:10, 16:9, 21:9)
+that fit the desktop, and display.window_size's; how many. None on
+Android. */
+int platform_window_sizes(long *widths, long *heights, int maximum);
 void platform_video_drawable_size(int *width, int *height);
 /* the window's mode and size and V-Sync, from config.toml as Settings has
 just written it (the main thread's) */

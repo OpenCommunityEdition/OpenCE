@@ -29,14 +29,25 @@ SCREENS = {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
         "spacing": 26,
+        # (rows in the place of the row before them: Window Size in
+        # Resolution's, port/linux/game/menu_functions.c showing the one the
+        # display mode chosen uses)
+        "same_place": ["display.window_size"],
         "rows": [
             ("DISPLAY MODE:", "display.mode",
              [("FULLSCREEN", "fullscreen"), ("BORDERLESS", "borderless"), ("WINDOWED", "windowed")],
-             "Fullscreen and borderless draw at the display's\nresolution; windowed, 640x480 scaled. F11: window.",
+             "Fullscreen takes the display; borderless covers it\nwith a window. F11 switches to the window.",
              "desktop"),
-            ("WINDOW SIZE:", "display.window_scale",
-             [("640 x 480", "1"), ("1280 x 960", "2"), ("1920 x 1440", "3"), ("2560 x 1920", "4")],
-             "The window's size when windowed (its edges can\nalso be dragged).", "desktop"),
+            # (port/linux/game/menu_tags.c adds the display's resolutions)
+            ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
+             "What fullscreen and borderless draw at. Fullscreen\nsets the display to it; borderless scales it.",
+             "desktop"),
+            # (port/linux/game/menu_tags.c puts the sizes that fit the desktop
+            # in place of this one)
+            ("WINDOW SIZE:", "display.window_size", [("1280 x 960", "1280x960")],
+             "The window's size: 4:3, then 16:10, 16:9 and 21:9\n(its edges can also be dragged).", "desktop"),
+            ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
+             "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
@@ -191,8 +202,10 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
                                       ("height", 60), ("string_list", f"{base}/help_strings"),
                                       ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
-    for index, (row, platform) in enumerate(rows):
-        children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", 73 + index * spec["spacing"]), ("platform", platform)])}/>')
+    # (each row: its widget, platform, and the place it is in, else the next)
+    for index, (row, platform, *place) in enumerate(rows):
+        y = 73 + (place[0] if place else index) * spec["spacing"]
+        children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", y), ("platform", platform)])}/>')
     children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", 414)])}/>')
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
@@ -211,10 +224,13 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
 def _setting_screen(folder: str, spec: dict) -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
+    place = -1
     for index, (label, setting, choices, _, platform) in enumerate(spec["rows"]):
         key = setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
-        rows.append((row, platform))
+        if setting not in spec.get("same_place", ()):
+            place += 1
+        rows.append((row, platform, place))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',

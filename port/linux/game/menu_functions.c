@@ -25,7 +25,8 @@ calls them from PC_MENU_FUNCTION_BASE on):
 - the settings screens' (tools/port_settings.py): "port settings save"
   (OK) writes those changed and applies the window's (the rest follow
   config.toml themselves), "port settings defaults" shows the defaults,
-  "port settings help" the help of the row chosen;
+  "port settings help" the help of the row chosen (and Video Setup's
+  Resolution or Window Size, for the display mode shown);
 - Controls Setup's: the keyboard and mouse's controls, two bindings each,
   shown a group at a time ("controls update menu"); "controls begin
   binding" takes the next key or button pressed for the binding left and
@@ -314,6 +315,22 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 		sdl_platform.c) */
 		if (!strcmp(name, "display.mode") && !text[0])
 			snprintf(text, size, "%s", default_value || config_boolean("display.fullscreen") ? "borderless" : "windowed");
+		/* (display.window_size empty: 640x480 times display.window_scale, as
+		older versions set it) */
+		if (!strcmp(name, "display.window_size") && !text[0])
+		{
+			char scale_text[32] = "";
+			long scale;
+
+			if (default_value)
+				config_default("display.window_scale", scale_text, sizeof(scale_text));
+			else
+				config_text("display.window_scale", scale_text, sizeof(scale_text));
+			scale = atol(scale_text);
+			if (scale < 1)
+				scale = 1;
+			snprintf(text, size, "%ldx%ld", 640 * scale, 480 * scale);
+		}
 		return TRUE;
 	}
 	for (index = 0; index < NUMBEROF(profile_settings); index++)
@@ -1135,6 +1152,37 @@ static void settings_help(struct widget_instance *list)
 			index = label + 1;
 	}
 	help->parameters.text_box.string_list_index = index;
+}
+
+/* Video Setup's Resolution and Window Size, in the one row's place
+(tools/port_settings.py): the one the display mode shown uses (Window Size
+the window's, Resolution fullscreen's and borderless's) is shown, and the
+list passes over the other, which takes no focus while it is hidden */
+static void video_rows_show(struct widget_instance *list)
+{
+	struct widget_instance *mode = named(list, "mode_spinner", 0);
+	struct widget_instance *resolution = named(list, "op_resolution", 0);
+	struct widget_instance *window_size = named(list, "op_window_size", 0);
+	struct pc_menu_setting *setting = mode ? pc_menu_setting_get(mode->definition_tag_index) : NULL;
+	struct widget_instance *shown, *child;
+	short index;
+
+	if (!setting || !resolution || !window_size)
+		return;
+	index = mode->parameters.list.selected_index;
+	shown = index >= 0 && index < setting->value_count && !strcmp(setting->values[index], "windowed") ?
+		window_size : resolution;
+	resolution->visible = shown == resolution;
+	window_size->visible = shown == window_size;
+	/* (the focus on the one hidden goes to the one shown: Defaults can
+	change the mode while it has it) */
+	if (list->focused_child == (shown == resolution ? window_size : resolution))
+	{
+		for (index = 0, child = list->child; child && child != shown; child = child->next)
+			index++;
+		list->focused_child = shown;
+		list->parameters.list.selected_index = index;
+	}
 }
 
 /* ---------- Change Color: the profile's colour, from a list of the
@@ -4564,7 +4612,10 @@ void pc_menu_game_data_function_invoke(
 	else if (!strcmp(name, "port lobby update"))
 		lobby_update(widget);
 	else if (!strcmp(name, "port settings help"))
+	{
+		video_rows_show(widget);
 		settings_help(widget);
+	}
 	else if (!strcmp(name, "controls update menu"))
 		controls_update(widget);
 	else if (!strcmp(name, "color picker update"))
