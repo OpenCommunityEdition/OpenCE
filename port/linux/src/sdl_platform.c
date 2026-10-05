@@ -396,6 +396,38 @@ static void platform_fullscreen_kind_apply(void)
 		exclusive && display ? SDL_GetDesktopDisplayMode(display) : NULL);
 }
 
+/* whether the game last asked for the window to be fullscreen */
+static BOOL platform_fullscreen_requested = FALSE;
+
+static void platform_window_set_fullscreen(BOOL fullscreen)
+{
+	platform_fullscreen_requested = fullscreen;
+	SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false);
+}
+
+/* whether the window is fullscreen. SDL sets its flag when the window
+manager confirms the request, and some never do: gamescope (the Steam
+Deck's Game Mode) makes the window the size of the display but leaves the
+flag unset, so the game drew 640x480 and gamescope stretched it. A window
+that was asked to be fullscreen and covers its display counts too. */
+static BOOL platform_window_fullscreen(void)
+{
+	SDL_DisplayID display;
+	const SDL_DisplayMode *mode;
+	int width, height;
+
+	if (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN)
+		return TRUE;
+	if (!platform_fullscreen_requested)
+		return FALSE;
+	display = SDL_GetDisplayForWindow(platform_window);
+	mode = display ? SDL_GetDesktopDisplayMode(display) : NULL;
+	if (!mode || !SDL_GetWindowSizeInPixels(platform_window, &width, &height))
+		return FALSE;
+	return width >= (int)(mode->w * mode->pixel_density + 0.5f) &&
+		height >= (int)(mode->h * mode->pixel_density + 0.5f);
+}
+
 /* whether the game is, or is to be, fullscreen, and if so the size in
 pixels of the display it fills (d3d8_gl.c draws at that resolution) */
 BOOL platform_screen_mode(long *width, long *height)
@@ -403,7 +435,7 @@ BOOL platform_screen_mode(long *width, long *height)
 	SDL_DisplayID display;
 	const SDL_DisplayMode *mode;
 
-	if (platform_window ? !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) :
+	if (platform_window ? !platform_window_fullscreen() :
 		!platform_fullscreen_setting() || !platform_sdl_initialize())
 	{
 		return FALSE;
@@ -476,6 +508,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 #ifndef HALO_ANDROID
+	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_fullscreen_kind_apply();
 #endif
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
@@ -517,8 +550,8 @@ void platform_display_apply(void)
 	if (!platform_window)
 		return;
 	platform_fullscreen_kind_apply();
-	if (((SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0) != (fullscreen != FALSE))
-		SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false);
+	if (platform_window_fullscreen() != (fullscreen != FALSE))
+		platform_window_set_fullscreen(fullscreen);
 	if (scale != platform_window_scale && scale >= 1)
 	{
 		platform_window_scale = scale;
@@ -866,13 +899,13 @@ static void platform_show_pending_message(void)
 #else
 	{
 		/* (a box cannot show above a fullscreen game) */
-		int fullscreen = (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+		BOOL fullscreen = platform_window_fullscreen();
 
 		if (fullscreen)
-			SDL_SetWindowFullscreen(platform_window, false);
+			platform_window_set_fullscreen(FALSE);
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, title, text, platform_window);
 		if (fullscreen)
-			SDL_SetWindowFullscreen(platform_window, true);
+			platform_window_set_fullscreen(TRUE);
 	}
 #endif
 }
@@ -984,8 +1017,7 @@ void platform_pump_events(void)
 			window's size and place while fullscreen) */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
 			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+				platform_window_set_fullscreen(!platform_window_fullscreen());
 			}
 #endif
 			break;
