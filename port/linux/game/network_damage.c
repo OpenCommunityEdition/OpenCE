@@ -34,6 +34,10 @@ being hit looks and feels like on the clients).
 - The damage to a unit goes to the machines of the players it concerns
   (the unit's, its riders', the damage's owner's) and those sent the
   unit's player this tick, which see it; a killing blow to all.
+- Scenery and devices that can be destroyed (lights, panels) are the
+  map's, at the same index on every machine. A client reports its hits on
+  them like any other, and every client deals the host's damage to its own
+  copy, which breaks and plays its effects as the host's did.
 */
 
 #include "cseries.h"
@@ -59,6 +63,8 @@ being hit looks and feels like on the clients).
 void damage_replay_player_effect(long player_index, struct damage_data *damage, real total_damage);
 void damage_replay_aftermath(long object_index, struct damage_data *damage, unsigned long being_damaged_flags,
 	real shield_damage, real body_damage, real body_damage_multiplier, short body_part);
+void damage_replay_static(long object_index, struct damage_data *damage, short node_index, short region_index,
+	short material_index);
 void damage_replay_kill(long object_index, struct damage_data *damage, short node_index, short region_index,
 	short material_index);
 /* network_distributed.c's */
@@ -142,7 +148,13 @@ enum
 	_damage_event_player_effect,
 	_damage_event_aftermath,
 	_damage_event_kill,
+	/* damage to destructible scenery or a device, to every machine */
+	_damage_event_static,
 };
+
+/* the objects every machine has from the map, at the same index, which
+damage can break (static_target) */
+#define STATIC_TARGET_TYPES (_object_mask_scenery | _object_mask_device)
 
 /* what a player's damage is, by how the game deals it (the shape of their
 report of it) */
@@ -483,6 +495,14 @@ static boolean distributed_damage_to_data(
 	return TRUE;
 }
 
+/* whether the object is scenery or a device that damage can destroy */
+static boolean static_target(
+	long object_index)
+{
+	return object_try_and_get_and_verify_type(object_index, STATIC_TARGET_TYPES) &&
+		object_get_maximum_body_vitality(object_index, TRUE) > 0.0f;
+}
+
 /* ---------- object_cause_damage (damage.c) */
 
 /* whether the damage is a weapon's own at the unit that fires it (weapons.c:
@@ -629,7 +649,8 @@ boolean network_damage_deals(
 			damage_replay_player_effect(unit->unit.player_index, &effect, 0.0f);
 		}
 		/* a hit of this machine's own player's, on the host's object */
-		if (distributed_player_is_local(damage->owner_player_index) && network_objects_client_has(object_index) &&
+		if (distributed_player_is_local(damage->owner_player_index) &&
+			(network_objects_client_has(object_index) || static_target(object_index)) &&
 			damage_report_count < MAXIMUM_HIT_REPORTS_PER_TICK)
 		{
 			struct distributed_hit_report *report = &damage_reports[damage_report_count++];
@@ -717,6 +738,33 @@ void network_damage_player_effect(
 
 /* the host: an object damaged, and what that did (object_damage_aftermath
 done, so that a kill's killer is known) */
+/* a damage event of this tick for the object, or NULL once the tick's are
+spent (the last RESERVED_KILL_EVENTS are kept for killing blows) */
+static struct distributed_damage_event *damage_event_new(
+	byte kind,
+	long object_index,
+	struct damage_data const *damage,
+	short node_index,
+	short region_index,
+	short material_index,
+	boolean kill)
+{
+	struct distributed_damage_event *event;
+
+	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
+		return NULL;
+	event = &damage_events[damage_event_count++];
+	csmemset(event, 0, sizeof(*event));
+	event->kind = kind;
+	event->player_index = NO_PLAYER;
+	event->object_index = object_index;
+	distributed_damage_from_data(damage, &event->damage);
+	event->node_index = node_index;
+	event->region_index = region_index;
+	event->material_index = material_index;
+	return event;
+}
+
 void network_damage_aftermath(
 	long object_index,
 	struct damage_data const *damage,
@@ -736,6 +784,11 @@ void network_damage_aftermath(
 
 	if (game_connection() != _game_connection_network_server)
 		return;
+	if (static_target(object_index))
+	{
+		damage_event_new(_damage_event_static, object_index, damage, node_index, region_index, material_index, FALSE);
+		return;
+	}
 	/* (units only: items and the like the objects' states place) */
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_unit);
 	if (!unit)
@@ -749,22 +802,15 @@ void network_damage_aftermath(
 		(victim_player_index != NONE ||
 			(TEST_FLAG(_object_mask_biped, unit->object.type) &&
 				!TEST_FLAG(being_damaged_flags, _object_being_damaged_body_destroyed_bit)));
-	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
+	event = damage_event_new(_damage_event_aftermath, object_index, damage, node_index, region_index, material_index,
+		kill);
+	if (!event)
 		return;
-	event = &damage_events[damage_event_count++];
-	csmemset(event, 0, sizeof(*event));
-	event->kind = _damage_event_aftermath;
-	event->player_index = NO_PLAYER;
-	event->object_index = object_index;
-	distributed_damage_from_data(damage, &event->damage);
 	event->being_damaged_flags = being_damaged_flags;
 	event->shield_damage = shield_damage;
 	event->body_damage = body_damage;
 	event->body_damage_multiplier = body_damage_multiplier;
 	event->body_part = body_part;
-	event->node_index = node_index;
-	event->region_index = region_index;
-	event->material_index = material_index;
 	/* a killing blow, a player's with who the host says dealt it */
 	if (kill)
 	{
@@ -1719,6 +1765,8 @@ static boolean distributed_report_valid(
 		return FALSE;
 	target = (struct object_datum *)object_try_and_get_and_verify_type(report->object_index,
 		_object_mask_biped | _object_mask_vehicle | _object_mask_weapon | _object_mask_equipment);
+	if (!target && static_target(report->object_index))
+		target = object_get(report->object_index);
 	if (!target || !tag_index_is_group(report->damage.definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
 		return FALSE;
 	/* numbers the game can take */
@@ -2158,6 +2206,15 @@ void network_damage_handle_events(
 				damage_replaying_killer = NONE;
 				if (victim_player_index != NONE && TEST_FLAG(event->kill_flags, _damage_event_telefragged_bit))
 					players_show_telefragged(victim_player_index);
+			}
+			break;
+		case _damage_event_static:
+			if (distributed_object_index_valid(event->object_index) && static_target(event->object_index) &&
+				distributed_damage_indices_valid(event->object_index, event->node_index, event->region_index,
+					event->material_index))
+			{
+				damage_replay_static(event->object_index, &damage, event->node_index, event->region_index,
+					event->material_index);
 			}
 			break;
 		}

@@ -29,6 +29,8 @@ that clients need to see is sent from this file:
   every tick in rotation, those that have moved since the map loaded more
   often. A scenario group is identified by its index, which is the same on
   every machine; a device's own group by the device.
+- Breakable surfaces (glass) the host breaks, each once as it breaks and
+  a few at a time again in rotation (for a late joiner or a lost message).
 - Named objects (scenery and devices) the scripts create or destroy.
   network_objects.c already handles units, vehicles, weapons and equipment.
   Twice a second the host sends which object names currently exist. A
@@ -95,6 +97,8 @@ index and tag, since the map placed them at the same index everywhere.
 #include "objects/object_types.h"
 #include "objects/damage.h"
 #include "objects/scenery.h"
+#include "physics/breakable_surfaces.h"
+#include "structures/structure_bsp_definitions.h"
 #include "physics/collisions.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "saved games/game_state.h"
@@ -190,6 +194,9 @@ enum
 	_coop_event_reverted,
 	/* a unit opened (value TRUE) or closed: a dropship's doors */
 	_coop_event_unit_open,
+	/* a breakable surface broke: value its index, frame its BSP, reals the
+	damage's epicenter */
+	_coop_event_surface_broken,
 };
 
 /* distributed_coop_event.type of an effect: at a cutscene flag (value), or on
@@ -1813,6 +1820,14 @@ static void client_apply_event(
 	case _coop_event_reverted:
 		client_stop_script_sounds();
 		break;
+	case _coop_event_surface_broken:
+		if (event->frame == global_structure_bsp_index)
+		{
+			real_point3d epicenter = { event->reals[0], event->reals[1], event->reals[2] };
+
+			breakable_surface_port_break(event->value, &epicenter);
+		}
+		break;
 	case _coop_event_unit_open:
 		if (distributed_object_index_valid(event->object_index) && network_objects_client_has(event->object_index) &&
 			object_try_and_get_and_verify_type(event->object_index, _object_mask_unit))
@@ -2438,6 +2453,51 @@ void network_coop_note_effect(
 	event->value = cutscene_flag_index;
 }
 
+void network_coop_note_surface_broken(
+	short breakable_surface_index,
+	real_point3d const *epicenter)
+{
+	struct distributed_coop_event *event = event_new(_coop_event_surface_broken);
+
+	if (!event)
+		return;
+	event->value = breakable_surface_index;
+	event->frame = global_structure_bsp_index;
+	event->reals[0] = epicenter->x;
+	event->reals[1] = epicenter->y;
+	event->reals[2] = epicenter->z;
+}
+
+/* host: a few broken surfaces again each refresh, round them all, for a
+machine that joined since or lost the message (broken from their middle) */
+static void host_send_broken_surfaces(
+	void)
+{
+	enum { SURFACES_PER_REFRESH = 8 };
+	static short cursor;
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	short count = (short)structure_bsp->breakable_surfaces.count;
+	short sent = 0;
+	short step;
+
+	if (!host_resend.refresh || count <= 0)
+		return;
+	for (step = 0; step < count && sent < SURFACES_PER_REFRESH; step++)
+	{
+		short index = (short)((cursor + step) % count);
+
+		if (!breakable_surface_extant(index))
+		{
+			struct structure_breakable_surface *surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces,
+				index, struct structure_breakable_surface);
+
+			network_coop_note_surface_broken(index, &surface->centroid);
+			sent++;
+		}
+	}
+	cursor = (short)((cursor + step) % count);
+}
+
 void network_coop_note_object_effect(
 	long effect_definition_index,
 	long object_index,
@@ -2552,6 +2612,7 @@ void network_coop_host_tick(
 	host_send_attachments();
 	host_send_looping_sounds();
 	host_send_hud_state();
+	host_send_broken_surfaces();
 	host_send_events();
 }
 
