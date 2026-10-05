@@ -473,6 +473,8 @@ static struct
 	/* no BSP switch trigger counts before this game time (one has just
 	switched, and the players are being brought into the new BSP) */
 	long bsp_switch_allowed_time;
+	/* the structure BSPs the players have been in this map, by bit */
+	word visited_structure_bsps;
 	/* where each player last stood on the ground, and on which BSP: where
 	everyone comes back when the last checkpoint was on another one */
 	short ground_structure_bsp_index;
@@ -2772,6 +2774,11 @@ someone who is only crossing a seam or riding over a gap. */
 it while the players are brought into the new one */
 #define COOP_BSP_SWITCH_SETTLE_TICKS (2 * TICKS_PER_SECOND)
 
+/* Going back to a BSP the team has already been in needs two thirds of the
+living players at the trigger: inside it, or this near the player in it
+(world units) */
+#define COOP_BACKTRACK_GATHER_DISTANCE 4.0f
+
 /* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
 beside a grounded teammate inside the BSP, else any teammate inside it, else
 to the last checkpoint. Skipped while scripts hold the controls, since
@@ -2978,6 +2985,47 @@ static boolean players_coop_in_bsp_switch_trigger(
 	}
 
 	return FALSE;
+}
+
+/* port: whether a network co-op host lets the unit on this trigger switch
+the BSP, which brings the whole team along. Anyone can lead the team into a
+BSP it hasn't been in; going back to one needs two thirds of the team
+there, so one player can't drag everyone back through the level. */
+static boolean players_coop_bsp_switch_allowed(
+	short bsp_switch_trigger_volume_index,
+	long unit_index)
+{
+	struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->bsp_switch_trigger_volumes, bsp_switch_trigger_volume_index,
+		struct scenario_bsp_switch_trigger_volume);
+	real_point3d const *center = &object_get(unit_index)->object.bounding_sphere_center;
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short living_count = 0;
+	short gathered_count = 0;
+
+	if (!VALID_INDEX(volume->destination_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO) ||
+		!TEST_FLAG(players_coop_state.visited_structure_bsps, volume->destination_structure_bsp_index))
+	{
+		return TRUE;
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		struct object_datum *teammate = object_try_and_get(player->unit_index);
+
+		if (!teammate || TEST_FLAG(teammate->object.damage_flags, _object_dead_bit))
+			continue;
+		living_count++;
+		if (scenario_trigger_volume_test_object(volume->trigger_volume_index, player->unit_index) ||
+			distance_squared3d(center, &teammate->object.bounding_sphere_center) <=
+				COOP_BACKTRACK_GATHER_DISTANCE * COOP_BACKTRACK_GATHER_DISTANCE)
+		{
+			gathered_count++;
+		}
+	}
+
+	return gathered_count * 3 >= living_count * 2;
 }
 
 static void player_teleport_on_bsp_switch(
@@ -4500,6 +4548,8 @@ void players_update_after_game(
 		if (players_globals->double_speed_ticks == 0)
 			game_set_players_are_double_speed(FALSE);
 	}
+	if (VALID_INDEX(global_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO))
+		SET_FLAG(players_coop_state.visited_structure_bsps, global_structure_bsp_index, TRUE);
 
 	data_iterator_new(&iterator, player_data);
 	while (player = data_iterator_next(&iterator))
@@ -4566,7 +4616,9 @@ void players_update_after_game(
 						global_structure_bsp_index &&
 						scenario_trigger_volume_test_object(
 							bsp_switch_trigger_volume->trigger_volume_index,
-							player->unit_index))
+							player->unit_index) &&
+						(!network_coop_active() ||
+							players_coop_bsp_switch_allowed(bsp_switch_trigger_volume_index, player->unit_index)))
 					{
 						if (players_globals->local_player_triggered_switch !=
 							_local_player_triggered_switch_none &&
