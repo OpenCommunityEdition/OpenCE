@@ -27,6 +27,7 @@ Conventions carried over from the Xbox:
 #include "port_config.h"
 
 #include <math.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1019,6 +1020,24 @@ only a little behind finds its changed registers without a full scan */
 #define CONSTANT_LOG_SIZE 1024
 static unsigned char constant_log[CONSTANT_LOG_SIZE];
 
+static void constants_serial_reset(void)
+{
+	unsigned long index;
+	struct program_entry *entry;
+
+	/* Start a new sequence before incrementing past ULONG_MAX. Every
+	register is newer than every cached program, including registers that
+	have not changed recently; an old program may still hold stale values. */
+	constants_serial = 1;
+	for (index = 0; index < XGPU_VERTEX_CONSTANT_COUNT; index++)
+		constant_serials[index] = constants_serial;
+	for (index = 0; index < PROGRAM_BUCKETS; index++)
+	{
+		for (entry = program_buckets[index]; entry; entry = entry->next)
+			entry->constants_serial = 0;
+	}
+}
+
 static void constants_store(unsigned long first, const void *data, unsigned long count)
 {
 	const float (*values)[4] = data;
@@ -1028,6 +1047,8 @@ static void constants_store(unsigned long first, const void *data, unsigned long
 	{
 		if (memcmp(device.constants[first + index], values[index], sizeof(device.constants[0])))
 		{
+			if (constants_serial == ULONG_MAX)
+				constants_serial_reset();
 			memcpy(device.constants[first + index], values[index], sizeof(device.constants[0]));
 			constant_serials[first + index] = ++constants_serial;
 			constant_log[constants_serial % CONSTANT_LOG_SIZE] = (unsigned char)(first + index);
@@ -2600,12 +2621,18 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	{
 		unsigned long first = entry->constant_count, last = 0, index;
 
-		if (constants_serial - entry->constants_serial <= XGPU_VERTEX_CONSTANT_COUNT)
+		/* Serial zero also marks a program invalidated by a sequence reset.
+		Scan the registers then: the old log does not describe that reset. */
+		if (entry->constants_serial &&
+			constants_serial - entry->constants_serial <= XGPU_VERTEX_CONSTANT_COUNT)
 		{
 			unsigned long serial;
 
-			for (serial = entry->constants_serial + 1; serial <= constants_serial; serial++)
+			/* Stop at the target rather than incrementing past it: the target
+			can be ULONG_MAX, whose successor is zero. */
+			for (serial = entry->constants_serial; serial != constants_serial; )
 			{
+				serial++;
 				index = constant_log[serial % CONSTANT_LOG_SIZE];
 				if (index >= entry->constant_count)
 					continue;
