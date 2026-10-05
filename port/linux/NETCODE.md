@@ -47,7 +47,12 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
-  Every machine follows the host's structure BSP. A loading zone into a
+  Every machine follows the host's structure BSP: a switch is sent at once
+  and reliably, and each client's input says which BSP it has loaded.
+  Until a client has the host's, the host takes none of its players'
+  movement and none of its loading zones, and after any switch no loading
+  zone switches again until every machine has the new BSP (ten seconds at
+  most). A loading zone into a
   BSP the team hasn't been in brings every player to whoever crossed it,
   as split screen does; one back into a BSP it has been in switches only
   with two thirds of the living players at it (in the trigger, or within
@@ -153,7 +158,8 @@ actors on its clients and sends the flinches and deaths the host picked;
 version 13 drives up to 1056 of the host's AI units on its clients (co-op's
 extra enemies), where 12 drove 288; version 14 sends co-op's device positions
 and its units opening and closing; version 15 sends co-op's allegiances with
-its presentation, a message of another size.
+its presentation, a message of another size; version 16 has a client's input
+say which structure BSP it has loaded (co-op).
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
