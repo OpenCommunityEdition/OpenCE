@@ -162,6 +162,9 @@ long antenna_new(
 			antenna->definition_index = definition_index;
 			antenna->object_index = NONE;
 			antenna->updates_since_last_render = 0;
+			/* (a new chain blends from no shape: the slot's record may be a
+			deleted antenna's, or an earlier map's) */
+			antenna_shapes[DATUM_INDEX_TO_ABSOLUTE_INDEX(antenna_index)].count = 0;
 			antenna->last_attachment_location.z = 0.0f;
 			antenna->last_attachment_location.y = 0.0f;
 			antenna->last_attachment_location.x = 0.0f;
