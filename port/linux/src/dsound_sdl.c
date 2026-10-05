@@ -503,7 +503,14 @@ static void audio_start(void)
 		spec.format = SDL_AUDIO_F32;
 		spec.channels = OUTPUT_CHANNELS;
 		spec.freq = OUTPUT_RATE;
+		#ifdef HALO_ANDROID
+		/* The Android audio callback crosses to a guest-capable worker thread.
+		1024 frames gave enough scheduler headroom to eliminate the observed
+		menu/music underruns without changing the mixer or exposing a new setting. */
+		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "1024");
+#else
 		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
+#endif
 		audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
 		if (audio_stream)
 		{
