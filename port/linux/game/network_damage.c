@@ -738,6 +738,33 @@ void network_damage_player_effect(
 
 /* the host: an object damaged, and what that did (object_damage_aftermath
 done, so that a kill's killer is known) */
+/* a damage event of this tick for the object, or NULL once the tick's are
+spent (the last RESERVED_KILL_EVENTS are kept for killing blows) */
+static struct distributed_damage_event *damage_event_new(
+	byte kind,
+	long object_index,
+	struct damage_data const *damage,
+	short node_index,
+	short region_index,
+	short material_index,
+	boolean kill)
+{
+	struct distributed_damage_event *event;
+
+	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
+		return NULL;
+	event = &damage_events[damage_event_count++];
+	csmemset(event, 0, sizeof(*event));
+	event->kind = kind;
+	event->player_index = NO_PLAYER;
+	event->object_index = object_index;
+	distributed_damage_from_data(damage, &event->damage);
+	event->node_index = node_index;
+	event->region_index = region_index;
+	event->material_index = material_index;
+	return event;
+}
+
 void network_damage_aftermath(
 	long object_index,
 	struct damage_data const *damage,
@@ -759,17 +786,7 @@ void network_damage_aftermath(
 		return;
 	if (static_target(object_index))
 	{
-		if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - RESERVED_KILL_EVENTS)
-			return;
-		event = &damage_events[damage_event_count++];
-		csmemset(event, 0, sizeof(*event));
-		event->kind = _damage_event_static;
-		event->player_index = NO_PLAYER;
-		event->object_index = object_index;
-		distributed_damage_from_data(damage, &event->damage);
-		event->node_index = node_index;
-		event->region_index = region_index;
-		event->material_index = material_index;
+		damage_event_new(_damage_event_static, object_index, damage, node_index, region_index, material_index, FALSE);
 		return;
 	}
 	/* (units only: items and the like the objects' states place) */
@@ -785,22 +802,15 @@ void network_damage_aftermath(
 		(victim_player_index != NONE ||
 			(TEST_FLAG(_object_mask_biped, unit->object.type) &&
 				!TEST_FLAG(being_damaged_flags, _object_being_damaged_body_destroyed_bit)));
-	if (damage_event_count >= MAXIMUM_DAMAGE_EVENTS_PER_TICK - (kill ? 0 : RESERVED_KILL_EVENTS))
+	event = damage_event_new(_damage_event_aftermath, object_index, damage, node_index, region_index, material_index,
+		kill);
+	if (!event)
 		return;
-	event = &damage_events[damage_event_count++];
-	csmemset(event, 0, sizeof(*event));
-	event->kind = _damage_event_aftermath;
-	event->player_index = NO_PLAYER;
-	event->object_index = object_index;
-	distributed_damage_from_data(damage, &event->damage);
 	event->being_damaged_flags = being_damaged_flags;
 	event->shield_damage = shield_damage;
 	event->body_damage = body_damage;
 	event->body_damage_multiplier = body_damage_multiplier;
 	event->body_part = body_part;
-	event->node_index = node_index;
-	event->region_index = region_index;
-	event->material_index = material_index;
 	/* a killing blow, a player's with who the host says dealt it */
 	if (kill)
 	{
