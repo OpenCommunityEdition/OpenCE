@@ -13,6 +13,9 @@ fires for whoever walks into it, and what it starts is sent to the clients
   players): the Maw's run to the Pillar of Autumn's bridge, a30's Pelican
   pickups. Split-screen players stand together; network players don't, so
   the wait would never end. In co-op one player arriving is enough.
+- Waiting until it's safe (game_safe_to_save) before a cutscene: the
+  game's test fails while any enemy sees any player. In co-op one player
+  out of danger is enough.
 - Naming players one at a time: the scripts reach the players through
   player0 and player1 (the first two in the players list), to put them in
   a Pelican, take them out of it, stage them for a cutscene or give them a
@@ -23,11 +26,13 @@ fires for whoever walks into it, and what it starts is sent to the clients
 /* ---------- headers */
 
 #include "cseries.h"
+#include "ai/ai.h"
 #include "game/game.h"
 #include "game/players.h"
 #include "hs/object_lists.h"
 #include "objects/objects.h"
 #include "objects/object_types.h"
+#include "units/bipeds.h"
 #include "units/units.h"
 
 #include "coop_scripts.h"
@@ -140,6 +145,30 @@ void coop_scripts_board_followers(
 		object_list_add(list_index, followers[index]);
 		vehicle_scripting_load_magic(vehicle_index, follower_seat, list_index);
 	}
+}
+
+boolean coop_scripts_safe_to_save(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (game_safe_to_save())
+		return TRUE;
+	if (!coop_scripts_host())
+		return FALSE;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		struct biped_datum *biped = biped_try_and_get(player->unit_index);
+
+		if (biped && !TEST_FLAG(biped->object.damage_flags, _object_dead_bit) &&
+			!TEST_FLAG(biped->biped.flags, _biped_airborne_bit) && !ai_port_enemies_can_see_unit(player->unit_index))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 void coop_scripts_player_add_equipment(

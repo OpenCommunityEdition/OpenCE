@@ -31,6 +31,14 @@ void coop_scripts_board_followers(
 	long vehicle_index,
 	char const *seat_name);
 
+/* hs.c's game_safe_to_save, for the scripts: the game's own test, or in
+co-op, any one player alive, on the ground and unseen by enemies. The
+scripts wait on it before a cutscene, and with players spread out a fight
+somewhere else would hold up the one a player has reached. Checkpoints
+keep the game's own test. */
+boolean coop_scripts_safe_to_save(
+	void);
+
 /* hs.c's player_add_equipment, for the scripts: gives the starting profile
 to player0's followers too */
 void coop_scripts_player_add_equipment(
