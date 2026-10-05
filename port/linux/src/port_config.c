@@ -111,6 +111,11 @@ static const struct config_setting config_settings[] =
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
 		"from port/assets/titles; false draws the maps' bitmap fonts and titles." },
+	{ "display.model_lod", _config_string, "\"auto\"", "HALO_MODEL_LOD", _environment_value, _platform_all,
+		"Draw every model at this level of detail, not the one its size on the\n"
+		"screen calls for: \"super_high\", \"high\", \"medium\", \"low\" or\n"
+		"\"super_low\"; \"auto\" is the game's own. The console's debug_lod\n"
+		"command forces a level too (and -1 gives the models back)." },
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },

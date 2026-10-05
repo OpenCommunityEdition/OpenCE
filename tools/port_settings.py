@@ -62,6 +62,10 @@ SCREENS = {
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
+            ("MODEL DETAIL:", "display.model_lod",
+             [("AUTO", "auto"), ("SUPER HIGH", "super_high"), ("HIGH", "high"), ("MEDIUM", "medium"),
+              ("LOW", "low"), ("SUPER LOW", "super_low")],
+             "Draw every model at this level of detail; Auto\nchooses by how large the model looks.", None),
         ],
     },
     "mouse_settings": {

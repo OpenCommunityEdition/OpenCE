@@ -808,9 +808,21 @@ void render_model(
 		{
 			geometry_detail_level_index--;
 		}
-		if (rasterizer_debug_options.debug_model_lod!=NONE)
 		{
-			geometry_detail_level_index = PIN(rasterizer_debug_options.debug_model_lod, 0, NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1);
+			/* port: the level the console forces (rasterizer_debug_model_lod, or
+			the debug_lod command), else the video settings' MODEL DETAIL
+			(display.model_lod; port/linux/game/model_lod.c) */
+			extern long port_model_lod(void);
+			short forced_detail_level = rasterizer_debug_options.debug_model_lod;
+
+			if (forced_detail_level==NONE)
+			{
+				forced_detail_level = (short)port_model_lod();
+			}
+			if (forced_detail_level!=NONE)
+			{
+				geometry_detail_level_index = PIN(forced_detail_level, 0, NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1);
+			}
 		}
 		match_assert(
 			"c:\\halo\\SOURCE\\models\\models.c",

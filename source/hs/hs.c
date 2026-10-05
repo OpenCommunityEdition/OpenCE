@@ -14024,7 +14024,7 @@ static boolean hs_expression_changes_no_game(
 {
 	static char const *const allowed[] = {
 		"set", "cls", "help", "print", "script_doc",
-		"display_framerate", "framerate_throttle", "framerate_lock", "rasterizer_fps_accumulate",
+		"debug_lod", "display_framerate", "framerate_throttle", "framerate_lock", "rasterizer_fps_accumulate",
 		"console_dump_to_file", "terminal_render", "screenshot_size", "screenshot_count",
 		"show_hud", "show_hud_help_text", "show_hud_timer", "hud_show_crosshair", "hud_show_health",
 		"hud_show_motion_sensor", "hud_show_shield", "sound_enable", "sound_set_gain",
@@ -14168,6 +14168,14 @@ static boolean hs_compile_and_evaluate_command(
 			name[length] = 0;
 			return kick ? network_game_server_kick_player(name) : network_game_server_ban_player(name);
 		}
+	}
+	/* port: the models' level of detail ("debug_lod <level>",
+	port/linux/game/model_lod.c), which is no script's either */
+	{
+		extern boolean port_debug_lod_command(char const *expression);
+
+		if (port_debug_lod_command(expression))
+			return TRUE;
 	}
 	csstrncpy(buffer, expression, sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
