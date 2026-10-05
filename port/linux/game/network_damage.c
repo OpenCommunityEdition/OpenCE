@@ -37,6 +37,7 @@ being hit looks and feels like on the clients).
 */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_globals.h"
 #include "game/players.h"
@@ -2020,6 +2021,26 @@ static boolean distributed_event_goes_to(
 	return FALSE;
 }
 
+/* How often the host logs how many client hits it accepted and refused
+(only when it refused some). Tells "my shots don't register" apart from
+"I missed". */
+#define REPORT_LOG_TICKS (30 * TICKS_PER_SECOND)
+
+static void distributed_log_reports(
+	void)
+{
+	static long logged_dealt;
+	static long logged_rejected;
+
+	if (game_time_get() % REPORT_LOG_TICKS != 0 || damage_rejected_reports == logged_rejected)
+		return;
+	error(_error_silent, "damage: clients' hits in the last %d seconds: %ld dealt, %ld refused",
+		REPORT_LOG_TICKS / TICKS_PER_SECOND, damage_dealt_reports - logged_dealt,
+		damage_rejected_reports - logged_rejected);
+	logged_dealt = damage_dealt_reports;
+	logged_rejected = damage_rejected_reports;
+}
+
 void network_damage_host_tick(
 	void)
 {
@@ -2030,6 +2051,7 @@ void network_damage_host_tick(
 		distributed_client_machines(machine_indices, HALO_PORT_MAXIMUM_NETWORK_MACHINES) : 0;
 	short machine_number;
 
+	distributed_log_reports();
 	distributed_note_weapons();
 	distributed_note_targets();
 	distributed_note_event_destinations();

@@ -14,6 +14,11 @@ void hud_dispose_weapon_interface_from_old_map(
 void hud_dispose_weapon_interface(
 	void);
 
+/* port: network co-op (port/linux/game/network_coop.c) */
+long hud_weapon_port_script_flags(
+	void);
+void hud_weapon_port_set_script_flags(
+	long flags);
 void scripted_hud_show_crosshair(
 	boolean show);
 

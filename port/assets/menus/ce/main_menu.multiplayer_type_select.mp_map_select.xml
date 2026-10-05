@@ -33,6 +33,8 @@
 		<on event="created" run="mp level list initialize"/>
 		<on event="deleted" run="mp level list dispose"/>
 		<on event="custom_activation" run="mp level select" open="main_menu/multiplayer_type_select/connected/gametype_select_screen_wrapper"/>
+		<on event="b" run="port map list back"/>
+		<on event="back" run="port map list back"/>
 		<child widget="main_menu/new_select/list_item_0" x="20" y="73"/>
 		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
 		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>

@@ -377,6 +377,9 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "main/d3d_intimacy.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h" /* port: a co-op game's level won */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
@@ -1854,11 +1857,22 @@ static void main_revert_map_private(
 static void main_skip_cinematic_private(
 	void)
 {
-	if (cinematic_can_be_skipped())
+	/* port: a network host never reverts without a saved state, which
+	would reset the map on the host alone */
+	if (cinematic_can_be_skipped() &&
+		(game_connection() != _game_connection_network_server || game_state_port_saved_game_valid()))
 	{
+		long now = game_time_get();
+
 		game_state_revert();
+		network_coop_skip_reverted(now);
 		ui_widgets_disable_pause_game(30);
 		main_globals.revert_map = FALSE;
+	}
+	else if (game_connection() == _game_connection_network_server)
+	{
+		error(_error_silent, "co-op: cutscene not skipped (skippable %d, saved state %d)",
+			cinematic_can_be_skipped(), game_state_port_saved_game_valid());
 	}
 	main_globals.skip_cinematic = FALSE;
 	return;
@@ -1939,6 +1953,8 @@ static void main_save_map_private(
 
 		if (save_map)
 		{
+			/* port: remember where the players are, for network co-op respawns */
+			players_note_checkpoint();
 			hud_autosave(TRUE);
 			main_globals.save_map_completed = TRUE;
 			main_globals.saving_map = FALSE;
@@ -1995,7 +2011,12 @@ static void main_lost_map_private(
 	{
 		main_globals.lost_map = FALSE;
 		main_globals.loss_timer = 0;
-		game_state_revert();
+		/* port: network co-op can't revert to a checkpoint (every machine would
+		have to), so the players respawn where they were at the last one */
+		if (game_connection() == _game_connection_network_server)
+			players_respawn_at_checkpoint();
+		else
+			game_state_revert();
 	}
 	return;
 }
@@ -2153,6 +2174,22 @@ static void main_won_map_private(
 {
 	short level;
 	short local_player_index;
+
+	/* port: when a network co-op level is won, the round ends for everyone as
+	in multiplayer, back to the lobby, and the next round is the campaign's
+	next level (The Maw's: The Pillar of Autumn). A level not in the campaign
+	repeats. */
+	if (game_connection() == _game_connection_network_server)
+	{
+		struct network_game *game = network_game_get_game();
+
+		main_globals.won_map = FALSE;
+		level = game ? main_get_solo_level_from_name(game->map.name) : NONE;
+		player_profile_save_level_completed(0);
+		network_game_server_port_cooperative_won(level != NONE ?
+			main_get_solo_level_name((level + 1) % NUMBER_OF_SINGLE_PLAYER_LEVELS) : NULL);
+		return;
+	}
 	main_globals.want_to_be_at_main_menu = TRUE;
 	main_globals.won_map = FALSE;
 	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name) + 1;

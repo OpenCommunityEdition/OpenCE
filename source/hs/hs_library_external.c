@@ -104,6 +104,7 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "units/units.h"
 #include "object_lists.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
 
@@ -674,6 +675,8 @@ void hs_effect_new(
 	struct scenario_cutscene_flag *cutscene_flag;
 	real_vector3d forward;
 
+	/* port: and on network co-op's clients (port/linux/game/network_coop.c) */
+	network_coop_note_effect(effect_definition_index, cutscene_flag_index);
 	cutscene_flag = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->cutscene_flags,
 		cutscene_flag_index,
@@ -706,6 +709,9 @@ void hs_effect_new_from_object_marker(
 		if (object_index != NONE)
 		{
 			struct object_marker marker;
+
+			/* port: and on network co-op's clients (port/linux/game/network_coop.c) */
+			network_coop_note_object_effect(effect_definition_index, object_index, marker_name);
 
 			if (object_get_marker_by_name(
 				object_index,
@@ -998,6 +1004,9 @@ void hs_teleport_players_not_in_trigger_volume(
 	short cutscene_flag_index)
 {
 	long player_index;
+	/* port: in network co-op the first player moved goes to the flag and
+	the rest around them, instead of all into the same spot */
+	long first_unit_index = NONE;
 
 	for (player_index = data_next_index(player_data, NONE);
 		player_index != NONE;
@@ -1011,11 +1020,17 @@ void hs_teleport_players_not_in_trigger_volume(
 				trigger_volume_index,
 				player->unit_index))
 		{
+			if (first_unit_index != NONE && network_coop_active())
+			{
+				player_teleport(player_index, first_unit_index, &object_get(first_unit_index)->object.position);
+				continue;
+			}
 			hs_object_orient(
 				player->unit_index,
 				cutscene_flag_index,
 				TRUE,
 				TRUE);
+			first_unit_index = player->unit_index;
 		}
 	}
 

@@ -27,6 +27,24 @@ void hud_messaging_dispose_from_old_map(
 	void);
 void hud_messaging_dispose(
 	void);
+/* port: network co-op (port/linux/game/network_coop.c) */
+struct hud_timer_state
+{
+	long reference_time;
+	short ticks;
+	short flash_cutoff;
+	short x, y;
+	short corner;
+	boolean paused;
+	boolean enabled;
+};
+void hud_messaging_port_timer_get(
+	struct hud_timer_state *state);
+void hud_messaging_port_timer_set(
+	struct hud_timer_state const *state);
+short hud_messaging_port_message_count(
+	void);
+
 void scripted_hud_set_state_message(
 	short message_index);
 void hud_messaging_globals_update(
