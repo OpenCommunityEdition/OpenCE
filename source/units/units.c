@@ -974,6 +974,8 @@ static long unit_get_weapon(struct unit_datum *unit, short index);
 static void unit_drop_item(long unit_index, long item_index);
 /* port/linux/game/network_objects.c's */
 boolean network_objects_creating_host_object(void);
+/* port/linux/game/network_damage.c's */
+void network_damage_note_grenade(long unit_index, short grenade_type);
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 static void unit_drop_grenades(
@@ -7653,6 +7655,9 @@ static void unit_throw_grenade_move_to_hand(
 		object_attach_to_node(unit_index, object_index, marker.node_index);
 		unit->unit.grenade_object_index = object_index;
 		unit->unit.grenade_throw_state = _unit_grenade_throw_in_hand;
+		/* port: the host takes a client's report of the grenade's damage only
+		from a grenade thrown (network_damage.c) */
+		network_damage_note_grenade(unit_index, unit->unit.current_grenade_index);
 	}
 	else
 	{

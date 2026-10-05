@@ -229,6 +229,9 @@ void network_objects_set_seat(long unit_index, long vehicle_index, short seat_in
 /* ---------- prototypes/NETWORK_DAMAGE.C */
 
 void network_damage_new_game(void);
+/* the host: a grenade a player's unit threw (units.c), whose damage that
+player's machine reports */
+void network_damage_note_grenade(long unit_index, short grenade_type);
 void network_damage_host_tick(void);
 void network_damage_client_tick(void);
 void network_damage_handle_events(void const *entries, short count);
