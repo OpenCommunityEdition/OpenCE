@@ -77,7 +77,9 @@ void hud_play_sound(
 			struct hud_sound_definition const *sound =
 				TAG_BLOCK_GET_ELEMENT(sounds, absolute_sound_index, struct hud_sound_definition);
 
-			if (state_flags & sound->state_flags)
+			/* port: a HUD sound with no tag never plays (a Custom Edition map's
+			HUD can have one; it asserted here) */
+			if (sound->sound.index != NONE && (state_flags & sound->state_flags))
 			{
 				switch (sound->sound.group_tag)
 				{

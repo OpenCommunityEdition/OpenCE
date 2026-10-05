@@ -1684,6 +1684,12 @@ void _rasterizer_model_draw(
 
 		if (local_model_effect_type == _render_model_effect_type_active_camouflage)
 		{
+			/* port: camouflage draws parts as model shaders. A Custom Edition
+			map's model can have parts with other shader types (an environment
+			shader on a first-person weapon); those aren't drawn while
+			camouflaged instead of being misread. */
+			if (shader->base.type != _shader_type_model)
+				return;
 			match_assert(
 				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
 				729,

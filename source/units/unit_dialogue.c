@@ -1134,7 +1134,10 @@ static long unit_find_dialogue_variant(
 			variant_index,
 			struct unit_dialogue_variant);
 
-		if (variant_number == NONE || variant->variant_number == variant_number)
+		/* port: a variant with no dialogue is skipped (a Custom Edition map's
+		unit can have one, which asserted when picked) */
+		if ((variant_number == NONE || variant->variant_number == variant_number) &&
+			variant->dialogue_index != NONE)
 		{
 			/* port: no more than the array holds (a map's count; released
 			maps have at most 6 variants) */
