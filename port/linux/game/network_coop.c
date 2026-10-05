@@ -98,6 +98,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/game_sound.h"
+#include "sound/sound_manager.h"
 #include "sound/sound_definitions.h"
 #include "units/units.h"
 #include "coop_spectate.h"
@@ -172,6 +173,8 @@ enum
 	_coop_event_scenery_animation,
 	_coop_event_effect,
 	_coop_event_attach,
+	/* the host skipped the cutscene: a client stops its dialogue */
+	_coop_event_cutscene_skipped,
 };
 
 /* distributed_coop_event.type of an effect: at a cutscene flag (value), or on
@@ -480,6 +483,19 @@ static struct
 	byte snaps[MAXIMUM_DEVICE_GROUPS];
 	boolean seen[MAXIMUM_DEVICE_GROUPS];
 } client_devices;
+
+/* client: the script sounds (impulse ones: dialogue) it played lately,
+which a skipped cutscene stops */
+enum
+{
+	CLIENT_SCRIPT_SOUND_COUNT = 16,
+};
+
+static struct
+{
+	long definition_indices[CLIENT_SCRIPT_SOUND_COUNT];
+	short next;
+} client_script_sounds;
 
 /* client: the object names that differed from the host's last time */
 static byte client_names_differing[OBJECT_NAME_BYTES];
@@ -1359,6 +1375,7 @@ static void client_apply_hud(
 	switch (event->type)
 	{
 	case _coop_hud_help_text:
+		hud_scripted_globals->show_hud_help_text = event->frame != 0;
 		if (event->value >= 0 && event->value < hud_messaging_port_message_count())
 			scripted_hud_set_state_message(event->value);
 		break;
@@ -1489,7 +1506,11 @@ static void client_apply_sound(
 	{
 	case _coop_sound_impulse:
 		if (distributed_tag_of_group(event->tag_index, SOUND_DEFINITION_TAG))
+		{
 			scripted_sound_new(event->tag_index, object_index, scale);
+			client_script_sounds.definition_indices[client_script_sounds.next] = event->tag_index;
+			client_script_sounds.next = (short)((client_script_sounds.next + 1) % CLIENT_SCRIPT_SOUND_COUNT);
+		}
 		break;
 	case _coop_sound_looping_start:
 		/* a resent sound that is already playing here is left alone */
@@ -1583,6 +1604,23 @@ static void client_apply_attach(
 	}
 }
 
+/* client: the cutscene was skipped, so the dialogue it started stops (the
+host's went with its revert; its music stops through host_send_looping_sounds) */
+static void client_stop_script_sounds(
+	void)
+{
+	short index;
+
+	for (index = 0; index < CLIENT_SCRIPT_SOUND_COUNT; index++)
+	{
+		long definition_index = client_script_sounds.definition_indices[index];
+
+		if (definition_index != NONE && distributed_tag_of_group(definition_index, SOUND_DEFINITION_TAG))
+			sound_stop_impulse(sound_definition_get(definition_index)->scripting_sound_index);
+		client_script_sounds.definition_indices[index] = NONE;
+	}
+}
+
 static void client_apply_event(
 	struct distributed_coop_event const *event)
 {
@@ -1615,6 +1653,9 @@ static void client_apply_event(
 		break;
 	case _coop_event_attach:
 		client_apply_attach(event);
+		break;
+	case _coop_event_cutscene_skipped:
+		client_stop_script_sounds();
 		break;
 	default:
 		break;
@@ -1704,6 +1745,7 @@ void network_coop_new_game(
 	csmemset(&host_devices, 0, sizeof(host_devices));
 	csmemset(&client_devices, 0, sizeof(client_devices));
 	csmemset(client_names_differing, 0, sizeof(client_names_differing));
+	csmemset(client_script_sounds.definition_indices, NONE, sizeof(client_script_sounds.definition_indices));
 	csmemset(host_sent_transforms, 0, sizeof(host_sent_transforms));
 	csmemset(host_sent_looks, 0, sizeof(host_sent_looks));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
@@ -1842,25 +1884,30 @@ static short host_looping_sound_find(
 	return NONE;
 }
 
+/* host, each tick: a looping sound that stopped without the scripts
+stopping it (it ended, or a skipped cutscene's revert took it) is stopped on
+the clients too; the rest are started again with the resent state */
 static void host_send_looping_sounds(
 	void)
 {
 	short index = 0;
 
-	if (!host_resend.refresh)
-		return;
 	while (index < host_looping_sound_count)
 	{
 		long definition_index = host_looping_sounds[index].definition_index;
 		struct distributed_coop_event *event;
 
-		/* it stopped on its own: drop it */
 		if (looping_sound_definition_get(definition_index)->runtime_scripting_sound_index == NONE)
 		{
+			if ((event = event_new(_coop_event_sound)) != NULL)
+			{
+				event->type = _coop_sound_looping_stop;
+				event->tag_index = definition_index;
+			}
 			host_looping_sounds[index] = host_looping_sounds[--host_looping_sound_count];
 			continue;
 		}
-		if ((event = event_new(_coop_event_sound)) != NULL)
+		if (host_resend.refresh && (event = event_new(_coop_event_sound)) != NULL)
 		{
 			event->type = _coop_sound_looping_start;
 			event->tag_index = definition_index;
@@ -1927,6 +1974,9 @@ void network_coop_note_hud(
 		return;
 	event->type = (byte)kind;
 	event->value = value;
+	/* (help text shows only while the scripts show it; the presentation
+	saying so comes a little after the event, so the event carries it) */
+	event->frame = (short)hud_scripted_globals->show_hud_help_text;
 	if (kind == _coop_hud_objective)
 		host_hud_state.objective = value;
 }
@@ -2267,6 +2317,7 @@ void network_coop_skip_reverted(
 		hs_runtime_port_shift_sleep_times(ticks);
 	}
 	error(_error_silent, "co-op: cutscene skipped; reverted %ld ticks, clock kept at %ld", ticks, now);
+	event_new(_coop_event_cutscene_skipped);
 	skip_vote_clear();
 	skip_vote.requested = FALSE;
 	skip_vote.cooldown_until = game_time_get() + SKIP_COOLDOWN_TICKS;

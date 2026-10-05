@@ -63,6 +63,7 @@ enum
 	/* the number of unit_start_animation_impulse impulses (private to units.c) */
 	NUMBER_OF_UNIT_ANIMATION_IMPULSES = 14,
 	NO_IMPULSE = 0xFF,
+	NO_TEAM = 0xFF,
 
 	/* An entry's impulse is one of the animation impulses or, past them, an
 	action the AI starts directly: a melee attack (unit_melee_attack_begin)
@@ -122,7 +123,9 @@ struct distributed_actor_state
 	byte active_camouflage;
 	/* the speech's sequence number; 0 when there is none */
 	byte speech_number;
-	byte pad;
+	/* the unit's team (NO_TEAM for none): the AI sets it after the unit is
+	made, so a client's copy would keep the team it was made with */
+	byte team;
 	short facing[NUMBER_OF_ANGLES];
 	short aiming[NUMBER_OF_ANGLES];
 	short looking[NUMBER_OF_ANGLES];
@@ -397,6 +400,8 @@ static void actor_state_from_unit(
 	SET_FLAG(state->flags, _distributed_actor_super_camouflaged_bit,
 		TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
 	state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
+	state->team = unit->object.owner_team_index >= 0 && unit->object.owner_team_index < NUMBER_OF_SOLO_CAMPAIGN_TEAMS ?
+		(byte)unit->object.owner_team_index : NO_TEAM;
 	state->position = unit->object.position;
 	distributed_vector_pack(&unit->object.translational_velocity, DISTRIBUTED_VELOCITY_SCALE, &state->velocity);
 	distributed_vector_pack(&unit->object.forward, DISTRIBUTED_UNIT_SCALE, &state->forward);
@@ -504,6 +509,8 @@ static boolean actor_state_apply(
 	SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit,
 		TEST_FLAG(state->flags, _distributed_actor_super_camouflaged_bit));
 	unit->unit.active_camouflage = (real)state->active_camouflage / 255.0f;
+	if (state->team != NO_TEAM && state->team < NUMBER_OF_SOLO_CAMPAIGN_TEAMS)
+		unit->object.owner_team_index = state->team;
 	SET_FLAG(unit->unit.flags, _unit_running_blindly_bit,
 		TEST_FLAG(state->flags, _distributed_actor_running_blindly_bit));
 	if (TEST_FLAG(state->flags, _distributed_actor_running_blindly_bit))

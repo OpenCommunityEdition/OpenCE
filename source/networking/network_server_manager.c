@@ -3861,6 +3861,11 @@ void network_game_server_port_cooperative_won(
 		sizeof(network_game_server_cooperative_next_map) - 1);
 	network_game_server_cooperative_next_map[sizeof(network_game_server_cooperative_next_map) - 1] = 0;
 	network_game_server_switch_to_postgame(server);
+	/* Back to the lobby at once, with the next level set up there to start
+	or change. Multiplayer leaves the postgame when the host presses a button
+	on its scoreboard (game_engine.c); co-op has neither, and every machine
+	was left on the level's last screen. */
+	network_game_server_reset_to_pregame(server);
 }
 
 /* port: reapply the co-op settings after a won round, since the playlist
