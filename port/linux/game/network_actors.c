@@ -400,7 +400,7 @@ static void actor_state_from_unit(
 	SET_FLAG(state->flags, _distributed_actor_super_camouflaged_bit,
 		TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
 	state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
-	state->team = unit->object.owner_team_index >= 0 && unit->object.owner_team_index < NUMBER_OF_SOLO_CAMPAIGN_TEAMS ?
+	state->team = unit->object.owner_team_index >= 0 && unit->object.owner_team_index < NO_TEAM ?
 		(byte)unit->object.owner_team_index : NO_TEAM;
 	state->position = unit->object.position;
 	distributed_vector_pack(&unit->object.translational_velocity, DISTRIBUTED_VELOCITY_SCALE, &state->velocity);
@@ -509,7 +509,7 @@ static boolean actor_state_apply(
 	SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit,
 		TEST_FLAG(state->flags, _distributed_actor_super_camouflaged_bit));
 	unit->unit.active_camouflage = (real)state->active_camouflage / 255.0f;
-	if (state->team != NO_TEAM && state->team < NUMBER_OF_SOLO_CAMPAIGN_TEAMS)
+	if (state->team != NO_TEAM)
 		unit->object.owner_team_index = state->team;
 	SET_FLAG(unit->unit.flags, _unit_running_blindly_bit,
 		TEST_FLAG(state->flags, _distributed_actor_running_blindly_bit));
