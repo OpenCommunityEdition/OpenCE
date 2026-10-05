@@ -7,9 +7,13 @@ percentage): for each player past the first, each squad of the players'
 enemies that a level places (encounters.c's encounter_create) gets that
 much of its count more; at 100%, two players meet twice the squad, four
 players four times it. STATIC MULTIPLIER (network.coop_enemies_multiplier):
-each squad is that many times as large, for any number of players. The
-extra enemies stand in rings about the squad's starting locations, on
-open ground, so they do not start inside each other.
+each squad is that many times as large, for any number of players.
+
+Extra enemies are placed in widening rings around the squad's starting
+locations, on a spot with ground under it, no wall in the way, and no
+other unit standing there. A starting location with no room left passes
+its enemy to the squad's next one; if none has room, the enemy isn't
+placed rather than being stacked on top of another.
 
 A squad a script loads into a dropship (vehicle_load_magic) can be larger
 than the dropship's seats. The riders left without a seat are erased, and
@@ -60,8 +64,9 @@ enum
 	COOP_ENEMIES_MAXIMUM_PERCENT = 200,
 	COOP_ENEMIES_MINIMUM_MULTIPLIER = 2,
 	COOP_ENEMIES_MAXIMUM_MULTIPLIER = 32,
-	/* the places tried for an extra enemy, a ring further out each */
-	SPREAD_ATTEMPTS = 8,
+	/* the rings tried around a starting location, the first holding
+	SPREAD_PLACES_PER_RING places and each further one that many more */
+	SPREAD_RINGS = 5,
 	SPREAD_PLACES_PER_RING = 6,
 	MAXIMUM_RIDING_VEHICLES = 32,
 	MAXIMUM_SEATED_RIDERS = 16,
@@ -71,11 +76,17 @@ enum
 	RIDER_RELEASE_TICKS = 4,
 };
 
-/* the rings' spacing, and the height over the ground the way to a place is
-looked along, and the ground looked for below it */
+/* the distance between rings; the height above the ground at which the way
+to a spot is checked for walls (and a unit there looked for), and how far
+below a spot ground is looked for */
 #define SPREAD_SPACING 0.8f
 #define SPREAD_STEP_HEIGHT 0.6f
 #define SPREAD_GROUND_DEPTH 2.0f
+/* how close, across the ground, a spot may be to a biped already standing
+there (about two bipeds' collision radius), and how far around a spot
+units are looked for */
+#define SPREAD_CLEARANCE 0.6f
+#define SPREAD_SEARCH_RADIUS 1.0f
 /* a kept rider's place beside a rider who got out, each a little apart */
 #define RIDER_SPACING 0.5f
 
@@ -192,6 +203,42 @@ static boolean coop_enemies_ground(
 	return TRUE;
 }
 
+/* whether a biped or vehicle already stands at a spot on the ground */
+static boolean coop_enemies_occupied(
+	real_point3d const *ground)
+{
+	real_point3d body = *ground;
+	struct location location;
+	long object_indices[32];
+	short object_count;
+	short index;
+
+	body.z += SPREAD_STEP_HEIGHT;
+	scenario_location_from_point(&location, &body);
+	if (location.cluster_index == NONE)
+		return TRUE;
+	object_count = objects_in_sphere(0, _object_mask_biped | _object_mask_vehicle, &location, &body,
+		SPREAD_SEARCH_RADIUS, object_indices, NUMBEROF(object_indices));
+	for (index = 0; index < object_count; index++)
+	{
+		struct object_datum *object = object_get(object_indices[index]);
+		real dx = object->object.position.x - ground->x;
+		real dy = object->object.position.y - ground->y;
+
+		if (object->object.type == _object_type_vehicle)
+		{
+			/* (inside a vehicle's bounding sphere) */
+			if (point_in_sphere(&body, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius))
+				return TRUE;
+		}
+		else if (dx * dx + dy * dy < SPREAD_CLEARANCE * SPREAD_CLEARANCE)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static struct coop_riding_vehicle *coop_enemies_riding_vehicle(
 	long vehicle_index,
 	boolean create)
@@ -263,6 +310,7 @@ static void coop_enemies_rider_place(
 	short out_count = 0;
 	short index, round;
 	real angle;
+	real_point3d spread;
 
 	*position = object->object.position;
 	*facing = (real)atan2(object->object.forward.j, object->object.forward.i);
@@ -299,7 +347,13 @@ static void coop_enemies_rider_place(
 			}
 		}
 	}
-	/* (never on the rider's own place: a ring about it, further each round) */
+	/* free ground around that spot, as the squad's own extra enemies get;
+	failing that, a ring around it, further out each round */
+	if (coop_enemies_spread_position(position, (short)(number + 1), &spread))
+	{
+		*position = spread;
+		return;
+	}
 	angle = (real)number * (_pi * 2.0f / SPREAD_PLACES_PER_RING);
 	position->x += (real)cos(angle) * RIDER_SPACING * (real)(round / SPREAD_PLACES_PER_RING + 1);
 	position->y += (real)sin(angle) * RIDER_SPACING * (real)(round / SPREAD_PLACES_PER_RING + 1);
@@ -362,23 +416,30 @@ boolean coop_enemies_spread_position(
 	real_point3d *position)
 {
 	real_point3d from = *origin;
-	short place = (short)((number - 1) % SPREAD_PLACES_PER_RING);
-	short ring = (short)((number - 1) / SPREAD_PLACES_PER_RING);
-	short attempt;
+	short ring;
 
 	from.z += SPREAD_STEP_HEIGHT;
-	for (attempt = 0; attempt < SPREAD_ATTEMPTS; attempt++, ring++)
+	for (ring = 0; ring < SPREAD_RINGS; ring++)
 	{
-		/* (each ring turned half a place from the last, so its places fall
-		between the last's) */
-		real angle = ((real)place + 0.5f * (real)(ring % 2)) * (_pi * 2.0f / SPREAD_PLACES_PER_RING);
+		short place_count = (short)(SPREAD_PLACES_PER_RING * (ring + 1));
 		real radius = SPREAD_SPACING * (real)(ring + 1);
-		real_point3d to = from;
+		short place;
 
-		to.x += (real)cos(angle) * radius;
-		to.y += (real)sin(angle) * radius;
-		if (coop_enemies_open(&from, &to) && coop_enemies_ground(&to, position))
-			return TRUE;
+		/* (each enemy starts at a different place on the ring, so a squad
+		spreads all the way round rather than filling one side first) */
+		for (place = 0; place < place_count; place++)
+		{
+			real angle = (real)((number + place) % place_count) * (_pi * 2.0f / (real)place_count);
+			real_point3d to = from;
+
+			to.x += (real)cos(angle) * radius;
+			to.y += (real)sin(angle) * radius;
+			if (coop_enemies_open(&from, &to) && coop_enemies_ground(&to, position) &&
+				!coop_enemies_occupied(position))
+			{
+				return TRUE;
+			}
+		}
 	}
 	return FALSE;
 }
