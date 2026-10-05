@@ -2654,6 +2654,20 @@ void damage_replay_kill(
 	distributed_damage_authorized = FALSE;
 }
 
+/* ... damage to scenery or a device, dealt as the host dealt it: the copy
+breaks, plays its effects and is destroyed as the host's was */
+void damage_replay_static(
+	long object_index,
+	struct damage_data *damage,
+	short node_index,
+	short region_index,
+	short material_index)
+{
+	distributed_damage_authorized = TRUE;
+	object_cause_damage(damage, object_index, node_index, region_index, material_index, NULL);
+	distributed_damage_authorized = FALSE;
+}
+
 /* the host's: what damage_set_network_state takes */
 void damage_get_network_state(
 	long object_index,

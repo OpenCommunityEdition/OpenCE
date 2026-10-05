@@ -88,6 +88,10 @@ void network_coop_note_attach(long parent_index, char const *parent_marker_name,
 	char const *child_marker_name);
 void network_coop_note_detach(long parent_index, long child_index);
 void network_coop_note_object_effect(long effect_definition_index, long object_index, char const *marker_name);
+/* breakable_surfaces.c: a breakable surface (glass) broke, from damage at
+`epicenter`. Each machine's own shots break glass too, but with their own
+random damage, so the host's breaks are the ones everyone keeps. */
+void network_coop_note_surface_broken(short breakable_surface_index, real_point3d const *epicenter);
 void network_coop_note_scenery_animation(long object_index, long animation_graph_index, short animation_index,
 	short frame_index);
 

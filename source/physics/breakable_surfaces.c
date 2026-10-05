@@ -25,6 +25,7 @@ BREAKABLE_SURFACES.C
 #include "sound/game_sound.h"
 #include "structures/structure_bsp_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- structures */
 
@@ -189,6 +190,8 @@ void breakable_surface_damage(
 							BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
 
 							breakable_surface_effect(breakable_surface_index, damage_data, seed_surface_index);
+							/* port: and on network co-op's clients */
+							network_coop_note_surface_broken(breakable_surface_index, &damage_data->epicenter);
 						}
 					}
 				}
@@ -236,12 +239,37 @@ void breakable_surface_damage_area_of_effect(
 					breakable_surface_get(breakable_surface_index)->vitality = 0.0f;
 					BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
 					breakable_surface_effect(breakable_surface_index, damage_data, breakable_surface->collision_surface_index);
+					/* port: and on network co-op's clients */
+					network_coop_note_surface_broken(breakable_surface_index, &damage_data->epicenter);
 				}
 			}
 		}
 	}
 	
 	return;
+}
+
+void breakable_surface_port_break(
+	short breakable_surface_index,
+	real_point3d const *epicenter)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	struct structure_breakable_surface *breakable_surface;
+	struct damage_data damage;
+
+	if (breakable_surface_index < 0 || breakable_surface_index >= structure_bsp->breakable_surfaces.count ||
+		!breakable_surface_extant(breakable_surface_index))
+	{
+		return;
+	}
+	breakable_surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces, breakable_surface_index,
+		struct structure_breakable_surface);
+	/* (the shards fly away from the epicenter, all the effect reads) */
+	csmemset(&damage, 0, sizeof(damage));
+	damage.epicenter = *epicenter;
+	breakable_surface_get(breakable_surface_index)->vitality = 0.0f;
+	BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
+	breakable_surface_effect(breakable_surface_index, &damage, breakable_surface->collision_surface_index);
 }
 
 /* ---------- private code */
