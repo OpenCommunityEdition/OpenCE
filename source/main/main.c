@@ -1845,11 +1845,39 @@ void main_pregame_render(
 	return;
 }
 
+/* port: a network co-op host reverts to its last saved state with its
+clock kept going forward, and the clients follow through the co-op syncs
+(network_coop.c). FALSE without a saved state, which would reset the map
+on the host alone. */
+static boolean main_coop_host_revert(
+	void)
+{
+	long now = game_time_get();
+
+	if (!game_state_port_saved_game_valid())
+		return FALSE;
+	game_state_revert();
+	network_coop_reverted(now);
+	ui_widgets_disable_pause_game(30);
+	return TRUE;
+}
+
+static boolean main_coop_host(
+	void)
+{
+	return game_connection() == _game_connection_network_server && network_coop_active();
+}
+
 static void main_revert_map_private(
 	void)
 {
-	game_state_revert();
-	ui_widgets_disable_pause_game(30);
+	if (main_coop_host())
+		main_coop_host_revert();
+	else
+	{
+		game_state_revert();
+		ui_widgets_disable_pause_game(30);
+	}
 	main_globals.revert_map = FALSE;
 	return;
 }
@@ -1859,13 +1887,15 @@ static void main_skip_cinematic_private(
 {
 	/* port: a network host never reverts without a saved state, which
 	would reset the map on the host alone */
-	if (cinematic_can_be_skipped() &&
+	if (cinematic_can_be_skipped() && main_coop_host() && main_coop_host_revert())
+	{
+		network_coop_skip_done();
+		main_globals.revert_map = FALSE;
+	}
+	else if (cinematic_can_be_skipped() && !main_coop_host() &&
 		(game_connection() != _game_connection_network_server || game_state_port_saved_game_valid()))
 	{
-		long now = game_time_get();
-
 		game_state_revert();
-		network_coop_skip_reverted(now);
 		ui_widgets_disable_pause_game(30);
 		main_globals.revert_map = FALSE;
 	}
@@ -2011,12 +2041,14 @@ static void main_lost_map_private(
 	{
 		main_globals.lost_map = FALSE;
 		main_globals.loss_timer = 0;
-		/* port: network co-op can't revert to a checkpoint (every machine would
-		have to), so the players respawn where they were at the last one */
-		if (game_connection() == _game_connection_network_server)
-			players_respawn_at_checkpoint();
-		else
+		/* port: in network co-op, everyone dying respawns the players where
+		they were at the last checkpoint, without a revert. A mission the
+		scripts failed (game_lost, with players still alive: d40's timer,
+		a50's Keyes) does revert, or its failure cutscene would never end. */
+		if (game_connection() != _game_connection_network_server)
 			game_state_revert();
+		else if (players_are_all_dead() || !main_coop_host_revert())
+			players_respawn_at_checkpoint();
 	}
 	return;
 }

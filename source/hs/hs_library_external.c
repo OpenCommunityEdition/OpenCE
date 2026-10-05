@@ -105,6 +105,7 @@ symbols in this file:
 #include "units/units.h"
 #include "object_lists.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 
 /* ---------- constants */
 
@@ -844,10 +845,12 @@ boolean hs_trigger_volume_test_objects_all(
 	short trigger_volume_index,
 	long object_list_index)
 {
+	/* port: in network co-op, waiting for every player means waiting for
+	any one of them (coop_scripts.c) */
 	return hs_trigger_volume_test_objects(
 		trigger_volume_index,
 		object_list_index,
-		TRUE);
+		!coop_scripts_any_player_will_do(object_list_index));
 }
 
 boolean hs_trigger_volume_test_objects_any(
@@ -985,7 +988,18 @@ void hs_object_teleport(
 	long object_index,
 	short cutscene_flag_index)
 {
+	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short follower_count = coop_scripts_players_following(object_index, followers, NUMBEROF(followers));
+	short follower;
+
 	hs_object_orient(object_index, cutscene_flag_index, TRUE, TRUE);
+	/* port: co-op players the scripts can't name go with player0, placed
+	around it (coop_scripts.c) */
+	for (follower = 0; follower < follower_count; follower++)
+	{
+		player_teleport(player_index_from_unit_index(followers[follower]), object_index,
+			&object_get(object_index)->object.position);
+	}
 
 	return;
 }

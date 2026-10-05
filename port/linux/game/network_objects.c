@@ -60,6 +60,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "items/weapons.h"
 #include "items/weapon_definitions.h"
 #include "items/equipment_definitions.h"
+#include "camera/observer.h"
 #include "cutscene/cinematics.h"
 #include "network_coop.h"
 #include "network_distributed.h"
@@ -1292,8 +1293,20 @@ static short distributed_host_object_period(
 		count = objects_host_viewers.player_unit_count;
 		origins = objects_host_viewers.player_unit_origins;
 	}
+	/* in a co-op cutscene every client looks through the host's camera, so
+	what it films is sent as often as what's next to the client's players
+	(b30's sword Elite walking out of the door) */
+	if (network_coop_active() && cinematic_in_progress())
+	{
+		real_point3d const *camera = &observer_get_camera(0)->position;
+		real dx = position->x - camera->x;
+		real dy = position->y - camera->y;
+		real dz = position->z - camera->z;
+
+		nearest = dx * dx + dy * dy + dz * dz;
+	}
 	/* nobody is alive anywhere, so nothing needs to be sent often */
-	if (!count)
+	if (!count && nearest < 0.0f)
 		return MAXIMUM_OBJECT_PERIOD_TICKS;
 	for (index = 0; index < count; index++)
 	{

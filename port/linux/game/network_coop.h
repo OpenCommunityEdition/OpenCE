@@ -96,9 +96,12 @@ network_coop_vote_skip returns FALSE outside network co-op, where the
 cinematic is skipped as usual. */
 boolean network_coop_skip_offered(void);
 boolean network_coop_vote_skip(void);
-/* main.c: after a co-op host reverts to skip a cinematic; now is the game
-time before the revert */
-void network_coop_skip_reverted(long now);
+/* main.c: after a co-op host reverts to its last saved state (to skip a
+cinematic, or because the mission failed); now is the game time before the
+revert */
+void network_coop_reverted(long now);
+/* main.c: the skip vote is over once the skip has reverted */
+void network_coop_skip_done(void);
 /* the vote count to show, if a skippable cinematic is playing */
 boolean network_coop_skip_vote_status(short *votes, short *voters, boolean *voted);
 
