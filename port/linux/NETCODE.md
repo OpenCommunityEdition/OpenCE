@@ -29,8 +29,8 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   it has, as it drives a remote player's, until it hears nothing of it for
   two seconds (`port/linux/game/network_actors.c`).
 - **Co-op.** A network game on a campaign level with no game engine
-  (Create Game's Map screen, whose campaign levels follow the multiplayer
-  maps over LAN and the internet) is co-op. Only the host runs the
+  (Create Game's Map screen, its SINGLEPLAYER maps, over LAN and the
+  internet) is co-op. Only the host runs the
   level's scripts and spawns players. `network_coop.c` sends the clients
   everything the scripts do that they would otherwise miss:
   - every tick: the cinematic, camera, screen fade, the HUD settings the

@@ -95,6 +95,8 @@
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_pic"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_name"/>
+		<child widget="main_menu/solo_level_select/replay_level_right_pic"/>
+		<child widget="main_menu/solo_level_select/replay_level_right_name"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_game_data"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_map_pic" controller="1" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix">

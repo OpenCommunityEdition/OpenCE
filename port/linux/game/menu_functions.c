@@ -43,7 +43,8 @@ the one last used, else the first) and the game's saved game in it:
   list update", "solo level set map") has those the profile has reached, and
   marks those it has finished on Normal, Heroic and Legendary, as the
   Xbox's list does; a level with the saved game in it goes on with it, at
-  its difficulty;
+  its difficulty. Its first row's chooser shows MULTIPLAYER's maps
+  instead, one chosen played alone at once;
 - the difficulty menu: "difficulty item select" (a difficulty chosen) and
   "set difficulty" (its OK button: the difficulty shown) start the game;
 - Load Game's list ("load game menu init", "load game list update", "load
@@ -857,12 +858,147 @@ static boolean campaign_continue(short controller)
 	return TRUE;
 }
 
-/* New Game's list: "initialize sp level list solo" starts on the level last
-played */
+/* ---- the map lists (New Game's and the Map screen's): their first row's
+chooser of SINGLEPLAYER (the campaign's levels) or MULTIPLAYER maps
+(port_settings.MAP_KIND_CHOOSER), then the kind's rows, scrolling as
+list_scroll scrolls */
+
+enum
+{
+	MAP_KIND_SINGLEPLAYER,
+	MAP_KIND_MULTIPLAYER,
+	NUMBER_OF_MAP_KINDS
+};
+
+/* the rows after the chooser */
+#define MAP_KIND_ROWS 10
+
+static void visible_set(struct widget_instance *widget, boolean visible);
+short ui_widget_port_multiplayer_maps(char const *const **names, short *last_used);
+
+/* the kind the chooser shows (kept at `only`, unless NONE) */
+static short map_kind_shown(struct widget_instance *list, short only)
+{
+	struct widget_instance *spinner = named(list, "list_item_0_map_kind_spinner", 0);
+
+	if (!spinner)
+		return only != NONE ? only : MAP_KIND_SINGLEPLAYER;
+	if (only != NONE)
+		spinner->parameters.list.selected_index = only;
+	return (short)PIN(spinner->parameters.list.selected_index, 0, NUMBER_OF_MAP_KINDS - 1);
+}
+
+static void map_kind_set(struct widget_instance *list, short kind)
+{
+	struct widget_instance *spinner = named(list, "list_item_0_map_kind_spinner", 0);
+
+	if (spinner)
+		spinner->parameters.list.selected_index = kind;
+}
+
+/* the first of count entries shown, for the entry chosen to be in the middle */
+static short map_kind_first(short chosen, short count)
+{
+	return (short)PIN(chosen - MAP_KIND_ROWS / 2, 0, MAX(count - MAP_KIND_ROWS, 0));
+}
+
+static void map_kind_focus(struct widget_instance *list, short first, short chosen)
+{
+	focus_row(list, (short)(1 + chosen - first));
+}
+
+/* the rows after the chooser: count entries from *first's, scrolled on at
+their ends; the entry focused, NONE when the chooser or the buttons have the
+focus */
+static short map_kind_rows_update(struct widget_instance *list, short *first, short count,
+	void (*entry_text)(short entry, wchar_t *text))
+{
+	short shown = (short)MIN(count, MAP_KIND_ROWS);
+	short row = focused_row(list), index = 0;
+	struct widget_instance *child;
+
+	if (row != NONE && row >= 1 && row == shown && *first + shown < count)
+	{
+		(*first)++;
+		focus_row(list, --row);
+	}
+	else if (row == 1 && *first > 0)
+	{
+		(*first)--;
+		focus_row(list, ++row);
+	}
+	for (child = list->child; child; child = child->next, index++)
+	{
+		wchar_t text[ROW_TEXT_LENGTH];
+
+		if (index < 1)
+			continue;
+		if (strncmp(child->name, "list_item_", 10))
+			break;
+		child->visible = index - 1 < shown;
+		if (index - 1 < shown)
+		{
+			entry_text((short)(*first + index - 1), text);
+			text_set(named(child, "list_item_text", 0), text);
+		}
+		visible_set(named(child, "list_item_arrows", 0), child == list->focused_child);
+		visible_set(named(child, "scroll_up_button", 0), FALSE);
+		visible_set(named(child, "scroll_down_button", 0), FALSE);
+	}
+	return row == NONE || row < 1 || row > shown ? NONE : (short)(*first + row - 1);
+}
+
+static void multiplayer_map_text(short map, wchar_t *text)
+{
+	string_get("pc\\main_menu\\mp_map_list", map, text);
+}
+
+/* the description's map (each list's has both kinds' widgets): a campaign
+level's picture, name and words (level_description sets them), or a
+multiplayer map's, or (both NONE) neither */
+static void map_description_show(struct widget_instance *description, short level, short map)
+{
+	struct widget_instance *widget;
+	short marker;
+
+	visible_set(named(description, "replay_level_right_name", 0), level != NONE);
+	visible_set(named(description, "replay_level_right_pic", 0), level != NONE);
+	visible_set(named(description, "replay_level_right_data", 0), level != NONE);
+	visible_set(named(description, "mp_map_right_name", 0), map != NONE);
+	visible_set(named(description, "mp_map_right_pic", 0), map != NONE);
+	visible_set(named(description, "mp_map_right_data", 0), map != NONE);
+	if (level == NONE)
+	{
+		for (marker = 0; marker < 3; marker++)
+			visible_set(named(description, "difficulty_indicator", marker), FALSE);
+	}
+	if (map == NONE)
+		return;
+	if ((widget = named(description, "mp_map_right_name", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = map;
+	if ((widget = named(description, "mp_map_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = map;
+	if ((widget = named(description, "mp_map_right_data", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = map;
+}
+
+/* New Game's list: SINGLEPLAYER's levels, the profile's reached, or
+MULTIPLAYER's maps, played alone to walk around (no game engine: a campaign
+game on the map) */
+static struct
+{
+	short kind;
+	short first, chosen;
+	/* the multiplayer maps (ui_widget_port_multiplayer_maps) */
+	char const *const *map_names;
+	short map_count;
+} level_list;
+
+/* "initialize sp level list solo" starts on the level last played */
 static boolean level_list_initialize(struct widget_instance *list, short controller)
 {
 	struct player_profile profile;
-	short level;
+	short level, last_used;
 
 	if (!campaign_profile(controller, &profile))
 		return FALSE;
@@ -873,37 +1009,70 @@ static boolean level_list_initialize(struct widget_instance *list, short control
 	if (!campaign.levels[level].available)
 		level = 0;
 	campaign.shown_level = level;
-	focus_row(list, level);
+	level_list.map_count = ui_widget_port_multiplayer_maps(&level_list.map_names, &last_used);
+	level_list.kind = MAP_KIND_SINGLEPLAYER;
+	level_list.chosen = level;
+	level_list.first = map_kind_first(level, NUMBER_OF_SINGLE_PLAYER_LEVELS);
+	map_kind_set(list, level_list.kind);
+	map_kind_focus(list, level_list.first, level_list.chosen);
 	return TRUE;
 }
 
-static void level_row_text(short row, wchar_t *text)
+static void level_row_text(short level, wchar_t *text)
 {
-	string_get("pc\\main_menu\\map_list", campaign.levels[row].available ? row : LEVEL_UNAVAILABLE, text);
+	string_get("pc\\main_menu\\map_list", campaign.levels[level].available ? level : LEVEL_UNAVAILABLE, text);
 }
 
 /* "solo map list update" */
 static void level_list_update(struct widget_instance *list)
 {
-	short row = focused_row(list), level;
+	struct widget_instance *description = list->parameters.list.extended_description;
+	short kind = map_kind_shown(list, NONE), count, entry, level;
 
-	rows_update(list, NUMBER_OF_SINGLE_PLAYER_LEVELS, level_row_text);
-	if (row != NONE && row < NUMBER_OF_SINGLE_PLAYER_LEVELS)
-		campaign.shown_level = row;
+	if (kind != level_list.kind)
+	{
+		level_list.kind = kind;
+		level_list.first = level_list.chosen = 0;
+	}
+	count = kind == MAP_KIND_SINGLEPLAYER ? NUMBER_OF_SINGLE_PLAYER_LEVELS : level_list.map_count;
+	entry = map_kind_rows_update(list, &level_list.first, count,
+		kind == MAP_KIND_SINGLEPLAYER ? level_row_text : multiplayer_map_text);
+	if (entry != NONE)
+		level_list.chosen = entry;
+	if (kind == MAP_KIND_MULTIPLAYER)
+	{
+		map_description_show(description, NONE, level_list.chosen < count ? level_list.chosen : NONE);
+		profile_name_show(description);
+		return;
+	}
+	map_description_show(description, 0, NONE);
+	campaign.shown_level = level_list.chosen;
 	level = campaign.shown_level;
 	if (!campaign.levels[level].available)
 		level = LEVEL_UNAVAILABLE;
-	level_description(list->parameters.list.extended_description, "replay_level", level,
-		level == campaign.saved_level, level == LEVEL_UNAVAILABLE ? NULL : campaign.levels[level].finished, NONE);
-	profile_name_show(list->parameters.list.extended_description);
+	level_description(description, "replay_level", level, level == campaign.saved_level,
+		level == LEVEL_UNAVAILABLE ? NULL : campaign.levels[level].finished, NONE);
+	profile_name_show(description);
 }
 
 /* "solo level set map": the level shown, if reached, for the difficulty
-menu */
-static boolean level_choose(void)
+menu; or the multiplayer map, played at once (FALSE: no difficulty menu) */
+static boolean level_choose(short controller)
 {
 	short level = campaign.shown_level;
 
+	if (level_list.kind == MAP_KIND_MULTIPLAYER)
+	{
+		struct player_profile profile;
+
+		if (level_list.chosen < 0 || level_list.chosen >= level_list.map_count ||
+			!campaign_profile(controller, &profile))
+		{
+			return campaign_fail();
+		}
+		campaign_start(level_list.map_names[level_list.chosen], main_get_difficulty(), controller);
+		return FALSE;
+	}
 	if (level < 0 || level >= NUMBER_OF_SINGLE_PLAYER_LEVELS || !campaign.levels[level].available)
 		return campaign_fail();
 	/* (not yet: setting it at the main menu changes map, as the Xbox's has it
@@ -1790,7 +1959,6 @@ Xbox's networking, run by the engine's port entry points
 (ui_widget_event_handler_functions.c) on our lists */
 
 #define MAXIMUM_ADVERTISED_GAMES 9
-#define MAP_ROWS 11
 #define GAMETYPE_ROWS 10
 #define MAXIMUM_GAMETYPES 100
 #define BROWSER_ROWS 15
@@ -2076,10 +2244,11 @@ static boolean multiplayer_host(struct widget_instance *widget, struct event_rec
 	return ui_widget_port_host(widget, event, widget_deleted);
 }
 
-/* ---- the map list (the Map screen's): the multiplayer maps, as Custom
-Edition lists them. Hosting over the network, the campaign's levels follow
-them: one chosen lists the difficulties (B goes back to the level), and is
-hosted as a network co-op game, which goes to Server Setup. */
+/* ---- the map list (the Map screen's): its chooser's SINGLEPLAYER levels
+or MULTIPLAYER maps (the map lists', above). A level chosen lists the
+difficulties (B goes back to the level) and is hosted as a network co-op
+game, which goes to Server Setup; a map goes on to the gametypes. Split
+screen hosts only multiplayer maps, its chooser kept at MULTIPLAYER. */
 
 enum
 {
@@ -2089,10 +2258,11 @@ enum
 
 static struct
 {
-	short step;
-	/* the multiplayer maps (ui_widget_port_multiplayer_maps), then, hosting
-	over the network, the campaign's levels */
-	short map_count, level_count;
+	short kind, step;
+	/* hosting over the network, which co-op needs */
+	boolean hosting;
+	/* the multiplayer maps (ui_widget_port_multiplayer_maps) */
+	short map_count;
 	short first, chosen;
 	/* the level whose difficulties are listed */
 	short level;
@@ -2102,72 +2272,76 @@ static struct
 
 static short map_step_count(void)
 {
-	return map_list.step == MAP_STEP_DIFFICULTIES ? NUMBER_OF_GAME_DIFFICULTY_LEVELS :
-		(short)(map_list.map_count + map_list.level_count);
+	if (map_list.step == MAP_STEP_DIFFICULTIES)
+		return NUMBER_OF_GAME_DIFFICULTY_LEVELS;
+	return map_list.kind == MAP_KIND_SINGLEPLAYER ? NUMBER_OF_SINGLE_PLAYER_LEVELS : map_list.map_count;
 }
 
-/* opens a step at the row given */
-static void map_step_open(struct widget_instance *list, short step, short row)
+/* opens a step at the entry given */
+static void map_step_open(struct widget_instance *list, short step, short entry)
 {
 	short count;
 
 	map_list.step = step;
 	count = map_step_count();
-	map_list.chosen = (short)PIN(row, 0, MAX(count - 1, 0));
-	map_list.first = (short)PIN(map_list.chosen - MAP_ROWS / 2, 0, MAX(count - MAP_ROWS, 0));
-	focus_row(list, (short)(map_list.chosen - map_list.first));
+	map_list.chosen = (short)PIN(entry, 0, MAX(count - 1, 0));
+	map_list.first = map_kind_first(map_list.chosen, count);
+	map_kind_focus(list, map_list.first, map_list.chosen);
 }
 
-static void map_row_text(short row, wchar_t *text)
+static void map_level_text(short level, wchar_t *text)
 {
-	short index = (short)(map_list.first + row);
-
-	if (map_list.step == MAP_STEP_DIFFICULTIES)
-		string_get("pc\\main_menu\\player_profiles_select\\difficulty_names", index, text);
-	else if (index >= map_list.map_count)
-		string_get("pc\\main_menu\\map_list", (short)(index - map_list.map_count), text);
-	else
-		string_get("pc\\main_menu\\mp_map_list", index, text);
-	text[ROW_TEXT_LENGTH - 1] = 0;
+	string_get("pc\\main_menu\\map_list", level, text);
 }
 
-/* "mp level list initialize" */
+static void map_difficulty_text(short difficulty, wchar_t *text)
+{
+	string_get("pc\\main_menu\\player_profiles_select\\difficulty_names", difficulty, text);
+}
+
+/* "mp level list initialize": on the multiplayer map used last */
 static boolean map_list_initialize(struct widget_instance *list)
 {
 	char const *const *names;
 	short last_used = 0;
-	boolean hosting = global_network_game_server_get() != NULL && !network_game_is_splitscreen_local();
 
+	map_list.hosting = global_network_game_server_get() != NULL && !network_game_is_splitscreen_local();
 	map_list.map_count = ui_widget_port_multiplayer_maps(&names, &last_used);
-	map_list.level_count = hosting ? NUMBER_OF_SINGLE_PLAYER_LEVELS : 0;
+	map_list.kind = MAP_KIND_MULTIPLAYER;
+	map_kind_set(list, map_list.kind);
 	map_step_open(list, MAP_STEP_MAPS, last_used);
 	return TRUE;
 }
 
-/* "mp map list update": the step's rows, and beside a multiplayer map its
-picture, name and words */
+/* "mp map list update": the chooser's kind, the step's rows, and beside
+them the level or map chosen: its picture, name and words */
 static void map_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
-	short count = map_step_count();
-	short row = list_scroll(list, &map_list.first, count, MAP_ROWS);
-	short map = NONE;
-	struct widget_instance *widget;
+	short kind = map_kind_shown(list, map_list.hosting ? NONE : MAP_KIND_MULTIPLAYER), count, entry;
 
-	if (row != NONE && row < count)
-		map_list.chosen = row;
-	rows_update(list, (short)MIN(count, MAP_ROWS), map_row_text);
-	if (map_list.step == MAP_STEP_MAPS && map_list.chosen < map_list.map_count)
-		map = map_list.chosen;
-	visible_set(named(description, "mp_map_right_item", 0), map != NONE);
-	if (map != NONE)
+	if (kind != map_list.kind)
 	{
-		if ((widget = named(description, "mp_map_right_name", 0)) != NULL)
-			widget->parameters.text_box.string_list_index = map;
-		if ((widget = named(description, "mp_map_right_pic", 0)) != NULL)
-			widget->animation.current_frame_index = map;
-		if ((widget = named(description, "mp_map_right_data", 0)) != NULL)
-			widget->parameters.text_box.string_list_index = map;
+		map_list.kind = kind;
+		map_list.step = MAP_STEP_MAPS;
+		map_list.first = map_list.chosen = 0;
+	}
+	count = map_step_count();
+	entry = map_kind_rows_update(list, &map_list.first, count, map_list.step == MAP_STEP_DIFFICULTIES ?
+		map_difficulty_text : kind == MAP_KIND_SINGLEPLAYER ? map_level_text : multiplayer_map_text);
+	if (entry != NONE)
+		map_list.chosen = entry;
+	visible_set(named(description, "mp_map_right_item", 0), map_list.chosen < count);
+	if (map_list.step == MAP_STEP_DIFFICULTIES || kind == MAP_KIND_SINGLEPLAYER)
+	{
+		short level = map_list.step == MAP_STEP_DIFFICULTIES ? map_list.level : map_list.chosen;
+
+		map_description_show(description, level, NONE);
+		level_description(description, "replay_level", level, FALSE, NULL, NONE);
+	}
+	else
+	{
+		map_description_show(description, NONE, map_list.chosen < count ? map_list.chosen : NONE);
 	}
 	profile_name_show(description);
 }
@@ -2179,6 +2353,8 @@ static boolean map_list_choose(struct widget_instance *list, boolean *widget_del
 {
 	short chosen = map_list.chosen;
 
+	if (chosen >= map_step_count())
+		return campaign_fail();
 	if (map_list.step == MAP_STEP_DIFFICULTIES)
 	{
 		/* the co-op game set up, then Server Setup in the gametypes' place */
@@ -2186,12 +2362,10 @@ static boolean map_list_choose(struct widget_instance *list, boolean *widget_del
 			return campaign_fail();
 		return ui_widget_port_open(list, SERVER_SETUP_NAME, widget_deleted);
 	}
-	if (chosen < map_list.map_count)
+	if (map_list.kind == MAP_KIND_MULTIPLAYER)
 		return ui_widget_port_multiplayer_map_choose(chosen);
-	if (chosen >= map_list.map_count + map_list.level_count)
-		return campaign_fail();
 	ui_play_audio_feedback_sound(SOUND_FORWARD);
-	map_list.level = (short)(chosen - map_list.map_count);
+	map_list.level = chosen;
 	map_step_open(list, MAP_STEP_DIFFICULTIES, (short)PIN(main_get_difficulty(), 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1));
 	return FALSE;
 }
@@ -2203,7 +2377,7 @@ static boolean map_list_back(struct widget_instance *list, boolean *widget_delet
 	ui_play_audio_feedback_sound(SOUND_BACK);
 	if (map_list.step == MAP_STEP_DIFFICULTIES)
 	{
-		map_step_open(list, MAP_STEP_MAPS, (short)(map_list.map_count + map_list.level));
+		map_step_open(list, MAP_STEP_MAPS, map_list.level);
 		return TRUE;
 	}
 	ui_widget_port_go_back(list);
@@ -2702,6 +2876,20 @@ static char const *scenario_name(char const *path)
 	return name ? name + 1 : path;
 }
 
+/* the campaign level whose scenario a path or name is (a network co-op
+game's map), else NONE */
+static short campaign_level_of(char const *map_name)
+{
+	short level;
+
+	for (level = 0; level < NUMBER_OF_SINGLE_PLAYER_LEVELS; level++)
+	{
+		if (!_stricmp(scenario_name(main_get_solo_level_name(level)), scenario_name(map_name)))
+			return level;
+	}
+	return NONE;
+}
+
 /* a game's type as the browsers and lobby show it: its engine's name, or
 CO-OP for one with none (network co-op: ui_widget_port_cooperative_level_choose) */
 static wchar_t const *game_type_name(long engine_type)
@@ -2726,13 +2914,10 @@ static void map_display_name(char const *map_name, wchar_t *text)
 			return;
 		}
 	}
-	for (index = 0; index < NUMBER_OF_SINGLE_PLAYER_LEVELS; index++)
+	if ((index = campaign_level_of(map_name)) != NONE)
 	{
-		if (!_stricmp(scenario_name(main_get_solo_level_name(index)), scenario_name(map_name)))
-		{
-			string_get("pc\\main_menu\\map_list", index, text);
-			return;
-		}
+		string_get("pc\\main_menu\\map_list", index, text);
+		return;
 	}
 	for (index = 0; map_name[index] && index < ROW_TEXT_LENGTH - 1; index++)
 		text[index] = (wchar_t)(unsigned char)map_name[index];
@@ -3515,6 +3700,7 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 {
 	char const *const *names;
 	short last, count = ui_widget_port_multiplayer_maps(&names, &last), map = 19, index;
+	short level = campaign_level_of(map_name);
 	struct widget_instance *widget;
 
 	for (index = 0; index < count; index++)
@@ -3522,10 +3708,22 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 		if (!_stricmp(names[index], map_name))
 			map = index;
 	}
+	/* (a network co-op game's level: its picture and name, sp_levels' and
+	map_list's, in the place of the map's) */
+	visible_set(named(description, "lobby_map_pic", 0), level == NONE);
+	visible_set(named(description, "lobby_map_name", 0), level == NONE);
+	visible_set(named(description, "replay_level_right_pic", 0), level != NONE);
+	visible_set(named(description, "replay_level_right_name", 0), level != NONE);
 	if ((widget = named(description, "lobby_map_pic", 0)) != NULL)
 		widget->animation.current_frame_index = map;
 	if ((widget = named(description, "lobby_map_name", 0)) != NULL)
 		widget->parameters.text_box.string_list_index = map;
+	if (level == NONE)
+		return;
+	if ((widget = named(description, "replay_level_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = level;
+	if ((widget = named(description, "replay_level_right_name", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = level;
 }
 
 /* "port lobby update" */
@@ -4711,7 +4909,7 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "solo level set map"))
 		{
-			return level_choose();
+			return level_choose(controller);
 		}
 		else if (!strcmp(name, "difficulty item select"))
 		{

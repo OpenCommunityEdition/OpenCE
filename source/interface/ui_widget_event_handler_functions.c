@@ -2027,7 +2027,10 @@ static boolean pause_game_quit_to_main_menu(
 			network_game_client_local_player_quit(controller_index);
 		return TRUE;
 	}
-	game_state_save_to_persistent_storage();
+	/* port: a multiplayer map played alone (New Game's MULTIPLAYER maps) is
+	not saved, so it never takes the place of the campaign's saved game */
+	if (main_get_current_solo_level() != NONE)
+		game_state_save_to_persistent_storage();
 	main_goto_main_menu();
 	return TRUE;
 }

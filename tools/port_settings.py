@@ -415,6 +415,9 @@ STRING_OVERRIDES.update({
         "SHORT RANGE", "HUMAN", "COVENANT", "CLASSIC", "HEAVY WEAPONS", "NO GRENADES"],
 })
 
+# the map lists' first row: SINGLEPLAYER or MULTIPLAYER maps (_map_kind)
+MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
+
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added
 WIDGET_PATCHES = {
@@ -439,14 +442,31 @@ WIDGET_PATCHES = {
     f"{MT}/multiplayer_type_select_list": {"insert_before": {
         f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
     }},
-    # (B on the Map screen goes from a co-op level's difficulties back to the
-    # level, else out of the screen: menu_functions.c's map list)
-    f"{MT}/mp_map_select/mp_map_select_list_2": {"handlers": [
+    # (the Map screen's and New Game's lists: SINGLEPLAYER or MULTIPLAYER
+    # maps, the first row's chooser's (_map_kind); B on the Map screen goes
+    # from a co-op level's difficulties back to the level, else out of the
+    # screen: menu_functions.c's map list)
+    f"{MT}/mp_map_select/mp_map_select_list_2": {"swap": {"main_menu/new_select/list_item_0": MAP_KIND_CHOOSER},
+                                                 "handlers": [
         '<on event="created" run="mp level list initialize"/>',
         '<on event="deleted" run="mp level list dispose"/>',
         f'<on event="custom_activation" run="mp level select" open="{MT}/connected/gametype_select_screen_wrapper"/>',
         '<on event="b" run="port map list back"/>',
         '<on event="back" run="port map list back"/>',
+    ]},
+    "main_menu/solo_level_select/solo_level_select_list": {"swap": {"main_menu/new_select/list_item_0": MAP_KIND_CHOOSER}},
+    # (each description shows the other kind's maps too: a campaign level's
+    # picture, name and words on the Map screen, a multiplayer map's on New
+    # Game's)
+    f"{MT}/mp_map_select/mp_map_right_item": {"children": [
+        '<child widget="main_menu/solo_level_select/replay_level_right_name"/>',
+        '<child widget="main_menu/solo_level_select/replay_level_right_pic"/>',
+        '<child widget="main_menu/solo_level_select/replay_level_right_data"/>',
+    ]},
+    "main_menu/solo_level_select/replay_level_right_item": {"children": [
+        f'<child widget="{MT}/mp_map_select/mp_map_right_name"/>',
+        f'<child widget="{MT}/mp_map_select/mp_map_right_pic"/>',
+        f'<child widget="{MT}/mp_map_select/mp_map_right_data"/>',
     ]},
     f"{MT}/join_game/header_join_game": {"children": [
         f'<child widget="{MT}/join_game/header_server_browser"/>',
@@ -756,7 +776,12 @@ def _lobby() -> list:
     lines += _widget(f"{base}/lobby_right_item", [("controller", 1), ("left", 406), ("top", 75), ("width", 162),
                                                   ("height", 326),
                                                   ("bitmap", "bitmaps/spinner_list_3_wide_item_background")],
+                     # (a campaign level's picture and name in place of the
+                     # map's, for network co-op: menu_functions.c's
+                     # lobby_map_show)
                      [f'<child widget="{base}/lobby_map_pic"/>', f'<child widget="{base}/lobby_map_name"/>',
+                      '<child widget="main_menu/solo_level_select/replay_level_right_pic"/>',
+                      '<child widget="main_menu/solo_level_select/replay_level_right_name"/>',
                       f'<child widget="{base}/lobby_game_data"/>'])
     lines += _widget(f"{base}/lobby_map_pic", [("controller", 1), ("left", 419), ("top", 87), ("width", 140),
                                                ("height", 114), ("bitmap", "ui\\shell\\bitmaps\\mp_map_grafix")], [])
@@ -943,6 +968,25 @@ def _item_options_extras() -> list:
     return lines
 
 
+def _map_kind() -> list:
+    """the map lists' first row (New Game's and the Map screen's), as the
+    gametype list's chooser: a spinner of SINGLEPLAYER or MULTIPLAYER maps,
+    for either controller (split screen co-op's New Game takes both)"""
+    lines = _widget(MAP_KIND_CHOOSER, [("width", 256), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                                       ("bitmap", "bitmaps/option_bkds_sm"), ("font", "ui\\large_ui"),
+                                       ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)],
+                    [f'<child widget="{MAP_KIND_CHOOSER}_spinner" x="15" y="2"/>'])
+    lines += _widget(f"{MAP_KIND_CHOOSER}_spinner",
+                     [("type", "spinner"), ("width", 226), ("height", 22), ("flags", "left_right_tabs_items"),
+                      ("string_list", "main_menu/new_select/var_map_kinds"), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1), ("list_flags", "items_from_strings"),
+                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                      ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 226 19 232")],
+                     ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    lines += _strings("main_menu/new_select/var_map_kinds", ["SINGLEPLAYER", "MULTIPLAYER"])
+    return lines
+
+
 def multiplayer_files() -> dict:
     """the port's multiplayer widgets: the browser's additions, the server
     settings, the lobby"""
@@ -953,6 +997,7 @@ def multiplayer_files() -> dict:
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
         f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
+        "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
     }
 

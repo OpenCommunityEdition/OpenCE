@@ -83,6 +83,11 @@ CHILD_OFFSETS = {
     **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",
         f"ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\server_item_{row}"): (10, 102 + 17 * (row - 1))
        for row in range(1, 16)},
+    # the map lists' first row, the SINGLEPLAYER or MULTIPLAYER chooser
+    # (port_settings.MAP_KIND_CHOOSER), where the gametype list has its own
+    **{(f"ui\\shell\\main_menu\\{list_tag}", "ui\\shell\\main_menu\\new_select\\list_item_0"): (82, 73)
+       for list_tag in ("multiplayer_type_select\\mp_map_select\\mp_map_select_list_2",
+                        "solo_level_select\\solo_level_select_list")},
 }
 SCALE = 4
 MAXIMUM_SIZE = 2048
