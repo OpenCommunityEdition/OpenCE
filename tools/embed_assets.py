@@ -3,18 +3,21 @@
 tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), the profile screens' Spartan pictures
 (port/assets/spartans, made by tools/spartan_assets.py) and the fonts the
-text is drawn with (port/assets/fonts) in the game as C data:
+text is drawn with (port/assets/fonts), and the menus' files
+(port/assets/menus, made by tools/ce_menus.py) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
 writes OUTPUT.c with each PNG and the bitmap it stands for (its tag, index
-and the checksum of its pixels, from port/assets/hud/layout.json,
-port/assets/titles/titles.json and port/assets/spartans/spartans.json), as
-port/linux/src/hud_hires.h declares them, failing to compile with more
-than its HUD_HIRES_MAXIMUM_TEXTURES. The builds generate it
-(hud_assets_build, called by tools/linux_build.py, windows_build.py and
-android_build.py), so the PNGs are the committed source and Android needs
-no files beside its guest image.
+and checksum of its pixels, from port/assets/hud/layout.json,
+port/assets/titles/titles.json and port/assets/spartans/spartans.json), the
+fonts listed in port/assets/fonts/fonts.json and the menu files listed in
+port/assets/menus/menus.json, as port/linux/src/hud_hires.h,
+text_hires.h and menu_files.h declare them, failing to compile with more
+than HUD_HIRES_MAXIMUM_TEXTURES. The builds generate it (hud_assets_build,
+called by tools/linux_build.py, windows_build.py and android_build.py), so
+the assets are the committed source and Android needs no files beside its
+guest image.
 
 The data are 32-bit words, not bytes: the Android build passes the guest's
 assembly through tools/android_asm_convert.py, which rewrites identifiers in
@@ -36,6 +39,8 @@ SPARTAN_ASSETS = Path("port/assets/spartans")
 SPARTAN_LIST = SPARTAN_ASSETS / "spartans.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
+MENU_ASSETS = Path("port/assets/menus")
+MENU_LIST = MENU_ASSETS / "menus.json"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -59,13 +64,21 @@ def textures() -> List[tuple]:
     return result
 
 
+def menu_files() -> List[str]:
+    """The menus' files menus.json lists, relative to their folder."""
+    if not (ROOT / MENU_LIST).is_file():
+        return []
+    return json.loads((ROOT / MENU_LIST).read_text())["files"]
+
+
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
-    inputs = [listing for listing in (LAYOUT, TITLE_LIST, SPARTAN_LIST, FONT_LIST) if (ROOT / listing).is_file()]
+    inputs = [listing for listing in (LAYOUT, TITLE_LIST, SPARTAN_LIST, FONT_LIST, MENU_LIST)
+              if (ROOT / listing).is_file()]
     if not inputs:
         return []
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
-            *(FONT_ASSETS / name for name in font_files())]
+            *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files())]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -74,7 +87,7 @@ def hud_configure_inputs() -> List[Path]:
     list may rename or remove."""
     inputs = []
     for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (SPARTAN_ASSETS, SPARTAN_LIST),
-                            (FONT_ASSETS, FONT_LIST)):
+                            (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
     return inputs
@@ -169,6 +182,28 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
+    lines.append("")
+    # the menus' files (menu_files.h)
+    lines.append('#include "menu_files.h"')
+    lines.append("")
+    menus = menu_files()
+    for index, name in enumerate(menus):
+        data = (ROOT / MENU_ASSETS / name).read_bytes()
+        if name.endswith(".png"):
+            png_size(data, name)
+        lines.append(f"static const unsigned int menu{index}[] = {{")
+        lines.extend(words(data))
+        lines.append("};")
+        lines.append("")
+    lines.append("const struct menu_file_embedded menu_files_embedded[] =")
+    lines.append("{")
+    for index, name in enumerate(menus):
+        size = (ROOT / MENU_ASSETS / name).stat().st_size
+        lines.append(f'\t{{ "{name}", menu{index}, {size} }},')
+    if not menus:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
     output = Path(sys.argv[1])
     output.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines) + "\n"

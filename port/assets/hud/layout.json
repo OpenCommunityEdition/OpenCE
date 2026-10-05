@@ -314,7 +314,7 @@
      "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
      "source_scale": 4,
      "source": [
-      -34,
+      -2,
       108
      ],
      "clip": [
@@ -380,7 +380,7 @@
      "svg": "hud_xbox_order__bitmaps__combined__hud_ammo_meters.svg",
      "source_scale": 4,
      "source": [
-      -25,
+      -5,
       312
      ],
      "clip": [
