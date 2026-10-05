@@ -83,6 +83,10 @@ void platform_mouse_capture(BOOL capture);
 
 /* main thread only; a no-op elsewhere */
 void platform_pump_events(void);
+/* request a capture from the bound Screenshot action */
+void platform_screenshot_request(void);
+/* consume the request; call on the render thread with a completed frame */
+BOOL platform_screenshot_take_request(void);
 /* a snapshot of the input state; consume_motion resets the mouse deltas */
 void platform_input_read(struct platform_input_state *state, BOOL consume_motion);
 #ifndef HALO_ANDROID
