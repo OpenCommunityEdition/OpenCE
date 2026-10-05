@@ -422,8 +422,20 @@ static boolean actor_state_apply(
 	real_vector3d forward;
 	real_vector3d up;
 
-	if (!distributed_object_index_valid(state->unit_index) || !network_objects_client_has(state->unit_index) ||
-		!actor_unit_valid(state->unit_index) ||
+	if (!distributed_object_index_valid(state->unit_index) || !network_objects_client_has(state->unit_index))
+		return FALSE;
+	/* (a body the host's unit got back up from: a Flood combat form that
+	feigned death, which it does only once its body is at rest. Left dead,
+	the ragdoll was dragged about by the host's positions. The host sends
+	only living units.) */
+	if (object_try_and_get_and_verify_type(state->unit_index, _object_mask_unit) &&
+		TEST_FLAG(unit_get(state->unit_index)->object.damage_flags, _object_dead_bit) &&
+		TEST_FLAG(unit_get(state->unit_index)->object.flags, _object_at_rest_bit) &&
+		unit_get(state->unit_index)->unit.player_index == NONE && state->body_vitality > 0)
+	{
+		unit_port_resurrect(state->unit_index);
+	}
+	if (!actor_unit_valid(state->unit_index) ||
 		state->animation_state >= NUMBER_OF_UNIT_ANIMATION_STATES ||
 		state->aiming_speed >= NUMBER_OF_UNIT_AIMING_SPEEDS ||
 		!VALID_FLAGS(state->control_flags, NUMBER_OF_UNIT_CONTROL_FLAGS) ||
