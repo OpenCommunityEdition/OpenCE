@@ -945,6 +945,10 @@ static struct
 	real power;
 } host_sent_devices[MAXIMUM_OBJECTS_PER_MAP];
 
+/* host: the structure BSP each client player's machine last said it has,
+NONE before its first input */
+static short host_player_structure_bsps[MAXIMUM_TRACKED_PLAYERS];
+
 /* host, each tick: the devices that moved or changed power (and, with the
 resent state, all that ever have) */
 static void host_send_device_states(
@@ -1903,6 +1907,7 @@ void network_coop_new_game(
 	csmemset(host_sent_transforms, 0, sizeof(host_sent_transforms));
 	csmemset(host_sent_looks, 0, sizeof(host_sent_looks));
 	csmemset(host_sent_devices, 0, sizeof(host_sent_devices));
+	csmemset(host_player_structure_bsps, NONE, sizeof(host_player_structure_bsps));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
@@ -2580,6 +2585,21 @@ word network_coop_device_group_entry_size(
 	void)
 {
 	return sizeof(struct distributed_coop_device_group);
+}
+
+void network_coop_note_player_structure_bsp(
+	short player_index,
+	short structure_bsp_index)
+{
+	if (player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS)
+		host_player_structure_bsps[player_index] = structure_bsp_index;
+}
+
+boolean network_coop_player_has_structure_bsp(
+	long player_index)
+{
+	return !network_coop_active() || player_get(player_index)->local_player_index != NONE ||
+		host_player_structure_bsps[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] == global_structure_bsp_index_get();
 }
 
 word network_coop_device_state_entry_size(

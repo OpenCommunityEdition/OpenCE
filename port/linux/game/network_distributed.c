@@ -320,7 +320,9 @@ ticks before it */
 struct distributed_player_input
 {
 	byte player_index;
-	byte pad[3];
+	/* co-op: the structure BSP the client has loaded */
+	byte structure_bsp_index;
+	byte pad[2];
 	/* the client's tick */
 	long tick;
 	/* the latest host tick the client has had a message of (the host
@@ -2083,9 +2085,14 @@ static void distributed_apply_predictions(
 		{
 			distributed_predictions[player_index].valid = FALSE;
 			distributed_predictions[player_index].taken_host_time = NONE;
-			/* (of the unit it has now: not one of a life before) */
-			if (unit_index != NONE && unit_index == state->unit_index)
+			/* (of the unit it has now: not one of a life before; and not
+			from a co-op client still loading the host's BSP, whose player
+			falls there with no floor under it) */
+			if (unit_index != NONE && unit_index == state->unit_index &&
+				network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index))
+			{
 				distributed_take_prediction(player_index, unit_index, &bound);
+			}
 		}
 		/* (what the host's next tick starts from) */
 		if (unit_index != NONE)
@@ -2257,6 +2264,7 @@ static void distributed_client_send_inputs(
 		if (!update_client_distributed_input(local_player_index, &input->tick, &input->action, input->control_flags))
 			continue;
 		input->player_index = distributed_player_to_byte(player_index);
+		input->structure_bsp_index = (byte)global_structure_bsp_index_get();
 		input->host_time = distributed_host_time;
 		count++;
 	}
@@ -2330,6 +2338,7 @@ static void distributed_handle_inputs(
 		/* (a spectator's buttons pick whom it watches: not counted) */
 		if (network_coop_active() && player->unit_index != NONE)
 			distributed_note_input_actions(input->player_index, &action);
+		network_coop_note_player_structure_bsp(input->player_index, input->structure_bsp_index);
 		update_server_handle_distributed_input(DATUM_INDEX_NEW(input->player_index, player->identifier), input->tick,
 			&action, input->control_flags, DISTRIBUTED_INPUT_HISTORY);
 		if (input->host_time != NONE && (host_time == NONE || input->host_time > host_time))
@@ -3001,9 +3010,12 @@ static void distributed_send_pings(
 }
 
 /* Co-op: the host's structure BSP. Clients switch BSP only when told
-(their own trigger volumes don't, players.c). It is resent regularly so a
-client that lost a message or joined late catches up. */
+(their own trigger volumes don't, players.c). A switch is sent at once and
+reliably; it is also resent regularly so a client that joined late catches
+up. */
 #define STRUCTURE_BSP_INTERVAL_TICKS (TICKS_PER_SECOND / 2)
+
+static short distributed_sent_structure_bsp_index = NONE;
 
 struct distributed_structure_bsp
 {
@@ -3021,10 +3033,14 @@ static void distributed_send_structure_bsp(
 	void)
 {
 	struct distributed_structure_bsp_message message;
+	short index = global_structure_bsp_index_get();
+	boolean switched = index != distributed_sent_structure_bsp_index;
 
-	message.structure_bsp.structure_bsp_index = global_structure_bsp_index_get();
+	message.structure_bsp.structure_bsp_index = index;
 	message.structure_bsp.pad = 0;
-	distributed_send(&message, _distributed_message_structure_bsp, 1, (word)sizeof(message), _distributed_to_clients);
+	distributed_send(&message, _distributed_message_structure_bsp, 1, (word)sizeof(message),
+		switched ? _distributed_to_clients_reliably : _distributed_to_clients);
+	distributed_sent_structure_bsp_index = index;
 }
 
 static void distributed_handle_structure_bsp(
@@ -3287,10 +3303,15 @@ void network_distributed_tick(
 		distributed_statistics_due = FALSE;
 		if (game_time_get() % PING_INTERVAL_TICKS == 0)
 			distributed_send_pings();
+		/* (before the players, so clients load a new BSP before they hear
+		where the host moved everyone into it) */
+		if (network_coop_active() && (global_structure_bsp_index_get() != distributed_sent_structure_bsp_index ||
+			game_time_get() % STRUCTURE_BSP_INTERVAL_TICKS == 0))
+		{
+			distributed_send_structure_bsp();
+		}
 		distributed_host_send_players();
 		network_actors_host_tick();
-		if (network_coop_active() && game_time_get() % STRUCTURE_BSP_INTERVAL_TICKS == 0)
-			distributed_send_structure_bsp();
 		network_coop_host_tick();
 		distributed_send_pickups();
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)

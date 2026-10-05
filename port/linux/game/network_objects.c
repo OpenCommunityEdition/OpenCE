@@ -1795,6 +1795,10 @@ void network_objects_apply_vehicle_predictions(
 		{
 			continue;
 		}
+		/* (not from a co-op client still loading the host's BSP: the
+		vehicle falls there with no ground under it) */
+		if (!network_coop_player_has_structure_bsp(driver->unit.player_index))
+			continue;
 		dx = state->position.x - vehicle->object.position.x;
 		dy = state->position.y - vehicle->object.position.y;
 		dz = state->position.z - vehicle->object.position.z;
