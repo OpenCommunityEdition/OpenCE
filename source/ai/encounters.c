@@ -3006,9 +3006,9 @@ static void encounter_post_combat(
 	return;
 }
 
-/* port: extra_number, from 1, places one of network co-op's extra enemies
-(coop_enemies.c): at the squad's starting locations in turn, each the
-place a ring about its own (0: the squad's own actor, as the Xbox's) */
+/* port: extra_number, counting from 1, places one of network co-op's extra
+enemies (coop_enemies.c), spread around the squad's starting locations in
+turn; 0 places the squad's own actor, as on the Xbox */
 static boolean encounter_place_actor(
 	long encounter_index,
 	short squad_index,
@@ -3033,16 +3033,26 @@ static boolean encounter_place_actor(
 		short actor_palette_index = squad_definition->actor_palette_index;
 		struct scenario *scenario = global_scenario_get();
 
-		/* port: an extra enemy a ring about the starting location */
+		/* port: an extra enemy goes on free ground around its starting
+		location, else around the squad's others in turn; with no room
+		anywhere it isn't placed, rather than stacked on another actor */
 		if (extra_number > 0)
 		{
-			spread_location = *starting_location;
-			if (coop_enemies_spread_position(&starting_location->position,
-				(short)((extra_number - 1) / squad_definition->starting_locations.count + 1),
-				&spread_location.position))
+			short count = squad_definition->starting_locations.count;
+			short tried;
+
+			for (tried = 0; tried < count; tried++)
 			{
-				starting_location = &spread_location;
+				struct actor_starting_location *candidate = TAG_BLOCK_GET_ELEMENT(&squad_definition->starting_locations,
+					(starting_location_index + tried) % count, struct actor_starting_location);
+
+				spread_location = *candidate;
+				if (coop_enemies_spread_position(&candidate->position, extra_number, &spread_location.position))
+					break;
 			}
+			if (tried == count)
+				return FALSE;
+			starting_location = &spread_location;
 		}
 
 		if (starting_location->actor_variant_index != NONE)

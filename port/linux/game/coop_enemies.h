@@ -21,9 +21,10 @@ short coop_enemies_extra_count(
 	long encounter_index,
 	short count);
 
-/* encounters.c: the place of a squad's `number`th extra enemy (from 1) at
-its starting location `origin`: rings about it, on open ground; FALSE if
-none is (the starting location itself then) */
+/* encounters.c: finds a spot for a squad's `number`th extra enemy
+(counting from 1) around the starting location `origin`, on its floor,
+clear of walls and objects, with room to stand and nobody there. FALSE if
+there's no room */
 boolean coop_enemies_spread_position(
 	real_point3d const *origin,
 	short number,
