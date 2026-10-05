@@ -181,12 +181,17 @@ void coop_scripts_board_followers(
 	if (count == 0 || vehicle_index == NONE)
 		return;
 	follower_seat_name(seat_name, follower_seat, sizeof(follower_seat));
+	/* (each list freed at once: there are few, and the scripts' own are only
+	collected after the tick's threads have run) */
 	for (index = 0; index < count; index++)
 	{
 		long list_index = object_list_new();
 
+		if (list_index == NONE)
+			break;
 		object_list_add(list_index, followers[index]);
 		vehicle_scripting_load_magic(vehicle_index, follower_seat, list_index);
+		object_list_delete(list_index);
 	}
 }
 

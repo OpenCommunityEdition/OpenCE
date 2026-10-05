@@ -56,13 +56,17 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   BSP the team hasn't been in brings every player to whoever crossed it,
   as split screen does; one back into a BSP it has been in switches only
   with two thirds of the living players at it (in the trigger, or within
-  4 world units of the player in it), so one player can't drag the team
-  back through the level. A player outside the loaded BSP and falling for
-  two seconds is brought back beside a teammate. A dead player watches a
-  living teammate (`coop_spectate.c`) and comes back beside one once it is
-  safe. With everyone dead they come back where they were at the last
-  checkpoint, since only the host could revert. A level won ends the round
-  as in multiplayer, and the next round is the campaign's next level.
+  15 world units of the player in it, about 45 metres), so one player can't
+  drag the team back through the level; a player held back is told how
+  many are there and how many it needs. A player outside the loaded BSP
+  and falling for two seconds is brought back beside a teammate. A dead
+  player watches a living teammate (`coop_spectate.c`) and comes back
+  beside one once it is safe. With everyone dead they come back where they
+  were at the last checkpoint, without a revert. A mission the scripts fail
+  with players still alive reverts to the last checkpoint on the host, as a
+  skipped cutscene does (below); a client never reverts on its own. A level
+  won ends the round as in multiplayer, and the next round is the
+  campaign's next level.
 
   Cutscenes are skipped by vote: more than half the machines must press
   skip. The host then reverts as single player does, but keeps its clock
@@ -73,12 +77,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a
   percentage of itself for each player past the first; STATIC MULTIPLIER,
-  that many times itself for any number of players. They stand in rings
-  about its starting locations where the ground is open, and never take the
-  actors a level needs for its own (the actor pool, `halo_port_capacity.h`,
-  holds 1024). Riders a dropship has no seats for are kept, and placed
-  beside its riders once they get out. Only the host runs the AI, so the
-  clients see them as the host's other actors.
+  that many times itself for any number of players. They stand around its
+  starting locations on free ground (the same floor, clear of crates and
+  other actors, with room to stand), or where none is left on rings about
+  them as before, and never take the actors a level needs for its own (the
+  actor pool, `halo_port_capacity.h`, holds 1024). Riders a dropship has no
+  seats for are kept, and placed beside its riders once they get out. Only
+  the host runs the AI, so the clients see them as the host's other actors.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
@@ -159,7 +164,10 @@ version 13 drives up to 1056 of the host's AI units on its clients (co-op's
 extra enemies), where 12 drove 288; version 14 sends co-op's device positions
 and its units opening and closing; version 15 sends co-op's allegiances with
 its presentation, a message of another size; version 16 has a client's input
-say which structure BSP it has loaded (co-op).
+say which structure BSP it has loaded (co-op); version 17 breaks the host's
+glass and destructible scenery on every machine (and takes a client's hits on
+scenery), sends the cluster a co-op cutscene keeps active, and leaves a
+failed co-op mission's revert to the host.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

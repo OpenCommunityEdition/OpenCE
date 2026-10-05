@@ -13,8 +13,9 @@ Extra enemies are placed in widening rings around the squad's starting
 locations, on a spot on the same floor, reachable without passing through
 a wall, crate or machine, with room to stand and nobody already there. A
 starting location with no room left passes its enemy to the squad's next
-one; if none has room, the enemy isn't placed rather than stacked on
-another.
+one; if none has room, the enemy goes where extra enemies went before free
+ground was looked for (rings around the starting location, whoever stands
+there), so a squad still gets every enemy the setting asks for.
 
 A squad a script loads into a dropship (vehicle_load_magic) can be larger
 than the dropship's seats. The riders left without a seat are erased, and
@@ -69,6 +70,8 @@ enum
 	SPREAD_PLACES_PER_RING places and each further one that many more */
 	SPREAD_RINGS = 5,
 	SPREAD_PLACES_PER_RING = 6,
+	/* the rings coop_enemies_fallback_position tries, a place on each */
+	FALLBACK_RINGS = 8,
 	MAXIMUM_RIDING_VEHICLES = 32,
 	MAXIMUM_SEATED_RIDERS = 16,
 	MAXIMUM_KEPT_RIDERS = 512,
@@ -76,6 +79,10 @@ enum
 	jumped out */
 	RIDER_RELEASE_TICKS = 4,
 };
+
+/* (coop_enemies.h's count of the places on all the rings) */
+typedef char coop_enemies_spread_spots_assert[
+	COOP_ENEMIES_SPREAD_SPOTS == SPREAD_PLACES_PER_RING * SPREAD_RINGS * (SPREAD_RINGS + 1) / 2 ? 1 : -1];
 
 /* distance between rings */
 #define SPREAD_SPACING 0.8f
@@ -90,6 +97,8 @@ a step, not a ledge */
 (about two bipeds' collision radius), and how far around it to look */
 #define SPREAD_CLEARANCE 0.6f
 #define SPREAD_SEARCH_RADIUS 1.0f
+/* how far below a fallback place the ground is looked for */
+#define FALLBACK_GROUND_DEPTH 2.0f
 /* a kept rider's place beside a rider who got out, each a little apart */
 #define RIDER_SPACING 0.5f
 
@@ -254,7 +263,9 @@ static boolean coop_enemies_spot_free(
 	real floor_height,
 	real_point3d *position)
 {
-	real_vector3d way = { spot->x - from->x, spot->y - from->y, spot->z - from->z };
+	/* (level, at step height: down to the starting location's floor, a spot
+	whose floor is a little higher would end the look inside it) */
+	real_vector3d way = { spot->x - from->x, spot->y - from->y, 0.0f };
 	real_vector3d up = { 0.0f, 0.0f, SPREAD_HEADROOM };
 	real_point3d floor;
 	real_point3d feet;
@@ -384,7 +395,7 @@ static void coop_enemies_rider_place(
 	}
 	/* free ground around that spot, as the squad's own extra enemies get;
 	failing that, a ring around it, further out each round */
-	if (coop_enemies_spread_position(position, (short)(number + 1), &spread))
+	if (coop_enemies_spread_position(position, (short)(number + 1), NULL, &spread))
 	{
 		*position = spread;
 		return;
@@ -448,12 +459,13 @@ short coop_enemies_extra_count(
 boolean coop_enemies_spread_position(
 	real_point3d const *origin,
 	short number,
+	long *taken,
 	real_point3d *position)
 {
 	real_point3d from = *origin;
 	real_point3d floor;
 	real floor_height = coop_enemies_floor(origin, &floor) ? floor.z : origin->z;
-	short ring;
+	short ring, first_spot = 0;
 
 	from.z = floor_height + SPREAD_STEP_HEIGHT;
 	for (ring = 0; ring < SPREAD_RINGS; ring++)
@@ -466,14 +478,60 @@ boolean coop_enemies_spread_position(
 		spreads all the way round rather than filling one side first) */
 		for (place = 0; place < place_count; place++)
 		{
-			real angle = (real)((number + place) % place_count) * (_pi * 2.0f / (real)place_count);
+			short around = (short)((number + place) % place_count);
+			short spot_index = (short)(first_spot + around);
+			real angle = (real)around * (_pi * 2.0f / (real)place_count);
 			real_point3d spot = from;
 
+			if (taken && BIT_VECTOR_TEST_FLAG(taken, spot_index))
+				continue;
 			spot.x += (real)cos(angle) * radius;
 			spot.y += (real)sin(angle) * radius;
 			spot.z = floor_height;
 			if (coop_enemies_spot_free(&from, &spot, floor_height, position))
 				return TRUE;
+			if (taken)
+				BIT_VECTOR_SET_FLAG(taken, spot_index, TRUE);
+		}
+		first_spot = (short)(first_spot + place_count);
+	}
+	return FALSE;
+}
+
+boolean coop_enemies_fallback_position(
+	real_point3d const *origin,
+	short number,
+	real_point3d *position)
+{
+	real_point3d from = *origin;
+	short place = (short)((number - 1) % SPREAD_PLACES_PER_RING);
+	short ring = (short)((number - 1) / SPREAD_PLACES_PER_RING);
+	short attempt;
+
+	from.z += SPREAD_STEP_HEIGHT;
+	for (attempt = 0; attempt < FALLBACK_RINGS; attempt++, ring++)
+	{
+		/* (each ring turned half a place from the last, so its places fall
+		between the last's) */
+		real angle = ((real)place + 0.5f * (real)(ring % 2)) * (_pi * 2.0f / SPREAD_PLACES_PER_RING);
+		real radius = SPREAD_SPACING * (real)(ring + 1);
+		real_point3d to = from;
+		real_vector3d way = { 0.0f, 0.0f, 0.0f };
+		real_vector3d down = { 0.0f, 0.0f, -(SPREAD_STEP_HEIGHT + FALLBACK_GROUND_DEPTH) };
+		struct collision_result collision;
+
+		way.i = (real)cos(angle) * radius;
+		way.j = (real)sin(angle) * radius;
+		to.x += way.i;
+		to.y += way.j;
+		/* (the level only: the way open, and ground below) */
+		if (!collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit) |
+				FLAG(_collision_test_back_facing_surfaces_bit), &from, &way, NONE, &collision) &&
+			collision_test_vector(FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit),
+				&to, &down, NONE, &collision))
+		{
+			*position = collision.point;
+			return TRUE;
 		}
 	}
 	return FALSE;
