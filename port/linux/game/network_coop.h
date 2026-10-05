@@ -68,6 +68,8 @@ void network_coop_note_nav_point(short kind, short nav_index, long target, long 
 /* units.c: a unit started a custom animation (animation_index NONE: stopped) */
 void network_coop_note_unit_animation(long unit_index, long animation_graph_index, short animation_index,
 	boolean interpolate);
+/* units.c: a unit (a dropship) opened or closed (unit_open, unit_close) */
+void network_coop_note_unit_open(long unit_index, boolean open);
 /* units.c: unit_custom_animation_at_frame moved it to a frame */
 void network_coop_note_unit_animation_frame(long unit_index, short frame_index);
 /* scenery.c: a scenery animation started */

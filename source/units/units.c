@@ -4114,6 +4114,27 @@ void unit_stop_custom_animation(
 	return;
 }
 
+/* port: a unit that feigned death gets back up (a Flood combat form). The
+host's does when its timer runs out (unit_update); a client's copy when the
+host's word on it says it is alive again (network_actors.c). */
+void unit_port_resurrect(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short new_state = TEST_FLAG(unit->unit.animation.flags, _unit_animation_fallen_on_front_bit) ?
+		_unit_state_resurrect_front : _unit_state_resurrect_back;
+
+	SET_FLAG(unit->object.damage_flags, _object_dead_bit, FALSE);
+	unit_set_actively_controlled(unit_index, TRUE);
+	unit_set_or_test_seat_and_weapon_label(unit_index, base_seat_label_get(_unit_animation_state_suspicious), NULL,
+		TRUE);
+	unit_animation_set_state(unit_index, new_state);
+	SET_FLAG(unit->unit.animation.flags, _unit_animation_ignore_translation_bit, FALSE);
+	if (unit->object.type == _object_type_biped)
+		biped_stop_limp_body_physics(unit_index);
+	unit_scream(unit_index, _unit_scream_resurrection);
+}
+
 /* how far into its own flinch or death animation a client's unit still
 switches to the host's pick */
 #define DAMAGE_ANIMATION_SWITCH_TICKS 10
@@ -5271,6 +5292,7 @@ void unit_open(
 {
 	if (unit_index!=NONE)
 	{
+		network_coop_note_unit_open(unit_index, TRUE);
 		unit_animation_set_state(unit_index, _unit_state_opening);
 	}
 
@@ -5282,6 +5304,7 @@ void unit_close(
 {
 	if (unit_index!=NONE)
 	{
+		network_coop_note_unit_open(unit_index, FALSE);
 		unit_animation_set_state(unit_index, _unit_state_closing);
 	}
 
@@ -5547,32 +5570,7 @@ boolean unit_update(
 			{
 				if (unit->object.body_vitality>0.f)
 				{
-					short new_state = TEST_FLAG(
-							unit->unit.animation.flags,
-							_unit_animation_fallen_on_front_bit) ? _unit_state_resurrect_front : _unit_state_resurrect_back;
-
-					SET_FLAG(unit->object.damage_flags, _object_dead_bit, FALSE);
-
-					unit_set_actively_controlled(unit_index, TRUE);
-					unit_set_or_test_seat_and_weapon_label(
-						unit_index,
-						base_seat_label_get(_unit_animation_state_suspicious),
-						NULL,
-						TRUE
-					);
-					unit_animation_set_state(unit_index, new_state);
-
-					SET_FLAG(
-						unit->unit.animation.flags,
-						_unit_animation_ignore_translation_bit,
-						FALSE);
-
-					if (unit->object.type==_object_type_biped)
-					{
-						biped_stop_limp_body_physics(unit_index);
-					}
-
-					unit_scream(unit_index, _unit_scream_resurrection);
+					unit_port_resurrect(unit_index);
 				}
 				else
 				{

@@ -184,6 +184,8 @@ enum
 	_coop_event_attach,
 	/* the host skipped the cutscene: a client stops its dialogue */
 	_coop_event_cutscene_skipped,
+	/* a unit opened (value TRUE) or closed: a dropship's doors */
+	_coop_event_unit_open,
 };
 
 /* distributed_coop_event.type of an effect: at a cutscene flag (value), or on
@@ -1793,6 +1795,16 @@ static void client_apply_event(
 	case _coop_event_cutscene_skipped:
 		client_stop_script_sounds();
 		break;
+	case _coop_event_unit_open:
+		if (distributed_object_index_valid(event->object_index) && network_objects_client_has(event->object_index) &&
+			object_try_and_get_and_verify_type(event->object_index, _object_mask_unit))
+		{
+			if (event->value)
+				unit_open(event->object_index);
+			else
+				unit_close(event->object_index);
+		}
+		break;
 	default:
 		break;
 	}
@@ -2233,6 +2245,18 @@ void network_coop_note_unit_animation(
 	event->tag_index = animation_graph_index;
 	event->value = animation_index;
 	event->interpolate = (byte)interpolate;
+}
+
+void network_coop_note_unit_open(
+	long unit_index,
+	boolean open)
+{
+	struct distributed_coop_event *event = event_new(_coop_event_unit_open);
+
+	if (!event)
+		return;
+	event->object_index = unit_index;
+	event->value = (short)open;
 }
 
 /* unit_custom_animation_at_frame starts the animation and then sets the
