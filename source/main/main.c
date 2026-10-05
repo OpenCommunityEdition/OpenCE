@@ -1871,9 +1871,10 @@ static boolean main_coop_host(
 static void main_revert_map_private(
 	void)
 {
+	/* (a network client never reverts on its own: its game is the host's) */
 	if (main_coop_host())
 		main_coop_host_revert();
-	else
+	else if (game_connection() != _game_connection_network_client)
 	{
 		game_state_revert();
 		ui_widgets_disable_pause_game(30);
@@ -1892,7 +1893,7 @@ static void main_skip_cinematic_private(
 		network_coop_skip_done();
 		main_globals.revert_map = FALSE;
 	}
-	else if (cinematic_can_be_skipped() && !main_coop_host() &&
+	else if (cinematic_can_be_skipped() && !main_coop_host() && game_connection() != _game_connection_network_client &&
 		(game_connection() != _game_connection_network_server || game_state_port_saved_game_valid()))
 	{
 		game_state_revert();
