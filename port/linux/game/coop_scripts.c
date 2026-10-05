@@ -7,7 +7,7 @@ The campaign's scripts were written for one or two players. Only the host
 runs them (game.c), against every player's unit, so most of what they do
 already happens for everyone: a trigger volume tested against (players)
 fires for whoever walks into it, and what it starts is sent to the clients
-(network_coop.c). Two habits of the scripts don't carry over:
+(network_coop.c). Three habits of the scripts don't carry over:
 
 - Waiting for every player at once (volume_test_objects_all on the
   players): the Maw's run to the Pillar of Autumn's bridge, a30's Pelican
@@ -98,7 +98,9 @@ boolean coop_scripts_any_player_will_do(
 	return any;
 }
 
-short coop_scripts_players_following(
+/* the units of the players following player0, if `unit_index` is
+player0's; how many */
+static short players_following(
 	long unit_index,
 	long *unit_indices,
 	short maximum_count)
@@ -125,13 +127,54 @@ short coop_scripts_players_following(
 	return count;
 }
 
+void coop_scripts_teleport_followers(
+	long unit_index)
+{
+	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short count = players_following(unit_index, followers, NUMBEROF(followers));
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		player_teleport(player_index_from_unit_index(followers[index]), unit_index,
+			&object_get(unit_index)->object.position);
+	}
+}
+
+void coop_scripts_suspend_followers(
+	long unit_index,
+	boolean suspended)
+{
+	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short count = players_following(unit_index, followers, NUMBEROF(followers));
+	short index;
+
+	for (index = 0; index < count; index++)
+		unit_scripting_suspended(followers[index], suspended);
+}
+
+void coop_scripts_exit_followers(
+	long unit_index,
+	long vehicle_index)
+{
+	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short count = players_following(unit_index, followers, NUMBEROF(followers));
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		if (object_get(followers[index])->object.parent_object_index == vehicle_index)
+			unit_scripting_exit_vehicle(followers[index]);
+	}
+}
+
 void coop_scripts_board_followers(
 	long unit_index,
 	long vehicle_index,
 	char const *seat_name)
 {
 	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-	short count = coop_scripts_players_following(unit_index, followers, NUMBEROF(followers));
+	short count = players_following(unit_index, followers, NUMBEROF(followers));
 	char follower_seat[64];
 	short index;
 
@@ -177,7 +220,7 @@ void coop_scripts_player_add_equipment(
 	boolean reset_equipment)
 {
 	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-	short count = coop_scripts_players_following(unit_index, followers, NUMBEROF(followers));
+	short count = players_following(unit_index, followers, NUMBEROF(followers));
 	short index;
 
 	player_add_equipment(unit_index, starting_profile_index, reset_equipment);

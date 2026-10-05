@@ -1886,24 +1886,29 @@ static void main_revert_map_private(
 static void main_skip_cinematic_private(
 	void)
 {
-	/* port: a network host never reverts without a saved state, which
-	would reset the map on the host alone */
-	if (cinematic_can_be_skipped() && main_coop_host() && main_coop_host_revert())
+	/* port: only a local game or a network co-op host reverts to skip; a
+	network game's other machines would be left out of step */
+	boolean skippable = cinematic_can_be_skipped();
+	boolean skipped = FALSE;
+
+	if (skippable && main_coop_host())
 	{
-		network_coop_skip_done();
-		main_globals.revert_map = FALSE;
+		skipped = main_coop_host_revert();
+		if (skipped)
+			network_coop_skip_done();
 	}
-	else if (cinematic_can_be_skipped() && !main_coop_host() && game_connection() != _game_connection_network_client &&
-		(game_connection() != _game_connection_network_server || game_state_port_saved_game_valid()))
+	else if (skippable && game_connection() == _game_connection_local)
 	{
 		game_state_revert();
 		ui_widgets_disable_pause_game(30);
-		main_globals.revert_map = FALSE;
+		skipped = TRUE;
 	}
-	else if (game_connection() == _game_connection_network_server)
+	if (skipped)
+		main_globals.revert_map = FALSE;
+	else if (main_coop_host())
 	{
 		error(_error_silent, "co-op: cutscene not skipped (skippable %d, saved state %d)",
-			cinematic_can_be_skipped(), game_state_port_saved_game_valid());
+			skippable, game_state_port_saved_game_valid());
 	}
 	main_globals.skip_cinematic = FALSE;
 	return;

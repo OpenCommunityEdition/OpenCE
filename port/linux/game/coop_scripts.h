@@ -15,17 +15,23 @@ list as inside once any of it is, because every object in it is a player */
 boolean coop_scripts_any_player_will_do(
 	long object_list_index);
 
-/* The units of the players the scripts can't name, when `unit_index` is
-player0's: they go along with whatever the scripts do to player0. Returns
-how many, 0 outside a co-op host's game or for any other unit. */
-short coop_scripts_players_following(
-	long unit_index,
-	long *unit_indices,
-	short maximum_count);
+/* What the scripts do to player0, done to the players they can't name too
+(the "followers"). Each does nothing unless `unit_index` is player0's in a
+co-op host's game. */
 
-/* units.c's vehicle_load_magic and unit_enter_vehicle: puts the players
-following player0 into the vehicle as well, each in a free seat of the
-same kind as player0's (`seat_name`) */
+/* hs_library_external.c's object_teleport: around player0 */
+void coop_scripts_teleport_followers(
+	long unit_index);
+/* units.c's unit_suspended */
+void coop_scripts_suspend_followers(
+	long unit_index,
+	boolean suspended);
+/* units.c's unit_exit_vehicle: those riding player0's vehicle get out */
+void coop_scripts_exit_followers(
+	long unit_index,
+	long vehicle_index);
+/* units.c's vehicle_load_magic and unit_enter_vehicle: into the vehicle,
+each in a free seat of the same kind as player0's (`seat_name`) */
 void coop_scripts_board_followers(
 	long unit_index,
 	long vehicle_index,

@@ -988,18 +988,9 @@ void hs_object_teleport(
 	long object_index,
 	short cutscene_flag_index)
 {
-	long followers[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
-	short follower_count = coop_scripts_players_following(object_index, followers, NUMBEROF(followers));
-	short follower;
-
 	hs_object_orient(object_index, cutscene_flag_index, TRUE, TRUE);
-	/* port: co-op players the scripts can't name go with player0, placed
-	around it (coop_scripts.c) */
-	for (follower = 0; follower < follower_count; follower++)
-	{
-		player_teleport(player_index_from_unit_index(followers[follower]), object_index,
-			&object_get(object_index)->object.position);
-	}
+	/* port: co-op players the scripts can't name go with player0 */
+	coop_scripts_teleport_followers(object_index);
 
 	return;
 }
