@@ -73,6 +73,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "effects/effect_definitions.h"
 #include "effects/player_effects.h"
 #include "game/game.h"
+#include "game/game_allegiance.h"
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "game/player_queues_new.h"
@@ -272,6 +273,10 @@ struct distributed_coop_presentation
 	byte pad[2];
 	real players_maximum_body_vitality;
 	real players_maximum_shield_vitality;
+	/* which teams are allies and friends (game_allegiance.c): the scripts
+	make them, so a client's would leave the marines its enemies */
+	unsigned long ally_teams[GAME_ALLEGIANCE_BITVECTOR_LONGS];
+	unsigned long friendly_teams[GAME_ALLEGIANCE_BITVECTOR_LONGS];
 };
 
 struct distributed_coop_presentation_message
@@ -1422,6 +1427,7 @@ static void host_presentation(
 	presentation->players_vitality_set = (byte)players_vitality.set;
 	presentation->players_maximum_body_vitality = players_vitality.maximum_body;
 	presentation->players_maximum_shield_vitality = players_vitality.maximum_shield;
+	game_allegiance_get_teams(presentation->ally_teams, presentation->friendly_teams);
 	SET_FLAG(presentation->flags, _presentation_skippable_bit, skip_vote.offered);
 	presentation->skip_votes = (byte)MIN(skip_vote.votes, 255);
 	presentation->skip_voters = (byte)MIN(skip_vote.voters, 255);
@@ -2853,6 +2859,7 @@ static void client_presentation_apply(
 		players_vitality.maximum_body = presentation->players_maximum_body_vitality;
 		players_vitality.maximum_shield = presentation->players_maximum_shield_vitality;
 	}
+	game_allegiance_set_teams(presentation->ally_teams, presentation->friendly_teams);
 	if (!presentation->scripted_shake && player_effect_port_scripted_active())
 		player_effect_port_scripted_end();
 
