@@ -643,15 +643,17 @@ static void distributed_vector_clamp(
 	}
 }
 
-/* Whether the object is a vehicle no player drives (a Pelican on its flight
-path): nothing on a client steers it, so its copy is kept at rest there
-(no physics of its own) and moved only to where the host has it. */
+/* Whether the object is a vehicle no player drives in co-op (a Pelican on
+its flight path): nothing on a client steers it, so its copy is kept at rest
+there (no physics of its own) and moved only to where the host has it. In
+multiplayer an empty vehicle (one bailed out of, or tumbling) keeps its own
+physics between updates. */
 static boolean distributed_vehicle_unsteered(
 	long object_index)
 {
 	struct unit_datum *vehicle;
 
-	if (object_get(object_index)->object.type != _object_type_vehicle)
+	if (!network_coop_active() || object_get(object_index)->object.type != _object_type_vehicle)
 		return FALSE;
 	vehicle = unit_get(object_index);
 	return vehicle->unit.driver_object_index == NONE ||

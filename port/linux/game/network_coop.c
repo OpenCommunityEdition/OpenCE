@@ -118,6 +118,14 @@ toward it each tick. */
 missed a message, would lack (host_resend) */
 #define OBJECT_REFRESH_TICKS (2 * TICKS_PER_SECOND)
 
+/* the screen effect a client takes from its host: the rasterizer's
+convolution types (none, blur, warp) and video overbright modes
+(rasterizer_xbox_screen_effect.c), and at most this many extra convolution
+passes, more than any script asks for */
+#define SCREEN_EFFECT_CONVOLUTION_TYPES 3
+#define SCREEN_EFFECT_OVERBRIGHT_MODES 3
+#define SCREEN_EFFECT_MAXIMUM_EXTRA_PASSES 8
+
 enum
 {
 	/* the farthest an object the cutscene camera films can be from it
@@ -321,6 +329,8 @@ struct distributed_coop_device_group
 	byte changed;
 	real value;
 };
+
+#define MAXIMUM_DEVICE_GROUPS_PER_MESSAGE 64
 
 struct distributed_coop_device_groups_message
 {
@@ -876,8 +886,18 @@ static void host_send_device_groups(
 	host_devices.refresh_next = count ? (short)((host_devices.refresh_next + DEVICE_GROUP_REFRESHES_PER_TICK) % count) : 0;
 	host_devices.moved_refresh_next = moved_count ?
 		(short)((host_devices.moved_refresh_next + DEVICE_GROUP_REFRESHES_PER_TICK) % moved_count) : 0;
-	if (sent)
-		send_to_clients(&host_devices.message, _distributed_message_coop_device_groups, sent, sizeof(entries[0]));
+	/* (in messages of at most MAXIMUM_DEVICE_GROUPS_PER_MESSAGE, since a
+	message counts its entries in a byte: each moved to the front, where the
+	message's entries begin, over those already sent) */
+	for (index = 0; index < sent; index += MAXIMUM_DEVICE_GROUPS_PER_MESSAGE)
+	{
+		short message_count = (short)MIN(sent - index, MAXIMUM_DEVICE_GROUPS_PER_MESSAGE);
+
+		if (index > 0)
+			csmemcpy(entries, &entries[index], message_count * sizeof(entries[0]));
+		send_to_clients(&host_devices.message, _distributed_message_coop_device_groups, message_count,
+			sizeof(entries[0]));
+	}
 }
 
 /* host: where each scenery or machine was last sent, by its absolute
@@ -1062,6 +1082,18 @@ void network_coop_handle_screen_effect(
 		if (!distributed_real_valid(reals[index]))
 			return;
 	}
+	/* (what the rasterizer can draw: its convolution types and overbright
+	modes, a script's few extra passes, and video with no convolution, as
+	rasterizer_screen_effect_set_video leaves it) */
+	state.convolution_type = (short)PIN(state.convolution_type, 0, SCREEN_EFFECT_CONVOLUTION_TYPES - 1);
+	state.convolution_extra_passes = (short)PIN(state.convolution_extra_passes, 0, SCREEN_EFFECT_MAXIMUM_EXTRA_PASSES);
+	state.video_overbright_mode = (short)PIN(state.video_overbright_mode, 0, SCREEN_EFFECT_OVERBRIGHT_MODES - 1);
+	if (state.video_on)
+	{
+		state.convolution_type = 0;
+		state.convolution_extra_passes = 0;
+		state.convolution_radius[0] = state.convolution_radius[1] = 0.0f;
+	}
 	/* the game can only blur one window, so split screen goes without */
 	if (main_get_window_count() > 1)
 	{
@@ -1215,6 +1247,10 @@ static void host_count_skip_votes(
 /* the least speed (squared, world units a tick) of an object the cutscene
 camera films when the scripts don't name it */
 #define CAMERA_OBJECT_SPEED 0.01f
+/* the camera an observer accepts (observer.c) */
+#define CAMERA_WORLD_BOUND 5000.0f
+#define CAMERA_MINIMUM_FIELD_OF_VIEW 0.001f
+#define CAMERA_MAXIMUM_FIELD_OF_VIEW (_pi / 2.0f)
 
 /* Host: the object the cutscene camera films: the nearest vehicle moving
 close to it (a camera riding along with a drop pod or a Pelican), else the
@@ -1589,12 +1625,21 @@ static void client_apply_attach(
 {
 	long parent_index = object_find(event->name_index, event->object_index, event->definition_index, _object_mask_all);
 	long child_index = object_find((short)event->reals[0], event->target, event->tag_index, _object_mask_all);
+	long ancestor_index;
 
 	if (parent_index == NONE || child_index == NONE || parent_index == child_index)
 		return;
 	/* a resent attach this machine already has */
 	if (event->type == _coop_attach && object_get(child_index)->object.parent_object_index == parent_index)
 		return;
+	/* (not to one of its own children, which objects.c cannot do: copies
+	of the hierarchy that differ here, or a host's mistake) */
+	for (ancestor_index = object_get(parent_index)->object.parent_object_index; event->type == _coop_attach &&
+		ancestor_index != NONE; ancestor_index = object_get(ancestor_index)->object.parent_object_index)
+	{
+		if (ancestor_index == child_index)
+			return;
+	}
 	if (event->type == _coop_detach)
 		objects_scripting_detach(parent_index, child_index);
 	else
@@ -2367,6 +2412,9 @@ void network_coop_host_tick(
 void network_coop_client_tick(
 	void)
 {
+	/* (a multiplayer game's input and camera are its own) */
+	if (!coop_client())
+		return;
 	client_play_presentation();
 	players_vitality_keep();
 	if (game_time_get() - coop_presentation.heard_time > PRESENTATION_SILENCE_TICKS)
@@ -2516,7 +2564,7 @@ void network_coop_handle_device_groups(
 	struct distributed_coop_device_group const *groups = entries;
 	short index;
 
-	if (!coop_game())
+	if (!coop_client())
 		return;
 	for (index = 0; index < count; index++)
 	{
@@ -2527,6 +2575,8 @@ void network_coop_handle_device_groups(
 		boolean runtime, snap;
 
 		if (group_index == NONE || !device_group_network_get(group_index, &here, &flags, &runtime))
+			continue;
+		if (!distributed_real_valid(entry->value))
 			continue;
 		value = PIN(entry->value, 0.0f, 1.0f);
 		/* Jump straight to the value when the host did, or when a rotation
@@ -2550,7 +2600,7 @@ void network_coop_handle_object_names(
 	struct distributed_coop_object_names const *names = entries;
 	short name_index;
 
-	if (!coop_game())
+	if (!coop_client())
 		return;
 	if (names->structure_bsp_index != global_structure_bsp_index_get() ||
 		names->name_count != MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO))
@@ -2593,7 +2643,7 @@ void network_coop_handle_events(
 	struct distributed_coop_event const *events = entries;
 	short index;
 
-	if (!coop_game())
+	if (!coop_client())
 		return;
 	for (index = 0; index < count; index++)
 	{
@@ -2602,6 +2652,12 @@ void network_coop_handle_events(
 			continue;
 		coop_events.applied_number = events[index].number;
 		coop_events.applied_any = TRUE;
+		/* (not with a number that isn't one) */
+		if (!distributed_real_valid(events[index].reals[0]) || !distributed_real_valid(events[index].reals[1]) ||
+			!distributed_real_valid(events[index].reals[2]))
+		{
+			continue;
+		}
 		client_apply_event(&events[index]);
 	}
 }
@@ -2614,7 +2670,7 @@ void network_coop_handle_presentation(
 {
 	short slot;
 
-	if (!coop_game() || host_time < 0)
+	if (!coop_client() || host_time < 0)
 		return;
 	coop_presentation.heard_time = game_time_get();
 	if (coop_presentation.playing && host_time <= coop_presentation.played_time)
@@ -2634,7 +2690,8 @@ static void client_presentation_apply(
 
 	player_input_enable(!presentation->input_disabled);
 	if (presentation->players_vitality_set && distributed_real_valid(presentation->players_maximum_body_vitality) &&
-		distributed_real_valid(presentation->players_maximum_shield_vitality))
+		distributed_real_valid(presentation->players_maximum_shield_vitality) &&
+		presentation->players_maximum_body_vitality > 0.0f && presentation->players_maximum_shield_vitality >= 0.0f)
 	{
 		players_vitality.set = TRUE;
 		players_vitality.maximum_body = presentation->players_maximum_body_vitality;
@@ -2684,12 +2741,15 @@ static void client_presentation_apply(
 		{
 			point_from_line3d(&filmed->object.position, &presentation->camera_object_offset, 1.0f, &position);
 		}
-		if (distributed_point_valid(&position, UNIT_WORLD_BOUND) && distributed_axes_make_valid(&forward, &up))
+		/* (where and how widely an observer can look: observer.c's
+		match_assert_valid_observer_command) */
+		if (distributed_point_valid(&position, CAMERA_WORLD_BOUND) && distributed_axes_make_valid(&forward, &up))
 		{
 			if (!(coop_presentation.cinematic_started && presentation->camera_scripted))
 				client_watch_host_from_behind(&position, &forward, &up);
 			scripted_camera_set_camera_point_relative(&position, &forward, &up,
-				(real)presentation->camera_field_of_view / FIELD_OF_VIEW_SCALE, 0, NONE);
+				PIN((real)presentation->camera_field_of_view / FIELD_OF_VIEW_SCALE, CAMERA_MINIMUM_FIELD_OF_VIEW,
+					CAMERA_MAXIMUM_FIELD_OF_VIEW), 0, NONE);
 		}
 	}
 	else

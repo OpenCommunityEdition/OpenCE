@@ -3809,6 +3809,19 @@ void network_distributed_handle_message(
 	{
 		return;
 	}
+	/* (the kinds whose handlers read one entry: not without it) */
+	switch (header.type)
+	{
+	case _distributed_message_structure_bsp:
+	case _distributed_message_coop_presentation:
+	case _distributed_message_coop_object_names:
+	case _distributed_message_coop_skip_vote:
+		if (header.count < 1)
+			return;
+		break;
+	default:
+		break;
+	}
 	distributed_statistics.received++;
 
 	/* (each kind from the host, or from a client) */

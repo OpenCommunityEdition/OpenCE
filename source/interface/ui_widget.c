@@ -3698,10 +3698,10 @@ static void widget_instance_initialize(
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
-	/* port: a network game never pauses (co-op opens the campaign's pause
+	/* port: a network co-op game never pauses (it opens the campaign's pause
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-		!network_game_is_active();
+		!network_coop_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);

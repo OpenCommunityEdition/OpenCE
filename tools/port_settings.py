@@ -439,6 +439,15 @@ WIDGET_PATCHES = {
     f"{MT}/multiplayer_type_select_list": {"insert_before": {
         f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
     }},
+    # (B on the Map screen goes from a co-op level's difficulties back to the
+    # level, else out of the screen: menu_functions.c's map list)
+    f"{MT}/mp_map_select/mp_map_select_list_2": {"handlers": [
+        '<on event="created" run="mp level list initialize"/>',
+        '<on event="deleted" run="mp level list dispose"/>',
+        f'<on event="custom_activation" run="mp level select" open="{MT}/connected/gametype_select_screen_wrapper"/>',
+        '<on event="b" run="port map list back"/>',
+        '<on event="back" run="port map list back"/>',
+    ]},
     f"{MT}/join_game/header_join_game": {"children": [
         f'<child widget="{MT}/join_game/header_server_browser"/>',
         f'<child widget="{MT}/join_game/header_direct_link"/>',

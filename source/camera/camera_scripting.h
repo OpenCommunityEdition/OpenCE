@@ -53,6 +53,8 @@ void scripted_camera_set_camera_point_relative(
 	long relative_object_index);
 short scripted_camera_time(
 	void);
+long scripted_camera_object_relative_to(
+	void);
 void scripted_camera_update(
 	struct dead_camera *camera,
 	struct camera_control const *controls,

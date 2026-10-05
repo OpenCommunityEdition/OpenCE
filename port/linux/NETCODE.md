@@ -29,7 +29,8 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   it has, as it drives a remote player's, until it hears nothing of it for
   two seconds (`port/linux/game/network_actors.c`).
 - **Co-op.** A network game on a campaign level with no game engine
-  (Create Game > COOPERATIVE > CAMPAIGN) is co-op. Only the host runs the
+  (Create Game's Map screen, whose campaign levels follow the multiplayer
+  maps over LAN and the internet) is co-op. Only the host runs the
   level's scripts and spawns players. `network_coop.c` sends the clients
   everything the scripts do that they would otherwise miss:
   - every tick: the cinematic, camera, screen fade, the HUD settings the
@@ -124,18 +125,10 @@ is dead; version 8 is the first whose clients play by the host's rules
 (below), so a build without them joins no host of it; version 9 tells
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
-hardware id; version 10 sends every player's ping for the scoreboard.
-
-A host never checks a joining client's version: the client reads the
-host's from its advertisement and joins only a version it plays with. That
-is its own, or one of a range (HALO_PORT_NETWORK_VERSION_MINIMUM to
-HALO_PORT_NETWORK_VERSION_MAXIMUM, halo_port_limits.h) of versions that
-differ from it only in messages the other machine drops, not knowing them:
-version 10 (OpenCE's build-73) adds the host's message of the players'
-pings, which a machine of version 9 drops. This build has version 10, as
-OpenCE's current builds (so their clients join its hosts), without that
-message (its hosts do not send it, its clients drop it), and joins hosts of
-9 and 10. The game browser lists the range's games.
+hardware id; version 10 sends every player's ping for the scoreboard;
+version 11 sends with the game's settings its gametype's PC options;
+version 12 plays the campaign together (co-op, above), drives the host's
+actors on its clients and sends the flinches and deaths the host picked.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
