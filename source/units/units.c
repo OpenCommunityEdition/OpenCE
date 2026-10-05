@@ -692,6 +692,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -5183,6 +5184,11 @@ short vehicle_scripting_load_magic(
 		short available_seat_count;
 		long reference_index;
 		long unit_index;
+		/* port: the riders left without a seat that network co-op keeps
+		(coop_enemies.c), erased once the list is gone through */
+		long unseated_actor_indices[64];
+		short unseated_count = 0;
+		short unseated_number;
 
 		available_seat_count = vehicle_scripting_find_available_seats(
 			vehicle_index,
@@ -5201,6 +5207,7 @@ short vehicle_scripting_load_magic(
 			{
 				struct unit_datum *unit = (struct unit_datum *)object;
 				short available_seat_index;
+				long loaded_before = loaded_count;
 
 				for (available_seat_index = 0;
 					available_seat_index<available_seat_count;
@@ -5236,10 +5243,24 @@ short vehicle_scripting_load_magic(
 						}
 					}
 				}
+
+				/* port: network co-op's extra enemies (coop_enemies.c): a
+				rider seated, or one left without a seat, kept until the
+				seated get out */
+				if (loaded_count > loaded_before)
+					coop_enemies_rider_seated(vehicle_index, unit_index);
+				else if (unit->object.parent_object_index == NONE && unit->unit.actor_index != NONE &&
+					unseated_count < (short)NUMBEROF(unseated_actor_indices) &&
+					coop_enemies_rider_unseated(vehicle_index, unit_index))
+				{
+					unseated_actor_indices[unseated_count++] = unit->unit.actor_index;
+				}
 			}
 
 			unit_index = object_list_get_next(object_list_index, &reference_index);
 		}
+		for (unseated_number = 0; unseated_number < unseated_count; unseated_number++)
+			actor_erase(unseated_actor_indices[unseated_number], FALSE);
 	}
 
 	return (short)loaded_count;

@@ -101,6 +101,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "sound/sound_manager.h"
 #include "sound/sound_definitions.h"
 #include "units/units.h"
+#include "coop_enemies.h"
 #include "coop_spectate.h"
 #include "network_coop.h"
 #include "network_distributed.h"
@@ -1805,6 +1806,7 @@ void network_coop_new_game(
 	skip_vote.voters = 0;
 	skip_vote.cooldown_until = 0;
 	skip_vote.skip_save_written = FALSE;
+	coop_enemies_new_game();
 }
 
 /* A network game on a campaign scenario with no game engine. Checking the
@@ -2361,6 +2363,8 @@ void network_coop_skip_reverted(
 		game_state_port_restamp_revert_time();
 		hs_runtime_port_shift_sleep_times(ticks);
 	}
+	/* (the dropships' riders kept are of the game state reverted from) */
+	coop_enemies_reset();
 	error(_error_silent, "co-op: cutscene skipped; reverted %ld ticks, clock kept at %ld", ticks, now);
 	event_new(_coop_event_cutscene_skipped);
 	skip_vote_clear();
@@ -2393,6 +2397,7 @@ void network_coop_host_tick(
 		return;
 	host_resend_update();
 	players_vitality_keep();
+	coop_enemies_update();
 	host_count_skip_votes();
 	host_presentation(&message.presentation);
 	send_to_clients(&message, _distributed_message_coop_presentation, 1, sizeof(message.presentation));

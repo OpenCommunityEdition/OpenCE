@@ -2576,9 +2576,10 @@ static char const *const server_settings_gametype_rows[] =
 
 /* the most players a co-op game hosted starts with (maximum_players') */
 #define COOPERATIVE_DEFAULT_PLAYERS 16
-/* Server Setup's help for co-op's FRIENDLY FIRE, by its choice (its
-help_strings, tools/port_settings.py) */
+/* Server Setup's help for co-op's FRIENDLY FIRE, by its choice, and its
+EXTRA ENEMIES (its help_strings, tools/port_settings.py) */
 #define COOPERATIVE_FRIENDLY_FIRE_HELP 12
+#define COOPERATIVE_EXTRA_ENEMIES_HELP 16
 
 /* co-op's FRIENDLY FIRE's choices (network.coop_friendly_fire's values,
 port_settings.COOP_FRIENDLY_FIRE_VALUES, in this order) */
@@ -2706,6 +2707,15 @@ static void server_settings_update(struct widget_instance *list)
 			multiplayer.cooperative_friendly_fire = cooperative_friendly_fire_modes[choice];
 			if (help && list->focused_child == named(list, "op_friendly_fire", 0))
 				help->parameters.text_box.string_list_index = (short)(COOPERATIVE_FRIENDLY_FIRE_HELP + choice);
+		}
+		/* ... and its EXTRA ENEMIES (network.coop_enemies, which the host
+		reads as the game begins: coop_enemies.c) */
+		visible_set(named(list, "op_extra_enemies", 0), cooperative);
+		if (cooperative && list->parameters.list.extended_description &&
+			list->focused_child == named(list, "op_extra_enemies", 0))
+		{
+			list->parameters.list.extended_description->parameters.text_box.string_list_index =
+				COOPERATIVE_EXTRA_ENEMIES_HELP;
 		}
 	}
 	/* LISTING (an internet game's): PUBLIC, listed in everyone's server

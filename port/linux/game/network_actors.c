@@ -50,9 +50,10 @@ an AI unit the same way it kills a player's.
 
 enum
 {
-	/* AI units tracked at once: every actor (actors.h allows 256) and the
-	units the cutscenes' recorded animations drive */
-	MAXIMUM_NETWORK_ACTORS = 288,
+	/* AI units tracked at once: every actor (halo_port_capacity.h's
+	HALO_PORT_MAXIMUM_ACTORS) and the units the cutscenes' recorded
+	animations drive */
+	MAXIMUM_NETWORK_ACTORS = HALO_PORT_MAXIMUM_ACTORS + 32,
 	MAXIMUM_ENTRIES_PER_MESSAGE = 64,
 	/* A client keeps applying a control for this long after the host last
 	sent one. After that the unit is left alone: the actor let go of it, or

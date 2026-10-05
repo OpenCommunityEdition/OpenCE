@@ -266,6 +266,11 @@ static const struct config_setting config_settings[] =
 		"\"on\", \"shields_only\" or \"explosives_only\" (Server Setup's FRIENDLY\n"
 		"FIRE in co-op, which writes its choice here). Their AI allies they\n"
 		"always can, as in the campaign." },
+	{ "network.coop_enemies", _config_integer, "50", "HALO_NET_COOP_ENEMIES", _environment_value, _platform_all,
+		"Online co-op's extra enemies, a percentage: for each player past the\n"
+		"first, each squad of enemies a level places gets this much of itself\n"
+		"more (100: as many again; 0 to 200). Server Setup's EXTRA ENEMIES in\n"
+		"co-op writes its choice here." },
 	{ "network.brokers_file", _config_string, "\"brokers.txt\"",
 		"HALO_NET_BROKERS_FILE", _environment_value, _platform_all,
 		"The file of the public MQTT brokers through which the machines of an\n"

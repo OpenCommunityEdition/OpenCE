@@ -53,6 +53,15 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   moving forward (the netcode depends on that) and moves the script
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
+
+  The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies`)
+  give each squad of enemies a level places that percentage of itself more
+  for each player past the first, in rings about its starting locations
+  where the ground is open, and never past the actors a level needs for its
+  own (the actor pool, `halo_port_capacity.h`, holds 1024). Riders a
+  dropship has no seats for are kept, and placed beside its riders once
+  they get out. Only the host runs the AI, so the clients see them as the
+  host's other actors.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
@@ -128,7 +137,9 @@ tells the host its Discord user, and a machine's join request carries its
 hardware id; version 10 sends every player's ping for the scoreboard;
 version 11 sends with the game's settings its gametype's PC options;
 version 12 plays the campaign together (co-op, above), drives the host's
-actors on its clients and sends the flinches and deaths the host picked.
+actors on its clients and sends the flinches and deaths the host picked;
+version 13 drives up to 1056 of the host's AI units on its clients (co-op's
+extra enemies), where 12 drove 288.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
