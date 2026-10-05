@@ -311,6 +311,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+#include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 
 #include <stddef.h>
 
@@ -540,7 +541,8 @@ static boolean encounter_place_actor(
 	long encounter_index,
 	short squad_index,
 	short initial_variant,
-	boolean spawning);
+	boolean spawning,
+	short extra_number);
 static void encounterless_deactivate(
 	long actor_index);
 static void encounters_test_activation(
@@ -1836,7 +1838,7 @@ boolean encounter_spawn_actor(
 {
 	if (ai_globals->ai_initialized_for_map)
 	{
-		if (encounter_place_actor(encounter_index, squad_index, 0, TRUE))
+		if (encounter_place_actor(encounter_index, squad_index, 0, TRUE, 0))
 		{
 			struct encounter_datum *encounter = encounter_get(encounter_index);
 			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
@@ -2245,8 +2247,16 @@ void encounter_create(
 
 			for (i = 0; i < count; ++i)
 			{
-				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE);
+				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE, 0);
 				initial_variant = 0;
+			}
+			/* port: network co-op's extra enemies, for its players
+			(coop_enemies.c) */
+			{
+				short extra_count = coop_enemies_extra_count(encounter_index, count);
+
+				for (i = 0; i < extra_count; ++i)
+					encounter_place_actor(encounter_index, squad_index, 0, FALSE, (short)(i + 1));
 			}
 		}
 
@@ -2996,18 +3006,25 @@ static void encounter_post_combat(
 	return;
 }
 
+/* port: extra_number, from 1, places one of network co-op's extra enemies
+(coop_enemies.c): at the squad's starting locations in turn, each the
+place a ring about its own (0: the squad's own actor, as the Xbox's) */
 static boolean encounter_place_actor(
 	long encounter_index,
 	short squad_index,
 	short initial_variant,
-	boolean spawning)
+	boolean spawning,
+	short extra_number)
 {
 	boolean placed = FALSE;
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 		&encounter_definition->squads, squad_index, struct squad_definition);
-	short starting_location_index = encounter_get_actor_starting_location(encounter_index, squad_index, spawning);
+	short starting_location_index = extra_number > 0 && squad_definition->starting_locations.count > 0 ?
+		(short)((extra_number - 1) % squad_definition->starting_locations.count) :
+		encounter_get_actor_starting_location(encounter_index, squad_index, spawning);
+	struct actor_starting_location spread_location;
 
 	if (starting_location_index != NONE)
 	{
@@ -3015,6 +3032,18 @@ static boolean encounter_place_actor(
 			&squad_definition->starting_locations, starting_location_index, struct actor_starting_location);
 		short actor_palette_index = squad_definition->actor_palette_index;
 		struct scenario *scenario = global_scenario_get();
+
+		/* port: an extra enemy a ring about the starting location */
+		if (extra_number > 0)
+		{
+			spread_location = *starting_location;
+			if (coop_enemies_spread_position(&starting_location->position,
+				(short)((extra_number - 1) / squad_definition->starting_locations.count + 1),
+				&spread_location.position))
+			{
+				starting_location = &spread_location;
+			}
+		}
 
 		if (starting_location->actor_variant_index != NONE)
 			actor_palette_index = starting_location->actor_variant_index;

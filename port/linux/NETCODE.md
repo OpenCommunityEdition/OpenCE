@@ -21,6 +21,59 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
   until a newer arrives.
+- **Actors driven.** Only the host runs the AI. Each tick it sends its
+  clients the control its actors gave their units (how they move, where
+  they face, aim and look, their trigger and buttons, their animation
+  impulses) with the units' state, those near a client's players every
+  tick and others less often; a client drives each unit with the latest
+  it has, as it drives a remote player's, until it hears nothing of it for
+  two seconds (`port/linux/game/network_actors.c`).
+- **Co-op.** A network game on a campaign level with no game engine
+  (Create Game's Map screen, its SINGLEPLAYER maps, over LAN and the
+  internet) is co-op. Only the host runs the
+  level's scripts and spawns players. `network_coop.c` sends the clients
+  everything the scripts do that they would otherwise miss:
+  - every tick: the cinematic, camera, screen fade, the HUD settings the
+    scripts control (what is shown, the mission timer), the skip vote, and
+    which teams are allies and friends (the scripts' allegiances, so the
+    marines are the players' allies on every machine);
+  - once each, numbered so nothing is applied twice: script sounds,
+    chapter titles, help and objective text, "Checkpoint" messages, screen
+    shake, nav points, custom animations on units and scenery, and units
+    opening and closing (dropships' doors);
+  - device groups (doors, elevators, switches; a client sets none itself,
+    and its player's use of one is relayed to the host), and each device's
+    position and power as it changes: a client puts its device where the
+    host's is once that stops, or if they drift apart while it moves;
+  - which named objects exist, so scripted creates and deletes match.
+
+  Every machine follows the host's structure BSP. A loading zone into a
+  BSP the team hasn't been in brings every player to whoever crossed it,
+  as split screen does; one back into a BSP it has been in switches only
+  with two thirds of the living players at it (in the trigger, or within
+  4 world units of the player in it), so one player can't drag the team
+  back through the level. A player outside the loaded BSP and falling for
+  two seconds is brought back beside a teammate. A dead player watches a
+  living teammate (`coop_spectate.c`) and comes back beside one once it is
+  safe. With everyone dead they come back where they were at the last
+  checkpoint, since only the host could revert. A level won ends the round
+  as in multiplayer, and the next round is the campaign's next level.
+
+  Cutscenes are skipped by vote: more than half the machines must press
+  skip. The host then reverts as single player does, but keeps its clock
+  moving forward (the netcode depends on that) and moves the script
+  threads' wake times along with it. The object, device and name syncs
+  bring the clients up to date.
+
+  The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
+  give each squad of enemies a level places more of itself: PER PLAYER, a
+  percentage of itself for each player past the first; STATIC MULTIPLIER,
+  that many times itself for any number of players. They stand in rings
+  about its starting locations where the ground is open, and never take the
+  actors a level needs for its own (the actor pool, `halo_port_capacity.h`,
+  holds 1024). Riders a dropship has no seats for are kept, and placed
+  beside its riders once they get out. Only the host runs the AI, so the
+  clients see them as the host's other actors.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
@@ -93,7 +146,14 @@ is dead; version 8 is the first whose clients play by the host's rules
 (below), so a build without them joins no host of it; version 9 tells
 every machine of a player the host dropped for cheating, each client
 tells the host its Discord user, and a machine's join request carries its
-hardware id; version 10 sends every player's ping for the scoreboard.
+hardware id; version 10 sends every player's ping for the scoreboard;
+version 11 sends with the game's settings its gametype's PC options;
+version 12 plays the campaign together (co-op, above), drives the host's
+actors on its clients and sends the flinches and deaths the host picked;
+version 13 drives up to 1056 of the host's AI units on its clients (co-op's
+extra enemies), where 12 drove 288; version 14 sends co-op's device positions
+and its units opening and closing; version 15 sends co-op's allegiances with
+its presentation, a message of another size.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -138,7 +198,9 @@ added to `bans.txt` beside `debug.txt` (a line each, as in `cheaters.txt`,
 with `ip=` and `hwid=`): the host refuses a machine joining whose address or
 hardware id is in it (a line taken out unbans). Both are as the player's
 machine tells them: anyone with administrator or root access can change
-them, and players behind one address share it.
+them, and players behind one address share it. The console's `kick <player
+name>` drops a player as `ban` does (every machine told), but adds no line
+and keeps no address out: the player may join again at once.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.
@@ -282,8 +344,10 @@ a pregame keep-alive every five seconds from the host
      host's latest tick it had heard of when it made the report.
    - The host deals a report once it has checked it: from that machine's
      player; damage one of their weapons (a vehicle's a driver's or
-     gunner's; now or in the last ten seconds), their grenades (while they
-     have them, and for a while after) or the vehicle they drove (in the
+     gunner's; now or in the last ten seconds), a grenade the host's own game
+     saw them throw in the last ten seconds that has not gone off (each
+     throw's explosion is taken once, its other hits that tick with it:
+     holding grenades deals nothing) or the vehicle they drove (in the
      last ten seconds: its collisions) can deal (its projectiles' impacts
      and detonations, followed through the tags), no harder than it can be
      (all of it, but an airborne melee blow's half again); of the shape the

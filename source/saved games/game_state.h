@@ -38,6 +38,11 @@ void game_state_save(
 	void);
 void game_state_revert(
 	void);
+/* port: network co-op's (game_state.c) */
+boolean game_state_port_saved_game_valid(
+	void);
+void game_state_port_restamp_revert_time(
+	void);
 void game_state_save_to_persistent_storage(
 	void);
 boolean game_state_test_persistent_storage(

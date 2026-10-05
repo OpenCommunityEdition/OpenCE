@@ -568,6 +568,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
@@ -1456,6 +1457,11 @@ static void rasterize_in_game_score_draw_line(
 	return;
 }
 
+/* port: the in-game scoreboard's lists (game_engine_rasterize_scoreboard,
+game_engine_rasterize_in_game_score): the players in the game, not those who
+quit, ranked and placed among themselves */
+static boolean statistic_buffer_in_game_only = FALSE;
+
 long populate_statistic_buffer(
 	struct statistic_buffer *statistic_buffer,
 	enum postgame_statistic statistic,
@@ -1474,6 +1480,8 @@ long populate_statistic_buffer(
 			"c:\\halo\\SOURCE\\game\\game_engine.c",
 			0x2C8,
 			player_count < MULTIPLAYER_MAXIMUM_PLAYERS);
+		if (statistic_buffer_in_game_only && player->quit_out_of_game)
+			continue;
 		if (player_count < MULTIPLAYER_MAXIMUM_PLAYERS)
 		{
 			statistic_buffer[player_count].player_index = player_iterator.datum_index;
@@ -1886,7 +1894,9 @@ static void game_engine_rasterize_scoreboard(
 	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
 		SCOREBOARD_BOTTOM_ROWS;
 	rows = MAX(rows, 1);
+	statistic_buffer_in_game_only = TRUE;
 	ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
+	statistic_buffer_in_game_only = FALSE;
 	team_columns = has_teams && scoreboard_team_columns() && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP;
 	for (index = 0; index < ranked_count; index++)
 	{
@@ -2109,11 +2119,13 @@ static void game_engine_rasterize_in_game_score(
 		return;
 	}
 	game_engine_generate_title_string(title_string, player_index);
+	statistic_buffer_in_game_only = TRUE;
 	entry_count = select_players_to_display(
 		_postgame_statistic_ranking,
 		player_index,
 		entries,
 		NUMBEROF(entries));
+	statistic_buffer_in_game_only = FALSE;
 
 	color.alpha = alpha;
 	color.red = 0.7f;
@@ -4396,6 +4408,9 @@ void game_engine_player_killed(
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
 		&friendly_fire);
+	/* port: a killer who has left the game since is no one's kill */
+	if (killing_player_index != NONE && !player_try_and_get(killing_player_index))
+		killing_player_index = NONE;
 	/* the host's kill of a player who quit, ahead of this client's clock
 	(game_update_quit_players has not come to its time yet) */
 	if (network_game_distributed_client() && dead_player->quit_out_of_game_time != NONE &&
@@ -7054,16 +7069,31 @@ short game_engine_friendly_damage(
 {
 	struct game_variant_options const *options = game_variant_options_get();
 	struct player_datum *attacker;
+	short friendly_fire;
 
-	if (!game_engine || !global_variant.universal_variant.teams || attacker_player_index == NONE ||
-		options->friendly_fire == _friendly_fire_on)
+	/* port: network co-op's friendly fire is Server Setup's FRIENDLY FIRE,
+	in the host's game settings (only the host deals damage), between its
+	players: their AI allies they always hurt, as in the campaign */
+	if (network_coop_active())
 	{
-		return _friendly_damage_all;
+		struct network_game *game = network_game_get_game();
+		struct unit_datum *unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index,
+			_object_mask_unit);
+
+		if (!game || !unit || unit->unit.player_index == NONE)
+			return _friendly_damage_all;
+		friendly_fire = game->variant_options.friendly_fire;
 	}
+	else if (!game_engine || !global_variant.universal_variant.teams)
+		return _friendly_damage_all;
+	else
+		friendly_fire = options->friendly_fire;
+	if (attacker_player_index == NONE || friendly_fire == _friendly_fire_on)
+		return _friendly_damage_all;
 	attacker = (struct player_datum *)datum_try_and_get(player_data, attacker_player_index);
 	if (!attacker || attacker->unit_index == object_index)
 		return _friendly_damage_all;
-	switch (options->friendly_fire)
+	switch (friendly_fire)
 	{
 	case _friendly_fire_off: return _friendly_damage_none;
 	case _friendly_fire_shields_only: return _friendly_damage_shields;
@@ -8281,6 +8311,12 @@ static void game_engine_update_item_spawn(
 				struct object_placement_data placement_data;
 				long object_index;
 
+				/* port: the gametype's no weapons on the map */
+				if (definition_index != NONE && game_variant_options_get()->no_map_weapons &&
+					object_definition_get(definition_index)->object.type == _object_type_weapon)
+				{
+					continue;
+				}
 				object_placement_data_new(
 					&placement_data,
 					definition_index,

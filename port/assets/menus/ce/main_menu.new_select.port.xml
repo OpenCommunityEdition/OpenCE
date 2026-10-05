@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/new_select/list_item_0_map_kind" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/new_select/list_item_0_map_kind_spinner" x="15" y="2"/>
+	</widget>
+	<widget name="main_menu/new_select/list_item_0_map_kind_spinner" type="spinner" width="226" height="22" flags="left_right_tabs_items" string_list="main_menu/new_select/var_map_kinds" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 226 19 232">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/new_select/var_map_kinds">
+		<string text="SINGLEPLAYER"/>
+		<string text="MULTIPLAYER"/>
+	</strings>
+</menus>

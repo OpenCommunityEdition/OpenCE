@@ -117,6 +117,10 @@ on the host's word */
 long network_objects_new_object_index(void);
 boolean network_objects_creating_host_object(void);
 boolean network_objects_may_delete(long object_index);
+/* port/linux/game/network_coop.c's: the scripts' attaching, on co-op's clients */
+void network_coop_note_attach(long parent_index, char const *parent_marker_name, long child_index,
+	char const *child_marker_name);
+void network_coop_note_detach(long parent_index, long child_index);
 
 static void object_connect_lights(long object_index, boolean disconnect, boolean reconnect);
 static void object_name_list_allocate(void);
@@ -1857,9 +1861,11 @@ short object_get_marker_by_name(
 
 	struct object_datum const *object = object_get(object_index);
 	struct object_definition const *object_definition = object_definition_get(object->definition_index);
-	struct object_datum *matrix_object = object_get(object_index);
-	real_matrix4x3 const *matrices = (real_matrix4x3 *)object_header_block_get(object_index,
-		&matrix_object->object.node_matrices);
+	/* port: the matrices the renderer draws with, so a marker an effect, a
+	particle system or a contrail hangs off moves as the object does, between
+	the ticks too (port/linux/game/render_interpolation.c). While a tick runs,
+	which is when the game asks for markers, this is the same array. */
+	real_matrix4x3 const *matrices = object_get_node_matrices(object_index);
 
 	marker = model_get_marker_by_name(
 		object_definition->object.model.index,
@@ -2885,6 +2891,7 @@ void objects_scripting_detach(
 		child_object_index!=NONE &&
 		object_get(child_object_index)->object.parent_object_index == parent_object_index)
 	{
+		network_coop_note_detach(parent_object_index, child_object_index);
 		object_detach(child_object_index);
 	}
 
@@ -3820,6 +3827,7 @@ void objects_scripting_attach(
 		child_object_index !=NONE &&
 		object_get(child_object_index)->object.parent_object_index==NONE)
 	{
+		network_coop_note_attach(parent_object_index, parent_marker_name, child_object_index, child_marker_name);
 		object_attach_to_marker(parent_object_index, parent_marker_name, child_object_index, child_marker_name);
 	}
 

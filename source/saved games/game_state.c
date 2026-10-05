@@ -299,6 +299,22 @@ void game_state_save(
 	return;
 }
 
+/* port: whether game_state_revert has a saved state to go back to */
+boolean game_state_port_saved_game_valid(
+	void)
+{
+	return game_state_globals.saved_game_valid;
+}
+
+/* port: stamps the revert at the current game time again, after a network
+co-op host moved its clock on past the revert (game_state_reverted
+compares the two) */
+void game_state_port_restamp_revert_time(
+	void)
+{
+	game_state_globals.revert_time = game_time_get();
+}
+
 void game_state_revert(
 	void)
 {

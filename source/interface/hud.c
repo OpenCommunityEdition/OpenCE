@@ -107,6 +107,8 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
+#include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
@@ -870,6 +872,7 @@ void hud_autosave(
 		: hud_globals->checkpoint_end_index;
 	short local_player_index;
 
+	network_coop_note_hud(_coop_hud_checkpoint, active);
 	scripted_hud_messages_clear();
 	if (active && hud_globals->checkpoint_sound.index != NONE)
 	{
@@ -993,11 +996,13 @@ static void hud_draw_players(
 	return;
 }
 
-/* port: in multiplayer, players' names above their heads
+/* port: in multiplayer and network co-op, players' names above their heads
 (display.player_names: "all", "allies", "enemies" or "none"). An ally's goes
-above the triangle the game draws over teammates; an enemy's only while the
-view sees them and they are not camouflaged, so that it never gives away
-where they hide. */
+above the triangle the game draws over teammates; an enemy's only within the
+motion sensor's reach, while the view sees them and they are not
+camouflaged, so that it never gives away where they hide. Whose names show
+follows the gametype's motion tracker: none if it shows no players, only
+allies' if it shows only friends (game_engine_draw_object_in_motion_sensor). */
 
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(const char *name);
@@ -1088,46 +1093,11 @@ static boolean hud_player_name_in_sight(
 	return in_sight;
 }
 
-/* the farthest an enemy's name is shown, in world units (the sniper rifle's
-at 2x; its 8x would reach across most maps) */
-#define MAXIMUM_ENEMY_NAME_RANGE 70.0f
-
-/* how far away enemies' names are shown: as far as the local player's
-weapon turns its reticle red over an enemy (its autoaim distance, times its
-zoom; a vehicle's gun when seated at one, none for a weapon that aims only
-when zoomed, unzoomed), never less than the motion sensor's reach and never
-more than MAXIMUM_ENEMY_NAME_RANGE */
+/* how far away enemies' names are shown: the motion sensor's reach */
 static real hud_player_name_enemy_range(
 	void)
 {
-	long player_index = local_player_get_player_index(render.local_player_index);
-	real range = hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
-	long unit_index;
-
-	if (player_index == NONE || player_get(player_index)->unit_index == NONE)
-		return range;
-	unit_index = unit_get_aiming_unit_index(player_get(player_index)->unit_index);
-	if (unit_index != NONE)
-	{
-		struct unit_datum *unit = unit_get(unit_index);
-		long weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
-
-		if (weapon_index != NONE)
-		{
-			struct weapon_definition *definition = weapon_definition_get(weapon_get(weapon_index)->definition_index);
-			short zoom_level = player_control_get_zoom_level(render.local_player_index);
-
-			if (zoom_level != NONE || !TEST_FLAG(definition->weapon.flags, _weapon_aim_assists_only_when_zoomed_bit))
-			{
-				real weapon_range = definition->weapon.aim_assist_parameters.autoaim_distance *
-					weapon_get_zoom_magnification(weapon_index, zoom_level);
-
-				range = MAX(range, weapon_range);
-			}
-		}
-	}
-
-	return MIN(range, MAXIMUM_ENEMY_NAME_RANGE);
+	return hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
 }
 
 static void hud_draw_player_name(
@@ -1223,8 +1193,11 @@ static void hud_draw_player_names(
 	if (setting == _player_names_none || player_index == NONE)
 		return;
 	team_index = player_get(player_index)->team_index;
-	indicators = game_engine_display_team_indicators();
+	/* the campaign always draws teammate triangles (hud_draw_players) */
+	indicators = game_engine_display_team_indicators() || !game_engine_running();
 	enemy_range = hud_player_name_enemy_range();
+	/* (the players the motion tracker would show this local player) */
+	game_engine_motion_sensor_viewer(render.local_player_index);
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
@@ -1233,8 +1206,11 @@ static void hud_draw_player_names(
 
 		if (iterator.datum_index == player_index || player->unit_index == NONE)
 			continue;
-		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies))
+		if ((ally && setting == _player_names_enemies) || (!ally && setting == _player_names_allies) ||
+			!game_engine_draw_object_in_motion_sensor(player->unit_index))
+		{
 			continue;
+		}
 		hud_draw_player_name(iterator.datum_index, ally, ally && indicators, enemy_range);
 	}
 
@@ -1388,9 +1364,15 @@ void hud_draw_screen(
 			hud_draw_players();
 		}
 
-		/* port: players' names above their heads, in multiplayer */
-		if (game_engine_running() && !cinematic_in_progress())
+		/* port: players' names above their heads, in multiplayer and network co-op */
+		if ((game_engine_running() || network_coop_active()) && !cinematic_in_progress())
 			hud_draw_player_names();
+		/* port: who a dead network co-op player is watching */
+		if (player->unit_index == NONE && coop_spectating() && !cinematic_in_progress())
+			coop_spectate_draw(render.local_player_index);
+		/* port: the network co-op vote to skip a cinematic */
+		if (cinematic_in_progress())
+			coop_skip_vote_draw(render.local_player_index);
 
 		if (!game_time_get_paused() &&
 			render.local_player_index == local_player_get_next(NONE))

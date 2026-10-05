@@ -20,6 +20,10 @@ header included in hcex build.
 
 /* ---------- prototypes/NETWORK_SERVER_MANAGER.C */
 
+/* port: whether the host's game is being played (not its lobby) */
+boolean network_game_server_playing(
+	struct network_game_server *server);
+
 struct network_game_server;
 struct game_variant;
 
@@ -55,7 +59,24 @@ every game the server sets up */
 void network_game_server_port_set_settings(
 	wchar_t const *name,
 	long maximum_players);
+/* port: a co-op level was won (main.c). Ends the round for everyone as in
+multiplayer; the next round is on next_map (NULL repeats the level). */
+void network_game_server_port_cooperative_won(
+	char const *next_map);
+/* port: co-op server settings: the difficulty, sent to clients, and the
+most players a co-op game starts with (Server Setup sets its own) */
+void network_game_server_port_set_cooperative(
+	struct network_game_server *server,
+	short difficulty);
+/* port: co-op's friendly fire between its players (a _friendly_fire_ mode:
+Server Setup's FRIENDLY FIRE), kept for the levels after */
+void network_game_server_port_set_cooperative_friendly_fire(
+	short friendly_fire);
 boolean network_game_server_ban_player(
+	char const *text);
+/* port: the host's kick command: as the ban command, but nothing kept (no
+bans.txt line, the address not kept out): the player may join again at once */
+boolean network_game_server_kick_player(
 	char const *text);
 short network_game_server_matching_player_names(
 	char const *text,

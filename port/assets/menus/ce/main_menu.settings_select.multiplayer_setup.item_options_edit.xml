@@ -26,9 +26,10 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_infinite_grenades" x="54" y="73"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_weapon_set" x="54" y="103"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_starting_equipment" x="54" y="133"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="163"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="193"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_map_weapons" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

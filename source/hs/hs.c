@@ -14088,6 +14088,29 @@ static boolean hs_expression_changes_no_game(
 static boolean hs_compile_and_evaluate_command(
 	char const *expression);
 
+/* port: the text after the host's command `word` ("ban", "kick") that an
+expression starts with (spaces and an opening parenthesis before it, in
+either case, then a space or the end), else NULL */
+static char const *hs_host_player_command(
+	char const *expression,
+	char const *word)
+{
+	char const *text = expression;
+	long index;
+
+	while (*text == ' ' || *text == '\t' || *text == '(')
+		text++;
+	for (index = 0; word[index]; index++)
+	{
+		char character = text[index] >= 'A' && text[index] <= 'Z' ? text[index] - 'A' + 'a' : text[index];
+
+		if (character != word[index])
+			return NULL;
+	}
+	text += index;
+	return *text == ' ' || *text == '\t' || *text == 0 ? text : NULL;
+}
+
 /* port: a command someone typed (the console, the telnet console, a cheat
 button, init.txt): what it logs is its answer, shown whatever
 config.toml's game.console_log is (terminal_command_running) */
@@ -14122,20 +14145,20 @@ static boolean hs_compile_and_evaluate_command(
 		console_warning("not while playing in another's game: the host decides the game");
 		return FALSE;
 	}
-	/* port: the host's ban command ("ban <player name>", or its start: Tab
-	completes it), which is no script's */
+	/* port: the host's ban and kick commands ("ban <player name>", "kick
+	<player name>", or the name's start: Tab completes it), which are no
+	script's */
 	{
-		char const *text = expression;
+		char const *text = hs_host_player_command(expression, "ban");
+		boolean kick = FALSE;
 
-		while (*text == ' ' || *text == '\t' || *text == '(')
-			text++;
-		if ((text[0] == 'b' || text[0] == 'B') && (text[1] == 'a' || text[1] == 'A') &&
-			(text[2] == 'n' || text[2] == 'N') && (text[3] == ' ' || text[3] == '\t' || text[3] == 0))
+		if (!text && (text = hs_host_player_command(expression, "kick")) != NULL)
+			kick = TRUE;
+		if (text)
 		{
 			char name[64];
 			long length = 0;
 
-			text += 3;
 			while (*text == ' ' || *text == '\t' || *text == '"')
 				text++;
 			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
@@ -14143,7 +14166,7 @@ static boolean hs_compile_and_evaluate_command(
 			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
 				length--;
 			name[length] = 0;
-			return network_game_server_ban_player(name);
+			return kick ? network_game_server_kick_player(name) : network_game_server_ban_player(name);
 		}
 	}
 	csstrncpy(buffer, expression, sizeof(buffer));

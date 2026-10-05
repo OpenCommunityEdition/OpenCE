@@ -919,6 +919,7 @@ static boolean playlist_profile_options_from_block(
 	options->friendly_fire = (short)PIN(options->friendly_fire, 0, NUMBER_OF_FRIENDLY_FIRE_MODES - 1);
 	options->radar_players = (byte)PIN(options->radar_players, 0, NUMBER_OF_RADAR_PLAYERS - 1);
 	options->loadout = (byte)PIN(options->loadout, 0, NUMBER_OF_LOADOUTS - 1);
+	options->no_map_weapons = options->no_map_weapons != FALSE;
 	/* (the gravity rifle, a cut weapon, and the flamethrower, once loadout
 	weapons: rocket launchers, as the game makes them) */
 	if (options->primary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)

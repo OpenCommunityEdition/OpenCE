@@ -1120,6 +1120,24 @@ void render_debug_trigger_volumes(
 	return;
 }
 
+/* port: moves every sleeping script thread's wake time on by `ticks`, after
+a network co-op host reverts but keeps its clock (network_coop.c) */
+void hs_runtime_port_shift_sleep_times(
+	long ticks)
+{
+	struct data_iterator iterator;
+	struct hs_thread_datum *thread;
+
+	data_iterator_new(&iterator, hs_thread_data);
+	while ((thread = data_iterator_next(&iterator)) != NULL)
+	{
+		if (thread->sleep_until > 0)
+			thread->sleep_until += ticks;
+		if (thread->previous_sleep_until > 0)
+			thread->previous_sleep_until += ticks;
+	}
+}
+
 void hs_runtime_update(
 	void)
 {

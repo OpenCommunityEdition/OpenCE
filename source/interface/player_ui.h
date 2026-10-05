@@ -72,6 +72,9 @@ short player_ui_get_last_single_player_level_played(
 	short local_player_index);
 void player_ui_local_player_joined_multiplayer_game(
 	short local_player_index);
+/* port: the local player out of this game and the next */
+void player_ui_local_player_left_multiplayer_game(
+	short local_player_index);
 boolean player_ui_rumble_disabled(
 	short local_player_index);
 boolean player_ui_get_path_to_local_player_profile_directory(

@@ -54,6 +54,9 @@ drive the controller.
 
 /* main/console.c */
 extern unsigned char console_is_active(void);
+/* port/linux/game/menu_functions.c: two or more players on this machine
+(co-op, or split screen in a network game) */
+extern unsigned char pc_menu_split_players(void);
 
 /* ---------- device tables */
 
@@ -634,6 +637,46 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 	return found;
 }
 
+/* whether one gamepad is port 1's (port_gamepad) */
+static BOOL lone_gamepad_split;
+
+/* no button of the gamepad held, its sticks and triggers at rest */
+static BOOL gamepad_idle(SDL_Gamepad *gamepad)
+{
+	int index;
+
+	for (index = 0; index < SDL_GAMEPAD_BUTTON_COUNT; index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)index))
+			return FALSE;
+	}
+	for (index = 0; index < SDL_GAMEPAD_AXIS_COUNT; index++)
+	{
+		if (abs(SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)index)) > 8000)
+			return FALSE;
+	}
+	return TRUE;
+}
+
+/* the gamepad of a port: the first shares port 0 with the keyboard, but for
+two or more players with one gamepad (co-op, split screen), port 1 has it
+(the keyboard's player is 1, the gamepad's 2). It changes port only at rest:
+a button held across the change would be pressed again on the other port
+(the B that leaves a profile screen leaving the game as player 1's) */
+static SDL_Gamepad *port_gamepad(SDL_Gamepad *gamepads[PORT_COUNT], int count, int port)
+{
+	if (count == 1)
+	{
+		BOOL split = pc_menu_split_players() != 0;
+
+		if (split != lone_gamepad_split && gamepad_idle(gamepads[0]))
+			lone_gamepad_split = split;
+		if (lone_gamepad_split)
+			return port == 1 ? gamepads[0] : NULL;
+	}
+	return port < count ? gamepads[port] : NULL;
+}
+
 static SHORT stick(Sint16 value, BOOL flip)
 {
 	int result = flip ? -(int)value - 1 : value;
@@ -717,9 +760,12 @@ static DWORD connected_gamepads(void)
 	DWORD mask = XDEVICE_PORT0_MASK;
 	int port;
 
-	/* the first pad shares port 0 with the keyboard */
-	for (port = 1; port < count; port++)
-		mask |= 1UL << port;
+	/* the first pad shares port 0 with the keyboard (port_gamepad) */
+	for (port = 1; port < PORT_COUNT; port++)
+	{
+		if (port_gamepad(gamepads, count, port))
+			mask |= 1UL << port;
+	}
 	return mask;
 }
 
@@ -813,7 +859,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			else
 				keyboard_controls(&input, &state->Gamepad);
 		}
-		if (count > 0)
+		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
@@ -824,9 +870,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			pthread_mutex_unlock(&mouse_lock);
 		}
 	}
-	else if (port < count)
+	else if (port_gamepad(gamepads, count, port))
 	{
-		sdl_gamepad_state(gamepads[port], &state->Gamepad);
+		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
 	}
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
@@ -850,11 +896,11 @@ DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	count = sdl_gamepads(gamepads);
-	if (port < count)
+	if (port_gamepad(gamepads, count, port))
 	{
 		/* the game refreshes the motors every frame; rumble a little longer
 		than that so they do not stutter */
-		SDL_RumbleGamepad(gamepads[port], feedback->Rumble.wLeftMotorSpeed,
+		SDL_RumbleGamepad(port_gamepad(gamepads, count, port), feedback->Rumble.wLeftMotorSpeed,
 			feedback->Rumble.wRightMotorSpeed, 100);
 	}
 	return ERROR_SUCCESS;

@@ -29,6 +29,9 @@ such setting */
 int config_text(const char *name, char *text, size_t size);
 /* the folder config.toml is in, with its separator */
 void config_folder(char *path, size_t size);
+/* a whole file (a UTF-8 path), NUL terminated, or NULL; free() it (the Android
+guest has no SDL_LoadFile) */
+char *config_file_read(const char *path, size_t *size);
 /* a setting's default, as text; 0 if there is no such setting */
 int config_default(const char *name, char *text, size_t size);
 /* how many times config_write has changed a setting: what keeps one reads

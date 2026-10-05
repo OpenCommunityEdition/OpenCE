@@ -662,6 +662,7 @@ struct widget_instance;
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
@@ -3332,7 +3333,11 @@ static void event_handler_dispatch(
 		{
 			close_all = TRUE;
 		}
+		/* port: not from a widget its function deleted (it went back:
+		menu_functions.c's profile_save_changes), which the Xbox's opened
+		from regardless */
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted &&
 			handler->widget_tag.index != NONE)
 		{
 			if (!ui_widget_launch_widget(widget, handler->widget_tag.index))
@@ -3693,7 +3698,10 @@ static void widget_instance_initialize(
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
-	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit);
+	/* port: a network co-op game never pauses (it opens the campaign's pause
+	screen, which would) */
+	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
+		!network_coop_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -5844,6 +5852,23 @@ static boolean ui_mouse_selection_row(
 		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
 }
 
+/* port: a press the menus post from their updates (menu_functions.c: the
+server browser's join, once its game is reached), posted where the mouse's
+are: one posted while the widgets update or draw would be overwritten by the
+next frame's events (queue_event keeps the latest) */
+static short ui_widget_port_press_controller = NONE;
+static short ui_widget_port_press_button;
+
+void ui_widget_port_post_button(
+	short controller_index,
+	short button_index)
+{
+	ui_widget_port_press_controller = controller_index;
+	ui_widget_port_press_button = button_index;
+
+	return;
+}
+
 static void ui_widgets_process_mouse(
 	void)
 {
@@ -6578,6 +6603,33 @@ static void widget_instance_tab_to_previous_valid_widget(
 	return;
 }
 
+/* port: whether a widget of the local player (NONE: any) takes the
+controller's events. In co-op's menus (Multiplayer's CO-OP CAMPAIGN,
+port/linux/game/menu_functions.c) the screens it shares with one player's
+campaign, New Game's levels and the difficulty, are player 1's (their rows
+the first controller's), and either player's controller uses them: player 1's
+is the one that chose co-op, player 2's the one that chose their profile */
+static boolean widget_takes_events_of_controller(
+	struct widget_instance const *widget,
+	short controller_index)
+{
+	short player;
+
+	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
+		return TRUE;
+	if (widget->local_player_index != 0 || !we_are_at_the_main_menu || player_spawn_count < 2 ||
+		controller_index < 0 || controller_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+	{
+		return FALSE;
+	}
+	for (player = 0; player < 2; player++)
+	{
+		if (player_ui_get_single_player_local_player_controller(player) == controller_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static void widget_instance_process_one_event_recursive(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -6586,8 +6638,7 @@ static void widget_instance_process_one_event_recursive(
 {
 	boolean event_handled = FALSE;
 	boolean widget_deleted = FALSE;
-	boolean event_for_this_widget = widget->local_player_index == NONE ||
-		widget->local_player_index == event->controller_index;
+	boolean event_for_this_widget = widget_takes_events_of_controller(widget, event->controller_index);
 	long audio_feedback = _ui_audio_feedback_none;
 
 	match_assert(
@@ -7014,8 +7065,7 @@ static void widget_instance_process_one_event_recursive(
 
 			for (child = widget->child; child; child = child->next)
 			{
-				if (child->local_player_index == NONE ||
-					child->local_player_index == event->controller_index)
+				if (widget_takes_events_of_controller(child, event->controller_index))
 				{
 					widget_instance_process_one_event_recursive(
 						child,
@@ -7029,8 +7079,7 @@ static void widget_instance_process_one_event_recursive(
 		}
 		else if (widget->focused_child)
 		{
-			if (widget->focused_child->local_player_index == NONE ||
-				widget->focused_child->local_player_index == event->controller_index)
+			if (widget_takes_events_of_controller(widget->focused_child, event->controller_index))
 			{
 				widget_instance_process_one_event_recursive(
 					widget->focused_child,
@@ -7136,7 +7185,10 @@ static boolean ui_check_for_pause_game(
 						network_game_client_get_machine_index(client);
 					char const *widget_name;
 
-					switch (local_player_count)
+					/* port: a campaign map has only the campaign's pause screen */
+					if (network_coop_active())
+						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
+					else switch (local_player_count)
 					{
 					case 1:
 						widget_name =
@@ -7292,6 +7344,11 @@ void process_ui_widgets(
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
 	ui_widgets_process_mouse();
+	if (ui_widget_port_press_controller != NONE)
+	{
+		event_manager_post_button(ui_widget_port_press_controller, ui_widget_port_press_button);
+		ui_widget_port_press_controller = NONE;
+	}
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))

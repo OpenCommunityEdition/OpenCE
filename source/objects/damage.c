@@ -1693,7 +1693,12 @@ void object_cause_damage(
 					force_kill = TRUE;
 				}
 
+				/* port: nor does a teammate's hit kill outright (a melee from
+				behind, an instant kill) where the gametype's friendly fire
+				spares the body; a killing blow the host dealt (a client's
+				replay of it) is dealt as the host dealt it */
 				if (force_kill &&
+					(friendly_damage == _friendly_damage_all || distributed_damage_authorized) &&
 					!TEST_FLAG(current_object->object.damage_flags, _object_dead_bit))
 				{
 					current_object->object.body_vitality = 0.f;

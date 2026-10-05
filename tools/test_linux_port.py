@@ -302,3 +302,40 @@ def test_menu_settings_exist():
     controls = set(re.findall(r'"(controls\.[a-z_]+)"', (root / "port/linux/src/xinput_sdl.c").read_text()))
     assert controls == {name for name in known if name.startswith("controls.")}
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
+
+
+def test_p2p_signatures_and_listings(tmp_path):
+    """internet play's Ed25519 (RFC 8032), the X25519 key of a seed, and the
+    server browser's listings from host to browser (tools/p2p_lobby_check.c),
+    built with the flags ninja gives the platform layer"""
+    import shlex
+
+    if not shutil.which("clang") or not shutil.which("ninja") or not Path("build.ninja").is_file():
+        pytest.skip("needs clang, ninja and a configured build")
+    command = subprocess.run(["ninja", "-t", "commands", "build/linux/obj/port/linux/src/p2p_crypto.o"],
+                             capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1]
+    words = shlex.split(command)
+    # (the compiler, and whatever runs it, ccache in CI: up to the first flag)
+    while words and not words[0].startswith("-"):
+        words = words[1:]
+    flags = []
+    skip = False
+    for word in words:
+        if skip:
+            skip = False
+        elif word in ("-MF", "-o", "-c"):
+            skip = True
+        elif word == "-MMD" or word.startswith("-flto") or word.startswith("-fprofile-use"):
+            continue
+        else:
+            flags.append(word)
+    program = tmp_path / "p2p_lobby_check"
+    built = subprocess.run(["clang", *flags, "-O1", "-no-pie", "-Wl,--unresolved-symbols=ignore-all", "-o",
+                            str(program), "tools/p2p_lobby_check.c", "port/linux/src/p2p_crypto.c",
+                            "port/linux/src/p2p_lobby.c", "port/third_party/monocypher/monocypher.c",
+                            "port/third_party/monocypher/monocypher-ed25519.c"],
+                           capture_output=True, text=True)
+    assert built.returncode == 0, built.stderr[-4000:]
+    result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout
+    assert "PASS" in result.stdout

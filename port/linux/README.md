@@ -83,7 +83,8 @@ These files are in the data root:
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
 
 The settings are in `config.toml` next to the executable. Refer to
-"Settings".
+"Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
+(`network.brokers_file`).
 
 If the game stops because of a fatal signal, it writes the address and a
 backtrace to the standard error. To find the function at the address, enter
@@ -95,8 +96,12 @@ The keyboard and the mouse are a control scheme of their own for the player
 of controller 1: each action has up to two keys or mouse buttons, which
 Settings > Controls Setup (or `[controls]` in `config.toml`) changes. The
 game adds the input of the first gamepad to controller 1. The other
-gamepads operate controllers 2 to 4. The profile's button layout (Settings >
-Gamepads) is the gamepads' only.
+gamepads operate controllers 2 to 4. With two or more players on this
+computer (co-op, or split screen in a network game) and only one gamepad,
+that gamepad is controller 2 (player 2) and the keyboard and mouse stay
+controller 1. The gamepad changes controller only when none of its buttons
+is held. The profile's button layout (Settings > Gamepads) is the
+gamepads' only.
 
 | Action | Keys and buttons (default) |
 | --- | --- |
@@ -157,6 +162,37 @@ change. The screens open, close and move between each other as the PC
 version's. `display.menus = "xbox"` gives the Xbox's menus, which start every
 kind of game.
 
+Multiplayer > CO-OP CAMPAIGN is the Xbox's cooperative play, which the PC
+version does not have: two players on this computer play the campaign in
+split screen. Player 1 is the player who chose it, on the current profile.
+Player 2 then chooses a profile with their own controller (a gamepad), and
+New Game's levels are those either profile has reached. Either player's
+controller chooses the level and the difficulty. A co-op game does
+not continue a saved game of one player.
+
+Network games have split screen too: up to 4 players on each computer. In
+the game lobby, another controller presses START to join, and the new
+player's profile is chosen on the ADD PLAYER screen that opens (with any
+controller). With one gamepad, choose the lobby's ADD PLAYER button first:
+until then that gamepad shares controller 1 with the keyboard. Two players on one profile get different names from the host. A
+player's B in the lobby leaves the game alone, and the last player of the
+computer leaves it for all of them. In the game, each player's pause menu
+opens on their part of the screen, and its LEAVE GAME is theirs: their part
+of the screen stays until the game ends. A game under way shows its own
+screen before JOIN GAME: players join there the same way, START or ADD
+PLAYER then START, and JOIN GAME brings them all into the game.
+
+In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
+the profile's settings while the game goes on, and for the host END GAME.
+END GAME ends the game as its time limit does: the players stay, and after
+the carnage report the host picks the next map and gametype (PICK GAME).
+LEAVE GAME of the host still ends the game for everyone. The buttons go into
+the map's own pause menu, before LEAVE GAME, so the buttons of a custom map
+stay. The Xbox's pause box is drawn taller to hold them (a redraw,
+`port/assets/menus/port_svg/pause`); a custom map's box keeps its size, and
+what is below its list moves down. The few pictures of the settings that
+come from the main menu's map are not drawn there.
+
 The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
 them from the PC version's tags), which the game contains. To change them,
 put files in a `menus` folder next to `config.toml`: a file with the same
@@ -185,10 +221,12 @@ the setting for one start of the game. It has priority over the file.
 
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
-| `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: a borderless window over the whole desktop. The display's mode is not changed. It draws at `display.resolution_width` and `_height`, the picture 480 lines of the game and as wide as that resolution's shape (letterboxed on a display of another shape). `"windowed"`: a window with the 640x480 picture of the Xbox, scaled (`display.window_scale`). `"borderless"`, from older versions, is the same as `"fullscreen"`. Empty: `display.fullscreen` decides. F11 changes between the window and fullscreen. Video Setup's Display Mode sets it: Fullscreen or Windowed. |
-| `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: fullscreen, as `display.mode = "fullscreen"`. `false`: a window, as `display.mode = "windowed"`. Used when `display.mode` is empty. |
-| `display.resolution_width`, `display.resolution_height` | `0`, `0` | `HALO_RESOLUTION_WIDTH`, `HALO_RESOLUTION_HEIGHT` | The resolution fullscreen draws at, scaled to the display: `1920`, `1080` draws at 1920x1080 on any display at least that size. The display's mode is not changed, and the window is never resized or moved. 640x480 or more and no more than the display; otherwise, or `0`, the display's own. Video Setup's Resolution sets it, from the display's resolutions; it shows with Fullscreen. |
-| `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | The size of the window, as a multiple of 640x480: `1` 640x480, `2` 1280x960, `3` 1920x1440, `4` 2560x1920. Only the window's: fullscreen draws at `display.resolution_width` and `_height`. You can change the size of the window. Video Setup's Window Scale sets it; it shows with Windowed. |
+| `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: the display, taken at the mode of `display.resolution` (the nearest the display has), or at its desktop mode. `"borderless"`: a window over the whole desktop, whose mode does not change. `"windowed"`: a window of `display.window_size`. Empty: `display.fullscreen` decides (`true`: borderless). F11 changes between the window and the fullscreen mode. Video Setup sets it. |
+| `display.fullscreen` | `true` | `HALO_FULLSCREEN` | `true`: borderless, as `display.mode = "borderless"`. `false`: a window, as `display.mode = "windowed"`. Used when `display.mode` is empty. |
+| `display.resolution` | `"native"` | `HALO_RESOLUTION` | What fullscreen and borderless draw at: `"native"`, the display's own resolution, or `"<width>x<height>"`, such as `"1920x1080"`, 640x480 or more. Fullscreen sets the display to it. Borderless draws at it and scales the picture to the display, where the display has room for it. The picture has 480 lines of the game and the width of the resolution's shape. A window draws at its own size instead. Video Setup's Resolution sets it, from the display's modes; it shows with Fullscreen and Borderless. |
+| `display.resolution_scaling` | `"native"` | `HALO_RESOLUTION_SCALING` | `"native"`: the game draws at the resolution of the window, or of the display (or `display.resolution`) fullscreen. `"original"`: the game draws the 640x480 picture of the Xbox and scales it up to the window or the display, whatever `display.mode` is. Video Setup sets it. |
+| `display.window_size` | `""` | `HALO_WINDOW_SIZE` | The size of the window, as `"<width>x<height>"`, such as `"1920x1080"`, 640x480 or more. You can change the size of the window; the game's picture takes its shape. Empty: `display.window_scale` decides. Video Setup's Window Size sets it, from sizes of each shape (4:3, 16:10, 16:9 and 21:9) that fit the desktop; it shows with Windowed. |
+| `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | Used when `display.window_size` is empty: the size of the window, as a multiple of 640x480. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
 | `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |
 | `debug.gpu_flush_draws` | `-1` | `HALO_GPU_FLUSH_DRAWS` | Flush the GPU's pipeline every this many draws. `-1`: every 3 on Intel graphics with Mesa's driver, which can otherwise hang in the game's long runs of small draws and reset the desktop's graphics too. `0`: never. |
@@ -197,7 +235,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the resolution the game draws at, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |
 | `display.menus` | `"pc"` | `HALO_MENUS` | `"pc"`: the PC version's menus, from the files in `port/assets/menus` and a `menus` folder next to `config.toml`. Refer to "Menus". `"xbox"`: the Xbox's menus. |
-| `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only while the enemy is in sight and not camouflaged, so it never shows where an enemy hides, and only as far away as the weapon in hand turns its reticle red over an enemy (at least 20 world units, the motion sensor's reach, and at most 70). |
+| `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `1.0` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
 | `display.scoreboard_background` | `true` | `HALO_SCOREBOARD_BACKGROUND` | `true`: the multiplayer scoreboard (hold BACK, or tab) has a panel behind its text, for clearer text. |
@@ -221,7 +259,14 @@ the setting for one start of the game. It has priority over the file.
 | `network.join_from_clipboard` | `true` | `HALO_NET_JOIN_FROM_CLIPBOARD` | `true`: when the game comes to the front, it joins the game of an invite link on the clipboard. |
 | `network.tunnel_port` | `0` | `HALO_NET_TUNNEL_PORT` | The UDP port for internet play. `0`: the game selects a port. Refer to "Internet play". |
 | `network.allow_upnp` | `true` | `HALO_NET_ALLOW_UPNP` | `true`: internet play can ask the router to forward its port (UPnP). `false`: the game does not ask. Refer to "Internet play". |
-| `network.signalling_brokers` | three public brokers | `HALO_NET_BROKERS` | The public MQTT brokers (`host:port`, with commas between them) that let the machines of an invite find each other. |
+| `network.public_lobby` | `true` | `HALO_NET_PUBLIC_LOBBY` | `true`: the server browser. Public games are listed, and Join Game > Server Browser shows them. `false`: no games are listed or shown. Refer to "Server browser". |
+| `network.host_public` | `true` | `HALO_NET_HOST_PUBLIC` | `true`: a new game of Create Game > Internet starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in Server Setup changes it for each game. Refer to "Server browser". |
+| `network.coop_friendly_fire` | `"on"` | `HALO_NET_COOP_FRIENDLY_FIRE` | Whether the players of an online co-op game hurt each other: `"off"`, `"on"`, `"shields_only"` or `"explosives_only"`. FRIENDLY FIRE in co-op's Server Setup writes its choice here. Their AI allies they always can, as in the campaign. |
+| `network.coop_enemies_mode` | `"per_player"` | `HALO_NET_COOP_ENEMIES_MODE` | Online co-op's extra enemies: `"none"`; `"per_player"`, each squad of enemies that a level places grows by `network.coop_enemies` for each player past the first; or `"multiplier"`, each squad is `network.coop_enemies_multiplier` times as large, for any number of players. The extra enemies stand around the squad's places, and those that a dropship has no seats for drop out of it after its passengers. EXTRA ENEMIES in co-op's Server Setup writes its choice here. |
+| `network.coop_enemies` | `50` | `HALO_NET_COOP_ENEMIES` | The extra enemies per player, a percentage from `25` to `200`: for each player past the first, each squad of enemies gets this much of itself more (`100`: as many again, so four players meet four times the squad). PER PLAYER in co-op's Server Setup writes its choice here. |
+| `network.coop_enemies_multiplier` | `2` | `HALO_NET_COOP_ENEMIES_MULTIPLIER` | The static multiplier of the enemies, `2` to `32`: each squad of enemies is this many times as large. MULTIPLIER in co-op's Server Setup writes its choice here. |
+| `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
+| `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
@@ -404,17 +449,73 @@ When the machines connect, the game of the host shows in Multiplayer,
 System Link. Join the game as on a local network. System link on a local
 network does not need an invite.
 
+### Server browser
+
+Server Setup in Create Game > Internet has a LISTING row:
+
+- PUBLIC (the default): the game also shows in Join Game > Server Browser
+  on every machine. Anyone can see and join the game.
+- PRIVATE: only players with the invite link can join.
+
+Each new game starts as PUBLIC (`network.host_public = false` makes new
+games start as PRIVATE). An online co-op game starts as PRIVATE, and keeps
+the last choice of its LISTING (`network.coop_public`). A LAN game is never listed. `network.public_lobby = false` turns the server browser off.
+
+In the Server Browser, select a game to join it. The game joins the invite
+of the game, as for a link. When it reaches the host, it opens the lobby.
+If it cannot reach the host in 30 seconds, it marks the game FAILED. REFRESH
+asks the hosts for their listings again.
+
+How it operates (`src/p2p_lobby.c`):
+
+- The host of a public game publishes a listing: the invite, and the name,
+  map, gametype and player counts of the game. The listing goes to the
+  same MQTT brokers as the invites (`network.brokers_file`), retained,
+  to a topic of the host (`hceu/3/lobby/s/<hash of its key>`).
+- The key of the host signs the listing (Ed25519). The key is the key of the
+  invite, so no other machine can list the invite of the host, change its
+  listing, or list a game with false details.
+- The host publishes the listing again every 30 seconds, when the game
+  changes, and when a browser asks. If the topic of the host is empty or
+  holds another listing, the host publishes again in 5 seconds or less. Thus
+  a broker that deletes the listing does not remove the game.
+- When the host stops (it stops hosting, the game becomes private, or the
+  game quits), it publishes a closed listing, and then empties its topic.
+  If the host loses its connection, the broker empties its topic (the will
+  of the connection). A browser removes a game that it does not hear for 90
+  seconds.
+- When a public game becomes private, the host makes a new invite. Thus a
+  player who saw the listing cannot join with the old invite.
+
+A public game does not publish the address of the host. But any machine
+with the invite can ask the host to connect, and the host then sends its
+addresses. Thus anyone can learn the address of the host of a public game,
+as for any public server.
+
+The brokers are in `brokers.txt` next to the executable (from
+`port/assets/network/brokers.txt`; on Android, the app writes it next to
+`config.toml` at each start), one `host:port` on each line. The game uses
+all of them at once (up to 4), so one that works is enough. An update
+replaces `brokers.txt`: to use brokers of your own, put them in another
+file and name it in `network.brokers_file`. All the players must use the
+same broker to see each other's games. The game uses
+MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
+retained messages, or does not let clients subscribe with wildcards, carries
+only invites, not listings.
+
 ### Security
 
 Only machines with the invite can find the game:
 
-- Each copy of the game makes an X25519 key pair when it starts. Its
-  identifier is from the hash of its public key.
+- Each copy of the game makes an Ed25519 key pair when it starts, and from
+  it an X25519 key pair (Monocypher, `port/third_party/monocypher`). Its
+  identifier is from the hash of its X25519 public key. The Ed25519 key
+  signs the listing of a public game.
 - The link contains a 16-byte hash of the public key of the host and a
   random 16-byte token. The identifier of the host is from the first 6
   bytes of the hash.
 - The machines exchange their public keys and addresses through public MQTT
-  brokers (`network.signalling_brokers`). The topics are HMACs of the token.
+  brokers (`network.brokers_file`). The topics are HMACs of the token.
   A key from the token encrypts and authenticates the messages
   (`src/p2p_signal.c`, `src/p2p_crypto.c`). The host authenticates its answer
   with a key that only it and the player can calculate. Its public key must
@@ -454,7 +555,9 @@ Only machines with the invite can find the game:
   `bans.txt`, and refuses a machine whose address or hardware id is in it.
 - The host can ban a player with `ban <player name>` in the developer
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
-  Refer to `NETCODE.md`. So that every player can be named, the host trims
+  Refer to `NETCODE.md`. `kick <player name>` drops the player the same
+  way, but keeps nothing: no line in `bans.txt`, and the player can join
+  again at once. So that every player can be named, the host trims
   the spaces around a name and removes characters that draw as nothing. A
   letter with a mark is typed as the plain letter (`ban jose` for "José").
   A name with nothing left to type becomes "Player", and a name that another
@@ -610,7 +713,7 @@ Other changes:
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 | `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), and adds the tags of the menus to the menus' map (`game/menu_tags.c`). |
-| `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB. |
+| `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB; the main menu and Multiplayer clear co-op's controllers, so that a gamepad going back to controller 1 is not a controller unplugged; the lobby's split screen players leave alone, and one who quits in game is not joined to the next game (`interface/player_ui.c`). |
 | `input/input_abstraction.c`, `game/player_control.c`, `game/players.c`, `game/player_queues_new.c`, `units/units.h` | The keyboard and mouse's actions (`src/xinput_sdl.c`, `include/halo_keyboard.h`) join controller 1's game controls; their reload key reloads on its own, and their action key only acts (a control flag of the port's, sent with the player's action, stops the reload the controller's X falls back to). |
 | `sound/sound_manager.c`, `interface/hud.c`, `game/game_engine.c` | The music's and the other sounds' volumes; the HUD's and the scoreboard's settings are read again when Settings changes them. |
 | `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |

@@ -349,27 +349,41 @@ int halo_interpolation_enabled(void)
 }
 
 #ifndef HALO_ANDROID
-/* whether the window is to be fullscreen (display.mode "fullscreen", or the
-older "borderless"; else display.fullscreen), never when it is hidden.
-Fullscreen is SDL's without a display mode: a borderless window over the
-whole desktop, whose mode is never changed. F11 switches to the window and
-back. */
-static BOOL platform_fullscreen_setting(void)
+enum
+{
+	_display_mode_windowed = 0,
+	_display_mode_borderless,
+	_display_mode_fullscreen
+};
+
+static int platform_display_mode(void)
 {
 	const char *mode = config_string("display.mode");
 
-	if (config_boolean("debug.hidden_window") || !strcmp(mode, "windowed"))
-		return FALSE;
-	return !strcmp(mode, "fullscreen") || !strcmp(mode, "borderless") || config_boolean("display.fullscreen");
+	if (!strcmp(mode, "fullscreen"))
+		return _display_mode_fullscreen;
+	if (!strcmp(mode, "borderless"))
+		return _display_mode_borderless;
+	if (!strcmp(mode, "windowed"))
+		return _display_mode_windowed;
+	return config_boolean("display.fullscreen") ? _display_mode_borderless : _display_mode_windowed;
+}
+
+/* whether the window is to be fullscreen (display.mode "fullscreen" or
+"borderless"; else display.fullscreen), never when it is hidden. Both use
+SDL fullscreen; platform_fullscreen_kind_apply sets the display mode for
+"fullscreen" and leaves it unchanged for "borderless". F11 switches to the
+window and back. */
+static BOOL platform_fullscreen_setting(void)
+{
+	return !config_boolean("debug.hidden_window") && platform_display_mode() != _display_mode_windowed;
 }
 
 /* ---------- the resolution
 
-Fullscreen draws at the resolution set (display.resolution_width and
-_height, Video Setup's Resolution), d3d8_gl.c scaling the picture to the
-display, whose mode stays its desktop one; or at the display's own, where
-none is set or the display the game is on has no room for it. A new one is
-taken up between frames (halo_screen_commit). */
+Fullscreen uses the closest display mode to display.resolution, or the
+desktop mode for "native". Borderless draws at that resolution and scales
+it to the desktop. Both are taken up between frames (halo_screen_commit). */
 
 /* the display the game is on, or will open on */
 static SDL_DisplayID platform_display(void)
@@ -377,6 +391,38 @@ static SDL_DisplayID platform_display(void)
 	SDL_DisplayID display = platform_window ? SDL_GetDisplayForWindow(platform_window) : 0;
 
 	return display ? display : SDL_GetPrimaryDisplay();
+}
+
+/* a size as a setting has it, "<width>x<height>": whether it is one, and
+the Xbox's 640x480 or more */
+static BOOL platform_size_parse(const char *text, long *width, long *height)
+{
+	char *end;
+
+	*width = strtol(text, &end, 10);
+	*height = *end == 'x' || *end == 'X' ? strtol(end + 1, &end, 10) : 0;
+	return !*end && *width >= 640 && *height >= 480;
+}
+
+/* display.resolution in pixels, or 0x0 for the display's own ("native"),
+as for one the game cannot draw at */
+static void platform_resolution_setting(long *width, long *height)
+{
+	if (!platform_size_parse(config_string("display.resolution"), width, height))
+		*width = *height = 0;
+}
+
+/* the window's size (display.window_size), else the Xbox's 640x480 times
+display.window_scale, as older versions set it */
+static void platform_window_size_setting(long *width, long *height)
+{
+	long scale = config_integer("display.window_scale");
+
+	if (!platform_size_parse(config_string("display.window_size"), width, height))
+	{
+		*width = 640 * (scale < 1 ? 1 : scale);
+		*height = 480 * (scale < 1 ? 1 : scale);
+	}
 }
 
 /* a display's own size in pixels (its desktop mode) */
@@ -391,77 +437,125 @@ static BOOL platform_display_size(SDL_DisplayID display, long *width, long *heig
 	return TRUE;
 }
 
-/* whether the game can draw a display of the size at a resolution: the
-Xbox's 640x480 or more, and no more than the display */
-static BOOL platform_resolution_fits(long width, long height, long display_width, long display_height)
+/* the window's fullscreen kind (display.mode): borderless, a window over
+the whole desktop (SDL's fullscreen without a mode), or fullscreen, the
+display taken at display.resolution's mode (the one nearest it), else at its
+desktop one. F11 switches to the kind set. */
+static void platform_fullscreen_kind_apply(void)
 {
-	return width >= 640 && height >= 480 && width <= display_width && height <= display_height;
+	static int applied = -1;
+	static long applied_width, applied_height;
+	int exclusive = platform_display_mode() == _display_mode_fullscreen ? 1 : 0;
+	long width = 0, height = 0;
+	SDL_DisplayID display;
+	SDL_DisplayMode closest;
+	const SDL_DisplayMode *mode = NULL;
+
+	if (!platform_window)
+		return;
+	if (exclusive)
+		platform_resolution_setting(&width, &height);
+	if (exclusive == applied && width == applied_width && height == applied_height)
+		return;
+	applied = exclusive;
+	applied_width = width;
+	applied_height = height;
+	display = SDL_GetDisplayForWindow(platform_window);
+	if (exclusive && display)
+	{
+		if (width && SDL_GetClosestFullscreenDisplayMode(display, (int)width, (int)height, 0.0f, false, &closest))
+			mode = &closest;
+		else
+			mode = SDL_GetDesktopDisplayMode(display);
+	}
+	SDL_SetWindowFullscreenMode(platform_window, mode);
 }
 
-/* whether the game is, or is to be, fullscreen, and if so the size in
-pixels it draws the display at (d3d8_gl.c) */
+/* whether the game last asked for the window to be fullscreen */
+static BOOL platform_fullscreen_requested = FALSE;
+
+static void platform_window_set_fullscreen(BOOL fullscreen)
+{
+	platform_fullscreen_requested = fullscreen;
+	SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false);
+}
+
+/* whether the window is fullscreen. SDL sets its flag when the window
+manager confirms the request, and some never do: gamescope (the Steam
+Deck's Game Mode) makes the window the size of the display but leaves the
+flag unset, so the game drew 640x480 and gamescope stretched it. A window
+that was asked to be fullscreen and covers its display counts too. */
+static BOOL platform_window_fullscreen(void)
+{
+	SDL_DisplayID display;
+	const SDL_DisplayMode *mode;
+	int width, height;
+
+	if (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN)
+		return TRUE;
+	if (!platform_fullscreen_requested)
+		return FALSE;
+	display = SDL_GetDisplayForWindow(platform_window);
+	mode = display ? SDL_GetDesktopDisplayMode(display) : NULL;
+	if (!mode || !SDL_GetWindowSizeInPixels(platform_window, &width, &height))
+		return FALSE;
+	return width >= (int)(mode->w * mode->pixel_density + 0.5f) &&
+		height >= (int)(mode->h * mode->pixel_density + 0.5f);
+}
+
+/* the size in pixels the game draws its picture at (d3d8_gl.c): the
+window's, the display's while fullscreen, or display.resolution's while
+fullscreen (either kind) where the display has room for it; before the
+window opens, what it will be. FALSE where display.resolution_scaling is
+"original": the Xbox's 640x480, scaled to the window. */
 BOOL platform_screen_mode(long *width, long *height)
 {
-	/* the display size last fallen back to, logged once */
-	static long fallback_width, fallback_height;
+	/* (the size last given, for a window that has none: minimized) */
+	static long last_width, last_height;
 	long resolution_width, resolution_height;
+	BOOL fullscreen;
 
-	if (platform_window ? !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) :
-		!platform_fullscreen_setting() || !platform_sdl_initialize())
-	{
+	if (!strcmp(config_string("display.resolution_scaling"), "original"))
 		return FALSE;
-	}
-	if (!platform_display_size(platform_display(), width, height))
-		return FALSE;
-	resolution_width = config_integer("display.resolution_width");
-	resolution_height = config_integer("display.resolution_height");
-	if (platform_resolution_fits(resolution_width, resolution_height, *width, *height))
+	if (platform_window)
 	{
-		fallback_width = fallback_height = 0;
-		*width = resolution_width;
-		*height = resolution_height;
-	}
-	else if ((resolution_width || resolution_height) && (*width != fallback_width || *height != fallback_height))
-	{
-		platform_log("display: no room for %ldx%ld on this display: drawing at its %ldx%ld", resolution_width,
-			resolution_height, *width, *height);
-		fallback_width = *width;
-		fallback_height = *height;
-	}
-	return TRUE;
-}
+		int pixel_width = 0, pixel_height = 0;
 
-void platform_resolution_setting(int *width, int *height, int default_value)
-{
-	long resolution_width, resolution_height, display_width, display_height;
-
-	if (default_value)
-	{
-		char text[16] = "";
-
-		config_default("display.resolution_width", text, sizeof(text));
-		resolution_width = strtol(text, NULL, 10);
-		config_default("display.resolution_height", text, sizeof(text));
-		resolution_height = strtol(text, NULL, 10);
+		SDL_GetWindowSizeInPixels(platform_window, &pixel_width, &pixel_height);
+		if (pixel_width <= 0 || pixel_height <= 0)
+		{
+			*width = last_width;
+			*height = last_height;
+			return last_width > 0;
+		}
+		*width = pixel_width;
+		*height = pixel_height;
+		fullscreen = platform_window_fullscreen();
 	}
 	else
 	{
-		resolution_width = config_integer("display.resolution_width");
-		resolution_height = config_integer("display.resolution_height");
+		if (!platform_sdl_initialize())
+			return FALSE;
+		fullscreen = platform_fullscreen_setting();
+		platform_window_size_setting(width, height);
+		if (fullscreen && !platform_display_size(SDL_GetPrimaryDisplay(), width, height))
+			return FALSE;
 	}
-	/* (none, one the game cannot draw at, or the display's own: 0x0) */
-	if (resolution_width < 640 || resolution_height < 480 || (platform_sdl_initialize() &&
-		platform_display_size(platform_display(), &display_width, &display_height) &&
-		resolution_width == display_width && resolution_height == display_height))
+	/* (fullscreen's display is at the resolution already, where it has that
+	mode: platform_fullscreen_kind_apply; borderless's is scaled to) */
+	platform_resolution_setting(&resolution_width, &resolution_height);
+	if (fullscreen && resolution_width && resolution_width <= *width && resolution_height <= *height)
 	{
-		resolution_width = resolution_height = 0;
+		*width = resolution_width;
+		*height = resolution_height;
 	}
-	*width = (int)resolution_width;
-	*height = (int)resolution_height;
+	last_width = *width;
+	last_height = *height;
+	return TRUE;
 }
 
-/* the size added to the list unless it has it; the list's count */
-static int platform_resolution_add(int *widths, int *heights, int count, int maximum, long width, long height)
+/* the size added to the list unless it has it already; the count */
+static int platform_resolution_add(long *widths, long *heights, int count, int maximum, long width, long height)
 {
 	int index;
 
@@ -470,50 +564,55 @@ static int platform_resolution_add(int *widths, int *heights, int count, int max
 		if (widths[index] == width && heights[index] == height)
 			return count;
 	}
-	if (count >= maximum)
-		return count;
-	widths[count] = (int)width;
-	heights[count] = (int)height;
-	return count + 1;
+	if (count < maximum)
+	{
+		widths[count] = width;
+		heights[count] = height;
+		count++;
+	}
+	return count;
 }
 
-int platform_display_resolutions(int *widths, int *heights, int maximum, int *native)
+int platform_display_resolutions(long *widths, long *heights, int maximum)
 {
 	SDL_DisplayID display;
-	long display_width, display_height;
 	SDL_DisplayMode **modes;
-	int mode_count = 0, count = 0, set_width, set_height, index;
+	long display_width, display_height, width, height;
+	int mode_count = 0, count = 0, index;
 
-	*native = -1;
 	if (maximum < 1 || !platform_sdl_initialize())
 		return 0;
-	display = platform_display();
+	display = platform_window ? SDL_GetDisplayForWindow(platform_window) : 0;
+	if (!display)
+		display = SDL_GetPrimaryDisplay();
 	if (!platform_display_size(display, &display_width, &display_height))
 		return 0;
-	count = platform_resolution_add(widths, heights, count, maximum, display_width, display_height);
-	/* (the one set, so that Video Setup shows it, even where this display has
-	no room for it) */
-	platform_resolution_setting(&set_width, &set_height, FALSE);
-	if (set_width)
-		count = platform_resolution_add(widths, heights, count, maximum, set_width, set_height);
-	/* (a size once for each of its refresh rates) */
 	modes = SDL_GetFullscreenDisplayModes(display, &mode_count);
 	for (index = 0; modes && index < mode_count; index++)
 	{
-		long width = (long)(modes[index]->w * modes[index]->pixel_density + 0.5f);
-		long height = (long)(modes[index]->h * modes[index]->pixel_density + 0.5f);
-
-		if (platform_resolution_fits(width, height, display_width, display_height))
+		width = (long)(modes[index]->w * modes[index]->pixel_density + 0.5f);
+		height = (long)(modes[index]->h * modes[index]->pixel_density + 0.5f);
+		if (width >= 640 && height >= 480 && width <= display_width && height <= display_height &&
+			(width != display_width || height != display_height))
+		{
 			count = platform_resolution_add(widths, heights, count, maximum, width, height);
+		}
 	}
 	SDL_free(modes);
-	/* by width, then height */
+	/* (the one set, though this display has no such mode, so that Video
+	Setup shows it) */
+	platform_resolution_setting(&width, &height);
+	if (width && (width != display_width || height != display_height))
+		count = platform_resolution_add(widths, heights, count, maximum, width, height);
+	/* largest first */
 	for (index = 1; index < count; index++)
 	{
-		int width = widths[index], height = heights[index], place;
+		int place;
 
-		for (place = index; place > 0 && (widths[place - 1] > width ||
-			(widths[place - 1] == width && heights[place - 1] > height)); place--)
+		width = widths[index];
+		height = heights[index];
+		for (place = index; place > 0 && (widths[place - 1] < width ||
+			(widths[place - 1] == width && heights[place - 1] < height)); place--)
 		{
 			widths[place] = widths[place - 1];
 			heights[place] = heights[place - 1];
@@ -521,72 +620,80 @@ int platform_display_resolutions(int *widths, int *heights, int maximum, int *na
 		widths[place] = width;
 		heights[place] = height;
 	}
-	for (index = 0; index < count; index++)
-	{
-		if (widths[index] == display_width && heights[index] == display_height)
-			*native = index;
-	}
 	return count;
 }
 
-/* the window resized (display.window_scale) where it is: put back at its
-place unless, at the size, it no longer fits there on the usable part of
-its display, where the place the system gives it is left */
-static void platform_window_resize(int width, int height)
+/* Video Setup's window sizes, by shape (4:3, 16:10, 16:9, 21:9), each from
+the smallest */
+static const short platform_window_sizes_offered[][2] =
 {
-	SDL_DisplayID display = SDL_GetDisplayForWindow(platform_window);
-	SDL_Rect usable;
-	int x = 0, y = 0, top = 0, left = 0, bottom = 0, right = 0;
-	/* (a fullscreen or maximized window's place is SDL's to keep) */
-	BOOL keep = !(SDL_GetWindowFlags(platform_window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED)) &&
-		SDL_GetWindowPosition(platform_window, &x, &y);
+	{ 640, 480 }, { 800, 600 }, { 1024, 768 }, { 1280, 960 }, { 1600, 1200 }, { 1920, 1440 }, { 2560, 1920 },
+	{ 1280, 800 }, { 1440, 900 }, { 1680, 1050 }, { 1920, 1200 }, { 2560, 1600 },
+	{ 1280, 720 }, { 1600, 900 }, { 1920, 1080 }, { 2560, 1440 }, { 3840, 2160 },
+	{ 2560, 1080 }, { 3440, 1440 }, { 3840, 1600 }, { 5120, 2160 },
+};
 
-	SDL_SetWindowSize(platform_window, width, height);
-	if (!keep || !display || !SDL_GetDisplayUsableBounds(display, &usable))
-		return;
-	/* (its frame's, where the system says) */
-	if (!SDL_GetWindowBordersSize(platform_window, &top, &left, &bottom, &right))
-		top = left = bottom = right = 0;
-	if (x - left >= usable.x && y - top >= usable.y && x + width + right <= usable.x + usable.w &&
-		y + height + bottom <= usable.y + usable.h)
+int platform_window_sizes(long *widths, long *heights, int maximum)
+{
+	SDL_DisplayID display;
+	SDL_Rect usable;
+	long width, height;
+	int count = 0, index;
+
+	if (maximum < 1 || !platform_sdl_initialize())
+		return 0;
+	display = platform_window ? SDL_GetDisplayForWindow(platform_window) : 0;
+	if (!display)
+		display = SDL_GetPrimaryDisplay();
+	if (!display || !SDL_GetDisplayUsableBounds(display, &usable))
+		usable.w = usable.h = 0;
+	for (index = 0; index < (int)(sizeof(platform_window_sizes_offered) / sizeof(*platform_window_sizes_offered));
+		index++)
 	{
-		SDL_SetWindowPosition(platform_window, x, y);
+		width = platform_window_sizes_offered[index][0];
+		height = platform_window_sizes_offered[index][1];
+		/* (the Xbox's own whatever the desktop's size) */
+		if (!index || (width <= usable.w && height <= usable.h))
+			count = platform_resolution_add(widths, heights, count, maximum, width, height);
 	}
+	/* (the one set, though it is none of them or too big for this desktop,
+	so that Video Setup shows it) */
+	platform_window_size_setting(&width, &height);
+	return platform_resolution_add(widths, heights, count, maximum, width, height);
 }
 
 #else
-void platform_resolution_setting(int *width, int *height, int default_value)
-{
-	(void)default_value;
-	*width = *height = 0;
-}
-
-int platform_display_resolutions(int *widths, int *heights, int maximum, int *native)
+int platform_display_resolutions(long *widths, long *heights, int maximum)
 {
 	(void)widths;
 	(void)heights;
 	(void)maximum;
-	*native = -1;
+	return 0;
+}
+
+int platform_window_sizes(long *widths, long *heights, int maximum)
+{
+	(void)widths;
+	(void)heights;
+	(void)maximum;
 	return 0;
 }
 
 #endif
-/* the window's scale (display.window_scale, as the window was made or last
-resized: platform_display_apply) */
-static long platform_window_scale = -1;
+#ifndef HALO_ANDROID
+/* the window's size (platform_window_size_setting), as the window was made
+or last resized: platform_display_apply */
+static long platform_window_width = -1, platform_window_height = -1;
+#endif
 
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
-	int scale = (int)config_integer("display.window_scale");
 	int version;
 
 	if (platform_window)
 		return TRUE;
 	if (!platform_sdl_initialize())
 		return FALSE;
-	if (scale < 1)
-		scale = 1;
-	platform_window_scale = scale;
 
 #ifdef HALO_ANDROID
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -611,18 +718,23 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 #endif
 
 #ifdef HALO_ANDROID
-	platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
-		SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
+	{
+		int scale = (int)config_integer("display.window_scale");
+
+		if (scale < 1)
+			scale = 1;
+		platform_window = SDL_CreateWindow("Halo", (int)(width * scale), (int)(height * scale),
+			SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
+	}
 #else
-	/* fullscreen over the desktop unless the window is set
-	(platform_fullscreen_setting), where the game draws at the resolution
-	platform_screen_mode gives (d3d8_gl.c); the window size is the windowed
-	mode F11 switches to and
-	from, where it draws 640x480: the Xbox's 640x480 times
-	display.window_scale, whatever shape the fullscreen picture has */
+	/* fullscreen (either kind) unless display.mode is the window, which F11
+	switches to and from: display.window_size, whatever shape the fullscreen
+	picture has. The game draws at the size platform_screen_mode gives
+	(d3d8_gl.c). */
 	(void)width;
 	(void)height;
-	platform_window = SDL_CreateWindow("Halo", 640 * scale, 480 * scale,
+	platform_window_size_setting(&platform_window_width, &platform_window_height);
+	platform_window = SDL_CreateWindow("Halo", (int)platform_window_width, (int)platform_window_height,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 		(config_boolean("debug.hidden_window") ? SDL_WINDOW_HIDDEN : 0) |
 		(platform_fullscreen_setting() ? SDL_WINDOW_FULLSCREEN : 0));
@@ -632,6 +744,10 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		platform_log("SDL_CreateWindow failed: %s", SDL_GetError());
 		return FALSE;
 	}
+#ifndef HALO_ANDROID
+	platform_fullscreen_requested = platform_fullscreen_setting();
+	platform_fullscreen_kind_apply();
+#endif
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_ANDROID
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -660,22 +776,28 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	return TRUE;
 }
 
-/* display.fullscreen, display.window_scale (when it changes: the window can
-be resized) and display.vsync, as Settings has written them */
+/* display.mode, display.resolution (fullscreen's display mode),
+display.window_size (when it changes: the window can be resized) and
+display.vsync, as Settings has written them; display.resolution_scaling
+and borderless's resolution are taken up between frames
+(halo_screen_commit) */
 void platform_display_apply(void)
 {
 #ifndef HALO_ANDROID
 	BOOL fullscreen = platform_fullscreen_setting();
-	long scale = config_integer("display.window_scale");
+	long width, height;
 
 	if (!platform_window)
 		return;
-	if (((SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0) != (fullscreen != FALSE))
-		SDL_SetWindowFullscreen(platform_window, fullscreen ? true : false);
-	if (scale != platform_window_scale && scale >= 1)
+	platform_fullscreen_kind_apply();
+	if (platform_window_fullscreen() != (fullscreen != FALSE))
+		platform_window_set_fullscreen(fullscreen);
+	platform_window_size_setting(&width, &height);
+	if (width != platform_window_width || height != platform_window_height)
 	{
-		platform_window_scale = scale;
-		platform_window_resize((int)(640 * scale), (int)(480 * scale));
+		platform_window_width = width;
+		platform_window_height = height;
+		SDL_SetWindowSize(platform_window, (int)width, (int)height);
 	}
 #else
 	if (!platform_window)
@@ -1019,13 +1141,13 @@ static void platform_show_pending_message(void)
 #else
 	{
 		/* (a box cannot show above a fullscreen game) */
-		int fullscreen = (SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) != 0;
+		BOOL fullscreen = platform_window_fullscreen();
 
 		if (fullscreen)
-			SDL_SetWindowFullscreen(platform_window, false);
+			platform_window_set_fullscreen(FALSE);
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, title, text, platform_window);
 		if (fullscreen)
-			SDL_SetWindowFullscreen(platform_window, true);
+			platform_window_set_fullscreen(TRUE);
 	}
 #endif
 }
@@ -1137,8 +1259,7 @@ void platform_pump_events(void)
 			window's size and place while fullscreen) */
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
 			{
-				SDL_SetWindowFullscreen(platform_window,
-					(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_FULLSCREEN) ? false : true);
+				platform_window_set_fullscreen(!platform_window_fullscreen());
 			}
 #endif
 			break;

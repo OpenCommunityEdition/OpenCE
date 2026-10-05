@@ -2,7 +2,7 @@
   <defs>
     <radialGradient id="cone" gradientUnits="userSpaceOnUse" cx="126.000" cy="130.342" r="128.840"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></radialGradient><radialGradient id="coned" gradientUnits="userSpaceOnUse" cx="126.000" cy="130.342" r="128.840"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#878787"/></radialGradient>
     <g id="art">
-      <path d="M126.000,130.342 L49.632,18.677 L202.368,18.677 Z" fill="url(#cone)"/>
+      <path d="M126.000,130.342 L37.886,1.502 L214.114,1.502 Z" fill="url(#cone)"/>
       <circle cx="126.000" cy="129.985" r="41.776" fill="#878787"/>
       <path d="M126.000,130.342 L102.251,95.616 A41.776,41.776 0 0 1 149.749,95.616 Z" fill="url(#coned)"/>
       <!-- "15m" pixel label -->

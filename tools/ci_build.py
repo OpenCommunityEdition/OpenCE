@@ -98,6 +98,10 @@ def main() -> int:
     # the menus' XML parser (port/third_party/expat), in every build, whose
     # MIT license asks copies to carry its notice
     shutil.copy2(ROOT / "port/third_party/expat/COPYING", dist / "expat-COPYING.txt")
+    # internet play's MQTT brokers, a file beside the game (network.brokers_file;
+    # Android's APK has its own copy)
+    if args.platform != "android":
+        shutil.copy2(ROOT / "port/assets/network/brokers.txt", dist / "brokers.txt")
     return 0
 
 

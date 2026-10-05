@@ -377,6 +377,9 @@ symbols in this file:
 #include "bink/bink_playback.h"
 #include "main/d3d_intimacy.h"
 #include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
+#include "networking/network_server_manager.h" /* port: a co-op game's level won */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
@@ -700,6 +703,9 @@ static char const *scenario_paths[10] =
 };
 
 static struct _main_globals main_globals = { 0 };
+/* Keep the original globals layout; these clocks belong to pending requests. */
+static long main_loss_last_tick;
+static long main_respawn_last_tick;
 boolean debug_force_frame_rate_update = FALSE;
 boolean debug_no_drawing = FALSE;
 boolean debug_game_save = FALSE;
@@ -903,6 +909,11 @@ void main_won_map(
 void main_lost_map(
 	void)
 {
+	if (!main_globals.lost_map)
+	{
+		main_globals.loss_timer = 0;
+		main_loss_last_tick = game_time_get();
+	}
 	main_globals.saving_map = FALSE;
 	main_globals.lost_map = TRUE;
 	return;
@@ -963,9 +974,14 @@ void main_save_map_nonsafe(
 void main_respawn(
 	boolean in_multiplayer)
 {
+	if (!main_globals.respawn)
+	{
+		main_globals.respawn_timer = 0;
+		main_respawn_last_tick = game_time_get();
+	}
 	main_globals.respawn = TRUE;
 	if (in_multiplayer)
-		main_globals.respawn_timer = 91;
+		main_globals.respawn_timer = 92;
 	return;
 }
 
@@ -1841,11 +1857,22 @@ static void main_revert_map_private(
 static void main_skip_cinematic_private(
 	void)
 {
-	if (cinematic_can_be_skipped())
+	/* port: a network host never reverts without a saved state, which
+	would reset the map on the host alone */
+	if (cinematic_can_be_skipped() &&
+		(game_connection() != _game_connection_network_server || game_state_port_saved_game_valid()))
 	{
+		long now = game_time_get();
+
 		game_state_revert();
+		network_coop_skip_reverted(now);
 		ui_widgets_disable_pause_game(30);
 		main_globals.revert_map = FALSE;
+	}
+	else if (game_connection() == _game_connection_network_server)
+	{
+		error(_error_silent, "co-op: cutscene not skipped (skippable %d, saved state %d)",
+			cinematic_can_be_skipped(), game_state_port_saved_game_valid());
 	}
 	main_globals.skip_cinematic = FALSE;
 	return;
@@ -1926,6 +1953,8 @@ static void main_save_map_private(
 
 		if (save_map)
 		{
+			/* port: remember where the players are, for network co-op respawns */
+			players_note_checkpoint();
 			hud_autosave(TRUE);
 			main_globals.save_map_completed = TRUE;
 			main_globals.saving_map = FALSE;
@@ -1944,17 +1973,50 @@ static void main_switch_to_structure_bsp_private(
 	return;
 }
 
+/* The original post-increment test expires on its 92nd 30 Hz update.
+   Render-only frames must not advance it. Saturate so blocked co-op
+   respawns can retry indefinitely without overflowing the short counter. */
+static boolean main_death_timer_expired(
+	short *timer,
+	long *last_tick,
+	boolean advance)
+{
+	long current_tick = game_time_get();
+	unsigned long elapsed_ticks = 0;
+
+	if (current_tick < *last_tick)
+	{
+		/* A checkpoint/core load can move the simulation clock backwards. */
+		*timer = 0;
+	}
+	else
+	{
+		elapsed_ticks = (unsigned long)current_tick - (unsigned long)*last_tick;
+	}
+	*last_tick = current_tick;
+
+	if (!advance)
+		return FALSE;
+
+	*timer = (short)MIN(92, (unsigned long)*timer + elapsed_ticks);
+	return *timer >= 92;
+}
+
 static void main_lost_map_private(
 	void)
 {
-	if (!game_time_get_paused())
+	if (main_death_timer_expired(
+		&main_globals.loss_timer, &main_loss_last_tick,
+		!game_time_get_paused()))
 	{
-		if (main_globals.loss_timer++ > 90)
-		{
-			main_globals.lost_map = FALSE;
-			main_globals.loss_timer = 0;
+		main_globals.lost_map = FALSE;
+		main_globals.loss_timer = 0;
+		/* port: network co-op can't revert to a checkpoint (every machine would
+		have to), so the players respawn where they were at the last one */
+		if (game_connection() == _game_connection_network_server)
+			players_respawn_at_checkpoint();
+		else
 			game_state_revert();
-		}
 	}
 	return;
 }
@@ -1962,13 +2024,13 @@ static void main_lost_map_private(
 static void main_respawn_private(
 	void)
 {
-	if (!game_time_get_paused() && !cinematic_in_progress())
+	if (main_death_timer_expired(
+		&main_globals.respawn_timer, &main_respawn_last_tick,
+		!game_time_get_paused() && !cinematic_in_progress()) &&
+		players_respawn_coop())
 	{
-		if (main_globals.respawn_timer++ > 90 && players_respawn_coop())
-		{
-			main_globals.respawn = FALSE;
-			main_globals.respawn_timer = 0;
-		}
+		main_globals.respawn = FALSE;
+		main_globals.respawn_timer = 0;
 	}
 	return;
 }
@@ -2112,6 +2174,22 @@ static void main_won_map_private(
 {
 	short level;
 	short local_player_index;
+
+	/* port: when a network co-op level is won, the round ends for everyone as
+	in multiplayer, back to the lobby, and the next round is the campaign's
+	next level (The Maw's: The Pillar of Autumn). A level not in the campaign
+	repeats. */
+	if (game_connection() == _game_connection_network_server && network_coop_active())
+	{
+		struct network_game *game = network_game_get_game();
+
+		main_globals.won_map = FALSE;
+		level = game ? main_get_solo_level_from_name(game->map.name) : NONE;
+		player_profile_save_level_completed(0);
+		network_game_server_port_cooperative_won(level != NONE ?
+			main_get_solo_level_name((level + 1) % NUMBER_OF_SINGLE_PLAYER_LEVELS) : NULL);
+		return;
+	}
 	main_globals.want_to_be_at_main_menu = TRUE;
 	main_globals.won_map = FALSE;
 	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name) + 1;

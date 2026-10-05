@@ -257,23 +257,38 @@ static char *console_get_text_to_autocomplete(
 	return result;
 }
 
-/* port: the text after the host's ban command ("ban "), which completes as
-a player's name (network_game_server_matching_player_names); NULL if the
-input is not it */
-static char *console_ban_command_name(
+/* port: the text after the host's ban or kick command ("ban ", "kick "),
+which completes as a player's name (network_game_server_matching_player_names);
+NULL if the input is not one */
+static char *console_player_command_name(
 	void)
 {
+	static char const *const commands[] = { "ban", "kick" };
 	char *text = console_globals.input_state.result;
+	short command;
 
 	while (*text == ' ' || *text == '(')
 		text++;
-	if ((text[0] == 'b' || text[0] == 'B') && (text[1] == 'a' || text[1] == 'A') &&
-		(text[2] == 'n' || text[2] == 'N') && text[3] == ' ')
+	for (command = 0; command < (short)NUMBEROF(commands); command++)
 	{
-		text += 3;
-		while (*text == ' ' || *text == '"')
-			text++;
-		return text;
+		char const *word = commands[command];
+		long length = (long)strlen(word);
+		long index;
+
+		for (index = 0; index < length; index++)
+		{
+			char character = text[index] >= 'A' && text[index] <= 'Z' ? text[index] - 'A' + 'a' : text[index];
+
+			if (character != word[index])
+				break;
+		}
+		if (index == length && text[length] == ' ')
+		{
+			text += length;
+			while (*text == ' ' || *text == '"')
+				text++;
+			return text;
+		}
 	}
 	return NULL;
 }
@@ -283,10 +298,10 @@ static void console_complete(
 {
 	char *matching_items[256];
 	char print_buffer[1024];
-	/* (port: the players' names the ban command completes) */
+	/* (port: the players' names the ban and kick commands complete) */
 	static char player_names[64][NETWORK_GAME_SERVER_NAME_TEXT_SIZE];
 
-	char *token = console_ban_command_name();
+	char *token = console_player_command_name();
 	short count;
 
 	if (token)

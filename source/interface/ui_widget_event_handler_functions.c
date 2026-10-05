@@ -923,6 +923,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "saved games/game_state.h"
 #include "saved games/player_profile.h"
 #include "interface/ui_widget_definitions.h"
@@ -1991,6 +1992,9 @@ static boolean pause_game_restart_at_checkpoint(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+	/* port: in co-op this would revert only this machine */
+	if (network_coop_active())
+		return FALSE;
 	main_revert_map();
 	return TRUE;
 }
@@ -2000,6 +2004,9 @@ static boolean pause_game_restart_level(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+	/* port: in co-op this would restart only this machine */
+	if (network_coop_active())
+		return FALSE;
 	main_reset_map();
 	return TRUE;
 }
@@ -2009,7 +2016,21 @@ static boolean pause_game_quit_to_main_menu(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	game_state_save_to_persistent_storage();
+	/* port: in co-op, take every player on this machine out of the network
+	game with one press (not one per split screen player). The solo save is
+	left alone. */
+	if (network_coop_active())
+	{
+		short controller_index;
+
+		for (controller_index = 0; controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; controller_index++)
+			network_game_client_local_player_quit(controller_index);
+		return TRUE;
+	}
+	/* port: a multiplayer map played alone (New Game's MULTIPLAYER maps) is
+	not saved, so it never takes the place of the campaign's saved game */
+	if (main_get_current_solo_level() != NONE)
+		game_state_save_to_persistent_storage();
 	main_goto_main_menu();
 	return TRUE;
 }
@@ -2029,6 +2050,10 @@ static boolean multiplayer_type_menu_initialize(
 	boolean *widget_deleted)
 {
 	player_spawn_count = 1;
+	/* port: and no co-op player's controller, which one player with one
+	gamepad gives back to the keyboard's (xinput_sdl.c's port_gamepad): its
+	going is not a controller unplugged (input_abstraction.c) */
+	player_ui_reset_single_player_local_player_controllers();
 	return TRUE;
 }
 
@@ -2315,6 +2340,8 @@ static boolean main_menu_initialize(
 	dispose_global_network_game_server();
 	network_game_accept_remote_connections(FALSE);
 	player_spawn_count = 1;
+	/* port: as multiplayer_type_menu_initialize */
+	player_ui_reset_single_player_local_player_controllers();
 	player_ui_end_editing_profile();
 	if (!ui_main_menu_music_active())
 		ui_start_main_menu_music();
@@ -2405,6 +2432,10 @@ static boolean network_game_remove_local_player(
 		event && event->controller_index >= 0 && event->controller_index < 4,
 		"valid controller index required to remove player from network game");
 	network_game_client_local_player_quit(event->controller_index);
+	/* port: a split screen player who quit, the others staying, is not
+	joined to the next game */
+	if (local_player_count() > 1)
+		player_ui_local_player_left_multiplayer_game(event->controller_index);
 	return TRUE;
 }
 
@@ -5918,6 +5949,30 @@ short ui_widget_port_gametypes(
 	return (short)count;
 }
 
+/* port: sets up the server for co-op (port/linux/game/menu_functions.c):
+the campaign level, the difficulty, and a gametype with no game engine,
+which is what makes a network game co-op (game.c, players.c). Returns FALSE
+without a server or a campaign level. */
+boolean ui_widget_port_cooperative_level_choose(
+	char const *map_name,
+	short difficulty)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct game_variant variant;
+
+	if (!server || !map_name || main_get_solo_level_from_name(map_name) == NONE)
+		return FALSE;
+	csmemset(&variant, 0, sizeof(variant));
+	ustrncpy(variant.human_readable_game_description, L"Co-op",
+		NUMBEROF(variant.human_readable_game_description) - 1);
+	main_set_difficulty(difficulty);
+	main_set_multiplayer_map_name(map_name);
+	network_game_server_port_set_cooperative(server, difficulty);
+	network_game_server_change_map_name(server, map_name);
+	network_game_server_change_game_variant(server, &variant);
+	return TRUE;
+}
+
 /* the gametype chosen (as multiplayer_profile_set_for_game), the server's
 if there is one */
 boolean ui_widget_port_gametype_choose(
@@ -5950,12 +6005,18 @@ boolean ui_widget_port_gametype_choose(
 	return TRUE;
 }
 
-/* hosting (as the Xbox's server list's Y) */
+/* hosting (as the Xbox's server list's Y): always a new game. A game made
+before and backed out of keeps its server (the lobby's last player leaving
+pauses it: netgame_unjoin_player), and network_game_start_new_server joins
+only a server it makes, so the client it made for that one never joined it
+and the lobby had nobody in it */
 boolean ui_widget_port_host(
 	struct widget_instance *widget,
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+	dispose_global_network_game_client();
+	dispose_global_network_game_server();
 	return network_game_start_new_server(widget, event, widget_deleted);
 }
 
@@ -6041,6 +6102,22 @@ boolean ui_widget_port_multiplayer_player(
 	player_ui_set_active_player_profile(controller_index, profile_index, &profile);
 	player_ui_local_player_joined_multiplayer_game(controller_index);
 	return TRUE;
+}
+
+/* the lobby's B of a player (port/linux/game/menu_functions.c): that
+controller's player leaves the game (netgame_unjoin_player); TRUE if they were
+the machine's last, which leaves it (and are joined again if its host's
+lobby comes back), else they leave the next game too */
+boolean ui_widget_port_unjoin_player(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	boolean left = netgame_unjoin_player(widget, event, widget_deleted);
+
+	if (!left && event && event->controller_index >= 0 && event->controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		player_ui_local_player_left_multiplayer_game(event->controller_index);
+	return left;
 }
 
 /* a screen by name in place of the widget's (back returns to it: as
