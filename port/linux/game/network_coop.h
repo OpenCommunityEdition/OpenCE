@@ -52,6 +52,13 @@ void network_coop_note_device_snap(short group_index);
 /* unit_scripting_commands.c: a script set a unit's maximum or current
 vitality; TRUE if it was a co-op player's, now set on every player's */
 boolean network_coop_set_players_vitality(long unit_index, boolean maximum, real body, real shield);
+/* host: whether the player's machine has the host's structure BSP loaded
+(always outside co-op, and for the host's own players). Until a client has,
+the host takes none of its players' movement, which falls there with no
+floor, and lets them trigger no BSP switch (players.c). */
+boolean network_coop_player_has_structure_bsp(long player_index);
+/* network_distributed.c: the structure BSP a client's input says it has */
+void network_coop_note_player_structure_bsp(short player_index, short structure_bsp_index);
 /* units.c: a vehicle left the vehicle carrying it (a Pelican's Warthog drop) */
 void network_coop_vehicle_dropped(long vehicle_index, long carrier_index);
 
