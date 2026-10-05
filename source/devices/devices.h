@@ -140,6 +140,13 @@ void device_group_network_set(
 	real value,
 	word flags,
 	boolean snap);
+/* port: a co-op client puts a device at the host's power, and at its
+position when move_to_position */
+void device_port_set_state(
+	long device_index,
+	real power,
+	boolean move_to_position,
+	real position);
 boolean device_can_change_position(
 	long device_index);
 boolean device_frontfacing(

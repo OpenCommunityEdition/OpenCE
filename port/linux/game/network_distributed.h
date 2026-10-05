@@ -103,6 +103,9 @@ enum
 	/* co-op: the host's cinematic screen effect (blur, filters, video), when
 	it changes and every two seconds (network_coop.c) */
 	_distributed_message_coop_screen_effect = 76,
+	/* co-op: where the host's devices are (doors, elevators), when they move
+	(network_coop.c) */
+	_distributed_message_coop_device_states = 77,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -279,6 +282,8 @@ word network_coop_object_transform_entry_size(void);
 word network_coop_object_look_entry_size(void);
 void network_coop_handle_object_looks(void const *entries, short count);
 word network_coop_screen_effect_entry_size(void);
+word network_coop_device_state_entry_size(void);
+void network_coop_handle_device_states(void const *entries, short count);
 void network_coop_handle_screen_effect(void const *entries, short count);
 word network_actors_damage_entry_size(void);
 void network_actors_handle_damage(void const *entries, short count);
