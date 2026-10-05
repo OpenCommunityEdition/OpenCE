@@ -34,7 +34,9 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   level's scripts and spawns players. `network_coop.c` sends the clients
   everything the scripts do that they would otherwise miss:
   - every tick: the cinematic, camera, screen fade, the HUD settings the
-    scripts control (what is shown, the mission timer) and the skip vote;
+    scripts control (what is shown, the mission timer), the skip vote, and
+    which teams are allies and friends (the scripts' allegiances, so the
+    marines are the players' allies on every machine);
   - once each, numbered so nothing is applied twice: script sounds,
     chapter titles, help and objective text, "Checkpoint" messages, screen
     shake, nav points, custom animations on units and scenery, and units
@@ -45,7 +47,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
-  Every machine follows the host's structure BSP. A dead player watches a
+  Every machine follows the host's structure BSP. A loading zone into a
+  BSP the team hasn't been in brings every player to whoever crossed it,
+  as split screen does; one back into a BSP it has been in switches only
+  with two thirds of the living players at it (in the trigger, or within
+  4 world units of the player in it), so one player can't drag the team
+  back through the level. A player outside the loaded BSP and falling for
+  two seconds is brought back beside a teammate. A dead player watches a
   living teammate (`coop_spectate.c`) and comes back beside one once it is
   safe. With everyone dead they come back where they were at the last
   checkpoint, since only the host could revert. A level won ends the round
@@ -144,7 +152,8 @@ version 12 plays the campaign together (co-op, above), drives the host's
 actors on its clients and sends the flinches and deaths the host picked;
 version 13 drives up to 1056 of the host's AI units on its clients (co-op's
 extra enemies), where 12 drove 288; version 14 sends co-op's device positions
-and its units opening and closing.
+and its units opening and closing; version 15 sends co-op's allegiances with
+its presentation, a message of another size.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
