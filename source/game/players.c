@@ -2778,9 +2778,10 @@ waits for every machine to have loaded it */
 #define COOP_BSP_SWITCH_WAIT_TICKS (10 * TICKS_PER_SECOND)
 
 /* Going back to a BSP the team has already been in needs two thirds of the
-living players at the trigger: inside it, or this near the player in it
-(world units) */
-#define COOP_BACKTRACK_GATHER_DISTANCE 4.0f
+living players with the player on the trigger: inside it, or this near
+them (world units, about 45 metres). Wide enough for a team walking through
+a doorway in a line, not for one player who ran back alone. */
+#define COOP_BACKTRACK_GATHER_DISTANCE 15.0f
 
 /* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
 beside a grounded teammate inside the BSP, else any teammate inside it, else
