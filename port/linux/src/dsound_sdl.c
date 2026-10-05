@@ -91,7 +91,10 @@ struct sdl_stream
 	struct voice_packet packets[MAXIMUM_STREAM_PACKETS];
 	unsigned long packet_head;
 	unsigned long packet_count;
-	/* position inside the head packet, in source frames */
+	/* packets already played by the mixer but still waiting for
+	DirectSoundDoWork to complete them from the game's thread */
+	unsigned long playback_offset;
+	/* position inside the packet at playback_offset, in source frames */
 	double cursor;
 	/* the last frame of the previous packet, for interpolating across packets */
 	float previous[2];
@@ -300,14 +303,47 @@ static float packet_sample(const struct voice_packet *packet, unsigned long fram
 	return packet->samples[frame * channels + channel] * (1.0f / 32768.0f);
 }
 
+static struct voice_packet *playback_packet(struct sdl_stream *stream)
+{
+	if (stream->playback_offset >= stream->packet_count)
+		return NULL;
+	return &stream->packets[(stream->packet_head + stream->playback_offset) % MAXIMUM_STREAM_PACKETS];
+}
+
+/* move across packets whose source frames have all been consumed */
+static struct voice_packet *playback_advance(struct sdl_stream *stream)
+{
+	struct voice_packet *packet = playback_packet(stream);
+
+	while (packet && stream->cursor >= (double)packet->frames)
+	{
+		stream->cursor -= (double)packet->frames;
+		if (packet->frames)
+		{
+			unsigned long last = packet->frames - 1;
+
+			stream->previous[0] = packet_sample(packet, last, 0, stream->channels);
+			stream->previous[1] = packet_sample(packet, last, stream->channels - 1, stream->channels);
+		}
+		packet->finished = TRUE;
+		stream->playback_offset++;
+		packet = playback_packet(stream);
+	}
+	return packet;
+}
+
 /* mixes one voice into output (frames of stereo float) */
 static void mix_voice(struct sdl_stream *stream, float *output, unsigned long frames)
 {
+	struct voice_packet *packet;
 	double step;
 	float target_left, target_right, left, right, ramp_left, ramp_right;
 	unsigned long frame;
 
 	if (stream->paused || !stream->packet_count || !stream->sample_rate)
+		return;
+	packet = playback_advance(stream);
+	if (!packet)
 		return;
 	step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE;
 	voice_gains(stream, &target_left, &target_right);
@@ -324,40 +360,10 @@ static void mix_voice(struct sdl_stream *stream, float *output, unsigned long fr
 
 	for (frame = 0; frame < frames; frame++)
 	{
-		struct voice_packet *packet;
 		unsigned long index;
 		float fraction, sample_left, sample_right;
 
-		/* skip to the first packet that still has frames to play */
-		for (;;)
-		{
-			unsigned long position;
-
-			packet = NULL;
-			for (position = 0; position < stream->packet_count; position++)
-			{
-				struct voice_packet *candidate = &stream->packets[(stream->packet_head + position) % MAXIMUM_STREAM_PACKETS];
-
-				if (!candidate->finished)
-				{
-					packet = candidate;
-					break;
-				}
-			}
-			if (!packet)
-				break;
-			if (stream->cursor < (double)packet->frames)
-				break;
-			stream->cursor -= (double)packet->frames;
-			if (packet->frames)
-			{
-				unsigned long last = packet->frames - 1;
-
-				stream->previous[0] = packet_sample(packet, last, 0, stream->channels);
-				stream->previous[1] = packet_sample(packet, last, stream->channels - 1, stream->channels);
-			}
-			packet->finished = TRUE;
-		}
+		packet = playback_advance(stream);
 		if (!packet)
 			break;
 
@@ -410,7 +416,9 @@ static void mix(float *output, unsigned long frames)
 	for (stream = streams; stream; stream = stream->next)
 		mix_voice(stream, output, frames);
 	pthread_mutex_unlock(&mixer_lock);
-	/* soft limit rather than wrap or hard clip when many voices pile up */
+	/* Soft-limit piled-up combat sounds without a libm tanh for every hot
+	sample. z*(27+z^2)/(27+9z^2) closely follows tanh over the knee and
+	becomes a constant once the output is already effectively saturated. */
 	for (sample = 0; sample < frames * OUTPUT_CHANNELS; sample++)
 	{
 		float value = output[sample];
@@ -418,9 +426,18 @@ static void mix(float *output, unsigned long frames)
 		if (value > 0.8f || value < -0.8f)
 		{
 			float sign = value < 0.0f ? -1.0f : 1.0f;
-			float excess = fabsf(value) - 0.8f;
+			float excess = (sign * value - 0.8f) * 5.0f;
+			float shaped;
 
-			output[sample] = sign * (0.8f + 0.2f * tanhf(excess / 0.2f));
+			if (excess >= 3.0f)
+				shaped = 1.0f;
+			else
+			{
+				float squared = excess * excess;
+
+				shaped = excess * (27.0f + squared) / (27.0f + 9.0f * squared);
+			}
+			output[sample] = sign * (0.8f + 0.2f * shaped);
 		}
 	}
 }
@@ -520,6 +537,10 @@ static void stream_complete_head(struct sdl_stream *stream, DWORD status, DWORD 
 
 	packet_release(entry);
 	entry->finished = FALSE;
+	/* playback_offset counts from packet_head, so consuming a completed head
+	keeps the same current playback packet one slot closer to the new head. */
+	if (stream->playback_offset)
+		stream->playback_offset--;
 	stream->packet_head = (stream->packet_head + 1) % MAXIMUM_STREAM_PACKETS;
 	stream->packet_count--;
 	if (packet.pdwCompletedSize)
@@ -651,6 +672,7 @@ static HRESULT STDMETHODCALLTYPE stream_process(IDirectSoundStream *object, LPCX
 	if (!stream->packet_count)
 	{
 		/* a stream that ran dry starts over */
+		stream->playback_offset = 0;
 		stream->cursor = 0.0;
 		stream->gains_valid = FALSE;
 	}
@@ -677,6 +699,7 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 		stream_complete_head(stream, head->finished ? XMEDIAPACKET_STATUS_SUCCESS : XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
+	stream->playback_offset = 0;
 	stream->cursor = 0.0;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
