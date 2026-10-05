@@ -3332,7 +3332,11 @@ static void event_handler_dispatch(
 		{
 			close_all = TRUE;
 		}
+		/* port: not from a widget its function deleted (it went back:
+		menu_functions.c's profile_save_changes), which the Xbox's opened
+		from regardless */
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted &&
 			handler->widget_tag.index != NONE)
 		{
 			if (!ui_widget_launch_widget(widget, handler->widget_tag.index))
@@ -3694,16 +3698,6 @@ static void widget_instance_initialize(
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit);
-	/* port: the menus' screens (port/assets/menus) pause the game, as its
-	pause menu does, but not a network game, which its pause menu does not
-	pause (their SETTINGS: ui_pause_menu_loaded) */
-	if (widget->pause_game_time &&
-		pc_menu_tag(tag_index) &&
-		!we_are_at_the_main_menu &&
-		network_game_is_active())
-	{
-		widget->pause_game_time = FALSE;
-	}
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -3843,14 +3837,16 @@ void ui_widget_port_go_back(
 
 /* ---------- SETTINGS in the pause menus (port)
 
-The full screen pause menus (the campaign's, and a network game's with one
-player here) get SETTINGS after RESUME GAME: the menus' own row for it
-(port/assets/menus/ce/in_game.xml), which menu_tags.c builds in the game's
-maps when the menus are there. It opens its screen as any widget opens
+The campaign's full screen pause menu (with one player here) gets SETTINGS
+after RESUME GAME: the menus' own row for it
+(port/assets/menus/ce/in_game.xml), which menu_tags.c builds in the
+campaign's maps when the menus are there (a multiplayer map's pause menu has
+menu_tags.c's own: pause_patch). It opens its screen as any widget opens
 another, so B comes back here, to SETTINGS. The rows are found by their tags'
 names, not their places, and spaced to fit the box (ui_pause_menu_rows_fit):
 a row added after SETTINGS is spaced with the others. */
 
+#define UI_PAUSE_MENU_TAG "ui\\shell\\solo_game\\pause_game\\pause_game"
 #define UI_PAUSE_MENU_SETTINGS_TAG "pc\\in_game\\settings_button"
 
 enum
@@ -3913,11 +3909,6 @@ static void ui_pause_menu_rows_fit(
 static void ui_pause_menu_loaded(
 	struct widget_instance *root)
 {
-	static char const *const pause_menus[] =
-	{
-		"ui\\shell\\solo_game\\pause_game\\pause_game",
-		"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
-	};
 	char const *name = tag_get_name(root->definition_tag_index);
 	long settings_tag_index;
 	struct widget_instance *box = NULL;
@@ -3925,16 +3916,10 @@ static void ui_pause_menu_loaded(
 	struct widget_instance *resume = NULL;
 	struct widget_instance *child;
 	struct widget_instance *settings;
-	short index;
 
-	for (index = 0; name && index < (short)NUMBEROF(pause_menus); index++)
-	{
-		if (!csstrcmp(name, pause_menus[index]))
-			break;
-	}
 	/* (and with one player here: the campaign's falls back on its full
 	screen pause menu for more, ui_check_for_pause_game) */
-	if (!name || index == (short)NUMBEROF(pause_menus) || local_player_count() > 1)
+	if (!name || csstrcmp(name, UI_PAUSE_MENU_TAG) || local_player_count() > 1)
 		return;
 	settings_tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, UI_PAUSE_MENU_SETTINGS_TAG);
 	if (settings_tag_index == NONE)
@@ -5996,6 +5981,23 @@ static boolean ui_mouse_selection_row(
 		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
 }
 
+/* port: a press the menus post from their updates (menu_functions.c: the
+server browser's join, once its game is reached), posted where the mouse's
+are: one posted while the widgets update or draw would be overwritten by the
+next frame's events (queue_event keeps the latest) */
+static short ui_widget_port_press_controller = NONE;
+static short ui_widget_port_press_button;
+
+void ui_widget_port_post_button(
+	short controller_index,
+	short button_index)
+{
+	ui_widget_port_press_controller = controller_index;
+	ui_widget_port_press_button = button_index;
+
+	return;
+}
+
 static void ui_widgets_process_mouse(
 	void)
 {
@@ -7332,11 +7334,6 @@ static boolean ui_check_for_pause_game(
 				else
 				{
 					ui_widget_delete(widget_globals.active_widgets[controller_index]);
-					/* port: and the screens B would have gone back to (the
-					pause menu, from its SETTINGS), as the campaign's START
-					closes them all (ui_widgets_close_all) */
-					if (widget_globals.widget_stack[controller_index])
-						dispose_widget_stack(&widget_globals.widget_stack[controller_index]);
 				}
 			}
 		}
@@ -7449,6 +7446,11 @@ void process_ui_widgets(
 		widget_globals.initialized);
 	widget_globals.current_system_milliseconds = system_milliseconds();
 	ui_widgets_process_mouse();
+	if (ui_widget_port_press_controller != NONE)
+	{
+		event_manager_post_button(ui_widget_port_press_controller, ui_widget_port_press_button);
+		ui_widget_port_press_controller = NONE;
+	}
 	if (widget_globals.initialization_thread)
 	{
 		if (!thread_has_exited(widget_globals.initialization_thread))

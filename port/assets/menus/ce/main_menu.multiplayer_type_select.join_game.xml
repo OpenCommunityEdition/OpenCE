@@ -39,7 +39,7 @@
 		<child widget="main_menu/multiplayer_type_select/join_game/ticker_rules_info" x="80"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/join_game_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
-		<child widget="main_menu/multiplayer_type_select/join_game/join_game_button_update" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/join_game/join_game_button_refresh" y="1"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/button_clipboard" x="128" y="1"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/join_game_button_filters" x="256" y="1"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/join_game_button_join" x="384" y="1"/>

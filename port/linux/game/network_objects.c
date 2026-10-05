@@ -175,6 +175,9 @@ enum
 	/* ... the round trip without one measured, and the most */
 	DEFAULT_OWN_ROUND_TRIP_TICKS = 6,
 	MAXIMUM_OWN_ROUND_TRIP_TICKS = 60,
+	/* ... how long the weapon the host says it picked up may take to reach
+	its unit, to be readied (the host's messages are not in step) */
+	PICKED_UP_WEAPON_TICKS = 3 * TICKS_PER_SECOND,
 	/* the most grenades of a kind a unit carries, as the host says (a dead
 	unit drops each) */
 	MAXIMUM_INVENTORY_GRENADES = 16,
@@ -422,6 +425,14 @@ static struct distributed_own_inventory
 	long fired_times[MAXIMUM_WEAPONS_PER_UNIT];
 	long weapon_times[MAXIMUM_WEAPONS_PER_UNIT];
 } objects_client_own_inventories[MAXIMUM_LOCAL_PLAYERS];
+/* ... the weapon each of them last picked up (the host said so), its unit
+and when, until it is readied (definition NONE: none) */
+static struct distributed_picked_up_weapon
+{
+	long unit_index;
+	long definition_index;
+	long time;
+} objects_client_picked_up_weapons[MAXIMUM_LOCAL_PLAYERS];
 /* ... whether it failed to make one of the host's objects since it last
 asked for them (it says so when it asks again) */
 static boolean objects_client_ask_again;
@@ -2377,6 +2388,68 @@ static void distributed_client_apply_inventory(
 		distributed_client_note_own_inventory(own, inventory->unit_index, FALSE);
 }
 
+/* a client's own player picked up a weapon (network_player_show_pickup) */
+void network_objects_client_picked_up_weapon(
+	short local_player_index,
+	long unit_index,
+	long definition_index)
+{
+	struct distributed_picked_up_weapon *picked_up;
+
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return;
+	picked_up = &objects_client_picked_up_weapons[local_player_index];
+	picked_up->unit_index = unit_index;
+	picked_up->definition_index = definition_index;
+	picked_up->time = game_time_get();
+}
+
+/* the weapons its own players picked up readied once they have them, as
+unit_add_weapon_to_inventory readies a pickup where it decides it (not
+while firing): the client chooses its players' weapons in hand
+(distributed_client_apply_inventory), and the host follows */
+static void distributed_client_ready_picked_up_weapons(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_picked_up_weapon *picked_up = &objects_client_picked_up_weapons[local_player_index];
+		long player_index = local_player_get_player_index(local_player_index);
+		struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+		long unit_index = distributed_living_unit(player);
+		struct unit_datum *unit;
+		short weapon_slot;
+
+		if (picked_up->definition_index == NONE)
+			continue;
+		if (unit_index == NONE || unit_index != picked_up->unit_index ||
+			game_time_get() - picked_up->time > PICKED_UP_WEAPON_TICKS)
+		{
+			picked_up->definition_index = NONE;
+			continue;
+		}
+		unit = unit_get(unit_index);
+		for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
+		{
+			long weapon_index = unit->unit.weapon_object_indices[weapon_slot];
+			struct weapon_datum *weapon = weapon_index != NONE ? weapon_try_and_get(weapon_index) : NULL;
+
+			if (weapon && weapon->definition_index == picked_up->definition_index)
+				break;
+		}
+		if (weapon_slot == MAXIMUM_WEAPONS_PER_UNIT)
+			continue;
+		if (!TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit))
+		{
+			player_control_set_desired_weapon(unit_index, weapon_slot);
+			unit->unit.desired_weapon_index = weapon_slot;
+		}
+		picked_up->definition_index = NONE;
+	}
+}
+
 void network_objects_handle_inventories(
 	void const *entries,
 	short count)
@@ -2549,6 +2622,7 @@ void network_objects_client_tick(
 	/* (too many to look at one by one later: all of them) */
 	else if (objects_client_new_object_count >= MAXIMUM_CLIENT_NEW_OBJECTS)
 		objects_client_check_all = TRUE;
+	distributed_client_ready_picked_up_weapons();
 	distributed_client_note_own_inventories();
 	distributed_client_send_vehicles();
 	/* (who it is, as its Discord told it: once its ready went, which makes
@@ -2606,6 +2680,7 @@ void network_objects_new_game(
 	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
 	{
 		objects_client_own_inventories[local_player_index].unit_index = NONE;
+		objects_client_picked_up_weapons[local_player_index].definition_index = NONE;
 		for (index = 0; index < OWN_VEHICLE_POSITION_TICKS; index++)
 		{
 			objects_client_own_vehicles[local_player_index][index].time = NONE;

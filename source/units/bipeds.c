@@ -4291,8 +4291,10 @@ boolean biped_update(
 					unit_get(biped_index)->unit.current_weapon_index);
 
 				/* (port: and with no weapon, which prevents it in the
-				Xbox game: a gametype's loadout of none) */
-				if ((weapon_index == NONE || !weapon_prevents_melee_attack(weapon_index)) &&
+				Xbox game: a gametype's loadout of none; not from a
+				vehicle's seat, which holds no weapon either) */
+				if (((weapon_index == NONE && biped->unit.parent_seat_index == NONE) ||
+					(weapon_index != NONE && !weapon_prevents_melee_attack(weapon_index))) &&
 					biped->unit.current_zoom_level==NONE)
 				{
 					short melee_speedup_ticks;

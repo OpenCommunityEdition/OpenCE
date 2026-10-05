@@ -103,8 +103,10 @@ static const struct config_setting config_settings[] =
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
 	{ "display.player_names", _config_string, "\"all\"", "HALO_PLAYER_NAMES", _environment_value, _platform_all,
 		"In multiplayer, whose names are drawn above their heads: \"all\",\n"
-		"\"allies\", \"enemies\" or \"none\". An enemy's shows only while in sight\n"
-		"and not camouflaged." },
+		"\"allies\", \"enemies\" or \"none\". An enemy's shows only within the\n"
+		"motion sensor's reach, in sight and not camouflaged; none show if the\n"
+		"gametype's motion tracker shows no players, only allies' if it shows\n"
+		"only friends." },
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 three quarters of the size of\n"
 		"the HUD's text, 0.25 to 4." },
@@ -232,11 +234,21 @@ static const struct config_setting config_settings[] =
 		"networks whose NAT stops connections: when a player joins this\n"
 		"machine's game, and when joining a game takes too long. False never\n"
 		"asks." },
-	{ "network.signalling_brokers", _config_string,
-		"\"broker.emqx.io:1883,broker.hivemq.com:1883,test.mosquitto.org:1883\"",
-		"HALO_NET_BROKERS", _environment_value, _platform_all,
-		"Public MQTT brokers through which the machines of an invite find each\n"
-		"other (its messages are encrypted); comma-separated host:port." },
+	{ "network.public_lobby", _config_boolean, "true", "HALO_NET_PUBLIC_LOBBY", _environment_value, _platform_all,
+		"The server browser: public games are listed through the signalling\n"
+		"brokers, and Join Game > Server Browser shows them. False lists no\n"
+		"game of this machine's and shows none." },
+	{ "network.host_public", _config_boolean, "true", "HALO_NET_HOST_PUBLIC", _environment_value, _platform_all,
+		"Whether a new game of Create Game > Internet starts as PUBLIC (listed\n"
+		"in everyone's server browser: anyone can see and join it) or, false,\n"
+		"PRIVATE (only players with its invite link can join). Server Setup's\n"
+		"LISTING changes it for each game." },
+	{ "network.brokers_file", _config_string, "\"brokers.txt\"",
+		"HALO_NET_BROKERS_FILE", _environment_value, _platform_all,
+		"The file of the public MQTT brokers through which the machines of an\n"
+		"invite find each other (its messages are encrypted), beside this file\n"
+		"unless a full path: one host:port on each line, up to 4. Updates\n"
+		"replace brokers.txt: keep a list of your own under another name." },
 	{ "network.stun_servers", _config_string, "\"stun.l.google.com:19302,stun.cloudflare.com:3478\"",
 		"HALO_NET_STUN", _environment_value, _platform_all,
 		"Public STUN servers that tell this machine its internet address;\n"
@@ -1062,6 +1074,11 @@ void config_folder(char *path, size_t size)
 }
 
 /* ---------- public code */
+
+char *config_file_read(const char *path, size_t *size)
+{
+	return config_read_file(path, size);
+}
 
 unsigned long config_changes(void)
 {

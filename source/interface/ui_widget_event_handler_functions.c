@@ -2029,6 +2029,10 @@ static boolean multiplayer_type_menu_initialize(
 	boolean *widget_deleted)
 {
 	player_spawn_count = 1;
+	/* port: and no co-op player's controller, which one player with one
+	gamepad gives back to the keyboard's (xinput_sdl.c's port_gamepad): its
+	going is not a controller unplugged (input_abstraction.c) */
+	player_ui_reset_single_player_local_player_controllers();
 	return TRUE;
 }
 
@@ -2315,6 +2319,8 @@ static boolean main_menu_initialize(
 	dispose_global_network_game_server();
 	network_game_accept_remote_connections(FALSE);
 	player_spawn_count = 1;
+	/* port: as multiplayer_type_menu_initialize */
+	player_ui_reset_single_player_local_player_controllers();
 	player_ui_end_editing_profile();
 	if (!ui_main_menu_music_active())
 		ui_start_main_menu_music();
@@ -2405,6 +2411,10 @@ static boolean network_game_remove_local_player(
 		event && event->controller_index >= 0 && event->controller_index < 4,
 		"valid controller index required to remove player from network game");
 	network_game_client_local_player_quit(event->controller_index);
+	/* port: a split screen player who quit, the others staying, is not
+	joined to the next game */
+	if (local_player_count() > 1)
+		player_ui_local_player_left_multiplayer_game(event->controller_index);
 	return TRUE;
 }
 
@@ -6041,6 +6051,22 @@ boolean ui_widget_port_multiplayer_player(
 	player_ui_set_active_player_profile(controller_index, profile_index, &profile);
 	player_ui_local_player_joined_multiplayer_game(controller_index);
 	return TRUE;
+}
+
+/* the lobby's B of a player (port/linux/game/menu_functions.c): that
+controller's player leaves the game (netgame_unjoin_player); TRUE if they were
+the machine's last, which leaves it (and are joined again if its host's
+lobby comes back), else they leave the next game too */
+boolean ui_widget_port_unjoin_player(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	boolean left = netgame_unjoin_player(widget, event, widget_deleted);
+
+	if (!left && event && event->controller_index >= 0 && event->controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		player_ui_local_player_left_multiplayer_game(event->controller_index);
+	return left;
 }
 
 /* a screen by name in place of the widget's (back returns to it: as

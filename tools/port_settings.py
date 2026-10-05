@@ -186,7 +186,8 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
                       f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
     lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", 11), ("width", 605), ("height", 59),
                                           ("bitmap", header_bitmap)], [])
-    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68), ("top", 350), ("width", 482),
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
+                                      ("top", spec.get("help_top", 350)), ("width", 482),
                                       ("height", 60), ("string_list", f"{base}/help_strings"),
                                       ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
@@ -349,13 +350,14 @@ def LOADOUT_HELPS(slot: str) -> list:
 
 STRING_OVERRIDES.update({
     f"{MT}/multiplayer_options": ["JOIN GAME", "CREATE GAME", "INTERNET", "LAN", "DIRECT LINK", "EDIT GAMETYPES",
-                                  "SERVER BROWSER"],
+                                  "SERVER BROWSER", "CO-OP CAMPAIGN"],
     f"{MT}/multiplayer_option_descriptions": [
         "Browse the games on the\\nInternet.",
         "Join a multiplayer game on\\nyour LAN.",
         "Join a game by its invite link,\\nor one a Discord invite\\nreached.",
         "Host a game on the Internet:\\nplayers join by its invite\\nlink or Discord.",
         "Host a game on your LAN\\nonly.",
+        "Play the campaign with a\\nfriend in split screen:\\nplayer 2 on a gamepad.",
         "Set all the attributes for your \\nmultiplayer gametypes and\\nkeep them for future use.",
     ],
     "main_menu/gametype_select/var_gametype_banks": ["STANDARD", "CUSTOM"],
@@ -417,6 +419,10 @@ WIDGET_PATCHES = {
         f'<on event="start" run="mp type set mode" open="{MT}/join_game/join_game_screen"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
+    # (Co-op, after Create Game's: _coop)
+    f"{MT}/multiplayer_type_select_list": {"insert_before": {
+        f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
+    }},
     f"{MT}/join_game/header_join_game": {"children": [
         f'<child widget="{MT}/join_game/header_server_browser"/>',
         f'<child widget="{MT}/join_game/header_direct_link"/>',
@@ -439,10 +445,12 @@ WIDGET_PATCHES = {
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
     # (Direct Link's clipboard button in the place of the PC version's
-    # Refresh, which this port has not: the lists update themselves; "swap"
-    # puts another widget in a child's place)
+    # Refresh, and Refresh in Get List's: the Server Browser's only, which
+    # asks the public games' hosts again; "swap" puts another widget in a
+    # child's place)
     f"{MT}/join_game/join_game_button_bar": {"swap": {
         f"{MT}/join_game/join_game_button_refresh": f"{MT}/join_game/button_clipboard",
+        f"{MT}/join_game/join_game_button_update": f"{MT}/join_game/join_game_button_refresh",
     }},
 }
 
@@ -452,6 +460,8 @@ TITLES = {
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "DIRECT LINK",
     f"{MT}/lobby/header_lobby": "GAME LOBBY",
+    f"{MT}/coop/header_player_2": "PLAYER 2 PROFILE",
+    f"{MT}/lobby/header_add_player": "ADD PLAYER",
 }
 
 
@@ -469,6 +479,39 @@ def title_backdrop(width: float) -> str:
         f'    <rect x="29.08" y="28.05" width="{width + 28:.2f}" height="40.95" fill="#021931" fill-opacity="0.893" '
         'filter="url(#soft)"/>',
         "  </g>", "</svg>", ""])
+
+
+# the in-game pause menu's box, taller for the buttons this port adds
+# (menu_tags.c's pause_patch: SETTINGS, and the host's END GAME): the
+# pausebox5 redraw's rounded box (ui-svg-handmade/shell/bitmaps), drawn to
+# hold each number of buttons, one frame each (the Xbox's 2-button box is
+# 159 units high, and each button 35 more)
+PAUSE_BOX_BUTTONS = [3, 4]
+
+
+def pause_box_height(buttons: int) -> int:
+    return 159 + (buttons - 2) * 35
+
+
+def pause_box_svg(piece: str, height: int) -> str:
+    """a piece of the pause box (left cap, centre strip, right cap; 9-slice:
+    the strip tiles across), height units high in its 256-high texture"""
+    width = 4 if piece == "center" else 16
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="256" viewBox="0 0 {width} 256">']
+    if piece == "center":
+        lines += [f'  <rect x="0" y="2" width="4" height="{height - 4}" fill="#0a2649" fill-opacity="0.75"/>',
+                  '  <rect x="0" y="0" width="4" height="2" fill="#2896ff"/>',
+                  f'  <rect x="0" y="{height - 2}" width="4" height="2" fill="#2896ff"/>']
+    else:
+        bottom, corner = height - 1, height - 9.5
+        cap = [f'    <path d="M9.5,1 H17 V{bottom} H9.5 A8.5,8.5 0 0 1 1,{corner} V9.5 A8.5,8.5 0 0 1 9.5,1 Z" '
+               'fill="#0a2649" fill-opacity="0.75" fill-rule="evenodd"/>',
+               f'    <path d="M17,1 H9.5 A8.5,8.5 0 0 0 1,9.5 V{corner} A8.5,8.5 0 0 0 9.5,{bottom} H17" fill="none" '
+               'stroke="#2896ff" stroke-width="2"/>']
+        lines += (['  <g transform="matrix(-1 0 0 1 16 0)">'] + cap + ['  </g>']) if piece == "right" else \
+            [line[2:] for line in cap]
+    lines += ["</svg>", ""]
+    return "\n".join(lines)
 
 
 # where the PC headers' text is (units of their 512x64), and its colour
@@ -521,9 +564,12 @@ def _join_game_extras() -> list:
 
 def _server_settings() -> list:
     """Create Game's server settings (in the PC version's place): the game's
-    name, the most players (up to the port's 128), and its invite link"""
+    name, the most players (up to the port's 128), its invite link, and
+    whether the server browser lists it (PUBLIC or PRIVATE: an internet
+    game's)"""
     base = f"{MT}/server_settings"
-    spec = {"screen": "server_settings_screen", "spacing": 30,
+    # (ten rows: closer together, the help lower)
+    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 358,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -547,6 +593,25 @@ def _server_settings() -> list:
     rows.append((f"{base}/op_max_players", None))
     extra += _value_row(base, "invite", 2, "ss copy invite")
     rows.append((f"{base}/op_invite", None))
+    # (PUBLIC or PRIVATE: menu_functions.c's server_settings_update)
+    extra += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
+                                            ("flags", "pass_unhandled_to_focused_child"),
+                                            ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                     [f'<child widget="{base}/listing_label"/>',
+                      f'<child widget="{base}/listing_spinner" x="320" y="1"/>'])
+    extra += _widget(f"{base}/listing_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                               ("height", 22), ("string_list", f"{base}/labels"),
+                                               ("string_index", 9), ("font", "ui\\large_ui"),
+                                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    extra += _widget(f"{base}/listing_spinner",
+                     [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147), ("height", 20),
+                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                      ("strings", "PUBLIC|PRIVATE"), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                      ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
+                     ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    rows.append((f"{base}/op_listing", None))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -576,7 +641,7 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:"])
+                                         "TEAMPLAY OPTIONS:", "LISTING:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -588,6 +653,9 @@ def _server_settings() -> list:
         "Each team's vehicles and their respawn time, for\\nthis game.",
         "The motion tracker and nav points, for this game.",
         "Friendly fire and team balance, for this game.",
+        # (LISTING's, by its choice)
+        "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
+        "Only players with your invite link can join.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
@@ -617,25 +685,43 @@ def _lobby() -> list:
     pregame's functions, which need no widget of theirs): up to the port's
     128 players, scrolling; the game's map and gametype; the countdown"""
     base = f"{MT}/lobby"
+    # (split screen: another controller's START joins it, its B leaves alone:
+    # menu_functions.c's lobby_join)
     lines = _widget(f"{base}/lobby_screen", [("width", 640), ("height", 480),
                                              ("flags", "pass_unhandled_to_focused_child"),
                                              ("bitmap", "bitmaps/gradient")],
-                    ['<on event="created" run="net server accept conx"/>',
+                    ['<on event="created" run="port lobby open"/>',
+                     '<on event="created" run="net server accept conx"/>',
                      '<on event="created" run="net server allow start"/>',
-                     '<on event="b" run="net game unjoin player" back="true"/>',
-                     '<on event="back" run="net game unjoin player" back="true"/>',
+                     '<on event="b" run="port lobby leave" back="true"/>',
+                     '<on event="back" run="port lobby leave" back="true"/>',
+                     f'<on event="start" run="port lobby join" open="{base}/player_profile_screen" branch="true"/>',
                      '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
                      f'<child widget="{base}/lobby_list"/>',
-                     f'<child widget="{base}/header_lobby"/>'])
+                     f'<child widget="{base}/header_lobby"/>',
+                     f'<child widget="{base}/lobby_join_help"/>'])
     lines += _header(f"{base}/header_lobby", f"{base}/header_lobby")
-    rows = [f'<child widget="main_menu/new_select/list_item_{index}" x="20" y="{73 + 30 * index}"/>'
-            for index in range(11)]
+    lines += _widget(f"{base}/lobby_join_help", [("type", "text"), ("controller", 1), ("left", 355), ("top", 446),
+                                                 ("width", 275), ("height", 24), ("font", "ui\\small_ui"),
+                                                 ("color", "#FF2896FF"), ("align", "right"), ("text_y", 5),
+                                                 ("text_flags", "no_focus_test")], [])
+    # (its rows: any controller's left and right switch its own player's team,
+    # on the rows only, so that they move along the buttons)
+    rows = [f'<child widget="{base}/list_item_{index}" x="20" y="{73 + 30 * index}"/>' for index in range(11)]
     lines += _widget(f"{base}/lobby_list", [("type", "column_list"), ("width", 640), ("height", 480),
                                             ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
                                             ("description", f"{base}/lobby_desc")],
                      ['<data input="net splitscreen prejoin players"/>', '<data input="port lobby update"/>',
-                      '<on event="left right" run="swap player team"/>', *rows,
+                      *rows,
                       f'<child widget="{base}/lobby_button_bar" y="414"/>'])
+    for index in range(11):
+        lines += _widget(f"{base}/list_item_{index}",
+                         [("width", 390), ("height", 28),
+                          ("bitmap", "bitmaps/sel_list_item_bkd_top" if index == 0 else "bitmaps/sel_list_item_bkd"),
+                          ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)],
+                         ['<on event="left right" run="swap player team"/>',
+                          '<child widget="main_menu/new_select/list_item_text" x="25"/>',
+                          '<child widget="main_menu/new_select/list_item_arrows"/>'])
     lines += _widget(f"{base}/lobby_desc", [("width", 640), ("height", 480)],
                      ['<child widget="main_menu/current_profile_name"/>',
                       f'<child widget="{base}/lobby_right_item" x="22" y="2"/>'])
@@ -654,10 +740,16 @@ def _lobby() -> list:
                                                  ("color", "#FF2896FF")], [])
     lines += _widget(f"{base}/lobby_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                   ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
-                     [f'<child widget="{base}/lobby_button_team" x="250" y="1"/>',
-                      f'<child widget="{base}/lobby_button_start" x="380" y="1"/>',
+                     # (SWITCH TEAM first: hidden in a game without teams, which
+                     # moves the focus to the first shown, START NOW; at the end
+                     # it traps none)
+                     [f'<child widget="{base}/lobby_button_team" x="120" y="1"/>',
+                      f'<child widget="{base}/lobby_button_start" x="250" y="1"/>',
+                      f'<child widget="{base}/lobby_button_add" x="380" y="1"/>',
                       f'<child widget="{base}/lobby_button_leave" x="510" y="1"/>'])
     for key, caption, handlers in (
+        ("add", "ADD PLAYER", ['<on event="a" run="port lobby add player"/>',
+                               '<on event="start" run="port lobby add player"/>']),
         ("team", "SWITCH TEAM", ['<on event="a" run="swap player team"/>', '<on event="start" run="swap player team"/>']),
         ("start", "START NOW", ['<on event="a" run="net game speed start"/>',
                                 '<on event="start" run="net game speed start"/>']),
@@ -668,17 +760,49 @@ def _lobby() -> list:
                                                        ("text", caption), ("font", "ui\\small_ui"),
                                                        ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 2)],
                          handlers + ['<on event="left_mouse" run="mouse emit accept event"/>'])
+    # a split screen player's profile, chosen as they join the lobby (any
+    # controller's presses: Co-op's rows; the host's countdown waits)
+    lines += _widget(f"{base}/player_profile_screen", [("width", 640), ("height", 480),
+                                                       ("flags", "pass_unhandled_to_focused_child"),
+                                                       ("bitmap", "bitmaps/gradient")],
+                     ['<on event="created" run="net server defer start"/>',
+                      '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
+                      f'<child widget="{base}/player_profile_list"/>',
+                      f'<child widget="{base}/header_add_player"/>',
+                      f'<child widget="{base}/player_profile_help" x="20" y="416"/>'])
+    lines += _header(f"{base}/header_add_player", f"{base}/header_add_player")
+    lines += _widget(f"{base}/player_profile_list",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", "main_menu/profile_manager/player_profile_extended_desc")],
+                     ['<data input="3wide player profile list update"/>',
+                      '<on event="created" run="port lobby player list initialize"/>',
+                      '<on event="deleted" run="player profile list dispose"/>',
+                      '<on event="custom_activation" run="port lobby player choose" back="true" branch="true"/>',
+                      *[f'<child widget="{MT}/coop/list_item_{index}" x="20" y="{73 + 30 * index}"/>'
+                        for index in range(11)],
+                      f'<child widget="{MT}/coop/player_2_button_bar" y="414"/>'])
+    lines += _widget(f"{base}/player_profile_help", [("type", "text"), ("width", 350), ("height", 24),
+                                                     ("text", "The new player's profile."),
+                                                     ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("text_y", 5),
+                                                     ("text_flags", "no_focus_test")], [])
     # a game under way's lobby, before joining it (the browser's rows of
-    # games in progress): what its advertisement tells, JOIN GAME
+    # games in progress): what its advertisement tells, JOIN GAME. Split
+    # screen players join here, as in the lobby, before JOIN GAME: the game
+    # starts at once for the machine, with the players it brings
     lines += _widget(f"{base}/preview_screen", [("width", 640), ("height", 480),
                                                 ("flags", "pass_unhandled_to_focused_child"),
                                                 ("bitmap", "bitmaps/gradient")],
-                     ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                     ['<on event="created" run="port lobby open"/>',
+                      '<on event="b" run="port lobby preview leave" back="true"/>',
+                      '<on event="back" run="port lobby preview leave" back="true"/>',
+                      f'<on event="start" run="port lobby preview add" open="{base}/player_profile_screen" branch="true"/>',
                       '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
                       f'<child widget="{base}/preview_list"/>',
-                      f'<child widget="{base}/header_lobby"/>'])
+                      f'<child widget="{base}/header_lobby"/>',
+                      f'<child widget="{base}/lobby_join_help"/>'])
     lines += _widget(f"{base}/preview_list", [("type", "column_list"), ("width", 640), ("height", 480),
-                                              ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                                              ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
                                               ("description", f"{base}/lobby_desc")],
                      ['<data input="port lobby preview update"/>',
                       f'<child widget="{base}/preview_status" x="30" y="75"/>',
@@ -687,15 +811,73 @@ def _lobby() -> list:
                                                 ("font", "ui\\large_ui"), ("color", "#FF2896FF")], [])
     lines += _widget(f"{base}/preview_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                     ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
-                     [f'<child widget="{base}/preview_button_join" x="380" y="1"/>',
+                     [f'<child widget="{base}/preview_button_join" x="250" y="1"/>',
+                      f'<child widget="{base}/preview_button_add" x="380" y="1"/>',
                       f'<child widget="{base}/preview_button_back" x="510" y="1"/>'])
-    for key, caption, run in (("join", "JOIN GAME", "port lobby preview join"), ("back", "BACK", "mouse emit back event")):
+    for key, caption, run in (("join", "JOIN GAME", "port lobby preview join"),
+                              ("add", "ADD PLAYER", "port lobby add player"),
+                              ("back", "BACK", "mouse emit back event")):
         lines += _widget(f"{base}/preview_button_{key}", [("type", "text"), ("width", 128), ("height", 24),
                                                          ("bitmap", "bitmaps/text_button_background"),
                                                          ("text", caption), ("font", "ui\\small_ui"),
                                                          ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 2)],
                          [f'<on event="a" run="{run}"/>', f'<on event="start" run="{run}"/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>'])
+    return lines
+
+
+def _coop() -> list:
+    """Co-op, the campaign for two players on this machine in split screen
+    (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
+    2's profile, chosen with player 2's controller (its rows take any
+    controller's presses, as the shared rows do only controller 1's), then
+    New Game's levels and difficulty (menu_functions.c's coop_begin)"""
+    base = f"{MT}/coop"
+    lines = _widget(f"{MT}/multiplayer_type_coop_item",
+                    [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
+                     ("string_list", f"{MT}/multiplayer_options"), ("string_index", 7), ("font", "ui\\large_ui"),
+                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
+                    [f'<on event="a" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
+                     f'<on event="start" run="port coop begin" open="{base}/player_2_profile_screen" branch="true"/>',
+                     '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _widget(f"{base}/player_2_profile_screen", [("width", 640), ("height", 480),
+                                                         ("flags", "pass_unhandled_to_focused_child"),
+                                                         ("bitmap", "bitmaps/gradient")],
+                     ['<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
+                      f'<child widget="{base}/player_2_profile_list"/>',
+                      f'<child widget="{base}/header_player_2"/>',
+                      f'<child widget="{base}/player_2_help" x="20" y="416"/>'])
+    lines += _header(f"{base}/header_player_2", f"{base}/header_player_2")
+    rows = [f'<child widget="{base}/list_item_{index}" x="20" y="{73 + 30 * index}"/>' for index in range(11)]
+    lines += _widget(f"{base}/player_2_profile_list",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", "main_menu/profile_manager/player_profile_extended_desc")],
+                     ['<data input="3wide player profile list update"/>',
+                      '<on event="created" run="port coop player 2 list initialize"/>',
+                      '<on event="deleted" run="player profile list dispose"/>',
+                      '<on event="custom_activation" run="port coop player 2" '
+                      'open="main_menu/solo_level_select/solo_level_select_screen" branch="true"/>',
+                      *rows, f'<child widget="{base}/player_2_button_bar" y="414"/>'])
+    for index in range(11):
+        lines += _widget(f"{base}/list_item_{index}",
+                         [("width", 390), ("height", 28),
+                          ("bitmap", "bitmaps/sel_list_item_bkd_top" if index == 0 else "bitmaps/sel_list_item_bkd"),
+                          ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)],
+                         ['<on event="a" run="single prev cl item activated"/>',
+                          '<on event="start" run="single prev cl item activated"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          '<child widget="main_menu/new_select/list_item_text" x="25"/>',
+                          '<child widget="main_menu/new_select/list_item_arrows"/>'])
+    lines += _widget(f"{base}/player_2_help", [("type", "text"), ("width", 350), ("height", 24),
+                                               ("text", "Player 2: choose with your controller."),
+                                               ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("text_y", 5),
+                                               ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/player_2_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                     ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     ['<data input="common button bar update"/>',
+                      '<child widget="main_menu/profile_manager/profile_manager_button_ok" x="380" y="1"/>',
+                      '<child widget="common_button_back" x="510" y="1"/>'])
     return lines
 
 
@@ -740,6 +922,7 @@ def multiplayer_files() -> dict:
         f"{MT}/join_game".replace("/", ".") + ".port.xml": head + _join_game_extras() + ["</menus>", ""],
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
+        f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
     }
 
@@ -747,12 +930,13 @@ def multiplayer_files() -> dict:
 REPLACED_FOLDERS = [f"{MT}/server_settings"]
 
 
-# ---------- in a game: SETTINGS in the pause menus
+# ---------- in the campaign: SETTINGS in the pause menu
 
 # The game's pause menus are the maps' own, not these files', and ui.map has
-# none of their art, so these widgets (in_game/...) are built in the game's
-# maps instead, with the screens they open (port/linux/game/menu_tags.c);
-# ui_widget.c adds SETTINGS to the pause menus after RESUME GAME. Its screen
+# none of their art, so these widgets (in_game/...) are built in the
+# campaign's maps instead, with the screens they open
+# (port/linux/game/menu_tags.c); ui_widget.c adds SETTINGS to the campaign's
+# pause menu after RESUME GAME (a multiplayer map's has menu_tags.c's own). Its screen
 # is the multiplayer pause menu's box and key, from the maps' own tags (every
 # campaign and multiplayer map has them), with rows as the pause menus have
 # them, named and ordered as Edit Profile has them. Each opens Edit Profile's
