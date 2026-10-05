@@ -74,6 +74,10 @@ void network_game_server_port_set_cooperative_friendly_fire(
 	short friendly_fire);
 boolean network_game_server_ban_player(
 	char const *text);
+/* port: the host's kick command: as the ban command, but nothing kept (no
+bans.txt line, the address not kept out): the player may join again at once */
+boolean network_game_server_kick_player(
+	char const *text);
 short network_game_server_matching_player_names(
 	char const *text,
 	char (*names)[NETWORK_GAME_SERVER_NAME_TEXT_SIZE],

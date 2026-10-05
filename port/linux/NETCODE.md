@@ -173,7 +173,9 @@ added to `bans.txt` beside `debug.txt` (a line each, as in `cheaters.txt`,
 with `ip=` and `hwid=`): the host refuses a machine joining whose address or
 hardware id is in it (a line taken out unbans). Both are as the player's
 machine tells them: anyone with administrator or root access can change
-them, and players behind one address share it.
+them, and players behind one address share it. The console's `kick <player
+name>` drops a player as `ban` does (every machine told), but adds no line
+and keeps no address out: the player may join again at once.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.
