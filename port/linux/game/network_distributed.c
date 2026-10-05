@@ -3343,6 +3343,7 @@ static boolean distributed_message_stale(
 	case _distributed_message_coop_object_looks:
 	case _distributed_message_damage_animations:
 	case _distributed_message_coop_screen_effect:
+	case _distributed_message_coop_device_states:
 		break;
 	default:
 		return FALSE;
@@ -3813,6 +3814,7 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_object_looks: entry_size = network_coop_object_look_entry_size(); break;
 	case _distributed_message_damage_animations: entry_size = network_objects_damage_animation_entry_size(); break;
 	case _distributed_message_coop_screen_effect: entry_size = network_coop_screen_effect_entry_size(); break;
+	case _distributed_message_coop_device_states: entry_size = network_coop_device_state_entry_size(); break;
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
@@ -3926,6 +3928,9 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_coop_screen_effect:
 		network_coop_handle_screen_effect(entries, header.count);
+		break;
+	case _distributed_message_coop_device_states:
+		network_coop_handle_device_states(entries, header.count);
 		break;
 	case _distributed_message_player_statistics:
 	{

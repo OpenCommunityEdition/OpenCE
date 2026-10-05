@@ -734,6 +734,23 @@ void device_group_network_set(
 	group->flags = (word)((group->flags & ~DEVICE_GROUP_NETWORK_FLAGS) | (flags & DEVICE_GROUP_NETWORK_FLAGS));
 }
 
+void device_port_set_state(
+	long device_index,
+	real power,
+	boolean move_to_position,
+	real position)
+{
+	struct device_datum *device = device_get(device_index);
+
+	device->device.power = PIN(power, 0.0f, 1.0f);
+	if (move_to_position)
+	{
+		device->device.position = PIN(position, 0.0f, 1.0f);
+		device->device.position_velocity = 0.0f;
+		device->device.flags |= FLAG(_device_position_changed_bit);
+	}
+}
+
 static boolean device_group_change(
 	short group_index,
 	real desired_value)

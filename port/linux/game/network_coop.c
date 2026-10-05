@@ -901,6 +901,96 @@ static void host_send_device_groups(
 	}
 }
 
+/* Where one of the host's devices is: its position (open, closed, how far
+up an elevator has gone) and power, which the device groups' values only
+aim it at. Found as the scenery animations' are (object_find). */
+struct distributed_coop_device_state
+{
+	short name_index;
+	byte moving;
+	byte pad;
+	long object_index;
+	long definition_index;
+	real position;
+	real power;
+};
+
+#define MAXIMUM_DEVICE_STATES_PER_MESSAGE 64
+
+struct distributed_coop_device_states_message
+{
+	struct distributed_message_header header;
+	struct distributed_coop_device_state states[MAXIMUM_DEVICE_STATES_PER_MESSAGE];
+};
+
+/* a client puts its device where the host's is when the host's is at rest
+there, or when the two are this far apart while it moves (of the device's
+travel, 0 to 1) */
+#define DEVICE_POSITION_TOLERANCE 0.03f
+
+/* host: each device's position and power as last sent, by its absolute
+index, and whether they have changed since the map placed it */
+static struct
+{
+	long object_index;
+	boolean moved;
+	real position;
+	real power;
+} host_sent_devices[MAXIMUM_OBJECTS_PER_MAP];
+
+/* host, each tick: the devices that moved or changed power (and, with the
+resent state, all that ever have) */
+static void host_send_device_states(
+	void)
+{
+	struct distributed_coop_device_states_message message;
+	struct object_iterator iterator;
+	struct device_datum *device;
+	short count = 0;
+
+	object_iterator_new(&iterator, _object_mask_device, 0);
+	while ((device = object_iterator_next(&iterator)) != NULL)
+	{
+		short absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.index);
+		struct distributed_coop_device_state *state;
+		boolean changed;
+
+		if (absolute_index < 0 || absolute_index >= MAXIMUM_OBJECTS_PER_MAP)
+			continue;
+		if (host_sent_devices[absolute_index].object_index != iterator.index)
+		{
+			/* (as the map placed it, on every machine) */
+			host_sent_devices[absolute_index].object_index = iterator.index;
+			host_sent_devices[absolute_index].moved = FALSE;
+			host_sent_devices[absolute_index].position = device->device.position;
+			host_sent_devices[absolute_index].power = device->device.power;
+			continue;
+		}
+		changed = host_sent_devices[absolute_index].position != device->device.position ||
+			host_sent_devices[absolute_index].power != device->device.power;
+		if (!changed && !(host_resend.refresh && host_sent_devices[absolute_index].moved))
+			continue;
+		host_sent_devices[absolute_index].moved = TRUE;
+		host_sent_devices[absolute_index].position = device->device.position;
+		host_sent_devices[absolute_index].power = device->device.power;
+		state = &message.states[count++];
+		state->name_index = device->object.name_index;
+		state->moving = (byte)(device->device.position_velocity != 0.0f);
+		state->pad = 0;
+		state->object_index = iterator.index;
+		state->definition_index = device->definition_index;
+		state->position = device->device.position;
+		state->power = device->device.power;
+		if (count == MAXIMUM_DEVICE_STATES_PER_MESSAGE)
+		{
+			send_to_clients(&message, _distributed_message_coop_device_states, count, sizeof(message.states[0]));
+			count = 0;
+		}
+	}
+	if (count > 0)
+		send_to_clients(&message, _distributed_message_coop_device_states, count, sizeof(message.states[0]));
+}
+
 /* host: where each scenery or machine was last sent, by its absolute
 index, and whether it has moved since the map placed it */
 static struct
@@ -1794,6 +1884,7 @@ void network_coop_new_game(
 	csmemset(client_script_sounds.definition_indices, NONE, sizeof(client_script_sounds.definition_indices));
 	csmemset(host_sent_transforms, 0, sizeof(host_sent_transforms));
 	csmemset(host_sent_looks, 0, sizeof(host_sent_looks));
+	csmemset(host_sent_devices, 0, sizeof(host_sent_devices));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
@@ -2405,6 +2496,7 @@ void network_coop_host_tick(
 	if (host_resend.joined || game_time_get() % OBJECT_NAMES_INTERVAL_TICKS == 0)
 		host_send_object_names();
 	host_send_object_transforms();
+	host_send_device_states();
 	host_send_object_looks();
 	host_send_screen_effect();
 	host_send_attachments();
@@ -2458,6 +2550,41 @@ word network_coop_device_group_entry_size(
 	void)
 {
 	return sizeof(struct distributed_coop_device_group);
+}
+
+word network_coop_device_state_entry_size(
+	void)
+{
+	return sizeof(struct distributed_coop_device_state);
+}
+
+/* client: its devices where the host's are (DEVICE_POSITION_TOLERANCE) */
+void network_coop_handle_device_states(
+	void const *entries,
+	short count)
+{
+	struct distributed_coop_device_state const *states = entries;
+	short index;
+
+	if (!coop_client())
+		return;
+	for (index = 0; index < count; index++)
+	{
+		struct distributed_coop_device_state const *state = &states[index];
+		long device_index = object_find(state->name_index, state->object_index, state->definition_index,
+			_object_mask_device);
+		struct device_datum *device;
+		real difference;
+
+		if (device_index == NONE || !distributed_real_valid(state->position) || !distributed_real_valid(state->power))
+			continue;
+		device = object_get_and_verify_type(device_index, _object_mask_device);
+		difference = device->device.position - state->position;
+		if (difference < 0.0f)
+			difference = -difference;
+		device_port_set_state(device_index, state->power,
+			(!state->moving && difference > 0.001f) || difference > DEVICE_POSITION_TOLERANCE, state->position);
+	}
 }
 
 word network_coop_object_transform_entry_size(
