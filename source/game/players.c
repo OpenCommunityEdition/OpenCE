@@ -2734,6 +2734,15 @@ static real_point3d const *players_checkpoint_position(
 	return NULL;
 }
 
+/* TRUE if a biped stands on something (not airborne), in the BSP or not */
+static boolean players_coop_unit_grounded_anywhere(
+	long unit_index)
+{
+	struct biped_datum *biped = biped_try_and_get(unit_index);
+
+	return biped && !TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
+}
+
 /* TRUE if the unit is outside the loaded structure BSP, where it would fall
 forever: on foot, or in a vehicle that is empty or player-driven. AI-driven
 vehicles are ignored because the intro Pelicans fly outside the BSP. */
@@ -2745,17 +2754,19 @@ static boolean players_coop_unit_stranded(
 
 	if (players_coop_unit_in_structure(unit_index))
 		return FALSE;
+	/* (on foot: only while falling, not standing on something the BSP
+	doesn't hold, such as an elevator in its shaft) */
 	if (vehicle_index == unit_index)
-		return TRUE;
+		return !players_coop_unit_grounded_anywhere(unit_index);
 	driver_index = object_try_and_get_and_verify_type(vehicle_index, _object_mask_unit) ?
 		unit_get(vehicle_index)->unit.driver_object_index : NONE;
 	return driver_index == NONE || unit_get(driver_index)->unit.player_index != NONE;
 }
 
-/* How long a player can be outside the BSP before being brought back. A
-BSP switch settles in a tick or two; waiting a bit longer avoids moving
-someone who is just crossing a seam. */
-#define COOP_STRANDED_TICKS TICKS_PER_SECOND
+/* How long a player can be falling outside the BSP before being brought
+back. A BSP switch settles in a tick or two; waiting longer avoids moving
+someone who is only crossing a seam or riding over a gap. */
+#define COOP_STRANDED_TICKS (2 * TICKS_PER_SECOND)
 
 /* After a BSP switch, how long the co-op host lets no other trigger switch
 it while the players are brought into the new one */
@@ -2990,13 +3001,14 @@ static void player_teleport_on_bsp_switch(
 		position);
 	if (biped)
 	{
-		/* port: network co-op moves the players the switch left outside the
-		BSP, and those standing where they would switch it straight back,
-		which switched the BSP back and forth every tick. Pulling everyone to
-		whoever crossed, as split screen does, bounced players far apart. */
+		/* port: in network co-op a loading zone brings the whole team to
+		whoever crossed it, as split screen does. Only one BSP is ever
+		loaded, so anyone left elsewhere would stand outside it, or on a
+		trigger that switches it straight back (players_update_after_game
+		waits COOP_BSP_SWITCH_SETTLE_TICKS before another switch). */
 		if (network_coop_active())
 		{
-			outside_switch_trigger = players_coop_in_bsp_switch_trigger(unit_index);
+			outside_switch_trigger = TRUE;
 		}
 		else if (players_globals->pending_teleport_starting_location_index != NONE &&
 			!scenario_trigger_volume_test_object(
