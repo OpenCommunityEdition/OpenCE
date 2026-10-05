@@ -899,8 +899,9 @@ as for any public server.
 The brokers are in `brokers.txt` next to the executable (from
 `port/assets/network/brokers.txt`; on Android, the app writes it next to
 `config.toml` at each start), one `host:port` on each line. The game uses
-all of them at once (up to 4), so one that works is enough. An update
-replaces `brokers.txt`: to use brokers of your own, put them in another
+all of them at once (up to 4), so one that works is enough. Without the
+file (a game run from somewhere the builds did not put it), the game uses
+its own copy of the list. An update replaces `brokers.txt`: to use brokers of your own, put them in another
 file and name it in `network.brokers_file`. All the players must use the
 same broker to see each other's games. The game uses
 MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep

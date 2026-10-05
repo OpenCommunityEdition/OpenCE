@@ -316,6 +316,17 @@ def test_menu_settings_exist():
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
 
 
+def test_default_brokers_are_brokers_txt():
+    """The brokers a game uses with no brokers.txt beside its config.toml
+    (p2p_signal.c's DEFAULT_BROKERS) are port/assets/network/brokers.txt's."""
+    root = MENUS.parent.parent.parent
+    listed = [line.split("#", 1)[0].strip()
+              for line in (root / "port/assets/network/brokers.txt").read_text().splitlines()]
+    default = re.search(r'^#define DEFAULT_BROKERS "([^"]*)"',
+                        (root / "port/linux/src/p2p_signal.c").read_text(), re.M).group(1)
+    assert default.split(",") == [line for line in listed if line]
+
+
 @linux_host_only
 def test_p2p_signatures_and_listings(tmp_path):
     """internet play's Ed25519 (RFC 8032), the X25519 key of a seed, and the

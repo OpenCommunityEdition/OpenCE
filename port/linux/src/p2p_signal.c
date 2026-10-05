@@ -1705,10 +1705,15 @@ static void broker_readable(struct broker *broker)
 
 /* ---------- p2p.c's side */
 
+/* port/assets/network/brokers.txt's brokers, for a game with no such file
+beside its config.toml (one run from somewhere the builds did not put it).
+Keep it the same as that file (test_linux_port.py checks) */
+#define DEFAULT_BROKERS "opence.milenko.org:1883,broker.emqx.io:1883,broker.hivemq.com:1883,test.mosquitto.org:1883"
+
 /* the brokers in network.brokers_file (beside config.toml, unless a full
 path: port/assets/network/brokers.txt, which the builds put there), one on
 each line, "#" starting a comment, into text: host:port entries separated by
-commas; empty if the file cannot be read */
+commas; DEFAULT_BROKERS if the file cannot be read */
 static void brokers_list(char *text, size_t size)
 {
 	const char *name = config_string("network.brokers_file");
@@ -1741,7 +1746,9 @@ static void brokers_list(char *text, size_t size)
 	file = config_file_read(path, &file_size);
 	if (!file)
 	{
-		platform_log("Internet play: the brokers' file %s cannot be read (network.brokers_file)", path);
+		platform_log("Internet play: the brokers' file %s cannot be read (network.brokers_file); "
+			"using the game's own list", path);
+		snprintf(text, size, "%s", DEFAULT_BROKERS);
 		return;
 	}
 	for (index = 0; index < file_size && length + 1 < size; index++)
