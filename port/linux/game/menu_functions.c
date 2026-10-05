@@ -91,6 +91,7 @@ char const *pc_menu_game_data_input_name(long function_index);
 void event_manager_post_button(short controller_index, short button_index);
 int config_text(char const *name, char *text, unsigned int size);
 int config_write(char const *name, char const *value);
+int config_boolean(char const *name);
 int config_default(char const *name, char *text, unsigned int size);
 char const *config_string(char const *name);
 void platform_display_apply(void);
@@ -2076,8 +2077,8 @@ static struct
 	/* the server settings */
 	wchar_t game_name[16];
 	short maximum_players_index;
-	/* (co-op's own, the most until set lower, so it leaves multiplayer's
-	as it was) */
+	/* (co-op's own, so it leaves multiplayer's as it was: each game hosted
+	starts with COOPERATIVE_DEFAULT_PLAYERS players at most) */
 	short cooperative_maximum_players_index;
 	boolean cooperative_maximum_players_set;
 	/* the browser's games */
@@ -2241,6 +2242,7 @@ static boolean multiplayer_host(struct widget_instance *widget, struct event_rec
 	new game starts with as network.host_public says) */
 	multiplayer.game_private = !config_boolean("network.host_public");
 	p2p_set_hosting_public(multiplayer.mode == _multiplayer_mode_host_internet && !multiplayer.game_private);
+	multiplayer.cooperative_maximum_players_set = FALSE;
 	return ui_widget_port_host(widget, event, widget_deleted);
 }
 
@@ -2569,18 +2571,47 @@ static char const *const server_settings_gametype_rows[] =
 	"op_team_options",
 };
 
+/* the most players a co-op game hosted starts with (maximum_players') */
+#define COOPERATIVE_DEFAULT_PLAYERS 16
+
 /* the most players Server Setup shows and sets: the multiplayer game's, or
-the co-op game's */
+the co-op game's (COOPERATIVE_DEFAULT_PLAYERS the first time in each game
+hosted: multiplayer_host) */
 static short *server_settings_maximum_players_index(void)
 {
+	short index;
+
 	if (!hosting_cooperative())
 		return &multiplayer.maximum_players_index;
 	if (!multiplayer.cooperative_maximum_players_set)
 	{
 		multiplayer.cooperative_maximum_players_index = NUMBEROF(maximum_players) - 1;
+		for (index = 0; index < NUMBEROF(maximum_players); index++)
+		{
+			if (maximum_players[index] == COOPERATIVE_DEFAULT_PLAYERS)
+				multiplayer.cooperative_maximum_players_index = index;
+		}
 		multiplayer.cooperative_maximum_players_set = TRUE;
 	}
 	return &multiplayer.cooperative_maximum_players_index;
+}
+
+/* Server Setup's LISTING, PRIVATE: the multiplayer game's (as
+network.host_public started it), or co-op's, saved in network.coop_public */
+static boolean server_settings_private(void)
+{
+	return hosting_cooperative() ? !config_boolean("network.coop_public") : multiplayer.game_private;
+}
+
+static void server_settings_private_set(boolean private_game)
+{
+	if (!hosting_cooperative())
+		multiplayer.game_private = private_game;
+	else if (private_game != server_settings_private() &&
+		!config_write("network.coop_public", private_game ? "false" : "true"))
+	{
+		platform_log("menus: could not write network.coop_public to config.toml");
+	}
 }
 
 /* "server settings init": the game's name (player 1's, else the one given
@@ -2605,7 +2636,8 @@ static boolean server_settings_initialize(struct widget_instance *list)
 	/* (PUBLIC or PRIVATE: this game's; the screen is made again on coming
 	back from an option's screen) */
 	if ((spinner = named(list, "listing_spinner", 0)) != NULL)
-		spinner->parameters.list.selected_index = multiplayer.game_private ? 1 : 0;
+		spinner->parameters.list.selected_index = server_settings_private() ? 1 : 0;
+	p2p_set_hosting_public(multiplayer.mode == _multiplayer_mode_host_internet && !server_settings_private());
 	return TRUE;
 }
 
@@ -2660,7 +2692,7 @@ static void server_settings_update(struct widget_instance *list)
 		boolean public = spinner->parameters.list.selected_index == 0;
 		struct widget_instance *help = list->parameters.list.extended_description;
 
-		multiplayer.game_private = !public;
+		server_settings_private_set(!public);
 		p2p_set_hosting_public(public);
 		if (help && list->focused_child == named(list, "op_listing", 0))
 			help->parameters.text_box.string_list_index = (short)(10 + spinner->parameters.list.selected_index);

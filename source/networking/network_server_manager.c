@@ -3897,7 +3897,9 @@ void network_game_server_port_set_cooperative(
 	if (!server || server->state != _network_game_server_state_pregame)
 		return;
 	server->game.difficulty = difficulty;
-	server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
+	/* (Server Setup's default for co-op, menu_functions.c's
+	COOPERATIVE_DEFAULT_PLAYERS, until it sets its own) */
+	server->game.maximum_players = MIN(16, MAXIMUM_NETWORK_PLAYER_COUNT);
 	if (!network_game_server_send_game_data_pregame(server))
 		network_event("network_game_server_port_set_cooperative() failed to send updated game settings to clients");
 
