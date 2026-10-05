@@ -771,7 +771,7 @@ MAXIMUM_PLAYERS = [2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
 # them (menu_functions.c's cooperative_friendly_fire_modes, in this order)
 COOP_FRIENDLY_FIRE_VALUES = ["off", "on", "shields_only", "explosives_only"]
 # network.coop_enemies' values, percentages (Server Setup's EXTRA ENEMIES)
-COOP_ENEMIES_VALUES = [0, 50, 100, 150, 200]
+COOP_ENEMIES_VALUES = [0, 25, 50, 100, 150, 200]
 # Server Setup's rows of the gametype's options: the gametype editor's
 # screens
 SETUP_OPTION_SCREENS = [
