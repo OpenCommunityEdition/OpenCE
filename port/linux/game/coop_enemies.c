@@ -2,12 +2,14 @@
 COOP_ENEMIES.C
 
 Network co-op's extra enemies: Server Setup's EXTRA ENEMIES
-(network.coop_enemies, a percentage). For each player past the first, each
-squad of the players' enemies that a level places (encounters.c's
-encounter_create) gets that much of its count more: at 100%, two players
-meet twice the squad, four players four times it. The extra enemies stand
-in rings about the squad's starting locations, on open ground, so they do
-not start inside each other.
+(network.coop_enemies_mode). PER PLAYER (network.coop_enemies, a
+percentage): for each player past the first, each squad of the players'
+enemies that a level places (encounters.c's encounter_create) gets that
+much of its count more; at 100%, two players meet twice the squad, four
+players four times it. STATIC MULTIPLIER (network.coop_enemies_multiplier):
+each squad is that many times as large, for any number of players. The
+extra enemies stand in rings about the squad's starting locations, on
+open ground, so they do not start inside each other.
 
 A squad a script loads into a dropship (vehicle_load_magic) can be larger
 than the dropship's seats. The riders left without a seat are erased, and
@@ -39,9 +41,11 @@ Only the host runs the AI, so all of this is the host's.
 #include "network_coop.h"
 
 #include <math.h>
+#include <string.h>
 
 /* port_config.c's */
 long config_integer(char const *name);
+char const *config_string(char const *name);
 
 /* ---------- constants */
 
@@ -50,8 +54,12 @@ enum
 	/* the actors a level keeps for its own placements, which the extra
 	enemies never take: as many as the Xbox's whole pool */
 	COOP_ENEMIES_LEVEL_ACTORS = 256,
-	/* EXTRA ENEMIES' greatest (Server Setup's choices: 0 to 200%) */
+	/* EXTRA ENEMIES' amounts, as Server Setup has them: 25 to 200% per
+	player, or 2 to 32 times (none is its NONE) */
+	COOP_ENEMIES_MINIMUM_PERCENT = 25,
 	COOP_ENEMIES_MAXIMUM_PERCENT = 200,
+	COOP_ENEMIES_MINIMUM_MULTIPLIER = 2,
+	COOP_ENEMIES_MAXIMUM_MULTIPLIER = 32,
 	/* the places tried for an extra enemy, a ring further out each */
 	SPREAD_ATTEMPTS = 8,
 	SPREAD_PLACES_PER_RING = 6,
@@ -70,6 +78,14 @@ looked along, and the ground looked for below it */
 #define SPREAD_GROUND_DEPTH 2.0f
 /* a kept rider's place beside a rider who got out, each a little apart */
 #define RIDER_SPACING 0.5f
+
+/* EXTRA ENEMIES' choices (network.coop_enemies_mode's values) */
+enum
+{
+	_coop_enemies_none,
+	_coop_enemies_per_player,
+	_coop_enemies_multiplier,
+};
 
 /* ---------- structures */
 
@@ -99,8 +115,11 @@ struct coop_kept_rider
 
 static struct
 {
-	/* EXTRA ENEMIES, as the game began with it */
+	/* EXTRA ENEMIES, as the game began with it: its choice, and the amount
+	of PER PLAYER (a percentage) and of STATIC MULTIPLIER */
+	short mode;
 	short percent;
+	short multiplier;
 	struct coop_riding_vehicle vehicles[MAXIMUM_RIDING_VEHICLES];
 	short vehicle_count;
 	struct coop_kept_rider riders[MAXIMUM_KEPT_RIDERS];
@@ -113,6 +132,14 @@ static boolean coop_enemies_host(
 	void)
 {
 	return game_connection() == _game_connection_network_server && network_coop_active();
+}
+
+/* whether this game has extra enemies (it is a co-op host's, with some
+chosen) */
+static boolean coop_enemies_on(
+	void)
+{
+	return coop_enemies.mode != _coop_enemies_none && coop_enemies_host();
 }
 
 /* the players in the game, every machine's: the network game's (a level
@@ -283,8 +310,17 @@ static void coop_enemies_rider_place(
 void coop_enemies_new_game(
 	void)
 {
+	char const *mode = config_string("network.coop_enemies_mode");
+
 	csmemset(&coop_enemies, 0, sizeof(coop_enemies));
-	coop_enemies.percent = (short)PIN(config_integer("network.coop_enemies"), 0, COOP_ENEMIES_MAXIMUM_PERCENT);
+	/* (an amount past Server Setup's, as it shows it: its nearest choice's
+	end) */
+	coop_enemies.percent = (short)PIN(config_integer("network.coop_enemies"), COOP_ENEMIES_MINIMUM_PERCENT,
+		COOP_ENEMIES_MAXIMUM_PERCENT);
+	coop_enemies.multiplier = (short)PIN(config_integer("network.coop_enemies_multiplier"),
+		COOP_ENEMIES_MINIMUM_MULTIPLIER, COOP_ENEMIES_MAXIMUM_MULTIPLIER);
+	coop_enemies.mode = !strcmp(mode, "per_player") ? _coop_enemies_per_player :
+		!strcmp(mode, "multiplier") ? _coop_enemies_multiplier : _coop_enemies_none;
 }
 
 void coop_enemies_reset(
@@ -302,15 +338,20 @@ short coop_enemies_extra_count(
 	long extra, room;
 	short players;
 
-	if (count <= 0 || coop_enemies.percent <= 0 || !coop_enemies_host())
+	if (count <= 0 || !coop_enemies_on())
 		return 0;
 	encounter = encounter_get(encounter_index);
 	if (!game_team_is_enemy(_game_team_player, encounter->team_index))
 		return 0;
-	players = coop_enemies_player_count();
-	if (players <= 1)
-		return 0;
-	extra = ((long)count * coop_enemies.percent * (players - 1) + 50) / 100;
+	if (coop_enemies.mode == _coop_enemies_multiplier)
+		extra = (long)count * (coop_enemies.multiplier - 1);
+	else
+	{
+		players = coop_enemies_player_count();
+		if (players <= 1)
+			return 0;
+		extra = ((long)count * coop_enemies.percent * (players - 1) + 50) / 100;
+	}
 	room = MAXIMUM_ACTORS - COOP_ENEMIES_LEVEL_ACTORS - actor_data->actual_count;
 	return (short)PIN(extra, 0, MAX(room, 0));
 }
@@ -349,7 +390,7 @@ void coop_enemies_rider_seated(
 	struct coop_riding_vehicle *vehicle;
 	struct unit_datum *unit;
 
-	if (coop_enemies.percent <= 0 || !coop_enemies_host())
+	if (!coop_enemies_on())
 		return;
 	vehicle = coop_enemies_riding_vehicle(vehicle_index, TRUE);
 	unit = unit_get(unit_index);
@@ -391,7 +432,7 @@ boolean coop_enemies_rider_unseated(
 	struct coop_kept_rider *rider;
 	struct coop_riding_vehicle *vehicle;
 
-	if (coop_enemies.percent <= 0 || !coop_enemies_host() || coop_enemies.rider_count >= MAXIMUM_KEPT_RIDERS)
+	if (!coop_enemies_on() || coop_enemies.rider_count >= MAXIMUM_KEPT_RIDERS)
 		return FALSE;
 	unit = unit_get(unit_index);
 	vehicle = coop_enemies_riding_vehicle(vehicle_index, FALSE);

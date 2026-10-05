@@ -266,11 +266,23 @@ static const struct config_setting config_settings[] =
 		"\"on\", \"shields_only\" or \"explosives_only\" (Server Setup's FRIENDLY\n"
 		"FIRE in co-op, which writes its choice here). Their AI allies they\n"
 		"always can, as in the campaign." },
+	{ "network.coop_enemies_mode", _config_string, "\"per_player\"", "HALO_NET_COOP_ENEMIES_MODE", _environment_value,
+		_platform_all,
+		"Online co-op's extra enemies: \"none\", \"per_player\" (each squad of\n"
+		"enemies grows by coop_enemies for each player past the first) or\n"
+		"\"multiplier\" (each is coop_enemies_multiplier times as large, for any\n"
+		"number of players). Server Setup's EXTRA ENEMIES in co-op writes its\n"
+		"choice here." },
 	{ "network.coop_enemies", _config_integer, "50", "HALO_NET_COOP_ENEMIES", _environment_value, _platform_all,
-		"Online co-op's extra enemies, a percentage: for each player past the\n"
-		"first, each squad of enemies a level places gets this much of itself\n"
-		"more (100: as many again; 0 to 200). Server Setup's EXTRA ENEMIES in\n"
-		"co-op writes its choice here." },
+		"Online co-op's extra enemies per player, a percentage: for each player\n"
+		"past the first, each squad of enemies a level places gets this much of\n"
+		"itself more (100: as many again; 25 to 200). Server Setup's PER PLAYER\n"
+		"in co-op writes its choice here." },
+	{ "network.coop_enemies_multiplier", _config_integer, "2", "HALO_NET_COOP_ENEMIES_MULTIPLIER", _environment_value,
+		_platform_all,
+		"Online co-op's static multiplier of its enemies: each squad of enemies\n"
+		"a level places is this many times as large (2 to 32). Server Setup's\n"
+		"MULTIPLIER in co-op writes its choice here." },
 	{ "network.brokers_file", _config_string, "\"brokers.txt\"",
 		"HALO_NET_BROKERS_FILE", _environment_value, _platform_all,
 		"The file of the public MQTT brokers through which the machines of an\n"

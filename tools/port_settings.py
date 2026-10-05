@@ -681,29 +681,42 @@ def _server_settings() -> list:
                      ['<on event="created" run="port setting load"/>', '<on event="deleted" run="port setting save"/>',
                       '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     rows.append((f"{base}/op_friendly_fire", None, 4))
-    # ... and its EXTRA ENEMIES (port/linux/game/coop_enemies.c), below it;
-    # its choice kept in network.coop_enemies
-    extra += _widget(f"{base}/op_extra_enemies", [("width", 512), ("height", 28),
-                                                  ("flags", "pass_unhandled_to_focused_child"),
-                                                  ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                     [f'<child widget="{base}/extra_enemies_label"/>',
-                      f'<child widget="{base}/extra_enemies_spinner" x="286" y="1"/>'])
-    extra += _widget(f"{base}/extra_enemies_label", [("type", "text"), ("controller", 1), ("width", 300),
-                                                     ("height", 22), ("string_list", f"{base}/labels"),
-                                                     ("string_index", 11), ("font", "ui\\large_ui"),
-                                                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-    extra += _widget(f"{base}/extra_enemies_spinner",
-                     [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
-                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
-                      ("strings", "|".join(f"{value}%" for value in COOP_ENEMIES_VALUES)),
-                      ("setting", "network.coop_enemies"),
-                      ("values", "|".join(str(value) for value in COOP_ENEMIES_VALUES)), ("font", "ui\\large_ui"),
-                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
-                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                      ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
-                     ['<on event="created" run="port setting load"/>', '<on event="deleted" run="port setting save"/>',
-                      '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    # ... and its EXTRA ENEMIES (port/linux/game/coop_enemies.c), below it:
+    # NONE, PER PLAYER or STATIC MULTIPLIER, and below that the amount of the
+    # one chosen (its own row, the other hidden: menu_functions.c's
+    # server_settings_update); each kept in its network.coop_enemies setting
+    def spinner_row(key, label_index, strings, setting, values):
+        nonlocal extra
+        extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+                                              ("flags", "pass_unhandled_to_focused_child"),
+                                              ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{base}/{key}_label"/>',
+                          f'<child widget="{base}/{key}_spinner" x="286" y="1"/>'])
+        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                                 ("height", 22), ("string_list", f"{base}/labels"),
+                                                 ("string_index", label_index), ("font", "ui\\large_ui"),
+                                                 ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        extra += _widget(f"{base}/{key}_spinner",
+                         [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("strings", "|".join(strings)), ("setting", setting),
+                          ("values", "|".join(str(value) for value in values)), ("font", "ui\\large_ui"),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                          ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
+                         ['<on event="created" run="port setting load"/>',
+                          '<on event="deleted" run="port setting save"/>',
+                          '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+
+    spinner_row("extra_enemies", 11, ["NONE", "PER PLAYER", "STATIC MULTIPLIER"], "network.coop_enemies_mode",
+                COOP_ENEMIES_MODES)
     rows.append((f"{base}/op_extra_enemies", None, 5))
+    spinner_row("enemies_per_player", 12, [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
+                "network.coop_enemies", COOP_ENEMIES_PERCENTAGES)
+    rows.append((f"{base}/op_enemies_per_player", None, 6))
+    spinner_row("enemies_multiplier", 13, [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
+                "network.coop_enemies_multiplier", COOP_ENEMIES_MULTIPLIERS)
+    rows.append((f"{base}/op_enemies_multiplier", None, 6))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -733,7 +746,8 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:", "EXTRA ENEMIES:"])
+                                         "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:", "EXTRA ENEMIES:",
+                                         "PER PLAYER:", "MULTIPLIER:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -753,8 +767,13 @@ def _server_settings() -> list:
         "Players can be hurt by weapons or explosives\\nfired by the other players.",
         "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
         "Players can be hurt by damage from explosives\\nfired by the other players.",
-        # (EXTRA ENEMIES')
+        # (EXTRA ENEMIES', by its choice: COOP_ENEMIES_MODES' order)
+        "Enemy squads are as the campaign has them.",
+        "Enemy squads grow with the players: by the amount\\nbelow for each player past the first.",
+        "Enemy squads are the amount below times as large,\\nhowever many players there are.",
+        # (PER PLAYER's and MULTIPLIER's)
         "For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again).",
+        "Each enemy squad is this many times as large.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
@@ -770,8 +789,12 @@ MAXIMUM_PLAYERS = [2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
 # network.coop_friendly_fire's values, as Server Setup's FRIENDLY FIRE shows
 # them (menu_functions.c's cooperative_friendly_fire_modes, in this order)
 COOP_FRIENDLY_FIRE_VALUES = ["off", "on", "shields_only", "explosives_only"]
-# network.coop_enemies' values, percentages (Server Setup's EXTRA ENEMIES)
-COOP_ENEMIES_VALUES = [0, 25, 50, 100, 150, 200]
+# Server Setup's EXTRA ENEMIES: network.coop_enemies_mode's values (in
+# coop_enemies.c's order), and the amounts of PER PLAYER (network.coop_enemies,
+# percentages) and STATIC MULTIPLIER (network.coop_enemies_multiplier)
+COOP_ENEMIES_MODES = ["none", "per_player", "multiplier"]
+COOP_ENEMIES_PERCENTAGES = [25, 50, 100, 150, 200]
+COOP_ENEMIES_MULTIPLIERS = [2, 4, 8, 16, 32]
 # Server Setup's rows of the gametype's options: the gametype editor's
 # screens
 SETUP_OPTION_SCREENS = [

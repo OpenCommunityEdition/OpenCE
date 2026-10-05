@@ -2576,10 +2576,23 @@ static char const *const server_settings_gametype_rows[] =
 
 /* the most players a co-op game hosted starts with (maximum_players') */
 #define COOPERATIVE_DEFAULT_PLAYERS 16
-/* Server Setup's help for co-op's FRIENDLY FIRE, by its choice, and its
-EXTRA ENEMIES (its help_strings, tools/port_settings.py) */
+/* Server Setup's help for co-op's FRIENDLY FIRE and EXTRA ENEMIES, by
+their choices, and EXTRA ENEMIES' PER PLAYER and MULTIPLIER (its
+help_strings, tools/port_settings.py) */
 #define COOPERATIVE_FRIENDLY_FIRE_HELP 12
 #define COOPERATIVE_EXTRA_ENEMIES_HELP 16
+#define COOPERATIVE_ENEMIES_PER_PLAYER_HELP 19
+#define COOPERATIVE_ENEMIES_MULTIPLIER_HELP 20
+
+/* co-op's EXTRA ENEMIES' choices (port_settings.COOP_ENEMIES_MODES, in this
+order): its amount's row is the choice's */
+enum
+{
+	_cooperative_enemies_none,
+	_cooperative_enemies_per_player,
+	_cooperative_enemies_multiplier,
+	NUMBER_OF_COOPERATIVE_ENEMIES_MODES
+};
 
 /* co-op's FRIENDLY FIRE's choices (network.coop_friendly_fire's values,
 port_settings.COOP_FRIENDLY_FIRE_VALUES, in this order) */
@@ -2708,14 +2721,30 @@ static void server_settings_update(struct widget_instance *list)
 			if (help && list->focused_child == named(list, "op_friendly_fire", 0))
 				help->parameters.text_box.string_list_index = (short)(COOPERATIVE_FRIENDLY_FIRE_HELP + choice);
 		}
-		/* ... and its EXTRA ENEMIES (network.coop_enemies, which the host
-		reads as the game begins: coop_enemies.c) */
-		visible_set(named(list, "op_extra_enemies", 0), cooperative);
-		if (cooperative && list->parameters.list.extended_description &&
-			list->focused_child == named(list, "op_extra_enemies", 0))
+		/* ... and its EXTRA ENEMIES, with the row of the amount of the one
+		chosen below it (network.coop_enemies_mode and its amounts, which the
+		host reads as the game begins: coop_enemies.c) */
 		{
-			list->parameters.list.extended_description->parameters.text_box.string_list_index =
-				COOPERATIVE_EXTRA_ENEMIES_HELP;
+			struct widget_instance *help = list->parameters.list.extended_description;
+			short mode = _cooperative_enemies_none;
+
+			if ((spinner = named(list, "extra_enemies_spinner", 0)) != NULL)
+			{
+				mode = (short)PIN(spinner->parameters.list.selected_index, 0,
+					NUMBER_OF_COOPERATIVE_ENEMIES_MODES - 1);
+			}
+			visible_set(named(list, "op_extra_enemies", 0), cooperative);
+			visible_set(named(list, "op_enemies_per_player", 0), cooperative && mode == _cooperative_enemies_per_player);
+			visible_set(named(list, "op_enemies_multiplier", 0), cooperative && mode == _cooperative_enemies_multiplier);
+			if (cooperative && help)
+			{
+				if (list->focused_child == named(list, "op_extra_enemies", 0))
+					help->parameters.text_box.string_list_index = (short)(COOPERATIVE_EXTRA_ENEMIES_HELP + mode);
+				else if (list->focused_child == named(list, "op_enemies_per_player", 0))
+					help->parameters.text_box.string_list_index = COOPERATIVE_ENEMIES_PER_PLAYER_HELP;
+				else if (list->focused_child == named(list, "op_enemies_multiplier", 0))
+					help->parameters.text_box.string_list_index = COOPERATIVE_ENEMIES_MULTIPLIER_HELP;
+			}
 		}
 	}
 	/* LISTING (an internet game's): PUBLIC, listed in everyone's server

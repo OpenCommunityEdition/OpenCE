@@ -20,6 +20,8 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="157"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_friendly_fire" x="54" y="185"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_extra_enemies" x="54" y="213"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_enemies_per_player" x="54" y="241"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_enemies_multiplier" x="54" y="241"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="185"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="213"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="241"/>
@@ -93,7 +95,29 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/extra_enemies_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/extra_enemies_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="0%|25%|50%|100%|150%|200%" setting="network.coop_enemies" values="0|25|50|100|150|200" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+	<widget name="main_menu/multiplayer_type_select/server_settings/extra_enemies_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NONE|PER PLAYER|STATIC MULTIPLIER" setting="network.coop_enemies_mode" values="none|per_player|multiplier" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_enemies_per_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/enemies_per_player_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/enemies_per_player_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/enemies_per_player_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="12" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/enemies_per_player_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="25%|50%|100%|150%|200%" setting="network.coop_enemies" values="25|50|100|150|200" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_enemies_multiplier" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/enemies_multiplier_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/enemies_multiplier_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/enemies_multiplier_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="13" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/enemies_multiplier_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="2X|4X|8X|16X|32X" setting="network.coop_enemies_multiplier" values="2|4|8|16|32" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="created" run="port setting load"/>
 		<on event="deleted" run="port setting save"/>
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -185,6 +209,8 @@
 		<string text="LISTING:"/>
 		<string text="FRIENDLY FIRE:"/>
 		<string text="EXTRA ENEMIES:"/>
+		<string text="PER PLAYER:"/>
+		<string text="MULTIPLIER:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/help_strings">
 		<string text=""/>
@@ -203,6 +229,10 @@
 		<string text="Players can be hurt by weapons or explosives\nfired by the other players."/>
 		<string text="Damage from the other players will only reduce\nshields. Health will be unaffected."/>
 		<string text="Players can be hurt by damage from explosives\nfired by the other players."/>
+		<string text="Enemy squads are as the campaign has them."/>
+		<string text="Enemy squads grow with the players: by the amount\nbelow for each player past the first."/>
+		<string text="Enemy squads are the amount below times as large,\nhowever many players there are."/>
 		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
+		<string text="Each enemy squad is this many times as large."/>
 	</strings>
 </menus>

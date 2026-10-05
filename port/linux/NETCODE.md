@@ -54,14 +54,15 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
 
-  The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies`)
-  give each squad of enemies a level places that percentage of itself more
-  for each player past the first, in rings about its starting locations
-  where the ground is open, and never past the actors a level needs for its
-  own (the actor pool, `halo_port_capacity.h`, holds 1024). Riders a
-  dropship has no seats for are kept, and placed beside its riders once
-  they get out. Only the host runs the AI, so the clients see them as the
-  host's other actors.
+  The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
+  give each squad of enemies a level places more of itself: PER PLAYER, a
+  percentage of itself for each player past the first; STATIC MULTIPLIER,
+  that many times itself for any number of players. They stand in rings
+  about its starting locations where the ground is open, and never take the
+  actors a level needs for its own (the actor pool, `halo_port_capacity.h`,
+  holds 1024). Riders a dropship has no seats for are kept, and placed
+  beside its riders once they get out. Only the host runs the AI, so the
+  clients see them as the host's other actors.
 - **Host authoritative.** The host alone decides damage, deaths, spawns,
   pickups, scores and the game's objects; clients do not decide them but
   apply what the host sends.
