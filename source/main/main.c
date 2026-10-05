@@ -2718,10 +2718,14 @@ void main_rasterizer_throttle(
 			profile_idle_start();
 			while ((__int64)rasterizer_globals.frame_and_vertical_blank_index < target_index)
 			{
-				if (precache_in_progress)
-				{
-					Sleep(1);
-				}
+				/* the native builds sleep between looks: the Xbox spun here,
+				and on a port each look at the clock is a system call, so a
+				game held at 30 frames a second (display.interpolation off)
+				spent half its game thread asking the time. A millisecond is
+				well inside a 33 ms frame (Windows sets its timer to 1 ms:
+				win32_posix.c) */
+				(void)precache_in_progress;
+				Sleep(1);
 				if (system_milliseconds() > start_milliseconds + 1000)
 				{
 					console_warning(
