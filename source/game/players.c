@@ -476,6 +476,10 @@ static struct
 	long bsp_switch_time;
 	/* the structure BSPs the players have been in this map, by bit */
 	word visited_structure_bsps;
+	/* when each local player was last told they wait for the team to go
+	back, and the count they were told (players_coop_show_backtrack_wait) */
+	long backtrack_message_times[MAXIMUM_LOCAL_PLAYERS];
+	short backtrack_message_counts[MAXIMUM_LOCAL_PLAYERS];
 	/* where each player last stood on the ground, and on which BSP: where
 	everyone comes back when the last checkpoint was on another one */
 	short ground_structure_bsp_index;
@@ -2778,9 +2782,13 @@ waits for every machine to have loaded it */
 #define COOP_BSP_SWITCH_WAIT_TICKS (10 * TICKS_PER_SECOND)
 
 /* Going back to a BSP the team has already been in needs two thirds of the
-living players at the trigger: inside it, or this near the player in it
-(world units) */
-#define COOP_BACKTRACK_GATHER_DISTANCE 4.0f
+living players with the player on the trigger: inside it, or this near
+them (world units, about 45 metres). Wide enough for a team walking through
+a doorway in a line, not for one player who ran back alone. */
+#define COOP_BACKTRACK_GATHER_DISTANCE 15.0f
+
+/* how often a player waiting for the team to go back is reminded */
+#define COOP_BACKTRACK_MESSAGE_TICKS (3 * TICKS_PER_SECOND)
 
 /* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
 beside a grounded teammate inside the BSP, else any teammate inside it, else
@@ -2967,9 +2975,9 @@ void players_respawn_at_checkpoint(
 	return;
 }
 
-/* port: whether the unit stands in a trigger that switches away from the
-loaded structure BSP */
-static boolean players_coop_in_bsp_switch_trigger(
+/* port: the trigger that switches away from the loaded structure BSP the
+unit stands in, or NONE */
+static short players_coop_bsp_switch_trigger(
 	long unit_index)
 {
 	struct scenario *scenario = global_scenario_get();
@@ -2983,11 +2991,11 @@ static boolean players_coop_in_bsp_switch_trigger(
 		if (volume->source_structure_bsp_index == global_structure_bsp_index &&
 			scenario_trigger_volume_test_object(volume->trigger_volume_index, unit_index))
 		{
-			return TRUE;
+			return index;
 		}
 	}
 
-	return FALSE;
+	return NONE;
 }
 
 /* port: whether a network co-op host lets any trigger switch the BSP yet.
@@ -3016,14 +3024,16 @@ static boolean players_coop_bsp_switch_ready(
 	return TRUE;
 }
 
-/* port: whether a network co-op host lets the unit on this trigger switch
-the BSP, which brings the whole team along. Not while the unit's machine
-is still loading the BSP the host has. Anyone can lead the team into a BSP
-it hasn't been in; going back to one needs two thirds of the team there,
-so one player can't drag everyone back through the level. */
-static boolean players_coop_bsp_switch_allowed(
+/* port: whether this trigger leads back to a BSP the team has been in and
+the unit on it must wait for more of the team: two thirds of the living
+players must be with it (in the trigger, or within
+COOP_BACKTRACK_GATHER_DISTANCE), so one player can't drag everyone back
+through the level. Also how many are there and how many it needs. */
+static boolean players_coop_backtrack_wait(
 	short bsp_switch_trigger_volume_index,
-	long unit_index)
+	long unit_index,
+	short *gathered_count,
+	short *needed_count)
 {
 	struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->bsp_switch_trigger_volumes, bsp_switch_trigger_volume_index,
@@ -3032,14 +3042,13 @@ static boolean players_coop_bsp_switch_allowed(
 	struct data_iterator iterator;
 	struct player_datum *player;
 	short living_count = 0;
-	short gathered_count = 0;
 
-	if (!network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index))
-		return FALSE;
+	*gathered_count = 0;
+	*needed_count = 0;
 	if (!VALID_INDEX(volume->destination_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO) ||
 		!TEST_FLAG(players_coop_state.visited_structure_bsps, volume->destination_structure_bsp_index))
 	{
-		return TRUE;
+		return FALSE;
 	}
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
@@ -3053,11 +3062,64 @@ static boolean players_coop_bsp_switch_allowed(
 			distance_squared3d(center, &teammate->object.bounding_sphere_center) <=
 				COOP_BACKTRACK_GATHER_DISTANCE * COOP_BACKTRACK_GATHER_DISTANCE)
 		{
-			gathered_count++;
+			(*gathered_count)++;
 		}
 	}
+	/* (two thirds, rounded up) */
+	*needed_count = (short)((living_count * 2 + 2) / 3);
 
-	return gathered_count * 3 >= living_count * 2;
+	return *gathered_count < *needed_count;
+}
+
+/* port: whether a network co-op host lets the unit on this trigger switch
+the BSP, which brings the whole team along: not while the unit's machine is
+still loading the host's BSP, nor back to one the team has been in until
+enough of it is there (players_coop_backtrack_wait) */
+static boolean players_coop_bsp_switch_allowed(
+	short bsp_switch_trigger_volume_index,
+	long unit_index)
+{
+	short gathered_count;
+	short needed_count;
+
+	return network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index) &&
+		!players_coop_backtrack_wait(bsp_switch_trigger_volume_index, unit_index, &gathered_count, &needed_count);
+}
+
+/* port: tells each of this machine's co-op players held back on a trigger
+how many of the team are there and how many it needs, at once and every
+COOP_BACKTRACK_MESSAGE_TICKS while they wait. Every machine works this out
+for its own players, as the host does for its decision. */
+static void players_coop_show_backtrack_wait(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		long player_index = local_player_get_player_index(local_player_index);
+		long unit_index = player_index != NONE ? player_get(player_index)->unit_index : NONE;
+		short trigger_index = unit_index != NONE ? players_coop_bsp_switch_trigger(unit_index) : NONE;
+		long *time = &players_coop_state.backtrack_message_times[local_player_index];
+		short *count = &players_coop_state.backtrack_message_counts[local_player_index];
+		short gathered_count;
+		short needed_count;
+		wchar_t text[64];
+
+		if (trigger_index == NONE ||
+			!players_coop_backtrack_wait(trigger_index, unit_index, &gathered_count, &needed_count))
+		{
+			*time = 0;
+			continue;
+		}
+		if (*time != 0 && *count == gathered_count && game_time_get() - *time < COOP_BACKTRACK_MESSAGE_TICKS)
+			continue;
+		*time = game_time_get();
+		*count = gathered_count;
+		usnprintf(text, NUMBEROF(text), L"Waiting for your team to go back: %d of %d here",
+			gathered_count, needed_count);
+		hud_print_message(local_player_index, text);
+	}
 }
 
 static void player_teleport_on_bsp_switch(
@@ -3250,7 +3312,7 @@ void players_reconnect_to_structure_bsp(
 				struct object_datum *unit = object_try_and_get(player->unit_index);
 
 				if (unit && scenario_leaf_index_from_point(&unit->object.bounding_sphere_center) != NONE &&
-					!players_coop_in_bsp_switch_trigger(player->unit_index))
+					players_coop_bsp_switch_trigger(player->unit_index) == NONE)
 				{
 					source_unit_index = player->unit_index;
 					teleport_position = unit->object.position;
@@ -4591,6 +4653,8 @@ void players_update_after_game(
 		players_coop_state.structure_bsp_index = global_structure_bsp_index;
 		players_coop_state.bsp_switch_time = game_time_get();
 	}
+	if (network_coop_active())
+		players_coop_show_backtrack_wait();
 
 	data_iterator_new(&iterator, player_data);
 	while (player = data_iterator_next(&iterator))
