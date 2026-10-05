@@ -177,8 +177,9 @@ until then that gamepad shares controller 1 with the keyboard. Two players on on
 player's B in the lobby leaves the game alone, and the last player of the
 computer leaves it for all of them. In the game, each player's pause menu
 opens on their part of the screen, and its LEAVE GAME is theirs: their part
-of the screen stays until the game ends. A game under way is joined by one
-player; others join in the lobby of the next.
+of the screen stays until the game ends. A game under way shows its own
+screen before JOIN GAME: players join there the same way, START or ADD
+PLAYER then START, and JOIN GAME brings them all into the game.
 
 In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
 the profile's settings while the game goes on, and for the host END GAME.

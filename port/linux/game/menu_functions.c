@@ -2844,6 +2844,9 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 			return campaign_fail();
 		if (advertised_in_progress(found))
 		{
+			/* (player 1 joining it: others join them there) */
+			if (!multiplayer_player(controller))
+				return FALSE;
 			csmemcpy(multiplayer.preview_key_id, found->key_id, sizeof(multiplayer.preview_key_id));
 			csmemcpy(multiplayer.preview_xnaddr, found->xnaddr, sizeof(multiplayer.preview_xnaddr));
 			return ui_widget_port_open(widget, PREVIEW_NAME, widget_deleted);
@@ -3017,6 +3020,9 @@ static boolean browser_select(struct widget_instance *widget, struct event_recor
 		if (multiplayer.game_chosen < multiplayer.game_count &&
 			advertised_in_progress(multiplayer.games[multiplayer.game_chosen]))
 		{
+			/* (player 1 joining it: others join them there) */
+			if (!multiplayer_player(controller))
+				return FALSE;
 			csmemcpy(multiplayer.preview_key_id, multiplayer.games[multiplayer.game_chosen]->key_id,
 				sizeof(multiplayer.preview_key_id));
 			csmemcpy(multiplayer.preview_xnaddr, multiplayer.games[multiplayer.game_chosen]->xnaddr,
@@ -3366,7 +3372,9 @@ static void lobby_update(struct widget_instance *list)
 
 /* ---- an in-progress game's lobby, before joining it (Direct Link and
 LAN's rows of games under way): what its advertisement tells (no players'
-names: they come with joining), JOIN GAME */
+names: they come with joining), JOIN GAME. Split screen players join here
+as in the lobby (lobby_join), for the game starts at once for a machine
+that joins it: player 1 as it opens, the others with START */
 
 /* the previewed game, found again among the client's (NULL: gone) */
 static struct advertised_game *preview_game(void)
@@ -3385,6 +3393,34 @@ static struct advertised_game *preview_game(void)
 		}
 	}
 	return NULL;
+}
+
+/* the preview's status's end: the players joining from here, when there
+are more than one (split screen) */
+static void preview_players_text(wchar_t *text, short size)
+{
+	short controller;
+	size_t length;
+
+	if (lobby_local_player_count() < 2)
+		return;
+	length = ustrlen(text);
+	usnprintf(text + length, size - 1 - length, L"\r\n\r\nJoining from here:");
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	{
+		struct player_profile profile;
+		wchar_t name[NUMBEROF(profile.player_name) + 1];
+
+		if (!player_ui_local_player_wants_to_play_multiplayer(controller))
+			continue;
+		player_ui_get_active_player_profile(controller, &profile);
+		ustrncpy(name, profile.player_name, NUMBEROF(profile.player_name));
+		name[NUMBEROF(profile.player_name)] = 0;
+		text[size - 1] = 0;
+		length = ustrlen(text);
+		usnprintf(text + length, size - 1 - length, L"\r\n%s  [P%d]", name, controller + 1);
+	}
+	text[size - 1] = 0;
 }
 
 /* "port lobby preview update" */
@@ -3409,22 +3445,74 @@ static void preview_update(struct widget_instance *list)
 		usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n\r\nThis game is under way.\r\n\r\n%s", name,
 			game->open ? L"JOIN GAME joins it now;\r\nits players show then." :
 			L"It cannot be joined now:\r\nit is loading, over or full.");
+		text[NUMBEROF(text) - 1] = 0;
+		preview_players_text(text, NUMBEROF(text));
 	}
 	else
 		usnprintf(text, NUMBEROF(text) - 1, L"The game is gone.");
 	text[NUMBEROF(text) - 1] = 0;
 	text_set_length(named(list, "preview_status", 0), text, LOBBY_TEXT_LENGTH);
+	lobby_join_help(list);
 	profile_name_show(description);
 }
 
-/* "port lobby preview join" */
+/* "port lobby preview add" (START): as the lobby's ("port lobby join"), a
+controller not joining chooses its profile, to join with the others; a
+joining player's START is the focused button's */
+static boolean preview_add(struct widget_instance *widget, short controller, boolean *widget_deleted)
+{
+	struct advertised_game *game = preview_game();
+	short count = lobby_local_player_count();
+
+	if (lobby_controller_playing(controller))
+	{
+		ui_widget_port_dispatch_event(focused_leaf(widget), BUTTON_START, controller, widget_deleted);
+		return FALSE;
+	}
+	if (!game || !game->open || count >= MAXIMUM_LOCAL_PLAYERS)
+		return campaign_fail();
+	if (game->player_count + count >= game->maximum_player_count)
+	{
+		display_error_text_deferred(L"The game is full.", NONE);
+		return campaign_fail();
+	}
+	lobby_join.controller = controller;
+	return TRUE;
+}
+
+/* "port lobby preview leave" (B): a joining player stays out, the last of
+them backing out (TRUE); a controller not joining cancels ADD PLAYER, else
+backs out for them all (the game is not joined yet: none is kept here) */
+static boolean preview_leave(short controller)
+{
+	short index;
+
+	if (!lobby_controller_playing(controller))
+	{
+		if (lobby_join.adding)
+		{
+			lobby_join_reset();
+			return FALSE;
+		}
+		for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+			player_ui_local_player_left_multiplayer_game(index);
+		return TRUE;
+	}
+	player_ui_local_player_left_multiplayer_game(controller);
+	return lobby_local_player_count() == 0;
+}
+
+/* "port lobby preview join": with the players joining from here (player 1,
+as the preview opened, and those added), whom the lobby asks the host for
+all at once ("net splitscreen prejoin players"): it starts the machine in
+the game once it has them all */
 static boolean preview_join(struct widget_instance *widget, short controller, boolean *widget_deleted)
 {
 	struct advertised_game *game = preview_game();
 
 	if (!game || !game->open)
 		return campaign_fail();
-	if (!multiplayer_player(controller))
+	if (!lobby_local_player_count() && !multiplayer_player(controller))
 		return FALSE;
 	return ui_widget_port_join(widget, game, LOBBY_NAME, widget_deleted);
 }
@@ -4347,6 +4435,14 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port lobby player choose"))
 		{
 			return lobby_player_choose();
+		}
+		else if (!strcmp(name, "port lobby preview add"))
+		{
+			return preview_add(widget, controller, widget_deleted);
+		}
+		else if (!strcmp(name, "port lobby preview leave"))
+		{
+			return preview_leave(controller);
 		}
 		else if (!strcmp(name, "port coop begin"))
 		{
