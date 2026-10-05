@@ -525,6 +525,18 @@ void object_pvs_set_camera_point(
 	return;
 }
 
+void objects_port_set_activating_cluster(
+	short cluster_index)
+{
+	if (cluster_index == NONE || cluster_index >= global_structure_bsp_get()->clusters.count)
+	{
+		object_globals->pvs_activation_type = _pvs_activation_normal;
+		return;
+	}
+	object_globals->pvs_activation_type = _pvs_activation_cluster;
+	object_globals->pvs_activation.cluster_index = cluster_index;
+}
+
 void object_pvs_clear(void)
 {
 	object_globals->pvs_activation_type = _pvs_activation_normal;

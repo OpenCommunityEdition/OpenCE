@@ -2082,6 +2082,13 @@ boolean ai_enemies_attacking_player(
 	return ai_enemies_endanger_player(TRUE, NONE);
 }
 
+/* port: whether enemies can see this player's unit */
+boolean ai_port_enemies_can_see_unit(
+	long unit_index)
+{
+	return ai_enemies_endanger_player(FALSE, unit_index);
+}
+
 /* port: whether enemies are attacking this player's unit */
 boolean ai_port_enemies_attacking_unit(
 	long unit_index)

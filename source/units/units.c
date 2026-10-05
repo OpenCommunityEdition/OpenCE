@@ -692,6 +692,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 
 /* port: the control and animation impulses the host's actors give their
@@ -2274,6 +2275,8 @@ void unit_scripting_suspended(
 	long unit_index,
 	boolean suspended)
 {
+	/* port: co-op players the scripts can't name go with player0 */
+	coop_scripts_suspend_followers(unit_index, suspended);
 	if (unit_index!=NONE)
 	{
 		struct unit_datum *unit = unit_get(unit_index);
@@ -4713,6 +4716,10 @@ void unit_scripting_enter_vehicle(
 					}
 				}
 			}
+
+			/* port: co-op players the scripts can't name board with player0 */
+			if (unit->object.parent_object_index == vehicle_index)
+				coop_scripts_board_followers(unit_index, vehicle_index, seat_name);
 		}
 	}
 
@@ -4825,10 +4832,13 @@ void unit_scripting_exit_vehicle(
 	if (unit_index!=NONE)
 	{
 		struct unit_datum *unit = unit_get(unit_index);
+		long vehicle_index = unit->object.parent_object_index;
 
 		if (unit->object.parent_object_index!=NONE && unit->unit.parent_seat_index!=NONE)
 		{
 			unit_try_and_exit_seat(unit_index);
+			/* port: co-op players the scripts can't name get out with player0 */
+			coop_scripts_exit_followers(unit_index, vehicle_index);
 		}
 	}
 
@@ -5282,6 +5292,16 @@ short vehicle_scripting_load_magic(
 		}
 		for (unseated_number = 0; unseated_number < unseated_count; unseated_number++)
 			actor_erase(unseated_actor_indices[unseated_number], FALSE);
+
+		/* port: co-op players the scripts can't name board with player0,
+		once this load's seats are taken */
+		for (unit_index = object_list_get_first(object_list_index, &reference_index);
+			unit_index != NONE;
+			unit_index = object_list_get_next(object_list_index, &reference_index))
+		{
+			if (object_get(unit_index)->object.parent_object_index == vehicle_index)
+				coop_scripts_board_followers(unit_index, vehicle_index, seat_name);
+		}
 	}
 
 	return (short)loaded_count;

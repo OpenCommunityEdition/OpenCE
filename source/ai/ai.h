@@ -143,6 +143,9 @@ boolean ai_consider_major_upgrade(
 	real chance);
 
 /* port: network co-op's respawn (players.c) */
+/* port: whether enemies can see this player's unit */
+boolean ai_port_enemies_can_see_unit(
+	long unit_index);
 boolean ai_port_enemies_attacking_unit(
 	long unit_index);
 boolean ai_enemies_attacking_player(
