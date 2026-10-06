@@ -470,6 +470,11 @@ If the latest release is newer, the game asks: "Do you want to update?"
   writes `auto = false` in the `[update]` section of `config.toml`. To get
   the questions again, set `auto = true`.
 
+Under gamescope (the Game Mode of the Steam Deck), the game does not ask,
+because a system dialog stops the game there. The game writes the new
+version in the log. To update, start the game from the desktop, or set
+`update_answer = "yes"` in the `[debug]` section of `config.toml`.
+
 The game downloads through HTTPS. It examines the certificate of the server
 against the certificate authorities of the system: on Linux, the bundle of
 the distribution (`src/posix_update.c`, with Mbed TLS); on Windows, the
