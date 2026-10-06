@@ -38,6 +38,20 @@ struct breakable_surface_globals
 
 /* ---------- prototypes */
 
+boolean tag_index_is_group(long tag_index, long group_tag);
+
+/* a networked break carries no damage effect (the host already dealt it).
+tag 0 is the scenario, and reading it as a damage effect stops the game. */
+static struct damage_breaking_effect_definition const *breakable_surface_breaking_effect(
+	struct damage_data const *damage_data)
+{
+	static struct damage_breaking_effect_definition const none;
+
+	if (damage_data && tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
+		return &damage_effect_definition_get(damage_data->definition_index)->breaking_effect;
+	return &none;
+}
+
 /* January evaluates the j/k terms as one group in this translation unit.
    The shared helper must remain flat for its other exact consumers. */
 static __inline real breakable_surface_plane_distance(
@@ -161,7 +175,7 @@ void breakable_surface_damage(
 	if (globals->enabled)
 	{
 		if (breakable_surface_index != NONE &&
-			damage_data->definition_index != NONE &&
+			tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG) &&
 			damage_data->material_type != NONE)
 		{
 			struct breakable_surface_datum *surface = breakable_surface_get(breakable_surface_index);
@@ -207,7 +221,11 @@ void breakable_surface_damage_area_of_effect(
 	const struct damage_data *damage_data)
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
-	struct damage_effect_definition *damage_effect_definition = damage_effect_definition_get(damage_data->definition_index);
+	struct damage_effect_definition *damage_effect_definition;
+
+	if (!tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
+		return;
+	damage_effect_definition = damage_effect_definition_get(damage_data->definition_index);
 
 	if (globals->enabled &&
 		(damage_effect_definition->damage.damage_lower_bound != 0.0f || damage_effect_definition->damage.damage_upper_bound != 0.0f))
@@ -501,7 +519,7 @@ static void breakable_surface_effect(
 								struct new_particle_data particle;
 
 								velocity = *global_zero_vector3d;
-								breaking_effect = &damage_effect_definition_get(damage_data->definition_index)->breaking_effect;
+								breaking_effect = breakable_surface_breaking_effect(damage_data);
 								vector_from_points3d(&damage_data->epicenter, &position, &outward_vector);
 								distance = normalize3d(&outward_vector);
 

@@ -15,6 +15,7 @@ RASTERIZER_MEMORY_POOL.C
 /* swapped? */
 static void *global_memory_pool;
 static long global_memory_index;
+static boolean pool_exceeded_this_frame;
 
 /* ---------- public code */
 
@@ -37,6 +38,7 @@ void rasterizer_memory_pool_begin(
 	void)
 {
 	global_memory_index = 0;
+	pool_exceeded_this_frame = FALSE;
 
 	return;
 }
@@ -57,8 +59,9 @@ void *rasterizer_memory_alloc(
 			memcpy(pointer, src, size);
 		}
 	}
-	else
+	else if (!pool_exceeded_this_frame)
 	{
+		pool_exceeded_this_frame = TRUE;
 		error(_error_silent, "### ERROR rasterizer memory pool exceeded");
 	}
 
