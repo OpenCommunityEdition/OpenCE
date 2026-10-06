@@ -94,6 +94,9 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "unit_definitions.h"
 
+/* port: the AI's speech goes to the clients' copies (port/linux/game/network_actors.c) */
+void network_actors_note_speech(long unit_index, long sound_definition_index);
+
 /* ---------- constants */
 
 enum unit_play_speech_type
@@ -1036,6 +1039,15 @@ void unit_dialogue_update(
 						&position,
 						&forward,
 						1.0f);
+					/* port: the AI's speech, heard on the clients too (they
+					play pain and death sounds themselves) */
+					if (unit->unit.player_index == NONE &&
+						unit->unit.speech.current.priority != _unit_speech_pain &&
+						unit->unit.speech.current.priority != _unit_speech_involuntary &&
+						unit->unit.speech.current.priority != _unit_speech_death)
+					{
+						network_actors_note_speech(unit_index, unit->unit.speech.current.sound_definition_index);
+					}
 				}
 
 				ai_communication_started(

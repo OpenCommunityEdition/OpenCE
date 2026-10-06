@@ -120,6 +120,7 @@ symbols in this file:
 #include "data.h"
 #include "lruv_cache.h"
 #include "memory_pool.h"
+#include "cluster_partitions.h"
 
 /* ---------- constants */
 
@@ -180,6 +181,9 @@ static game_state_before_save_proc before_save_procs[] =
 static game_state_before_load_proc before_load_procs[] =
 {
 	game_sound_clear,
+	/* port: where the cluster lists' references are, which the game state
+	being loaded does not hold */
+	cluster_partitions_port_forget,
 };
 
 static game_state_after_load_proc after_load_procs[] =
@@ -297,6 +301,22 @@ void game_state_save(
 	main_start_time();
 
 	return;
+}
+
+/* port: whether game_state_revert has a saved state to go back to */
+boolean game_state_port_saved_game_valid(
+	void)
+{
+	return game_state_globals.saved_game_valid;
+}
+
+/* port: stamps the revert at the current game time again, after a network
+co-op host moved its clock on past the revert (game_state_reverted
+compares the two) */
+void game_state_port_restamp_revert_time(
+	void)
+{
+	game_state_globals.revert_time = game_time_get();
 }
 
 void game_state_revert(

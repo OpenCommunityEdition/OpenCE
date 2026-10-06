@@ -518,6 +518,59 @@ static const char *comparison_operator(unsigned long function)
 	}
 }
 
+/* ---------- per-pixel model lighting
+
+The game lights its models for each vertex: its model lighting programs
+(nv2a_vsh.c nv2a_vertex_shader_lighting) sum the ambient light, two distant
+lights and two point lights into the diffuse color v0. Halo's models have
+few vertices, so the light across a curved surface comes out in facets, and
+a point light that passes close lights only the vertices it reaches.
+model_lighting computes the same sum for each pixel, from the normal and
+world position the vertex program hands on and the same constants
+(XGPU_MODEL_LIGHT_COUNT): the same falloff, facing, cone and translucency
+terms, clamped where the programs clamp them. The diffuse alpha, which the
+programs write apart (0, or planar fog's), is kept. */
+
+static void model_lighting(struct xgpu_text *text, BOOL point_lights)
+{
+	int light;
+
+	xgpu_text_append(text,
+		"uniform vec4 model_lights[%d];\n"
+		"in vec4 xWorldNormal;\n"
+		"%s"
+		"vec3 model_lighting()\n"
+		"{\n"
+		/* the normal's direction between the vertices, at the length the
+		vertices' normals have, as the programs light by it unnormalized
+		(shorter than 1 on some models: the first-person weapons) */
+		"\tvec3 n = xWorldNormal.xyz * (xWorldNormal.w * inversesqrt(max(dot(xWorldNormal.xyz, xWorldNormal.xyz), 1.0e-24)));\n"
+		/* the ambient light, the first distant light, which also lights the
+		back by the translucency, and the second */
+		"\tfloat facing = dot(n, -model_lights[7].xyz);\n"
+		"\tvec3 light = model_lights[11].xyz + max(max(facing, -facing * model_lights[0].z), 0.0) * model_lights[8].xyz +\n"
+		"\t\tmax(dot(n, -model_lights[9].xyz), 0.0) * model_lights[10].xyz;\n",
+		XGPU_MODEL_LIGHT_COUNT, point_lights ? "in vec3 xWorldPosition;\n" : "");
+	/* each point light: its position and 1 / radius squared, its cone's axis
+	and falloff scale, its color and falloff offset */
+	for (light = 0; point_lights && light < 2; light++)
+	{
+		int first = 1 + light * 3;
+
+		xgpu_text_append(text,
+			"\t{\n"
+			"\t\tvec3 to_light = model_lights[%d].xyz - xWorldPosition;\n"
+			"\t\tfloat distance_squared = dot(to_light, to_light);\n"
+			"\t\tvec3 l = to_light * inversesqrt(max(distance_squared, 1.0e-12));\n"
+			"\t\tlight += max(1.0 - distance_squared * model_lights[%d].w, 0.0) * clamp(dot(l, n), 0.0, 1.0) *\n"
+			"\t\t\tclamp(dot(l, -model_lights[%d].xyz) * model_lights[%d].w + model_lights[%d].w, 0.0, 1.0) *\n"
+			"\t\t\tmodel_lights[%d].xyz;\n"
+			"\t}\n",
+			first, first, first + 1, first + 1, first + 2, first + 2);
+	}
+	xgpu_text_append(text, "\treturn clamp(light, 0.0, 1.0);\n}\n");
+}
+
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 {
 	const DWORD *state = key->combiner_state;
@@ -556,6 +609,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		XGPU_PIXEL_UNIFORMS);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
+	if (key->per_pixel_lighting)
+		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
 		"float signed_byte(float x)\n"
 		"{\n"
@@ -572,6 +627,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"\tvec4 v1 = xD1;\n"
 		"\tvec4 t0 = vec4(0.0), t1 = vec4(0.0), t2 = vec4(0.0), t3 = vec4(0.0);\n"
 		"\tfloat dot0 = 0.0, dot1 = 0.0, dot2 = 0.0, dot3 = 0.0;\n");
+	if (key->per_pixel_lighting)
+		xgpu_text_append(&text, "\tv0.rgb = model_lighting();\n");
 
 	for (stage = 0; stage < 4; stage++)
 		texture_stage(&text, key, stage);
@@ -645,9 +702,27 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		const char *comparison = comparison_operator(key->alpha_test_function);
 
 		if (!comparison)
+		{
 			xgpu_text_append(&text, "\tdiscard;\n");
+		}
+		else if (*comparison && key->alpha_test_samples && comparison[0] != '=' && comparison[0] != '!')
+		{
+			/* multisampled: the samples covered as alpha passes the reference
+			over the pixel (its change across the pixel from fwidth), the rest
+			left as they are; alpha itself is kept, the game keeping values of
+			its own in destination alpha */
+			xgpu_text_append(&text,
+				"\tfloat test_alpha = clamp(result.a, 0.0, 1.0) * 255.0;\n"
+				"\tfloat test_coverage = clamp(%s(test_alpha - alpha_reference) / max(fwidth(test_alpha), 1.0) + 0.5, 0.0, 1.0);\n"
+				"\tint test_samples = int(test_coverage * %d.0 + 0.5);\n"
+				"\tif (test_samples == 0) discard;\n"
+				"\tgl_SampleMask[0] = (1 << test_samples) - 1;\n",
+				comparison[0] == '<' ? "-" : "", (int)key->alpha_test_samples);
+		}
 		else if (*comparison)
+		{
 			xgpu_text_append(&text, "\tif (!(floor(clamp(result.a, 0.0, 1.0) * 255.0 + 0.5) %s alpha_reference)) discard;\n", comparison);
+		}
 	}
 	if (*config_string("debug.gpu_debug_expression"))
 		xgpu_text_append(&text, "\tresult = vec4(vec3(%s), 1.0);\n", config_string("debug.gpu_debug_expression"));

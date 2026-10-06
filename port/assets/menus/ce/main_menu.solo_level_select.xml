@@ -14,6 +14,9 @@
 		<child widget="main_menu/solo_level_select/difficulty_indicator" x="416" y="343"/>
 		<child widget="main_menu/solo_level_select/difficulty_indicator" x="466" y="343"/>
 		<child widget="main_menu/solo_level_select/difficulty_indicator" x="516" y="343"/>
+		<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_right_name"/>
+		<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_right_pic"/>
+		<child widget="main_menu/multiplayer_type_select/mp_map_select/mp_map_right_data"/>
 	</widget>
 	<widget name="main_menu/solo_level_select/replay_level_right_name" type="text" controller="1" left="417" top="204" width="146" height="43" string_list="main_menu/map_list" string_index="2" font="ui\large_ui" color="#FF2896FF">
 	</widget>
@@ -38,7 +41,7 @@
 		<on event="created" run="initialize sp level list solo"/>
 		<on event="deleted" run="dispose sp level list"/>
 		<on event="custom_activation" run="solo level set map" open="main_menu/difficulty_select/difficulty_select_list_screen"/>
-		<child widget="main_menu/new_select/list_item_0" x="20" y="73"/>
+		<child widget="main_menu/new_select/list_item_0_map_kind" x="82" y="73"/>
 		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
 		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
 		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>

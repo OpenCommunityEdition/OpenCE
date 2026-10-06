@@ -42,6 +42,14 @@ EXPAT_DIR = Path("port/third_party/expat")
 EXPAT_SOURCES = ("xmlparse.c", "xmlrole.c", "xmltok.c")
 KCP_DIR = Path("port/third_party/kcp")
 MONOCYPHER_DIR = Path("port/third_party/monocypher")
+# the port's zlib (port/third_party/zlib/zlib_prefixed.h): what inflates the
+# maps, the menus' and the HUD's PNGs and the updates, data from anywhere,
+# instead of the game's own 1.1.3 (its inflate only, its names prefixed z_)
+ZLIB_DIR = Path("port/third_party/zlib")
+ZLIB_SOURCES = ("adler32.c", "crc32.c", "inffast.c", "inflate.c", "inftrees.c", "uncompr.c", "zutil.c")
+# (its names prefixed, and the one Z_PREFIX leaves, its error messages, which
+# the game's zlib names the same)
+ZLIB_DEFINES = ("-DZ_PREFIX", "-Dz_errmsg=z_port_errmsg")
 MUSL_VERSION = "1.2.5"
 MUSL_DIR = THIRD_PARTY / f"musl-{MUSL_VERSION}"
 MUSL_URL = f"https://musl.libc.org/releases/musl-{MUSL_VERSION}.tar.gz"
@@ -216,7 +224,23 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
-    toolchain = ndk / "toolchains" / "llvm" / "prebuilt" / "linux-x86_64"
+    prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
+    _host_tag = os.environ.get("ANDROID_NDK_HOST_TAG", "")
+    if not _host_tag:
+        if sys.platform == "darwin":
+            _host_tag = "darwin-x86_64"
+        elif os.name == "nt":
+            _host_tag = "windows-x86_64"
+        else:
+            _host_tag = "linux-x86_64"
+    if not (prebuilt / _host_tag).is_dir():
+        # an NDK that names its host folder differently: take the one there is
+        _tags = sorted(entry.name for entry in prebuilt.iterdir() if entry.is_dir()) if prebuilt.is_dir() else []
+        if not _tags:
+            n.comment("Android build: the NDK has no LLVM toolchain")
+            return
+        _host_tag = _tags[0]
+    toolchain = prebuilt / _host_tag
     sysroot_include = toolchain / "sysroot" / "usr" / "include"
     host_cc = toolchain / "bin" / f"aarch64-linux-android{ANDROID_API}-clang"
     ndk_bin = toolchain / "bin"
@@ -389,7 +413,11 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     game_cflags = " ".join([
         guest_abi, guest_code, " ".join(game_flags), profile_flags,
         f"-include {prefix_header}", f"-include {semantics_header}",
-        f"-I{LINUX_DIR}/include", game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
+        f"-I{LINUX_DIR}/include",
+        # the headers of the port's own game units (port/linux/game), for the
+        # game sources that call them
+        f"-iquote {Path(config['game_sources'])}",
+        game_defines_and_includes(config), *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
     for source in game_sources(config):
         cflags = game_cflags
@@ -405,7 +433,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-include {prefix_header}", f"-include {platform_semantics_header}",
         f"-I{LINUX_DIR}/src", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/guest/runtime",
         f"-I{PORT_DIR}/include", f"-I{TOML_DIR}", f"-I{EXPAT_DIR}", f"-I{KCP_DIR}", f"-I{MONOCYPHER_DIR}",
-        "-Isource -Isource/cseries",
+        f"-I{ZLIB_DIR}", "-Isource -Isource/cseries",
         f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
     ])
     guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
@@ -427,6 +455,12 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # (port/third_party/monocypher; p2p_crypto.c)
     for name in ("monocypher.c", "monocypher-ed25519.c"):
         objects.append(guest_object(MONOCYPHER_DIR / name, platform_cflags))
+    # the port's zlib
+    for name in ZLIB_SOURCES:
+        # (not the CPU's CRC32 instructions, which the guest's assembly step
+        # is not told it may use)
+        objects.append(guest_object(ZLIB_DIR / name, " ".join([platform_cflags, *ZLIB_DEFINES,
+                                                               "-U__ARM_FEATURE_CRC32"])))
     # the game's sin, pow and the rest, the same on every port
     # (port/include/halo_math.h)
     musl_math_cflags = " ".join([

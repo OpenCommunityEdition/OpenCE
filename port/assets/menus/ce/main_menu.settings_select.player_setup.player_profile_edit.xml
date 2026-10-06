@@ -60,6 +60,7 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_extended_desc_pic" controller="1" left="288" top="85" width="279" height="202" bitmap="main_menu/settings_select/player_setup/player_profile_edit/profile_options">
+		<data input="port gamepad layout preview"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_extended_desc_text" type="text" controller="1" left="294" top="290" width="296" height="110" string_list="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_descriptions" font="ui\large_ui" color="#FF2896FF">
 		<replace search="__BUILD__" function="build_number"/>
