@@ -613,6 +613,17 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			/* a voice turned all the way down (out of earshot), and not
 			sending to the reverb, only moves on */
 		}
+		else if (!reverb_enabled)
+		{
+			/* with reverb disabled, it uses linear interpolation
+			for raw (non-muffled) sound quality instead. */
+			const float *a = stream->history[stream->center % RESAMPLER_HISTORY];
+			const float *b = stream->history[(stream->center + 1) % RESAMPLER_HISTORY];
+			float fraction = (float)stream->phase;
+
+			sample_left = a[0] + (b[0] - a[0]) * fraction;
+			sample_right = a[1] + (b[1] - a[1]) * fraction;
+		}
 		else if (scale == 1.0f)
 		{
 			double position = stream->phase * RESAMPLER_TABLE_STEPS;
