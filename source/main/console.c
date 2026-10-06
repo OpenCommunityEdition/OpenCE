@@ -168,7 +168,8 @@ void console_printf(
 		terminal_clear();
 	}
 	
-	vsprintf(buffer, format, arglist);
+	/* port: no longer than the buffer (cut to 255 below, as it was) */
+	vsnprintf(buffer, NUMBEROF(buffer), format, arglist);
 	buffer[255] = '\0';
 	
 	terminal_printf(0, "%s", buffer);
@@ -193,7 +194,8 @@ void console_warning(
 	va_start(arglist, format);
 
 
-	vsprintf(buffer, format, arglist);
+	/* port: no longer than the buffer (cut to 255 below, as it was) */
+	vsnprintf(buffer, NUMBEROF(buffer), format, arglist);
 	buffer[255] = '\0';
 
 	/* (port: an important line, shown as config.toml's game.console_log

@@ -606,6 +606,8 @@ static struct distributed_client_clock
 	short fast_windows;
 	boolean fast;
 	boolean ahead_on_stream;
+	/* (its datagrams' word logged, unverified, while they go on saying so) */
+	boolean logged_unverified;
 } distributed_client_clocks[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 /* the host: whether the message being handled came over its machine's
 stream (network_distributed_handle_stream_message) */
@@ -2178,7 +2180,8 @@ static void distributed_handle_unit_state(
 	unit_index = state->unit_index;
 	/* the seat it rides: a client's own player's, once it has ridden
 	otherwise for longer than its prediction takes to reach the host and
-	come back */
+	come back (a player within the tracked ones, as players.c's datums are) */
+	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
 	{
 		struct unit_datum *unit = unit_get(unit_index);
 		long vehicle_index = unit->object.parent_object_index != NONE && unit->unit.parent_seat_index != NONE ?
@@ -3576,9 +3579,13 @@ static void distributed_write_player_record(
 		error(_error_log, "could not open %s to add a player to it", file_name);
 		return;
 	}
-	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s\tdiscord_id=%s\tplayers=%s\treason=%s\n", when,
-		kept_address, hardware_id[0] ? hardware_id : "none", discord_name[0] ? discord_name : "none",
-		discord_id[0] ? discord_id : "none", kept_names, kept_reason);
+	/* (the Discord user as the machine told it, which it may say is anyone's:
+	marked so) */
+	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s\n", when,
+		kept_address, hardware_id[0] ? hardware_id : "none",
+		discord_name[0] ? discord_name : "none", discord_name[0] ? " (self-reported)" : "",
+		discord_id[0] ? discord_id : "none", discord_id[0] ? " (self-reported)" : "",
+		kept_names, kept_reason);
 	fclose(file);
 }
 
@@ -3743,13 +3750,14 @@ static void distributed_note_client_clock(
 		{
 			clock->fast_windows = 0;
 			clock->ahead_on_stream = FALSE;
+			clock->logged_unverified = FALSE;
 		}
 		else if (++clock->fast_windows == 1)
 		{
 			error(_error_log, "machine #%ld's game runs %.2f times as fast as this host's (%ld ticks ahead): "
 				"its players' predictions refused", machine_index, rate, ahead);
 		}
-		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS)
+		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS && clock->ahead_on_stream)
 		{
 			error(_error_log, "machine #%ld's game ran %.2f times as fast as this host's for %d seconds "
 				"(%ld ticks ahead): dropped", machine_index, rate,
@@ -3769,30 +3777,40 @@ static void distributed_note_client_clock(
 					distributed_client_identities[machine_index].discord_name, 1);
 				if (discord_id[0] || discord_name[0])
 					snprintf(discord, sizeof(discord), " (Discord: %s, %s)", discord_name, discord_id);
-				snprintf(reason, sizeof(reason), "speed hack (game ran %.2f times as fast)%s", rate,
-					clock->ahead_on_stream ? "" : " (its datagrams only: not banned)");
+				snprintf(reason, sizeof(reason), "speed hack (game ran %.2f times as fast)", rate);
 				snprintf(text, sizeof(text), "%s%s kicked by the host: their game ran %.2f times as fast (a speed hack)",
 					names, discord, rate);
 				distributed_send_notice(text);
-				/* banned, and kept out, only when its stream said so
-				too; on its datagrams' word alone (which another machine
-				could have sent as from its address), logged and dropped,
-				and it may join again */
-				if (clock->ahead_on_stream)
-				{
-					distributed_log_cheater(machine_index, names, reason);
-				}
-				else
-				{
-					char address[32];
-
-					distributed_machine_address_text(machine_index, address, sizeof(address));
-					distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
-				}
+				distributed_log_cheater(machine_index, names, reason);
 			}
-			network_game_server_kick_machine(machine_index, clock->ahead_on_stream);
+			network_game_server_kick_machine(machine_index, TRUE);
 			clock->fast_windows = 0;
 			clock->ahead_on_stream = FALSE;
+		}
+		/* dropped, banned and kept out only when its stream said so too; on
+		its datagrams' word alone (which another machine could have sent as
+		from its address, to have it dropped and logged as a cheater) it
+		stays, its players' predictions refused while they say so, and is
+		logged once, unverified (dropped as above if its stream says so later) */
+		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS)
+		{
+			clock->fast_windows = CLIENT_CLOCK_FAST_WINDOWS;
+			if (!clock->logged_unverified)
+			{
+				char names[64];
+				char reason[96];
+				char address[32];
+
+				error(_error_log, "machine #%ld's datagrams said its game ran %.2f times as fast as this host's "
+					"for %d seconds (%ld ticks ahead), its stream not: not dropped (unverified)", machine_index, rate,
+					CLIENT_CLOCK_FAST_WINDOWS * CLIENT_CLOCK_WINDOW_MILLISECONDS / 1000, ahead);
+				distributed_machine_player_names(machine_index, names, sizeof(names));
+				snprintf(reason, sizeof(reason), "unverified speed hack (its datagrams only, not dropped: "
+					"game ran %.2f times as fast)", rate);
+				distributed_machine_address_text(machine_index, address, sizeof(address));
+				distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
+				clock->logged_unverified = TRUE;
+			}
 		}
 	}
 	clock->window_tick = clock->latest_tick;

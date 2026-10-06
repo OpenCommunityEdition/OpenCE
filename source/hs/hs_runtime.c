@@ -311,6 +311,12 @@ enum
 	HS_THREAD_STACK_SIZE = 0x200
 };
 
+/* port: the size of the text an inspector writes (hs_evaluate_inspect) */
+enum
+{
+	HS_INSPECT_BUFFER_SIZE = 1024
+};
+
 enum
 {
 	_hs_thread_in_function_call_bit = 0,
@@ -501,6 +507,8 @@ static boolean hs_stack_push(
 	long thread_index);
 static void hs_stack_overflow(
 	long thread_index);
+static void hs_syntax_error(
+	long thread_index);
 static void *hs_stack_allocate(
 	long thread_index,
 	long size);
@@ -536,6 +544,7 @@ struct data_array *hs_global_data;
 struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
 extern short const hs_external_global_count;
+extern long const hs_function_table_count;
 extern short const hs_type_sizes[NUMBER_OF_HS_TYPES];
 boolean debug_scripting;
 unsigned long hs_debug_data[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_TRIGGER_VOLUMES_PER_SCENARIO)];
@@ -1356,6 +1365,23 @@ static void hs_stack_overflow(
 	return;
 }
 
+/* port: a script that reaches a syntax node a damaged map has wrong
+(hs_evaluate, hs_thread_main) is ended as one whose stack overflows is */
+static void hs_syntax_error(
+	long thread_index)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+	if (!TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+	{
+		error(_error_silent, "a problem occurred while executing the script %s: corrupt syntax tree. (it was stopped)",
+			hs_thread_format(thread_index));
+		SET_FLAG(thread->flags, _hs_thread_stack_overflow_bit, TRUE);
+	}
+
+	return;
+}
+
 static char const *hs_thread_format(
 	long thread_index)
 {
@@ -1550,7 +1576,9 @@ static void hs_inspect_string(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x26d,
 		type==_hs_type_string);
 
-	sprintf(buffer, "%s", (char const *)value);
+	/* port: no longer than hs_evaluate_inspect's buffer (a script's
+	string can be any length) */
+	snprintf(buffer, HS_INSPECT_BUFFER_SIZE, "%s", (char const *)value);
 
 	return;
 }
@@ -1568,6 +1596,14 @@ static void hs_inspect_enum(
 	match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27c,
 		(short)value>=0 && (short)value<enum_definition->count,
 		"enum_value>=0 && enum_value<enum_definition->count");
+
+	/* port: a value that isn't one of the enum's isn't looked up */
+	if ((short)value<0 || (short)value>=enum_definition->count)
+	{
+		sprintf(buffer, "<invalid %s %d>", hs_type_names[type], (short)value);
+
+		return;
+	}
 
 	sprintf(buffer, "%s", enum_definition->values[(short)value]);
 
@@ -2148,7 +2184,7 @@ void hs_evaluate_inspect(
 	long thread_index,
 	boolean initialize)
 {
-	char string[1024];
+	char string[HS_INSPECT_BUFFER_SIZE];
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	long *value = hs_stack_allocate(thread_index, sizeof(long));
 
@@ -2170,14 +2206,15 @@ void hs_evaluate_inspect(
 		struct hs_syntax_node *expression = hs_syntax_get(hs_syntax_get(hs_syntax_get(
 			thread->stack->expression_index)->data)->next_node_index);
 
-		if (hs_type_inspectors[expression->type])
+		/* port: (the type was checked as the value was evaluated: checked
+		again before it picks an inspector) */
+		if (hs_type_valid(expression->type) && hs_type_inspectors[expression->type])
 		{
 			hs_type_inspectors[expression->type](expression->type, *value, string);
-			/* BUG (preserved for exact matching): the inspected value's text is passed as the
-			 * format (January 0x4bc840 +0xdd..+0xe6), so inspecting a string that contains '%'
-			 * reads arguments that were never passed. A corrected build should print it through
-			 * "%s". Source-policy approval pending (2026-09-27 audit). */
-			console_printf(FALSE, string);
+			/* port: printed through "%s". January passes the text as the
+			format (0x4bc840 +0xdd..+0xe6), so a '%' in an inspected string
+			read arguments that were never passed */
+			console_printf(FALSE, "%s", string);
 		}
 
 		hs_return(thread_index, 0);
@@ -2637,11 +2674,22 @@ static void hs_thread_main(
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(thread->stack->expression_index);
 		boolean initialize = TEST_FLAG(thread->flags, _hs_thread_in_function_call_bit);
+		long index_count;
 
 		thread->stack->size = 0;
 		SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, FALSE);
 
-		if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
+		/* port: a function or script that isn't there isn't called, and the
+		thread is ended. hs_evaluate pushes only nodes whose index was
+		checked, but this index picks a function pointer */
+		index_count = TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ?
+			global_scenario_get()->hs_scripts.count :
+			hs_function_table_count;
+		if (expression->index<0 || expression->index>=index_count)
+		{
+			hs_syntax_error(thread_index);
+		}
+		else if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
 		{
 			struct hs_function_definition *function = hs_function_get(expression->index);
 
@@ -2756,6 +2804,18 @@ static void hs_evaluate(
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2ff, thread_index,
 		valid_thread(thread), "corrupted stack.");
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x300, destination);
+
+	/* port: only a node with a value's type is evaluated. Those are the
+	ones hs_compile_postprocess checked: their function or script index, and
+	the type a constant or global casts from. A node that isn't there, or a
+	function's name (left unchecked, and never in a value's place in the
+	shipped maps), comes only from a damaged map: the thread is ended */
+	if (!expression || !hs_type_valid(expression->type))
+	{
+		hs_syntax_error(thread_index);
+
+		return;
+	}
 
 	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
 	{

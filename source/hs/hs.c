@@ -3610,6 +3610,8 @@ static void hs_allocate(
 	void);
 static boolean hs_scenario_syntax_data_valid(
 	struct scenario const *scenario);
+static boolean hs_scenario_string_constants_valid(
+	struct scenario const *scenario);
 static void hs_scenario_scripts_disable(
 	struct scenario *scenario);
 static boolean hs_rebuild_source(
@@ -3622,6 +3624,9 @@ boolean hs_scenario_postprocess(
 /* ---------- constants */
 
 #define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
+/* port: the size of the "hs globals" array (hs_runtime_initialize), which
+holds the external globals and the map's */
+#define MAXIMUM_HS_GLOBALS 0x400
 
 /* ---------- globals */
 
@@ -12131,7 +12136,26 @@ static boolean hs_scenario_syntax_data_valid(
 		data->actual_count >= 0 &&
 		data->actual_count <= data->count &&
 		data->first_free_absolute_index >= 0 &&
-		data->first_free_absolute_index <= data->maximum_count;
+		data->first_free_absolute_index <= data->maximum_count &&
+		hs_scenario_string_constants_valid(scenario);
+}
+
+/* port: the scenario's script strings as the map holds them (the names
+and strings its nodes point into): inside the tag cache, with the 0x400
+bytes at their end that the console's expressions are written to
+(hs_compile_expression). The shipped maps' all are */
+static boolean hs_scenario_string_constants_valid(
+	struct scenario const *scenario)
+{
+	byte const *tag_cache = (byte const *)physical_memory_get_tag_cache_base_address();
+	byte const *address = (byte const *)scenario->hs_string_constants.address;
+	long size = scenario->hs_string_constants.size;
+
+	return tag_cache &&
+		size >= 0x400 &&
+		size <= TAG_CACHE_SIZE &&
+		address >= tag_cache &&
+		address <= tag_cache+TAG_CACHE_SIZE-size;
 }
 
 /* port: the scenario runs no scripts, its script data not being sound: a
@@ -12169,6 +12193,11 @@ static void hs_allocate(
 	if (scenario)
 	{
 		hs_scenario_scripts_disable(scenario);
+		/* port: strings that aren't sound aren't gone by either, the
+		console's expressions included (hs_compile_expression refuses a
+		scenario without room for them) */
+		if (!hs_scenario_string_constants_valid(scenario))
+			scenario->hs_string_constants.size = 0;
 		if (hs_syntax_data && hs_syntax_data_allocated)
 			return;
 		error(0, "the scenario's script data is missing or damaged; its scripts won't run");
@@ -12707,10 +12736,11 @@ void hs_help(
 	function_index = hs_find_function_by_name(function_name);
 	if (function_index != NONE)
 	{
+		/* port: printed through "%s" (the text isn't a format) */
 		hs_get_function_parameters_string(function_index, result);
-		console_printf(FALSE, result);
+		console_printf(FALSE, "%s", result);
 		hs_get_function_documentation_string(function_index, result);
-		console_printf(FALSE, result);
+		console_printf(FALSE, "%s", result);
 	}
 	return;
 }
@@ -14038,6 +14068,41 @@ boolean hs_scenario_postprocess(
 		return FALSE;
 	}
 	recompile = scenario->hs_scripts.count == 0 && scenario->hs_source_files.count>0;
+	/* port: the map's globals take the "hs globals" array's datums after the
+	external ones (hs_runtime_initialize_for_new_map); more than are left
+	would be set through datums that aren't there. Each has a value's type,
+	which the casts' and the type names' tables are looked up by. A map
+	whose globals aren't so runs no scripts. The shipped maps' all are, and
+	have far fewer */
+	if (scenario->hs_globals.count<0 ||
+		scenario->hs_globals.count>MAXIMUM_HS_GLOBALS-hs_external_global_count)
+	{
+		error(0, "the scenario has %ld script globals, more than the %d there is room for; its scripts won't run",
+			scenario->hs_globals.count,
+			MAXIMUM_HS_GLOBALS-hs_external_global_count);
+		hs_scenario_scripts_disable(scenario);
+	}
+	else
+	{
+		short global_index;
+
+		for (global_index = 0; global_index<scenario->hs_globals.count; global_index++)
+		{
+			struct hs_global const *global = TAG_BLOCK_GET_ELEMENT(
+				&scenario->hs_globals,
+				global_index,
+				struct hs_global);
+
+			if (!hs_type_valid(global->type))
+			{
+				error(0, "the scenario's script global #%d has no type (%d); its scripts won't run",
+					global_index,
+					global->type);
+				hs_scenario_scripts_disable(scenario);
+				break;
+			}
+		}
+	}
 	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
 	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
 	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
@@ -14063,6 +14128,10 @@ boolean hs_scenario_postprocess(
 		if (hs_compile_source() && hs_compile_postprocess(&error_message, &error_source))
 		{
 			success = TRUE;
+			/* port: a cache file's blocks can't be resized (tag_block_resize),
+			so the recompile didn't reset the map's scripts and globals: they
+			still name the nodes hs_compile_initialize deleted. None run */
+			hs_scenario_scripts_disable(scenario);
 		}
 		else
 		{

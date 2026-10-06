@@ -942,6 +942,12 @@ boolean network_game_server_send_message_to_all_machines(
 		server && message);
 
 	message_length = GET_MESSAGE_SIZE(message->header);
+	/* port: the assert is not checked in release builds */
+	if (message_length > sizeof(message_buffer))
+	{
+		network_event("network_game_server_send_message_to_all_machines() got a message of #%d bytes", message_length);
+		return FALSE;
+	}
 	for (machine_index = 0; machine_index < MAXIMUM_NETWORK_MACHINE_COUNT; machine_index++)
 	{
 		struct network_game_server_client_machine *machine =
@@ -1754,9 +1760,9 @@ static boolean network_game_server_handle_message_client_ping(
 	boolean result = FALSE;
 	/* port: an address answered no more often than PING_REPLY_INTERVAL, and
 	no more than MAXIMUM_PING_REPLY_ADDRESSES in that time (the answer goes
-	to the port the ping names, at the address it came from, which anyone
-	can send one as: a flood of pings would be a flood of answers, at
-	another's machine). A searching client pings once a second */
+	to the client port at the address it came from, which anyone can send
+	one as: a flood of pings would be a flood of answers, at another's
+	machine). A searching client pings once a second */
 	static struct
 	{
 		unsigned long address;
@@ -1800,7 +1806,10 @@ static boolean network_game_server_handle_message_client_ping(
 		struct transport_address address;
 		address.address_length = IPV4_ADDRESS_LENGTH;
 		address.address.long_words[0] = source_address->address.long_words[0];
-		address.port = client_message->port;
+		/* port: to the client port, as the game's advertisement goes, not
+		the port the ping names (every client names that one; any other
+		was an answer at whatever else listens there) */
+		address.port = NETWORK_GAME_CLIENT_PORT;
 		result = network_game_server_write(
 			network_game_server_get_connection(server),
 			reply,

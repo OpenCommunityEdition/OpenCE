@@ -958,7 +958,27 @@ boolean scenario_trigger_volume_test_point(
 	short trigger_volume_index,
 	const real_point3d *position)
 {
-	struct scenario_trigger_volume *trigger_volume = TAG_BLOCK_GET_ELEMENT(
+	struct scenario_trigger_volume *trigger_volume;
+
+	/* port: a trigger volume that isn't the scenario's (a script's or a
+	tag's index) holds nothing */
+	if (trigger_volume_index<0 ||
+		trigger_volume_index>=global_scenario_get()->trigger_volumes.count)
+	{
+		static boolean reported = FALSE;
+
+		if (!reported)
+		{
+			error(_error_silent, "trigger volume #%d isn't the scenario's (it has %ld)",
+				trigger_volume_index,
+				global_scenario_get()->trigger_volumes.count);
+			reported = TRUE;
+		}
+
+		return FALSE;
+	}
+
+	trigger_volume = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->trigger_volumes,
 		trigger_volume_index,
 		struct scenario_trigger_volume);

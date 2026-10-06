@@ -223,7 +223,11 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
 #include "cache/cache_files_decompress_windows.h"
-#include "memory/zlib/zlib.h"
+/* port: the port's zlib (1.3), not the game's 1.1.3, inflates the maps,
+which are anyone's files; its inflate needs about 40 KB of ZLIB_BUFFER_SIZE,
+and frees what it takes in the reverse order, as cache_copy_compressed_free
+wants */
+#include "../../port/third_party/zlib/zlib_prefixed.h"
 
 #include <xtl.h>
 

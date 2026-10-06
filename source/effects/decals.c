@@ -236,6 +236,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "shaders/shader_definitions.h"
+#include "tag_files/tag_files.h"
 
 /* ---------- constants */
 
@@ -1545,6 +1546,18 @@ void decal_new_from_collision(
 		short deviant_surface_count = 0;
 		struct decal_definition *definition = decal_definition_get(decal_definition_index);
 		struct bitmap_group *bitmap_group = bitmap_group_get(definition->shader.map.index);
+
+		/* port: a type the wrap table has (the map's value). A bad one is
+		made a scratch in the tag, so it is said once. */
+		if (!VALID_INDEX(definition->type, NUMBER_OF_DECAL_TYPES))
+		{
+			error(
+				_error_silent,
+				"decal %s has type %d (made a scratch)",
+				tag_get_name(decal_definition_index),
+				definition->type);
+			definition->type = _decal_type_scratch;
+		}
 
 		if (!reuse_previous_geometry)
 		{

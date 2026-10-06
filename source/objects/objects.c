@@ -152,6 +152,7 @@ static void object_delete_attachments(long object_index);
 static void object_delete_recursive(long object_index, boolean delete_siblings);
 static void object_compute_function_values(long object_index);
 static void object_compute_change_colors(long object_index);
+static void object_model_nodes_error(long model_index, struct model const *model);
 
 /* ---------- globals */
 
@@ -1473,7 +1474,9 @@ void object_permute_region(
 		short region_index;
 		struct model* model = model_definition_get(object_definition->object.model.index);
 		
-		for (region_index = 0; region_index<model->regions.count; region_index++)
+		/* port: no more regions than a model has room for (a map's count; far
+		enough past it, the writes reached the object's node blocks) */
+		for (region_index = 0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL); region_index++)
 		{
 			if (desired_region_index==NONE || desired_region_index==region_index)
 			{
@@ -2382,7 +2385,9 @@ void object_compute_node_matrices(
 		cannot_interpolate_node_orientations_storage :
 		(real_orientation *)object_header_block_get(object_index, &object->object.node_orientations);
 
-	if (object_definition->object.model.index!=NONE)
+	/* port: a model without nodes is placed like no model (a map's count) */
+	if (object_definition->object.model.index!=NONE &&
+		model_definition_get(object_definition->object.model.index)->nodes.count>0)
 	{
 		real_matrix4x3 *object_node_matrix;
 		boolean world_relative;
@@ -2394,6 +2399,8 @@ void object_compute_node_matrices(
 		struct object_type_definition *object_type_definition = object_type_definition_get(object->object.type);
 		
 		struct model *model = model_definition_get(object_definition->object.model.index);
+		/* port: the nodes node_stack and the orientations hold (a map's count) */
+		short model_node_count = (short)MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL);
 
 		if (object->object.parent_object_index==NONE)
 		{
@@ -2457,7 +2464,8 @@ void object_compute_node_matrices(
 					overlay_index,
 					struct animation_graph_object_overlay);
 
-				if (overlay->animation_index!=NONE &&
+				/* port: an animation the graph has (a map's index) */
+				if (VALID_INDEX(overlay->animation_index, animation_graph->animations.count) &&
 					overlay->function_index<object_definition->object.functions.count)
 				{
 					struct object_function_definition* function = TAG_BLOCK_GET_ELEMENT(
@@ -2484,7 +2492,9 @@ void object_compute_node_matrices(
 
 						overlay_animation_apply_continuous(animation, frame_index, node_orientations);
 					}
-					else if (overlay->mode==_object_overlay_mode_scale)
+					/* port: and a frame to pick (a map's frame count of 0 divided
+					by zero) */
+					else if (overlay->mode==_object_overlay_mode_scale && animation->frame_count>0)
 					{
 						short frame_index = OBJECT_FRAME_INDEX_GET(object_index) % (unsigned long)animation->frame_count;
 
@@ -2759,11 +2769,18 @@ void object_compute_node_matrices(
 			else
 			{
 				real_orientation *orientation = &node_orientations[node_stack_index];
+				short parent_node_index = node->parent_node_index;
 
 				matrix4x3_from_orientation(&object_nodes[node_stack_index], orientation);
 				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2929, node->parent_node_index!=NONE);
+				/* port: a parent the model doesn't have is the root (a map's index) */
+				if (!VALID_INDEX(parent_node_index, model_node_count))
+				{
+					object_model_nodes_error(object_definition->object.model.index, model);
+					parent_node_index = 0;
+				}
 				matrix4x3_multiply(
-					&object_nodes[node->parent_node_index],
+					&object_nodes[parent_node_index],
 					&object_nodes[node_stack_index],
 					&object_nodes[node_stack_index]);
 			}
@@ -2781,13 +2798,29 @@ void object_compute_node_matrices(
 
 			next_sibling_node_index = node->next_sibling_node_index;
 
+			/* port: only nodes the model has, and no more than node_stack holds
+			(a map's links, which could go in a loop) */
 			if (next_sibling_node_index!=NONE)
 			{
-				node_stack[node_count++] = next_sibling_node_index;
+				if (VALID_INDEX(next_sibling_node_index, model_node_count) && node_count<MAXIMUM_NODES_PER_MODEL)
+				{
+					node_stack[node_count++] = next_sibling_node_index;
+				}
+				else
+				{
+					object_model_nodes_error(object_definition->object.model.index, model);
+				}
 			}
 			if (node->first_child_node_index!=NONE)
 			{
-				node_stack[node_count++] = node->first_child_node_index;
+				if (VALID_INDEX(node->first_child_node_index, model_node_count) && node_count<MAXIMUM_NODES_PER_MODEL)
+				{
+					node_stack[node_count++] = node->first_child_node_index;
+				}
+				else
+				{
+					object_model_nodes_error(object_definition->object.model.index, model);
+				}
 			}
 
 			if (node_index==node_count)
@@ -3139,8 +3172,22 @@ static void attachments_new(
 
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
+	/* port: no more attachments than the object holds (a map's count; the rest
+	aren't made) */
+	short attachment_count = (short)MIN(object_definition->object.attachments.count, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
 
-	for (attachment_num = 0; attachment_num<object_definition->object.attachments.count; attachment_num++)
+	if (object_definition->object.attachments.count>MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT &&
+		model_data_report_once(object_definition))
+	{
+		error(
+			_error_silent,
+			"### ERROR %s has %ld attachments; only the first %d are made",
+			tag_get_name(object->definition_index),
+			object_definition->object.attachments.count,
+			MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
+	}
+
+	for (attachment_num = 0; attachment_num<attachment_count; attachment_num++)
 	{
 		struct object_attachment_definition* attachment = TAG_BLOCK_GET_ELEMENT(
 			&object_definition->object.attachments,
@@ -3382,10 +3429,39 @@ long object_new(
 			}
 			else
 			{
-				node_count = model_definition_get(object_definition->object.model.index)->nodes.count;
+				long model_node_count = model_definition_get(object_definition->object.model.index)->nodes.count;
+
+				/* port: the root's matrix at least, which the object always has
+				(a map's model with no nodes is placed like no model). And no
+				more nodes than a block's size, a short, can hold: past that the
+				size wrapped and the matrices overran the object (a map's count;
+				the object isn't made) */
+				if (model_node_count==0)
+				{
+					node_count = 1;
+				}
+				else if (model_node_count<0 ||
+					model_node_count>SHORT_MAX/(long)sizeof(struct real_matrix4x3))
+				{
+					if (model_data_report_once(model_definition_get(object_definition->object.model.index)))
+					{
+						error(
+							_error_silent,
+							"### ERROR model %s has %ld nodes; %s isn't made",
+							tag_get_name(object_definition->object.model.index),
+							model_node_count,
+							tag_get_name(definition_index));
+					}
+					node_count = NONE;
+				}
+				else
+				{
+					node_count = (short)model_node_count;
+				}
 			}
 
-			if (object_header_block_allocate(
+			if (node_count>0 &&
+				object_header_block_allocate(
 				object_index,
 				offsetof(struct object_datum, object.node_matrices),
 				sizeof(struct real_matrix4x3) * node_count))
@@ -4336,7 +4412,8 @@ static void object_connect_lights(
 		short i;
 		struct object_definition *object_definition = object_definition_get(object->definition_index);
 		
-		for (i =0; i<object_definition->object.attachments.count; ++i)
+		/* port: the attachments attachments_new made (a map's count) */
+		for (i =0; i<MIN(object_definition->object.attachments.count, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT); ++i)
 		{
 			if (!object->object.attachment_types[i] && object->object.attachment_indices[i]!=NONE)
 			{
@@ -4588,7 +4665,9 @@ static short object_find_region_permutations_available_with_variant(
 	short i;
 	short result = 0;
 
-	for (i = 0; i<region->permutations.count; i++)
+	/* port: no more permutations than a region has room for, and the caller's
+	available_indices holds (a map's count) */
+	for (i = 0; i<MIN(region->permutations.count, MAXIMUM_PERMUTATIONS_PER_MODEL_REGION); i++)
 	{
 		struct model_region_permutation* permutation = TAG_BLOCK_GET_ELEMENT(
 			&region->permutations,
@@ -4618,7 +4697,9 @@ static boolean object_select_random_region_permutations_by_variant(
 	struct object_datum *object = object_get(object_index);
 	boolean result = TRUE;
 
-	for (region_index =0; region_index<model->regions.count; region_index++)
+	/* port: no more regions than a model has room for (a map's count; far
+	enough past it, the writes reached the object's node blocks) */
+	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL); region_index++)
 	{
 		struct model_region *region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
 		short permutation_index = object_find_region_permutations_available_with_variant(region, variant_number, available_permutation_indices);
@@ -4652,7 +4733,9 @@ static short object_determine_variant_number(
 	struct object_datum *object = object_get(object_index);
 	short result = 0;
 
-	for (region_index =0; region_index<model->regions.count&& !result; region_index++)
+	/* port: the regions object_select_random_region_permutations_by_variant
+	chose for (a map's count) */
+	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL)&& !result; region_index++)
 	{
 		struct model_region* region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
 		if (object->object.region_permutations[region_index] < region->permutations.count)
@@ -4732,7 +4815,8 @@ static void attachments_delete(
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
 
-	for (attachment_index =0; attachment_index<object_definition->object.attachments.count; ++attachment_index)
+	/* port: the attachments attachments_new made (a map's count) */
+	for (attachment_index =0; attachment_index<MIN(object_definition->object.attachments.count, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT); ++attachment_index)
 	{
 		if (object->object.attachment_types[attachment_index]!=NONE &&
 			object->object.attachment_indices[attachment_index]!=NONE)
@@ -4759,6 +4843,23 @@ static void attachments_delete(
 				break;
 			}
 		}
+	}
+
+	return;
+}
+
+/* port: a map's model with a bad node list, reported once (the matrices are
+built every tick) */
+static void object_model_nodes_error(
+	long model_index,
+	struct model const *model)
+{
+	if (model_data_report_once(model))
+	{
+		error(
+			_error_silent,
+			"### ERROR model %s has a bad node list; its bad links are skipped",
+			tag_get_name(model_index));
 	}
 
 	return;

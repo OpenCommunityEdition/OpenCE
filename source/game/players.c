@@ -330,6 +330,11 @@ enum
 		_object_mask_control
 };
 
+/* port: network_distributed.c's arrays of MAXIMUM_TRACKED_PLAYERS are indexed
+by a player's datum index */
+typedef char player_data_maximum_count_assert[
+	NETWORK_GAME_MAXIMUM_PLAYER_COUNT == HALO_PORT_MAXIMUM_NETWORK_PLAYERS ? 1 : -1];
+
 /* ---------- macros */
 
 /* ---------- structures */

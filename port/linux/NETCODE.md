@@ -195,18 +195,20 @@ only ever jumps forward to it when behind, so an honest one is never ahead
 while going faster (one that caught up, or a host that stalled, is one or
 the other, not both). One more than a tenth faster and half a second ahead
 has its players' predictions refused at once (the host's copies go as its
-own ticks have them), and after ten seconds of it is dropped, and every
-machine is told who, in red on its console and in its `debug.txt`. Its
-address is kept out of the host's games while the host runs only when a
-message that came over its connection's stream was that far ahead too: a
-datagram is known to be the machine's only by the address it came from,
-which another machine can send one as, so on its datagrams alone it is
-dropped, logged, and may join again
+own ticks have them). After ten seconds of it, if a message that came over
+its connection's stream was that far ahead too, it is dropped, every
+machine is told who, in red on its console and in its `debug.txt`, and its
+address is kept out of the host's games while the host runs. A datagram is
+known to be the machine's only by the address it came from, which another
+machine can send one as, so on its datagrams alone it is not dropped: its
+players' predictions stay refused while it goes on, and it is logged once,
+as unverified (dropped as above if its stream says so later)
 (`distributed_note_client_clock`, `network_game_server_kick_machine`,
 `_distributed_message_notice`). The host also adds a line to
 `cheaters.txt` beside its `debug.txt`: when, the player's address (an
 internet play peer's real one), their Discord user and their players'
-names, and why. A client tells the host its Discord user as the Discord
+names, and why (an unverified one says so). The Discord user is marked
+`(self-reported)` there and in `bans.txt`. A client tells the host its Discord user as the Discord
 client signed in on its machine says (its id and name, none without one:
 not running, or internet play off), once it is in the game and again
 when it changes; it says what it likes, so the host keeps of it only digits

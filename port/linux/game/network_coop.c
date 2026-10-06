@@ -155,7 +155,8 @@ enum
 	/* each event is sent in this many ticks' messages */
 	EVENT_SENDS = 3,
 
-	/* the size of devices.c's device group array */
+	/* the size of devices.c's device group array (devices_initialize's;
+	every index into the arrays below is checked against this too) */
 	MAXIMUM_DEVICE_GROUPS = 1024,
 	/* a changed group is sent in this many ticks' messages */
 	DEVICE_GROUP_SENDS = 3,
@@ -178,6 +179,9 @@ enum
 	PLAYERS_PER_DROPPED_VEHICLE = 4,
 	MAXIMUM_DROPPED_VEHICLES = 5,
 };
+
+/* (devices.c's literal count: a change there is one here) */
+typedef char device_groups_count_assert[MAXIMUM_DEVICE_GROUPS == 1024 ? 1 : -1];
 
 /* distributed_coop_event.kind */
 enum
@@ -829,6 +833,7 @@ static short device_group_find(
 	{
 		group_index = entry->group_index;
 		return group_index >= 0 && group_index < global_scenario_get()->device_groups.count &&
+			group_index < MAXIMUM_DEVICE_GROUPS &&
 			device_group_network_get(group_index, &value, &flags, &runtime) && !runtime ? group_index : NONE;
 	}
 	device_index = object_find(entry->name_index, entry->object_index, entry->definition_index, _object_mask_device);

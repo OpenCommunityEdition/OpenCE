@@ -25,7 +25,7 @@ anti_aliasing_values).
 #include <stdlib.h>
 
 #ifndef HALO_ANDROID
-#include "memory/zlib/zlib.h"
+#include "zlib_prefixed.h"
 
 /* port/third_party/smaa, embedded by tools/embed_assets.py: the shader's
 text (ending in a NUL), and the lookup textures' bytes compressed with
@@ -372,8 +372,8 @@ static GLuint lookup_texture(const unsigned int *stream, unsigned long stream_si
 	if (!texels)
 		return 0;
 	result = uncompress(texels, &size, (const Bytef *)stream, (uLong)stream_size);
-	/* (the game's zlib is 1.1, which can stop short of saying the stream
-	has ended: the size says whether it is whole) */
+	/* (the size says whether it is whole, as with the game's zlib 1.1,
+	which could stop short of saying the stream had ended) */
 	if ((result == Z_OK || result == Z_BUF_ERROR) && size == (uLongf)(width * height * texel_size))
 	{
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

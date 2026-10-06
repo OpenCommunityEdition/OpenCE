@@ -128,6 +128,12 @@ short sound_definition_find_pitch_range_by_pitch(
 
 			if (range->permutations.count)
 			{
+				/* port: the first range with permutations if no pitch ratio
+				picks one (a NaN pitch, or zero pitch or bounds, from the map's
+				values); NONE would index the ranges at -1 */
+				if (result == NONE)
+					result = range_index;
+
 				if (range->bend_bounds.lower <= pitch && pitch <= range->bend_bounds.upper)
 				{
 					result = range_index;
@@ -215,17 +221,56 @@ short sound_definition_next_permutation(
 	short pitch_range_index,
 	short permutation_index)
 {
-	struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+	struct sound_pitch_range *range;
+	short selected_permutation_index;
+	short attempt_count = 0;
+
+	/* port: no range (NONE, from a sound none of whose ranges has
+	permutations), no permutation */
+	if (!VALID_INDEX(pitch_range_index, definition->pitch_ranges.count))
+		return NONE;
+
+	range = TAG_BLOCK_GET_ELEMENT(
 		&definition->pitch_ranges,
 		pitch_range_index,
 		struct sound_pitch_range);
-	short selected_permutation_index;
-	short attempt_count = 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_definitions.c",
 		892,
 		range->permutations.count);
+
+	/* port: every index this returns is one of the range's permutations
+	(the counts and indices are the map's, and the sound cache writes
+	through the permutation). A bad one is fixed in the tag, so it is said
+	once. */
+	if (range->permutations.count <= 0)
+		return NONE;
+	if (range->actual_permutation_count < 1 ||
+		range->actual_permutation_count > range->permutations.count)
+	{
+		error(
+			_error_silent,
+			"pitch range %s picks from %d of its %d permutations",
+			range->name,
+			range->actual_permutation_count,
+			range->permutations.count);
+		range->actual_permutation_count = (short)PIN(
+			range->actual_permutation_count,
+			1,
+			range->permutations.count);
+	}
+	if (range->forced_permutation_index != NONE &&
+		!VALID_INDEX(range->forced_permutation_index, range->permutations.count))
+	{
+		error(
+			_error_silent,
+			"pitch range %s forces permutation %d of %d",
+			range->name,
+			range->forced_permutation_index,
+			range->permutations.count);
+		range->forced_permutation_index = NONE;
+	}
 
 	if (range->forced_permutation_index != NONE)
 	{
@@ -235,12 +280,27 @@ short sound_definition_next_permutation(
 		return selected_permutation_index;
 	}
 
-	if (TEST_FLAG(definition->flags, 1) && permutation_index != NONE)
+	/* port: and the permutation is one of this range's */
+	if (TEST_FLAG(definition->flags, 1) &&
+		VALID_INDEX(permutation_index, range->permutations.count))
 	{
 		struct sound_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
 			&range->permutations,
 			permutation_index,
 			struct sound_permutation);
+
+		/* port: NONE ends the chain; any other index past the range ends it too */
+		if (permutation->next_permutation_index != NONE &&
+			!VALID_INDEX(permutation->next_permutation_index, range->permutations.count))
+		{
+			error(
+				_error_silent,
+				"permutation %s is followed by permutation %d of %d",
+				permutation->name,
+				permutation->next_permutation_index,
+				range->permutations.count);
+			permutation->next_permutation_index = NONE;
+		}
 
 		return permutation->next_permutation_index;
 	}
