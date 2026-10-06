@@ -320,6 +320,16 @@ void render_particles(
 									&position,
 									radius);
 
+#ifdef HALO_VR
+							{
+								/* the VR mode's eye pass: in the eyes' pixels, not
+								the centre view's, as the objects' sizes
+								(port/linux/game/vr_render.c) */
+								extern real vr_render_level_of_detail_scale(void);
+
+								diameter *= vr_render_level_of_detail_scale();
+							}
+#endif
 							if (diameter > definition->lod_cutoff)
 							{
 								real fade;

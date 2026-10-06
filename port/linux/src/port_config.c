@@ -6,8 +6,11 @@ The native ports' settings (port_config.h), parsed with tomlc17
 type, default, the HALO_* environment variable that overrides it and the
 comment written into a new file. The file is read once, on the first
 question; unknown keys and values of the wrong type are reported in the log
-and the defaults used instead, and the file itself is never rewritten once
-it exists, so that the player's edits and comments stay.
+and the defaults used instead. A setting the player has not set is written
+commented out at its default ("# vsync = true", CONFIG_DEFAULTS_NOTE), so
+that a newer default reaches it; otherwise the file only gains the settings
+it lacks (config_add_missing) and the lines config_write sets, so that the
+player's edits and comments stay.
 */
 
 #include "platform.h"
@@ -168,6 +171,84 @@ static const struct config_setting config_settings[] =
 		"maps' sound environments, as the Xbox's I3DL2 reverb did); false keeps\n"
 		"them dry." },
 
+#ifdef HALO_VR
+	/* the VR build's (configure.py --vr; vr.c) */
+	{ "vr.enabled", _config_boolean, "true", "HALO_VR", _environment_value, _platform_desktop,
+		"Play in the VR headset (OpenXR); false plays flat, in the window." },
+	{ "vr.resolution_scale", _config_real, "1.0", "HALO_VR_RESOLUTION_SCALE", _environment_value, _platform_desktop,
+		"The eyes' images, as a multiple of the size the headset recommends\n"
+		"(0.25 to 2): smaller is faster, larger sharper." },
+	{ "vr.refresh_rate", _config_real, "90.0", "HALO_VR_REFRESH_RATE", _environment_value, _platform_desktop,
+		"The headset's refresh rate to ask for, in Hz (the game draws a frame for\n"
+		"each refresh); 0 leaves the runtime's." },
+	{ "vr.aim", _config_string, "\"controller\"", "HALO_VR_AIM", _environment_value, _platform_desktop,
+		"What aims: \"controller\" the right controller, which holds the weapon\n"
+		"(the reticle shows where it points), \"head\" the head (the reticle in\n"
+		"the middle of the view, the weapon before the eyes), \"gamepad\" a\n"
+		"gamepad, as on the flat screen (the stick turns the view, and the head\n"
+		"looks about from it: vr.gamepad_view)." },
+	{ "vr.gamepad_view", _config_string, "\"camera\"", "HALO_VR_GAMEPAD_VIEW", _environment_value,
+		_platform_desktop,
+		"With vr.aim = \"gamepad\", how the stick moves the view: \"camera\" turns\n"
+		"and pitches it, as the flat screen's camera (the reticle in the middle\n"
+		"with your head straight; the most like the Xbox game, and the most\n"
+		"likely to make you sick), \"level\" turns it smoothly but never pitches\n"
+		"it (the stick's pitch moves the reticle), \"snap\" turns it a step of\n"
+		"vr.snap_turn_angle each time the aim is that far from it." },
+	{ "vr.weapon_offset", _config_string, "\"0.15, -0.22, 0.30\"", "HALO_VR_WEAPON_OFFSET", _environment_value,
+		_platform_desktop,
+		"With vr.aim = \"controller\" and vr.hands = \"game\", where the weapon's\n"
+		"grip is from the eye it is drawn for, in metres: \"right, up, forward\"." },
+	{ "vr.depth", _config_boolean, "false", "HALO_VR_DEPTH", _environment_value, _platform_desktop,
+		"Give the runtime the eyes' depth too, for its reprojection (SteamVR on\n"
+		"the Steam Frame cannot take it yet)." },
+	{ "vr.melee_gesture", _config_boolean, "true", "HALO_VR_MELEE_GESTURE", _environment_value, _platform_desktop,
+		"A punch with the right controller (fast, where it points) melees, as B does." },
+	{ "vr.two_handed", _config_boolean, "true", "HALO_VR_TWO_HANDED", _environment_value, _platform_desktop,
+		"With vr.aim = \"controller\", a long gun (not a pistol or the needler)\n"
+		"is aimed with both hands while the left grip holds it by the foregrip:\n"
+		"along the line from the right hand to the left." },
+	{ "vr.hands", _config_string, "\"arms\"", "HALO_VR_HANDS", _environment_value, _platform_desktop,
+		"With vr.aim = \"controller\", the first-person hands: each where its\n"
+		"controller is (the left on a long gun's foregrip while it holds it),\n"
+		"with \"arms\" the arms reaching them from the shoulders (vr.shoulders),\n"
+		"with \"floating\" no arms; \"game\" the game's arms, posed from the\n"
+		"weapon in the right hand." },
+	{ "vr.shoulders", _config_string, "\"0.19, -0.20, -0.07\"", "HALO_VR_SHOULDERS", _environment_value,
+		_platform_desktop,
+		"With vr.hands = \"arms\", where each shoulder is from your eyes, in\n"
+		"metres: \"out to its side, up, forward\" (turned with your body)." },
+	{ "vr.vehicle_view", _config_string, "\"first_person\"", "HALO_VR_VEHICLE_VIEW", _environment_value, _platform_desktop,
+		"The view in a vehicle's seat: \"first_person\" from your head where you\n"
+		"sit, level with the horizon; \"third_person\" the game's camera following\n"
+		"the vehicle." },
+	{ "vr.turn", _config_string, "\"snap\"", "HALO_VR_TURN", _environment_value, _platform_desktop,
+		"How the right stick turns: \"snap\" in steps (vr.snap_turn_angle),\n"
+		"\"smooth\" continuously (vr.smooth_turn_speed); with vr.aim = \"gamepad\",\n"
+		"vr.gamepad_view instead." },
+	{ "vr.snap_turn_angle", _config_real, "30.0", "HALO_VR_SNAP_TURN_ANGLE", _environment_value, _platform_desktop,
+		"Degrees of each snap turn." },
+	{ "vr.smooth_turn_speed", _config_real, "150.0", "HALO_VR_SMOOTH_TURN_SPEED", _environment_value, _platform_desktop,
+		"Degrees a second of smooth turning, the stick pushed all the way." },
+	{ "vr.height", _config_string, "\"seated\"", "HALO_VR_HEIGHT", _environment_value, _platform_desktop,
+		"\"seated\": the head where it is when recentred (both grips, or a\n"
+		"gamepad's Back, held) is the player's eye. \"standing\": the head\n"
+		"vr.player_height above the floor is." },
+	{ "vr.player_height", _config_real, "1.65", "HALO_VR_PLAYER_HEIGHT", _environment_value, _platform_desktop,
+		"Standing, the height of your eyes in metres." },
+	{ "vr.world_scale", _config_real, "1.0", "HALO_VR_WORLD_SCALE", _environment_value, _platform_desktop,
+		"How large the world looks: more than 1 makes it larger (and your\n"
+		"movements and eyes smaller in it)." },
+	{ "vr.hud_distance", _config_real, "2.0", "HALO_VR_HUD_DISTANCE", _environment_value, _platform_desktop,
+		"How far in front of your eyes the HUD is, in metres." },
+	{ "vr.hud_size", _config_real, "60.0", "HALO_VR_HUD_SIZE", _environment_value, _platform_desktop,
+		"How wide the HUD is, in degrees of your view (20 to 120)." },
+	{ "vr.menu_distance", _config_real, "2.5", "HALO_VR_MENU_DISTANCE", _environment_value, _platform_desktop,
+		"How far in front of you the menus are, in metres." },
+	{ "vr.menu_width", _config_real, "2.6", "HALO_VR_MENU_WIDTH", _environment_value, _platform_desktop,
+		"How wide the menus are, in metres." },
+
+#endif
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
@@ -398,7 +479,8 @@ static const struct config_setting config_settings[] =
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
-		"up and down; empty for none." },
+		"up and down; \"pad\" turns, looks, fires, throws, holds Back and walks in\n"
+		"turn, logging each (the VR mode's vr.aim = \"gamepad\"); empty for none." },
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
@@ -406,6 +488,36 @@ static const struct config_setting config_settings[] =
 		"Quit this many seconds after the window opens; 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
 		"Keep the window hidden (and never fullscreen)." },
+#ifdef HALO_VR
+	{ "debug.vr_force_render", _config_boolean, "false", "HALO_VR_FORCE_RENDER", _environment_value, _platform_desktop,
+		"Draw the VR frames while the runtime says not to (the headset not\n"
+		"worn), to measure them." },
+	{ "debug.vr_gpu_time", _config_boolean, "false", "HALO_VR_GPU_TIME", _environment_value, _platform_desktop,
+		"With gpu_stats, also log the GPU's time for each VR frame (waiting for\n"
+		"it each frame, which costs the overlap of the GPU and the game)." },
+	{ "debug.vr_test_turn", _config_real, "0.0", "HALO_VR_TEST_TURN", _environment_value, _platform_desktop,
+		"Turn the VR player this many degrees a second, as the right stick would\n"
+		"(automated tests without hands); 0 none." },
+	{ "debug.vr_test_jitter", _config_real, "0.0", "HALO_VR_TEST_JITTER", _environment_value, _platform_desktop,
+		"Move the VR head by up to this many millimetres (and turn it as many\n"
+		"hundredths of a degree) at random each frame, as a worn headset moves:\n"
+		"for automated tests of what flickers when the view barely moves; 0 none." },
+	{ "debug.vr_test_head", _config_string, "\"\"", "HALO_VR_TEST_HEAD", _environment_value, _platform_desktop,
+		"Hold the VR head still and level where it is first, for automated tests\n"
+		"(a simulated headset's wobbles): \"0\", or \"<degrees> <seconds>\" turns it\n"
+		"left and right by as many degrees over as many seconds; empty none." },
+	{ "debug.vr_test_hands", _config_string, "\"\"", "HALO_VR_TEST_HANDS", _environment_value, _platform_desktop,
+		"Hold the VR controllers still, for automated tests without hands:\n"
+		"\"lx ly lz lyaw lpitch lroll, rx ry rz ryaw rpitch rroll[, grip[, buttons\n"
+		"[, trigger[, head]]]]\", the left and right hands in metres right, up and\n"
+		"forward from the recentred head and degrees of yaw (left), pitch (up)\n"
+		"and roll (right), the left grip's pull (0 to 1), the buttons pressed\n"
+		"for the pose's first 20 frames (A 1, B 2, X 4, Y 8, the right trigger\n"
+		"65536, the left 131072), the right trigger's pull (0 to 1) and the\n"
+		"head turned (degrees left); poses separated by ';' are held 288 frames\n"
+		"each in turn.\n"
+		"Empty: the controllers' own." },
+#endif
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
@@ -545,6 +657,31 @@ static int config_write_file(const char *path, const char *text)
 #endif
 }
 
+/* in the file's head: a setting the player has not set is written
+commented out at its default, so that a newer version's default reaches it
+(config_append_setting); a file without this note was written by an older
+version, which wrote them as values (config_migrate) */
+#define CONFIG_DEFAULTS_MARK "is at its default"
+#define CONFIG_DEFAULTS_NOTE \
+	"# A setting commented out (\"# key = value\") " CONFIG_DEFAULTS_MARK ", which a\n" \
+	"# newer version may change: take the \"# \" out to keep a value of your own.\n"
+
+/* the defaults the older versions wrote into the file as values, which a
+file without CONFIG_DEFAULTS_NOTE has though the player never chose them:
+there, they become the setting's commented default (config_migrate) */
+static const struct
+{
+	const char *name;
+	const char *old_default;
+} config_old_defaults[] =
+{
+#ifdef HALO_VR
+	/* (before "arms" was the default) */
+	{ "vr.hands", "\"floating\"" },
+#endif
+	{ NULL, NULL },
+};
+
 struct config_text
 {
 	char *buffer;
@@ -583,7 +720,7 @@ static char *config_copy(const char *text, size_t length)
 }
 
 /* one setting as the file holds it: its comment, and its key at the
-default */
+default, commented out (CONFIG_DEFAULTS_NOTE) */
 static void config_append_setting(struct config_text *text, const struct config_setting *setting)
 {
 	const char *dot = strchr(setting->name, '.');
@@ -617,7 +754,7 @@ static void config_append_setting(struct config_text *text, const struct config_
 	}
 	config_append(text, buffer);
 #endif
-	snprintf(buffer, sizeof(buffer), "%s = %s\n", dot + 1, setting->default_value);
+	snprintf(buffer, sizeof(buffer), "# %s = %s\n", dot + 1, setting->default_value);
 	config_append(text, buffer);
 }
 
@@ -642,6 +779,7 @@ static char *config_default_text(void)
 		"# it to go back to them. Each setting can also be set for one run with\n"
 		"# the environment variable named with it, which wins over this file.\n");
 #endif
+	config_append(&text, "#\n" CONFIG_DEFAULTS_NOTE);
 	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
 	{
 		const struct config_setting *setting = &config_settings[index];
@@ -660,6 +798,70 @@ static char *config_default_text(void)
 		config_append_setting(&text, setting);
 	}
 	return text.buffer;
+}
+
+static int config_line_key(const char *line, const char *end, const char *key, int commented);
+static int config_line_section(const char *line, const char *end, char *section, size_t size);
+static const char *config_find_line(const char *text, const char *section, const char *key, int commented);
+static char *config_set_line(const char *text, const char *section, const char *key, const char *line_text);
+static long config_setting_index(const char *name);
+
+/* a file an older version wrote (without CONFIG_DEFAULTS_NOTE): the note
+added to its head, and the defaults it wrote as values that have changed
+since (config_old_defaults: strings) commented out at today's default.
+Returns the new text, or NULL if the file has the note */
+static char *config_migrate(const char *text, toml_datum_t table)
+{
+	struct config_text out = { NULL, 0, 0 };
+	const char *head_end = strstr(text, "\n\n");
+	char *result;
+	size_t index;
+
+	if (strstr(text, CONFIG_DEFAULTS_MARK))
+		return NULL;
+	/* (at the end of the head's comment: before its first blank line) */
+	if (text[0] == '#' && head_end)
+	{
+		char *head = config_copy(text, (size_t)(head_end + 1 - text));
+
+		if (head)
+			config_append(&out, head);
+		free(head);
+		config_append(&out, "#\n" CONFIG_DEFAULTS_NOTE);
+		config_append(&out, head_end + 1);
+	}
+	else
+	{
+		config_append(&out, CONFIG_DEFAULTS_NOTE "\n");
+		config_append(&out, text);
+	}
+	result = out.buffer;
+	for (index = 0; result && config_old_defaults[index].name; index++)
+	{
+		const char *name = config_old_defaults[index].name;
+		const char *old = config_old_defaults[index].old_default;
+		const char *dot = strchr(name, '.');
+		long setting = config_setting_index(name);
+		toml_datum_t datum = toml_seek(table, name);
+		size_t length = strlen(old);
+		char section[64], line_text[300];
+		char *updated;
+
+		/* (a string's: without its quotes) */
+		if (setting < 0 || !dot || datum.type != TOML_STRING || length < 2 || strlen(datum.u.s) != length - 2 ||
+			strncmp(datum.u.s, old + 1, length - 2))
+			continue;
+		snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
+		snprintf(line_text, sizeof(line_text), "# %s = %s\n", dot + 1, config_settings[setting].default_value);
+		updated = config_set_line(result, section, dot + 1, line_text);
+		if (!updated)
+			continue;
+		free(result);
+		result = updated;
+		platform_log("settings: %s = %s was an older version's default: now this version's, %s", name, old,
+			config_settings[setting].default_value);
+	}
+	return result;
 }
 
 /* the settings of this build that text (the file, parsed as table) lacks,
@@ -683,6 +885,10 @@ static char *config_add_missing(const char *text, toml_datum_t table)
 		const char *insert = NULL;
 
 		if (!(setting->platforms & CONFIG_PLATFORM) || !dot || toml_seek(table, setting->name).type != TOML_UNKNOWN)
+			continue;
+		/* (a commented default is the setting, at its default) */
+		snprintf(header, sizeof(header), "%.*s", (int)(dot - setting->name), setting->name);
+		if (config_find_line(current, header, dot + 1, 1))
 			continue;
 		snprintf(header, sizeof(header), "[%.*s]", (int)(dot - setting->name), setting->name);
 		/* the end of the section's last line that is not blank */
@@ -736,7 +942,7 @@ static char *config_add_missing(const char *text, toml_datum_t table)
 		{
 			free(result);
 			result = updated.buffer;
-			platform_log("settings: added %s (new in this version) at its default", setting->name);
+			platform_log("settings: added %s (new in this version), commented out at its default", setting->name);
 		}
 	}
 	return result;
@@ -899,7 +1105,15 @@ static void config_load(void)
 	if (text)
 	{
 		toml_result_t result = toml_parse(text, (int)size);
+		char *migrated = result.ok ? config_migrate(text, result.toptab) : NULL;
 
+		if (migrated)
+		{
+			toml_free(result);
+			free(text);
+			text = migrated;
+			result = toml_parse(text, (int)strlen(text));
+		}
 		if (result.ok)
 		{
 			char *completed;
@@ -909,7 +1123,7 @@ static void config_load(void)
 			config_report_unknown_keys(result.toptab);
 			platform_log("settings: %s", path);
 			completed = config_add_missing(text, result.toptab);
-			if (completed && !config_write_file(path, completed))
+			if ((completed || migrated) && !config_write_file(path, completed ? completed : text))
 				platform_log("settings: cannot write %s", path);
 			free(completed);
 		}
@@ -976,13 +1190,22 @@ static const struct config_value *config_value(const char *name, enum config_typ
 
 /* ---------- writing a setting */
 
-/* the line's key, if it is "key = ..." (after spaces), in key */
-static int config_line_key(const char *line, const char *end, const char *key)
+/* the line's key, if it is "key = ..." (after spaces), or (commented) a
+commented default "# key = ..." (CONFIG_DEFAULTS_NOTE) */
+static int config_line_key(const char *line, const char *end, const char *key, int commented)
 {
 	size_t length = strlen(key);
 
 	while (line < end && (*line == ' ' || *line == '\t'))
 		line++;
+	if (commented)
+	{
+		if (line >= end || *line != '#')
+			return 0;
+		line++;
+		while (line < end && (*line == ' ' || *line == '\t'))
+			line++;
+	}
 	if ((size_t)(end - line) <= length || strncmp(line, key, length) != 0)
 		return 0;
 	line += length;
@@ -1008,19 +1231,101 @@ static int config_line_section(const char *line, const char *end, char *section,
 	return 1;
 }
 
+/* the key's line in the section of text (commented: its commented
+default's), or NULL */
+static const char *config_find_line(const char *text, const char *section, const char *key, int commented)
+{
+	char current[64] = "";
+	int in_section = 0;
+	const char *line;
+
+	for (line = text; *line;)
+	{
+		const char *end = line + strcspn(line, "\n");
+
+		if (config_line_section(line, end, current, sizeof(current)))
+			in_section = !strcmp(current, section);
+		else if (in_section && config_line_key(line, end, key, commented))
+			return line;
+		line = *end ? end + 1 : end;
+	}
+	return NULL;
+}
+
+/* text with line_text (a line, its new line included) for the key in the
+section: in place of the key's line, else of its commented default, else
+at the end of the section (or of the file, in a new section); the rest kept
+as it is. NULL if out of memory */
+static char *config_set_line(const char *text, const char *section, const char *key, const char *line_text)
+{
+	const char *found = config_find_line(text, section, key, 0);
+	struct config_text out = { NULL, 0, 0 };
+	char current[64] = "";
+	const char *line;
+	int written = 0, in_section = 0;
+
+	if (!found)
+		found = config_find_line(text, section, key, 1);
+	for (line = text; *line;)
+	{
+		const char *end = line + strcspn(line, "\n");
+		const char *next = *end ? end + 1 : end;
+
+		if (config_line_section(line, end, current, sizeof(current)))
+		{
+			/* (leaving the section without the key: it goes at its end) */
+			if (in_section && !written)
+			{
+				config_append(&out, line_text);
+				written = 1;
+			}
+			in_section = !strcmp(current, section);
+		}
+		else if (line == found)
+		{
+			config_append(&out, line_text);
+			written = 1;
+			line = next;
+			continue;
+		}
+		{
+			char *copy = config_copy(line, (size_t)(next - line));
+
+			if (copy)
+			{
+				config_append(&out, copy);
+				free(copy);
+			}
+		}
+		line = next;
+	}
+	if (!written)
+	{
+		if (out.length && out.buffer[out.length - 1] != '\n')
+			config_append(&out, "\n");
+		if (!in_section)
+		{
+			char header[80];
+
+			snprintf(header, sizeof(header), "\n[%s]\n", section);
+			config_append(&out, header);
+		}
+		config_append(&out, line_text);
+	}
+	return out.buffer;
+}
+
 /* sets a setting, for now and in config.toml, from its value as text
-("true", "60", "1.5", "all"): its line there is changed (or added), the rest
-of the file kept as it is */
+("true", "60", "1.5", "all"): its line there is changed (or its commented
+default, or added), the rest of the file kept as it is */
 int config_write(const char *name, const char *value)
 {
 	const char *dot = strchr(name, '.');
 	long index = config_setting_index(name);
-	char section[64], key[64], wanted[80], current[64] = "", line_text[600], path[1024];
-	struct config_text out = { 0 };
+	char section[64], key[64], line_text[600], path[1024];
 	size_t size = 0;
-	char *text;
-	const char *line;
-	int written = 0, in_section = 0, succeeded;
+	char *text, *updated;
+	int succeeded;
 
 	if (index < 0 || !dot || (size_t)(dot - name) >= sizeof(section) || strlen(value) > 256)
 		return 0;
@@ -1060,59 +1365,13 @@ int config_write(const char *name, const char *value)
 		break;
 	}
 	}
-	snprintf(wanted, sizeof(wanted), "%s", section);
 	config_path(path, sizeof(path));
 	text = config_read_file(path, &size);
-	for (line = text ? text : ""; *line;)
-	{
-		const char *end = line + strcspn(line, "\n");
-		const char *next = *end ? end + 1 : end;
-
-		if (config_line_section(line, end, current, sizeof(current)))
-		{
-			/* (leaving the section without the key: it goes at its end) */
-			if (in_section && !written)
-			{
-				config_append(&out, line_text);
-				written = 1;
-			}
-			in_section = !strcmp(current, wanted);
-		}
-		else if (in_section && !written && config_line_key(line, end, key))
-		{
-			config_append(&out, line_text);
-			written = 1;
-			line = next;
-			continue;
-		}
-		{
-			char *copy = config_copy(line, (size_t)(next - line));
-
-			if (copy)
-			{
-				config_append(&out, copy);
-				free(copy);
-			}
-		}
-		line = next;
-	}
-	if (!written)
-	{
-		if (out.length && out.buffer[out.length - 1] != '\n')
-			config_append(&out, "\n");
-		if (!in_section)
-		{
-			char header[80];
-
-			snprintf(header, sizeof(header), "\n[%s]\n", section);
-			config_append(&out, header);
-		}
-		config_append(&out, line_text);
-	}
-	succeeded = out.buffer && config_write_file(path, out.buffer);
+	updated = config_set_line(text ? text : "", section, key, line_text);
+	succeeded = updated && config_write_file(path, updated);
 	config_change_count++;
 	pthread_mutex_unlock(&config_lock);
-	free(out.buffer);
+	free(updated);
 	free(text);
 	return succeeded;
 }

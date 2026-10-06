@@ -333,8 +333,6 @@ static const char shader_prologue[] =
 	/* the #version line comes first, from the context's capabilities */
 	"precision highp float;\n"
 	"precision highp int;\n"
-#else
-	"#version 450 core\n"
 #endif
 	"uniform vec4 c[192];\n"
 	"uniform vec4 viewport_scale;\n"
@@ -384,14 +382,38 @@ static const char shader_prologue[] =
 	"}\n";
 
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
+	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting, int multiview)
 {
 	struct xgpu_text text = { 0 };
 	unsigned long index;
-
 #ifdef HALO_GLES
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+#else
+	xgpu_text_append(&text, "#version 450 core\n");
 #endif
+	if (multiview == XGPU_MULTIVIEW_EYES)
+	{
+		/* both eyes in one draw: each eye's clip position is a fixed
+		transform of the centre view's, for the projection the game has set
+		(d3d8_gl.c, halo_vr_set_eye_transforms) */
+		xgpu_text_append(&text,
+			"#extension GL_OVR_multiview2 : require\n"
+			"layout(num_views = 2) in;\n"
+			"#define VIEW gl_ViewID_OVR\n");
+	}
+	else if (multiview == XGPU_MULTIVIEW_LEFT_EYE)
+	{
+		/* the left eye's alone (a visibility test, the crosshairs) */
+		xgpu_text_append(&text, "#define VIEW 0\n");
+	}
+	else if (multiview == XGPU_MULTIVIEW_RIGHT_EYE)
+	{
+		/* the right eye's alone (the crosshairs) */
+		xgpu_text_append(&text, "#define VIEW 1\n");
+	}
+	if (multiview)
+		xgpu_text_append(&text, "uniform mat4 eye_correction[2];\nuniform vec4 screen_correction[2];\n"
+			"uniform float screen_points;\n");
 	xgpu_text_append(&text, "%s", shader_prologue);
 	/* (the pixel shader's model_lighting; the normal's length in w) */
 	if (lighting)
@@ -530,19 +552,35 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 			break;
 	}
 
+	if (multiview)
+	{
+		/* a draw that went through clip space (the world's) moves to each
+		eye; one drawn in screen space (the HUD's, full-screen passes) is the
+		same in both */
+		/* (a point the game projected itself is drawn in screen space,
+		whether or not the program divides by w) */
+		xgpu_text_append(&text, "\tif (screen_points != 0.0)\n\t\tclip_captured = false;\n");
+		xgpu_text_append(&text, "\tif (clip_captured)\n\t\tclip_position = eye_correction[VIEW] * clip_position;\n");
+		/* except where the game projected a point itself (lens flares,
+		sprites: vr_render_screen_point), which moves to each eye in the
+		screen by a scale and offset; else none */
+		xgpu_text_append(&text, "\telse\n\t\toPos.xy = oPos.xy * screen_correction[VIEW].xy + "
+			"screen_correction[VIEW].zw * oPos.w;\n");
+	}
 	xgpu_text_append(&text,
 		"\t/* undo the screen-space conversion done with c[-38] and c[-37] */\n"
 		"\tvec3 scale = vec3(viewport_scale.x != 0.0 ? viewport_scale.x : 1.0,\n"
 		"\t\tviewport_scale.y != 0.0 ? viewport_scale.y : 1.0,\n"
-		"\t\tviewport_scale.z != 0.0 ? viewport_scale.z : 1.0);\n"
-		/* Direct3D 8 puts pixel centres on integer screen coordinates (the
-		game offsets its screen-space quads by -0.5 to match), OpenGL on
-		half-integers */
-		/* The conversion is screen = clip * c[-38] * rcc(w) + c[-37]; undoing
-		it by multiplying by w again is lossy near the camera plane, where
-		rcc clamps and 1/w rounds differently on each GPU (Mali put vertices
-		of the first-person weapon at the vanishing point). Where the clip
-		position was kept, the same result is computed without dividing. */
+		"\t\tviewport_scale.z != 0.0 ? viewport_scale.z : 1.0);\n");
+	/* Direct3D 8 puts pixel centres on integer screen coordinates (the
+	game offsets its screen-space quads by -0.5 to match), OpenGL on
+	half-integers */
+	/* The conversion is screen = clip * c[-38] * rcc(w) + c[-37]; undoing it
+	by multiplying by w again is lossy near the camera plane, where rcc clamps
+	and 1/w rounds differently on each GPU (Mali put vertices of the
+	first-person weapon at the vanishing point). Where the clip position was
+	kept, the same result is computed without dividing. */
+	xgpu_text_append(&text,
 		"\tvec4 position;\n"
 		"\tif (clip_captured)\n"
 		"\t\tposition = vec4((clip_position.xyz * c[%d].xyz + (c[%d].xyz + vec3(0.5 + screen_offset, 0.5, 0.0)\n"
@@ -564,7 +602,16 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		which the clipper also takes. */
 		"\tif (!(abs(position.w) > 0.0))\n"
 		"\t\tposition = vec4(0.0, 0.0, 0.0, -1.0);\n"
-		"\tgl_Position = position;\n"
+		"\tgl_Position = position;\n",
+		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37);
+	if (multiview)
+	{
+		/* the eyes' images have their first row at the bottom (OpenXR's GL
+		images), the game's targets at the top: the eye pass draws upside
+		down (d3d8_gl.c, vr_flip_rows) */
+		xgpu_text_append(&text, "\tgl_Position.y = -gl_Position.y;\n");
+	}
+	xgpu_text_append(&text,
 #ifdef HALO_GLES
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
 		GL: rows from the top, depth 0..1 */
@@ -581,8 +628,6 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT2 = oT2;\n"
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
-		"}\n",
-		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
-		);
+		"}\n");
 	return text.buffer;
 }

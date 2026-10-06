@@ -89,7 +89,7 @@ parser.add_argument(
     "--vr",
     action="store_true",
     help="the VR mode (OpenXR) in `ninja linux_arm64`, with the desktop OpenGL renderer; "
-    "refer to port/linux/VR.md",
+    "refer to \"VR\" in port/linux/README.md",
 )
 args = parser.parse_args()
 

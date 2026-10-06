@@ -264,6 +264,15 @@ void render_sky(
 				}
 			}
 
+#ifdef HALO_VR
+			{
+				/* the VR mode's eyes see the sky at infinity
+				(port/linux/game/vr_render.c) */
+				extern void vr_render_sky(boolean sky);
+
+				vr_render_sky(TRUE);
+			}
+#endif
 			rasterizer_models_begin(TRUE);
 			csmemset(&render_model_lighting, 0, sizeof(render_model_lighting));
 			render_model_lighting.ambient_color = *global_real_rgb_white;
@@ -282,6 +291,13 @@ void render_sky(
 				0,
 				TRUE);
 			rasterizer_models_end();
+#ifdef HALO_VR
+			{
+				extern void vr_render_sky(boolean sky);
+
+				vr_render_sky(FALSE);
+			}
+#endif
 		}
 	}
 

@@ -23,6 +23,9 @@ Conventions carried over from the Xbox:
 
 #include "xgpu.h"
 #include "sdl_platform.h"
+#ifdef HALO_VR
+#include <SDL3/SDL.h>
+#endif
 #include "halo_ui_pointer.h"
 #include "port_config.h"
 
@@ -167,6 +170,10 @@ static int anti_aliasing(void)
 	return anti_aliasing_values[anti_aliasing_value].mode;
 }
 
+#ifdef HALO_VR
+static BOOL vr_screen_mode(long *width, float scale[2]);
+#endif
+
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
@@ -186,6 +193,12 @@ static void screen_mode_choose(long *width, float scale[2])
 #else
 	long display_width, display_height;
 
+#ifdef HALO_VR
+	/* the menus' 640x480, at the scale of the HUD's image (each VR pass sets
+	its own: halo_vr_pass) */
+	if (vr_screen_mode(width, scale))
+		return;
+#endif
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
 	if (platform_screen_mode(&display_width, &display_height) && display_width > 0 && display_height > 0)
@@ -315,14 +328,17 @@ struct vertex_shader_object
 	struct vertex_element elements[XGPU_VERTEX_ATTRIBUTE_COUNT];
 	unsigned long element_count;
 	unsigned long packed_mask;
-	/* [0] streams per the declaration, [1] immediate mode (all floats) */
-	GLuint shader[2];
+	/* [0] streams per the declaration, [1] immediate mode (all floats); [2]
+	and [3] the same drawing both of the VR mode's eyes (multiview), [4] and
+	[5] its left eye alone, [6] and [7] its right eye alone (xgpu.h,
+	XGPU_MULTIVIEW_*) */
+	GLuint shader[8];
 	/* one of the game's model lighting programs (halo_vertex_shader_lighting),
 	whose draws can be lit for each pixel (display.per_pixel_lighting): where
 	its lighting's normal and position are (lighting.lights is 0 for the
 	others), and its shaders that hand them on, as shader[] */
 	struct nv2a_vertex_lighting lighting;
-	GLuint lit_shader[2];
+	GLuint lit_shader[8];
 	/* a shader lit for each pixel failed to compile or link: lit as the
 	vertex shader lights it from then on */
 	BOOL lighting_failed;
@@ -332,6 +348,9 @@ struct vertex_shader_object
 	struct vertex_array_entry *vertex_array;
 	unsigned long vertex_array_streams;
 #endif
+	/* the program projects through clip space (its multiview variant moves
+	it to each eye), as opposed to drawing in screen space */
+	BOOL projects;
 };
 
 /* ---------- programs */
@@ -383,6 +402,13 @@ struct program_entry
 	constants_serial at their last upload */
 	GLint model_lights;
 	unsigned long long model_lights_serial;
+	/* the VR mode's multiview programs: their eye transforms (and those of
+	their points in screen space), and vr_gl.eye_serial when they were last
+	set */
+	GLint eye_correction;
+	GLint screen_correction;
+	GLint screen_points;
+	unsigned long eye_serial;
 
 	/* the vertex constants c[0..constant_count) the program uses; with
 	consecutive locations, a changed range is uploaded by itself */
@@ -434,6 +460,8 @@ struct framebuffer_entry
 	GLuint depth;
 	/* color and depth are multisampled renderbuffers, not textures */
 	BOOL renderbuffers;
+	/* the layers it attaches (framebuffer_views) */
+	int views;
 	GLuint framebuffer;
 };
 
@@ -460,6 +488,13 @@ the unsynchronized write the ring allows (host_gl_buffer_write). */
 #define INDEX_BUFFER_SIZE (8 * 1024 * 1024)
 #endif
 #define VISIBILITY_TEST_SLOTS 4096
+/* the visibility tests counted by the pixel shaders (atomic counters), not
+by queries: on ES, and in the VR mode, whose eye pass is a multiview pass,
+where a query counts in as many slots as views in Vulkan, which Zink does
+not allow for (the GPU writes past them, faulting) */
+#if defined(HALO_GLES) || defined(HALO_VR)
+#define XGPU_SAMPLE_COUNTERS
+#endif
 #ifdef HALO_GLES
 #define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
 #define VISIBILITY_ALL_SAMPLES 1000000
@@ -531,7 +566,7 @@ struct gl_device
 	lights makes hundreds of tests. */
 	GLuint visibility_known[VISIBILITY_TEST_SLOTS];
 	BOOL visibility_unread[VISIBILITY_TEST_SLOTS];
-#ifdef HALO_GLES
+#ifdef XGPU_SAMPLE_COUNTERS
 	/* with atomic counters: one counter per test, used as a ring */
 	GLuint visibility_counters;
 	unsigned long counter_next;
@@ -550,7 +585,8 @@ struct gl_device
 	unsigned long ring_test_count[STREAM_BUFFER_RING];
 	GLuint counter_values[VISIBILITY_TEST_SLOTS];
 	GLuint visibility_latest[VISIBILITY_TEST_SLOTS];
-#else
+#endif
+#ifndef HALO_GLES
 	/* each test's latest result, which the GPU writes (as a query buffer)
 	when the test's draws are done: the game waits for results at the start
 	of the next frame, and a query would stop the CPU there until the GPU
@@ -572,6 +608,106 @@ struct gl_device
 };
 
 static struct gl_device device;
+
+#ifdef HALO_GLES
+#define SAMPLE_COUNTING xgpu_capabilities.atomic_counters
+#elif defined(XGPU_SAMPLE_COUNTERS)
+/* the VR mode's (vr_gl_initialize) */
+static BOOL sample_counting;
+#define SAMPLE_COUNTING sample_counting
+#endif
+
+/* ---------- the VR mode (HALO_VR; vr.h, vr.c)
+
+A VR frame is drawn in two passes. The eye pass draws the 3D view once, from
+the centre of the head with the union of the eyes' fields of view, into both
+eyes at once: the screen's render targets are 2-layer texture arrays drawn
+into with GL_OVR_multiview2, the back buffer being the OpenXR swapchain's
+image itself, and each vertex the game projected through clip space moves to
+its eye by the transform halo_vr_set_eye_transforms gives for the current
+projection. The HUD pass draws the HUD, the menus and everything else into
+the quad layer's image, over transparent black. The game draws both in its
+640x480 screen, each at its image's scale. */
+
+#ifdef HALO_VR
+#include "vr.h"
+#include "vr_host.h"
+
+#ifndef GL_DEPTH_CLAMP
+#define GL_DEPTH_CLAMP 0x864F
+#endif
+
+static struct
+{
+	BOOL ready;
+	int pass;
+	int eye_width, eye_height;
+	int hud_width, hud_height;
+	/* the back buffer in the eye pass: the swapchain's image (the HUD pass
+	draws into a target of its own, copied into the HUD's image at the
+	present) */
+	struct render_target_entry eye_target;
+	BOOL eyes_drawn, hud_drawn;
+	/* row-major (vr.h), and the screen's points' (vr.h); the serial counts
+	their changes */
+	float eye_transforms[2][16];
+	float screen_corrections[2][4];
+	BOOL screen_points;
+	unsigned long eye_serial;
+	/* the bound framebuffer draws both eyes (bind_targets), or one eye's
+	layer alone: in the eye pass, a visibility test is drawn into the left
+	eye's (XGPU_MULTIVIEW_LEFT_EYE), and what halo_vr_draw_eye asks for into
+	that eye's (the crosshairs: each eye's screen correction applied in a
+	draw of its own; in a multiview draw, on spark's NVIDIA driver, the
+	right eye's came out moved by the left eye's correction and then its
+	own) */
+	BOOL multiview;
+	BOOL left_eye;
+	BOOL right_eye;
+	BOOL visibility_test;
+	int eye_alone;
+	/* debug.gpu_stats: where a frame's time goes (vr_timing) */
+	BOOL depth_failed;
+	BOOL statistics;
+	Uint64 marks[4];
+	double spans[3];
+	unsigned long timed;
+	/* debug.vr_gpu_time: the GPU's time for each frame */
+	BOOL gpu_time;
+	double gpu_milliseconds, gpu_worst;
+	unsigned long gpu_frames;
+} vr_gl;
+
+/* the frame's marks: the last present's end (then the game updates, and
+waits for the runtime's frame), the eye pass begun, the HUD pass begun
+after it, the present */
+static void vr_timing(int mark)
+{
+	if (!vr_gl.statistics)
+		return;
+	vr_gl.marks[mark] = SDL_GetTicksNS();
+	if (mark == 3 && vr_gl.marks[0] && vr_gl.marks[1] > vr_gl.marks[0] && vr_gl.marks[2] > vr_gl.marks[1])
+	{
+		vr_gl.spans[0] += (double)(vr_gl.marks[1] - vr_gl.marks[0]) * 1e-6;
+		vr_gl.spans[1] += (double)(vr_gl.marks[2] - vr_gl.marks[1]) * 1e-6;
+		vr_gl.spans[2] += (double)(vr_gl.marks[3] - vr_gl.marks[2]) * 1e-6;
+		if (++vr_gl.timed == 300)
+		{
+			platform_log("vr: a frame's draws: %.2f ms before the eyes, %.2f ms the eyes, %.2f ms the HUD and present",
+				vr_gl.spans[0] / vr_gl.timed, vr_gl.spans[1] / vr_gl.timed, vr_gl.spans[2] / vr_gl.timed);
+			if (vr_gl.gpu_frames)
+			{
+				platform_log("vr: the GPU's time a frame: %.2f ms, worst %.2f ms (%dx%d eyes)",
+					vr_gl.gpu_milliseconds / vr_gl.gpu_frames, vr_gl.gpu_worst, vr_gl.eye_width, vr_gl.eye_height);
+			}
+			vr_gl.gpu_milliseconds = vr_gl.gpu_worst = 0.0;
+			vr_gl.gpu_frames = 0;
+			memset(vr_gl.spans, 0, sizeof(vr_gl.spans));
+			vr_gl.timed = 0;
+		}
+	}
+}
+#endif
 
 /* debug.gpu_stats prints these once a second */
 static struct
@@ -707,9 +843,9 @@ static struct
 	GLenum front_face, cull_mode, polygon_mode;
 	float polygon_offset[2];
 	GLenum active_texture;
-	/* per unit: the GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP and GL_TEXTURE_3D
+	/* per unit: the GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_3D and GL_TEXTURE_2D_ARRAY
 	bindings */
-	GLuint textures[D3DTSS_MAXSTAGES][3];
+	GLuint textures[D3DTSS_MAXSTAGES][4];
 	GLuint samplers[D3DTSS_MAXSTAGES];
 	GLuint array_buffer;
 	GLuint element_array_buffer;
@@ -763,7 +899,7 @@ static void state_framebuffer(GLuint framebuffer)
 /* gl_state.textures' slot of a target */
 static int texture_slot(GLenum target)
 {
-	return target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : 0;
+	return target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : target == GL_TEXTURE_2D_ARRAY ? 3 : 0;
 }
 
 #ifdef HALO_GLES
@@ -1169,6 +1305,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	long screen;
 	BOOL depth;
 
+	int layers = 1;
+
 	if (!surface || !surface->Data)
 		return NULL;
 	float scale[2] = { 1.0f, 1.0f };
@@ -1192,6 +1330,16 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
+#ifdef HALO_VR
+		/* in the eye pass the back buffer is the eyes' swapchain image, and
+		the screen's other targets have a layer for each eye */
+		if (vr_gl.pass == HALO_VR_PASS_EYES)
+		{
+			if (!depth && surface->Data == device.back_buffer.Data)
+				return &vr_gl.eye_target;
+			layers = 2;
+		}
+#endif
 	}
 	else if (!depth && surface_is_shadow_map(surface))
 	{
@@ -1202,7 +1350,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	{
 		if (entry->target.data == surface->Data && entry->target.width == width &&
 			entry->target.height == height && entry->target.depth == depth &&
-			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1] &&
+			entry->target.layers == layers)
 		{
 			return render_target_remember(surface, screen, entry);
 		}
@@ -1216,7 +1365,23 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[1] = scale[1];
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
+	entry->target.layers = layers;
 	glGenTextures(1, &entry->target.texture);
+#ifdef HALO_VR
+	if (layers > 1)
+	{
+		glBindTexture(GL_TEXTURE_2D_ARRAY, entry->target.texture);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
+		if (depth)
+			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH24_STENCIL8, (GLsizei)entry->target.gl_width,
+				(GLsizei)entry->target.gl_height, layers, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+		else
+			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, (GLsizei)entry->target.gl_width,
+				(GLsizei)entry->target.gl_height, layers, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+	}
+	else
+#endif
+	{
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	if (depth)
@@ -1225,6 +1390,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	else
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+	}
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
@@ -1238,13 +1404,28 @@ struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
 {
 	struct render_target_entry *entry, *best = NULL;
 
+#ifdef HALO_VR
+	if (vr_gl.pass == HALO_VR_PASS_EYES && data == device.back_buffer.Data)
+		return &vr_gl.eye_target.target;
+#endif
 	for (entry = *render_target_bucket(data); entry; entry = entry->next_in_bucket)
 	{
-		if (entry->target.data == data && !entry->target.depth && (!best || entry->last_rendered > best->last_rendered))
+		/* (in a VR pass, the targets of its own pass) */
+		if (entry->target.data == data && !entry->target.depth && (!best || entry->last_rendered > best->last_rendered)
+#ifdef HALO_VR
+			&& (vr_gl.pass == HALO_VR_PASS_NONE || entry->target.width != (unsigned long)halo_screen_width() ||
+				entry->target.height != SCREEN_HEIGHT ||
+				(entry->target.layers > 1) == (vr_gl.pass == HALO_VR_PASS_EYES))
+#endif
+			)
 			best = entry;
 	}
 	return best ? &best->target : NULL;
 }
+
+/* the layers the next framebuffer_find attaches: 1, 2 (multiview), or -1
+or -2 for the first or second layer of 2-layer textures alone */
+static int framebuffer_views = 1;
 
 /* the framebuffer of these textures, or with renderbuffers, of these
 multisampled renderbuffers (render_target_multisample) */
@@ -1257,7 +1438,8 @@ static GLuint framebuffer_find(GLuint color, GLuint depth, BOOL renderbuffers)
 	the draw before it did) */
 	for (link = &framebuffers; (entry = *link) != NULL; link = &entry->next)
 	{
-		if (entry->color == color && entry->depth == depth && entry->renderbuffers == renderbuffers)
+		if (entry->color == color && entry->depth == depth && entry->renderbuffers == renderbuffers &&
+			entry->views == framebuffer_views)
 		{
 			*link = entry->next;
 			entry->next = framebuffers;
@@ -1269,6 +1451,7 @@ static GLuint framebuffer_find(GLuint color, GLuint depth, BOOL renderbuffers)
 	entry->color = color;
 	entry->depth = depth;
 	entry->renderbuffers = renderbuffers;
+	entry->views = framebuffer_views;
 	glGenFramebuffers(1, &entry->framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, entry->framebuffer);
 	if (renderbuffers)
@@ -1278,6 +1461,24 @@ static GLuint framebuffer_find(GLuint color, GLuint depth, BOOL renderbuffers)
 		if (depth)
 			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depth);
 	}
+#ifdef HALO_VR
+	else if (framebuffer_views > 1)
+	{
+		/* both eyes' layers, each draw drawing into both */
+		if (color)
+			glFramebufferTextureMultiviewOVR(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color, 0, 0, framebuffer_views);
+		if (depth)
+			glFramebufferTextureMultiviewOVR(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depth, 0, 0, framebuffer_views);
+	}
+	else if (framebuffer_views < 0)
+	{
+		/* one eye's layer */
+		if (color)
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color, 0, -framebuffer_views - 1);
+		if (depth)
+			glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depth, 0, -framebuffer_views - 1);
+	}
+#endif
 	else
 	{
 		if (color)
@@ -1393,6 +1594,20 @@ static unsigned long render_target_write_serial;
 
 /* the pixels per unit of the bound targets (render_target_get) */
 static float target_scale[2] = { 1.0f, 1.0f };
+#ifdef HALO_VR
+/* the bound targets' rows: the eye pass draws upside down (vr_flip_rows) */
+static unsigned long target_height;
+
+/* The eye pass draws upside down (its vertex shaders flip y, nv2a_vsh.c),
+as OpenXR's GL images have their first row at the bottom where the game's
+targets have it at the top: the rows of its rectangles count from the
+other end, and its layered targets are sampled upside down (nv2a_psh.c). */
+static void vr_flip_rows(GLint *y, GLint height)
+{
+	if (vr_gl.multiview || vr_gl.left_eye || vr_gl.right_eye)
+		*y = (GLint)target_height - *y - height;
+}
+#endif
 
 /* the pixel edge of a coordinate in a target's units, at its scale:
 floorf's, without its call (on 32-bit x86 it saves and restores the FPU's
@@ -1417,11 +1632,20 @@ static GLint target_pixel(float coordinate, int axis)
 
 /* binds the framebuffer for the current targets; returns FALSE if there is
 nothing to draw into */
+#ifdef HALO_VR
+static void vr_frame_resume(void);
+#endif
+
 static BOOL bind_targets(BOOL *has_depth)
 {
-	struct render_target_entry *color = render_target_get(device.render_target);
-	struct render_target_entry *depth = render_target_get(device.depth_stencil);
+	struct render_target_entry *color, *depth;
 	int samples;
+
+#ifdef HALO_VR
+	vr_frame_resume();
+#endif
+	color = render_target_get(device.render_target);
+	depth = render_target_get(device.depth_stencil);
 
 	if (depth && !depth->target.depth)
 		depth = NULL;
@@ -1435,6 +1659,23 @@ static BOOL bind_targets(BOOL *has_depth)
 	/* viewports and clears are in the targets' units (render_target_get) */
 	target_scale[0] = color ? color->target.scale[0] : depth->target.scale[0];
 	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
+#ifdef HALO_VR
+	framebuffer_views = color ? color->target.layers : depth->target.layers;
+	if (color && depth && color->target.layers != depth->target.layers)
+		depth = NULL;
+	vr_gl.left_eye = framebuffer_views > 1 && (vr_gl.visibility_test || vr_gl.eye_alone == 0);
+	vr_gl.right_eye = framebuffer_views > 1 && !vr_gl.left_eye && vr_gl.eye_alone == 1;
+	if (vr_gl.left_eye)
+		framebuffer_views = -1;
+	if (vr_gl.right_eye)
+		framebuffer_views = -2;
+	vr_gl.multiview = framebuffer_views > 1;
+	if (vr_gl.multiview || vr_gl.left_eye || vr_gl.right_eye)
+		vr_gl.eyes_drawn = TRUE;
+	if (vr_gl.pass == HALO_VR_PASS_HUD && color && color->target.data == device.back_buffer.Data)
+		vr_gl.hud_drawn = TRUE;
+	target_height = color ? color->target.gl_height : depth->target.gl_height;
+#endif
 	/* with multisampling, multisampled where either is a screen buffer or
 	is multisampled already */
 	samples = anti_aliasing() == _anti_aliasing_msaa ? anti_aliasing_samples : 0;
@@ -1443,6 +1684,12 @@ static BOOL bind_targets(BOOL *has_depth)
 	{
 		samples = 0;
 	}
+#ifdef HALO_VR
+	/* (not in the VR mode's passes: the eyes' targets have a layer for each
+	eye, and the HUD is a layer of its own) */
+	if (vr_gl.pass != HALO_VR_PASS_NONE)
+		samples = 0;
+#endif
 	if (color)
 		render_target_multisample(&color->target, samples);
 	if (depth)
@@ -1462,11 +1709,42 @@ static BOOL bind_targets(BOOL *has_depth)
 		state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
 		target_samples = 1;
 	}
+#ifdef HALO_VR
+	framebuffer_views = 1;
+#endif
 	*has_depth = depth != NULL;
 	return TRUE;
 }
 
 /* ---------- device creation */
+
+#ifdef XGPU_SAMPLE_COUNTERS
+/* the visibility tests' counters and their snapshots (with
+SAMPLE_COUNTING) */
+static void sample_counters_create(void)
+{
+	int ring;
+
+	if (!SAMPLE_COUNTING || device.visibility_counters)
+		return;
+	glGenBuffers(1, &device.visibility_counters);
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, device.visibility_counters);
+	glBufferData(GL_ATOMIC_COUNTER_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+	glGenBuffers(STREAM_BUFFER_RING, device.counter_snapshots);
+	for (ring = 0; ring < STREAM_BUFFER_RING; ring++)
+	{
+		glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[ring]);
+		glBufferData(GL_COPY_WRITE_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_STREAM_READ);
+	}
+	glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+	xgpu_gl_state_invalidate();
+}
+#endif
+
+#ifdef HALO_VR
+static void vr_gl_initialize(void);
+#endif
 
 static void gl_initialize(void)
 {
@@ -1571,22 +1849,7 @@ static void gl_initialize(void)
 	}
 #endif
 #ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters)
-	{
-		int ring;
-
-		glGenBuffers(1, &device.visibility_counters);
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, device.visibility_counters);
-		glBufferData(GL_ATOMIC_COUNTER_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-		glGenBuffers(STREAM_BUFFER_RING, device.counter_snapshots);
-		for (ring = 0; ring < STREAM_BUFFER_RING; ring++)
-		{
-			glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[ring]);
-			glBufferData(GL_COPY_WRITE_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_STREAM_READ);
-		}
-		glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-	}
+	sample_counters_create();
 #endif
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
@@ -1607,6 +1870,9 @@ static void gl_initialize(void)
 		if (renderbuffer_size < maximum_target_size)
 			maximum_target_size = renderbuffer_size;
 	}
+#ifdef HALO_VR
+	vr_gl_initialize();
+#endif
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
 	if (anti_aliasing_value < 0)
@@ -1852,6 +2118,9 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 
 	platform_menus_set_active(menus_active != 0);
 	platform_ui_pointer_set_active(menus_active != 0);
+#ifdef HALO_VR
+	halo_vr_menus(menus_active != 0);
+#endif
 	if (!menus_active || !device.gl_ready || !platform_ui_pointer_read(&state))
 		return 0;
 	memset(pointer, 0, sizeof(*pointer));
@@ -2044,8 +2313,19 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		return;
 	/* the query object is chosen when the test ends; use a scratch one */
 	device.visibility_test_active = TRUE;
-#ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters)
+#ifdef HALO_VR
+	vr_gl.visibility_test = vr_gl.pass == HALO_VR_PASS_EYES && !SAMPLE_COUNTING;
+	if (vr_gl.visibility_test)
+	{
+		BOOL has_depth;
+
+		/* the query begins with the left eye's layer bound, outside any
+		multiview pass (xgpu.h, XGPU_MULTIVIEW_LEFT_EYE) */
+		bind_targets(&has_depth);
+	}
+#endif
+#ifdef XGPU_SAMPLE_COUNTERS
+	if (SAMPLE_COUNTING)
 	{
 		const GLuint zero = 0;
 
@@ -2068,11 +2348,14 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	if (!device.gl_ready || !device.visibility_test_active)
 		return S_OK;
 	device.visibility_test_active = FALSE;
+#ifdef HALO_VR
+	vr_gl.visibility_test = FALSE;
+#endif
 	index %= VISIBILITY_TEST_SLOTS;
 	if (!index)
 		index = 1;
-#ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters)
+#ifdef XGPU_SAMPLE_COUNTERS
+	if (SAMPLE_COUNTING)
 	{
 		unsigned long *count = &device.ring_test_count[device.buffer_ring];
 
@@ -2085,6 +2368,11 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 			(*count)++;
 		}
 		device.query_pending[index] = TRUE;
+#ifdef HALO_VR
+		/* (a count of the game's pixels, as below: drawn into both eyes,
+		the test counts each pixel twice) */
+		device.query_area[index] = target_scale[0] * target_scale[1] * (vr_gl.multiview ? 2.0f : 1.0f);
+#endif
 		return S_OK;
 	}
 #endif
@@ -2139,12 +2427,16 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			*result = 0;
 		return S_OK;
 	}
-#ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters)
+#ifdef XGPU_SAMPLE_COUNTERS
+	if (SAMPLE_COUNTING)
 	{
 		/* the latest count the GPU has finished (counter_snapshots) */
 		if (result)
+#ifdef HALO_VR
+			*result = visibility_unscaled(device.visibility_latest[index], index);
+#else
 			*result = device.visibility_latest[index];
+#endif
 		return S_OK;
 	}
 #endif
@@ -2525,18 +2817,21 @@ static unsigned long hash_words(const void *data, unsigned long size)
 }
 
 /* lit: the shader that hands the lighting's normal and position on
-(vertex_shader_object lit_shader) */
-static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immediate, BOOL lit)
+(vertex_shader_object lit_shader); multiview: XGPU_MULTIVIEW_*, the VR
+mode's eyes */
+static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immediate, BOOL lit, int multiview)
 {
-	int variant = immediate ? 1 : 0;
+	int variant = (immediate ? 1 : 0) + multiview * 2;
 	GLuint *shader = lit ? &program->lit_shader[variant] : &program->shader[variant];
 
 	if (!*shader)
 	{
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
-			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
+			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL, multiview);
 
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
+		if (multiview)
+			program->projects = strstr(source, "clip_captured = true") != NULL;
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -2686,6 +2981,10 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->texture_lod_bias = glGetUniformLocation(entry->program, "texture_lod_bias");
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
+	entry->eye_correction = glGetUniformLocation(entry->program, "eye_correction");
+	entry->screen_correction = glGetUniformLocation(entry->program, "screen_correction");
+	entry->screen_points = glGetUniformLocation(entry->program, "screen_points");
+	entry->eye_serial = (unsigned long)-1;
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		char name[8];
@@ -2736,6 +3035,8 @@ static struct
 	GLuint sampler;
 } sampler_cache[SAMPLER_CACHE_SIZE];
 static unsigned long sampler_cache_count;
+/* the VR mode samples sRGB images without decoding them (vr_gl_initialize) */
+static BOOL samplers_skip_srgb_decode;
 
 /* a sampler's parameters from its state (configure_sampler's inputs) */
 static void sampler_parameters(GLuint sampler, const DWORD *inputs)
@@ -2777,6 +3078,8 @@ static void sampler_parameters(GLuint sampler, const DWORD *inputs)
 	color_to_vec4(inputs[9], border);
 	glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, border);
 #endif
+	if (samplers_skip_srgb_decode)
+		glSamplerParameteri(sampler, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
 }
 
 /* the sampler object of a sampler state, made the first time; with the
@@ -3017,10 +3320,15 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 					texture_scale[stage][1] = 1.0f / (float)target->height;
 				}
 				if (!description.linear && !description.cube_map && description.levels > 1 &&
-					target->width == description.width && target->height == description.height)
+					target->width == description.width && target->height == description.height &&
+					target->layers == 1)
 					gl_texture = mip_composite_get(&description, texture->Data);
 				else
 					description.levels = 1;
+#ifdef HALO_VR
+				if (target->layers > 1)
+					gl_target = GL_TEXTURE_2D_ARRAY;
+#endif
 			}
 			else
 			{
@@ -3043,7 +3351,8 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 				key->point_threshold = description.hires_point_threshold != FALSE;
 			}
 			key->sampler_type[stage] = gl_target == GL_TEXTURE_CUBE_MAP ? _xgpu_sampler_cube :
-				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
+				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d :
+				gl_target == GL_TEXTURE_2D_ARRAY ? _xgpu_sampler_2d_layered : _xgpu_sampler_2d;
 		}
 	}
 #ifdef HALO_GLES
@@ -3113,6 +3422,9 @@ static void apply_raster_state(BOOL has_depth)
 	viewport[1] = target_pixel((float)device.viewport.Y, 1);
 	viewport[2] = target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - viewport[0];
 	viewport[3] = target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - viewport[1];
+#ifdef HALO_VR
+	vr_flip_rows(&viewport[1], viewport[3]);
+#endif
 	if (memcmp(gl_state.viewport, viewport, sizeof(viewport)))
 	{
 		memcpy(gl_state.viewport, viewport, sizeof(viewport));
@@ -3231,6 +3543,11 @@ static void apply_raster_state(BOOL has_depth)
 		GLenum front_face = rs[D3DRS_FRONTFACE] == D3DFRONT_CCW ? GL_CW : GL_CCW;
 #else
 		GLenum front_face = rs[D3DRS_FRONTFACE] == D3DFRONT_CCW ? GL_CCW : GL_CW;
+#endif
+#ifdef HALO_VR
+		/* (as does the eye pass's) */
+		if (vr_gl.multiview || vr_gl.left_eye || vr_gl.right_eye)
+			front_face = front_face == GL_CW ? GL_CCW : GL_CW;
 #endif
 		GLenum cull_mode = rs[D3DRS_CULLMODE] == rs[D3DRS_FRONTFACE] ? GL_FRONT : GL_BACK;
 
@@ -3430,15 +3747,18 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #endif
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
-#ifdef HALO_GLES
-	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
+#ifdef XGPU_SAMPLE_COUNTERS
+	key.count_samples = device.visibility_test_active && SAMPLE_COUNTING;
 #endif
-
+#ifdef HALO_VR
+	key.multiview = vr_gl.multiview ? XGPU_MULTIVIEW_EYES : vr_gl.left_eye ? XGPU_MULTIVIEW_LEFT_EYE :
+		vr_gl.right_eye ? XGPU_MULTIVIEW_RIGHT_EYE : XGPU_MULTIVIEW_NONE;
+#endif
 	entry = NULL;
 	if (program->lighting.lights && !program->lighting_failed && per_pixel_lighting())
 	{
 		key.per_pixel_lighting = (unsigned char)program->lighting.lights;
-		entry = program_get(vertex_shader_get(program, immediate, TRUE), fragment_shader_get(&key));
+		entry = program_get(vertex_shader_get(program, immediate, TRUE, key.multiview), fragment_shader_get(&key));
 		if (!entry)
 		{
 			/* drawn as the vertex shader lights it instead (not at all,
@@ -3450,7 +3770,26 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		}
 	}
 	if (!entry)
-		entry = program_get(vertex_shader_get(program, immediate, FALSE), fragment_shader_get(&key));
+		entry = program_get(vertex_shader_get(program, immediate, FALSE, key.multiview), fragment_shader_get(&key));
+#ifdef HALO_VR
+	if (vr_gl.multiview && vr_gl.statistics && !program->projects)
+	{
+		/* debug.gpu_stats: the eye pass's draws in screen space, the same in
+		both eyes (each program once, and the game's function that drew) */
+		static unsigned long reported[64];
+		static int reported_count;
+		int index;
+
+		for (index = 0; index < reported_count && reported[index] != program->id; index++)
+			;
+		if (index == reported_count && reported_count < 64)
+		{
+			reported[reported_count++] = program->id;
+			platform_log("vr: screen-space draw in the eye pass: vertex shader %lu, drawn from %p", program->id,
+				__builtin_return_address(1));
+		}
+	}
+#endif
 	if (!entry)
 	{
 		stats.skipped_link++;
@@ -3464,10 +3803,23 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.draws++;
 	draw_flush();
 	state_program(entry->program);
-#ifdef HALO_GLES
+#ifdef XGPU_SAMPLE_COUNTERS
 	if (key.count_samples)
 		glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, device.visibility_counters,
 			(GLintptr)(device.counter_active * sizeof(GLuint)), sizeof(GLuint));
+#endif
+#ifdef HALO_VR
+	if ((entry->eye_correction >= 0 || entry->screen_correction >= 0) && entry->eye_serial != vr_gl.eye_serial)
+	{
+		/* (a program that never projects has no eye_correction) */
+		if (entry->eye_correction >= 0)
+			glUniformMatrix4fv(entry->eye_correction, 2, GL_TRUE, &vr_gl.eye_transforms[0][0]);
+		if (entry->screen_correction >= 0)
+			glUniform4fv(entry->screen_correction, 2, &vr_gl.screen_corrections[0][0]);
+		if (entry->screen_points >= 0)
+			glUniform1f(entry->screen_points, vr_gl.screen_points ? 1.0f : 0.0f);
+		entry->eye_serial = vr_gl.eye_serial;
+	}
 #endif
 
 	if (entry->constants >= 0 && entry->constants_serial != constants_serial)
@@ -4573,10 +4925,13 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 		keeps a split-screen window's clear from wiping the other window */
 		GLint x0 = target_pixel((float)device.viewport.X, 0);
 		GLint y0 = target_pixel((float)device.viewport.Y, 1);
+		GLint height = target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0;
 
+#ifdef HALO_VR
+		vr_flip_rows(&y0, height);
+#endif
 		glEnable(GL_SCISSOR_TEST);
-		glScissor(x0, y0, target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0,
-			target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0);
+		glScissor(x0, y0, target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0, height);
 		glClear(mask);
 		glDisable(GL_SCISSOR_TEST);
 		xgpu_gl_state_invalidate();
@@ -4597,8 +4952,14 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 			continue;
 		x0 = target_pixel((float)(left + UI_OFFSET), 0);
 		y0 = target_pixel((float)top, 1);
-		glScissor(x0, y0, target_pixel((float)(right + UI_OFFSET), 0) - x0,
-			target_pixel((float)bottom, 1) - y0);
+		{
+			GLint height = target_pixel((float)bottom, 1) - y0;
+
+#ifdef HALO_VR
+			vr_flip_rows(&y0, height);
+#endif
+			glScissor(x0, y0, target_pixel((float)(right + UI_OFFSET), 0) - x0, height);
+		}
 		glClear(mask);
 	}
 	glDisable(GL_SCISSOR_TEST);
@@ -4636,61 +4997,574 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
-static void write_screenshot(struct render_target_entry *target)
+/* writes BGRA pixels as a BMP named <name><frame>.bmp in the screenshot
+folder: rows from the top (as the game's targets hold them), or from the
+bottom (as the VR mode's eye images do) */
+static void write_bmp(const char *name, const unsigned char *pixels, unsigned long width, unsigned long height,
+	BOOL bottom_up)
 {
-	const char *directory = *config_string("debug.screenshot_directory") ?
-		config_string("debug.screenshot_directory") : NULL;
-	unsigned long width = target->target.gl_width, height = target->target.gl_height;
-	unsigned char *pixels;
-	char path[512];
-	FILE *file;
-	unsigned long row;
+	const char *directory = config_string("debug.screenshot_directory");
 	unsigned char header[54] = { 'B', 'M' };
 	unsigned long image_size = width * height * 4;
+	unsigned long row;
+	char path[512];
+	FILE *file;
 
-	if (!directory)
+	snprintf(path, sizeof(path), "%s/%s%05lu.bmp", directory, name, device.frame);
+	file = fopen(path, "wb");
+	if (!file)
 		return;
-	pixels = malloc(image_size);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+	*(unsigned int *)(header + 2) = (unsigned int)(54 + image_size);
+	*(unsigned int *)(header + 10) = 54;
+	*(unsigned int *)(header + 14) = 40;
+	*(int *)(header + 18) = (int)width;
+	*(int *)(header + 22) = bottom_up ? (int)height : -(int)height;
+	*(unsigned short *)(header + 26) = 1;
+	*(unsigned short *)(header + 28) = 32;
+	*(unsigned int *)(header + 34) = (unsigned int)image_size;
+	fwrite(header, 1, sizeof(header), file);
+	for (row = 0; row < height; row++)
+		fwrite(pixels + row * width * 4, 1, width * 4, file);
+	fclose(file);
+}
+
+/* the target's pixels, read into a malloc'd BGRA buffer; layer is the
+array layer of a layered target */
+static unsigned char *read_target(GLuint texture, int layer, unsigned long width, unsigned long height)
+{
+	unsigned char *pixels = malloc(width * height * 4);
+	unsigned long index;
+
+	if (layer < 0)
+	{
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(texture, 0));
+	}
+	else
+	{
+#ifdef HALO_VR
+		static GLuint framebuffer;
+
+		if (!framebuffer)
+			glGenFramebuffers(1, &framebuffer);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+		glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture, 0, layer);
+#endif
+	}
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+	xgpu_gl_state_invalidate();
+#ifdef HALO_GLES
+	for (index = 0; index < width * height; index++)
+	{
+		unsigned char red = pixels[index * 4];
+
+		pixels[index * 4] = pixels[index * 4 + 2];
+		pixels[index * 4 + 2] = red;
+	}
+#else
+	(void)index;
+#endif
+	return pixels;
+}
+
+static void write_screenshot(struct render_target_entry *target)
+{
+	unsigned long width = target->target.gl_width, height = target->target.gl_height;
+	unsigned char *pixels;
+	unsigned long index;
+
+	if (!*config_string("debug.screenshot_directory"))
+		return;
+	pixels = read_target(target->target.texture, -1, width, height);
 	/* the display ignores destination alpha, which the game uses as scratch;
 	image viewers would show it as transparency */
-	for (row = 0; row < width * height; row++)
-	{
-#ifdef HALO_GLES
-		unsigned char red = pixels[row * 4];
-
-		pixels[row * 4] = pixels[row * 4 + 2];
-		pixels[row * 4 + 2] = red;
-#endif
-		pixels[row * 4 + 3] = 0xff;
-	}
-	snprintf(path, sizeof(path), "%s/frame%05lu.bmp", directory, device.frame);
-	file = fopen(path, "wb");
-	if (file)
-	{
-		*(unsigned int *)(header + 2) = (unsigned int)(54 + image_size);
-		*(unsigned int *)(header + 10) = 54;
-		*(unsigned int *)(header + 14) = 40;
-		*(int *)(header + 18) = (int)width;
-		*(int *)(header + 22) = -(int)height; /* rows from the top, as read */
-		*(unsigned short *)(header + 26) = 1;
-		*(unsigned short *)(header + 28) = 32;
-		*(unsigned int *)(header + 34) = (unsigned int)image_size;
-		fwrite(header, 1, sizeof(header), file);
-		for (row = 0; row < height; row++)
-			fwrite(pixels + row * width * 4, 1, width * 4, file);
-		fclose(file);
-	}
+	for (index = 0; index < width * height; index++)
+		pixels[index * 4 + 3] = 0xff;
+	write_bmp("frame", pixels, width, height, FALSE);
 	free(pixels);
 }
+
+#ifdef HALO_VR
+/* ---------- the VR mode's passes */
+
+#define GL_TEXTURE_SRGB_DECODE_EXT 0x8A48
+#define GL_SKIP_DECODE_EXT 0x8A4A
+
+int host_gl_has_extension(const char *name);
+
+static void vr_gl_initialize(void)
+{
+	int stage;
+
+	if (!halo_vr_enabled())
+		return;
+	if (!host_gl_has_extension("GL_OVR_multiview2") || !glFramebufferTextureMultiviewOVR)
+	{
+		platform_log("vr: the driver has no GL_OVR_multiview2; playing flat");
+		return;
+	}
+	if (!halo_vr_initialize())
+		return;
+	halo_vr_eye_size(&vr_gl.eye_width, &vr_gl.eye_height);
+	halo_vr_hud_size(&vr_gl.hud_width, &vr_gl.hud_height);
+	vr_gl.statistics = config_boolean("debug.gpu_stats");
+	vr_gl.gpu_time = vr_gl.statistics && config_boolean("debug.vr_gpu_time");
+	/* the eyes' images are sRGB (the only colour formats SteamVR offers),
+	holding the game's values as they are: sampling them must not decode
+	them, and the samplers override the textures' own setting */
+	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
+		glSamplerParameteri(device.samplers[stage], GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
+	samplers_skip_srgb_decode = TRUE;
+	for (stage = 0; stage < SAMPLER_CACHE_SIZE; stage++)
+	{
+		if (sampler_cache[stage].sampler)
+			glSamplerParameteri(sampler_cache[stage].sampler, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
+	}
+	vr_gl.eye_target.target.width = 640;
+	vr_gl.eye_target.target.height = SCREEN_HEIGHT;
+	vr_gl.eye_target.target.scale[0] = (float)vr_gl.eye_width / 640.0f;
+	vr_gl.eye_target.target.scale[1] = (float)vr_gl.eye_height / (float)SCREEN_HEIGHT;
+	vr_gl.eye_target.target.gl_width = (unsigned long)vr_gl.eye_width;
+	vr_gl.eye_target.target.gl_height = (unsigned long)vr_gl.eye_height;
+	vr_gl.eye_target.target.layers = 2;
+	memset(vr_gl.eye_transforms, 0, sizeof(vr_gl.eye_transforms));
+	for (stage = 0; stage < 4; stage++)
+	{
+		vr_gl.eye_transforms[0][stage * 5] = 1.0f;
+		vr_gl.eye_transforms[1][stage * 5] = 1.0f;
+	}
+	vr_gl.screen_corrections[0][0] = vr_gl.screen_corrections[0][1] = 1.0f;
+	vr_gl.screen_corrections[1][0] = vr_gl.screen_corrections[1][1] = 1.0f;
+	vr_gl.eye_alone = -1;
+	{
+		GLint counters = 0;
+
+		/* the eye pass's visibility tests are counted by the pixel shaders
+		(XGPU_SAMPLE_COUNTERS) */
+		glGetIntegerv(GL_MAX_FRAGMENT_ATOMIC_COUNTERS, &counters);
+		SAMPLE_COUNTING = counters > 0;
+		sample_counters_create();
+		if (!SAMPLE_COUNTING)
+			platform_log("vr: no atomic counters: the visibility tests are drawn in the left eye alone");
+	}
+	vr_gl.ready = TRUE;
+	/* the screen becomes the menus' 640x480 at the HUD's scale (the device
+	is still being made: halo_screen_commit would leave its surfaces) */
+	halo_screen_commit();
+	device.presentation.BackBufferWidth = 640;
+	d3d8_surface_resize(&device.back_buffer, D3DFMT_LIN_A8R8G8B8, 640, SCREEN_HEIGHT);
+	d3d8_surface_resize(&device.depth_buffer, D3DFMT_LIN_D24S8, 640, SCREEN_HEIGHT);
+	if (halo_vr_frame_active())
+		halo_vr_pass(HALO_VR_PASS_HUD);
+}
+
+static BOOL vr_screen_mode(long *width, float scale[2])
+{
+	if (!vr_gl.ready)
+		return FALSE;
+	*width = 640;
+	scale[0] = (float)vr_gl.hud_width / 640.0f;
+	scale[1] = (float)vr_gl.hud_height / (float)SCREEN_HEIGHT;
+	return TRUE;
+}
+
+void halo_vr_pass(int pass)
+{
+	if (!vr_gl.ready)
+		return;
+	if (pass != HALO_VR_PASS_NONE && !halo_vr_frame_active())
+		pass = HALO_VR_PASS_NONE;
+	if (pass == HALO_VR_PASS_EYES)
+	{
+		GLuint image = halo_vr_image(VR_SWAPCHAIN_EYES);
+
+		if (image)
+		{
+			if (vr_gl.eye_target.target.texture != image)
+			{
+				glBindTexture(GL_TEXTURE_2D_ARRAY, image);
+				glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
+			}
+			vr_gl.eye_target.target.data = device.back_buffer.Data;
+			vr_gl.eye_target.target.texture = image;
+			vr_gl.eye_target.last_rendered = device.frame + 1;
+			screen_scale[0] = vr_gl.eye_target.target.scale[0];
+			screen_scale[1] = vr_gl.eye_target.target.scale[1];
+		}
+		else
+		{
+			pass = HALO_VR_PASS_HUD;
+		}
+	}
+	if (pass != HALO_VR_PASS_EYES)
+	{
+		screen_scale[0] = (float)vr_gl.hud_width / 640.0f;
+		screen_scale[1] = (float)vr_gl.hud_height / (float)SCREEN_HEIGHT;
+	}
+	if (pass == HALO_VR_PASS_EYES)
+		vr_timing(1);
+	else if (pass == HALO_VR_PASS_HUD && vr_gl.pass == HALO_VR_PASS_EYES)
+		vr_timing(2);
+	vr_gl.pass = pass;
+	vr_gl.multiview = FALSE;
+	vr_gl.left_eye = FALSE;
+	vr_gl.right_eye = FALSE;
+	vr_gl.eye_alone = -1;
+	/* (depth clamping: the sky's alone, halo_vr_sky) */
+	glDisable(GL_DEPTH_CLAMP);
+	if (pass == HALO_VR_PASS_HUD && !vr_gl.hud_drawn)
+	{
+		/* the frame's HUD starts transparent */
+		struct render_target_entry *hud = render_target_get(&device.back_buffer);
+
+		if (hud)
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_get(hud->target.texture, 0));
+			glDisable(GL_SCISSOR_TEST);
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			hud->last_rendered = device.frame + 1;
+			vr_gl.hud_drawn = TRUE;
+		}
+	}
+	xgpu_gl_state_invalidate();
+}
+
+void halo_vr_set_eye_transforms(const float transforms[2][16])
+{
+	if (memcmp(vr_gl.eye_transforms, transforms, sizeof(vr_gl.eye_transforms)))
+	{
+		memcpy(vr_gl.eye_transforms, transforms, sizeof(vr_gl.eye_transforms));
+		vr_gl.eye_serial++;
+	}
+}
+
+/* The sky is drawn about the camera at a thousandth of its size, its far
+side near the far plane: in the eye pass (whose view and projection are the
+union of both eyes', and moved by the head) parts of it were clipped, some
+frames, leaving the clear colour where they belonged. Drawn without the
+depth test, it is drawn with depth clamping instead of the near and far
+planes' clipping. The rest of the eye pass is clipped as the flat screen
+is. */
+void halo_vr_sky(int sky)
+{
+	if (!vr_gl.ready)
+		return;
+	if (sky && vr_gl.pass == HALO_VR_PASS_EYES)
+		glEnable(GL_DEPTH_CLAMP);
+	else
+		glDisable(GL_DEPTH_CLAMP);
+}
+
+/* the draws from now on into that eye's layer alone (0 left, 1 right), or
+both (-1): the crosshairs, each eye's in a draw of its own */
+void halo_vr_draw_eye(int eye)
+{
+	vr_gl.eye_alone = eye;
+}
+
+void halo_vr_set_screen_corrections(const float corrections[2][4])
+{
+	static const float none[2][4] = { { 1.0f, 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f, 0.0f, 0.0f } };
+
+	if (memcmp(vr_gl.screen_corrections, corrections, sizeof(vr_gl.screen_corrections)))
+	{
+		memcpy(vr_gl.screen_corrections, corrections, sizeof(vr_gl.screen_corrections));
+		/* (identity: none of the game's points) */
+		vr_gl.screen_points = memcmp(corrections, none, sizeof(none)) != 0;
+		vr_gl.eye_serial++;
+	}
+}
+
+/* debug.screenshot_every in VR: both eyes side by side (eyes<frame>.bmp)
+and the HUD over grey (hud<frame>.bmp) */
+static void vr_write_screenshots(struct render_target_entry *hud)
+{
+	unsigned long width = (unsigned long)vr_gl.eye_width, height = (unsigned long)vr_gl.eye_height;
+	unsigned long row, index;
+
+	if (!*config_string("debug.screenshot_directory"))
+		return;
+	if (vr_gl.eyes_drawn && vr_gl.eye_target.target.texture)
+	{
+		unsigned char *left = read_target(vr_gl.eye_target.target.texture, 0, width, height);
+		unsigned char *right = read_target(vr_gl.eye_target.target.texture, 1, width, height);
+		unsigned char *both = malloc(width * 2 * height * 4);
+
+		for (row = 0; row < height; row++)
+		{
+			memcpy(both + row * width * 8, left + row * width * 4, width * 4);
+			memcpy(both + row * width * 8 + width * 4, right + row * width * 4, width * 4);
+		}
+		for (index = 0; index < width * 2 * height; index++)
+			both[index * 4 + 3] = 0xff;
+		write_bmp("eyes", both, width * 2, height, TRUE);
+		free(left);
+		free(right);
+		free(both);
+	}
+	if (vr_gl.hud_drawn && hud)
+	{
+		unsigned char *pixels = read_target(hud->target.texture, -1, hud->target.gl_width, hud->target.gl_height);
+
+		for (index = 0; index < hud->target.gl_width * hud->target.gl_height; index++)
+		{
+			unsigned char *pixel = pixels + index * 4;
+			int alpha = pixel[3], channel;
+
+			/* (as the compositor shows it: premultiplied, over grey) */
+			for (channel = 0; channel < 3; channel++)
+			{
+				int value = pixel[channel] + (255 - alpha) * 96 / 255;
+
+				pixel[channel] = (unsigned char)(value > 255 ? 255 : value);
+			}
+			pixel[3] = 0xff;
+		}
+		write_bmp("hud", pixels, hud->target.gl_width, hud->target.gl_height, FALSE);
+		free(pixels);
+	}
+}
+
+/* the HUD's (or the menus') target into its swapchain image, upside down
+for OpenXR's GL images. The game's draws leave the target's alpha as their
+scratch, not as coverage (the Xbox's display ignored it), and the layer
+would show nothing where it is 0: the target starts black, so a pixel's
+brightness is its coverage, and the copy makes that its alpha (the colour
+is then premultiplied, as the compositor's default blending expects).
+FALSE if the copy's program cannot be made. */
+static BOOL vr_copy_hud(struct render_target_entry *hud, GLuint image)
+{
+	static GLuint program;
+	static BOOL failed;
+	static GLint size_location;
+	static const char vertex_source[] =
+		"#version 450 core\n"
+		"void main()\n"
+		"{\n"
+		"	vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));\n"
+		"	gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
+		"}\n";
+	static const char fragment_source[] =
+		"#version 450 core\n"
+		"uniform sampler2D hud_texture;\n"
+		"uniform vec2 size;\n"
+		"out vec4 colour;\n"
+		"void main()\n"
+		"{\n"
+		/* (row 0 of the image is the target's last) */
+		"	vec4 c = texture(hud_texture, vec2(gl_FragCoord.x / size.x, 1.0 - gl_FragCoord.y / size.y));\n"
+		"	colour = vec4(c.rgb, max(c.r, max(c.g, c.b)));\n"
+		"}\n";
+
+	if (failed)
+		return FALSE;
+	if (!program)
+	{
+		GLuint vertex = xgpu_compile_shader(GL_VERTEX_SHADER, vertex_source, "VR HUD vertex");
+		GLuint fragment = xgpu_compile_shader(GL_FRAGMENT_SHADER, fragment_source, "VR HUD pixel");
+		GLint status = 0;
+
+		program = glCreateProgram();
+		glAttachShader(program, vertex);
+		glAttachShader(program, fragment);
+		glLinkProgram(program);
+		glGetProgramiv(program, GL_LINK_STATUS, &status);
+		if (!vertex || !fragment || !status)
+		{
+			platform_log("vr: cannot make the HUD copy's program; no HUD is shown");
+			failed = TRUE;
+			return FALSE;
+		}
+		glUseProgram(program);
+		glUniform1i(glGetUniformLocation(program, "hud_texture"), 0);
+		size_location = glGetUniformLocation(program, "size");
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_get(image, 0));
+	glViewport(0, 0, vr_gl.hud_width, vr_gl.hud_height);
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glUseProgram(program);
+	glUniform2f(size_location, (GLfloat)vr_gl.hud_width, (GLfloat)vr_gl.hud_height);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, hud->target.texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindSampler(0, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	return TRUE;
+}
+
+/* the eyes' depth into its swapchain (XR_KHR_composition_layer_depth),
+for the compositor's reprojection: the game's depth buffer has a stencil,
+which OpenXR's depth formats have not, so a full-screen draw copies it,
+both eyes at once */
+static void vr_copy_depth(void)
+{
+	static GLuint program;
+	static const char vertex_source[] =
+		"#version 450 core\n"
+		"#extension GL_OVR_multiview2 : require\n"
+		"layout(num_views = 2) in;\n"
+		"out vec2 uv;\n"
+		"void main()\n"
+		"{\n"
+		"	vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));\n"
+		/* (the upper-left clip origin: row 0 at the top) */
+		"	uv = vec2(p.x, 1.0 - p.y);\n"
+		"	gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);\n"
+		"}\n";
+	static const char fragment_source[] =
+		"#version 450 core\n"
+		"#extension GL_OVR_multiview2 : require\n"
+		"uniform sampler2DArray depth_texture;\n"
+		"in vec2 uv;\n"
+		"void main()\n"
+		"{\n"
+		"	gl_FragDepth = texture(depth_texture, vec3(uv, float(gl_ViewID_OVR))).r;\n"
+		"}\n";
+	struct render_target_entry *depth;
+	GLuint image;
+	int pass = vr_gl.pass;
+	float scale[2];
+
+	if (!vr_gl.eyes_drawn || !halo_vr_depth_wanted())
+		return;
+	scale[0] = screen_scale[0];
+	scale[1] = screen_scale[1];
+	vr_gl.pass = HALO_VR_PASS_EYES;
+	screen_scale[0] = vr_gl.eye_target.target.scale[0];
+	screen_scale[1] = vr_gl.eye_target.target.scale[1];
+	depth = render_target_get(&device.depth_buffer);
+	vr_gl.pass = pass;
+	screen_scale[0] = scale[0];
+	screen_scale[1] = scale[1];
+	if (!depth || depth->target.layers != 2 || !(image = halo_vr_image(VR_SWAPCHAIN_DEPTH)))
+		return;
+	if (!program)
+	{
+		GLuint vertex = xgpu_compile_shader(GL_VERTEX_SHADER, vertex_source, "VR depth vertex");
+		GLuint fragment = xgpu_compile_shader(GL_FRAGMENT_SHADER, fragment_source, "VR depth pixel");
+		GLint status = 0;
+
+		program = glCreateProgram();
+		glAttachShader(program, vertex);
+		glAttachShader(program, fragment);
+		glLinkProgram(program);
+		glGetProgramiv(program, GL_LINK_STATUS, &status);
+		if (!vertex || !fragment || !status)
+		{
+			platform_log("vr: cannot make the depth copy's program; no depth is submitted");
+			vr_gl.depth_failed = TRUE;
+		}
+		glUseProgram(program);
+		glUniform1i(glGetUniformLocation(program, "depth_texture"), 0);
+	}
+	if (vr_gl.depth_failed)
+		return;
+	framebuffer_views = 2;
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_get(0, image));
+	framebuffer_views = 1;
+	glViewport(0, 0, vr_gl.eye_width, vr_gl.eye_height);
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_BLEND);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_ALWAYS);
+	glDepthMask(GL_TRUE);
+	glDepthRange(0.0, 1.0);
+	glUseProgram(program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, depth->target.texture);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindSampler(0, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	xgpu_gl_state_invalidate();
+	halo_vr_depth_written();
+}
+
+/* presents a VR frame: the HUD copied into its image, upside down for
+OpenXR's GL images (the eyes were drawn so), and the frame ended */
+static void vr_present(BOOL screenshot)
+{
+	struct render_target_entry *hud = NULL;
+
+	vr_timing(3);
+	vr_copy_depth();
+	if (vr_gl.hud_drawn)
+	{
+		int pass = vr_gl.pass;
+
+		vr_gl.pass = HALO_VR_PASS_HUD;
+		screen_scale[0] = (float)vr_gl.hud_width / 640.0f;
+		screen_scale[1] = (float)vr_gl.hud_height / (float)SCREEN_HEIGHT;
+		hud = render_target_get(&device.back_buffer);
+		vr_gl.pass = pass;
+	}
+	if (screenshot)
+		vr_write_screenshots(hud);
+	if (hud)
+	{
+		GLuint image = halo_vr_image(VR_SWAPCHAIN_HUD);
+
+		if (!image || !vr_copy_hud(hud, image))
+			hud = NULL;
+	}
+	vr_gl.pass = HALO_VR_PASS_NONE;
+	vr_gl.multiview = FALSE;
+	vr_gl.left_eye = FALSE;
+	vr_gl.right_eye = FALSE;
+	vr_gl.eye_alone = -1;
+	xgpu_gl_state_invalidate();
+	/* (the GPU starts on the frame while the game updates: halo_vr_present) */
+	glFlush();
+	if (vr_gl.gpu_time)
+	{
+		/* debug.vr_gpu_time: the driver submits a frame's work at the flush
+		(Zink records it until then), so waiting for it to finish from here
+		times the GPU's work on the frame, at the cost of the overlap */
+		Uint64 start = SDL_GetTicksNS();
+		double milliseconds;
+
+		glFinish();
+		milliseconds = (double)(SDL_GetTicksNS() - start) * 1e-6;
+		vr_gl.gpu_milliseconds += milliseconds;
+		if (milliseconds > vr_gl.gpu_worst)
+			vr_gl.gpu_worst = milliseconds;
+		vr_gl.gpu_frames++;
+	}
+	halo_vr_present(vr_gl.eyes_drawn, hud != NULL);
+	vr_gl.eyes_drawn = FALSE;
+	vr_gl.hud_drawn = FALSE;
+	vr_timing(0);
+}
+
+/* the next frame begins when the game first draws (vr.c waits for it
+then): until the 3D view, everything goes to the HUD */
+static void vr_frame_resume(void)
+{
+	if (vr_gl.ready && vr_gl.pass == HALO_VR_PASS_NONE && halo_vr_frame_active())
+		halo_vr_pass(HALO_VR_PASS_HUD);
+}
+#endif
 
 /* the end of a frame's GL work: the streamed data and visibility results of
 the frames the GPU may still be drawing stay as they are */
 static void frame_end_buffers(void)
 {
-#ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters)
+#ifdef XGPU_SAMPLE_COUNTERS
+	if (SAMPLE_COUNTING)
 	{
 		/* this frame's counts, for when the GPU is done with it (the
 		barrier makes the shaders' counter writes visible to the copy,
@@ -4709,8 +5583,8 @@ static void frame_end_buffers(void)
 	device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
 	host_gl_wait_frame((unsigned int)device.buffer_ring);
 #endif
-#ifdef HALO_GLES
-	if (xgpu_capabilities.atomic_counters && device.ring_test_count[device.buffer_ring])
+#ifdef XGPU_SAMPLE_COUNTERS
+	if (SAMPLE_COUNTING && device.ring_test_count[device.buffer_ring])
 	{
 		unsigned long ring = device.buffer_ring;
 		unsigned long test;
@@ -4754,6 +5628,16 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	if (screenshot_every < 0)
 		screenshot_every = config_integer("debug.screenshot_every");
 
+#ifdef HALO_VR
+	if (device.gl_ready && vr_gl.ready)
+	{
+		/* (the window stays hidden: the headset paces the frames) */
+		vr_present(screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0);
+		xgpu_texture_cache_begin_frame();
+		frame_end_buffers();
+	}
+	else
+#endif
 	if (device.gl_ready)
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);

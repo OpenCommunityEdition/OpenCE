@@ -1416,4 +1416,31 @@ void hud_draw_screen(
 	return;
 }
 
+#ifdef HALO_VR
+/* the VR mode's crosshairs alone, as hud_draw_screen would draw them, for
+port/linux/game/vr_render.c to draw in the eyes */
+void hud_draw_vr_crosshairs(
+	void)
+{
+	long player_index = local_player_get_player_index(render.local_player_index);
+	director_perspective perspective = director_get_perspective(render.local_player_index);
+
+	if (player_index != NONE && hud_scripted_globals->show_hud &&
+		perspective != _director_perspective_neutral &&
+		perspective != _director_perspective_scripted)
+	{
+		struct player_datum *player = player_get(player_index);
+
+		if (player->unit_index != NONE)
+		{
+			rasterizer_hud_begin();
+			hud_render_weapon_crosshairs(player);
+			rasterizer_hud_end();
+		}
+	}
+
+	return;
+}
+#endif
+
 /* ---------- private code */

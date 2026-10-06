@@ -55,6 +55,8 @@ short scripted_camera_time(
 	void);
 long scripted_camera_object_relative_to(
 	void);
+long scripted_camera_relative_object(
+	void);
 void scripted_camera_update(
 	struct dead_camera *camera,
 	struct camera_control const *controls,

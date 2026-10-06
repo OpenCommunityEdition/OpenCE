@@ -825,6 +825,123 @@ void first_person_weapons_update(
 	return;
 }
 
+#ifdef HALO_VR
+/* the VR mode's hands (port/linux/game/vr_hands.c): the first-person
+animation graph of the local player's weapon in hand, or NONE */
+long first_person_weapon_vr_graph(
+	short local_player_index)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+	struct weapon_datum *weapon;
+
+	if (first_person_weapon->weapon_index==NONE ||
+		!(weapon= weapon_try_and_get(first_person_weapon->weapon_index)))
+	{
+		return NONE;
+	}
+
+	return weapon_definition_get(weapon->definition_index)->weapon.interface_definition.first_person_animations.index;
+}
+
+/* its idle pose: the idle animation's first frame about a camera at the
+origin looking along x, z up (node_matrices), and which models draw each
+node (node_models: 1 the weapon's, 2 the arms'); the graph's node count, or
+0 */
+short first_person_weapon_vr_idle_pose(
+	short local_player_index,
+	struct real_matrix4x3 *node_matrices,
+	byte *node_models)
+{
+	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+	long animation_graph_index= first_person_weapon_vr_graph(local_player_index);
+	struct weapon_definition *weapon_definition;
+	struct animation_graph *animation_graph;
+	struct animation_graph_first_person_weapon_animations *first_person_weapon_animations;
+	struct game_globals_first_person_interface *first_person_interface;
+	real_orientation node_orientations[MAXIMUM_NODES_PER_ANIMATION];
+	short idle_animation_index;
+	short node_index;
+
+	if (animation_graph_index==NONE)
+	{
+		return 0;
+	}
+	weapon_definition= weapon_definition_get(weapon_get(first_person_weapon->weapon_index)->definition_index);
+	animation_graph= animation_graph_definition_get(animation_graph_index);
+	if (!animation_graph->first_person_weapon_animations.count ||
+		animation_graph->nodes.count<=0 ||
+		animation_graph->nodes.count>MAXIMUM_NODES_PER_ANIMATION)
+	{
+		return 0;
+	}
+	first_person_weapon_animations= TAG_BLOCK_GET_ELEMENT(
+		&animation_graph->first_person_weapon_animations,
+		0,
+		struct animation_graph_first_person_weapon_animations);
+	idle_animation_index= VALID_INDEX(
+		_first_person_weapon_animation_idle,
+		first_person_weapon_animations->animations.count) ?
+		animation_graph_animation_index_get(
+			&first_person_weapon_animations->animations)
+				[_first_person_weapon_animation_idle].animation_index :
+		(short)NONE;
+	if (idle_animation_index==NONE)
+	{
+		return 0;
+	}
+	animation_get_node_orientations(
+		NULL,
+		TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, idle_animation_index, struct animation),
+		0,
+		node_orientations);
+	animation_graph_node_matrices_from_orientations(
+		animation_graph_index,
+		node_matrices,
+		node_orientations,
+		global_origin3d,
+		global_forward3d,
+		global_up3d);
+
+	csmemset(node_models, 0, MAXIMUM_NODES_PER_ANIMATION);
+	if (first_person_weapon->weapon_node_remapping_table_valid &&
+		weapon_definition->weapon.interface_definition.first_person_model.index!=NONE)
+	{
+		struct model *model= model_definition_get(weapon_definition->weapon.interface_definition.first_person_model.index);
+
+		for (node_index= 0; node_index<model->nodes.count; node_index++)
+		{
+			short graph_node_index= first_person_weapon->weapon_node_remapping_table[node_index];
+
+			if (graph_node_index>=0 && graph_node_index<MAXIMUM_NODES_PER_ANIMATION)
+			{
+				node_models[graph_node_index]|= 1;
+			}
+		}
+	}
+	first_person_interface= TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->first_person_interface,
+		0,
+		struct game_globals_first_person_interface);
+	if (first_person_weapon->hands_node_remapping_table_valid &&
+		first_person_interface && first_person_interface->hands.index!=NONE)
+	{
+		struct model *hands_model= model_definition_get(first_person_interface->hands.index);
+
+		for (node_index= 0; node_index<hands_model->nodes.count; node_index++)
+		{
+			short graph_node_index= first_person_weapon->hands_node_remapping_table[node_index];
+
+			if (graph_node_index>=0 && graph_node_index<MAXIMUM_NODES_PER_ANIMATION)
+			{
+				node_models[graph_node_index]|= 2;
+			}
+		}
+	}
+
+	return (short)animation_graph->nodes.count;
+}
+#endif
+
 /* ---------- private code */
 
 static void first_person_weapon_set_visibility(
@@ -1435,6 +1552,20 @@ static void first_person_weapon_build_node_matrices(
 			first_person_weapon->node_matrices,
 			(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
 			&render.camera);
+#ifdef HALO_VR
+		{
+			/* the VR mode: the hands and arms follow the controllers
+			(vr.hands, port/linux/game/vr_hands.c) */
+			extern void vr_hands_pose(short local_player_index, long animation_graph_index,
+				struct real_matrix4x3 *node_matrices, short node_count);
+
+			vr_hands_pose(
+				local_player_index,
+				weapon_definition->weapon.interface_definition.first_person_animations.index,
+				first_person_weapon->node_matrices,
+				(short)animation_graph->nodes.count);
+		}
+#endif
 	}
 
 	return;

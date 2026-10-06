@@ -37,6 +37,8 @@ SDL_DIR = THIRD_PARTY / "SDL3"
 # the system's OpenGL ES and EGL headers (libgles-dev and libegl-dev on
 # Debian and Ubuntu, mesa on Arch Linux)
 GL_HEADERS = Path("/usr/include")
+# the Khronos OpenXR headers, for the VR build's host (port/linux/arm64/host_vr.c)
+OPENXR_DIR = Path("port/third_party/openxr")
 
 # the Android guest's, with the desktop's code paths (no HALO_ANDROID)
 LINUX_ARM64_GUEST_ABI_FLAGS = [flag for flag in GUEST_ABI_FLAGS if flag != "-DHALO_ANDROID=1"]
@@ -92,7 +94,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         guest_cc=cc, gl_headers=GL_HEADERS, ar="llvm-ar", ld="ld.lld",
         builtins="$$($linux_arm64_cc -print-libgcc-file-name)", asm_target="aarch64-linux-gnu",
         abi_flags=abi_flags, extra_runtime=[PORT_DIR / "guest_desktop.c"],
-        extra_imports=[PORT_DIR / "host_imports.list"],
+        extra_imports=[PORT_DIR / "host_imports.list", *([PORT_DIR / "vr_imports.list"] if vr else [])],
         updater_cflags=updater_defines(getattr(sln, "port_release", False)), desktop_gl=desktop_gl)
 
     # ---------- SDL3, built from the same source as the guest's headers
@@ -123,7 +125,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
     host_cflags = " ".join([
         "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
         f"-I{ANDROID_DIR}/include", f"-I{ANDROID_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
-        f"-I{TOML_DIR}", *host_defines,
+        f"-I{TOML_DIR}", f"-I{OPENXR_DIR}", *host_defines,
     ])
     host_sources = [source for source in sorted((ANDROID_DIR / "host").glob("*.c")) if source.name != "host_main.c"]
     host_sources += [
@@ -132,6 +134,9 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         LINUX_DIR / "src" / "posix_trace_marker.c",
         TOML_DIR / "tomlc17.c",
     ]
+    if vr:
+        # OpenXR (port/linux/src/vr_host.h), with the runtime loaded at run time
+        host_sources.append(PORT_DIR / "host_vr.c")
     host_objects: List[Path] = []
     for source in host_sources:
         obj = host_obj_dir / (source.name + ".o")

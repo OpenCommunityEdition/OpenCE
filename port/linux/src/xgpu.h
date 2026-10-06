@@ -44,6 +44,7 @@ void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
 int host_gl_map_results(unsigned int buffer, unsigned int size);
 void host_gl_read_results(void *data, unsigned int size);
+void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 #endif
 
 /* ---------- GL state
@@ -100,9 +101,25 @@ header). Attributes whose bit is set in packed_attribute_mask are fed as
 NORMPACKED3 32-bit integers and unpacked in the shader. With lighting (else
 NULL), the normal and world position go to the pixel shader too, which
 lights the diffuse color for each pixel (nv2a_pixel_shader_key
-per_pixel_lighting). Returns a malloc'd string. */
+per_pixel_lighting). With multiview XGPU_MULTIVIEW_EYES, the program draws
+both of the VR mode's eyes at once (GL_OVR_multiview2): the clip position
+goes through eye_correction[gl_ViewID_OVR] (d3d8_gl.c); with
+XGPU_MULTIVIEW_LEFT_EYE or XGPU_MULTIVIEW_RIGHT_EYE, that eye's layer alone.
+Returns a malloc'd string. */
+enum
+{
+	XGPU_MULTIVIEW_NONE = 0,
+	XGPU_MULTIVIEW_EYES,
+	/* the eye pass's visibility tests: queries in a multiview pass would
+	count in as many query slots as views (Vulkan), which Zink does not
+	allow for, and the GPU writes past them */
+	XGPU_MULTIVIEW_LEFT_EYE,
+	/* a draw into each eye's layer in turn, each with its own screen
+	correction (the crosshairs: halo_vr_draw_eye) */
+	XGPU_MULTIVIEW_RIGHT_EYE,
+};
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
+	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting, int multiview);
 
 /* ---------- pixel shaders */
 
@@ -112,6 +129,8 @@ enum
 	_xgpu_sampler_2d,
 	_xgpu_sampler_3d,
 	_xgpu_sampler_cube,
+	/* a 2-layer render target (the VR mode's eye pass): the view's layer */
+	_xgpu_sampler_2d_layered,
 };
 
 /* everything a translated pixel shader depends on; the GLSL program cache
@@ -150,6 +169,10 @@ struct nv2a_pixel_shader_key
 	proportion to how far alpha is past the reference, not all of the pixel
 	or none of it, so that cut-out edges (foliage, grates) are smoothed too */
 	unsigned char alpha_test_samples;
+	/* drawn into both eyes at once (the VR mode, d3d8_gl.c): layered
+	render targets are sampled at the view's layer (XGPU_MULTIVIEW_*) */
+	unsigned char multiview;
+	unsigned char reserved[1];
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -232,6 +255,10 @@ struct xgpu_render_target
 	/* changes whenever the target is drawn into or cleared (d3d8_gl.c,
 	bind_targets) */
 	unsigned long written;
+
+	/* 2: a texture array, a layer for each eye, drawn into with multiview
+	(the VR mode's eye pass, d3d8_gl.c); else 1 */
+	int layers;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */

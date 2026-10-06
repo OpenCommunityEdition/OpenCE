@@ -2100,6 +2100,69 @@ void hud_render_weapon_interface(
 	return;
 }
 
+#ifdef HALO_VR
+/* the VR mode's crosshairs alone (the weapon's, as
+hud_render_weapon_interface finds it), which port/linux/game/vr_render.c
+draws in the eyes where the aim meets the world: in the HUD's layer, in
+front of the head, they swam as the head moved */
+void hud_render_weapon_crosshairs(
+	struct player_datum *player)
+{
+	struct unit_datum *unit = unit_get(player->unit_index);
+	long weapon_index = unit_inventory_get_weapon(
+		player->unit_index,
+		unit->unit.current_weapon_index);
+	boolean seat_disallows_hud = FALSE;
+
+	if (weapon_index == NONE &&
+		unit->object.parent_object_index != NONE &&
+		unit->unit.parent_seat_index != NONE)
+	{
+		struct unit_datum *parent = unit_get(unit->object.parent_object_index);
+		struct unit_seat *seat = TAG_BLOCK_GET_ELEMENT(
+			&unit_definition_get(parent->definition_index)->unit.seats,
+			unit->unit.parent_seat_index,
+			struct unit_seat);
+
+		if (TEST_FLAG(seat->flags, _unit_seat_gunner_bit))
+		{
+			weapon_index = unit_inventory_get_weapon(
+				unit->object.parent_object_index,
+				parent->unit.current_weapon_index);
+		}
+		else
+		{
+			seat_disallows_hud = TRUE;
+		}
+	}
+	if (weapon_index != NONE)
+	{
+		struct weapon_definition *definition = weapon_definition_get(
+			weapon_get(weapon_index)->definition_index);
+		long hud_index = definition->weapon.interface_definition.hud_interface.index;
+		struct weapon_interface_state weapon_state;
+
+		if (hud_index != NONE)
+		{
+			weapon_build_weapon_interface_state(weapon_index, &weapon_state);
+			crosshairs_draw(player, weapon_index, hud_index, &weapon_state);
+		}
+	}
+	else if (!seat_disallows_hud && !unit_get_weapon_count(player->unit_index))
+	{
+		struct weapon_interface_state weapon_state = { 0 };
+
+		crosshairs_draw(
+			player,
+			NONE,
+			hud_globals->defaults.default_weapon_hud.index,
+			&weapon_state);
+	}
+
+	return;
+}
+#endif
+
 /* ---------- private code */
 
 char *strip_path_name(

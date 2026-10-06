@@ -403,6 +403,16 @@ static boolean object_is_first_person_camera(
 		? NONE
 		: player_get(local_player_get_player_index(render.local_player_index))->unit_index;
 
+#ifdef HALO_VR
+	{
+		/* the VR mode's view from the player's head in a vehicle's seat
+		(port/linux/game/vr_render.c) */
+		extern boolean vr_render_hides_object(long object_index);
+
+		if (vr_render_hides_object(object_index))
+			return TRUE;
+	}
+#endif
 	return (unit_index == object_index &&
 		director_get_perspective(render.local_player_index) ==
 			_director_perspective_first_person) ||
@@ -459,7 +469,18 @@ static real object_get_level_of_detail_pixels(
 
 	object_get_bounding_sphere(object_index, &center, &radius);
 
+#ifdef HALO_VR
+	{
+		/* the VR mode's eye pass: in the eyes' pixels, not the centre
+		view's (port/linux/game/vr_render.c) */
+		extern real vr_render_level_of_detail_scale(void);
+
+		return render_frustum_sphere_diameter_in_pixels(&render.frustum, &center, radius) *
+			vr_render_level_of_detail_scale();
+	}
+#else
 	return render_frustum_sphere_diameter_in_pixels(&render.frustum, &center, radius);
+#endif
 }
 
 static void render_object_list(

@@ -40,6 +40,9 @@ drive the controller.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "halo_keyboard.h"
+#ifdef HALO_VR
+#include "vr.h"
+#endif
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -163,6 +166,12 @@ int halo_linux_mouse_aiming(short gamepad_index)
 
 	if (gamepad_index != 0)
 		return FALSE;
+#ifdef HALO_VR
+	/* the head aims in VR: a view dragged by magnetism would sicken (the
+	gamepad's aim, vr.aim = "gamepad", keeps it, as on the flat screen) */
+	if (halo_vr_aiming() && !halo_vr_gamepad_aiming())
+		return TRUE;
+#endif
 	if (read_at != config_changes())
 	{
 		read_at = config_changes();
@@ -517,11 +526,74 @@ void test_input_hold_action(int hold)
 	test_input_holding_action = hold;
 }
 
+/* "pad": the VR mode's gamepad (vr.aim = "gamepad") put through its paces,
+in a cycle of phases that the log names as each begins */
+static const struct test_pad_phase
+{
+	const char *name;
+	double seconds;
+	float lx, ly, rx, ry;
+	int right_trigger, left_trigger, back;
+} test_pad_phases[] =
+{
+	{ "still", 4.0 },
+	{ "turn right", 3.0, 0.0f, 0.0f, 0.6f },
+	{ "still", 2.0 },
+	{ "look up", 1.0, 0.0f, 0.0f, 0.0f, 0.8f },
+	{ "still", 2.0 },
+	{ "look down", 2.0, 0.0f, 0.0f, 0.0f, -0.8f },
+	{ "still", 2.0 },
+	{ "look up", 1.0, 0.0f, 0.0f, 0.0f, 0.8f },
+	{ "fire", 1.5, 0.0f, 0.0f, 0.0f, 0.0f, 1 },
+	{ "throw a grenade", 0.3, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1 },
+	{ "still", 3.0 },
+	{ "hold back (recentre)", 1.5, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 1 },
+	{ "still", 2.0 },
+	{ "walk forward, turn left", 3.0, 0.0f, 0.8f, -0.5f },
+	{ "still", 3.0 },
+};
+static int test_input_back;
+
+static void test_pad_gamepad(XINPUT_GAMEPAD *pad)
+{
+	static Uint64 start;
+	static int last_phase = -1;
+	double cycle = 0.0, t;
+	int phase, count = (int)(sizeof(test_pad_phases) / sizeof(test_pad_phases[0]));
+	const struct test_pad_phase *p;
+
+	if (!start)
+		start = SDL_GetTicks();
+	for (phase = 0; phase < count; phase++)
+		cycle += test_pad_phases[phase].seconds;
+	t = fmod((double)(SDL_GetTicks() - start) / 1000.0, cycle);
+	for (phase = 0; phase < count - 1 && t >= test_pad_phases[phase].seconds; phase++)
+		t -= test_pad_phases[phase].seconds;
+	p = &test_pad_phases[phase];
+	if (phase != last_phase)
+	{
+		platform_log("test input: pad: %s", p->name);
+		last_phase = phase;
+	}
+	pad->sThumbLX = (SHORT)(p->lx * 32767.0f);
+	pad->sThumbLY = (SHORT)(p->ly * 32767.0f);
+	pad->sThumbRX = (SHORT)(p->rx * 32767.0f);
+	pad->sThumbRY = (SHORT)(p->ry * 32767.0f);
+	if (p->right_trigger)
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+	if (p->left_trigger)
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+	if (p->back)
+		pad->wButtons |= XINPUT_GAMEPAD_BACK;
+	test_input_back = p->back;
+}
+
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	static int checked;
 	static int seed = -1;
 	static int looking;
+	static int pad_test;
 	double t;
 
 	if (!checked)
@@ -538,9 +610,19 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 			seed = atoi(setting + 5);
 			looking = 1;
 		}
+		else if (!strcmp(setting, "pad"))
+		{
+			seed = 0;
+			pad_test = 1;
+		}
 	}
 	if (seed < 0)
 		return;
+	if (pad_test)
+	{
+		test_pad_gamepad(pad);
+		return;
+	}
 	if (test_input_holding_action)
 	{
 		/* (standing still, the button held from a second on) */
@@ -760,6 +842,11 @@ static DWORD connected_gamepads(void)
 	DWORD mask = XDEVICE_PORT0_MASK;
 	int port;
 
+#ifdef HALO_VR
+	/* (in the headset, all of them: XInputGetState) */
+	if (halo_vr_running())
+		return mask;
+#endif
 	/* the first pad shares port 0 with the keyboard (port_gamepad) */
 	for (port = 1; port < PORT_COUNT; port++)
 	{
@@ -837,6 +924,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	int port = controller_port(device);
 	SDL_Gamepad *gamepads[PORT_COUNT];
 	int count;
+#ifdef HALO_VR
+	int back = 0;
+#endif
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
@@ -861,7 +951,29 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+#ifdef HALO_VR
+		if (halo_vr_running())
+		{
+			/* in the headset every gamepad is the first player's: Steam
+			may list gamepads of its own (Steam Input's) before the one in
+			the hands */
+			int other;
+
+			for (other = 0; other < count; other++)
+			{
+				if (other > 0 || !port_gamepad(gamepads, count, 0))
+					sdl_gamepad_state(gamepads[other], &state->Gamepad);
+				back = back || SDL_GetGamepadButton(gamepads[other], SDL_GAMEPAD_BUTTON_BACK);
+			}
+		}
+		halo_vr_gamepad(&state->Gamepad);
+#endif
 		test_input_gamepad(&state->Gamepad);
+#ifdef HALO_VR
+		/* a gamepad's Back held recentres (not the keyboard's tab, the
+		scores) */
+		halo_vr_gamepad_back(back || test_input_back);
+#endif
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{
@@ -870,7 +982,11 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			pthread_mutex_unlock(&mouse_lock);
 		}
 	}
+#ifdef HALO_VR
+	else if (!halo_vr_running() && port_gamepad(gamepads, count, port))
+#else
 	else if (port_gamepad(gamepads, count, port))
+#endif
 	{
 		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
 	}
@@ -895,7 +1011,23 @@ DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 	feedback->Header.dwStatus = ERROR_SUCCESS;
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
+#ifdef HALO_VR
+	if (port == 0)
+		halo_vr_rumble(feedback->Rumble.wLeftMotorSpeed / 65535.0f, feedback->Rumble.wRightMotorSpeed / 65535.0f);
+#endif
 	count = sdl_gamepads(gamepads);
+#ifdef HALO_VR
+	/* (in the headset, each gamepad is port 0's) */
+	if (halo_vr_running())
+	{
+		int index;
+
+		for (index = 0; port == 0 && index < count; index++)
+			SDL_RumbleGamepad(gamepads[index], feedback->Rumble.wLeftMotorSpeed,
+				feedback->Rumble.wRightMotorSpeed, 100);
+		return ERROR_SUCCESS;
+	}
+#endif
 	if (port_gamepad(gamepads, count, port))
 	{
 		/* the game refreshes the motors every frame; rumble a little longer

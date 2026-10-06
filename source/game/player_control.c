@@ -739,6 +739,42 @@ static void handle_one_player_input(
 				input.facing_delta.pitch);
 			player_control_angle_step_ticks = 1.f;
 		}
+#ifdef HALO_VR
+		{
+			/* the VR mode: the first player's aim follows the head
+			(port/linux/src/vr.c), so the reticle is in the middle of the view
+			and the netcode sends an ordinary player's facing */
+			extern int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch);
+			extern void halo_vr_aim_release(void);
+			extern boolean vr_render_long_gun(long weapon_index);
+			float vr_yaw, vr_pitch;
+			int vr_aim = 0;
+
+			/* (a long gun held on foot may be aimed with both hands; with
+			vr.aim = "gamepad" the stick aims as on the flat screen, and the
+			facing is left as it is: 2) */
+			if (local_player_index == 0 && !director_inhibited_facing(local_player_index) &&
+				!cinematic_in_progress())
+			{
+				vr_aim = halo_vr_aim(player->desired_angles.yaw,
+					unit->object.parent_object_index == NONE && vr_render_long_gun(current_weapon_index),
+					&vr_yaw, &vr_pitch);
+			}
+			if (vr_aim == 1)
+			{
+				while (vr_yaw < 0.f)
+					vr_yaw += _pi * 2.f;
+				while (vr_yaw >= _pi * 2.f)
+					vr_yaw -= _pi * 2.f;
+				player->desired_angles.yaw = vr_yaw;
+				player->desired_angles.pitch = PIN(vr_pitch, -DEGREES_TO_RADIANS(85.f), DEGREES_TO_RADIANS(85.f));
+			}
+			else if (local_player_index == 0 && vr_aim == 0)
+			{
+				halo_vr_aim_release();
+			}
+		}
+#endif
 
 		if (unit->object.parent_object_index == NONE)
 		{

@@ -15,6 +15,9 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "xiso.h"
+#ifdef HALO_VR
+#include "vr.h"
+#endif
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -719,6 +722,17 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)width;
 	(void)height;
 	platform_window_size_setting(&platform_window_width, &platform_window_height);
+#ifdef HALO_VR
+	if (halo_vr_enabled())
+	{
+		/* an EGL context, which OpenXR takes through XR_MNDX_egl_enable, in a
+		window that stays hidden: the headset shows the game (vr.c) */
+		SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+		platform_window = SDL_CreateWindow("Halo", (int)platform_window_width, (int)platform_window_height,
+			SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+	}
+	else
+#endif
 	platform_window = SDL_CreateWindow("Halo", (int)platform_window_width, (int)platform_window_height,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 		(config_boolean("debug.hidden_window") ? SDL_WINDOW_HIDDEN : 0) |

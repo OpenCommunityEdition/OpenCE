@@ -170,6 +170,14 @@ static boolean warned_about_too_many_transparent_geometry_groups;
 void _rasterizer_widget_end(
 	void)
 {
+#ifdef HALO_VR
+	{
+		/* (rasterizer_widget_project_billboard) */
+		extern void vr_render_screen_point_end(void);
+
+		vr_render_screen_point_end();
+	}
+#endif
 	return;
 }
 
@@ -1025,6 +1033,20 @@ static boolean rasterizer_widget_project_billboard(
 			projected_axes->j =
 				viewport_height * inverse_w * projected_radius_y * 0.5f;
 			projected = TRUE;
+#ifdef HALO_VR
+			{
+				/* the VR mode's eyes: what is drawn about the point moves to
+				each eye as the point does (port/linux/game/vr_render.c) */
+				extern void vr_render_screen_point(const real clip[4], real width, real height);
+				real clip[4];
+
+				clip[1] = clip_y;
+				clip[2] = clip_z;
+				clip[3] = 1.0f / inverse_w;
+				clip[0] = (((projected_center->x * 2.0f + 1.0f) / viewport_width) - 1.0f) * clip[3];
+				vr_render_screen_point(clip, (real)viewport_width, (real)viewport_height);
+			}
+#endif
 		}
 	}
 

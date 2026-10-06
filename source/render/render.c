@@ -87,6 +87,9 @@ symbols in this file:
 #include "effects/weather_particle_systems.h"
 #include "main/main.h"
 #include "structures/structures.h"
+#ifdef HALO_VR
+#include "../../port/linux/src/vr.h"
+#endif
 
 /* ---------- constants */
 
@@ -150,6 +153,19 @@ boolean render_particles_enabled = TRUE;
 boolean render_particle_systems_enabled = TRUE;
 boolean render_weather_particle_systems_enabled = TRUE;
 
+#ifdef HALO_VR
+/* the VR mode (port/linux/game/vr_render.c): the 3D view drawn into both
+eyes, without the HUD and menus, which are drawn into their own layer */
+boolean vr_render_camera(struct render_camera *camera, struct render_camera *rasterizer_camera);
+void vr_render_frustum_bounds(real_rectangle2d *bounds);
+void vr_render_end(void);
+boolean vr_render_hud_camera(struct render_camera *camera);
+boolean vr_render_weapon_camera(struct render_camera *camera);
+void vr_render_crosshairs(void);
+
+static boolean render_vr_eye_pass;
+#endif
+
 /* ---------- public code */
 
 void render_effects(
@@ -210,6 +226,10 @@ static void render_nonplayer_frame(
 	case 0:
 		/* letterbox bars and split screen dividers: laid out from the
 		viewport, so not centered like the menus on a wide screen */
+#ifdef HALO_VR
+		/* (no letterbox before the eyes) */
+		if (!halo_vr_frame_active())
+#endif
 		interface_draw_fullscreen_overlays();
 		rasterizer_debug_draw();
 		break;
@@ -333,6 +353,18 @@ static void render_window(
 	{
 		build_sprite_prepare_for_window();
 		render_sky();
+#ifdef HALO_VR
+		if (render_vr_eye_pass)
+		{
+			/* the weapon in the right controller (vr.aim) */
+			struct render_camera head = render.camera;
+
+			vr_render_weapon_camera(&render.camera);
+			first_person_weapon_render_update();
+			render.camera = head;
+		}
+		else
+#endif
 		first_person_weapon_render_update();
 		lights_preprocess_scene();
 		render_objects();
@@ -408,8 +440,19 @@ static void render_window(
 		rasterizer_transparent_geometry_stop();
 		structure_render_fog_screen();
 		rasterizer_lens_flares_draw();
+#ifdef HALO_VR
+		if (render_vr_eye_pass)
+		{
+			rasterizer_screen_flash();
+			/* the crosshairs where the aim meets the world, in the eyes */
+			vr_render_crosshairs();
+		}
+		else
+#endif
+		{
 		/* port: the 3D view antialiased (display.anti_aliasing), before the
-		HUD and menus are drawn over it */
+		HUD and menus are drawn over it (not the VR mode's eye pass: its
+		targets have a layer for each eye) */
 		if (rasterizer_target == _render_target_primary)
 		{
 			halo_screen_anti_alias(
@@ -423,6 +466,7 @@ static void render_window(
 		halo_screen_ui_offset(TRUE);
 		render_ui_widgets(local_player_index, &rasterizer_camera->viewport_bounds);
 		halo_screen_ui_offset(FALSE);
+		}
 	}
 
 	bink_playback_render();
@@ -531,6 +575,11 @@ static void render_player_frame(
 		}
 	}
 
+#ifdef HALO_VR
+	/* the union of the eyes' fields of view */
+	if (render_vr_eye_pass)
+		vr_render_frustum_bounds(&frustum_bounds);
+#endif
 	render_camera_build_frustum(camera, &frustum_bounds, &frustum, TRUE);
 	render_camera_build_frustum(
 		&window->rasterizer_camera,
@@ -538,7 +587,12 @@ static void render_player_frame(
 		&rasterizer_frustum,
 		TRUE);
 
-	if (main_get_window_count() == 1)
+	if (main_get_window_count() == 1
+#ifdef HALO_VR
+		/* (a mirror's view would need the eyes' mirrored too) */
+		&& !render_vr_eye_pass
+#endif
+		)
 	{
 		if (structure_visibility_find_mirror(camera, &frustum, &mirror))
 		{
@@ -587,6 +641,64 @@ static void render_player_frame(
 	return;
 }
 
+#ifdef HALO_VR
+/* the HUD and the menus of a player's window, into the HUD's layer, from
+the camera the layer matches */
+static void render_vr_hud(
+	const struct render_window *window)
+{
+	struct rasterizer_window_begin_parameters parameters;
+	struct render_camera camera = window->rasterizer_camera;
+
+	profile_render_window_start(FALSE);
+	memset(&parameters, 0, sizeof(parameters));
+	vr_render_hud_camera(&camera);
+	render.local_player_index = window->local_player_index;
+	render.camera = camera;
+	render_camera_build_frustum(&render.camera, NULL, &render.frustum, TRUE);
+	parameters.camera = camera;
+	render_camera_build_frustum(&parameters.camera, NULL, &parameters.frustum, TRUE);
+	parameters.rasterizer_target = _render_target_primary;
+	/* (the HUD pass began over transparent black: d3d8_gl.c) */
+	parameters.suppress_clear = TRUE;
+	parameters.window_index = render.window_index;
+	rasterizer_window_begin(&parameters);
+	if (!bink_playback_in_progress())
+	{
+		interface_draw_screen();
+		halo_screen_ui_offset(TRUE);
+		render_ui_widgets(window->local_player_index, &camera.viewport_bounds);
+		halo_screen_ui_offset(FALSE);
+	}
+	rasterizer_window_end();
+	profile_render_window_end();
+
+	return;
+}
+
+/* a player's window in VR: the 3D view once, into both eyes, then its HUD */
+static void render_vr_player_frame(
+	struct render_window *window)
+{
+	struct render_window eye_window = *window;
+
+	if (vr_render_camera(&eye_window.render_camera, &eye_window.rasterizer_camera))
+	{
+		render_vr_eye_pass = TRUE;
+		halo_vr_pass(HALO_VR_PASS_EYES);
+		render_player_frame(&eye_window, NULL);
+		halo_vr_pass(HALO_VR_PASS_HUD);
+		render_vr_eye_pass = FALSE;
+		vr_render_end();
+		/* the HUD's camera starts from the head's */
+		window->rasterizer_camera.position = eye_window.rasterizer_camera.position;
+	}
+	render_vr_hud(window);
+
+	return;
+}
+#endif
+
 void render_frame(
 	struct render_window *windoze,
 	short window_count,
@@ -628,6 +740,13 @@ void render_frame(
 					screenshot_page_index->y * global_screenshot_size + screenshot_index->y;
 			}
 
+#ifdef HALO_VR
+			if (halo_vr_frame_active())
+			{
+				render_vr_player_frame(window);
+				continue;
+			}
+#endif
 			render_player_frame(
 				window,
 				screenshot_index != NULL ? &screenshot_combined_index : NULL);

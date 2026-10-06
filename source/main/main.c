@@ -402,6 +402,9 @@ symbols in this file:
 #define HALO_BUILD_FLAVOR "local"
 #endif
 #endif
+#ifdef HALO_VR
+#include "../../port/linux/src/vr.h"
+#endif
 
 /* ---------- constants */
 
@@ -2408,6 +2411,11 @@ static void main_update_time_unthrottled(
 	LARGE_INTEGER counter;
 	LARGE_INTEGER frequency;
 	real seconds_elapsed = 0.0f;
+#ifdef HALO_VR
+	/* in VR, the time between the frames' displays (vr.c) */
+	float vr_seconds;
+	boolean vr_paced = halo_vr_frame_clock(&vr_seconds) != 0;
+#endif
 
 	QueryPerformanceCounter(&counter);
 	QueryPerformanceFrequency(&frequency);
@@ -2417,6 +2425,10 @@ static void main_update_time_unthrottled(
 			(double)frequency.QuadPart);
 	}
 	previous_counter = counter;
+#ifdef HALO_VR
+	if (vr_paced)
+		seconds_elapsed = vr_seconds;
+#endif
 
 	if (main_globals.movie)
 	{

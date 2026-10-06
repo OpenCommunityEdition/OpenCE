@@ -254,12 +254,25 @@ the Linux arm64 build's desktop renderer (tools/linux_arm64_build.py) */
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv) \
 	X(glMemoryBarrier) \
-	X(glDebugMessageCallback)
+	X(glDebugMessageCallback) \
+	X(glBlendFuncSeparate) \
+	X(glUniformMatrix4fv) \
+	X(glFramebufferTextureLayer) \
+	X(glCopyBufferSubData) \
+	X(glBindBufferRange)
+/* extensions a driver may lack, resolved without failing (gl_functions.c):
+the VR mode's multiview */
+#define GL_OPTIONAL_FUNCTIONS(X) \
+	X(glFramebufferTextureMultiviewOVR)
 /* DESKTOP_GL_FUNCTIONS_END */
+#endif
+#ifndef GL_OPTIONAL_FUNCTIONS
+#define GL_OPTIONAL_FUNCTIONS(X)
 #endif
 
 #define GL_DECLARE_FUNCTION(name) extern __typeof__(&name) halo_##name;
 GL_FUNCTIONS(GL_DECLARE_FUNCTION)
+GL_OPTIONAL_FUNCTIONS(GL_DECLARE_FUNCTION)
 #undef GL_DECLARE_FUNCTION
 
 /* call sites use the ordinary names; gl_functions.c, which defines the
@@ -486,6 +499,12 @@ pointers, sees the declarations without these aliases */
 #define glGetQueryObjectuiv halo_glGetQueryObjectuiv
 #define glMemoryBarrier halo_glMemoryBarrier
 #define glDebugMessageCallback halo_glDebugMessageCallback
+#define glBlendFuncSeparate halo_glBlendFuncSeparate
+#define glUniformMatrix4fv halo_glUniformMatrix4fv
+#define glFramebufferTextureLayer halo_glFramebufferTextureLayer
+#define glFramebufferTextureMultiviewOVR halo_glFramebufferTextureMultiviewOVR
+#define glCopyBufferSubData halo_glCopyBufferSubData
+#define glBindBufferRange halo_glBindBufferRange
 
 #endif
 #endif

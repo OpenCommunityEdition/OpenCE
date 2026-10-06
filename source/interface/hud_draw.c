@@ -1655,6 +1655,19 @@ static void hud_draw_bitmap_with_meter(
 			_hud_dont_scale_offset_bit),
 		0.0f,
 		&point);
+#ifdef HALO_VR
+	if (is_crosshair_bitmap)
+	{
+		/* the VR mode's crosshairs, where the controller points
+		(port/linux/game/vr_render.c) */
+		extern short vr_render_crosshair_offset[2];
+
+		if (vr_render_crosshair_offset[0] >= 1000)
+			return;
+		point.x += vr_render_crosshair_offset[0];
+		point.y += vr_render_crosshair_offset[1];
+	}
+#endif
 	hud_calculate_bitmap_bounds(
 		bitmap,
 		absolute_placement->corner,

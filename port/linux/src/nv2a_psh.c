@@ -280,6 +280,7 @@ static const char *sampler_declaration(unsigned char type)
 	{
 	case _xgpu_sampler_3d: return "sampler3D";
 	case _xgpu_sampler_cube: return "samplerCube";
+	case _xgpu_sampler_2d_layered: return "sampler2DArray";
 	default: return "sampler2D";
 	}
 }
@@ -341,6 +342,18 @@ static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *k
 		break;
 	case _xgpu_sampler_cube:
 		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
+#ifdef HALO_GLES
+			, stage
+#endif
+			);
+		break;
+	case _xgpu_sampler_2d_layered:
+		/* the VR mode's eye pass: the eye's own layer (in a draw into one
+		layer, that eye's), drawn upside down (d3d8_gl.c, vr_flip_rows) */
+		xgpu_text_append(text, "texture(tex%d, vec3((%s).xy * texture_scale[%d].xy * vec2(1.0, -1.0) + vec2(0.0, 1.0), %s)"
+			SAMPLE_BIAS ")", stage,
+			coordinates, stage, key->multiview == XGPU_MULTIVIEW_EYES ? "float(gl_ViewID_OVR)" :
+				key->multiview == XGPU_MULTIVIEW_RIGHT_EYE ? "1.0" : "0.0"
 #ifdef HALO_GLES
 			, stage
 #endif
@@ -605,8 +618,19 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 			"layout(binding = 0, offset = 0) uniform atomic_uint visible_samples;\n");
 	}
 #endif
+	xgpu_text_append(&text, SHADER_VERSION);
+	if (key->multiview == XGPU_MULTIVIEW_EYES)
+		xgpu_text_append(&text, "#extension GL_OVR_multiview2 : require\n");
+#ifndef HALO_GLES
+	if (key->count_samples)
+	{
+		/* (as above: the VR mode's) */
+		xgpu_text_append(&text,
+			"layout(early_fragment_tests) in;\n"
+			"layout(binding = 0, offset = 0) uniform atomic_uint visible_samples;\n");
+	}
+#endif
 	xgpu_text_append(&text,
-		SHADER_VERSION
 		"in vec4 xD0;\n"
 		"in vec4 xD1;\n"
 		"in vec4 xB0;\n"
@@ -741,10 +765,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tresult = vec4(t0.rgb, 1.0);\n");
 	if (config_boolean("debug.gpu_debug_flat"))
 		xgpu_text_append(&text, "\tresult = xD0.a > 0.0 ? vec4(xD0.rgb, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);\n");
-#ifdef HALO_GLES
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
-#endif
 	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n}\n");
 	return text.buffer;
 }

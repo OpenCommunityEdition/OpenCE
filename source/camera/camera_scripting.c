@@ -301,6 +301,15 @@ void scripted_camera_set(
 	return;
 }
 
+/* the object the scripted camera moves with (a camera point's, or the unit
+it looks out of or at), else NONE (port/linux/game/render_interpolation.c) */
+long scripted_camera_relative_object(
+	void)
+{
+	return camera_script_globals.mode == _camera_script_mode_animation ?
+		NONE : camera_script_globals.relative_object_index;
+}
+
 void scripted_camera_set_absolute(
 	short camera_point_index,
 	word transition_time)

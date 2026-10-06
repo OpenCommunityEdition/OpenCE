@@ -244,6 +244,12 @@ int main(int argc, char *argv[])
 	guest's environment is its own copy, so the guest's request cannot reach
 	the driver, which reads this process's. An explicit setting stays. */
 	setenv("mesa_glthread", "true", 0);
+#ifdef HALO_DESKTOP_GL
+	/* Steam starts its games with Mesa capped at GL 4.3 (and GLSL 430),
+	where the 4.5 context the renderer asks for fails (EGL_BAD_MATCH) */
+	unsetenv("MESA_GL_VERSION_OVERRIDE");
+	unsetenv("MESA_GLSL_VERSION_OVERRIDE");
+#endif
 	host_install_signal_handlers();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)
 		host_fatal("cannot start the game thread");

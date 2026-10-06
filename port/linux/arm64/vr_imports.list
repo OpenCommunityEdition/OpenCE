@@ -1,0 +1,10 @@
+# Host functions the VR build's guest imports (configure.py --vr): declared in
+# port/linux/src/vr_host.h, defined in host_vr.c.
+host_vr_initialize
+host_vr_frame_wait
+host_vr_locate
+host_vr_input
+host_vr_acquire
+host_vr_release
+host_vr_frame_end
+host_vr_haptic

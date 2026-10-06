@@ -110,6 +110,10 @@ void hud_render_nav_points(
 	short local_player_index);
 void hud_draw_screen(
 	void);
+#ifdef HALO_VR
+void hud_draw_vr_crosshairs(
+	void);
+#endif
 
 /* ---------- prototypes/HUD_NAV_POINTS.C */
 

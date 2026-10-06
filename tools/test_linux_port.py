@@ -228,7 +228,7 @@ def test_menus_are_well_formed():
             where = f"{path.name}: <{element.tag} {element.get('name', '')}>"
             assert element.tag in MENU_ATTRIBUTES, where
             assert set(element.attrib) <= MENU_ATTRIBUTES[element.tag], where
-            assert element.get("platform") in (None, "desktop", "android"), where
+            assert element.get("platform") in (None, "desktop", "android", "vr"), where
             # (menu_files.c's whole numbers, which the tags keep in shorts,
             # its true/false attributes, and no text but whitespace outside
             # <string>s)
@@ -303,6 +303,78 @@ def test_menu_settings_exist():
     controls = set(re.findall(r'"(controls\.[a-z_]+)"', (root / "port/linux/src/xinput_sdl.c").read_text()))
     assert controls == {name for name in known if name.startswith("controls.")}
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
+
+
+@pytest.fixture
+def config_check(tmp_path):
+    """port_config.c (the VR build's settings) built on its own
+    (tools/config_check.c): run(command...) in a folder of config.toml"""
+    root = Path(__file__).resolve().parent.parent
+    compiler = shutil.which("clang") or shutil.which("cc")
+    if not compiler:
+        pytest.skip("needs a C compiler")
+    stubs = tmp_path / "stubs"
+    (stubs / "SDL3").mkdir(parents=True)
+    (stubs / "SDL3" / "SDL.h").write_text("const char *SDL_GetBasePath(void);\n")
+    (stubs / "platform.h").write_text("void platform_log(const char *format, ...);\n")
+    for name in ("port_config.c", "port_config.h"):
+        shutil.copy(root / "port/linux/src" / name, stubs / name)
+    program = tmp_path / "config_check"
+    subprocess.run([compiler, "-DHALO_VR=1", "-DHALO_ARM64_GUEST=1", f"-I{stubs}",
+                    f"-I{root}/port/third_party/tomlc17", "-o", str(program), str(stubs / "port_config.c"),
+                    str(root / "tools/config_check.c"), str(root / "port/third_party/tomlc17/tomlc17.c"),
+                    "-lpthread"], check=True, capture_output=True)
+    data = tmp_path / "data"
+    data.mkdir()
+
+    def run(*command):
+        result = subprocess.run([str(program), str(data), *command], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.strip()
+    run.config = data / "config.toml"
+    return run
+
+
+def test_config_writes_defaults_commented_out(config_check):
+    """a new file has every setting commented out at its default, once; a
+    setting written replaces its commented default"""
+    assert config_check("get", "vr.hands") == "arms"
+    text = config_check.config.read_text()
+    assert "is at its default" in text
+    assert '\n# hands = "arms"\n' in text and "\nhands =" not in text
+    config_check("get", "vr.hands")
+    assert config_check.config.read_text() == text
+    config_check("write", "vr.hands", "floating")
+    written = config_check.config.read_text()
+    assert '\nhands = "floating"\n' in written and '# hands = "arms"' not in written
+    assert len(re.findall(r"^(# )?hands = ", written, re.M)) == 1
+    assert config_check("get", "vr.hands") == "floating"
+    assert config_check.config.read_text() == written
+
+
+def test_config_keeps_an_older_file(config_check):
+    """an older version's file keeps its values, and gains the note and the
+    settings it lacks commented out; its vr.hands = "floating", the older
+    versions' default, becomes the default, once"""
+    old = ('# Halo settings\n#\n# The game writes this file with the defaults when it is missing.\n\n'
+           '[display]\n\n# Wait for the display.\nvsync = false\n\n[vr]\n\nhands = "floating"\nturn = "smooth"\n')
+    config_check.config.write_text(old)
+    assert config_check("get", "vr.hands") == "arms"
+    assert config_check("get", "display.vsync") == "false"
+    assert config_check("get", "vr.turn") == "smooth"
+    text = config_check.config.read_text()
+    assert text.startswith("# Halo settings\n#\n# The game writes this file with the defaults when it is missing.\n#\n# A")
+    assert "\nvsync = false\n" in text and '\nturn = "smooth"\n' in text
+    assert '\n# hands = "arms"\n' in text and '"floating"' not in text
+    assert "\n# smooth_turn_speed = 150.0\n" in text
+    config_check("get", "vr.hands")
+    assert config_check.config.read_text() == text
+    # (chosen again, it stays)
+    config_check("write", "vr.hands", "floating")
+    assert config_check("get", "vr.hands") == "floating"
+    # (any other value of an older file stays)
+    config_check.config.write_text(old.replace('"floating"', '"game"'))
+    assert config_check("get", "vr.hands") == "game"
 
 
 def test_p2p_signatures_and_listings(tmp_path):
