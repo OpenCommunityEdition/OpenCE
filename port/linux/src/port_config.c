@@ -139,6 +139,12 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_all,
 		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
+	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
+		_platform_all,
+		"Light the models (characters, weapons, vehicles, scenery) for each\n"
+		"pixel by the lights the game gives them, without the facets the light\n"
+		"of each vertex shows across curved surfaces; false lights each vertex,\n"
+		"as the Xbox does." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },

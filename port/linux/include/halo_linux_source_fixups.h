@@ -46,6 +46,9 @@ two (display.shadow_resolution) */
 long halo_shadow_map_scale(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* names a model lighting vertex program, whose draws can be lit for each
+pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
+void halo_vertex_shader_lighting(unsigned long handle);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

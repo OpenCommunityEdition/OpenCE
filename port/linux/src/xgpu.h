@@ -65,12 +65,32 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribu
 /* D3D constant register -96 is hardware register 0 */
 #define XGPU_VERTEX_CONSTANT_BIAS 96
 
+/* where one of the game's model lighting programs (d3d8_gl.c
+halo_vertex_shader_lighting) has the normal, and the world position, that it
+lights the diffuse color by: the temporary register that holds each before
+the instruction given */
+struct nv2a_vertex_lighting
+{
+	/* 1 by the ambient and distant lights, 2 by the point lights too */
+	int lights;
+	unsigned long normal_instruction, normal_register;
+	/* (with the point lights only) */
+	unsigned long position_instruction, position_register;
+};
+
+/* finds them in a model lighting program, checking that it lights its
+diffuse color as nv2a_psh.c does for each pixel; FALSE if it does not */
+BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instruction_count,
+	struct nv2a_vertex_lighting *lighting);
+
 /* GLSL for an NV2A vertex program (the instruction words after the program
 header). Attributes whose bit is set in packed_attribute_mask are fed as
-NORMPACKED3 32-bit integers and unpacked in the shader. Returns a malloc'd
-string. */
+NORMPACKED3 32-bit integers and unpacked in the shader. With lighting (else
+NULL), the normal and world position go to the pixel shader too, which
+lights the diffuse color for each pixel (nv2a_pixel_shader_key
+per_pixel_lighting). Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask);
+	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
 
 /* ---------- pixel shaders */
 
@@ -106,6 +126,10 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* a model lighting program's draw lit for each pixel
+	(display.per_pixel_lighting): nv2a_vertex_lighting's lights, or 0 for
+	the diffuse color the vertex shader computed */
+	unsigned char per_pixel_lighting;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -131,6 +155,13 @@ C0/C1 of each stage and the final combiner, and texture constants */
 	"uniform vec4 bump_luminance[4];\n" \
 	"uniform vec4 texture_scale[4];\n" \
 	XGPU_PIXEL_UNIFORMS_ES
+
+/* the vertex constants the per-pixel model lighting reads, in a uniform of
+their own (the vertex shader's 192 would pass OpenGL ES's least fragment
+uniform space): [0] c[-82] (the translucency in z), [1] to [11] c[-79] to
+c[-69] (rasterizer_set_model_lighting's two point lights, two distant
+lights and the ambient light) */
+#define XGPU_MODEL_LIGHT_COUNT 12
 
 /* ---------- textures */
 

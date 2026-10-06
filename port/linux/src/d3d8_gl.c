@@ -216,6 +216,15 @@ struct vertex_shader_object
 	unsigned long packed_mask;
 	/* [0] streams per the declaration, [1] immediate mode (all floats) */
 	GLuint shader[2];
+	/* one of the game's model lighting programs (halo_vertex_shader_lighting),
+	whose draws can be lit for each pixel (display.per_pixel_lighting): where
+	its lighting's normal and position are (lighting.lights is 0 for the
+	others), and its shaders that hand them on, as shader[] */
+	struct nv2a_vertex_lighting lighting;
+	GLuint lit_shader[2];
+	/* a shader lit for each pixel failed to compile or link: lit as the
+	vertex shader lights it from then on */
+	BOOL lighting_failed;
 };
 
 /* ---------- programs */
@@ -263,6 +272,10 @@ struct program_entry
 	GLint bump_matrix, bump_luminance, texture_scale;
 	GLint texture_lod_bias;
 	GLint screen_offset;
+	/* the lights of a draw lit for each pixel (XGPU_MODEL_LIGHT_COUNT), and
+	constants_serial at their last upload */
+	GLint model_lights;
+	unsigned long long model_lights_serial;
 
 	/* the vertex constants c[0..constant_count) the program uses; with
 	consecutive locations, a changed range is uploaded by itself */
@@ -1961,6 +1974,24 @@ static struct vertex_shader_object *vertex_shader_from_handle(DWORD handle)
 	return object;
 }
 
+/* the game names its model lighting programs as it creates them
+(rasterizer_xbox_vertex_shaders_initialize.c), so that their draws can be lit
+for each pixel (display.per_pixel_lighting); one whose lighting is not as
+the pixel shader computes it stays lit for each vertex */
+void halo_vertex_shader_lighting(unsigned long handle)
+{
+	struct vertex_shader_object *object = vertex_shader_from_handle((DWORD)handle);
+
+	if (!object || !object->instructions)
+		return;
+	if (!nv2a_vertex_shader_lighting(object->instructions, object->instruction_count, &object->lighting))
+	{
+		memset(&object->lighting, 0, sizeof(object->lighting));
+		platform_log("GPU: vertex shader %lu is not lit as the pixel shader would light it: lit for each vertex",
+			object->id);
+	}
+}
+
 void WINAPI D3DDevice_DeleteVertexShader(DWORD handle)
 {
 	/* programs stay cached; the object is small */
@@ -2035,22 +2066,26 @@ static unsigned long hash_words(const void *data, unsigned long size)
 	return hash;
 }
 
-static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immediate)
+/* lit: the shader that hands the lighting's normal and position on
+(vertex_shader_object lit_shader) */
+static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immediate, BOOL lit)
 {
 	int variant = immediate ? 1 : 0;
+	GLuint *shader = lit ? &program->lit_shader[variant] : &program->shader[variant];
 
-	if (!program->shader[variant])
+	if (!*shader)
 	{
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
-			immediate ? 0 : device.vertex_shader->packed_mask);
+			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
-		program->shader[variant] = compile_shader(GL_VERTEX_SHADER, source, "vertex");
+		*shader = compile_shader(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
 			FILE *file;
 
-			snprintf(path, sizeof(path), "%s/vs%03lu_%d.glsl", debug_settings.dump_shaders, program->id, variant);
+			snprintf(path, sizeof(path), "%s/vs%03lu_%d%s.glsl", debug_settings.dump_shaders, program->id, variant,
+				lit ? "_lit" : "");
 			if ((file = fopen(path, "w")) != NULL)
 			{
 				fputs(source, file);
@@ -2059,7 +2094,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 		}
 		free(source);
 	}
-	return program->shader[variant];
+	return *shader;
 }
 
 typedef char pixel_shader_key_size_assert[sizeof(struct nv2a_pixel_shader_key) % 4 == 0 ? 1 : -1];
@@ -2204,6 +2239,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->texture_scale = glGetUniformLocation(entry->program, "texture_scale");
 	entry->texture_lod_bias = glGetUniformLocation(entry->program, "texture_lod_bias");
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
+	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		char name[8];
@@ -2746,6 +2782,29 @@ static void draw_flush(void)
 #endif
 }
 
+/* display.per_pixel_lighting: the model lighting programs' draws are lit for
+each pixel (nv2a_psh.c model_lighting), from shaders of their own; read
+again when a setting changes */
+static BOOL per_pixel_lighting(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	static BOOL enabled;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		enabled = config_boolean("display.per_pixel_lighting") != 0;
+	}
+	return enabled;
+}
+
+/* the vertex constant register of each of the per-pixel lighting's
+(XGPU_MODEL_LIGHT_COUNT) */
+static unsigned long model_light_register(int light)
+{
+	return (unsigned long)(XGPU_VERTEX_CONSTANT_BIAS + (light ? -80 + light : -82));
+}
+
 static struct program_entry *prepare_draw(BOOL immediate)
 {
 	struct vertex_shader_object *program = current_program();
@@ -2803,7 +2862,23 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
 #endif
 
-	entry = program_get(vertex_shader_get(program, immediate), fragment_shader_get(&key));
+	entry = NULL;
+	if (program->lighting.lights && !program->lighting_failed && per_pixel_lighting())
+	{
+		key.per_pixel_lighting = (unsigned char)program->lighting.lights;
+		entry = program_get(vertex_shader_get(program, immediate, TRUE), fragment_shader_get(&key));
+		if (!entry)
+		{
+			/* drawn as the vertex shader lights it instead (not at all,
+			were it to fail too) */
+			platform_log("GPU: vertex shader %lu cannot be lit for each pixel here (refer to the shader log above): "
+				"lit for each vertex", program->id);
+			program->lighting_failed = TRUE;
+			key.per_pixel_lighting = 0;
+		}
+	}
+	if (!entry)
+		entry = program_get(vertex_shader_get(program, immediate, FALSE), fragment_shader_get(&key));
 	if (!entry)
 	{
 		stats.skipped_link++;
@@ -2874,6 +2949,27 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		constants_checkpoint_serial = constants_serial;
 		constants_checkpoint_first = XGPU_VERTEX_CONSTANT_COUNT;
 		constants_checkpoint_last = 0;
+	}
+	/* the lights of a draw lit for each pixel, from the same registers, when
+	any of them changed since the program last had them */
+	if (entry->model_lights >= 0 && entry->model_lights_serial != constants_serial)
+	{
+		int light;
+
+		for (light = 0; light < XGPU_MODEL_LIGHT_COUNT; light++)
+		{
+			if (constant_serials[model_light_register(light)] > entry->model_lights_serial)
+				break;
+		}
+		if (light < XGPU_MODEL_LIGHT_COUNT)
+		{
+			float lights[XGPU_MODEL_LIGHT_COUNT][4];
+
+			for (light = 0; light < XGPU_MODEL_LIGHT_COUNT; light++)
+				memcpy(lights[light], device.constants[model_light_register(light)], sizeof(lights[0]));
+			glUniform4fv(entry->model_lights, XGPU_MODEL_LIGHT_COUNT, lights[0]);
+		}
+		entry->model_lights_serial = constants_serial;
 	}
 
 	/* the state the other uniforms come from: most draws share it with the
