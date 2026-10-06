@@ -279,18 +279,10 @@ floating-point contraction, as on x86.
 
 ### Game source changes
 
-The port's code tells three things apart, each its own macro, which the
-Android build defines all of (`tools/android_build.py`):
-
-- `HALO_ARM64_GUEST`: the guest's ABI (ILP32 AArch64 code in a 64-bit
-  process);
-- `HALO_GLES`: the OpenGL ES renderer;
-- `HALO_ANDROID`: the app (its display, input, files and lifecycle).
-
-
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ARM64_GUEST`:
+These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
+shares:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.
