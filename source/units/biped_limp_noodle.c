@@ -32,6 +32,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
@@ -89,6 +90,9 @@ static void biped_limp_noodle_adjust_orientations(
 	real_matrix4x3 *node_matrices,
 	long node_count,
 	real_point3d const *last_positions);
+static boolean biped_limp_noodle_nodes_valid(
+	long biped_index,
+	struct animation_graph const *animation_graph);
 /* ---------- globals */
 
 static struct collision_feature_list features;
@@ -526,9 +530,11 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 					}
 					else
 					{
-						if (node->next_sibling_node_index != NONE)
+						/* port: no more than node_queue holds (a map's links,
+						which could go in a loop) */
+						if (node->next_sibling_node_index != NONE && queue_tail < (short)NUMBEROF(node_queue))
 							node_queue[queue_tail++] = node->next_sibling_node_index;
-						if (node->first_child_node_index != NONE)
+						if (node->first_child_node_index != NONE && queue_tail < (short)NUMBEROF(node_queue))
 							node_queue[queue_tail++] = node->first_child_node_index;
 						continue;
 					}
@@ -536,9 +542,11 @@ static void biped_limp_noodle_move_relax_and_constrain_positions(
 			}
 
 next_node:
-			if (node->next_sibling_node_index != NONE)
+			/* port: no more than node_queue holds (a map's links, which could
+			go in a loop) */
+			if (node->next_sibling_node_index != NONE && queue_tail < (short)NUMBEROF(node_queue))
 				node_queue[queue_tail++] = node->next_sibling_node_index;
-			if (node->first_child_node_index != NONE)
+			if (node->first_child_node_index != NONE && queue_tail < (short)NUMBEROF(node_queue))
 				node_queue[queue_tail++] = node->first_child_node_index;
 		}
 		while (queue_head != queue_tail);
@@ -701,6 +709,14 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 		biped->biped.limp_body_current_relaxation_iterations >=
 		biped->biped.limp_body_max_relaxation_iterations;
 
+	/* port: a graph whose nodes don't fit the biped is done relaxing (a
+	map's counts and links) */
+	if (!relaxation_complete &&
+		!biped_limp_noodle_nodes_valid(biped_index, animation_graph))
+	{
+		relaxation_complete = TRUE;
+	}
+
 	if (!relaxation_complete)
 	{
 		long node_index;
@@ -723,4 +739,45 @@ boolean biped_limp_noodle_relax_nodes_onto_environment(
 	}
 
 	return relaxation_complete;
+}
+
+/* port: TRUE when the graph's nodes fit last_positions, node_queue and the
+biped's node matrices, and every link names one of them (a map's counts and
+indices). The relaxation walks them without checking. Released bipeds have at
+most 41 nodes, as many as their models, and no bad links. */
+static boolean biped_limp_noodle_nodes_valid(
+	long biped_index,
+	struct animation_graph const *animation_graph)
+{
+	static boolean reported = FALSE;
+	struct object_datum *object = object_get(biped_index);
+	long node_count = animation_graph->nodes.count;
+	boolean valid = node_count > 0 &&
+		node_count <= MAXIMUM_NODES_PER_ANIMATION &&
+		node_count <= object->object.node_matrices.size / (long)sizeof(real_matrix4x3);
+	long node_index;
+
+	for (node_index = 0; valid && node_index < node_count; node_index++)
+	{
+		struct animation_graph_node *node = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->nodes,
+			node_index,
+			struct animation_graph_node);
+
+		if ((node->next_sibling_node_index != NONE && !VALID_INDEX(node->next_sibling_node_index, node_count)) ||
+			(node->first_child_node_index != NONE && !VALID_INDEX(node->first_child_node_index, node_count)) ||
+			(node_index && !VALID_INDEX(node->parent_node_index, node_count)))
+		{
+			valid = FALSE;
+		}
+	}
+
+	if (!valid && !reported)
+	{
+		reported = TRUE;
+		error(_error_silent, "### ERROR %s has %ld animation nodes or a bad node link; its body doesn't relax",
+			tag_get_name(object->definition_index), node_count);
+	}
+
+	return valid;
 }

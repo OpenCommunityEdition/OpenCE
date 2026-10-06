@@ -237,6 +237,18 @@ short hs_global_get_type(
 	short global_index);
 char const *hs_global_get_name(
 	short global_index);
+/* port: the map's scripts and global initializers that call a function a
+map's scripts may not (hs_scenario_functions_check) */
+boolean hs_scenario_script_disabled(
+	short script_index);
+boolean hs_scenario_global_initializer_disabled(
+	short global_index);
+
+/* ---------- prototypes/HS_GLOBALS_EXTERNAL.C */
+
+/* port: the external globals a map's scripts may set */
+boolean hs_external_global_settable_by_maps(
+	short global_index);
 /* ---------- prototypes/HS_COMPILE.C */
 
 void hs_compile_initialize(

@@ -1038,6 +1038,45 @@ static void get_particle_world_position(
 	return;
 }
 
+
+/* port: a particle's time moved back into its glow's length (total, more
+than 0): one length at a time, as the game did, unless it is past by more
+than a length (a length too short to change the time would never get
+there): then to within a length past it first, where the game's loop ends
+on the same value (a time of a whole number of lengths ends at total) */
+static real glow_time_wrap_down(
+	real t,
+	real total)
+{
+	if (!(t < 2.0f * total))
+	{
+		t = total + (real)fmod(t - total, total);
+		if (!(t == t))
+			return 0.0f;
+	}
+	while (t > total)
+		t -= total;
+
+	return t;
+}
+
+static real glow_time_wrap_up(
+	real t,
+	real total)
+{
+	if (!(t > -total))
+	{
+		t = (real)fmod(t, total);
+		if (t < 0.0f)
+			t += total;
+		return t == t ? t : 0.0f;
+	}
+	while (t < 0.0f)
+		t += total;
+
+	return t;
+}
+
 static void glow_normal_particle_update_position(
 	long object_index,
 	struct glow_datum *glow,
@@ -1064,7 +1103,14 @@ static void glow_normal_particle_update_position(
 			definition->minimum_distance_to_object;
 	}
 
-	if (TEST_FLAG(particle->flags, _glow_particle_moving_backwards_bit))
+	/* port: a glow whose markers are all in one place (a model's) has no
+	length to move along: its particles stay at the start, as the loops
+	below would never end */
+	if (!(glow->total_time > 0.0f))
+	{
+		particle->t = 0.0f;
+	}
+	else if (TEST_FLAG(particle->flags, _glow_particle_moving_backwards_bit))
 	{
 		particle->t -= elapsed_time;
 
@@ -1073,16 +1119,14 @@ static void glow_normal_particle_update_position(
 			case _glow_boundary_effect_bounce:
 				if (particle->t < 0.0f)
 				{
-					while (particle->t < 0.0f)
-						particle->t += glow->total_time;
+					particle->t = glow_time_wrap_up(particle->t, glow->total_time);
 					particle->t = glow->total_time - particle->t;
 					SET_FLAG(particle->flags, _glow_particle_moving_backwards_bit, FALSE);
 				}
 				break;
 
 			case _glow_boundary_effect_wrap:
-				while (particle->t < 0.0f)
-					particle->t += glow->total_time;
+				particle->t = glow_time_wrap_up(particle->t, glow->total_time);
 				break;
 
 			default:
@@ -1099,16 +1143,14 @@ static void glow_normal_particle_update_position(
 			case _glow_boundary_effect_bounce:
 				if (particle->t > glow->total_time)
 				{
-					while (particle->t > glow->total_time)
-						particle->t -= glow->total_time;
+					particle->t = glow_time_wrap_down(particle->t, glow->total_time);
 					particle->t = glow->total_time - particle->t;
 					SET_FLAG(particle->flags, _glow_particle_moving_backwards_bit, TRUE);
 				}
 				break;
 
 			case _glow_boundary_effect_wrap:
-				while (particle->t > glow->total_time)
-					particle->t -= glow->total_time;
+				particle->t = glow_time_wrap_down(particle->t, glow->total_time);
 				break;
 
 			default:

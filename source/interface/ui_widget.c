@@ -2230,10 +2230,17 @@ void ui_widget_delete(
 		if (handler->event_type == _widget_event_deleted &&
 			TEST_FLAG(handler->flags, _event_handler_run_function_bit))
 		{
+			/* port: an event of nothing, not none: a map's widget may name a
+			function for this handler that reads its event */
+			static struct event_record no_event;
 			boolean widget_deleted = FALSE;
-			boolean handled = ui_widget_event_handler_function_invoke(
+			boolean handled;
+
+			csmemset(&no_event, 0, sizeof(no_event));
+			no_event.controller_index = NONE;
+			handled = ui_widget_event_handler_function_invoke(
 				widget,
-				NULL,
+				&no_event,
 				handler->function,
 				&widget_deleted);
 
@@ -4047,8 +4054,27 @@ void draw_string_and_hack_in_icons(
 {
 	wchar_t *current = string_data;
 	rectangle2d cursor_bounds = *bounds;
+	unsigned long length;
 
-	wcscpy(string_data, instring);
+	/* port: no more than the buffer holds (the text is the map's: a string
+	list's or a hud message's; retail strings are up to 398 characters of
+	1024). A longer one is cut, said once. */
+	for (length = 0; length < NUMBEROF(string_data) - 1 && instring[length]; length++)
+		string_data[length] = instring[length];
+	string_data[length] = 0;
+	if (instring[length])
+	{
+		static boolean long_string_reported = FALSE;
+
+		if (!long_string_reported)
+		{
+			long_string_reported = TRUE;
+			error(
+				_error_silent,
+				"string of more than %d characters cut",
+				(long)NUMBEROF(string_data) - 1);
+		}
+	}
 	while (current)
 	{
 		wchar_t *icon_spec = wcschr(current, L'%');

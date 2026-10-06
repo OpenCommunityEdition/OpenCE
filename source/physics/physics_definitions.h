@@ -21,6 +21,16 @@ enum
 	POINT_PHYSICS_DEFINITION_VERSION = 1,
 };
 
+enum
+{
+	/* port: the most mass points and powered mass points of a physics
+	(from the map) the engine uses: what physics_update's callers hold
+	(vehicle_update's arrays, vehicles.c). The retail physics have at most
+	22 and 2 */
+	MAXIMUM_MASS_POINTS_PER_PHYSICS = 32,
+	MAXIMUM_POWERED_MASS_POINTS_PER_PHYSICS = 32,
+};
+
 /* ---------- macros */
 
 #define physics_definition_get(index) ((struct physics_definition *)tag_get(POINT_PHYSICS_DEFINITION_TAG, index))

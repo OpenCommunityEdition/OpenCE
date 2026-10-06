@@ -2647,6 +2647,7 @@ static void biped_update_physics(
 				physics->existing_support_surface_index,
 				struct collision_surface);
 			long edge_index = surface->first_edge_index;
+			short edge_count = 0;
 			real_plane3d plane;
 			real_plane3d best_plane;
 			real best_velocity_dot;
@@ -2664,14 +2665,41 @@ static void biped_update_physics(
 
 			do
 			{
-				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+				struct collision_edge *edge;
+				boolean reverse;
+				long neighbor_surface_index;
+
+				/* port: the surface's ring of edges ends as
+				collision_surface_edge_ring_continues says, or at an edge
+				whose vertices aren't the bsp's (a map's indices; the
+				retail rings all close within 3 to 8 edges) */
+				if (!collision_surface_edge_ring_continues(bsp, edge_index, edge_count++))
+				{
+					break;
+				}
+				edge = TAG_BLOCK_GET_ELEMENT(
 					&bsp->edges,
 					edge_index,
 					struct collision_edge);
-				boolean reverse = physics->existing_support_surface_index == edge->surface_indices[1];
-				long neighbor_surface_index = edge->surface_indices[!reverse];
+				if (!VALID_INDEX(edge->vertex_indices[0], bsp->vertices.count) ||
+					!VALID_INDEX(edge->vertex_indices[1], bsp->vertices.count))
+				{
+					static boolean reported = FALSE;
 
-				if (neighbor_surface_index != NONE)
+					if (!reported)
+					{
+						reported = TRUE;
+						error(_error_silent, "collision edge #%ld's vertices are not the bsp's", edge_index);
+					}
+					break;
+				}
+				reverse = physics->existing_support_surface_index == edge->surface_indices[1];
+				neighbor_surface_index = edge->surface_indices[!reverse];
+
+				/* port: (and a neighbor that is no surface of the bsp's is
+				none) */
+				if (neighbor_surface_index != NONE &&
+					collision_bsp_valid_surface_index(bsp, neighbor_surface_index))
 				{
 					struct collision_surface *neighbor_surface = TAG_BLOCK_GET_ELEMENT(
 						&bsp->surfaces,

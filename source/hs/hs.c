@@ -3614,6 +3614,19 @@ static boolean hs_scenario_string_constants_valid(
 	struct scenario const *scenario);
 static void hs_scenario_scripts_disable(
 	struct scenario *scenario);
+/* port: the script function allowlist */
+static struct hs_syntax_node const *hs_syntax_try_get(
+	long expression_index);
+static boolean hs_syntax_node_linked_twice(
+	long expression_index);
+static short hs_syntax_node_refusal(
+	struct hs_syntax_node const *expression,
+	char const **name);
+static short hs_expression_refusal(
+	long root_expression_index,
+	char const **name);
+static void hs_scenario_functions_check(
+	struct scenario *scenario);
 static boolean hs_rebuild_source(
 	void);
 static boolean hs_compile_source(
@@ -3627,6 +3640,27 @@ boolean hs_scenario_postprocess(
 /* port: the size of the "hs globals" array (hs_runtime_initialize), which
 holds the external globals and the map's */
 #define MAXIMUM_HS_GLOBALS 0x400
+/* port: the scripts block's maximum (hs_scripts_block) */
+#define MAXIMUM_HS_SCRIPTS_PER_SCENARIO 512
+
+/* port: a script node's flags (as hs_compile.c and hs_runtime.c have them) */
+enum
+{
+	_hs_syntax_node_primitive_bit = 0,
+	_hs_syntax_node_script_bit,
+	_hs_syntax_node_variable_bit,
+	_hs_syntax_node_permanent_bit,
+};
+
+/* port: why a map's script may not have a node (hs_syntax_node_refusal) */
+enum
+{
+	_hs_node_refusal_none = 0,
+	_hs_node_refusal_function,
+	_hs_node_refusal_global,
+	_hs_node_refusal_arguments,
+	_hs_node_refusal_damaged,
+};
 
 /* ---------- globals */
 
@@ -3636,6 +3670,12 @@ static char const **enumeration_results = NULL;
 static char const *hs_enumeration_substring = NULL;
 static boolean hs_recompile_pending = FALSE;
 static boolean hs_syntax_data_allocated = FALSE;
+/* port: the map's scripts and global initializers that call a function
+maps may not (hs_scenario_functions_check) */
+static unsigned long hs_scenario_disabled_scripts[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_HS_SCRIPTS_PER_SCENARIO)];
+static unsigned long hs_scenario_disabled_globals[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_HS_GLOBALS)];
+/* port: the nodes linked to, then walked (hs_scenario_functions_check) */
+static unsigned long hs_syntax_nodes_marked[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO)];
 #define hs_token_enumerators hs_function_table.token_enumerators
 struct data_array *hs_syntax_data;
 extern long global_scenario_index;
@@ -12044,6 +12084,519 @@ struct hs_function_table_storage hs_function_table=
 	},
 };
 
+/* port: the functions a map's scripts may call, by the function table's
+index (hs_scenario_functions_check). The console's expressions may call
+any. Allowed are gameplay's: AI, objects, units, devices, cinematics,
+the camera, sound, the HUD, and the game progress and checkpoints the
+shipped campaign uses. Not allowed are files, raw game state (core\),
+the console's and the developer's tools (debug, profiling, cheats,
+crash), switching maps or the game engine, the network, and the
+player's own settings. Every function the shipped maps' scripts call is
+allowed (291 of them). A function added to the table is not allowed until
+it is listed here */
+static boolean const hs_function_allowed_in_maps[]=
+{
+	/* the language: forms, logic, arithmetic, threads, casts */
+	TRUE, /* begin */
+	TRUE, /* begin_random */
+	TRUE, /* if */
+	FALSE, /* cond: compiled to if, it has no evaluator */
+	TRUE, /* set */
+	TRUE, /* and */
+	TRUE, /* or */
+	TRUE, /* + */
+	TRUE, /* - */
+	TRUE, /* * */
+	TRUE, /* / */
+	TRUE, /* min */
+	TRUE, /* max */
+	TRUE, /* = */
+	TRUE, /* != */
+	TRUE, /* > */
+	TRUE, /* < */
+	TRUE, /* >= */
+	TRUE, /* <= */
+	TRUE, /* sleep */
+	TRUE, /* sleep_until */
+	TRUE, /* wake */
+	TRUE, /* inspect */
+	TRUE, /* unit */
+	FALSE, /* ai_debug_communication_suppress: AI debugging */
+	FALSE, /* ai_debug_communication_ignore: AI debugging */
+	FALSE, /* ai_debug_communication_focus: AI debugging */
+	TRUE, /* not */
+	TRUE, /* print */
+
+	/* players, trigger volumes, objects, effects, damage */
+	TRUE, /* players */
+	TRUE, /* volume_teleport_players_not_inside */
+	TRUE, /* volume_test_object */
+	TRUE, /* volume_test_objects */
+	TRUE, /* volume_test_objects_all */
+	TRUE, /* object_teleport */
+	TRUE, /* object_set_facing */
+	TRUE, /* object_set_shield */
+	TRUE, /* object_set_permutation */
+	TRUE, /* object_create */
+	TRUE, /* object_destroy */
+	TRUE, /* object_create_anew */
+	TRUE, /* object_create_containing */
+	TRUE, /* object_create_anew_containing */
+	TRUE, /* object_destroy_containing */
+	TRUE, /* object_destroy_all */
+	TRUE, /* list_get */
+	TRUE, /* list_count */
+	TRUE, /* effect_new */
+	TRUE, /* effect_new_on_object_marker */
+	TRUE, /* damage_new */
+	TRUE, /* damage_object */
+	TRUE, /* objects_can_see_object */
+	TRUE, /* objects_can_see_flag */
+	TRUE, /* objects_delete_by_definition */
+
+	/* sound gain; the console */
+	FALSE, /* sound_set_gain: the master gain, the player's setting */
+	FALSE, /* sound_get_gain: the master gain, the player's setting */
+	FALSE, /* script_recompile: the console */
+	FALSE, /* script_doc: writes hs_doc.txt */
+	FALSE, /* help: the console */
+
+	/* random numbers, the countdown timer, recordings, objects */
+	TRUE, /* random_range */
+	TRUE, /* real_random_range */
+	TRUE, /* numeric_countdown_timer_set */
+	TRUE, /* numeric_countdown_timer_get */
+	TRUE, /* numeric_countdown_timer_stop */
+	TRUE, /* numeric_countdown_timer_restart */
+	TRUE, /* breakable_surfaces_enable */
+	TRUE, /* recording_play */
+	TRUE, /* recording_play_and_delete */
+	TRUE, /* recording_play_and_hover */
+	TRUE, /* recording_kill */
+	TRUE, /* recording_time */
+	TRUE, /* object_set_ranged_attack_inhibited */
+	TRUE, /* object_set_melee_attack_inhibited */
+	FALSE, /* objects_dump_memory: a debug dump */
+	TRUE, /* object_set_collideable */
+	TRUE, /* object_set_scale */
+	TRUE, /* objects_attach */
+	TRUE, /* objects_detach */
+	TRUE, /* garbage_collect_now */
+	TRUE, /* object_cannot_take_damage */
+	TRUE, /* object_can_take_damage */
+	TRUE, /* object_beautify */
+	TRUE, /* objects_predict */
+	TRUE, /* object_type_predict */
+	TRUE, /* object_pvs_activate */
+	TRUE, /* object_pvs_set_object */
+	TRUE, /* object_pvs_set_camera */
+	TRUE, /* object_pvs_clear */
+	TRUE, /* render_lights */
+
+	/* scenery */
+	TRUE, /* scenery_get_animation_time */
+	TRUE, /* scenery_animation_start */
+	TRUE, /* scenery_animation_start_at_frame */
+	FALSE, /* render_effects: a render debug toggle */
+
+	/* units and vehicles */
+	TRUE, /* unit_can_blink */
+	TRUE, /* unit_open */
+	TRUE, /* unit_close */
+	TRUE, /* unit_kill */
+	TRUE, /* unit_kill_silent */
+	TRUE, /* unit_get_custom_animation_time */
+	TRUE, /* unit_stop_custom_animation */
+	TRUE, /* unit_custom_animation_at_frame */
+	TRUE, /* custom_animation */
+	TRUE, /* custom_animation_list */
+	TRUE, /* unit_is_playing_custom_animation */
+	TRUE, /* unit_aim_without_turning */
+	TRUE, /* unit_set_emotion */
+	TRUE, /* unit_set_enterable_by_player */
+	TRUE, /* unit_enter_vehicle */
+	TRUE, /* vehicle_test_seat_list */
+	TRUE, /* vehicle_test_seat */
+	TRUE, /* unit_set_emotion_animation */
+	TRUE, /* unit_exit_vehicle */
+	TRUE, /* unit_set_maximum_vitality */
+	TRUE, /* units_set_maximum_vitality */
+	TRUE, /* unit_set_current_vitality */
+	TRUE, /* units_set_current_vitality */
+	TRUE, /* vehicle_load_magic */
+	TRUE, /* vehicle_unload */
+	TRUE, /* magic_seat_name */
+	TRUE, /* unit_set_seat */
+	TRUE, /* magic_melee_attack */
+	TRUE, /* vehicle_riders */
+	TRUE, /* vehicle_driver */
+	TRUE, /* vehicle_gunner */
+	TRUE, /* unit_get_health */
+	TRUE, /* unit_get_shield */
+	TRUE, /* unit_get_total_grenade_count */
+	TRUE, /* unit_has_weapon */
+	TRUE, /* unit_has_weapon_readied */
+	TRUE, /* unit_doesnt_drop_items */
+	TRUE, /* unit_impervious */
+	TRUE, /* unit_suspended */
+	TRUE, /* unit_solo_player_integrated_night_vision_is_active */
+	TRUE, /* units_set_desired_flashlight_state */
+	TRUE, /* unit_set_desired_flashlight_state */
+	TRUE, /* unit_get_current_flashlight_state */
+
+	/* devices, breakable surfaces */
+	TRUE, /* device_set_never_appears_locked */
+	TRUE, /* device_get_power */
+	TRUE, /* device_set_power */
+	TRUE, /* device_set_position */
+	TRUE, /* device_get_position */
+	TRUE, /* device_set_position_immediate */
+	TRUE, /* device_group_get */
+	TRUE, /* device_group_set */
+	TRUE, /* device_group_set_immediate */
+	TRUE, /* device_one_sided_set */
+	TRUE, /* device_operates_automatically_set */
+	TRUE, /* device_group_change_only_once_more_set */
+	TRUE, /* breakable_surfaces_reset */
+
+	/* cheats */
+	FALSE, /* cheat_all_powerups: a cheat */
+	FALSE, /* cheat_all_weapons: a cheat */
+	FALSE, /* cheat_all_vehicles: a cheat */
+	FALSE, /* cheat_teleport_to_camera: a cheat */
+	FALSE, /* cheat_active_camouflage: a cheat */
+	FALSE, /* cheat_active_camouflage_local_player: a cheat */
+	FALSE, /* cheats_load: reads cheats.txt */
+
+	/* AI */
+	TRUE, /* ai_free */
+	TRUE, /* ai_free_units */
+	TRUE, /* ai_attach */
+	TRUE, /* ai_attach_free */
+	TRUE, /* ai_detach */
+	TRUE, /* ai_place */
+	TRUE, /* ai_kill */
+	TRUE, /* ai_kill_silent */
+	TRUE, /* ai_erase */
+	TRUE, /* ai_erase_all */
+	FALSE, /* ai_select: AI debugging (the debug selection) */
+	FALSE, /* ai_deselect: AI debugging (the debug selection) */
+	TRUE, /* ai_spawn_actor */
+	TRUE, /* ai_set_respawn */
+	TRUE, /* ai_set_deaf */
+	TRUE, /* ai_set_blind */
+	TRUE, /* ai_magically_see_encounter */
+	TRUE, /* ai_magically_see_players */
+	TRUE, /* ai_magically_see_unit */
+	TRUE, /* ai_timer_start */
+	TRUE, /* ai_timer_expire */
+	TRUE, /* ai_attack */
+	TRUE, /* ai_defend */
+	TRUE, /* ai_retreat */
+	TRUE, /* ai_maneuver */
+	TRUE, /* ai_maneuver_enable */
+	TRUE, /* ai_migrate */
+	TRUE, /* ai_migrate_and_speak */
+	TRUE, /* ai_migrate_by_unit */
+	TRUE, /* ai_allegiance */
+	TRUE, /* ai_allegiance_remove */
+	TRUE, /* ai_living_count */
+	TRUE, /* ai_living_fraction */
+	TRUE, /* ai_strength */
+	TRUE, /* ai_swarm_count */
+	TRUE, /* ai_nonswarm_count */
+	TRUE, /* ai_actors */
+	TRUE, /* ai_go_to_vehicle */
+	TRUE, /* ai_go_to_vehicle_override */
+	TRUE, /* ai_going_to_vehicle */
+	TRUE, /* ai_exit_vehicle */
+	TRUE, /* ai_braindead */
+	TRUE, /* ai_braindead_by_unit */
+	TRUE, /* ai_disregard */
+	TRUE, /* ai_prefer_target */
+	TRUE, /* ai_teleport_to_starting_location */
+	TRUE, /* ai_teleport_to_starting_location_if_unsupported */
+	TRUE, /* ai_renew */
+	TRUE, /* ai_try_to_fight_nothing */
+	TRUE, /* ai_try_to_fight */
+	TRUE, /* ai_try_to_fight_player */
+	TRUE, /* ai_command_list */
+	TRUE, /* ai_command_list_by_unit */
+	TRUE, /* ai_command_list_advance */
+	TRUE, /* ai_command_list_advance_by_unit */
+	TRUE, /* ai_command_list_status */
+	TRUE, /* ai_is_attacking */
+	TRUE, /* ai_force_active */
+	TRUE, /* ai_force_active_by_unit */
+	TRUE, /* ai_set_return_state */
+	TRUE, /* ai_set_current_state */
+	TRUE, /* ai_playfight */
+	TRUE, /* ai_status */
+	TRUE, /* ai_reconnect */
+	TRUE, /* ai_vehicle_encounter */
+	TRUE, /* ai_vehicle_enterable_distance */
+	TRUE, /* ai_vehicle_enterable_team */
+	TRUE, /* ai_vehicle_enterable_actor_type */
+	TRUE, /* ai_vehicle_enterable_actors */
+	TRUE, /* ai_vehicle_enterable_disable */
+	TRUE, /* ai_look_at_object */
+	TRUE, /* ai_stop_looking */
+	TRUE, /* ai_automatic_migration_target */
+	TRUE, /* ai_follow_target_disable */
+	TRUE, /* ai_follow_target_players */
+	TRUE, /* ai_follow_target_unit */
+	TRUE, /* ai_follow_target_ai */
+	TRUE, /* ai_follow_distance */
+	TRUE, /* ai_conversation */
+	TRUE, /* ai_conversation_stop */
+	TRUE, /* ai_conversation_advance */
+	TRUE, /* ai_conversation_line */
+	TRUE, /* ai_conversation_status */
+	TRUE, /* ai_link_activation */
+	TRUE, /* ai_berserk */
+	TRUE, /* ai_set_team */
+	TRUE, /* ai_allow_charge */
+	TRUE, /* ai_allow_dormant */
+	TRUE, /* ai_allegiance_broken */
+
+	/* the camera */
+	TRUE, /* camera_control */
+	TRUE, /* camera_set */
+	TRUE, /* camera_set_relative */
+	TRUE, /* camera_set_animation */
+	TRUE, /* camera_set_first_person */
+	TRUE, /* camera_set_dead */
+	TRUE, /* camera_time */
+
+	/* the game: speed, time, difficulty, map, BSP; developer tools */
+	FALSE, /* debug_camera_load: reads the saved camera file */
+	FALSE, /* debug_camera_save: writes the saved camera file */
+	TRUE, /* game_speed */
+	TRUE, /* game_time */
+	FALSE, /* game_variant: sets the game engine */
+	TRUE, /* game_difficulty_get */
+	TRUE, /* game_difficulty_get_real */
+	FALSE, /* map_reset: restarts the map */
+	FALSE, /* map_name: switches map */
+	FALSE, /* multiplayer_map_name: switches map */
+	FALSE, /* game_difficulty_set: the next map's difficulty */
+	FALSE, /* crash: crashes */
+	TRUE, /* switch_bsp */
+	TRUE, /* structure_bsp_index */
+	FALSE, /* version: the console */
+	FALSE, /* playback: film playback */
+	FALSE, /* texture_cache_flush: a developer tool */
+	FALSE, /* sound_cache_flush: a developer tool */
+	FALSE, /* debug_memory: a debug dump */
+	FALSE, /* debug_memory_by_file: a debug dump */
+	FALSE, /* debug_memory_for_file: a debug dump */
+	FALSE, /* debug_tags: writes tag_dump.txt */
+	FALSE, /* profile_reset: profiling */
+	FALSE, /* profile_dump: profiling */
+	FALSE, /* profile_activate: profiling */
+	FALSE, /* profile_deactivate: profiling */
+	FALSE, /* profile_graph_toggle: profiling */
+	FALSE, /* debug_pvs: a render debug toggle */
+	FALSE, /* radiosity_start: a lighting tool */
+	FALSE, /* radiosity_save: a lighting tool, writes files */
+	FALSE, /* radiosity_debug_point: a lighting tool */
+
+	/* AI globals; AI debugging */
+	TRUE, /* ai */
+	TRUE, /* ai_dialogue_triggers */
+	TRUE, /* ai_grenades */
+	FALSE, /* ai_lines: AI debugging */
+	FALSE, /* ai_debug_sound_point_set: AI debugging */
+	FALSE, /* ai_debug_vocalize: AI debugging */
+	FALSE, /* ai_debug_teleport_to: AI debugging */
+	FALSE, /* ai_debug_speak: AI debugging */
+	FALSE, /* ai_debug_speak_list: AI debugging */
+
+	/* cinematics */
+	TRUE, /* fade_in */
+	TRUE, /* fade_out */
+	TRUE, /* cinematic_start */
+	TRUE, /* cinematic_stop */
+	TRUE, /* cinematic_skip_start_internal */
+	TRUE, /* cinematic_skip_stop_internal */
+	TRUE, /* cinematic_show_letterbox */
+	TRUE, /* cinematic_set_title */
+	TRUE, /* cinematic_set_title_delayed */
+	TRUE, /* cinematic_suppress_bsp_object_creation */
+	FALSE, /* attract_mode_start: leaves the game for the attract movie */
+
+	/* game progress and checkpoints (the saved-game system scripts use) */
+	TRUE, /* game_won */
+	TRUE, /* game_lost */
+	TRUE, /* game_safe_to_save */
+	TRUE, /* game_all_quiet */
+	TRUE, /* game_safe_to_speak */
+	TRUE, /* game_is_cooperative */
+	TRUE, /* game_save */
+	TRUE, /* game_save_cancel */
+	TRUE, /* game_save_no_timeout */
+	TRUE, /* game_save_totally_unsafe */
+	TRUE, /* game_saving */
+	TRUE, /* game_revert */
+	TRUE, /* game_reverted */
+
+	/* core files: raw game state */
+	FALSE, /* core_save: writes raw game state under core */
+	FALSE, /* core_save_name: writes raw game state under core */
+	FALSE, /* core_load: loads raw game state from under core */
+	FALSE, /* core_load_at_startup: loads raw game state from under core */
+	FALSE, /* core_load_name: loads raw game state from under core */
+	FALSE, /* core_load_name_at_startup: loads raw game state from under core */
+
+	/* skipping ticks, sound */
+	TRUE, /* game_skip_ticks */
+	TRUE, /* sound_impulse_start */
+	TRUE, /* sound_impulse_time */
+	TRUE, /* sound_impulse_stop */
+	TRUE, /* sound_looping_predict */
+	TRUE, /* sound_looping_start */
+	TRUE, /* sound_looping_stop */
+	TRUE, /* sound_looping_set_scale */
+	TRUE, /* sound_looping_set_alternate */
+	FALSE, /* debug_sounds_enable: sound debugging */
+	FALSE, /* debug_sounds_distances: sound debugging */
+	FALSE, /* debug_sounds_wet: sound debugging */
+	FALSE, /* sound_enable: all sound, the player's setting */
+	TRUE, /* sound_class_set_gain */
+
+	/* vehicles, players, player input tests */
+	TRUE, /* vehicle_hover */
+	TRUE, /* players_unzoom_all */
+	TRUE, /* player_enable_input */
+	TRUE, /* player_camera_control */
+	TRUE, /* player_action_test_reset */
+	TRUE, /* player_action_test_jump */
+	TRUE, /* player_action_test_primary_trigger */
+	TRUE, /* player_action_test_grenade_trigger */
+	TRUE, /* player_action_test_zoom */
+	TRUE, /* player_action_test_action */
+	TRUE, /* player_action_test_accept */
+	TRUE, /* player_action_test_back */
+	TRUE, /* player_action_test_look_relative_up */
+	TRUE, /* player_action_test_look_relative_down */
+	TRUE, /* player_action_test_look_relative_left */
+	TRUE, /* player_action_test_look_relative_right */
+	TRUE, /* player_action_test_look_relative_all_directions */
+	TRUE, /* player_action_test_move_relative_all_directions */
+	TRUE, /* player_add_equipment */
+	FALSE, /* debug_teleport_player: a debug teleport */
+
+	/* the HUD, nav points, the console, player effects, the time code */
+	TRUE, /* show_hud */
+	TRUE, /* show_hud_help_text */
+	TRUE, /* enable_hud_help_flash */
+	TRUE, /* hud_help_flash_restart */
+	TRUE, /* activate_nav_point_flag */
+	TRUE, /* activate_nav_point_object */
+	TRUE, /* activate_team_nav_point_flag */
+	TRUE, /* activate_team_nav_point_object */
+	TRUE, /* deactivate_nav_point_flag */
+	TRUE, /* deactivate_nav_point_object */
+	TRUE, /* deactivate_team_nav_point_flag */
+	TRUE, /* deactivate_team_nav_point_object */
+	TRUE, /* cls */
+	FALSE, /* error_overflow_suppression: the error log's own state */
+	FALSE, /* structure_lens_flares_place: an editing tool */
+	TRUE, /* player_effect_set_max_translation */
+	TRUE, /* player_effect_set_max_rotation */
+	TRUE, /* player_effect_set_max_rumble */
+	TRUE, /* player_effect_start */
+	TRUE, /* player_effect_stop */
+	TRUE, /* hud_show_health */
+	TRUE, /* hud_blink_health */
+	TRUE, /* hud_show_shield */
+	TRUE, /* hud_blink_shield */
+	TRUE, /* hud_show_motion_sensor */
+	TRUE, /* hud_blink_motion_sensor */
+	TRUE, /* hud_show_crosshair */
+	TRUE, /* hud_clear_messages */
+	TRUE, /* hud_set_help_text */
+	TRUE, /* hud_set_objective_text */
+	TRUE, /* hud_set_timer_time */
+	TRUE, /* hud_set_timer_warning_time */
+	TRUE, /* hud_set_timer_position */
+	TRUE, /* show_hud_timer */
+	TRUE, /* pause_hud_timer */
+	TRUE, /* hud_get_timer_ticks */
+	TRUE, /* time_code_show */
+	TRUE, /* time_code_start */
+	TRUE, /* time_code_reset */
+
+	/* the rasterizer, screen effects */
+	TRUE, /* rasterizer_decals_flush */
+	FALSE, /* rasterizer_fps_accumulate: the frame rate display */
+	TRUE, /* rasterizer_model_ambient_reflection_tint */
+	TRUE, /* rasterizer_lights_reset_for_new_map */
+	TRUE, /* script_screen_effect_set_value */
+	TRUE, /* cinematic_screen_effect_start */
+	TRUE, /* cinematic_screen_effect_set_convolution */
+	TRUE, /* cinematic_screen_effect_set_filter */
+	TRUE, /* cinematic_screen_effect_set_filter_desaturation_tint */
+	TRUE, /* cinematic_screen_effect_set_video */
+	TRUE, /* cinematic_screen_effect_stop */
+	TRUE, /* cinematic_set_near_clip_distance */
+
+	/* saved-game devices, profiles, the network, menus, help */
+	FALSE, /* enumerate_memory_units: the saved-game devices */
+	FALSE, /* delete_save_game_files: deletes profiles and saved games */
+	FALSE, /* fast_setup_network_server: starts a network game */
+	FALSE, /* profile_unlock_solo_levels: the player's profile */
+	TRUE, /* player0_look_invert_pitch */
+	TRUE, /* player0_look_pitch_is_inverted */
+	TRUE, /* player0_joystick_set_is_normal */
+	FALSE, /* ui_widget_show_path: a menu debug toggle */
+	TRUE, /* display_scenario_help */
+	FALSE, /* network_game_start_now: starts a network game */
+	FALSE, /* xbox_set_machine_name: the machine's name */
+};
+typedef char verify_hs_function_allowed_in_maps_size[
+	NUMBEROF(hs_function_allowed_in_maps) == NUMBEROF(hs_function_table.functions) ? 1 : -1];
+
+/* port: the arguments the special forms' evaluators read (hs_runtime.c), by
+the function table's index; NONE is any number (hs_syntax_node_refusal). The
+rest's are their parameters'. The shipped maps' all have these */
+static struct
+{
+	short minimum;
+	short maximum;
+} const hs_special_form_argument_counts[]=
+{
+	{ 0, NONE }, /* begin */
+	{ 1, 32 }, /* begin_random: its bit vector holds 32 */
+	{ 2, 3 }, /* if */
+	{ 0, NONE }, /* cond (a map may not call it) */
+	{ 2, 2 }, /* set */
+	{ 0, NONE }, /* and */
+	{ 0, NONE }, /* or */
+	{ 0, NONE }, /* + */
+	{ 0, NONE }, /* - */
+	{ 0, NONE }, /* * */
+	{ 0, NONE }, /* / */
+	{ 0, NONE }, /* min */
+	{ 0, NONE }, /* max */
+	{ 2, 2 }, /* = */
+	{ 2, 2 }, /* != */
+	{ 2, 2 }, /* > */
+	{ 2, 2 }, /* < */
+	{ 2, 2 }, /* >= */
+	{ 2, 2 }, /* <= */
+	{ 1, 2 }, /* sleep */
+	{ 1, 3 }, /* sleep_until */
+	{ 1, 1 }, /* wake */
+	{ 1, 1 }, /* inspect */
+	{ 1, 1 }, /* unit */
+	{ 0, NONE }, /* ai_debug_communication_suppress */
+	{ 0, NONE }, /* ai_debug_communication_ignore */
+	{ 0, NONE }, /* ai_debug_communication_focus */
+};
+typedef char verify_hs_special_form_argument_counts_size[
+	NUMBEROF(hs_special_form_argument_counts) == _hs_function_debug_string__last+1 ? 1 : -1];
+
 /* ---------- public code */
 
 boolean hs_scenario_merge(
@@ -12169,6 +12722,398 @@ static void hs_scenario_scripts_disable(
 	scenario->hs_globals.count = 0;
 
 	return;
+}
+
+/* port: a script node as datum_get finds it (the array's count bounds it),
+or NULL */
+static struct hs_syntax_node const *hs_syntax_try_get(
+	long expression_index)
+{
+	if (DATUM_INDEX_TO_ABSOLUTE_INDEX(expression_index)>=hs_syntax_data->count)
+		return NULL;
+
+	return (struct hs_syntax_node const *)datum_try_and_get(hs_syntax_data, expression_index);
+}
+
+/* port: marks the node a link names, and whether a link had already: a node
+two links name (or a loop) is as damaged as the shipped maps' never are */
+static boolean hs_syntax_node_linked_twice(
+	long expression_index)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(expression_index);
+	boolean twice;
+
+	if (expression_index == NONE || !hs_syntax_try_get(expression_index))
+		return FALSE;
+	twice = BIT_VECTOR_TEST_FLAG(hs_syntax_nodes_marked, absolute_index);
+	BIT_VECTOR_SET_FLAG(hs_syntax_nodes_marked, absolute_index, TRUE);
+
+	return twice;
+}
+
+/* port: why a map's script may not have the node (_hs_node_refusal_none if
+it may), and the function or global it names. A map may not have:
+- a link (to the next argument, or a call's first node) that isn't a node:
+the runtime goes through it (hs_syntax_get);
+- a call to a function a map may not call (hs_function_allowed_in_maps), or
+with arguments its evaluator would read past (hs_arguments_evaluate, the
+special forms', begin_random's bit vector of 32);
+- a set whose variable isn't a global's name (hs_evaluate_set takes its index
+from the node as it is), or names an external global a map may not set
+(hs_external_global_settable_by_maps);
+- a wake whose argument isn't a script.
+Only a node with a value's type that is neither a constant nor a script's
+call is a function's call (hs_evaluate, hs_thread_main); its function's and
+its globals' indices are the ones hs_compile_postprocess found by name */
+static short hs_syntax_node_refusal(
+	struct hs_syntax_node const *expression,
+	char const **name)
+{
+	struct hs_syntax_node const *predicate;
+	struct hs_syntax_node const *first_argument = NULL;
+	struct hs_function_definition const *function;
+	short function_index;
+	short minimum_count;
+	short maximum_count;
+
+	*name = NULL;
+	/* (a node that isn't permanent is a console expression's, which
+	hs_node_gc deletes from under the script) */
+	if (!TEST_FLAG(expression->flags, _hs_syntax_node_permanent_bit))
+		return _hs_node_refusal_damaged;
+	if (expression->next_node_index != NONE && !hs_syntax_try_get(expression->next_node_index))
+		return _hs_node_refusal_damaged;
+	if (TEST_FLAG(expression->flags, _hs_syntax_node_primitive_bit))
+		return _hs_node_refusal_none;
+	predicate = hs_syntax_try_get(expression->data);
+	if (!predicate)
+		return _hs_node_refusal_damaged;
+	if (TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) || !hs_type_valid(expression->type))
+		return _hs_node_refusal_none;
+
+	function_index = expression->function_index;
+	if (function_index<0 || function_index>=(short)NUMBEROF(hs_function_allowed_in_maps))
+		return _hs_node_refusal_damaged;
+	function = hs_function_get(function_index);
+	*name = function->name;
+	if (!hs_function_allowed_in_maps[function_index])
+		return _hs_node_refusal_function;
+
+	if (function->parse == hs_macro_function_parse)
+	{
+		minimum_count = maximum_count = function->parameter_count;
+	}
+	else if (function_index<(short)NUMBEROF(hs_special_form_argument_counts))
+	{
+		minimum_count = hs_special_form_argument_counts[function_index].minimum;
+		maximum_count = hs_special_form_argument_counts[function_index].maximum;
+	}
+	else
+	{
+		minimum_count = 0;
+		maximum_count = NONE;
+	}
+	/* (counted no further than one past the most it may have) */
+	if (maximum_count != NONE)
+	{
+		long argument_index = predicate->next_node_index;
+		short argument_count = 0;
+
+		while (argument_index != NONE && argument_count<=maximum_count)
+		{
+			struct hs_syntax_node const *argument = hs_syntax_try_get(argument_index);
+
+			if (!argument)
+				return _hs_node_refusal_damaged;
+			/* (a function's argument is of the type it takes, as the
+			compiler made it: hs_arguments_evaluate hands the function the
+			value as that type) */
+			if (function->parse == hs_macro_function_parse &&
+				argument_count<function->parameter_count &&
+				argument->type != function->parameter_types[argument_count])
+			{
+				return _hs_node_refusal_damaged;
+			}
+			if (!first_argument)
+				first_argument = argument;
+			argument_count++;
+			argument_index = argument->next_node_index;
+		}
+		if (argument_count<minimum_count || argument_count>maximum_count)
+			return _hs_node_refusal_arguments;
+	}
+
+	if (function_index == _hs_function_set)
+	{
+		short designator = (short)first_argument->data;
+
+		if (!TEST_FLAG(first_argument->flags, _hs_syntax_node_primitive_bit) ||
+			!TEST_FLAG(first_argument->flags, _hs_syntax_node_variable_bit) ||
+			hs_global_get_type(designator) == _hs_unparsed)
+		{
+			return _hs_node_refusal_damaged;
+		}
+		/* (and its value is of the global's type, which the global is
+		read as) */
+		{
+			struct hs_syntax_node const *value = hs_syntax_try_get(first_argument->next_node_index);
+
+			if (!value || value->type != hs_global_get_type(designator))
+				return _hs_node_refusal_damaged;
+		}
+		if ((designator & 0x8000) && !hs_external_global_settable_by_maps(designator & 0x7FFF))
+		{
+			*name = hs_global_external_get(designator & 0x7FFF)->name;
+			return _hs_node_refusal_global;
+		}
+	}
+	else if (function_index == _hs_function_wake)
+	{
+		if (!TEST_FLAG(first_argument->flags, _hs_syntax_node_primitive_bit) ||
+			first_argument->type != _hs_type_script)
+		{
+			return _hs_node_refusal_damaged;
+		}
+	}
+
+	return _hs_node_refusal_none;
+}
+
+/* port: whether a script's or global's root node is of the type the
+script returns or the global holds, as the compiler made it: the runtime
+reads its value as that type (hs_script_evaluate, the global's
+initialization). No root is of any type */
+static boolean hs_root_type_valid(
+	long root_expression_index,
+	short type)
+{
+	struct hs_syntax_node const *root;
+
+	if (root_expression_index == NONE)
+		return TRUE;
+	root = hs_syntax_try_get(root_expression_index);
+
+	return !root || root->type == type;
+}
+
+/* port: why the map's expression may not run (hs_syntax_node_refusal; a node
+it links to twice, or a loop, is damaged), and the function or global it
+names. Each node is walked once, so the stack holds no more than the nodes
+there are */
+static short hs_expression_refusal(
+	long root_expression_index,
+	char const **name)
+{
+	static long stack[MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO+1];
+	long stack_count = 0;
+
+	*name = NULL;
+	csmemset(hs_syntax_nodes_marked, 0, sizeof(hs_syntax_nodes_marked));
+	stack[stack_count++] = root_expression_index;
+	while (stack_count>0)
+	{
+		struct hs_syntax_node const *expression = hs_syntax_try_get(stack[--stack_count]);
+		long child_index;
+		short refusal;
+
+		if (!expression)
+			continue;
+		refusal = hs_syntax_node_refusal(expression, name);
+		if (refusal != _hs_node_refusal_none)
+			return refusal;
+		if (TEST_FLAG(expression->flags, _hs_syntax_node_primitive_bit))
+			continue;
+
+		/* (a call's function name, then its arguments) */
+		child_index = expression->data;
+		while (child_index != NONE)
+		{
+			struct hs_syntax_node const *child = hs_syntax_try_get(child_index);
+			long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(child_index);
+
+			/* (a link that isn't a node: the node it is in is refused as it
+			is walked) */
+			if (!child)
+				break;
+			if (BIT_VECTOR_TEST_FLAG(hs_syntax_nodes_marked, absolute_index))
+			{
+				*name = NULL;
+				return _hs_node_refusal_damaged;
+			}
+			BIT_VECTOR_SET_FLAG(hs_syntax_nodes_marked, absolute_index, TRUE);
+			stack[stack_count++] = child_index;
+			child_index = child->next_node_index;
+		}
+	}
+
+	return _hs_node_refusal_none;
+}
+
+/* port: a map's script that may not run (hs_syntax_node_refusal: one that
+calls a function a map may not, sets an external global it may not, or
+holds a node the runtime would go wrong on) doesn't: a startup, dormant or
+continuous script gets no thread, and a static one returns its type's
+default (hs_runtime.c). A global whose initializer may not run starts at its
+type's default. Every node is looked at once first; the shipped maps' are
+all sound, none is linked to twice, and then no script is walked. The
+console's expressions, compiled later, may call and set anything */
+static void hs_scenario_functions_check(
+	struct scenario *scenario)
+{
+	long expression_index;
+	short script_index;
+	short global_index;
+	short refusal;
+	char const *name;
+	boolean refused = FALSE;
+	boolean linked_twice = FALSE;
+	short first_refusal = _hs_node_refusal_none;
+	char const *first_name = NULL;
+	char const *first_owner = NULL;
+	char const *first_kind = NULL;
+	short disabled_script_count = 0;
+	short disabled_global_count = 0;
+	char reason[128];
+
+	csmemset(hs_syntax_nodes_marked, 0, sizeof(hs_syntax_nodes_marked));
+	for (script_index = 0; script_index<scenario->hs_scripts.count; script_index++)
+	{
+		struct hs_script const *script = TAG_BLOCK_GET_ELEMENT(
+			&scenario->hs_scripts,
+			script_index,
+			struct hs_script);
+
+		if (hs_syntax_node_linked_twice(script->root_expression_index))
+			linked_twice = TRUE;
+		if (!hs_root_type_valid(script->root_expression_index, script->return_type))
+			refused = TRUE;
+	}
+	for (global_index = 0; global_index<scenario->hs_globals.count; global_index++)
+	{
+		struct hs_global const *global = TAG_BLOCK_GET_ELEMENT(
+			&scenario->hs_globals,
+			global_index,
+			struct hs_global);
+
+		if (hs_syntax_node_linked_twice(global->initialization_expression_index))
+			linked_twice = TRUE;
+		if (!hs_root_type_valid(global->initialization_expression_index, global->type))
+			refused = TRUE;
+	}
+	for (expression_index = data_next_index(hs_syntax_data, NONE);
+		expression_index != NONE;
+		expression_index = data_next_index(hs_syntax_data, expression_index))
+	{
+		struct hs_syntax_node const *expression = hs_syntax_try_get(expression_index);
+
+		if (hs_syntax_node_refusal(expression, &name) != _hs_node_refusal_none)
+			refused = TRUE;
+		if (hs_syntax_node_linked_twice(expression->next_node_index))
+			linked_twice = TRUE;
+		if (!TEST_FLAG(expression->flags, _hs_syntax_node_primitive_bit) &&
+			hs_syntax_node_linked_twice(expression->data))
+		{
+			linked_twice = TRUE;
+		}
+	}
+	if (!refused && !linked_twice)
+		return;
+
+	for (script_index = 0; script_index<scenario->hs_scripts.count; script_index++)
+	{
+		struct hs_script const *script = TAG_BLOCK_GET_ELEMENT(
+			&scenario->hs_scripts,
+			script_index,
+			struct hs_script);
+
+		refusal = hs_expression_refusal(script->root_expression_index, &name);
+		if (refusal == _hs_node_refusal_none && !hs_root_type_valid(script->root_expression_index, script->return_type))
+		{
+			name = NULL;
+			refusal = _hs_node_refusal_damaged;
+		}
+		if (refusal != _hs_node_refusal_none)
+		{
+			BIT_VECTOR_SET_FLAG(hs_scenario_disabled_scripts, script_index, TRUE);
+			if (!first_owner)
+			{
+				first_refusal = refusal;
+				first_name = name;
+				first_owner = script->name;
+				first_kind = "script";
+			}
+			disabled_script_count++;
+		}
+	}
+	for (global_index = 0; global_index<scenario->hs_globals.count; global_index++)
+	{
+		struct hs_global const *global = TAG_BLOCK_GET_ELEMENT(
+			&scenario->hs_globals,
+			global_index,
+			struct hs_global);
+
+		refusal = hs_expression_refusal(global->initialization_expression_index, &name);
+		if (refusal == _hs_node_refusal_none && !hs_root_type_valid(global->initialization_expression_index, global->type))
+		{
+			name = NULL;
+			refusal = _hs_node_refusal_damaged;
+		}
+		if (refusal != _hs_node_refusal_none)
+		{
+			BIT_VECTOR_SET_FLAG(hs_scenario_disabled_globals, global_index, TRUE);
+			if (!first_owner)
+			{
+				first_refusal = refusal;
+				first_name = name;
+				first_owner = global->name;
+				first_kind = "global";
+			}
+			disabled_global_count++;
+		}
+	}
+
+	if (first_owner)
+	{
+		switch (first_refusal)
+		{
+		case _hs_node_refusal_function:
+			csprintf(reason, "calls %s, which a map's scripts may not", first_name);
+			break;
+		case _hs_node_refusal_global:
+			csprintf(reason, "sets %s, which a map's scripts may not", first_name);
+			break;
+		case _hs_node_refusal_arguments:
+			csprintf(reason, "calls %s with arguments it doesn't take", first_name);
+			break;
+		default:
+			csprintf(reason, "has a damaged script node");
+			break;
+		}
+		error(_error_silent, "the map's %s %.32s %s; %d scripts won't run, %d globals start at their defaults",
+			first_kind,
+			first_owner,
+			reason,
+			disabled_script_count,
+			disabled_global_count);
+	}
+
+	return;
+}
+
+boolean hs_scenario_script_disabled(
+	short script_index)
+{
+	return script_index>=0 &&
+		script_index<MAXIMUM_HS_SCRIPTS_PER_SCENARIO &&
+		BIT_VECTOR_TEST_FLAG(hs_scenario_disabled_scripts, script_index);
+}
+
+boolean hs_scenario_global_initializer_disabled(
+	short global_index)
+{
+	return global_index>=0 &&
+		global_index<MAXIMUM_HS_GLOBALS &&
+		BIT_VECTOR_TEST_FLAG(hs_scenario_disabled_globals, global_index);
 }
 
 static void hs_allocate(
@@ -12512,6 +13457,11 @@ void hs_dispose_from_old_map(
 		}
 		hs_syntax_data = NULL;
 	}
+	/* port: the old map's disabled scripts and globals are not the next's
+	(whose scripts may not be postprocessed: hs_scenario_postprocess clears
+	them only then) */
+	csmemset(hs_scenario_disabled_scripts, 0, sizeof(hs_scenario_disabled_scripts));
+	csmemset(hs_scenario_disabled_globals, 0, sizeof(hs_scenario_disabled_globals));
 	hs_runtime_dispose_from_old_map();
 	object_lists_dispose_from_old_map();
 	return;
@@ -12685,7 +13635,10 @@ boolean hs_evaluate_by_name(
 			&global_scenario_get()->hs_scripts,
 			script_index,
 			struct hs_script);
-		hs_runtime_evaluate(script->root_expression_index);
+		/* port: a script that doesn't run (hs_scenario_functions_check)
+		isn't run here either */
+		if (!hs_scenario_script_disabled(script_index))
+			hs_runtime_evaluate(script->root_expression_index);
 		return TRUE;
 	}
 
@@ -14057,6 +15010,9 @@ boolean hs_scenario_postprocess(
 
 	scenario = global_scenario_get();
 	saved_syntax_data = hs_syntax_data;
+	/* port: the last map's are let go of (hs_scenario_functions_check) */
+	csmemset(hs_scenario_disabled_scripts, 0, sizeof(hs_scenario_disabled_scripts));
+	csmemset(hs_scenario_disabled_globals, 0, sizeof(hs_scenario_disabled_globals));
 	hs_allocate();
 	/* port: script data that isn't sound isn't gone through (hs_allocate
 	has an empty array stand in for it, and the map runs no scripts) */
@@ -14103,10 +15059,24 @@ boolean hs_scenario_postprocess(
 			}
 		}
 	}
+	/* port: no more scripts than the scripts block holds (what
+	hs_scenario_functions_check marks them by has room for). The shipped
+	maps' most is d40's 297 */
+	if (scenario->hs_scripts.count<0 ||
+		scenario->hs_scripts.count>MAXIMUM_HS_SCRIPTS_PER_SCENARIO)
+	{
+		error(0, "the scenario has %ld scripts, more than the %d there is room for; its scripts won't run",
+			scenario->hs_scripts.count,
+			MAXIMUM_HS_SCRIPTS_PER_SCENARIO);
+		hs_scenario_scripts_disable(scenario);
+	}
 	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
 	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
 	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
 	{
+		/* port: before the console's expressions are compiled into the
+		same nodes */
+		hs_scenario_functions_check(scenario);
 		if (scenario->hs_string_constants.size<0x400)
 		{
 			success = tag_data_resize(

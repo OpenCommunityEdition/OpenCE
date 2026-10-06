@@ -416,7 +416,8 @@ void race_flags_make_unique(
 {
 	struct scenario *scenario = global_scenario_get();
 	unsigned long used_flags = 0;
-	short itr;
+	/* port: a long counter, for a map's long count */
+	long itr;
 
 	for (itr = 0; itr < scenario->netgame_flags.count; itr++)
 	{

@@ -202,6 +202,7 @@ boolean hs_trigger_volume_test_objects(
 	long object_list_index,
 	boolean all)
 {
+	static boolean reported = FALSE;
 	long reference_index;
 	long object_index;
 	boolean result;
@@ -231,7 +232,17 @@ boolean hs_trigger_volume_test_objects(
 			&reference_index);
 	}
 
-	BIT_VECTOR_SET_FLAG(hs_debug_data, trigger_volume_index, result);
+	/* port: only the volumes hs_debug_data has bits for (a script's index,
+	map data; released maps have at most 158 volumes) */
+	if (VALID_INDEX(trigger_volume_index, MAXIMUM_TRIGGER_VOLUMES_PER_SCENARIO))
+	{
+		BIT_VECTOR_SET_FLAG(hs_debug_data, trigger_volume_index, result);
+	}
+	else if (!reported)
+	{
+		reported = TRUE;
+		error(_error_silent, "### ERROR a script tests trigger volume #%d", trigger_volume_index);
+	}
 
 	return result;
 }

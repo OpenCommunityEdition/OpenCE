@@ -645,6 +645,41 @@ the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
 
+## Map checks
+
+The game reads a map's tags straight into memory and uses them as its own
+structures: every pointer, count, index and enum in them is the map's, and
+the game writes values into tags as it runs. So before anything reads a
+map's tags, the port checks every tag against a schema of its group
+(`game/tag_schema_*.c`, read by `game/tag_validate.c`), and each structure
+BSP as it loads:
+
+- Every block and every piece of data must lie in the tags (or the BSP) and
+  overlap no other. Otherwise the game refuses the map.
+- A block with more elements than the game has room for is cut to the
+  maximum. A tag reference that is not a tag of the right group becomes
+  none. So do an index past its block and an enum past its values (or they
+  become 0, where the game cannot take none). A string gets its terminator.
+  Values that the game sets as it runs are reset.
+- Checks that the schema cannot express run last: the BSPs' and the models'
+  graphs, vertex and index buffers, and indices into other tags.
+
+Each correction goes to `debug.txt`. The game's own maps need none.
+`build/linux/map_validate [--strict] map.map...` runs the same checks on map
+files without the game, and `tools/test_linux_port.py` runs it on the maps
+in `assets/maps`. `map_validate --fuzz <runs> map.map` changes a few words
+of the tags at random in each run. The checks must not crash or hang, and a
+map that they let through must need no more corrections.
+
+A map's scripts can call only the script functions that a map needs (the
+allowlist in `hs/hs.c`). They cannot call the functions for files, the
+saved state of the game, the console, debugging or cheats. A script that
+calls one does not run. The developer console can call every function.
+
+Defensive checks stay in the game code too. An index into a tag block, the
+tags or a tag's data that is out of range gets zeros (`tag_empty_data` in
+`tag_files/tag_groups.c`), not other memory.
+
 ## What operates
 
 | Area | Status |

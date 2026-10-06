@@ -2998,7 +2998,8 @@ static short players_coop_bsp_switch_trigger(
 	struct scenario *scenario = global_scenario_get();
 	short index;
 
-	for (index = 0; index < scenario->bsp_switch_trigger_volumes.count; index++)
+	/* port: a short counter stops at SHORT_MAX (a map's count) */
+	for (index = 0; index < MIN(scenario->bsp_switch_trigger_volumes.count, SHORT_MAX); index++)
 	{
 		struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
 			&scenario->bsp_switch_trigger_volumes, index, struct scenario_bsp_switch_trigger_volume);
@@ -4229,6 +4230,23 @@ static long create_weapon(
 			starting_weapon->weapon.index,
 			unit_index);
 		weapon_index = object_new(&placement_data);
+		/* port: only a weapon gets a weapon's rounds (a map's tag reference
+		can name any object; its datum was written as a weapon's). Anything
+		else isn't kept */
+		if (weapon_index != NONE &&
+			object_get(weapon_index)->object.type != _object_type_weapon)
+		{
+			static boolean reported = FALSE;
+
+			if (!reported)
+			{
+				reported = TRUE;
+				error(_error_silent, "### ERROR starting weapon %s isn't a weapon",
+					tag_get_name(starting_weapon->weapon.index));
+			}
+			object_delete(weapon_index);
+			weapon_index = NONE;
+		}
 		if (weapon_index != NONE)
 		{
 			weapon = weapon_get(weapon_index);

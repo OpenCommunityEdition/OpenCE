@@ -756,8 +756,35 @@ long light_new(
 			light->definition_index = definition_index;
 			light->object_index = object_index;
 			light->attachment_marker_index = object_attachment_index;
+			/* port: a function and a change color the object holds, or none
+			(an attachment's references in a map; retail's are none to d for
+			the function, none to b for the color) */
 			light->function_index = object_function_index;
 			light->color_function_index = object_change_color_index;
+			if ((object_function_index!=NONE && !VALID_INDEX(object_function_index, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS)) ||
+				(object_change_color_index!=NONE && !VALID_INDEX(object_change_color_index, NUMBER_OF_OBJECT_CHANGE_COLORS)))
+			{
+				static boolean reference_reported = FALSE;
+
+				if (!reference_reported)
+				{
+					reference_reported = TRUE;
+					error(
+						_error_silent,
+						"### ERROR light %s is attached with function #%d and change color #%d; the bad one is none",
+						tag_get_name(definition_index),
+						object_function_index,
+						object_change_color_index);
+				}
+				if (!VALID_INDEX(object_function_index, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS))
+				{
+					light->function_index = NONE;
+				}
+				if (!VALID_INDEX(object_change_color_index, NUMBER_OF_OBJECT_CHANGE_COLORS))
+				{
+					light->color_function_index = NONE;
+				}
+			}
 			light->flags = 0;
 			SET_FLAG(light->flags, _point_light_dynamic_bit,
 				TEST_FLAG(definition->flags, _light_definition_dynamic_bit));
@@ -1185,8 +1212,12 @@ real object_get_self_illumination(
 	struct object_definition *definition = object_definition_get(object->definition_index);
 	real illumination = 0.0f;
 	short attachment_index = 0;
+	/* port: the attachments attachments_new made (a map's count; past them
+	the types and indices were the object's other fields; retail has up to
+	8) */
+	short attachment_count = (short)MIN(definition->object.attachments.count, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
 
-	if (definition->object.attachments.count > 0)
+	if (attachment_count > 0)
 	{
 		do
 		{
@@ -1198,7 +1229,7 @@ real object_get_self_illumination(
 			}
 			attachment_index++;
 		}
-		while (attachment_index < definition->object.attachments.count);
+		while (attachment_index < attachment_count);
 	}
 
 	if (object->object.first_child_object_index != NONE)

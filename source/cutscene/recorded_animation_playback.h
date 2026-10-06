@@ -22,16 +22,20 @@ header included in hcex build.
 
 void byte_swap_recording_stream(void *stream, long stream_size, byte unit_control_data_version);
 
-void recorded_animation_initialize_event_stream(
+/* port: the stream's end bounds every read; initializing is FALSE when the
+stream can't be played, applying FALSE when it is finished or damaged */
+boolean recorded_animation_initialize_event_stream(
 	void *animation_state,
 	void *controller,
 	byte **event_stream,
-	byte unit_control_data_version);
+	byte unit_control_data_version,
+	byte const *event_stream_end);
 boolean recorded_animation_apply_event_stream(
 	void *animation_state,
 	struct unit_control_data *controller,
 	long *relative_ticks,
-	byte **event_stream);
+	byte **event_stream,
+	byte const *event_stream_end);
 
 /* ---------- globals */
 
