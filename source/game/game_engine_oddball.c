@@ -324,7 +324,12 @@ static void oddball_engine_prespawn_player_update(
 static void oddball_engine_player_added(
 	long player_index)
 {
-	player_get(player_index);
+	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	/* port: not the score of a player who quit from the slot (as slayer's) */
+	oddball_globals.individual_score[slot] = 0;
+	if (!game_engine_has_teams())
+		oddball_globals.team_score[slot] = 0;
 
 	return;
 }

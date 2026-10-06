@@ -346,7 +346,15 @@ static void king_engine_prespawn_player_update(
 static void king_engine_player_added(
 	long player_index)
 {
-	player_get(player_index);
+	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	/* port: not the time of a player who quit from the slot (as slayer's) */
+	king_globals.on_the_hill[slot] = FALSE;
+	if (!game_engine_has_teams())
+	{
+		king_globals.score[slot] = 0;
+		king_globals.score_tick[slot] = 0;
+	}
 
 	return;
 }
