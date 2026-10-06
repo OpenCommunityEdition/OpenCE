@@ -421,17 +421,15 @@ played faster than the output rate takes its frames (a step over 1) gets the
 low pass narrowed to match, up to RESAMPLER_MAXIMUM_STRETCH times, so it
 does not alias. The frames come from the voice's packets in turn, so the low
 pass reads straight across a packet's end into the next. */
-/* Note: When reverb is off, the full-band table avoids the extra high-frequency
-roll-off at normal playback rates, preserving the previous dry sound. */
 
 /* the low pass's one side, RESAMPLER_TABLE_STEPS values a source frame */
-static float resampler_tables[2][RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 2];
+static float resampler_table[RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 2];
 /* the same low pass as the weights of a voice's taps 1 - RESAMPLER_ZERO_CROSSINGS
 to RESAMPLER_ZERO_CROSSINGS, at each of RESAMPLER_TABLE_STEPS phases between two
 source frames (and one row more, for the last's blend): a voice at the output
 rate or slower blends two rows by its phase, which is what the table gave tap
 by tap, a third of the work */
-static float resampler_phases[2][RESAMPLER_TABLE_STEPS + 1][2 * RESAMPLER_ZERO_CROSSINGS];
+static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][2 * RESAMPLER_ZERO_CROSSINGS];
 
 static double bessel_i0(double x)
 {
@@ -448,31 +446,24 @@ static double bessel_i0(double x)
 
 static void resampler_initialize(void)
 {
-	static const double cutoffs[] = { 1.0, RESAMPLER_CUTOFF };
-	unsigned long table;
+	unsigned long index;
 
-	for (table = 0; table < sizeof(cutoffs) / sizeof(cutoffs[0]); table++)
+	for (index = 0; index <= RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS; index++)
 	{
-		unsigned long index;
+		double distance = (double)index / RESAMPLER_TABLE_STEPS;
+		double edge = distance / RESAMPLER_ZERO_CROSSINGS;
+		double angle = 3.14159265358979 * RESAMPLER_CUTOFF * distance;
+		double sinc = index ? sin(angle) / angle : 1.0;
+		double window = bessel_i0(RESAMPLER_KAISER_BETA * sqrt(1.0 - edge * edge)) / bessel_i0(RESAMPLER_KAISER_BETA);
 
-		for (index = 0; index <= RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS; index++)
-		{
-			double distance = (double)index / RESAMPLER_TABLE_STEPS;
-			double edge = distance / RESAMPLER_ZERO_CROSSINGS;
-			double angle = 3.14159265358979 * cutoffs[table] * distance;
-			double sinc = index ? sin(angle) / angle : 1.0;
-			double window = bessel_i0(RESAMPLER_KAISER_BETA * sqrt(1.0 - edge * edge)) /
-				bessel_i0(RESAMPLER_KAISER_BETA);
-
-			resampler_tables[table][index] = (float)(cutoffs[table] * sinc * window);
-		}
-		resampler_tables[table][RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 1] = 0.0f;
+		resampler_table[index] = (float)(RESAMPLER_CUTOFF * sinc * window);
 	}
+	resampler_table[RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 1] = 0.0f;
 }
 
 /* the low pass, distance source frames from its centre times
 RESAMPLER_TABLE_STEPS */
-static float resampler_weight(const float *table, float distance)
+static float resampler_weight(float distance)
 {
 	unsigned long index = (unsigned long)distance;
 	float fraction;
@@ -480,25 +471,21 @@ static float resampler_weight(const float *table, float distance)
 	if (index >= RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS)
 		return 0.0f;
 	fraction = distance - (float)index;
-	return table[index] + (table[index + 1] - table[index]) * fraction;
+	return resampler_table[index] + (resampler_table[index + 1] - resampler_table[index]) * fraction;
 }
 
 static void resampler_phases_initialize(void)
 {
-	unsigned long table, phase, tap;
+	unsigned long phase, tap;
 
-	for (table = 0; table < 2; table++)
+	for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)
 	{
-		for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)
+		for (tap = 0; tap < 2 * RESAMPLER_ZERO_CROSSINGS; tap++)
 		{
-			for (tap = 0; tap < 2 * RESAMPLER_ZERO_CROSSINGS; tap++)
-			{
-				float distance = fabsf((float)((long)tap + 1 - RESAMPLER_ZERO_CROSSINGS) -
-					(float)phase / RESAMPLER_TABLE_STEPS);
+			float distance = fabsf((float)((long)tap + 1 - RESAMPLER_ZERO_CROSSINGS) -
+				(float)phase / RESAMPLER_TABLE_STEPS);
 
-				resampler_phases[table][phase][tap] = resampler_weight(resampler_tables[table],
-					distance * RESAMPLER_TABLE_STEPS);
-			}
+			resampler_phases[phase][tap] = resampler_weight(distance * RESAMPLER_TABLE_STEPS);
 		}
 	}
 }
@@ -565,9 +552,6 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float ramp_direct_lowpass, ramp_room_lowpass;
 	long width;
 	unsigned long frame;
-	/* Keep the dry path full-band at normal rates; faster playback still narrows
-	the filter below to prevent aliasing. */
-	unsigned long table = reverb_enabled;
 
 	if (stream->paused || !stream->packet_count || !stream->sample_rate)
 		return;
@@ -634,8 +618,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			double position = stream->phase * RESAMPLER_TABLE_STEPS;
 			unsigned long row = (unsigned long)position;
 			float blend = (float)(position - (double)row);
-			const float *weights = resampler_phases[table][row], *next_weights =
-				resampler_phases[table][row + 1];
+			const float *weights = resampler_phases[row], *next_weights = resampler_phases[row + 1];
 			unsigned long first = stream->center + 1 - RESAMPLER_ZERO_CROSSINGS;
 
 			for (tap = 0; tap < 2 * RESAMPLER_ZERO_CROSSINGS; tap++)
@@ -652,8 +635,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			for (tap = 1 - width; tap <= width; tap++)
 			{
 				const float *source = stream->history[(stream->center + (unsigned long)tap) % RESAMPLER_HISTORY];
-				float weight = scale * resampler_weight(resampler_tables[table],
-					fabsf((float)tap - (float)stream->phase) * scale * RESAMPLER_TABLE_STEPS);
+				float weight = scale * resampler_weight(fabsf((float)tap - (float)stream->phase) * scale * RESAMPLER_TABLE_STEPS);
 
 				sample_left += source[0] * weight;
 				sample_right += source[1] * weight;
