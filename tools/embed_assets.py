@@ -141,8 +141,9 @@ def main() -> None:
         lines.append("")
         tag = asset["tag"].replace("\\", "\\\\")
         coverage = int(any(cell["kind"] == "meter" for cell in asset.get("cells", [])))
+        point_threshold = int(any(cell.get("thresholds") for cell in asset.get("cells", [])))
         table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
-                     f'{int(title)}, asset{index}, {len(data)} }},')
+                     f'{point_threshold}, {int(title)}, asset{index}, {len(data)} }},')
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)
