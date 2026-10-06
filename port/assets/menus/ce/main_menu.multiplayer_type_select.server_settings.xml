@@ -22,6 +22,7 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_extra_enemies" x="54" y="213"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_enemies_per_player" x="54" y="241"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_enemies_multiplier" x="54" y="241"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_collisions" x="54" y="269"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="185"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="213"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="241"/>
@@ -122,6 +123,17 @@
 		<on event="deleted" run="port setting save"/>
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_player_collisions" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/player_collisions_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/player_collisions_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/player_collisions_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="14" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/player_collisions_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.coop_player_collisions" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="created" run="port setting load"/>
+		<on event="deleted" run="port setting save"/>
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/op_game_type" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" run="port setup edit" open="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen"/>
 		<on event="start" run="port setup edit" open="main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/gametype_select_screen"/>
@@ -211,6 +223,7 @@
 		<string text="EXTRA ENEMIES:"/>
 		<string text="PER PLAYER:"/>
 		<string text="MULTIPLIER:"/>
+		<string text="PLAYER COLLISIONS:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/help_strings">
 		<string text=""/>
@@ -234,5 +247,7 @@
 		<string text="Enemy squads are the amount below times as large,\nhowever many players there are."/>
 		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
 		<string text="Each enemy squad is this many times as large."/>
+		<string text="Players bump into each other, as in the campaign."/>
+		<string text="Players walk through each other, so that no one\nblocks a doorway. The AI's characters still block."/>
 	</strings>
 </menus>

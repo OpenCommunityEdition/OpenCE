@@ -1687,6 +1687,10 @@ static void object_get_features_in_sphere(
 
 							if ((!TEST_FLAG(flags, _collision_test_skip_passthrough_bipeds_bit) ||
 								!TEST_FLAG(biped->biped.flags, _biped_movement_passes_through_bipeds_bit)) &&
+								/* port: (nor a player's, to a player in a co-op
+								game without player collisions) */
+								(!TEST_FLAG(flags, _collision_test_skip_player_bipeds_bit) ||
+									biped->unit.player_index == NONE) &&
 								(object->object.parent_object_index == NONE ||
 									biped->unit.parent_seat_index == NONE))
 							{

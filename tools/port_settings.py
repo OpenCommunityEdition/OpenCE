@@ -739,6 +739,11 @@ def _server_settings() -> list:
     spinner_row("enemies_multiplier", 13, [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
                 "network.coop_enemies_multiplier", COOP_ENEMIES_MULTIPLIERS)
     rows.append((f"{base}/op_enemies_multiplier", None, 6))
+    # ... and its PLAYER COLLISIONS, below them (network.coop_player_collisions,
+    # which the host sends its players as the game begins: menu_functions.c's
+    # server_start)
+    spinner_row("player_collisions", 14, ["ON", "OFF"], "network.coop_player_collisions", ["true", "false"])
+    rows.append((f"{base}/op_player_collisions", None, 7))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -769,7 +774,7 @@ def _server_settings() -> list:
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
                                          "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:", "EXTRA ENEMIES:",
-                                         "PER PLAYER:", "MULTIPLIER:"])
+                                         "PER PLAYER:", "MULTIPLIER:", "PLAYER COLLISIONS:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -796,6 +801,9 @@ def _server_settings() -> list:
         # (PER PLAYER's and MULTIPLIER's)
         "For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again).",
         "Each enemy squad is this many times as large.",
+        # (PLAYER COLLISIONS', by its choice)
+        "Players bump into each other, as in the campaign.",
+        "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
