@@ -628,6 +628,30 @@ struct vertex_binding
 
 /* a binding per stream (setup_streams); GL has at least 16 */
 #define VERTEX_BINDING_COUNT 16
+
+/* a vertex array object for each vertex layout (the attributes a draw
+enables, and each one's format and binding), made once: a draw binds its
+layout's and points the bindings at its streams, rather than enabling,
+formatting and binding each attribute again (setup_streams) */
+struct vertex_layout
+{
+	unsigned long enabled;
+	struct attribute_format formats[XGPU_VERTEX_ATTRIBUTE_COUNT];
+};
+
+struct vertex_array_entry
+{
+	struct vertex_array_entry *next;
+	unsigned long hash;
+	struct vertex_layout layout;
+	GLuint vertex_array;
+	/* its bindings, as last pointed (nothing else changes them) */
+	struct vertex_binding bindings[VERTEX_BINDING_COUNT];
+};
+
+#define VERTEX_ARRAY_BUCKET_COUNT 64
+static struct vertex_array_entry *vertex_array_buckets[VERTEX_ARRAY_BUCKET_COUNT];
+static struct vertex_array_entry *current_vertex_array;
 #endif
 
 static struct
@@ -662,8 +686,7 @@ static struct
 #ifdef HALO_ANDROID
 	struct attribute_pointer attribute_pointers[XGPU_VERTEX_ATTRIBUTE_COUNT];
 #else
-	struct attribute_format attribute_formats[XGPU_VERTEX_ATTRIBUTE_COUNT];
-	struct vertex_binding vertex_bindings[VERTEX_BINDING_COUNT];
+	GLuint vertex_array;
 #endif
 	/* a disabled attribute's value; kind 1 is the integer zero */
 	unsigned char attribute_value_kind[XGPU_VERTEX_ATTRIBUTE_COUNT];
@@ -748,15 +771,13 @@ static void state_element_array_buffer(GLuint buffer)
 	}
 }
 
+#ifdef HALO_ANDROID
 /* enables the attribute, reading size elements of type from buffer: each
 vertex is stride bytes on from the one before it, starting at
-buffer_offset, with the attribute relative_offset bytes into it.
-Attributes given the same binding share the buffer, its offset and its
-stride (on desktop GL; ES points each attribute on its own). */
+buffer_offset, with the attribute relative_offset bytes into it */
 static void state_attribute_stream(GLuint index, GLuint binding, GLuint buffer, GLint size, GLenum type,
 	GLboolean normalized, BOOL integer, GLsizei stride, unsigned long buffer_offset, unsigned long relative_offset)
 {
-#ifdef HALO_ANDROID
 	struct attribute_pointer *pointer = &gl_state.attribute_pointers[index];
 	unsigned long offset = buffer_offset + relative_offset;
 
@@ -784,53 +805,106 @@ static void state_attribute_stream(GLuint index, GLuint binding, GLuint buffer, 
 	pointer->integer = integer ? GL_TRUE : GL_FALSE;
 	pointer->stride = stride;
 	pointer->offset = offset;
+}
 #else
-	struct attribute_format *format = &gl_state.attribute_formats[index];
-	struct vertex_binding *vertex_binding = &gl_state.vertex_bindings[binding];
+/* the vertex array of a layout, made the first time (its attributes enabled,
+formatted and bound to their bindings) */
+static struct vertex_array_entry *vertex_array_get(const struct vertex_layout *layout)
+{
+	const unsigned char *bytes = (const unsigned char *)layout;
+	unsigned long hash = 2166136261UL, index;
+	struct vertex_array_entry **bucket, *entry;
 
-	if (gl_state.attribute_enabled[index] != 1)
+	for (index = 0; index < sizeof(*layout); index++)
+		hash = (hash ^ bytes[index]) * 16777619UL;
+	bucket = &vertex_array_buckets[hash % VERTEX_ARRAY_BUCKET_COUNT];
+	for (entry = *bucket; entry; entry = entry->next)
 	{
-		gl_state.attribute_enabled[index] = 1;
-		glEnableVertexAttribArray(index);
+		if (entry->hash == hash && !memcmp(&entry->layout, layout, sizeof(*layout)))
+			return entry;
 	}
-	if (format->size != size || format->type != type || format->normalized != normalized ||
-		format->integer != (integer ? GL_TRUE : GL_FALSE) || format->relative_offset != relative_offset)
+	entry = calloc(1, sizeof(*entry));
+	entry->hash = hash;
+	entry->layout = *layout;
+	memset(entry->bindings, 0xff, sizeof(entry->bindings));
+	glGenVertexArrays(1, &entry->vertex_array);
+	glBindVertexArray(entry->vertex_array);
+	gl_state.vertex_array = entry->vertex_array;
+	/* (the index buffer's binding is the vertex array's) */
+	gl_state.element_array_buffer = (GLuint)-1;
+	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
-		if (integer)
-			glVertexAttribIFormat(index, size, type, (GLuint)relative_offset);
+		const struct attribute_format *format = &layout->formats[index];
+
+		if (!(layout->enabled & (1UL << index)))
+			continue;
+		glEnableVertexAttribArray((GLuint)index);
+		if (format->integer)
+			glVertexAttribIFormat((GLuint)index, format->size, format->type, format->relative_offset);
 		else
-			glVertexAttribFormat(index, size, type, normalized, (GLuint)relative_offset);
-		format->size = size;
-		format->type = type;
-		format->normalized = normalized;
-		format->integer = integer ? GL_TRUE : GL_FALSE;
-		format->relative_offset = (GLuint)relative_offset;
+			glVertexAttribFormat((GLuint)index, format->size, format->type, format->normalized, format->relative_offset);
+		glVertexAttribBinding((GLuint)index, format->binding);
 	}
-	if (format->binding != binding)
+	entry->next = *bucket;
+	*bucket = entry;
+	return entry;
+}
+
+static void state_vertex_array(struct vertex_array_entry *entry)
+{
+	if (gl_state.vertex_array != entry->vertex_array)
 	{
-		glVertexAttribBinding(index, binding);
-		format->binding = binding;
+		gl_state.vertex_array = entry->vertex_array;
+		glBindVertexArray(entry->vertex_array);
+		/* (the index buffer's binding is the vertex array's) */
+		gl_state.element_array_buffer = (GLuint)-1;
 	}
-	if (vertex_binding->buffer != buffer || vertex_binding->offset != buffer_offset || vertex_binding->stride != stride)
+	current_vertex_array = entry;
+}
+
+/* points the bound vertex array's binding at buffer: each vertex is stride
+bytes on from the one before it, starting at offset */
+static void state_vertex_buffer(GLuint binding, GLuint buffer, unsigned long offset, GLsizei stride)
+{
+	struct vertex_binding *vertex_binding = &current_vertex_array->bindings[binding];
+
+	if (vertex_binding->buffer != buffer || vertex_binding->offset != offset || vertex_binding->stride != stride)
 	{
-		glBindVertexBuffer(binding, buffer, (GLintptr)buffer_offset, stride);
+		glBindVertexBuffer(binding, buffer, (GLintptr)offset, stride);
 		vertex_binding->buffer = buffer;
-		vertex_binding->offset = buffer_offset;
+		vertex_binding->offset = offset;
 		vertex_binding->stride = stride;
 	}
-#endif
 }
+
+/* an attribute of a layout */
+static void layout_attribute(struct vertex_layout *layout, unsigned long index, GLuint binding, GLint size,
+	GLenum type, GLboolean normalized, BOOL integer, unsigned long relative_offset)
+{
+	struct attribute_format *format = &layout->formats[index];
+
+	format->size = size;
+	format->type = type;
+	format->normalized = normalized;
+	format->integer = integer ? GL_TRUE : GL_FALSE;
+	format->relative_offset = (GLuint)relative_offset;
+	format->binding = binding;
+	layout->enabled |= 1UL << index;
+}
+#endif
 
 /* disables the attribute, which then reads value, or the integer zero */
 static void state_attribute_value(GLuint index, const float *value)
 {
 	unsigned char kind = value ? 0 : 1;
 
+#ifdef HALO_ANDROID
 	if (gl_state.attribute_enabled[index] != 0)
 	{
 		gl_state.attribute_enabled[index] = 0;
 		glDisableVertexAttribArray(index);
 	}
+#endif
 	if (gl_state.attribute_value_kind[index] == kind &&
 		(!value || !memcmp(gl_state.attribute_values[index], value, sizeof(gl_state.attribute_values[index]))))
 	{
@@ -3950,6 +4024,13 @@ static void setup_streams(unsigned long first, unsigned long count)
 	BOOL placed[16] = { FALSE };
 	BOOL enabled[XGPU_VERTEX_ATTRIBUTE_COUNT] = { FALSE };
 	unsigned long index, total = 0;
+#ifndef HALO_ANDROID
+	struct vertex_layout layout;
+	unsigned long streams_used = 0;
+
+	/* (zeroed: layouts are compared and hashed whole) */
+	memset(&layout, 0, sizeof(layout));
+#endif
 
 	/* the mirror first; then one reservation for everything streamed */
 	for (index = 0; index < declaration->element_count; index++)
@@ -3998,6 +4079,7 @@ static void setup_streams(unsigned long first, unsigned long count)
 			stream_buffers[stream] = device.stream_buffer;
 			stats.streamed_bytes += bytes;
 		}
+#ifdef HALO_ANDROID
 		if (element->type == D3DVSDT_NORMPACKED3)
 		{
 			state_attribute_stream(element->reg, (GLuint)stream, stream_buffers[stream], 1, GL_UNSIGNED_INT, GL_FALSE,
@@ -4009,8 +4091,29 @@ static void setup_streams(unsigned long first, unsigned long count)
 			state_attribute_stream(element->reg, (GLuint)stream, stream_buffers[stream], size, type, normalized,
 				FALSE, (GLsizei)stride, stream_offsets[stream], element->offset);
 		}
+#else
+		if (element->type == D3DVSDT_NORMPACKED3)
+		{
+			layout_attribute(&layout, element->reg, (GLuint)stream, 1, GL_UNSIGNED_INT, GL_FALSE, TRUE, element->offset);
+		}
+		else
+		{
+			attribute_format(element, &size, &type, &normalized);
+			layout_attribute(&layout, element->reg, (GLuint)stream, size, type, normalized, FALSE, element->offset);
+		}
+		streams_used |= 1UL << stream;
+#endif
 		enabled[element->reg] = TRUE;
 	}
+#ifndef HALO_ANDROID
+	state_vertex_array(vertex_array_get(&layout));
+	for (index = 0; index < 16; index++)
+	{
+		if (streams_used & (1UL << index))
+			state_vertex_buffer((GLuint)index, stream_buffers[index], stream_offsets[index],
+				(GLsizei)device.streams[index].stride);
+	}
+#endif
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		if (!enabled[index])
@@ -4185,11 +4288,30 @@ void WINAPI D3DDevice_End(void)
 		return;
 	trace_draw("immediate", type, count, device.immediate_vertices);
 	offset = stream_upload(device.immediate_vertices, count * stride);
+#ifdef HALO_ANDROID
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		state_attribute_stream(index, 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)stride,
 			offset, index * 4 * sizeof(float));
 	}
+#else
+	{
+		/* every attribute four floats, one after another */
+		static struct vertex_array_entry *immediate_array;
+
+		if (!immediate_array)
+		{
+			struct vertex_layout layout;
+
+			memset(&layout, 0, sizeof(layout));
+			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+				layout_attribute(&layout, index, 0, 4, GL_FLOAT, GL_FALSE, FALSE, index * 4 * sizeof(float));
+			immediate_array = vertex_array_get(&layout);
+		}
+		state_vertex_array(immediate_array);
+		state_vertex_buffer(0, device.stream_buffer, offset, (GLsizei)stride);
+	}
+#endif
 	if (type == D3DPT_QUADLIST)
 	{
 		unsigned long index_count;
