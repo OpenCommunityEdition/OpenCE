@@ -70,6 +70,10 @@ GUEST_ABI_FLAGS = [
     "-fno-define-target-os-macros",
     "-D__linux__=1",
     "-D__unix__=1",
+    # the ILP32 guest's code paths, the OpenGL ES renderer's, and the app's
+    # (in the port's sources, each its own macro)
+    "-DHALO_ARM64_GUEST=1",
+    "-DHALO_GLES=1",
     "-DHALO_ANDROID=1",
     # ARMv8.0: nothing the emulator's binary translation or an older
     # device could lack (Darwin targets otherwise assume pointer
