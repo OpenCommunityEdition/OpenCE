@@ -3303,8 +3303,16 @@ static void lobby_browser_update(struct widget_instance *list)
 		/* (no ping yet: its host is reached only on joining) */
 		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : !game->open ? L"CLOSED" :
 			game->in_progress ? L"LIVE" : L"-");
-		/* (the lock: a game with a password) */
-		visible_set(named(row, "server_item_locked", 0), game->locked);
+		/* (the lock: a game with a password. Its bitmap's first frame is
+		empty, the PC version's for no lock; the next is the lock, in the
+		menus' blue) */
+		{
+			struct widget_instance *lock = named(row, "server_item_locked", 0);
+
+			visible_set(lock, game->locked);
+			if (lock)
+				lock->animation.current_frame_index = 1;
+		}
 		visible_set(named(row, "server_item_dedicated", 0), FALSE);
 		visible_set(named(row, "server_item_classic", 0), FALSE);
 	}
