@@ -151,8 +151,18 @@ def main() -> None:
         lines.append("")
         tag = asset["tag"].replace("\\", "\\\\")
         coverage = int(any(cell["kind"] == "meter" for cell in asset.get("cells", [])))
+        replace = asset.get("replace", [0, 0, 0, 0])
+        original_width = original_height = 0
+        if "replace" in asset:
+            if (asset["format"] != "ay8" or title or scale > 8 or len(replace) != 4 or
+                    not 0 <= replace[0] < replace[2] <= asset["width"] or
+                    not 0 <= replace[1] < replace[3] <= asset["height"] or
+                    any(n <= 0 or n & (n - 1) for n in (asset["width"], asset["height"]))):
+                sys.exit(f"{name}: partial redraw requires a swizzled AY8 bitmap and an in-bounds rectangle")
+            original_width, original_height = asset["width"], asset["height"]
         table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
-                     f'{int(title)}, asset{index}, {len(data)} }},')
+                     f'{int(title)}, asset{index}, {len(data)}, '
+                     f'{original_width}, {original_height}, {{ {", ".join(map(str, replace))} }} }},')
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)

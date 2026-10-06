@@ -25,6 +25,8 @@ layout: reads the Xbox map's HUD bitmaps (sizes, formats, sprite rectangles,
     with a cell that no redraw matches is left out.
 build: renders port/assets/hud/svg with layout.json into port/assets/hud/*.png
     (committed; the builds embed them).
+    Entries with a replace rectangle redraw only that icon at runtime;
+    the map supplies the rest of the swizzled AY8 bitmap (seat labels).
 check: compares each PNG, reduced to the tag's size, with the map's bitmap
     and writes side-by-side images into --out.
 
@@ -383,6 +385,12 @@ def layout(arguments) -> None:
     renders = {}
     entries = []
     sources = {}
+    # Hand-aligned partial redraws cannot be matched to an entire sheet:
+    # the map keeps the text, and only its icon is shipped. Keep their
+    # recipes and SVGs when regenerating the automatically matched layout.
+    partial = [e for e in json.loads(LAYOUT.read_text())["assets"] if "replace" in e] if LAYOUT.exists() else []
+    partial_svgs = {c["svg"]: (ASSETS/"svg"/c["svg"]).read_bytes() for e in partial for c in e["cells"]}
+    partial_keys = {(e["tag"], e["bitmap"]) for e in partial}
     for group_tag, tag in sorted(xbox_map.tags):
         if group_tag != "bitm" or not tag.startswith(FOLDERS):
             continue
@@ -391,6 +399,8 @@ def layout(arguments) -> None:
             continue
         group = xbox_map.bitmap_group(tag)
         for index, bitmap in enumerate(group["bitmaps"]):
+            if (tag, index) in partial_keys:
+                continue
             width, height = bitmap["width"], bitmap["height"]
             # (the combined sheets by their own names, as before the others;
             # the weapon's by its name and theirs)
@@ -484,6 +494,9 @@ def layout(arguments) -> None:
     (ASSETS / "svg").mkdir(parents=True)
     for svg in sorted({cell["svg"] for entry in entries for cell in entry["cells"]}):
         shutil.copyfile(svg_root / sources[svg], ASSETS / "svg" / svg)
+    for svg, data in partial_svgs.items():
+        (ASSETS/"svg"/svg).write_bytes(data)
+    entries.extend(partial)
     LAYOUT.write_text(json.dumps({"assets": entries}, indent=1) + "\n")
 
 
@@ -590,6 +603,12 @@ def check(arguments) -> None:
             print(f"{entry['name']}: this map's bitmap is not the one laid out")
         xbox = decode_bitmap(bitmap)
         image = Image.open(ASSETS / f"{entry['name']}.png").convert("RGBA")
+        # Show the runtime composition too, without committing the map's text.
+        if "replace" in entry:
+            original = Image.fromarray(xbox, "RGBA").resize(image.size, Image.Resampling.BILINEAR)
+            box = tuple(v*entry["scale"] for v in entry["replace"])
+            original.paste(image.crop(box), box)
+            image = original
         reduced = np.asarray(image.resize((entry["width"], entry["height"]), Image.BOX))
         score = overlap(reduced[..., 3].astype(float), xbox[..., 3].astype(float))
         print(f"{entry['name']}: alpha overlap {score:.2f}")

@@ -218,10 +218,63 @@ failed:
 	return NULL;
 }
 
-unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels)
+/* A partial redraw keeps the seat label from the map instead of shipping
+English text. The same CRC check as full redraws guards its AY8 layout.
+Bilinear resampling retains the original label's filtering; the entire old
+icon rectangle, including the hollow centre, is replaced by the new art. */
+static int hud_hires_preserve_ay8(unsigned char *pixels, unsigned long width, unsigned long height,
+	const unsigned char *original, const struct hud_hires_embedded *embedded)
 {
-	unsigned long width = 0, height = 0, largest;
-	unsigned char *pixels = png_decode(png, size, &width, &height);
+	unsigned long w = embedded->original_width, h = embedded->original_height;
+	unsigned long x, y, scale;
+	unsigned int const *r = embedded->replace;
+	unsigned char *linear;
+
+	if (!w && !h)
+		return 1;
+	if (!original || !w || !h || (w & (w - 1)) || (h & (h - 1)) ||
+		w > width || h > height || width % w || height % h || width / w != height / h || width / w > 8 ||
+		r[0] >= r[2] || r[1] >= r[3] || r[2] > w || r[3] > h)
+		return 0;
+	scale = width / w;
+	linear = malloc(w * h);
+	if (!linear)
+		return 0;
+	for (y = 0; y < h; y++) for (x = 0; x < w; x++)
+	{
+		unsigned long bit, out_bit = 1, offset = 0;
+		for (bit = 1; bit < w || bit < h; bit <<= 1)
+		{
+			if (bit < w) { if (x & bit) offset |= out_bit; out_bit <<= 1; }
+			if (bit < h) { if (y & bit) offset |= out_bit; out_bit <<= 1; }
+		}
+		linear[y * w + x] = original[offset];
+	}
+	for (y = 0; y < height; y++) for (x = 0; x < width; x++)
+	{
+		/* Integer bilinear weights at the new texel centres, clamped to
+		the old sheet's edges, just as GL_LINEAR samples it. */
+		long sx = (long)(2 * x + 1) - (long)scale, sy = (long)(2 * y + 1) - (long)scale;
+		unsigned long span = 2 * scale, x0, x1, y0, y1, fx, fy, value;
+		if (x >= r[0] * scale && x < r[2] * scale && y >= r[1] * scale && y < r[3] * scale)
+			continue;
+		if (sx < 0) sx = 0;
+		if (sy < 0) sy = 0;
+		x0 = (unsigned long)sx / span; y0 = (unsigned long)sy / span;
+		x1 = x0 + 1 < w ? x0 + 1 : x0; y1 = y0 + 1 < h ? y0 + 1 : y0;
+		fx = (unsigned long)sx % span; fy = (unsigned long)sy % span;
+		value = linear[y0*w+x0]*(span-fx)*(span-fy) + linear[y0*w+x1]*fx*(span-fy) +
+			linear[y1*w+x0]*(span-fx)*fy + linear[y1*w+x1]*fx*fy;
+		memset(pixels + (y*width+x)*4, (int)((value + span*span/2)/(span*span)), 4);
+	}
+	free(linear);
+	return 1;
+}
+
+static unsigned int hud_hires_pixels_texture(unsigned char *pixels, unsigned long width,
+	unsigned long height, unsigned long *levels)
+{
+	unsigned long largest;
 	GLuint texture;
 
 	if (!pixels)
@@ -242,9 +295,18 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	return texture;
 }
 
-unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
+unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels)
+{
+	unsigned long width = 0, height = 0;
+	unsigned char *pixels = png_decode(png, size, &width, &height);
+	return hud_hires_pixels_texture(pixels, width, height, levels);
+}
+
+unsigned int hud_hires_override_texture(long asset, const unsigned char *original, unsigned long *levels)
 {
 	const struct hud_hires_embedded *embedded;
+	unsigned long width = 0, height = 0;
+	unsigned char *pixels;
 
 	if (asset < 0 || asset >= hud_hires_asset_count() || textures[asset].failed)
 		return 0;
@@ -254,7 +316,14 @@ unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 		return textures[asset].texture;
 	}
 	embedded = &hud_hires_embedded[asset];
-	textures[asset].texture = hud_hires_png_texture(embedded->png, embedded->png_size, &textures[asset].levels);
+	pixels = png_decode((const unsigned char *)embedded->png, embedded->png_size, &width, &height);
+	if (pixels && (width != embedded->width || height != embedded->height ||
+		!hud_hires_preserve_ay8(pixels, width, height, original, embedded)))
+	{
+		free(pixels);
+		pixels = NULL;
+	}
+	textures[asset].texture = hud_hires_pixels_texture(pixels, width, height, &textures[asset].levels);
 	if (!textures[asset].texture)
 	{
 		platform_log("high-res hud: could not decode the texture for %s bitmap %d", embedded->tag, embedded->bitmap);

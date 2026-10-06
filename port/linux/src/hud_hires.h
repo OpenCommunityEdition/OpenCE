@@ -32,6 +32,11 @@ struct hud_hires_embedded
 	int title;
 	const unsigned int *png;
 	unsigned int png_size;
+	/* A partial redraw of a swizzled AY8 bitmap: retain the map's pixels
+	outside this rectangle (in original texels), including its seat label.
+	Zero dimensions mean the PNG replaces the whole bitmap as usual. */
+	unsigned int original_width, original_height;
+	unsigned int replace[4]; /* left, top, right, bottom */
 };
 
 extern const struct hud_hires_embedded hud_hires_embedded[];
@@ -47,7 +52,7 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 	unsigned long level0_size);
 /* its GL texture (decoded and uploaded, mipmapped, on first use; 0 if it
 could not be), and the number of its mip levels */
-unsigned int hud_hires_override_texture(long asset, unsigned long *levels);
+unsigned int hud_hires_override_texture(long asset, const unsigned char *original, unsigned long *levels);
 /* a GL texture drawn from an 8-bit RGBA PNG (as the tools write them), with
 all its mip levels, and their number; 0 if it could not be */
 unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels);

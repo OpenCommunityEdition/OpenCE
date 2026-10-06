@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="128" viewBox="0 0 512 128">
+  <!-- The seat meter's plusx contour, in the background's coordinates:
+       meter offset (0,10), source offset (1,260), plus translation (0,-2).
+       Keep its outline coincident with the meter instead of mixing the
+       original Xbox outline with the differently shaped high-res fill. -->
+  <path transform="translate(-1,-222)" d="M327.21,274.16 L339.43,274.16 L334.08,285.74 L345.32,285.74 L340.46,296.25 L329.23,296.25 L323.88,307.82 L311.66,307.82 L317.01,296.25 L305.77,296.25 L310.63,285.74 L321.86,285.74 Z" fill="none" stroke="#ffffff" stroke-width="3.34" stroke-linejoin="miter"/>
+</svg>

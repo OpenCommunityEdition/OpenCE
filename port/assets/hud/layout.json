@@ -1899,6 +1899,86 @@
    ]
   },
   {
+   "name": "hud_unit_backgrounds__9",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 9,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 661112012,
+   "replace": [
+    74,
+    10,
+    89,
+    24
+   ],
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud_vehicle_health_outline.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 1.0
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__10",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 10,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3401836366,
+   "replace": [
+    74,
+    10,
+    89,
+    24
+   ],
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud_vehicle_health_outline.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 1.0
+    }
+   ]
+  },
+  {
    "name": "hud_unit_meters__0",
    "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_meters",
    "bitmap": 0,
