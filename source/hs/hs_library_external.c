@@ -152,6 +152,10 @@ void hs_object_create_anew(
 	short object_name_index);
 void hs_object_destroy(
 	long object_index);
+boolean hs_unit_can_see_flag(
+	long unit_index,
+	short cutscene_flag_index,
+	real degrees);
 
 /* ---------- globals */
 
@@ -274,6 +278,32 @@ boolean hs_unit_can_see_object(
 	return result;
 }
 
+/* port: in network co-op a test of the players (the scripts' player0)
+passes for any player, as volume_test_objects_all does (coop_scripts.c), so
+the a10 tutorial's panels light for whoever looks at them: whether any
+player's unit sees the object, or with object_index NONE the cutscene flag */
+static boolean hs_any_player_can_see(
+	long object_index,
+	short cutscene_flag_index,
+	real degrees)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE &&
+			(object_index != NONE ? hs_unit_can_see_object(player->unit_index, object_index, degrees) :
+				hs_unit_can_see_flag(player->unit_index, cutscene_flag_index, degrees)))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 boolean hs_objects_can_see_object(
 	long object_list_index,
 	long object_index,
@@ -283,6 +313,8 @@ boolean hs_objects_can_see_object(
 	long unit_index;
 	boolean result;
 
+	if (object_index != NONE && coop_scripts_any_player_will_do(object_list_index))
+		return hs_any_player_can_see(object_index, NONE, degrees);
 	result = FALSE;
 	unit_index = object_list_get_first(object_list_index, &reference_index);
 	while (unit_index != NONE)
@@ -332,6 +364,8 @@ boolean hs_objects_can_see_flag(
 	long reference_index;
 	long unit_index;
 
+	if (coop_scripts_any_player_will_do(object_list_index))
+		return hs_any_player_can_see(NONE, cutscene_flag_index, degrees);
 	unit_index = object_list_get_first(object_list_index, &reference_index);
 	while (unit_index != NONE)
 	{
