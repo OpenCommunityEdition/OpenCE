@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
 <menus>
-	<widget name="main_menu/multiplayer_type_select/lobby/lobby_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+	<widget name="main_menu/multiplayer_type_select/lobby/lobby_screen" width="640" height="480" flags="pass_unhandled_to_focused_child main_menu_if_no_history" bitmap="bitmaps/gradient">
 		<on event="created" run="port lobby open"/>
 		<on event="created" run="net server accept conx"/>
 		<on event="created" run="net server allow start"/>
@@ -95,6 +95,8 @@
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_pic"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_map_name"/>
+		<child widget="main_menu/solo_level_select/replay_level_right_pic"/>
+		<child widget="main_menu/solo_level_select/replay_level_right_name"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_game_data"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_map_pic" controller="1" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix">

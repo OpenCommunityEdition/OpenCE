@@ -465,7 +465,8 @@ typedef char ai_prop_unopposable_enemy_offset_assert[
 static void ai_place_pending_mounted_weapons(
 	void);
 static boolean ai_enemies_endanger_player(
-	boolean must_be_attacking);
+	boolean must_be_attacking,
+	long unit_index);
 static void ai_flush_spatial_effects(
 	void);
 
@@ -1971,8 +1972,11 @@ void ai_update(
 	return;
 }
 
+/* port: unit_index NONE is any player's unit (the game's own check); else
+only enemies of that unit count (network co-op's respawn, players.c) */
 static boolean ai_enemies_endanger_player(
-	boolean must_be_attacking)
+	boolean must_be_attacking,
+	long unit_index)
 {
 	long current_time = game_time_get();
 	struct data_iterator iterator;
@@ -1985,7 +1989,8 @@ static boolean ai_enemies_endanger_player(
 	{
 		if (prop->player &&
 			prop->enemy &&
-			unit_get(prop->unit_index)->unit.player_index != NONE)
+			unit_get(prop->unit_index)->unit.player_index != NONE &&
+			(unit_index == NONE || prop->unit_index == unit_index))
 		{
 			struct actor_datum *actor = actor_get(prop->owner_actor_index);
 			long object_index = actor->meta.swarm
@@ -2068,13 +2073,27 @@ static boolean ai_enemies_endanger_player(
 boolean ai_enemies_can_see_player(
 	void)
 {
-	return ai_enemies_endanger_player(FALSE);
+	return ai_enemies_endanger_player(FALSE, NONE);
 }
 
 boolean ai_enemies_attacking_player(
 	void)
 {
-	return ai_enemies_endanger_player(TRUE);
+	return ai_enemies_endanger_player(TRUE, NONE);
+}
+
+/* port: whether enemies can see this player's unit */
+boolean ai_port_enemies_can_see_unit(
+	long unit_index)
+{
+	return ai_enemies_endanger_player(FALSE, unit_index);
+}
+
+/* port: whether enemies are attacking this player's unit */
+boolean ai_port_enemies_attacking_unit(
+	long unit_index)
+{
+	return ai_enemies_endanger_player(TRUE, unit_index);
 }
 
 long ai_get_race_from_team_index(

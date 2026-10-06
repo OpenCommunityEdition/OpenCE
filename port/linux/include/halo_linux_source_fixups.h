@@ -41,8 +41,17 @@ the display's shape, or 640 (port/linux/src/d3d8_gl.c) */
 long halo_screen_width(void);
 /* takes up a new width between frames (F11); returns the width */
 long halo_screen_commit(void);
+/* the shadow maps' pixels for each of their 128 texels each way, a power of
+two (display.shadow_resolution) */
+long halo_shadow_map_scale(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* names a model lighting vertex program, whose draws can be lit for each
+pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
+void halo_vertex_shader_lighting(unsigned long handle);
+/* display.anti_aliasing's pass over a window's 3D view, before the HUD and
+menus (source/render/render.c): the window's bounds on the screen */
+void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

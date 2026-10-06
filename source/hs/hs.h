@@ -179,6 +179,9 @@ void hs_runtime_initialize(
 	void);
 void hs_runtime_initialize_for_new_map(
 	void);
+/* port: network co-op (port/linux/game/network_coop.c) */
+void hs_runtime_port_shift_sleep_times(
+	long ticks);
 void hs_runtime_update(
 	void);
 long hs_runtime_evaluate(

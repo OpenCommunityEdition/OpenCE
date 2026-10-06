@@ -88,8 +88,8 @@ struct game_allegiance_globals
 	short allegiance_count;
 	struct game_allegiance_record allegiances[8];
 	byte reserved92[2];
-	unsigned long ally_bitvector[4];
-	unsigned long friendly_bitvector[4];
+	unsigned long ally_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS];
+	unsigned long friendly_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS];
 };
 
 typedef char game_allegiance_record_size_assert[
@@ -450,6 +450,28 @@ void game_allegiance_update(
 	}
 
 	return;
+}
+
+/* port: which teams are allies and which friends. A co-op client takes the
+host's, as only the host runs the scripts that make allegiances. */
+void game_allegiance_get_teams(
+	unsigned long ally_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS],
+	unsigned long friendly_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS])
+{
+	csmemcpy(ally_bitvector, game_allegiance_globals->ally_bitvector,
+		sizeof(game_allegiance_globals->ally_bitvector));
+	csmemcpy(friendly_bitvector, game_allegiance_globals->friendly_bitvector,
+		sizeof(game_allegiance_globals->friendly_bitvector));
+}
+
+void game_allegiance_set_teams(
+	unsigned long const ally_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS],
+	unsigned long const friendly_bitvector[GAME_ALLEGIANCE_BITVECTOR_LONGS])
+{
+	csmemcpy(game_allegiance_globals->ally_bitvector, ally_bitvector,
+		sizeof(game_allegiance_globals->ally_bitvector));
+	csmemcpy(game_allegiance_globals->friendly_bitvector, friendly_bitvector,
+		sizeof(game_allegiance_globals->friendly_bitvector));
 }
 
 void game_allegiance_create(

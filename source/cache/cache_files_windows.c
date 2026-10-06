@@ -427,7 +427,9 @@ static struct cache_file_runtime_globals cache_file_globals;
 void tags_header_register_vertex_and_index_buffers(
 	struct cache_file_tag_header *header)
 {
-	short index;
+	/* port: a long, as the buffers' counts are (a short wrapped on a count
+	past 0x7FFF, and the loop never ended) */
+	long index;
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
@@ -450,7 +452,9 @@ void tags_header_register_vertex_and_index_buffers(
 void tags_header_deregister_vertex_and_index_buffers(
 	struct cache_file_tag_header *header)
 {
-	short index;
+	/* port: a long, as the buffers' counts are (a short wrapped on a count
+	past 0x7FFF, and the loop never ended) */
+	long index;
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
@@ -480,7 +484,9 @@ void tags_header_deregister_vertex_and_index_buffers(
 void structure_bsp_header_register_vertex_buffers(
 	struct cache_file_structure_bsp_header *header)
 {
-	short index;
+	/* port: a long, as the buffers' counts are (a short wrapped on a count
+	past 0x7FFF, and the loop never ended) */
+	long index;
 
 	for (index = 0; index < header->vertex_buffer_count; index++)
 	{
@@ -504,7 +510,9 @@ void structure_bsp_header_register_vertex_buffers(
 void structure_bsp_header_deregister_vertex_buffers(
 	struct cache_file_structure_bsp_header *header)
 {
-	short index;
+	/* port: a long, as the buffers' counts are (a short wrapped on a count
+	past 0x7FFF, and the loop never ended) */
+	long index;
 
 	rasterizer_globals.current_lock_operation = _rasterizer_lock_bsp_switch;
 
@@ -590,11 +598,28 @@ boolean cache_files_precache_map_begin(
 		if (cache_file_read_header_from_dvd(cache_map_name, &header))
 		{
 			long buffer_size = cache_copy_buffer_size(copy_map);
-			void *buffer = texture_cache_steal_memory(buffer_size);
 			short map_file_index = cached_map_files_find_free_map(
 				header.file_length,
 				header.scenario_type);
-			struct cached_map_file *map_file = cached_map_file_get(map_file_index);
+			void *buffer;
+			struct cached_map_file *map_file;
+
+			/* port: a map no cache file holds (of no type the cache files are
+			for, or too big for its type's) is not precached; the texture
+			cache's memory is taken only once one does */
+			if (map_file_index == NONE)
+			{
+				error(_error_silent, "no cache file can hold map '%s' (%08x bytes, type %d)",
+					cache_map_name, header.file_length, header.scenario_type);
+				if (copy_map)
+				{
+					display_error_damaged_media();
+				}
+
+				return FALSE;
+			}
+			buffer = texture_cache_steal_memory(buffer_size);
+			map_file = cached_map_file_get(map_file_index);
 
 			memset(
 				&map_file->header,
@@ -757,6 +782,14 @@ boolean cache_file_open(
 		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
 		224,
 		map_file_index!=NONE);
+	/* port: a map in no cache file is not opened (its index would be
+	NONE's, before the cache files) */
+	if (map_file_index == NONE)
+	{
+		error(_error_silent, "the map '%s' is in no cache file", scenario_name);
+
+		return FALSE;
+	}
 	memset(
 		cache_file_globals.requests,
 		0,
@@ -797,6 +830,16 @@ short cache_file_read(
 		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
 		276,
 		offset>=0);
+	/* port: the offset and size are the map's (a texture's or sound's,
+	which nothing checks): a negative one is no read, failed at once (a
+	negative size read the file to its end over what follows the buffer) */
+	if (offset < 0 || size < 0)
+	{
+		error(_error_silent, "cache file read of %08x bytes at %08x refused", size, offset);
+		*completion_flag_reference = _cache_file_read_failed;
+
+		return NONE;
+	}
 	if (size & (CACHE_FILE_SECTOR_SIZE - 1))
 	{
 		size = (size | (CACHE_FILE_SECTOR_SIZE - 1)) + 1;
@@ -1056,7 +1099,13 @@ static void CALLBACK cache_file_read_io_completion_routine(
 		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
 		1389,
 		finished_request->overlapped.hEvent);
-	*(volatile boolean *)finished_request->overlapped.hEvent = TRUE;
+	/* port: a read that failed or came up short completes as failed: what
+	waits on it stops waiting, and a caller that checks (the map's tags and
+	bsps) sees it, instead of taking what is in its buffer for the map */
+	*(volatile boolean *)finished_request->overlapped.hEvent =
+		error_code == ERROR_SUCCESS && bytes_transferred == (unsigned long)finished_request->size ?
+			TRUE :
+			_cache_file_read_failed;
 	finished_request->pending = FALSE;
 	finished_request->running = FALSE;
 
@@ -1222,9 +1271,11 @@ static short cached_map_files_find_free_map(
 		 * arm's assertion failure calls system_exit, which does not return in January
 		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
 		 * Source-policy approval pending (2026-09-27 audit). */
+		/* port: the type is the map's header's, and a release build's assertion
+		goes on: a type no cache file is for finds none */
 		default:
 			match_vassert("c:\\halo\\SOURCE\\cache\\cache_files_windows.c", 1172, FALSE, NULL);
-			break;
+			return NONE;
 	}
 
 	for (map_file_index = first_map_file_index;

@@ -47,6 +47,11 @@ must call this afterwards. */
 
 void xgpu_gl_state_invalidate(void);
 
+/* a compiled shader, or a linked program of two, or 0 with the log
+written */
+GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
+GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
+
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -65,12 +70,32 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribu
 /* D3D constant register -96 is hardware register 0 */
 #define XGPU_VERTEX_CONSTANT_BIAS 96
 
+/* where one of the game's model lighting programs (d3d8_gl.c
+halo_vertex_shader_lighting) has the normal, and the world position, that it
+lights the diffuse color by: the temporary register that holds each before
+the instruction given */
+struct nv2a_vertex_lighting
+{
+	/* 1 by the ambient and distant lights, 2 by the point lights too */
+	int lights;
+	unsigned long normal_instruction, normal_register;
+	/* (with the point lights only) */
+	unsigned long position_instruction, position_register;
+};
+
+/* finds them in a model lighting program, checking that it lights its
+diffuse color as nv2a_psh.c does for each pixel; FALSE if it does not */
+BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instruction_count,
+	struct nv2a_vertex_lighting *lighting);
+
 /* GLSL for an NV2A vertex program (the instruction words after the program
 header). Attributes whose bit is set in packed_attribute_mask are fed as
-NORMPACKED3 32-bit integers and unpacked in the shader. Returns a malloc'd
-string. */
+NORMPACKED3 32-bit integers and unpacked in the shader. With lighting (else
+NULL), the normal and world position go to the pixel shader too, which
+lights the diffuse color for each pixel (nv2a_pixel_shader_key
+per_pixel_lighting). Returns a malloc'd string. */
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask);
+	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
 
 /* ---------- pixel shaders */
 
@@ -106,6 +131,15 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* a model lighting program's draw lit for each pixel
+	(display.per_pixel_lighting): nv2a_vertex_lighting's lights, or 0 for
+	the diffuse color the vertex shader computed */
+	unsigned char per_pixel_lighting;
+	/* drawn into a multisampled target (display.anti_aliasing's
+	multisampling), its samples a pixel: the alpha test covers samples in
+	proportion to how far alpha is past the reference, not all of the pixel
+	or none of it, so that cut-out edges (foliage, grates) are smoothed too */
+	unsigned char alpha_test_samples;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -131,6 +165,13 @@ C0/C1 of each stage and the final combiner, and texture constants */
 	"uniform vec4 bump_luminance[4];\n" \
 	"uniform vec4 texture_scale[4];\n" \
 	XGPU_PIXEL_UNIFORMS_ES
+
+/* the vertex constants the per-pixel model lighting reads, in a uniform of
+their own (the vertex shader's 192 would pass OpenGL ES's least fragment
+uniform space): [0] c[-82] (the translucency in z), [1] to [11] c[-79] to
+c[-69] (rasterizer_set_model_lighting's two point lights, two distant
+lights and the ambient light) */
+#define XGPU_MODEL_LIGHT_COUNT 12
 
 /* ---------- textures */
 
@@ -170,9 +211,33 @@ struct xgpu_render_target
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
 	unsigned long gl_width, gl_height;
+	/* with multisampling, the multisampled renderbuffer draws go to, its
+	samples a pixel (0 when it has none), and whether it has been drawn into
+	since the texture last had its pixels (d3d8_gl.c,
+	render_target_multisample) */
+	GLuint multisample;
+	int samples;
+	BOOL unresolved;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
+
+/* ---------- anti-aliasing
+
+display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
+window's 3D view in place before the HUD and menus are drawn over it, so
+that their text stays sharp. Supersampling and multisampling are the
+device's (d3d8_gl.c). */
+
+/* the programs and textures of FXAA, or of SMAA, made now; FALSE if they
+cannot be (once FALSE, it stays so) */
+BOOL xgpu_post_prepare(BOOL smaa);
+
+/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
+target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
+not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
+	const GLint corners[4]);
 
 #endif

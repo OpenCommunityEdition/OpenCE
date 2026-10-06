@@ -98,6 +98,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
 
@@ -111,6 +112,10 @@ enum
 	_device_group_runtime_bit = 2,
 	_scenario_device_group_can_change_only_once_bit = 0,
 };
+
+/* port: the group flags network_coop.c syncs */
+#define DEVICE_GROUP_NETWORK_FLAGS \
+	(FLAG(_device_group_can_change_only_once_bit) | FLAG(_device_group_changed_once_bit))
 
 enum
 {
@@ -186,6 +191,9 @@ typedef char device_animation_frame_count_offset_assert[
 void device_group_set_actual_value(
 	short group_index,
 	real actual_value);
+static boolean device_group_change(
+	short group_index,
+	real desired_value);
 static short device_group_new(
 	real initial_value,
 	unsigned long flags);
@@ -594,6 +602,7 @@ void device_group_set_actual_value(
 
 	group = datum_get(device_groups_data, group_index);
 	group->actual_value = actual_value;
+	network_coop_note_device_snap(group_index);
 
 	object_iterator_new(&iterator, _object_mask_device, 0);
 	while ((device = object_iterator_next(&iterator)) != NULL)
@@ -675,6 +684,74 @@ void device_render_debug(
 }
 
 boolean device_group_set_desired_value(
+	short group_index,
+	real desired_value)
+{
+	/* port: on a co-op client only the host moves devices (network_coop.c) */
+	if (network_coop_devices_remote())
+		return FALSE;
+
+	return device_group_change(group_index, desired_value);
+}
+
+/* port: reads a group for network_coop.c; FALSE if it doesn't exist */
+boolean device_group_network_get(
+	short group_index,
+	real *value,
+	word *flags,
+	boolean *runtime)
+{
+	struct device_group_datum *group = group_index != NONE ? datum_try_and_get(device_groups_data, group_index) : NULL;
+
+	if (!group)
+		return FALSE;
+	*value = group->actual_value;
+	*flags = group->flags & DEVICE_GROUP_NETWORK_FLAGS;
+	*runtime = TEST_FLAG(group->flags, _device_group_runtime_bit);
+
+	return TRUE;
+}
+
+/* port: a co-op client applies the host's group state. snap jumps the
+devices to the value; otherwise they move there as usual. */
+void device_group_network_set(
+	short group_index,
+	real value,
+	word flags,
+	boolean snap)
+{
+	struct device_group_datum *group = group_index != NONE ? datum_try_and_get(device_groups_data, group_index) : NULL;
+
+	if (!group)
+		return;
+	if (snap)
+		device_group_set_actual_value(group_index, value);
+	else
+	{
+		group->flags &= ~FLAG(_device_group_changed_once_bit);
+		device_group_change(group_index, value);
+	}
+	group->flags = (word)((group->flags & ~DEVICE_GROUP_NETWORK_FLAGS) | (flags & DEVICE_GROUP_NETWORK_FLAGS));
+}
+
+void device_port_set_state(
+	long device_index,
+	real power,
+	boolean move_to_position,
+	real position)
+{
+	struct device_datum *device = device_get(device_index);
+
+	device->device.power = PIN(power, 0.0f, 1.0f);
+	if (move_to_position)
+	{
+		device->device.position = PIN(position, 0.0f, 1.0f);
+		device->device.position_velocity = 0.0f;
+		device->device.flags |= FLAG(_device_position_changed_bit);
+	}
+}
+
+static boolean device_group_change(
 	short group_index,
 	real desired_value)
 {

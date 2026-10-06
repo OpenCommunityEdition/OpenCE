@@ -107,6 +107,8 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
 #include "text/draw_string.h"
+#include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
@@ -870,6 +872,7 @@ void hud_autosave(
 		: hud_globals->checkpoint_end_index;
 	short local_player_index;
 
+	network_coop_note_hud(_coop_hud_checkpoint, active);
 	scripted_hud_messages_clear();
 	if (active && hud_globals->checkpoint_sound.index != NONE)
 	{
@@ -993,7 +996,7 @@ static void hud_draw_players(
 	return;
 }
 
-/* port: in multiplayer, players' names above their heads
+/* port: in multiplayer and network co-op, players' names above their heads
 (display.player_names: "all", "allies", "enemies" or "none"). An ally's goes
 above the triangle the game draws over teammates; an enemy's only within the
 motion sensor's reach, while the view sees them and they are not
@@ -1190,7 +1193,8 @@ static void hud_draw_player_names(
 	if (setting == _player_names_none || player_index == NONE)
 		return;
 	team_index = player_get(player_index)->team_index;
-	indicators = game_engine_display_team_indicators();
+	/* the campaign always draws teammate triangles (hud_draw_players) */
+	indicators = game_engine_display_team_indicators() || !game_engine_running();
 	enemy_range = hud_player_name_enemy_range();
 	/* (the players the motion tracker would show this local player) */
 	game_engine_motion_sensor_viewer(render.local_player_index);
@@ -1360,9 +1364,15 @@ void hud_draw_screen(
 			hud_draw_players();
 		}
 
-		/* port: players' names above their heads, in multiplayer */
-		if (game_engine_running() && !cinematic_in_progress())
+		/* port: players' names above their heads, in multiplayer and network co-op */
+		if ((game_engine_running() || network_coop_active()) && !cinematic_in_progress())
 			hud_draw_player_names();
+		/* port: who a dead network co-op player is watching */
+		if (player->unit_index == NONE && coop_spectating() && !cinematic_in_progress())
+			coop_spectate_draw(render.local_player_index);
+		/* port: the network co-op vote to skip a cinematic */
+		if (cinematic_in_progress())
+			coop_skip_vote_draw(render.local_player_index);
 
 		if (!game_time_get_paused() &&
 			render.local_player_index == local_player_get_next(NONE))

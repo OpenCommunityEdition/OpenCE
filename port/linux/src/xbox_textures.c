@@ -656,6 +656,10 @@ struct texture_entry
 	unsigned long last_used_frame;
 	/* the high-res HUD texture drawn in its place (hud_hires.h), or -1 */
 	long override;
+	/* the newest generation of its pages (memory_watch_generation) as of the
+	memory watch serial read before it was found: the same while no watched
+	page has been written since (0: never found) */
+	unsigned long watched_serial, watched_generation;
 };
 
 #define TEXTURE_BUCKET_COUNT 4096
@@ -668,7 +672,7 @@ static struct texture_entry *texture_buckets[TEXTURE_BUCKET_COUNT];
 texture that is not palettized is remembered with the memory watch serial it
 started at: while no watched page has been written since, and no texture
 has been dropped, the same lookup finds the same current texture. */
-#define RECENT_TEXTURE_COUNT 64
+#define RECENT_TEXTURE_COUNT 512
 
 static struct
 {
@@ -680,9 +684,14 @@ static struct
 static unsigned long texture_drop_serial = 1;
 static unsigned long texture_frame = 0;
 
+/* (every bit of the three mixed into the top ones: textures are aligned,
+and few sizes and formats are common) */
 static unsigned long bucket_index(DWORD data, DWORD format_word, DWORD size_word)
 {
-	return ((data >> 7) ^ (format_word * 2654435761UL) ^ size_word) % TEXTURE_BUCKET_COUNT;
+	unsigned long hash = (unsigned long)data * 2654435761UL ^ (unsigned long)format_word * 2246822519UL ^
+		(unsigned long)size_word * 3266489917UL;
+
+	return ((hash & 0xffffffffUL) >> 20) % TEXTURE_BUCKET_COUNT;
 }
 
 /* palettized textures are cached per palette contents: the game rewrites
@@ -757,25 +766,33 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
 	unsigned long watch_serial = memory_watch_serial();
 
+	/* (a texture that is not palettized has the one entry, until one is
+	dropped: remembered, a page written since only means checking it) */
+	entry = NULL;
 	if (!palettized && recent_textures[recent].entry && recent_textures[recent].data == data &&
 		recent_textures[recent].format_word == format_word && recent_textures[recent].size_word == size_word &&
-		recent_textures[recent].watch_serial == watch_serial &&
 		recent_textures[recent].drop_serial == texture_drop_serial)
 	{
 		entry = recent_textures[recent].entry;
-		entry->last_used_frame = texture_frame;
-		return texture_entry_result(entry, target, description);
+		if (recent_textures[recent].watch_serial == watch_serial)
+		{
+			entry->last_used_frame = texture_frame;
+			return texture_entry_result(entry, target, description);
+		}
 	}
 
-	for (entry = *bucket; entry; entry = entry->next)
+	if (!entry)
 	{
-		if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
+		for (entry = *bucket; entry; entry = entry->next)
 		{
-			if (entry->palette_hash == hash)
-				break;
-			variant_count++;
-			if (!oldest_variant || entry->last_used_frame < oldest_variant->last_used_frame)
-				oldest_variant = entry;
+			if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
+			{
+				if (entry->palette_hash == hash)
+					break;
+				variant_count++;
+				if (!oldest_variant || entry->last_used_frame < oldest_variant->last_used_frame)
+					oldest_variant = entry;
+			}
 		}
 	}
 	if (!entry && variant_count >= MAXIMUM_PALETTE_VARIANTS)
@@ -806,7 +823,17 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 
 	if (no_cache < 0)
 		no_cache = config_boolean("debug.texture_no_cache");
-	generation = memory_watch_generation(entry->address, entry->size);
+	/* (its pages' newest generation, found again only once a watched page
+	has been written: a large texture's pages, scanned for every draw that
+	bound it, were much of a frame with many objects) */
+	if (entry->watched_serial && entry->watched_serial == watch_serial)
+		generation = entry->watched_generation;
+	else
+	{
+		generation = memory_watch_generation(entry->address, entry->size);
+		entry->watched_serial = watch_serial;
+		entry->watched_generation = generation;
+	}
 	if (!entry->generation || generation > entry->generation || no_cache)
 	{
 		/* protect first, so a write racing with the upload is noticed */
