@@ -308,6 +308,28 @@ int pthread_cond_broadcast(pthread_cond_t *condition)
 
 /* ---------- time */
 
+typedef VOID (WINAPI *system_time_proc)(LPFILETIME);
+
+/* the wall clock: GetSystemTimePreciseAsFileTime where Windows has it
+(Windows 8 and later), else GetSystemTimeAsFileTime. Importing the precise
+one directly would keep the game from starting on Windows 7. Threads that
+race here store the same pointer. */
+static void system_time(FILETIME *now)
+{
+	static system_time_proc volatile proc;
+	system_time_proc get_time = proc;
+
+	if (!get_time)
+	{
+		get_time = (system_time_proc)(void *)GetProcAddress(GetModuleHandleW(L"kernel32.dll"),
+			"GetSystemTimePreciseAsFileTime");
+		if (!get_time)
+			get_time = GetSystemTimeAsFileTime;
+		proc = get_time;
+	}
+	get_time(now);
+}
+
 int clock_gettime(clockid_t clock, struct timespec *time)
 {
 	if (clock == CLOCK_MONOTONIC)
@@ -327,7 +349,7 @@ int clock_gettime(clockid_t clock, struct timespec *time)
 		FILETIME now;
 		unsigned long long intervals;
 
-		GetSystemTimePreciseAsFileTime(&now);
+		system_time(&now);
 		intervals = ((unsigned long long)now.dwHighDateTime << 32) | now.dwLowDateTime;
 		intervals -= 116444736000000000ULL;
 		time->tv_sec = (time_t)(intervals / 10000000ULL);
