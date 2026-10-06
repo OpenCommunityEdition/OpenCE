@@ -58,6 +58,10 @@ so players of the two versions can play together.
    says to put the disc image next to the executable, and stops.
 3. The game extracts the `maps/` folder. Then the game starts.
 
+The `maps/` folder holds the Xbox maps only. If it holds Halo PC's maps
+instead (a Halo PC or Custom Edition install's `maps` folder), the game says
+so and stops: Custom Edition maps go in `custom_maps/`, beside `maps/`.
+
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md). On

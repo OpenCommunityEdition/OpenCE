@@ -112,6 +112,61 @@ extern const unsigned long platform_window_icon_size;
 #endif
 #endif
 
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* the maps folder checked to hold the Xbox maps (platform_maps_folder_check).
+When it holds Halo PC's instead, or no ui.map, the player is told where each
+kind goes and the game quits, rather than failing to load Halo PC's ui.map
+as the Xbox's (game_load). Halo PC maps in maps/ itself, which play only from
+custom_maps, are warned of */
+static void data_check_maps(void)
+{
+	struct platform_maps_folder maps;
+	char message[2048];
+	char where[1200];
+	BOOL quiet = config_boolean("debug.hidden_window") || config_real("debug.exit_after") > 0.0 ||
+		config_string("debug.network_test")[0];
+
+	platform_maps_folder_check(&maps);
+	snprintf(where, sizeof(where),
+		"Put the Xbox maps from your Halo: Combat Evolved disc image in %s/maps. Halo Custom Edition "
+		"maps go in a custom_maps folder beside it.",
+		maps.root);
+	switch (maps.state)
+	{
+	case _maps_folder_xbox:
+		if (!maps.stray_pc_maps)
+			return;
+		snprintf(message, sizeof(message),
+			"These maps in the maps folder are Halo PC maps, which play only from custom_maps: %s%s.\n\n%s",
+			maps.stray_names, maps.stray_pc_maps > PLATFORM_MAPS_FOLDER_NAMED ? " and more" : "", where);
+		platform_log("maps folder: %ld Halo PC maps in %s/maps (%s)", maps.stray_pc_maps, maps.root,
+			maps.stray_names);
+		if (!quiet)
+			SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Halo", message, NULL);
+		return;
+	case _maps_folder_halo_pc:
+		snprintf(message, sizeof(message),
+			"The maps folder holds Halo PC maps, not the Xbox maps: its ui.map is from %s.\n\n%s\n\n"
+			"To copy the Xbox maps out of your disc image again, move this maps folder aside and "
+			"start the game.",
+			maps.ui_version == 609 ? "Halo PC (Custom Edition)" : "Halo PC", where);
+		break;
+	default:
+		snprintf(message, sizeof(message),
+			"Halo's Xbox maps were not found: %s/maps has no ui.map.\n\n%s\n\n"
+			"To copy the Xbox maps out of your disc image, move the maps folder aside and start the game.",
+			maps.root, where);
+		break;
+	}
+	platform_log("maps folder: %s/maps is not the Xbox maps (ui.map version %ld): quitting", maps.root,
+		maps.ui_version);
+	platform_log("%s", message);
+	if (!quiet)
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
+	exit(EXIT_FAILURE);
+}
+#endif
+
 BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
@@ -159,8 +214,11 @@ BOOL platform_sdl_initialize(void)
 	platform_sdl_started = TRUE;
 #ifndef HALO_ANDROID
 	/* found (or offered to the player, platform_offer_game_data) before the
-	game's window opens */
+	game's window opens, and checked to be the Xbox maps */
 	platform_data_root();
+#ifndef HALO_WEB
+	data_check_maps();
+#endif
 	/* (a new version looked for meanwhile, updater_poll asking about it) */
 	updater_start();
 #endif
