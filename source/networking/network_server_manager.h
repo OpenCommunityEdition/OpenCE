@@ -49,6 +49,10 @@ void network_game_generate_join_game_token(
 void network_game_server_kick_machine(
 	long machine_index,
 	boolean kept_out);
+/* port: the rejection code of the last machine
+network_game_server_accept_client_machine_into_game refused */
+short network_game_server_last_refusal_code(
+	void);
 /* the host's ban command (console.c, hs.c) */
 enum
 {

@@ -2033,7 +2033,9 @@ static boolean network_game_server_handle_message_client_join_game_request(
 						struct message_server_machine_rejected rejection;
 						struct network_message *reply;
 
-						rejection.reason = _network_game_server_rejection_reason_game_not_open;
+						/* port: a banned machine is told so (it was told the
+						game is not open) */
+						rejection.reason = network_game_server_last_refusal_code();
 						network_event(
 							"server failed to accept valid client machine '%s' @%s into the game",
 							join_game_request.machine_name,
