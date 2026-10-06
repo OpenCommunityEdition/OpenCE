@@ -173,7 +173,10 @@ static void send_activity(void)
 	else
 	{
 		size = snprintf(json, sizeof(json),
-			"{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"%lu\",\"args\":{\"pid\":%lu}}",
+			"{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"%lu\",\"args\":{\"pid\":%lu,\"activity\":{"
+			"\"details\":\"In Menus\","
+			"\"assets\":{\"large_image\":\"logo\",\"large_text\":\"Halo: Combat Evolved\"},"
+			"\"instance\":false}}}",
 			++discord.nonce, (unsigned long)posix_process_id());
 	}
 	discord_send(_opcode_frame, json, size);
