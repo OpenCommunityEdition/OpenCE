@@ -443,7 +443,8 @@ Android build defines all of (`tools/android_build.py`):
 
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ARM64_GUEST`:
+These changes are in `#ifdef HALO_ARM64_GUEST`, which the Linux arm64 build
+shares:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.
