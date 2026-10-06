@@ -84,6 +84,89 @@ static float screen_scale[2] = { 1.0f, 1.0f };
 static long ui_offset;
 #define UI_OFFSET ((GLint)ui_offset)
 
+/* ---------- anti-aliasing
+
+display.anti_aliasing, off unless it is set: the Xbox drew without any.
+"fxaa" and "smaa" are passes over each window's 3D view before the HUD and
+menus are drawn over it (halo_screen_anti_alias, xgpu_post.c); "ssaa2x"
+draws the screen's targets at twice the resolution each way
+(screen_mode_choose), which the display blit scales down; "msaa2x" to
+"msaa8x" draw the back buffer and its depth buffer with that many samples a
+pixel (render_target_multisample). The setting is read again between frames
+(halo_screen_commit), so that a change applies from the next one. */
+
+enum
+{
+	_anti_aliasing_off,
+	_anti_aliasing_fxaa,
+	_anti_aliasing_smaa,
+	_anti_aliasing_ssaa,
+	_anti_aliasing_msaa,
+};
+
+static const struct
+{
+	const char *name;
+	int mode;
+	int samples;
+} anti_aliasing_values[] =
+{
+	{ "off", _anti_aliasing_off, 0 },
+	{ "fxaa", _anti_aliasing_fxaa, 0 },
+#ifdef HALO_ANDROID
+	/* (SMAA's three passes and supersampling's four times the pixels are
+	more than a phone's GPU has to spare: FXAA in SMAA's place, and none) */
+	{ "smaa", _anti_aliasing_fxaa, 0 },
+	{ "ssaa2x", _anti_aliasing_off, 0 },
+#else
+	{ "smaa", _anti_aliasing_smaa, 0 },
+	{ "ssaa2x", _anti_aliasing_ssaa, 0 },
+#endif
+	{ "msaa2x", _anti_aliasing_msaa, 2 },
+	{ "msaa4x", _anti_aliasing_msaa, 4 },
+	{ "msaa8x", _anti_aliasing_msaa, 8 },
+};
+
+#define NUMBER_OF_ANTI_ALIASING_VALUES ((int)(sizeof(anti_aliasing_values) / sizeof(anti_aliasing_values[0])))
+
+/* the value in effect, -1 until the setting is first read; multisampling's
+samples a pixel, at most the GPU's (anti_aliasing_prepare); and the GPU's
+most samples and largest target (texture and renderbuffer), 0 until the GL
+context exists */
+static int anti_aliasing_value = -1;
+static int anti_aliasing_samples;
+static GLint anti_aliasing_maximum_samples, maximum_target_size;
+
+static void anti_aliasing_prepare(void);
+
+/* display.anti_aliasing's value (none of them: the first, off) */
+static void anti_aliasing_read(void)
+{
+	const char *setting = config_string("display.anti_aliasing");
+	int value;
+
+	for (value = NUMBER_OF_ANTI_ALIASING_VALUES - 1;
+		value > 0 && strcmp(setting, anti_aliasing_values[value].name);
+		value--)
+	{
+	}
+	if (value == anti_aliasing_value)
+		return;
+	anti_aliasing_value = value;
+	if (strcmp(setting, anti_aliasing_values[value].name))
+		platform_log("anti-aliasing: \"%s\" is unknown, so off", setting);
+	else
+		platform_log("anti-aliasing: %s", setting);
+	anti_aliasing_prepare();
+}
+
+static int anti_aliasing(void)
+{
+	if (anti_aliasing_value < 0)
+		anti_aliasing_read();
+	return anti_aliasing_values[anti_aliasing_value].mode;
+}
+
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
@@ -116,6 +199,24 @@ static void screen_mode_choose(long *width, float scale[2])
 		keeps its shape and the display blit letterboxes it */
 		if (*width != wanted && *width != (wanted & ~1L))
 			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+		/* supersampling: twice the pixels each way, or as many as the GPU's
+		largest target has (once it is known), which the display blit
+		scales down; not with "original" resolution scaling, which draws
+		the Xbox's 640x480 */
+		if (anti_aliasing() == _anti_aliasing_ssaa && maximum_target_size > 0)
+		{
+			float factor = 2.0f;
+
+			if (*width * scale[0] * factor > (float)maximum_target_size)
+				factor = (float)maximum_target_size / (*width * scale[0]);
+			if (SCREEN_HEIGHT * scale[1] * factor > (float)maximum_target_size)
+				factor = (float)maximum_target_size / (SCREEN_HEIGHT * scale[1]);
+			if (factor > 1.0f)
+			{
+				scale[0] *= factor;
+				scale[1] *= factor;
+			}
+		}
 	}
 #endif
 }
@@ -304,6 +405,9 @@ struct render_target_entry
 	struct render_target_entry *next_in_bucket;
 	struct xgpu_render_target target;
 	unsigned long last_rendered;
+	/* the back buffer or its depth buffer, which the 3D view is drawn into:
+	multisampled with multisampling (render_target_multisample) */
+	BOOL screen_buffer;
 };
 
 /* every draw looks up its targets and whether its textures are render
@@ -322,6 +426,8 @@ struct framebuffer_entry
 	struct framebuffer_entry *next;
 	GLuint color;
 	GLuint depth;
+	/* color and depth are multisampled renderbuffers, not textures */
+	BOOL renderbuffers;
 	GLuint framebuffer;
 };
 
@@ -839,7 +945,7 @@ void WINAPI D3DDevice_BlockUntilVerticalBlank(void)
 
 /* ---------- GL helpers */
 
-static GLuint compile_shader(GLenum type, const char *source, const char *what)
+GLuint xgpu_compile_shader(GLenum type, const char *source, const char *what)
 {
 	GLuint shader = glCreateShader(type);
 	GLint status = 0;
@@ -857,6 +963,26 @@ static GLuint compile_shader(GLenum type, const char *source, const char *what)
 		return 0;
 	}
 	return shader;
+}
+
+GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what)
+{
+	GLuint program = glCreateProgram();
+	GLint status = 0;
+
+	glAttachShader(program, vertex_shader);
+	glAttachShader(program, fragment_shader);
+	glLinkProgram(program);
+	glGetProgramiv(program, GL_LINK_STATUS, &status);
+	if (!status)
+	{
+		char log[4096];
+
+		glGetProgramInfoLog(program, sizeof(log), NULL, log);
+		platform_log("cannot link the %s program: %s", what, log);
+		return 0;
+	}
+	return program;
 }
 
 #ifndef HALO_ANDROID
@@ -986,6 +1112,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	else
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)entry->target.gl_width, (GLsizei)entry->target.gl_height,
 			0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -1006,7 +1133,9 @@ struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
 	return best ? &best->target : NULL;
 }
 
-static GLuint framebuffer_get(GLuint color, GLuint depth)
+/* the framebuffer of these textures, or with renderbuffers, of these
+multisampled renderbuffers (render_target_multisample) */
+static GLuint framebuffer_find(GLuint color, GLuint depth, BOOL renderbuffers)
 {
 	struct framebuffer_entry *entry, **link;
 	GLenum draw_buffer = color ? GL_COLOR_ATTACHMENT0 : GL_NONE;
@@ -1015,7 +1144,7 @@ static GLuint framebuffer_get(GLuint color, GLuint depth)
 	the draw before it did) */
 	for (link = &framebuffers; (entry = *link) != NULL; link = &entry->next)
 	{
-		if (entry->color == color && entry->depth == depth)
+		if (entry->color == color && entry->depth == depth && entry->renderbuffers == renderbuffers)
 		{
 			*link = entry->next;
 			entry->next = framebuffers;
@@ -1026,30 +1155,135 @@ static GLuint framebuffer_get(GLuint color, GLuint depth)
 	entry = calloc(1, sizeof(*entry));
 	entry->color = color;
 	entry->depth = depth;
+	entry->renderbuffers = renderbuffers;
 	glGenFramebuffers(1, &entry->framebuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, entry->framebuffer);
-	if (color)
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
-	if (depth)
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+	if (renderbuffers)
+	{
+		if (color)
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color);
+		if (depth)
+			glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depth);
+	}
+	else
+	{
+		if (color)
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+		if (depth)
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+	}
 	glDrawBuffers(1, &draw_buffer);
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		platform_log("framebuffer %u/%u is incomplete", color, depth);
+		platform_log("framebuffer %u/%u%s is incomplete", color, depth, renderbuffers ? " (multisampled)" : "");
 	xgpu_gl_state_invalidate();
 	entry->next = framebuffers;
 	framebuffers = entry;
 	return entry->framebuffer;
 }
 
+static GLuint framebuffer_get(GLuint color, GLuint depth)
+{
+	return framebuffer_find(color, depth, FALSE);
+}
+
+/* ---------- multisampling
+
+With display.anti_aliasing's multisampling, the back buffer and its depth
+buffer are drawn into multisampled renderbuffers, and so is any target drawn
+together with one of them (the mirror's view goes to the secondary target
+with the back buffer's depth buffer): a framebuffer's attachments are all
+multisampled or none is, so that of a target's texture and its renderbuffer
+only one has pixels drawn since the other had them. The renderbuffer's
+pixels are resolved into the texture before anything reads the texture (a
+draw's textures, the display blit), and the texture's are put into the
+renderbuffer when it is made, or made again for other samples. Nothing
+samples a depth buffer as a texture (the game's copy of the depth buffer's
+memory is a target of its own), so a depth buffer is resolved only when it
+stops being multisampled. */
+
+/* the samples a pixel of the bound targets: their renderbuffers' (or 1) */
+static int target_samples = 1;
+
+/* the multisampled pixels of a target drawn into since into its texture */
+static void render_target_resolve(struct xgpu_render_target *target)
+{
+	GLuint read, draw;
+
+	if (!target->unresolved)
+		return;
+	target->unresolved = FALSE;
+	/* (both found first: making a framebuffer binds it) */
+	read = target->depth ? framebuffer_find(0, target->multisample, TRUE) :
+		framebuffer_find(target->multisample, 0, TRUE);
+	draw = target->depth ? framebuffer_get(0, target->texture) : framebuffer_get(target->texture, 0);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
+	glDisable(GL_SCISSOR_TEST);
+	glBlitFramebuffer(0, 0, (GLint)target->gl_width, (GLint)target->gl_height,
+		0, 0, (GLint)target->gl_width, (GLint)target->gl_height,
+		target->depth ? GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT : GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	xgpu_gl_state_invalidate();
+}
+
+/* a target's renderbuffer with these samples a pixel (0: none, its storage
+a pixel, the renderbuffer kept for the framebuffers made of it): its pixels
+resolved into its texture first, and the texture's put into the new
+storage */
+static void render_target_multisample(struct xgpu_render_target *target, int samples)
+{
+	GLuint draw;
+
+	if (target->samples == samples)
+		return;
+	render_target_resolve(target);
+	if (!target->multisample)
+		glGenRenderbuffers(1, &target->multisample);
+	glBindRenderbuffer(GL_RENDERBUFFER, target->multisample);
+	glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, target->depth ? GL_DEPTH24_STENCIL8 : GL_RGBA8,
+		samples ? (GLsizei)target->gl_width : 1, samples ? (GLsizei)target->gl_height : 1);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	target->samples = samples;
+	if (!samples)
+		return;
+	draw = target->depth ? framebuffer_find(0, target->multisample, TRUE) :
+		framebuffer_find(target->multisample, 0, TRUE);
+#ifdef HALO_ANDROID
+	/* (ES blits into no multisampled framebuffer: it is cleared instead. A
+	change of the setting is taken up between frames, and the frame clears
+	the screen's targets before it draws) */
+	glBindFramebuffer(GL_FRAMEBUFFER, draw);
+	glDisable(GL_SCISSOR_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glStencilMask(0xff);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClearDepth(1.0f);
+	glClearStencil(0);
+	glClear(target->depth ? GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT : GL_COLOR_BUFFER_BIT);
+#else
+	{
+		GLuint read = target->depth ? framebuffer_get(0, target->texture) : framebuffer_get(target->texture, 0);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
+		glDisable(GL_SCISSOR_TEST);
+		glBlitFramebuffer(0, 0, (GLint)target->gl_width, (GLint)target->gl_height,
+			0, 0, (GLint)target->gl_width, (GLint)target->gl_height,
+			target->depth ? GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT : GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+#endif
+	xgpu_gl_state_invalidate();
+}
+
 /* the pixels per unit of the bound targets (render_target_get) */
 static float target_scale[2] = { 1.0f, 1.0f };
 
-/* the pixel edge of a coordinate in the bound targets' units: floorf's,
-without its call (on 32-bit x86 it saves and restores the FPU's rounding,
-several times a draw) */
-static GLint target_pixel(float coordinate, int axis)
+/* the pixel edge of a coordinate in a target's units, at its scale:
+floorf's, without its call (on 32-bit x86 it saves and restores the FPU's
+rounding, several times a draw) */
+static GLint scaled_pixel(float coordinate, float scale)
 {
-	float value = coordinate * target_scale[axis] + 0.5f;
+	float value = coordinate * scale + 0.5f;
 	GLint pixel = (GLint)value;
 
 	/* (the conversion is toward zero: a negative value with a fraction
@@ -1059,12 +1293,19 @@ static GLint target_pixel(float coordinate, int axis)
 	return pixel;
 }
 
+/* ... in the bound targets' units */
+static GLint target_pixel(float coordinate, int axis)
+{
+	return scaled_pixel(coordinate, target_scale[axis]);
+}
+
 /* binds the framebuffer for the current targets; returns FALSE if there is
 nothing to draw into */
 static BOOL bind_targets(BOOL *has_depth)
 {
 	struct render_target_entry *color = render_target_get(device.render_target);
 	struct render_target_entry *depth = render_target_get(device.depth_stencil);
+	int samples;
 
 	if (depth && !depth->target.depth)
 		depth = NULL;
@@ -1075,7 +1316,33 @@ static BOOL bind_targets(BOOL *has_depth)
 	/* viewports and clears are in the targets' units (render_target_get) */
 	target_scale[0] = color ? color->target.scale[0] : depth->target.scale[0];
 	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
-	state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
+	/* with multisampling, multisampled where either is a screen buffer or
+	is multisampled already */
+	samples = anti_aliasing() == _anti_aliasing_msaa ? anti_aliasing_samples : 0;
+	if (samples && !((color && (color->screen_buffer || color->target.samples)) ||
+		(depth && (depth->screen_buffer || depth->target.samples))))
+	{
+		samples = 0;
+	}
+	if (color)
+		render_target_multisample(&color->target, samples);
+	if (depth)
+		render_target_multisample(&depth->target, samples);
+	if (samples)
+	{
+		state_framebuffer(framebuffer_find(color ? color->target.multisample : 0,
+			depth ? depth->target.multisample : 0, TRUE));
+		if (color)
+			color->target.unresolved = TRUE;
+		if (depth)
+			depth->target.unresolved = TRUE;
+		target_samples = samples;
+	}
+	else
+	{
+		state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
+		target_samples = 1;
+	}
 	*has_depth = depth != NULL;
 	return TRUE;
 }
@@ -1196,8 +1463,43 @@ static void gl_initialize(void)
 	debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
 		config_string("debug.gpu_dump_shaders") : NULL;
 	debug_settings.statistics = config_boolean("debug.gpu_stats");
+	{
+		GLint renderbuffer_size = 0;
+
+		glGetIntegerv(GL_MAX_SAMPLES, &anti_aliasing_maximum_samples);
+		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum_target_size);
+		glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &renderbuffer_size);
+		if (renderbuffer_size < maximum_target_size)
+			maximum_target_size = renderbuffer_size;
+	}
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
+	if (anti_aliasing_value < 0)
+		anti_aliasing_read();
+	else
+		anti_aliasing_prepare();
+}
+
+/* what display.anti_aliasing's value needs of the GL context, once there is
+one: multisampling's samples, at most the GPU's, and the passes' programs,
+built as the value is chosen rather than in the middle of a frame (SMAA's
+are large) */
+static void anti_aliasing_prepare(void)
+{
+	int mode;
+
+	if (!device.gl_ready || anti_aliasing_value < 0)
+		return;
+	mode = anti_aliasing_values[anti_aliasing_value].mode;
+	anti_aliasing_samples = anti_aliasing_values[anti_aliasing_value].samples;
+	if (anti_aliasing_samples > anti_aliasing_maximum_samples)
+	{
+		platform_log("anti-aliasing: the GPU has at most %d samples a pixel", (int)anti_aliasing_maximum_samples);
+		anti_aliasing_samples = anti_aliasing_maximum_samples < 2 ? 0 : anti_aliasing_maximum_samples;
+	}
+	if ((mode == _anti_aliasing_fxaa || mode == _anti_aliasing_smaa) && !xgpu_post_prepare(mode == _anti_aliasing_smaa))
+		platform_log("anti-aliasing: its programs do not build, so the 3D view is not antialiased");
+	xgpu_gl_state_invalidate();
 }
 
 Direct3D *WINAPI Direct3DCreate8(UINT sdk_version)
@@ -1436,6 +1738,9 @@ long halo_screen_commit(void)
 	long width;
 	float scale[2];
 
+	/* (display.anti_aliasing, as Settings or config.toml has it now:
+	supersampling changes the scale below) */
+	anti_aliasing_read();
 	/* display.shadow_resolution, if it has changed: the maps' entries at
 	the old scale stay (render_target_get), but are no longer found */
 	if (shadow_scale && shadow_scale_read_at != config_changes())
@@ -1640,11 +1945,12 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	glEndQuery(VISIBILITY_QUERY);
-	/* the target's pixels to a game pixel: the result is a count of the
-	game's pixels (visibility_unscaled), which the game divides by its own
-	test's area (lens flares, rasterizer_lights.c), a split-screen window's
-	or the screen's alike */
-	device.query_area[index] = target_scale[0] * target_scale[1];
+	/* the target's samples to a game pixel (its pixels, by its samples a
+	pixel with multisampling): the result is a count of the game's pixels
+	(visibility_unscaled), which the game divides by its own test's area
+	(lens flares, rasterizer_lights.c), a split-screen window's or the
+	screen's alike */
+	device.query_area[index] = target_scale[0] * target_scale[1] * (float)target_samples;
 	/* swap the scratch query into the requested slot */
 	scratch = device.queries[0];
 	device.queries[0] = device.queries[index];
@@ -2078,7 +2384,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
-		*shader = compile_shader(GL_VERTEX_SHADER, source, "vertex");
+		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -2130,7 +2436,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
-	entry->shader = compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
+	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -2156,7 +2462,6 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
 	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
 	struct program_entry *entry;
-	GLint status = 0;
 	int stage;
 
 	if (last && last->vertex_shader == vertex_shader && last->fragment_shader == fragment_shader)
@@ -2180,20 +2485,9 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	if (!vertex_shader || !fragment_shader)
 		return NULL;
 
-	entry->program = glCreateProgram();
-	glAttachShader(entry->program, vertex_shader);
-	glAttachShader(entry->program, fragment_shader);
-	glLinkProgram(entry->program);
-	glGetProgramiv(entry->program, GL_LINK_STATUS, &status);
-	if (!status)
-	{
-		char log[4096];
-
-		glGetProgramInfoLog(entry->program, sizeof(log), NULL, log);
-		platform_log("cannot link a shader program: %s", log);
-		entry->program = 0;
+	entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
+	if (!entry->program)
 		return NULL;
-	}
 	state_program(entry->program);
 	entry->constants = glGetUniformLocation(entry->program, "c");
 	entry->constant_count = XGPU_VERTEX_CONSTANT_COUNT;
@@ -2424,6 +2718,7 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 		if (!target || target->width != width || target->height != height ||
 			target->gl_width != width || target->gl_height != height)
 			break;
+		render_target_resolve(target);
 #ifdef HALO_ANDROID
 		if (!xgpu_capabilities.copy_image)
 		{
@@ -2477,6 +2772,8 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 
 			if (target)
 			{
+				/* (multisampled: its pixels drawn since, resolved) */
+				render_target_resolve(target);
 				xgpu_texture_describe(texture->Format, texture->Size, &description);
 				gl_texture = target->texture;
 				gl_target = GL_TEXTURE_2D;
@@ -2831,13 +3128,6 @@ static struct program_entry *prepare_draw(BOOL immediate)
 				skip++;
 		}
 	}
-	if (!bind_targets(&has_depth))
-	{
-		stats.skipped_no_target++;
-		return NULL;
-	}
-	apply_raster_state(has_depth);
-
 	memset(&key, 0, sizeof(key));
 	memcpy(key.combiner_state, D3D__RenderState, sizeof(key.combiner_state));
 	/* constants are uniforms, not part of the program */
@@ -2845,7 +3135,17 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT0] = 0;
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
 	key.texture_modes = D3D__RenderState[D3DRS_PSTEXTUREMODES];
+	/* the textures before the targets: a render target the draw samples
+	has its multisampled pixels resolved by a blit (render_target_resolve),
+	which binds framebuffers of its own, and the back buffer can be both
+	sampled and drawn into */
 	bind_textures(&key, uniforms.texture_scale);
+	if (!bind_targets(&has_depth))
+	{
+		stats.skipped_no_target++;
+		return NULL;
+	}
+	apply_raster_state(has_depth);
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		key.alpha_kill[stage] = D3D__TextureState[stage][D3DTSS_ALPHAKILL] == D3DTALPHAKILL_ENABLE;
@@ -2856,6 +3156,11 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		D3D__RenderState[D3DRS_SRCBLEND] == D3DBLEND_CONSTANTCOLOR &&
 		D3D__RenderState[D3DRS_DESTBLEND] == D3DBLEND_SRCALPHA;
 	key.alpha_test_function = D3D__RenderState[D3DRS_ALPHATESTENABLE] ? D3D__RenderState[D3DRS_ALPHAFUNC] : 0;
+#ifndef HALO_ANDROID
+	/* (gl_SampleMask: ES has it only from 3.2) */
+	if (target_samples > 1 && key.alpha_test_function && !D3D__RenderState[D3DRS_ALPHABLENDENABLE])
+		key.alpha_test_samples = (unsigned char)target_samples;
+#endif
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
 #ifdef HALO_ANDROID
@@ -3978,6 +4283,35 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	xgpu_gl_state_invalidate();
 }
 
+/* ---------- the anti-aliasing passes */
+
+/* display.anti_aliasing's pass over a window's 3D view, before the HUD and
+menus are drawn over it (source/render/render.c); the window's bounds in the
+game's units of the screen */
+void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
+{
+	struct render_target_entry *target;
+	GLint corners[4];
+	int mode = anti_aliasing();
+
+	if (!device.gl_ready || (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa))
+		return;
+	/* (the primary target's view: the back buffer's) */
+	target = render_target_get(&device.back_buffer);
+	if (!target)
+		return;
+	/* (no longer multisampled, if it was before the setting changed) */
+	render_target_multisample(&target->target, 0);
+	corners[0] = scaled_pixel(x0, target->target.scale[0]);
+	corners[1] = scaled_pixel(y0, target->target.scale[1]);
+	corners[2] = scaled_pixel(x1, target->target.scale[0]);
+	corners[3] = scaled_pixel(y1, target->target.scale[1]);
+	xgpu_post_anti_alias(mode == _anti_aliasing_smaa, framebuffer_get(target->target.texture, 0),
+		target->target.gl_width, target->target.gl_height, corners);
+	glBindVertexArray(device.vertex_array);
+	xgpu_gl_state_invalidate();
+}
+
 /* ---------- presentation */
 
 static void write_screenshot(struct render_target_entry *target)
@@ -4049,6 +4383,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
+		render_target_resolve(&back_buffer->target);
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
 

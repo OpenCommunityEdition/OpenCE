@@ -96,6 +96,12 @@ static const struct config_setting config_settings[] =
 	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
 		"With vsync off, the most frames a second: 0 for twice the display's\n"
 		"refresh rate, -1 for no limit (which can hang some Intel graphics)." },
+	{ "display.anti_aliasing", _config_string, "\"off\"", "HALO_ANTI_ALIASING", _environment_value, _platform_all,
+		"Smoothing of jagged edges, which the Xbox did not have: \"off\"; \"fxaa\"\n"
+		"or \"smaa\" smooth the 3D view once it is drawn (the HUD and menus stay\n"
+		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
+		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
+		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\"." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },

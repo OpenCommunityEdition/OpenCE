@@ -47,6 +47,11 @@ must call this afterwards. */
 
 void xgpu_gl_state_invalidate(void);
 
+/* a compiled shader, or a linked program of two, or 0 with the log
+written */
+GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
+GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
+
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -130,6 +135,11 @@ struct nv2a_pixel_shader_key
 	(display.per_pixel_lighting): nv2a_vertex_lighting's lights, or 0 for
 	the diffuse color the vertex shader computed */
 	unsigned char per_pixel_lighting;
+	/* drawn into a multisampled target (display.anti_aliasing's
+	multisampling), its samples a pixel: the alpha test covers samples in
+	proportion to how far alpha is past the reference, not all of the pixel
+	or none of it, so that cut-out edges (foliage, grates) are smoothed too */
+	unsigned char alpha_test_samples;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -201,9 +211,33 @@ struct xgpu_render_target
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
 	unsigned long gl_width, gl_height;
+	/* with multisampling, the multisampled renderbuffer draws go to, its
+	samples a pixel (0 when it has none), and whether it has been drawn into
+	since the texture last had its pixels (d3d8_gl.c,
+	render_target_multisample) */
+	GLuint multisample;
+	int samples;
+	BOOL unresolved;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
+
+/* ---------- anti-aliasing
+
+display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
+window's 3D view in place before the HUD and menus are drawn over it, so
+that their text stays sharp. Supersampling and multisampling are the
+device's (d3d8_gl.c). */
+
+/* the programs and textures of FXAA, or of SMAA, made now; FALSE if they
+cannot be (once FALSE, it stays so) */
+BOOL xgpu_post_prepare(BOOL smaa);
+
+/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
+target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
+not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
+	const GLint corners[4]);
 
 #endif
