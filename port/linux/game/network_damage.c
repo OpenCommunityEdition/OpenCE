@@ -479,7 +479,8 @@ static boolean distributed_damage_to_data(
 	if (!tag_index_is_group(damage->definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
 		return FALSE;
 	damage_data_new(result, damage->definition_index);
-	result->flags = damage->flags;
+	/* (the flags the game has) */
+	result->flags = damage->flags & (FLAG(NUMBER_OF_DAMAGE_DATA_FLAGS) - 1);
 	result->owner_player_index = distributed_player_from_byte(damage->owner_player_index);
 	result->owner_team_index = damage->owner_team_index;
 	result->owner_object_index = distributed_object_index_valid(damage->owner_object_index) &&
@@ -490,7 +491,10 @@ static boolean distributed_damage_to_data(
 	result->scale = damage->scale;
 	result->multiplier = damage->multiplier;
 	result->material_effect_scale = damage->material_effect_scale;
-	result->material_type = damage->material_type;
+	/* (a material the game has, else none, damage_data_new's: it indexes
+	the materials' modifiers) */
+	if (damage->material_type >= 0 && damage->material_type < NUMBER_OF_MATERIAL_TYPES)
+		result->material_type = damage->material_type;
 	scenario_location_from_point(&result->location, &result->epicenter);
 	return TRUE;
 }

@@ -1245,6 +1245,14 @@ static struct cache_file_tag_instance *instances_grow(long count, long *first_in
 
 	if (!instances)
 		return NULL;
+	/* (every tag's absolute index fits a tag index's 16 bits, short of
+	NONE's, and the table's size cannot wrap: the map's count was checked
+	as it loaded, cache_files.c, and is again) */
+	if (existing < 0 || count < 0 || existing > UNSIGNED_SHORT_MAX - count)
+	{
+		platform_log("menus: %ld tags and the map's %ld are too many for a tag table", count, existing);
+		return NULL;
+	}
 	grown = allocate((existing + count) * sizeof(*grown));
 	if (!grown)
 		return NULL;

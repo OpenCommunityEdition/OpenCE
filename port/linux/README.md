@@ -546,12 +546,15 @@ Only machines with the invite can find the game:
   flood of requests can make players join more slowly. A player asks again
   for 90 seconds.
 - The host drops a player whose game runs faster than time (a speed hack)
-  for ten seconds, and keeps that address out of its games. Each player
-  sees who in red on the console. The host adds a line to `cheaters.txt`
-  (beside `debug.txt`) with the address and hardware id of the player, and
-  the Discord name and id that the game of the player told it (a player can
-  change these). The host also bans the player: it adds the line to
-  `bans.txt`, and refuses a machine whose address or hardware id is in it.
+  for ten seconds. Each player sees who in red on the console. The host
+  adds a line to `cheaters.txt` (beside `debug.txt`) with the address and
+  hardware id of the player, and the Discord name and id that the game of
+  the player told it (a player can change these). If the messages on the
+  player's connection were also ahead, the host keeps that address out of
+  its games and bans the player: it adds the line to `bans.txt`, and refuses
+  a machine whose address or hardware id is in it. If only the player's
+  datagrams were ahead, the player can join again: another machine can send
+  datagrams with the player's address.
 - The host can ban a player with `ban <player name>` in the developer
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same

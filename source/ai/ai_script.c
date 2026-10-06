@@ -3255,7 +3255,8 @@ void ai_scripting_attach_unit(
 					squad_index,
 					struct squad_definition);
 
-				if (squad_definition->actor_palette_index != NONE)
+				/* port: an entry the palette has (a map's index), as the others here */
+				if (VALID_INDEX(squad_definition->actor_palette_index, scenario->ai_actor_palette.count))
 				{
 					struct tag_reference *actor_palette_entry = TAG_BLOCK_GET_ELEMENT(
 						&scenario->ai_actor_palette,

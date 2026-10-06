@@ -1559,7 +1559,10 @@ static void client_apply_player_effect(
 	switch (event->type)
 	{
 	case _coop_player_effect_translation:
-		scripted_player_effect_set_translation(reals[0], reals[1], reals[2]);
+		/* (the camera's shake, which moves it no further than an observer
+		accepts) */
+		scripted_player_effect_set_translation(PIN(reals[0], -CAMERA_WORLD_BOUND, CAMERA_WORLD_BOUND),
+			PIN(reals[1], -CAMERA_WORLD_BOUND, CAMERA_WORLD_BOUND), PIN(reals[2], -CAMERA_WORLD_BOUND, CAMERA_WORLD_BOUND));
 		break;
 	case _coop_player_effect_rotation:
 		scripted_player_effect_set_rotation(reals[0], reals[1], reals[2]);
@@ -2674,7 +2677,16 @@ void network_coop_note_player_structure_bsp(
 boolean network_coop_player_has_structure_bsp(
 	long player_index)
 {
-	return !network_coop_active() || player_get(player_index)->local_player_index != NONE ||
+	struct player_datum *player;
+
+	if (!network_coop_active())
+		return TRUE;
+	/* (no player, or none of the tracked: whose BSP is not known, which
+	does not keep their predictions out) */
+	player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+	if (!player || DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) >= MAXIMUM_TRACKED_PLAYERS)
+		return TRUE;
+	return player->local_player_index != NONE ||
 		host_player_structure_bsps[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index)] == global_structure_bsp_index_get();
 }
 

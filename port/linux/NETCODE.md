@@ -189,9 +189,13 @@ only ever jumps forward to it when behind, so an honest one is never ahead
 while going faster (one that caught up, or a host that stalled, is one or
 the other, not both). One more than a tenth faster and half a second ahead
 has its players' predictions refused at once (the host's copies go as its
-own ticks have them), and after ten seconds of it is dropped, its address
-kept out of the host's games while the host runs, and every machine is
-told who, in red on its console and in its `debug.txt`
+own ticks have them), and after ten seconds of it is dropped, and every
+machine is told who, in red on its console and in its `debug.txt`. Its
+address is kept out of the host's games while the host runs only when a
+message that came over its connection's stream was that far ahead too: a
+datagram is known to be the machine's only by the address it came from,
+which another machine can send one as, so on its datagrams alone it is
+dropped, logged, and may join again
 (`distributed_note_client_clock`, `network_game_server_kick_machine`,
 `_distributed_message_notice`). The host also adds a line to
 `cheaters.txt` beside its `debug.txt`: when, the player's address (an
@@ -206,7 +210,8 @@ A joining machine tells the host its hardware id: a keyed hash (HMAC-SHA-256,
 16 bytes as hex) of what its machine is known by (Windows' SMBIOS UUID, else
 its MachineGuid; Linux's `/etc/machine-id`; Android's `ANDROID_ID`, which the
 launcher writes to `hardware_id.txt`: `p2p_hardware_id`), kept by the host
-as hex only. A player dropped for cheating, and one the host bans with the
+as hex only. A player dropped for cheating (on its stream's word, as
+above), and one the host bans with the
 console's `ban <player name>` (Tab completes the name; the host's alone), is
 added to `bans.txt` beside `debug.txt` (a line each, as in `cheaters.txt`,
 with `ip=` and `hwid=`): the host refuses a machine joining whose address or

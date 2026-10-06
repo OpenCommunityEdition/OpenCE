@@ -47,7 +47,8 @@ void network_game_server_pause_countdown(
 void network_game_generate_join_game_token(
 	byte *join_token);
 void network_game_server_kick_machine(
-	long machine_index);
+	long machine_index,
+	boolean kept_out);
 /* the host's ban command (console.c, hs.c) */
 enum
 {

@@ -115,6 +115,9 @@ enum
 };
 static struct cluster_partition *cluster_partitions_port[MAXIMUM_PORT_CLUSTER_PARTITIONS];
 static short cluster_partitions_port_count;
+/* port: the list of a cluster index that fits no cluster's
+(cluster_partition_get_first_reference) */
+static long cluster_partition_port_no_cluster_first_reference;
 
 /* ---------- public code */
 
@@ -267,10 +270,13 @@ void cluster_partition_copy(
 	struct cluster_partition *result,
 	struct cluster_partition const *source)
 {
+	/* port: no more clusters than the partitions hold (a map's bsp may say
+	it has more) */
 	csmemcpy(
 		result->cluster_first_data_references,
 		source->cluster_first_data_references,
-		global_structure_bsp_get()->clusters.count * sizeof(*result->cluster_first_data_references));
+		PIN(global_structure_bsp_get()->clusters.count, 0, MAXIMUM_CLUSTERS_PER_STRUCTURE) *
+			sizeof(*result->cluster_first_data_references));
 	reference_list_copy(
 		result->cluster_reference_data,
 		source->cluster_reference_data);
@@ -551,6 +557,14 @@ static long *cluster_partition_get_first_reference(
 		"c:\\halo\\SOURCE\\structures\\cluster_partitions.c",
 		0xd5,
 		cluster_index>=0 && cluster_index<global_structure_bsp_get()->clusters.count);
+
+	/* port: a cluster index that fits no cluster's list has an empty list
+	(what is put in it is not kept), not one past the lists */
+	if (cluster_index < 0 || cluster_index >= MAXIMUM_CLUSTERS_PER_STRUCTURE)
+	{
+		cluster_partition_port_no_cluster_first_reference = NONE;
+		return &cluster_partition_port_no_cluster_first_reference;
+	}
 
 	return &partition->cluster_first_data_references[cluster_index];
 }
