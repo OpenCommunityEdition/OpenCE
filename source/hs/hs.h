@@ -186,6 +186,10 @@ void hs_runtime_update(
 	void);
 long hs_runtime_evaluate(
 	long expression_index);
+/* port: whether the running script waits on the call it evaluates, which
+is a sleep_until's condition (hs_runtime.c) */
+boolean hs_runtime_waiting_on_call(
+	void);
 char const *hs_runtime_get_executing_thread_name(
 	void);
 boolean hs_wake_by_name(
