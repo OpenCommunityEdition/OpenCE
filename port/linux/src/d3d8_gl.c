@@ -138,6 +138,47 @@ float halo_screen_pixel_scale(void)
 	return screen_scale[1];
 }
 
+/* display.shadow_resolution: the size the shadow maps are drawn at.
+
+Each object's shadow is drawn from above into a 128x128 map, blurred into
+another and projected onto the level under it (rasterizer_xbox_shadows.c).
+On a large screen, a shadow's 128 texels show as steps along its edge, which
+crawl as the object moves. The two maps, the game's only R5G6B5 render
+targets (rasterizer_xbox.c), can be drawn larger as the screen's targets are
+(render_target_get): the game's viewports, clears and quads, in its 128 units,
+scale up with them. The scale is a power of two up to 8 (1024x1024), which
+the blur needs to cover the same part of the map as the Xbox's
+(rasterizer_shadow_convolve); 1, the default, draws them as the Xbox did. It
+changes only between frames (halo_screen_commit). */
+#define SHADOW_MAP_SIZE 128
+#define SHADOW_MAP_MAXIMUM_SCALE 8
+
+/* 0 until first asked */
+static long shadow_scale;
+static unsigned long shadow_scale_read_at;
+
+static long shadow_scale_choose(void)
+{
+	long resolution = config_integer("display.shadow_resolution");
+	long scale = 1;
+
+	while (scale < SHADOW_MAP_MAXIMUM_SCALE && SHADOW_MAP_SIZE * scale * 2 <= resolution)
+		scale *= 2;
+	return scale;
+}
+
+/* the shadow maps' pixels for each of their 128 texels each way */
+long halo_shadow_map_scale(void)
+{
+	if (!shadow_scale)
+	{
+		shadow_scale_read_at = config_changes();
+		shadow_scale = shadow_scale_choose();
+		platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow_scale, SHADOW_MAP_SIZE * shadow_scale);
+	}
+	return shadow_scale;
+}
+
 void halo_screen_ui_offset(unsigned char centered)
 {
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
@@ -830,6 +871,17 @@ static void surface_dimensions(const D3DSurface *surface, unsigned long *width, 
 		format == D3DFMT_LIN_D24S8 || format == D3DFMT_LIN_F24S8 || format == D3DFMT_LIN_D16 || format == D3DFMT_LIN_F16;
 }
 
+/* the shadow maps: the game's only R5G6B5 render targets, 128x128
+(rasterizer_xbox.c) */
+static BOOL surface_is_shadow_map(const D3DSurface *surface)
+{
+	struct xgpu_texture_description description;
+
+	xgpu_texture_describe(surface->Format, surface->Size, &description);
+	return description.format == D3DFMT_R5G6B5 && description.width == SHADOW_MAP_SIZE &&
+		description.height == SHADOW_MAP_SIZE;
+}
+
 /* the targets render_target_get found last, by what it found them from:
 each draw asks again for the same two (bind_targets) */
 #define RECENT_RENDER_TARGET_COUNT 4
@@ -882,11 +934,17 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		}
 	}
 	surface_dimensions(surface, &width, &height, &depth);
-	/* the screen's targets are drawn at the screen's scale */
+	/* the screen's targets are drawn at the screen's scale, and the shadow
+	maps at display.shadow_resolution's (halo_shadow_map_scale) */
 	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
+	}
+	else if (!depth && surface_is_shadow_map(surface))
+	{
+		scale[0] = (float)halo_shadow_map_scale();
+		scale[1] = scale[0];
 	}
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
@@ -1365,6 +1423,20 @@ long halo_screen_commit(void)
 	long width;
 	float scale[2];
 
+	/* display.shadow_resolution, if it has changed: the maps' entries at
+	the old scale stay (render_target_get), but are no longer found */
+	if (shadow_scale && shadow_scale_read_at != config_changes())
+	{
+		long shadow = shadow_scale_choose();
+
+		shadow_scale_read_at = config_changes();
+		if (shadow != shadow_scale)
+		{
+			platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
+			shadow_scale = shadow;
+			memset(recent_render_targets, 0, sizeof(recent_render_targets));
+		}
+	}
 	if (!screen_width)
 		return halo_screen_width();
 	screen_mode_choose(&width, scale);
