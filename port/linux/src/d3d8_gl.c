@@ -729,9 +729,16 @@ static void state_framebuffer(GLuint framebuffer)
 	}
 }
 
+/* gl_state.textures' slot of a target */
+static int texture_slot(GLenum target)
+{
+	return target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : 0;
+}
+
+#ifdef HALO_ANDROID
 static void state_texture(int unit, GLenum target, GLuint texture)
 {
-	int slot = target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : 0;
+	int slot = texture_slot(target);
 
 	if (gl_state.textures[unit][slot] == texture)
 		return;
@@ -743,6 +750,7 @@ static void state_texture(int unit, GLenum target, GLuint texture)
 	gl_state.textures[unit][slot] = texture;
 	glBindTexture(target, texture);
 }
+#endif
 
 static void state_sampler(int unit, GLuint sampler)
 {
@@ -2934,8 +2942,38 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
 		}
 	}
+#ifdef HALO_ANDROID
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 		state_texture(stage, gl_targets[stage], gl_textures[stage]);
+#else
+	{
+		/* the units whose texture changes, bound in one call (GL 4.4's
+		multi-bind) rather than selecting and binding each unit; binding no
+		texture unbinds all of the unit's targets */
+		int first = -1, last = -1;
+
+		for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
+		{
+			if (gl_state.textures[stage][texture_slot(gl_targets[stage])] != gl_textures[stage])
+			{
+				if (first < 0)
+					first = stage;
+				last = stage;
+			}
+		}
+		if (first >= 0)
+		{
+			glBindTextures((GLuint)first, (GLsizei)(last - first + 1), &gl_textures[first]);
+			for (stage = first; stage <= last; stage++)
+			{
+				if (gl_textures[stage])
+					gl_state.textures[stage][texture_slot(gl_targets[stage])] = gl_textures[stage];
+				else
+					memset(gl_state.textures[stage], 0, sizeof(gl_state.textures[stage]));
+			}
+		}
+	}
+#endif
 }
 
 static GLenum stencil_operation(DWORD operation)
