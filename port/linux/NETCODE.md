@@ -337,9 +337,12 @@ a pregame keep-alive every five seconds from the host
 4. (Done) Corrections: the host sends each client where its moving objects
    are (vehicles, items, bodies) as often as they are near that client's
    nearest player (every tick within 25 world units, every second within
-   60, every third within 120, every fourth further off), once more to
-   every client as an object comes to rest, and a few of those at rest,
-   round them all. A client puts its copies there, and the difference is
+   60, every third within 120, every fourth further off), to every client
+   three times over half a second as an object comes to rest (one lost
+   would leave a falling body hanging until its turn round all of them),
+   and a few of those at rest, round them all. A client takes the host's
+   word on whether each is at rest even when its copy is close enough to
+   leave where it is. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
    jump. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's
