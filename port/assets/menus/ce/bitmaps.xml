@@ -302,6 +302,11 @@
 		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6.png" width="512" height="256"/>
 		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_options" index="3"/>
 		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8.png" width="512" height="256"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="4" width="279" height="279" y="34"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="5" width="279" height="279" y="34"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="6" width="279" height="279" y="34"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="7" width="279" height="279" y="34"/>
+		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="8" width="279" height="279" y="34"/>
 	</bitmap>
 	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings">
 		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings__0.png" width="512" height="64"/>

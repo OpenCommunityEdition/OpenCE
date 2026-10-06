@@ -1366,6 +1366,14 @@ static boolean ui_widget_load_children_recursive(
 /* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
 boolean pc_menu_tag(
 	long tag_index);
+/* port: where in its widget, and how large, the menus draw a frame of
+ui.map's that they scale (port/linux/game/menu_tags.c) */
+boolean pc_menu_frame_placement(
+	struct bitmap_data const *bitmap,
+	short *x,
+	short *y,
+	short *width,
+	short *height);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -6112,14 +6120,37 @@ static void widget_instance_render_recursive(
 				alpha_modifier;
 		}
 		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
-		draw_bitmap_in_rect(
-			bitmap,
-			&bounds,
-			&bounds,
-			clip,
-			color,
-			&multitexture_params,
-			FALSE);
+		{
+			/* port: a frame of ui.map's that the menus scale (the Xbox's
+			picture of the button settings, in the profile settings' smaller
+			box): drawn at their size, from where they place it, in units of
+			that size rather than one to a texel */
+			rectangle2d texels = bounds;
+			short frame_x, frame_y, frame_width, frame_height;
+			boolean shown = TRUE;
+
+			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
+			{
+				bounds.x0 += frame_x;
+				bounds.y0 += frame_y;
+				texels.x0 = 0;
+				texels.y0 = 0;
+				texels.x1 = (short)((long)(bounds.x1 - bounds.x0) * bitmap->width / frame_width);
+				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
+				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
+			}
+			if (shown)
+			{
+				draw_bitmap_in_rect(
+					bitmap,
+					&bounds,
+					&texels,
+					clip,
+					color,
+					&multitexture_params,
+					FALSE);
+			}
+		}
 		if (use_nifty_plasma_fx)
 		{
 			ui_plasma_effect_color.alpha = 0.0f;

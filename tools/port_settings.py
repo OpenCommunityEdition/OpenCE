@@ -441,8 +441,12 @@ STRING_OVERRIDES.update({
 MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 
 # changes to the PC version's widgets (by our names): attributes set, all
-# their handlers replaced, children added
+# their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    # (the profile settings' picture: on Gamepad Setup's row, the profile's
+    # button settings, BITMAP_FRAMES; menu_functions.c's
+    # profile_gamepad_layout)
+    f"{PE}/profile_edit_extended_desc_pic": {"inputs": ["port gamepad layout preview"]},
     # (straight to their screens: no "checking for updates" dialog, which
     # asked the PC version's servers)
     f"{MT}/multiplayer_type_join_internet_item": {"set": {"string_index": 6}, "handlers": [
@@ -519,6 +523,17 @@ WIDGET_PATCHES = {
         f"{MT}/join_game/join_game_button_refresh": f"{MT}/join_game/button_clipboard",
         f"{MT}/join_game/join_game_button_update": f"{MT}/join_game/join_game_button_refresh",
     }},
+}
+
+# frames added after a PC bitmap's (by our names): (the Xbox map's bitmap,
+# its frame, the size drawn at, where in the widget). The profile settings'
+# picture gets the Xbox's Controller Setup's pictures of its five button
+# settings (its first four frames are the thumbstick settings'), which show
+# 512 by 235 of their 512 by 512: drawn at 279 wide, in the middle of the
+# picture's 279 by 202
+XBOX_CONTROLLER_PICTURES = f"ui\\shell\\{PE.replace('/', chr(92))}\\controller_edit\\config_controller"
+BITMAP_FRAMES = {
+    f"{PE}/profile_options": [(XBOX_CONTROLLER_PICTURES, 4 + preset, 279, 279, 0, 34) for preset in range(5)],
 }
 
 # the titles this port has that the PC version has not, set as its headers

@@ -438,6 +438,7 @@ static void read_frame(struct reader *reader, const XML_Char **attributes, long 
 	{
 		{ "png", &frame.png }, { "map", &frame.map }, { "index", NULL, &frame.index },
 		{ "width", NULL, &frame.width }, { "height", NULL, &frame.height },
+		{ "x", NULL, &frame.x }, { "y", NULL, &frame.y },
 	};
 
 	memset(&frame, 0, sizeof(frame));
@@ -449,6 +450,10 @@ static void read_frame(struct reader *reader, const XML_Char **attributes, long 
 		reader_error(reader, "a <frame> with a png needs width and height");
 	else if (!reader->failed && frame.map && frame.index < 0)
 		reader_error(reader, "a <frame> of a map bitmap needs its index");
+	else if (!reader->failed && frame.map && (frame.width < 0 || frame.height < 0 || !frame.width != !frame.height))
+		reader_error(reader, "a <frame> of a map bitmap is scaled to a width and a height, or neither");
+	else if (!reader->failed && (frame.x || frame.y) && (!frame.map || !frame.width))
+		reader_error(reader, "only a scaled <frame> of a map bitmap is placed at an x and y");
 	if (!reader->failed && reader->bitmap_frames_attribute)
 		reader_error(reader, "a bitmap's <frame>s and frames= cannot be mixed");
 	if (frame.index < 0)
