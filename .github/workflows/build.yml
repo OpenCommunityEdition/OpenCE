@@ -67,7 +67,9 @@ jobs:
         run: python tools/ci_build.py linux release
 
       - name: Test
-        run: python -m pytest -q tools/test_linux_port.py
+        run: |
+          python -m pytest -q tools/test_linux_port.py
+          python tools/test_light_storage.py
 
       - name: Compile cache
         run: ccache --show-stats
@@ -199,6 +201,9 @@ jobs:
 
       - name: Release
         run: python tools/ci_build.py windows release
+
+      - name: Test light storage
+        run: python tools/test_light_storage.py
 
       - name: Compile cache
         run: ccache --show-stats
