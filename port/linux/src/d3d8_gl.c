@@ -326,6 +326,12 @@ struct vertex_shader_object
 	/* a shader lit for each pixel failed to compile or link: lit as the
 	vertex shader lights it from then on */
 	BOOL lighting_failed;
+#ifndef HALO_ANDROID
+	/* the vertex array its draws last used, and the streams they had
+	(setup_streams: the layout follows from the two) */
+	struct vertex_array_entry *vertex_array;
+	unsigned long vertex_array_streams;
+#endif
 };
 
 /* ---------- programs */
@@ -4144,7 +4150,14 @@ static void setup_streams(unsigned long first, unsigned long count)
 		enabled[element->reg] = TRUE;
 	}
 #ifndef HALO_ANDROID
-	state_vertex_array(vertex_array_get(&layout));
+	/* (the layout follows from the declaration and the streams it has, so
+	the same two have the same vertex array: no need to look it up) */
+	if (!declaration->vertex_array || declaration->vertex_array_streams != streams_used)
+	{
+		declaration->vertex_array = vertex_array_get(&layout);
+		declaration->vertex_array_streams = streams_used;
+	}
+	state_vertex_array(declaration->vertex_array);
 	for (index = 0; index < 16; index++)
 	{
 		if (streams_used & (1UL << index))
