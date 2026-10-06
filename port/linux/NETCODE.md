@@ -52,14 +52,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   Until a client has the host's, the host takes none of its players'
   movement and none of its loading zones, and after any switch no loading
   zone switches again until every machine has the new BSP (ten seconds at
-  most). A loading zone into a
-  BSP the team hasn't been in brings every player to whoever crossed it,
-  as split screen does; one back into a BSP it has been in switches only
-  with two thirds of the living players at it (in the trigger, or within
-  15 world units of the player in it, about 45 metres), so one player can't
-  drag the team back through the level; a player held back is told how
-  many are there and how many it needs. A player outside the loaded BSP
-  and falling for two seconds is brought back beside a teammate. A dead
+  most). Only the host's crossing of a loading zone switches the BSP, and
+  it brings every player to the host, however far behind, so no one
+  running ahead or doubling back drags the team through the level (while
+  none of the host's players are alive, anyone's crossing does); a client
+  standing on a loading zone is told it waits for the host. A player
+  outside the loaded BSP and falling for two seconds is brought back beside
+  the host, else a teammate. A dead
   player watches a living teammate (`coop_spectate.c`) and comes back
   beside one once it is safe. With everyone dead they come back where they
   were at the last checkpoint, without a revert. A mission the scripts fail
