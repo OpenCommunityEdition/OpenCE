@@ -116,6 +116,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
     host_sources += [
         PORT_DIR / "host_main.c", PORT_DIR / "host_desktop.c",
         LINUX_DIR / "src" / "posix_files.c", LINUX_DIR / "src" / "posix_net.c",
+        LINUX_DIR / "src" / "posix_trace_marker.c",
         TOML_DIR / "tomlc17.c",
     ]
     host_objects: List[Path] = []
@@ -157,7 +158,9 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         name="linux_arm64_host_link",
         command=(f"$linux_arm64_cc -o $out $in -L{sdl_build} "
                  + " ".join(f"-l{lib}" for lib in HOST_LIBRARIES)
-                 + " '-Wl,-rpath,$$ORIGIN' -Wl,--no-undefined"),
+                 + " '-Wl,-rpath,$$ORIGIN' -Wl,--no-undefined"
+                 # (posix_trace_marker.c's, which the GPU driver's calls must reach)
+                 + "".join(f" -Wl,--export-dynamic-symbol={name}" for name in ("open", "open64", "openat", "openat64"))),
         description="LINUX ARM64 LINK $out",
     )
     n.build(outputs=output, rule="linux_arm64_host_link", inputs=host_objects, implicit=[libsdl])
