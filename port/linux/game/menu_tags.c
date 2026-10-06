@@ -44,6 +44,8 @@ no screen pauses the game (a network game's clock runs on).
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
 char const *config_string(char const *name);
+int platform_display_resolutions(long *widths, long *heights, int maximum);
+int platform_window_sizes(long *widths, long *heights, int maximum);
 
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
@@ -62,6 +64,7 @@ char const *pc_menus_root_name(void);
 char const *pc_menu_function_name(long function_index);
 char const *pc_menu_game_data_input_name(long function_index);
 boolean pc_menu_tag(long tag_index);
+boolean pc_menu_frame_placement(struct bitmap_data const *bitmap, short *x, short *y, short *width, short *height);
 
 /* ---------- constants */
 
@@ -237,6 +240,15 @@ typedef char verify_ui_widget_definition_conditional_widgets_offset[
 typedef char verify_ui_widget_definition_size[
 	sizeof(struct ui_widget_definition) == 0x3EC ? 1 : -1];
 
+/* a frame of ui.map's that a menu file scales: where in its widget, and at
+what size, it is drawn (pc_menu_frame_placement) */
+struct menu_frame_placement
+{
+	struct bitmap_data const *bitmap;
+	short x, y;
+	short width, height;
+};
+
 /* a spinner bound to a setting (menu_functions.c) */
 struct pc_menu_setting
 {
@@ -340,6 +352,7 @@ static char const *const port_function_names[] =
 	"mp level select", "mp profiles list initialize", "mp profiles list dispose", "mp profile set for game",
 	"port lobby preview join",
 	"port setup edit",
+	"port map list back",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
@@ -357,6 +370,8 @@ static char const *const port_function_names[] =
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
+	/* (the server browser's password screen) */
+	"port password init", "port password edit", "port password join", "port password back",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -374,6 +389,10 @@ static char const *const port_game_data_input_names[] =
 	/* (the gametype editor's: the Xbox's stops the game on the buttons'
 	row; the Xbox's read only player_ui's gametype, not Server Setup's) */
 	"game settings lists text update", "get edit game settings name", "mp edit profile set rule text",
+	"port password update",
+	/* (the profile settings' picture: the Xbox's of the button settings,
+	on Gamepad Setup's row) */
+	"port gamepad layout preview",
 };
 
 static struct
@@ -383,6 +402,8 @@ static struct
 	long block_count;
 	struct bitmap_data **bitmaps;
 	long bitmap_count;
+	struct menu_frame_placement *placements;
+	long placement_count;
 	struct cache_file_tag_instance *original_instances;
 	long original_count;
 	struct pc_menu_setting *settings;
@@ -700,6 +721,41 @@ static long split(char const *text, char const **pieces)
 	return count;
 }
 
+/* a spinner's strings, or its values, split: its own, but Video Setup's
+sizes are the display's (sdl_platform.c), shown "1920 x 1080" and set
+"1920x1080": its resolutions after Resolution's own (NATIVE), and the
+window sizes that fit it in place of Window Size's own */
+static long spinner_split(struct halo_menu_widget const *widget, boolean values, char const **pieces)
+{
+	long count = split(values ? widget->values : widget->strings, pieces);
+	long widths[MAXIMUM_STRINGS], heights[MAXIMUM_STRINGS];
+	long added, index;
+
+	if (widget->setting && !strcmp(widget->setting, "display.resolution"))
+		added = platform_display_resolutions(widths, heights, (int)(MAXIMUM_STRINGS - count));
+	else if (widget->setting && !strcmp(widget->setting, "display.window_size"))
+	{
+		added = platform_window_sizes(widths, heights, MAXIMUM_STRINGS);
+		if (added > 0)
+			count = 0;
+	}
+	else
+		return count;
+	for (index = 0; index < added; index++)
+	{
+		char text[32];
+		char *piece;
+
+		snprintf(text, sizeof(text), values ? "%ldx%ld" : "%ld x %ld", widths[index], heights[index]);
+		piece = allocate((long)strlen(text) + 1);
+		if (!piece)
+			break;
+		strcpy(piece, text);
+		pieces[count++] = piece;
+	}
+	return count;
+}
+
 static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 {
 	struct bitmap_group *group = allocate(sizeof(struct bitmap_group));
@@ -751,6 +807,24 @@ static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 			memcpy(bitmap, (struct bitmap_data *)group_source->bitmaps.address + data->index, sizeof(*bitmap));
 			bitmap->cache_block_index = NONE;
 			bitmap->base_address = NULL;
+			/* (scaled to a size of the file's: the texture stays the map's,
+			drawn smaller or larger, ui_widget.c) */
+			if (data->width > 0 && data->height > 0 && data->width <= 2048 && data->height <= 2048)
+			{
+				struct menu_frame_placement *placements = realloc(menu_tags.placements,
+					(menu_tags.placement_count + 1) * sizeof(*menu_tags.placements));
+
+				if (placements)
+				{
+					menu_tags.placements = placements;
+					placements[menu_tags.placement_count].bitmap = bitmap;
+					placements[menu_tags.placement_count].x = (short)PIN(data->x, -2048, 2048);
+					placements[menu_tags.placement_count].y = (short)PIN(data->y, -2048, 2048);
+					placements[menu_tags.placement_count].width = (short)data->width;
+					placements[menu_tags.placement_count].height = (short)data->height;
+					menu_tags.placement_count++;
+				}
+			}
 			continue;
 		}
 
@@ -914,7 +988,7 @@ static void setting_add(struct halo_menu_widget const *source, long definition_i
 	setting->definition_index = definition_index;
 	setting->setting = source->setting;
 	setting->loaded_index = NONE;
-	setting->value_count = split(source->values, setting->values);
+	setting->value_count = spinner_split(source, TRUE, setting->values);
 }
 
 /* a font: large, small, terminal, or the map's by its path */
@@ -1207,6 +1281,14 @@ static struct cache_file_tag_instance *instances_grow(long count, long *first_in
 
 	if (!instances)
 		return NULL;
+	/* (every tag's absolute index fits a tag index's 16 bits, short of
+	NONE's, and the table's size cannot wrap: the map's count was checked
+	as it loaded, cache_files.c, and is again) */
+	if (existing < 0 || count < 0 || existing > UNSIGNED_SHORT_MAX - count)
+	{
+		platform_log("menus: %ld tags and the map's %ld are too many for a tag table", count, existing);
+		return NULL;
+	}
 	grown = allocate((existing + count) * sizeof(*grown));
 	if (!grown)
 		return NULL;
@@ -1280,6 +1362,8 @@ static void menu_tags_release(void)
 		free(menu_tags.blocks);
 	if (menu_tags.bitmaps)
 		free(menu_tags.bitmaps);
+	if (menu_tags.placements)
+		free(menu_tags.placements);
 	if (menu_tags.settings)
 		free(menu_tags.settings);
 	memset(&menu_tags, 0, sizeof(menu_tags));
@@ -1639,7 +1723,7 @@ void menu_tags_loaded(
 		if (widget->strings)
 		{
 			char const *pieces[MAXIMUM_STRINGS];
-			long count = split(widget->strings, pieces);
+			long count = spinner_split(widget, FALSE, pieces);
 
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.spinner_tags[index], widget->name, " strings",
 				string_list_build(pieces, count));
@@ -1741,6 +1825,32 @@ boolean pc_menu_tag(
 {
 	return menu_tags.loaded && tag_index != NONE &&
 		DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_index) >= menu_tags.original_count;
+}
+
+/* where in its widget, and how large, a frame of ui.map's that a menu file
+scales is drawn (<frame map=... width= height= x= y=>); FALSE for any other
+bitmap, drawn as it is (ui_widget.c) */
+boolean pc_menu_frame_placement(
+	struct bitmap_data const *bitmap,
+	short *x,
+	short *y,
+	short *width,
+	short *height)
+{
+	long index;
+
+	for (index = 0; index < menu_tags.placement_count; index++)
+	{
+		if (menu_tags.placements[index].bitmap == bitmap)
+		{
+			*x = menu_tags.placements[index].x;
+			*y = menu_tags.placements[index].y;
+			*width = menu_tags.placements[index].width;
+			*height = menu_tags.placements[index].height;
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 char const *pc_menu_function_name(

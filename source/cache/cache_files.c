@@ -137,6 +137,16 @@ symbols in this file:
 
 /* ---------- constants */
 
+enum
+{
+	/* port: a vertex or index buffer in a cache file (a D3DResource: Common,
+	Data, Lock), as cache_files_disable_writes counts them */
+	CACHE_FILE_BUFFER_SIZE = 12,
+	/* port: what cache_file_read rounds a read's size up to a multiple of
+	(cache_files_windows.c) */
+	CACHE_FILE_SECTOR_SIZE = 512,
+};
+
 /* ---------- macros */
 
 #define STRUCTURE_BSP_TAG 'sbsp'
@@ -221,6 +231,18 @@ typedef char verify_cache_file_header_size[
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index);
+static boolean cache_file_region_contains(
+	void const *region,
+	unsigned long region_size,
+	void const *address,
+	long count,
+	long element_size);
+static boolean cache_file_tag_header_verify(
+	struct cache_file_tag_header *tag_header,
+	long tag_data_size,
+	char const *scenario_name);
+static boolean cache_file_structure_bsp_reference_verify(
+	struct scenario_structure_bsp_reference *reference);
 
 /* ---------- globals */
 
@@ -268,6 +290,174 @@ static struct cache_file_tag_instance *cache_get_tag_instance(
 		csprintf(temporary, "i don't think %08x is a tag index", tag_index));
 
 	return tag_instance;
+}
+
+/* port: whether count elements of element_size bytes at address all lie in
+the region_size bytes at region (no elements always do): a map's pointers
+and counts are checked so before anything follows them */
+static boolean cache_file_region_contains(
+	void const *region,
+	unsigned long region_size,
+	void const *address,
+	long count,
+	long element_size)
+{
+	unsigned long offset = (unsigned long)address - (unsigned long)region;
+
+	if (count == 0)
+		return TRUE;
+
+	return count > 0 &&
+		(unsigned long)address >= (unsigned long)region &&
+		offset <= region_size &&
+		(unsigned long)count <= (region_size - offset) / (unsigned long)element_size;
+}
+
+/* port: whether the tag header of the tags just read (tag_data_size bytes
+at the tag cache's base) can be trusted, as everything after trusts it:
+its tag table and vertex and index buffers lie in the tag data, its tags'
+count fits a tag index's absolute index, and it names a scenario tag */
+static boolean cache_file_tag_header_verify(
+	struct cache_file_tag_header *tag_header,
+	long tag_data_size,
+	char const *scenario_name)
+{
+	char const *problem = NULL;
+
+	if (tag_header->signature != CACHE_FILE_TAG_HEADER_SIGNATURE)
+	{
+		problem = "signature";
+	}
+	else if (tag_header->tag_count <= 0 || tag_header->tag_count > UNSIGNED_SHORT_MAX)
+	{
+		problem = "tag count";
+	}
+	else if (!cache_file_region_contains(
+		tag_header,
+		tag_data_size,
+		tag_header->tag_instances,
+		tag_header->tag_count,
+		sizeof(struct cache_file_tag_instance)))
+	{
+		problem = "tag table";
+	}
+	else if (!cache_file_region_contains(
+		tag_header,
+		tag_data_size,
+		tag_header->vertex_buffers,
+		tag_header->vertex_buffer_count,
+		CACHE_FILE_BUFFER_SIZE))
+	{
+		problem = "vertex buffers";
+	}
+	else if (!cache_file_region_contains(
+		tag_header,
+		tag_data_size,
+		tag_header->index_buffers,
+		tag_header->index_buffer_count,
+		CACHE_FILE_BUFFER_SIZE))
+	{
+		problem = "index buffers";
+	}
+	else
+	{
+		long scenario_absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_header->scenario_tag_index);
+		long absolute_index;
+
+		if (scenario_absolute_index >= tag_header->tag_count ||
+			tag_header->tag_instances[scenario_absolute_index].tag_index != tag_header->scenario_tag_index ||
+			tag_header->tag_instances[scenario_absolute_index].group_tag != SCENARIO_TAG)
+		{
+			problem = "scenario tag";
+		}
+
+		/* port: each tag's data lies in the tag cache, or there is none yet
+		(a structure bsp's, set as it loads). Every tag_get goes by these.
+		The port's own tags (menu_tags.c) are added after this, and may lie
+		elsewhere */
+		for (absolute_index = 0;
+			!problem && absolute_index < tag_header->tag_count;
+			absolute_index++)
+		{
+			void const *base_address = tag_header->tag_instances[absolute_index].base_address;
+
+			if (base_address &&
+				!cache_file_region_contains(tag_header, TAG_CACHE_SIZE, base_address, 1, 1))
+			{
+				problem = "tag data address";
+			}
+		}
+	}
+
+	if (problem)
+	{
+		error(_error_silent, "the cache file '%s' is damaged: its tag header's %s is wrong", scenario_name, problem);
+
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* port: whether a structure bsp reference (the scenario's) may be loaded:
+its bytes lie in the map and fit the tag cache after the tag data, where
+they are read to (rounded up to whole sectors, as the read is), and it
+names a structure bsp tag */
+static boolean cache_file_structure_bsp_reference_verify(
+	struct scenario_structure_bsp_reference *reference)
+{
+	byte *tag_cache_base_address = physical_memory_get_tag_cache_base_address();
+	long tag_data_size = cache_file_globals.header.tag_data_size;
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(reference->structure_bsp.index);
+	long read_size;
+
+	if (reference->file_offset < 0 ||
+		reference->file_size < (long)sizeof(struct cache_file_structure_bsp_header) ||
+		reference->file_size > TAG_CACHE_SIZE ||
+		reference->file_offset > cache_file_globals.header.file_length - reference->file_size)
+	{
+		error(
+			_error_silent,
+			"a structure bsp is damaged: %08x bytes at %08x, in %08x bytes",
+			reference->file_size,
+			reference->file_offset,
+			cache_file_globals.header.file_length);
+
+		return FALSE;
+	}
+
+	read_size = (reference->file_size + CACHE_FILE_SECTOR_SIZE - 1) & ~(CACHE_FILE_SECTOR_SIZE - 1);
+	if (!cache_file_region_contains(
+		tag_cache_base_address + tag_data_size,
+		TAG_CACHE_SIZE - tag_data_size,
+		reference->base_address,
+		read_size,
+		1))
+	{
+		error(
+			_error_silent,
+			"a structure bsp is damaged: its %08x bytes at %08x would load to %08lx, outside the tag cache",
+			reference->file_size,
+			reference->file_offset,
+			(unsigned long)reference->base_address);
+
+		return FALSE;
+	}
+
+	if (reference->structure_bsp.index == NONE ||
+		absolute_index >= cache_file_globals.tag_header->tag_count ||
+		global_tag_instances[absolute_index].tag_index != reference->structure_bsp.index ||
+		global_tag_instances[absolute_index].group_tag != STRUCTURE_BSP_TAG)
+	{
+		error(
+			_error_silent,
+			"a structure bsp is damaged: %08x is not a structure bsp tag",
+			reference->structure_bsp.index);
+
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 /* ---------- public code */
@@ -404,7 +594,9 @@ long tag_loaded(
 	long group_tag,
 	char const *name)
 {
-	short absolute_index;
+	/* port: a long, as the tags' count is (a short wrapped on a count past
+	0x7FFF, and the walk never ended) */
+	long absolute_index;
 	long result = NONE;
 
 	if (cache_file_globals.tags_loaded)
@@ -611,6 +803,27 @@ boolean cache_file_header_verify(
 		return FALSE;
 	}
 
+	/* port: the map holds at least its header, and its tag data lies in it
+	and fits the tag cache, which it is read into whole (a size rounded up
+	to whole sectors still fits, the cache being whole sectors). Checked
+	without overflow: the offset and size are each checked first */
+	if (header->file_length < (long)sizeof(struct cache_file_header) ||
+		header->tag_data_offset < 0 ||
+		header->tag_data_size < 0 ||
+		header->tag_data_size > TAG_CACHE_SIZE ||
+		header->tag_data_offset > header->file_length - header->tag_data_size)
+	{
+		error(
+			_error_silent,
+			"the cache file '%s' is damaged: %08x bytes of tag data at %08x, in %08x bytes",
+			scenario_name,
+			header->tag_data_size,
+			header->tag_data_offset,
+			header->file_length);
+
+		return FALSE;
+	}
+
 	return TRUE;
 }
 
@@ -806,6 +1019,26 @@ long scenario_tags_load(
 				SwitchToThread();
 			}
 
+			/* port: tags that did not all read, or whose header cannot be
+			trusted, are not loaded: the map is refused, as one whose header
+			is wrong is, and closed for the next to open */
+			if (read_complete != TRUE)
+			{
+				error(_error_silent, "the cache file '%s' could not be read", scenario_name);
+				cache_file_close();
+
+				return NONE;
+			}
+			if (!cache_file_tag_header_verify(
+				tag_cache_base_address,
+				cache_file_globals.header.tag_data_size,
+				scenario_name))
+			{
+				cache_file_close();
+
+				return NONE;
+			}
+
 			cache_file_globals.tag_header = tag_cache_base_address;
 			match_vassert(
 				"c:\\halo\\SOURCE\\cache\\cache_files.c",
@@ -845,6 +1078,11 @@ long scenario_tags_load(
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
+		/* port: a map refused is closed for the next to open */
+		else
+		{
+			cache_file_close();
+		}
 	}
 
 	return result;
@@ -855,6 +1093,18 @@ boolean scenario_structure_bsp_load(
 {
 	struct cache_file_tag_instance *tag_instance;
 	byte *tag_cache_base_address;
+	/* port: the bsp's header, once read and checked */
+	struct cache_file_structure_bsp_header *structure_bsp_header;
+
+	/* port: the tag data's size was checked as the map loaded
+	(cache_file_header_verify); the bsp's reference is the map's, and is
+	checked before anything is read where it says */
+	if (cache_file_globals.header.tag_data_size < 0 ||
+		cache_file_globals.header.tag_data_size > TAG_CACHE_SIZE ||
+		!cache_file_structure_bsp_reference_verify(reference))
+	{
+		return FALSE;
+	}
 
 	tag_cache_base_address = physical_memory_get_tag_cache_base_address();
 	csmemset(
@@ -879,9 +1129,43 @@ boolean scenario_structure_bsp_load(
 				sound_idle();
 			}
 		}
+
+		/* port: a bsp that did not all read, or whose header's pointers
+		leave what was read, is not loaded */
+		structure_bsp_header = reference->base_address;
+		if (read_complete != TRUE ||
+			structure_bsp_header->signature != CACHE_FILE_STRUCTURE_BSP_HEADER_SIGNATURE ||
+			!cache_file_region_contains(
+				reference->base_address,
+				reference->file_size,
+				structure_bsp_header->base_address,
+				1,
+				1) ||
+			!cache_file_region_contains(
+				reference->base_address,
+				reference->file_size,
+				structure_bsp_header->vertex_buffers,
+				structure_bsp_header->vertex_buffer_count,
+				CACHE_FILE_BUFFER_SIZE) ||
+			!cache_file_region_contains(
+				reference->base_address,
+				reference->file_size,
+				structure_bsp_header->index_buffers,
+				structure_bsp_header->index_buffer_count,
+				CACHE_FILE_BUFFER_SIZE))
+		{
+			error(
+				_error_silent,
+				"a structure bsp is damaged: its %08x bytes at %08x %s",
+				reference->file_size,
+				reference->file_offset,
+				read_complete != TRUE ? "could not be read" : "have a wrong header");
+
+			return FALSE;
+		}
 	}
 
-	cache_file_globals.structure_bsp_header = reference->base_address;
+	cache_file_globals.structure_bsp_header = structure_bsp_header;
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
 		0xE0,

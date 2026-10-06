@@ -1104,6 +1104,10 @@ static void update_peers(void)
 		{
 			int candidate;
 
+			/* (every address it gave, until a packet sealed by it arrives
+			from one: then only that one, above. The addresses are anyone's
+			who has the invite to give, so they are sent to no longer than
+			this) */
 			for (candidate = 0; candidate < peer->candidate_count; candidate++)
 				peer_ping(peer, &peer->candidates[candidate]);
 			peer->sent_time = p2p_now();
@@ -1295,7 +1299,10 @@ int p2p_local_candidates(struct p2p_candidate *candidates, int maximum_count)
 		candidates[count].address = lan;
 		candidates[count++].port = p2p.tunnel_port;
 	}
-	/* (the port the router forwards here, UPnP) */
+	/* (the port the router forwards here, UPnP; STUN's addresses are offered
+	too, even where the router names another: then either may be the one
+	that works, and a machine on the LAN that answers as the router cannot
+	take the real address's place) */
 	if (p2p.upnp_forwarded && count < maximum_count)
 		candidates[count++] = p2p.upnp_candidate;
 	for (index = 0; index < p2p.stun_count && count < maximum_count; index++)
@@ -2401,7 +2408,8 @@ void p2p_new_invite_if_listed(void)
 	if (!p2p.has_token || !p2p.token_listed)
 		return;
 	make_invite();
-	platform_log("Internet play: the game is private now, with a new invite: %s", p2p.invite);
+	platform_log("Internet play: a new invite, so that the one listed lets no one in (private, or a new password): %s",
+		p2p.invite);
 	if (p2p.hosting)
 	{
 		p2p_signal_host(p2p.token);

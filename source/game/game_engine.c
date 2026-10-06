@@ -568,6 +568,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
@@ -7068,16 +7069,31 @@ short game_engine_friendly_damage(
 {
 	struct game_variant_options const *options = game_variant_options_get();
 	struct player_datum *attacker;
+	short friendly_fire;
 
-	if (!game_engine || !global_variant.universal_variant.teams || attacker_player_index == NONE ||
-		options->friendly_fire == _friendly_fire_on)
+	/* port: network co-op's friendly fire is Server Setup's FRIENDLY FIRE,
+	in the host's game settings (only the host deals damage), between its
+	players: their AI allies they always hurt, as in the campaign */
+	if (network_coop_active())
 	{
-		return _friendly_damage_all;
+		struct network_game *game = network_game_get_game();
+		struct unit_datum *unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index,
+			_object_mask_unit);
+
+		if (!game || !unit || unit->unit.player_index == NONE)
+			return _friendly_damage_all;
+		friendly_fire = game->variant_options.friendly_fire;
 	}
+	else if (!game_engine || !global_variant.universal_variant.teams)
+		return _friendly_damage_all;
+	else
+		friendly_fire = options->friendly_fire;
+	if (attacker_player_index == NONE || friendly_fire == _friendly_fire_on)
+		return _friendly_damage_all;
 	attacker = (struct player_datum *)datum_try_and_get(player_data, attacker_player_index);
 	if (!attacker || attacker->unit_index == object_index)
 		return _friendly_damage_all;
-	switch (options->friendly_fire)
+	switch (friendly_fire)
 	{
 	case _friendly_fire_off: return _friendly_damage_none;
 	case _friendly_fire_shields_only: return _friendly_damage_shields;

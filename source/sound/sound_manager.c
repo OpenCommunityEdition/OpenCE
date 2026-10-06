@@ -1451,6 +1451,27 @@ static long looping_sound_new(
 			looping_sound->component_sound_count = 0;
 			looping_sound->ordered_sounds_finished = FALSE;
 
+			/* port: no more tracks or details than the looping sound holds. A
+			tag with more is cut to that, and said once. */
+			if (definition->tracks.count > (long)NUMBEROF(looping_sound->tracks) ||
+				definition->details.count > (long)NUMBEROF(looping_sound->detail_play_times))
+			{
+				error(
+					_error_silent,
+					"looping sound %s has %d tracks and %d details (only %d and %d are played)",
+					tag_get_name(definition_index),
+					definition->tracks.count,
+					definition->details.count,
+					(long)NUMBEROF(looping_sound->tracks),
+					(long)NUMBEROF(looping_sound->detail_play_times));
+				definition->tracks.count = MIN(
+					definition->tracks.count,
+					(long)NUMBEROF(looping_sound->tracks));
+				definition->details.count = MIN(
+					definition->details.count,
+					(long)NUMBEROF(looping_sound->detail_play_times));
+			}
+
 			for (detail_index = 0;
 				detail_index < definition->details.count;
 				detail_index++)
@@ -2610,7 +2631,11 @@ boolean sound_refresh_looping(
 						&source->location.position);
 				}
 
-				for (track_index = 0; track_index < definition->tracks.count; track_index++)
+				/* port: no more tracks than the looping sound holds (the map's count) */
+				for (track_index = 0;
+					track_index < definition->tracks.count &&
+						track_index < (short)NUMBEROF(loop->tracks);
+					track_index++)
 				{
 					struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
 						&definition->tracks,
@@ -3040,7 +3065,10 @@ static void process_looping_sounds(
 		{
 			short detail_index;
 
-			for (detail_index = 0; detail_index < definition->details.count;
+			/* port: no more details than the looping sound holds (the map's count) */
+			for (detail_index = 0;
+				detail_index < definition->details.count &&
+					detail_index < (short)NUMBEROF(looping_sound->detail_play_times);
 				detail_index++)
 			{
 				struct looping_sound_detail *detail = TAG_BLOCK_GET_ELEMENT(

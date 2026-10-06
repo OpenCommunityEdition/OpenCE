@@ -512,6 +512,16 @@ long unspatialized_impulse_sound_new(
 		0);
 }
 
+/* port: a co-op host sends its scripts' sounds to its clients
+(port/linux/game/network_coop.c; the kinds are in network_distributed.h) */
+enum
+{
+	_coop_sound_impulse,
+	_coop_sound_looping_start,
+	_coop_sound_looping_stop,
+};
+void network_coop_note_sound(short kind, long definition_index, long object_index, real scale);
+
 void scripted_sound_new(
 	long definition_index,
 	long source_object_index,
@@ -525,6 +535,7 @@ void scripted_sound_new(
 
 	if (definition_index != NONE)
 	{
+		network_coop_note_sound(_coop_sound_impulse, definition_index, source_object_index, scale);
 		definition = sound_definition_get(definition_index);
 		sound_stop_impulse(definition->scripting_sound_index);
 		definition->scripting_time = game_time_get()
@@ -737,6 +748,8 @@ static void scripted_looping_sound_stop_internal(
 void scripted_looping_sound_stop(
 	long sound_index)
 {
+	if (sound_index != NONE)
+		network_coop_note_sound(_coop_sound_looping_stop, sound_index, NONE, 0.0f);
 	scripted_looping_sound_stop_internal(sound_index, FALSE);
 
 	return;
@@ -755,6 +768,8 @@ void scripted_looping_sound_start(
 	{
 		definition = looping_sound_definition_get(sound_index);
 		scripted_looping_sound_stop(sound_index);
+		/* after the stop above, so clients get them in the same order */
+		network_coop_note_sound(_coop_sound_looping_start, sound_index, source_object_index, gain);
 		match_assert(
 			"c:\\halo\\SOURCE\\sound\\game_sound.c",
 			495,

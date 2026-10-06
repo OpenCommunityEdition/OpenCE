@@ -190,11 +190,9 @@ void dead_camera_update(
 		}
 		else
 		{
-			next_unit_index = (long)result;
+			next_unit_index = NONE;
 		}
-		/* January preserves the command pointer as the fallback object index
-		 * when no player is found. This is a bug; a corrected build should
-		 * initialize next_unit_index to NONE instead. */
+		/* With no living player, keep observing the dead unit/current position. */
 
 		if (next_unit_index != camera->unit_index && next_unit_index != NONE)
 		{

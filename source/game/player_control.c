@@ -209,6 +209,7 @@ symbols in this file:
 #include "units/vehicles.h"
 
 #include "real_math.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
 
@@ -1679,25 +1680,85 @@ boolean player_control_action_test_look_relative_all_directions(
 		_player_control_look_relative_all_directions_flags);
 }
 
+/* The actions the scripts test for (player_control_action_test_*) that a
+player's unit control, turning, sticks and trigger show. A local player's
+come from its input blob; in network co-op the host's scripts count a
+client's too (port/linux/game/network_distributed.c), so Pillar of
+Autumn's tutorial goes on for whichever player does what it asks. */
+void player_control_action_test_note(
+	unsigned long unit_control_flags,
+	real_euler_angles2d const *facing_delta,
+	real_vector2d const *throttle,
+	real primary_trigger)
+{
+	struct player_control_globals_data *globals = player_control_globals;
+
+	if (TEST_FLAG(unit_control_flags, _unit_control_action_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_action_bit);
+	}
+	if (TEST_FLAG(unit_control_flags, _unit_control_jump_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_jump_bit);
+	}
+	if (TEST_FLAG(unit_control_flags, _unit_control_throw_grenade_bit))
+	{
+		globals->action_flags |= FLAG(_player_control_grenade_trigger_bit);
+	}
+	if (primary_trigger > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_primary_trigger_bit);
+	}
+
+	if (facing_delta->pitch > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_up_bit);
+	}
+	else if (facing_delta->pitch < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_down_bit);
+	}
+	if (facing_delta->yaw > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_left_bit);
+	}
+	else if (facing_delta->yaw < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_look_relative_right_bit);
+	}
+	if (throttle->i > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_forward_bit);
+	}
+	else if (throttle->i < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_backward_bit);
+	}
+	if (throttle->j > 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_right_bit);
+	}
+	else if (throttle->j < 0.f)
+	{
+		globals->action_flags |= FLAG(_player_control_move_relative_left_bit);
+	}
+}
+
 static void player_control_action_test_check_reset_input_blob(
 	struct input_blob *input)
 {
 	struct player_control_globals_data *globals;
 
-	if (input->accept && cinematic_can_be_skipped())
+	if (input->accept && (cinematic_can_be_skipped() || network_coop_skip_offered()))
 	{
-		main_skip_cinematic();
+		/* port: in network co-op the players vote to skip (network_coop.c) */
+		if (!network_coop_vote_skip())
+			main_skip_cinematic();
 	}
 
+	player_control_action_test_note(input->unit_control_flags, &input->facing_delta, &input->throttle,
+		input->primary_trigger);
 	globals = player_control_globals;
-	if (TEST_FLAG(input->unit_control_flags, _unit_control_action_bit))
-	{
-		globals->action_flags |= FLAG(_player_control_action_bit);
-	}
-	if (TEST_FLAG(input->unit_control_flags, _unit_control_jump_bit))
-	{
-		globals->action_flags |= FLAG(_player_control_jump_bit);
-	}
 	if (input->accept)
 	{
 		globals->action_flags |= FLAG(_player_control_accept_bit);
@@ -1706,50 +1767,9 @@ static void player_control_action_test_check_reset_input_blob(
 	{
 		globals->action_flags |= FLAG(_player_control_back_bit);
 	}
-	if (input->primary_trigger > 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_primary_trigger_bit);
-	}
-	if (TEST_FLAG(input->unit_control_flags, _unit_control_throw_grenade_bit))
-	{
-		globals->action_flags |= FLAG(_player_control_grenade_trigger_bit);
-	}
 	if (TEST_FLAG(input->player_control_flags, _player_control_input_zoom_bit))
 	{
 		globals->action_flags |= FLAG(_player_control_zoom_bit);
-	}
-
-	if (input->facing_delta.pitch > 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_look_relative_up_bit);
-	}
-	else if (input->facing_delta.pitch < 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_look_relative_down_bit);
-	}
-	if (input->facing_delta.yaw > 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_look_relative_left_bit);
-	}
-	else if (input->facing_delta.yaw < 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_look_relative_right_bit);
-	}
-	if (input->throttle.i > 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_move_relative_forward_bit);
-	}
-	else if (input->throttle.i < 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_move_relative_backward_bit);
-	}
-	if (input->throttle.j > 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_move_relative_right_bit);
-	}
-	else if (input->throttle.j < 0.f)
-	{
-		globals->action_flags |= FLAG(_player_control_move_relative_left_bit);
 	}
 
 	if (!TEST_FLAG(globals->action_test_flags, _player_control_action_bit))

@@ -210,6 +210,15 @@ unsigned long xgpu_texture_face_size(const struct xgpu_texture_description *desc
 	return size;
 }
 
+/* whether the size is one D3DDevice_GetDeviceCaps allows (d3d8_gl.c): up
+to 4096 by 4096, and 512 each way for a volume */
+static BOOL texture_size_supported(const struct xgpu_texture_description *description)
+{
+	if (description->depth > 1)
+		return description->width <= 512 && description->height <= 512 && description->depth <= 512;
+	return description->width <= 4096 && description->height <= 4096;
+}
+
 unsigned long xgpu_texture_level_pitch(const struct xgpu_texture_description *description, unsigned long level)
 {
 	struct format_information information = format_information(description->format);
@@ -351,8 +360,9 @@ static unsigned long convert_texel(unsigned char kind, const unsigned char *sour
 	}
 }
 
-/* one level (or 3D slice set) of an uncompressed texture into BGRA */
-static void decode_level(const struct xgpu_texture_description *description, unsigned long level,
+/* one level (or 3D slice set) of an uncompressed texture into BGRA; FALSE
+when out of memory */
+static BOOL decode_level(const struct xgpu_texture_description *description, unsigned long level,
 	const unsigned char *source, const D3DCOLOR *palette, unsigned long *destination)
 {
 	struct format_information information = format_information(description->format);
@@ -370,12 +380,14 @@ static void decode_level(const struct xgpu_texture_description *description, uns
 			for (x = 0; x < width; x++)
 				destination[y * width + x] = convert_texel(information.kind, row + x * information.bytes, palette, x, row);
 		}
-		return;
+		return TRUE;
 	}
 	{
 		struct swizzle_masks masks = swizzle_masks(width, height, depth);
 		unsigned long *x_offsets = malloc(width * sizeof(unsigned long));
 
+		if (!x_offsets)
+			return FALSE;
 		for (x = 0; x < width; x++)
 			x_offsets[x] = spread(masks.x, x);
 		for (z = 0; z < depth; z++)
@@ -396,6 +408,7 @@ static void decode_level(const struct xgpu_texture_description *description, uns
 		}
 		free(x_offsets);
 	}
+	return TRUE;
 }
 
 #ifdef HALO_ANDROID
@@ -556,6 +569,8 @@ static void texture_dump(GLenum target, const struct xgpu_texture_description *d
 	if (!directory || target != GL_TEXTURE_2D)
 		return;
 	pixels = malloc(width * height * 4);
+	if (!pixels)
+		return;
 	glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
 	snprintf(path, sizeof(path), "%s/tex%05lu_fmt%02x_%lux%lu.tga", directory, dump_index++,
 		(unsigned)description->format, width, height);
@@ -590,6 +605,12 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
 #endif
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
+	if (!converted && !(description->compressed && !decode_compressed))
+	{
+		platform_log("textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+			description->width, description->height, description->depth);
+		return;
+	}
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
 #ifdef HALO_ANDROID
@@ -629,7 +650,13 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 						(unsigned long)depth, converted);
 				else
 #endif
-				decode_level(description, level, source, palette, converted);
+				if (!decode_level(description, level, source, palette, converted))
+				{
+					platform_log("textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+						description->width, description->height, description->depth);
+					free(converted);
+					return;
+				}
 				if (target == GL_TEXTURE_3D)
 					glTexImage3D(image_target, (GLint)level, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);
 				else
@@ -656,6 +683,10 @@ struct texture_entry
 	unsigned long last_used_frame;
 	/* the high-res HUD texture drawn in its place (hud_hires.h), or -1 */
 	long override;
+	/* the newest generation of its pages (memory_watch_generation) as of the
+	memory watch serial read before it was found: the same while no watched
+	page has been written since (0: never found) */
+	unsigned long watched_serial, watched_generation;
 };
 
 #define TEXTURE_BUCKET_COUNT 4096
@@ -668,7 +699,7 @@ static struct texture_entry *texture_buckets[TEXTURE_BUCKET_COUNT];
 texture that is not palettized is remembered with the memory watch serial it
 started at: while no watched page has been written since, and no texture
 has been dropped, the same lookup finds the same current texture. */
-#define RECENT_TEXTURE_COUNT 64
+#define RECENT_TEXTURE_COUNT 512
 
 static struct
 {
@@ -680,9 +711,14 @@ static struct
 static unsigned long texture_drop_serial = 1;
 static unsigned long texture_frame = 0;
 
+/* (every bit of the three mixed into the top ones: textures are aligned,
+and few sizes and formats are common) */
 static unsigned long bucket_index(DWORD data, DWORD format_word, DWORD size_word)
 {
-	return ((data >> 7) ^ (format_word * 2654435761UL) ^ size_word) % TEXTURE_BUCKET_COUNT;
+	unsigned long hash = (unsigned long)data * 2654435761UL ^ (unsigned long)format_word * 2246822519UL ^
+		(unsigned long)size_word * 3266489917UL;
+
+	return ((hash & 0xffffffffUL) >> 20) % TEXTURE_BUCKET_COUNT;
 }
 
 /* palettized textures are cached per palette contents: the game rewrites
@@ -757,25 +793,33 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
 	unsigned long watch_serial = memory_watch_serial();
 
+	/* (a texture that is not palettized has the one entry, until one is
+	dropped: remembered, a page written since only means checking it) */
+	entry = NULL;
 	if (!palettized && recent_textures[recent].entry && recent_textures[recent].data == data &&
 		recent_textures[recent].format_word == format_word && recent_textures[recent].size_word == size_word &&
-		recent_textures[recent].watch_serial == watch_serial &&
 		recent_textures[recent].drop_serial == texture_drop_serial)
 	{
 		entry = recent_textures[recent].entry;
-		entry->last_used_frame = texture_frame;
-		return texture_entry_result(entry, target, description);
+		if (recent_textures[recent].watch_serial == watch_serial)
+		{
+			entry->last_used_frame = texture_frame;
+			return texture_entry_result(entry, target, description);
+		}
 	}
 
-	for (entry = *bucket; entry; entry = entry->next)
+	if (!entry)
 	{
-		if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
+		for (entry = *bucket; entry; entry = entry->next)
 		{
-			if (entry->palette_hash == hash)
-				break;
-			variant_count++;
-			if (!oldest_variant || entry->last_used_frame < oldest_variant->last_used_frame)
-				oldest_variant = entry;
+			if (entry->data == data && entry->format_word == format_word && entry->size_word == size_word)
+			{
+				if (entry->palette_hash == hash)
+					break;
+				variant_count++;
+				if (!oldest_variant || entry->last_used_frame < oldest_variant->last_used_frame)
+					oldest_variant = entry;
+			}
 		}
 	}
 	if (!entry && variant_count >= MAXIMUM_PALETTE_VARIANTS)
@@ -788,6 +832,12 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	if (!entry)
 	{
 		entry = calloc(1, sizeof(*entry));
+		if (!entry)
+		{
+			xgpu_texture_describe(format_word, size_word, description);
+			*target = GL_TEXTURE_2D;
+			return 0;
+		}
 		entry->data = data;
 		entry->format_word = format_word;
 		entry->size_word = size_word;
@@ -796,7 +846,15 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 		entry->target = entry->description.cube_map ? GL_TEXTURE_CUBE_MAP :
 			entry->description.depth > 1 ? GL_TEXTURE_3D : GL_TEXTURE_2D;
 		entry->address = (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(data);
-		entry->size = xgpu_texture_face_size(&entry->description) * (entry->description.cube_map ? 6 : 1);
+		/* (a size beyond D3DDevice_GetDeviceCaps' is never uploaded: its
+		byte counts would not fit in 32 bits) */
+		entry->size = texture_size_supported(&entry->description) ?
+			xgpu_texture_face_size(&entry->description) * (entry->description.cube_map ? 6 : 1) : 0;
+		if (!entry->size)
+		{
+			platform_log("textures: a %lux%lux%lu texture is larger than the device takes; it is not drawn",
+				entry->description.width, entry->description.height, entry->description.depth);
+		}
 		entry->generation = 0;
 		entry->override = -1;
 		glGenTextures(1, &entry->texture);
@@ -806,7 +864,17 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 
 	if (no_cache < 0)
 		no_cache = config_boolean("debug.texture_no_cache");
-	generation = memory_watch_generation(entry->address, entry->size);
+	/* (its pages' newest generation, found again only once a watched page
+	has been written: a large texture's pages, scanned for every draw that
+	bound it, were much of a frame with many objects) */
+	if (entry->watched_serial && entry->watched_serial == watch_serial)
+		generation = entry->watched_generation;
+	else
+	{
+		generation = memory_watch_generation(entry->address, entry->size);
+		entry->watched_serial = watch_serial;
+		entry->watched_generation = generation;
+	}
 	if (!entry->generation || generation > entry->generation || no_cache)
 	{
 		/* protect first, so a write racing with the upload is noticed */
@@ -816,7 +884,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			entry->generation = 1;
 		/* (which bitmap is here may have changed with the pixels) */
 		entry->override = -1;
-		if (!palettized && !entry->description.cube_map && entry->description.depth == 1)
+		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
 			unsigned long levels;
 
@@ -826,7 +894,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
 				entry->override = -1;
 		}
-		if (entry->override < 0 && platform_is_contiguous((void *)entry->address) &&
+		if (entry->override < 0 && entry->size && platform_is_contiguous((void *)entry->address) &&
 			platform_is_contiguous((void *)(entry->address + entry->size - 1)))
 		{
 			if (config_boolean("debug.texture_log"))

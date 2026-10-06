@@ -763,7 +763,22 @@ struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
 		group = bitmap_group_get(bitmap_group_index);
 		if (group)
 		{
-			if (group->sequences.count > 0)
+			/* port: the asserts only log in release, and % keeps a negative
+			sequence negative. So a negative one (the map's, as hud elements
+			give it) has no sequence, and the frame is the bitmap, as with no
+			sequences at all. */
+			if (group->sequences.count > 0 && sequence_index < 0)
+			{
+				static boolean reported = FALSE;
+
+				if (!reported)
+				{
+					reported = TRUE;
+					error(_error_silent, "bitmap 0x%08lX asked for sequence #%d (none used)",
+						(unsigned long)bitmap_group_index, sequence_index);
+				}
+			}
+			else if (group->sequences.count > 0)
 			{
 				struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
 					&group->sequences,
@@ -775,7 +790,7 @@ struct bitmap_data *bitmap_group_get_bitmap_from_sequence(
 					bitmap_index = (short)(frame_index % sequence->bitmap_count +
 						sequence->first_bitmap_index);
 				}
-				else if (sequence->sprites.count)
+				else if (sequence->sprites.count && frame_index >= 0) /* port: not below the first sprite */
 				{
 					bitmap_index = TAG_BLOCK_GET_ELEMENT(
 						&sequence->sprites,

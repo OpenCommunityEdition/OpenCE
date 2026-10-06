@@ -213,6 +213,7 @@ symbols in this file:
 #include "ai/actors.h"
 #include "ai/ai.h"
 #include "cache/cache_files.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
@@ -249,6 +250,8 @@ enum weapon_trigger_flags
 enum
 {
 	MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON = 2,
+	/* port: the magazines a weapon holds (struct _weapon_datum) */
+	MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON = 2,
 };
 
 /* TU-local copies: no shared header declares these tag/runtime enumerations yet.
@@ -361,6 +364,13 @@ struct trigger_firing_effect
 
 /* ---------- prototypes */
 
+static short weapon_magazine_count(
+	struct weapon_definition const *weapon_definition);
+static short weapon_trigger_count(
+	struct weapon_definition const *weapon_definition);
+static boolean weapon_trigger_magazine_valid(
+	struct weapon_definition const *weapon_definition,
+	struct weapon_trigger_definition const *trigger_definition);
 static struct weapon_trigger *weapon_trigger_get(
 	struct weapon_datum *weapon,
 	short trigger_index);
@@ -505,6 +515,48 @@ void weapons_initialize(
 void weapons_initialize_for_new_map(
 	void)
 {
+	struct tag_iterator iterator;
+	long weapon_definition_index;
+
+	/* port: a weapon holds two magazines and two triggers. A weapon tag with
+	more is cut down to two here, before any weapon is made, or every loop
+	over them writes past the weapon. Tool never builds more, so the
+	released maps are untouched. A trigger's magazine past the magazines is
+	only reported here. The weapon skips it where it fires. */
+	tag_iterator_new(&iterator, WEAPON_DEFINITION_TAG);
+	while ((weapon_definition_index= tag_iterator_next(&iterator))!=NONE)
+	{
+		struct weapon_definition *weapon_definition= weapon_definition_get(weapon_definition_index);
+		short trigger_index;
+
+		if (weapon_definition->weapon.magazines.count<0 ||
+			weapon_definition->weapon.magazines.count>MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON)
+		{
+			error(_error_silent, "weapon tag 0x%08lX has %ld magazines (cut to %d)",
+				(unsigned long)weapon_definition_index, weapon_definition->weapon.magazines.count, MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON);
+			weapon_definition->weapon.magazines.count= weapon_definition->weapon.magazines.count<0 ? 0 : MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON;
+		}
+
+		if (weapon_definition->weapon.triggers.count<0 ||
+			weapon_definition->weapon.triggers.count>MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON)
+		{
+			error(_error_silent, "weapon tag 0x%08lX has %ld triggers (cut to %d)",
+				(unsigned long)weapon_definition_index, weapon_definition->weapon.triggers.count, MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON);
+			weapon_definition->weapon.triggers.count= weapon_definition->weapon.triggers.count<0 ? 0 : MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON;
+		}
+
+		for (trigger_index= 0; trigger_index<weapon_trigger_count(weapon_definition); trigger_index++)
+		{
+			struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+			if (!weapon_trigger_magazine_valid(weapon_definition, trigger_definition))
+			{
+				error(_error_silent, "weapon tag 0x%08lX trigger #%d has bad magazine #%d (it won't fire)",
+					(unsigned long)weapon_definition_index, trigger_index, trigger_definition->magazine_index);
+			}
+		}
+	}
+
 	return;
 }
 
@@ -740,20 +792,24 @@ boolean weapon_new(
 	weapon->weapon.state = _weapon_state_idle;
 	weapon->weapon.overheated_effect_index = NONE;
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<weapon_magazine_count(weapon_definition); ++magazine_index)
 	{
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
 
+		if (!magazine)
+			continue;
 		magazine->rounds_loaded = MIN(magazine_definition->rounds_total_initial, magazine_definition->rounds_loaded_maximum);
 		magazine->rounds_total = magazine_definition->rounds_total_initial-magazine->rounds_loaded;
 	}
 
-	for (trigger_index = 0; trigger_index<weapon_definition->weapon.triggers.count; ++trigger_index)
+	for (trigger_index = 0; trigger_index<weapon_trigger_count(weapon_definition); ++trigger_index)
 	{
 		struct weapon_trigger *trigger = weapon_trigger_get(weapon, trigger_index);
 
 		(void)TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+		if (!trigger)
+			continue;
 		trigger->charging_effect_index = NONE;
 		trigger->idle_ticks = 127;
 	}
@@ -771,11 +827,13 @@ void weapon_set_total_rounds(
 
 	match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 3082, rounds_array);
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<weapon_magazine_count(weapon_definition); ++magazine_index)
 	{
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
 
+		if (!magazine)
+			continue;
 		magazine->rounds_total = MIN(magazine_definition->rounds_total_maximum, rounds_array[magazine_index]);
 		magazine->rounds_loaded = MIN(magazine->rounds_loaded, magazine->rounds_total);
 	}
@@ -839,11 +897,13 @@ void weapon_export_function_values(
 				{
 					short trigger_index;
 
-					for (trigger_index= 0; trigger_index<weapon_definition->weapon.triggers.count; ++trigger_index)
+					for (trigger_index= 0; trigger_index<weapon_trigger_count(weapon_definition); ++trigger_index)
 					{
 						struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 						struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
 
+						if (!trigger)
+							continue;
 						if (trigger_definition->charging_time>0.0f)
 						{
 							real charged_illumination= weapon_trigger_get_charged_fraction(weapon_index, trigger_index)*trigger_definition->charged_illumination;
@@ -966,12 +1026,12 @@ boolean weapon_handle_potential_inventory_item(
 	boolean handled = FALSE;
 	short magazine_index;
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<weapon_magazine_count(weapon_definition); ++magazine_index)
 	{
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
 
-		if (magazine->rounds_total<magazine_definition->rounds_total_maximum)
+		if (magazine && magazine->rounds_total<magazine_definition->rounds_total_maximum)
 		{
 			short rounds_needed = magazine_definition->rounds_total_maximum-magazine->rounds_total;
 			short rounds_taken = 0;
@@ -1144,14 +1204,19 @@ void weapon_build_weapon_interface_state(
 	state->heat = weapon->weapon.heat;
 	state->age = weapon->weapon.age;
 	state->overheated = TEST_FLAG(weapon->weapon.flags, 0);
-	state->magazine_count = (short)weapon_definition->weapon.magazines.count;
+	/* port: the state's magazines are the two the hud keeps on its stack,
+	so no more than two are filled in or counted */
+	state->magazine_count = (short)MIN(weapon_magazine_count(weapon_definition), (short)NUMBEROF(state->magazines));
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<state->magazine_count; ++magazine_index)
 	{
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
-		long reloading = magazine->state==_magazine_reloading || magazine->state==_magazine_chambering;
+		long reloading;
 
+		if (!magazine)
+			continue;
+		reloading = magazine->state==_magazine_reloading || magazine->state==_magazine_chambering;
 		state->magazines[magazine_index].reloading = reloading;
 		state->magazines[magazine_index].can_fire = magazine->state==_magazine_idle;
 		state->magazines[magazine_index].rounds_loaded = magazine->rounds_loaded;
@@ -1179,7 +1244,7 @@ void weapon_set_current_amount(
 	{
 		short trigger_index;
 
-		for (trigger_index = 0; trigger_index<weapon_definition->weapon.triggers.count; ++trigger_index)
+		for (trigger_index = 0; trigger_index<weapon_trigger_count(weapon_definition); ++trigger_index)
 		{
 			struct weapon_trigger_definition *trigger_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 
@@ -1400,6 +1465,9 @@ static void weapon_magazine_finish_reload(
 	long rounds_to_load;
 	short rounds_loaded;
 
+	if (!magazine)
+		return;
+
 	if (TEST_FLAG(magazine_definition->flags, 0))
 		magazine->rounds_loaded = 0;
 
@@ -1433,7 +1501,8 @@ static void weapon_magazine_start_chamber(
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 
-	if (weapon_magazine_state_interruptable(magazine->state, _magazine_chambering) &&
+	if (magazine &&
+		weapon_magazine_state_interruptable(magazine->state, _magazine_chambering) &&
 		weapon_magazine_state_change_ok(weapon_index))
 	{
 		struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
@@ -1546,6 +1615,8 @@ static void weapon_trigger_recover(
 		struct weapon_trigger_definition);
 
 	(void)trigger_definition;
+	if (!trigger)
+		return;
 	trigger->idle_ticks = 0;
 	weapon_trigger_idle(weapon_index, trigger_index);
 
@@ -1581,6 +1652,9 @@ static void weapon_magazine_start_reload(
 	struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
 	struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+	if (!magazine)
+		return;
 
 	switch (magazine->state)
 	{
@@ -1638,6 +1712,12 @@ static struct weapon_trigger *weapon_trigger_get(
 
 	match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 1639, trigger_index>=0 && trigger_index<weapon_definition->weapon.triggers.count);
 
+	/* port: no trigger past the weapon's two. The callers skip it. */
+	if (trigger_index<0 || trigger_index>=(short)NUMBEROF(weapon->weapon.triggers))
+	{
+		return NULL;
+	}
+
 	return &weapon->weapon.triggers[trigger_index];
 }
 
@@ -1649,7 +1729,43 @@ static struct weapon_magazine *weapon_magazine_get(
 
 	match_assert("c:\\halo\\SOURCE\\items\\weapons.c", 1650, magazine_index>=0 && magazine_index<weapon_definition->weapon.magazines.count);
 
+	/* port: no magazine past the weapon's two (a trigger's magazine is the
+	map's). The callers skip it. */
+	if (magazine_index<0 || magazine_index>=(short)NUMBEROF(weapon->weapon.magazines))
+	{
+		return NULL;
+	}
+
 	return &weapon->weapon.magazines[magazine_index];
+}
+
+/* port: the magazines and triggers to go through. A tag's count past the
+weapon's two would write past the weapon (weapons_initialize_for_new_map
+cuts it already; this keeps every loop in the weapon anyway). */
+static short weapon_magazine_count(
+	struct weapon_definition const *weapon_definition)
+{
+	long count = weapon_definition->weapon.magazines.count;
+
+	return (short)(count<0 ? 0 : MIN(count, MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON));
+}
+
+static short weapon_trigger_count(
+	struct weapon_definition const *weapon_definition)
+{
+	long count = weapon_definition->weapon.triggers.count;
+
+	return (short)(count<0 ? 0 : MIN(count, MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON));
+}
+
+/* port: whether a trigger's magazine is none or one the weapon has. The
+index is the map's, and the weapon takes rounds out of it. */
+static boolean weapon_trigger_magazine_valid(
+	struct weapon_definition const *weapon_definition,
+	struct weapon_trigger_definition const *trigger_definition)
+{
+	return trigger_definition->magazine_index==NONE ||
+		(trigger_definition->magazine_index>=0 && trigger_definition->magazine_index<weapon_magazine_count(weapon_definition));
 }
 
 static real weapon_trigger_get_charged_fraction(
@@ -1660,6 +1776,9 @@ static real weapon_trigger_get_charged_fraction(
 	struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
 	struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
 	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+	if (!trigger)
+		return 0.0f;
 
 	switch (trigger->state)
 	{
@@ -1758,13 +1877,20 @@ static boolean weapon_trigger_can_fire_again(
 		trigger_index,
 		struct weapon_trigger_definition);
 	boolean result = FALSE;
-	real fraction = TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit)
+	real fraction;
+	real rate_of_fire;
+	real required_ticks;
+	char ticks_since_fire;
+
+	if (!trigger)
+		return FALSE;
+
+	fraction = TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit)
 		? weapon->weapon.primary_trigger
 		: trigger->rate_of_fire;
-	real rate_of_fire = (trigger_definition->final_rate_of_fire - trigger_definition->initial_rate_of_fire) *
+	rate_of_fire = (trigger_definition->final_rate_of_fire - trigger_definition->initial_rate_of_fire) *
 		fraction + trigger_definition->initial_rate_of_fire;
-	real required_ticks = rate_of_fire > 0.0001f ? TICKS_PER_SECOND / rate_of_fire : 0.0f;
-	char ticks_since_fire;
+	required_ticks = rate_of_fire > 0.0001f ? TICKS_PER_SECOND / rate_of_fire : 0.0f;
 
 	if (weapon_definition->weapon.age_rate_of_fire_penalty > 0.0f)
 	{
@@ -1799,6 +1925,8 @@ static void weapon_magazine_idle(
 		struct weapon_magazine_definition);
 
 	(void)magazine_definition;
+	if (!magazine)
+		return;
 	magazine->state = _magazine_idle;
 	magazine->state_timer = 0;
 
@@ -1863,6 +1991,12 @@ static void weapon_trigger_change_state(
 		0xA12,
 		new_state>=0 && new_state<NUMBER_OF_TRIGGER_STATES);
 
+	/* port: the asserts only log in release. No trigger past the two. */
+	if (trigger_index<0 || trigger_index>=MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON)
+	{
+		return;
+	}
+
 	weapon->weapon.triggers[trigger_index].state = (char)new_state;
 	weapon->weapon.triggers[trigger_index].state_timer = new_state_timer;
 
@@ -1882,7 +2016,7 @@ static void weapon_trigger_start_ejection_port(
 		trigger_index,
 		struct weapon_trigger_definition);
 
-	if (trigger_definition->ejection_port_recovery_time > 0.0f)
+	if (trigger && trigger_definition->ejection_port_recovery_time > 0.0f)
 	{
 		if ((TEST_FLAG(
 				trigger_definition->flags,
@@ -1978,20 +2112,24 @@ static void weapon_reset(
 	struct weapon_datum *weapon = weapon_get(weapon_index);
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.triggers.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<weapon_trigger_count(weapon_definition); ++magazine_index)
 	{
 		struct weapon_trigger* trigger = weapon_trigger_get(weapon, magazine_index);
 		struct weapon_trigger_definition *trigger_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, magazine_index, struct weapon_trigger_definition);
 
+		if (!trigger)
+			continue;
 		trigger->state = _trigger_uninitialized;
 		trigger->state_timer = 0;
 	}
 
-	for (magazine_index = 0; magazine_index<weapon_definition->weapon.magazines.count; ++magazine_index)
+	for (magazine_index = 0; magazine_index<weapon_magazine_count(weapon_definition); ++magazine_index)
 	{
 		struct weapon_magazine *magazine = weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition = TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
 
+		if (!magazine)
+			continue;
 		if (magazine->state==_magazine_reloading)
 		{
 			if (2*magazine->state_timer<weapon_get_first_person_animation_time(weapon_index, 0, _first_person_weapon_animation_reload_while_empty, NONE))
@@ -2178,6 +2316,11 @@ static void trigger_create_projectiles(
 	struct object_marker markers[MAXIMUM_MARKERS_PER_OBJECT];
 	short marker_count;
 	short marker_index;
+
+	if (!trigger)
+	{
+		return;
+	}
 
 	trigger_marker_names[0]= "primary trigger";
 	trigger_marker_names[1]= "secondary trigger";
@@ -2395,6 +2538,11 @@ static void weapon_trigger_fire(
 	boolean misfired= FALSE;
 	boolean loads_alternate_ammunition= FALSE;
 
+	if (!trigger)
+	{
+		return;
+	}
+
 	if (trigger_index==1 &&
 		(weapon_definition->weapon.secondary_trigger_mode==_weapon_secondary_trigger_loads_alternate_ammunition ||
 		weapon_definition->weapon.secondary_trigger_mode==_weapon_secondary_trigger_loads_multiple_primary_ammunition))
@@ -2404,10 +2552,15 @@ static void weapon_trigger_fire(
 
 	if (trigger_definition->magazine_index!=NONE)
 	{
-		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition);
-		struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+		/* port: a magazine the weapon doesn't have is never fired from. Its
+		index is the map's, and the rounds are taken out of it here. */
+		struct weapon_magazine *magazine= weapon_trigger_magazine_valid(weapon_definition, trigger_definition) ?
+			weapon_magazine_get(weapon, trigger_definition->magazine_index) : NULL;
+		struct weapon_magazine_definition *magazine_definition= magazine ?
+			TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition) : NULL;
 
-		if (!loads_alternate_ammunition || weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded)
+		if (magazine &&
+			(!loads_alternate_ammunition || weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded))
 		{
 			if ((magazine->rounds_loaded>=trigger_definition->rounds_per_shot || TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) &&
 				!(TEST_FLAG(weapon_definition->weapon.flags, _weapon_cannot_fire_at_maximum_age_bit) && weapon->weapon.age>=1.0f) &&
@@ -2651,12 +2804,21 @@ static void weapon_trigger_begin_firing(
 	struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 	boolean can_fire= TRUE;
 
+	if (!trigger)
+	{
+		return;
+	}
+
 	if (trigger_definition->magazine_index!=NONE)
 	{
-		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition);
-		struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+		/* port: and not from a magazine the weapon doesn't have */
+		struct weapon_magazine *magazine= weapon_trigger_magazine_valid(weapon_definition, trigger_definition) ?
+			weapon_magazine_get(weapon, trigger_definition->magazine_index) : NULL;
+		struct weapon_magazine_definition *magazine_definition= magazine ?
+			TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition) : NULL;
 
-		if (magazine->state!=_magazine_idle)
+		(void)magazine_definition;
+		if (!magazine || magazine->state!=_magazine_idle)
 		{
 			can_fire= FALSE;
 		}
@@ -2753,7 +2915,10 @@ static void weapon_trigger_release_charge(
 		weapon_trigger_recover(weapon_index, trigger_index);
 	}
 
-	trigger->rate_of_fire= 0.0f;
+	if (trigger)
+	{
+		trigger->rate_of_fire= 0.0f;
+	}
 
 	return;
 }
@@ -2926,10 +3091,15 @@ boolean weapon_update(
 		weapon_magazine_start_reload(weapon_index, 0, TRUE);
 	}
 
-	for (magazine_index= 0; magazine_index<weapon_definition->weapon.magazines.count; magazine_index++)
+	for (magazine_index= 0; magazine_index<weapon_magazine_count(weapon_definition); magazine_index++)
 	{
 		struct weapon_magazine *magazine= weapon_magazine_get(weapon, magazine_index);
 		struct weapon_magazine_definition *magazine_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, magazine_index, struct weapon_magazine_definition);
+
+		if (!magazine)
+		{
+			continue;
+		}
 
 		if (magazine_definition->rounds_recharged_per_second>0 && magazine->rounds_loaded<magazine_definition->rounds_loaded_maximum)
 		{
@@ -2976,10 +3146,15 @@ boolean weapon_update(
 		}
 	}
 
-	for (trigger_index= 0; trigger_index<weapon_definition->weapon.triggers.count; trigger_index++)
+	for (trigger_index= 0; trigger_index<weapon_trigger_count(weapon_definition); trigger_index++)
 	{
 		struct weapon_trigger *trigger= weapon_trigger_get(weapon, trigger_index);
 		struct weapon_trigger_definition *trigger_definition= TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+
+		if (!trigger)
+		{
+			continue;
+		}
 
 		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_analog_rate_of_fire_bit) && TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit))
 		{
@@ -3033,13 +3208,15 @@ boolean weapon_update(
 		case _trigger_idle:
 			if (!TEST_FLAG(weapon->weapon.control_flags, _weapon_control_user_busy_bit) &&
 				weapon->object.parent_object_index!=NONE &&
-				trigger_definition->magazine_index!=NONE)
+				trigger_definition->magazine_index!=NONE &&
+				weapon_trigger_magazine_valid(weapon_definition, trigger_definition)) /* port: one it has */
 			{
 				struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
 
-				if ((magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) ||
+				if (magazine &&
+					((magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) ||
 					magazine->rounds_loaded<trigger_definition->minimum_rounds_loaded_per_shot ||
-					magazine->rounds_loaded==0)
+					magazine->rounds_loaded==0))
 				{
 					weapon_magazine_start_reload(weapon_index, trigger_definition->magazine_index, TRUE);
 				}
@@ -3110,9 +3287,17 @@ boolean weapon_update(
 				weapon->weapon.overcharged= 1.0f-(trigger->state_timer*(1.0f/TICKS_PER_SECOND))/trigger_definition->charged_time;
 				if (trigger->state_timer)
 				{
-					struct weapon_magazine *magazine= weapon_magazine_get(weapon, trigger_definition->magazine_index);
+					/* port: this never checked for no magazine. With none (NONE) it
+					reads the slot just before the magazines, which is still in
+					the weapon, so that is kept as it was. Any other index must
+					be a magazine the weapon has. */
+					struct weapon_magazine *magazine= trigger_definition->magazine_index==NONE ?
+						&weapon->weapon.magazines[trigger_definition->magazine_index] :
+						weapon_trigger_magazine_valid(weapon_definition, trigger_definition) ?
+							weapon_magazine_get(weapon, trigger_definition->magazine_index) : NULL;
 
-					if (magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit))
+					if (magazine &&
+						magazine->rounds_loaded<trigger_definition->rounds_per_shot && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit))
 					{
 						weapon_trigger_release_charge(weapon_index, trigger_index);
 					}

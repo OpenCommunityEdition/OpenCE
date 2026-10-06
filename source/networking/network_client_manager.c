@@ -411,6 +411,12 @@ enum
 	long as the host waits for a silent machine, network_server_manager.c):
 	network_game_client_network_lost */
 	NETWORK_GAME_CLIENT_LINK_DOWN_TIMEOUT = 15000,
+	/* port: how long a frame the client spends on the messages that came
+	(a host that floods it with them would hold each frame for as long as
+	they took): those left wait in the queue, in order, for the next
+	frame's, and the stream what the queue has no room for. One is always
+	handled (network_game_client_process_messages) */
+	MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE = 50,
 };
 
 enum network_game_client_state
@@ -745,6 +751,9 @@ static boolean add_advertised_game(
 	struct message_server_game_advertise *advertisement);
 static boolean network_game_client_process_incoming_messages(
 	struct network_game_client *client);
+static boolean network_game_client_process_messages(
+	struct network_game_client *client,
+	boolean budgeted);
 static boolean network_game_client_process_last_messages(
 	struct network_game_client *client);
 static void network_game_client_update_precache_status(
@@ -1255,6 +1264,10 @@ boolean network_game_client_game_settings_updated(
 		message_packet->machine_count <= MAXIMUM_NETWORK_MACHINE_COUNT &&
 		message_packet->player_count >= 0 &&
 		message_packet->player_count <= MAXIMUM_NUMBER_OF_PLAYERS &&
+		/* port: and the most players, which caps player_count as players are
+		added (network_game_add_player) */
+		message_packet->maximum_players > 0 &&
+		message_packet->maximum_players <= MAXIMUM_NUMBER_OF_PLAYERS &&
 		network_game_client_map_name_is_valid(message_packet->map.name, sizeof(message_packet->map.name)) &&
 		VALID_INDEX(message_packet->difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS))
 	{
@@ -1917,7 +1930,10 @@ boolean network_game_client_add_player_to_game(
 					struct network_player const *added = player;
 					long slot;
 
-					player = &client->game.players[client->game.player_count - 1];
+					/* (the slot network_game_add_player gave it, not one
+					worked out from player_count) */
+					player = VALID_INDEX(added->player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) ?
+						&client->game.players[added->player_list_index] : NULL;
 					for (slot = 0; slot < MAXIMUM_NUMBER_OF_PLAYERS; slot++)
 					{
 						if (network_player_is_valid(&client->game.players[slot]) &&
@@ -1930,7 +1946,7 @@ boolean network_game_client_add_player_to_game(
 					}
 				}
 
-				success = network_game_spawn_player(player);
+				success = player && network_game_spawn_player(player);
 
 				if (success)
 				{
@@ -2451,10 +2467,20 @@ static boolean add_advertised_game(
 static boolean network_game_client_process_incoming_messages(
 	struct network_game_client *client)
 {
+	return network_game_client_process_messages(client, TRUE);
+}
+
+/* (budgeted: no longer than MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE, else
+every message queued) */
+static boolean network_game_client_process_messages(
+	struct network_game_client *client,
+	boolean budgeted)
+{
 	boolean success = TRUE;
 	word message_packet_size;
 	struct transport_address source_address;
 	word message_packet[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];
+	unsigned long start_time = system_milliseconds();
 
 	message_packet_size = sizeof(message_packet);
 
@@ -2474,6 +2500,8 @@ static boolean network_game_client_process_incoming_messages(
 		}
 
 		message_packet_size = sizeof(message_packet);
+		if (budgeted && system_milliseconds() - start_time >= MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE)
+			break;
 	}
 
 	return success;
@@ -2490,7 +2518,8 @@ static boolean network_game_client_process_last_messages(
 {
 	short state = client->state;
 
-	if (!network_game_client_process_incoming_messages(client))
+	/* (all of them: the connection goes) */
+	if (!network_game_client_process_messages(client, FALSE))
 	{
 		network_event("network_game_client_process_incoming_messages() failed after the connection failed");
 	}

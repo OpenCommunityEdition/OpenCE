@@ -497,4 +497,85 @@ real rasterizer_get_near_clip_distance(
 	return near_clip_distance;
 }
 
+/* port: the state for network co-op (rasterizer_cinematics.h) */
+void rasterizer_screen_effect_port_get(
+	struct rasterizer_screen_effect_port_state *state)
+{
+	struct rasterizer_cinematic_screen_effect_state const *globals = cinematic_screen_effect_globals;
+
+	csmemset(state, 0, sizeof(*state));
+	if (!globals)
+		return;
+	state->has_control = globals->has_control;
+	state->initialized = globals->initialized;
+	state->video_on = globals->parameters.video_on;
+	state->filter_desaturation_is_additive = globals->parameters.filter_desaturation_is_additive;
+	state->filter_light_enhancement_uses_convolution_mask =
+		globals->parameters.filter_light_enhancement_uses_convolution_mask;
+	state->filter_desaturation_uses_convolution_mask = globals->parameters.filter_desaturation_uses_convolution_mask;
+	state->convolution_extra_passes = globals->parameters.convolution_extra_passes;
+	state->convolution_type = globals->parameters.convolution_type;
+	state->video_overbright_mode = globals->parameters.video_overbright_mode;
+	state->filter_desaturation_tint = globals->parameters.filter_desaturation_tint;
+	state->video_noise_intensity = globals->parameters.video_noise_intensity;
+	csmemcpy(state->convolution_radius, globals->convolution_radius, sizeof(state->convolution_radius));
+	csmemcpy(state->convolution_time, globals->convolution_time, sizeof(state->convolution_time));
+	csmemcpy(state->filter_light_enhancement_intensity, globals->filter_light_enhancement_intensity,
+		sizeof(state->filter_light_enhancement_intensity));
+	csmemcpy(state->filter_desaturation_intensity, globals->filter_desaturation_intensity,
+		sizeof(state->filter_desaturation_intensity));
+	csmemcpy(state->filter_time, globals->filter_time, sizeof(state->filter_time));
+	csmemcpy(state->script_values, globals->script_values, sizeof(state->script_values));
+	state->near_clip_distance = globals->near_clip_distance;
+}
+
+/* port: the first bitmap of one of the video effect's bitmap groups, as
+rasterizer_screen_effect_set_video uses it */
+static struct bitmap_data *screen_effect_video_bitmap(
+	long bitmap_group_index)
+{
+	return TAG_BLOCK_GET_ELEMENT(&bitmap_group_get(bitmap_group_index)->bitmaps, 0, struct bitmap_data);
+}
+
+/* port: the host's state put in place on a client, with the video effect's
+bitmaps found on this machine */
+void rasterizer_screen_effect_port_set(
+	struct rasterizer_screen_effect_port_state const *state)
+{
+	struct rasterizer_cinematic_screen_effect_state *globals = cinematic_screen_effect_globals;
+	boolean video = state->video_on && global_rasterizer_data &&
+		global_rasterizer_data->screen_effect_video_scanline_map.index != NONE &&
+		global_rasterizer_data->screen_effect_video_noise_map.index != NONE;
+
+	if (!globals)
+		return;
+	globals->has_control = state->has_control;
+	globals->initialized = state->initialized;
+	globals->parameters.convolution_extra_passes = state->convolution_extra_passes;
+	globals->parameters.convolution_type = state->convolution_type;
+	globals->parameters.convolution_mask = NULL;
+	globals->parameters.filter_desaturation_tint = state->filter_desaturation_tint;
+	globals->parameters.filter_desaturation_is_additive = state->filter_desaturation_is_additive;
+	globals->parameters.filter_light_enhancement_uses_convolution_mask =
+		state->filter_light_enhancement_uses_convolution_mask;
+	globals->parameters.filter_desaturation_uses_convolution_mask = state->filter_desaturation_uses_convolution_mask;
+	globals->parameters.video_on = video;
+	globals->parameters.video_overbright_mode = state->video_overbright_mode;
+	globals->parameters.video_noise_intensity = state->video_noise_intensity;
+	globals->parameters.video_noise_map_scale = video ? 1.0f : 0.0f;
+	globals->parameters.video_scanline_map =
+		video ? screen_effect_video_bitmap(global_rasterizer_data->screen_effect_video_scanline_map.index) : NULL;
+	globals->parameters.video_noise_map =
+		video ? screen_effect_video_bitmap(global_rasterizer_data->screen_effect_video_noise_map.index) : NULL;
+	csmemcpy(globals->convolution_radius, state->convolution_radius, sizeof(globals->convolution_radius));
+	csmemcpy(globals->convolution_time, state->convolution_time, sizeof(globals->convolution_time));
+	csmemcpy(globals->filter_light_enhancement_intensity, state->filter_light_enhancement_intensity,
+		sizeof(globals->filter_light_enhancement_intensity));
+	csmemcpy(globals->filter_desaturation_intensity, state->filter_desaturation_intensity,
+		sizeof(globals->filter_desaturation_intensity));
+	csmemcpy(globals->filter_time, state->filter_time, sizeof(globals->filter_time));
+	csmemcpy(globals->script_values, state->script_values, sizeof(globals->script_values));
+	globals->near_clip_distance = state->near_clip_distance;
+}
+
 /* ---------- private code */

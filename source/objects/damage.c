@@ -1693,7 +1693,12 @@ void object_cause_damage(
 					force_kill = TRUE;
 				}
 
+				/* port: nor does a teammate's hit kill outright (a melee from
+				behind, an instant kill) where the gametype's friendly fire
+				spares the body; a killing blow the host dealt (a client's
+				replay of it) is dealt as the host dealt it */
 				if (force_kill &&
+					(friendly_damage == _friendly_damage_all || distributed_damage_authorized) &&
 					!TEST_FLAG(current_object->object.damage_flags, _object_dead_bit))
 				{
 					current_object->object.body_vitality = 0.f;
@@ -2644,6 +2649,20 @@ void damage_replay_kill(
 	short material_index)
 {
 	SET_FLAG(damage->flags, _damage_kill_instantly_bit, TRUE);
+	distributed_damage_authorized = TRUE;
+	object_cause_damage(damage, object_index, node_index, region_index, material_index, NULL);
+	distributed_damage_authorized = FALSE;
+}
+
+/* ... damage to scenery or a device, dealt as the host dealt it: the copy
+breaks, plays its effects and is destroyed as the host's was */
+void damage_replay_static(
+	long object_index,
+	struct damage_data *damage,
+	short node_index,
+	short region_index,
+	short material_index)
+{
 	distributed_damage_authorized = TRUE;
 	object_cause_damage(damage, object_index, node_index, region_index, material_index, NULL);
 	distributed_damage_authorized = FALSE;

@@ -176,6 +176,10 @@ typedef char verify_rasterizer_shadows_shader_model_animation_offset[
 
 static void rasterizer_shadow_convolve(
 	void);
+static void rasterizer_shadow_convolve_pass(
+	short source_target,
+	short destination_target,
+	real offset);
 
 /* ---------- globals */
 
@@ -850,6 +854,9 @@ static void rasterizer_shadow_convolve(
 {
 	short stage;
 	real vertex_constants[8][4];
+	/* port: the shadow maps' texels for each of the Xbox's 128 */
+	long scale = halo_shadow_map_scale();
+	long distance;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_shadows.c",
@@ -953,6 +960,14 @@ static void rasterizer_shadow_convolve(
 		vertex_constants[7][1] = 1.0f;
 		vertex_constants[7][2] = 0.0f;
 		vertex_constants[7][3] = -0.00390625f;
+		/* port: half a texel of a larger map (rasterizer_shadow_convolve_pass) */
+		if (scale > 1)
+		{
+			for (distance = 0; distance < 8; distance++)
+			{
+				vertex_constants[distance][3] /= (real)scale;
+			}
+		}
 		IDirect3DDevice8_SetVertexShaderConstant(
 			global_d3d_device,
 			-81,
@@ -997,7 +1012,78 @@ static void rasterizer_shadow_convolve(
 			-1.0078125f,
 			-0.9921875f);
 		IDirect3DDevice8_End(global_d3d_device);
+
+		/* port: the passes that widen the blur of a larger map, back and
+		forth between the maps, ending in the secondary */
+		for (distance = 1; distance < scale; distance *= 2)
+		{
+			rasterizer_shadow_convolve_pass(3, 2, (real)distance / (real)(128 * scale));
+			rasterizer_shadow_convolve_pass(2, 3, (real)distance / (real)(128 * scale));
+		}
 	}
+
+	return;
+}
+
+/* port: the shadow maps can be drawn larger than the Xbox's 128x128
+(display.shadow_resolution, port/linux/src/d3d8_gl.c): scale times as many
+texels each way, a power of two. The Xbox's blur takes four taps diagonally
+half a texel off each texel, on the corners it shares with its neighbours.
+Each tap averages the four texels there, and together they weigh the texel
+and its neighbours 1, 2, 1 each way: a tent over three texels, which is a box
+two texels wide taken twice. For the shadows to stay as soft, a larger map's
+blur must cover as much of the map: a tent scale times as wide, a box of
+2 * scale texels taken twice, which weighs the texels 2 * scale - |d| for |d|
+up to 2 * scale - 1 texels away. The Xbox's pass, with its taps half a texel
+of the larger map off, is the box of two texels taken twice. A further pass
+with its taps diagonally distance texels off, on texels' centres, averages
+texels 2 * distance apart each way, which doubles a box of 2 * distance
+texels; two passes each at distance 1, 2, ... scale / 2 make both boxes
+2 * scale texels wide. The quad's offsets of half a texel stay as they are:
+they are half of the game's units, which the port undoes in the same units
+at any size (port/linux/src/nv2a_vsh.c), so the quad covers the map. */
+static void rasterizer_shadow_convolve_pass(
+	short source_target,
+	short destination_target,
+	real offset)
+{
+	short stage;
+	real vertex_constants[8][4];
+
+	csmemset(vertex_constants, 0, sizeof(vertex_constants));
+	for (stage = 0; stage < 4; stage++)
+	{
+		rasterizer_set_target_as_texture(stage, source_target, FALSE);
+		vertex_constants[stage * 2][0] = 1.0f;
+		vertex_constants[stage * 2 + 1][1] = 1.0f;
+	}
+	/* the Xbox pass's corners, in its order */
+	vertex_constants[0][3] = -offset;
+	vertex_constants[1][3] = -offset;
+	vertex_constants[2][3] = offset;
+	vertex_constants[3][3] = offset;
+	vertex_constants[4][3] = -offset;
+	vertex_constants[5][3] = offset;
+	vertex_constants[6][3] = offset;
+	vertex_constants[7][3] = -offset;
+	IDirect3DDevice8_SetVertexShaderConstant(
+		global_d3d_device,
+		-81,
+		vertex_constants,
+		8);
+
+	rasterizer_set_target(destination_target, 0, 0, FALSE, FALSE);
+
+	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
+	IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 0);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, 0, -1.0078125f, 1.0078125f);
+	IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 0);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, 0, 0.9921875f, 1.0078125f);
+	IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 1, 1);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, 0, 0.9921875f, -0.9921875f);
+	IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 1);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, 0, -1.0078125f, -0.9921875f);
+	IDirect3DDevice8_End(global_d3d_device);
 
 	return;
 }

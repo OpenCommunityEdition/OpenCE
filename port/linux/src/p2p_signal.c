@@ -104,8 +104,9 @@ enum
 	PROOF_SIZE = NONCE_SIZE + TAG_SIZE,
 	BUFFER_SIZE = 4096,
 	MAXIMUM_MESSAGE_SIZE = 512,
-	/* a listing's most (p2p_lobby.c's MAXIMUM_LISTING_SIZE, and some) */
-	MAXIMUM_LISTING_SIZE = 256,
+	/* a listing's most (p2p_lobby.c's MAXIMUM_LISTING_SIZE, 268 with a
+	password's sealed token, and some) */
+	MAXIMUM_LISTING_SIZE = 320,
 	/* the publishes awaiting acknowledgement on a broker */
 	MAXIMUM_IN_FLIGHT = 4,
 	/* the topics a broker is subscribed to (_topic_*) */

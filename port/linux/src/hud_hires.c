@@ -14,9 +14,10 @@ report's, a whole panel), and the profiles' Spartan pictures shown, about
 They are drawn with linear filtering and their mip levels (d3d8_gl.c,
 configure_sampler), as they are larger than they appear.
 
-The PNGs are the ones tools/hud_assets.py, title_assets.py and
-spartan_assets.py write, so only what they write is read: 8-bit RGBA, not
-interlaced, its data inflated with the game's zlib.
+The embedded PNGs are the ones tools/hud_assets.py, title_assets.py and
+spartan_assets.py write. A menus folder's PNGs can be anyone's. Only 8-bit
+RGBA, non-interlaced PNGs are read, with their data inflated by the port's
+zlib (port/third_party/zlib).
 */
 
 #include "hud_hires.h"
@@ -24,13 +25,18 @@ interlaced, its data inflated with the game's zlib.
 #include "port_config.h"
 #include "xgpu.h"
 
-#include "memory/zlib/zlib.h"
+#include "zlib_prefixed.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
+
+/* a PNG's inflated rows and its texels, which are held at once: 128 MB for
+a 4096 by 4096 sheet (the largest shipped, 2048 by 2048, takes 32 MB), and
+no more for a small file that names a large size (a menus folder's) */
+#define MAXIMUM_DECODED_SIZE (192UL << 20)
 
 static struct
 {
@@ -141,6 +147,12 @@ static unsigned char *png_decode(const unsigned char *data, unsigned long size, 
 		!width || !height || width > 8192 || height > 8192 ||
 		data[24] != 8 || data[25] != 6 || data[28] != 0)
 		return NULL;
+	if (filtered_size + stride * height > MAXIMUM_DECODED_SIZE)
+	{
+		platform_log("png: %lux%lu is too large to decode (more than %lu MB)", width, height,
+			MAXIMUM_DECODED_SIZE >> 20);
+		return NULL;
+	}
 	*png_width = width;
 	*png_height = height;
 	compressed = malloc(size);

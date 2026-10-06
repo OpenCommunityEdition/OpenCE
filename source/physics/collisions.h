@@ -51,6 +51,9 @@ enum
 	_collision_test_try_to_keep_location_valid_bit,
 	_collision_test_skip_passthrough_bipeds_bit,
 	_collision_test_use_vehicle_physics_bit,
+	/* port: no players' bipeds (a player's own movement in a co-op game
+	without player collisions: network_coop_player_collisions) */
+	_collision_test_skip_player_bipeds_bit,
 
 	NUMBER_OF_COLLISION_TEST_FLAGS,
 

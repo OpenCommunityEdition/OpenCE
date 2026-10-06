@@ -25,6 +25,7 @@ BREAKABLE_SURFACES.C
 #include "sound/game_sound.h"
 #include "structures/structure_bsp_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- structures */
 
@@ -36,6 +37,21 @@ struct breakable_surface_globals
 };
 
 /* ---------- prototypes */
+
+/* port: cache_files.c's */
+boolean tag_index_is_group(long tag_index, long group_tag);
+
+/* port: a networked break carries no damage effect (the host already dealt
+it). Tag 0 is the scenario, and reading it as a damage effect stops the game */
+static struct damage_breaking_effect_definition const *breakable_surface_breaking_effect(
+	struct damage_data const *damage_data)
+{
+	static struct damage_breaking_effect_definition const none;
+
+	if (damage_data && tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
+		return &damage_effect_definition_get(damage_data->definition_index)->breaking_effect;
+	return &none;
+}
 
 /* January evaluates the j/k terms as one group in this translation unit.
    The shared helper must remain flat for its other exact consumers. */
@@ -160,7 +176,7 @@ void breakable_surface_damage(
 	if (globals->enabled)
 	{
 		if (breakable_surface_index != NONE &&
-			damage_data->definition_index != NONE &&
+			tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG) &&
 			damage_data->material_type != NONE)
 		{
 			struct breakable_surface_datum *surface = breakable_surface_get(breakable_surface_index);
@@ -189,6 +205,8 @@ void breakable_surface_damage(
 							BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
 
 							breakable_surface_effect(breakable_surface_index, damage_data, seed_surface_index);
+							/* port: and on network co-op's clients */
+							network_coop_note_surface_broken(breakable_surface_index, &damage_data->epicenter);
 						}
 					}
 				}
@@ -204,7 +222,11 @@ void breakable_surface_damage_area_of_effect(
 	const struct damage_data *damage_data)
 {
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
-	struct damage_effect_definition *damage_effect_definition = damage_effect_definition_get(damage_data->definition_index);
+	struct damage_effect_definition *damage_effect_definition;
+
+	if (!tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
+		return;
+	damage_effect_definition = damage_effect_definition_get(damage_data->definition_index);
 
 	if (globals->enabled &&
 		(damage_effect_definition->damage.damage_lower_bound != 0.0f || damage_effect_definition->damage.damage_upper_bound != 0.0f))
@@ -236,12 +258,40 @@ void breakable_surface_damage_area_of_effect(
 					breakable_surface_get(breakable_surface_index)->vitality = 0.0f;
 					BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
 					breakable_surface_effect(breakable_surface_index, damage_data, breakable_surface->collision_surface_index);
+					/* port: and on network co-op's clients */
+					network_coop_note_surface_broken(breakable_surface_index, &damage_data->epicenter);
 				}
 			}
 		}
 	}
 	
 	return;
+}
+
+void breakable_surface_port_break(
+	short breakable_surface_index,
+	real_point3d const *epicenter)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	struct structure_breakable_surface *breakable_surface;
+	struct damage_data damage;
+
+	if (breakable_surface_index < 0 || breakable_surface_index >= structure_bsp->breakable_surfaces.count ||
+		!breakable_surface_extant(breakable_surface_index))
+	{
+		return;
+	}
+	breakable_surface = TAG_BLOCK_GET_ELEMENT(&structure_bsp->breakable_surfaces, breakable_surface_index,
+		struct structure_breakable_surface);
+	/* (the shards fly away from the epicenter, all the effect reads) */
+	csmemset(&damage, 0, sizeof(damage));
+	damage.epicenter = *epicenter;
+	/* (and where it is, which the break's sound plays in: zeros were leaf
+	and cluster 0) */
+	scenario_location_from_point(&damage.location, epicenter);
+	breakable_surface_get(breakable_surface_index)->vitality = 0.0f;
+	BIT_VECTOR_SET_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index, FALSE);
+	breakable_surface_effect(breakable_surface_index, &damage, breakable_surface->collision_surface_index);
 }
 
 /* ---------- private code */
@@ -473,7 +523,7 @@ static void breakable_surface_effect(
 								struct new_particle_data particle;
 
 								velocity = *global_zero_vector3d;
-								breaking_effect = &damage_effect_definition_get(damage_data->definition_index)->breaking_effect;
+								breaking_effect = breakable_surface_breaking_effect(damage_data);
 								vector_from_points3d(&damage_data->epicenter, &position, &outward_vector);
 								distance = normalize3d(&outward_vector);
 

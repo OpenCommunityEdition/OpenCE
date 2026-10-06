@@ -52,6 +52,8 @@ the 640x480 menu screen (the PNG is a whole multiple of it), or a frame of a
 bitmap of the map: `<frame map="ui\shell\...\profile_options" index="1"/>`. (Or
 `frames="a.png b.png"` with one `width` and `height` for all.) A widget draws
 its bitmap from the top left, one unit to a texel, cut to the widget's size.
+A map's frame with a `width` and `height` is drawn scaled to that size
+instead, from `x` and `y` in the widget (0 if not given).
 A list's item shows frame 1 while it has the focus and frame 0 otherwise, if
 the bitmap has exactly two frames; the game's functions choose others.
 
