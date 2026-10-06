@@ -610,6 +610,39 @@ void halo_input_name(int input, char *name, size_t size)
 		snprintf(name, size, "%s", "");
 }
 
+/* a binding's name as the keyboard's layout labels the key: config.toml
+names a key by where it sits (its scancode, named as on a US keyboard), so
+WASD stays under the fingers on any layout, as Halo PC's DirectInput keys
+did, but the menus show what is printed on it: the zoom key "Z" (the key
+right of the left Shift) shows as Y on a German keyboard. A key with no
+character of its own (Space, Left Shift, the keypad's) keeps its name, as
+does one whose character the menus' font has not (beyond Latin-1). */
+void halo_input_shown_name(const char *binding, char *shown, size_t size)
+{
+	int input = halo_input_from_name(binding);
+	SDL_Keycode key;
+
+	snprintf(shown, size, "%s", binding);
+	if (input < 0 || input >= SDL_SCANCODE_COUNT)
+		return;
+	/* (as in key events: the French number row shows its numbers, and a
+	non-Latin layout's letters the US ones) */
+	key = SDL_GetKeyFromScancode((SDL_Scancode)input, SDL_KMOD_NONE, true);
+	if (key == ',')
+		snprintf(shown, size, "%s", "Comma");
+	else if (key > ' ' && key < 0x7f)
+		snprintf(shown, size, "%c", key >= 'a' && key <= 'z' ? (char)(key - 'a' + 'A') : (char)key);
+	else if (key >= 0xa1 && key <= 0xff && size >= 2)
+	{
+		/* (Latin-1, a byte the menus take as its character; the small
+		letters made capitals but for sharp s and y with diaeresis) */
+		if (key >= 0xe0 && key <= 0xfe && key != 0xf7)
+			key -= 0x20;
+		shown[0] = (char)key;
+		shown[1] = 0;
+	}
+}
+
 static void bindings_read(void)
 {
 	int action;
