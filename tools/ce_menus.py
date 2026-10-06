@@ -153,7 +153,7 @@ WIRED = {
     "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
     "load game menu delete request", "load game menu delete finish",
     "controls screen init", "controls begin binding", "controls screen change set", "controls screen defaults",
-    "controls update menu", "profile manager select", "direct ip connect go",
+    "controls update menu", "profile manager select", "direct ip connect go", "ss edit server password",
 }
 
 # ---------- HEK tags

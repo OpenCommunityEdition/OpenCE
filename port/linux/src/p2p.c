@@ -2401,7 +2401,8 @@ void p2p_new_invite_if_listed(void)
 	if (!p2p.has_token || !p2p.token_listed)
 		return;
 	make_invite();
-	platform_log("Internet play: the game is private now, with a new invite: %s", p2p.invite);
+	platform_log("Internet play: a new invite, so that the one listed lets no one in (private, or a new password): %s",
+		p2p.invite);
 	if (p2p.hosting)
 	{
 		p2p_signal_host(p2p.token);

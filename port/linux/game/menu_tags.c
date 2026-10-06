@@ -360,6 +360,8 @@ static char const *const port_function_names[] =
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
+	/* (the server browser's password screen) */
+	"port password init", "port password edit", "port password join", "port password back",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -377,6 +379,7 @@ static char const *const port_game_data_input_names[] =
 	/* (the gametype editor's: the Xbox's stops the game on the buttons'
 	row; the Xbox's read only player_ui's gametype, not Server Setup's) */
 	"game settings lists text update", "get edit game settings name", "mp edit profile set rule text",
+	"port password update",
 };
 
 static struct

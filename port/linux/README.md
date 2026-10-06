@@ -465,10 +465,18 @@ Each new game starts as PUBLIC (`network.host_public = false` makes new
 games start as PRIVATE). An online co-op game starts as PRIVATE, and keeps
 the last choice of its LISTING (`network.coop_public`). A LAN game is never listed. `network.public_lobby = false` turns the server browser off.
 
+A PUBLIC game can also have a PASSWORD (a row of Server Setup, below
+LISTING). The Server Browser shows a lock at the left of a game with a
+password. A player who selects that game must type the password, and JOIN
+GAME joins only with the correct password. The invite link of the game joins
+it without the password. The host keeps the password only while the game
+runs.
+
 In the Server Browser, select a game to join it. The game joins the invite
 of the game, as for a link. When it reaches the host, it opens the lobby.
-If it cannot reach the host in 30 seconds, it marks the game FAILED. REFRESH
-asks the hosts for their listings again.
+If it cannot reach the host in 30 seconds, it marks the game FAILED. A game
+that is full or starting shows CLOSED. REFRESH asks the hosts for their
+listings again.
 
 How it operates (`src/p2p_lobby.c`):
 
@@ -490,6 +498,14 @@ How it operates (`src/p2p_lobby.c`):
   seconds.
 - When a public game becomes private, the host makes a new invite. Thus a
   player who saw the listing cannot join with the old invite.
+- The listing of a game with a password does not hold the invite in clear
+  text. The secret part of the invite (its token) is encrypted with a key
+  from the password (Argon2id, salted with the key of the host, then
+  XChaCha20-Poly1305). The browser makes the key from the password that the
+  player types, and opens the invite only if the password is correct. When
+  the host sets or changes the password, it makes a new invite. A player who
+  has the listing can try passwords on their own machine without the host,
+  so use a long password.
 
 A public game does not publish the address of the host. But any machine
 with the invite can ask the host to connect, and the host then sends its
