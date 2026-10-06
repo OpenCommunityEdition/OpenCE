@@ -46,7 +46,7 @@ measurement). The desktop builds' cache is 256 MB, half their 512 MB memory
 window (port/linux/src/platform.h), whose pages are backed as they are used.
 Android's window is 128 MB, and its cache the Xbox's. */
 
-#ifdef HALO_ANDROID
+#ifdef HALO_ARM64_GUEST
 #define HALO_PORT_TEXTURE_CACHE_PAGE_COUNT 0x580 /* (0x580) */
 #else
 #define HALO_PORT_TEXTURE_CACHE_PAGE_COUNT 0x4000 /* (0x580) */
@@ -62,7 +62,7 @@ over a map's (loose_sounds.c), are longer than the Xbox maps' and fill it (a
 campaign map's dialogue and music did, "SOUND CACHE BLOWN" in debug.txt).
 The desktop builds' cache is 16 MB; Android's window keeps the Xbox's. */
 
-#ifdef HALO_ANDROID
+#ifdef HALO_ARM64_GUEST
 #define HALO_PORT_SOUND_CACHE_SIZE 0x400000 /* (0x400000) */
 #else
 #define HALO_PORT_SOUND_CACHE_SIZE 0x1000000 /* (0x400000) */

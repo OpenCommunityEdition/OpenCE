@@ -329,7 +329,7 @@ BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instru
 /* ---------- translation */
 
 static const char shader_prologue[] =
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	/* the #version line comes first, from the context's capabilities */
 	"precision highp float;\n"
 	"precision highp int;\n"
@@ -389,7 +389,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 	struct xgpu_text text = { 0 };
 	unsigned long index;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
 #endif
 	xgpu_text_append(&text, "%s", shader_prologue);
@@ -565,7 +565,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tif (!(abs(position.w) > 0.0))\n"
 		"\t\tposition = vec4(0.0, 0.0, 0.0, -1.0);\n"
 		"\tgl_Position = position;\n"
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
 		GL: rows from the top, depth 0..1 */
 		"\tgl_Position.y = -gl_Position.y;\n"
