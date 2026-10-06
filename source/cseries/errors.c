@@ -277,6 +277,11 @@ void error(
 			va_end(argument_list);
 			csstrcat(string, "\r\n");
 
+			/* (port: the file first: printing used to halt on a long line
+			while this call still held the lock, and the reason never reached
+			debug.txt) */
+			write_to_error_file(string, TRUE);
+
 			/* (port: on screen as config.toml's game.console_log says: an
 			assert that stops the game, and what a command someone typed
 			logs (its answer), always; the rest, the game's chatter.
@@ -287,7 +292,6 @@ void error(
 			{
 				terminal_printf(global_real_argb_white, "%s", string);
 			}
-			write_to_error_file(string, TRUE);
 
 			new_size = csstrlen(string);
 			if (error_globals.message_buffer_size+new_size >= ERROR_MESSAGE_BUFFER_MAXIMUM_SIZE)

@@ -31,6 +31,11 @@ void hud_tick_shield(
 	long player_index,
 	real amount);
 
+/* port: network co-op (port/linux/game/network_coop.c) */
+long hud_unit_port_script_flags(
+	void);
+void hud_unit_port_set_script_flags(
+	long flags);
 void scripted_hud_show_health(
 	boolean show);
 void scripted_hud_blink_health(

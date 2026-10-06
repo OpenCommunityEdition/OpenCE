@@ -22,6 +22,14 @@ enum cached_map_file_precache_state
 	NUMBER_OF_CACHED_MAP_FILE_PRECACHE_STATES,
 };
 
+/* port: what a read's completion flag is set to when the read failed or came
+up short (cache_file_read): not FALSE, so whatever waits on it stops
+waiting, but not TRUE either, so a caller that checks can tell */
+enum
+{
+	_cache_file_read_failed = 2,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -37,8 +45,10 @@ struct cache_file_structure_bsp_header;
 struct tag_iterator
 {
 	byte reserved0[4];
-	short absolute_index;
-	byte reserved6[10];
+	/* port: a long, as the tags' count is (a short wrapped on a count past
+	0x7FFF, and the walk never ended); the struct keeps its size */
+	long absolute_index;
+	byte reserved8[8];
 	long group_tag;
 };
 

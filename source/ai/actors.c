@@ -317,6 +317,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "networking/network_game_globals.h"
 
 /* ---------- constants */
 
@@ -2224,6 +2225,12 @@ long actor_new(
 	long actor_definition_index;
 	long actor_index = NONE;
 
+	/* port: a client of the distributed netcode runs no AI: it has the host's
+	actors' units, driven as the host sends them (port/linux/game/network_actors.c),
+	and its own (placed at the map's start or by its scripts) would be extras
+	the host doesn't have */
+	if (network_game_distributed_client())
+		return NONE;
 	if (actor_variant_definition_index != NONE)
 	{
 		actor_variant_definition = actor_variant_definition_get(actor_variant_definition_index);
@@ -2662,6 +2669,9 @@ long actor_place(
 	long unit_index;
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actors.c", 603, starting_location);
+	/* port: none on a client of the distributed netcode (actor_new) */
+	if (network_game_distributed_client())
+		return NONE;
 	objects_garbage_collection();
 
 	actor_variant_definition =
@@ -2831,7 +2841,8 @@ short actors_spawn_from_unit(
 {
 	short spawned_actor_count = 0;
 
-	if (actor_variant_definition_index != NONE && actor_count > 0)
+	/* port: none on a client of the distributed netcode (actor_new) */
+	if (actor_variant_definition_index != NONE && actor_count > 0 && !network_game_distributed_client())
 	{
 		struct unit_datum *source_unit = unit_get(unit_index);
 		long source_actor_index = source_unit->unit.swarm_actor_index != NONE ?

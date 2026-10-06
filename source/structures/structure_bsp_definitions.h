@@ -228,8 +228,10 @@ struct structure_collision_material
 
 /* ---------- prototypes/STRUCTURE_BSP_DEFINITIONS.C */
 
+/* port: whether a map's bsp fits what the engine holds of one */
+boolean structure_bsp_port_verify(struct structure_bsp const *structure_bsp);
 unsigned long *structure_bsp_get_cluster_pvs(struct structure_bsp *structure_bsp, short cluster_index);
-void structure_bsp_find_material_for_surface(struct structure_bsp *structure, long surface_index, short *lightmap_index, short *material_index);
+boolean structure_bsp_find_material_for_surface(struct structure_bsp *structure, long surface_index, short *lightmap_index, short *material_index);
 void vertex_type_from_shader_tag(unsigned long group_tag, short *vertex_type, short *lightmap_vertex_type, boolean compressed);
 byte *structure_bsp_get_cluster_encoded_sound_data(struct structure_bsp *structure_bsp, short row_index, short column_index);
 byte structure_bsp_get_cluster_encoded_sound_distance(struct structure_bsp *structure_bsp, short from_cluster_index, short to_cluster_index);

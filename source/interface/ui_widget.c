@@ -662,6 +662,7 @@ struct widget_instance;
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
@@ -3697,7 +3698,10 @@ static void widget_instance_initialize(
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
-	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit);
+	/* port: a network co-op game never pauses (it opens the campaign's pause
+	screen, which would) */
+	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
+		!network_coop_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -7181,7 +7185,10 @@ static boolean ui_check_for_pause_game(
 						network_game_client_get_machine_index(client);
 					char const *widget_name;
 
-					switch (local_player_count)
+					/* port: a campaign map has only the campaign's pause screen */
+					if (network_coop_active())
+						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
+					else switch (local_player_count)
 					{
 					case 1:
 						widget_name =

@@ -2,8 +2,9 @@
 """Embeds the high-res HUD textures (port/assets/hud, made by
 tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), the fonts the text is drawn with
-(port/assets/fonts) and the menus' files (port/assets/menus, made by
-tools/ce_menus.py) in the game as C data:
+(port/assets/fonts), the menus' files (port/assets/menus, made by
+tools/ce_menus.py) and SMAA's shader and lookup textures
+(port/third_party/smaa) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -35,6 +36,10 @@ FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
+# SMAA's files and the names port/linux/src/xgpu_post.c declares them by
+SMAA_ASSETS = Path("port/third_party/smaa")
+SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
+              ("search_tex.zlib", "xgpu_smaa_search_texture"))
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -63,13 +68,17 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def smaa_files() -> List[tuple]:
+    """SMAA's files that the checkout has, with their symbols."""
+    return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
+
+
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
     inputs = [listing for listing in (LAYOUT, TITLE_LIST, FONT_LIST, MENU_LIST) if (ROOT / listing).is_file()]
-    if not inputs:
-        return []
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
-            *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files())]
+            *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
+            *(SMAA_ASSETS / name for name, _ in smaa_files())]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -81,6 +90,8 @@ def hud_configure_inputs() -> List[Path]:
                             (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
+    if (ROOT / SMAA_ASSETS).is_dir():
+        inputs.append(SMAA_ASSETS)
     return inputs
 
 
@@ -93,11 +104,10 @@ def words(data: bytes) -> List[str]:
 
 
 def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
-    """Emits the rule that generates output; returns [output], or nothing
-    when there are no assets."""
+    """Emits the rule that generates output; returns [output]. It is made
+    whatever assets the checkout has (with none, its tables are empty), so
+    that the symbols the platform layer refers to are always defined."""
     inputs = hud_asset_inputs()
-    if not inputs:
-        return []
     n.rule(
         name=f"{prefix}_embed_assets",
         command="$python tools/embed_assets.py $out",
@@ -146,6 +156,8 @@ def main() -> None:
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)
+    if not table:
+        lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int hud_hires_embedded_count = {len(table)};")
     lines.append("")
@@ -192,6 +204,23 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    lines.append("")
+    # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
+    # and its lookup textures (xgpu_post.c); each of size 0 that the
+    # checkout does not have. Android has no SMAA.
+    lines.append("#ifndef HALO_ANDROID")
+    present = dict(smaa_files())
+    for name, symbol in SMAA_FILES:
+        data = (ROOT / SMAA_ASSETS / name).read_bytes() if name in present else b""
+        if data and name.endswith(".hlsl"):
+            data = bytes(byte if byte < 0x80 else 0x20 for byte in data) + b"\0"
+        lines.append("")
+        lines.append(f"const unsigned int {symbol}[] = {{")
+        lines.extend(words(data) if data else ["\t0,"])
+        lines.append("};")
+        lines.append(f"const unsigned long {symbol}_size = {len(data)};")
+    lines.append("")
+    lines.append("#endif")
     output = Path(sys.argv[1])
     output.parent.mkdir(parents=True, exist_ok=True)
     text = "\n".join(lines) + "\n"

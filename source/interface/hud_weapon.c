@@ -480,6 +480,20 @@ void scripted_hud_show_crosshair(
 	return;
 }
 
+/* port: the scripts' crosshair flag, for network co-op
+(port/linux/game/network_coop.c) */
+long hud_weapon_port_script_flags(
+	void)
+{
+	return weapon_hud_globals->script_flags;
+}
+
+void hud_weapon_port_set_script_flags(
+	long flags)
+{
+	weapon_hud_globals->script_flags = flags;
+}
+
 static struct weapon_hud_state *get_hud_state(
 	short local_player_index)
 {

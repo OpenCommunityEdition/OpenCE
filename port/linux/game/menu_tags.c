@@ -44,6 +44,8 @@ no screen pauses the game (a network game's clock runs on).
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
 char const *config_string(char const *name);
+int platform_display_resolutions(long *widths, long *heights, int maximum);
+int platform_window_sizes(long *widths, long *heights, int maximum);
 
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
@@ -340,6 +342,7 @@ static char const *const port_function_names[] =
 	"mp level select", "mp profiles list initialize", "mp profiles list dispose", "mp profile set for game",
 	"port lobby preview join",
 	"port setup edit",
+	"port map list back",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
@@ -700,6 +703,41 @@ static long split(char const *text, char const **pieces)
 	return count;
 }
 
+/* a spinner's strings, or its values, split: its own, but Video Setup's
+sizes are the display's (sdl_platform.c), shown "1920 x 1080" and set
+"1920x1080": its resolutions after Resolution's own (NATIVE), and the
+window sizes that fit it in place of Window Size's own */
+static long spinner_split(struct halo_menu_widget const *widget, boolean values, char const **pieces)
+{
+	long count = split(values ? widget->values : widget->strings, pieces);
+	long widths[MAXIMUM_STRINGS], heights[MAXIMUM_STRINGS];
+	long added, index;
+
+	if (widget->setting && !strcmp(widget->setting, "display.resolution"))
+		added = platform_display_resolutions(widths, heights, (int)(MAXIMUM_STRINGS - count));
+	else if (widget->setting && !strcmp(widget->setting, "display.window_size"))
+	{
+		added = platform_window_sizes(widths, heights, MAXIMUM_STRINGS);
+		if (added > 0)
+			count = 0;
+	}
+	else
+		return count;
+	for (index = 0; index < added; index++)
+	{
+		char text[32];
+		char *piece;
+
+		snprintf(text, sizeof(text), values ? "%ldx%ld" : "%ld x %ld", widths[index], heights[index]);
+		piece = allocate((long)strlen(text) + 1);
+		if (!piece)
+			break;
+		strcpy(piece, text);
+		pieces[count++] = piece;
+	}
+	return count;
+}
+
 static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 {
 	struct bitmap_group *group = allocate(sizeof(struct bitmap_group));
@@ -914,7 +952,7 @@ static void setting_add(struct halo_menu_widget const *source, long definition_i
 	setting->definition_index = definition_index;
 	setting->setting = source->setting;
 	setting->loaded_index = NONE;
-	setting->value_count = split(source->values, setting->values);
+	setting->value_count = spinner_split(source, TRUE, setting->values);
 }
 
 /* a font: large, small, terminal, or the map's by its path */
@@ -1207,6 +1245,14 @@ static struct cache_file_tag_instance *instances_grow(long count, long *first_in
 
 	if (!instances)
 		return NULL;
+	/* (every tag's absolute index fits a tag index's 16 bits, short of
+	NONE's, and the table's size cannot wrap: the map's count was checked
+	as it loaded, cache_files.c, and is again) */
+	if (existing < 0 || count < 0 || existing > UNSIGNED_SHORT_MAX - count)
+	{
+		platform_log("menus: %ld tags and the map's %ld are too many for a tag table", count, existing);
+		return NULL;
+	}
 	grown = allocate((existing + count) * sizeof(*grown));
 	if (!grown)
 		return NULL;
@@ -1639,7 +1685,7 @@ void menu_tags_loaded(
 		if (widget->strings)
 		{
 			char const *pieces[MAXIMUM_STRINGS];
-			long count = split(widget->strings, pieces);
+			long count = spinner_split(widget, FALSE, pieces);
 
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.spinner_tags[index], widget->name, " strings",
 				string_list_build(pieces, count));

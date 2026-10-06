@@ -2486,8 +2486,12 @@ boolean hs_compile_postprocess(
 				long predicate_index = hs_syntax_get(expression_index)->data;
 				struct hs_syntax_node *predicate;
 
+				/* port: a predicate that isn't a node (a map's) is as corrupt
+				as one that isn't a function name, where hs_syntax_get's NULL
+				was gone through */
 				if (predicate_index == NONE ||
-					(predicate = hs_syntax_get(predicate_index))->type != _hs_function_name)
+					!(predicate = datum_try_and_get(hs_syntax_data, predicate_index)) ||
+					predicate->type != _hs_function_name)
 				{
 					hs_compile_globals.error = "corrupt syntax tree (you need to recompile scripts.)";
 					success = FALSE;
