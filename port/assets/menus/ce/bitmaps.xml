@@ -302,6 +302,7 @@
 		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__6.png" width="512" height="256"/>
 		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\profile_options" index="3"/>
 		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__8.png" width="512" height="256"/>
+		<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5.png" width="512" height="256"/>
 		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="4" width="279" height="279" y="34"/>
 		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="5" width="279" height="279" y="34"/>
 		<frame map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\controller_edit\config_controller" index="6" width="279" height="279" y="34"/>
@@ -346,5 +347,11 @@
 	</bitmap>
 	<bitmap name="blank">
 		<frame png="ce/port/blank__0.png" width="4" height="4"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/vr_controls/header_vr_controls">
+		<frame png="ce/port/main_menu/settings_select/player_setup/player_profile_edit/vr_controls/header_vr_controls.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display">
+		<frame png="ce/port/main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display.png" width="512" height="64"/>
 	</bitmap>
 </menus>

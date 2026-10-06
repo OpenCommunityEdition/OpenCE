@@ -20,7 +20,11 @@ Video and Network Setup), which `tools/port_settings.py` writes in their
 style with what this port has to set: config.toml's settings (a window or
 the full screen, the frame rate, the volumes, internet play, the
 multiplayer HUD), the profile's controller settings, and the keyboard and
-mouse's controls.
+mouse's controls; and the VR build's VR Setup (VR Controls and VR
+Display, from an item of the profile menu with `platform="vr"`).
+`python3 tools/port_settings.py` writes those screens alone, which need
+none of the PC version's tags: a value added to a setting's spinner is one
+more pair in its row there.
 
 To change the menus without building the game, put files in a `menus` folder
 next to `config.toml`. A file with the same path as one here replaces it. On
@@ -94,7 +98,7 @@ be a child of many).
 | `description` | A column list's extended description: a widget |
 | `controller` | `1` to `4`, or `any` (the default); a `<child>`'s or `child_controller`: the one it is for |
 | `auto_close`, `auto_close_fade` | It closes itself after this many milliseconds, fading for this many |
-| `platform` | `desktop` or `android`: it is only there. Every element takes this. |
+| `platform` | `desktop` or `android`: it is only there; `vr`: only in the VR build while it plays in the headset. Every element takes this. |
 
 Widget flags: `pass_unhandled_to_focused_child` (an event it does not handle
 goes to its focused child: a screen needs it for its list to get events),

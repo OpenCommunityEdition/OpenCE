@@ -164,6 +164,95 @@ SCREENS = {
     },
 }
 
+# ---------- VR Setup (the VR build's, HALO_VR: port/linux/src/vr.c), its
+# item in the profile menu only while the game runs in VR (platform "vr").
+# Two screens: what the hands do, then where things are. Its settings are
+# read again as config.toml changes (vr.c, settings_read), but those marked
+# RESTART, which open the headset's session. A row with a screen in place
+# of a setting opens it (VR_LINK), after saving this screen's.
+# (A value added to a setting is one more (shown, value) pair here, then
+# python3 tools/port_settings.py writes the screens' files.)
+
+RESTART = "(RESTART)"
+VR_HANDS = [("ARMS", "arms"), ("FLOATING HANDS", "floating"), ("GAME ARMS", "game")]
+VR_AIM = [("CONTROLLER", "controller"), ("HEAD", "head"), ("GAMEPAD", "gamepad")]
+VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
+VR_SCREENS = {
+    "vr_controls": {
+        "screen": "vr_controls_screen",
+        "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
+        "spacing": 28,
+        "rows": [
+            ("HANDS:", "vr.hands", VR_HANDS,
+             "Aiming with the controller, your hands: with arms\nfrom the shoulders, floating, or the game's arms.",
+             None),
+            ("AIM:", "vr.aim", VR_AIM,
+             "What aims: the right controller, which holds the\nweapon, your head, or a gamepad's right stick.", None),
+            ("GAMEPAD VIEW:", "vr.gamepad_view", [("CAMERA", "camera"), ("LEVEL", "level"), ("SNAP", "snap")],
+             "With a gamepad, the right stick turns and\npitches the view, only turns it, or in steps.", None),
+            ("TWO-HANDED AIM:", "vr.two_handed", ON_OFF,
+             "The left grip holds a long gun by its foregrip:\nit aims along the line between your hands.", None),
+            ("PUNCH TO MELEE:", "vr.melee_gesture", ON_OFF,
+             "A punch of the right controller melees, as B does.", None),
+            ("TURNING:", "vr.turn", [("SNAP", "snap"), ("SMOOTH", "smooth")],
+             "How the right stick turns you: in steps, or\ncontinuously.", None),
+            ("SNAP TURN ANGLE:", "vr.snap_turn_angle",
+             [(f"{angle} DEGREES", str(angle)) for angle in (15, 22.5, 30, 45, 60, 90)],
+             "How far each snap turn turns you.", None),
+            ("SMOOTH TURN SPEED:", "vr.smooth_turn_speed",
+             [(f"{speed} DEG/S", str(speed)) for speed in (60, 90, 120, 150, 180, 240, 300, 360)],
+             "How fast smooth turning turns you, the stick\npushed all the way: degrees a second.", None),
+            ("VEHICLE VIEW:", "vr.vehicle_view", [("FIRST PERSON", "first_person"), ("THIRD PERSON", "third_person")],
+             "In a vehicle's seat, the view from your head, or\nthe game's camera following the vehicle.", None),
+            ("HEIGHT, HUD, MENUS...", None, VR_DISPLAY,
+             "Your height, the world's scale, the HUD, the\nmenus and the headset's resolution.", None),
+        ],
+    },
+    "vr_display": {
+        "screen": "vr_display_screen",
+        "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
+        "spacing": 28,
+        "rows": [
+            (f"POSITION {RESTART}:", "vr.height", [("SEATED", "seated"), ("STANDING", "standing")],
+             "Seated: your eyes where they are when you\nrecentre. From the next time the game starts.", None),
+            ("EYE HEIGHT:", "vr.player_height",
+             [(f"{height / 100:.2f} M", f"{height / 100:g}") for height in range(140, 205, 5)],
+             "Standing, the height of your eyes above the\nfloor.", None),
+            ("WORLD SCALE:", "vr.world_scale",
+             [(f"{scale:g}X", f"{scale:g}") for scale in (0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5)],
+             "How large the world looks: more than 1 makes it\nlarger, and you smaller in it.", None),
+            ("HUD DISTANCE:", "vr.hud_distance",
+             [(f"{distance:.1f} M", f"{distance:g}") for distance in (1, 1.5, 2, 2.5, 3, 4, 5)],
+             "How far in front of your eyes the HUD is.", None),
+            ("HUD SIZE:", "vr.hud_size",
+             [(f"{size} DEGREES", str(size)) for size in (40, 50, 60, 70, 80, 90, 100)],
+             "How wide the HUD is, in degrees of your view.", None),
+            ("MENU DISTANCE:", "vr.menu_distance",
+             [(f"{distance:.1f} M", f"{distance:g}") for distance in (1.5, 2, 2.5, 3, 3.5, 4)],
+             "How far in front of you the menus are.", None),
+            ("MENU WIDTH:", "vr.menu_width",
+             [(f"{width:.1f} M", f"{width:g}") for width in (1.6, 2, 2.3, 2.6, 3, 3.5, 4)],
+             "How wide the menus are.", None),
+            (f"RESOLUTION {RESTART}:", "vr.resolution_scale",
+             [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5)],
+             "Of the size the headset recommends: less is\nfaster, more sharper. From the next start.", None),
+            (f"REFRESH RATE {RESTART}:", "vr.refresh_rate",
+             [("HEADSET'S", "0"), *((f"{rate} HZ", str(rate)) for rate in (72, 80, 90, 120, 144))],
+             "The headset's rate, if it offers it; the game\ndraws a frame each refresh. From the next start.",
+             None),
+        ],
+    },
+}
+SCREENS.update(VR_SCREENS)
+# the profile menu's VR Setup item (in VR only), below About, its
+# description and picture the list's tenth (the video settings' picture)
+VR_ITEM = f"{PE}/vr_setup_profile_item"
+FRAMES_ADDED = {
+    f"{PE}/profile_options": [
+        '<frame png="ce/shell/main_menu/settings_select/player_setup/player_profile_edit/profile_options__5.png" '
+        'width="512" height="256"/>'],
+}
+
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
 CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
@@ -181,6 +270,8 @@ STRING_OVERRIDES = {
         "Internet play, updates and the\\nmultiplayer HUD.\\n\\nProfile:",
         "Change the current profile's\\nfree-for-all multiplayer color.\\n\\nProfile:",
         "Halo: Combat Evolved, the Xbox\\ngame, on this computer.\\n\\nProfile:",
+        # (VR Setup's, in VR only)
+        "Your hands, aiming, turning,\\nthe HUD and the menus in VR.\\n\\nProfile:",
     ],
 }
 
@@ -248,6 +339,23 @@ def _setting_screen(folder: str, spec: dict) -> list:
     rows, extra = [], []
     place = -1
     for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
+        if setting is None:
+            # (a row that opens another screen, choices: its widget)
+            key = choices.rsplit("/", 1)[1]
+            row = f"{base}/op_{key}"
+            place += 1
+            rows.append((row, platform, place))
+            extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                                   ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                             [f'<on event="a" run="port settings save" open="{choices}"/>',
+                              f'<on event="start" run="port settings save" open="{choices}"/>',
+                              '<on event="left_mouse" run="mouse emit accept event"/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_label")])}/>'])
+            extra += _widget(f"{base}/{key}_label",
+                             [("type", "text"), ("controller", 1), ("width", 480), ("height", 22),
+                              ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
+                              ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+            continue
         key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
         if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
@@ -332,11 +440,22 @@ def _controls_screen() -> list:
                    extra)
 
 
+def _vr_item() -> list:
+    """the profile menu's VR Setup item, below About (as its items are)"""
+    return _widget(VR_ITEM, [("type", "text"), ("left", 51), ("top", 375), ("width", 232), ("height", 32),
+                             ("bitmap", "bitmaps/list_item_bkd"), ("text", "VR SETUP"), ("font", "ui\\large_ui"),
+                             ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
+                   [f'<on event="a" open="{PE}/vr_controls/vr_controls_screen"/>',
+                    f'<on event="start" open="{PE}/vr_controls/vr_controls_screen"/>',
+                    '<on event="left_mouse" run="mouse emit accept event"/>'])
+
+
 def settings_files() -> dict:
     """the files of the port's screens, by their names in ce/"""
     files = {}
     for folder, spec in SCREENS.items():
         files[f"{PE}/{folder}".replace("/", ".") + ".xml"] = _setting_screen(folder, spec)
+    files[f"{PE}/vr_controls".replace("/", ".") + ".xml"] += _vr_item()
     files[f"{PE}/controls_setup".replace("/", ".") + ".xml"] = _controls_screen()
     return {name: ['<?xml version="1.0" encoding="UTF-8"?>',
                    "<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->",
@@ -510,6 +629,9 @@ WIDGET_PATCHES = {
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
+    # (VR Setup, below About, in VR only: _vr_item)
+    f"{PE}/profile_edit_select_list": {"insert_before": {
+        f"{PE}/profile_edit_button_bar": [f'<child widget="{VR_ITEM}" platform="vr"/>']}},
     # (the PC's Vehicles row's Start opened Item Options)
     "main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item": {"handlers": [
         '<on event="a" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>',
@@ -540,6 +662,8 @@ BITMAP_FRAMES = {
 # the titles this port has that the PC version has not, set as its headers
 # are (port/assets/menus/port_svg): bitmap name, text
 TITLES = {
+    f"{PE}/vr_controls/header_vr_controls": "VR CONTROLS",
+    f"{PE}/vr_display/header_vr_display": "VR DISPLAY",
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "DIRECT LINK",
     f"{MT}/join_game/header_password": "PASSWORD",
@@ -1179,3 +1303,20 @@ def multiplayer_files() -> dict:
 
 
 REPLACED_FOLDERS = [f"{MT}/server_settings"]
+
+
+def main() -> None:
+    """writes the port's own screens' files (port/assets/menus/ce), as
+    tools/ce_menus.py does with the rest, which needs the PC version's tags:
+    for a change to them alone (a value added to a setting's spinner).
+    A new file is listed in menus.json by hand, a new title drawn by
+    ce_menus.py"""
+    from pathlib import Path
+
+    folder = Path(__file__).resolve().parent.parent / "port/assets/menus/ce"
+    for name, lines in [*settings_files().items(), *multiplayer_files().items()]:
+        (folder / name).write_text("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

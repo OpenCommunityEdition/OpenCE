@@ -81,6 +81,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_settings_profile_item"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/color_profile_item" y="32"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/about_item" y="32"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_setup_profile_item" platform="vr"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/profile_edit_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/profile_label" type="text" controller="1" width="400" height="22" font="ui\large_ui" color="#FFFFFFFF">

@@ -23,6 +23,9 @@ high-res HUD's are (hud_hires.c).
 #include "platform.h"
 #include "port_config.h"
 #include "xgpu.h"
+#ifdef HALO_VR
+#include "vr.h"
+#endif
 
 #include "expat.h"
 
@@ -387,7 +390,8 @@ static long current_line(struct reader *reader)
 	return (long)XML_GetCurrentLineNumber(reader->parser);
 }
 
-/* whether the element is for this platform (its platform attribute) */
+/* whether the element is for this platform (its platform attribute):
+"desktop", "android", or "vr" (the VR build, playing in the headset) */
 static int for_this_platform(struct reader *reader, const XML_Char **attributes)
 {
 	int index;
@@ -398,9 +402,17 @@ static int for_this_platform(struct reader *reader, const XML_Char **attributes)
 		{
 			const char *platform = attributes[index + 1];
 
+			if (!strcmp(platform, "vr"))
+			{
+#ifdef HALO_VR
+				return halo_vr_running();
+#else
+				return 0;
+#endif
+			}
 			if (strcmp(platform, "desktop") && strcmp(platform, "android"))
 			{
-				reader_error(reader, "platform=\"%s\" is not \"desktop\" or \"android\"", platform);
+				reader_error(reader, "platform=\"%s\" is not \"desktop\", \"android\" or \"vr\"", platform);
 				return 1;
 			}
 #ifdef HALO_ANDROID

@@ -366,6 +366,8 @@ class Art:
             self.draw(relative, index, len(data), width, height, MENUS / png, self.shown.get(tag, []))
             self.pngs.append(png)
             lines.append(f"\t\t<frame{attributes([('png', png), ('width', width), ('height', height)])}/>")
+        # (frames of the port's items: tools/port_settings.py)
+        lines += [f"\t\t{line}" for line in port_settings.FRAMES_ADDED.get(our_name(tag), [])]
         # (the port's frames after them: the Xbox map's, scaled)
         for source, index, width, height, x, y in port_settings.BITMAP_FRAMES.get(our_name(tag), []):
             self.added_frames.append((our_name(tag), source, index))
