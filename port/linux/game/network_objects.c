@@ -245,7 +245,11 @@ struct distributed_object_change
 	byte change;
 	byte flags;
 	byte owner_player_index;
-	byte pad;
+	/* which bitmap of its shaders it draws with, when not its tag's (0). An
+	AI unit's actor variant sets it after the unit is made
+	(actor_customize_unit): the Elite major's and commander's armor are 1
+	and 2. Builds before it sent 0 here. */
+	byte forced_shader_permutation_index;
 	long object_index;
 	long definition_index;
 	short owner_team_index;
@@ -1004,6 +1008,7 @@ static void distributed_change_from_object(
 	change->owner_player_index = distributed_player_to_byte(object->object.owner_player_index);
 	change->owner_team_index = object->object.owner_team_index;
 	change->variant_number = object->object.variant_number;
+	change->forced_shader_permutation_index = (byte)PIN(object->object.forced_shader_permutation_index, 0, 0xFF);
 	change->position = object->object.position;
 	change->forward = object->object.forward;
 	change->up = object->object.up;
@@ -2155,6 +2160,8 @@ static void distributed_client_apply_change(
 	struct object_datum *object = object_get(object_index);
 
 	csmemcpy(object->object.base_change_colors, change->change_colors, sizeof(object->object.base_change_colors));
+	if (change->forced_shader_permutation_index)
+		object->object.forced_shader_permutation_index = change->forced_shader_permutation_index;
 	/* (and the colors drawn, which object_new chose from the tag: an AI unit's
 	are its variant's, set after it was made, actors.c) */
 	{
