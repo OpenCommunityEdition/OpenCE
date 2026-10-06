@@ -1531,9 +1531,10 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 }
 
 /* the list's buttons: SETTINGS (and the host's END GAME) put before LEAVE
-GAME (quit); returns how many were added */
+GAME (quit); returns how many were added, and how much taller the list
+grew for them (growth) */
 static long pause_list_patch(struct cache_file_tag_instance *instances, struct ui_widget_definition *list, long quit,
-	boolean host)
+	boolean host, short *growth)
 {
 	struct ui_widget_child_reference *children = list->child_widgets.address;
 	long count = list->child_widgets.count, added = host ? 2 : 1, child;
@@ -1575,8 +1576,25 @@ static long pause_list_patch(struct cache_file_tag_instance *instances, struct u
 	}
 	list->child_widgets.address = grown;
 	list->child_widgets.count = count + added;
-	/* (the list draws within its bounds) */
-	list->bounds.y1 = (short)(list->bounds.y1 + added * spacing);
+	/* (a list with room for them, Halo PC's of five rows that Custom Edition
+	maps keep two of: the buttons centred in it; else it grows, as the
+	Xbox's of two rows does, and draws within its bounds) */
+	{
+		short room = (short)(list->bounds.y1 - list->bounds.y0);
+		short column = (short)((count + added - 1) * spacing + model->bounds.y1 - model->bounds.y0);
+
+		*growth = 0;
+		if (column <= room)
+		{
+			for (child = 0; child < count + added; child++)
+				grown[child].vertical_offset = (short)((room - column) / 2 + child * spacing);
+		}
+		else
+		{
+			*growth = (short)(added * PAUSE_BUTTON_SPACING);
+			list->bounds.y1 = (short)(list->bounds.y1 + added * spacing);
+		}
+	}
 	return added;
 }
 
@@ -1624,6 +1642,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 	boolean host = global_network_game_server_get() != NULL;
 	struct tag_block const *screens;
 	long patched_list = NONE, added = 0, buttons = 0, screen;
+	short grow = 0;
 	boolean box_redrawn = FALSE;
 
 	if (collection == NONE || quit_function == NONE)
@@ -1635,7 +1654,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 		struct ui_widget_definition *definition;
 		struct ui_widget_child_reference *children;
 		long child, list_child = NONE, box_child = NONE;
-		short grow, list_top;
+		short list_top;
 
 		if (screen_tag == NONE)
 			continue;
@@ -1660,7 +1679,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			quit = pause_quit_button(list, quit_function);
 			if (quit == NONE || patched_list != NONE)
 				continue;
-			added = pause_list_patch(instances, list, quit, host);
+			added = pause_list_patch(instances, list, quit, host, &grow);
 			if (!added)
 				return;
 			buttons = list->child_widgets.count;
@@ -1678,8 +1697,8 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			}
 		}
 		/* the stock box: taller, centred where it was, the list with it, and
-		what is below it moved down; else only what is below the list */
-		grow = (short)(added * PAUSE_BUTTON_SPACING);
+		what is below it moved down; else only what is below the list (as far
+		as the list grew) */
 		list_top = children[list_child].vertical_offset;
 		for (child = 0; child < definition->child_widgets.count; child++)
 		{
