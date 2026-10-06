@@ -79,6 +79,7 @@ symbols in this file:
 #include "effects/particle_system_definitions.h"
 
 #include "bitmaps/bitmap_group.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "memory/data.h"
 #include "objects/object_lights.h"
@@ -88,6 +89,7 @@ symbols in this file:
 #include "render/render_sprite.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "tag_files/tag_files.h"
 
 /* ---------- constants */
 
@@ -290,7 +292,8 @@ void particle_systems_reconnect_to_structure_bsp(
 			}
 		}
 
-		for (type_index = 0; type_index < definition->types.count; type_index++)
+		/* port: no more types than the system holds (the map's count) */
+		for (type_index = 0; type_index < definition->types.count && type_index < MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM; type_index++)
 		{
 			long *particle_index_reference = &system->types[type_index].first_particle_index;
 
@@ -500,7 +503,8 @@ static void particle_system_delete(
 	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
 	short type_index;
 
-	for (type_index = 0; type_index < definition->types.count; type_index++)
+	/* port: no more types than the system holds (the map's count) */
+	for (type_index = 0; type_index < definition->types.count && type_index < MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM; type_index++)
 	{
 		struct particle_type *type = &system->types[type_index];
 		long particle_index = type->first_particle_index;
@@ -529,6 +533,19 @@ static boolean particle_system_initialize(
 
 	scenario_location_from_point(&system->location, &system->position);
 	SET_FLAG(system->flags, _particle_system_initializing_bit, TRUE);
+
+	/* port: no more types than the system holds. A tag with more is cut to
+	that, and said once. */
+	if (definition->types.count > MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM)
+	{
+		error(
+			_error_silent,
+			"particle system %s has %d types (only %d are used)",
+			tag_get_name(system->definition_index),
+			definition->types.count,
+			MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM);
+		definition->types.count = MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM;
+	}
 
 	for (type_index = 0; type_index < definition->types.count; type_index++)
 	{
@@ -734,6 +751,22 @@ static void particle_system_new_particles(
 						0x1E8,
 						creation_function_index>=0 &&
 						creation_function_index<NUMBER_OF_PARTICLE_SYSTEM_TYPE_CREATION_PHYSICS);
+					/* port: physics the table has (the map's value picks a
+					function to call). A bad one is made the default in the tag,
+					so it is said once. */
+					if (!VALID_INDEX(creation_function_index, (short)NUMBEROF(particle_creation_functions)))
+					{
+						error(
+							_error_silent,
+							"particle system %s has particle creation physics %d (default used)",
+							tag_get_name(system->definition_index),
+							creation_function_index);
+						creation_function_index = 0;
+						if (initializing)
+							type_definition->initial_particle_creation_physics = creation_function_index;
+						else
+							state_definition->particle_creation_physics = creation_function_index;
+					}
 
 					marker_index = seed_random_range(get_global_local_random_seed_address(), 0, marker_count);
 					particle_creation_functions[creation_function_index](
@@ -1064,9 +1097,21 @@ static void particle_system_update(
 		0x2E1,
 		system_definition->system_update_physics>=0 &&
 		system_definition->system_update_physics<NUMBER_OF_PARTICLE_SYSTEM_UPDATE_PHYSICS);
+	/* port: physics the table has (the map's value picks a function to
+	call). A bad one is made the default in the tag, so it is said once. */
+	if (!VALID_INDEX(system_definition->system_update_physics, (short)NUMBEROF(system_update_functions)))
+	{
+		error(
+			_error_silent,
+			"particle system %s has system physics %d (default used)",
+			tag_get_name(system->definition_index),
+			system_definition->system_update_physics);
+		system_definition->system_update_physics = _particle_system_update_physics_default;
+	}
 	system_update_functions[system_definition->system_update_physics](system, delta_time);
 
-	for (type_index = 0; type_index < system_definition->types.count; type_index++)
+	/* port: no more types than the system holds (the map's count) */
+	for (type_index = 0; type_index < system_definition->types.count && type_index < MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM; type_index++)
 	{
 		struct particle_system_type *type_definition = TAG_BLOCK_GET_ELEMENT(
 			&system_definition->types,
@@ -1326,6 +1371,16 @@ static void particle_system_update(
 						0x3AF,
 						type_state_definition->particle_update_physics>=0 &&
 						type_state_definition->particle_update_physics<NUMBER_OF_PARTICLE_SYSTEM_TYPE_UPDATE_PHYSICS);
+					/* port: physics the table has, as above */
+					if (!VALID_INDEX(type_state_definition->particle_update_physics, (short)NUMBEROF(particle_update_functions)))
+					{
+						error(
+							_error_silent,
+							"particle system %s has particle physics %d (default used)",
+							tag_get_name(system->definition_index),
+							type_state_definition->particle_update_physics);
+						type_state_definition->particle_update_physics = 0;
+					}
 					particle_update_functions[type_state_definition->particle_update_physics](
 						system,
 						type_index,
@@ -1356,7 +1411,8 @@ static void particle_system_render(
 	struct particle_system_definition *definition = particle_system_definition_get(system->definition_index);
 	short type_index;
 
-	for (type_index = 0; type_index < definition->types.count; type_index++)
+	/* port: no more types than the system holds (the map's count) */
+	for (type_index = 0; type_index < definition->types.count && type_index < MAXIMUM_PARTICLE_SYSTEM_TYPES_PER_SYSTEM; type_index++)
 	{
 		struct particle_system_type *type_definition = TAG_BLOCK_GET_ELEMENT(
 			&definition->types,

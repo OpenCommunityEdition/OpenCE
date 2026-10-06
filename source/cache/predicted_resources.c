@@ -89,8 +89,10 @@ pitch_range_loop:
 		short permutation_index;
 
 		pitch_range = TAG_BLOCK_GET_ELEMENT(pitch_ranges, pitch_range_index, struct sound_pitch_range);
+		/* port: and no more than the range has (both counts are the map's) */
 		for (permutation_index = 0;
-			permutation_index < pitch_range->actual_permutation_count;
+			permutation_index < pitch_range->actual_permutation_count &&
+				permutation_index < pitch_range->permutations.count;
 			permutation_index++)
 		{
 			_sound_cache_sound_request(

@@ -663,6 +663,7 @@ struct widget_instance;
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
@@ -1367,6 +1368,14 @@ static boolean ui_widget_load_children_recursive(
 /* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
 boolean pc_menu_tag(
 	long tag_index);
+/* port: where in its widget, and how large, the menus draw a frame of
+ui.map's that they scale (port/linux/game/menu_tags.c) */
+boolean pc_menu_frame_placement(
+	struct bitmap_data const *bitmap,
+	short *x,
+	short *y,
+	short *width,
+	short *height);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -3764,7 +3773,10 @@ static void widget_instance_initialize(
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
-	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit);
+	/* port: a network co-op game never pauses (it opens the campaign's pause
+	screen, which would) */
+	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
+		!network_coop_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -6756,14 +6768,46 @@ static void widget_instance_render_recursive(
 		/* port: the cheats menu's taller boxes */
 		if (!ui_cheats_render_box_piece(widget, bitmap, &bounds, clip, color))
 		{
-			draw_bitmap_in_rect(
-				bitmap,
-				&bounds,
-				&bounds,
-				clip,
-				color,
-				&multitexture_params,
-				FALSE);
+			rectangle2d texels = bounds;
+			short frame_x, frame_y, frame_width, frame_height;
+			boolean shown = TRUE;
+
+			/* port: a frame of ui.map's that the menus scale (the Xbox's
+			picture of the button settings, in the profile settings' smaller
+			box): drawn at their size, from where they place it, in units of
+			that size rather than one to a texel */
+			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
+			{
+				bounds.x0 += frame_x;
+				bounds.y0 += frame_y;
+				texels.x0 = 0;
+				texels.y0 = 0;
+				texels.x1 = (short)((long)(bounds.x1 - bounds.x0) * bitmap->width / frame_width);
+				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
+				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
+			}
+			if (shown)
+			{
+				draw_bitmap_in_rect(
+					bitmap,
+					&bounds,
+					&texels,
+					clip,
+					color,
+					&multitexture_params,
+					FALSE);
+			}
+			if (shown)
+			{
+				draw_bitmap_in_rect(
+					bitmap,
+					&bounds,
+					&texels,
+					clip,
+					color,
+					&multitexture_params,
+					FALSE);
+			}
 		}
 		if (use_nifty_plasma_fx)
 		{
@@ -7248,6 +7292,33 @@ static void widget_instance_tab_to_previous_valid_widget(
 	return;
 }
 
+/* port: whether a widget of the local player (NONE: any) takes the
+controller's events. In co-op's menus (Multiplayer's CO-OP CAMPAIGN,
+port/linux/game/menu_functions.c) the screens it shares with one player's
+campaign, New Game's levels and the difficulty, are player 1's (their rows
+the first controller's), and either player's controller uses them: player 1's
+is the one that chose co-op, player 2's the one that chose their profile */
+static boolean widget_takes_events_of_controller(
+	struct widget_instance const *widget,
+	short controller_index)
+{
+	short player;
+
+	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
+		return TRUE;
+	if (widget->local_player_index != 0 || !we_are_at_the_main_menu || player_spawn_count < 2 ||
+		controller_index < 0 || controller_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+	{
+		return FALSE;
+	}
+	for (player = 0; player < 2; player++)
+	{
+		if (player_ui_get_single_player_local_player_controller(player) == controller_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 static void widget_instance_process_one_event_recursive(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -7256,8 +7327,7 @@ static void widget_instance_process_one_event_recursive(
 {
 	boolean event_handled = FALSE;
 	boolean widget_deleted = FALSE;
-	boolean event_for_this_widget = widget->local_player_index == NONE ||
-		widget->local_player_index == event->controller_index;
+	boolean event_for_this_widget = widget_takes_events_of_controller(widget, event->controller_index);
 	long audio_feedback = _ui_audio_feedback_none;
 
 	match_assert(
@@ -7705,8 +7775,7 @@ static void widget_instance_process_one_event_recursive(
 
 			for (child = widget->child; child; child = child->next)
 			{
-				if (child->local_player_index == NONE ||
-					child->local_player_index == event->controller_index)
+				if (widget_takes_events_of_controller(child, event->controller_index))
 				{
 					widget_instance_process_one_event_recursive(
 						child,
@@ -7720,8 +7789,7 @@ static void widget_instance_process_one_event_recursive(
 		}
 		else if (widget->focused_child)
 		{
-			if (widget->focused_child->local_player_index == NONE ||
-				widget->focused_child->local_player_index == event->controller_index)
+			if (widget_takes_events_of_controller(widget->focused_child, event->controller_index))
 			{
 				widget_instance_process_one_event_recursive(
 					widget->focused_child,
@@ -7827,7 +7895,10 @@ static boolean ui_check_for_pause_game(
 						network_game_client_get_machine_index(client);
 					char const *widget_name;
 
-					switch (local_player_count)
+					/* port: a campaign map has only the campaign's pause screen */
+					if (network_coop_active())
+						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
+					else switch (local_player_count)
 					{
 					case 1:
 						widget_name =
@@ -7884,6 +7955,30 @@ static boolean ui_check_for_pause_game(
 				{
 					if (game_time_get_paused() == TRUE)
 						ui_widgets_close_all();
+					/* port: (and a multiplayer map's own, below, which pauses
+					nothing, closes as in a multiplayer game) */
+					else if (tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\pause_game\\pause_game") == NONE)
+						ui_widget_delete(widget_globals.active_widgets[controller_index]);
+				}
+				/* port: a multiplayer map played alone (New Game's MULTIPLAYER
+				maps) has no campaign pause screen, but its own (LEAVE GAME
+				goes to the main menu: network_game_remove_local_player) */
+				else if (tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\pause_game\\pause_game") == NONE &&
+					tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game") != NONE)
+				{
+					if (!ui_widget_load_by_name_or_tag(
+						"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
+						NONE,
+						NULL,
+						controller_index,
+						NONE,
+						NONE,
+						NONE))
+					{
+						error(
+							_error_silent,
+							"failed to load multiplayer pause game window");
+					}
 				}
 				else if (!ui_widget_load_by_name_or_tag(
 					"ui\\shell\\solo_game\\pause_game\\pause_game",

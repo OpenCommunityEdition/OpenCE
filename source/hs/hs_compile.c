@@ -920,6 +920,15 @@ long hs_compile_expression(
 				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
 				0xA6,
 				global_scenario_get()->hs_string_constants.size>=HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES);
+			/* port: none is written before the scenario's strings (hs_allocate
+			lets go of strings that aren't sound) */
+			if (global_scenario_get()->hs_string_constants.size<HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
+			{
+				*error_message = "the scenario has no room for the expression's text.";
+				*error_source = source;
+
+				return NONE;
+			}
 			source_offset = global_scenario_get()->hs_string_constants.size - HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES;
 			hs_compile_globals.compiled_source = global_scenario_get()->hs_string_constants.address;
 		}
@@ -2486,8 +2495,12 @@ boolean hs_compile_postprocess(
 				long predicate_index = hs_syntax_get(expression_index)->data;
 				struct hs_syntax_node *predicate;
 
+				/* port: a predicate that isn't a node (a map's) is as corrupt
+				as one that isn't a function name, where hs_syntax_get's NULL
+				was gone through */
 				if (predicate_index == NONE ||
-					(predicate = hs_syntax_get(predicate_index))->type != _hs_function_name)
+					!(predicate = datum_try_and_get(hs_syntax_data, predicate_index)) ||
+					predicate->type != _hs_function_name)
 				{
 					hs_compile_globals.error = "corrupt syntax tree (you need to recompile scripts.)";
 					success = FALSE;

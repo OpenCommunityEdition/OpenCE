@@ -170,7 +170,7 @@ MENUS = Path(__file__).resolve().parent.parent / "port/assets/menus"
 MENU_ATTRIBUTES = {
     "menus": {"root"},
     "bitmap": {"name", "width", "height", "frames", "platform"},
-    "frame": {"png", "map", "index", "width", "height", "platform"},
+    "frame": {"png", "map", "index", "width", "height", "x", "y", "platform"},
     "strings": {"name", "platform"},
     "string": {"text", "platform"},
     "widget": {"name", "type", "controller", "flags", "bitmap", "text", "strings", "values", "setting", "font",

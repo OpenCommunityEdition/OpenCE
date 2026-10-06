@@ -24,7 +24,10 @@ enum
 
 enum
 {
-	RASTERIZER_MEMORY_POOL_SIZE = 0x18000,
+	/* port: the Xbox pool (0x18000) held a frame of 1024 particles. The
+	native particle pool is larger, and a full co-op Library spends the Xbox
+	pool before the frame is drawn */
+	RASTERIZER_MEMORY_POOL_SIZE = 0x18000 * (HALO_PORT_MAXIMUM_PARTICLES / 1024),
 	RASTERIZER_MAXIMUM_TRIANGLES_PER_TRIANGLE_BUFFER = 24576,
 	RASTERIZER_MAXIMUM_DEBUG_PRIMITIVES = 131072,
 	RASTERIZER_MAXIMUM_DEBUG_VERTICES = 393216,

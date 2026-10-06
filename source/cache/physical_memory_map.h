@@ -10,6 +10,10 @@ header included in hcex build.
 
 /* ---------- constants */
 
+/* port: the tag cache's size, which the loader checks a map's tag data and
+structure bsps against (cache_files.c) */
+#define TAG_CACHE_SIZE 0x1600000
+
 /* ---------- macros */
 
 /* ---------- structures */

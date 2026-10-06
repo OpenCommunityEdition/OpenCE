@@ -482,7 +482,14 @@ void game_time_update(
 			}
 		}
 
+		/* The effects and the widgets that move every frame (game_frame) hang
+		off objects: they read the pose between the last two ticks, as the
+		renderer does, and the ticks above have taken their snapshots already
+		(port/linux/game/render_interpolation.c). The frames of one tick share
+		the fraction, so what they hang off is drawn where they put it. */
+		render_interpolation_frame_begin();
 		game_frame(game_time_get_speed()*time_delta_sec);
+		render_interpolation_frame_end();
 	}
 	else
 	{

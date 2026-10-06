@@ -25,13 +25,16 @@ numbered from here, clear of the Xbox's (0 to 101 and 0 to 40) and the PC's
 #define PC_MENU_FUNCTION_BASE 256
 
 /* a frame: a PNG drawn at width by height, or the map's bitmap's frame
-(map: its bitmap group tag, index: the bitmap's number in it) */
+(map: its bitmap group tag, index: the bitmap's number in it), drawn as the
+map has it or, with a width and height, scaled to that size, x and y into
+the widget */
 struct halo_menu_frame
 {
 	char const *png;
 	char const *map;
 	long index;
 	long width, height;
+	long x, y;
 };
 
 struct halo_menu_bitmap

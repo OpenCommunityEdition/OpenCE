@@ -381,6 +381,20 @@ void scripted_hud_blink_motion_sensor(
 	return;
 }
 
+/* port: the scripts' show and blink flags, for network co-op
+(port/linux/game/network_coop.c) */
+long hud_unit_port_script_flags(
+	void)
+{
+	return unit_hud_globals->script_flags;
+}
+
+void hud_unit_port_set_script_flags(
+	long flags)
+{
+	unit_hud_globals->script_flags = flags;
+}
+
 void hud_play_unit_sounds(
 	struct player_datum const *player,
 	boolean show_hud)

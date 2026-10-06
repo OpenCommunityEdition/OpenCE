@@ -12,9 +12,11 @@ the host can list its invite, alter its listing, or list another's under
 false details:
 
 	"HL", format 1, the lobby version (2: HALO_PORT_NETWORK_VERSION; browsers
-	hide others), flags (open, under way, teams, closed), sequence (4: newest
-	wins), Unix time (4), the Ed25519 key (32), the invite's token (16),
-	players, most players, the gametype's engine (1 each), the game's name,
+	hide others), flags (open, under way, teams, closed, password), sequence
+	(4: newest wins), Unix time (4), the Ed25519 key (32), the invite's token
+	(16; a password's game's sealed with the password's key, 56:
+	p2p_seal_token; a tombstone's zero), players, most players, the
+	gametype's engine (1 each), the game's name,
 	map and gametype (a length byte, then up to 32, 32 and 24 characters of
 	printable ASCII), a stamp (8, reserved: zero), and the signature (64) of
 	"hceu-lobby-1" and all before it.
@@ -37,6 +39,14 @@ one deletes or keeps is no authority, so
   ignores an emptied slot (a wipe is not a delete).
 A host that stops publishes a tombstone, then clears its slot. Going private
 makes a new invite (p2p.c), so a listing seen before lets no one in.
+
+A game with a password (Server Setup's PASSWORD: p2p_set_hosting_password)
+is listed with its token sealed with the password's key (Argon2id of the
+password, salted with the host's key: p2p_password_key), so that only who
+knows the password can join it from the server browser
+(p2p_listing_unlock); its invite link, which holds the token, still joins it
+as any invite does. Setting or changing the password makes a new invite, as
+going private does.
 
 Checking signatures takes work, and anyone can send listings: at most
 VERIFY_BUDGET milliseconds of it each pass of the p2p thread, from a queue
@@ -62,11 +72,11 @@ enum
 	_listing_has_teams = 4,
 	/* a tombstone: the host stopped */
 	_listing_closed = 8,
-	/* (reserved) */
+	/* its token sealed with a password's key */
 	_listing_password = 16,
 	STAMP_SIZE = 8,
 	/* the signed part's end: everything but the signature */
-	MAXIMUM_LISTING_SIZE = 2 + 1 + 2 + 1 + 4 + 4 + P2P_KEY_SIZE + P2P_TOKEN_SIZE + 3 +
+	MAXIMUM_LISTING_SIZE = 2 + 1 + 2 + 1 + 4 + 4 + P2P_KEY_SIZE + P2P_SEALED_TOKEN_SIZE + 3 +
 		(1 + P2P_LISTING_NAME_SIZE) + (1 + P2P_LISTING_MAP_SIZE) + (1 + P2P_LISTING_GAMETYPE_SIZE) + STAMP_SIZE +
 		P2P_SIGNATURE_SIZE,
 	MINIMUM_LISTING_SIZE = 2 + 1 + 2 + 1 + 4 + 4 + P2P_KEY_SIZE + P2P_TOKEN_SIZE + 3 + 3 + STAMP_SIZE +
@@ -88,6 +98,10 @@ enum
 
 static const char signature_label[] = "hceu-lobby-1";
 
+/* (p2p.h's sizes of a locked listing's are p2p_internal.h's) */
+typedef char check_listing_sizes[P2P_LISTING_SIGNING_KEY_SIZE == P2P_KEY_SIZE &&
+	P2P_LISTING_KEY_HASH_SIZE == P2P_KEY_HASH_SIZE && P2P_LISTING_SEALED_TOKEN_SIZE == P2P_SEALED_TOKEN_SIZE ? 1 : -1];
+
 /* a listing, read */
 struct listing
 {
@@ -97,6 +111,8 @@ struct listing
 	unsigned long time;
 	unsigned char key[P2P_KEY_SIZE];
 	unsigned char token[P2P_TOKEN_SIZE];
+	/* (_listing_password: its token, sealed) */
+	unsigned char sealed_token[P2P_SEALED_TOKEN_SIZE];
 	int player_count, maximum_player_count, engine_type;
 	char name[P2P_LISTING_NAME_SIZE + 1];
 	char map[P2P_LISTING_MAP_SIZE + 1];
@@ -143,6 +159,9 @@ static struct
 	int engine_type;
 	int flags;
 	int player_count, maximum_player_count;
+	/* the password's key (p2p_set_hosting_password), if it has one */
+	int has_password;
+	unsigned char password_key[P2P_PASSWORD_KEY_SIZE];
 	/* listed: with this token; its listing as last published */
 	int listed;
 	unsigned char token[P2P_TOKEN_SIZE];
@@ -240,6 +259,8 @@ static int listing_make(unsigned char *bytes, int flags)
 	unsigned char data[sizeof(signature_label) - 1 + MAXIMUM_LISTING_SIZE];
 	int size = 0;
 
+	if (lobby.has_password && !(flags & _listing_closed))
+		flags |= _listing_password;
 	bytes[size++] = 'H';
 	bytes[size++] = 'L';
 	bytes[size++] = LISTING_FORMAT;
@@ -252,8 +273,20 @@ static int listing_make(unsigned char *bytes, int flags)
 	size += 4;
 	memcpy(bytes + size, p2p_signing_key(), P2P_KEY_SIZE);
 	size += P2P_KEY_SIZE;
-	memcpy(bytes + size, lobby.token, P2P_TOKEN_SIZE);
-	size += P2P_TOKEN_SIZE;
+	if (flags & _listing_password)
+	{
+		p2p_seal_token(lobby.password_key, p2p_signing_key(), lobby.token, bytes + size);
+		size += P2P_SEALED_TOKEN_SIZE;
+	}
+	else
+	{
+		/* (a tombstone's none: it may end a game with a password) */
+		if (flags & _listing_closed)
+			memset(bytes + size, 0, P2P_TOKEN_SIZE);
+		else
+			memcpy(bytes + size, lobby.token, P2P_TOKEN_SIZE);
+		size += P2P_TOKEN_SIZE;
+	}
 	bytes[size++] = (unsigned char)(lobby.player_count > 255 ? 255 : lobby.player_count);
 	bytes[size++] = (unsigned char)(lobby.maximum_player_count > 255 ? 255 : lobby.maximum_player_count);
 	bytes[size++] = (unsigned char)lobby.engine_type;
@@ -302,8 +335,20 @@ static int listing_read(const unsigned char *bytes, int size, struct listing *li
 	offset += 4;
 	memcpy(listing->key, bytes + offset, P2P_KEY_SIZE);
 	offset += P2P_KEY_SIZE;
-	memcpy(listing->token, bytes + offset, P2P_TOKEN_SIZE);
-	offset += P2P_TOKEN_SIZE;
+	if (listing->flags & _listing_password)
+	{
+		/* (its token sealed, which is longer: the counts after it too) */
+		if (offset + P2P_SEALED_TOKEN_SIZE + 3 > size)
+			return 0;
+		memset(listing->token, 0, P2P_TOKEN_SIZE);
+		memcpy(listing->sealed_token, bytes + offset, P2P_SEALED_TOKEN_SIZE);
+		offset += P2P_SEALED_TOKEN_SIZE;
+	}
+	else
+	{
+		memcpy(listing->token, bytes + offset, P2P_TOKEN_SIZE);
+		offset += P2P_TOKEN_SIZE;
+	}
 	listing->player_count = bytes[offset++];
 	listing->maximum_player_count = bytes[offset++];
 	listing->engine_type = bytes[offset++];
@@ -569,10 +614,22 @@ static void listing_take(const struct queued *queued, const struct listing *list
 	memcpy(game->payload, queued->payload, (size_t)queued->size);
 	game->payload_size = queued->size;
 	shown = &game->listing;
-	memcpy(bytes, queued->key_hash, P2P_KEY_HASH_SIZE);
-	memcpy(bytes + P2P_KEY_HASH_SIZE, listing->token, P2P_TOKEN_SIZE);
-	p2p_hex(bytes, sizeof(bytes), text);
-	snprintf(shown->invite, sizeof(shown->invite), "halo://join/%s", text);
+	shown->locked = (listing->flags & _listing_password) != 0;
+	if (shown->locked)
+	{
+		/* (its invite once the password opens its token: p2p_listing_unlock) */
+		shown->invite[0] = 0;
+		memcpy(shown->key_hash, queued->key_hash, P2P_KEY_HASH_SIZE);
+		memcpy(shown->signing_key, listing->key, P2P_KEY_SIZE);
+		memcpy(shown->sealed_token, listing->sealed_token, P2P_SEALED_TOKEN_SIZE);
+	}
+	else
+	{
+		memcpy(bytes, queued->key_hash, P2P_KEY_HASH_SIZE);
+		memcpy(bytes + P2P_KEY_HASH_SIZE, listing->token, P2P_TOKEN_SIZE);
+		p2p_hex(bytes, sizeof(bytes), text);
+		snprintf(shown->invite, sizeof(shown->invite), "halo://join/%s", text);
+	}
 	p2p_identifier_from_hash(queued->key_hash, shown->identifier);
 	memcpy(shown->name, listing->name, sizeof(shown->name));
 	memcpy(shown->map, listing->map, sizeof(shown->map));
@@ -669,6 +726,33 @@ void p2p_set_hosting_public(int public)
 	pthread_mutex_unlock(&p2p_lock);
 }
 
+void p2p_set_hosting_password(const char *password)
+{
+	unsigned char key[P2P_PASSWORD_KEY_SIZE];
+	int has_password = password && *password;
+
+	/* (the key takes a while: not under the lock) */
+	if (has_password)
+		p2p_password_key(password, p2p_signing_key(), key);
+	pthread_mutex_lock(&p2p_lock);
+	if (has_password != lobby.has_password ||
+		(has_password && !p2p_equal(key, lobby.password_key, P2P_PASSWORD_KEY_SIZE)))
+	{
+		/* (a new invite, if one was listed: who saw it, with no password or
+		another, cannot join with it) */
+		p2p_new_invite_if_listed();
+		lobby.has_password = has_password;
+		if (has_password)
+			memcpy(lobby.password_key, key, sizeof(key));
+		else
+			memset(lobby.password_key, 0, sizeof(lobby.password_key));
+		if (lobby.listed)
+			republish_soon(0);
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	memset(key, 0, sizeof(key));
+}
+
 void p2p_set_game_listing(const char *name, const char *map, const char *gametype, int engine_type, int open,
 	int in_progress, int has_teams)
 {
@@ -763,6 +847,28 @@ int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
 	pthread_mutex_unlock(&p2p_lock);
 	qsort(games, (size_t)count, sizeof(*games), listing_order);
 	return count;
+}
+
+int p2p_listing_unlock(struct p2p_listing *listing, const char *password)
+{
+	unsigned char key[P2P_PASSWORD_KEY_SIZE];
+	unsigned char bytes[P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE];
+	char text[2 * (P2P_KEY_HASH_SIZE + P2P_TOKEN_SIZE) + 1];
+	int opened;
+
+	if (!listing->locked)
+		return 1;
+	p2p_password_key(password ? password : "", listing->signing_key, key);
+	memcpy(bytes, listing->key_hash, P2P_KEY_HASH_SIZE);
+	opened = p2p_unseal_token(key, listing->signing_key, listing->sealed_token, bytes + P2P_KEY_HASH_SIZE);
+	if (opened)
+	{
+		p2p_hex(bytes, sizeof(bytes), text);
+		snprintf(listing->invite, sizeof(listing->invite), "halo://join/%s", text);
+	}
+	memset(key, 0, sizeof(key));
+	memset(bytes, 0, sizeof(bytes));
+	return opened;
 }
 
 void p2p_lobby_mark_failed(const unsigned char *identifier)

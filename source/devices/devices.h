@@ -129,6 +129,24 @@ void device_set_power(
 boolean device_group_set_desired_value(
 	short group_index,
 	real desired_value);
+/* port: co-op device sync (port/linux/game/network_coop.c) */
+boolean device_group_network_get(
+	short group_index,
+	real *value,
+	word *flags,
+	boolean *runtime);
+void device_group_network_set(
+	short group_index,
+	real value,
+	word flags,
+	boolean snap);
+/* port: a co-op client puts a device at the host's power, and at its
+position when move_to_position */
+void device_port_set_state(
+	long device_index,
+	real power,
+	boolean move_to_position,
+	real position);
 boolean device_can_change_position(
 	long device_index);
 boolean device_frontfacing(

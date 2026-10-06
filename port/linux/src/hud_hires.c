@@ -15,7 +15,7 @@ configure_sampler), as they are larger than they appear.
 
 The PNGs are the ones tools/hud_assets.py and title_assets.py write, so only
 what they write is read: 8-bit RGBA, not interlaced, its data inflated with
-the game's zlib.
+the port's zlib (port/third_party/zlib: a menus folder's PNGs are anyone's).
 */
 
 #include "hud_hires.h"
@@ -23,7 +23,7 @@ the game's zlib.
 #include "port_config.h"
 #include "xgpu.h"
 
-#include "memory/zlib/zlib.h"
+#include "zlib_prefixed.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +32,10 @@ the game's zlib.
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
 #define MAXIMUM_TEXTURES 128
+/* a PNG's inflated rows and its texels, which are held at once: 128 MB for
+a 4096 by 4096 sheet (the largest shipped, 2048 by 2048, takes 32 MB), and
+no more for a small file that names a large size (a menus folder's) */
+#define MAXIMUM_DECODED_SIZE (192UL << 20)
 
 static struct
 {
@@ -141,6 +145,12 @@ static unsigned char *png_decode(const unsigned char *data, unsigned long size, 
 		!width || !height || width > 8192 || height > 8192 ||
 		data[24] != 8 || data[25] != 6 || data[28] != 0)
 		return NULL;
+	if (filtered_size + stride * height > MAXIMUM_DECODED_SIZE)
+	{
+		platform_log("png: %lux%lu is too large to decode (more than %lu MB)", width, height,
+			MAXIMUM_DECODED_SIZE >> 20);
+		return NULL;
+	}
 	*png_width = width;
 	*png_height = height;
 	compressed = malloc(size);

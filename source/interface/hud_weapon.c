@@ -409,6 +409,8 @@ static void render_weapon_hud(
 /* ---------- globals */
 
 static struct weapon_hud_globals *weapon_hud_globals = NULL;
+/* port: a crosshair's bad sequence or bitmap was reported (once) */
+static boolean crosshair_bad_bitmap_reported = FALSE;
 
 /* ---------- public code */
 
@@ -478,6 +480,20 @@ void scripted_hud_show_crosshair(
 		show);
 
 	return;
+}
+
+/* port: the scripts' crosshair flag, for network co-op
+(port/linux/game/network_coop.c) */
+long hud_weapon_port_script_flags(
+	void)
+{
+	return weapon_hud_globals->script_flags;
+}
+
+void hud_weapon_port_set_script_flags(
+	long flags)
+{
+	weapon_hud_globals->script_flags = flags;
 }
 
 static struct weapon_hud_state *get_hud_state(
@@ -1034,14 +1050,25 @@ static void crosshairs_draw(
 									!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
 									0.5f :
 									1.0f;
-								struct bitmap_group_sequence *sequence = !TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit) ?
-									TAG_BLOCK_GET_ELEMENT(
-										&bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap))->sequences,
-										item->sequence_index,
-										struct bitmap_group_sequence) :
-									NULL;
+								struct bitmap_group_sequence *sequence = NULL;
 								short frame_index;
 								pixel32 color;
+
+								/* port: a sprite item's sequence is the map's. Only one the
+								bitmap has is used, and the item isn't drawn otherwise (its
+								state still runs, below) */
+								if (!TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit))
+								{
+									struct bitmap_group *sequence_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
+
+									if (item->sequence_index >= 0 && item->sequence_index < sequence_group->sequences.count)
+									{
+										sequence = TAG_BLOCK_GET_ELEMENT(
+											&sequence_group->sequences,
+											item->sequence_index,
+											struct bitmap_group_sequence);
+									}
+								}
 
 								switch (state_index)
 								{
@@ -1131,7 +1158,9 @@ static void crosshairs_draw(
 								case _crosshair_state_flash_secondary_ammo_none_for_reload:
 								case _crosshair_state_primary_trigger_ready:
 								case _crosshair_state_secondary_trigger_ready:
-									if (item->frame_rate > 0)
+									/* port: a sequence with no sprites (or none) stays on frame 0
+									rather than dividing by zero */
+									if (item->frame_rate > 0 && sequence && sequence->sprites.count > 0)
 									{
 										frame_index = (short)(((game_time_get() - state->value.reference_data) /
 											item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
@@ -1172,6 +1201,17 @@ static void crosshairs_draw(
 								{
 									continue;
 								}
+								/* port: nor does a sprite item whose sequence isn't there */
+								if (!sequence && !TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit))
+								{
+									if (!crosshair_bad_bitmap_reported)
+									{
+										crosshair_bad_bitmap_reported = TRUE;
+										error(_error_silent, "crosshair %d item %d has no sequence #%d (not drawn)",
+											crosshair_index, item_index, item->sequence_index);
+									}
+									continue;
+								}
 								match_vassert(
 									"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 									0x4A5,
@@ -1184,14 +1224,25 @@ static void crosshairs_draw(
 										strip_path_name(tag_get_name(definition_indices[definition_index]))));
 								{
 									struct bitmap_group *bitmap_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
-									struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
-										&bitmap_group->bitmaps,
-										sequence ?
-											TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
-											item->sequence_index,
-										struct bitmap_data);
+									short bitmap_index = sequence ?
+										TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
+										item->sequence_index;
+									/* port: the bitmap (the sprite's, or the item's own) must be
+									one the group has, or the item isn't drawn */
+									struct bitmap_data *bitmap = bitmap_index >= 0 && bitmap_index < bitmap_group->bitmaps.count ?
+										TAG_BLOCK_GET_ELEMENT(
+											&bitmap_group->bitmaps,
+											bitmap_index,
+											struct bitmap_data) :
+										NULL;
 
-									if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+									if (!bitmap && !crosshair_bad_bitmap_reported)
+									{
+										crosshair_bad_bitmap_reported = TRUE;
+										error(_error_silent, "crosshair %d item %d has no bitmap #%d (not drawn)",
+											crosshair_index, item_index, bitmap_index);
+									}
+									if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 									{
 										if (TEST_FLAG(item->flags, _hud_crosshair_hide_outside_area_bit))
 										{

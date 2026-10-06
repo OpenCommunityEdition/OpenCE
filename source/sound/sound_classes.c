@@ -108,6 +108,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "sound_classes.h"
 #include "game_state.h"
 
@@ -210,6 +211,32 @@ char const *sound_class_names[NUMBER_OF_SOUND_CLASSES] =
 	"scripted_dialog_force_unspatialized", "", "", "game_event",
 };
 
+/* ---------- private code */
+
+/* port: a class the engine has (a sound's class is the map's value, asked
+on every play). One out of range is the nearest class, said once a run. */
+static short sound_class_index_valid(
+	short class_index)
+{
+	static boolean complained = FALSE;
+
+	if (!VALID_INDEX(class_index, NUMBER_OF_SOUND_CLASSES))
+	{
+		if (!complained)
+		{
+			error(
+				_error_silent,
+				"sound class %d is not one of the %d sound classes",
+				class_index,
+				NUMBER_OF_SOUND_CLASSES);
+			complained = TRUE;
+		}
+		class_index = (short)PIN(class_index, 0, NUMBER_OF_SOUND_CLASSES - 1);
+	}
+
+	return class_index;
+}
+
 /* ---------- public code */
 
 struct sound_class_definition *sound_class_get(
@@ -217,6 +244,7 @@ struct sound_class_definition *sound_class_get(
 {
 	struct sound_class_definition *definition;
 
+	class_index = sound_class_index_valid(class_index);
 	definition = &sound_classes[class_index];
 	match_assert(
 		"c:\\halo\\source\\sound\\sound_classes.h",
@@ -266,6 +294,7 @@ void sound_classes_dispose(
 static struct sound_class_datum *sound_class_datum_get(
 	short index)
 {
+	index = sound_class_index_valid(index);
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_classes.c",
 		288,

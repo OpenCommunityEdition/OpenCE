@@ -199,6 +199,26 @@ int p2p_ed25519_verify(const unsigned char *public_key, const void *message, int
 /* the X25519 public key of an Ed25519 one; 0 if it has a small order */
 int p2p_ed25519_to_x25519(const unsigned char *public_key, unsigned char *x25519_public);
 
+enum
+{
+	/* a password-protected listing's token, sealed (p2p_seal_token): its
+	nonce (24), its tag (16), then the token sealed */
+	P2P_PASSWORD_KEY_SIZE = 32,
+	P2P_SEALED_TOKEN_SIZE = 24 + 16 + 16,
+};
+
+/* the key of a password (Argon2id: P2P_PASSWORD_KEY_SIZE bytes), for the
+host whose Ed25519 key salt is (P2P_KEY_SIZE bytes): it takes a few
+milliseconds, so that guessing passwords at a listing takes long */
+void p2p_password_key(const char *password, const unsigned char *salt, unsigned char *key);
+/* a token (P2P_TOKEN_SIZE bytes) sealed with a password's key, bound to the
+host's Ed25519 key (P2P_SEALED_TOKEN_SIZE bytes); and opened: 0 if the key
+is not the one it was sealed with (a wrong password), or it was altered */
+void p2p_seal_token(const unsigned char *key, const unsigned char *signing_key, const unsigned char *token,
+	unsigned char *sealed);
+int p2p_unseal_token(const unsigned char *key, const unsigned char *signing_key, const unsigned char *sealed,
+	unsigned char *token);
+
 /* ---------- p2p_lobby.c: public games' listings */
 
 /* the p2p thread's pass: the token of the game hosted for the internet

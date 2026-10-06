@@ -92,6 +92,12 @@ in everyone's server browser: Create Game's PUBLIC; a private game is
 reached only by its invite. Going private makes a new invite, if the old one
 was listed */
 void p2p_set_hosting_public(int public);
+/* the password of the game hosted for the internet (Server Setup's
+PASSWORD; NULL or empty: none): its listing lets only those who know it
+join from the server browser (its invite link still joins it). Setting or
+changing it makes a new invite, if the old one was listed. It takes a few
+milliseconds (the password's key) */
+void p2p_set_hosting_password(const char *password);
 /* the hosted game's details as listed (printable ASCII is kept; NULL leaves
 one as it was): the game's server calls it as they change (calling it with
 the same again costs little) */
@@ -109,10 +115,16 @@ enum
 	P2P_LISTING_GAMETYPE_SIZE = 24,
 	/* an invite link's text (P2P_LINK_SIZE) */
 	P2P_LISTING_INVITE_SIZE = 77,
+	/* a password's game's: its host's key and its key's hash, and its token
+	sealed (P2P_KEY_SIZE, P2P_KEY_HASH_SIZE, P2P_SEALED_TOKEN_SIZE) */
+	P2P_LISTING_SIGNING_KEY_SIZE = 32,
+	P2P_LISTING_KEY_HASH_SIZE = 16,
+	P2P_LISTING_SEALED_TOKEN_SIZE = 56,
 };
 
 struct p2p_listing
 {
+	/* (empty for a locked one until p2p_listing_unlock opens it) */
 	char invite[P2P_LISTING_INVITE_SIZE];
 	/* the host's (its XNADDR's abEnet once reached) */
 	unsigned char identifier[6];
@@ -125,12 +137,20 @@ struct p2p_listing
 	unsigned char failed;
 	/* milliseconds, -1 if not known */
 	short ping;
+	/* it has a password: its invite is sealed with it (p2p_listing_unlock) */
+	unsigned char locked;
+	unsigned char key_hash[P2P_LISTING_KEY_HASH_SIZE];
+	unsigned char signing_key[P2P_LISTING_SIGNING_KEY_SIZE];
+	unsigned char sealed_token[P2P_LISTING_SEALED_TOKEN_SIZE];
 };
 /* a copy of the public games found, in the order shown (the most players
 first; then those not failed, the open ones, by name); returns their count */
 int p2p_lobby_games(struct p2p_listing *games, int maximum_count);
 /* a game the browser could not join: kept, marked failed, for this run */
 void p2p_lobby_mark_failed(const unsigned char *identifier);
+/* a locked game's invite (into its invite), if the password is its own:
+FALSE if not; TRUE for a game with none. It takes a few milliseconds */
+int p2p_listing_unlock(struct p2p_listing *listing, const char *password);
 
 /* the sizes of a Discord user's id and name as kept (with their end), and
 the text kept of either as told: only the characters allowed (digits in an

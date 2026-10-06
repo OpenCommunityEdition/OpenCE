@@ -449,6 +449,22 @@ static void cheat_objects(
 	return;
 }
 
+/* port: a block's references (the map's count and address): none from a
+block with no count or no address, and no more than a short counts (the
+count was cast to one, and wrapped) */
+static void cheat_objects_from_block(
+	struct tag_block const *block)
+{
+	if (block->count > 0 && block->address)
+	{
+		cheat_objects(
+			(struct tag_reference *)block->address,
+			(short)MIN(block->count, SHORT_MAX));
+	}
+
+	return;
+}
+
 void cheat_all_weapons(
 	void)
 {
@@ -456,9 +472,7 @@ void cheat_all_weapons(
 
 	if (TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->weapon_list, 0, struct tag_reference))
 	{
-		cheat_objects(
-			TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->weapon_list, 0, struct tag_reference),
-			(short)globals->weapon_list.count);
+		cheat_objects_from_block(&globals->weapon_list);
 	}
 	else
 	{
@@ -487,9 +501,7 @@ void cheat_all_powerups(
 {
 	struct game_globals *globals = scenario_get_game_globals();
 
-	cheat_objects(
-		TAG_BLOCK_TRY_AND_GET_ELEMENT(&globals->cheat_powerups, 0, struct tag_reference),
-		(short)globals->cheat_powerups.count);
+	cheat_objects_from_block(&globals->cheat_powerups);
 
 	return;
 }
@@ -499,13 +511,12 @@ void cheat_all_vehicles(
 {
 	struct game_globals *globals = scenario_get_game_globals();
 
-	if (globals->multiplayer_information.count)
+	/* port: a block with an address, too */
+	if (globals->multiplayer_information.count > 0 && globals->multiplayer_information.address)
 	{
-		cheat_objects(
-			TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
-				struct game_globals_multiplayer_information)->vehicles.address,
-			(short)TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
-				struct game_globals_multiplayer_information)->vehicles.count);
+		cheat_objects_from_block(
+			&TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
+				struct game_globals_multiplayer_information)->vehicles);
 	}
 
 	return;

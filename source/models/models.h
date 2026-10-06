@@ -84,6 +84,8 @@ void render_model(
 	long unique_identifier,
 	short forced_shader_permutation_index,
 	unsigned long flags);
+boolean model_data_report_once(
+	void const *data);
 
 /* ---------- globals */
 

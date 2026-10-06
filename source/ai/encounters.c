@@ -311,6 +311,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+#include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 
 #include <stddef.h>
 
@@ -540,7 +541,8 @@ static boolean encounter_place_actor(
 	long encounter_index,
 	short squad_index,
 	short initial_variant,
-	boolean spawning);
+	boolean spawning,
+	short extra_number);
 static void encounterless_deactivate(
 	long actor_index);
 static void encounters_test_activation(
@@ -557,6 +559,10 @@ static void encounter_new(
 	struct encounter_definition *encounter_definition,
 	short *squad_base,
 	short *platoon_base);
+static void encounter_definition_fit(
+	struct encounter_definition *encounter_definition,
+	short squad_base,
+	short platoon_base);
 static boolean encounter_activate(
 	long encounter_index);
 static void encounter_deactivate(
@@ -1836,7 +1842,7 @@ boolean encounter_spawn_actor(
 {
 	if (ai_globals->ai_initialized_for_map)
 	{
-		if (encounter_place_actor(encounter_index, squad_index, 0, TRUE))
+		if (encounter_place_actor(encounter_index, squad_index, 0, TRUE, 0))
 		{
 			struct encounter_datum *encounter = encounter_get(encounter_index);
 			struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
@@ -1868,8 +1874,13 @@ void encounter_verify_firing_position_owner_actor_indices(
 	long owner_actor_indices[MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER];
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
+	/* port: no more firing positions than the array holds (the map's count) */
+	long firing_position_count = PIN(
+		encounter_definition->firing_positions.count,
+		0,
+		MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
 
-	csmemset(owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+	csmemset(owner_actor_indices, NONE, firing_position_count*sizeof(long));
 
 	encounter_actor_iterator_new(&iterator, encounter_index);
 	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
@@ -1878,7 +1889,9 @@ void encounter_verify_firing_position_owner_actor_indices(
 		{
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 302, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 303, owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
-			owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+			/* port: and only a position the array holds */
+			if (VALID_INDEX(actor->firing_positions.current_position_index, firing_position_count))
+				owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
 		}
 	}
 
@@ -1893,8 +1906,14 @@ void encounter_build_firing_position_owner_actor_indices(
 		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
+	/* port: no more firing positions than the callers' arrays hold
+	(MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER entries; the map's count) */
+	long firing_position_count = PIN(
+		encounter_definition->firing_positions.count,
+		0,
+		MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
 
-	csmemset(firing_position_owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+	csmemset(firing_position_owner_actor_indices, NONE, firing_position_count*sizeof(long));
 
 	encounter_actor_iterator_new(&iterator, encounter_index);
 	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
@@ -1903,7 +1922,9 @@ void encounter_build_firing_position_owner_actor_indices(
 		{
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 332, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 333, firing_position_owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
-			firing_position_owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+			/* port: and only a position the arrays hold */
+			if (VALID_INDEX(actor->firing_positions.current_position_index, firing_position_count))
+				firing_position_owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
 		}
 	}
 
@@ -2245,8 +2266,16 @@ void encounter_create(
 
 			for (i = 0; i < count; ++i)
 			{
-				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE);
+				encounter_place_actor(encounter_index, squad_index, initial_variant, FALSE, 0);
 				initial_variant = 0;
+			}
+			/* port: network co-op's extra enemies, for its players
+			(coop_enemies.c) */
+			{
+				short extra_count = coop_enemies_extra_count(encounter_index, count);
+
+				for (i = 0; i < extra_count; ++i)
+					encounter_place_actor(encounter_index, squad_index, 0, FALSE, (short)(i + 1));
 			}
 		}
 
@@ -2416,6 +2445,76 @@ static void squad_reset_starting_locations(
 	return;
 }
 
+/* port: an encounter's counts cut to the room the engine has for them (the
+map's counts index fixed arrays: squads and platoons an encounter and a map,
+firing positions an encounter, starting locations a squad). The encounter
+plays with its first ones. The tag is cut, so every user of it agrees, and
+it is said once. Every retail encounter fits. */
+static void encounter_definition_fit(
+	struct encounter_definition *encounter_definition,
+	short squad_base,
+	short platoon_base)
+{
+	long maximum_squad_count = MIN(
+		MAXIMUM_SQUADS_PER_ENCOUNTER,
+		MAXIMUM_SQUADS_PER_MAP - squad_base);
+	long maximum_platoon_count = MIN(
+		MAXIMUM_PLATOONS_PER_ENCOUNTER,
+		MAXIMUM_PLATOONS_PER_MAP - platoon_base);
+	long maximum_starting_location_count =
+		(long)NUMBEROF(squad_array->required_locations) * LONG_BITS;
+	short squad_index;
+
+	if (encounter_definition->squads.count > maximum_squad_count ||
+		encounter_definition->platoons.count > maximum_platoon_count ||
+		encounter_definition->firing_positions.count > MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER)
+	{
+		error(
+			_error_silent,
+			"encounter %s has %d squads, %d platoons and %d firing positions (only %d, %d and %d are used)",
+			encounter_definition->name,
+			encounter_definition->squads.count,
+			encounter_definition->platoons.count,
+			encounter_definition->firing_positions.count,
+			MIN(encounter_definition->squads.count, maximum_squad_count),
+			MIN(encounter_definition->platoons.count, maximum_platoon_count),
+			MIN(encounter_definition->firing_positions.count, (long)MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER));
+		encounter_definition->squads.count = MIN(
+			encounter_definition->squads.count,
+			maximum_squad_count);
+		encounter_definition->platoons.count = MIN(
+			encounter_definition->platoons.count,
+			maximum_platoon_count);
+		encounter_definition->firing_positions.count = MIN(
+			encounter_definition->firing_positions.count,
+			(long)MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
+	}
+
+	for (squad_index = 0;
+		squad_index < encounter_definition->squads.count;
+		squad_index++)
+	{
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads,
+			squad_index,
+			struct squad_definition);
+
+		if (squad_definition->starting_locations.count > maximum_starting_location_count)
+		{
+			error(
+				_error_silent,
+				"encounter %s squad %s has %d starting locations (only %d are used)",
+				encounter_definition->name,
+				squad_definition->name,
+				squad_definition->starting_locations.count,
+				maximum_starting_location_count);
+			squad_definition->starting_locations.count = maximum_starting_location_count;
+		}
+	}
+
+	return;
+}
+
 static void encounter_new(
 	struct encounter_definition *encounter_definition,
 	short *squad_base,
@@ -2428,6 +2527,8 @@ static void encounter_new(
 		struct encounter_datum *encounter = encounter_get(encounter_index);
 		short squad_index;
 		short platoon_index;
+
+		encounter_definition_fit(encounter_definition, *squad_base, *platoon_base);
 
 		encounter->team_index = encounter_definition->team_index;
 		encounter->first_actor_index = NONE;
@@ -2996,18 +3097,25 @@ static void encounter_post_combat(
 	return;
 }
 
+/* port: extra_number, counting from 1, places one of network co-op's extra
+enemies (coop_enemies.c), spread around the squad's starting locations in
+turn; 0 places the squad's own actor, as on the Xbox */
 static boolean encounter_place_actor(
 	long encounter_index,
 	short squad_index,
 	short initial_variant,
-	boolean spawning)
+	boolean spawning,
+	short extra_number)
 {
 	boolean placed = FALSE;
 	struct encounter_definition *encounter_definition = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 		&encounter_definition->squads, squad_index, struct squad_definition);
-	short starting_location_index = encounter_get_actor_starting_location(encounter_index, squad_index, spawning);
+	short starting_location_index = extra_number > 0 && squad_definition->starting_locations.count > 0 ?
+		(short)((extra_number - 1) % squad_definition->starting_locations.count) :
+		encounter_get_actor_starting_location(encounter_index, squad_index, spawning);
+	struct actor_starting_location spread_location;
 
 	if (starting_location_index != NONE)
 	{
@@ -3015,6 +3123,61 @@ static boolean encounter_place_actor(
 			&squad_definition->starting_locations, starting_location_index, struct actor_starting_location);
 		short actor_palette_index = squad_definition->actor_palette_index;
 		struct scenario *scenario = global_scenario_get();
+
+		/* port: an extra enemy goes on free ground around its starting
+		location, else around the squad's others in turn */
+		if (extra_number > 0)
+		{
+			/* (what was found taken around the starting locations while this
+			squad's extra enemies are placed, not tried again for the rest of
+			them: placing actors only takes room, and each enemy would try
+			every taken place again, and every place of a full location) */
+			static struct
+			{
+				long encounter_index;
+				long time;
+				short squad_index;
+				unsigned long full;
+				long taken[32][BIT_VECTOR_SIZE_IN_LONGS(COOP_ENEMIES_SPREAD_SPOTS)];
+			} full_locations = { NONE, NONE, NONE, 0 };
+			short count = squad_definition->starting_locations.count;
+			short tried;
+
+			if (extra_number == 1 || full_locations.encounter_index != encounter_index ||
+				full_locations.squad_index != squad_index || full_locations.time != game_time_get())
+			{
+				full_locations.encounter_index = encounter_index;
+				full_locations.squad_index = squad_index;
+				full_locations.time = game_time_get();
+				full_locations.full = 0;
+				csmemset(full_locations.taken, 0, sizeof(full_locations.taken));
+			}
+			for (tried = 0; tried < count; tried++)
+			{
+				short candidate_index = (short)((starting_location_index + tried) % count);
+				struct actor_starting_location *candidate = TAG_BLOCK_GET_ELEMENT(&squad_definition->starting_locations,
+					candidate_index, struct actor_starting_location);
+
+				if (candidate_index < 32 && TEST_FLAG(full_locations.full, candidate_index))
+					continue;
+				spread_location = *candidate;
+				if (coop_enemies_spread_position(&candidate->position, extra_number,
+					candidate_index < 32 ? full_locations.taken[candidate_index] : NULL, &spread_location.position))
+					break;
+				if (candidate_index < 32)
+					SET_FLAG(full_locations.full, candidate_index, TRUE);
+			}
+			/* (with no room anywhere, as extra enemies were placed before:
+			on rings around the squad's starting location in turn, else on
+			it) */
+			if (tried == count)
+			{
+				spread_location = *starting_location;
+				coop_enemies_fallback_position(&starting_location->position,
+					(short)((extra_number - 1) / MAX(count, 1) + 1), &spread_location.position);
+			}
+			starting_location = &spread_location;
+		}
 
 		if (starting_location->actor_variant_index != NONE)
 			actor_palette_index = starting_location->actor_variant_index;

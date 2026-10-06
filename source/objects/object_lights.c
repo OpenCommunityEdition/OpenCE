@@ -496,6 +496,31 @@ boolean debug_lights;
 boolean debug_object_lights;
 struct data_array *light_data;
 struct cluster_partition light_cluster_partition;
+
+/* port: the clusters' lights kept for lighting objects (lights_port_cluster):
+as many as the light partition's lists can hold */
+enum
+{
+	LIGHTS_PORT_MAXIMUM_ENTRIES = HALO_PORT_MAXIMUM_CLUSTER_REFERENCES,
+};
+struct lights_port_entry
+{
+	long light_index;
+	real_point3d position;
+	real radius;
+};
+static struct
+{
+	/* each light's radius or rasterizer light written (lights_preprocess_scene) */
+	unsigned long radius_writes;
+	/* what the entries were kept for; each cluster's, and where they are */
+	unsigned long generation;
+	short entry_count;
+	unsigned long cluster_generations[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+	short cluster_first_entries[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+	short cluster_entry_counts[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+	struct lights_port_entry entries[LIGHTS_PORT_MAXIMUM_ENTRIES];
+} lights_port;
 struct lights_game_globals *lights_game_globals = NULL;
 short debug_rasterizer_light_count;
 struct lights_globals lights_globals;
@@ -812,6 +837,7 @@ void lights_preprocess_scene(
 			_point_light_attached_to_first_person_weapon_bit,
 			FALSE);
 		light->rasterizer_light_index = NONE;
+		lights_port.radius_writes++;
 		if (light->parent_light_index != NONE)
 		{
 			struct point_light_definition *definition = light_definition_get(
@@ -967,6 +993,7 @@ void lights_preprocess_scene(
 				light->radius = (definition->radius_modifier_lower_bound * inverse_intensity
 					+ definition->radius_modifier_upper_bound * intensity)
 					* definition->radius;
+				lights_port.radius_writes++;
 				if (light->radius != 0.0f)
 				{
 					struct rasterizer_light_submit_parameters light_parameters;
@@ -1035,6 +1062,7 @@ void lights_preprocess_scene(
 			else
 			{
 				light->radius = definition->radius;
+				lights_port.radius_writes++;
 			}
 
 			if (definition->lens_flare.index != NONE)
@@ -1796,6 +1824,136 @@ void light_reconnect_to_map(
 	return;
 }
 
+/* a light of a cluster, for find_point_lights_for_object_in_cluster: as
+the Xbox's loop does each, marking it (so its other clusters pass it over) */
+static void find_point_light_for_object(
+	long object_index,
+	long light_index,
+	real_point3d const *center,
+	real radius,
+	long *light_indices,
+	real *light_intensities,
+	real *light_attenuations,
+	short *light_count,
+	short maximum_light_count)
+{
+	if (light_unmarked(light_index))
+	{
+		struct light_datum *light = light_get(light_index);
+
+		if (light->rasterizer_light_index != NONE
+			&& (light->object_index != object_index
+				|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
+					_light_definition_dont_light_own_object_bit)))
+		{
+			real distance = distance3d(&light->position, center);
+
+			if (distance < radius + light->radius)
+			{
+				real attenuation = light_attenuation(light->radius, distance);
+				real intensity = real_rgb_color_brightness(&light->color) * attenuation;
+				short index;
+
+				if (*light_count < maximum_light_count)
+				{
+					index = (*light_count)++;
+				}
+				else
+				{
+					real minimum_intensity = REAL_MAX;
+					short dimmest_index = NONE;
+
+					for (index = 0; index < *light_count; index++)
+					{
+						if (minimum_intensity > light_intensities[index])
+						{
+							minimum_intensity = light_intensities[index];
+							dimmest_index = index;
+						}
+					}
+
+					if (minimum_intensity < intensity)
+					{
+						index = dimmest_index;
+					}
+				}
+
+				if (index < maximum_light_count)
+				{
+					light_indices[index] = light_index;
+					light_intensities[index] = intensity;
+					light_attenuations[index] = attenuation;
+				}
+			}
+		}
+		light_mark(light_index);
+	}
+}
+
+/* port: a cluster's lights in its list's order, with where each is and how
+far it reaches, kept while none of that changes: while the light partition's
+lists (cluster_partitions.c's port_modification_count) and the lights' radii
+and rasterizer lights (lights_port.radius_writes, written as a frame's lights
+are prepared) are as they were; a light only moves as it joins its clusters
+again. An object lit (each object drawn, each shadow) then passes over the
+lights too far to reach it without their datums or the list's: with hundreds
+of lights in a cluster (network co-op's extra enemies), reading them was
+most of a frame's lighting. FALSE: not kept (the list walked as before). */
+static boolean lights_port_cluster(
+	short cluster_index,
+	short *first_entry,
+	short *entry_count)
+{
+	unsigned long generation = 1 + light_cluster_partition.port_modification_count + lights_port.radius_writes;
+	long reference_index;
+	long light_index;
+	short first;
+
+	if (cluster_index < 0 || cluster_index >= MAXIMUM_CLUSTERS_PER_STRUCTURE)
+		return FALSE;
+	if (lights_port.generation != generation)
+	{
+		lights_port.generation = generation;
+		lights_port.entry_count = 0;
+	}
+	if (lights_port.cluster_generations[cluster_index] != generation)
+	{
+		first = lights_port.entry_count;
+		for (light_index = cluster_partition_get_first_datum(&light_cluster_partition, &reference_index, cluster_index);
+			light_index != NONE;
+			light_index = cluster_partition_get_next_datum(&light_cluster_partition, &reference_index))
+		{
+			struct light_datum *light = light_get(light_index);
+			struct lights_port_entry *entry;
+
+			/* (one not drawn this frame lights nothing: reaching an object,
+			it would only be marked, for that object's other clusters to pass
+			over) */
+			if (light->rasterizer_light_index == NONE)
+				continue;
+			if (lights_port.entry_count >= LIGHTS_PORT_MAXIMUM_ENTRIES)
+			{
+				/* (more than are kept: this cluster's walked) */
+				lights_port.entry_count = first;
+				first = NONE;
+				break;
+			}
+			entry = &lights_port.entries[lights_port.entry_count++];
+			entry->light_index = light_index;
+			entry->position = light->position;
+			entry->radius = light->radius;
+		}
+		lights_port.cluster_generations[cluster_index] = generation;
+		lights_port.cluster_first_entries[cluster_index] = first;
+		lights_port.cluster_entry_counts[cluster_index] = first == NONE ? 0 : (short)(lights_port.entry_count - first);
+	}
+	if (lights_port.cluster_first_entries[cluster_index] == NONE)
+		return FALSE;
+	*first_entry = lights_port.cluster_first_entries[cluster_index];
+	*entry_count = lights_port.cluster_entry_counts[cluster_index];
+	return TRUE;
+}
+
 static void find_point_lights_for_object_in_cluster(
 	long object_index,
 	short cluster_index,
@@ -1809,66 +1967,52 @@ static void find_point_lights_for_object_in_cluster(
 {
 	long light_index;
 	long reference_index;
+	short first_entry, entry_count;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\objects\\object_lights.c",
 		0x544,
 		lights_globals.marker_initialized);
+	/* port: the cluster's lights as kept (lights_port_cluster). A light too
+	far to reach the object is passed over: the Xbox's loop tested it the
+	same, on the same position and radius, and rejected it. Left unmarked, it
+	is tested again in the object's other clusters, and rejected again.
+	Most are far along one axis, which says so without the distance: a
+	distance is never less than one axis of it but for rounding, a few parts
+	in 2^24, well inside the margin here. */
+	if (lights_port_cluster(cluster_index, &first_entry, &entry_count))
+	{
+		short entry_index;
+
+		for (entry_index = first_entry; entry_index < first_entry + entry_count; entry_index++)
+		{
+			struct lights_port_entry const *entry = &lights_port.entries[entry_index];
+			real reach = radius + entry->radius;
+			real bound = reach * 1.000001f;
+			real offset;
+
+			offset = entry->position.x - center->x;
+			if (offset > bound || -offset > bound)
+				continue;
+			offset = entry->position.y - center->y;
+			if (offset > bound || -offset > bound)
+				continue;
+			offset = entry->position.z - center->z;
+			if (offset > bound || -offset > bound)
+				continue;
+			if (!(distance3d(&entry->position, center) < reach))
+				continue;
+			find_point_light_for_object(object_index, entry->light_index, center, radius, light_indices,
+				light_intensities, light_attenuations, light_count, maximum_light_count);
+		}
+		return;
+	}
 	for (light_index = cluster_partition_get_first_datum(&light_cluster_partition, &reference_index, cluster_index);
 		light_index != NONE;
 		light_index = cluster_partition_get_next_datum(&light_cluster_partition, &reference_index))
 	{
-		if (light_unmarked(light_index))
-		{
-			struct light_datum *light = light_get(light_index);
-
-			if (light->rasterizer_light_index != NONE
-				&& (light->object_index != object_index
-					|| !TEST_FLAG(light_definition_get(light->definition_index)->flags,
-						_light_definition_dont_light_own_object_bit)))
-			{
-				real distance = distance3d(&light->position, center);
-
-				if (distance < radius + light->radius)
-				{
-					real attenuation = light_attenuation(light->radius, distance);
-					real intensity = real_rgb_color_brightness(&light->color) * attenuation;
-					short index;
-
-					if (*light_count < maximum_light_count)
-					{
-						index = (*light_count)++;
-					}
-					else
-					{
-						real minimum_intensity = REAL_MAX;
-						short dimmest_index = NONE;
-
-						for (index = 0; index < *light_count; index++)
-						{
-							if (minimum_intensity > light_intensities[index])
-							{
-								minimum_intensity = light_intensities[index];
-								dimmest_index = index;
-							}
-						}
-
-						if (minimum_intensity < intensity)
-						{
-							index = dimmest_index;
-						}
-					}
-
-					if (index < maximum_light_count)
-					{
-						light_indices[index] = light_index;
-						light_intensities[index] = intensity;
-						light_attenuations[index] = attenuation;
-					}
-				}
-			}
-			light_mark(light_index);
-		}
+		find_point_light_for_object(object_index, light_index, center, radius, light_indices, light_intensities,
+			light_attenuations, light_count, maximum_light_count);
 	}
 
 	return;

@@ -263,7 +263,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "model_animation_definitions.h"
+#include "models.h"
 
 /* ---------- constants */
 
@@ -515,7 +517,22 @@ byte *animation_get_frame_data(struct animation const *animation, short frame_in
 
 byte *animation_get_frame_info(struct animation const *animation, short frame_index, short frame_info_size)
 {
+	/* port: a frame's info (dx, dy, dz, dyaw) is at most four reals */
+	static real no_frame_info[4];
+
 	match_assert("c:\\halo\\SOURCE\\models\\model_animation_definitions.c", 1167, frame_index>=0 && frame_index<animation->frame_count);
+	/* port: no movement for a frame past the animation's frame info (a map's
+	frame count and size) */
+	if (frame_index<0 || frame_info_size<0 || frame_info_size>(short)sizeof(no_frame_info) ||
+		((long)frame_index+1)*frame_info_size>animation->frame_info.size)
+	{
+		if (model_data_report_once(animation))
+		{
+			error(_error_silent, "### ERROR animation '%.31s' has a bad frame info; it is skipped", animation->name);
+		}
+		csmemset(no_frame_info, 0, sizeof(no_frame_info));
+		return (byte *)no_frame_info;
+	}
 	return tag_data_get_pointer(&animation->frame_info, frame_index * frame_info_size, frame_info_size);
 }
 

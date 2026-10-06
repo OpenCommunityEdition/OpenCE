@@ -16,6 +16,7 @@
     "winmm",
     "user32",
     "advapi32",
-    "winhttp"
+    "winhttp",
+    "dbghelp"
   ]
 }

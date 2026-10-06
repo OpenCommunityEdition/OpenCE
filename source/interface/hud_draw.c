@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
@@ -407,6 +408,9 @@ static void hud_draw_multitexture_overlay(
 
 /* ---------- globals */
 
+/* port: a hud bitmap's bad sequence or sprite was reported (once) */
+static boolean hud_bad_bitmap_reported = FALSE;
+
 /* ---------- public code */
 
 /* Inspect the guarded caller's frame, not the return site of this helper.
@@ -443,7 +447,8 @@ void hud_retrieve_bitmap_and_bounding_rect(
 	{
 		struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
 
-		if (sequence_index<group->sequences.count)
+		/* port: and not below the first sequence (the index is the map's) */
+		if (sequence_index>=0 && sequence_index<group->sequences.count)
 		{
 			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
 				&group->sequences, sequence_index, struct bitmap_group_sequence);
@@ -455,11 +460,27 @@ void hud_retrieve_bitmap_and_bounding_rect(
 			sprite_count = sequence->sprites.count;
 			if (sprite_count)
 			{
-				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
-					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite);
+				/* port: a negative sprite count would give a negative sprite.
+				A sprite's bitmap must be one the group has, or the sprite is
+				not drawn. */
+				struct bitmap_group_sprite *sprite = sprite_count>0 ? TAG_BLOCK_GET_ELEMENT(
+					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite) : NULL;
 
-				*bitmap = TAG_BLOCK_GET_ELEMENT(
-					&group->bitmaps, sprite->bitmap_index, struct bitmap_data);
+				if (sprite && sprite->bitmap_index>=0 && sprite->bitmap_index<group->bitmaps.count)
+				{
+					*bitmap = TAG_BLOCK_GET_ELEMENT(
+						&group->bitmaps, sprite->bitmap_index, struct bitmap_data);
+				}
+				else
+				{
+					*bitmap = NULL;
+					if (!hud_bad_bitmap_reported)
+					{
+						hud_bad_bitmap_reported = TRUE;
+						error(_error_silent, "hud bitmap 0x%08lX sequence #%d has a bad sprite (not drawn)",
+							(unsigned long)bitmap_group_index, sequence_index);
+					}
+				}
 			}
 			else
 			{
@@ -1171,12 +1192,32 @@ void hud_draw_weapon_overlays(
 		if (!TEST_FLAG(item->flags, _hud_overlay_runtime_invalid_bit) &&
 			(item->type & type_flags))
 		{
-			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
-				&bitmap_group_get(overlays->bitmap.index)->sequences,
-				item->sequence_index,
-				struct bitmap_group_sequence);
+			struct bitmap_group_sequence *sequence = NULL;
 			pixel32 color;
 			short frame_index;
+
+			/* port: the item's sequence is the map's. Only one the bitmap has
+			is looked at, and a sequence with no sprites stays on frame 0
+			(it was a divide by zero). The bad sequence itself isn't drawn
+			(hud_retrieve_bitmap_and_bounding_rect). */
+			if (overlays->bitmap.index!=NONE)
+			{
+				struct bitmap_group *group = bitmap_group_get(overlays->bitmap.index);
+
+				if (item->sequence_index>=0 && item->sequence_index<group->sequences.count)
+				{
+					sequence = TAG_BLOCK_GET_ELEMENT(
+						&group->sequences,
+						item->sequence_index,
+						struct bitmap_group_sequence);
+				}
+				else if (!hud_bad_bitmap_reported)
+				{
+					hud_bad_bitmap_reported = TRUE;
+					error(_error_silent, "hud overlay bitmap 0x%08lX has no sequence #%d (not drawn)",
+						(unsigned long)overlays->bitmap.index, item->sequence_index);
+				}
+			}
 
 			if (TEST_FLAG(item->flags, _hud_overlay_flashes_bit) &&
 				TEST_FLAG(draw_flags, _hud_draw_flashing_bit))
@@ -1190,7 +1231,8 @@ void hud_draw_weapon_overlays(
 
 			if (TEST_FLAG(item->flags, _hud_overlay_flashes_bit) &&
 				TEST_FLAG(draw_flags, _hud_draw_flashing_bit) &&
-				item->frame_rate > 0)
+				item->frame_rate > 0 &&
+				sequence && sequence->sprites.count > 0)
 			{
 				frame_index = (short)(((game_time_get() - reference_time) /
 					item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
@@ -1590,13 +1632,15 @@ static real_rectangle2d const *get_sprite_clip_rect(
 	{
 		struct bitmap_group *group = bitmap_group_get(bitmap_group_index);
 
-		if (sequence_index<group->sequences.count)
+		/* port: no sequence below the first, and no sprite from a negative
+		sprite count or frame (all the map's) */
+		if (sequence_index>=0 && sequence_index<group->sequences.count)
 		{
 			struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
 				&group->sequences, sequence_index, struct bitmap_group_sequence);
 			long sprite_count = sequence->sprites.count;
 
-			if (sprite_count)
+			if (sprite_count>0 && frame_index>=0)
 			{
 				struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(
 					&sequence->sprites, frame_index%sprite_count, struct bitmap_group_sprite);
