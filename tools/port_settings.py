@@ -23,16 +23,21 @@ VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
 # menu opens), its header (widget, bitmap), the row spacing, and its rows:
-# (label, setting, [(shown, value)], help, platform)
+# (label, setting, [(shown, value)], help, platform[, key]): key names the
+# row's widgets where two rows set one setting (one for each platform), else
+# the setting's name does
 SCREENS = {
     "video_settings": {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
-        "spacing": 26,
+        # (closer than the other screens' rows, and the help lower, for all
+        # twelve places to fit above it)
+        "spacing": 24,
+        "help_top": 364,
         # (rows in the place of the row before them: Window Size in
         # Resolution's, port/linux/game/menu_functions.c showing the one the
-        # display mode chosen uses)
-        "same_place": ["display.window_size"],
+        # display mode chosen uses; Android's anti-aliasing in the desktop's)
+        "same_place": ["display.window_size", "anti_aliasing_android"],
         "rows": [
             ("DISPLAY MODE:", "display.mode",
              [("FULLSCREEN", "fullscreen"), ("BORDERLESS", "borderless"), ("WINDOWED", "windowed")],
@@ -62,6 +67,21 @@ SCREENS = {
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
+            ("ANTI-ALIASING:", "display.anti_aliasing",
+             [("OFF", "off"), ("FXAA", "fxaa"), ("SMAA", "smaa"), ("SSAA 2X", "ssaa2x"), ("MSAA 2X", "msaa2x"),
+              ("MSAA 4X", "msaa4x"), ("MSAA 8X", "msaa8x")],
+             "Smooth jagged edges, which the Xbox did not. FXAA\nand SMAA are cheap; SSAA and MSAA are sharper.",
+             "desktop"),
+            ("ANTI-ALIASING:", "display.anti_aliasing",
+             [("OFF", "off"), ("FXAA", "fxaa"), ("MSAA 2X", "msaa2x"), ("MSAA 4X", "msaa4x")],
+             "Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper.",
+             "android", "anti_aliasing_android"),
+            ("SHADOW RESOLUTION:", "display.shadow_resolution",
+             [("128", "128"), ("256", "256"), ("512", "512"), ("1024", "1024")],
+             "The size objects' shadows are drawn at: 128 as on\nthe Xbox; larger for smoother, as soft, edges.",
+             None),
+            ("PER-PIXEL LIGHTING:", "display.per_pixel_lighting", ON_OFF,
+             "Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex.", None),
         ],
     },
     "mouse_settings": {
@@ -88,6 +108,8 @@ SCREENS = {
             ("MUSIC VOLUME:", "audio.music_volume", VOLUMES, "The music's volume.", None),
             ("EFFECTS VOLUME:", "audio.effects_volume", VOLUMES,
              "The volume of every other sound: effects and\nspeech.", None),
+            ("REVERB:", "audio.reverb", ON_OFF,
+             "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
         ],
@@ -225,10 +247,10 @@ def _setting_screen(folder: str, spec: dict) -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     place = -1
-    for index, (label, setting, choices, _, platform) in enumerate(spec["rows"]):
-        key = setting.split(".", 1)[1]
+    for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
+        key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
-        if setting not in spec.get("same_place", ()):
+        if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
             place += 1
         rows.append((row, platform, place))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
@@ -255,7 +277,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
     extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]])
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
-                      [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, _ in spec["rows"]])
+                      [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]])
     return _screen(folder, spec, rows, ["port settings help"], [], extra)
 
 
