@@ -61,6 +61,18 @@ OBJECTS.C
 
 #define MAXIMUM_DUMPS 1024
 
+/* port: the garbage collection (objects_garbage_collection). With many
+players spread over a level and many bodies (co-op's extra enemies), every
+body was in some player's view, none could go, and the whole collection
+(every garbage object's visibility, the memory pool compacted) ran again
+every tick on the host. A player sees garbage no further off than
+GARBAGE_VISIBLE_DISTANCE (world units, about 90 metres), and a collection
+of active garbage that left too much is tried again only after
+GARBAGE_ACTIVE_RETRY_TICKS. Running short of memory or objects still
+collects at once. */
+#define GARBAGE_VISIBLE_DISTANCE 30.0f
+#define GARBAGE_ACTIVE_RETRY_TICKS TICKS_PER_SECOND
+
 
 // This is dangerous, bungie returns the same value regardless of whether the index is valid
 #define OBJECT_INCOMING_FUNCTION_GET_VALUE(object, index)	\
@@ -89,6 +101,11 @@ struct object_globals
 		short cluster_index;
 	} pvs_activation;
 };
+
+/* port: when a collection of active garbage may be tried again (NONE: at
+once); not in the game state, so a revert, which takes the clock back, puts
+it right (objects_garbage_active_due) */
+static long garbage_active_retry_time = NONE;
 
 struct object_memory_release_function
 {
@@ -1685,7 +1702,8 @@ boolean object_visible_to_any_player(
 						struct unit_datum const *unit = unit_get(player->unit_index);
 						real distance = normalize3d(vector_from_points3d(&player_position, &object->object.bounding_sphere_center, &eye_to_point));
 
-						if (dot_product3d(&unit->unit.desired_aiming_vector, &eye_to_point) > cosine(arctangent(object->object.bounding_sphere_radius, distance) + sloppy_maximum_field_of_view))
+						if (distance <= GARBAGE_VISIBLE_DISTANCE &&
+							dot_product3d(&unit->unit.desired_aiming_vector, &eye_to_point) > cosine(arctangent(object->object.bounding_sphere_radius, distance) + sloppy_maximum_field_of_view))
 						{
 							visible = TRUE;
 							break;
@@ -3945,6 +3963,18 @@ static long active_garbage_limit(
 	return limit_per_16_players * MAX(16, player_count) / 16;
 }
 
+/* port: whether a collection of active garbage may be tried
+(GARBAGE_ACTIVE_RETRY_TICKS) */
+static boolean objects_garbage_active_due(
+	void)
+{
+	long now = game_time_get();
+
+	if (garbage_active_retry_time != NONE && garbage_active_retry_time - now > GARBAGE_ACTIVE_RETRY_TICKS)
+		garbage_active_retry_time = NONE;
+	return garbage_active_retry_time == NONE || now >= garbage_active_retry_time;
+}
+
 void objects_garbage_collection(
 	void)
 {
@@ -3971,7 +4001,8 @@ void objects_garbage_collection(
 		}
 		else
 		{
-			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER))
+			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER) &&
+				objects_garbage_active_due())
 			{
 				garbage_collect_mode = _garbage_collect_active_objects;
 			}
@@ -3982,6 +4013,7 @@ void objects_garbage_collection(
 	{
 		long garbage_collect_mode_wide;
 		short garbage_object_count = 0;
+		short collected_count = 0;
 		boolean should_collect = FALSE;
 
 		{
@@ -4082,12 +4114,18 @@ void objects_garbage_collection(
 
 					object_set_garbage(object_index, FALSE);
 					object_delete_immediately(object_index);
+					collected_count++;
 				}
 			}
 
 			}
 
-		memory_pool_compact(object_memory_pool);
+		/* port: active garbage left above its target is tried again later,
+		and nothing collected moves nothing to compact */
+		if (garbage_collect_mode == _garbage_collect_active_objects)
+			garbage_active_retry_time = should_collect ? NONE : game_time_get() + GARBAGE_ACTIVE_RETRY_TICKS;
+		if (collected_count > 0 || garbage_collect_mode != _garbage_collect_active_objects)
+			memory_pool_compact(object_memory_pool);
 		
 		if (debug_object_garbage_collection)
 		{
@@ -4164,7 +4202,9 @@ void objects_garbage_collection(
 					break;
 				}
 
-				if (status_still_critical || garbage_collection_after_first_attempt)
+				/* (port: as often as the warning, not every tick: a host kept
+				critical by many enemies wrote it to debug.txt each tick) */
+				if ((status_still_critical || garbage_collection_after_first_attempt) && garbage_should_warn)
 				{
 					char tempbuffer[512];
 					const char *status;
