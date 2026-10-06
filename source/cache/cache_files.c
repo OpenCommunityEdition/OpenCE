@@ -134,6 +134,7 @@ symbols in this file:
 #include "interface/ui_widget.h"
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
+#include "models/models.h"
 
 /* ---------- constants */
 
@@ -1046,6 +1047,9 @@ long scenario_tags_load(
 
 				pal_tags_loaded(cache_file_globals.header.build);
 			}
+			/* The two powerups' authored render spheres can be smaller than
+			 * their rigid meshes. Derive their bounds while tags are writable. */
+			models_fix_powerup_render_bounds();
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
