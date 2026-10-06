@@ -1157,9 +1157,11 @@ only a little behind finds its changed registers without a full scan */
 static unsigned char constant_log[CONSTANT_LOG_SIZE];
 /* the registers changed since the last upload (to any program): the
 smallest and largest, and the serial that upload was current to. A program
-current to that serial needs them, and nothing in the log. */
-static unsigned long constants_checkpoint_serial, constants_checkpoint_first = XGPU_VERTEX_CONSTANT_COUNT,
-	constants_checkpoint_last;
+current to that serial needs them, and nothing in the log. The serial is
+64-bit as the others are (cut to 32, it matched a program left at an old
+serial, which then took only the checkpoint's registers). */
+static unsigned long long constants_checkpoint_serial;
+static unsigned long constants_checkpoint_first = XGPU_VERTEX_CONSTANT_COUNT, constants_checkpoint_last;
 
 static void constants_store(unsigned long first, const void *data, unsigned long count)
 {
