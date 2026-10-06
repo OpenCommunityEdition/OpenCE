@@ -82,6 +82,10 @@ symbols in this file:
 #include "shaders/shaders.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+#include "cache/cache_files.h"
+#include "items/equipment_definitions.h"
+#include <float.h>
+#include <xtl.h>
 
 /* ---------- constants */
 
@@ -413,6 +417,82 @@ static void render_model_parts(
 }
 
 /* ---------- public code */
+
+static boolean model_rigid_render_radius(
+	struct model const *model,
+	real_point3d const *center,
+	real *radius)
+{
+	struct model_node const *root;
+	real maximum_squared = 0.0f;
+	long geometry_index, vertex_count = 0;
+	if (model->nodes.count != 1 || !model->nodes.address ||
+		model->geometries.count <= 0 || model->geometries.count > MAXIMUM_GEOMETRIES_PER_MODEL ||
+		!model->geometries.address) return FALSE;
+	root = TAG_BLOCK_GET_ELEMENT(&model->nodes, 0, struct model_node);
+	/* Include every LOD/permutation. A one-node model has a fixed mesh in
+	 * root-node space; skeletal animation needs a different bounds policy. */
+	for (geometry_index = 0; geometry_index < model->geometries.count; ++geometry_index)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index, struct model_geometry);
+		long part_index;
+		if (geometry->parts.count < 0 || geometry->parts.count > MAXIMUM_PARTS_PER_MODEL_GEOMETRY ||
+			(geometry->parts.count && !geometry->parts.address)) return FALSE;
+		for (part_index = 0; part_index < geometry->parts.count; ++part_index)
+		{
+			struct model_geometry_part const *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index, struct model_geometry_part);
+			struct vertex_buffer const *buffer = &part->vertex_buffer;
+			byte *vertices = NULL;
+			long stride, i;
+			boolean valid = TRUE;
+			if (TEST_FLAG(part->flags, _model_geometry_part_stripped_bit)) continue;
+			if (TEST_FLAG(part->flags, _model_geometry_part_local_nodes_bit) || !buffer->hardware_format || buffer->offset ||
+				buffer->count <= 0 || buffer->count > MAXIMUM_VERTICES_PER_MODEL_GEOMETRY_PART ||
+				(buffer->type != _rasterizer_vertex_type_model_compressed && buffer->type != _rasterizer_vertex_type_model_uncompressed)) return FALSE;
+			stride = rasterizer_geometry_get_vertex_size(buffer->type);
+			IDirect3DVertexBuffer8_Lock(buffer->hardware_format, 0, 0, &vertices, D3DLOCK_READONLY);
+			if (!vertices) valid = FALSE;
+			for (i = 0; valid && i < buffer->count; ++i)
+			{
+				real_point3d point;
+				real squared;
+				matrix4x3_transform_point(&root->runtime_default_inverse_matrix,
+					(real_point3d const *)(vertices + i * stride), &point);
+				squared = distance_squared3d(&point, center);
+				if (!(squared >= 0.0f && squared < FLT_MAX)) valid = FALSE;
+				else maximum_squared = MAX(maximum_squared, squared);
+			}
+			IDirect3DVertexBuffer8_Unlock(buffer->hardware_format);
+			if (!valid) return FALSE;
+			vertex_count += buffer->count;
+		}
+	}
+	if (!vertex_count) return FALSE;
+	/* Round outward so the extremal vertex stays inside the sphere. */
+	*radius = nextafterf(sqrtf(maximum_squared), FLT_MAX);
+	return TRUE;
+}
+
+void models_fix_powerup_render_bounds(void)
+{
+	struct tag_iterator iterator;
+	long index;
+	tag_iterator_new(&iterator, EQUIPMENT_DEFINITION_TAG);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct equipment_definition *equipment = equipment_definition_get(index);
+		real radius;
+		if ((equipment->equipment.powerup_type == _equipment_powerup_overshield ||
+			equipment->equipment.powerup_type == _equipment_powerup_active_camouflage) &&
+			equipment->object.model.index != NONE && equipment->object.animation_graph.index == NONE &&
+			model_rigid_render_radius(model_definition_get(equipment->object.model.index), &equipment->object.bounding_offset, &radius) &&
+			radius > equipment->object.render_bounding_radius)
+		{
+			/* Derived tag data only: leave physics, pickup radius and saves intact. */
+			equipment->object.render_bounding_radius = radius;
+		}
+	}
+}
 
 void model_interpolate_node_orientations(
 	struct model const *model,
