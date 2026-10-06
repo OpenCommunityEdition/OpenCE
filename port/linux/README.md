@@ -855,6 +855,10 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   The host does the windows, the displays, the 2D renderer, the dialogs
   and the downloads of the self-updater (`src/posix_update.c`).
 - The renderer uses OpenGL ES, as on Android.
+- The host keeps the GPU driver from the kernel's `trace_marker`, as the
+  x86 build does (`src/posix_trace_marker.c`, under "The platform layer"
+  below): on the Steam Frame, its markers took the game from the headset's
+  72 Hz to about 50 frames a second.
 
 ## What operates
 

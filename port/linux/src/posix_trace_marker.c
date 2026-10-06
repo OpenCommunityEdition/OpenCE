@@ -13,7 +13,8 @@ trace_marker that cannot be opened turns the markers off (gpuvis then skips
 them).
 
 This executable defines open() and openat() (and their 64-bit names), which
-the link exports (tools/linux_build.py), so the driver's calls come here:
+the link exports (tools/linux_build.py, and tools/linux_arm64_build.py for
+the arm64 build's host), so the driver's calls come here:
 they refuse trace_marker and pass everything else to the C library's.
 HALO_GPU_TRACE_MARKERS=1 lets the driver open it, to capture with gpuvis.
 Built with the host ABI.
