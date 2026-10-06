@@ -1311,6 +1311,16 @@ long find_best_starting_location_index(
 		}
 	}
 
+	/* port: a multiplayer map played alone (New Game's MULTIPLAYER maps:
+	no game engine) has no starting location for no game type, every one
+	being for its game types: the player starts at any of them, not at none
+	(outside the map, with no pause menu) */
+	if (best_starting_location_index == NONE && !game_engine_running() && starting_location_count > 0)
+	{
+		best_starting_location_index = (short)PIN(
+			(short)(real_random_range(0.0f, 1.0f) * starting_location_count), 0, starting_location_count - 1);
+	}
+
 	return best_starting_location_index;
 }
 

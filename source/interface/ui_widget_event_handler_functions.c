@@ -2431,6 +2431,14 @@ static boolean network_game_remove_local_player(
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 4073,
 		event && event->controller_index >= 0 && event->controller_index < 4,
 		"valid controller index required to remove player from network game");
+	/* port: a multiplayer map played alone (its pause screen: ui_widget.c's
+	ui_check_for_pause_game) has no network game to leave: the main menu,
+	the map not saved (as the campaign's pause screen quits it) */
+	if (!global_network_game_client_get())
+	{
+		main_goto_main_menu();
+		return TRUE;
+	}
 	network_game_client_local_player_quit(event->controller_index);
 	/* port: a split screen player who quit, the others staying, is not
 	joined to the next game */

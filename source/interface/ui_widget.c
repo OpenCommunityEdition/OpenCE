@@ -7245,6 +7245,30 @@ static boolean ui_check_for_pause_game(
 				{
 					if (game_time_get_paused() == TRUE)
 						ui_widgets_close_all();
+					/* port: (and a multiplayer map's own, below, which pauses
+					nothing, closes as in a multiplayer game) */
+					else if (tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\pause_game\\pause_game") == NONE)
+						ui_widget_delete(widget_globals.active_widgets[controller_index]);
+				}
+				/* port: a multiplayer map played alone (New Game's MULTIPLAYER
+				maps) has no campaign pause screen, but its own (LEAVE GAME
+				goes to the main menu: network_game_remove_local_player) */
+				else if (tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\solo_game\\pause_game\\pause_game") == NONE &&
+					tag_loaded(UI_WIDGET_DEFINITION_TAG, "ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game") != NONE)
+				{
+					if (!ui_widget_load_by_name_or_tag(
+						"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
+						NONE,
+						NULL,
+						controller_index,
+						NONE,
+						NONE,
+						NONE))
+					{
+						error(
+							_error_silent,
+							"failed to load multiplayer pause game window");
+					}
 				}
 				else if (!ui_widget_load_by_name_or_tag(
 					"ui\\shell\\solo_game\\pause_game\\pause_game",
