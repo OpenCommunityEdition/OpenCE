@@ -623,6 +623,13 @@ void halo_input_shown_name(const char *binding, char *shown, size_t size)
 	SDL_Keycode key;
 
 	snprintf(shown, size, "%s", binding);
+#ifdef HALO_ANDROID
+	/* (the Android guest's SDL has no keyboard layouts to ask: the US
+	names, which match a hardware keyboard's usual labels there) */
+	(void)input;
+	(void)key;
+	return;
+#else
 	if (input < 0 || input >= SDL_SCANCODE_COUNT)
 		return;
 	/* (as in key events: the French number row shows its numbers, and a
@@ -641,6 +648,7 @@ void halo_input_shown_name(const char *binding, char *shown, size_t size)
 		shown[0] = (char)key;
 		shown[1] = 0;
 	}
+#endif
 }
 
 static void bindings_read(void)
