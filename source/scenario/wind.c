@@ -185,6 +185,7 @@ void wind_update(
 	void)
 {
 	short weather_palette_index;
+	short weather_palette_count;
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
 	struct tag_block *weather_palette_block;
 
@@ -195,9 +196,11 @@ void wind_update(
 	wind_globals.time++;
 	weather_palette_index = 0;
 	weather_palette_block = &structure_bsp->weather_palette;
+	/* port: no more entries than there are wind states (a map's count) */
+	weather_palette_count = (short)MIN(weather_palette_block->count, (long)NUMBEROF(wind_globals.wind_states));
 
 	for (;
-		weather_palette_index < weather_palette_block->count;
+		weather_palette_index < weather_palette_count;
 		weather_palette_index++)
 	{
 		struct structure_weather_palette_entry *weather_palette =
@@ -263,7 +266,7 @@ void wind_update(
 		}
 	}
 
-	wind_globals.count = (short)weather_palette_block->count;
+	wind_globals.count = weather_palette_count;
 
 	return;
 }
@@ -370,7 +373,8 @@ boolean scenario_get_current(
 				fog_region_index,
 				struct structure_fog_region);
 
-			if (fog_region->fog_palette_index != NONE
+			/* port: and the palette entry is one the map has */
+			if (VALID_INDEX(fog_region->fog_palette_index, structure_bsp->fog_palette.count)
 				&& fog_region->weather_palette_index != NONE)
 			{
 				struct structure_fog_palette_entry *fog_palette =

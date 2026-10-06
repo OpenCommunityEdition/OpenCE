@@ -311,10 +311,19 @@ enum
 	HS_THREAD_STACK_SIZE = 0x200
 };
 
+/* port: the size of the text an inspector writes (hs_evaluate_inspect) */
+enum
+{
+	HS_INSPECT_BUFFER_SIZE = 1024
+};
+
 enum
 {
 	_hs_thread_in_function_call_bit = 0,
 	_hs_thread_sleeping_bit,
+	/* port: the thread's stack overflowed (hs_stack_overflow); hs_thread_main
+	ends it */
+	_hs_thread_stack_overflow_bit,
 	_hs_global_external_bit = 15,
 };
 
@@ -494,7 +503,11 @@ static void hs_thread_delete(
 static long hs_thread_new(
 	short type,
 	long script_index);
-static void hs_stack_push(
+static boolean hs_stack_push(
+	long thread_index);
+static void hs_stack_overflow(
+	long thread_index);
+static void hs_syntax_error(
 	long thread_index);
 static void *hs_stack_allocate(
 	long thread_index,
@@ -531,6 +544,7 @@ struct data_array *hs_global_data;
 struct data_array *hs_thread_data;
 extern struct data_array *hs_syntax_data;
 extern short const hs_external_global_count;
+extern long const hs_function_table_count;
 extern short const hs_type_sizes[NUMBER_OF_HS_TYPES];
 boolean debug_scripting;
 unsigned long hs_debug_data[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_TRIGGER_VOLUMES_PER_SCENARIO)];
@@ -1120,6 +1134,24 @@ void render_debug_trigger_volumes(
 	return;
 }
 
+/* port: moves every sleeping script thread's wake time on by `ticks`, after
+a network co-op host reverts but keeps its clock (network_coop.c) */
+void hs_runtime_port_shift_sleep_times(
+	long ticks)
+{
+	struct data_iterator iterator;
+	struct hs_thread_datum *thread;
+
+	data_iterator_new(&iterator, hs_thread_data);
+	while ((thread = data_iterator_next(&iterator)) != NULL)
+	{
+		if (thread->sleep_until > 0)
+			thread->sleep_until += ticks;
+		if (thread->previous_sleep_until > 0)
+			thread->previous_sleep_until += ticks;
+	}
+}
+
 void hs_runtime_update(
 	void)
 {
@@ -1286,7 +1318,7 @@ static void hs_thread_delete(
 	return;
 }
 
-static void hs_stack_push(
+static boolean hs_stack_push(
 	long thread_index)
 {
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
@@ -1297,9 +1329,55 @@ static void hs_stack_push(
 		(byte *) (new_frame+1)<thread->stack_data+HS_THREAD_STACK_SIZE,
 		"stack overflow.");
 
+	/* port: a frame past the thread's stack isn't pushed (it would be
+	written over the next thread's datum): the thread is ended instead */
+	if ((byte *)(new_frame+1)>=thread->stack_data+HS_THREAD_STACK_SIZE ||
+		TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+	{
+		hs_stack_overflow(thread_index);
+
+		return FALSE;
+	}
+
 	new_frame->previous = thread->stack;
 	thread->stack = new_frame;
 	new_frame->size = 0;
+
+	return TRUE;
+}
+
+/* port: a script whose stack overflows is ended rather than let write past
+its thread's stack: the push or allocation is refused (its caller returns),
+and hs_thread_main lets the thread's frames go once the evaluation in hand
+returns */
+static void hs_stack_overflow(
+	long thread_index)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+	if (!TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+	{
+		error(_error_silent, "a problem occurred while executing the script %s: stack overflow. (it was stopped)",
+			hs_thread_format(thread_index));
+		SET_FLAG(thread->flags, _hs_thread_stack_overflow_bit, TRUE);
+	}
+
+	return;
+}
+
+/* port: a script that reaches a syntax node a damaged map has wrong
+(hs_evaluate, hs_thread_main) is ended as one whose stack overflows is */
+static void hs_syntax_error(
+	long thread_index)
+{
+	struct hs_thread_datum *thread = hs_thread_get(thread_index);
+
+	if (!TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+	{
+		error(_error_silent, "a problem occurred while executing the script %s: corrupt syntax tree. (it was stopped)",
+			hs_thread_format(thread_index));
+		SET_FLAG(thread->flags, _hs_thread_stack_overflow_bit, TRUE);
+	}
 
 	return;
 }
@@ -1498,7 +1576,9 @@ static void hs_inspect_string(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x26d,
 		type==_hs_type_string);
 
-	sprintf(buffer, "%s", (char const *)value);
+	/* port: no longer than hs_evaluate_inspect's buffer (a script's
+	string can be any length) */
+	snprintf(buffer, HS_INSPECT_BUFFER_SIZE, "%s", (char const *)value);
 
 	return;
 }
@@ -1516,6 +1596,14 @@ static void hs_inspect_enum(
 	match_vassert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x27c,
 		(short)value>=0 && (short)value<enum_definition->count,
 		"enum_value>=0 && enum_value<enum_definition->count");
+
+	/* port: a value that isn't one of the enum's isn't looked up */
+	if ((short)value<0 || (short)value>=enum_definition->count)
+	{
+		sprintf(buffer, "<invalid %s %d>", hs_type_names[type], (short)value);
+
+		return;
+	}
 
 	sprintf(buffer, "%s", enum_definition->values[(short)value]);
 
@@ -1818,6 +1906,10 @@ void hs_evaluate_begin(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x15,
 		function_index==_hs_function_begin);
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!expression_index || !result)
+		return;
+
 	if (initialize)
 	{
 		*expression_index = hs_syntax_get(hs_syntax_get(
@@ -1945,6 +2037,10 @@ void hs_evaluate_logical(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0xcf,
 		function_index==_hs_function_and || function_index==_hs_function_or);
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!expression_index || !value || !result)
+		return;
+
 	if (initialize)
 	{
 		*expression_index = hs_syntax_get(hs_syntax_get(
@@ -1996,6 +2092,10 @@ void hs_evaluate_if(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x77,
 		function_index==_hs_function_if);
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!condition || !expression_index || !result)
+		return;
+
 	if (initialize)
 	{
 		*condition = 0;
@@ -2046,7 +2146,9 @@ void hs_evaluate_set(
 	short type;
 	long global_index;
 
-	hs_stack_allocate(thread_index, sizeof(long));
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!hs_stack_allocate(thread_index, sizeof(long)))
+		return;
 	type = hs_global_get_type((short)variable->data);
 
 	if (initialize)
@@ -2082,12 +2184,16 @@ void hs_evaluate_inspect(
 	long thread_index,
 	boolean initialize)
 {
-	char string[1024];
+	char string[HS_INSPECT_BUFFER_SIZE];
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	long *value = hs_stack_allocate(thread_index, sizeof(long));
 
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x2bc,
 		function_index==_hs_function_inspect);
+
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!value)
+		return;
 
 	if (initialize)
 	{
@@ -2100,14 +2206,15 @@ void hs_evaluate_inspect(
 		struct hs_syntax_node *expression = hs_syntax_get(hs_syntax_get(hs_syntax_get(
 			thread->stack->expression_index)->data)->next_node_index);
 
-		if (hs_type_inspectors[expression->type])
+		/* port: (the type was checked as the value was evaluated: checked
+		again before it picks an inspector) */
+		if (hs_type_valid(expression->type) && hs_type_inspectors[expression->type])
 		{
 			hs_type_inspectors[expression->type](expression->type, *value, string);
-			/* BUG (preserved for exact matching): the inspected value's text is passed as the
-			 * format (January 0x4bc840 +0xdd..+0xe6), so inspecting a string that contains '%'
-			 * reads arguments that were never passed. A corrected build should print it through
-			 * "%s". Source-policy approval pending (2026-09-27 audit). */
-			console_printf(FALSE, string);
+			/* port: printed through "%s". January passes the text as the
+			format (0x4bc840 +0xdd..+0xe6), so a '%' in an inspected string
+			read arguments that were never passed */
+			console_printf(FALSE, "%s", string);
 		}
 
 		hs_return(thread_index, 0);
@@ -2127,6 +2234,10 @@ void hs_evaluate_arithmetic(
 	real *value = hs_stack_allocate(thread_index, sizeof(real));
 	real *result = hs_stack_allocate(thread_index, sizeof(real));
 	long result_long;
+
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!argument_index || !expression_index || !value || !result)
+		return;
 
 	if (initialize)
 	{
@@ -2201,6 +2312,10 @@ void hs_evaluate_object_cast_up(
 		function_index>=_hs_function_object_to_unit &&
 		function_index<=_hs_function_object_to_unit);
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!object_index)
+		return;
+
 	if (initialize)
 	{
 		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
@@ -2245,6 +2360,10 @@ void hs_evaluate_begin_random(
 
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x45,
 		function_index==_hs_function_begin_random);
+
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!argument_count || !evaluated || !result)
+		return;
 
 	if (initialize)
 	{
@@ -2299,6 +2418,10 @@ void hs_evaluate_debug_string(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x304,
 		(function_index>=_hs_function_debug_string__first) &&
 		(function_index<=_hs_function_debug_string__last));
+
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!expression_index || !argument_count || !arguments)
+		return;
 
 	if (initialize)
 	{
@@ -2365,6 +2488,10 @@ void hs_evaluate_sleep_until(
 
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x1e5,
 		function_index==_hs_function_sleep_until);
+
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!condition || !ticks || !timeout || !start_time || !argument_index)
+		return;
 
 	if (initialize)
 	{
@@ -2437,6 +2564,10 @@ void hs_evaluate_sleep(
 	match_assert("c:\\halo\\source\\hs\\hs_library_internal_runtime.h", 0x189,
 		function_index==_hs_function_sleep);
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!ticks || !script_index || !argument_index)
+		return;
+
 	if (initialize)
 	{
 		hs_evaluate(thread_index, hs_syntax_get(hs_syntax_get(
@@ -2506,6 +2637,7 @@ static void hs_thread_main(
 {
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	struct hs_script *script = NULL;
+	long *root_result;
 
 	hs_runtime_globals.executing_thread_index = (short)thread_index;
 	if (thread->type==_hs_thread_type_script)
@@ -2529,8 +2661,10 @@ static void hs_thread_main(
 		match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2c3, script);
 
 		thread->stack->size = 0;
-		hs_evaluate(thread_index, script->root_expression_index,
-			hs_stack_allocate(thread_index, sizeof(long)));
+		/* port: (the base frame, just emptied, has room) */
+		root_result = hs_stack_allocate(thread_index, sizeof(long));
+		if (root_result)
+			hs_evaluate(thread_index, script->root_expression_index, root_result);
 	}
 
 	while (thread->stack!=(struct hs_stack_frame *)thread->stack_data &&
@@ -2540,11 +2674,22 @@ static void hs_thread_main(
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(thread->stack->expression_index);
 		boolean initialize = TEST_FLAG(thread->flags, _hs_thread_in_function_call_bit);
+		long index_count;
 
 		thread->stack->size = 0;
 		SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, FALSE);
 
-		if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
+		/* port: a function or script that isn't there isn't called, and the
+		thread is ended. hs_evaluate pushes only nodes whose index was
+		checked, but this index picks a function pointer */
+		index_count = TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ?
+			global_scenario_get()->hs_scripts.count :
+			hs_function_table_count;
+		if (expression->index<0 || expression->index>=index_count)
+		{
+			hs_syntax_error(thread_index);
+		}
+		else if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
 		{
 			struct hs_function_definition *function = hs_function_get(expression->index);
 
@@ -2558,6 +2703,15 @@ static void hs_thread_main(
 		else
 		{
 			hs_script_evaluate(expression->index, thread_index, initialize);
+		}
+
+		/* port: a stack overflow (hs_stack_overflow) ends the thread: its
+		frames are let go, and a script's thread doesn't run again */
+		if (TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+		{
+			thread->stack = (struct hs_stack_frame *)thread->stack_data;
+			thread->flags = 0;
+			thread->sleep_until = thread->type==_hs_thread_type_script ? NONE : 0;
 		}
 	}
 
@@ -2594,6 +2748,10 @@ static void hs_script_evaluate(
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	long *result = hs_stack_allocate(thread_index, sizeof(long));
 
+	/* port: none on a stack overflow (hs_stack_overflow) */
+	if (!result)
+		return;
+
 	if (initialize)
 		hs_evaluate(thread_index, script->root_expression_index, result);
 	else
@@ -2618,6 +2776,17 @@ static void *hs_stack_allocate(
 		frame->data+frame->size+size<=thread->stack_data+HS_THREAD_STACK_SIZE,
 		"stack overflow.");
 
+	/* port: none past the thread's stack (hs_stack_overflow); the caller
+	returns on NULL */
+	if (size<0 ||
+		size>thread->stack_data+HS_THREAD_STACK_SIZE-(frame->data+frame->size) ||
+		TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
+	{
+		hs_stack_overflow(thread_index);
+
+		return NULL;
+	}
+
 	result = frame->data+frame->size;
 	frame->size += (short)size;
 
@@ -2635,6 +2804,18 @@ static void hs_evaluate(
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2ff, thread_index,
 		valid_thread(thread), "corrupted stack.");
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x300, destination);
+
+	/* port: only a node with a value's type is evaluated. Those are the
+	ones hs_compile_postprocess checked: their function or script index, and
+	the type a constant or global casts from. A node that isn't there, or a
+	function's name (left unchecked, and never in a value's place in the
+	shipped maps), comes only from a damaged map: the thread is ended */
+	if (!expression || !hs_type_valid(expression->type))
+	{
+		hs_syntax_error(thread_index);
+
+		return;
+	}
 
 	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
 	{
@@ -2658,9 +2839,12 @@ static void hs_evaluate(
 	else
 	{
 		thread->stack->result = destination;
-		hs_stack_push(thread_index);
-		SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, TRUE);
-		thread->stack->expression_index = expression_index;
+		/* port: not pushed on a stack overflow (hs_stack_overflow) */
+		if (hs_stack_push(thread_index))
+		{
+			SET_FLAG(thread->flags, _hs_thread_in_function_call_bit, TRUE);
+			thread->stack->expression_index = expression_index;
+		}
 	}
 
 	return;
@@ -3113,6 +3297,11 @@ static long *hs_arguments_evaluate(
 	long *values = hs_stack_allocate(thread_index, formal_parameter_count*sizeof(long));
 	short *argument_index = hs_stack_allocate(thread_index, sizeof(short));
 	long *expression_index = hs_stack_allocate(thread_index, sizeof(long));
+
+	/* port: none on a stack overflow (hs_stack_overflow): as for arguments
+	still being evaluated, the caller returns on NULL */
+	if (!values || !argument_index || !expression_index)
+		return NULL;
 
 	if (initialize)
 	{

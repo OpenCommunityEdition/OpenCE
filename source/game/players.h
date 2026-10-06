@@ -295,6 +295,11 @@ void player_control_new_unit(
 	long unit_index);
 void player_control_action_test_reset(
 	void);
+void player_control_action_test_note(
+	unsigned long unit_control_flags,
+	real_euler_angles2d const *facing_delta,
+	real_vector2d const *throttle,
+	real primary_trigger);
 boolean player_control_action_test_accept(
 	void);
 boolean player_control_action_test_back(
@@ -372,6 +377,17 @@ short players_get_respawn_failure(
 	void);
 
 boolean players_respawn_coop(
+	void);
+/* port: network co-op checkpoints (players.c): remember where the players
+were at the last checkpoint, and respawn everyone there. Players other than
+the first are held back from spawning on a new level: until its opening
+cutscene ends and a teammate has been free on foot a few seconds (not
+riding a vehicle, nor held by the scripts). */
+boolean players_coop_waiting_to_start(
+	long player_index);
+void players_note_checkpoint(
+	void);
+void players_respawn_at_checkpoint(
 	void);
 void players_reconnect_to_structure_bsp(
 	void);

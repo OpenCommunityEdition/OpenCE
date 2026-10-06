@@ -131,6 +131,11 @@ enum
 	_portal_hull_from_portal_discarded,
 	_portal_hull_from_portal_degenerate,
 	MAXIMUM_PORTAL_HULL_VERTICES = 256,
+	/* port: how deep structure_visibility_build_surfaces_traverse_node goes
+	in a bsp (from the map) before it stops: four times the deepest bsp the
+	tools' leaf maps hold (leaf_map.c's 256-node stack), where the retail
+	bsps are at most 66 deep */
+	MAXIMUM_STRUCTURE_BSP_TRAVERSAL_DEPTH = 1024,
 	COMPRESSED_STRUCTURE_VERTEX_SIZE = 0x20,
 	_shader_type_environment = 3,
 };
@@ -310,7 +315,8 @@ static short structure_visibility_build_surfaces_traverse_node(
 	real_rectangle3d const *cull_bounds,
 	short cull_plane_count,
 	real_plane3d const *cull_planes,
-	short intersection);
+	short intersection,
+	short depth);
 static void structure_visibility_traverse_subclusters(
 	struct structure_bsp *structure);
 static void structure_visibility_traverse_surface_lists(
@@ -328,6 +334,11 @@ static const real_plane3d screen_plane =
 };
 
 static boolean warned_about_missing_subclusters;
+/* port: whether a map's malformed bsp was reported (once each) */
+static boolean warned_about_portal_hull_vertices;
+static boolean warned_about_invalid_structure_bsp;
+static boolean warned_about_rendered_clusters;
+static boolean warned_about_structure_bsp_depth;
 static struct structure_visibility_globals structure_visibility_globals;
 static struct profile_section render_structure_visibility_portal_traversal =
 	{ "render_structure_visibility_portal_traversal", NONE, TRUE };
@@ -375,7 +386,10 @@ leaf_index_ready:
 	render.visible_sky_index = NONE;
 	render.visible_sky_model = FALSE;
 
-	if (leaf_index != NONE)
+	/* port: a leaf (from the map) that is no leaf, or in no cluster, is
+	in none */
+	if (leaf_index != NONE &&
+		(leaf_index & LONG_MAX) < structure->leaves.count)
 	{
 		struct structure_leaf *leaf = TAG_BLOCK_GET_ELEMENT(
 			&structure->leaves,
@@ -384,6 +398,10 @@ leaf_index_ready:
 		struct structure_cluster *cluster;
 		struct structure_visibility_sky *sky;
 
+		if (leaf->cluster_index < 0 || leaf->cluster_index >= structure->clusters.count)
+		{
+			return;
+		}
 		render.cluster_index = leaf->cluster_index;
 		cluster = TAG_BLOCK_GET_ELEMENT(&structure->clusters, render.cluster_index, struct structure_cluster);
 		render.visible_sky_index = cluster->sky_index;
@@ -455,6 +473,14 @@ static void structure_visibility_traverse_subclusters(
 				(short)surface_list_index < subcluster->surface_indices.count;
 				surface_index_buffer++, surface_list_index++)
 			{
+				/* port: a surface index (from the map) that is no surface is
+				skipped (the bsp's surfaces fit the flags, as
+				structure_bsp_port_verify checked) */
+				if ((unsigned long)*surface_index_buffer >= (unsigned long)structure->surfaces.count)
+				{
+					continue;
+				}
+
 				if (!BIT_VECTOR_TEST_FLAG(render.environment_surface_flags, *surface_index_buffer))
 				{
 					if (render.environment_surface_count >= MAXIMUM_RENDERED_ENVIRONMENT_SURFACES)
@@ -496,18 +522,40 @@ static void structure_visibility_traverse_surface_lists(
 
 		while (consumed_surface_index_count < cluster->surface_indices.count)
 		{
-			struct structure_material *material = TAG_BLOCK_GET_ELEMENT(
-				&TAG_BLOCK_GET_ELEMENT(
-					&structure->lightmaps,
-					surface_index_buffer[0],
-					struct structure_lightmap)->materials,
+			struct tag_block *materials;
+			struct structure_material *material;
+			long group_end;
+
+			/* port: a group (from the map) whose header is not all in the
+			list, or names no lightmap's material, ends the list; its
+			surfaces end with the list */
+			if (consumed_surface_index_count > cluster->surface_indices.count - 3 ||
+				surface_index_buffer[0] < 0 ||
+				surface_index_buffer[0] >= structure->lightmaps.count)
+			{
+				break;
+			}
+			materials = &TAG_BLOCK_GET_ELEMENT(
+				&structure->lightmaps,
+				surface_index_buffer[0],
+				struct structure_lightmap)->materials;
+			if (surface_index_buffer[1] < 0 ||
+				surface_index_buffer[1] >= materials->count)
+			{
+				break;
+			}
+			material = TAG_BLOCK_GET_ELEMENT(
+				materials,
 				surface_index_buffer[1],
 				struct structure_material);
-			long group_end;
 
 			surface_index_buffer += 2;
 			group_end = consumed_surface_index_count + *surface_index_buffer++ + 3;
 			consumed_surface_index_count += 3;
+			if (group_end > cluster->surface_indices.count)
+			{
+				group_end = cluster->surface_indices.count;
+			}
 
 			while (consumed_surface_index_count < group_end)
 			{
@@ -523,6 +571,12 @@ static void structure_visibility_traverse_surface_lists(
 					"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 					0x1A0,
 					surface_index_buffer-(long *) cluster->surface_indices.address<=cluster->surface_indices.count);
+				/* port: (as in structure_visibility_traverse_subclusters) */
+				if ((unsigned long)surface_index >= (unsigned long)structure->surfaces.count)
+				{
+					consumed_surface_index_count++;
+					continue;
+				}
 				if (!BIT_VECTOR_TEST_FLAG(render.environment_surface_flags, surface_index))
 				{
 					struct structure_visibility_surface *surface = TAG_BLOCK_GET_ELEMENT(
@@ -861,6 +915,20 @@ static short portal_hull_from_points(
 	short hull_result;
 
 	result->vertex_count = 0;
+
+	/* port: a portal or mirror (from the map) with more vertices than
+	viewer_points holds is not seen through */
+	if (vertex_count < 0 || vertex_count > MAXIMUM_PORTAL_HULL_VERTICES)
+	{
+		if (!warned_about_portal_hull_vertices)
+		{
+			error(_error_silent, "a portal or mirror has %d vertices (maximum %d)",
+				vertex_count, MAXIMUM_PORTAL_HULL_VERTICES);
+			warned_about_portal_hull_vertices = TRUE;
+		}
+		return _portal_hull_from_portal_discarded;
+	}
+
 	facing = plane3d_distance_to_point(plane, &camera->position) * winding;
 
 	if (camera->mirrored)
@@ -871,6 +939,11 @@ static short portal_hull_from_points(
 	if (fabs(facing) < 0.1f)
 	{
 		hull_result = _portal_hull_from_portal_degenerate;
+	}
+	else if (facing > 0.0f && vertex_count < NUMBER_OF_VERTICES_PER_TRIANGLE)
+	{
+		/* port: nor is one with too few to clip (no hull was made of it) */
+		hull_result = _portal_hull_from_portal_discarded;
 	}
 	else if (facing > 0.0f)
 	{
@@ -895,6 +968,13 @@ static short portal_hull_from_points(
 			"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 			0x485,
 			result->vertex_count!=NONE);
+		/* port: a polygon (from the map) that clips to more vertices than a
+		hull holds makes none (the hull's vertices are not written past) */
+		if (result->vertex_count == NONE)
+		{
+			result->vertex_count = 0;
+			return _portal_hull_from_portal_discarded;
+		}
 
 		if (winding == 1)
 		{
@@ -944,6 +1024,18 @@ static short portal_hull_from_portal(
 		portal_index,
 		struct structure_visibility_portal);
 
+	/* port: a portal (from the map) whose plane is no plane is not seen
+	through */
+	if (portal->plane_index < 0 ||
+		portal->plane_index >= TAG_BLOCK_GET_ELEMENT(
+			&structure->collision_bsp,
+			0,
+			struct collision_bsp)->bsp3d.planes.count)
+	{
+		result->vertex_count = 0;
+		return _portal_hull_from_portal_discarded;
+	}
+
 	return portal_hull_from_points(
 		&render.camera,
 		&render.frustum,
@@ -968,7 +1060,9 @@ boolean structure_visibility_find_mirror(
 	struct structure_bsp *structure = global_structure_bsp_get();
 	boolean found = FALSE;
 
-	if (render.cluster_index != NONE)
+	/* port: (nor mirrors) */
+	if (render.cluster_index != NONE &&
+		structure_bsp_port_verify(structure))
 	{
 		real_rectangle2d projection_bounds;
 		struct portal_hull projection_hull;
@@ -1109,11 +1203,19 @@ static short structure_visibility_build_surfaces_traverse_clusters(
 		(short)cluster_list_index < cluster_count && found_count < maximum_count;
 		cluster_list_index++)
 	{
-		struct structure_visibility_cluster *cluster = TAG_BLOCK_GET_ELEMENT(
+		struct structure_visibility_cluster *cluster;
+		long subcluster_index;
+
+		/* port: a cluster index that fits no cluster is skipped */
+		if (cluster_indices[(short)cluster_list_index] < 0 ||
+			cluster_indices[(short)cluster_list_index] >= structure->clusters.count)
+		{
+			continue;
+		}
+		cluster = TAG_BLOCK_GET_ELEMENT(
 			&structure->clusters,
 			cluster_indices[(short)cluster_list_index],
 			struct structure_visibility_cluster);
-		long subcluster_index;
 
 		for (subcluster_index = 0;
 			(short)subcluster_index < cluster->subclusters.count && found_count < maximum_count;
@@ -1137,6 +1239,12 @@ static short structure_visibility_build_surfaces_traverse_clusters(
 					(short)surface_list_index < subcluster->surface_indices.count;
 					surface_index_buffer++, surface_list_index++)
 				{
+					/* port: (as in structure_visibility_traverse_subclusters) */
+					if ((unsigned long)*surface_index_buffer >= (unsigned long)structure->surfaces.count)
+					{
+						continue;
+					}
+
 					if (BIT_VECTOR_TEST_FLAG(render.environment_surface_flags, *surface_index_buffer) &&
 						!BIT_VECTOR_TEST_FLAG(surface_flags, *surface_index_buffer))
 					{
@@ -1173,11 +1281,26 @@ static short structure_visibility_build_surfaces_traverse_leaf(
 {
 	short found_count = 0;
 	struct structure_bsp *structure = global_structure_bsp_get();
-	struct structure_leaf *leaf = TAG_BLOCK_GET_ELEMENT(
+	struct structure_leaf *leaf;
+	real_rectangle3d leaf_bounds;
+
+	/* port: a leaf (from the map) that is no leaf, or whose surfaces'
+	references are not all references, is not traversed */
+	if ((leaf_index & LONG_MAX) >= structure->leaves.count)
+	{
+		return 0;
+	}
+	leaf = TAG_BLOCK_GET_ELEMENT(
 		&structure->leaves,
 		leaf_index & LONG_MAX,
 		struct structure_leaf);
-	real_rectangle3d leaf_bounds;
+	if (leaf->first_surface_reference_index < 0 ||
+		leaf->surface_reference_count < 0 ||
+		leaf->first_surface_reference_index >
+			structure->surface_references.count - leaf->surface_reference_count)
+	{
+		return 0;
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
@@ -1226,6 +1349,12 @@ static short structure_visibility_build_surfaces_traverse_leaf(
 				struct structure_visibility_surface_reference);
 			long surface_index = reference->surface_index;
 
+			/* port: (as in structure_visibility_traverse_subclusters) */
+			if ((unsigned long)surface_index >= (unsigned long)structure->surfaces.count)
+			{
+				continue;
+			}
+
 			if (BIT_VECTOR_TEST_FLAG(render.environment_surface_flags, surface_index) &&
 				!BIT_VECTOR_TEST_FLAG(surface_flags, surface_index))
 			{
@@ -1255,7 +1384,8 @@ static short structure_visibility_build_surfaces_traverse_node(
 	real_rectangle3d const *cull_bounds,
 	short cull_plane_count,
 	real_plane3d const *cull_planes,
-	short intersection)
+	short intersection,
+	short depth)
 {
 	short found_count = 0;
 	struct structure_bsp *structure = global_structure_bsp_get();
@@ -1282,6 +1412,25 @@ static short structure_visibility_build_surfaces_traverse_node(
 		0x2AE,
 		intersection);
 
+	/* port: a node (from the map) that is no node, or deeper than any bsp
+	is (a cycle of nodes would never end), is not traversed */
+	if (node_index < 0 ||
+		node_index >= structure->nodes.count ||
+		node_index >= collision->bsp3d.nodes.count)
+	{
+		return 0;
+	}
+	if (depth >= MAXIMUM_STRUCTURE_BSP_TRAVERSAL_DEPTH)
+	{
+		if (!warned_about_structure_bsp_depth)
+		{
+			error(_error_silent, "structure bsp is more than %d nodes deep",
+				MAXIMUM_STRUCTURE_BSP_TRAVERSAL_DEPTH);
+			warned_about_structure_bsp_depth = TRUE;
+		}
+		return 0;
+	}
+
 	dequantize_byte_to_real_rectangle3d(
 		parent_bounds,
 		TAG_BLOCK_GET_ELEMENT(&structure->nodes, node_index, byte_rectangle3d),
@@ -1306,16 +1455,25 @@ static short structure_visibility_build_surfaces_traverse_node(
 			&collision->bsp3d.nodes,
 			node_index,
 			struct bsp3d_node);
-		real_plane3d *plane = TAG_BLOCK_GET_ELEMENT(
+		real_plane3d *plane;
+		real distance;
+		boolean descend_side[2];
+		short side;
+
+		/* port: (nor is one whose plane is no plane) */
+		if (node->plane_designator < 0 ||
+			node->plane_designator >= collision->bsp3d.planes.count)
+		{
+			return 0;
+		}
+		plane = TAG_BLOCK_GET_ELEMENT(
 			&collision->bsp3d.planes,
 			node->plane_designator,
 			real_plane3d);
-		real distance =
+		distance =
 			cull_sphere_center->x * plane->n.i +
 			cull_sphere_center->y * plane->n.j +
 			cull_sphere_center->z * plane->n.k - plane->d;
-		boolean descend_side[2];
-		short side;
 
 		descend_side[0] = distance < cull_sphere_radius;
 		descend_side[1] = distance > -cull_sphere_radius;
@@ -1336,7 +1494,8 @@ static short structure_visibility_build_surfaces_traverse_node(
 						cull_bounds,
 						cull_plane_count,
 						cull_planes,
-						intersection);
+						intersection,
+						(short)(depth + 1));
 				}
 				else if (node->children[side] != NONE)
 				{
@@ -1387,6 +1546,13 @@ short structure_visibility_build_surfaces(
 		0x266,
 		!bounding_surface_count || bounding_surfaces);
 
+	/* port: a bsp (from the map) bigger than the flags hold has no surfaces
+	found in it (structure_visibility_compute reports it) */
+	if (!structure_bsp_port_verify(structure))
+	{
+		return 0;
+	}
+
 	csmemset(
 		surface_flags,
 		0,
@@ -1416,7 +1582,8 @@ short structure_visibility_build_surfaces(
 			bounding_box,
 			bounding_surface_count,
 			bounding_surfaces,
-			_intersection_spanning);
+			_intersection_spanning,
+			0);
 	}
 
 	if (cluster_indices)
@@ -1467,7 +1634,8 @@ short structure_visibility_build_surfaces(
 		bounding_box,
 		bounding_surface_count,
 		bounding_surfaces,
-		_intersection_spanning);
+		_intersection_spanning,
+		0);
 }
 
 static void structure_visibility_traverse_cluster(
@@ -1490,6 +1658,22 @@ static void structure_visibility_traverse_cluster(
 		"c:\\halo\\SOURCE\\structures\\structure_visibility.c",
 		0x3EE,
 		valid_portal_hull(visible_region));
+
+	/* port: a cluster past the rendered clusters' room is not rendered, nor
+	is any past it traversed (render.rendered_clusters is not written past).
+	As the clusters being traversed are each rendered, this bounds how deep
+	the traversal goes, however a map's portals lead */
+	if (!BIT_VECTOR_TEST_FLAG(render.visible_cluster_flags, cluster_index) &&
+		render.rendered_cluster_count >= MAXIMUM_RENDERED_CLUSTERS)
+	{
+		if (!warned_about_rendered_clusters)
+		{
+			error(_error_silent, "more than %d clusters visible", MAXIMUM_RENDERED_CLUSTERS);
+			warned_about_rendered_clusters = TRUE;
+		}
+		return;
+	}
+
 	BIT_VECTOR_SET_FLAG(
 		structure_visibility_globals.visited_cluster_flags,
 		cluster_index,
@@ -1554,12 +1738,21 @@ static void structure_visibility_traverse_cluster(
 			&cluster->portal_indices,
 			(short)portal_list_index,
 			short);
-		struct structure_visibility_portal *portal = TAG_BLOCK_GET_ELEMENT(
+		struct structure_visibility_portal *portal;
+		boolean direction;
+		short neighbor_cluster_index;
+
+		/* port: a portal (from the map) that is no portal is skipped */
+		if (portal_index < 0 || portal_index >= structure->cluster_portals.count)
+		{
+			continue;
+		}
+		portal = TAG_BLOCK_GET_ELEMENT(
 			&structure->cluster_portals,
 			portal_index,
 			struct structure_visibility_portal);
-		boolean direction = portal->cluster_indices[0] == cluster_index;
-		short neighbor_cluster_index = portal->cluster_indices[direction];
+		direction = portal->cluster_indices[0] == cluster_index;
+		neighbor_cluster_index = portal->cluster_indices[direction];
 
 		if (neighbor_cluster_index >= 0 &&
 			neighbor_cluster_index < clusters->count &&
@@ -1684,6 +1877,24 @@ void structure_visibility_compute(
 {
 	struct structure_bsp *structure = global_structure_bsp_get();
 
+	/* port: a bsp (from the map) bigger than the engine's flags and arrays
+	of its clusters and surfaces hold, or without its clusters' pvs, has
+	nothing of it visible */
+	if (!structure_bsp_port_verify(structure))
+	{
+		if (!warned_about_invalid_structure_bsp)
+		{
+			error(_error_silent, "structure bsp has %ld clusters and %ld surfaces (maximum %d and %d), or too little cluster data",
+				structure->clusters.count, structure->surfaces.count,
+				MAXIMUM_CLUSTERS_PER_STRUCTURE, MAXIMUM_SURFACES_PER_STRUCTURE);
+			warned_about_invalid_structure_bsp = TRUE;
+		}
+		csmemset(render.visible_cluster_flags, 0, sizeof(render.visible_cluster_flags));
+		render.environment_surface_count = 0;
+		render.rendered_cluster_count = 0;
+		return;
+	}
+
 	profile_enter(render_structure_visibility_portal_traversal);
 	if (render.cluster_index != NONE)
 	{
@@ -1723,6 +1934,12 @@ void structure_visibility_compute(
 			if (BIT_VECTOR_TEST_FLAG(render.visible_cluster_flags, cluster_index))
 			{
 				struct rendered_cluster *rendered_cluster;
+
+				/* port: (as in structure_visibility_traverse_cluster) */
+				if (render.rendered_cluster_count >= MAXIMUM_RENDERED_CLUSTERS)
+				{
+					break;
+				}
 
 				TAG_BLOCK_GET_ELEMENT(
 					&structure->clusters,

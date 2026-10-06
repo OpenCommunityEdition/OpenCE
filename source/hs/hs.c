@@ -2787,6 +2787,7 @@ symbols in this file:
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
 #include "cache/cache_files.h"
+#include "cache/physical_memory_map.h" /* port: hs_scenario_syntax_data_valid */
 #include "cache/texture_cache.h"
 #include "camera/camera_scripting.h"
 #include "cutscene/cinematics.h"
@@ -2837,6 +2838,7 @@ symbols in this file:
 #include "main/main.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 
 /* ---------- constants */
 
@@ -3606,6 +3608,12 @@ boolean hs_scenario_merge(
 	struct scenario *source_scenario);
 static void hs_allocate(
 	void);
+static boolean hs_scenario_syntax_data_valid(
+	struct scenario const *scenario);
+static boolean hs_scenario_string_constants_valid(
+	struct scenario const *scenario);
+static void hs_scenario_scripts_disable(
+	struct scenario *scenario);
 static boolean hs_rebuild_source(
 	void);
 static boolean hs_compile_source(
@@ -3616,6 +3624,9 @@ boolean hs_scenario_postprocess(
 /* ---------- constants */
 
 #define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
+/* port: the size of the "hs globals" array (hs_runtime_initialize), which
+holds the external globals and the map's */
+#define MAXIMUM_HS_GLOBALS 0x400
 
 /* ---------- globals */
 
@@ -12093,17 +12104,103 @@ boolean hs_scenario_merge(
 	return success;
 }
 
+/* port: the scenario's script data as the map holds it, the header of its
+data array too (which hs_scenario_postprocess and the data array code go by,
+the nodes' count above all): inside the tag cache, and the data array of
+script nodes it has room for. The shipped maps' all are, of 19001 nodes
+(their names differ: a30's is "static script node"). */
+static boolean hs_scenario_syntax_data_valid(
+	struct scenario const *scenario)
+{
+	long const syntax_data_size =
+		sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
+	byte const *tag_cache = (byte const *)physical_memory_get_tag_cache_base_address();
+	byte const *address = (byte const *)scenario->hs_syntax_data.address;
+	struct data_array const *data = (struct data_array const *)address;
+
+	if (scenario->hs_syntax_data.size != syntax_data_size ||
+		!tag_cache ||
+		address < tag_cache ||
+		address > tag_cache+TAG_CACHE_SIZE-syntax_data_size ||
+		((unsigned long)address & 3))
+	{
+		return FALSE;
+	}
+
+	return data->signature == 'd@t@' &&
+		data->maximum_count == MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO &&
+		data->size == sizeof(struct hs_syntax_node) &&
+		data->valid &&
+		data->count >= 0 &&
+		data->count <= data->maximum_count &&
+		data->actual_count >= 0 &&
+		data->actual_count <= data->count &&
+		data->first_free_absolute_index >= 0 &&
+		data->first_free_absolute_index <= data->maximum_count &&
+		hs_scenario_string_constants_valid(scenario);
+}
+
+/* port: the scenario's script strings as the map holds them (the names
+and strings its nodes point into): inside the tag cache, with the 0x400
+bytes at their end that the console's expressions are written to
+(hs_compile_expression). The shipped maps' all are */
+static boolean hs_scenario_string_constants_valid(
+	struct scenario const *scenario)
+{
+	byte const *tag_cache = (byte const *)physical_memory_get_tag_cache_base_address();
+	byte const *address = (byte const *)scenario->hs_string_constants.address;
+	long size = scenario->hs_string_constants.size;
+
+	return tag_cache &&
+		size >= 0x400 &&
+		size <= TAG_CACHE_SIZE &&
+		address >= tag_cache &&
+		address <= tag_cache+TAG_CACHE_SIZE-size;
+}
+
+/* port: the scenario runs no scripts, its script data not being sound: a
+cache file's blocks can't be resized (tag_block_resize), so the counts are
+let go of in place, and no global is initialized or script thread started
+(hs_runtime_initialize_for_new_map) against nodes that aren't there */
+static void hs_scenario_scripts_disable(
+	struct scenario *scenario)
+{
+	scenario->hs_scripts.count = 0;
+	scenario->hs_globals.count = 0;
+
+	return;
+}
+
 static void hs_allocate(
 	void)
 {
 	struct scenario *scenario;
 
 	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+	/* port: as the map holds it only when it is sound */
 	if (scenario &&
 		scenario->hs_syntax_data.size ==
-			sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node))
+			sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node) &&
+		hs_scenario_syntax_data_valid(scenario))
 	{
 		return;
+	}
+
+	/* port: script data a map holds that isn't sound is the map's, in the
+	tag cache: it isn't freed or replaced (what the Xbox did here, freeing
+	tag memory), the map runs no scripts, and an array of the port's own,
+	made once, stands in for it */
+	if (scenario)
+	{
+		hs_scenario_scripts_disable(scenario);
+		/* port: strings that aren't sound aren't gone by either, the
+		console's expressions included (hs_compile_expression refuses a
+		scenario without room for them) */
+		if (!hs_scenario_string_constants_valid(scenario))
+			scenario->hs_string_constants.size = 0;
+		if (hs_syntax_data && hs_syntax_data_allocated)
+			return;
+		error(0, "the scenario's script data is missing or damaged; its scripts won't run");
 	}
 
 	hs_syntax_data = data_new(
@@ -12113,19 +12210,7 @@ static void hs_allocate(
 	if (hs_syntax_data)
 	{
 		data_make_valid(hs_syntax_data);
-		if (scenario)
-		{
-			match_free("c:\\halo\\SOURCE\\hs\\hs.c", 336, scenario->hs_syntax_data.address);
-			scenario->hs_syntax_data.address = hs_syntax_data;
-			scenario->hs_syntax_data.size =
-				sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
-			tag_data_resize(&scenario->hs_string_constants, 0x400);
-			tag_block_resize(&scenario->hs_scripts, 0);
-		}
-		else
-		{
-			hs_syntax_data_allocated = TRUE;
-		}
+		hs_syntax_data_allocated = TRUE;
 	}
 	else
 	{
@@ -12542,8 +12627,17 @@ struct hs_external_global_definition *hs_global_external_get(
 short hs_global_get_type(
 	short global_index)
 {
+	/* port: a global that isn't there (a map's syntax node names it) has
+	no type */
 	if (global_index & 0x8000)
+	{
+		if ((global_index & 0x7FFF) >= hs_external_global_count)
+			return _hs_unparsed;
+
 		return hs_global_external_get(global_index & 0x7FFF)->type;
+	}
+	if ((global_index & 0x7FFF) >= global_scenario_get()->hs_globals.count)
+		return _hs_unparsed;
 
 	return TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->hs_globals,
@@ -12642,10 +12736,11 @@ void hs_help(
 	function_index = hs_find_function_by_name(function_name);
 	if (function_index != NONE)
 	{
+		/* port: printed through "%s" (the text isn't a format) */
 		hs_get_function_parameters_string(function_index, result);
-		console_printf(FALSE, result);
+		console_printf(FALSE, "%s", result);
 		hs_get_function_documentation_string(function_index, result);
-		console_printf(FALSE, result);
+		console_printf(FALSE, "%s", result);
 	}
 	return;
 }
@@ -12964,7 +13059,8 @@ static long alphabetize(
 	return _stricmp(*left, *right);
 }
 
-HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(game_safe_to_save_evaluate, game_safe_to_save)
+/* port: in network co-op, once any player is safe (coop_scripts.c) */
+HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(game_safe_to_save_evaluate, coop_scripts_safe_to_save)
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(game_all_quiet_evaluate, game_all_quiet)
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(game_safe_to_speak_evaluate, game_safe_to_speak)
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(game_is_cooperative_evaluate, game_is_cooperative)
@@ -13782,7 +13878,8 @@ HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(player_control_action_test_look_relative
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(player_control_action_test_look_relative_right_evaluate, player_control_action_test_look_relative_right)
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(player_control_action_test_look_relative_all_directions_evaluate, player_control_action_test_look_relative_all_directions)
 HS_EVALUATE_RETURN_BOOLEAN_NO_ARGUMENTS(player_control_action_test_move_relative_all_directions_evaluate, player_control_action_test_move_relative_all_directions)
-HS_EVALUATE_VOID_FROM_ARGUMENTS(player_add_equipment_evaluate, struct hs_arguments_long_word_boolean, (player_add_equipment(arguments->value0, arguments->value1, arguments->value2)))
+/* port: in network co-op, also for the players the scripts can't name (coop_scripts.c) */
+HS_EVALUATE_VOID_FROM_ARGUMENTS(player_add_equipment_evaluate, struct hs_arguments_long_word_boolean, (coop_scripts_player_add_equipment(arguments->value0, arguments->value1, arguments->value2)))
 HS_EVALUATE_VOID_FROM_ARGUMENTS(debug_player_teleport_evaluate, struct hs_arguments_short_word, (debug_player_teleport(arguments->value0, arguments->value1)))
 HS_EVALUATE_VOID_STRING(main_set_map_name_evaluate, main_set_map_name)
 HS_EVALUATE_VOID_STRING(main_set_multiplayer_map_name_evaluate, main_set_multiplayer_map_name)
@@ -13961,7 +14058,51 @@ boolean hs_scenario_postprocess(
 	scenario = global_scenario_get();
 	saved_syntax_data = hs_syntax_data;
 	hs_allocate();
+	/* port: script data that isn't sound isn't gone through (hs_allocate
+	has an empty array stand in for it, and the map runs no scripts) */
+	if (!hs_scenario_syntax_data_valid(scenario))
+	{
+		if (restore_syntax_data)
+			hs_syntax_data = saved_syntax_data;
+
+		return FALSE;
+	}
 	recompile = scenario->hs_scripts.count == 0 && scenario->hs_source_files.count>0;
+	/* port: the map's globals take the "hs globals" array's datums after the
+	external ones (hs_runtime_initialize_for_new_map); more than are left
+	would be set through datums that aren't there. Each has a value's type,
+	which the casts' and the type names' tables are looked up by. A map
+	whose globals aren't so runs no scripts. The shipped maps' all are, and
+	have far fewer */
+	if (scenario->hs_globals.count<0 ||
+		scenario->hs_globals.count>MAXIMUM_HS_GLOBALS-hs_external_global_count)
+	{
+		error(0, "the scenario has %ld script globals, more than the %d there is room for; its scripts won't run",
+			scenario->hs_globals.count,
+			MAXIMUM_HS_GLOBALS-hs_external_global_count);
+		hs_scenario_scripts_disable(scenario);
+	}
+	else
+	{
+		short global_index;
+
+		for (global_index = 0; global_index<scenario->hs_globals.count; global_index++)
+		{
+			struct hs_global const *global = TAG_BLOCK_GET_ELEMENT(
+				&scenario->hs_globals,
+				global_index,
+				struct hs_global);
+
+			if (!hs_type_valid(global->type))
+			{
+				error(0, "the scenario's script global #%d has no type (%d); its scripts won't run",
+					global_index,
+					global->type);
+				hs_scenario_scripts_disable(scenario);
+				break;
+			}
+		}
+	}
 	hs_syntax_data = (struct data_array *)scenario->hs_syntax_data.address;
 	hs_syntax_data->data = (char *)hs_syntax_data+sizeof(struct data_array);
 	if (!recompile && hs_compile_postprocess(&error_message, &error_source))
@@ -13987,6 +14128,10 @@ boolean hs_scenario_postprocess(
 		if (hs_compile_source() && hs_compile_postprocess(&error_message, &error_source))
 		{
 			success = TRUE;
+			/* port: a cache file's blocks can't be resized (tag_block_resize),
+			so the recompile didn't reset the map's scripts and globals: they
+			still name the nodes hs_compile_initialize deleted. None run */
+			hs_scenario_scripts_disable(scenario);
 		}
 		else
 		{
@@ -13996,6 +14141,9 @@ boolean hs_scenario_postprocess(
 				!tag_data_resize(&global_scenario_get()->hs_string_constants, 0x400))
 			{
 				error(0, "couldn't reset scripts.");
+				/* port: a cache file's can't be resized: none run against the
+				nodes just deleted */
+				hs_scenario_scripts_disable(scenario);
 			}
 			success = FALSE;
 		}
@@ -14088,6 +14236,29 @@ static boolean hs_expression_changes_no_game(
 static boolean hs_compile_and_evaluate_command(
 	char const *expression);
 
+/* port: the text after the host's command `word` ("ban", "kick") that an
+expression starts with (spaces and an opening parenthesis before it, in
+either case, then a space or the end), else NULL */
+static char const *hs_host_player_command(
+	char const *expression,
+	char const *word)
+{
+	char const *text = expression;
+	long index;
+
+	while (*text == ' ' || *text == '\t' || *text == '(')
+		text++;
+	for (index = 0; word[index]; index++)
+	{
+		char character = text[index] >= 'A' && text[index] <= 'Z' ? text[index] - 'A' + 'a' : text[index];
+
+		if (character != word[index])
+			return NULL;
+	}
+	text += index;
+	return *text == ' ' || *text == '\t' || *text == 0 ? text : NULL;
+}
+
 /* port: a command someone typed (the console, the telnet console, a cheat
 button, init.txt): what it logs is its answer, shown whatever
 config.toml's game.console_log is (terminal_command_running) */
@@ -14122,20 +14293,20 @@ static boolean hs_compile_and_evaluate_command(
 		console_warning("not while playing in another's game: the host decides the game");
 		return FALSE;
 	}
-	/* port: the host's ban command ("ban <player name>", or its start: Tab
-	completes it), which is no script's */
+	/* port: the host's ban and kick commands ("ban <player name>", "kick
+	<player name>", or the name's start: Tab completes it), which are no
+	script's */
 	{
-		char const *text = expression;
+		char const *text = hs_host_player_command(expression, "ban");
+		boolean kick = FALSE;
 
-		while (*text == ' ' || *text == '\t' || *text == '(')
-			text++;
-		if ((text[0] == 'b' || text[0] == 'B') && (text[1] == 'a' || text[1] == 'A') &&
-			(text[2] == 'n' || text[2] == 'N') && (text[3] == ' ' || text[3] == '\t' || text[3] == 0))
+		if (!text && (text = hs_host_player_command(expression, "kick")) != NULL)
+			kick = TRUE;
+		if (text)
 		{
 			char name[64];
 			long length = 0;
 
-			text += 3;
 			while (*text == ' ' || *text == '\t' || *text == '"')
 				text++;
 			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
@@ -14143,7 +14314,7 @@ static boolean hs_compile_and_evaluate_command(
 			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
 				length--;
 			name[length] = 0;
-			return network_game_server_ban_player(name);
+			return kick ? network_game_server_kick_player(name) : network_game_server_ban_player(name);
 		}
 	}
 	csstrncpy(buffer, expression, sizeof(buffer));

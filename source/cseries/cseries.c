@@ -348,7 +348,10 @@ char *csprintf(
 	va_list arglist;
 	
 	va_start(arglist, format);
-	vsprintf(buffer, format, arglist);
+	/* port: no longer than the longest a string is (MAXIMUM_STRING_SIZE,
+	as csstrlen asserts): the caller's buffer's size isn't passed */
+	vsnprintf(buffer, MAXIMUM_STRING_SIZE, format, arglist);
+	va_end(arglist);
 	
 	return buffer;
 }
@@ -478,9 +481,24 @@ char *csstrcat(
 	char *s1,
 	const char *s2)
 {
+	unsigned long length;
+	unsigned long append_length;
+
 	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 290, s1 && s2);
 
-	return strcat(s1, s2);
+	/* port: the result is no longer than the longest a string is
+	(MAXIMUM_STRING_SIZE, as csstrlen asserts): the rest of s2 is left
+	off. The caller's buffer's size isn't passed */
+	length = strlen(s1);
+	if (length >= MAXIMUM_STRING_SIZE-1)
+		return s1;
+	append_length = strlen(s2);
+	if (append_length > MAXIMUM_STRING_SIZE-1-length)
+		append_length = MAXIMUM_STRING_SIZE-1-length;
+	memmove(s1+length, s2, append_length);
+	s1[length+append_length] = 0;
+
+	return s1;
 }
 
 long csstrcmp(
@@ -551,12 +569,20 @@ char *csstrcpy(
 	const char *source)
 {
 	long source_size = strlen(source);
-	long destination_size = strlen(destination);
 	
 	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 371, source_size>=0 && source_size<MAXIMUM_STRING_SIZE);
 	cseries_match_assert("c:\\halo\\SOURCE\\cseries\\cseries.c", 372, source+source_size<destination || destination+source_size<source);
 	
-	return strcpy(destination, source);
+	/* port: no more is copied than the longest a string is
+	(MAXIMUM_STRING_SIZE, the assert above, which a release build only
+	logs), and copying over itself is a memmove. The destination isn't
+	measured first (it was, unused): it is often not yet a string */
+	if (source_size >= MAXIMUM_STRING_SIZE)
+		source_size = MAXIMUM_STRING_SIZE-1;
+	memmove(destination, source, source_size);
+	destination[source_size] = 0;
+
+	return destination;
 }
 
 void *csmemcpy(

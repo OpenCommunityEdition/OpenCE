@@ -662,6 +662,14 @@ boolean network_game_remove_player(
 				game->players[player_index].machine_index == player->machine_index &&
 				game->players[player_index].controller_index == player->controller_index)
 			{
+				/* port: a client's count is the host's (its settings), and
+				need not be as many as the players it lists: none taken
+				below none */
+				if (game->player_count <= 0)
+				{
+					error(2, "tried to remove a player from a game of %d players", game->player_count);
+					break;
+				}
 				network_game_invalidate_player(&game->players[player_index]);
 				game->player_count--;
 				result = TRUE;
@@ -707,7 +715,9 @@ boolean network_game_remove_machine(
 				}
 
 				network_game_invalidate_machine(game, machine->machine_index);
-				game->machine_count--;
+				/* (port: and none below none, as for its players) */
+				if (game->machine_count > 0)
+					game->machine_count--;
 				result = TRUE;
 				break;
 			}

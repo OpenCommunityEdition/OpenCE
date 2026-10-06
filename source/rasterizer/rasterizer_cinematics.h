@@ -87,6 +87,38 @@ void rasterizer_set_near_clip_distance(
 real rasterizer_get_near_clip_distance(
 	void);
 
+/* port: the cinematic screen effect as the scripts left it, without its
+bitmaps' addresses, for network co-op to copy from the host to a client
+(port/linux/game/network_coop.c). Its times are game time, the same on
+every machine, so a client's effect fades as the host's does. Every field
+from filter_desaturation_tint on is a real. */
+struct rasterizer_screen_effect_port_state
+{
+	byte has_control;
+	byte initialized;
+	byte video_on;
+	byte filter_desaturation_is_additive;
+	byte filter_light_enhancement_uses_convolution_mask;
+	byte filter_desaturation_uses_convolution_mask;
+	short convolution_extra_passes;
+	short convolution_type;
+	short video_overbright_mode;
+	real_rgb_color filter_desaturation_tint;
+	real video_noise_intensity;
+	real convolution_radius[2];
+	real convolution_time[2];
+	real filter_light_enhancement_intensity[2];
+	real filter_desaturation_intensity[2];
+	real filter_time[2];
+	real script_values[4];
+	real near_clip_distance;
+};
+
+void rasterizer_screen_effect_port_get(
+	struct rasterizer_screen_effect_port_state *state);
+void rasterizer_screen_effect_port_set(
+	struct rasterizer_screen_effect_port_state const *state);
+
 /* ---------- globals */
 
 /* ---------- public code */

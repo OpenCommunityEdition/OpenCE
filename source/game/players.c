@@ -236,6 +236,8 @@ symbols in this file:
 #include "camera/observer.h"
 #include "data.h"
 #include "devices/devices.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
 #include "effects/player_effects.h"
@@ -270,6 +272,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
+#include "objects/object_definitions.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
@@ -326,6 +329,11 @@ enum
 		_object_mask_item |
 		_object_mask_control
 };
+
+/* port: network_distributed.c's arrays of MAXIMUM_TRACKED_PLAYERS are indexed
+by a player's datum index */
+typedef char player_data_maximum_count_assert[
+	NETWORK_GAME_MAXIMUM_PLAYER_COUNT == HALO_PORT_MAXIMUM_NETWORK_PLAYERS ? 1 : -1];
 
 /* ---------- macros */
 
@@ -405,6 +413,8 @@ typedef char players_static_data_screen_flash_offset_assert[
 
 /* ---------- prototypes */
 
+static boolean players_respawn_network_coop(
+	void);
 static long is_player_in_trigger(
 	short bsp_switch_trigger_volume_index,
 	long object_index);
@@ -453,6 +463,44 @@ static void player_handle_powerup_equipment(
 	long equipment_index);
 
 /* ---------- globals */
+
+/* port: network co-op timers, by player absolute index. Each holds the
+game time plus one at which something started, or 0 when it isn't happening.
+spawnable_since: when the player became somewhere others can spawn beside
+(player_spawnable_beside); they wait a while after (players_coop_room_to_spawn). */
+static struct
+{
+	long spawnable_since[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	/* when the dead started waiting for a safe teammate to respawn beside */
+	long respawn_wait_since;
+	/* when each player's unit left the loaded structure BSP */
+	long stranded_since[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	/* the structure BSP loaded, and when it last switched, by a trigger,
+	a script or a skipped cutscene (players_coop_bsp_switch_ready) */
+	short structure_bsp_index;
+	long bsp_switch_time;
+	/* the structure BSPs the players have been in this map, by bit */
+	word visited_structure_bsps;
+	/* when each local player was last told they wait for the team to go
+	back, and the count they were told (players_coop_show_backtrack_wait) */
+	long backtrack_message_times[MAXIMUM_LOCAL_PLAYERS];
+	short backtrack_message_counts[MAXIMUM_LOCAL_PLAYERS];
+	/* where each player last stood on the ground, and on which BSP: where
+	everyone comes back when the last checkpoint was on another one */
+	short ground_structure_bsp_index;
+	boolean has_ground_position[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	real_point3d ground_positions[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+} players_coop_state;
+
+/* port: where each player was at the last checkpoint, in network co-op
+(players_note_checkpoint) */
+static struct
+{
+	boolean valid;
+	short structure_bsp_index;
+	boolean has_position[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	real_point3d positions[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+} players_checkpoint;
 
 struct players_globals *players_globals;
 struct data_array *team_data;
@@ -550,6 +598,9 @@ void players_initialize_for_new_map(
 	players_globals->all_dead = FALSE;
 	players_globals->pending_teleport_starting_location_index = NONE;
 	players_globals->respawn_failure = 0;
+	/* port: a new map has no network co-op checkpoint yet */
+	csmemset(&players_checkpoint, 0, sizeof(players_checkpoint));
+	csmemset(&players_coop_state, 0, sizeof(players_coop_state));
 	data_make_valid(player_data);
 	data_make_valid(team_data);
 	csmemset(
@@ -922,7 +973,9 @@ boolean any_player_is_dead(
 		player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
-		if (player->unit_index == NONE)
+		/* port: ignore co-op players still waiting for the first checkpoint,
+		or the checkpoint that lets them in could never be saved */
+		if (player->unit_index == NONE && !players_coop_waiting_to_start(iterator.datum_index))
 			return TRUE;
 	}
 
@@ -1263,7 +1316,42 @@ long find_best_starting_location_index(
 		}
 	}
 
+	/* port: a multiplayer map played alone (New Game's MULTIPLAYER maps:
+	no game engine) has no starting location for no game type, every one
+	being for its game types: the player starts at any of them, not at none
+	(outside the map, with no pause menu) */
+	if (best_starting_location_index == NONE && !game_engine_running() && starting_location_count > 0)
+	{
+		best_starting_location_index = (short)PIN(
+			(short)(real_random_range(0.0f, 1.0f) * starting_location_count), 0, starting_location_count - 1);
+	}
+
 	return best_starting_location_index;
+}
+
+/* port: paints a network co-op player's unit in their profile colour. The
+campaign Spartan is always green because its tag fixes that colour, which
+overrides the colour the unit is created with; this replaces fixed colours. */
+static void players_coop_color_unit(
+	long unit_index,
+	real_rgb_color const *color)
+{
+	struct object_datum *object = object_get(unit_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	short index;
+
+	for (index = 0; index < definition->object.change_colors.count && index < NUMBER_OF_OBJECT_CHANGE_COLORS; index++)
+	{
+		struct object_change_color_definition *change_color = TAG_BLOCK_GET_ELEMENT(
+			&definition->object.change_colors, index, struct object_change_color_definition);
+
+		/* skip colours driven by a function, like the shield glow */
+		if (change_color->permutations.count > 0 && !change_color->scaled_by && !change_color->darken_by)
+		{
+			object->object.base_change_colors[index] = *color;
+			object->object.outgoing_change_colors[index] = *color;
+		}
+	}
 }
 
 static void player_spawn(
@@ -1376,6 +1464,8 @@ static void player_spawn(
 					&placement_data,
 					&change_color);
 				unit_index = object_new(&placement_data);
+				if (unit_index != NONE && network_coop_active())
+					players_coop_color_unit(unit_index, &change_color);
 				if (unit_index != NONE)
 				{
 					unit = unit_try_and_get(unit_index);
@@ -1804,14 +1894,17 @@ static boolean player_handle_action(
 	switch (player->action_result)
 	{
 	case _player_action_result_touch_device:
-		device_touched(player->action_object_index, player->unit_index);
+		/* port: on a co-op client the host decides device use; the action is
+		relayed to it (network_coop.c) */
+		if (!network_coop_devices_remote())
+			device_touched(player->action_object_index, player->unit_index);
 		result = TRUE;
 		break;
 
 	case _player_action_result_swap_for_powerup:
-		/* port: a distributed client's inventories are the host's (the
-		powerup is swapped where the host decides pickups, and the relayed
-		action of a remote player reaches here too): it swaps nothing */
+		/* port: a distributed client swaps nothing: the host owns inventories
+		and decides pickups, and a remote player's relayed action also reaches
+		here */
 		if (!players_decide_pickups())
 		{
 			result = TRUE;
@@ -1913,7 +2006,7 @@ static boolean player_teleport_internal(
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\players.c",
 		0x4FB,
-		source_unit_index==NONE || local_player_count()>1);
+		source_unit_index==NONE || local_player_count()>1 || game_connection()!=_game_connection_local);
 	if (source_unit_index != NONE &&
 		object_get_ultimate_parent(source_unit_index) != source_unit_index)
 	{
@@ -2109,11 +2202,12 @@ static boolean player_teleport_internal(
 	else
 	{
 		error(2, "couldn't teleport player into a valid location");
-		match_assert(
-			"c:\\halo\\SOURCE\\game\\players.c",
-			0x5AB,
-			player->local_player_index!=NONE);
-		player_pseudo_kill(player_index, source_unit_index);
+		/* port: only a local player is pseudo-killed, because the respawn
+		hands the unit back to a local player; another machine's stays put
+		(the Xbox halted for it). Network co-op respawns its own way, so its
+		players stay put too. */
+		if (player->local_player_index != NONE && !network_coop_active())
+			player_pseudo_kill(player_index, source_unit_index);
 	}
 
 	return result;
@@ -2312,6 +2406,11 @@ boolean players_respawn_coop(
 	boolean result;
 	boolean dangerous;
 
+	/* port: network co-op checks safety around each teammate instead
+	(players_respawn_network_coop) */
+	if (game_connection() == _game_connection_network_server && network_coop_active())
+		return players_respawn_network_coop();
+
 	players_globals->respawn_failure = 0;
 	result = FALSE;
 	if (!players_globals->respawn_failed)
@@ -2407,6 +2506,637 @@ result_complete:
 	return result;
 }
 
+/* ---------- port: network co-op
+
+A network game on a campaign map with no game engine is co-op. Players
+spawn on the host and respawn beside each other, as in local co-op
+(players_respawn_coop). When everyone is dead, local co-op reverts to the
+last checkpoint (game_state_revert), but every machine would have to do
+that in step. Instead the players respawn where they were at the last
+checkpoint (main_save_map_private records it), or at the map's start if
+that was on another BSP. */
+
+static boolean players_coop_room_to_spawn(
+	void);
+static boolean player_place_beside_teammate(
+	long player_index);
+
+/* How long into a level the extra players wait before spawning. The opening
+cutscene starts a tick or so in, and the first player may still be somewhere
+with no room beside them (the drop pod on Halo). */
+#define COOP_LEVEL_START_TICKS (2 * TICKS_PER_SECOND)
+
+/* Co-op: TRUE while players after the first are held back from spawning:
+during the level's first seconds, during a cutscene, or until a teammate has
+been free on foot for a while (players_coop_room_to_spawn). */
+static boolean players_coop_extras_held(
+	void)
+{
+	return game_time_get() < COOP_LEVEL_START_TICKS || cinematic_in_progress() || !players_coop_room_to_spawn();
+}
+
+/* Co-op host: TRUE if a player who hasn't spawned on this level yet may
+spawn now. The first player spawns at once (the level's script places them).
+The others spawn beside a teammate (player_place_beside_teammate) once nothing
+holds them back (players_coop_extras_held): when the opening cutscene ends or
+is skipped, or straight away if they join later. */
+static boolean players_coop_may_spawn(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE)
+			return !players_coop_extras_held();
+	}
+
+	return TRUE;
+}
+
+/* TRUE if this player hasn't spawned on the level yet and is being held
+back (players_coop_extras_held); they spectate a teammate meanwhile */
+boolean players_coop_waiting_to_start(
+	long player_index)
+{
+	struct player_datum *player = player_try_and_get(player_index);
+
+	return player && player->unit_index == NONE && player->statistics.deaths == 0 && network_coop_active() &&
+		players_coop_extras_held();
+}
+
+/* an enemy projectile this close (world units) makes a teammate unsafe
+to respawn beside */
+#define COOP_RESPAWN_DANGER_RADIUS 15.0f
+/* how often the respawn's safety test runs while someone is dead */
+#define COOP_RESPAWN_CHECK_TICKS (TICKS_PER_SECOND / 2)
+/* after waiting this long for a safe teammate, the dead respawn beside any
+teammate standing on the ground */
+#define COOP_RESPAWN_FALLBACK_TICKS (10 * TICKS_PER_SECOND)
+
+/* TRUE if an enemy projectile (a grenade, a plasma bolt) is flying near the
+unit. Players' own shots and needles stuck in a body don't count. */
+static boolean players_coop_danger_near(
+	long unit_index)
+{
+	real_point3d const *center = &object_get(unit_index)->object.bounding_sphere_center;
+	real radius_squared = COOP_RESPAWN_DANGER_RADIUS * COOP_RESPAWN_DANGER_RADIUS;
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	object_iterator_new(&iterator, _object_mask_projectile, 0);
+	while ((object = object_iterator_next(&iterator)) != NULL)
+	{
+		if (object->object.owner_player_index == NONE && object->object.parent_object_index == NONE &&
+			distance_squared3d(center, &object->object.bounding_sphere_center) <= radius_squared)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+/* TRUE if the unit (or the vehicle it rides) is inside the loaded structure
+BSP. In network co-op players can be left outside it after a BSP switch. */
+static boolean players_coop_unit_in_structure(
+	long unit_index)
+{
+	return object_get(object_get_ultimate_parent(unit_index))->object.location.cluster_index != NONE;
+}
+
+/* TRUE if a living player's unit is on solid ground: inside the structure
+BSP, not airborne and not in a moving vehicle */
+static boolean players_coop_unit_grounded(
+	long unit_index)
+{
+	long root_index = object_get_ultimate_parent(unit_index);
+
+	if (!players_coop_unit_in_structure(unit_index))
+		return FALSE;
+	if (root_index == unit_index)
+	{
+		struct biped_datum *biped = biped_try_and_get(unit_index);
+
+		return !biped || !TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
+	}
+	else
+	{
+		struct players_vehicle_datum *vehicle = (struct players_vehicle_datum *)
+			object_try_and_get_and_verify_type(root_index, _object_mask_vehicle);
+
+		return !vehicle || vehicle->vehicle.unknown_state <= 0;
+	}
+}
+
+/* TRUE if it is safe to respawn beside a living player's unit: grounded,
+not under attack, and no enemy projectile nearby */
+static boolean players_coop_unit_safe(
+	long unit_index)
+{
+	return players_coop_unit_grounded(unit_index) && !ai_port_enemies_attacking_unit(unit_index) &&
+		!players_coop_danger_near(unit_index);
+}
+
+/* the unit of the first living player that passes `test`, or NONE */
+static long players_coop_unit_where(
+	boolean (*test)(long unit_index))
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE && test(player->unit_index))
+			return player->unit_index;
+	}
+
+	return NONE;
+}
+
+/* Network co-op respawn: the dead come back beside the first teammate who
+is safe, or after COOP_RESPAWN_FALLBACK_TICKS beside one at least on the
+ground, so a long fight can't keep them out. The campaign's own test
+(players_respawn_coop) is map-wide (any projectile or enemy attack
+anywhere), which with many players spread out would almost never pass.
+Returns whether everyone waiting came back. */
+static boolean players_respawn_network_coop(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long safe_unit_index;
+	boolean result = TRUE;
+
+	if (!players_coop_state.respawn_wait_since)
+		players_coop_state.respawn_wait_since = game_time_get() + 1;
+	/* main.c calls this every tick while someone is dead; the safety test
+	walks all the map's projectiles, so twice a second is enough */
+	if (game_time_get() % COOP_RESPAWN_CHECK_TICKS != 0)
+		return FALSE;
+	safe_unit_index = players_coop_unit_where(players_coop_unit_safe);
+	if (safe_unit_index == NONE &&
+		game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
+	{
+		safe_unit_index = players_coop_unit_where(players_coop_unit_grounded);
+	}
+	if (safe_unit_index == NONE)
+		return FALSE;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		/* players still waiting for the level's first checkpoint spawn then */
+		if (player->unit_index != NONE || player->quit_out_of_game ||
+			players_coop_waiting_to_start(iterator.datum_index))
+		{
+			continue;
+		}
+		player_spawn(iterator.datum_index);
+		if (player->unit_index == NONE)
+			result = FALSE;
+		/* (beside the safe teammate, else any with room: never left at the
+		level's start, where player_spawn put them) */
+		else if (!player_teleport(iterator.datum_index, safe_unit_index,
+				&object_get(safe_unit_index)->object.bounding_sphere_center) &&
+			!player_place_beside_teammate(iterator.datum_index))
+		{
+			result = FALSE;
+		}
+	}
+	if (result)
+		players_coop_state.respawn_wait_since = 0;
+
+	return result;
+}
+
+/* What a new player can spawn beside: the player's unit on foot, or the
+vehicle it rides if a player drives it (a Warthog). NONE while scripts hold
+the controls (Pillar of Autumn's cryo tube) or while it rides an AI vehicle
+(Silent Cartographer's Pelican), which would put the new player inside. */
+static long player_spawnable_beside(
+	struct player_datum const *player)
+{
+	long vehicle_index;
+	long driver_index;
+
+	if (player->unit_index == NONE || !player_input_enabled() || !players_coop_unit_in_structure(player->unit_index))
+		return NONE;
+	vehicle_index = object_get_ultimate_parent(player->unit_index);
+	if (vehicle_index == player->unit_index)
+		return vehicle_index;
+	driver_index = object_try_and_get_and_verify_type(vehicle_index, _object_mask_unit) ?
+		unit_get(vehicle_index)->unit.driver_object_index : NONE;
+	return driver_index != NONE && unit_get(driver_index)->unit.player_index != NONE ? vehicle_index : NONE;
+}
+
+/* How long a teammate must have been somewhere spawnable before others
+spawn beside them, so nobody lands inside a vehicle they just left. */
+#define COOP_DISEMBARK_TICKS (4 * TICKS_PER_SECOND)
+
+/* Where the player comes back: their position at the last checkpoint, or,
+when that was on another structure BSP (everyone died before the next one),
+where they last stood on the ground on this one. NULL if the player has
+neither (they joined since); they come back beside a teammate. */
+static real_point3d const *players_checkpoint_position(
+	long player_index)
+{
+	short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	if (players_checkpoint.valid && players_checkpoint.structure_bsp_index == global_structure_bsp_index_get())
+		return players_checkpoint.has_position[index] ? &players_checkpoint.positions[index] : NULL;
+	if (players_coop_state.ground_structure_bsp_index == global_structure_bsp_index_get() &&
+		players_coop_state.has_ground_position[index])
+	{
+		return &players_coop_state.ground_positions[index];
+	}
+
+	return NULL;
+}
+
+/* TRUE if a biped stands on something (not airborne), in the BSP or not */
+static boolean players_coop_unit_grounded_anywhere(
+	long unit_index)
+{
+	struct biped_datum *biped = biped_try_and_get(unit_index);
+
+	return biped && !TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
+}
+
+/* TRUE if the unit is outside the loaded structure BSP, where it would fall
+forever: on foot, or in a vehicle that is empty or player-driven. AI-driven
+vehicles are ignored because the intro Pelicans fly outside the BSP. */
+static boolean players_coop_unit_stranded(
+	long unit_index)
+{
+	long vehicle_index = object_get_ultimate_parent(unit_index);
+	long driver_index;
+
+	if (players_coop_unit_in_structure(unit_index))
+		return FALSE;
+	/* (on foot: only while falling, not standing on something the BSP
+	doesn't hold, such as an elevator in its shaft) */
+	if (vehicle_index == unit_index)
+		return !players_coop_unit_grounded_anywhere(unit_index);
+	driver_index = object_try_and_get_and_verify_type(vehicle_index, _object_mask_unit) ?
+		unit_get(vehicle_index)->unit.driver_object_index : NONE;
+	return driver_index == NONE || unit_get(driver_index)->unit.player_index != NONE;
+}
+
+/* How long a player can be falling outside the BSP before being brought
+back. A BSP switch settles in a tick or two; waiting longer avoids moving
+someone who is only crossing a seam or riding over a gap. */
+#define COOP_STRANDED_TICKS (2 * TICKS_PER_SECOND)
+
+/* After a BSP switch, how long the co-op host lets no other trigger switch
+it while the players are brought into the new one, and the longest it then
+waits for every machine to have loaded it */
+#define COOP_BSP_SWITCH_SETTLE_TICKS (2 * TICKS_PER_SECOND)
+#define COOP_BSP_SWITCH_WAIT_TICKS (10 * TICKS_PER_SECOND)
+
+/* Going back to a BSP the team has already been in needs two thirds of the
+living players with the player on the trigger: inside it, or this near
+them (world units, about 45 metres). Wide enough for a team walking through
+a doorway in a line, not for one player who ran back alone. */
+#define COOP_BACKTRACK_GATHER_DISTANCE 15.0f
+
+/* how often a player waiting for the team to go back is reminded */
+#define COOP_BACKTRACK_MESSAGE_TICKS (3 * TICKS_PER_SECOND)
+
+/* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
+beside a grounded teammate inside the BSP, else any teammate inside it, else
+to the last checkpoint. Skipped while scripts hold the controls, since
+cutscenes place the players themselves. A BSP switch already moves everyone
+(players_reconnect_to_structure_bsp); this catches anyone it missed. */
+static void players_coop_rescue_stranded(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (!network_coop_active() || game_connection() != _game_connection_network_server)
+		return;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		long *since = &players_coop_state.stranded_since[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)];
+		long teammate_index;
+		boolean rescued;
+
+		if (player->unit_index == NONE || !player_input_enabled() || !players_coop_unit_stranded(player->unit_index))
+		{
+			*since = 0;
+			continue;
+		}
+		if (*since == 0)
+			*since = game_time_get() + 1;
+		if (game_time_get() + 1 - *since < COOP_STRANDED_TICKS)
+			continue;
+		teammate_index = players_coop_unit_where(players_coop_unit_grounded);
+		if (teammate_index == NONE)
+			teammate_index = players_coop_unit_where(players_coop_unit_in_structure);
+		if (teammate_index != NONE)
+		{
+			rescued = player_teleport(iterator.datum_index, teammate_index,
+				&object_get(teammate_index)->object.bounding_sphere_center);
+		}
+		else
+		{
+			real_point3d const *position = players_checkpoint_position(iterator.datum_index);
+
+			rescued = position && player_teleport(iterator.datum_index, NONE, position);
+		}
+		if (rescued)
+			*since = 0;
+	}
+}
+
+/* co-op, each tick: records when each player became somewhere spawnable,
+and where each last stood on the ground */
+static void players_coop_note_on_foot(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (!network_coop_active())
+		return;
+	if (players_coop_state.ground_structure_bsp_index != global_structure_bsp_index_get())
+	{
+		players_coop_state.ground_structure_bsp_index = global_structure_bsp_index_get();
+		csmemset(players_coop_state.has_ground_position, 0, sizeof(players_coop_state.has_ground_position));
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		long *since = &players_coop_state.spawnable_since[index];
+
+		if (player_spawnable_beside(player) == NONE)
+			*since = 0;
+		else if (*since == 0)
+			*since = game_time_get() + 1;
+		if (player->unit_index != NONE && object_get_ultimate_parent(player->unit_index) == player->unit_index &&
+			players_coop_unit_grounded(player->unit_index))
+		{
+			players_coop_state.ground_positions[index] = object_get(player->unit_index)->object.bounding_sphere_center;
+			players_coop_state.has_ground_position[index] = TRUE;
+		}
+	}
+}
+
+/* Co-op host: TRUE if a new player has somewhere to spawn, i.e. a teammate
+who has been spawnable for COOP_DISEMBARK_TICKS. While every teammate rides
+an AI vehicle (Silent Cartographer's Pelican) or is held by the scripts
+(Pillar of Autumn's cryo tube), the others spectate. */
+static boolean players_coop_room_to_spawn(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		long since = players_coop_state.spawnable_since[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)];
+
+		if (player_spawnable_beside(player) != NONE && since != 0 && game_time_get() + 1 - since >= COOP_DISEMBARK_TICKS)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/* Co-op host: moves a newly spawned player beside a teammate who is on foot
+or in a player-driven vehicle (player_spawnable_beside). player_teleport tries
+a few spots around each. Teammates are tried in turn so a big lobby spreads
+out. FALSE if nobody has room; the player stays where they spawned. */
+static boolean player_place_beside_teammate(
+	long player_index)
+{
+	struct data_iterator iterator;
+	struct player_datum *other;
+
+	if (player_get(player_index)->unit_index == NONE)
+		return FALSE;
+	data_iterator_new(&iterator, player_data);
+	while ((other = data_iterator_next(&iterator)) != NULL)
+	{
+		if (iterator.datum_index != player_index && player_spawnable_beside(other) != NONE &&
+			player_teleport(player_index, other->unit_index, &object_get(other->unit_index)->object.bounding_sphere_center))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+void players_note_checkpoint(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	csmemset(&players_checkpoint, 0, sizeof(players_checkpoint));
+	players_checkpoint.structure_bsp_index = global_structure_bsp_index_get();
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (player->unit_index != NONE)
+		{
+			players_checkpoint.positions[index] = object_get(player->unit_index)->object.bounding_sphere_center;
+			players_checkpoint.has_position[index] = TRUE;
+			players_checkpoint.valid = TRUE;
+		}
+	}
+
+	return;
+}
+
+/* Everyone back after all died: each where they were at the last checkpoint
+(players_checkpoint_position), then those with no such spot beside the
+others. Players who come back are spawned first, at the level's start. */
+void players_respawn_at_checkpoint(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	boolean unplaced[NETWORK_GAME_MAXIMUM_PLAYER_COUNT] = { FALSE };
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		real_point3d const *position;
+
+		if (player->unit_index != NONE || player->quit_out_of_game)
+			continue;
+		player_spawn(iterator.datum_index);
+		position = players_checkpoint_position(iterator.datum_index);
+		unplaced[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)] = player->unit_index != NONE &&
+			!(position && player_teleport(iterator.datum_index, NONE, position));
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (unplaced[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)])
+			player_place_beside_teammate(iterator.datum_index);
+	}
+
+	return;
+}
+
+/* port: the trigger that switches away from the loaded structure BSP the
+unit stands in, or NONE */
+static short players_coop_bsp_switch_trigger(
+	long unit_index)
+{
+	struct scenario *scenario = global_scenario_get();
+	short index;
+
+	for (index = 0; index < scenario->bsp_switch_trigger_volumes.count; index++)
+	{
+		struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
+			&scenario->bsp_switch_trigger_volumes, index, struct scenario_bsp_switch_trigger_volume);
+
+		if (volume->source_structure_bsp_index == global_structure_bsp_index &&
+			scenario_trigger_volume_test_object(volume->trigger_volume_index, unit_index))
+		{
+			return index;
+		}
+	}
+
+	return NONE;
+}
+
+/* port: whether a network co-op host lets any trigger switch the BSP yet.
+After a switch it waits COOP_BSP_SWITCH_SETTLE_TICKS while the players are
+brought in, then until every player's machine has loaded the new BSP, so no
+client falls two switches behind. A client stuck longer than
+COOP_BSP_SWITCH_WAIT_TICKS no longer holds the team. */
+static boolean players_coop_bsp_switch_ready(
+	void)
+{
+	long since = game_time_get() - players_coop_state.bsp_switch_time;
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (since < COOP_BSP_SWITCH_SETTLE_TICKS)
+		return FALSE;
+	if (since >= COOP_BSP_SWITCH_WAIT_TICKS)
+		return TRUE;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE && !network_coop_player_has_structure_bsp(iterator.datum_index))
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* port: whether this trigger leads back to a BSP the team has been in and
+the unit on it must wait for more of the team: two thirds of the living
+players must be with it (in the trigger, or within
+COOP_BACKTRACK_GATHER_DISTANCE), so one player can't drag everyone back
+through the level. Also how many are there and how many it needs. */
+static boolean players_coop_backtrack_wait(
+	short bsp_switch_trigger_volume_index,
+	long unit_index,
+	short *gathered_count,
+	short *needed_count)
+{
+	struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->bsp_switch_trigger_volumes, bsp_switch_trigger_volume_index,
+		struct scenario_bsp_switch_trigger_volume);
+	real_point3d const *center = &object_get(unit_index)->object.bounding_sphere_center;
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short living_count = 0;
+
+	*gathered_count = 0;
+	*needed_count = 0;
+	if (!VALID_INDEX(volume->destination_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO) ||
+		!TEST_FLAG(players_coop_state.visited_structure_bsps, volume->destination_structure_bsp_index))
+	{
+		return FALSE;
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		struct object_datum *teammate = object_try_and_get(player->unit_index);
+
+		if (!teammate || TEST_FLAG(teammate->object.damage_flags, _object_dead_bit))
+			continue;
+		living_count++;
+		if (scenario_trigger_volume_test_object(volume->trigger_volume_index, player->unit_index) ||
+			distance_squared3d(center, &teammate->object.bounding_sphere_center) <=
+				COOP_BACKTRACK_GATHER_DISTANCE * COOP_BACKTRACK_GATHER_DISTANCE)
+		{
+			(*gathered_count)++;
+		}
+	}
+	/* (two thirds, rounded up) */
+	*needed_count = (short)((living_count * 2 + 2) / 3);
+
+	return *gathered_count < *needed_count;
+}
+
+/* port: whether a network co-op host lets the unit on this trigger switch
+the BSP, which brings the whole team along: not while the unit's machine is
+still loading the host's BSP, nor back to one the team has been in until
+enough of it is there (players_coop_backtrack_wait) */
+static boolean players_coop_bsp_switch_allowed(
+	short bsp_switch_trigger_volume_index,
+	long unit_index)
+{
+	short gathered_count;
+	short needed_count;
+
+	return network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index) &&
+		!players_coop_backtrack_wait(bsp_switch_trigger_volume_index, unit_index, &gathered_count, &needed_count);
+}
+
+/* port: tells each of this machine's co-op players held back on a trigger
+how many of the team are there and how many it needs, at once and every
+COOP_BACKTRACK_MESSAGE_TICKS while they wait. Every machine works this out
+for its own players, as the host does for its decision. */
+static void players_coop_show_backtrack_wait(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		long player_index = local_player_get_player_index(local_player_index);
+		long unit_index = player_index != NONE ? player_get(player_index)->unit_index : NONE;
+		short trigger_index = unit_index != NONE ? players_coop_bsp_switch_trigger(unit_index) : NONE;
+		long *time = &players_coop_state.backtrack_message_times[local_player_index];
+		short *count = &players_coop_state.backtrack_message_counts[local_player_index];
+		short gathered_count;
+		short needed_count;
+		wchar_t text[64];
+
+		if (trigger_index == NONE ||
+			!players_coop_backtrack_wait(trigger_index, unit_index, &gathered_count, &needed_count))
+		{
+			*time = 0;
+			continue;
+		}
+		if (*time != 0 && *count == gathered_count && game_time_get() - *time < COOP_BACKTRACK_MESSAGE_TICKS)
+			continue;
+		*time = game_time_get();
+		*count = gathered_count;
+		usnprintf(text, NUMBEROF(text), L"Waiting for your team to go back: %d of %d here",
+			gathered_count, needed_count);
+		hud_print_message(local_player_index, text);
+	}
+}
+
 static void player_teleport_on_bsp_switch(
 	long player_index,
 	long source_unit_index,
@@ -2428,7 +3158,16 @@ static void player_teleport_on_bsp_switch(
 		position);
 	if (biped)
 	{
-		if (players_globals->pending_teleport_starting_location_index != NONE &&
+		/* port: in network co-op a loading zone brings the whole team to
+		whoever crossed it, as split screen does. Only one BSP is ever
+		loaded, so anyone left elsewhere would stand outside it, or on a
+		trigger that switches it straight back (players_update_after_game
+		waits for players_coop_bsp_switch_ready before another switch). */
+		if (network_coop_active())
+		{
+			outside_switch_trigger = TRUE;
+		}
+		else if (players_globals->pending_teleport_starting_location_index != NONE &&
 			!scenario_trigger_volume_test_object(
 				TAG_BLOCK_GET_ELEMENT(
 					&global_scenario_get()->bsp_switch_trigger_volumes,
@@ -2463,6 +3202,10 @@ static void player_teleport_on_bsp_switch(
 					player_index,
 					source_unit_index,
 					position);
+				/* port: a big co-op team runs out of room around the
+				crosser, so the rest go beside whoever is already in */
+				if (!teleport_succeeded && network_coop_active())
+					teleport_succeeded = player_place_beside_teammate(player_index);
 			}
 			else
 			{
@@ -2487,13 +3230,13 @@ void players_reconnect_to_structure_bsp(
 	long source_unit_index;
 	boolean teleport_position_valid;
 	boolean found_player;
-	short local_player_index;
 	short cutscene_flag_index;
-	long player_index;
 	long player_unit_index;
 
+	/* port: also on a network co-op host, whose other players are remote */
 	if (players_globals->pending_teleport_starting_location_index != NONE &&
-		players_globals->local_player_count > 1)
+		(players_globals->local_player_count > 1 ||
+			(network_coop_active() && game_connection() == _game_connection_network_server)))
 	{
 		scenario = global_scenario_get();
 		bsp_switch = TAG_BLOCK_GET_ELEMENT(
@@ -2573,28 +3316,46 @@ void players_reconnect_to_structure_bsp(
 			}
 		}
 
+		/* port: in network co-op, if whoever crossed isn't in the new BSP yet,
+		the others gather to a player who is and stands on no switch trigger,
+		so nobody is left to switch it straight back */
+		if (!found_player && network_coop_active())
+		{
+			data_iterator_new(&iterator, player_data);
+			while ((player = data_iterator_next(&iterator)) != NULL && !found_player)
+			{
+				struct object_datum *unit = object_try_and_get(player->unit_index);
+
+				if (unit && scenario_leaf_index_from_point(&unit->object.bounding_sphere_center) != NONE &&
+					players_coop_bsp_switch_trigger(player->unit_index) == NONE)
+				{
+					source_unit_index = player->unit_index;
+					teleport_position = unit->object.position;
+					found_player = TRUE;
+				}
+			}
+		}
+
 		match_vassert(
 			"c:\\halo\\SOURCE\\game\\players.c",
 			0x63E,
 			found_player,
 			"no players in the bsp");
+		/* port: all players, not just local ones (the same set in split screen) */
 		if (found_player)
 		{
-			local_player_index = local_player_get_next(NONE);
-			while (local_player_index != NONE)
+			data_iterator_new(&iterator, player_data);
+			while ((player = data_iterator_next(&iterator)) != NULL)
 			{
-				player_index = local_player_get_player_index(local_player_index);
-				player = player_get(player_index);
 				if (player->unit_index != NONE &&
 					player->unit_index != source_unit_index)
 				{
 					player_teleport_on_bsp_switch(
-						player_index,
+						iterator.datum_index,
 						source_unit_index,
 						&teleport_position);
-					player_get(player_index)->cluster_index = NONE;
+					player->cluster_index = NONE;
 				}
-				local_player_index = local_player_get_next(local_player_index);
 			}
 		}
 		players_globals->pending_teleport_starting_location_index = NONE;
@@ -3638,6 +4399,8 @@ void players_update_before_game(
 	short action_index;
 
 	profile_enter(PLAYERS_UPDATE_BEFORE_GAME_PROFILE);
+	players_coop_note_on_foot();
+	players_coop_rescue_stranded();
 	if (update_client_dequeue(actions))
 	{
 		data_iterator_new(&iterator, player_data);
@@ -3708,10 +4471,24 @@ void players_update_before_game(
 					else if (network_game_distributed_client())
 						game_engine_client_respawn_countdown(iterator.datum_index);
 				}
-				else if (!main_menu_is_active())
+				/* port: in co-op only the host spawns players; clients get their units
+				from the network. One who quit doesn't come back. */
+				else if (!main_menu_is_active() && !network_game_distributed_client() && !player->quit_out_of_game)
 				{
 					if (player->statistics.deaths == 0)
-						player_spawn(iterator.datum_index);
+					{
+						/* port: in network co-op the first player spawns at the map's
+						start; everyone else, late joiners included, spawns beside a
+						player already in the game once nothing holds them back
+						(players_coop_may_spawn) */
+						if (game_connection() != _game_connection_network_server)
+							player_spawn(iterator.datum_index);
+						else if (players_coop_may_spawn())
+						{
+							player_spawn(iterator.datum_index);
+							player_place_beside_teammate(iterator.datum_index);
+						}
+					}
 					else if (!players_globals->all_dead)
 						main_respawn(players_globals->respawn_failed);
 				}
@@ -3884,6 +4661,15 @@ void players_update_after_game(
 		if (players_globals->double_speed_ticks == 0)
 			game_set_players_are_double_speed(FALSE);
 	}
+	if (VALID_INDEX(global_structure_bsp_index, MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO))
+		SET_FLAG(players_coop_state.visited_structure_bsps, global_structure_bsp_index, TRUE);
+	if (players_coop_state.structure_bsp_index != global_structure_bsp_index)
+	{
+		players_coop_state.structure_bsp_index = global_structure_bsp_index;
+		players_coop_state.bsp_switch_time = game_time_get();
+	}
+	if (network_coop_active())
+		players_coop_show_backtrack_wait();
 
 	data_iterator_new(&iterator, player_data);
 	while (player = data_iterator_next(&iterator))
@@ -3930,7 +4716,11 @@ void players_update_after_game(
 		{
 			root_object_index = object_get_ultimate_parent(player->unit_index);
 			root_object = object_get(root_object_index);
-			if (!TEST_FLAG(root_object->object.flags, _object_outside_of_map_bit))
+			/* port: a co-op client only switches BSP when the host does
+			(network_distributed.c), and the host not again until everyone
+			has the new one */
+			if (!TEST_FLAG(root_object->object.flags, _object_outside_of_map_bit) &&
+				!(network_coop_active() && (network_game_distributed_client() || !players_coop_bsp_switch_ready())))
 			{
 				scenario = global_scenario_get();
 				for (bsp_switch_trigger_volume_index = 0;
@@ -3945,7 +4735,9 @@ void players_update_after_game(
 						global_structure_bsp_index &&
 						scenario_trigger_volume_test_object(
 							bsp_switch_trigger_volume->trigger_volume_index,
-							player->unit_index))
+							player->unit_index) &&
+						(!network_coop_active() ||
+							players_coop_bsp_switch_allowed(bsp_switch_trigger_volume_index, player->unit_index)))
 					{
 						if (players_globals->local_player_triggered_switch !=
 							_local_player_triggered_switch_none &&
@@ -3964,6 +4756,7 @@ void players_update_after_game(
 							bsp_switch_trigger_volume_index;
 						main_switch_structure_bsp(
 							bsp_switch_trigger_volume->destination_structure_bsp_index);
+						players_coop_state.bsp_switch_time = game_time_get();
 					}
 				}
 			}
@@ -3987,7 +4780,7 @@ void players_update_after_game(
 
 	if (players_globals->all_dead)
 	{
-		if (!game_engine_running() && !players_lost_map_started)
+		if (!game_engine_running() && !players_lost_map_started && !network_game_distributed_client())
 		{
 			main_lost_map();
 			players_lost_map_started = TRUE;

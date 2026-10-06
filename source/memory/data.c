@@ -322,6 +322,12 @@ long datum_new(
 		absolute_index++;
 		header = (struct datum_header *)((byte *)header+size);
 	}
+	/* port: none free from first_free_absolute_index on (and none before it
+	is, as ever): the next search starts at the end, until a datum is deleted
+	(datum_delete lowers it), rather than walking a full array again. A full
+	array (the AI's props, with many actors) was walked on every new datum. */
+	if (result == NONE)
+		data->first_free_absolute_index = data->maximum_count;
 
 	return result;
 }

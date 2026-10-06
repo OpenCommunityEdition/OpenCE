@@ -210,7 +210,10 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 		while (*cursor && *cursor != '\\' && *cursor != '/' && component_length + 1 < sizeof(component))
 			component[component_length++] = *cursor++;
 		component[component_length] = '\0';
-		if (!component_length || !strcmp(component, "."))
+		/* . and .. (and Windows' spellings of them, with trailing dots and
+		spaces) are skipped: FATX names are never only dots, and .. would
+		leave the root */
+		if (!component_length || strspn(component, ". ") == component_length)
 			continue;
 
 		if (posix_find_entry_case_insensitive(resolved, component, on_disk, sizeof(on_disk)))

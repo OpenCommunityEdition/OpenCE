@@ -51,6 +51,18 @@ symbols in this file:
 
 /* ---------- structures */
 
+/* A chain's shape after each of the last two ticks, relative to the point
+its object's marker carries the base by: a frame between the ticks is drawn
+with the part of the way between those two shapes that it is, as an object is
+drawn between its own (port/linux/game/render_interpolation.c). */
+struct antenna_shape
+{
+	short count;
+	boolean has_previous;
+	real_point3d previous[MAXIMUM_ANTENNA_VERTICES + 1];
+	real_point3d latest[MAXIMUM_ANTENNA_VERTICES + 1];
+};
+
 /* ---------- prototypes */
 
 struct bitmap_data *bitmap_group_try_and_get_bitmap(
@@ -63,7 +75,12 @@ static void antenna_update_attachment(
 	struct location *attachment_location,
 	real_point3d *attachment_point,
 	real_vector3d *attachment_vector);
+static void antenna_record_shape(
+	long antenna_index,
+	struct antenna_datum *antenna,
+	short count);
 static void antenna_render_proper(
+	long antenna_index,
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition);
 static void antenna_update(
@@ -74,6 +91,7 @@ static void antenna_update(
 /* ---------- globals */
 
 struct data_array *antenna_data;
+static struct antenna_shape antenna_shapes[MAXIMUM_ANTENNAS];
 
 /* ---------- public code */
 
@@ -144,6 +162,9 @@ long antenna_new(
 			antenna->definition_index = definition_index;
 			antenna->object_index = NONE;
 			antenna->updates_since_last_render = 0;
+			/* (a new chain blends from no shape: the slot's record may be a
+			deleted antenna's, or an earlier map's) */
+			antenna_shapes[DATUM_INDEX_TO_ABSOLUTE_INDEX(antenna_index)].count = 0;
 			antenna->last_attachment_location.z = 0.0f;
 			antenna->last_attachment_location.y = 0.0f;
 			antenna->last_attachment_location.x = 0.0f;
@@ -247,7 +268,7 @@ void antenna_render(
 		}
 
 		antenna->updates_since_last_render = 0;
-		antenna_render_proper(antenna, definition);
+		antenna_render_proper(antenna_index, antenna, definition);
 	}
 
 	return;
@@ -269,7 +290,19 @@ void antennas_update(
 		{
 			antenna->updates_since_last_render++;
 			if (antenna->object_index != NONE && antenna->updates_since_last_render < 5)
+			{
+				/* The chain is a simulation of the Xbox's own step, an update
+				a tick: its springs, its carry and its points' physics are
+				per-update quantities (game.c steps it in the tick, not in
+				game_frame with the frames' own movement). */
 				antenna_update(antenna, definition, MIN(delta, 1.0f / 15.0f));
+				/* what this tick leaves a frame between ticks to be drawn in
+				(antenna_render_proper) */
+				antenna_record_shape(
+					antenna_index,
+					antenna,
+					(short)(definition->vertices.count + 1));
+			}
 		}
 	}
 
@@ -324,7 +357,51 @@ static void antenna_update_attachment(
 	return;
 }
 
+/* the shape this tick leaves the chain in, relative to the point the base
+was put at (antenna_update_attachment): a tick on from the last one, so a
+frame between the two is drawn from both (antenna_render_proper) */
+static void antenna_record_shape(
+	long antenna_index,
+	struct antenna_datum *antenna,
+	short count)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(antenna_index);
+	struct antenna_shape *shape;
+	real_point3d const *base = &antenna->vertices[0].position;
+	short vertex_index;
+
+	if (count <= 0 || count > MAXIMUM_ANTENNA_VERTICES + 1 ||
+		absolute_index < 0 || absolute_index >= MAXIMUM_ANTENNAS)
+	{
+		return;
+	}
+
+	shape = &antenna_shapes[absolute_index];
+	if (shape->count == count)
+	{
+		csmemcpy(shape->previous, shape->latest, sizeof(real_point3d) * count);
+		shape->has_previous = TRUE;
+	}
+	else
+	{
+		shape->count = count;
+		shape->has_previous = FALSE;
+	}
+
+	for (vertex_index = 0; vertex_index < count; vertex_index++)
+	{
+		real_point3d const *position = &antenna->vertices[vertex_index].position;
+
+		shape->latest[vertex_index].x = position->x - base->x;
+		shape->latest[vertex_index].y = position->y - base->y;
+		shape->latest[vertex_index].z = position->z - base->z;
+	}
+
+	return;
+}
+
 static void antenna_render_proper(
+	long antenna_index,
 	struct antenna_datum *antenna,
 	struct antenna_definition *definition)
 {
@@ -336,12 +413,64 @@ static void antenna_render_proper(
 		real falloff_scale =
 			(100.0f - definition->cutoff_pixels) /
 			(definition->falloff_pixels - definition->cutoff_pixels);
+		struct antenna_shape const *shape =
+			&antenna_shapes[DATUM_INDEX_TO_ABSOLUTE_INDEX(antenna_index)];
+		real_point3d chain[MAXIMUM_ANTENNA_VERTICES + 1];
+		real fraction = render_interpolation_fraction();
+		real_point3d base = antenna->vertices[0].position;
+		short chain_count = (short)(vertices->count + 1);
 		short vertex_index;
 
 		if (falloff_scale < 0.0f)
 			falloff_scale = 0.0f;
 		else if (falloff_scale > 1.0f)
 			falloff_scale = 1.0f;
+
+		if (chain_count > MAXIMUM_ANTENNA_VERTICES + 1)
+			chain_count = MAXIMUM_ANTENNA_VERTICES + 1;
+
+		/* The frames between the ticks (port/linux/game/render_interpolation.c):
+		the ticks left the chain's shape, a frame is drawn the part of the way
+		between the last two of them that it is, and the point its vehicle's
+		marker is at now carries the whole of it. The ticks' own base is what
+		the shape was recorded against, so with no such record the shape the
+		last tick left is drawn instead. */
+		if (antenna->object_index != NONE)
+		{
+			struct object_marker marker;
+
+			object_get_marker_by_name(
+				antenna->object_index,
+				definition->attachment_marker,
+				&marker,
+				1);
+			base = marker.matrix.position;
+		}
+
+		for (vertex_index = 0; vertex_index < chain_count; vertex_index++)
+		{
+			real_point3d offset;
+
+			if (shape->count == chain_count && shape->has_previous)
+			{
+				offset.x = shape->previous[vertex_index].x +
+					(shape->latest[vertex_index].x - shape->previous[vertex_index].x) * fraction;
+				offset.y = shape->previous[vertex_index].y +
+					(shape->latest[vertex_index].y - shape->previous[vertex_index].y) * fraction;
+				offset.z = shape->previous[vertex_index].z +
+					(shape->latest[vertex_index].z - shape->previous[vertex_index].z) * fraction;
+			}
+			else
+			{
+				offset.x = antenna->vertices[vertex_index].position.x - antenna->vertices[0].position.x;
+				offset.y = antenna->vertices[vertex_index].position.y - antenna->vertices[0].position.y;
+				offset.z = antenna->vertices[vertex_index].position.z - antenna->vertices[0].position.z;
+			}
+
+			chain[vertex_index].x = base.x + offset.x;
+			chain[vertex_index].y = base.y + offset.y;
+			chain[vertex_index].z = base.z + offset.z;
+		}
 
 		build_sprites_begin(
 			&sprite_data,
@@ -351,12 +480,10 @@ static void antenna_render_proper(
 			0);
 
 		for (vertex_index = 0;
-			vertex_index < vertices->count;
+			vertex_index < chain_count - 1;
 			vertex_index = (short)(vertex_index + 1))
 		{
 			struct antenna_vertex_datum *vertex = &antenna->vertices[vertex_index];
-			struct antenna_vertex_datum *next_vertex =
-				&antenna->vertices[vertex_index + 1];
 			struct antenna_vertex_definition *definition_vertex = TAG_BLOCK_GET_ELEMENT(
 				vertices,
 				vertex_index,
@@ -364,9 +491,9 @@ static void antenna_render_proper(
 			real_vector3d direction;
 			real_argb_color color;
 
-			direction.i = next_vertex->position.x - vertex->position.x;
-			direction.j = next_vertex->position.y - vertex->position.y;
-			direction.k = next_vertex->position.z - vertex->position.z;
+			direction.i = chain[vertex_index + 1].x - chain[vertex_index].x;
+			direction.j = chain[vertex_index + 1].y - chain[vertex_index].y;
+			direction.k = chain[vertex_index + 1].z - chain[vertex_index].z;
 			color = definition_vertex->color;
 
 			if (vertex->sprite_scale != 0.0f && falloff_scale > 0.0f)
@@ -376,7 +503,7 @@ static void antenna_render_proper(
 					1,
 					definition_vertex->sequence_index,
 					0,
-					&vertex->position,
+					&chain[vertex_index],
 					&direction,
 					0.0f,
 					vertex->sprite_scale,

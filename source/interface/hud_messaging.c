@@ -145,6 +145,7 @@ symbols in this file:
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 #include <stddef.h>
 
@@ -606,6 +607,7 @@ void scripted_hud_set_state_message(
 {
 	struct scenario *scenario = global_scenario_get();
 
+	network_coop_note_hud(_coop_hud_help_text, message_index);
 	if (hud_scripted_globals->show_hud_help_text &&
 		scenario->hud_messages.index != NONE)
 	{
@@ -626,6 +628,7 @@ void scripted_hud_set_flashing_state(
 {
 	long time;
 
+	network_coop_note_hud(_coop_hud_help_flash, flash);
 	if (flash && !hud_messaging_globals->use_flash)
 	{
 		time = game_time_get();
@@ -656,6 +659,7 @@ void scripted_hud_set_objective(
 {
 	struct scenario *scenario = global_scenario_get();
 
+	network_coop_note_hud(_coop_hud_objective, message_index);
 	if (scenario->hud_messages.index != NONE)
 	{
 		struct hud_message_text_definition *hud_messages =
@@ -735,6 +739,47 @@ void scripted_hud_show_timer(
 {
 	hud_messaging_globals->timer.enabled = show;
 	return;
+}
+
+/* port: the script timer and the scenario's message count, for network
+co-op (port/linux/game/network_coop.c) */
+void hud_messaging_port_timer_get(
+	struct hud_timer_state *state)
+{
+	struct hud_timer_data_definition const *timer = &hud_messaging_globals->timer;
+
+	state->reference_time = timer->reference_time;
+	state->ticks = timer->ticks;
+	state->flash_cutoff = timer->flash_cutoff;
+	state->x = timer->position.n[0];
+	state->y = timer->position.n[1];
+	state->corner = timer->corner;
+	state->paused = timer->paused;
+	state->enabled = timer->enabled;
+}
+
+void hud_messaging_port_timer_set(
+	struct hud_timer_state const *state)
+{
+	struct hud_timer_data_definition *timer = &hud_messaging_globals->timer;
+
+	timer->reference_time = state->reference_time;
+	timer->ticks = state->ticks;
+	timer->flash_cutoff = state->flash_cutoff;
+	timer->position.n[0] = state->x;
+	timer->position.n[1] = state->y;
+	timer->corner = PIN(state->corner, 0, 4);
+	timer->paused = state->paused;
+	timer->enabled = state->enabled;
+}
+
+short hud_messaging_port_message_count(
+	void)
+{
+	struct scenario *scenario = global_scenario_get();
+
+	return scenario->hud_messages.index != NONE ?
+		(short)HUD_MESSAGE_TEXT_DEFINITION_GET(scenario->hud_messages.index)->messages.count : 0;
 }
 
 void scripted_hud_pause_timer(
@@ -1129,6 +1174,7 @@ void scripted_hud_messages_clear(
 	struct hud_messaging_datum_definition *datum = hud_messaging_globals->message_data;
 	long datum_count = NUMBER_OF_HUD_MESSAGING_DATUMS;
 
+	network_coop_note_hud(_coop_hud_messages_clear, 0);
 	do
 	{
 		struct hud_message_definition *message = datum->messages;
