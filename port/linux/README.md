@@ -208,8 +208,17 @@ problem.
 
 The settings are in `config.toml` next to the executable
 (`build/linux/config.toml`). At the first start, the game writes the file
-with the default values and a comment for each setting. To get the default
-values again, delete the file.
+with a comment for each setting and the setting commented out at its
+default (`# vsync = true`): a commented setting follows the default, also a
+newer version's. To keep a value of your own, take the `# ` out (or change
+it in the Settings menu, which does that). A newer version adds its new
+settings the same way. To get the default values again, delete the file.
+
+A file written before this (without the note "A setting commented out ...
+is at its default" in its head) keeps its values; the game adds the note,
+and a value that was only the older versions' default and has changed
+since becomes the new default, once: `vr.hands = "floating"` becomes
+`# hands = "arms"`.
 
 The game reads the file at start-up. If a key is not correct, or a value
 has the wrong type, the game writes the line to the log and uses the default
@@ -775,6 +784,251 @@ port operates" in [port/android/README.md](../android/README.md#how-the-port-ope
   x86 build does (`src/posix_trace_marker.c`, under "The platform layer"
   below): on the Steam Frame, its markers took the game from the headset's
   72 Hz to about 50 frames a second.
+
+## VR
+
+`python3 configure.py --vr`, then `ninja linux_arm64`, builds the 64-bit
+ARM game with a VR mode: the game plays in an OpenXR headset, in stereo,
+with the head tracked in 6 degrees of freedom. It was made on a Steam Frame
+with SteamVR. The VR build draws with desktop OpenGL 4.5
+(`--linux-arm64-gl=desktop`, which `--vr` implies); it needs no OpenXR
+package, as it loads the active runtime itself (or a
+`libopenxr_loader.so.1` where there is one).
+
+To play, start SteamVR, then start `build/linux_arm64/halo` (from a
+terminal of the headset's desktop session, or as a non-Steam game in
+Steam). Without a runtime or a headset the game plays flat, in its window.
+`vr.enabled = false` (or `HALO_VR=0`) plays flat too.
+
+### Controls
+
+The Steam Frame's controllers are the halves of an Xbox controller:
+
+| Controller | Game |
+| --- | --- |
+| Left stick | Move (click: crouch) |
+| Right stick, left and right | Turn: in steps (`vr.turn = "snap"`) or smoothly (`"smooth"`) |
+| Right stick click | Zoom |
+| Head | Look |
+| Right controller | Aim: it holds the weapon, and the reticle shows where it points (`vr.aim = "controller"`). With `vr.aim = "head"`, the head aims and the reticle stays in the middle of the view. |
+| Left controller | The left hand, where the controller is; the left grip closes it (`vr.hands`). The right trigger pulls the right index finger too. |
+| Right trigger, left trigger | Fire, throw a grenade |
+| A, B, X, Y | Jump, melee, action and reload, switch weapon |
+| Left grip, the left hand on a long gun's foregrip | Aim it with both hands, along the line from the right hand to the left (`vr.two_handed`) |
+| A punch of the right controller | Melee (`vr.melee_gesture`) |
+| Left bumper, right bumper | Flashlight, switch grenade |
+| D-pad (left controller), View, Menu | The menus' d-pad, Back (scoreboard), Start (pause) |
+| Both grips, held | Recentre: the head's place and heading become the player's eye and facing (not while the left hand holds a foregrip) |
+| A gamepad's Back (View), held 1 s | Recentre, as both grips do |
+
+Other controllers that SteamVR maps to the Touch layout operate as well
+(the grips as the bumpers).
+
+#### With a gamepad (`vr.aim = "gamepad"`)
+
+A gamepad (an Xbox controller, by Bluetooth or USB, or the headset's
+controllers as its two halves) plays as on the flat screen, with the
+profile's button layout, look sensitivity and acceleration, and the aim
+assist: the left stick moves, the right stick turns and aims, and the
+triggers, bumpers, buttons, d-pad, Start and Back are the game's. The
+headset shows the world, and the head looks about from where the stick
+points the view (`vr.gamepad_view`):
+
+| | Does |
+| --- | --- |
+| Right stick | Turns and aims the player, as on the flat screen. With `vr.gamepad_view = "camera"` (the default) it is the camera, as on the Xbox: it turns and pitches the view smoothly, and you aim at the middle of the view. With `"level"` it turns the view smoothly but never pitches it: its pitch moves the weapon and the reticle, not the horizon. With `"snap"` the view's heading turns by `vr.snap_turn_angle` each time the aim is more than that from it (the aim sweeps across the view, which turns in steps), and its pitch moves only the weapon and the reticle. |
+| Head | Looks about from the view the stick points, in 6 degrees of freedom, and never moves the aim: with the head straight the reticle is in the middle (with `"camera"`), and a glance looks elsewhere while the reticle stays where the aim is. |
+| Back (View), held 1 s | Recentre: where the head looks becomes where the player aims |
+
+`"camera"` is the most like the Xbox game, and the most likely to make you
+sick: the stick turns and tilts the whole world while your head is still.
+`"level"` keeps the horizon level, and `"snap"` turns it in steps, which
+most people find the most comfortable.
+
+The weapon is posed as on the flat screen from the player's eye looking
+along the aim, so it stays before the body whichever way the head looks.
+The reticle is in the world, where the aim meets it (as far as what it
+aims at, in both eyes), as large as in the HUD.
+The headset's controllers are an Xbox controller's halves here: their
+sticks, buttons and triggers are a gamepad's (the right stick looks, never
+snap-turns), where they point aims nothing, and a punch does not melee;
+they rumble with the gamepad. Both grips held still recentre. In the headset
+every gamepad is the first player's: Steam may list a gamepad of its own
+(Steam Input's) besides the one in the hands, and all of them merge into
+controller 1 (each stick pushed furthest wins). In a vehicle the view is
+as `vr.vehicle_view` says, and the vehicle steers and aims where the stick
+does.
+
+### Settings
+
+In the headset, Settings' VR Setup (below About; only there while the
+game plays in VR) sets most of these with the left d-pad: VR Controls
+(the hands, the aim, the gamepad's view, two-handed aiming, the melee
+punch, turning and the vehicles' view) and, from its last row, VR Display (the play position,
+the eye height, the world's scale, the HUD's and the menus' distance and
+size, the resolution and the refresh rate). OK writes them to
+`config.toml`, and they apply at once, but those marked RESTART:
+`vr.height`, `vr.resolution_scale` and `vr.refresh_rate`, which the
+headset's session is opened with, apply from the next start.
+
+| Setting | Default | Environment variable | Function |
+| --- | --- | --- | --- |
+| `vr.enabled` | `true` | `HALO_VR` | `false`: play flat. |
+| `vr.resolution_scale` | `1.0` | `HALO_VR_RESOLUTION_SCALE` | The eyes' images, as a multiple of the size that the headset recommends (from `0.25` to `2`). |
+| `vr.refresh_rate` | `90.0` | `HALO_VR_REFRESH_RATE` | The refresh rate to ask the runtime for. `0`: the runtime's. |
+| `vr.aim` | `"controller"` | `HALO_VR_AIM` | `"controller"`: the right controller aims and holds the weapon. `"head"`: the head aims. `"gamepad"`: a gamepad aims and plays, as on the flat screen, and the head looks about freely (above, "With a gamepad"). |
+| `vr.gamepad_view` | `"camera"` | `HALO_VR_GAMEPAD_VIEW` | With `vr.aim = "gamepad"`: `"camera"`, the stick turns and pitches the view as the flat screen's camera, the head's turn on top (the most like the Xbox game, and the most likely to make you sick); `"level"`, it turns the view smoothly, and its pitch moves only the reticle; `"snap"`, the view turns a step of `vr.snap_turn_angle` each time the aim is more than that from it, and its pitch moves only the reticle. |
+| `vr.weapon_offset` | `"0.15, -0.22, 0.30"` | `HALO_VR_WEAPON_OFFSET` | With `vr.hands = "game"`: where the weapon's grip is from the eye that the game poses it for, in metres: right, up, forward. |
+| `vr.depth` | `false` | `HALO_VR_DEPTH` | `true`: give the runtime the eyes' depth too (`XR_KHR_composition_layer_depth`), for its reprojection. SteamVR on the Steam Frame cannot make a depth swapchain for an OpenGL session yet. |
+| `vr.melee_gesture` | `true` | `HALO_VR_MELEE_GESTURE` | A punch with the right controller (fast, in the direction it points) melees, as B does. |
+| `vr.two_handed` | `true` | `HALO_VR_TWO_HANDED` | With `vr.aim = "controller"`: a long gun (any but the pistols, the needler, the flag and the ball) is aimed along the line from the right hand to the left while the left grip holds it by the foregrip (pressed within 18 cm of the line ahead of the right hand). The aim turns to that line over 0.15 s, smoothed, and back when the grip is let go. |
+| `vr.hands` | `"arms"` | `HALO_VR_HANDS` | With `vr.aim = "controller"`: each first-person hand where its controller is (the right holding the weapon, its index finger on the trigger as far as the trigger is pulled; the left open, closing as the grip is pulled, and on a long gun's foregrip while it holds it). `"arms"`: the arms reach the hands from the shoulders (`vr.shoulders`). `"floating"`: no arms above the wrists. `"game"`: the game's arms, posed from the weapon in the right hand. A hand whose controller is not tracked is not drawn, nor its arm. |
+| `vr.shoulders` | `"0.19, -0.20, -0.07"` | `HALO_VR_SHOULDERS` | With `vr.hands = "arms"`: where each shoulder is from the eyes, in metres: out to its side, up, forward, turned with the body (which faces between the head and the hands, and follows the head past a 40 degree turn, and slowly). |
+| `vr.vehicle_view` | `"first_person"` | `HALO_VR_VEHICLE_VIEW` | `"first_person"`: in a vehicle's seat, the view is from the seated player's head, level with the horizon. `"third_person"`: the game's camera following the vehicle. |
+| `vr.turn` | `"snap"` | `HALO_VR_TURN` | `"snap"` or `"smooth"` (with `vr.aim = "gamepad"`, `vr.gamepad_view` instead). |
+| `vr.snap_turn_angle` | `30.0` | `HALO_VR_SNAP_TURN_ANGLE` | Degrees of each snap turn. |
+| `vr.smooth_turn_speed` | `150.0` | `HALO_VR_SMOOTH_TURN_SPEED` | Degrees each second of smooth turning. |
+| `vr.height` | `"seated"` | `HALO_VR_HEIGHT` | `"seated"`: the head where it is at the recentring is the player's eye. `"standing"`: the head `vr.player_height` above the floor is. |
+| `vr.player_height` | `1.65` | `HALO_VR_PLAYER_HEIGHT` | Standing, the height of your eyes, in metres. |
+| `vr.world_scale` | `1.0` | `HALO_VR_WORLD_SCALE` | More than `1` makes the world look larger. |
+| `vr.hud_distance`, `vr.hud_size` | `2.0`, `60.0` | `HALO_VR_HUD_DISTANCE`, `HALO_VR_HUD_SIZE` | The HUD's distance in front of the eyes (metres) and width (degrees of the view). |
+| `vr.menu_distance`, `vr.menu_width` | `2.5`, `2.6` | `HALO_VR_MENU_DISTANCE`, `HALO_VR_MENU_WIDTH` | The menus' distance and width, in metres. |
+| `debug.vr_force_render` | `false` | `HALO_VR_FORCE_RENDER` | Draw the frames while the runtime says not to (the headset not worn), to measure them. |
+| `debug.vr_test_turn` | `0.0` | `HALO_VR_TEST_TURN` | Turn the player this many degrees a second, for automated tests without hands. |
+| `debug.vr_test_jitter` | `0.0` | `HALO_VR_TEST_JITTER` | Move the head by up to this many millimetres (and turn it as many hundredths of a degree) at random each frame, as a worn headset moves: for automated tests of what flickers when the view barely moves. |
+| `debug.vr_test_head` | `""` | `HALO_VR_TEST_HEAD` | Hold the head still and level where it is first located (a simulated headset's head wobbles), for automated tests: `"0"`, or `"<degrees> <seconds>"` turns it left and right by as many degrees over as many seconds, smoothly (a sine of the frames' display times). |
+| `debug.vr_test_hands` | `""` | `HALO_VR_TEST_HANDS` | Hold the controllers still, for automated tests without hands: `"lx ly lz lyaw lpitch lroll, rx ry rz ryaw rpitch rroll[, grip[, buttons[, trigger[, head]]]]"`, the left and right hands in metres right, up and forward from the recentred head and degrees of yaw (left), pitch (up) and roll (right) (a hand 10 metres or more out is not tracked), the left grip's pull (0 to 1), the buttons pressed for the pose's first 20 frames (A 1, B 2, X 4, Y 8, the right trigger 65536, the left 131072), the right trigger's pull (0 to 1) and the head turned (degrees left). Poses separated by `;` are held 288 frames each in turn (the log says from which frame). With the hands posed, a cross marks each controller's grip and a line where it points, and white lines the arms' bones. |
+| `debug.vr_gpu_time` | `false` | `HALO_VR_GPU_TIME` | With `debug.gpu_stats`, log the GPU's time for each frame too, waiting for it at the present (which costs the overlap of the GPU and the game, and lets the GPU's clock drop: an upper bound). |
+
+`debug.test_input = "pad"` (`HALO_TEST_INPUT=pad`) puts the gamepad mode
+through its paces without a gamepad: it turns, looks up and down, fires,
+throws a grenade, holds Back (recentring) and walks, a few seconds each in
+turn, and logs each.
+
+`debug.gpu_stats` also logs the VR frames' timing, and
+`debug.screenshot_every` writes both eyes (`eyes*.bmp`) and the HUD
+(`hud*.bmp`).
+
+The GPU's time is best read from the kernel: the process's
+`drm-engine-gpu` time in `/proc/<pid>/fdinfo`. On the Steam Frame (b30's
+first outdoor area, SteamVR holding 72 Hz with the headset idle, the GPU at
+its 903 MHz) the game keeps the GPU busy about 8 ms a frame at
+`vr.resolution_scale = 1.0` (1728x1728 eyes), about 13 ms at 1.25 (on the
+edge of 72 Hz), and at 1.5 the runtime drops to 36 Hz. At 90 Hz (11.1 ms)
+the default scale leaves about 3 ms, so there is no anti-aliasing:
+supersampling costs as above, and multisampling the eye pass
+(`GL_OVR_multiview_multisampled_render_to_texture`, which Zink offers) cost
+15 ms a frame at 2 samples, and drew the multi-pass shaders wrongly.
+
+### How it operates
+
+- The host opens the OpenXR session on SDL's EGL context
+  (`XR_KHR_opengl_enable` with `XR_MNDX_egl_enable`;
+  `arm64/host_vr.c`). The guest gets the swapchains' GL textures, the
+  views and the controllers through `src/vr_host.h`, whose structures
+  hold only 32-bit values.
+- The game draws its 3D view once a frame, from the centre of the head,
+  with a field of view that covers both eyes (`game/vr_render.c`): the
+  culling and the game's work are those of one view. That view has the
+  game's 480-line viewport, so the size of an object on the screen, which
+  picks its model's detail level, its lighting's refresh and its shadow, is
+  scaled to an eye's lines over the eye's field of view (about 3.6 times,
+  at 1728 lines an eye). The renderer draws
+  each draw into both eyes at once with `GL_OVR_multiview2`, directly into
+  the eyes' swapchain image, a 2-layer texture array. Each vertex that the
+  game projected through clip space moves to its eye by a 4x4 for each
+  eye, which `game/vr_render.c` makes each time the game sets a projection
+  (`rasterizer_set_frustum_z`). The eyes are beside the centre, looking
+  the same way, so only x and y move: each eye's depth is exactly the
+  centre's. (Made through the inverse of the centre's projection, the depth
+  lost its precision, differently each frame: some frames all beyond about
+  100 world units went past the far plane, the water's edge flickered on
+  b30's horizon, and, depth-clamped, a10's Pillar of Autumn showed its far
+  side over its near hull.) The screen's other render targets have a
+  layer for each eye. Draws in screen space are the same in both eyes.
+- The HUD and the menus are drawn into a target of their own, which is
+  copied each frame into a quad layer: in front of the head in a game, in
+  front of the place of the last recentring in the menus. The HUD's camera
+  has the field of view of the layer, so the waypoints are in the correct
+  place. With `vr.aim = "controller"` or `"gamepad"` the reticle is not in
+  the layer but in the eyes (`vr_render_crosshairs`): drawn at the end of
+  the eye pass where the aim meets the world (a line-of-sight test, its
+  distance smoothed), in each eye by a scale and offset from the middle of
+  the screen where the game draws it, as large as in the layer, each eye
+  in a draw of its own (`halo_vr_draw_eye`). In the layer, in front of the
+  head, it was placed for the head's pose as the frame was drawn, which
+  the compositor showed it with at the pose of the display while it moved
+  the eyes' images to that: it swam against the world as the head moved,
+  stepped by the layer's pixels, and at the layer's 2 metres the eyes saw
+  it doubled against what it aimed at.
+- The runtime paces the game (`xrWaitFrame`). A frame ends when the next
+  starts, because SteamVR's `xrEndFrame` waits for the GPU. The views are
+  located again just before the frame's draws. The game's ticks are
+  interpolated, as on the flat screen. The frame is begun before the game
+  reads its clock, and the game's time moves on by the time between the
+  frames' predicted displays, so that the frames are as evenly apart in
+  the game as the headset shows them (read when the last frame's work
+  ended, they were 9 to 19 ms apart at 72 Hz, and what moved fast
+  juddered).
+- The player's facing follows the right controller (or the head). Thus
+  the netcode sees a normal player's aim. The first-person weapon is
+  posed from a camera behind the controller, and drawn in both eyes as
+  the world is. With both hands on a long gun, the facing and the weapon
+  follow the line between the hands instead: still only an aim for the
+  netcode.
+- With a gamepad (`vr.aim = "gamepad"`) the facing is the game's own, from
+  the stick (`player_control.c`), and the netcode sees it as ever; the
+  view before the head's turn and move is the facing's yaw and pitch
+  (`vr.gamepad_view = "camera"`), its yaw alone (`"level"`) or its yaw in
+  steps (`"snap"`), and the first-person weapon is posed from the player's eye along
+  the facing (not the camera, which shakes as the weapon fires), the
+  game's arms with it. The reticle is where the facing meets the world, as
+  the controller's is where its line does.
+- The first-person weapon and the arms are two models posed by one
+  animation graph, whose nodes the game builds each frame
+  (`first_person_weapon_build_node_matrices`); `game/vr_hands.c` poses
+  them again. Each hand's middle (its wrist and knuckles) is at its
+  controller's grip pose, turned with the controller's pointing pose as
+  the weapon's idle animation has it turned from the camera. For the
+  right hand the camera is placed so (the weapon and the hand then play
+  their animation about it, reloads and throws too); the left wrist
+  (`frame l wriste`) and its fingers are put there in the idle pose's
+  shape once the nodes are built, the fingers curled about the knuckles'
+  line as the grip is pulled, and blended onto the weapon's foregrip as
+  the left hand takes it. The right index finger curls as the trigger is
+  pulled, and the weapon's `frame trigger` (the pistol's) moves back.
+- With arms, the shoulders are below and beside the eyes, turned with the
+  body: the heading between the head's and the hands', followed past a
+  40 degree turn of the head, and slowly (so that looking about does not
+  swing them). Each arm is two bones, the model's (0.31 to 0.33 m each):
+  the elbow is where they meet (the law of cosines), bent down, out and a
+  little back, and each bone is turned from the idle pose's to lie along
+  the arm, the forearm twisted with the hand. Out of reach, the shoulder
+  comes forward up to 5 cm and the arm stretches the rest. With floating
+  hands, the arms are scaled to almost nothing at the wrists.
+- In a vehicle's seat (`vr.vehicle_view = "first_person"`) the eye is the
+  seated player's head marker, which the game poses between ticks as it
+  does the vehicle, and the player's body is not drawn. The view turns as
+  on foot (the stick and the head, never the vehicle): the vehicle steers
+  and aims where the controller (or head) points, and the horizon stays
+  level whatever the vehicle does.
+- The sky is drawn about the camera at a thousandth of its size, a few
+  metres away: its draws move to each eye as from the centre of the head,
+  so that it is at infinity. Its draws are depth-clamped rather than
+  clipped by the near and far planes (its far side is near the far plane,
+  and the union view, moved by the head, clipped parts of it some frames).
+  The rest of the eye pass is clipped as the flat screen is.
+  What the game projects to the screen itself (lens flares,
+  their visibility tests, the light volumes' sprites) is drawn in screen
+  space and moved to each eye as its point moves, by a scale and offset.
+  The sun's glow (`rasterizer_ray_of_buddha`), a blur of the screen about
+  the sun, is not moved.
+- The visibility tests (the lens flares') are counted by the pixel shaders'
+  atomic counters, as on ES, not by queries: Vulkan counts a query in a
+  multiview pass in as many slots as views, which Zink does not allow for,
+  and Turnip's writes past them faulted the GPU (and could lose the
+  device). Without atomic counters they would be drawn into the left eye's
+  layer alone, outside the multiview pass.
 
 ## What operates
 
