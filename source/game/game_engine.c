@@ -1667,6 +1667,27 @@ static long select_players_to_display(
 	return MIN(maximum_count, player_count);
 }
 
+/* port: network co-op's scoreboard list (game_engine_rasterize_scoreboard):
+the players in the game, as they joined */
+static long populate_campaign_player_buffer(
+	struct statistic_buffer *statistic_buffer)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long player_count = 0;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL && player_count < MULTIPLAYER_MAXIMUM_PLAYERS)
+	{
+		if (player->quit_out_of_game)
+			continue;
+		csmemset(&statistic_buffer[player_count], 0, sizeof(*statistic_buffer));
+		statistic_buffer[player_count++].player_index = iterator.datum_index;
+	}
+
+	return player_count;
+}
+
 /* port: the scoreboard of a full-screen view (game_engine_rasterize_in_game_score;
 a split-screen view's keeps the Xbox's six rows): SCOREBOARD_SCALE times the
 HUD's text, centred, on a panel (display.scoreboard_background). A team game's
@@ -1675,7 +1696,9 @@ order of score in one column, or two when one has too few rows; each with
 the player's ping in a network game (the host's measure:
 network_distributed.c). More players than a page are scrolled to with the
 mouse wheel and Page Up/Down (platform_scoreboard_scroll), a footer telling
-which are shown; opened, it shows the viewer's own player's page. */
+which are shown; opened, it shows the viewer's own player's page. Network
+co-op's campaign, with no game engine, lists its players as they joined,
+with only their names and pings. */
 enum
 {
 	/* the rows' widths (in the scoreboard's text, before it is scaled):
@@ -1861,6 +1884,7 @@ static void game_engine_rasterize_scoreboard(
 	boolean has_teams = game_engine_has_teams();
 	boolean network = game_connection() == _game_connection_network_client ||
 		game_connection() == _game_connection_network_server;
+	boolean campaign = !game_engine;
 	boolean team_columns;
 	long font_index = hud_get_font_index();
 	long string_list_index;
@@ -1894,9 +1918,16 @@ static void game_engine_rasterize_scoreboard(
 	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
 		SCOREBOARD_BOTTOM_ROWS;
 	rows = MAX(rows, 1);
-	statistic_buffer_in_game_only = TRUE;
-	ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
-	statistic_buffer_in_game_only = FALSE;
+	if (campaign)
+	{
+		ranked_count = populate_campaign_player_buffer(ranked);
+	}
+	else
+	{
+		statistic_buffer_in_game_only = TRUE;
+		ranked_count = populate_statistic_buffer(ranked, _postgame_statistic_ranking, FALSE);
+		statistic_buffer_in_game_only = FALSE;
+	}
 	team_columns = has_teams && scoreboard_team_columns() && width >= 2 * SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP;
 	for (index = 0; index < ranked_count; index++)
 	{
@@ -1987,15 +2018,20 @@ static void game_engine_rasterize_scoreboard(
 	team_colors[1].green = 0.3f;
 	team_colors[1].blue = 0.6f;
 
-	game_engine_generate_title_string(title_string, player_index);
+	if (campaign)
+		usprintf(title_string, L"Co-op");
+	else
+		game_engine_generate_title_string(title_string, player_index);
 	color.alpha = alpha;
 	color.red = color.green = color.blue = 0.7f;
 	scoreboard_draw_row(title_string, FALSE, &color, 0, top, left, FALSE);
 
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
-	column_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x43) : L"";
+	column_name = string_list_index != NONE && !campaign ? unicode_string_list_get_string(string_list_index, 0x43) : L"";
 	score_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x44) : L"";
-	game_engine->format_score_name(score_string);
+	score_string[0] = 0;
+	if (!campaign)
+		game_engine->format_score_name(score_string);
 	usprintf(row_string, L"\t%s\t%s\t%s\t%s", column_name, score_name, score_string, network ? L"Ping" : L"");
 	{
 		long column;
@@ -2040,13 +2076,16 @@ static void game_engine_rasterize_scoreboard(
 			continue;
 		color = *hud_get_text_color(&text_color);
 		color.alpha = alpha;
-		game_engine->format_player_score(entry->player_index, score_string);
-		if (game_engine_player_is_out_of_lives(entry->player_index))
-			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8A) : L"";
-		else if (player->quit_out_of_game)
-			status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8B) : L"";
-		else
-			status_string = score_string;
+		score_string[0] = 0;
+		status_string = score_string;
+		if (!campaign)
+		{
+			game_engine->format_player_score(entry->player_index, score_string);
+			if (game_engine_player_is_out_of_lives(entry->player_index))
+				status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8A) : L"";
+			else if (player->quit_out_of_game)
+				status_string = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x8B) : L"";
+		}
 		ping_string[0] = 0;
 		if (network)
 		{
@@ -2063,7 +2102,7 @@ static void game_engine_rasterize_scoreboard(
 		usprintf(
 			row_string,
 			L"\t%s\t%s\t%s\t%s",
-			get_place_string(entry),
+			campaign ? L"" : get_place_string(entry),
 			player->name,
 			status_string,
 			ping_string);
@@ -2112,8 +2151,9 @@ static void game_engine_rasterize_in_game_score(
 	wchar_t *column_name;
 	wchar_t *score_name;
 
-	/* port: a full-screen view's its own (game_engine_rasterize_scoreboard) */
-	if (local_player_count() <= 1)
+	/* port: a full-screen view's its own, as is the campaign's
+	(game_engine_rasterize_scoreboard) */
+	if (local_player_count() <= 1 || !game_engine)
 	{
 		game_engine_rasterize_scoreboard(player_index, alpha);
 		return;
@@ -3493,7 +3533,7 @@ static void game_engine_post_rasterize_in_game(
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game_engine.c",
 		0x771,
-		NULL != game_engine);
+		NULL != game_engine || network_coop_active());
 
 	if (game_engine && player)
 		internal_rasterize_target_name(player_index);
@@ -3502,7 +3542,7 @@ static void game_engine_post_rasterize_in_game(
 	fade = game_engine_globals.hud_message_timers[local_player_index];
 	if ((!gamepad ||
 		!gamepad->buttons[_gamepad_binary_button_back]) &&
-		game_engine_globals.postgame_state != game_engine_mode_postgame_delay)
+		(!game_engine || game_engine_globals.postgame_state != game_engine_mode_postgame_delay))
 	{
 		/* a frame is no longer a tick (render_interpolation.c): fade in half
 		a second, not in 15 frames */
@@ -3865,6 +3905,12 @@ void game_engine_post_rasterize(
 				!"unreachable");
 			break;
 		}
+	}
+	/* port: network co-op's campaign has the scoreboard too, of names and
+	pings (game_engine_rasterize_scoreboard) */
+	else if (network_coop_active())
+	{
+		game_engine_post_rasterize_in_game();
 	}
 
 	return;
