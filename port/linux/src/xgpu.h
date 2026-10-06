@@ -106,6 +106,9 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* Discrete meter thresholds in texture 0's red are read at level zero,
+	without filtering. Coverage/brightness still use the filtered lookup. */
+	unsigned char point_threshold;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -144,6 +147,7 @@ struct xgpu_texture_description
 	unsigned long pitch; /* linear textures */
 	BOOL hires;         /* a high-res HUD texture drawn in the texture's place (hud_hires.h) */
 	BOOL hires_coverage; /* ... whose green is its coverage (a meter's) */
+	BOOL hires_point_threshold; /* ... whose red holds discrete segment data */
 };
 
 void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_texture_description *description);
