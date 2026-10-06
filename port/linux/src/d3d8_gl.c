@@ -1349,6 +1349,8 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- device creation */
 
+static void program_adopt(GLuint vertex_shader, GLuint fragment_shader, GLuint program);
+
 static void gl_initialize(void)
 {
 	GLint major = 0, minor = 0;
@@ -1472,6 +1474,9 @@ static void gl_initialize(void)
 		if (renderbuffer_size < maximum_target_size)
 			maximum_target_size = renderbuffer_size;
 	}
+	/* the shaders and programs of earlier runs, made now rather than in the
+	middle of the frames that first draw with them (xgpu_shader_cache.c) */
+	xgpu_shader_cache_warm(program_adopt);
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
 	if (anti_aliasing_value < 0)
@@ -2384,7 +2389,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
-		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
+		*shader = xgpu_shader_cache_compile(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -2436,7 +2441,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
-	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
+	entry->shader = xgpu_shader_cache_compile(GL_FRAGMENT_SHADER, source, "pixel");
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -2456,13 +2461,14 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	return entry->shader;
 }
 
+static struct program_entry *program_entry_add(GLuint vertex_shader, GLuint fragment_shader, GLuint program);
+
 static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_shader)
 {
 	static struct program_entry *last;
 	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
 	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
 	struct program_entry *entry;
-	int stage;
 
 	if (last && last->vertex_shader == vertex_shader && last->fragment_shader == fragment_shader)
 		return last;
@@ -2476,18 +2482,49 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 			return entry;
 		}
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = program_entry_add(vertex_shader, fragment_shader,
+		vertex_shader && fragment_shader ? xgpu_link_program(vertex_shader, fragment_shader, "shader") : 0);
+	if (!entry || !entry->program)
+		return NULL;
+	xgpu_shader_cache_linked(vertex_shader, fragment_shader);
+	last = entry;
+	return entry;
+}
+
+/* a program made already, ready for program_get to find (the shader
+cache's warming at start-up) */
+static void program_adopt(GLuint vertex_shader, GLuint fragment_shader, GLuint program)
+{
+	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
+	struct program_entry *entry;
+
+	for (entry = program_buckets[hash % PROGRAM_BUCKETS]; entry; entry = entry->next)
+	{
+		if (entry->vertex_shader == vertex_shader && entry->fragment_shader == fragment_shader)
+			return;
+	}
+	program_entry_add(vertex_shader, fragment_shader, program);
+}
+
+/* a pair's cache entry with its program (0: it did not link), the
+program's uniforms found */
+static struct program_entry *program_entry_add(GLuint vertex_shader, GLuint fragment_shader, GLuint program)
+{
+	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
+	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
+	struct program_entry *entry = calloc(1, sizeof(*entry));
+	int stage;
+
+	if (!entry)
+		return NULL;
 	entry->vertex_shader = vertex_shader;
 	entry->fragment_shader = fragment_shader;
 	memset(&entry->uniforms, 0xff, sizeof(entry->uniforms));
 	entry->next = *bucket;
 	*bucket = entry;
-	if (!vertex_shader || !fragment_shader)
-		return NULL;
-
-	entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
+	entry->program = program;
 	if (!entry->program)
-		return NULL;
+		return entry;
 	state_program(entry->program);
 	entry->constants = glGetUniformLocation(entry->program, "c");
 	entry->constant_count = XGPU_VERTEX_CONSTANT_COUNT;
@@ -2541,7 +2578,6 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		snprintf(name, sizeof(name), "tex%d", stage);
 		glUniform1i(glGetUniformLocation(entry->program, name), stage);
 	}
-	last = entry;
 	return entry;
 }
 

@@ -116,6 +116,7 @@ this list to generate the guest's entry points */
 	X(glGetShaderiv) \
 	X(glGetShaderInfoLog) \
 	X(glDeleteShader) \
+	X(glDeleteProgram) \
 	X(glCreateProgram) \
 	X(glAttachShader) \
 	X(glBindAttribLocation) \
@@ -229,6 +230,7 @@ this list to generate the guest's entry points */
 	X(glGetShaderiv) \
 	X(glGetShaderInfoLog) \
 	X(glDeleteShader) \
+	X(glDeleteProgram) \
 	X(glCreateProgram) \
 	X(glAttachShader) \
 	X(glBindAttribLocation) \
@@ -345,6 +347,7 @@ pointers, sees the declarations without these aliases */
 #define glGetShaderiv halo_glGetShaderiv
 #define glGetShaderInfoLog halo_glGetShaderInfoLog
 #define glDeleteShader halo_glDeleteShader
+#define glDeleteProgram halo_glDeleteProgram
 #define glCreateProgram halo_glCreateProgram
 #define glAttachShader halo_glAttachShader
 #define glBindAttribLocation halo_glBindAttribLocation
@@ -456,6 +459,7 @@ pointers, sees the declarations without these aliases */
 #define glGetShaderiv halo_glGetShaderiv
 #define glGetShaderInfoLog halo_glGetShaderInfoLog
 #define glDeleteShader halo_glDeleteShader
+#define glDeleteProgram halo_glDeleteProgram
 #define glCreateProgram halo_glCreateProgram
 #define glAttachShader halo_glAttachShader
 #define glBindAttribLocation halo_glBindAttribLocation

@@ -52,6 +52,14 @@ written */
 GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
 GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
 
+/* the draws' shaders by their text (xgpu_shader_cache.c): a text compiled
+before gives the same shader; program_get tells it each pair it links; and
+at start-up the texts and pairs of earlier runs are all compiled and linked,
+each program handed to linked() */
+GLuint xgpu_shader_cache_compile(GLenum type, const char *source, const char *what);
+void xgpu_shader_cache_linked(GLuint vertex_shader, GLuint fragment_shader);
+void xgpu_shader_cache_warm(void (*linked)(GLuint vertex_shader, GLuint fragment_shader, GLuint program));
+
 /* ---------- generated source text */
 
 struct xgpu_text
