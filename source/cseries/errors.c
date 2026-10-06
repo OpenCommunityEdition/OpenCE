@@ -277,8 +277,9 @@ void error(
 			va_end(argument_list);
 			csstrcat(string, "\r\n");
 
-			/* the file first: printing used to halt on a long line while this
-			call still held the lock, and the reason never reached debug.txt */
+			/* (port: the file first: printing used to halt on a long line
+			while this call still held the lock, and the reason never reached
+			debug.txt) */
 			write_to_error_file(string, TRUE);
 
 			/* (port: on screen as config.toml's game.console_log says: an

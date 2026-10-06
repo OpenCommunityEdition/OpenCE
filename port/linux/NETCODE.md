@@ -167,7 +167,9 @@ its presentation, a message of another size; version 16 has a client's input
 say which structure BSP it has loaded (co-op); version 17 breaks the host's
 glass and destructible scenery on every machine (and takes a client's hits on
 scenery), sends the cluster a co-op cutscene keeps active, and leaves a
-failed co-op mission's revert to the host.
+failed co-op mission's revert to the host; version 18 sends with an object
+the bitmap of its shaders it draws with when its actor variant set one (co-op:
+the Elite major's and commander's armor).
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
