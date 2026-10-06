@@ -243,6 +243,10 @@ enum
 	/* (struct distributed_object_state, the host's) the host has the vehicle
 	where the client it goes to had it at the tick in time */
 	_distributed_object_predicted_bit,
+	/* (struct distributed_object_state) a unit's integrated light is on, and
+	the host sent it at all: older builds leave both 0, which is not "off" */
+	_distributed_object_light_sent_bit,
+	_distributed_object_light_on_bit,
 };
 
 struct distributed_object_change
@@ -672,6 +676,18 @@ static boolean distributed_vehicle_unsteered(
 		unit_get(vehicle->unit.driver_object_index)->unit.player_index == NONE;
 }
 
+/* whether this machine's player drives the unit: it is their biped, or the
+vehicle they drive */
+static boolean distributed_unit_driven_here(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (unit->unit.driver_object_index != NONE)
+		unit = unit_get(unit->unit.driver_object_index);
+	return unit->unit.player_index != NONE && distributed_player_is_local(unit->unit.player_index);
+}
+
 /* Whether a client puts its copy exactly where the host has it, rather than
 closing on it: an unsteered vehicle, and anything in a co-op cutscene
 (where it keeps up with the host's camera). */
@@ -807,6 +823,12 @@ static void distributed_state_from_object(
 	SET_FLAG(state->flags, _distributed_object_at_rest_bit, TEST_FLAG(object->object.flags, _object_at_rest_bit));
 	SET_FLAG(state->flags, _distributed_object_dead_bit, TEST_FLAG(_object_mask_unit, object->object.type) &&
 		TEST_FLAG(object->object.damage_flags, _object_dead_bit));
+	if (TEST_FLAG(_object_mask_unit, object->object.type))
+	{
+		SET_FLAG(state->flags, _distributed_object_light_sent_bit, TRUE);
+		SET_FLAG(state->flags, _distributed_object_light_on_bit,
+			TEST_FLAG(unit_get(object_index)->unit.flags, _unit_integrated_light_on_bit));
+	}
 	state->position = object->object.position;
 	distributed_vector_pack(&object->object.forward, DISTRIBUTED_UNIT_SCALE, &state->forward);
 	distributed_vector_pack(&object->object.up, DISTRIBUTED_UNIT_SCALE, &state->up);
@@ -2496,6 +2518,17 @@ void network_objects_handle_states(
 		if (!distributed_object_index_valid(state->object_index) || !network_objects_client_has(state->object_index))
 			continue;
 		object = object_get(state->object_index);
+		/* (the unit's light as the host has it: only presses toggle it here,
+		so one missed, or made before this machine joined, left it wrong for
+		good. Not for what this machine's player drives: their press lands
+		here first) */
+		if (TEST_FLAG(state->flags, _distributed_object_light_sent_bit) &&
+			TEST_FLAG(_object_mask_unit, object->object.type) &&
+			!distributed_unit_driven_here(state->object_index))
+		{
+			SET_FLAG(unit_get(state->object_index)->unit.flags, _unit_integrated_light_on_bit,
+				TEST_FLAG(state->flags, _distributed_object_light_on_bit));
+		}
 		if (TEST_FLAG(state->flags, _distributed_object_dead_bit))
 		{
 			distributed_client_dead_biped(state->object_index);
