@@ -195,6 +195,7 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "input/input.h"
 #include "input/input_abstraction.h"
+#include "interface/ui_widget.h"
 #include "interface/player_ui.h"
 #include "items/weapons.h"
 #include "main/main.h"
@@ -602,6 +603,23 @@ static void player_action_clear(
 	return;
 }
 
+/* port: whether a menu of the player's own is up (a network game's pause
+menu, which pauses nothing): its controller drives the menu, not the player,
+whose D-pad and sticks would otherwise move them as they move about it. The
+buttons still held as it closes are let go of first (ui_widget_delete). */
+static boolean player_control_port_menu_has_controller(
+	short local_player_index)
+{
+	long player_index = local_player_get_player_index(local_player_index);
+	short gamepad_index;
+
+	if (player_index == NONE)
+		return FALSE;
+	gamepad_index = player_get(player_index)->local_player_index;
+	return gamepad_index >= 0 && gamepad_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
+		ui_widgets_active_for_local_player(gamepad_index);
+}
+
 static void handle_one_player_input(
 	short local_player_index,
 	real time_delta_sec)
@@ -634,7 +652,8 @@ static void handle_one_player_input(
 			player->desired_angles.yaw);
 	}
 
-	if (director_inhibited_input(local_player_index))
+	if (director_inhibited_input(local_player_index) ||
+		player_control_port_menu_has_controller(local_player_index))
 	{
 		csmemset(&input, 0, sizeof(input));
 	}
