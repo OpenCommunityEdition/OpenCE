@@ -89,6 +89,9 @@ long create_enumerated_saved_game_file(
 	wchar_t *display_name);
 boolean delete_enumerated_saved_game_file(
 	long profile_index);
+long saved_game_file_index_after_removal(
+	long profile_index,
+	long removed_index);
 void saved_game_file_get_useable_untitled_profile_name(
 	wchar_t *display_name);
 void saved_game_files_enumerate_available_to_local_player_index(

@@ -1210,6 +1210,35 @@ void player0_look_invert_pitch(
 	return;
 }
 
+/* port: a saved game file deleted (delete_enumerated_saved_game_file): the
+files after it moved down its memory unit's list, so the indices of the
+players' profiles and the one being edited follow them, and none is left
+naming the file deleted. A player profile deleted before the one in use
+left that one's index naming the next file, often the next profile made,
+which the profile in use was then saved over (taking its name, while its
+folder kept the new profile's name, which then read as in use). */
+void player_ui_saved_game_file_removed(
+	long removed_index)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		player_ui_globals.local_players[local_player_index].active_profile_index =
+			saved_game_file_index_after_removal(
+				player_ui_globals.local_players[local_player_index].active_profile_index,
+				removed_index);
+	}
+	player_ui_globals.edit_profile_index = saved_game_file_index_after_removal(
+		player_ui_globals.edit_profile_index,
+		removed_index);
+	player1_last_used_profile_index = saved_game_file_index_after_removal(
+		player1_last_used_profile_index,
+		removed_index);
+
+	return;
+}
+
 static void clear_profile_edit_data(
 	void)
 {
