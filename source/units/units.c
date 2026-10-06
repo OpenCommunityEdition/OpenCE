@@ -10551,6 +10551,112 @@ static boolean unit_animation_set_state(
 done:
 	return result;
 }
+/* port: a unit throwing a grenade on the move keeps its lower body (the
+pelvis and the legs) in the movement animation; the throw keeps the spine
+and everything above it. The throw is a base animation, which sets every
+node, so the legs of the original game stop while the unit slides. */
+static boolean unit_node_is_at_or_below(
+	struct model *model,
+	short node_index,
+	short ancestor_node_index)
+{
+	while (node_index != NONE)
+	{
+		if (node_index == ancestor_node_index)
+		{
+			return TRUE;
+		}
+		node_index = TAG_BLOCK_GET_ELEMENT(&model->nodes, node_index, struct model_node)->parent_node_index;
+	}
+
+	return FALSE;
+}
+
+static void unit_grenade_throw_keep_legs_moving(
+	long unit_index,
+	struct real_orientation *node_orientations)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+	struct animation_graph *animation_graph;
+	struct animation_graph_unit_seat *unit_seat;
+	struct animation_graph_weapon_class *weapon_class;
+	struct animation *animation;
+	struct model *model;
+	struct real_orientation move_orientations[MAXIMUM_NODES_PER_MODEL];
+	short slot;
+	short animation_index;
+	short spine;
+	short node_index;
+
+	if (unit->unit.animation.state != _unit_state_throw_grenade ||
+		unit->object.parent_object_index != NONE ||
+		unit->unit.animation.seat_index == NONE ||
+		magnitude3d(&unit->unit.throttle) < 0.1f)
+	{
+		return;
+	}
+
+	/* the movement animation for the direction the unit is pushed */
+	if (fabs(unit->unit.throttle.i) >= fabs(unit->unit.throttle.j))
+	{
+		slot = unit->unit.throttle.i > 0.f ?
+			_unit_weapon_class_animation_moving_front :
+			_unit_weapon_class_animation_moving_back;
+	}
+	else
+	{
+		slot = unit->unit.throttle.j > 0.f ?
+			_unit_weapon_class_animation_moving_left :
+			_unit_weapon_class_animation_moving_right;
+	}
+
+	animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+	unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, unit->unit.animation.seat_index, struct animation_graph_unit_seat);
+	weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, unit->unit.animation.weapon_index, struct animation_graph_weapon_class);
+
+	if (slot >= weapon_class->animations.count)
+	{
+		return;
+	}
+	animation_index = animation_graph_animation_index_get(&weapon_class->animations)[slot].animation_index;
+	if (animation_index == NONE)
+	{
+		return;
+	}
+
+	animation = TAG_BLOCK_GET_ELEMENT(&animation_graph->animations, animation_index, struct animation);
+	model = model_definition_get(unit_definition->object.model.index);
+	if (animation->type != _animation_base ||
+		animation->frame_count < 1 ||
+		animation->node_count != model->nodes.count)
+	{
+		return;
+	}
+
+	/* the throw keeps the spine and everything above it */
+	spine = model_find_node(unit_definition->object.model.index, "bip01 spine");
+	if (spine == NONE)
+	{
+		return;
+	}
+
+	animation_get_node_orientations(
+		model,
+		animation,
+		(short)(game_time_get() % animation->frame_count),
+		move_orientations);
+
+	for (node_index = 0; node_index < model->nodes.count; node_index++)
+	{
+		if (!unit_node_is_at_or_below(model, node_index, spine))
+		{
+			node_orientations[node_index] = move_orientations[node_index];
+		}
+	}
+
+	return;
+}
 void unit_preprocess_node_orientations(
 	long unit_index,
 	struct real_orientation *node_orientations)
@@ -10565,6 +10671,7 @@ void unit_preprocess_node_orientations(
 	unit_definition = unit_definition_get(unit->definition_index);
 	animation_graph = animation_graph_definition_get(
 		unit_definition->object.animation_graph.index);
+	unit_grenade_throw_keep_legs_moving(unit_index, node_orientations);
 
 	if (unit->unit.animation.action_animation.index != NONE)
 	{
