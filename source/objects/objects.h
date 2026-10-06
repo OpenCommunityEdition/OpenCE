@@ -529,6 +529,10 @@ __inline void object_get_render_bounding_sphere(
 
 	*center = object->object.bounding_sphere_center;
 	*radius = object_definition_get(object->definition_index)->object.render_bounding_radius;
+	/* Growing an object must grow its culling sphere. Preserve the existing
+	 * conservative sphere for scales at or below one. */
+	if (object->object.scale > 1.0f)
+		*radius *= object->object.scale;
 
 	return;
 }
