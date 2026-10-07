@@ -939,6 +939,22 @@ static char const *expression_get_function_name(
 		struct hs_script)->name;
 }
 
+boolean hs_runtime_waiting_on_call(
+	void)
+{
+	struct hs_stack_frame *frame;
+	struct hs_syntax_node *caller;
+
+	if (hs_runtime_globals.executing_thread_index == NONE)
+		return FALSE;
+	frame = hs_thread_get(hs_runtime_globals.executing_thread_index)->stack;
+	if (!frame || !frame->previous)
+		return FALSE;
+	caller = hs_syntax_get(frame->previous->expression_index);
+
+	return !TEST_FLAG(caller->flags, _hs_syntax_node_script_bit) && caller->function_index == _hs_function_sleep_until;
+}
+
 char const *hs_runtime_get_executing_thread_name(
 	void)
 {
