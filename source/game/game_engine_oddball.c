@@ -507,10 +507,13 @@ static real_point3d find_position_for_ball(
 {
 	struct scenario *scenario = global_scenario_get();
 	long flag_index = NONE;
-	/* BUG (original): after the fatal missing-spawn assertion, January returns
-	 * the untouched value. A corrected build should report failure explicitly.
-	 */
-	real_point3d position;
+	/* port: the first player starting location (else the origin) when the map
+	has no ball spawn, as a Custom Edition map may not: the original returned
+	whatever was on the stack after its missing-spawn assertion, which a
+	release build carries on past */
+	real_point3d position = scenario->players.count > 0 ?
+		TAG_BLOCK_GET_ELEMENT(&scenario->players, 0, struct player_starting_location)->position :
+		*global_origin3d;
 
 	if (!game_engine_get_variant()->game_engine_variant.oddball.random_start)
 	{

@@ -80,13 +80,20 @@ boolean custom_edition_cache_playable(
 Custom Edition maps folders, whatever it holds. */
 boolean custom_edition_map_file_present(
 	char const *map_name);
+/* The checksum in the header of the level's map file, which differs between
+versions of a map; 0 if it has no file or the file is not a Custom Edition
+cache. */
+unsigned long custom_edition_map_checksum(
+	char const *level_name);
 /* Whether this machine can play the level `level_name` (custom_maps\<name>),
 as a network game's client must: its file present and a Custom Edition
-cache, Custom Edition maps able to run, and the resource maps present. When
-not, `message` (`message_size` characters) says why, for the player, and
-what to do. */
+cache of the host's version (`checksum`, custom_edition_map_checksum's on
+the host; 0 for any), Custom Edition maps able to run, and the resource maps
+present. When not, `message` (`message_size` characters) says why, for the
+player, and what to do. */
 boolean custom_edition_cache_present(
 	char const *level_name,
+	unsigned long checksum,
 	char *message,
 	long message_size);
 
