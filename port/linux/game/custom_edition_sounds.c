@@ -205,10 +205,12 @@ struct frames
 	long rate;
 };
 
+/* (none may have been made: the game's free, debug_free, does not take NULL) */
 static void frames_free(
 	struct frames *frames)
 {
-	free(frames->samples);
+	if (frames->samples)
+		free(frames->samples);
 	frames->samples = NULL;
 }
 
@@ -630,7 +632,9 @@ boolean custom_edition_sounds_read(
 void custom_edition_sounds_dispose(
 	void)
 {
-	free(custom_edition_sounds_globals.decoded);
+	/* (none, when no sound needed decoding: debug_free does not take NULL) */
+	if (custom_edition_sounds_globals.decoded)
+		free(custom_edition_sounds_globals.decoded);
 	memset(&custom_edition_sounds_globals, 0, sizeof(custom_edition_sounds_globals));
 
 	return;

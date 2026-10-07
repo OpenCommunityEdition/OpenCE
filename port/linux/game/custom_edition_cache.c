@@ -291,7 +291,9 @@ static boolean custom_edition_cache_models_convert(
 			report,
 			model_data);
 	}
-	free(model_data);
+	/* (the game's free, debug_free, does not take NULL) */
+	if (model_data)
+		free(model_data);
 
 	return success;
 }
