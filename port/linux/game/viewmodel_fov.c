@@ -54,8 +54,10 @@ void viewmodel_projection_begin(void)
 	saved_rasterizer_frustum = global_window_parameters.frustum;
 	/* Retain cropped/tiled viewport bounds. CPU visibility and GPU projection
 	change together; pose, weapon markers and gameplay values stay put. */
-	render_frustum_get_projection_bounds(&saved_render_frustum, &render_bounds);
-	render_frustum_get_projection_bounds(&saved_rasterizer_frustum, &rasterizer_bounds);
+	/* The builder takes normalized crop bounds. get_projection_bounds instead
+	returns signed view-space ray slopes, which would invert/rescale the view. */
+	render_bounds = saved_render_frustum.frustum_bounds;
+	rasterizer_bounds = saved_rasterizer_frustum.frustum_bounds;
 	render.camera.vertical_field_of_view = angle;
 	global_window_parameters.camera.vertical_field_of_view = angle;
 	render_camera_build_frustum(&render.camera, &render_bounds, &render.frustum, TRUE);
