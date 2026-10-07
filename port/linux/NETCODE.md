@@ -75,7 +75,8 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
 
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a
-  percentage of itself for each player past the first; STATIC MULTIPLIER,
+  percentage of itself for each player past the first, to 8 times its size
+  at most (more filled the clients' objects); STATIC MULTIPLIER,
   that many times itself for any number of players. They stand around its
   starting locations on free ground (the same floor, clear of crates and
   other actors, with room to stand), or where none is left on rings about
