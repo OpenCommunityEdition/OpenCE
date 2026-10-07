@@ -466,6 +466,13 @@ struct load_state
 	lowest structure BSP address, relative to the tag cache */
 	uint32_t used_bytes;
 	uint32_t usable_bytes;
+	/* the map's own tag data (the first used bytes), and where its tag
+	instances end within it: a tag the map keeps a header of (a resource
+	map's sound) must keep it in the tag data after the instances, so that
+	filling it in writes over neither the instances nor a tag placed from a
+	resource map */
+	uint32_t tag_data_bytes;
+	uint32_t instances_end;
 	uint32_t file_length;
 	/* the model data in the file: vertices, then from `index_data_offset`
 	the strips */
@@ -1584,7 +1591,11 @@ static enum cache_file_status resource_sound_load(
 	{
 		return load_fail(state, _cache_file_status_missing_resource_map, header_address);
 	}
-	if (!tag_cache_offset(state, header_address, SOUND_DEFINITION_BYTES, &header_offset))
+	/* (in the map's own tag data, after its tag instances: the header is
+	written into below) */
+	if (!tag_cache_offset(state, header_address, SOUND_DEFINITION_BYTES, &header_offset) ||
+		header_offset < state->instances_end ||
+		!range_fits(header_offset, SOUND_DEFINITION_BYTES, state->tag_data_bytes))
 	{
 		return load_fail(state, _cache_file_status_bad_tag_address, header_address);
 	}
@@ -2165,6 +2176,7 @@ enum cache_file_status custom_edition_cache_load(
 		return load_fail(&state, _cache_file_status_read_failed, identity->tag_data_offset);
 	}
 	state.used_bytes = identity->tag_data_size;
+	state.tag_data_bytes = identity->tag_data_size;
 	report->tag_data_bytes = identity->tag_data_size;
 
 	/* the tag index */
@@ -2190,6 +2202,7 @@ enum cache_file_status custom_edition_cache_load(
 		return load_fail(&state, _cache_file_status_bad_tag_instances_range, read_u32(tag_index + TAG_INDEX_INSTANCES_OFFSET));
 	}
 	tag_instances = tag_cache + instances_offset;
+	state.instances_end = instances_offset + (uint32_t)tag_count * TAG_INSTANCE_BYTES;
 
 	/* the model vertex and index data (in the file; the index data offset
 	counts from the vertex data) */

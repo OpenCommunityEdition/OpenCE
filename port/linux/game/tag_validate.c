@@ -1306,6 +1306,42 @@ boolean tag_validate_claimed(
 	return (tag_validate_claims[offset / CLAIM_BITS] & (1UL << (offset % CLAIM_BITS))) != 0;
 }
 
+/* whether any of the size bytes at address were found to be a tag's root,
+block or data (for checks: a buffer's data the game draws from must not be
+bytes it writes to as it runs) */
+boolean tag_validate_any_claimed(
+	void const *address,
+	unsigned long size)
+{
+	unsigned long offset = (unsigned long)address - (unsigned long)tag_validate_globals.header;
+	unsigned long bit;
+
+	if (!tag_validate_globals.header || (unsigned long)address < (unsigned long)tag_validate_globals.header ||
+		offset > tag_validate_globals.tag_cache_size || size > tag_validate_globals.tag_cache_size - offset)
+	{
+		return TRUE;
+	}
+	for (bit = offset; bit < offset + size; )
+	{
+		unsigned long word = tag_validate_claims[bit / CLAIM_BITS];
+
+		if (bit % CLAIM_BITS == 0 && offset + size - bit >= CLAIM_BITS)
+		{
+			if (word)
+				return TRUE;
+			bit += CLAIM_BITS;
+		}
+		else
+		{
+			if (word & (1UL << (bit % CLAIM_BITS)))
+				return TRUE;
+			bit++;
+		}
+	}
+
+	return FALSE;
+}
+
 void tag_validate_refuse(
 	struct tag_validation *validation,
 	char const *format,

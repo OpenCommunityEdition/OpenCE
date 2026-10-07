@@ -385,6 +385,21 @@ static boolean model_geometry_part_check(
 	long bad_index_count = 0;
 	long index;
 
+	/* (a cache's parts keep no vertices or triangles of their own: the game
+	draws from the buffers, and what reads those blocks, the debug vertex
+	display, does so unchecked) */
+	if (part->uncompressed_vertices.count || part->compressed_vertices.count || part->triangles.count)
+	{
+		tag_validate_correct(validation, "has %ld uncompressed vertices, %ld compressed vertices and %ld triangles"
+			" of its own: none", part->uncompressed_vertices.count, part->compressed_vertices.count,
+			part->triangles.count);
+		part->uncompressed_vertices.count = 0;
+		part->uncompressed_vertices.address = NULL;
+		part->compressed_vertices.count = 0;
+		part->compressed_vertices.address = NULL;
+		part->triangles.count = 0;
+		part->triangles.address = NULL;
+	}
 	if (!vertex_buffer->hardware_format || !triangle_buffer->hardware_format)
 		return TRUE;
 	vertices = tag_validate_vertex_buffer_data(validation, vertex_buffer->hardware_format);
@@ -421,10 +436,17 @@ static boolean model_geometry_part_check(
 		tag_validate_correct(validation, "has %ld triangles, %ld indices outside the tags: none",
 			triangle_buffer->count, index_count);
 	}
+	else if (index_count && tag_validate_any_claimed(indices, (unsigned long)(index_count * sizeof(word))))
+	{
+		/* (the indices say how many vertices a draw reads: ones in bytes
+		of a tag, which the game writes to as it runs, could change after
+		this check) */
+		tag_validate_correct(validation, "has %ld indices in a tag's bytes: none", index_count);
+	}
 	else
 	{
-		/* (the buffers' data is only read, never corrected: it is not one
-		of the tags' blocks, so it may lie where another tag is) */
+		/* (the vertices are only read, by index, so they may lie where
+		another tag is) */
 		for (index = 0; index < index_count; index++)
 		{
 			if (indices[index] >= vertex_buffer->count)

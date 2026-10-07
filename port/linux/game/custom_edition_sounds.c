@@ -51,10 +51,18 @@ the channels (port/linux/src/dsound_sdl.c decodes it).
 #define DECODED_GROWTH 0x100000
 
 /* an Ogg Vorbis stream is decoded into a buffer that grows by this many
-frames, and refused past the most (over six minutes at 44 kHz); no
-packet decodes to more than 4096 frames */
+frames; no packet decodes to more than 4096 frames */
 #define VORBIS_GROWTH_FRAMES 4096
-#define VORBIS_MAXIMUM_FRAMES 0x1000000
+/* The most frames a permutation has at any stage (decoded, or brought to
+the rate this build plays): over six minutes at 44 kHz, and 64 MB of
+stereo samples. Every buffer of frames is sized from a count within it
+(frames_allocate), so that count * channels * 2 cannot wrap the 32-bit
+size_t of this build: a stream that said it was at 1 Hz once made a count
+whose bytes wrapped to a few KB, which the resampler then wrote 4 GB into */
+#define MAXIMUM_FRAMES 0x1000000L
+/* the highest rate a stream is taken to be at (its own rate is read from
+it, and the resampler scales by it) */
+#define MAXIMUM_SAMPLE_RATE 192000
 
 /* ---------- globals */
 
@@ -204,6 +212,21 @@ static void frames_free(
 	frames->samples = NULL;
 }
 
+/* room for `count` frames of `channels` channels, or NULL when there are
+none, too many (MAXIMUM_FRAMES), or no memory: the only way a buffer of
+frames is made */
+static short *frames_allocate(
+	long count,
+	long channels)
+{
+	if (count <= 0 || count > MAXIMUM_FRAMES || channels < 1 || channels > 2)
+	{
+		return NULL;
+	}
+
+	return malloc((size_t)count * (size_t)channels * sizeof(short));
+}
+
 /* the Ogg Vorbis stream `data`, at its own channel count and rate; FALSE
 when it cannot be decoded. It is decoded a packet at a time, so a stream
 of more channels than a sound has, or one longer than any sound, is
@@ -229,9 +252,9 @@ static boolean vorbis_decode(
 	frames->rate = (long)info.sample_rate;
 	capacity = VORBIS_GROWTH_FRAMES;
 	frames->samples = NULL;
-	if (info.channels >= 1 && info.channels <= 2 && info.sample_rate > 0)
+	if (info.channels >= 1 && info.channels <= 2 && info.sample_rate > 0 && info.sample_rate <= MAXIMUM_SAMPLE_RATE)
 	{
-		frames->samples = malloc((size_t)capacity * info.channels * sizeof(short));
+		frames->samples = frames_allocate(capacity, info.channels);
 	}
 	while (frames->samples)
 	{
@@ -239,8 +262,14 @@ static boolean vorbis_decode(
 
 		if (frames->count + VORBIS_GROWTH_FRAMES > capacity)
 		{
-			short *larger = realloc(frames->samples, (size_t)capacity * 2 * info.channels * sizeof(short));
+			short *larger;
 
+			/* (the limit is a power of two, so doubling reaches it exactly) */
+			if (capacity >= MAXIMUM_FRAMES)
+			{
+				break;
+			}
+			larger = realloc(frames->samples, (size_t)capacity * 2 * (size_t)info.channels * sizeof(short));
 			if (!larger)
 			{
 				break;
@@ -257,10 +286,6 @@ static boolean vorbis_decode(
 			break;
 		}
 		frames->count += count;
-		if (frames->count > VORBIS_MAXIMUM_FRAMES)
-		{
-			break;
-		}
 	}
 	stb_vorbis_close(vorbis);
 	if (!decoded)
@@ -284,7 +309,7 @@ static boolean pcm_decode(
 	frames->count = data_bytes / (2 * channels);
 	frames->channels = channels;
 	frames->rate = rate;
-	frames->samples = frames->count > 0 ? malloc((size_t)frames->count * channels * sizeof(short)) : NULL;
+	frames->samples = frames_allocate(frames->count, channels);
 	for (index = 0; frames->samples && index < frames->count * channels; index++)
 	{
 		frames->samples[index] = (short)(data[2 * index] | (data[2 * index + 1] << 8));
@@ -327,7 +352,7 @@ static boolean adpcm_decode(
 	frames->count = block_count * ADPCM_BLOCK_SAMPLES;
 	frames->channels = channels;
 	frames->rate = rate;
-	frames->samples = frames->count > 0 ? malloc((size_t)frames->count * channels * sizeof(short)) : NULL;
+	frames->samples = frames_allocate(frames->count, channels);
 	for (block_index = 0; frames->samples && block_index < block_count; block_index++)
 	{
 		byte const *block = data + block_index * ADPCM_BLOCK_BYTES * channels;
@@ -369,7 +394,8 @@ static boolean frames_conform(
 	long channels,
 	long rate)
 {
-	long count = (long)((double)frames->count * rate / frames->rate);
+	double scaled_count = (double)frames->count * rate / frames->rate;
+	long count;
 	short *samples;
 	long frame;
 
@@ -377,7 +403,15 @@ static boolean frames_conform(
 	{
 		return frames->count > 0;
 	}
-	samples = count > 0 ? malloc((size_t)count * channels * sizeof(short)) : NULL;
+	/* (the count at the new rate, refused before it is a long when it is
+	more than any sound has: a stream's own rate can be anything) */
+	if (frames->rate <= 0 || !(scaled_count >= 0.0) || scaled_count > (double)MAXIMUM_FRAMES)
+	{
+		frames_free(frames);
+		return FALSE;
+	}
+	count = (long)scaled_count;
+	samples = frames_allocate(count, channels);
 	for (frame = 0; samples && frame < count; frame++)
 	{
 		long source = MIN((long)((double)frame * frames->rate / rate), frames->count - 1);

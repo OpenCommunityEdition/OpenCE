@@ -1148,6 +1148,59 @@ static char const bitmap_format_bits_per_pixel[NUMBER_OF_BITMAP_FORMATS] =
 	8, 8, 8, 16, 0, 0, 16, 0, 16, 16, 32, 32, 0, 0, 4, 8, 8, 8
 };
 
+/* the bytes of pixels the game reads for a bitmap (bitmap_get_pixel_data_size:
+every mipmap's width by height by depth, compressed sides rounded to 4, a
+cube map's six faces, at its format's bits a pixel), or NONE when they are
+more than the texture cache holds or a long counts. The bitmap's type,
+format and dimensions have been checked */
+static long bitmap_read_pixel_data_size(
+	struct bitmap_data const *bitmap)
+{
+	boolean compressed = TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) != 0;
+	long bits_per_pixel = bitmap_format_bits_per_pixel[bitmap->format];
+	unsigned long pixel_count = 0;
+	short mipmap_index;
+
+	for (mipmap_index = 0; mipmap_index <= bitmap->mipmap_count; mipmap_index++)
+	{
+		unsigned long width = MAX(bitmap->width >> mipmap_index, 1);
+		unsigned long height = MAX(bitmap->height >> mipmap_index, 1);
+		unsigned long depth = MAX(bitmap->depth >> mipmap_index, 1);
+
+		if (compressed)
+		{
+			width += (-width) & 3;
+			height += (-height) & 3;
+		}
+		pixel_count += width * height * depth * (bitmap->type == _bitmap_type_cube_map ? 6 : 1);
+	}
+	/* (at most 4096x4096x6 and a third again for mipmaps, so no overflow
+	yet; the bytes could overflow a long) */
+	if (!bits_per_pixel || pixel_count > (unsigned long)MAXIMUM_BITMAP_PIXELS_SIZE * 8 / bits_per_pixel)
+		return NONE;
+
+	return (long)(pixel_count * bits_per_pixel / 8);
+}
+
+/* a bitmap of no pixels the game can read: one a8 pixel at the start of the
+file (there is always a file) */
+static void bitmap_make_empty(
+	struct bitmap_data *bitmap)
+{
+	bitmap->type = _bitmap_type_2d;
+	bitmap->format = _bitmap_format_a8;
+	bitmap->width = 1;
+	bitmap->height = 1;
+	bitmap->depth = 1;
+	bitmap->mipmap_count = 0;
+	SET_FLAG(bitmap->flags, _bitmap_compressed_bit, FALSE);
+	SET_FLAG(bitmap->flags, _bitmap_linear_bit, FALSE);
+	bitmap->pixels_offset = 0;
+	bitmap->pixels_size = 1;
+
+	return;
+}
+
 /* what the texture cache makes of a bitmap (texture_cache_initialize_hardware_format,
 rasterizer_xbox_bitmap_get_pixel_data_size) must be a texture the device has:
 a format with a hardware format, dimensions it takes, mipmaps there are, a
@@ -1207,13 +1260,15 @@ static boolean bitmap_data_check(
 			SET_FLAG(bitmap->flags, _bitmap_linear_bit, FALSE);
 		}
 	}
+	/* (the pixels the game reads are as many as its dimensions, format and
+	mipmaps make, whatever the map says: texture_cache_bitmap_new) */
 	if (bitmap->pixels_size < 0 || bitmap->pixels_size > MAXIMUM_BITMAP_PIXELS_SIZE ||
-		!tag_validate_file_contains(validation, bitmap->pixels_offset, bitmap->pixels_size))
+		!tag_validate_file_contains(validation, bitmap->pixels_offset, bitmap->pixels_size) ||
+		!tag_validate_file_contains(validation, bitmap->pixels_offset, bitmap_read_pixel_data_size(bitmap)))
 	{
-		tag_validate_correct(validation, "has %ld bytes of pixels at %08lx, outside the map's files: none",
-			bitmap->pixels_size, (unsigned long)bitmap->pixels_offset);
-		bitmap->pixels_offset = 0;
-		bitmap->pixels_size = 0;
+		tag_validate_correct(validation, "has %ld (reads %ld) bytes of pixels at %08lx, outside the map's files: none",
+			bitmap->pixels_size, bitmap_read_pixel_data_size(bitmap), (unsigned long)bitmap->pixels_offset);
+		bitmap_make_empty(bitmap);
 	}
 
 	return TRUE;
@@ -1245,14 +1300,17 @@ static boolean bitmap_group_check(
 			unsigned long offset = (unsigned long)group->pixel_data.file_offset + (unsigned long)bitmap->pixels_offset;
 
 			if (offset > (unsigned long)LONG_MAX ||
-				!tag_validate_file_contains(validation, (long)offset, bitmap->pixels_size))
+				!tag_validate_file_contains(validation, (long)offset, bitmap->pixels_size) ||
+				!tag_validate_file_contains(validation, (long)offset, bitmap_read_pixel_data_size(bitmap)))
 			{
 				tag_validate_correct(validation,
-					"has bitmap %ld with %ld bytes of pixels at %08lx past its data at %08lx, outside the map's files: none",
-					bitmap_index, bitmap->pixels_size, (unsigned long)bitmap->pixels_offset,
-					(unsigned long)group->pixel_data.file_offset);
-				bitmap->pixels_offset = 0;
-				bitmap->pixels_size = 0;
+					"has bitmap %ld with %ld (reads %ld) bytes of pixels at %08lx past its data at %08lx, outside the map's files: none",
+					bitmap_index, bitmap->pixels_size, bitmap_read_pixel_data_size(bitmap),
+					(unsigned long)bitmap->pixels_offset, (unsigned long)group->pixel_data.file_offset);
+				bitmap_make_empty(bitmap);
+				/* (the group's offset is added by the game: the start of the
+				file is where it stands) */
+				bitmap->pixels_offset = -group->pixel_data.file_offset;
 			}
 		}
 	}

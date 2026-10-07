@@ -1391,6 +1391,12 @@ static void structure_material_check(
 	}
 	structure_vertex_buffer_check(validation, &material->vertices, FALSE, lightmap_index, material_index);
 	structure_vertex_buffer_check(validation, &material->lightmap_vertices, TRUE, lightmap_index, material_index);
+	/* (the lightmap debug modes draw every vertex from the lightmap buffer
+	whether or not the material has lightmap vertices: a buffer of none is
+	no buffer. The retail maps' lightless materials have one, so this is no
+	correction) */
+	if (!material->lightmap_vertices.count)
+		material->lightmap_vertices.hardware_format = NULL;
 
 	/* (its surfaces' vertices: its own, and its lightmap's when it has them
 	or its lightmap a bitmap, which object_lights.c samples them in) */

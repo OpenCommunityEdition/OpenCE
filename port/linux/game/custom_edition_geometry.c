@@ -544,10 +544,11 @@ static boolean custom_edition_model_part_convert(
 	part->centroid_primary_node_weight = source->centroid_primary_node_weight;
 	part->centroid_secondary_node_weight = source->centroid_secondary_node_weight;
 	part->centroid = source->centroid;
-	/* empty, as in Xbox caches */
-	part->uncompressed_vertices = source->uncompressed_vertices;
-	part->compressed_vertices = source->compressed_vertices;
-	part->triangles = source->triangles;
+	/* empty, as in Xbox caches (whatever the map held: the game draws from
+	the buffers alone) */
+	csmemset(&part->uncompressed_vertices, 0, sizeof(part->uncompressed_vertices));
+	csmemset(&part->compressed_vertices, 0, sizeof(part->compressed_vertices));
+	csmemset(&part->triangles, 0, sizeof(part->triangles));
 	csmemset(&part->triangle_buffer, 0, sizeof(part->triangle_buffer));
 	csmemset(&part->vertex_buffer, 0, sizeof(part->vertex_buffer));
 
@@ -774,6 +775,10 @@ boolean custom_edition_models_convert(
 	boolean success = TRUE;
 
 	assert(!globals->model_parts && !globals->model_geometry);
+	/* (every model's local nodes are made before any model is verified:
+	making them writes node indices into the model data, and parts of
+	different models may name the same vertices there, so a model verified
+	earlier could otherwise be drawn from vertices changed after its check) */
 	while ((model = custom_edition_cache_tag_next(tag_cache, loaded_bytes, GBXMODEL_GROUP_TAG, sizeof(*model), &tag_index)) != NULL)
 	{
 		if (model_has_many_nodes(model) && !TEST_FLAG(model->flags, _gbxmodel_parts_have_local_nodes_bit) &&
@@ -782,6 +787,10 @@ boolean custom_edition_models_convert(
 			error(_error_silent, "custom edition: the model '%s', of %ld nodes, is drawn a part's nodes at a time",
 				custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index), model->nodes.count);
 		}
+	}
+	tag_index = NONE;
+	while ((model = custom_edition_cache_tag_next(tag_cache, loaded_bytes, GBXMODEL_GROUP_TAG, sizeof(*model), &tag_index)) != NULL)
+	{
 		custom_edition_model_part_shaders_bound(model, custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index));
 		if (!custom_edition_model_verify(
 			model,

@@ -320,6 +320,12 @@ long tag_validate_corrections(
 data (tools/map_validate.c) */
 boolean tag_validate_claimed(
 	void const *address);
+/* whether any of the size bytes at address are in a tag's root, block or
+data (TRUE too when they are not all in the tag cache): what the game draws
+from must not be bytes it writes to as it runs */
+boolean tag_validate_any_claimed(
+	void const *address,
+	unsigned long size);
 
 /* for checks: */
 
