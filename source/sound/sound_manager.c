@@ -742,6 +742,12 @@ boolean sound_valid_for_channel(
 	short channel_type_flags)
 {
 	boolean valid = TRUE;
+	#ifdef HALO_NATIVE_AUDIO
+	/* The SDL mixer only decodes Xbox ADPCM and little-endian PCM16. */
+	if (compression != _sound_compression_none &&
+		compression != _sound_compression_xbox_adpcm)
+		return FALSE;
+	#endif
 
 	if (!TEST_FLAG(
 			channel_type_flags,
@@ -770,6 +776,18 @@ boolean sound_valid_for_channel(
 	{
 		valid = FALSE;
 	}
+
+	#ifdef HALO_NATIVE_AUDIO
+	/* Native DirectSound emulation accepts positioned stereo 44k ADPCM and
+	 * stereo PCM streams. Keep unpositioned sounds on their 2D channels. */
+	if (encoding == _sound_encoding_stereo &&
+		(sample_rate == 1 || compression == _sound_compression_none) &&
+		TEST_FLAG(channel_type_flags, _sound_channel_3d_bit) !=
+			(spatialization_mode != _sound_spatialization_mode_none))
+	{
+		valid = FALSE;
+	}
+	#endif
 
 	return valid;
 }
@@ -819,6 +837,21 @@ boolean sound_is_active(
 {
 	return sound_manager_globals.initialized && sound_manager_globals.enabled;
 }
+
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+boolean sound_definition_has_live_instances(long definition_index)
+{
+	long sound_index;
+
+	if (!sound_manager_globals.initialized || !sound_data)
+		return FALSE;
+	for (sound_index = data_next_index(sound_data, NONE); sound_index != NONE;
+		sound_index = data_next_index(sound_data, sound_index))
+		if (sound_get(sound_index)->definition_index == definition_index)
+			return TRUE;
+	return FALSE;
+}
+#endif
 
 void sound_pause(
 	boolean paused)
@@ -2207,6 +2240,10 @@ static short sound_find_channel(
 			sound_definition_get(sound->definition_index)->sound_class)->speech &&
 		sound->source_identifier != NONE)
 	{
+		#ifdef HALO_NATIVE_AUDIO
+		struct sound_definition *definition =
+			sound_definition_get(sound->definition_index);
+		#endif
 		short channel_index;
 
 		for (
@@ -2222,8 +2259,18 @@ static short sound_find_channel(
 
 				if (other_sound->source_identifier == sound->source_identifier &&
 					sound_class_get(
-						sound_definition_get(
-							other_sound->definition_index)->sound_class)->speech)
+					sound_definition_get(
+							other_sound->definition_index)->sound_class)->speech
+					#ifdef HALO_NATIVE_AUDIO
+					&&
+					sound_valid_for_channel(
+						definition->compression,
+						definition->encoding,
+						definition->sample_rate,
+						other_sound->source.spatialization_mode,
+						channel->type_flags)
+					#endif
+					)
 				{
 					sound->source.spatialization_mode =
 						other_sound->source.spatialization_mode;
@@ -2433,10 +2480,17 @@ long sound_new_impulse(
 
 	if (sound_manager_globals.initialized && sound_manager_globals.enabled)
 	{
-		if (definition->compression == _sound_compression_xbox_adpcm &&
-			((definition->encoding == _sound_encoding_mono &&
-				definition->sample_rate == 0) ||
+		#ifdef HALO_NATIVE_AUDIO
+		if ((definition->compression == _sound_compression_xbox_adpcm ||
+			definition->compression == _sound_compression_none) &&
+			(definition->sample_rate == 0 || definition->sample_rate == 1) &&
+			(definition->encoding == _sound_encoding_mono ||
 				definition->encoding == _sound_encoding_stereo))
+		#else
+		if (definition->compression == _sound_compression_xbox_adpcm &&
+			((definition->encoding == _sound_encoding_mono && definition->sample_rate == 0) ||
+			 definition->encoding == _sound_encoding_stereo))
+		#endif
 		{
 			if (source->scale != 0.f || definition->zero_gain_modifier != 0.f)
 			{
@@ -2558,7 +2612,11 @@ long sound_new_impulse(
 		{
 			error(
 				_error_silent,
+				#ifdef HALO_NATIVE_AUDIO
+				"attempt to play a sound without 16-bit PCM or Xbox ADPCM mono/stereo 22k/44k samples.");
+				#else
 				"attempt to play a sound that was not a mono 22k compressed sound or a stereo 22k or 44k compressed sound.");
+				#endif
 		}
 	}
 
@@ -3601,6 +3659,21 @@ static void prioritize_sounds(
 						struct sound_definition *definition =
 							sound_definition_get(sound->definition_index);
 
+						#ifdef HALO_NATIVE_AUDIO
+						if (!sound_valid_for_channel(
+								definition->compression,
+								definition->encoding,
+								definition->sample_rate,
+								sound->source.spatialization_mode,
+								channel->type_flags))
+							error(_error_silent,
+								"Sound channel mismatch: %s (compression %d, encoding %d, rate %d, spatial %d, channel flags 0x%x)",
+								tag_get_name(sound->definition_index),
+								definition->compression, definition->encoding,
+								definition->sample_rate,
+								sound->source.spatialization_mode,
+								channel->type_flags);
+						#endif
 						match_vassert(
 							"c:\\halo\\SOURCE\\sound\\sound_manager.c",
 							0x642,

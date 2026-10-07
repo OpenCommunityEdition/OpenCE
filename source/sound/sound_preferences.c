@@ -28,12 +28,26 @@ symbols in this file:
 static struct sound_preferences default_sound_preferences =
 {
 	0,
+	/* Native PCM gets dedicated streams so it cannot borrow an ADPCM channel.
+	 * Keep the original voice counts for cached Xbox sounds. */
+	#ifdef HALO_NATIVE_AUDIO
+	{ 8, 43, 10, 10, 2, 8, 8, 4, 8, 4, 8, 4, 8, 4, 8 },
+	{ 7, 38, 9, 9, 2, 8, 8, 4, 8, 4, 8, 4, 8, 4, 8 },
+	#else
 	{ 10, 51, 10, 10 },
 	{ 9, 46, 9, 9 },
+	#endif
 	0,
 };
 
-short sound_channel_type_flags[4] = { 8, 9, 10, 14 };
+/* ADPCM: mono 22k 2D/3D, stereo 22k/44k 2D, mono 44k 2D/3D,
+ * stereo 44k 3D. Native PCM: mono/stereo 22k/44k, each 2D/3D. */
+short sound_channel_type_flags[NUMBER_OF_SOUND_CHANNEL_TYPES] =
+	{ 8, 9, 10, 14
+	#ifdef HALO_NATIVE_AUDIO
+	, 12, 13, 15, 0, 1, 2, 3, 4, 5, 6, 7
+	#endif
+	};
 
 /* ---------- public code */
 

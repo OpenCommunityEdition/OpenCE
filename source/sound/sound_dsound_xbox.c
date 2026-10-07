@@ -25,13 +25,11 @@ enum
 {
 	NUMBER_OF_SOUND_SAMPLE_RATES = 2,
 	MAXIMUM_SOUND_CHANNELS = 256,
-	NUMBER_OF_SOUND_CHANNEL_TYPES = 4,
 	MAXIMUM_DSOUND_ERROR_STRING_LENGTH = 256,
 	MAXIMUM_DSOUND_ERROR_MESSAGE_LENGTH = 4096,
 	MAXIMUM_SOUND_PACKETS = 4,
 	MAXIMUM_SOUND_PACKET_SIZE = 8192,
 	MAXIMUM_COMPRESSED_SOUND_PACKET_SIZE = 2304,
-	SOUND_CACHE_SIZE = 0x400000,
 	SOUND_COMPRESSED_BLOCK_SIZE = 36,
 	SOUND_COMPRESSED_SAMPLES_PER_BLOCK = 64,
 	MAXIMUM_DSOUND_MIXBINS = 8
@@ -145,7 +143,7 @@ struct dsound_globals
 	short actual_channel_count;
 	byte reserved406[2];
 	struct sound_channel channels[MAXIMUM_SOUND_CHANNELS];
-	short type_first_channel_index[NUMBER_OF_SOUND_CHANNEL_TYPES];
+	short type_first_channel_index[ORIGINAL_SOUND_CHANNEL_TYPES];
 	real_point3d listener_position;
 	real_vector3d listener_forward;
 	real_vector3d listener_up;
@@ -315,6 +313,11 @@ static void dsound_virtual_queue_sound(
 /* ---------- globals */
 
 extern struct dsound_globals dsound_globals;
+/* The original four-entry index array in dsound_globals has fixed Xbox
+ * offsets; keep the extra pools in separate storage. */
+#ifdef HALO_NATIVE_AUDIO
+static short extra_first_channel_index[NUMBER_OF_SOUND_CHANNEL_TYPES - ORIGINAL_SOUND_CHANNEL_TYPES];
+#endif
 extern unsigned long const sound_sample_rate_samples_per_second[NUMBER_OF_SOUND_SAMPLE_RATES];
 extern HRESULT interrupt_result;
 extern boolean debug_sound_channels;
@@ -1860,7 +1863,18 @@ static boolean dsound_initialize(
 					{
 						short index;
 
+						#ifdef HALO_NATIVE_AUDIO
+						if (type_index<ORIGINAL_SOUND_CHANNEL_TYPES)
+						{
+							dsound_globals.type_first_channel_index[type_index]= channel_index;
+						}
+						else
+						{
+							extra_first_channel_index[type_index - ORIGINAL_SOUND_CHANNEL_TYPES]= channel_index;
+						}
+						#else
 						dsound_globals.type_first_channel_index[type_index]= channel_index;
+						#endif
 
 						for (index= 0; index<preferences->actual_channel_counts[type_index]; index++)
 						{
@@ -2102,10 +2116,12 @@ static boolean dsound_initialize_channel(
 	{
 		wave_format.wfx.wFormatTag= WAVE_FORMAT_PCM;
 		wave_format.wfx.wBitsPerSample= 16;
-		wave_format.wfx.nChannels= 2;
-		wave_format.wfx.nBlockAlign= 4;
-		wave_format.wfx.nSamplesPerSec= sound_sample_rate_samples_per_second[1];
-		wave_format.wfx.nAvgBytesPerSec= wave_format.wfx.nSamplesPerSec*4;
+		wave_format.wfx.nChannels= (WORD)(TEST_FLAG(type_flags, _sound_channel_stereo_bit) ? 2 : 1);
+		wave_format.wfx.nBlockAlign= 2*wave_format.wfx.nChannels;
+		wave_format.wfx.nSamplesPerSec= sound_samples_per_second(
+			TEST_FLAG(type_flags, _sound_channel_44k_bit));
+		wave_format.wfx.nAvgBytesPerSec= wave_format.wfx.nSamplesPerSec*wave_format.wfx.nBlockAlign;
+		wave_format.wfx.cbSize= 0;
 	}
 	else
 	{
@@ -2530,10 +2546,10 @@ static boolean dsound_channel_queue_packet(
 			if ((byte *)channel->playing_permutation->cache_base_address>=
 					(byte *)physical_memory_get_sound_cache_base_address() &&
 				channel->playing_permutation->samples.size>=0 &&
-				channel->playing_permutation->samples.size<=SOUND_CACHE_SIZE &&
+				channel->playing_permutation->samples.size<=PHYSICAL_SOUND_CACHE_SIZE &&
 				(unsigned long)((byte *)channel->playing_permutation->cache_base_address-
 					(byte *)physical_memory_get_sound_cache_base_address())<=
-					(unsigned long)(SOUND_CACHE_SIZE-channel->playing_permutation->samples.size) &&
+					(unsigned long)(PHYSICAL_SOUND_CACHE_SIZE-channel->playing_permutation->samples.size) &&
 				channel->sample_offset>=0 &&
 				channel->sample_offset<=channel->playing_permutation->samples.size)
 			{
@@ -2570,7 +2586,8 @@ static boolean dsound_channel_queue_packet(
 					}
 					else
 					{
-						long block_size= SOUND_COMPRESSED_BLOCK_SIZE*
+						long block_size= (TEST_FLAG(channel->type_flags, _sound_channel_compressed_bit) ?
+							SOUND_COMPRESSED_BLOCK_SIZE : 2)*
 							(TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) ? 2 : 1);
 
 						channel->sample_offset= MAX(remaining_size/block_size/2, 1)*block_size;
@@ -2755,7 +2772,13 @@ static void dsound_virtual_remap(
 		1421,
 		vchannel->type_index>=0 && vchannel->type_index<NUMBER_OF_SOUND_CHANNEL_TYPES);
 
+	#ifdef HALO_NATIVE_AUDIO
+	for (channel_index= vchannel->type_index<ORIGINAL_SOUND_CHANNEL_TYPES ?
+			dsound_globals.type_first_channel_index[vchannel->type_index] :
+			extra_first_channel_index[vchannel->type_index - ORIGINAL_SOUND_CHANNEL_TYPES];
+	#else
 	for (channel_index= dsound_globals.type_first_channel_index[vchannel->type_index];
+	#endif
 		vchannel->channel_index==NONE && channel_index<dsound_globals.actual_channel_count;
 		channel_index++)
 	{

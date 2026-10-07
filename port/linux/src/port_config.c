@@ -156,6 +156,10 @@ static const struct config_setting config_settings[] =
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
+	{ "audio.loose_sounds", _config_boolean, "true", "HALO_LOOSE_SOUNDS", _environment_value, _platform_desktop,
+		"Load matching .sound tags from tags/ when a map loads. False uses\n"
+		"the sounds in the map. Use loose_sounds 0/1 in the console to switch\n"
+		"immediately; restart after editing config.toml outside the game." },
 	{ "audio.volume", _config_real, "1.0", "HALO_VOLUME", _environment_value, _platform_all,
 		"The volume of everything, 0.0 to 1.0." },
 	{ "audio.music_volume", _config_real, "1.0", "HALO_MUSIC_VOLUME", _environment_value, _platform_all,

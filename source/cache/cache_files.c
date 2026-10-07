@@ -137,6 +137,10 @@ symbols in this file:
 #include "tag_schema.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "cache_file_formats.h" /* port: CUSTOM_EDITION_TAG_CACHE_BYTES */
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+#include "cache/loose_sound.h"
+#include "sound/sound_definitions.h"
+#endif
 
 /* ---------- constants */
 
@@ -598,6 +602,10 @@ void scenario_tags_unload(
 		hud_hires_tags_unloaded();
 	}
 	sound_cache_close();
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+	/* The sound cache no longer holds any of the loose permutation arrays. */
+	loose_sound_close();
+#endif
 	texture_cache_close();
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
@@ -1175,6 +1183,10 @@ long scenario_tags_load(
 				menu_tags_loaded(cache_file_globals.header.name);
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+			loose_sound_open();
+			loose_sound_reload(NULL);
+#endif
 		}
 
 		return result;
@@ -1270,6 +1282,10 @@ long scenario_tags_load(
 				hud_hires_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+			loose_sound_open();
+			loose_sound_reload(NULL);
+#endif
 		}
 		/* port: a map refused is closed for the next to open */
 		else
@@ -1472,6 +1488,10 @@ void *tag_get(
 		return cache_empty_tag_instance(tag_index)->base_address;
 	}
 	
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+	if (tag_instance->group_tag == SOUND_DEFINITION_TAG)
+		return loose_sound_tag_get(tag_index, tag_instance->base_address);
+#endif
 	return tag_instance->base_address;
 }
 

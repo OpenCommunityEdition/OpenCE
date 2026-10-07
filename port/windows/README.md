@@ -46,6 +46,9 @@ Enter `build\windows\halo.exe`.
 
 The game finds the game data as on Linux. Refer to "Start the game" in
 [port/linux/README.md](../linux/README.md#start-the-game).
+Loose Xbox ADPCM and 16-bit PCM sound tags load from `tags/` in the working directory, using the
+same relative paths as the map. See [Loose sound tags](../linux/README.md#loose-sound-tags)
+for the live reload and mode-switching console commands.
 
 | Item | Location |
 | --- | --- |

@@ -243,6 +243,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
 | `display.per_pixel_lighting` | `false` | `HALO_PER_PIXEL_LIGHTING` | `false`: the models (characters, weapons, vehicles, scenery) are lit at each vertex and the light is blended between them, as on the Xbox. The light across a curved surface then shows facets, and a point light that passes close lights only the vertices it reaches. `true`: the models are lit at each pixel by the same lights (the ambient light, two distant lights and two point lights), which changes their look. |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
+| `audio.loose_sounds` | `true` | `HALO_LOOSE_SOUNDS` | Load matching `.sound` tags from `tags/` on desktop. `loose_sounds 0/1` switches mode and restarts sound. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
 | `audio.effects_volume` | `1.0` | `HALO_EFFECTS_VOLUME` | The volume of the other sounds (effects and speech), of the master volume. |
@@ -288,6 +289,24 @@ the setting for one start of the game. It has priority over the file.
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
+
+### Loose sound tags
+
+Put an Invader Xbox ADPCM or 16-bit PCM sound tag in `tags/` in the game's
+working directory, at the same relative path as an existing sound in the map:
+`tags/sound/sfx/weapons/assault rifle/fire.sound`, for example. The loader
+accepts mono or stereo at 22.05 or 44.1 kHz. It loads `.sound` tags and their
+embedded samples; source WAVs and FLACs must first be compiled with Invader.
+The tag must replace a sound already referenced by the map. No map rebuild is
+needed, and PCM uses more sound cache space than Xbox ADPCM.
+
+In the developer console, `sound_reload` rescans all sounds;
+`sound_reload sound\\sfx\\weapons\\assault rifle\\fire` reloads one.
+`loose_sounds 0` switches to the map's sounds and `loose_sounds 1` switches
+back, restarting the sound system in either case. `sound_restart` restarts
+the current mode. Reloads retain old sound packets until playback finishes;
+format changes during playback require `sound_restart`, which interrupts
+voices. Editing `audio.loose_sounds` outside the game takes effect on restart.
 
 ## Updates
 

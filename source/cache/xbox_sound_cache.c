@@ -106,6 +106,10 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "sound/sound_definitions.h"
 #include "tag_files/tag_files.h"
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+#include "cache/loose_sound.h"
+#include <string.h>
+#endif
 
 #include <xtl.h>
 
@@ -114,7 +118,7 @@ symbols in this file:
 /* port: the cache's pages (sound_cache_new), named for the size check */
 enum
 {
-	SOUND_CACHE_PAGE_COUNT = 1024,
+	SOUND_CACHE_PAGE_COUNT = PHYSICAL_SOUND_CACHE_SIZE / 4096,
 	SOUND_CACHE_PAGE_SIZE_BITS = 12,
 };
 
@@ -580,6 +584,18 @@ static void sound_cache_start_loading_sound(
 	cache_block_index = lruv_block_new(
 		xbox_sound_cache_globals.cache,
 		sound->samples.size);
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+	if (cache_block_index == NONE)
+	{
+		/* Predictions are unreferenced, but the LRU keeps anything touched
+		   in the current frame. Give it one chance to evict those predictions;
+		   in-flight packets and referenced sounds stay locked by the callback. */
+		lruv_idle(xbox_sound_cache_globals.cache);
+		cache_block_index = lruv_block_new(
+			xbox_sound_cache_globals.cache,
+			sound->samples.size);
+	}
+#endif
 	if (cache_block_index != NONE)
 	{
 		byte *cache_address;
@@ -603,6 +619,25 @@ static void sound_cache_start_loading_sound(
 		sound->cache_block_index = cache_block_index;
 		sound->cache_base_address = (unsigned long)cache_address;
 		cache_sound->sound = sound;
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		{
+			byte const *loose_samples = loose_sound_samples(sound);
+
+			if (loose_samples)
+			{
+				memcpy(cache_address, loose_samples, sound->samples.size);
+				cache_sound->loaded = TRUE;
+			}
+			else
+				cache_file_read(
+					sound->cache_tag_index,
+					sound->samples.file_offset,
+					sound->samples.size,
+					cache_address,
+					&cache_sound->loaded,
+					FALSE);
+		}
+#else
 		cache_file_read(
 			sound->cache_tag_index,
 			sound->samples.file_offset,
@@ -610,11 +645,35 @@ static void sound_cache_start_loading_sound(
 			cache_address,
 			&cache_sound->loaded,
 			FALSE);
+#endif
 	}
 	else if (
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		!xbox_sound_cache_globals.last_allocation_failure_time ||
+#endif
 		system_milliseconds() -
 			xbox_sound_cache_globals.last_allocation_failure_time > 10000)
 	{
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		byte page_usage[PHYSICAL_SOUND_CACHE_SIZE / 4096];
+		long page_index;
+		long resident_pages = 0;
+		long pinned_pages = 0;
+
+		lruv_cache_get_page_usage(xbox_sound_cache_globals.cache, page_usage);
+		for (page_index = 0;
+			page_index < PHYSICAL_SOUND_CACHE_SIZE / 4096;
+			page_index++)
+		{
+			if (page_usage[page_index] & 1) resident_pages++;
+			if (page_usage[page_index] & 8) pinned_pages++;
+		}
+		error(_error_silent,
+			"SOUND CACHE BLOWN: %s needs %ld KiB; %ld MiB cache, %ld KiB resident, %ld KiB pinned. See stabbed.txt in the game data root",
+			sound->name, (long)(sound->samples.size + 1023) / 1024,
+			(long)PHYSICAL_SOUND_CACHE_SIZE / 1048576,
+			resident_pages * 4, pinned_pages * 4);
+#else
 		/* (port: chatter, shown as config.toml's game.console_log says) */
 		if (terminal_shows(_terminal_message_chatter))
 		{
@@ -632,6 +691,7 @@ static void sound_cache_start_loading_sound(
 				global_real_argb_purple,
 				"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 		}
+#endif
 		lruv_debug_to_file(
 			"d:\\stabbed.txt",
 			sound->name,

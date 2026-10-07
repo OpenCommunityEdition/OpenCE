@@ -69,6 +69,8 @@ struct voice_packet
 	short *samples;           /* interleaved, source channel count */
 	unsigned long frames;
 	BOOL finished;            /* played out by the mixer, not yet completed */
+	/* Packet energy used to retain the loudness of positioned stereo. */
+	double mid_power, side_power, mid_side_power;
 };
 
 struct sdl_stream
@@ -127,6 +129,10 @@ struct sdl_stream
 	/* the direct path's low pass, for each channel, and the room send's */
 	float direct_lowpass[2];
 	float room_lowpass;
+	/* The current packet may be released before the resampler finishes it. */
+	double stereo_mid_power, stereo_side_power, stereo_mid_side_power;
+	float stereo_compensation;
+	BOOL stereo_compensation_valid;
 };
 
 static pthread_mutex_t mixer_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -532,6 +538,12 @@ static BOOL take_frame(struct sdl_stream *stream, float *frame)
 		{
 			frame[0] = packet_sample(packet, stream->cursor, 0, stream->channels);
 			frame[1] = packet_sample(packet, stream->cursor, stream->channels - 1, stream->channels);
+			if (stream->channels == 2 && stream->has_3d)
+			{
+				stream->stereo_mid_power = packet->mid_power;
+				stream->stereo_side_power = packet->side_power;
+				stream->stereo_mid_side_power = packet->mid_side_power;
+			}
 			stream->cursor++;
 			return TRUE;
 		}
@@ -541,6 +553,45 @@ static BOOL take_frame(struct sdl_stream *stream, float *frame)
 }
 
 /* ---------- mixing */
+
+/* A panned stereo source narrows towards a point. Recover lost side-channel
+energy, capped at +3 dB for strongly out-of-phase material. */
+static float stereo_spatial_compensation(const struct sdl_stream *stream,
+	float left_gain, float right_gain)
+{
+	float width = fminf(left_gain, right_gain);
+	double gains = (double)left_gain * left_gain + (double)right_gain * right_gain;
+	double width_power = (double)width * width;
+	double original = gains * (stream->stereo_mid_power + stream->stereo_side_power);
+	double narrowed = gains * stream->stereo_mid_power +
+		2.0 * width_power * stream->stereo_side_power +
+		2.0 * width * (left_gain - right_gain) * stream->stereo_mid_side_power;
+	float correction;
+
+	if (original <= 0.0 || narrowed <= 0.0 || narrowed >= original)
+		return 1.0f;
+	correction = (float)sqrt(original / narrowed);
+	return correction < 1.41421356f ? correction : 1.41421356f;
+}
+
+static void mix_stereo_frame(float *output, float sample_left, float sample_right,
+	float left_gain, float right_gain, BOOL positioned)
+{
+	if (positioned)
+	{
+		float middle = (sample_left + sample_right) * 0.5f;
+		float side = (sample_left - sample_right) * 0.5f;
+		float width = fminf(left_gain, right_gain);
+
+		output[0] += middle * left_gain + side * width;
+		output[1] += middle * right_gain - side * width;
+	}
+	else
+	{
+		output[0] += sample_left * left_gain;
+		output[1] += sample_right * right_gain;
+	}
+}
 
 /* mixes one voice into output (frames of stereo float), and into the reverb's
 send (frames of mono) */
@@ -665,8 +716,25 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		}
 		else
 		{
-			output[frame * 2] += sample_left * left;
-			output[frame * 2 + 1] += sample_right * right;
+			BOOL positioned = stream->has_3d && stream->mode != DS3DMODE_DISABLE;
+			float mix_left = left, mix_right = right;
+
+			if (positioned)
+			{
+				float target = stereo_spatial_compensation(stream, left, right);
+
+				if (!stream->stereo_compensation_valid)
+				{
+					stream->stereo_compensation = target;
+					stream->stereo_compensation_valid = TRUE;
+				}
+				else
+					stream->stereo_compensation += (target - stream->stereo_compensation) * 0.00417f;
+				mix_left *= stream->stereo_compensation;
+				mix_right *= stream->stereo_compensation;
+			}
+			mix_stereo_frame(output + frame * 2, sample_left, sample_right,
+				mix_left, mix_right, positioned);
 		}
 		left += ramp_left;
 		right += ramp_right;
@@ -1296,6 +1364,7 @@ static HRESULT STDMETHODCALLTYPE stream_process(IDirectSoundStream *object, LPCX
 	struct voice_packet *entry;
 	unsigned long frames = 0;
 	short *samples;
+	double mid_power = 0.0, side_power = 0.0, mid_side_power = 0.0;
 
 	(void)output;
 	if (!input)
@@ -1304,6 +1373,22 @@ static HRESULT STDMETHODCALLTYPE stream_process(IDirectSoundStream *object, LPCX
 	samples = stream->adpcm ?
 		decode_adpcm(input->pvBuffer, input->dwMaxSize, stream->channels, &frames) :
 		decode_pcm(input->pvBuffer, input->dwMaxSize, stream->channels, &frames);
+	if (samples && stream->channels == 2 && stream->has_3d)
+	{
+		unsigned long frame;
+
+		for (frame = 0; frame < frames; frame++)
+		{
+			double left = (double)samples[frame * 2];
+			double right = (double)samples[frame * 2 + 1];
+			double mid = (left + right) * 0.5;
+			double side = (left - right) * 0.5;
+
+			mid_power += mid * mid;
+			side_power += side * side;
+			mid_side_power += mid * side;
+		}
+	}
 	pthread_mutex_lock(&mixer_lock);
 	if (stream->packet_count == MAXIMUM_STREAM_PACKETS)
 	{
@@ -1316,6 +1401,9 @@ static HRESULT STDMETHODCALLTYPE stream_process(IDirectSoundStream *object, LPCX
 	entry->samples = samples;
 	entry->frames = samples ? frames : 0;
 	entry->finished = FALSE;
+	entry->mid_power = mid_power;
+	entry->side_power = side_power;
+	entry->mid_side_power = mid_side_power;
 	if (input->pdwStatus)
 		*input->pdwStatus = XMEDIAPACKET_STATUS_PENDING;
 	if (input->pdwCompletedSize)
@@ -1326,6 +1414,7 @@ static HRESULT STDMETHODCALLTYPE stream_process(IDirectSoundStream *object, LPCX
 		stream->cursor = 0;
 		resampler_reset(stream);
 		stream->gains_valid = FALSE;
+		stream->stereo_compensation_valid = FALSE;
 	}
 	stream->packet_count++;
 	pthread_mutex_unlock(&mixer_lock);
@@ -1352,6 +1441,7 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	}
 	stream->cursor = 0;
 	resampler_reset(stream);
+	stream->stereo_compensation_valid = FALSE;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
 }

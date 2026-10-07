@@ -14,6 +14,9 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
 
+/* Extra native sound formats and channels, including Android. */
+#define HALO_NATIVE_AUDIO 1
+
 /* ---------- XDK architecture selection (MSVC predefines these) */
 
 #define _X86_ 1

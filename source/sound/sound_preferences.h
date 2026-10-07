@@ -14,11 +14,21 @@ header included in hcex build.
 
 /* ---------- structures */
 
+enum
+{
+	#ifdef HALO_NATIVE_AUDIO
+		NUMBER_OF_SOUND_CHANNEL_TYPES = 15,
+	#else
+	NUMBER_OF_SOUND_CHANNEL_TYPES = 4,
+	#endif
+	ORIGINAL_SOUND_CHANNEL_TYPES = 4,
+};
+
 struct sound_preferences
 {
 	short platform;
-	short actual_channel_counts[4];
-	short virtual_channel_counts[4];
+	short actual_channel_counts[NUMBER_OF_SOUND_CHANNEL_TYPES];
+	short virtual_channel_counts[NUMBER_OF_SOUND_CHANNEL_TYPES];
 	short unused;
 };
 
@@ -31,7 +41,7 @@ void write_sound_preferences(
 
 /* ---------- globals */
 
-extern short sound_channel_type_flags[4];
+extern short sound_channel_type_flags[NUMBER_OF_SOUND_CHANNEL_TYPES];
 
 /* ---------- public code */
 

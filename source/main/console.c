@@ -62,6 +62,12 @@ symbols in this file:
 #include "input/input.h"
 #include "interface/terminal.h"
 #include "math/real_math.h"
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+#include "cache/loose_sound.h"
+#include "../../port/linux/src/port_config.h"
+#include <ctype.h>
+#include <stdlib.h>
+#endif
 
 /* ---------- constants */
 
@@ -232,6 +238,67 @@ static boolean console_process_command(
 	console_globals.previous_command_count = MIN(console_globals.previous_command_count + 1, MAXIMUM_NUMBER_OF_PREVIOUS_COMMANDS);
 	console_globals.selected_previous_command_index = NONE;
 
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+	if (!strncmp(command, "sound_reload", 12) &&
+		(!command[12] || isspace((unsigned char)command[12])))
+	{
+		const char *argument = command + 12;
+		while (isspace((unsigned char)*argument)) argument++;
+		loose_sound_reload(argument);
+		return TRUE;
+	}
+	if (!strncmp(command, "sound_restart", 13) &&
+		(!command[13] || isspace((unsigned char)command[13])))
+	{
+		const char *argument = command + 13;
+		while (isspace((unsigned char)*argument)) argument++;
+		if (*argument)
+			console_warning("Use sound_restart without arguments");
+		else if (loose_sound_restart())
+			console_printf(FALSE, "Sound restarted (%s)",
+				config_boolean("audio.loose_sounds") ? "loose sounds" : "map sounds");
+		return TRUE;
+	}
+	if (!strncmp(command, "loose_sounds", 12) &&
+		(!command[12] || isspace((unsigned char)command[12])))
+	{
+		const char *argument = command + 12;
+		char option[8];
+		size_t length = 0;
+		int enabled;
+		while (isspace((unsigned char)*argument)) argument++;
+		if (!*argument)
+		{
+			console_printf(FALSE, "Loose sounds: %s",
+				config_boolean("audio.loose_sounds") ? "on" : "off");
+			return TRUE;
+		}
+		while (argument[length] && !isspace((unsigned char)argument[length]) &&
+			length < sizeof(option) - 1) length++;
+		if (length == sizeof(option) - 1 && argument[length] &&
+			!isspace((unsigned char)argument[length]))
+		{
+			console_warning("Use loose_sounds 0/1 or off/on");
+			return TRUE;
+		}
+		memcpy(option, argument, length);
+		option[length] = 0;
+		argument += length;
+		while (isspace((unsigned char)*argument)) argument++;
+		if (*argument || (strcmp(option, "0") && strcmp(option, "1") &&
+			_stricmp(option, "off") && _stricmp(option, "on")))
+		{
+			console_warning("Use loose_sounds 0/1 or off/on");
+			return TRUE;
+		}
+		enabled = !strcmp(option, "1") || !_stricmp(option, "on");
+		if (!config_write_boolean("audio.loose_sounds", enabled))
+			console_warning("Loose sound mode changed, but config.toml could not be saved");
+		if (loose_sound_restart())
+			console_printf(FALSE, "Loose sounds: %s; sound restarted", enabled ? "on" : "off");
+		return TRUE;
+	}
+#endif
 	return hs_compile_and_evaluate(command);
 }
 
@@ -295,6 +362,15 @@ static char *console_player_command_name(
 	return NULL;
 }
 
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+static int console_audio_command_compare(const void *left, const void *right)
+{
+	const char *const *a = left;
+	const char *const *b = right;
+	return _stricmp(*a, *b);
+}
+#endif
+
 static void console_complete(
 	void)
 {
@@ -317,7 +393,28 @@ static void console_complete(
 	else
 	{
 		token = console_get_text_to_autocomplete();
+		#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		count = hs_tokens_enumerate(token, NONE, matching_items, NUMBEROF(matching_items) - 3);
+		if (token == console_globals.input_state.result)
+		{
+			static char *audio_commands[] = { "sound_reload", "sound_restart", "loose_sounds" };
+			short command_index;
+			for (command_index = 0; command_index < NUMBEROF(audio_commands); command_index++)
+			{
+				short match_index;
+				if (_strnicmp(audio_commands[command_index], token, strlen(token)))
+					continue;
+				for (match_index = 0; match_index < count; match_index++)
+					if (!_stricmp(matching_items[match_index], audio_commands[command_index]))
+						break;
+				if (match_index == count && count < NUMBEROF(matching_items))
+					matching_items[count++] = audio_commands[command_index];
+			}
+			qsort(matching_items, count, sizeof(matching_items[0]), console_audio_command_compare);
+		}
+		#else
 		count = hs_tokens_enumerate(token, NONE, matching_items, NUMBEROF(matching_items));
+		#endif
 	}
 
 	if (count)

@@ -55,6 +55,9 @@ void sound_render(
 
 void sound_stop_all(
 	void);
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+boolean sound_definition_has_live_instances(long definition_index);
+#endif
 void sound_stop_impulse(
 	long sound_index);
 void sound_stop_impulse_by_source_and_definition(

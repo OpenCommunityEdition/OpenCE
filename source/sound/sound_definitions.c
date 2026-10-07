@@ -162,13 +162,28 @@ void try_to_reset_permutations(
 	struct sound_pitch_range *range)
 {
 	short permutation_count = range->actual_permutation_count;
+	/* Shifting a 32-bit value by 32 is undefined. Loose sound tags can use
+	   all 32 random permutations supported by the cache format. */
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+	unsigned long all_permutations_mask = permutation_count == 32 ?
+		0xFFFFFFFFu : ((1u << permutation_count) - 1u);
+#else
 	unsigned long all_permutations_mask = (FLAG(permutation_count) - 1);
+#endif
 
 	if ((~range->played_permutation_mask & all_permutations_mask) == 0)
 	{
 		range->played_permutation_mask = 0;
 		if (permutation_count > 1)
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		{
+			if (range->previous_permutation_index >= 0 &&
+				range->previous_permutation_index < 32)
+				range->played_permutation_mask = 1u << range->previous_permutation_index;
+		}
+#else
 			range->played_permutation_mask = FLAG((byte)range->previous_permutation_index);
+#endif
 	}
 
 	return;
@@ -316,11 +331,19 @@ short sound_definition_next_permutation(
 	{
 		try_to_reset_permutations(range);
 
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+		if (!(range->played_permutation_mask & (1u << selected_permutation_index)))
+#else
 		if (!TEST_FLAG(range->played_permutation_mask, selected_permutation_index))
+#endif
 		{
 			struct sound_permutation *permutation;
 
+#if defined(HALO_NATIVE_AUDIO) && !defined(HALO_ANDROID)
+			range->played_permutation_mask |= 1u << selected_permutation_index;
+#else
 			SET_FLAG(range->played_permutation_mask, selected_permutation_index, TRUE);
+#endif
 			if (attempt_count++ == 16)
 				break;
 

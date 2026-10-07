@@ -48,7 +48,6 @@ symbols in this file:
 #define TAG_CACHE_BASE_ADDRESS 0x803A6000
 /* port: the native builds' larger texture cache (halo_port_capacity.h) */
 #define TEXTURE_CACHE_SIZE HALO_PORT_TEXTURE_CACHE_SIZE
-#define SOUND_CACHE_SIZE 0x400000
 
 /* ---------- macros */
 
@@ -85,7 +84,7 @@ void physical_memory_allocate(
 #line 55 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, physical_memory_map_globals.texture_cache_base_address);
 
-	physical_memory_map_globals.sound_cache_base_address = XPhysicalAlloc(SOUND_CACHE_SIZE, -1, 0, PAGE_READWRITE);
+	physical_memory_map_globals.sound_cache_base_address = XPhysicalAlloc(PHYSICAL_SOUND_CACHE_SIZE, -1, 0, PAGE_READWRITE);
 #line 58 "c:\\halo\\SOURCE\\cache\\physical_memory_map.c"
 	match_assert(__FILE__, __LINE__, physical_memory_map_globals.sound_cache_base_address);
 

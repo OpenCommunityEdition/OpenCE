@@ -16,6 +16,8 @@ much shorter than the Linux build's halo_linux_prefix.h.
 #endif
 
 #define HALO_WINDOWS 1
+/* Extra native sound formats and channels. */
+#define HALO_NATIVE_AUDIO 1
 
 /* ---------- XDK architecture selection */
 
