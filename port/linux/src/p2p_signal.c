@@ -695,6 +695,10 @@ static void broker_sync_topics(struct broker *broker)
 			broker_topic(broker, had, 0, 0);
 		if (wanted[index][0])
 			broker_topic(broker, wanted[index], 1, index == _topic_own_slot);
+		/* (a send that failed closed the broker, which forgot its topics:
+		they are asked for again once it is ready again) */
+		if (broker->state != _broker_ready)
+			return;
 		/* (once subscribed to the slots, the hosts are asked to publish:
 		retained copies come at once, but may be old) */
 		if (index == _topic_slots && wanted[index][0])
