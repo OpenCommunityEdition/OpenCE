@@ -194,8 +194,14 @@ def menu():
     path = ROOT/'port/assets/menus/ce/main_menu.settings_select.player_setup.player_profile_edit.video_settings.xml'
     assert path.read_text() == '\n'.join(port_settings.settings_files()[path.name])
     root = ET.parse(path).getroot()
-    assert not any(w.get('setting') in ('display.fov', 'display.viewmodel_fov') for w in root.findall('widget'))
-    print('PASS: world/viewmodel FOV are console options; Video Setup has no FOV row')
+    options = {w.get('setting'): w for w in root.findall('widget') if w.get('setting')}
+    for name, zero in (('display.fov', 'DEFAULT'), ('display.viewmodel_fov', 'SAME')):
+        widget = options[name]
+        assert widget.get('strings').split('|') == [zero] + [str(n) for n in range(80, 151, 5)]
+        assert widget.get('values').split('|') == ['0'] + [str(n) for n in range(80, 151, 5)]
+        assert [e.get('event') for e in widget.findall('on')] == ['created']
+    assert any(w.get('name').endswith('/settings_next_page') for w in root.findall('widget'))
+    print('PASS: paginated Video Setup exposes FOV Default=0 and Viewmodel FOV Same=0, followed by 80-150; console config keys and pending-edit lifecycle preserved')
 
 
 def main():

@@ -55,6 +55,12 @@ SCREENS = {
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
+            # The stock horizontal 16:9 view is about 76.9 degrees: round
+            # up to 80 for the first numeric choice, as in the earlier menu.
+            ("FOV:", "display.fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
+             "Horizontal view in degrees at 16:9. Default uses\nthe authored view; scoped views keep their zoom.", None),
+            ("VIEWMODEL FOV:", "display.viewmodel_fov", [("SAME", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
+             "Weapon and hands field of view at 16:9. Same\nfollows the current world view, including zoom.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
              [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("144", "144"), ("165", "165"),
               ("240", "240"), ("NONE", "-1")],
