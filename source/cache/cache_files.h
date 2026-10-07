@@ -73,8 +73,11 @@ boolean cache_files_map_plays_multiplayer(
 void cache_files_show_multiplayer_unavailable(
 	char const *map_name,
 	char const *build);
-boolean cache_files_map_present(
+unsigned long cache_files_map_version(
 	char const *map_name);
+boolean cache_files_map_present(
+	char const *map_name,
+	unsigned long version);
 
 unsigned long cache_files_get_checksum(
 	void);

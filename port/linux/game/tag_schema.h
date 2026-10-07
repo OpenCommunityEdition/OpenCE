@@ -77,6 +77,10 @@ enum tag_schema_field_flags
 	/* (set by the macros) an index or enum of an unsigned type, whose NONE
 	is all ones */
 	_tag_schema_unsigned_bit,
+	/* a block whose maximum is the Xbox editing kit's, not the length of an
+	array of the game's: a Custom Edition map's tools went past it, and the
+	game takes the block as long as it is */
+	_tag_schema_tool_maximum_bit,
 	NUMBER_OF_TAG_SCHEMA_FIELD_FLAGS
 };
 
@@ -128,6 +132,9 @@ TAG_SCHEMA_END */
 #define TAG_SCHEMA_BLOCK(type, field, definition, maximum) \
 	{ _tag_schema_block, sizeof(struct tag_block), 1, 0, \
 		TAG_SCHEMA_OFFSET(type, field, struct tag_block), (maximum), 0, 0, &(definition), NULL, #field }
+
+/* ... whose maximum is the editing kit's (_tag_schema_tool_maximum_bit) */
+#define TAG_SCHEMA_TOOL_BLOCK(type, field, definition, maximum) 	{ _tag_schema_block, sizeof(struct tag_block), 1, FLAG(_tag_schema_tool_maximum_bit), 		TAG_SCHEMA_OFFSET(type, field, struct tag_block), (maximum), 0, 0, &(definition), NULL, #field }
 
 #define TAG_SCHEMA_DATA(type, field, maximum) \
 	{ _tag_schema_data, sizeof(struct tag_data), 1, 0, \

@@ -75,8 +75,12 @@ than the damaged disc error precaching a missing map gives
 (`cache_files_map_present`, called as the host's settings arrive): also when
 the map cannot run there (Custom Edition maps turned off, the file not a
 Custom Edition cache, or `bitmaps.map`, `sounds.map` and `loc.map` missing),
-and when the host names a Custom Edition map as other versions of this port
-do (`levels\test\<name>\<name>`) and the file is in `custom_maps`. The
+when its copy of a Custom Edition map is another version than the host's
+(the host sends its file's header checksum as the game record's map
+version, which the Xbox left 0: `cache_files_map_version`; a host that sends
+0 is not checked), and when the host names a Custom Edition map as other
+versions of this port do (`levels\test\<name>\<name>`) and the file is in
+`custom_maps`. The
 error's text is wrapped to its dialog, in the menus' smaller font when it
 would not fit; `debug.txt` has the details.
 
