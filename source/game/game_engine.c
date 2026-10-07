@@ -4188,7 +4188,9 @@ it, back there after the time (the clients get the host's: the distributed
 netcode). Vehicles otherwise stay where they are left (the Xbox game's). */
 enum
 {
-	MAXIMUM_VEHICLE_HOMES = 64
+	/* (a map places up to 80 vehicles, a Custom Edition map more: those
+	past this never came back) */
+	MAXIMUM_VEHICLE_HOMES = 1024
 };
 
 static struct

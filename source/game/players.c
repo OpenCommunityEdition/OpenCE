@@ -256,6 +256,7 @@ symbols in this file:
 #include "items/projectiles.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
+#include "main/console.h"
 #include "main/main.h"
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
@@ -2890,6 +2891,72 @@ static void players_coop_rescue_stranded(
 		if (rescued)
 			*since = 0;
 	}
+}
+
+/* port: the unit of the host's first player in the level (on the host, its
+local players), or NONE */
+static long players_coop_host_unit(
+	void)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		long player_index = local_player_get_player_index(local_player_index);
+		long unit_index = player_index != NONE ? player_get(player_index)->unit_index : NONE;
+
+		if (unit_index != NONE && players_coop_unit_in_structure(unit_index))
+			return unit_index;
+	}
+
+	return NONE;
+}
+
+/* port: the co-op host's bringto command (hs.c). Every other player comes
+to the host's first player in the level, or, with no room there, beside one
+who already came. Returns whether anyone came. */
+boolean players_coop_bring_to_host(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	long arrived_unit_indices[NETWORK_GAME_MAXIMUM_PLAYER_COUNT + 1];
+	short arrived_count = 0;
+	short missed_count = 0;
+
+	if (!network_coop_active() || game_connection() != _game_connection_network_server)
+	{
+		console_warning("bringto: only the host of a co-op game brings the players");
+		return FALSE;
+	}
+	arrived_unit_indices[arrived_count++] = players_coop_host_unit();
+	if (arrived_unit_indices[0] == NONE)
+	{
+		console_warning("bringto: the host has no player in the level");
+		return FALSE;
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short arrived_index;
+
+		if (player->unit_index == NONE || player->unit_index == arrived_unit_indices[0])
+			continue;
+		for (arrived_index = 0; arrived_index < arrived_count; arrived_index++)
+		{
+			long beside_index = arrived_unit_indices[arrived_index];
+
+			if (player_teleport(iterator.datum_index, beside_index, &object_get(beside_index)->object.bounding_sphere_center))
+				break;
+		}
+		if (arrived_index < arrived_count)
+			arrived_unit_indices[arrived_count++] = player->unit_index;
+		else
+			missed_count++;
+	}
+	console_printf(FALSE, "bringto: %d brought, %d with no room", arrived_count - 1, missed_count);
+
+	return arrived_count > 1;
 }
 
 /* co-op, each tick: records when each player became somewhere spawnable,

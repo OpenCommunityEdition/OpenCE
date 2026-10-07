@@ -813,7 +813,9 @@ boolean custom_edition_models_convert(
 	if (!globals->model_parts || !globals->model_geometry || !globals->palettes || !scratch)
 	{
 		error(_error_silent, "custom edition: out of memory for the geometry of %ld model parts", totals.part_count);
-		free(scratch);
+		/* (the game's free, debug_free, does not take NULL) */
+		if (scratch)
+			free(scratch);
 		return FALSE;
 	}
 	vertices = (struct model_vertex_compressed *)globals->model_geometry;

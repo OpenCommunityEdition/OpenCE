@@ -6,7 +6,10 @@ Network co-op's extra enemies: Server Setup's EXTRA ENEMIES
 percentage): for each player past the first, each squad of the players'
 enemies that a level places (encounters.c's encounter_create) gets that
 much of its count more; at 100%, two players meet twice the squad, four
-players four times it. STATIC MULTIPLIER (network.coop_enemies_multiplier):
+players four times it, but no squad grows past COOP_ENEMIES_MAXIMUM_GROWTH
+times its size (at 100%, 64 players made squads 64 times as large: more
+than the ground round them, the clients' objects or the host's ticks could
+take). STATIC MULTIPLIER (network.coop_enemies_multiplier):
 each squad is that many times as large, for any number of players.
 
 Extra enemies are placed in widening rings around the squad's starting
@@ -66,6 +69,8 @@ enum
 	COOP_ENEMIES_MAXIMUM_PERCENT = 200,
 	COOP_ENEMIES_MINIMUM_MULTIPLIER = 2,
 	COOP_ENEMIES_MAXIMUM_MULTIPLIER = 32,
+	/* the largest PER PLAYER makes a squad, in times its size */
+	COOP_ENEMIES_MAXIMUM_GROWTH = 8,
 	/* the rings tried around a starting location, the first holding
 	SPREAD_PLACES_PER_RING places and each further one that many more */
 	SPREAD_RINGS = 5,
@@ -451,6 +456,7 @@ short coop_enemies_extra_count(
 		if (players <= 1)
 			return 0;
 		extra = ((long)count * coop_enemies.percent * (players - 1) + 50) / 100;
+		extra = MIN(extra, (long)count * (COOP_ENEMIES_MAXIMUM_GROWTH - 1));
 	}
 	room = MAXIMUM_ACTORS - COOP_ENEMIES_LEVEL_ACTORS - actor_data->actual_count;
 	return (short)PIN(extra, 0, MAX(room, 0));
