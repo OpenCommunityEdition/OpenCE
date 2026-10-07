@@ -81,9 +81,11 @@ def main() -> int:
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
     if args.platform == "macos":
-        # (zipped by ditto, which keeps what a copy of the folder would lose:
-        # the executable's mode and the app's signature)
-        run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", "build/macos/Halo.app", dist / "Halo.app.zip"])
+        # (zipped by ditto, which keeps what an artifact's copy of the folder
+        # would lose, the executable's mode; without the files' extended
+        # attributes, which have no place in a signed app)
+        run(["ditto", "-c", "-k", "--norsrc", "--noextattr", "--noqtn", "--noacl", "--keepParent",
+             "build/macos/Halo.app", dist / "Halo.app.zip"])
     for output in outputs:
         shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)

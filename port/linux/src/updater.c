@@ -48,7 +48,13 @@ of its own to update to yet) */
 #define HALO_BUILD_FLAVOR "release"
 #endif
 
-#define UPDATE_REPOSITORY "OpenCommunityEdition/OpenCE"
+/* the repository whose releases update this build: the one GitHub Actions
+built it in (HALO_UPDATE_REPOSITORY, tools/linux_build.py), so that a
+fork's builds update from the fork's releases, else this project's */
+#ifndef HALO_UPDATE_REPOSITORY
+#define HALO_UPDATE_REPOSITORY "OpenCommunityEdition/OpenCE"
+#endif
+#define UPDATE_REPOSITORY HALO_UPDATE_REPOSITORY
 #ifdef _WIN32
 #define UPDATE_PLATFORM "windows"
 #define PATH_SEPARATOR "\\"

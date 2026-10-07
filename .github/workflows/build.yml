@@ -1,7 +1,7 @@
 name: Build
 
-# Debug and release builds of the native ports (Linux, Windows, Android) for
-# every pushed commit, uploaded as artifacts. tools/ci_build.py does each
+# Debug and release builds of the native ports (Linux, Windows, Android,
+# macOS) for every pushed commit, uploaded as artifacts. tools/ci_build.py does each
 # build; see it for the options.
 #
 # Kept cheap:
@@ -12,7 +12,8 @@ name: Build
 #   are cached too;
 # - a newer push to the same branch cancels a run still going;
 # - pushes that only change documentation do not build;
-# - Windows, whose minutes cost twice Linux's, builds only Windows;
+# - Windows, whose minutes cost twice Linux's, builds only Windows, and so
+#   does macOS only macOS;
 # - artifacts are kept for three days.
 #
 # A successful build of main is also published as a GitHub release, the
@@ -233,13 +234,64 @@ jobs:
           path: dist/halo-windows-release-symbols
           retention-days: 3
 
+  macos:
+    # GitHub's Apple silicon runner: Xcode's clang, which has the arm64_32
+    # target the guest is compiled for, and Homebrew for ld.lld
+    # (port/macos/README.md)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: brew install lld ninja ccache
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-macos-${{ github.sha }}
+          restore-keys: ccache-macos-
+
+      # musl, SDL and the OpenGL ES headers, which configure.py fetches
+      - uses: actions/cache@v4
+        with:
+          path: build/macos/third_party
+          key: macos-third-party-${{ hashFiles('tools/guest_build.py', 'tools/macos_build.py') }}
+
+      - name: Debug
+        run: python3 tools/ci_build.py macos debug
+
+      - name: Release
+        run: python3 tools/ci_build.py macos release
+
+      - name: Test
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q pytest
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -q tools/test_macos_port.py
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-macos-debug
+          path: dist/halo-macos-debug
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-macos-release
+          path: dist/halo-macos-release
+          retention-days: 3
+
   release:
-    # The six builds (and the Windows builds' PDBs) as a release, tagged
+    # The eight builds (and the Windows builds' PDBs) as a release, tagged
     # build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
     # latest/download links); then all but the newest five build-* releases
     # go, tags and all. Only for main, and only when every platform built.
-    needs: [linux, android, windows]
+    needs: [linux, android, windows, macos]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -261,7 +313,13 @@ jobs:
           mkdir release
           for build in artifacts/*/; do
             name="$(basename "$build")"
-            (cd "$build" && zip -qr "$GITHUB_WORKSPACE/release/$name.zip" .)
+            # (the macOS app comes zipped, which keeps its executable's mode
+            # through the artifact: unzipped here, so that the release's zip
+            # has the app itself)
+            if [ -f "$build/Halo.app.zip" ]; then
+              (cd "$build" && unzip -q Halo.app.zip && rm Halo.app.zip && chmod +x Halo.app/Contents/MacOS/halo)
+            fi
+            (cd "$build" && zip -qry "$GITHUB_WORKSPACE/release/$name.zip" .)
           done
           ls -l release
 
@@ -323,7 +381,7 @@ jobs:
     # without it): green when every platform built, red when one did not,
     # with each platform's result, this run's release (main only), and links
     # to the latest release's builds.
-    needs: [linux, android, windows, release]
+    needs: [linux, android, windows, macos, release]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -334,6 +392,7 @@ jobs:
           LINUX: ${{ needs.linux.result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
+          MACOS: ${{ needs.macos.result }}
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
           SERVER: ${{ github.server_url }}
           REPOSITORY: ${{ github.repository }}
@@ -356,13 +415,13 @@ jobs:
               *) echo "➖ Skipped" ;;
             esac
           }
-          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
+          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ] && [ "$MACOS" = success ]; then
             title="Build succeeded"; color=5763719
           else
             title="Build failed"; color=15548997
           fi
           latest="$SERVER/$REPOSITORY/releases/latest"
-          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) · [macOS]($latest/download/halo-macos-release.zip) ([all builds]($latest))"
           if [ -n "$RELEASE_TAG" ]; then
             release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
           else
@@ -373,7 +432,7 @@ jobs:
             --arg title "$title" --argjson color "$color" --arg url "$RUN_URL" \
             --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR ($BRANCH)" \
             --arg release "$release" --arg downloads "$downloads" \
-            --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
+            --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" --arg macos "$(status "$MACOS")" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{
               title: $title, url: $url, color: $color, description: $description, timestamp: $timestamp,
@@ -381,6 +440,7 @@ jobs:
                 {name: "Linux", value: $linux, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
+                {name: "macOS", value: $macos, inline: true},
                 {name: "Release", value: $release},
                 {name: "Latest release builds", value: $downloads}
               ]

@@ -2,6 +2,12 @@
 
 [![Join our Discord](https://invidget.switchblade.xyz/9gqcHyr5km)](https://discord.gg/9gqcHyr5km)
 
+> This repository is a fork of
+> [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE).
+> It adds a native port to macOS on Apple silicon (arm64). Refer to
+> [port/macos/README.md](port/macos/README.md). Its releases contain the
+> builds of all four platforms.
+
 This project is a port of the Halo: Combat Evolved decompilation to Linux,
 Windows, Android and macOS (Apple silicon). The decompilation is of the Xbox
 build 2342 (`cachebeta.exe`, SHA-256
@@ -19,22 +25,29 @@ builds of the latest release:
 
 | Platform | Release | Debug |
 | --- | --- | --- |
-| Linux | [halo-linux-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-debug.zip) |
-| Windows | [halo-windows-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-debug.zip) |
-| Android | [halo-android-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-debug.zip) |
+| Linux | [halo-linux-release.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-linux-debug.zip) |
+| Windows | [halo-windows-release.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-windows-debug.zip) |
+| Android | [halo-android-release.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-android-debug.zip) |
+| macOS (Apple silicon) | [halo-macos-release.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-macos-release.zip) | [halo-macos-debug.zip](https://github.com/spacemandev-git/OpenCE/releases/latest/download/halo-macos-debug.zip) |
 
 Use the release build to play. The debug build stops at the first failed
 assertion and writes it to the log. Use the debug build to find and report
 problems.
 
-For macOS, build the game. Refer to [port/macos/README.md](port/macos/README.md).
+On macOS, move `Halo.app` from the zip to the Applications folder. The app
+is not notarized by Apple, so macOS does not open the downloaded app. Enter
+this command one time to permit it:
 
-The game updates itself. At start-up it looks for a newer release, and asks
+```
+xattr -dr com.apple.quarantine /Applications/Halo.app
+```
+
+On Linux, Windows and Android, the game updates itself. At start-up it looks for a newer release, and asks
 if you want to install it. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates).
 
-Each build of the `main` branch that passes on all three platforms is a new
-release. The [Releases](https://github.com/OpenCommunityEdition/OpenCE/releases)
+Each build of the `main` branch that passes on all four platforms is a new
+release. The [Releases](https://github.com/spacemandev-git/OpenCE/releases)
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
 

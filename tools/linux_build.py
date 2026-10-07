@@ -149,7 +149,13 @@ def updater_defines(release: bool) -> str:
     if not number.isdigit():
         number = "0"
     flavor = "release" if release else "debug"
-    return f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
+    defines = f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
+    # (the repository GitHub Actions builds in, whose releases are its
+    # updates: a fork's own)
+    repository = os.environ.get("GITHUB_REPOSITORY", "")
+    if re.fullmatch(r"[\w.-]+/[\w.-]+", repository):
+        defines += f' -DHALO_UPDATE_REPOSITORY=\\"{repository}\\"'
+    return defines
 
 PLATFORM_FLAGS = [
     "-std=gnu11",

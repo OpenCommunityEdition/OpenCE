@@ -12,6 +12,19 @@ The macOS build uses the platform layer of the Linux build
 (`port/android/guest`). Refer to [port/linux/README.md](../linux/README.md)
 and [port/android/README.md](../android/README.md).
 
+## Download
+
+The releases of
+[spacemandev-git/OpenCE](https://github.com/spacemandev-git/OpenCE/releases)
+contain `halo-macos-release.zip` (to play) and `halo-macos-debug.zip`:
+
+1. Unzip the file and move `Halo.app` to the Applications folder.
+2. The app is not notarized by Apple, so macOS does not open the downloaded
+   app. Enter `xattr -dr com.apple.quarantine /Applications/Halo.app` one
+   time to permit it.
+3. Start the app. At the first start, it asks for the disc image (refer to
+   "Game data").
+
 ## Requirements
 
 You do not need the Xbox SDK. You need the tools of the Linux build (Python,

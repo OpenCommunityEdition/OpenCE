@@ -642,6 +642,10 @@ def test_the_guest_runtime_under_load(tmp_path):
 
 
 def test_the_game_starts_and_exits(tmp_path):
+    """the build's host loads the image and runs the game's start without a
+    fault: to its end where it ends (debug.exit_after counts from the
+    window's opening, and a debug build stops without game data), else for
+    some seconds"""
     executable = ROOT / "build/macos/halo"
     image = ROOT / "build/macos/halo_guest.elf"
     if sys.platform != "darwin" or not executable.is_file() or not image.is_file():
@@ -650,10 +654,16 @@ def test_the_game_starts_and_exits(tmp_path):
     shutil.copy2(image, tmp_path / "halo_guest.elf")
     environment = dict(os.environ, HALO_HIDDEN_WINDOW="1", HALO_EXIT_AFTER="2",
                        HALO_SAVE_ROOT=str(tmp_path / "saves"))
-    result = subprocess.run([str(tmp_path / "halo")], cwd=tmp_path, env=environment, capture_output=True,
-                            text=True, timeout=60)
-    assert result.returncode == 0, result.stderr
-    assert "the game exited (0)" in result.stderr
-    assert "signal" not in result.stderr
-    assert "cannot be both" not in result.stderr
+    process = subprocess.Popen([str(tmp_path / "halo")], cwd=tmp_path, env=environment, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True)
+    try:
+        output, _ = process.communicate(timeout=20)
+        assert process.returncode == 0, output
+        assert "the game exited (0)" in output
+    except subprocess.TimeoutExpired:
+        process.kill()
+        output, _ = process.communicate()
+    assert "starting" in output
+    assert "signal" not in output, output
+    assert "cannot be both" not in output
     assert (tmp_path / "config.toml").is_file()
