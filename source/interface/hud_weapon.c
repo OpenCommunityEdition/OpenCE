@@ -405,10 +405,15 @@ static void render_weapon_hud(
 	short const *new_state_flags,
 	short const *new_overlay_flags,
 	short const *new_numbers);
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count);
 
 /* ---------- globals */
 
 static struct weapon_hud_globals *weapon_hud_globals = NULL;
+/* port: a crosshair's bad sequence or bitmap was reported (once) */
+static boolean crosshair_bad_bitmap_reported = FALSE;
 
 /* ---------- public code */
 
@@ -1023,7 +1028,8 @@ static void crosshairs_draw(
 						struct weapon_hud_crosshairs_element);
 					short state_index = element->crosshair_type;
 
-					if (TEST_FLAG(render_flags, state_index) &&
+					if (weapon_hud_state_index_valid(state_index, NUMBER_OF_WEAPON_HUD_CROSSHAIR_STATES) &&
+						TEST_FLAG(render_flags, state_index) &&
 						TEST_FLAG(map_type_flags, element->use_on_map_type))
 					{
 						struct crosshair_state *state = &crosshair->states[state_index];
@@ -1048,14 +1054,25 @@ static void crosshairs_draw(
 									!TEST_FLAG(item->placement.multiplayer_scaling_flags, _hud_dont_scale_size_bit) ?
 									0.5f :
 									1.0f;
-								struct bitmap_group_sequence *sequence = !TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit) ?
-									TAG_BLOCK_GET_ELEMENT(
-										&bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap))->sequences,
-										item->sequence_index,
-										struct bitmap_group_sequence) :
-									NULL;
+								struct bitmap_group_sequence *sequence = NULL;
 								short frame_index;
 								pixel32 color;
+
+								/* port: a sprite item's sequence is the map's. Only one the
+								bitmap has is used, and the item isn't drawn otherwise (its
+								state still runs, below) */
+								if (!TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit))
+								{
+									struct bitmap_group *sequence_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
+
+									if (item->sequence_index >= 0 && item->sequence_index < sequence_group->sequences.count)
+									{
+										sequence = TAG_BLOCK_GET_ELEMENT(
+											&sequence_group->sequences,
+											item->sequence_index,
+											struct bitmap_group_sequence);
+									}
+								}
 
 								switch (state_index)
 								{
@@ -1145,7 +1162,9 @@ static void crosshairs_draw(
 								case _crosshair_state_flash_secondary_ammo_none_for_reload:
 								case _crosshair_state_primary_trigger_ready:
 								case _crosshair_state_secondary_trigger_ready:
-									if (item->frame_rate > 0)
+									/* port: a sequence with no sprites (or none) stays on frame 0
+									rather than dividing by zero */
+									if (item->frame_rate > 0 && sequence && sequence->sprites.count > 0)
 									{
 										frame_index = (short)(((game_time_get() - state->value.reference_data) /
 											item->frame_rate / TICKS_PER_SECOND) % sequence->sprites.count);
@@ -1186,6 +1205,17 @@ static void crosshairs_draw(
 								{
 									continue;
 								}
+								/* port: nor does a sprite item whose sequence isn't there */
+								if (!sequence && !TEST_FLAG(item->flags, _hud_crosshair_not_a_sprite_bit))
+								{
+									if (!crosshair_bad_bitmap_reported)
+									{
+										crosshair_bad_bitmap_reported = TRUE;
+										error(_error_silent, "crosshair %d item %d has no sequence #%d (not drawn)",
+											crosshair_index, item_index, item->sequence_index);
+									}
+									continue;
+								}
 								match_vassert(
 									"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 									0x4A5,
@@ -1198,14 +1228,25 @@ static void crosshairs_draw(
 										strip_path_name(tag_get_name(definition_indices[definition_index]))));
 								{
 									struct bitmap_group *bitmap_group = bitmap_group_get(verify_tag_reference(&element->crosshairs.bitmap));
-									struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(
-										&bitmap_group->bitmaps,
-										sequence ?
-											TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
-											item->sequence_index,
-										struct bitmap_data);
+									short bitmap_index = sequence ?
+										TAG_BLOCK_GET_ELEMENT(&sequence->sprites, frame_index, struct bitmap_group_sprite)->bitmap_index :
+										item->sequence_index;
+									/* port: the bitmap (the sprite's, or the item's own) must be
+									one the group has, or the item isn't drawn */
+									struct bitmap_data *bitmap = bitmap_index >= 0 && bitmap_index < bitmap_group->bitmaps.count ?
+										TAG_BLOCK_GET_ELEMENT(
+											&bitmap_group->bitmaps,
+											bitmap_index,
+											struct bitmap_data) :
+										NULL;
 
-									if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
+									if (!bitmap && !crosshair_bad_bitmap_reported)
+									{
+										crosshair_bad_bitmap_reported = TRUE;
+										error(_error_silent, "crosshair %d item %d has no bitmap #%d (not drawn)",
+											crosshair_index, item_index, bitmap_index);
+									}
+									if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 									{
 										if (TEST_FLAG(item->flags, _hud_crosshair_hide_outside_area_bit))
 										{
@@ -1280,6 +1321,31 @@ static void crosshairs_draw(
 
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x4E2);
 	return;
+}
+
+/* port: a hud element's state (or crosshair) type is the map's, and indexes
+the state tables (8 states, 19 crosshair states; retail elements use up to 7
+and 18): an element of any other is not drawn, and that is said once */
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count)
+{
+	static boolean bad_state_reported = FALSE;
+
+	if (VALID_INDEX(state_index, state_count))
+		return TRUE;
+
+	if (!bad_state_reported)
+	{
+		bad_state_reported = TRUE;
+		error(
+			_error_silent,
+			"weapon hud element of state %d (of %d) not drawn",
+			state_index,
+			state_count);
+	}
+
+	return FALSE;
 }
 
 static void render_weapon_hud(
@@ -1647,7 +1713,8 @@ static void render_weapon_hud(
 			struct weapon_hud_static_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			/* (the zoomed view's, at the middle: hud_zoomed_layout_begin) */
 			rectangle2d window_bounds;
@@ -1677,7 +1744,8 @@ static void render_weapon_hud(
 			struct weapon_hud_meter_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			byte value;
 			rectangle2d window_bounds;
@@ -1712,7 +1780,8 @@ static void render_weapon_hud(
 			struct weapon_hud_number_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			short magazine_size = 1;
 			short value;
@@ -1731,6 +1800,10 @@ static void render_weapon_hud(
 						struct weapon_magazine_definition);
 
 				magazine_size = magazine->rounds_loaded_maximum;
+				/* port: the map's; a magazine of none divides by one (an
+				integer divide by zero halts) */
+				if (magazine_size == 0)
+					magazine_size = 1;
 			}
 
 			state_index = element->header.state_type;
@@ -1785,7 +1858,8 @@ static void render_weapon_hud(
 			struct weapon_hud_overlays_element);
 
 		if (!TEST_FLAG(element->runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->use_on_map_type))
+			TEST_FLAG(map_type_flags, element->use_on_map_type) &&
+			weapon_hud_state_index_valid(element->state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			state_index = element->state_type;
 			hud_draw_weapon_overlays(

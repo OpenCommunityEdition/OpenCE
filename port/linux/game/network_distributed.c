@@ -163,6 +163,10 @@ enum
 	(or the other way round) before it is put where the host has it: its
 	own prediction reaches the host and comes back in about a round trip */
 	SEAT_DISAGREEMENT_TICKS = 15,
+	/* how long a client waits for a player's killing blow once the host's
+	states say the player died, before the unit dies without it (an
+	actor's waits as long: network_objects.c) */
+	DEATH_BLOW_WAIT_TICKS = TICKS_PER_SECOND / 2,
 	/* the machines, and the host: a client's messages' sender */
 	MAXIMUM_SENDERS = HALO_PORT_MAXIMUM_NETWORK_MACHINES + 1,
 	HOST_SENDER = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
@@ -462,6 +466,10 @@ static struct distributed_death
 	short killing_player_index;
 	boolean friendly_fire;
 	boolean killed_by_vehicle;
+	/* a client: when the host's states first said the player's living unit
+	here was dead (NONE: not), to wait for the killing blow
+	(DEATH_BLOW_WAIT_TICKS) */
+	long dead_since;
 } distributed_deaths[MAXIMUM_TRACKED_PLAYERS];
 /* the host: a kill this tick, whose statistics the clients should have
 with it */
@@ -606,6 +614,8 @@ static struct distributed_client_clock
 	short fast_windows;
 	boolean fast;
 	boolean ahead_on_stream;
+	/* (its datagrams' word logged, unverified, while they go on saying so) */
+	boolean logged_unverified;
 } distributed_client_clocks[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 /* the host: whether the message being handled came over its machine's
 stream (network_distributed_handle_stream_message) */
@@ -2151,12 +2161,22 @@ static void distributed_handle_unit_state(
 	unit_index = distributed_living_unit(player);
 	if (!alive)
 	{
-		/* died on the host (who counts it; the damage that killed it,
-		network_damage.c, usually kills it here first) */
-		if (unit_index != NONE)
-			unit_kill_no_statistics(unit_index);
+		/* died on the host, who counts it. Its killing blow (network_damage.c)
+		kills it here with the death the host's had, so it is given a while
+		to come before the unit dies without one, as it falls. */
+		if (unit_index != NONE && state->player_index < MAXIMUM_TRACKED_PLAYERS)
+		{
+			long *dead_since = &distributed_deaths[state->player_index].dead_since;
+
+			if (*dead_since == NONE)
+				*dead_since = game_time_get();
+			else if (game_time_get() - *dead_since >= DEATH_BLOW_WAIT_TICKS)
+				unit_kill_no_statistics(unit_index);
+		}
 		return;
 	}
+	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
+		distributed_deaths[state->player_index].dead_since = NONE;
 	/* spawned on the host: the host's unit is the player's here too, once
 	this machine has it (network_objects.c) */
 	if (state->unit_index == NONE || !network_objects_client_has(state->unit_index) ||
@@ -2178,7 +2198,8 @@ static void distributed_handle_unit_state(
 	unit_index = state->unit_index;
 	/* the seat it rides: a client's own player's, once it has ridden
 	otherwise for longer than its prediction takes to reach the host and
-	come back */
+	come back (a player within the tracked ones, as players.c's datums are) */
+	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
 	{
 		struct unit_datum *unit = unit_get(unit_index);
 		long vehicle_index = unit->object.parent_object_index != NONE && unit->unit.parent_seat_index != NONE ?
@@ -2811,8 +2832,8 @@ static void distributed_handle_actions(
 		action.control_flags = relayed.control_flags[0];
 		action.desired_facing.yaw = distributed_angle_unpack(relayed.yaw, FALSE);
 		action.desired_facing.pitch = distributed_angle_unpack(relayed.pitch, TRUE);
-		action.throttle.i = (real)relayed.throttle_i / 127.0f;
-		action.throttle.j = (real)relayed.throttle_j / 127.0f;
+		action.throttle.i = PIN((real)relayed.throttle_i / 127.0f, -1.0f, 1.0f);
+		action.throttle.j = PIN((real)relayed.throttle_j / 127.0f, -1.0f, 1.0f);
 		action.primary_trigger = (real)relayed.primary_trigger / 255.0f;
 		action.desired_weapon_index = relayed.desired_weapon_index;
 		action.desired_grenade_index = relayed.desired_grenade_index;
@@ -3238,6 +3259,7 @@ void network_distributed_new_game(
 	distributed_host_update_number = NONE;
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
+		distributed_deaths[player_index].dead_since = NONE;
 		distributed_sent_units[player_index].flags = 0;
 		distributed_sent_units[player_index].unit_index = NONE;
 		distributed_sent_units[player_index].vehicle_index = NONE;
@@ -3576,9 +3598,13 @@ static void distributed_write_player_record(
 		error(_error_log, "could not open %s to add a player to it", file_name);
 		return;
 	}
-	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s\tdiscord_id=%s\tplayers=%s\treason=%s\n", when,
-		kept_address, hardware_id[0] ? hardware_id : "none", discord_name[0] ? discord_name : "none",
-		discord_id[0] ? discord_id : "none", kept_names, kept_reason);
+	/* (the Discord user as the machine told it, which it may say is anyone's:
+	marked so) */
+	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s\n", when,
+		kept_address, hardware_id[0] ? hardware_id : "none",
+		discord_name[0] ? discord_name : "none", discord_name[0] ? " (self-reported)" : "",
+		discord_id[0] ? discord_id : "none", discord_id[0] ? " (self-reported)" : "",
+		kept_names, kept_reason);
 	fclose(file);
 }
 
@@ -3743,13 +3769,14 @@ static void distributed_note_client_clock(
 		{
 			clock->fast_windows = 0;
 			clock->ahead_on_stream = FALSE;
+			clock->logged_unverified = FALSE;
 		}
 		else if (++clock->fast_windows == 1)
 		{
 			error(_error_log, "machine #%ld's game runs %.2f times as fast as this host's (%ld ticks ahead): "
 				"its players' predictions refused", machine_index, rate, ahead);
 		}
-		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS)
+		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS && clock->ahead_on_stream)
 		{
 			error(_error_log, "machine #%ld's game ran %.2f times as fast as this host's for %d seconds "
 				"(%ld ticks ahead): dropped", machine_index, rate,
@@ -3769,30 +3796,40 @@ static void distributed_note_client_clock(
 					distributed_client_identities[machine_index].discord_name, 1);
 				if (discord_id[0] || discord_name[0])
 					snprintf(discord, sizeof(discord), " (Discord: %s, %s)", discord_name, discord_id);
-				snprintf(reason, sizeof(reason), "speed hack (game ran %.2f times as fast)%s", rate,
-					clock->ahead_on_stream ? "" : " (its datagrams only: not banned)");
+				snprintf(reason, sizeof(reason), "speed hack (game ran %.2f times as fast)", rate);
 				snprintf(text, sizeof(text), "%s%s kicked by the host: their game ran %.2f times as fast (a speed hack)",
 					names, discord, rate);
 				distributed_send_notice(text);
-				/* banned, and kept out, only when its stream said so
-				too; on its datagrams' word alone (which another machine
-				could have sent as from its address), logged and dropped,
-				and it may join again */
-				if (clock->ahead_on_stream)
-				{
-					distributed_log_cheater(machine_index, names, reason);
-				}
-				else
-				{
-					char address[32];
-
-					distributed_machine_address_text(machine_index, address, sizeof(address));
-					distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
-				}
+				distributed_log_cheater(machine_index, names, reason);
 			}
-			network_game_server_kick_machine(machine_index, clock->ahead_on_stream);
+			network_game_server_kick_machine(machine_index, TRUE);
 			clock->fast_windows = 0;
 			clock->ahead_on_stream = FALSE;
+		}
+		/* dropped, banned and kept out only when its stream said so too; on
+		its datagrams' word alone (which another machine could have sent as
+		from its address, to have it dropped and logged as a cheater) it
+		stays, its players' predictions refused while they say so, and is
+		logged once, unverified (dropped as above if its stream says so later) */
+		else if (clock->fast_windows >= CLIENT_CLOCK_FAST_WINDOWS)
+		{
+			clock->fast_windows = CLIENT_CLOCK_FAST_WINDOWS;
+			if (!clock->logged_unverified)
+			{
+				char names[64];
+				char reason[96];
+				char address[32];
+
+				error(_error_log, "machine #%ld's datagrams said its game ran %.2f times as fast as this host's "
+					"for %d seconds (%ld ticks ahead), its stream not: not dropped (unverified)", machine_index, rate,
+					CLIENT_CLOCK_FAST_WINDOWS * CLIENT_CLOCK_WINDOW_MILLISECONDS / 1000, ahead);
+				distributed_machine_player_names(machine_index, names, sizeof(names));
+				snprintf(reason, sizeof(reason), "unverified speed hack (its datagrams only, not dropped: "
+					"game ran %.2f times as fast)", rate);
+				distributed_machine_address_text(machine_index, address, sizeof(address));
+				distributed_write_player_record(CHEATERS_FILE, address, machine_index, names, reason);
+				clock->logged_unverified = TRUE;
+			}
 		}
 	}
 	clock->window_tick = clock->latest_tick;
@@ -3807,6 +3844,12 @@ boolean distributed_machine_clock_fast(
 	return machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
 		distributed_client_clocks[machine_index].fast;
 }
+
+/* whether the messages handled now came in a batch (the unreliable ones;
+one sent reliably comes on its own): a killing blow sent again reliably is
+not overtaken by the newer damage sent with the ticks since
+(distributed_message_stale) */
+static boolean distributed_handling_batch;
 
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
@@ -3846,7 +3889,11 @@ void network_distributed_handle_message(
 			offset += length;
 			/* (no batch in a batch) */
 			if (((struct distributed_message_header const *)buffer)->type != _distributed_message_batch)
+			{
+				distributed_handling_batch = TRUE;
 				network_distributed_handle_message(machine_index, buffer, (word)(sizeof(message_header) + length));
+				distributed_handling_batch = FALSE;
+			}
 		}
 		return;
 	}
@@ -3925,8 +3972,11 @@ void network_distributed_handle_message(
 			distributed_host_time = header.game_time;
 		break;
 	}
-	if (distributed_message_stale(machine_index, &header))
+	if ((distributed_handling_batch || header.type != _distributed_message_damage_events) &&
+		distributed_message_stale(machine_index, &header))
+	{
 		return;
+	}
 	/* (the host: a client's clock, by its messages' ticks; and its players'
 	predictions not taken while its game runs fast) */
 	if (machine_index != NONE)

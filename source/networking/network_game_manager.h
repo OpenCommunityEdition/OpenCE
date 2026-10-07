@@ -42,12 +42,22 @@ struct network_game_local_data
 	byte __padding431[3];
 };
 
+/* port: network_game's cooperative_flags */
+enum
+{
+	/* the players pass through each other (Server Setup's PLAYER COLLISIONS:
+	OFF, co-op's): network_coop_player_collisions */
+	_network_game_cooperative_no_player_collisions_bit = 0,
+};
+
 struct network_game
 {
 	wchar_t name[16];
 	struct network_game_map map;
 	struct game_variant variant;
-	byte __padding10C;
+	/* port: co-op's switches (_network_game_cooperative_*_bit), in a byte the
+	Xbox's game left as padding, which builds before them send as 0 */
+	byte cooperative_flags;
 	char minimum_players;
 	/* port: 128 does not fit a signed char */
 	byte maximum_players;

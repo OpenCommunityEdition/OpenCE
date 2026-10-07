@@ -92,6 +92,8 @@ index and tag, since the map placed them at the same index everywhere.
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
 #include "models/models.h"
+#include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
 #include "objects/object_definitions.h"
 #include "objects/objects.h"
 #include "objects/object_types.h"
@@ -153,7 +155,8 @@ enum
 	/* each event is sent in this many ticks' messages */
 	EVENT_SENDS = 3,
 
-	/* the size of devices.c's device group array */
+	/* the size of devices.c's device group array (devices_initialize's;
+	every index into the arrays below is checked against this too) */
 	MAXIMUM_DEVICE_GROUPS = 1024,
 	/* a changed group is sent in this many ticks' messages */
 	DEVICE_GROUP_SENDS = 3,
@@ -176,6 +179,9 @@ enum
 	PLAYERS_PER_DROPPED_VEHICLE = 4,
 	MAXIMUM_DROPPED_VEHICLES = 5,
 };
+
+/* (devices.c's literal count: a change there is one here) */
+typedef char device_groups_count_assert[MAXIMUM_DEVICE_GROUPS == 1024 ? 1 : -1];
 
 /* distributed_coop_event.kind */
 enum
@@ -827,6 +833,7 @@ static short device_group_find(
 	{
 		group_index = entry->group_index;
 		return group_index >= 0 && group_index < global_scenario_get()->device_groups.count &&
+			group_index < MAXIMUM_DEVICE_GROUPS &&
 			device_group_network_get(group_index, &value, &flags, &runtime) && !runtime ? group_index : NONE;
 	}
 	device_index = object_find(entry->name_index, entry->object_index, entry->definition_index, _object_mask_device);
@@ -1745,7 +1752,8 @@ static void client_apply_attach(
 	struct distributed_coop_event const *event)
 {
 	long parent_index = object_find(event->name_index, event->object_index, event->definition_index, _object_mask_all);
-	long child_index = object_find((short)event->reals[0], event->target, event->tag_index, _object_mask_all);
+	long child_index = object_find((short)PIN(event->reals[0], -1.0f, 32767.0f), event->target, event->tag_index,
+		_object_mask_all);
 	long ancestor_index;
 
 	if (parent_index == NONE || child_index == NONE || parent_index == child_index)
@@ -1959,6 +1967,16 @@ boolean network_coop_active(
 
 	return (connection == _game_connection_network_server || connection == _game_connection_network_client) &&
 		global_scenario && global_scenario->type == _scenario_type_solo && !game_engine_running();
+}
+
+boolean network_coop_player_collisions(
+	void)
+{
+	struct network_game *game;
+
+	if (!network_coop_active() || !(game = network_game_get_game()))
+		return TRUE;
+	return !TEST_FLAG(game->cooperative_flags, _network_game_cooperative_no_player_collisions_bit);
 }
 
 boolean network_coop_devices_remote(

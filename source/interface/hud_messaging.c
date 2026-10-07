@@ -1602,6 +1602,24 @@ void hud_messaging_update(
 										0x457,
 										custom_index < NUMBER_OF_HUD_CUSTOM_ICONS,
 										"custom_index<NUMBER_OF_HUD_CUSTOM_ICONS");
+									/* port: the icon is the map's (a message element's
+									data, retail up to custom 2) and indexes the message's
+									8 custom icons: one past them is not drawn, said once */
+									if (custom_index >= NUMBER_OF_HUD_CUSTOM_ICONS)
+									{
+										static boolean bad_custom_icon_reported = FALSE;
+
+										if (!bad_custom_icon_reported)
+										{
+											bad_custom_icon_reported = TRUE;
+											error(
+												_error_silent,
+												"hud message uses custom icon %d (of %d)",
+												custom_index,
+												NUMBER_OF_HUD_CUSTOM_ICONS);
+										}
+										break;
+									}
 									if (TEST_FLAG(state_message->is_text_flags, custom_index))
 									{
 										short string_index = state_message->info[custom_index].text.string_index;

@@ -28,6 +28,7 @@ AI_DEBUG.C
 #include "main/console.h"
 #include "memory/data.h"
 #include "objects/damage.h"
+#include "physics/collision_bsp.h" /* port: collision_surface_edge_ring_continues */
 #include "physics/collision_bsp_definitions.h"
 #include "physics/collisions.h"
 #include "rasterizer/rasterizer.h"
@@ -715,20 +716,42 @@ static void ai_debug_render_surface(
 	union real_argb_color const *color)
 {
 	struct collision_bsp const *collision_bsp = TAG_BLOCK_GET_ELEMENT(&structure_bsp->collision_bsp, 0, struct collision_bsp);
-	struct collision_surface const *collision_surface = TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, surface_index, struct collision_surface);
-	long edge_index = collision_surface->first_edge_index;
+	struct collision_surface const *collision_surface;
+	long edge_index;
+	short edge_count = 0;
+
+	/* port: a surface that is the bsp's (an actor's or biped's, from a
+	map's edges), and its ring of edges as
+	collision_surface_edge_ring_continues says (a map's ring that doesn't
+	close would walk forever; the retail rings all close within 3 to 8
+	edges) */
+	if (!collision_bsp_valid_surface_index(collision_bsp, surface_index))
+		return;
+	collision_surface = TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, surface_index, struct collision_surface);
+	edge_index = collision_surface->first_edge_index;
+	if (!collision_surface_edge_ring_continues(collision_bsp, edge_index, 0))
+		return;
 
 	do
 	{
 		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(&collision_bsp->edges, edge_index, struct collision_edge);
 		const boolean next_index_belongs_to_surface = edge->surface_indices[1] == surface_index;
-		struct collision_vertex const *point0 = TAG_BLOCK_GET_ELEMENT(&collision_bsp->vertices, edge->vertex_indices[0], struct collision_vertex);
-		struct collision_vertex const *point1 = TAG_BLOCK_GET_ELEMENT(&collision_bsp->vertices, edge->vertex_indices[1], struct collision_vertex);
+		struct collision_vertex const *point0;
+		struct collision_vertex const *point1;
+
+		/* port: (and with vertices that are the bsp's) */
+		if (!VALID_INDEX(edge->vertex_indices[0], collision_bsp->vertices.count) ||
+			!VALID_INDEX(edge->vertex_indices[1], collision_bsp->vertices.count))
+			break;
+		point0 = TAG_BLOCK_GET_ELEMENT(&collision_bsp->vertices, edge->vertex_indices[0], struct collision_vertex);
+		point1 = TAG_BLOCK_GET_ELEMENT(&collision_bsp->vertices, edge->vertex_indices[1], struct collision_vertex);
 
 		render_debug_line_offset(TRUE, &point0->point, &point1->point, color, offset + 0.015f);
 		edge_index = edge->edge_indices[next_index_belongs_to_surface];
+		edge_count++;
 	}
-	while (edge_index!=collision_surface->first_edge_index);
+	while (edge_index!=collision_surface->first_edge_index &&
+		collision_surface_edge_ring_continues(collision_bsp, edge_index, edge_count));
 
 	return;
 }
@@ -3854,7 +3877,15 @@ static void ai_debug_render_path_nodes(
 
 					if (!previous_node)
 					{
-						if (render_surfaces)
+						/* port: (a node's surface that is the bsp's, with a ring
+						of edges, as in ai_debug_render_surface; any other is
+						drawn at its closest point) */
+						if (render_surfaces &&
+							collision_bsp_valid_surface_index(collision_bsp, node->surface_index) &&
+							collision_surface_edge_ring_continues(collision_bsp,
+								TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, node->surface_index,
+									struct collision_surface)->first_edge_index,
+								0))
 						{
 						struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
 								&collision_bsp->surfaces, node->surface_index,
@@ -3869,7 +3900,13 @@ static void ai_debug_render_path_nodes(
 									&collision_bsp->edges, edge_index, struct collision_edge);
 								const boolean next_index_belongs_to_surface =
 									edge->surface_indices[1]==node->surface_index;
-								struct collision_vertex const *vertex = TAG_BLOCK_GET_ELEMENT(
+								struct collision_vertex const *vertex;
+
+								/* port: (and with vertices that are the bsp's) */
+								if (!VALID_INDEX(edge->vertex_indices[next_index_belongs_to_surface],
+									collision_bsp->vertices.count))
+									break;
+								vertex = TAG_BLOCK_GET_ELEMENT(
 									&collision_bsp->vertices,
 									edge->vertex_indices[next_index_belongs_to_surface],
 									struct collision_vertex);
@@ -3882,9 +3919,12 @@ static void ai_debug_render_path_nodes(
 
 								edge_index = edge->edge_indices[next_index_belongs_to_surface];
 							}
-							while (edge_index!=surface->first_edge_index);
+							while (edge_index!=surface->first_edge_index &&
+								collision_surface_edge_ring_continues(collision_bsp, edge_index, (short)vertex_count));
 
-							scale = 1.0f / vertex_count;
+							/* port: (no vertices, from a ring that ends at once,
+							leave the centre at the origin) */
+							scale = vertex_count ? 1.0f / vertex_count : 0.0f;
 							centre.x *= scale;
 							centre.y *= scale;
 							centre.z *= scale;

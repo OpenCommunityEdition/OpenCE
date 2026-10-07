@@ -119,6 +119,14 @@ EXPAT_SOURCES = ("xmlparse.c", "xmlrole.c", "xmltok.c")
 KCP_DIR = Path("port/third_party/kcp")
 MONOCYPHER_DIR = Path("port/third_party/monocypher")
 MUSL_MATH_DIR = Path("port/third_party/musl-math")
+# the port's zlib (port/third_party/zlib/zlib_prefixed.h): what inflates the
+# maps, the menus' and the HUD's PNGs and the updates, data from anywhere,
+# instead of the game's own 1.1.3 (its inflate only, its names prefixed z_)
+ZLIB_DIR = Path("port/third_party/zlib")
+ZLIB_SOURCES = ("adler32.c", "crc32.c", "inffast.c", "inflate.c", "inftrees.c", "uncompr.c", "zutil.c")
+# (its names prefixed, and the one Z_PREFIX leaves, its error messages, which
+# the game's zlib names the same)
+ZLIB_DEFINES = ("-DZ_PREFIX", "-Dz_errmsg=z_port_errmsg")
 # the self-updater's TLS (port/linux/src/posix_update.c)
 MBEDTLS_DIR = Path("port/third_party/mbedtls")
 # internet play's UPnP (port/linux/src/posix_upnp.c)
@@ -357,6 +365,14 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     )
 
     n.rule(
+        name="linux_tool_link",
+        command="$linux_cc $ldflags -o $out @$out.rsp",
+        description="LINUX LINK $out",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+    )
+
+    n.rule(
         name="linux_pgo_train",
         command="$python tools/pgo_train.py --binary $binary --work $work --output $out",
         description="LINUX PGO TRAINING: playing levels in the instrumented build",
@@ -366,14 +382,19 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     embedded_assets = hud_assets_build(n, "linux", build_dir / "generated" / "hud_hires_assets.c")
 
-    abi = " ".join(LINUX_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
+    # (a debug build checks its stack frames, and stops at the first one
+    # overrun, as it stops at the first failed assertion; a release build
+    # does not, so that an overrun nobody has met cannot end a game)
+    abi = " ".join(LINUX_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False)
+                                                          else ["-fstack-protector-strong"]))
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
-             implicit_inputs: List[Path]) -> None:
-        """the objects and the executable, with the given extra flags"""
+             implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
+        """the objects and the executable, with the given extra flags (and
+        the tag validator alone, tools/map_validate.c, as validator)"""
         extra = " ".join(extra_cflags)
         # the posix_* units have glibc's 32-bit wchar_t, and LLVM will not
         # optimise them together with code that has a 16-bit one: they stay
@@ -426,6 +447,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-I{EXPAT_DIR}",
             f"-I{KCP_DIR}",
             f"-I{MONOCYPHER_DIR}",
+            f"-I{ZLIB_DIR}",
             "-Isource -Isource/cseries",
             sdk_flags,
         ])
@@ -470,6 +492,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # (port/third_party/monocypher; p2p_crypto.c)
         for name in ("monocypher.c", "monocypher-ed25519.c"):
             add_object(MONOCYPHER_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
+        # the port's zlib
+        for name in ZLIB_SOURCES:
+            add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
         # the game's sin, pow and the rest, the same on every port
         # (port/include/halo_math.h)
         for source in musl_math_sources():
@@ -485,6 +510,29 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             },
             implicit=[Path("tools/linux_link_check.py")],
         )
+
+        # the tag validator (port/linux/game/tag_validate.c, tag_schema*.c)
+        # alone on map files: the game's objects of it, and a program that
+        # reads maps (tools/map_validate.c)
+        if validator is not None:
+            game_dir = Path(config["game_sources"])
+            tool = Path("tools/map_validate.c")
+            tool_object = obj_dir / tool.with_suffix(".o")
+            n.build(
+                outputs=tool_object,
+                rule="linux_cc",
+                inputs=tool,
+                variables={"cflags": " ".join([posix_cflags, f"-I{ZLIB_DIR}", *ZLIB_DEFINES, posix_extra])},
+            )
+            tool_objects = [tool_object, obj_dir / (game_dir / "tag_validate.o"),
+                            *(obj_dir / source.with_suffix(".o") for source in sorted(game_dir.glob("tag_schema*.c"))),
+                            *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES)]
+            n.build(
+                outputs=validator,
+                rule="linux_tool_link",
+                inputs=tool_objects,
+                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags])},
+            )
 
     # Profile-guided optimisation: with the committed profile, or with
     # --pgo=train one that an instrumented build records while playing
@@ -505,10 +553,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # compiled together when lld links them.
     cflags, ldflags = lto_flags(sln, build_dir / "thinlto-cache")
     cflags += profile_use_flags(profile)
-    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [])
+    validator = build_dir / "map_validate"
+    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [], validator)
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build_dir / "brokers.txt"
     n.rule(name="linux_copy", command="cp $in $out", description="LINUX COPY $out")
     n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="linux", rule="phony", inputs=[output, brokers])
+    n.build(outputs="linux", rule="phony", inputs=[output, brokers, validator])
     n.newline()

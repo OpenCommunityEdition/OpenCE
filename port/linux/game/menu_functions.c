@@ -1438,6 +1438,32 @@ static boolean color_choose(void)
 	return TRUE;
 }
 
+/* ---------- Edit Profile Settings: its picture of Gamepad Setup, the
+profile's button settings as the Xbox's Controller Setup shows them */
+
+/* the picture's frames (the bitmap's: tools/port_settings.py's
+BITMAP_FRAMES): Gamepad Setup's row's, as the list numbers its rows
+(player_profile_edit_select_menu_update_extended_description), and after
+the PC version's nine the Xbox's five of the button settings */
+#define PROFILE_GAMEPAD_FRAME 2
+#define PROFILE_FIRST_LAYOUT_FRAME 9
+
+/* "port gamepad layout preview" (the picture's own): on Gamepad Setup's
+row, the edited profile's button settings */
+static void profile_gamepad_layout(struct widget_instance *picture)
+{
+	struct player_profile *profile = player_ui_get_edit_player_profile();
+	short frame = picture->animation.current_frame_index;
+
+	if (frame == PROFILE_GAMEPAD_FRAME ||
+		(frame >= PROFILE_FIRST_LAYOUT_FRAME && frame < PROFILE_FIRST_LAYOUT_FRAME + NUMBER_OF_BUTTON_PRESETS))
+	{
+		picture->animation.current_frame_index = (short)(PROFILE_FIRST_LAYOUT_FRAME +
+			(profile && profile->controller_settings.button_preset < NUMBER_OF_BUTTON_PRESETS ?
+				profile->controller_settings.button_preset : _button_preset_standard));
+	}
+}
+
 /* ---------- Profiles: the player profiles, and a row to make one (as the
 PC version's list has them, but by the Xbox's names for its spinner's
 functions); choosing one makes it player 1's, the profile the campaign and
@@ -1970,6 +1996,10 @@ Xbox's networking, run by the engine's port entry points
 #define KEY_MODIFIER_CONTROL_BIT 1
 #define LOBBY_NAME "pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"
 #define PREVIEW_NAME "pc\\main_menu\\multiplayer_type_select\\lobby\\preview_screen"
+/* the server browser's password screen (tools/port_settings.py), and the
+longest password */
+#define PASSWORD_NAME "pc\\main_menu\\multiplayer_type_select\\join_game\\password\\password_screen"
+#define PASSWORD_LENGTH 32
 /* the lobby's panel's lines (the gametype, the players, the countdown, the
 invite) */
 #define LOBBY_TEXT_LENGTH (ROW_TEXT_LENGTH * 4)
@@ -2036,6 +2066,7 @@ boolean ui_widget_port_unjoin_player(struct widget_instance *widget, struct even
 	boolean *widget_deleted);
 void network_game_server_port_set_settings(wchar_t const *name, long maximum_players);
 void network_game_server_port_set_cooperative_friendly_fire(short friendly_fire);
+void network_game_server_port_set_cooperative_player_collisions(boolean player_collisions);
 void *global_network_game_client_get(void);
 void *global_network_game_server_get(void);
 boolean network_game_is_splitscreen_local(void);
@@ -2084,6 +2115,8 @@ static struct
 	boolean cooperative_maximum_players_set;
 	/* co-op's FRIENDLY FIRE shown (network.coop_friendly_fire's) */
 	short cooperative_friendly_fire;
+	/* co-op's PLAYER COLLISIONS shown, OFF (network.coop_player_collisions's) */
+	boolean cooperative_no_player_collisions;
 	/* the browser's games */
 	struct advertised_game *games[MAXIMUM_ADVERTISED_GAMES];
 	short game_count, game_chosen;
@@ -2096,6 +2129,9 @@ static struct
 	/* Server Setup's LISTING: PRIVATE (each new game starts with
 	network.host_public's choice: PUBLIC unless set otherwise) */
 	boolean game_private;
+	/* Server Setup's PASSWORD (a public internet game's; empty: none), kept
+	while the game runs, never written down */
+	char game_password[PASSWORD_LENGTH + 1];
 } multiplayer = { 0, 0, 0, { 0 }, 0, { 0 }, 0, 0, 0, 0, { 0 }, NUMBEROF(maximum_players) - 1 };
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
@@ -2108,6 +2144,8 @@ static struct
 	char before[TEXT_FIELD_LENGTH];
 	short maximum;
 	void (*done)(char const *text);
+	/* a password's: shown as stars (text_field_begin_masked) */
+	boolean masked;
 } text_field;
 
 /* when the field was last shown (a field not shown for a while is let go
@@ -2129,10 +2167,19 @@ static void text_field_begin(struct widget_instance *row, char const *text, shor
 	snprintf(text_field.before, sizeof(text_field.before), "%s", text);
 	text_field.maximum = (short)MIN(maximum, TEXT_FIELD_LENGTH - 1);
 	text_field.done = done;
+	text_field.masked = FALSE;
 	text_field_shown_time = system_milliseconds();
 	while (input_get_key(&key))
 		;
 	platform_text_field(TRUE);
+}
+
+/* a password's field: as text_field_begin, its text shown as stars */
+static void text_field_begin_masked(struct widget_instance *row, char const *text, short maximum,
+	void (*done)(char const *text))
+{
+	text_field_begin(row, text, maximum, done);
+	text_field.masked = TRUE;
 }
 
 static void text_field_end(boolean keep)
@@ -2199,7 +2246,7 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 		text = text_field.text;
 	}
 	for (index = 0; text[index] && index < TEXT_FIELD_LENGTH; index++)
-		shown[index] = (wchar_t)(unsigned char)text[index];
+		shown[index] = editing && text_field.masked ? L'*' : (wchar_t)(unsigned char)text[index];
 	if (editing && (system_milliseconds() / 500) % 2)
 		shown[index++] = L'_';
 	shown[index] = 0;
@@ -2583,6 +2630,8 @@ help_strings, tools/port_settings.py) */
 #define COOPERATIVE_EXTRA_ENEMIES_HELP 16
 #define COOPERATIVE_ENEMIES_PER_PLAYER_HELP 19
 #define COOPERATIVE_ENEMIES_MULTIPLIER_HELP 20
+#define COOPERATIVE_PLAYER_COLLISIONS_HELP 21
+#define SERVER_PASSWORD_HELP 23
 
 /* co-op's EXTRA ENEMIES' choices (port_settings.COOP_ENEMIES_MODES, in this
 order): its amount's row is the choice's */
@@ -2746,6 +2795,18 @@ static void server_settings_update(struct widget_instance *list)
 					help->parameters.text_box.string_list_index = COOPERATIVE_ENEMIES_MULTIPLIER_HELP;
 			}
 		}
+		/* ... and its PLAYER COLLISIONS, below them: ON or OFF, its help its
+		choice's */
+		visible_set(named(list, "op_player_collisions", 0), cooperative);
+		if (cooperative && (spinner = named(list, "player_collisions_spinner", 0)) != NULL)
+		{
+			short choice = (short)PIN(spinner->parameters.list.selected_index, 0, 1);
+			struct widget_instance *help = list->parameters.list.extended_description;
+
+			multiplayer.cooperative_no_player_collisions = choice == 1;
+			if (help && list->focused_child == named(list, "op_player_collisions", 0))
+				help->parameters.text_box.string_list_index = (short)(COOPERATIVE_PLAYER_COLLISIONS_HELP + choice);
+		}
 	}
 	/* LISTING (an internet game's): PUBLIC, listed in everyone's server
 	browser, or PRIVATE, for this game. Its help is its choice's */
@@ -2761,6 +2822,41 @@ static void server_settings_update(struct widget_instance *list)
 		if (help && list->focused_child == named(list, "op_listing", 0))
 			help->parameters.text_box.string_list_index = (short)(10 + spinner->parameters.list.selected_index);
 	}
+	/* PASSWORD (a PUBLIC internet game's): its stars, NONE if it has none */
+	row = named(list, "op_password", 0);
+	visible_set(row, named(list, "op_listing", 0) && named(list, "op_listing", 0)->visible &&
+		!server_settings_private());
+	if (row && !row->visible && text_field_editing(row))
+		text_field_end(FALSE);
+	if (row && row->visible)
+	{
+		struct widget_instance *help = list->parameters.list.extended_description;
+		short index;
+
+		for (index = 0; multiplayer.game_password[index] && index < (short)sizeof(text) - 1; index++)
+			text[index] = '*';
+		text[index] = 0;
+		text_field_show(named(list, "password_value", 0), index ? text : "NONE", text_field_editing(row));
+		if (help && list->focused_child == row)
+			help->parameters.text_box.string_list_index = SERVER_PASSWORD_HELP;
+	}
+}
+
+static void server_password_done(char const *text)
+{
+	snprintf(multiplayer.game_password, sizeof(multiplayer.game_password), "%s", text);
+}
+
+/* "ss edit server password" (its row's A: begins, or ends) */
+static boolean server_password_edit(struct widget_instance *row)
+{
+	if (text_field_editing(row))
+	{
+		text_field_end(TRUE);
+		return TRUE;
+	}
+	text_field_begin_masked(row, multiplayer.game_password, PASSWORD_LENGTH, server_password_done);
+	return TRUE;
 }
 
 /* "ss edit server name" (its row's A: begins, or ends) */
@@ -2797,12 +2893,16 @@ static boolean server_start(void)
 		text_field_end(TRUE);
 	network_game_server_port_set_settings(multiplayer.game_name,
 		maximum_players[PIN(*server_settings_maximum_players_index(), 0, NUMBEROF(maximum_players) - 1)]);
+	/* (its listing's password: a PUBLIC internet game's, else none) */
+	p2p_set_hosting_password(multiplayer.mode == _multiplayer_mode_host_internet && !server_settings_private() ?
+		multiplayer.game_password : NULL);
 	/* the gametype as Server Setup's options left it (co-op keeps its own,
 	and its FRIENDLY FIRE) */
 	if (hosting_cooperative())
 	{
 		gametype_setup_end();
 		network_game_server_port_set_cooperative_friendly_fire(multiplayer.cooperative_friendly_fire);
+		network_game_server_port_set_cooperative_player_collisions(!multiplayer.cooperative_no_player_collisions);
 	}
 	else if (!gametype_setup_apply())
 		return campaign_fail();
@@ -3063,6 +3163,11 @@ static struct
 	/* the last that failed, and when */
 	char failed_name[P2P_LISTING_NAME_SIZE + 1];
 	unsigned long failed_time;
+	/* a game with a password chosen: the password screen's (its own copy:
+	the rows' are read again each frame), and a join it began, which the
+	browser takes up again as it comes back */
+	struct p2p_listing password_game;
+	boolean password_joined;
 } lobby_browser;
 
 static void lobby_browser_begin(void)
@@ -3071,7 +3176,10 @@ static void lobby_browser_begin(void)
 	lobby_browser.first = 0;
 	lobby_browser.chosen = 0;
 	lobby_browser.shown = FALSE;
-	lobby_browser.joining = lobby_browser.ready = FALSE;
+	/* (going on with the join the password screen began) */
+	lobby_browser.joining = lobby_browser.password_joined;
+	lobby_browser.ready = FALSE;
+	lobby_browser.password_joined = FALSE;
 	lobby_browser.begin_time = system_milliseconds();
 	p2p_lobby_browse(TRUE);
 }
@@ -3219,8 +3327,18 @@ static void lobby_browser_update(struct widget_instance *list)
 		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d/%d", game->player_count, game->maximum_player_count);
 		text_set(named(row, "server_item_players", 0), text);
 		/* (no ping yet: its host is reached only on joining) */
-		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : game->in_progress ? L"LIVE" : L"-");
-		visible_set(named(row, "server_item_locked", 0), !game->open);
+		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : !game->open ? L"CLOSED" :
+			game->in_progress ? L"LIVE" : L"-");
+		/* (the lock: a game with a password. Its bitmap's first frame is
+		empty, the PC version's for no lock; the next is the lock, in the
+		menus' blue) */
+		{
+			struct widget_instance *lock = named(row, "server_item_locked", 0);
+
+			visible_set(lock, game->locked);
+			if (lock)
+				lock->animation.current_frame_index = 1;
+		}
 		visible_set(named(row, "server_item_dedicated", 0), FALSE);
 		visible_set(named(row, "server_item_classic", 0), FALSE);
 	}
@@ -3295,9 +3413,10 @@ static void lobby_browser_update(struct widget_instance *list)
 			wchar_t gametype[P2P_LISTING_GAMETYPE_SIZE + 1];
 
 			text_to_wide(game->gametype, gametype, NUMBEROF(gametype));
-			usnprintf(text, NUMBEROF(text) - 1, L"%s: %d %s of %d%s", gametype, game->player_count,
+			usnprintf(text, NUMBEROF(text) - 1, L"%s: %d %s of %d%s%s", gametype, game->player_count,
 				game->player_count == 1 ? L"player" : L"players", game->maximum_player_count,
-				!game->open ? L", full or starting" : game->in_progress ? L", under way" : L"");
+				!game->open ? L", full or starting" : game->in_progress ? L", under way" : L"",
+				game->locked ? L", password" : L"");
 		}
 		else
 			text[0] = 0;
@@ -3327,9 +3446,26 @@ static void lobby_browser_update(struct widget_instance *list)
 	browser_focus(list);
 }
 
+/* the game's host reached by its invite (joined, once it is reached:
+lobby_browser_update) */
+static boolean lobby_browser_join(struct p2p_listing const *game, short controller)
+{
+	if (!p2p_join_invite(game->invite))
+		return FALSE;
+	csmemcpy(lobby_browser.identifier, game->identifier, sizeof(lobby_browser.identifier));
+	csmemcpy(lobby_browser.name, game->name, sizeof(lobby_browser.name));
+	lobby_browser.joining = TRUE;
+	lobby_browser.ready = FALSE;
+	lobby_browser.join_time = system_milliseconds();
+	lobby_browser.controller = controller;
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
+}
+
 /* the server browser's rows and buttons: Refresh asks the hosts again; a
-row (or Join) joins its game's invite; the A press posted once its host is
-reached joins its game (or shows its lobby, if under way) */
+row (or Join) joins its game's invite, a game with a password once its
+screen has it; the A press posted once its host is reached joins its game
+(or shows its lobby, if under way) */
 static boolean lobby_browser_select(struct widget_instance *widget, short controller, short row,
 	boolean *widget_deleted)
 {
@@ -3374,15 +3510,117 @@ static boolean lobby_browser_select(struct widget_instance *widget, short contro
 	if (index >= lobby_browser.count)
 		return campaign_fail();
 	game = &lobby_browser.games[index];
-	if (!game->open || !config_boolean("network.online") || !p2p_join_invite(game->invite))
+	if (!game->open || !config_boolean("network.online"))
 		return campaign_fail();
-	csmemcpy(lobby_browser.identifier, game->identifier, sizeof(lobby_browser.identifier));
-	csmemcpy(lobby_browser.name, game->name, sizeof(lobby_browser.name));
-	lobby_browser.joining = TRUE;
-	lobby_browser.ready = FALSE;
-	lobby_browser.join_time = system_milliseconds();
-	lobby_browser.controller = controller;
-	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	/* (a game with a password: its screen asks for it, then joins) */
+	if (game->locked)
+	{
+		lobby_browser.password_game = *game;
+		lobby_browser.controller = controller;
+		return ui_widget_port_open(widget, PASSWORD_NAME, widget_deleted);
+	}
+	return lobby_browser_join(game, controller) || campaign_fail();
+}
+
+/* ---- the server browser's password screen (a game with a password
+chosen: lobby_browser_select, tools/port_settings.py): its password typed at
+once, shown as stars; JOIN GAME, or Enter, joins the game with it if it is
+the game's (the browser, back again, goes on with the join), else its help
+says it is not and the typing begins again */
+
+/* its help's lines (tools/port_settings.py's) */
+enum
+{
+	_password_help_ask = 1,
+	_password_help_wrong,
+	_password_help_failed,
+};
+
+static struct
+{
+	char text[PASSWORD_LENGTH + 1];
+	short help;
+} password_screen;
+
+static void password_screen_done(char const *text)
+{
+	snprintf(password_screen.text, sizeof(password_screen.text), "%s", text);
+}
+
+/* "port password init" */
+static boolean password_screen_initialize(struct widget_instance *list)
+{
+	struct widget_instance *row = named(list, "op_password", 0);
+
+	password_screen.text[0] = 0;
+	password_screen.help = _password_help_ask;
+	if (row)
+		text_field_begin_masked(row, "", PASSWORD_LENGTH, password_screen_done);
+	return TRUE;
+}
+
+/* "port password update" */
+static void password_screen_update(struct widget_instance *list)
+{
+	struct widget_instance *help = list->parameters.list.extended_description;
+	char stars[PASSWORD_LENGTH + 1];
+	short index;
+
+	for (index = 0; password_screen.text[index] && index < PASSWORD_LENGTH; index++)
+		stars[index] = '*';
+	stars[index] = 0;
+	text_field_show(named(list, "password_value", 0), stars, text_field_editing(named(list, "op_password", 0)));
+	if (help)
+		help->parameters.text_box.string_list_index = password_screen.help;
+}
+
+/* "port password join" (JOIN GAME, and Enter: password_screen_edit) */
+static boolean password_screen_join(struct widget_instance *widget, boolean *widget_deleted)
+{
+	struct p2p_listing game = lobby_browser.password_game;
+	struct widget_instance *row = named(screen_of(widget), "op_password", 0);
+
+	if (text_field_editing(NULL))
+		text_field_end(TRUE);
+	if (!p2p_listing_unlock(&game, password_screen.text))
+	{
+		password_screen.help = _password_help_wrong;
+		password_screen.text[0] = 0;
+		if (row)
+			text_field_begin_masked(row, "", PASSWORD_LENGTH, password_screen_done);
+		return campaign_fail();
+	}
+	if (!lobby_browser_join(&game, lobby_browser.controller))
+	{
+		password_screen.help = _password_help_failed;
+		return campaign_fail();
+	}
+	password_screen.text[0] = 0;
+	lobby_browser.password_joined = TRUE;
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* "port password back" (B, Escape): back to the browser at once, though the
+password is being typed */
+static boolean password_screen_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	if (text_field_editing(NULL))
+		text_field_end(FALSE);
+	password_screen.text[0] = 0;
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* "port password edit" (the field's row's A: the typing begins; Enter, its
+end, joins) */
+static boolean password_screen_edit(struct widget_instance *row, boolean *widget_deleted)
+{
+	if (text_field_editing(row))
+		return password_screen_join(row, widget_deleted);
+	text_field_begin_masked(row, password_screen.text, PASSWORD_LENGTH, password_screen_done);
 	return TRUE;
 }
 
@@ -4890,6 +5128,26 @@ boolean pc_menu_event_function_invoke(
 		{
 			return server_name_edit(widget);
 		}
+		else if (!strcmp(name, "ss edit server password"))
+		{
+			return server_password_edit(widget);
+		}
+		else if (!strcmp(name, "port password init"))
+		{
+			return password_screen_initialize(widget);
+		}
+		else if (!strcmp(name, "port password edit"))
+		{
+			return password_screen_edit(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port password join"))
+		{
+			return password_screen_join(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port password back"))
+		{
+			return password_screen_back(widget, widget_deleted);
+		}
 		else if (!strcmp(name, "ss copy invite"))
 		{
 			return invite_copy();
@@ -5064,6 +5322,8 @@ void pc_menu_game_data_function_invoke(
 		gametype_list_update(widget);
 	else if (!strcmp(name, "server settings update"))
 		server_settings_update(widget);
+	else if (!strcmp(name, "port password update"))
+		password_screen_update(widget);
 	else if (!strcmp(name, "gamespy screen update"))
 		browser_update(widget);
 	else if (!strcmp(name, "gt edit list update"))
@@ -5093,4 +5353,6 @@ void pc_menu_game_data_function_invoke(
 		profile_list_update(widget);
 	else if (!strcmp(name, "load game list update"))
 		saved_game_list_update(widget);
+	else if (!strcmp(name, "port gamepad layout preview"))
+		profile_gamepad_layout(widget);
 }

@@ -559,6 +559,10 @@ static void encounter_new(
 	struct encounter_definition *encounter_definition,
 	short *squad_base,
 	short *platoon_base);
+static void encounter_definition_fit(
+	struct encounter_definition *encounter_definition,
+	short squad_base,
+	short platoon_base);
 static boolean encounter_activate(
 	long encounter_index);
 static void encounter_deactivate(
@@ -567,6 +571,9 @@ static void encounter_update_timers(
 	long encounter_index);
 static short squad_get_actor_type(
 	struct squad_definition *squad_definition);
+static boolean encounter_definition_cluster_index_valid(
+	short cluster_index,
+	long bit_vector_size);
 
 /* ---------- globals */
 
@@ -794,7 +801,9 @@ void encounter_compute_activation_cluster_bit_vector(
 					"c:\\halo\\SOURCE\\ai\\encounters.c",
 					487,
 					(firing_position->cluster_index >= 0) && (firing_position->cluster_index < bit_vector_size));
-				BIT_VECTOR_SET_FLAG(bit_vector, firing_position->cluster_index, TRUE);
+				/* port: only a cluster the bit vector holds (a map's index) */
+				if (encounter_definition_cluster_index_valid(firing_position->cluster_index, bit_vector_size))
+					BIT_VECTOR_SET_FLAG(bit_vector, firing_position->cluster_index, TRUE);
 			}
 		}
 	}
@@ -830,7 +839,9 @@ void encounter_compute_activation_cluster_bit_vector(
 							"c:\\halo\\SOURCE\\ai\\encounters.c",
 							511,
 							(move_position->cluster_index >= 0) && (move_position->cluster_index < bit_vector_size));
-						BIT_VECTOR_SET_FLAG(bit_vector, move_position->cluster_index, TRUE);
+						/* port: only a cluster the bit vector holds (a map's index) */
+						if (encounter_definition_cluster_index_valid(move_position->cluster_index, bit_vector_size))
+							BIT_VECTOR_SET_FLAG(bit_vector, move_position->cluster_index, TRUE);
 					}
 				}
 			}
@@ -1870,8 +1881,13 @@ void encounter_verify_firing_position_owner_actor_indices(
 	long owner_actor_indices[MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER];
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
+	/* port: no more firing positions than the array holds (the map's count) */
+	long firing_position_count = PIN(
+		encounter_definition->firing_positions.count,
+		0,
+		MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
 
-	csmemset(owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+	csmemset(owner_actor_indices, NONE, firing_position_count*sizeof(long));
 
 	encounter_actor_iterator_new(&iterator, encounter_index);
 	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
@@ -1880,7 +1896,9 @@ void encounter_verify_firing_position_owner_actor_indices(
 		{
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 302, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 303, owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
-			owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+			/* port: and only a position the array holds */
+			if (VALID_INDEX(actor->firing_positions.current_position_index, firing_position_count))
+				owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
 		}
 	}
 
@@ -1895,8 +1913,14 @@ void encounter_build_firing_position_owner_actor_indices(
 		&global_scenario_get()->ai_encounters, DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index), struct encounter_definition);
 	struct encounter_actor_iterator iterator;
 	struct actor_datum *actor;
+	/* port: no more firing positions than the callers' arrays hold
+	(MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER entries; the map's count) */
+	long firing_position_count = PIN(
+		encounter_definition->firing_positions.count,
+		0,
+		MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
 
-	csmemset(firing_position_owner_actor_indices, NONE, encounter_definition->firing_positions.count*sizeof(long));
+	csmemset(firing_position_owner_actor_indices, NONE, firing_position_count*sizeof(long));
 
 	encounter_actor_iterator_new(&iterator, encounter_index);
 	while ((actor = encounter_actor_iterator_next(&iterator)) != NULL)
@@ -1905,7 +1929,9 @@ void encounter_build_firing_position_owner_actor_indices(
 		{
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 332, actor->firing_positions.current_position_index>=0 && actor->firing_positions.current_position_index < encounter_definition->firing_positions.count);
 			match_assert("c:\\halo\\SOURCE\\ai\\encounters.c", 333, firing_position_owner_actor_indices[actor->firing_positions.current_position_index]==NONE);
-			firing_position_owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
+			/* port: and only a position the arrays hold */
+			if (VALID_INDEX(actor->firing_positions.current_position_index, firing_position_count))
+				firing_position_owner_actor_indices[actor->firing_positions.current_position_index] = iterator.index;
 		}
 	}
 
@@ -2305,6 +2331,28 @@ void encounters_update(
 
 /* ---------- private code */
 
+/* port: a firing or move position's cluster (a map's index) is one the
+activation bit vector holds; one that isn't is skipped, said once */
+static boolean encounter_definition_cluster_index_valid(
+	short cluster_index,
+	long bit_vector_size)
+{
+	static boolean reported = FALSE;
+
+	if (VALID_INDEX(cluster_index, bit_vector_size))
+		return TRUE;
+
+	if (!reported)
+	{
+		error(_error_silent, "an encounter position is in cluster #%d (there is room for %ld)",
+			cluster_index,
+			bit_vector_size);
+		reported = TRUE;
+	}
+
+	return FALSE;
+}
+
 static void encounter_clear_pursuit(
 	long encounter_index)
 {
@@ -2426,6 +2474,76 @@ static void squad_reset_starting_locations(
 	return;
 }
 
+/* port: an encounter's counts cut to the room the engine has for them (the
+map's counts index fixed arrays: squads and platoons an encounter and a map,
+firing positions an encounter, starting locations a squad). The encounter
+plays with its first ones. The tag is cut, so every user of it agrees, and
+it is said once. Every retail encounter fits. */
+static void encounter_definition_fit(
+	struct encounter_definition *encounter_definition,
+	short squad_base,
+	short platoon_base)
+{
+	long maximum_squad_count = MIN(
+		MAXIMUM_SQUADS_PER_ENCOUNTER,
+		MAXIMUM_SQUADS_PER_MAP - squad_base);
+	long maximum_platoon_count = MIN(
+		MAXIMUM_PLATOONS_PER_ENCOUNTER,
+		MAXIMUM_PLATOONS_PER_MAP - platoon_base);
+	long maximum_starting_location_count =
+		(long)NUMBEROF(squad_array->required_locations) * LONG_BITS;
+	short squad_index;
+
+	if (encounter_definition->squads.count > maximum_squad_count ||
+		encounter_definition->platoons.count > maximum_platoon_count ||
+		encounter_definition->firing_positions.count > MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER)
+	{
+		error(
+			_error_silent,
+			"encounter %s has %d squads, %d platoons and %d firing positions (only %d, %d and %d are used)",
+			encounter_definition->name,
+			encounter_definition->squads.count,
+			encounter_definition->platoons.count,
+			encounter_definition->firing_positions.count,
+			MIN(encounter_definition->squads.count, maximum_squad_count),
+			MIN(encounter_definition->platoons.count, maximum_platoon_count),
+			MIN(encounter_definition->firing_positions.count, (long)MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER));
+		encounter_definition->squads.count = MIN(
+			encounter_definition->squads.count,
+			maximum_squad_count);
+		encounter_definition->platoons.count = MIN(
+			encounter_definition->platoons.count,
+			maximum_platoon_count);
+		encounter_definition->firing_positions.count = MIN(
+			encounter_definition->firing_positions.count,
+			(long)MAXIMUM_FIRING_POSITIONS_PER_ENCOUNTER);
+	}
+
+	for (squad_index = 0;
+		squad_index < encounter_definition->squads.count;
+		squad_index++)
+	{
+		struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
+			&encounter_definition->squads,
+			squad_index,
+			struct squad_definition);
+
+		if (squad_definition->starting_locations.count > maximum_starting_location_count)
+		{
+			error(
+				_error_silent,
+				"encounter %s squad %s has %d starting locations (only %d are used)",
+				encounter_definition->name,
+				squad_definition->name,
+				squad_definition->starting_locations.count,
+				maximum_starting_location_count);
+			squad_definition->starting_locations.count = maximum_starting_location_count;
+		}
+	}
+
+	return;
+}
+
 static void encounter_new(
 	struct encounter_definition *encounter_definition,
 	short *squad_base,
@@ -2438,6 +2556,8 @@ static void encounter_new(
 		struct encounter_datum *encounter = encounter_get(encounter_index);
 		short squad_index;
 		short platoon_index;
+
+		encounter_definition_fit(encounter_definition, *squad_base, *platoon_base);
 
 		encounter->team_index = encounter_definition->team_index;
 		encounter->first_actor_index = NONE;
@@ -3680,7 +3800,10 @@ static void encounter_update_follow(
 						firing_position_index,
 						struct firing_position_definition);
 
-					if (TEST_FLAG(firing_position_groups, firing_position->group_index))
+					/* port: and a group the distances hold (a map's index; a group
+					past them, or below them, is shifted into the mask's bits) */
+					if (VALID_INDEX(firing_position->group_index, NUMBER_OF_FIRING_POSITION_GROUP_INDICES) &&
+						TEST_FLAG(firing_position_groups, firing_position->group_index))
 					{
 						real distance_squared = distance_squared3d(&firing_position->position, &follow_position);
 

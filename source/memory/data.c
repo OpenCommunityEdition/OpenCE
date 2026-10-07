@@ -74,6 +74,8 @@ symbols in this file:
 /* ---------- prototypes */
 
 static void datum_initialize(struct data_array *data, struct datum_header *header);
+static boolean data_usable(struct data_array *data, void const *caller);
+void platform_log(const char *format, ...);
 
 /* ---------- globals */
 
@@ -268,6 +270,8 @@ long datum_new_at_index(
 
 	data_verify(data);
 	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 123, data->valid);
+	if (!data_usable(data, __builtin_return_address(0)))
+		return NONE;
 
 	if (absolute_index>=0 && absolute_index<data->maximum_count && identifier)
 	{
@@ -299,6 +303,8 @@ long datum_new(
 
 	data_verify(data);
 	match_assert("c:\\halo\\SOURCE\\memory\\data.c", 163, data->valid);
+	if (!data_usable(data, __builtin_return_address(0)))
+		return NONE;
 
 	absolute_index = data->first_free_absolute_index;
 	size = data->size;
@@ -556,6 +562,39 @@ void data_compact(
 }
 
 /* ---------- private code */
+
+/* port: whether an array gives out datums: one that is an array (its
+signature, its elements) made valid for the map (data_make_valid). The
+release game went on past the asserts, and an array never made valid, with
+no identifier yet (data_delete_all seeds it), gave out identifier 0, which
+marks a free datum: datum_get of it returned NULL to a caller that wrote
+through it (light_new: Sentry NATIVE-7 and NATIVE-9). Each array is reported
+once, to halo.log, with the first caller turned away. */
+static boolean data_usable(
+	struct data_array *data,
+	void const *caller)
+{
+	static struct data_array const *reported[32];
+	static long reported_count;
+	long index;
+
+	if (data->signature == 'd@t@' && data->data && data->valid && data->next_identifier)
+		return TRUE;
+	for (index = 0; index < reported_count; index++)
+	{
+		if (reported[index] == data)
+			return FALSE;
+	}
+	if (reported_count < (long)NUMBEROF(reported))
+		reported[reported_count++] = data;
+	platform_log("data: %.32s gives out no datum: signature %08lx, %s, next identifier %04x, count %d of %d "
+		"(asked from %p)",
+		data->signature == 'd@t@' ? data->name : "(not an array)", (unsigned long)data->signature,
+		data->valid ? "valid" : "not valid", (unsigned short)data->next_identifier, data->count,
+		data->maximum_count, caller);
+
+	return FALSE;
+}
 
 static void datum_initialize(
 	struct data_array *data,

@@ -920,6 +920,15 @@ long hs_compile_expression(
 				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
 				0xA6,
 				global_scenario_get()->hs_string_constants.size>=HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES);
+			/* port: none is written before the scenario's strings (hs_allocate
+			lets go of strings that aren't sound) */
+			if (global_scenario_get()->hs_string_constants.size<HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
+			{
+				*error_message = "the scenario has no room for the expression's text.";
+				*error_source = source;
+
+				return NONE;
+			}
 			source_offset = global_scenario_get()->hs_string_constants.size - HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES;
 			hs_compile_globals.compiled_source = global_scenario_get()->hs_string_constants.address;
 		}

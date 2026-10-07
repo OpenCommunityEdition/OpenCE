@@ -216,6 +216,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "math/real_math.h"
 #include "physics/collision_bsp_definitions.h"
+#include "physics/collision_bsp.h" /* port: collision_surface_edge_ring_continues */
 
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -236,6 +237,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "shaders/shader_definitions.h"
+#include "tag_files/tag_files.h"
 
 /* ---------- constants */
 
@@ -457,6 +459,10 @@ static long decal_insert(
 	short layer,
 	long next_decal_index,
 	boolean permanent);
+/* port: whether a collision edge's vertices (from the map) are the bsp's */
+static boolean decal_collision_edge_vertices_valid(
+	struct collision_bsp const *collision_bsp,
+	long edge_index);
 
 /* ---------- globals */
 
@@ -472,6 +478,7 @@ static boolean decals_unlock_locked_count_reported = FALSE;
 static boolean decals_unlock_permanent_count_reported = FALSE;
 static boolean decal_delete_locked_reported = FALSE;
 static boolean decal_delete_permanent_reported = FALSE;
+static boolean decal_collision_edge_vertices_reported = FALSE;
 
 struct decal_wrap_parameters const decal_wrap_parameters[NUMBER_OF_DECAL_TYPES] =
 {
@@ -1088,7 +1095,10 @@ static void decal_clip_to_surface(
 		1147,
 		type>=0 && type<NUMBER_OF_DECAL_TYPES);
 
-	if (surface_index!=NONE)
+	/* port: and a surface that is the bsp's (a neighbor across an edge, a
+	map's index) */
+	if (surface_index!=NONE &&
+		collision_bsp_valid_surface_index(global_collision_bsp_get(), surface_index))
 	{
 		short working_surface_queue_write_index;
 		short working_deviant_surface_count;
@@ -1152,17 +1162,33 @@ static void decal_clip_to_surface(
 
 			do
 			{
-				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+				struct collision_edge *edge;
+				boolean surface_on_right;
+				struct collision_vertex *edge_start;
+				real_plane2d surface_edge_plane;
+				real_point2d *output_points = decal_points2d_temp[edge_iteration&1];
+
+				/* port: a surface whose ring of edges ends early (as
+				collision_surface_edge_ring_continues says, or at an edge
+				whose vertices aren't the bsp's: a map's indices) gets no
+				decal. Within MAXIMUM_EDGES_PER_COLLISION_SURFACE edges the
+				decal's 4 points clip to no more than the 12 the temporary
+				polygons hold */
+				if (!collision_surface_edge_ring_continues(collision_bsp, edge_index, edge_iteration) ||
+					!decal_collision_edge_vertices_valid(collision_bsp, edge_index))
+				{
+					decal_point_count = 0;
+					break;
+				}
+				edge = TAG_BLOCK_GET_ELEMENT(
 					&collision_bsp->edges,
 					edge_index,
 					struct collision_edge);
-				boolean surface_on_right = edge->surface_indices[1]==surface_index;
-				struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+				surface_on_right = edge->surface_indices[1]==surface_index;
+				edge_start = TAG_BLOCK_GET_ELEMENT(
 					&collision_bsp->vertices,
 					edge->vertex_indices[!surface_on_right],
 					struct collision_vertex);
-				real_plane2d surface_edge_plane;
-				real_point2d *output_points = decal_points2d_temp[edge_iteration&1];
 
 				if (edge_iteration==0)
 				{
@@ -1317,15 +1343,29 @@ static void decal_clip_to_surface(
 		else
 		{
 			long edge_index = surface->first_edge_index;
+			short edge_count = 0;
+			boolean ring_closed = TRUE;
 
 			do
 			{
-				struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+				struct collision_edge *edge;
+				boolean surface_on_right;
+				struct collision_vertex *edge_start;
+
+				/* port: (as above; and a surface whose ring ends early is
+				no deviant surface to wrap around) */
+				if (!collision_surface_edge_ring_continues(collision_bsp, edge_index, edge_count++) ||
+					!decal_collision_edge_vertices_valid(collision_bsp, edge_index))
+				{
+					ring_closed = FALSE;
+					break;
+				}
+				edge = TAG_BLOCK_GET_ELEMENT(
 					&collision_bsp->edges,
 					edge_index,
 					struct collision_edge);
-				boolean surface_on_right = edge->surface_indices[1]==surface_index;
-				struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+				surface_on_right = edge->surface_indices[1]==surface_index;
+				edge_start = TAG_BLOCK_GET_ELEMENT(
 					&collision_bsp->vertices,
 					edge->vertex_indices[!surface_on_right],
 					struct collision_vertex);
@@ -1373,7 +1413,8 @@ static void decal_clip_to_surface(
 			}
 			while (edge_index!=surface->first_edge_index);
 
-			if (surface_angle<=DEGREES_TO_RADIANS(
+			if (ring_closed &&
+				surface_angle<=DEGREES_TO_RADIANS(
 					decal_wrap_parameters[type].minimum_skip_angle) &&
 				working_deviant_surface_count<MAXIMUM_DECAL_SURFACE_QUEUE_SIZE)
 			{
@@ -1545,6 +1586,18 @@ void decal_new_from_collision(
 		short deviant_surface_count = 0;
 		struct decal_definition *definition = decal_definition_get(decal_definition_index);
 		struct bitmap_group *bitmap_group = bitmap_group_get(definition->shader.map.index);
+
+		/* port: a type the wrap table has (the map's value). A bad one is
+		made a scratch in the tag, so it is said once. */
+		if (!VALID_INDEX(definition->type, NUMBER_OF_DECAL_TYPES))
+		{
+			error(
+				_error_silent,
+				"decal %s has type %d (made a scratch)",
+				tag_get_name(decal_definition_index),
+				definition->type);
+			definition->type = _decal_type_scratch;
+		}
 
 		if (!reuse_previous_geometry)
 		{
@@ -1877,24 +1930,39 @@ void decal_new_from_collision(
 										bunch_surface_index,
 										struct collision_surface);
 									long edge_index = bunch_surface->first_edge_index;
+									short edge_count = 0;
 
 									do
 									{
-										struct collision_edge *edge = TAG_BLOCK_GET_ELEMENT(
+										struct collision_edge *edge;
+										boolean surface_on_right;
+										struct collision_vertex *edge_start;
+										struct collision_vertex *edge_end;
+										real minimum_distance;
+										real maximum_distance;
+
+										/* port: (as in decal_clip_to_surface: the deviant
+										surfaces' rings all closed there) */
+										if (!collision_surface_edge_ring_continues(collision_bsp, edge_index, edge_count++) ||
+											!decal_collision_edge_vertices_valid(collision_bsp, edge_index))
+										{
+											break;
+										}
+										edge = TAG_BLOCK_GET_ELEMENT(
 											&collision_bsp->edges,
 											edge_index,
 											struct collision_edge);
-										boolean surface_on_right = edge->surface_indices[1]==bunch_surface_index;
-										struct collision_vertex *edge_start = TAG_BLOCK_GET_ELEMENT(
+										surface_on_right = edge->surface_indices[1]==bunch_surface_index;
+										edge_start = TAG_BLOCK_GET_ELEMENT(
 											&collision_bsp->vertices,
 											edge->vertex_indices[!surface_on_right],
 											struct collision_vertex);
-										struct collision_vertex *edge_end = TAG_BLOCK_GET_ELEMENT(
+										edge_end = TAG_BLOCK_GET_ELEMENT(
 											&collision_bsp->vertices,
 											edge->vertex_indices[surface_on_right],
 											struct collision_vertex);
-										real minimum_distance = (real)fabs(plane3d_distance_to_point(&projection.plane, &edge_start->point));
-										real maximum_distance = (real)fabs(plane3d_distance_to_point(&projection.plane, &edge_end->point));
+										minimum_distance = (real)fabs(plane3d_distance_to_point(&projection.plane, &edge_start->point));
+										maximum_distance = (real)fabs(plane3d_distance_to_point(&projection.plane, &edge_end->point));
 
 										if (minimum_distance>maximum_distance)
 										{
@@ -2502,6 +2570,32 @@ static void decal_set_first_decal_index(
 	decal_globals->first_decal_indices[layer][cluster_index]= decal_index;
 
 	return;
+}
+
+/* port: an edge (one of the bsp's) whose vertices are not both the bsp's
+ends its surface's ring (reported once; the retail ones all are) */
+static boolean decal_collision_edge_vertices_valid(
+	struct collision_bsp const *collision_bsp,
+	long edge_index)
+{
+	struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+		&collision_bsp->edges,
+		edge_index,
+		struct collision_edge);
+
+	if (VALID_INDEX(edge->vertex_indices[0], collision_bsp->vertices.count) &&
+		VALID_INDEX(edge->vertex_indices[1], collision_bsp->vertices.count))
+	{
+		return TRUE;
+	}
+
+	if (!decal_collision_edge_vertices_reported)
+	{
+		error(_error_silent, "collision edge #%ld's vertices are not the bsp's", edge_index);
+		decal_collision_edge_vertices_reported = TRUE;
+	}
+
+	return FALSE;
 }
 
 /* ---------- end of file */

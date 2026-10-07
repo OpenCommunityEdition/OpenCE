@@ -170,7 +170,7 @@ MENUS = Path(__file__).resolve().parent.parent / "port/assets/menus"
 MENU_ATTRIBUTES = {
     "menus": {"root"},
     "bitmap": {"name", "width", "height", "frames", "platform"},
-    "frame": {"png", "map", "index", "width", "height", "platform"},
+    "frame": {"png", "map", "index", "width", "height", "x", "y", "platform"},
     "strings": {"name", "platform"},
     "string": {"text", "platform"},
     "widget": {"name", "type", "controller", "flags", "bitmap", "text", "strings", "values", "setting", "font",
@@ -339,3 +339,37 @@ def test_p2p_signatures_and_listings(tmp_path):
     result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout
     assert "PASS" in result.stdout
+
+
+# ---------- the tag validator (port/linux/game/tag_validate.c)
+
+RETAIL_MAPS = Path("assets/maps")
+MAP_VALIDATE = Path("build/linux/map_validate")
+
+
+def _retail_maps():
+    maps = sorted(RETAIL_MAPS.glob("*.map"))
+    if not maps or not MAP_VALIDATE.is_file():
+        pytest.skip("needs the retail maps in assets/maps and ninja linux's build/linux/map_validate")
+    return maps
+
+
+def test_retail_maps_need_no_corrections():
+    """every retail map in assets/maps passes the tag validator, each of its
+    structure bsps too, with no correction: the schemas (tag_schema_*.c)
+    say what the game's own maps hold"""
+    maps = _retail_maps()
+    result = subprocess.run([str(MAP_VALIDATE), "--strict", *map(str, maps)], capture_output=True, text=True,
+                            timeout=1800)
+    assert result.returncode == 0, result.stdout[-6000:]
+
+
+def test_tag_validator_survives_damaged_maps():
+    """retail maps with a few of their tags' words changed at random: the
+    validator never crashes or hangs, and a map it lets through is clean
+    when checked again"""
+    maps = _retail_maps()
+    chosen = [path for path in maps if path.stem in ("bloodgulch", "a10", "ui")] or maps[:1]
+    result = subprocess.run([str(MAP_VALIDATE), "--fuzz", "300", "--seed", "1", *map(str, chosen)],
+                            capture_output=True, text=True, timeout=1800)
+    assert result.returncode == 0, (result.stdout + result.stderr)[-6000:]

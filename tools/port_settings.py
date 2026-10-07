@@ -441,8 +441,12 @@ STRING_OVERRIDES.update({
 MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 
 # changes to the PC version's widgets (by our names): attributes set, all
-# their handlers replaced, children added
+# their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    # (the profile settings' picture: on Gamepad Setup's row, the profile's
+    # button settings, BITMAP_FRAMES; menu_functions.c's
+    # profile_gamepad_layout)
+    f"{PE}/profile_edit_extended_desc_pic": {"inputs": ["port gamepad layout preview"]},
     # (straight to their screens: no "checking for updates" dialog, which
     # asked the PC version's servers)
     f"{MT}/multiplayer_type_join_internet_item": {"set": {"string_index": 6}, "handlers": [
@@ -521,11 +525,23 @@ WIDGET_PATCHES = {
     }},
 }
 
+# frames added after a PC bitmap's (by our names): (the Xbox map's bitmap,
+# its frame, the size drawn at, where in the widget). The profile settings'
+# picture gets the Xbox's Controller Setup's pictures of its five button
+# settings (its first four frames are the thumbstick settings'), which show
+# 512 by 235 of their 512 by 512: drawn at 279 wide, in the middle of the
+# picture's 279 by 202
+XBOX_CONTROLLER_PICTURES = f"ui\\shell\\{PE.replace('/', chr(92))}\\controller_edit\\config_controller"
+BITMAP_FRAMES = {
+    f"{PE}/profile_options": [(XBOX_CONTROLLER_PICTURES, 4 + preset, 279, 279, 0, 34) for preset in range(5)],
+}
+
 # the titles this port has that the PC version has not, set as its headers
 # are (port/assets/menus/port_svg): bitmap name, text
 TITLES = {
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "DIRECT LINK",
+    f"{MT}/join_game/header_password": "PASSWORD",
     f"{MT}/lobby/header_lobby": "GAME LOBBY",
     f"{MT}/coop/header_player_2": "PLAYER 2 PROFILE",
     f"{MT}/lobby/header_add_player": "ADD PLAYER",
@@ -616,9 +632,11 @@ def _value_row(base: str, key: str, label_index: int, run: str) -> list:
 
 
 def _join_game_extras() -> list:
-    """the browser's added titles and Direct Link's clipboard button"""
+    """the browser's added titles, Direct Link's clipboard button, and the
+    password screen"""
     base = f"{MT}/join_game"
-    lines = _header(f"{base}/header_server_browser", f"{base}/header_server_browser")
+    lines = _password_screen()
+    lines += _header(f"{base}/header_server_browser", f"{base}/header_server_browser")
     lines += _header(f"{base}/header_direct_link", f"{base}/header_direct_link")
     lines += _widget(f"{base}/button_clipboard", [("type", "text"), ("width", 128), ("height", 24),
                                                   ("bitmap", "bitmaps/text_button_background"),
@@ -629,14 +647,48 @@ def _join_game_extras() -> list:
     return lines
 
 
+def _password_screen() -> list:
+    """the server browser's password screen: a game with a password chosen
+    (menu_functions.c's lobby_browser_select), its password typed (shown as
+    stars), JOIN GAME joins it if it is the game's; else its help says so"""
+    base = f"{MT}/join_game/password"
+    spec = {"screen": "password_screen", "spacing": 28, "help_top": 120,
+            "header": ("header_password", f"{MT}/join_game/header_password")}
+    extra = _value_row(base, "password", 0, "port password edit")
+    extra += _button(f"{base}/button_defaults", 3, [])
+    extra += _widget(f"{base}/button_ok", [("type", "text"), ("width", 128), ("height", 24),
+                                           ("bitmap", "bitmaps/text_button_background"), ("text", "JOIN GAME"),
+                                           ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
+                                           ("text_y", 2)],
+                     ['<on event="a" run="port password join"/>', '<on event="start" run="port password join"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>'])
+    extra += _strings(f"{base}/labels", ["PASSWORD:"])
+    # (by its state: menu_functions.c's password_screen_update)
+    extra += _strings(f"{base}/help_strings", [
+        "",
+        "This game has a password. Type it, then press\\nEnter to join.",
+        "That is not the game's password. Try again.",
+        "Could not join the game.",
+    ])
+    lines = _screen(base, spec, [(f"{base}/op_password", None)], ["port password update"],
+                    ['<on event="created" run="port password init"/>'], extra)
+    # (no Defaults: the bar is JOIN GAME and CANCEL; B goes back at once,
+    # even while typing, which the screen starts with)
+    lines = [line.replace(f'<child widget="{base}/button_defaults" y="1"/>', "") for line in lines]
+    lines = [line.replace('<on event="b" back="true"/>', '<on event="b" run="port password back"/>')
+             .replace('<on event="back" back="true"/>', '<on event="back" run="port password back"/>')
+             for line in lines]
+    return lines
+
+
 def _server_settings() -> list:
     """Create Game's server settings (in the PC version's place): the game's
     name, the most players (up to the port's 128), its invite link, and
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # (ten rows: closer together, the help lower)
-    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 358,
+    # (eleven rows: closer together, the help lower)
+    spec = {"screen": "server_settings_screen", "spacing": 26, "help_top": 366,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -679,6 +731,10 @@ def _server_settings() -> list:
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
                      ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     rows.append((f"{base}/op_listing", None))
+    # PASSWORD (a public internet game's: menu_functions.c's server_settings_update),
+    # which players from the server browser must type
+    extra += _value_row(base, "password", 15, "ss edit server password")
+    rows.append((f"{base}/op_password", None))
     # co-op's FRIENDLY FIRE (between its players), in the place of the
     # gametype's rows, which co-op hides as multiplayer hides it, laid out
     # as Teamplay Options' (menu_functions.c's server_settings_update); its
@@ -702,7 +758,7 @@ def _server_settings() -> list:
                       ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
                      ['<on event="created" run="port setting load"/>', '<on event="deleted" run="port setting save"/>',
                       '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-    rows.append((f"{base}/op_friendly_fire", None, 4))
+    rows.append((f"{base}/op_friendly_fire", None, 5))
     # ... and its EXTRA ENEMIES (port/linux/game/coop_enemies.c), below it:
     # NONE, PER PLAYER or STATIC MULTIPLIER, and below that the amount of the
     # one chosen (its own row, the other hidden: menu_functions.c's
@@ -732,13 +788,18 @@ def _server_settings() -> list:
 
     spinner_row("extra_enemies", 11, ["NONE", "PER PLAYER", "STATIC MULTIPLIER"], "network.coop_enemies_mode",
                 COOP_ENEMIES_MODES)
-    rows.append((f"{base}/op_extra_enemies", None, 5))
+    rows.append((f"{base}/op_extra_enemies", None, 6))
     spinner_row("enemies_per_player", 12, [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
                 "network.coop_enemies", COOP_ENEMIES_PERCENTAGES)
-    rows.append((f"{base}/op_enemies_per_player", None, 6))
+    rows.append((f"{base}/op_enemies_per_player", None, 7))
     spinner_row("enemies_multiplier", 13, [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
                 "network.coop_enemies_multiplier", COOP_ENEMIES_MULTIPLIERS)
-    rows.append((f"{base}/op_enemies_multiplier", None, 6))
+    rows.append((f"{base}/op_enemies_multiplier", None, 7))
+    # ... and its PLAYER COLLISIONS, below them (network.coop_player_collisions,
+    # which the host sends its players as the game begins: menu_functions.c's
+    # server_start)
+    spinner_row("player_collisions", 14, ["ON", "OFF"], "network.coop_player_collisions", ["true", "false"])
+    rows.append((f"{base}/op_player_collisions", None, 8))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -757,7 +818,7 @@ def _server_settings() -> list:
         extra += _widget(f"{base}/{key}_value", [("type", "text"), ("controller", 1), ("width", 280), ("height", 22),
                                                  ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("align", "center"),
                                                  ("text_y", 5), ("text_flags", "no_focus_test")], [])
-        rows.append((f"{base}/op_{key}", None, 4 + index))
+        rows.append((f"{base}/op_{key}", None, 5 + index))
     extra += _button(f"{base}/button_defaults", 3, [])
     extra += _widget(f"{base}/button_ok", [("type", "text"), ("width", 128), ("height", 24),
                                            ("bitmap", "bitmaps/text_button_background"), ("text", "START GAME"),
@@ -769,7 +830,7 @@ def _server_settings() -> list:
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
                                          "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:", "EXTRA ENEMIES:",
-                                         "PER PLAYER:", "MULTIPLIER:"])
+                                         "PER PLAYER:", "MULTIPLIER:", "PLAYER COLLISIONS:", "PASSWORD:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -796,6 +857,11 @@ def _server_settings() -> list:
         # (PER PLAYER's and MULTIPLIER's)
         "For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again).",
         "Each enemy squad is this many times as large.",
+        # (PLAYER COLLISIONS', by its choice)
+        "Players bump into each other, as in the campaign.",
+        "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
+        # (PASSWORD's)
+        "Players from the Server Browser must type it to\\njoin (an invite link needs none). Enter sets it.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)

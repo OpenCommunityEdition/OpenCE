@@ -273,7 +273,8 @@ void error(
 			va_list argument_list;
 
 			va_start(argument_list, format);
-			vsprintf(string, format, argument_list);
+			/* port: no longer than the buffer, with room for the "\r\n" */
+			vsnprintf(string, NUMBEROF(string)-2, format, argument_list);
 			va_end(argument_list);
 			csstrcat(string, "\r\n");
 

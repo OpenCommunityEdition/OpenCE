@@ -31,7 +31,7 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 
 #ifndef HALO_ANDROID
 
-#include "memory/zlib/zlib.h"
+#include "zlib_prefixed.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -164,6 +164,13 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 				if (result != Z_OK && result != Z_STREAM_END)
 					break;
 				produced = sizeof(output) - stream.avail_out;
+				/* (no more than the entry says, before it is on the disk) */
+				if (written + (unsigned long)produced > size)
+				{
+					snprintf(reason, reason_size, "it unpacks to more than %lu bytes", size);
+					result = Z_ERRNO;
+					break;
+				}
 				if (SDL_WriteIO(file, output, produced) != produced)
 				{
 					snprintf(reason, reason_size, "could not write %s after %lu bytes (%s)", path, written, SDL_GetError());
@@ -185,9 +192,9 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 				break;
 			}
 		}
-		/* (the game's zlib is 1.1, which can want a byte past the end of a
-		raw stream before it says the stream has ended: all of the input
-		unpacked is enough, as the size and the CRC are checked) */
+		/* (all of the input unpacked is enough, as the size and the CRC are
+		checked: the game's zlib 1.1, used here before, could want a byte past
+		the end of a raw stream before it said the stream had ended) */
 		if (ended || !remaining)
 		{
 			if (written != size)

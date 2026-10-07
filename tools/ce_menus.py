@@ -153,7 +153,7 @@ WIRED = {
     "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
     "load game menu delete request", "load game menu delete finish",
     "controls screen init", "controls begin binding", "controls screen change set", "controls screen defaults",
-    "controls update menu", "profile manager select", "direct ip connect go",
+    "controls update menu", "profile manager select", "direct ip connect go", "ss edit server password",
 }
 
 # ---------- HEK tags
@@ -291,6 +291,7 @@ class Art:
         self.placeholder = Image.open(placeholder).convert("RGBA")
         self.pictures = []  # (frame, size, PC picture) of the frames drawn as the placeholder
         self.xbox_frames = []  # (PC frame, Xbox bitmap, its frame) drawn from the Xbox map
+        self.added_frames = []  # (our bitmap, Xbox bitmap, its frame): port_settings.BITMAP_FRAMES
         self.svgs = []
         self.pngs = []
 
@@ -365,6 +366,10 @@ class Art:
             self.draw(relative, index, len(data), width, height, MENUS / png, self.shown.get(tag, []))
             self.pngs.append(png)
             lines.append(f"\t\t<frame{attributes([('png', png), ('width', width), ('height', height)])}/>")
+        # (the port's frames after them: the Xbox map's, scaled)
+        for source, index, width, height, x, y in port_settings.BITMAP_FRAMES.get(our_name(tag), []):
+            self.added_frames.append((our_name(tag), source, index))
+            lines.append(f"\t\t<frame{attributes([('map', source), ('index', index), ('width', width), ('height', height), ('x', x or None), ('y', y or None)])}/>")
         lines.append("\t</bitmap>")
         return "\n".join(lines)
 
@@ -477,6 +482,7 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
     for data in widget["game data inputs"]:
         name = inputs[data["function"]]
         lines.append(f"{inner}<data{attributes([('input', f'unwired {name}' if name in INCOMPATIBLE else name)])}/>")
+    lines += [f"{inner}<data{attributes([('input', name)])}/>" for name in patch.get("inputs", [])]
     lines += [f"{inner}{line}" for line in patch.get("handlers", [])]
     for handler in widget["event handlers"] if "handlers" not in patch else []:
         flags = handler["flags"]
@@ -651,6 +657,15 @@ def main() -> None:
         "| --- | --- |",
     ]
     report += [f"| `{name}.png` | `{tag}` frame {index} |" for name, tag, index in sorted(art.xbox_frames)]
+    report += [
+        "",
+        "These frames are added after a bitmap's, drawn scaled from the Xbox map's (the profile settings'",
+        "picture of Gamepad Setup: the Xbox's Controller Setup's pictures of the button settings).",
+        "",
+        "| Our bitmap | The Xbox's frame |",
+        "| --- | --- |",
+    ]
+    report += [f"| `{name}` | `{tag}` frame {index} |" for name, tag, index in art.added_frames]
     report += [
         "",
         "## Placeholders, to be redrawn",

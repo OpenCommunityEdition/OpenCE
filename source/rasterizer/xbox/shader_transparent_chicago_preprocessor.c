@@ -38,7 +38,11 @@ enum
 enum
 {
 	NUMBER_OF_SHADER_FUNCTIONS = 13,
-	NUMBER_OF_PIXEL_SHADER_STAGES = 8
+	NUMBER_OF_PIXEL_SHADER_STAGES = 8,
+	/* port: the maps a chicago shader has room for: the four texture stages
+	(texture_modes) the draw sets up (the tag's own maximum; retail has 4 at
+	most) */
+	MAXIMUM_SHADER_TRANSPARENT_CHICAGO_MAPS = 4
 };
 
 /* ---------- macros */
@@ -82,6 +86,8 @@ struct shader_transparent_chicago_combiner_table
 static boolean shader_map_verify(
 	struct shader_transparent_chicago_map *map,
 	short map_index);
+static void shader_transparent_chicago_data_error(
+	void);
 
 /* ---------- globals */
 
@@ -127,6 +133,7 @@ boolean shader_transparent_chicago_create(
 	struct shader_transparent_chicago_definition *chicago;
 	boolean result = TRUE;
 	short map_index;
+	short map_count;
 
 #line 100 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_chicago_preprocessor.c"
 	match_assert(__FILE__, __LINE__, shader);
@@ -136,23 +143,38 @@ boolean shader_transparent_chicago_create(
 
 	csmemset(pixel_shader, 0, sizeof(*pixel_shader));
 
-	pixel_shader->combiner_count = (chicago->maps.count + 1) | 0x11000;
+	/* port: no more maps than the texture stages hold (a map's count) */
+	map_count = (short)MIN(chicago->maps.count, MAXIMUM_SHADER_TRANSPARENT_CHICAGO_MAPS);
+	if (chicago->maps.count > map_count)
+	{
+		shader_transparent_chicago_data_error();
+	}
 
-	if (chicago->maps.count > 0)
+	pixel_shader->combiner_count = (map_count + 1) | 0x11000;
+
+	if (map_count > 0)
 	{
 		pixel_shader->texture_modes =
-			((((chicago->maps.count > 3) << 5 | (chicago->maps.count > 2)) << 5 |
-			(chicago->maps.count > 1)) << 5) |
+			((((map_count > 3) << 5 | (map_count > 2)) << 5 |
+			(map_count > 1)) << 5) |
 			(2 * (chicago->first_map_type != 0) + 1);
 
-		for (map_index = 0; map_index < chicago->maps.count; map_index++)
+		for (map_index = 0; map_index < map_count; map_index++)
 		{
 			struct shader_transparent_chicago_map *map = TAG_BLOCK_GET_ELEMENT(
 				&chicago->maps,
 				map_index,
 				struct shader_transparent_chicago_map);
 
-			if (map_index != chicago->maps.count - 1)
+			/* port: a function the combiner table doesn't have (a map's) adds
+			no stage inputs */
+			if (map_index != map_count - 1 &&
+				(!VALID_INDEX(map->color_function, NUMBER_OF_SHADER_FUNCTIONS) ||
+				!VALID_INDEX(map->alpha_function, NUMBER_OF_SHADER_FUNCTIONS)))
+			{
+				shader_transparent_chicago_data_error();
+			}
+			else if (map_index != map_count - 1)
 			{
 				pixel_shader->alpha_inputs[map_index + 1] =
 					shader_transparent_chicago_combiner_table.stage_increments[map->alpha_function] * (map_index + 1) +
@@ -189,3 +211,19 @@ boolean shader_transparent_chicago_create(
 }
 
 /* ---------- private code */
+
+/* port: a map's chicago shader with more maps than the stages hold, or a
+function past the combiner table; said once */
+static void shader_transparent_chicago_data_error(
+	void)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "### ERROR a transparent chicago shader has a bad map function or count");
+		reported = TRUE;
+	}
+
+	return;
+}
