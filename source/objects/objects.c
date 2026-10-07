@@ -53,6 +53,9 @@ OBJECTS.C
 #include "sound/game_sound.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+/* port: object_bounds_cache.c's */
+void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
+
 
 /* ---------- constants */
 
@@ -2937,6 +2940,8 @@ void object_compute_node_matrices(
 	{
 		object->object.bounding_sphere_radius *= object->object.scale;
 	}
+	/* port: (and in the packed copy collision reads: object_bounds_cache.c) */
+	object_bounds_cache_update(object_index, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
 
 	return;
 }
