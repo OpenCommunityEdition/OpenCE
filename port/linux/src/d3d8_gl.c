@@ -1363,6 +1363,9 @@ static void render_target_multisample(struct xgpu_render_target *target, int sam
 	xgpu_gl_state_invalidate();
 }
 
+/* counts draws and clears into render targets (xgpu_render_target.written) */
+static unsigned long render_target_write_serial;
+
 /* the pixels per unit of the bound targets (render_target_get) */
 static float target_scale[2] = { 1.0f, 1.0f };
 
@@ -1400,7 +1403,10 @@ static BOOL bind_targets(BOOL *has_depth)
 	if (!color && !depth)
 		return FALSE;
 	if (color)
+	{
 		color->last_rendered = device.frame + 1;
+		color->target.written = ++render_target_write_serial;
+	}
 	/* viewports and clears are in the targets' units (render_target_get) */
 	target_scale[0] = color ? color->target.scale[0] : depth->target.scale[0];
 	target_scale[1] = color ? color->target.scale[1] : depth->target.scale[1];
@@ -2781,13 +2787,23 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 The game renders some textures one mip level at a time, each level being a
 surface of its own (the water's ripple map). Sampling such a texture needs
 every level in one GL texture, so the levels' render targets are copied into
-a mipmapped composite whenever it is bound. */
+a mipmapped composite. Each draw of the water binds it, some maps (a30) more
+than once a frame, so the copy (and the mipmaps of the levels the game did not
+render) is redone only once a level's target has been drawn into since the
+last one. */
+
+#define MIP_COMPOSITE_LEVELS 16
 
 struct mip_composite
 {
 	struct mip_composite *next;
 	unsigned long data, width, height, levels;
 	GLuint texture;
+	/* the levels last copied, and each one's target's texture and written
+	serial then */
+	unsigned long rendered_levels;
+	GLuint level_sources[MIP_COMPOSITE_LEVELS];
+	unsigned long level_written[MIP_COMPOSITE_LEVELS];
 };
 
 static struct mip_composite *mip_composites;
@@ -2816,7 +2832,9 @@ static void copy_level_by_blit(GLuint source, GLuint destination, GLint level, G
 static GLuint mip_composite_get(const struct xgpu_texture_description *description, unsigned long data)
 {
 	struct mip_composite *composite;
+	struct xgpu_render_target *targets[MIP_COMPOSITE_LEVELS];
 	unsigned long level, rendered_levels = 0;
+	BOOL changed;
 
 	for (composite = mip_composites; composite; composite = composite->next)
 	{
@@ -2844,10 +2862,11 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 
 			glTexImage2D(GL_TEXTURE_2D, (GLint)level, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 		}
+		composite->rendered_levels = ~0UL;
 		composite->next = mip_composites;
 		mip_composites = composite;
 	}
-	for (level = 0; level < description->levels; level++)
+	for (level = 0; level < description->levels && level < MIP_COMPOSITE_LEVELS; level++)
 	{
 		unsigned long width = description->width >> level ? description->width >> level : 1;
 		unsigned long height = description->height >> level ? description->height >> level : 1;
@@ -2857,17 +2876,35 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 		if (!target || target->width != width || target->height != height ||
 			target->gl_width != width || target->gl_height != height)
 			break;
+		targets[level] = target;
+		rendered_levels++;
+	}
+	changed = rendered_levels != composite->rendered_levels;
+	for (level = 0; level < rendered_levels && !changed; level++)
+	{
+		changed = targets[level]->texture != composite->level_sources[level] ||
+			targets[level]->written != composite->level_written[level];
+	}
+	if (!changed)
+		return composite->texture;
+	composite->rendered_levels = rendered_levels;
+	for (level = 0; level < rendered_levels; level++)
+	{
+		struct xgpu_render_target *target = targets[level];
+		GLsizei width = (GLsizei)target->width, height = (GLsizei)target->height;
+
+		composite->level_sources[level] = target->texture;
+		composite->level_written[level] = target->written;
 		render_target_resolve(target);
 #ifdef HALO_ANDROID
 		if (!xgpu_capabilities.copy_image)
 		{
-			copy_level_by_blit(target->texture, composite->texture, (GLint)level, (GLsizei)width, (GLsizei)height);
+			copy_level_by_blit(target->texture, composite->texture, (GLint)level, width, height);
 		}
 		else
 #endif
 		glCopyImageSubData(target->texture, GL_TEXTURE_2D, 0, 0, 0, 0,
-			composite->texture, GL_TEXTURE_2D, (GLint)level, 0, 0, 0, (GLsizei)width, (GLsizei)height, 1);
-		rendered_levels++;
+			composite->texture, GL_TEXTURE_2D, (GLint)level, 0, 0, 0, width, height, 1);
 	}
 	glBindTexture(GL_TEXTURE_2D, composite->texture);
 	/* levels the game did not render come from the ones it did */
