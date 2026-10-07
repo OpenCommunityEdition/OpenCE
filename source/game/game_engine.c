@@ -931,11 +931,19 @@ long game_globals_get_weapon(
 	struct game_globals *game_globals,
 	long weapon_list_index)
 {
-	struct tag_reference *weapon = TAG_BLOCK_GET_ELEMENT(
+	struct tag_reference *weapon;
+	long weapon_definition_index;
+
+	/* port: none past the end of the list. A Custom Edition map's globals can
+	list fewer weapons than the Xbox's fourteen (stopping before the
+	grenades). */
+	if (weapon_list_index < 0 || weapon_list_index >= game_globals->weapon_list.count)
+		return NONE;
+	weapon = TAG_BLOCK_GET_ELEMENT(
 		&game_globals->weapon_list,
 		weapon_list_index,
 		struct tag_reference);
-	long weapon_definition_index = weapon->index;
+	weapon_definition_index = weapon->index;
 
 	return weapon_definition_index;
 }
@@ -6743,6 +6751,10 @@ static void game_engine_predict_resources(
 		0,
 		struct game_globals_multiplayer_information);
 
+	/* port: the cases below take the three multiplayer vehicles the Xbox's
+	globals always have; a Halo Custom Edition map's can have fewer, and then
+	gets no vehicle predicted (port/linux/game/custom_edition_cache.c) */
+	if (multiplayer_information->vehicles.count >= 3)
 	switch (global_variant.universal_variant.vehicle_set)
 	{
 	case _game_engine_vehicles_warthog:
@@ -7184,6 +7196,11 @@ long game_engine_remap_vehicle(
 {
 	long result = vehicle_definition_index;
 
+	/* port: a Halo Custom Edition map's vehicles are chosen by their
+	placements, and its scripts may create any
+	(port/linux/game/custom_edition_objects.c) */
+	if (custom_edition_vehicles_by_placement())
+		return result;
 	if (game_engine)
 	{
 		struct game_globals *game_globals;

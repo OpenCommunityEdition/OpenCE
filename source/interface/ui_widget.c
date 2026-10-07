@@ -1825,6 +1825,8 @@ void draw_bitmap_in_rect(
 
 		parameters.meter_parameters = NULL;
 		parameters.point_sampled = FALSE;
+		/* port: (rasterizer.h) */
+		parameters.alpha_weighted = FALSE;
 		parameters.framebuffer_blend_function = 0;
 		rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	}

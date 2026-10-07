@@ -1207,11 +1207,11 @@ static boolean bitmap_data_check(
 			SET_FLAG(bitmap->flags, _bitmap_linear_bit, FALSE);
 		}
 	}
-	if (bitmap->pixels_offset < 0 || bitmap->pixels_size < 0 || bitmap->pixels_size > MAXIMUM_BITMAP_PIXELS_SIZE ||
-		bitmap->pixels_offset > tag_validate_file_length(validation) - bitmap->pixels_size)
+	if (bitmap->pixels_size < 0 || bitmap->pixels_size > MAXIMUM_BITMAP_PIXELS_SIZE ||
+		!tag_validate_file_contains(validation, bitmap->pixels_offset, bitmap->pixels_size))
 	{
-		tag_validate_correct(validation, "has %ld bytes of pixels at %08lx, outside the map's %ld: none",
-			bitmap->pixels_size, (unsigned long)bitmap->pixels_offset, tag_validate_file_length(validation));
+		tag_validate_correct(validation, "has %ld bytes of pixels at %08lx, outside the map's files: none",
+			bitmap->pixels_size, (unsigned long)bitmap->pixels_offset);
 		bitmap->pixels_offset = 0;
 		bitmap->pixels_size = 0;
 	}
@@ -1228,28 +1228,29 @@ static boolean bitmap_group_check(
 	long sequence_index;
 
 	/* (the texture cache adds the pixel data's offset in the file to each
-	bitmap's own: the sum must be in the map, as bitmap_data_check has the
-	bitmap's alone) */
+	bitmap's own: the sum must be in the map's files, as bitmap_data_check
+	has the bitmap's alone) */
 	{
-		long file_length = tag_validate_file_length(validation);
 		long bitmap_index;
 
-		if (group->pixel_data.file_offset < 0 || group->pixel_data.file_offset > file_length)
+		if (!tag_validate_file_contains(validation, group->pixel_data.file_offset, 0))
 		{
-			tag_validate_correct(validation, "has its pixel data at %08lx, outside the map's %ld: 0",
-				(unsigned long)group->pixel_data.file_offset, file_length);
+			tag_validate_correct(validation, "has its pixel data at %08lx, outside the map's files: 0",
+				(unsigned long)group->pixel_data.file_offset);
 			group->pixel_data.file_offset = 0;
 		}
 		for (bitmap_index = 0; bitmap_index < group->bitmaps.count; bitmap_index++)
 		{
 			struct bitmap_data *bitmap = (struct bitmap_data *)group->bitmaps.address + bitmap_index;
+			unsigned long offset = (unsigned long)group->pixel_data.file_offset + (unsigned long)bitmap->pixels_offset;
 
-			if (bitmap->pixels_offset > file_length - group->pixel_data.file_offset - bitmap->pixels_size)
+			if (offset > (unsigned long)LONG_MAX ||
+				!tag_validate_file_contains(validation, (long)offset, bitmap->pixels_size))
 			{
 				tag_validate_correct(validation,
-					"has bitmap %ld with %ld bytes of pixels at %08lx past its data at %08lx, outside the map's %ld: none",
+					"has bitmap %ld with %ld bytes of pixels at %08lx past its data at %08lx, outside the map's files: none",
 					bitmap_index, bitmap->pixels_size, (unsigned long)bitmap->pixels_offset,
-					(unsigned long)group->pixel_data.file_offset, file_length);
+					(unsigned long)group->pixel_data.file_offset);
 				bitmap->pixels_offset = 0;
 				bitmap->pixels_size = 0;
 			}

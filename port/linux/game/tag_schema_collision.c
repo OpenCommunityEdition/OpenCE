@@ -1224,6 +1224,16 @@ static boolean collision_bsp_graph_check(
 	struct collision_bsp *bsp,
 	boolean structure)
 {
+	/* (the nodes, surfaces and bsp2d references each name a plane, which the
+	game reads by its designator's index whatever it is: with no planes, no
+	value is one, and the bsp cannot be walked) */
+	if (!bsp->bsp3d.planes.count &&
+		(bsp->bsp3d.nodes.count || bsp->surfaces.count || bsp->bsp2d_references.count))
+	{
+		tag_validate_refuse(validation, "has %ld nodes, %ld surfaces and %ld bsp2d references, and no planes",
+			bsp->bsp3d.nodes.count, bsp->surfaces.count, bsp->bsp2d_references.count);
+		return FALSE;
+	}
 	bsp3d_check(validation, bsp);
 	bsp2d_check(validation, bsp);
 	collision_leaves_check(validation, bsp);
@@ -1278,6 +1288,13 @@ static void structure_vertex_buffer_check(
 
 	if (!vertices->hardware_format)
 		return;
+	/* (a Custom Edition map's bsp has none: its materials are given theirs as
+	their vertices are compressed, custom_edition_geometry.c) */
+	if (tag_validate_custom_edition(validation))
+	{
+		vertices->hardware_format = NULL;
+		return;
+	}
 	data = lightmap ?
 		tag_validate_index_buffer_data(validation, vertices->hardware_format) :
 		tag_validate_vertex_buffer_data(validation, vertices->hardware_format);
@@ -1310,7 +1327,14 @@ static void structure_material_check(
 	struct structure_surface *surfaces = structure_bsp->surfaces.address;
 	struct structure_lightmap const *lightmap = (struct structure_lightmap const *)structure_bsp->lightmaps.address +
 		lightmap_index;
-	long vertex_data_size = material->compressed_vertex_data.size;
+	/* (a Custom Edition map's vertices are uncompressed, and compressed as
+	the bsp loads: custom_edition_geometry.c) */
+	boolean uncompressed = tag_validate_custom_edition(validation);
+	long vertex_data_size = uncompressed ? material->uncompressed_vertex_data.size : material->compressed_vertex_data.size;
+	long vertex_size = uncompressed ? UNCOMPRESSED_ENVIRONMENT_VERTEX_SIZE : COMPRESSED_ENVIRONMENT_VERTEX_SIZE;
+	long lightmap_vertex_size = uncompressed ?
+		UNCOMPRESSED_ENVIRONMENT_LIGHTMAP_VERTEX_SIZE :
+		COMPRESSED_ENVIRONMENT_LIGHTMAP_VERTEX_SIZE;
 	long vertex_count;
 	long surface_index;
 	long end;
@@ -1323,6 +1347,14 @@ static void structure_material_check(
 			structure_bsp->surfaces.count);
 		material->first_surface_index = 0;
 		material->surface_count = 0;
+	}
+	/* (a Custom Edition map's tools leave a lightmap vertex type of 0 or 2
+	whatever its vertices are; its vertices are uncompressed, and their types
+	this build's once they are compressed: custom_edition_geometry.c) */
+	if (uncompressed)
+	{
+		material->vertices.type = _rasterizer_vertex_type_environment_uncompressed;
+		material->lightmap_vertices.type = _rasterizer_vertex_type_environment_lightmap_uncompressed;
 	}
 	if (material->vertices.type != _rasterizer_vertex_type_environment_uncompressed &&
 		material->vertices.type != _rasterizer_vertex_type_environment_compressed)
@@ -1343,14 +1375,13 @@ static void structure_material_check(
 	if (material->vertices.count < 0 || material->lightmap_vertices.count < 0 ||
 		material->vertices.count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL ||
 		material->lightmap_vertices.count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL ||
-		material->vertices.count * COMPRESSED_ENVIRONMENT_VERTEX_SIZE +
-			material->lightmap_vertices.count * COMPRESSED_ENVIRONMENT_LIGHTMAP_VERTEX_SIZE > vertex_data_size)
+		material->vertices.count * vertex_size + material->lightmap_vertices.count * lightmap_vertex_size > vertex_data_size)
 	{
 		long fit_count = PIN(material->vertices.count, 0,
-			MIN(vertex_data_size / COMPRESSED_ENVIRONMENT_VERTEX_SIZE, MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
+			MIN(vertex_data_size / vertex_size, MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
 		long fit_lightmap_count = PIN(material->lightmap_vertices.count, 0,
-			MIN((vertex_data_size - fit_count * COMPRESSED_ENVIRONMENT_VERTEX_SIZE) /
-				COMPRESSED_ENVIRONMENT_LIGHTMAP_VERTEX_SIZE, MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
+			MIN((vertex_data_size - fit_count * vertex_size) / lightmap_vertex_size,
+				MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL));
 
 		tag_validate_correct(validation, "lightmap %d's material %d's %ld vertices and %ld lightmap vertices are not in"
 			" its %ld bytes: %ld and %ld", lightmap_index, material_index, material->vertices.count,
