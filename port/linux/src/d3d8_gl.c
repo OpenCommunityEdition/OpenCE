@@ -25,6 +25,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "screenshot.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -4314,53 +4315,35 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
-static void write_screenshot(struct render_target_entry *target)
+/* the target's pixels, saved to path as a BMP file (screenshot.h); 1 on
+success */
+static int write_screenshot(struct render_target_entry *target, const char *path)
 {
-	const char *directory = *config_string("debug.screenshot_directory") ?
-		config_string("debug.screenshot_directory") : NULL;
 	unsigned long width = target->target.gl_width, height = target->target.gl_height;
-	unsigned char *pixels;
-	char path[512];
-	FILE *file;
-	unsigned long row;
-	unsigned char header[54] = { 'B', 'M' };
-	unsigned long image_size = width * height * 4;
+	unsigned char *pixels = malloc(width * height * 4);
+	int saved;
 
-	if (!directory)
-		return;
-	pixels = malloc(image_size);
+	if (!pixels)
+		return 0;
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+	/* rows from the top, as screenshot_write_bmp takes them */
 	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
-	/* the display ignores destination alpha, which the game uses as scratch;
-	image viewers would show it as transparency */
-	for (row = 0; row < width * height; row++)
-	{
 #ifdef HALO_ANDROID
-		unsigned char red = pixels[row * 4];
-
-		pixels[row * 4] = pixels[row * 4 + 2];
-		pixels[row * 4 + 2] = red;
-#endif
-		pixels[row * 4 + 3] = 0xff;
-	}
-	snprintf(path, sizeof(path), "%s/frame%05lu.bmp", directory, device.frame);
-	file = fopen(path, "wb");
-	if (file)
 	{
-		*(unsigned int *)(header + 2) = (unsigned int)(54 + image_size);
-		*(unsigned int *)(header + 10) = 54;
-		*(unsigned int *)(header + 14) = 40;
-		*(int *)(header + 18) = (int)width;
-		*(int *)(header + 22) = -(int)height; /* rows from the top, as read */
-		*(unsigned short *)(header + 26) = 1;
-		*(unsigned short *)(header + 28) = 32;
-		*(unsigned int *)(header + 34) = (unsigned int)image_size;
-		fwrite(header, 1, sizeof(header), file);
-		for (row = 0; row < height; row++)
-			fwrite(pixels + row * width * 4, 1, width * 4, file);
-		fclose(file);
+		unsigned long pixel;
+
+		for (pixel = 0; pixel < width * height; pixel++)
+		{
+			unsigned char red = pixels[pixel * 4];
+
+			pixels[pixel * 4] = pixels[pixel * 4 + 2];
+			pixels[pixel * 4 + 2] = red;
+		}
 	}
+#endif
+	saved = screenshot_write_bmp(path, pixels, width, height);
 	free(pixels);
+	return saved;
 }
 
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
@@ -4379,13 +4362,24 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
 		int window_width, window_height, width, height, x, y;
+		const char *screenshot_path;
 
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
 		render_target_resolve(&back_buffer->target);
-		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
-			write_screenshot(back_buffer);
+		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0 &&
+			*config_string("debug.screenshot_directory"))
+		{
+			char path[512];
+
+			snprintf(path, sizeof(path), "%s/frame%05lu.bmp", config_string("debug.screenshot_directory"),
+				device.frame);
+			write_screenshot(back_buffer, path);
+		}
+		/* one asked for by name (the telnet console's port_screenshot) */
+		if ((screenshot_path = screenshot_due()) != NULL)
+			screenshot_saved(write_screenshot(back_buffer, screenshot_path));
 
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */

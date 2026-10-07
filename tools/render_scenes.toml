@@ -1,0 +1,67 @@
+# The scenes tools/render_test.py draws with each renderer and compares.
+#
+# A scene:
+#   name          its pictures' name (letters, digits, '-', '_' and '.')
+#   map           b30, or a path: levels\test\bloodgulch\bloodgulch
+#   core          the game state it starts from (core_save_name, in the
+#                 scratch data root's core/; render_test.py author makes it).
+#                 Without one, the game is frozen once the map has loaded,
+#                 which is not the same tick from run to run: for a first
+#                 look only.
+#   camera        tools/render_cameras/<camera>.txt (debug_camera_save's);
+#                 without one, the player's own view
+#   settings      HALO_* environment variables for the run
+#   commands      console commands before the picture (at most 127
+#                 characters each)
+#   settle_frames, threshold, tolerance: as [defaults]
+
+[defaults]
+# frames drawn after the last command, before the one saved
+settle_frames = 8
+# a pixel matches when no channel differs by more than this (of 255)
+threshold = 2
+# a scene passes when at least this fraction of its pixels match
+tolerance = 0.995
+
+# Checks the harness itself (the game starts, the console answers, a frame is
+# saved): not the same tick from run to run.
+[[scene]]
+name = "smoke-b30"
+map = "b30"
+tolerance = 0.0
+
+# b30 after a minute that no one plays (render_test.py author b30 --scene
+# b30-auto --after 60 makes its game state): from the saved camera, and from
+# the player's own view (the first-person weapon, the HUD).
+[[scene]]
+name = "b30-auto"
+map = "b30"
+core = "b30-auto"
+camera = "b30/b30-auto"
+
+[[scene]]
+name = "b30-auto-player"
+map = "b30"
+core = "b30-auto"
+
+# Scenes made with 'render_test.py author <map>' go below, for example:
+#
+# [[scene]]
+# name = "b30-beach"
+# map = "b30"
+# core = "b30-beach"
+# camera = "b30/b30-beach"
+#
+# [[scene]]
+# name = "b30-beach-no-fog"
+# map = "b30"
+# core = "b30-beach"
+# camera = "b30/b30-beach"
+# commands = ["rasterizer_fog_atmosphere 0", "rasterizer_fog_plane 0"]
+#
+# [[scene]]
+# name = "b30-beach-smaa"
+# map = "b30"
+# core = "b30-beach"
+# camera = "b30/b30-beach"
+# settings = { HALO_ANTI_ALIASING = "smaa" }

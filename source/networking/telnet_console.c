@@ -46,6 +46,8 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_address_constants.h"
 #include "bungie_net/network/transport_endpoint.h"
+#include "cache/cache_files.h"
+#include "game/game.h"
 #include "hs/hs.h"
 #include "networking/telnet_console.h"
 
@@ -84,6 +86,9 @@ struct telnet_console_globals
 /* the platform layer's (port/linux/src/port_config.c) */
 int config_boolean(const char *name);
 long config_integer(const char *name);
+/* the platform layer's (port/linux/src/screenshot.h) */
+int screenshot_request(const char *name, long settle_frames, char *message, unsigned long size);
+int screenshot_result(char *message, unsigned long size);
 
 static boolean telnet_client_write(
 	struct telnet_client *client,
@@ -95,6 +100,8 @@ static boolean process_telnet_client_buffer(
 	char *buffer,
 	long size,
 	struct telnet_client *client);
+static boolean telnet_port_command(
+	char const *expression);
 
 /* ---------- globals */
 
@@ -261,6 +268,14 @@ void telnet_console_process(
 				error(2, "connection lost to telnet client ('%s')", transport_error_to_string((short)count));
 			}
 		}
+
+		/* port: a port_screenshot's frame, once the renderer has saved it */
+		{
+			char message[600];
+
+			if (screenshot_result(message, sizeof(message)))
+				telnet_console_print(message);
+		}
 	}
 
 	return;
@@ -367,7 +382,9 @@ static boolean process_telnet_client_buffer(
 					expression[TELNET_CLIENT_BUFFER_SIZE-1] = 0;
 					client->buffer[0] = 0;
 
-					if (hs_compile_and_evaluate(expression))
+					/* port: the port's own commands never reach the script
+					compiler (telnet_port_command) */
+					if (telnet_port_command(expression) || hs_compile_and_evaluate(expression))
 					{
 						telnet_client_write(client, "\r\n", 2);
 					}
@@ -401,4 +418,68 @@ static boolean process_telnet_client_buffer(
 	}
 
 	return client->endpoint!=NULL;
+}
+
+/* port: commands of the port's own, for tools/render_test.py, kept out of the
+script functions (whose order the maps' scripts name them by). TRUE when the
+expression was one (it has then been done, or why not printed):
+
+  port_screenshot <name> [<settle frames>]
+    saves the frame presented after that many more frames (2 if not given)
+    as <debug.screenshot_directory>/<name>.bmp, then prints "captured
+    <path>" (screenshot.h)
+  port_status
+    prints "port_status: in_game <game time>" once a map has loaded and its
+    game is under way, else "port_status: loading" (the console runs while
+    a map loads, behind the loading screen) */
+static boolean telnet_port_command(
+	char const *expression)
+{
+	char words[3][TELNET_CLIENT_BUFFER_SIZE];
+	long word_count = 0;
+	char const *character = expression;
+	char message[600];
+
+	/* words split by spaces; parentheses and quotes are ignored, so that
+	(port_screenshot "name") reads as port_screenshot name */
+	while (*character && word_count<(long)NUMBEROF(words))
+	{
+		long length = 0;
+
+		while (*character==' ' || *character=='(' || *character==')' || *character=='"')
+			character++;
+		while (*character && *character!=' ' && *character!='(' && *character!=')' && *character!='"' &&
+			length<TELNET_CLIENT_BUFFER_SIZE-1)
+		{
+			words[word_count][length++] = *character++;
+		}
+		words[word_count][length] = 0;
+		if (length)
+			word_count++;
+	}
+	if (word_count==0)
+		return FALSE;
+
+	if (csstrcmp(words[0], "port_screenshot")==0)
+	{
+		if (word_count<2)
+			csstrncpy(message, "usage: port_screenshot <name> [<settle frames>]", sizeof(message)-1);
+		else
+			screenshot_request(words[1], word_count>2 ? atol(words[2]) : 2, message, sizeof(message));
+	}
+	else if (csstrcmp(words[0], "port_status")==0)
+	{
+		if (game_time_initialized() && game_in_progress() && !cache_files_precache_in_progress())
+			snprintf(message, sizeof(message), "port_status: in_game %ld", game_time_get());
+		else
+			csstrncpy(message, "port_status: loading", sizeof(message)-1);
+	}
+	else
+	{
+		return FALSE;
+	}
+	message[sizeof(message)-1] = 0;
+	telnet_console_print(message);
+
+	return TRUE;
 }
