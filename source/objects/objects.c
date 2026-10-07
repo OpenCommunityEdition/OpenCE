@@ -65,10 +65,11 @@ OBJECTS.C
 players spread over a level and many bodies (co-op's extra enemies), every
 body was in some player's view, none could go, and the whole collection
 (every garbage object's visibility, the memory pool compacted) ran again
-every tick on the host. A player sees garbage no further off than
-GARBAGE_VISIBLE_DISTANCE (world units, about 90 metres), and a collection
-of active garbage that left too much is tried again only after
-GARBAGE_ACTIVE_RETRY_TICKS. Running short of memory or objects still
+every tick on the host. In network co-op only (single player and
+multiplayer keep the game's own collection), a player sees garbage no
+further off than GARBAGE_VISIBLE_DISTANCE (world units, about 90 metres),
+and a collection of active garbage that left too much is tried again only
+after GARBAGE_ACTIVE_RETRY_TICKS. Running short of memory or objects still
 collects at once. */
 #define GARBAGE_VISIBLE_DISTANCE 30.0f
 #define GARBAGE_ACTIVE_RETRY_TICKS TICKS_PER_SECOND
@@ -145,6 +146,7 @@ boolean network_objects_may_delete(long object_index);
 void network_coop_note_attach(long parent_index, char const *parent_marker_name, long child_index,
 	char const *child_marker_name);
 void network_coop_note_detach(long parent_index, long child_index);
+boolean network_coop_active(void);
 
 static void object_connect_lights(long object_index, boolean disconnect, boolean reconnect);
 static void object_name_list_allocate(void);
@@ -1736,7 +1738,7 @@ boolean object_visible_to_any_player(
 						struct unit_datum const *unit = unit_get(player->unit_index);
 						real distance = normalize3d(vector_from_points3d(&player_position, &object->object.bounding_sphere_center, &eye_to_point));
 
-						if (distance <= GARBAGE_VISIBLE_DISTANCE &&
+						if ((!network_coop_active() || distance <= GARBAGE_VISIBLE_DISTANCE) &&
 							dot_product3d(&unit->unit.desired_aiming_vector, &eye_to_point) > cosine(arctangent(object->object.bounding_sphere_radius, distance) + sloppy_maximum_field_of_view))
 						{
 							visible = TRUE;
@@ -4074,12 +4076,14 @@ static long active_garbage_limit(
 }
 
 /* port: whether a collection of active garbage may be tried
-(GARBAGE_ACTIVE_RETRY_TICKS) */
+(GARBAGE_ACTIVE_RETRY_TICKS: in network co-op) */
 static boolean objects_garbage_active_due(
 	void)
 {
 	long now = game_time_get();
 
+	if (!network_coop_active())
+		return TRUE;
 	if (garbage_active_retry_time != NONE && garbage_active_retry_time - now > GARBAGE_ACTIVE_RETRY_TICKS)
 		garbage_active_retry_time = NONE;
 	return garbage_active_retry_time == NONE || now >= garbage_active_retry_time;
@@ -4230,11 +4234,12 @@ void objects_garbage_collection(
 
 			}
 
-		/* port: active garbage left above its target is tried again later,
-		and nothing collected moves nothing to compact */
+		/* port: in network co-op, active garbage left above its target is
+		tried again later, and nothing collected moves nothing to compact */
 		if (garbage_collect_mode == _garbage_collect_active_objects)
 			garbage_active_retry_time = should_collect ? NONE : game_time_get() + GARBAGE_ACTIVE_RETRY_TICKS;
-		if (collected_count > 0 || garbage_collect_mode != _garbage_collect_active_objects)
+		if (!network_coop_active() || collected_count > 0 ||
+			garbage_collect_mode != _garbage_collect_active_objects)
 			memory_pool_compact(object_memory_pool);
 		
 		if (debug_object_garbage_collection)
@@ -4312,9 +4317,11 @@ void objects_garbage_collection(
 					break;
 				}
 
-				/* (port: as often as the warning, not every tick: a host kept
-				critical by many enemies wrote it to debug.txt each tick) */
-				if ((status_still_critical || garbage_collection_after_first_attempt) && garbage_should_warn)
+				/* (port: in network co-op as often as the warning, not every
+				tick: a host kept critical by many enemies wrote it to
+				debug.txt each tick) */
+				if ((status_still_critical || garbage_collection_after_first_attempt) &&
+					(garbage_should_warn || !network_coop_active()))
 				{
 					char tempbuffer[512];
 					const char *status;

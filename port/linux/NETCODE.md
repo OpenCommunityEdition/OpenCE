@@ -172,7 +172,10 @@ the Elite major's and commander's armor); version 19 sends with the game's
 settings whether co-op's players collide with each other (Server Setup's PLAYER
 COLLISIONS: each machine's players then pass through the others'); version 20
 lists a public game with a password with its invite's token sealed with the
-password's key (`p2p_lobby.c`), a listing of another layout.
+password's key (`p2p_lobby.c`), a listing of another layout; version 21
+sends each killing blow again reliably and an object come to rest three
+times (a client waits for a player's blow before its body dies without one),
+and switches co-op's BSP on the host's crossing alone.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
