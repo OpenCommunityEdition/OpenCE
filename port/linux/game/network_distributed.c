@@ -109,6 +109,8 @@ void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
 void p2p_discord_sanitize(char *destination, int size, const char *source, int name);
 void p2p_discord_identity(char *id, int id_size, char *name, int name_size);
 unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
+/* network_connection.c's */
+boolean network_connection_last_read_was_unreliable(void);
 unsigned long system_milliseconds(void);
 void console_warning(const char *format, ...);
 
@@ -129,6 +131,10 @@ host's copies go as its own ticks have them) ... */
 #define CLIENT_CLOCK_FAST_WINDOWS 5
 /* the longest notice's text (_distributed_message_notice) */
 #define MAXIMUM_NOTICE_LENGTH 160
+/* how far a datagram's tick may be from the latest a message from its
+sender had, either way (distributed_sender_times): as long as a machine may
+go silent before it is dropped */
+#define DISTRIBUTED_TIME_WINDOW_TICKS (15 * TICKS_PER_SECOND)
 /* a Discord user's id and name as kept, with their ends (p2p.h's
 P2P_DISCORD_ID_SIZE and P2P_DISCORD_NAME_SIZE) */
 #define DISCORD_ID_SIZE 24
@@ -631,6 +637,14 @@ static long distributed_game_state_time;
 /* the latest tick of each kind of unreliable message had from each sender
 (a machine, or the host), NONE for none */
 static long distributed_received_times[MAXIMUM_SENDERS][NUMBER_OF_DISTRIBUTED_MESSAGES];
+/* the latest tick of any message had from each sender, NONE for none: a
+datagram, which anyone can send as from another machine, is dropped when
+its tick is further from it than DISTRIBUTED_TIME_WINDOW_TICKS (one stamped
+far ahead would have every newer one of the sender's taken for stale, and
+its clock for fast); a message over the sender's stream, which only it can
+send, is taken whatever its tick, and moves it
+(distributed_message_time_bounded) */
+static long distributed_sender_times[MAXIMUM_SENDERS];
 /* the host: each client machine's clock, measured (CLIENT_CLOCK_WINDOW_MILLISECONDS):
 its latest tick, and its tick and the host's time as the window began
 (NONE: none begun); how many windows in a row it went fast, and whether
@@ -1285,6 +1299,7 @@ static boolean distributed_machine_loaded(
 		sizeof(distributed_machine_players[machine_index]));
 	for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
 		distributed_received_times[machine_index][type] = NONE;
+	distributed_sender_times[machine_index] = NONE;
 	csmemset(&distributed_round_trips[machine_index], 0, sizeof(distributed_round_trips[machine_index]));
 	csmemset(distributed_viewers[machine_index], 0, sizeof(distributed_viewers[machine_index]));
 	csmemset(&distributed_client_clocks[machine_index], 0, sizeof(distributed_client_clocks[machine_index]));
@@ -3384,6 +3399,7 @@ void network_distributed_new_game(
 		distributed_batches[sender].size = 0;
 		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
 			distributed_received_times[sender][type] = NONE;
+		distributed_sender_times[sender] = NONE;
 	}
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
@@ -3484,6 +3500,61 @@ void network_distributed_tick(
 	profile_scope(distributed_tick_batches_flush_section, distributed_batches_flush();)
 	distributed_machines.in_tick = FALSE;
 	distributed_machines.valid = FALSE;
+}
+
+/* whether a message's tick is near enough the latest had from its sender
+to be taken (distributed_sender_times); from_stream: it came over the
+sender's stream (or a client's connection to the host), not in a datagram */
+static boolean distributed_message_time_bounded(
+	long machine_index,
+	long game_time,
+	boolean from_stream)
+{
+	short sender = machine_index == NONE ? HOST_SENDER : (short)machine_index;
+	long *latest;
+	unsigned long distance;
+	short type;
+
+	if (sender < 0 || sender >= MAXIMUM_SENDERS)
+		return FALSE;
+	latest = &distributed_sender_times[sender];
+	if (*latest == NONE)
+	{
+		*latest = game_time;
+		return TRUE;
+	}
+	/* (unsigned: no tick, however far, overflows it) */
+	distance = game_time > *latest ?
+		(unsigned long)game_time - (unsigned long)*latest :
+		(unsigned long)*latest - (unsigned long)game_time;
+	if (distance > DISTRIBUTED_TIME_WINDOW_TICKS)
+	{
+		static unsigned long last_logged_time;
+		static boolean logged;
+
+		if (!from_stream)
+		{
+			unsigned long now = system_milliseconds();
+
+			if (!logged || now - last_logged_time >= 1000)
+			{
+				error(_error_silent, "distributed message stamped %ld ticks from its sender's latest in a datagram; dropped",
+					game_time > *latest ? (long)distance : -(long)distance);
+				last_logged_time = now;
+				logged = TRUE;
+			}
+			return FALSE;
+		}
+		/* (the sender's own word: what a datagram sent as from it had moved
+		its latest to is forgotten) */
+		*latest = game_time;
+		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
+			distributed_received_times[sender][type] = NONE;
+		return TRUE;
+	}
+	if (game_time > *latest)
+		*latest = game_time;
+	return TRUE;
 }
 
 /* whether an unreliable message of the kind is older than one had already
@@ -4131,6 +4202,15 @@ void network_distributed_handle_message(
 	}
 	distributed_statistics.received++;
 
+	/* (the kinds a client sends only over its stream: in a datagram, which
+	anyone can send as from it, they are not its) */
+	if ((header.type == _distributed_message_client_ready ||
+			header.type == _distributed_message_client_identity ||
+			header.type == _distributed_message_hit_reports) &&
+		!distributed_handling_stream_message)
+	{
+		return;
+	}
 	/* (each kind from the host, or from a client) */
 	switch (header.type)
 	{
@@ -4149,11 +4229,19 @@ void network_distributed_handle_message(
 	default:
 		if (game_connection() != _game_connection_network_client)
 			return;
-		/* (the host's latest tick, which this client's input messages tell
-		it back) */
-		if (distributed_host_time == NONE || header.game_time > distributed_host_time)
-			distributed_host_time = header.game_time;
 		break;
+	}
+	if (!distributed_message_time_bounded(machine_index, header.game_time,
+		machine_index == NONE ? !network_connection_last_read_was_unreliable() : distributed_handling_stream_message))
+	{
+		return;
+	}
+	/* (a client: the host's latest tick, which its input messages tell it
+	back) */
+	if (machine_index == NONE &&
+		(distributed_host_time == NONE || header.game_time > distributed_host_time))
+	{
+		distributed_host_time = header.game_time;
 	}
 	if ((distributed_handling_batch || header.type != _distributed_message_damage_events) &&
 		distributed_message_stale(machine_index, &header))
