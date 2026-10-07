@@ -68,6 +68,31 @@ def test_render_skips_tags_used_as_both_struct_and_union():
 # ---------- Xbox SDK declarations (port/include/xdk)
 
 
+@pytest.mark.skipif(shutil.which("clang") is None, reason="clang is needed to compile the headers")
+def test_math_isfinite_in_game_iso_mode(tmp_path):
+    root = Path(__file__).resolve().parent.parent
+    source = write(tmp_path / "finite.c", """
+        #include <math.h>
+        int main(void) {
+            volatile double zero = 0.0;
+            volatile double finite = 1.0;
+            volatile double positive_infinity = finite / zero;
+            volatile double nan_value = zero / zero;
+            return !(isfinite(finite) && isfinite(zero) &&
+                !isfinite(positive_infinity) && !isfinite(-positive_infinity) &&
+                !isfinite(nan_value));
+        }
+    """)
+    output = tmp_path / "finite"
+    # Use the actual game mode/header, rather than the C11 host-test mode.
+    flags = [flag for flag in linux_build.GAME_FLAGS if flag != "-w"]
+    for optimisation in ("-O0", "-O2"):
+        subprocess.run(["clang", *flags, optimisation,
+            "-Werror=implicit-function-declaration", "-I", str(root / "port/linux/include"),
+            str(source), "-o", str(output)], check=True)
+        subprocess.run([str(output)], check=True)
+
+
 XDK_INCLUDE = Path(__file__).resolve().parent.parent / "port" / "include" / "xdk"
 
 
