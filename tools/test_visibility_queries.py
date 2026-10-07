@@ -37,6 +37,7 @@ typedef int BOOL, HRESULT;
 static float target_scale[2] = {1, 1};
 static unsigned target_samples = 1;
 static void platform_log(const char *text) {(void)text;}
+HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD, UINT *, ULONGLONG *);
 '''
 
 FAKE_GL = r'''
@@ -58,6 +59,8 @@ static struct write_record writes[65536];
 static unsigned next_query, active, next_write, completed, bound_query_buffer, live_syncs;
 static GLuint gpu[4098], mapped[4096], counters[4096];
 static int map_failure, fence_failure, wait_failure, query_available = TRUE;
+static unsigned wait_calls, complete_after_polls;
+static void complete(unsigned through);
 static struct {int atomic_counters;} xgpu_capabilities;
 static void glGenQueries(int n, GLuint *queries) {
     for (int i=0; i<n; i++) queries[i]=++next_query;
@@ -94,7 +97,9 @@ static GLsync glFenceSync(GLenum condition, GLbitfield flags) {
     return &syncs[next_write];
 }
 static GLenum glClientWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
-    CHECK(sync && sync->alive && flags==GL_SYNC_FLUSH_COMMANDS_BIT && !timeout);
+    CHECK(sync && sync->alive && (flags==0 || flags==GL_SYNC_FLUSH_COMMANDS_BIT) && !timeout);
+    wait_calls++;
+    if(complete_after_polls && wait_calls%complete_after_polls==0) complete(sync->sequence);
     if(wait_failure) return GL_WAIT_FAILED;
     return sync->sequence<=completed ? GL_ALREADY_SIGNALED : GL_TIMEOUT_EXPIRED;
 }
@@ -117,6 +122,7 @@ static void reset(int mapped_mode, int atomic) {
     memset(gpu,0,sizeof(gpu));memset(counters,0,sizeof(counters));
     next_query=active=next_write=completed=bound_query_buffer=live_syncs=0;
     fence_failure=wait_failure=0;query_available=TRUE;map_failure=!mapped_mode;
+    wait_calls=complete_after_polls=0;
     target_scale[0]=target_scale[1]=1;target_samples=1;
     xgpu_capabilities.atomic_counters=atomic;
     visibility_init();device.gl_ready=TRUE;
@@ -166,23 +172,36 @@ static void independence(int mapped_mode, int atomic) {
     device.gl_ready=FALSE;CHECK(read(1)==0);
 }
 #ifndef HALO_ANDROID
+static void nonblocking_caller(void) {
+    reset(TRUE,FALSE);submit(0,256);complete_after_polls=128;
+    getter_calls=spin_calls=0;
+    long value=_rasterizer_widget_get_occlusion_test_result(0);
+    printf("Delayed GPU, actual game getter: %u reads, %u spin entries, result %ld\n",getter_calls,spin_calls,value);
+    CHECK(getter_calls==1 && spin_calls==0);
+    CHECK(value==0); /* Never completed: conservative initial cached visibility. */
+    complete(next_write);CHECK(read(0)==256);
+    submit(0,0);getter_calls=spin_calls=0;value=_rasterizer_widget_get_occlusion_test_result(0);
+    CHECK(getter_calls==1 && spin_calls==0 && value==256);
+    complete(next_write);CHECK(read(0)==0);
+}
 static void stale_completion(void) {
     reset(TRUE,FALSE);submit(2,256);complete(next_write);CHECK(read(2)==256);
     submit(2,0);unsigned value=777;ULONGLONG timestamp=999;
-    CHECK(D3DDevice_GetVisibilityTestResult(2,&value,&timestamp)==D3DERR_TESTINCOMPLETE);
-    CHECK(value==777 && timestamp==0);complete(next_write);CHECK(read(2)==0);
-    /* Replacing a completed fence must protect the newest submission. */
-    submit(2,512);unsigned old_sequence=next_write;submit(2,0);complete(old_sequence);
-    CHECK(D3DDevice_GetVisibilityTestResult(2,&value,NULL)==D3DERR_TESTINCOMPLETE);
-    CHECK(live_syncs==1);complete(next_write);CHECK(read(2)==0);
+    CHECK(D3DDevice_GetVisibilityTestResult(2,&value,&timestamp)==S_OK);
+    CHECK(value==256 && timestamp==0);complete(next_write);CHECK(read(2)==0);
+    /* Keep an unfinished result so persistent multi-frame lag cannot starve it. */
+    submit(2,512);unsigned old_sequence=next_write;submit(2,0);
+    CHECK(next_write==old_sequence && read(2)==0 && live_syncs==1);
+    complete(next_write);CHECK(read(2)==512 && live_syncs==0);
+    submit(2,0);complete(next_write);CHECK(read(2)==0);
     for(int i=0;i<500;i++) {
         submit(2,i%2 ? 0 : 64);
-        CHECK(D3DDevice_GetVisibilityTestResult(2,&value,NULL)==D3DERR_TESTINCOMPLETE);
-        complete(next_write);CHECK(read(2)==(i%2 ? 0 : 64));CHECK(live_syncs==1);
+        CHECK(read(2)==(i%2 ? 64 : 0));
+        complete(next_write);CHECK(read(2)==(i%2 ? 0 : 64));CHECK(live_syncs==0);
     }
     /* Sync creation/wait failures must use the fresh query, never old mapping. */
-    submit(2,128);complete(next_write);fence_failure=TRUE;submit(2,0);CHECK(read(2)==0);
-    fence_failure=FALSE;submit(2,64);complete(next_write);submit(2,0);
+    submit(2,128);complete(next_write);CHECK(read(2)==128);fence_failure=TRUE;submit(2,0);CHECK(read(2)==0);
+    fence_failure=FALSE;submit(2,64);complete(next_write);CHECK(read(2)==64);submit(2,0);
     wait_failure=TRUE;CHECK(read(2)==0);CHECK(!device.visibility_sync[2]);
 }
 static void scaling_and_fallback(void) {
@@ -192,8 +211,23 @@ static void scaling_and_fallback(void) {
         submit(1,13);complete(next_write);CHECK(read(0)==64 && read(1)==13);
     }
     reset(FALSE,FALSE);submit(0,64);query_available=FALSE;unsigned value=77;
-    CHECK(D3DDevice_GetVisibilityTestResult(0,&value,NULL)==D3DERR_TESTINCOMPLETE);
-    CHECK(value==77);query_available=TRUE;CHECK(read(0)==64);
+    CHECK(D3DDevice_GetVisibilityTestResult(0,&value,NULL)==S_OK);
+    CHECK(value==0);query_available=TRUE;CHECK(read(0)==64);
+}
+static void sustained_lag(void) {
+    reset(TRUE,FALSE);target_scale[0]=2;target_scale[1]=1.5f;target_samples=4;
+    submit(0,768);unsigned pending_sequence=next_write;
+    target_scale[0]=target_scale[1]=1;target_samples=1;
+    for(unsigned frame=0;frame<5;frame++) {
+        getter_calls=spin_calls=0;
+        CHECK(_rasterizer_widget_get_occlusion_test_result(0)==0);
+        CHECK(getter_calls==1 && spin_calls==0);
+        submit(0,0);CHECK(next_write==pending_sequence && live_syncs==1);
+    }
+    complete(pending_sequence);CHECK(read(0)==64); /* Uses original test's area. */
+    submit(0,0);CHECK(read(0)==64);
+    complete(next_write);CHECK(read(0)==0);
+    puts("PASS: five frames of GPU lag still update; cached counts use completed test's scale; hidden count eventually replaces visible count");
 }
 #endif
 int main(void) {
@@ -202,11 +236,29 @@ int main(void) {
     independence(FALSE,TRUE);
     puts("PASS: Android boolean/atomic paths; independent slots 0/1/4095; four windows; all 4096 slots and counter wrap");
 #else
-    independence(TRUE,FALSE);stale_completion();scaling_and_fallback();
+    nonblocking_caller();independence(TRUE,FALSE);stale_completion();scaling_and_fallback();sustained_lag();
     puts("PASS: desktop mapped/unmapped paths; independent slots 0/1/4095; delayed/replaced results; 500 reuses; bounded syncs; failures; four windows; all slots; sample scaling");
 #endif
     return 0;
 }
+'''
+
+CALLER = r'''
+typedef int boolean;
+#define NONE -1
+static struct {int lens_flare_occlusion_enabled;} rasterizer_debug_options={TRUE};
+static int global_d3d_device;
+enum {_rasterizer_profile_screen_effect, _error_silent};
+static unsigned getter_calls,spin_calls;
+static HRESULT counted_get(DWORD index,UINT *result,ULONGLONG *timestamp) {
+    getter_calls++;return D3DDevice_GetVisibilityTestResult(index,result,timestamp);
+}
+#define IDirect3DDevice8_GetVisibilityTestResult(device,index,result,timestamp) counted_get(index,result,timestamp)
+static void rasterizer_spin_begin(int profile) {(void)profile;spin_calls++;}
+static void rasterizer_spin_end(void) {}
+static void rasterizer_error(HRESULT result,const char *text) {(void)result;(void)text;CHECK(FALSE);}
+#define match_assert(file,line,condition) CHECK(condition)
+#define error(...) CHECK(FALSE)
 '''
 
 REAL_GL = r'''
@@ -236,7 +288,37 @@ static GLuint shader(GLenum type,const char *text) {
     GLuint s=glCreateShader(type);glShaderSource(s,1,&text,NULL);glCompileShader(s);
     GLint ok=0;glGetShaderiv(s,GL_COMPILE_STATUS,&ok);CHECK(ok);return s;
 }
-int main(void) {
+static int time_compare(const void *a,const void *b) {
+    double x=*(const double *)a,y=*(const double *)b;return (x>y)-(x<y);
+}
+static void benchmark(void) {
+    enum {FLARES=128,FRAMES=120};double times[FRAMES];
+    GLuint fbo,color,depth;glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+    glGenRenderbuffers(1,&color);glBindRenderbuffer(GL_RENDERBUFFER,color);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER,0,GL_RGBA8,512,512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_RENDERBUFFER,color);
+    glGenRenderbuffers(1,&depth);glBindRenderbuffer(GL_RENDERBUFFER,depth);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER,0,GL_DEPTH_COMPONENT24,512,512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,depth);
+    CHECK(glCheckFramebufferStatus(GL_FRAMEBUFFER)==GL_FRAMEBUFFER_COMPLETE);
+    glViewport(0,0,512,512);glDepthMask(GL_TRUE);glClearDepth(.4);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);
+    getter_calls=spin_calls=0;
+    Uint64 frequency=SDL_GetPerformanceFrequency();
+    for(unsigned frame=0;frame<FRAMES;frame++) {
+        for(unsigned i=0;i<FLARES;i++) submit(i,i%2 ? .2f : .7f);
+        glFlush(); /* Deliberately queued GPU work, without a completion wait. */
+        Uint64 start=SDL_GetPerformanceCounter();
+        for(unsigned i=0;i<FLARES;i++) _rasterizer_widget_get_occlusion_test_result(i);
+        times[frame]=1000.0*(SDL_GetPerformanceCounter()-start)/frequency;
+    }
+    glFinish();for(unsigned i=0;i<FLARES;i++) CHECK(read(i)==(i%2 ? 512*512 : 0));
+    qsort(times,FRAMES,sizeof(times[0]),time_compare);
+    printf("BENCH: queued GPU work, %d flares x %d frames; read-batch median %.4f ms, p95 %.4f ms; getter calls %u, spin entries %u\n",
+           FLARES,FRAMES,times[FRAMES/2],times[FRAMES*95/100],getter_calls,spin_calls);
+    CHECK(glGetError()==GL_NO_ERROR);
+}
+int main(int argc,char **argv) {
+    (void)argv;
     CHECK(SDL_Init(SDL_INIT_VIDEO));
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,4);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,5);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE);
@@ -257,6 +339,7 @@ int main(void) {
     glUseProgram(program);depth_location=glGetUniformLocation(program,"z");CHECK(depth_location>=0);
     glClipControl(GL_UPPER_LEFT,GL_ZERO_TO_ONE);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);
     glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);
+    if(argc>1) {benchmark();SDL_GL_DestroyContext(context);SDL_DestroyWindow(window);SDL_Quit();return 0;}
     for(int samples=0;samples<=4;samples+=4) {
         GLuint fbo,color,depth;glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);
         glGenRenderbuffers(1,&color);glBindRenderbuffer(GL_RENDERBUFFER,color);
@@ -270,19 +353,20 @@ int main(void) {
         target_samples=actual_samples>0 ? actual_samples : 1;glViewport(0,0,64,64);
         glDepthMask(GL_TRUE);glClearDepth(.4);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);
         submit(0,.7f);submit(1,.2f);submit(4095,.2f);
-        unsigned blocked=read(0),visible=read(1),reserved=read(4095);
+        glFinish();unsigned blocked=read(0),visible=read(1),reserved=read(4095);
         CHECK(blocked==0 && visible==4096 && reserved==4096);
-        submit(0,.2f);submit(1,.7f);CHECK(read(0)==4096 && read(1)==0);
+        submit(0,.2f);submit(1,.7f);glFinish();CHECK(read(0)==4096 && read(1)==0);
         /* Half the source is blocked: keep the actual visible fraction. */
         glEnable(GL_SCISSOR_TEST);glScissor(0,0,32,64);glDepthMask(GL_TRUE);
         glClearDepth(1);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);glDisable(GL_SCISSOR_TEST);
-        submit(2,.7f);CHECK(read(2)==2048);
+        submit(2,.7f);glFinish();CHECK(read(2)==2048);
         /* A scaled split window returns game pixels, not physical/MSAA samples. */
         target_scale[0]=target_scale[1]=2;glViewport(0,0,32,32);submit(3,.2f);
-        target_scale[0]=target_scale[1]=1;CHECK(read(3)==256);
+        target_scale[0]=target_scale[1]=1;glFinish();CHECK(read(3)==256);
         glViewport(0,0,64,64);
         for(unsigned frame=0;frame<240;frame++) {
             submit(0,frame%2 ? .2f : .7f);submit(1,frame%2 ? .7f : .2f);
+            glFinish();
             CHECK(read(0)==(frame%2 ? 4096 : 2048));
             CHECK(read(1)==(frame%2 ? 2048 : 4096));
         }
@@ -291,7 +375,7 @@ int main(void) {
     /* The same real depth results when persistent mapping is unavailable. */
     device.visibility_results=NULL;glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,64,64);
     glDepthMask(GL_TRUE);glClearDepth(.4);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);
-    target_samples=1;submit(0,.7f);submit(1,.2f);CHECK(read(0)==0 && read(1)==4096);
+    target_samples=1;submit(0,.7f);submit(1,.2f);glFinish();CHECK(read(0)==0 && read(1)==4096);
     CHECK(glGetError()==GL_NO_ERROR);
     SDL_GL_DestroyContext(context);SDL_DestroyWindow(window);SDL_Quit();
     puts("PASS: real depth-occluded/visible/half-occluded flares; 1x/4x MSAA; split-window scaling; 480 alternating frames; unmapped fallback; no GL errors");
@@ -304,6 +388,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--cc', default='clang')
     p.add_argument('--source', type=Path, default=ROOT / 'port/linux/src/d3d8_gl.c')
+    p.add_argument('--benchmark-only', action='store_true')
     args = p.parse_args()
     source = args.source.read_text()
     definitions = source[source.index('#define VISIBILITY_TEST_SLOTS'):source.index('struct gl_device\n')]
@@ -317,15 +402,17 @@ def main():
         'void WINAPI D3DDevice_BeginVisibilityTest(', 'HRESULT WINAPI D3DDevice_EndVisibilityTest(',
         'static GLuint visibility_unscaled(', 'HRESULT WINAPI D3DDevice_GetVisibilityTestResult('))
     body = definitions + device + 'static void visibility_init(void) {\n' + init + atomic + '\n}\n' + functions
+    caller = CALLER + block((ROOT / 'source/rasterizer/xbox/rasterizer_xbox_widgets.c').read_text(),
+                           'long _rasterizer_widget_get_occlusion_test_result(')
     compiler = [args.cc, '-std=gnu11', '-O2', '-fuse-ld=lld']
     if sys.platform == 'win32':
         compiler += ['--target=i686-pc-windows-msvc']
     env = dict(os.environ)
     with tempfile.TemporaryDirectory(prefix='halo-visibility-test-') as directory:
         path = Path(directory)
-        for name, flags in [('desktop', []), ('android', ['-DHALO_ANDROID'])]:
+        for name, flags in ([] if args.benchmark_only else [('desktop', []), ('android', ['-DHALO_ANDROID'])]):
             c, exe = path / (name + '.c'), path / (name + '.exe')
-            c.write_text(COMMON + FAKE_GL + body + FAKE_TESTS)
+            c.write_text(COMMON + FAKE_GL + body + caller + FAKE_TESTS)
             subprocess.run([*compiler, *flags, str(c), '-o', str(exe)], check=True)
             subprocess.run([str(exe)], check=True, timeout=20)
         gl_compiler = compiler + ['-I' + str(ROOT / 'port/linux/src')]
@@ -338,9 +425,9 @@ def main():
             gl_compiler += subprocess.check_output(['pkg-config', '--cflags', 'sdl3'], text=True).split()
             libraries = subprocess.check_output(['pkg-config', '--libs', 'sdl3'], text=True).split()
         c, exe = path / 'real_gl.c', path / 'real_gl.exe'
-        c.write_text(REAL_GL + COMMON + body + REAL_TESTS)
+        c.write_text(REAL_GL + COMMON + body + caller + REAL_TESTS)
         subprocess.run([*gl_compiler, str(c), *libraries, '-o', str(exe)], check=True)
-        subprocess.run([str(exe)], env=env, check=True, timeout=45)
+        subprocess.run([str(exe), *(['benchmark'] if args.benchmark_only else [])], env=env, check=True, timeout=45)
 
 
 if __name__ == '__main__':
