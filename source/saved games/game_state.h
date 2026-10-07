@@ -49,6 +49,11 @@ boolean game_state_test_persistent_storage(
 	char *map_name,
 	short *difficulty,
 	boolean *corrupted);
+/* port: takes an image of the game state read from a file, if it is one of
+this build's (game_state.c) */
+boolean game_state_image_accept(
+	void *image,
+	long size);
 void game_state_save_core(
 	const char *name);
 boolean game_state_reverted(

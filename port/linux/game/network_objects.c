@@ -2133,6 +2133,12 @@ static boolean distributed_client_change_valid(
 		team_count = game_engine_get_variant()->game_engine_index == game_engine_ctf ? CTF_FLAG_TEAMS : ODDBALL_TEAMS;
 	if (change->owner_team_index != NONE && (change->owner_team_index < 0 || change->owner_team_index >= team_count))
 		return FALSE;
+	/* (a flag or ball of no team would index the game type's arrays at -1) */
+	if (type == _object_type_weapon && ((weapon_definition_get(change->definition_index)->weapon.flags >> 3) & 1) &&
+		change->owner_team_index == NONE)
+	{
+		return FALSE;
+	}
 	/* (its colors numbers) */
 	{
 		short color_index;
@@ -2845,6 +2851,24 @@ void network_objects_set_seat(
 			seat_index >= unit_definition_get(vehicle->definition_index)->unit.seats.count)
 		{
 			return;
+		}
+		/* (and not one the unit carries, however far down: a ring of
+		parents would turn every walk up them forever) */
+		{
+			long ancestor_index = vehicle->object.parent_object_index;
+			long steps;
+
+			for (steps = 0; ancestor_index != NONE; steps++)
+			{
+				struct object_header_datum const *ancestor;
+
+				if (ancestor_index == unit_index || steps >= 16)
+					return;
+				ancestor = (struct object_header_datum const *)datum_try_and_get(object_header_data, ancestor_index);
+				if (!ancestor || !ancestor->datum)
+					return;
+				ancestor_index = ancestor->datum->object.parent_object_index;
+			}
 		}
 	}
 	if (unit->object.parent_object_index != NONE && unit->unit.parent_seat_index != NONE)

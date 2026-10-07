@@ -445,7 +445,17 @@ static void *allocate(long size)
 		return NULL;
 	}
 	memset(block, 0, size > 0 ? size : 1);
-	menu_tags.blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+	{
+		void **blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+
+		if (!blocks)
+		{
+			free(block);
+			build.failed = TRUE;
+			return NULL;
+		}
+		menu_tags.blocks = blocks;
+	}
 	menu_tags.blocks[menu_tags.block_count++] = block;
 	return block;
 }
@@ -1339,7 +1349,9 @@ static void instance_set(struct cache_file_tag_instance *instances, long group_t
 	instance->parent_group_tags[0] = NONE;
 	instance->parent_group_tags[1] = NONE;
 	instance->tag_index = tag_index;
-	instance->name = copy;
+	/* (the name is read by tag_loaded: of none, when the copy failed, which
+	fails the build) */
+	instance->name = copy ? copy : "";
 	instance->base_address = definition;
 }
 
@@ -1673,6 +1685,8 @@ void menu_tags_loaded(
 	build.spinner_tags = malloc((widget_count + 1) * sizeof(long));
 	build.bitmap_tags = malloc((menus->bitmap_count + 1) * sizeof(long));
 	build.strings_tags = malloc((menus->string_list_count + 1) * sizeof(long));
+	if (!build.widget_tags || !build.text_tags || !build.spinner_tags || !build.bitmap_tags || !build.strings_tags)
+		goto failed;
 	for (index = 0; index < widget_count; index++)
 	{
 		own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);

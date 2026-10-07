@@ -453,6 +453,14 @@ What reaches the other machines, and how, decides how the game feels over
 a real network as much as the model does (compared with Quake III, Source,
 Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
+- **Datagrams carry only what is theirs.** A datagram is known to be a
+  machine's only by the address it came from, which anyone can send one
+  as. So a client takes from a datagram only what the host sends in one: its
+  game's advertisement, its answer to a ping, and the distributed netcode's
+  messages (checked as the host's below); the game's own messages (a player
+  added or removed, the game begun or over, its settings), which the host
+  sends over its connection, are ignored in a datagram
+  (`network_client_message_handler.c`).
 - **Nothing held back.** The game's connections (the reliable messages:
   objects made and deleted, the game type's state, hits, pickups) send each
   write at once (`TCP_NODELAY`, in `xnet.c` for the game's sockets and in
@@ -550,7 +558,16 @@ shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
-datagrams, to test as over the internet.
+datagrams, to test as over the internet. `debug.network_corrupt` damages
+that share of the datagrams a machine receives at random (bytes changed,
+cut short, stretched to a full datagram, or replaced throughout: `xnet.c`),
+and `debug.network_corrupt_stream` that share of its reads of connections
+(a damaged connection is closed, so a little goes a long way), from
+`debug.network_corrupt_after` seconds after the start (what a host sends its
+own client over the loopback is damaged too, so the game is set up and
+started first), to test that nothing another machine sends can crash the
+game: a host and a client with a third of their datagrams damaged must play
+on, their logs noting what they refused.
 
 The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it

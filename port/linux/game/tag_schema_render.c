@@ -1227,6 +1227,34 @@ static boolean bitmap_group_check(
 	struct bitmap_group *group = base;
 	long sequence_index;
 
+	/* (the texture cache adds the pixel data's offset in the file to each
+	bitmap's own: the sum must be in the map, as bitmap_data_check has the
+	bitmap's alone) */
+	{
+		long file_length = tag_validate_file_length(validation);
+		long bitmap_index;
+
+		if (group->pixel_data.file_offset < 0 || group->pixel_data.file_offset > file_length)
+		{
+			tag_validate_correct(validation, "has its pixel data at %08lx, outside the map's %ld: 0",
+				(unsigned long)group->pixel_data.file_offset, file_length);
+			group->pixel_data.file_offset = 0;
+		}
+		for (bitmap_index = 0; bitmap_index < group->bitmaps.count; bitmap_index++)
+		{
+			struct bitmap_data *bitmap = (struct bitmap_data *)group->bitmaps.address + bitmap_index;
+
+			if (bitmap->pixels_offset > file_length - group->pixel_data.file_offset - bitmap->pixels_size)
+			{
+				tag_validate_correct(validation,
+					"has bitmap %ld with %ld bytes of pixels at %08lx past its data at %08lx, outside the map's %ld: none",
+					bitmap_index, bitmap->pixels_size, (unsigned long)bitmap->pixels_offset,
+					(unsigned long)group->pixel_data.file_offset, file_length);
+				bitmap->pixels_offset = 0;
+				bitmap->pixels_size = 0;
+			}
+		}
+	}
 	for (sequence_index = 0; sequence_index < group->sequences.count; sequence_index++)
 	{
 		struct bitmap_group_sequence *sequence = (struct bitmap_group_sequence *)group->sequences.address +
