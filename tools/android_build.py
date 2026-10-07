@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
                           compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
-                          profile_use_flags, xdk_headers)
+                          profile_use_flags, updater_defines, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
 
@@ -421,6 +421,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     ])
     for source in game_sources(config):
         cflags = game_cflags
+        if source.as_posix() == "source/main/main.c":
+            cflags += " " + updater_defines(getattr(sln, "port_release", False))
         if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
             cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
         objects.append(guest_object(source, cflags))

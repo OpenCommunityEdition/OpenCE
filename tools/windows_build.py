@@ -366,7 +366,11 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             f"-I{XDK_INCLUDE}",
         ])
         for source in game_sources(linux_config):
-            add_object(source, game_cflags)
+            # The halt screen and version command identify this native build.
+            flags = game_cflags
+            if source.as_posix() == "source/main/main.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
             add_object(source, game_cflags)
 

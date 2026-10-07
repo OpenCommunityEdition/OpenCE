@@ -429,7 +429,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             sdk_flags,
         ])
         for source in game_sources(config):
-            add_object(source, game_cflags)
+            # The halt screen and version command identify this native build.
+            flags = game_cflags
+            if source.as_posix() == "source/main/main.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         # Port-specific units that must see the game exactly as its own
         # sources do (port/linux/game).
         for source in sorted(Path(config["game_sources"]).glob("*.c")):
