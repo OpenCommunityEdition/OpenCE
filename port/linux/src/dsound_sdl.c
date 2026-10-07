@@ -540,6 +540,26 @@ static BOOL take_frame(struct sdl_stream *stream, float *frame)
 	}
 }
 
+/* whether the voice has a frame to take; the packets with none left are
+marked finished on the way, as take_frame marks them */
+static BOOL voice_has_frames(struct sdl_stream *stream)
+{
+	unsigned long position;
+
+	for (position = 0; position < stream->packet_count; position++)
+	{
+		struct voice_packet *packet = &stream->packets[(stream->packet_head + position) % MAXIMUM_STREAM_PACKETS];
+
+		if (packet->finished)
+			continue;
+		if (stream->cursor < packet->frames)
+			return TRUE;
+		stream->cursor = 0;
+		packet->finished = TRUE;
+	}
+	return FALSE;
+}
+
 /* ---------- mixing */
 
 /* mixes one voice into output (frames of stereo float), and into the reverb's
@@ -560,6 +580,16 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	rate, and the frames it reaches on each side */
 	scale = step > 1.0 ? (float)(1.0 / (step < RESAMPLER_MAXIMUM_STRETCH ? step : RESAMPLER_MAXIMUM_STRETCH)) : 1.0f;
 	width = (long)ceilf(RESAMPLER_ZERO_CROSSINGS / scale);
+	/* a voice that ran dry and stopped (below) starts over once it has
+	frames again: stream_process starts over only a stream with no packets,
+	and the next can come before the finished ones are completed */
+	if (stream->silence > (unsigned long)(2 * width))
+	{
+		if (!voice_has_frames(stream))
+			return;
+		resampler_reset(stream);
+		stream->gains_valid = FALSE;
+	}
 	voice_gains(stream, &target_left, &target_right, &target_room, &target_direct_lowpass, &target_room_lowpass);
 	if (!stream->gains_valid)
 	{
