@@ -22,7 +22,16 @@ hang, and a map it lets through must be clean when checked again.
 With --log, each run that was corrected is written to a file as the map's
 name, the seed and the changed words (offset:value in the inflated file).
 
-usage: map_validate [--strict] [--quiet] [--fuzz iterations [--seed n] [--log file]] map.map...
+A Halo Custom Edition or OpenSauce map is checked as the game checks one
+(port/linux/game/custom_edition_cache.c): its loader reads it, with the
+resource maps beside it (or in --maps), into its own tag cache, its bytes
+are converted for this build, then the validator checks its tags and each
+of its structure bsps. Fuzzing changes words of its file, so that the
+loader and the conversion are tried too. (The game also decodes its Ogg
+Vorbis sounds and converts its scripts and geometry, from tags the validator
+passed: not here.) Resource maps given as maps are passed over.
+
+usage: map_validate [--strict] [--quiet] [--maps folder] [--fuzz iterations [--seed n] [--log file]] map.map...
 */
 
 #include <stdarg.h>
@@ -34,6 +43,7 @@ usage: map_validate [--strict] [--quiet] [--fuzz iterations [--seed n] [--log fi
 #include <unistd.h>
 
 #include "zlib_prefixed.h"
+#include "../port/linux/game/cache_file_formats.h"
 
 /* ---------- constants */
 
@@ -119,6 +129,13 @@ unsigned char tag_validate_tags(void *tag_header, long tag_data_size, long file_
 unsigned char tag_validate_structure_bsp(long tag_index, void *base, long size);
 long tag_validate_corrections(void);
 unsigned char tag_validate_claimed(void const *address);
+struct tag_validate_file_range
+{
+	unsigned long offset;
+	unsigned long size;
+};
+unsigned char tag_validate_custom_edition_tags(void *tag_header, long loaded_size, unsigned long tag_cache_size,
+	struct tag_validate_file_range const *file_ranges, short file_range_count, char const *map_name);
 
 static int quiet;
 /* (fuzzing: each bsp is checked twice, and whether a second check of one
@@ -521,9 +538,419 @@ static int map_fuzz(char const *path, unsigned char *tag_cache, unsigned long se
 	return failed;
 }
 
+/* ---------- Custom Edition maps */
+
+enum
+{
+	/* where a Custom Edition map's bitmaps.map and sounds.map count in the
+	offsets of its tags, after the map itself (as the game has them,
+	custom_edition_cache.c) */
+	CUSTOM_EDITION_BITMAPS_OFFSET = 0x40000000,
+	CUSTOM_EDITION_SOUNDS_OFFSET = 0x60000000,
+};
+
+/* a file read whole */
+struct memory_file
+{
+	unsigned char *bytes;
+	unsigned long size;
+	struct cache_file_source source;
+};
+
+/* the folder resource maps are looked in, when not beside the map (--maps) */
+static char const *resource_maps_folder;
+
+static int memory_file_read(void *context, uint32_t offset, uint32_t size, void *buffer)
+{
+	struct memory_file const *file = context;
+
+	if (offset > file->size || size > file->size - offset)
+		return 0;
+	memcpy(buffer, file->bytes + offset, size);
+	return 1;
+}
+
+static int memory_file_open(struct memory_file *file, char const *path)
+{
+	FILE *stream = fopen(path, "rb");
+	long size;
+
+	memset(file, 0, sizeof(*file));
+	if (!stream)
+		return 0;
+	if (fseek(stream, 0, SEEK_END) || (size = ftell(stream)) < 0 || fseek(stream, 0, SEEK_SET) ||
+		!(file->bytes = malloc((size_t)size + 1)) || fread(file->bytes, 1, (size_t)size, stream) != (size_t)size)
+	{
+		free(file->bytes);
+		file->bytes = NULL;
+		fclose(stream);
+		return 0;
+	}
+	fclose(stream);
+	file->size = (unsigned long)size;
+	file->source.context = file;
+	file->source.read = memory_file_read;
+	file->source.size = (uint32_t)size;
+	return 1;
+}
+
+static void memory_file_close(struct memory_file *file)
+{
+	free(file->bytes);
+	memset(file, 0, sizeof(*file));
+}
+
+/* a map's resource maps (bitmaps.map, sounds.map, loc.map, or an OpenSauce
+mod set's data_files/<mod>-bitmaps.map and so on), beside it or in --maps;
+those missing are left closed, and the map refused if it needs them */
+struct custom_edition_resources
+{
+	struct memory_file files[NUMBER_OF_RESOURCE_MAP_TYPES];
+	struct resource_map storage[NUMBER_OF_RESOURCE_MAP_TYPES];
+	struct resource_map *maps[NUMBER_OF_RESOURCE_MAP_TYPES];
+};
+
+static void custom_edition_resources_open(struct custom_edition_resources *resources, char const *map_path,
+	struct cache_file_identity const *identity)
+{
+	short type;
+
+	memset(resources, 0, sizeof(*resources));
+	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
+	{
+		char path[1024];
+		char const *slash = strrchr(map_path, '/');
+		int folder_length = resource_maps_folder ? (int)strlen(resource_maps_folder) : slash ? (int)(slash - map_path) : 1;
+		char const *folder = resource_maps_folder ? resource_maps_folder : slash ? map_path : ".";
+
+		if (identity->has_opensauce_header && (identity->opensauce.flags >> _opensauce_cache_uses_mod_data_files_bit) & 1)
+		{
+			snprintf(path, sizeof(path), "%.*s/data_files/%s-%s.map", folder_length, folder, identity->opensauce.mod_name,
+				resource_map_type_describe((enum resource_map_type)type));
+		}
+		else
+		{
+			snprintf(path, sizeof(path), "%.*s/%s.map", folder_length, folder,
+				resource_map_type_describe((enum resource_map_type)type));
+		}
+		if (memory_file_open(&resources->files[type], path) &&
+			resource_map_open(&resources->files[type].source, (enum resource_map_type)type, &resources->storage[type]) ==
+				_cache_file_status_ok)
+		{
+			resources->maps[type] = &resources->storage[type];
+		}
+	}
+}
+
+static void custom_edition_resources_close(struct custom_edition_resources *resources)
+{
+	short type;
+
+	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
+	{
+		if (resources->maps[type])
+			resource_map_close(resources->maps[type]);
+		memory_file_close(&resources->files[type]);
+	}
+}
+
+/* a Custom Edition map (map, with its resources) loaded, converted and
+checked where the game does it, then each of its structure bsps: 0 if it
+plays (its corrections counted), 1 if it is refused. *loaded_bytes is how
+many bytes of the tag cache its tags take. */
+static int custom_edition_check(struct memory_file *map, struct custom_edition_resources *resources,
+	unsigned char *tag_cache, char const *name, long *corrections, unsigned long *loaded_bytes)
+{
+	struct custom_edition_load_report report;
+	struct custom_edition_conversion_report conversion;
+	struct tag_validate_file_range ranges[3];
+	short range_count = 0;
+	enum cache_file_status status;
+	struct tag_header *tags = (struct tag_header *)tag_cache;
+	struct tag_block *bsps;
+	long bsp_count;
+	long index;
+	int refused = 0;
+
+	*corrections = 0;
+	*loaded_bytes = 0;
+	memset(tag_cache, 0xCD, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED);
+	status = custom_edition_cache_load(&map->source, resources->maps, tag_cache, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+		&report);
+	if (status != _cache_file_status_ok)
+	{
+		if (!quiet)
+		{
+			printf("%s: its loader refuses it: %s (tag %ld, %08lx)\n", name, cache_file_status_describe(status),
+				(long)report.problem_tag_index, (unsigned long)report.problem_location);
+		}
+		return 1;
+	}
+	*loaded_bytes = report.tag_data_bytes + report.resource_tag_bytes;
+	custom_edition_cache_combine_resource_offsets(tag_cache, *loaded_bytes, CUSTOM_EDITION_BITMAPS_OFFSET,
+		CUSTOM_EDITION_SOUNDS_OFFSET);
+	status = custom_edition_cache_convert(tag_cache, *loaded_bytes, report.identity.name, &conversion);
+	if (status != _cache_file_status_ok)
+	{
+		if (!quiet)
+			printf("%s: its conversion refuses it: %s\n", name, cache_file_status_describe(status));
+		return 1;
+	}
+	ranges[range_count].offset = 0;
+	ranges[range_count++].size = report.identity.file_length;
+	if (resources->maps[_resource_map_bitmaps])
+	{
+		ranges[range_count].offset = CUSTOM_EDITION_BITMAPS_OFFSET;
+		ranges[range_count++].size = resources->files[_resource_map_bitmaps].size;
+	}
+	if (resources->maps[_resource_map_sounds])
+	{
+		ranges[range_count].offset = CUSTOM_EDITION_SOUNDS_OFFSET;
+		ranges[range_count++].size = resources->files[_resource_map_sounds].size;
+	}
+	if (!tag_validate_custom_edition_tags(tag_cache, (long)*loaded_bytes, report.tag_cache_bytes, ranges, range_count,
+		name))
+	{
+		return 1;
+	}
+	*corrections = tag_validate_corrections();
+
+	/* each bsp, where it loads: the scenario's references, as its loader
+	found them (custom_edition_structure_bsp_reference_valid) */
+	{
+		short scenario_index = (short)tags->scenario_tag_index;
+
+		if (scenario_index < 0 || scenario_index >= tags->tag_count ||
+			tags->instances[scenario_index].group_tag != SCENARIO_GROUP_TAG)
+		{
+			if (!quiet)
+				printf("%s: its tag header names no scenario\n", name);
+			return 1;
+		}
+		bsps = (struct tag_block *)((unsigned char *)tags->instances[scenario_index].base_address +
+			SCENARIO_STRUCTURE_BSPS_OFFSET);
+		bsp_count = bsps->count < MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO ? bsps->count : MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO;
+	}
+	for (index = 0; index < bsp_count && !refused; index++)
+	{
+		struct scenario_structure_bsp_reference *reference =
+			(struct scenario_structure_bsp_reference *)bsps->address + index;
+		unsigned long address = (unsigned long)reference->base_address;
+		unsigned long top = CUSTOM_EDITION_TAG_CACHE_ADDRESS + report.tag_cache_bytes;
+
+		if (reference->file_offset < CACHE_FILE_HEADER_SIZE || reference->file_size < 0x18 ||
+			(unsigned long)reference->file_offset > report.identity.file_length ||
+			(unsigned long)reference->file_size > report.identity.file_length - (unsigned long)reference->file_offset ||
+			address < CUSTOM_EDITION_TAG_CACHE_ADDRESS + *loaded_bytes || address > top ||
+			(unsigned long)reference->file_size > top - address)
+		{
+			if (!quiet)
+				printf("%s: its structure bsp %ld is outside it\n", name, index);
+			refused = 1;
+			break;
+		}
+		memset(tag_cache + *loaded_bytes, 0xCD, report.tag_cache_bytes - *loaded_bytes);
+		memcpy(reference->base_address, map->bytes + reference->file_offset, reference->file_size);
+		if (!tag_validate_structure_bsp(reference->tag_index, reference->base_address, reference->file_size))
+		{
+			refused = 1;
+		}
+		else if (recheck)
+		{
+			long before = tag_validate_corrections();
+
+			if (!tag_validate_structure_bsp(reference->tag_index, reference->base_address, reference->file_size) ||
+				tag_validate_corrections() != before)
+			{
+				printf("%s: fuzz seed %lu: structure bsp %ld as corrected is not clean when checked again\n", name,
+					fuzz_seed, index);
+				recheck_failed = 1;
+			}
+		}
+	}
+	*corrections = tag_validate_corrections();
+
+	return refused;
+}
+
+/* the Custom Edition map at path checked (custom_edition_check), or, with
+iterations, fuzzed as map_fuzz fuzzes an Xbox map, its file's words changed */
+static int custom_edition_validate(char const *path, unsigned char *tag_cache, long *corrections, unsigned long seed,
+	long iterations)
+{
+	char const *name = strrchr(path, '/') ? strrchr(path, '/') + 1 : path;
+	struct memory_file map;
+	struct custom_edition_resources resources;
+	struct cache_file_identity identity;
+	unsigned long loaded_bytes;
+	unsigned long *claimed = NULL;
+	long claimed_count = 0;
+	long refusals = 0;
+	long corrected = 0;
+	long iteration;
+	int failed = 0;
+
+	*corrections = 0;
+	if (!memory_file_open(&map, path) || cache_file_identify(&map.source, &identity) != _cache_file_status_ok)
+	{
+		printf("%s: cannot be read\n", name);
+		memory_file_close(&map);
+		return 1;
+	}
+	custom_edition_resources_open(&resources, path, &identity);
+	if (!iterations)
+	{
+		failed = custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes);
+		custom_edition_resources_close(&resources);
+		memory_file_close(&map);
+		return failed;
+	}
+
+	fuzz_name = name;
+	recheck = 1;
+	/* (the words of its tag data that the tags' roots, blocks and data
+	hold, where most changes go) */
+	if (!custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes))
+	{
+		unsigned long offset;
+
+		claimed = malloc(sizeof(*claimed) * (identity.tag_data_size / 4 + 1));
+		for (offset = 0; claimed && offset + 4 <= identity.tag_data_size; offset += 4)
+		{
+			if (tag_validate_claimed(tag_cache + offset))
+				claimed[claimed_count++] = identity.tag_data_offset + offset;
+		}
+	}
+	for (iteration = 0; iteration < iterations; iteration++)
+	{
+		enum { MAXIMUM_CHANGES = 8 };
+		unsigned long offsets[MAXIMUM_CHANGES];
+		unsigned long values[MAXIMUM_CHANGES];
+		long changes;
+		long change;
+
+		fuzz_seed = seed + iteration;
+		fuzz_state = fuzz_seed * 2654435761UL + 1;
+		changes = 1 + fuzz_random() % MAXIMUM_CHANGES;
+		for (change = 0; change < changes; change++)
+		{
+			/* (most in the tags' roots, blocks and data, some anywhere in the
+			tag data, some anywhere in the file: its bsps, its model data,
+			its header) */
+			unsigned long choice = fuzz_random() % 8;
+			unsigned long offset = choice < 5 && claimed_count ? claimed[fuzz_random() % claimed_count] :
+				choice < 7 ? identity.tag_data_offset + fuzz_random() % identity.tag_data_size :
+				fuzz_random() % map.size;
+			unsigned long value;
+
+			offset &= ~3UL;
+			if (offset + 4 > map.size)
+				offset = identity.tag_data_offset;
+			offsets[change] = offset;
+			memcpy(&values[change], map.bytes + offset, 4);
+			switch (fuzz_random() % 9)
+			{
+			case 0: value = fuzz_random(); break;
+			case 1: value = fuzz_random() % 8; break;
+			case 2: value = fuzz_random() % 300; break;
+			case 3: value = 0xFFFFFFFFUL; break;
+			case 4: value = 0x80000000UL; break;
+			case 5: value = 0x7FFFFFFFUL; break;
+			case 6: value = 0xFFFF; break;
+			case 7: value = CUSTOM_EDITION_TAG_CACHE_ADDRESS + fuzz_random() % identity.tag_data_size; break;
+			default: value = CUSTOM_EDITION_TAG_CACHE_ADDRESS + fuzz_random() % CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED; break;
+			}
+			memcpy(map.bytes + offset, &value, 4);
+		}
+
+		alarm(120);
+		if (custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes))
+		{
+			refusals++;
+		}
+		else
+		{
+			if (*corrections)
+			{
+				corrected++;
+				if (fuzz_log)
+				{
+					fprintf(fuzz_log, "%s %lu", name, fuzz_seed);
+					for (change = 0; change < changes; change++)
+					{
+						unsigned long value;
+
+						memcpy(&value, map.bytes + offsets[change], 4);
+						fprintf(fuzz_log, " %lx:%lx", offsets[change], value);
+					}
+					fprintf(fuzz_log, "\n");
+				}
+			}
+			/* (the tags as corrected, checked again: nothing more to correct;
+			the files' ranges do not matter to the tags' own) */
+			{
+				struct tag_validate_file_range everything = { 0, 0xFFFFFFFFUL };
+
+				if (!tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+						&everything, 1, name) ||
+					tag_validate_corrections() != 0)
+				{
+					printf("%s: fuzz seed %lu: the corrected tags are not clean when checked again:\n", name, fuzz_seed);
+					failed = 1;
+					/* (what was corrected, then what is left) */
+					quiet = 0;
+					custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes);
+					printf("checked again:\n");
+					tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+						&everything, 1, name);
+					quiet = 1;
+				}
+			}
+		}
+		alarm(0);
+		for (change = changes - 1; change >= 0; change--)
+			memcpy(map.bytes + offsets[change], &values[change], 4);
+	}
+	recheck = 0;
+	if (recheck_failed)
+		failed = 1;
+	printf("%s: %ld runs: %ld refused, %ld corrected, %ld unchanged\n", name, iterations, refusals, corrected,
+		iterations - refusals - corrected);
+	free(claimed);
+	custom_edition_resources_close(&resources);
+	memory_file_close(&map);
+
+	return failed;
+}
+
+/* the format of the file at path, from its first bytes */
+static enum cache_file_format file_format(char const *path)
+{
+	unsigned char header[CACHE_FILE_HEADER_SIZE];
+	FILE *file = fopen(path, "rb");
+	size_t read;
+	int has_opensauce_header;
+
+	if (!file)
+		return _cache_file_format_unrecognized;
+	read = fread(header, 1, sizeof(header), file);
+	fclose(file);
+	if (read < 16)
+		return _cache_file_format_unrecognized;
+	if (read == sizeof(header) && cache_file_header_format(header, &has_opensauce_header) != _cache_file_format_unrecognized)
+		return cache_file_header_format(header, &has_opensauce_header);
+	{
+		unsigned long type = header[0] | header[1] << 8 | (unsigned long)header[2] << 16 | (unsigned long)header[3] << 24;
+
+		return type > _resource_map_none && type < NUMBER_OF_RESOURCE_MAP_TYPES ?
+			_cache_file_format_resource_map : _cache_file_format_unrecognized;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	unsigned char *tag_cache;
+	unsigned char *custom_edition_tag_cache;
 	int strict = 0;
 	int failed = 0;
 	long fuzz_iterations = 0;
@@ -535,6 +962,14 @@ int main(int argc, char **argv)
 	if (tag_cache != (unsigned char *)TAG_CACHE_BASE_ADDRESS)
 	{
 		fprintf(stderr, "map_validate: the tag cache's address (%08x) is taken\n", TAG_CACHE_BASE_ADDRESS);
+		return 2;
+	}
+	custom_edition_tag_cache = mmap((void *)CUSTOM_EDITION_TAG_CACHE_ADDRESS, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+		PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+	if (custom_edition_tag_cache != (unsigned char *)CUSTOM_EDITION_TAG_CACHE_ADDRESS)
+	{
+		fprintf(stderr, "map_validate: the Custom Edition tag cache's address (%08lx) is taken\n",
+			(unsigned long)CUSTOM_EDITION_TAG_CACHE_ADDRESS);
 		return 2;
 	}
 	for (argument = 1; argument < argc; argument++)
@@ -570,6 +1005,35 @@ int main(int argc, char **argv)
 		{
 			seed = strtoul(argv[++argument], NULL, 10);
 			continue;
+		}
+		if (!strcmp(argv[argument], "--maps") && argument + 1 < argc)
+		{
+			resource_maps_folder = argv[++argument];
+			continue;
+		}
+		switch (file_format(argv[argument]))
+		{
+		case _cache_file_format_resource_map:
+			if (!quiet)
+				printf("%s: a resource map, passed over\n", argv[argument]);
+			continue;
+		case _cache_file_format_custom_edition_cache:
+			if (custom_edition_validate(argv[argument], custom_edition_tag_cache, &corrections, seed, fuzz_iterations))
+			{
+				if (!fuzz_iterations)
+					printf("%s: refused\n", argv[argument]);
+				failed = 1;
+			}
+			else if (!fuzz_iterations)
+			{
+				printf("%s: %ld corrections\n", argv[argument], corrections);
+				if (strict && corrections)
+					failed = 1;
+			}
+			fflush(stdout);
+			continue;
+		default:
+			break;
 		}
 		if (fuzz_iterations)
 		{

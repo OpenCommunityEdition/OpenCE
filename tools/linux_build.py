@@ -524,7 +524,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 inputs=tool,
                 variables={"cflags": " ".join([posix_cflags, f"-I{ZLIB_DIR}", *ZLIB_DEFINES, posix_extra])},
             )
+            # (and the Custom Edition maps' loader, cache_file_formats.c)
             tool_objects = [tool_object, obj_dir / (game_dir / "tag_validate.o"),
+                            obj_dir / (game_dir / "cache_file_formats.o"),
                             *(obj_dir / source.with_suffix(".o") for source in sorted(game_dir.glob("tag_schema*.c"))),
                             *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES)]
             n.build(
