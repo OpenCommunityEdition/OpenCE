@@ -15187,7 +15187,13 @@ static boolean hs_expression_changes_no_game(
 				break;
 		}
 		if (index >= (short)NUMBEROF(allowed))
-			return FALSE;
+		{
+			unsigned option_index;
+			const struct console_option *option;
+			for (option_index = 0; (option = console_option_get(option_index)) != NULL; option_index++)
+				if (!csstrcmp(token, option->command)) break;
+			if (!option) return FALSE;
+		}
 	}
 	return TRUE;
 }
