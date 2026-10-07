@@ -38,6 +38,7 @@ static float target_scale[2] = {1, 1};
 static unsigned target_samples = 1;
 static void platform_log(const char *text) {(void)text;}
 HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD, UINT *, ULONGLONG *);
+static void test_frame_advance(void);
 '''
 
 FAKE_GL = r'''
@@ -108,6 +109,7 @@ static void complete(unsigned through) {
     while(completed<through) {
         struct write_record w=writes[++completed];mapped[w.slot]=w.value;
     }
+    test_frame_advance();
 }
 static void host_gl_buffer_write(GLenum target, unsigned offset, unsigned size, const void *value) {
     CHECK(target==GL_ATOMIC_COUNTER_BUFFER && size==sizeof(GLuint));
@@ -212,13 +214,14 @@ static void scaling_and_fallback(void) {
     }
     reset(FALSE,FALSE);submit(0,64);query_available=FALSE;unsigned value=77;
     CHECK(D3DDevice_GetVisibilityTestResult(0,&value,NULL)==S_OK);
-    CHECK(value==0);query_available=TRUE;CHECK(read(0)==64);
+    CHECK(value==0);query_available=TRUE;test_frame_advance();CHECK(read(0)==64);
 }
 static void sustained_lag(void) {
     reset(TRUE,FALSE);target_scale[0]=2;target_scale[1]=1.5f;target_samples=4;
     submit(0,768);unsigned pending_sequence=next_write;
     target_scale[0]=target_scale[1]=1;target_samples=1;
     for(unsigned frame=0;frame<5;frame++) {
+        test_frame_advance();
         getter_calls=spin_calls=0;
         CHECK(_rasterizer_widget_get_occlusion_test_result(0)==0);
         CHECK(getter_calls==1 && spin_calls==0);
@@ -229,6 +232,20 @@ static void sustained_lag(void) {
     complete(next_write);CHECK(read(0)==0);
     puts("PASS: five frames of GPU lag still update; cached counts use completed test's scale; hidden count eventually replaces visible count");
 }
+static void ordered_polling(void) {
+    reset(TRUE,FALSE);
+    for(unsigned i=0;i<1024;i++) submit(i,i%2 ? 256 : 0);
+    wait_calls=0;
+    for(unsigned i=0;i<1024;i++) CHECK(read(i)==0);
+    CHECK(wait_calls==1); /* One pending fence covers all later submissions. */
+    complete(next_write);
+    for(unsigned i=0;i<1024;i++) CHECK(read(i)==(i%2 ? 256 : 0));
+    /* Slot order is not submission order: a ready older test must still update. */
+    submit(1,512);complete(next_write);submit(0,256);
+    CHECK(read(0)==0);CHECK(read(1)==512);
+    complete(next_write);CHECK(read(0)==256);
+    puts("PASS: 1024 delayed flares need one readiness poll; older retained results update despite newer blocked tests");
+}
 #endif
 int main(void) {
     independence(FALSE,FALSE);
@@ -236,7 +253,7 @@ int main(void) {
     independence(FALSE,TRUE);
     puts("PASS: Android boolean/atomic paths; independent slots 0/1/4095; four windows; all 4096 slots and counter wrap");
 #else
-    nonblocking_caller();independence(TRUE,FALSE);stale_completion();scaling_and_fallback();sustained_lag();
+    nonblocking_caller();independence(TRUE,FALSE);stale_completion();scaling_and_fallback();sustained_lag();ordered_polling();
     puts("PASS: desktop mapped/unmapped paths; independent slots 0/1/4095; delayed/replaced results; 500 reuses; bounded syncs; failures; four windows; all slots; sample scaling");
 #endif
     return 0;
@@ -305,13 +322,14 @@ static void benchmark(void) {
     getter_calls=spin_calls=0;
     Uint64 frequency=SDL_GetPerformanceFrequency();
     for(unsigned frame=0;frame<FRAMES;frame++) {
+        test_frame_advance();
         for(unsigned i=0;i<FLARES;i++) submit(i,i%2 ? .2f : .7f);
         glFlush(); /* Deliberately queued GPU work, without a completion wait. */
         Uint64 start=SDL_GetPerformanceCounter();
         for(unsigned i=0;i<FLARES;i++) _rasterizer_widget_get_occlusion_test_result(i);
         times[frame]=1000.0*(SDL_GetPerformanceCounter()-start)/frequency;
     }
-    glFinish();for(unsigned i=0;i<FLARES;i++) CHECK(read(i)==(i%2 ? 512*512 : 0));
+    glFinish();test_frame_advance();for(unsigned i=0;i<FLARES;i++) CHECK(read(i)==(i%2 ? 512*512 : 0));
     qsort(times,FRAMES,sizeof(times[0]),time_compare);
     printf("BENCH: queued GPU work, %d flares x %d frames; read-batch median %.4f ms, p95 %.4f ms; getter calls %u, spin entries %u\n",
            FLARES,FRAMES,times[FRAMES/2],times[FRAMES*95/100],getter_calls,spin_calls);
@@ -353,20 +371,21 @@ int main(int argc,char **argv) {
         target_samples=actual_samples>0 ? actual_samples : 1;glViewport(0,0,64,64);
         glDepthMask(GL_TRUE);glClearDepth(.4);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);
         submit(0,.7f);submit(1,.2f);submit(4095,.2f);
-        glFinish();unsigned blocked=read(0),visible=read(1),reserved=read(4095);
+        glFinish();test_frame_advance();unsigned blocked=read(0),visible=read(1),reserved=read(4095);
         CHECK(blocked==0 && visible==4096 && reserved==4096);
-        submit(0,.2f);submit(1,.7f);glFinish();CHECK(read(0)==4096 && read(1)==0);
+        submit(0,.2f);submit(1,.7f);glFinish();test_frame_advance();CHECK(read(0)==4096 && read(1)==0);
         /* Half the source is blocked: keep the actual visible fraction. */
         glEnable(GL_SCISSOR_TEST);glScissor(0,0,32,64);glDepthMask(GL_TRUE);
         glClearDepth(1);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);glDisable(GL_SCISSOR_TEST);
-        submit(2,.7f);glFinish();CHECK(read(2)==2048);
+        submit(2,.7f);glFinish();test_frame_advance();CHECK(read(2)==2048);
         /* A scaled split window returns game pixels, not physical/MSAA samples. */
         target_scale[0]=target_scale[1]=2;glViewport(0,0,32,32);submit(3,.2f);
-        target_scale[0]=target_scale[1]=1;glFinish();CHECK(read(3)==256);
+        target_scale[0]=target_scale[1]=1;glFinish();test_frame_advance();CHECK(read(3)==256);
         glViewport(0,0,64,64);
         for(unsigned frame=0;frame<240;frame++) {
             submit(0,frame%2 ? .2f : .7f);submit(1,frame%2 ? .7f : .2f);
             glFinish();
+            test_frame_advance();
             CHECK(read(0)==(frame%2 ? 4096 : 2048));
             CHECK(read(1)==(frame%2 ? 2048 : 4096));
         }
@@ -375,7 +394,7 @@ int main(int argc,char **argv) {
     /* The same real depth results when persistent mapping is unavailable. */
     device.visibility_results=NULL;glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,64,64);
     glDepthMask(GL_TRUE);glClearDepth(.4);glClear(GL_DEPTH_BUFFER_BIT);glDepthMask(GL_FALSE);
-    target_samples=1;submit(0,.7f);submit(1,.2f);glFinish();CHECK(read(0)==0 && read(1)==4096);
+    target_samples=1;submit(0,.7f);submit(1,.2f);glFinish();test_frame_advance();CHECK(read(0)==0 && read(1)==4096);
     CHECK(glGetError()==GL_NO_ERROR);
     SDL_GL_DestroyContext(context);SDL_DestroyWindow(window);SDL_Quit();
     puts("PASS: real depth-occluded/visible/half-occluded flares; 1x/4x MSAA; split-window scaling; 480 alternating frames; unmapped fallback; no GL errors");
@@ -393,7 +412,7 @@ def main():
     source = args.source.read_text()
     definitions = source[source.index('#define VISIBILITY_TEST_SLOTS'):source.index('struct gl_device\n')]
     fields = source[source.index('\tGLuint queries[VISIBILITY_TEST_SLOTS];'):source.index('\n\tunsigned long frame;')]
-    device = 'static struct {\n' + fields + '\nBOOL gl_ready;\n} device;\n'
+    device = 'static struct {\n' + fields + '\nunsigned long frame;\nBOOL gl_ready;\n} device;\n'
     # Compile the production initialization statements, including buffer unbinding.
     init = source[source.index('\tglGenQueries(VISIBILITY_TEST_SLOTS, device.queries);'):source.index('\n\t{\n\t\tlong every = config_integer("debug.gpu_flush_draws");')]
     init += '\n#endif\n'  # Close the desktop branch whose config block follows.
@@ -402,6 +421,7 @@ def main():
         'void WINAPI D3DDevice_BeginVisibilityTest(', 'HRESULT WINAPI D3DDevice_EndVisibilityTest(',
         'static GLuint visibility_unscaled(', 'HRESULT WINAPI D3DDevice_GetVisibilityTestResult('))
     body = definitions + device + 'static void visibility_init(void) {\n' + init + atomic + '\n}\n' + functions
+    body += '\nstatic void test_frame_advance(void) {device.frame++;}\n'
     caller = CALLER + block((ROOT / 'source/rasterizer/xbox/rasterizer_xbox_widgets.c').read_text(),
                            'long _rasterizer_widget_get_occlusion_test_result(')
     compiler = [args.cc, '-std=gnu11', '-O2', '-fuse-ld=lld']

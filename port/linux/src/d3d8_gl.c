@@ -543,6 +543,10 @@ struct gl_device
 	volatile GLuint *visibility_results;
 	/* completion of each current query's write into the mapped result slot */
 	GLsync visibility_sync[VISIBILITY_TEST_SLOTS];
+	ULONGLONG visibility_sequence[VISIBILITY_TEST_SLOTS];
+	ULONGLONG visibility_next_sequence;
+	ULONGLONG visibility_blocked_sequence;
+	unsigned long visibility_blocked_frame;
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
 	unsigned long flush_every;
 	unsigned long flush_draws;
@@ -2052,11 +2056,7 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	/* Keep an unread test until its result arrives. Replacing its fence
 	every frame could starve the cache when the GPU stays frames behind. */
 	if (device.visibility_unread[index])
-	{
-		D3DDevice_GetVisibilityTestResult(index, NULL, NULL);
-		if (device.visibility_unread[index])
-			return S_OK;
-	}
+		return S_OK;
 #endif
 	/* the target's samples to a game pixel (its pixels, by its samples a
 	pixel with multisampling): the result is a count of the game's pixels
@@ -2071,6 +2071,7 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	device.query_pending[index] = TRUE;
 	device.visibility_unread[index] = TRUE;
 #ifndef HALO_ANDROID
+	device.visibility_sequence[index] = ++device.visibility_next_sequence;
 	if (device.visibility_results)
 	{
 		/* the GPU writes the count into the slot once it is known (given
@@ -2121,6 +2122,18 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	}
 #endif
 #ifndef HALO_ANDROID
+	/* GPU commands complete in submission order. After one pending test,
+	later tests cannot be ready at that observation point either. Reuse
+	their cached counts for this frame instead of polling the driver for
+	every flare. Older retained tests still get their own readiness check. */
+	if (device.visibility_unread[index] && device.visibility_blocked_sequence &&
+		device.visibility_blocked_frame == device.frame &&
+		device.visibility_sequence[index] >= device.visibility_blocked_sequence)
+	{
+		if (result)
+			*result = device.visibility_known[index];
+		return S_OK;
+	}
 	if (device.visibility_results && device.visibility_sync[index] && device.visibility_unread[index])
 	{
 		/* coherent mapping does not mean the current write has completed:
@@ -2130,6 +2143,8 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 
 		if (status == GL_TIMEOUT_EXPIRED)
 		{
+			device.visibility_blocked_sequence = device.visibility_sequence[index];
+			device.visibility_blocked_frame = device.frame;
 			if (result)
 				*result = device.visibility_known[index];
 			return S_OK;
@@ -2170,6 +2185,13 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			device.visibility_known[index] = samples;
 			device.visibility_unread[index] = FALSE;
 		}
+#ifndef HALO_ANDROID
+		else
+		{
+			device.visibility_blocked_sequence = device.visibility_sequence[index];
+			device.visibility_blocked_frame = device.frame;
+		}
+#endif
 	}
 	if (result)
 		*result = device.visibility_known[index];
