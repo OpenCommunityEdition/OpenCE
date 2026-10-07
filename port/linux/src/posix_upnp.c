@@ -151,8 +151,9 @@ static int upnp_find_router(char *error, int error_size)
 		upnp_remove_left_forwardings();
 		return 1;
 	case UPNP_PRIVATEIP_IGD:
+		/* (not the address itself: logs and screens show none) */
 		snprintf(error, (size_t)error_size,
-			"the router's internet address (%s) is a private one: another NAT is beyond it", wan_address);
+			"the router's internet address is a private one: another NAT is beyond it");
 		break;
 	case UPNP_DISCONNECTED_IGD:
 		snprintf(error, (size_t)error_size, "the UPnP router is not connected to the internet");
