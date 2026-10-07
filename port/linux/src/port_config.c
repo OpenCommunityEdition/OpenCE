@@ -12,6 +12,7 @@ it exists, so that the player's edits and comments stay.
 
 #include "platform.h"
 #include "port_config.h"
+#include "console_options.h"
 #include "tomlc17.h"
 
 #include <SDL3/SDL.h>
@@ -22,6 +23,19 @@ it exists, so that the player's edits and comments stay.
 #include <string.h>
 
 /* ---------- the settings */
+
+/* Only explicitly registered local presentation options are console commands.
+Adding an alias never shifts Halo's compiled map-script indices. */
+static const struct console_option console_options[] =
+{
+	{ "display.vsync", "display.vsync", console_option_boolean, 0, 1, 0,
+		"Wait for the display between frames (0/1)." },
+};
+
+const struct console_option *console_option_get(unsigned index)
+{
+	return index < sizeof(console_options) / sizeof(console_options[0]) ? &console_options[index] : NULL;
+}
 
 enum config_type
 {
@@ -532,23 +546,33 @@ static char *config_read_file(const char *path, size_t *size)
 
 static int config_write_file(const char *path, const char *text)
 {
-#ifdef HALO_ANDROID
-	FILE *file = fopen(path, "wb");
+	char temporary[1100];
 	int written;
+
+	if (snprintf(temporary, sizeof(temporary), "%s.tmp", path) >= (int)sizeof(temporary))
+		return 0;
+#ifdef HALO_ANDROID
+	FILE *file = fopen(temporary, "wb");
 
 	if (!file)
 		return 0;
 	written = fwrite(text, 1, strlen(text), file) == strlen(text);
-	return fclose(file) == 0 && written;
+	if (fclose(file) != 0) written = 0;
+	if (written) written = rename(temporary, path) == 0;
+	if (!written) remove(temporary);
 #else
-	return SDL_SaveFile(path, text, strlen(text));
+	written = SDL_SaveFile(temporary, text, strlen(text));
+	if (written) written = SDL_RenamePath(temporary, path);
+	if (!written) SDL_RemovePath(temporary);
 #endif
+	return written;
 }
 
 struct config_text
 {
 	char *buffer;
 	size_t length, capacity;
+	int failed;
 };
 
 static void config_append(struct config_text *text, const char *string)
@@ -561,7 +585,10 @@ static void config_append(struct config_text *text, const char *string)
 		char *buffer = realloc(text->buffer, capacity);
 
 		if (!buffer)
+		{
+			text->failed = 1;
 			return;
+		}
 		text->buffer = buffer;
 		text->capacity = capacity;
 	}
@@ -1013,6 +1040,7 @@ static int config_line_section(const char *line, const char *end, char *section,
 of the file kept as it is */
 int config_write(const char *name, const char *value)
 {
+	struct config_value replacement;
 	const char *dot = strchr(name, '.');
 	long index = config_setting_index(name);
 	char section[64], key[64], wanted[80], current[64] = "", line_text[600], path[1024];
@@ -1027,20 +1055,21 @@ int config_write(const char *name, const char *value)
 	/* (the file read first, as the other settings are) */
 	config_value(name, config_settings[index].type);
 	pthread_mutex_lock(&config_lock);
-	config_set_from_text(&config_values[index], config_settings[index].type, value);
+	replacement = config_values[index];
+	config_set_from_text(&replacement, config_settings[index].type, value);
 	snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
 	snprintf(key, sizeof(key), "%s", dot + 1);
 	switch (config_settings[index].type)
 	{
 	case _config_boolean:
-		snprintf(line_text, sizeof(line_text), "%s = %s\n", key, config_values[index].boolean ? "true" : "false");
+		snprintf(line_text, sizeof(line_text), "%s = %s\n", key, replacement.boolean ? "true" : "false");
 		break;
 	case _config_integer:
-		snprintf(line_text, sizeof(line_text), "%s = %ld\n", key, config_values[index].integer);
+		snprintf(line_text, sizeof(line_text), "%s = %ld\n", key, replacement.integer);
 		break;
 	case _config_real:
 		/* (with its point: TOML reads 1 as an integer) */
-		snprintf(line_text, sizeof(line_text), "%s = %.15g", key, config_values[index].real);
+		snprintf(line_text, sizeof(line_text), "%s = %.15g", key, replacement.real);
 		if (!strpbrk(line_text + strlen(key) + 3, ".en"))
 			strcat(line_text, ".0");
 		strcat(line_text, "\n");
@@ -1050,7 +1079,9 @@ int config_write(const char *name, const char *value)
 		char *end = line_text + snprintf(line_text, sizeof(line_text), "%s = \"", key);
 		const char *character;
 
-		for (character = config_values[index].string; *character; character++)
+		if (!replacement.string) { pthread_mutex_unlock(&config_lock); return 0; }
+
+		for (character = replacement.string; *character; character++)
 		{
 			if (*character == '"' || *character == '\\')
 				*end++ = '\\';
@@ -1093,6 +1124,7 @@ int config_write(const char *name, const char *value)
 				config_append(&out, copy);
 				free(copy);
 			}
+			else out.failed = 1;
 		}
 		line = next;
 	}
@@ -1109,8 +1141,14 @@ int config_write(const char *name, const char *value)
 		}
 		config_append(&out, line_text);
 	}
-	succeeded = out.buffer && config_write_file(path, out.buffer);
-	config_change_count++;
+	succeeded = out.buffer && !out.failed && config_write_file(path, out.buffer);
+	if (succeeded)
+	{
+		config_values[index] = replacement;
+		config_change_count++;
+	}
+	else if (config_settings[index].type == _config_string)
+		free(replacement.string);
 	pthread_mutex_unlock(&config_lock);
 	free(out.buffer);
 	free(text);

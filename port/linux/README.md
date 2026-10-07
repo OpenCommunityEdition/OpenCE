@@ -218,6 +218,15 @@ from the next main menu.
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
+Registered local console options use the same settings store. For example,
+`display.vsync 0` disables V-Sync and saves it to `config.toml` immediately;
+`display.vsync` prints its value and `display.vsync default` restores its
+default. Tab completes registered names and `help display.vsync` describes
+them. Invalid arguments and failed saves keep the previous value. Only
+explicitly registered local display options use this path; legacy console
+variables retain their existing behavior. These options also work for co-op
+clients and in `init.txt`, without becoming map-script functions.
+
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: the display, taken at the mode of `display.resolution` (the nearest the display has), or at its desktop mode. `"borderless"`: a window over the whole desktop, whose mode does not change. `"windowed"`: a window of `display.window_size`. Empty: `display.fullscreen` decides (`true`: borderless). F11 changes between the window and the fullscreen mode. Video Setup sets it. |
