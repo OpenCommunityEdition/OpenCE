@@ -1247,13 +1247,15 @@ static boolean bitmap_data_check(
 		bitmap->mipmap_count = (short)PIN(bitmap->mipmap_count, 0, maximum_mipmap_count);
 	}
 	/* (a linear texture has a format with a linear form, and a pitch of
-	64-byte steps) */
+	64-byte steps: a Custom Edition map's rows are padded to them as its
+	pixels load, custom_edition_bitmaps.c) */
 	if (TEST_FLAG(bitmap->flags, _bitmap_linear_bit))
 	{
 		long pitch = (long)bitmap->width * bitmap_format_bits_per_pixel[bitmap->format] / 8;
+		long padded_pitch = (pitch + BITMAP_PITCH_ALIGNMENT - 1) / BITMAP_PITCH_ALIGNMENT * BITMAP_PITCH_ALIGNMENT;
 
 		if (compressed || bitmap->format == _bitmap_format_p8_bump || bitmap->type != _bitmap_type_2d ||
-			pitch % BITMAP_PITCH_ALIGNMENT || pitch > MAXIMUM_BITMAP_PITCH)
+			(pitch != padded_pitch && !tag_validate_custom_edition(validation)) || padded_pitch > MAXIMUM_BITMAP_PITCH)
 		{
 			tag_validate_correct(validation, "is linear, but of format %d, type %d, pitch %ld: not linear",
 				bitmap->format, bitmap->type, pitch);
