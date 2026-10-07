@@ -5881,7 +5881,9 @@ static boolean solo_level_initialize_list_single_player(
 /* port: the PC version's multiplayer menus (port/linux/game/menu_functions.c),
 on our lists rather than the Xbox's spinners: */
 
-/* the multiplayer maps (the Xbox's 13), and the one used last (else 0) */
+/* the multiplayer maps (the Xbox's 13), and the one used last (else 0),
+unless last_used is NULL: it is read from a file of the save root, which the
+menus that name maps each frame need not do */
 short ui_widget_port_multiplayer_maps(
 	char const *const **names,
 	short *last_used)
@@ -5890,6 +5892,8 @@ short ui_widget_port_multiplayer_maps(
 	short level_index;
 
 	*names = (char const *const *)event_handler_functions.multiplayer_levels;
+	if (!last_used)
+		return 13;
 	*last_used = 0;
 	if (saved_game_file_retrieve_last_used_multiplayer_map(map_name))
 	{

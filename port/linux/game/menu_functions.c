@@ -813,6 +813,7 @@ static void profile_name_show(struct widget_instance *description)
 	static struct player_profile profile;
 	static long read_index = NONE;
 	static unsigned long read_time;
+	static boolean read_good;
 	long index = player_ui_get_active_player_profile_index(0);
 
 	if (!description)
@@ -824,13 +825,17 @@ static void profile_name_show(struct widget_instance *description)
 	}
 	else if ((index = player_ui_get_player1_last_used_profile_index()) == NONE)
 		return;
-	else if (index != read_index || system_milliseconds() - read_time > 1000)
+	else
 	{
-		read_index = NONE;
-		if (!player_profile_get(index, &profile))
+		/* (one that cannot be read too: tried again a second later) */
+		if (index != read_index || system_milliseconds() - read_time > 1000)
+		{
+			read_index = index;
+			read_good = player_profile_get(index, &profile);
+			read_time = system_milliseconds();
+		}
+		if (!read_good)
 			return;
-		read_index = index;
-		read_time = system_milliseconds();
 	}
 	text_set(named(description, "current_profile_name", 0), profile.player_name);
 }
@@ -3103,8 +3108,8 @@ scenario's path or name */
 static void map_display_name(char const *map_name, wchar_t *text)
 {
 	char const *const *names;
-	short last, index;
-	short count = ui_widget_port_multiplayer_maps(&names, &last);
+	short index;
+	short count = ui_widget_port_multiplayer_maps(&names, NULL);
 
 	for (index = 0; index < count; index++)
 	{
@@ -4037,7 +4042,7 @@ static void lobby_row_text(short row, wchar_t *text)
 static void lobby_map_show(struct widget_instance *description, char const *map_name)
 {
 	char const *const *names;
-	short last, count = ui_widget_port_multiplayer_maps(&names, &last), map = 19, index;
+	short count = ui_widget_port_multiplayer_maps(&names, NULL), map = 19, index;
 	short level = campaign_level_of(map_name);
 	struct widget_instance *widget;
 
