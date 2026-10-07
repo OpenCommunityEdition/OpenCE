@@ -1484,8 +1484,9 @@ static void client_cinematic_end(
 
 /* client with nothing else to watch: moves the camera (position, forward,
 up) behind and above the host's eyes, like spectating a teammate. It eases
-toward the target so the host looking around doesn't jerk it. */
-static void client_watch_host_from_behind(
+toward the target so the host looking around doesn't jerk it. Returns
+whether the result is a camera the observer can accept. */
+static boolean client_watch_host_from_behind(
 	real_point3d *position,
 	real_vector3d *forward,
 	real_vector3d *up)
@@ -1509,15 +1510,19 @@ static void client_watch_host_from_behind(
 			&coop_presentation.watching_host_position);
 		vectors_interpolate(&coop_presentation.watching_host_forward, forward, WATCH_HOST_FOLLOW,
 			&coop_presentation.watching_host_forward);
-		normalize3d(&coop_presentation.watching_host_forward);
 	}
+	if (normalize3d(&coop_presentation.watching_host_forward) == 0.0f)
+		return FALSE;
 	*position = coop_presentation.watching_host_position;
 	*forward = coop_presentation.watching_host_forward;
-	/* keep the camera upright */
+	/* World up is not square to a host looking up or down. Rebuild up from
+	   the look direction when that pair would fail the camera check. */
 	up->i = 0.0f;
 	up->j = 0.0f;
 	up->k = 1.0f;
-	distributed_axes_make_valid(forward, up);
+	if (!distributed_axes_make_valid(forward, up))
+		observer_up_from_forward(forward, up);
+	return valid_real_vector3d_axes2(forward, up);
 }
 
 /* client: looks through the host's camera, or with its own */
@@ -3035,11 +3040,14 @@ static void client_presentation_apply(
 		match_assert_valid_observer_command) */
 		if (distributed_point_valid(&position, CAMERA_WORLD_BOUND) && distributed_axes_make_valid(&forward, &up))
 		{
+			boolean camera_ready = TRUE;
+
 			if (!(coop_presentation.cinematic_started && presentation->camera_scripted))
-				client_watch_host_from_behind(&position, &forward, &up);
-			scripted_camera_set_camera_point_relative(&position, &forward, &up,
-				PIN((real)presentation->camera_field_of_view / FIELD_OF_VIEW_SCALE, CAMERA_MINIMUM_FIELD_OF_VIEW,
-					CAMERA_MAXIMUM_FIELD_OF_VIEW), 0, NONE);
+				camera_ready = client_watch_host_from_behind(&position, &forward, &up);
+			if (camera_ready && valid_real_vector3d_axes2(&forward, &up))
+				scripted_camera_set_camera_point_relative(&position, &forward, &up,
+					PIN((real)presentation->camera_field_of_view / FIELD_OF_VIEW_SCALE, CAMERA_MINIMUM_FIELD_OF_VIEW,
+						CAMERA_MAXIMUM_FIELD_OF_VIEW), 0, NONE);
 		}
 	}
 	else
