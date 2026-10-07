@@ -70,6 +70,7 @@ jobs:
         run: |
           python -m pytest -q tools/test_linux_port.py
           python tools/test_light_storage.py
+          python tools/test_settings_pagination.py
 
       - name: Compile cache
         run: ccache --show-stats

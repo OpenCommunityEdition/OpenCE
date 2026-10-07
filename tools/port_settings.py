@@ -254,7 +254,8 @@ def _setting_screen(folder: str, spec: dict) -> list:
             place += 1
         rows.append((row, platform, place))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
-                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform),
+                               ("string_index", place)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
                           f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 320), ("y", 1)])}/>'])
         extra += _widget(f"{base}/{key}_label",
@@ -278,6 +279,20 @@ def _setting_screen(folder: str, spec: dict) -> list:
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]])
+    # Container string_index records a logical slot, including mutually
+    # exclusive rows. Runtime pagination counts the platform's available slots.
+    packed = place >= 12
+    if packed:
+        spec = dict(spec, spacing=24, help_top=364)
+        rows = [(row, platform, slot % 11) for row, platform, slot in rows]
+    rows.append((f"{base}/settings_next_page", None, 11))
+    extra += _widget(f"{base}/settings_next_page",
+                     [("type", "text"), ("width", 512), ("height", 28),
+                      ("bitmap", "bitmaps/option_bkds"), ("string_index", int(packed)),
+                      ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)],
+                     ['<on event="a" run="port settings next page"/>',
+                      '<on event="start" run="port settings next page"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>'])
     return _screen(folder, spec, rows, ["port settings help"], [], extra)
 
 

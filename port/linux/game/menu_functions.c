@@ -1464,6 +1464,84 @@ static void video_rows_show(struct widget_instance *list)
 	}
 }
 
+/* Settings widgets stay alive across pages: OK and Defaults still visit
+every spinner, while Cancel deletes the pending edits without saving them.
+The pager's private text-box index is the page of this screen instance;
+its caption is generated, so there is no fixed table of pages. */
+static boolean settings_row_available(struct widget_instance *row)
+{
+	return !strncmp(row->name, "op_", 3) &&
+		((strcmp(row->name, "op_resolution") && strcmp(row->name, "op_window_size")) || row->visible);
+}
+
+static void settings_paginate(struct widget_instance *list, boolean change_page)
+{
+	struct widget_instance *pager = named(list, "settings_next_page", 0);
+	struct widget_instance *row, *first = NULL;
+	long count = 0, previous = NONE, ordinal = -1, pages, page, stride;
+	wchar_t caption[ROW_TEXT_LENGTH];
+
+	if (!pager)
+		return;
+	for (row = list->child; row; row = row->next)
+	{
+		if (settings_row_available(row))
+		{
+			short slot = pc_menu_string_index(row->definition_tag_index);
+			if (slot != previous)
+				count++;
+			previous = slot;
+		}
+	}
+	pages = count > 12 ? (count + 10) / 11 : 1;
+	stride = pages > 1 ? 11 : 12;
+	page = MAX(0, pager->parameters.text_box.string_list_index);
+	if (change_page)
+		page++;
+	if (page >= pages)
+		page = 0;
+	pager->parameters.text_box.string_list_index = (short)page;
+	pager->visible = pages > 1;
+	pager->vertical_offset = 337;
+	usnprintf(caption, ROW_TEXT_LENGTH - 1, L"Page %ld", (page + 1) % pages + 1);
+	text_set(pager, caption);
+	previous = NONE;
+	for (row = list->child; row; row = row->next)
+	{
+		if (settings_row_available(row))
+		{
+			short slot = pc_menu_string_index(row->definition_tag_index);
+			if (slot != previous)
+				ordinal++;
+			previous = slot;
+			row->visible = ordinal / stride == page;
+			if (pages > 1 || pc_menu_string_index(pager->definition_tag_index))
+				row->vertical_offset = (short)(73 + ordinal % stride * 24);
+			if (row->visible && !first)
+				first = row;
+		}
+	}
+	if (first && (change_page || !list->focused_child || !list->focused_child->visible))
+	{
+		short index = 0;
+		for (row = list->child; row != first; row = row->next)
+			index++;
+		list->focused_child = first;
+		list->parameters.list.selected_index = index;
+	}
+}
+
+static boolean settings_next_page(struct widget_instance *pager)
+{
+	struct widget_instance *list = pager->parent;
+	if (!list || strcmp(pager->name, "settings_next_page"))
+		return FALSE;
+	video_rows_show(list);
+	settings_paginate(list, TRUE);
+	settings_help(list);
+	return TRUE;
+}
+
 /* ---------- Change Color: the profile's colour, from a list of the
 game's colours (more than its rows: it scrolls), by the Xbox's names for
 its spinner's functions */
@@ -5327,6 +5405,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			settings_each(screen_of(widget), setting_default_show);
 		}
+		else if (!strcmp(name, "port settings next page"))
+		{
+			return settings_next_page(widget);
+		}
 		else if (!strcmp(name, "controls screen init") || !strcmp(name, "controls screen defaults"))
 		{
 			return controls_load(!strcmp(name, "controls screen defaults"));
@@ -5501,6 +5583,7 @@ void pc_menu_game_data_function_invoke(
 	else if (!strcmp(name, "port settings help"))
 	{
 		video_rows_show(widget);
+		settings_paginate(widget, FALSE);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "controls update menu"))
