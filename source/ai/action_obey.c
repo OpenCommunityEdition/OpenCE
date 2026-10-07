@@ -615,6 +615,10 @@ void action_obey_end(
 	return;
 }
 
+/* port: a command's modifier's name, if it has one (a map's command may
+have any modifier; the game plays it by comparing) */
+#define ACTION_OBEY_COMMAND_NAME(names, index) 	(VALID_INDEX((index), (long)NUMBEROF(names)) ? (names)[(index)] : "<bad modifier>")
+
 void action_obey_describe_command(
 	struct scenario *scenario,
 	struct ai_command_definition *command,
@@ -649,7 +653,7 @@ void action_obey_describe_command(
 				string_size,
 				"go to (p%d) %s",
 				command->point1_index,
-				go_to_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(go_to_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -679,7 +683,7 @@ void action_obey_describe_command(
 					string,
 					string_size,
 					"move %s along angle %.1f, dist %.2f",
-					move_facing_names[command->atom_modifier],
+					ACTION_OBEY_COMMAND_NAME(move_facing_names, command->atom_modifier),
 					command->parameter2,
 					command->parameter1);
 			}
@@ -689,7 +693,7 @@ void action_obey_describe_command(
 					string,
 					string_size,
 					"move %s towards (p%d), dist %.2f",
-					move_facing_names[command->atom_modifier],
+					ACTION_OBEY_COMMAND_NAME(move_facing_names, command->atom_modifier),
 					command->point1_index,
 					command->parameter1);
 			}
@@ -710,7 +714,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"move %s for %.1f sec",
-				move_facing_names[command->atom_modifier],
+				ACTION_OBEY_COMMAND_NAME(move_facing_names, command->atom_modifier),
 				command->parameter1);
 		}
 		break;
@@ -720,7 +724,7 @@ void action_obey_describe_command(
 			string,
 			string_size,
 			"look %s at (p%d) for %.1f",
-			look_modifier_names[command->atom_modifier],
+			ACTION_OBEY_COMMAND_NAME(look_modifier_names, command->atom_modifier),
 			command->point1_index,
 			command->parameter1);
 		break;
@@ -730,7 +734,7 @@ void action_obey_describe_command(
 			string,
 			string_size,
 			"look %s at random one of (p%d-p%d) for %.1f-%.1f",
-			look_modifier_names[command->atom_modifier],
+			ACTION_OBEY_COMMAND_NAME(look_modifier_names, command->atom_modifier),
 			command->point1_index,
 			command->point2_index,
 			command->parameter1,
@@ -742,7 +746,7 @@ void action_obey_describe_command(
 			string,
 			string_size,
 			"look %s at player for %.1f",
-			look_modifier_names[command->atom_modifier],
+			ACTION_OBEY_COMMAND_NAME(look_modifier_names, command->atom_modifier),
 			command->parameter1);
 		break;
 
@@ -763,7 +767,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"look %s at %s for %.1f",
-				look_modifier_names[command->atom_modifier],
+				ACTION_OBEY_COMMAND_NAME(look_modifier_names, command->atom_modifier),
 				object_name,
 				command->parameter1);
 		}
@@ -783,7 +787,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"animation mode %s",
-				animation_mode_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(animation_mode_names, command->atom_modifier));
 		}
 		break;
 
@@ -799,7 +803,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"crouch %s",
-				crouch_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(crouch_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -835,7 +839,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"enter vehicle as %s if within %.1f",
-				vehicle_modifier_names[command->atom_modifier],
+				ACTION_OBEY_COMMAND_NAME(vehicle_modifier_names, command->atom_modifier),
 				command->parameter1);
 		}
 		break;
@@ -880,7 +884,7 @@ void action_obey_describe_command(
 				string_size,
 				"script %s %s",
 				script_name,
-				script_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(script_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -946,7 +950,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"targeting %s",
-				targeting_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(targeting_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -971,7 +975,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"action %s",
-				action_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(action_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -987,7 +991,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"initiative %s",
-				initiative_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(initiative_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -1004,7 +1008,7 @@ void action_obey_describe_command(
 				string,
 				string_size,
 				"wait %s",
-				wait_modifier_names[command->atom_modifier]);
+				ACTION_OBEY_COMMAND_NAME(wait_modifier_names, command->atom_modifier));
 		}
 		break;
 
@@ -1022,7 +1026,7 @@ void action_obey_describe_command(
 					string,
 					string_size,
 					"loop to <none> %s",
-					loop_modifier_names[command->atom_modifier]);
+					ACTION_OBEY_COMMAND_NAME(loop_modifier_names, command->atom_modifier));
 			}
 			else
 			{
@@ -1031,7 +1035,7 @@ void action_obey_describe_command(
 					string_size,
 					"loop to #%d %s",
 					command->command_index,
-					loop_modifier_names[command->atom_modifier]);
+					ACTION_OBEY_COMMAND_NAME(loop_modifier_names, command->atom_modifier));
 			}
 		}
 		break;
@@ -2355,6 +2359,11 @@ static boolean action_obey_command_begin(
 			break;
 
 		case _ai_atom_vocalize:
+			/* port: a vocalization the dialogue tables have (a map's
+			modifier indexes them), or none; else the atom is skipped, as
+			one whose unit has nothing to say */
+			if (command->atom_modifier == NONE ||
+				VALID_INDEX(command->atom_modifier, NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES))
 			{
 				short vocalization_type = command->atom_modifier;
 				long sound_definition_index = NONE;
@@ -2378,6 +2387,19 @@ static boolean action_obey_command_begin(
 					ai_communication_packet_new(&speech_item.ai);
 					unit_speak(unit_index, speech_type, &speech_item);
 					result = TRUE;
+				}
+			}
+			else
+			{
+				static boolean reported = FALSE;
+
+				if (!reported)
+				{
+					error(_error_silent, "command list %s vocalizes #%d (there are %d)",
+						command_list->name,
+						command->atom_modifier,
+						NUMBER_OF_DIALOGUE_VOCALIZATION_TYPES);
+					reported = TRUE;
 				}
 			}
 			break;

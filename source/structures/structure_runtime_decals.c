@@ -29,6 +29,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h" /* port: error */
 #include "effects/decal_definitions.h"
 #include "effects/decals.h"
 #include "math/real_math.h"
@@ -50,9 +51,16 @@ struct structure_decals_globals
 	byte pad[3];
 };
 
+/* ---------- prototypes */
+
+static void structure_decals_report_malformed(
+	long decal_index);
+
 /* ---------- globals */
 
 static struct structure_decals_globals *structure_decals_globals = NULL;
+/* port: whether a map's malformed runtime decal was reported (once) */
+static boolean warned_about_runtime_decals;
 
 /* ---------- public code */
 
@@ -174,15 +182,40 @@ void structure_decals_update(
 				{
 					do
 					{
-						struct structure_runtime_decal *runtime_decal = TAG_BLOCK_GET_ELEMENT(
+						struct structure_runtime_decal *runtime_decal;
+						struct scenario_decal_palette_entry *palette_entry;
+						long definition_index;
+
+						/* port: a decal (from the map) that is none of the bsp's,
+						or whose palette entry is none of the scenario's or names
+						no decal, is not made (the cluster's decals end there) */
+						if (cluster->first_decal_index + decal_index < 0 ||
+							cluster->first_decal_index + decal_index >= runtime_decals->count)
+						{
+							structure_decals_report_malformed(cluster->first_decal_index + decal_index);
+							break;
+						}
+						runtime_decal = TAG_BLOCK_GET_ELEMENT(
 							runtime_decals,
 							cluster->first_decal_index + decal_index,
 							struct structure_runtime_decal);
-						struct scenario_decal_palette_entry *palette_entry = TAG_BLOCK_GET_ELEMENT(
+						if (runtime_decal->palette_index >= global_scenario_get()->decal_palette.count)
+						{
+							structure_decals_report_malformed(cluster->first_decal_index + decal_index);
+							decal_index++;
+							continue;
+						}
+						palette_entry = TAG_BLOCK_GET_ELEMENT(
 							&global_scenario_get()->decal_palette,
 							runtime_decal->palette_index,
 							struct scenario_decal_palette_entry);
-						long definition_index = palette_entry->reference.index;
+						definition_index = palette_entry->reference.index;
+						if (definition_index == NONE)
+						{
+							structure_decals_report_malformed(cluster->first_decal_index + decal_index);
+							decal_index++;
+							continue;
+						}
 
 						decal_definition_get(definition_index);
 						{
@@ -212,3 +245,16 @@ void structure_decals_update(
 }
 
 /* ---------- private code */
+
+/* port: (warned_about_runtime_decals) */
+static void structure_decals_report_malformed(
+	long decal_index)
+{
+	if (!warned_about_runtime_decals)
+	{
+		error(_error_silent, "runtime decal #%ld is not the bsp's, or its palette entry names no decal", decal_index);
+		warned_about_runtime_decals = TRUE;
+	}
+
+	return;
+}

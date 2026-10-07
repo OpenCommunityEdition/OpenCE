@@ -328,12 +328,41 @@ long flag_new(
 		if (flag_index != NONE)
 		{
 			struct flag_datum_prefix *flag = flag_get(flag_index);
+			/* port: and a height the update's rows hold, with the one past
+			the last that the attachments' spans reach, and a size that isn't
+			negative (a map's; a negative width let any height through the
+			product; retail's flag is 16 by 13) */
+			boolean bad_size = definition->width < 0 ||
+				definition->height < 0 ||
+				definition->height >= MAXIMUM_FLAG_HEIGHT;
+
+			if (bad_size)
+			{
+				static boolean size_reported = FALSE;
+
+				if (!size_reported)
+				{
+					size_reported = TRUE;
+					error(
+						_error_silent,
+						"### ERROR a flag is %d by %d; it isn't simulated",
+						definition->width,
+						definition->height);
+				}
+			}
 
 			if (definition->height * definition->width >= MAXIMUM_FLAG_VERTICES ||
 				definition->width >= MAXIMUM_FLAG_WIDTH ||
+				bad_size ||
 				definition->shader_blue.index == NONE)
 			{
 				flag->noop = TRUE;
+				/* port: still the flag's own definition and no object yet,
+				which flags_update and flag_render read for it too (they read
+				whatever the slot held) */
+				flag->initialized = FALSE;
+				flag->object_index = NONE;
+				flag->definition_index = definition_index;
 			}
 			else
 			{
@@ -381,8 +410,11 @@ void flag_update_attachment(
 	real_vector3d delta;
 	short i;
 	short y;
+	/* port: no more attachment points than the caller's arrays hold (a map's
+	count; retail's flag has 2) */
+	short attachment_point_count = (short)PIN(definition->attachment_points.count, 0, MAXIMUM_FLAG_ATTACHMENT_POINTS);
 
-	for (i = 0; i < definition->attachment_points.count; i++)
+	for (i = 0; i < attachment_point_count; i++)
 	{
 		struct flag_attachment_point *point = TAG_BLOCK_GET_ELEMENT(
 			&definition->attachment_points,
@@ -402,7 +434,7 @@ void flag_update_attachment(
 		y_attachments[y] = NONE;
 
 	y = 0;
-	for (i = 0; i < definition->attachment_points.count; i++)
+	for (i = 0; i < attachment_point_count; i++)
 	{
 		struct flag_attachment_point *point;
 		short span;
@@ -427,7 +459,9 @@ void flag_update_attachment(
 		{
 			real t = ((real)y - row_start) / ((real)y_end - row_start);
 			real_point3d *from = &attachment_points[i];
-			real_point3d *to = &attachment_points[i + 1];
+			/* port: the last point the array holds goes to itself (a map's
+			span past it read past the array) */
+			real_point3d *to = i + 1 < MAXIMUM_FLAG_ATTACHMENT_POINTS ? &attachment_points[i + 1] : from;
 			real_point3d *force_point = &attachment_force_points[y];
 
 			force_point->x = from->x * (1.0f - t) + to->x * t;
@@ -495,9 +529,10 @@ void flag_update(
 		attachment_force_points,
 		attachment_y,
 		y_attachments);
+	/* port: the last point flag_update_attachment set (a map's count) */
 	under_water = scenario_location_underwater(
 		&attachment_location,
-		&attachment_points[flag_definition->attachment_points.count - 1],
+		&attachment_points[PIN(flag_definition->attachment_points.count, 1, MAXIMUM_FLAG_ATTACHMENT_POINTS) - 1],
 		&weather_palette_index);
 
 	if (!flag->noop)

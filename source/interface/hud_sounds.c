@@ -11,6 +11,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 
 #include "interface/hud.h"
 #include "objects/objects.h"
@@ -45,12 +46,32 @@ void hud_play_sound(
 	unsigned long state_flags,
 	struct tag_block const *sounds,
 	long *sound_indices,
-	word *played_flags)
+	word *played_flags,
+	short maximum_sound_count)
 {
 	long absolute_sound_index = 0;
 	short sound_index = 0;
+	/* port: no more sounds than the caller holds handles for (the map's
+	count; retail unit huds have up to 5 of 12). The rest are not played,
+	and that is said once. */
+	long sound_count = MIN(sounds->count, (long)maximum_sound_count);
 
-	if (sounds->count > 0)
+	if (sounds->count > sound_count)
+	{
+		static boolean too_many_sounds_reported = FALSE;
+
+		if (!too_many_sounds_reported)
+		{
+			too_many_sounds_reported = TRUE;
+			error(
+				_error_silent,
+				"hud has %d sounds (only %d are played)",
+				sounds->count,
+				sound_count);
+		}
+	}
+
+	if (sound_count > 0)
 		do
 		{
 			struct hud_sound_definition const *sound =
@@ -108,7 +129,7 @@ void hud_play_sound(
 			sound_index++;
 			absolute_sound_index = sound_index;
 		}
-		while (absolute_sound_index < sounds->count);
+		while (absolute_sound_index < sound_count);
 
 	return;
 }

@@ -159,11 +159,16 @@ static void delete_tree(const char *xbox_directory)
 		do
 		{
 			char child[MAX_PATH * 2];
+			int directory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-			snprintf(child, sizeof(child), "%s%s", xbox_directory, data.cFileName);
-			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			/* (a path that does not fit is left) */
+			if (snprintf(child, sizeof(child), "%s%s%s", xbox_directory, data.cFileName, directory ? "\\" : "") >=
+				(int)sizeof(child))
 			{
-				strcat(child, "\\");
+				continue;
+			}
+			if (directory)
+			{
 				delete_tree(child);
 			}
 			else

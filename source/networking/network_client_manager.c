@@ -761,6 +761,8 @@ static void network_game_client_update_precache_status(
 static boolean network_game_client_map_name_is_valid(
 	char const *map_name,
 	long size);
+static boolean network_game_client_game_record_is_valid(
+	struct network_game *game);
 static boolean network_game_client_idle_searching(
 	struct network_game_client *client);
 static boolean network_game_client_idle_joining(
@@ -1273,9 +1275,25 @@ boolean network_game_client_game_settings_updated(
 	{
 		struct network_game previous_game;
 
+		/* port: the record's players: no two the same machine's same
+		controller, no machine with more than its local players; the
+		strings ending in their fields */
+		if (!network_game_client_game_record_is_valid(message_packet))
+		{
+			network_event("invalid message_server_game_settings_update message received: its players");
+			return FALSE;
+		}
 		if (csstrcmp(message_packet->map.name, client->game.map.name))
 		{
 			char build[0x20];
+
+			/* port: a map this machine has not (a Custom Edition map not in
+			its custom_maps folder, say): the player told which and where to
+			copy it (the main menu's error, in place of the failed join's), and
+			the game left, rather than precaching it, which would give the
+			damaged disc error (cache_files.c) */
+			if (!network_game_is_splitscreen_local() && !cache_files_map_present(message_packet->map.name))
+				return FALSE;
 
 			/* port: a map of a build this version does not play with others
 			(its objects would not be the host's): said, and the game left */
@@ -1587,7 +1605,13 @@ boolean network_game_client_handle_game_update(
 	/* (the host's time at the start, and a game in progress's past 16 bits
 	of ticks: the host's whole time, if it is ahead; never back, which the
 	host would take for old messages) */
-	if (network_game_client_late_join_clock_pending)
+	/* port: and never one the game's arithmetic on its time (a second more,
+	a time limit) could take past a long */
+	if (message_packet->game_time < 0 || message_packet->game_time > 0x3FFFFFFF)
+	{
+		network_event("ignoring the host's game tick #%ld", message_packet->game_time);
+	}
+	else if (network_game_client_late_join_clock_pending)
 	{
 		network_game_client_late_join_clock_pending = FALSE;
 		if (message_packet->game_time > game_time_get())
@@ -2311,10 +2335,55 @@ static boolean network_game_client_map_name_is_valid(
 	long size)
 {
 	/* (a scenario's tag path, of which the cache takes the name after the
-	last backslash) */
-	return memchr(map_name, '\0', size) != NULL &&
-		!strchr(map_name, '/') &&
-		!strstr(map_name, "..");
+	last backslash: letters, digits and a few more, none that a path reads
+	otherwise) */
+	char const *character;
+	char const *leaf;
+
+	if (!memchr(map_name, '\0', size))
+		return FALSE;
+	for (character = map_name; *character; character++)
+	{
+		if (!((*character >= 'a' && *character <= 'z') || (*character >= 'A' && *character <= 'Z') ||
+			(*character >= '0' && *character <= '9') || *character == '_' || *character == '-' ||
+			*character == '.' || *character == ' ' || *character == '\\'))
+		{
+			return FALSE;
+		}
+	}
+	if (strstr(map_name, ".."))
+		return FALSE;
+	leaf = strrchr(map_name, '\\');
+	leaf = leaf ? leaf + 1 : map_name;
+	return *leaf && leaf[strspn(leaf, ". ")] != 0;
+}
+
+/* port: the players of a settings record the host sends: each valid one
+the only one of its machine's controller (so no machine has more than its
+local players); the record's strings made to end in their fields */
+static boolean network_game_client_game_record_is_valid(
+	struct network_game *game)
+{
+	short machine_players[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_LOCAL_PLAYERS];
+	short index;
+
+	game->name[NUMBEROF(game->name) - 1] = 0;
+	game->variant.human_readable_game_description[NUMBEROF(game->variant.human_readable_game_description) - 1] = 0;
+	for (index = 0; index < NUMBEROF(game->machines); index++)
+		game->machines[index].name[NUMBEROF(game->machines[index].name) - 1] = 0;
+	csmemset(machine_players, 0, sizeof(machine_players));
+	for (index = 0; index < NUMBEROF(game->players); index++)
+	{
+		struct network_player *player = &game->players[index];
+
+		player->name[NUMBEROF(player->name) - 1] = 0;
+		if (!network_player_is_valid(player))
+			continue;
+		if (machine_players[player->machine_index][player->controller_index]++)
+			return FALSE;
+	}
+
+	return TRUE;
 }
 
 static boolean add_advertised_game(

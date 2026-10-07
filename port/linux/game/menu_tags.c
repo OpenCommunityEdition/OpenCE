@@ -460,7 +460,17 @@ static void *allocate(long size)
 		return NULL;
 	}
 	memset(block, 0, size > 0 ? size : 1);
-	menu_tags.blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+	{
+		void **blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+
+		if (!blocks)
+		{
+			free(block);
+			build.failed = TRUE;
+			return NULL;
+		}
+		menu_tags.blocks = blocks;
+	}
 	menu_tags.blocks[menu_tags.block_count++] = block;
 	return block;
 }
@@ -1418,7 +1428,9 @@ static void instance_set(struct cache_file_tag_instance *instances, long group_t
 	instance->parent_group_tags[0] = NONE;
 	instance->parent_group_tags[1] = NONE;
 	instance->tag_index = tag_index;
-	instance->name = copy;
+	/* (the name is read by tag_loaded: of none, when the copy failed, which
+	fails the build) */
+	instance->name = copy ? copy : "";
 	instance->base_address = definition;
 }
 
@@ -1754,6 +1766,9 @@ void menu_tags_loaded(
 	build.wanted_widgets = malloc((widget_count + 1) * sizeof(boolean));
 	build.wanted_bitmaps = malloc((menus->bitmap_count + 1) * sizeof(boolean));
 	build.wanted_strings = malloc((menus->string_list_count + 1) * sizeof(boolean));
+	if (!build.widget_tags || !build.text_tags || !build.spinner_tags || !build.bitmap_tags ||
+		!build.strings_tags || !build.wanted_widgets || !build.wanted_bitmaps || !build.wanted_strings)
+		goto failed;
 	/* ui.map and a multiplayer map: all but the in-game widgets; a campaign
 	map: those, and what they lead to */
 	for (index = 0; index < widget_count; index++)

@@ -47,6 +47,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
 #include "cseries/cseries.h"
+#include "cseries/errors.h"
 #include "interface/hud_draw.h"
 #include "bitmaps/bitmap_color_conversion.h"
 #include "math/real_math.h"
@@ -296,6 +297,9 @@ void lightning_submit(
 					real jitter_scale = 1.f;
 					boolean first_marker = TRUE;
 					short marker_index;
+					/* port: no more markers than the short counter reaches (a
+					map's count; retail has up to 12) */
+					short marker_count = (short)MIN(definition->markers.count, SHORT_MAX);
 
 					if (animation)
 					{
@@ -307,7 +311,7 @@ void lightning_submit(
 						}
 					}
 
-					for (marker_index = 0; marker_index < definition->markers.count; marker_index++)
+					for (marker_index = 0; marker_index < marker_count; marker_index++)
 					{
 						struct lightning_marker_definition *marker_definition = TAG_BLOCK_GET_ELEMENT(
 							&definition->markers,
@@ -331,7 +335,7 @@ void lightning_submit(
 						}
 
 						if (TEST_FLAG(marker_definition->flags, _lightning_marker_not_connected_to_next_marker_bit) ||
-							marker_index == definition->markers.count - 1)
+							marker_index == marker_count - 1)
 						{
 							rasterizer_globals.current_lock_operation = _rasterizer_lock_lightning;
 							if (point_count > 2)
@@ -460,6 +464,27 @@ void lightning_submit(
 								first_marker = TRUE;
 							}
 							rasterizer_globals.current_lock_operation = _rasterizer_lock_none;
+						}
+						/* port: a segment whose points fit after the ones so far (a
+						map's octaves; past 12 of them, or past the bolt's 4097
+						points, they were written past points; retail's bolts have
+						up to 3 octaves and 54 points). One that doesn't is left
+						out, and the bolt goes on from the point it reached */
+						else if (marker_definition->octaves_to_next_marker < 0 ||
+							marker_definition->octaves_to_next_marker >= SHORT_BITS-1 ||
+							point_count + (1L << marker_definition->octaves_to_next_marker) >= MAXIMUM_LIGHTNING_POINTS)
+						{
+							static boolean octaves_reported = FALSE;
+
+							if (!octaves_reported)
+							{
+								octaves_reported = TRUE;
+								error(
+									_error_silent,
+									"### ERROR lightning %s has a marker %d octaves to the next; that segment isn't drawn",
+									tag_get_name(lightning->definition_index),
+									marker_definition->octaves_to_next_marker);
+							}
 						}
 						else
 						{
