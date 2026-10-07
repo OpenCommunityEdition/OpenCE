@@ -209,8 +209,9 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 }
 
 /* the Swap: line of the /proc/self/smaps entry starting at start, in kB; -1
-if it cannot be read */
-static long mapping_swap_kb(uint64_t start)
+if it cannot be read (or no entry starts there); with end, the entry must
+also end there */
+static long mapping_swap_kb_ending(uint64_t start, uint64_t end)
 {
 	FILE *smaps = fopen("/proc/self/smaps", "r");
 	char line[512];
@@ -228,7 +229,7 @@ static long mapping_swap_kb(uint64_t start)
 		{
 			if (inside)
 				break;
-			inside = lo == start;
+			inside = lo == start && (!end || hi == end);
 			continue;
 		}
 		if (inside && sscanf(line, "Swap: %ld kB", &kb) == 1)
@@ -241,9 +242,30 @@ static long mapping_swap_kb(uint64_t start)
 	return result;
 }
 
+static long mapping_swap_kb(uint64_t start)
+{
+	return mapping_swap_kb_ending(start, 0);
+}
+
+/* whether any of from..to is swapped out, when the mapping holding it has
+swap somewhere: smaps counts swap per mapping, so the range is made a
+mapping of its own for a moment (MADV_DONTDUMP splits it off and changes
+nothing about its pages: neither ART nor the game ever dumps core), read,
+and merged back (MADV_DODUMP). -1 if that cannot be done */
+static long range_swap_kb(uint64_t from, uint64_t to)
+{
+	long kb;
+
+	if (madvise((void *)from, (size_t)(to - from), MADV_DONTDUMP) != 0)
+		return -1;
+	kb = mapping_swap_kb_ending(from, to);
+	madvise((void *)from, (size_t)(to - from), MADV_DODUMP);
+	return kb;
+}
+
 /* without pagemap (some kernels or policies refuse it): mincore() tells
-which pages are resident, and the mapping's smaps entry tells whether any
-of it is swapped out, which mincore cannot see */
+which pages are resident, and smaps whether any of the range is swapped
+out, which mincore cannot see */
 static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t to, struct range_usage *usage)
 {
 	unsigned char residency[4096];
@@ -251,10 +273,24 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 	long swapped = mapping_swap_kb(mapping_start);
 
 	usage->method = "mincore";
+	if (swapped > 0)
+	{
+		/* (swap somewhere in the space: only the range's own matters) */
+		long range_swapped = range_swap_kb(from, to);
+
+		if (range_swapped == 0)
+		{
+			finding(HOST_LOG_INFO, "ART's large object space at %08llx: %ld kB of it swapped out, none of %08llx-%08llx",
+				(unsigned long long)mapping_start, swapped, (unsigned long long)from, (unsigned long long)to);
+			swapped = 0;
+		}
+		else
+			swapped = range_swapped;
+	}
 	if (swapped != 0)
 	{
 		finding(HOST_LOG_WARN, "ART's large object space at %08llx: %s", (unsigned long long)mapping_start,
-			swapped < 0 ? "cannot read its smaps entry" : "part of it is swapped out");
+			swapped < 0 ? "cannot read its smaps entry" : "part of the range is swapped out");
 		return RANGE_UNKNOWN;
 	}
 	while (address < to)
