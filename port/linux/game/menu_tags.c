@@ -344,7 +344,7 @@ static char const *const port_function_names[] =
 	"direct ip connect go", "direct ip edit field", "network settings edit a port", "network settings defaults",
 	"load game menu delete request", "load game menu delete finish",
 	"initialize sp level list solo", "dispose sp level list", "solo level set map", "set difficulty",
-	"port settings save", "port settings defaults", "controls binding slot",
+	"port settings save", "port settings defaults", "controls binding slot", "port settings next page",
 	"color picker menu initialize", "color picker menu dispose", "color picker select color",
 	"player profile list initialize", "player profile list dispose", "request del player profile",
 	"final del player profile",

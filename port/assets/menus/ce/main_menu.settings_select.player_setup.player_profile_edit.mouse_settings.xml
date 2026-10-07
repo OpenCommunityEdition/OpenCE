@@ -17,6 +17,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_vertical_sensitivity" x="54" y="103"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_invert_mouse" x="54" y="133"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_aim_assist" x="54" y="163"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/settings_next_page" x="54" y="403"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -24,7 +25,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_sensitivity" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_sensitivity" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" string_index="0">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_sensitivity_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_sensitivity_spinner" x="320" y="1"/>
 	</widget>
@@ -33,7 +34,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_sensitivity_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" setting="input.mouse_sensitivity" values="0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_vertical_sensitivity" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_vertical_sensitivity" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" string_index="1">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_vertical_sensitivity_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_vertical_sensitivity_spinner" x="320" y="1"/>
 	</widget>
@@ -42,7 +43,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_vertical_sensitivity_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SAME|0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" setting="input.mouse_vertical_sensitivity" values="0|0.25|0.5|0.75|1|1.25|1.5|1.75|2|2.5|3|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_invert_mouse" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_invert_mouse" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" string_index="2">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_mouse_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_mouse_spinner" x="320" y="1"/>
 	</widget>
@@ -51,7 +52,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/invert_mouse_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="YES|NO" setting="input.invert_mouse" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_aim_assist" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/op_mouse_aim_assist" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" string_index="3">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_aim_assist_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/mouse_aim_assist_spinner" x="320" y="1"/>
 	</widget>
@@ -83,4 +84,9 @@
 		<string text="Moving the mouse forward looks down."/>
 		<string text="Slow and drag the view along with a target while\naiming with the mouse, as with a controller."/>
 	</strings>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/mouse_settings/settings_next_page" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port settings next page"/>
+		<on event="start" run="port settings next page"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
 </menus>
