@@ -92,7 +92,9 @@ static real plane3d_distance_to_point(struct plane const*p,struct point const*v)
 TESTS = r'''
 static unsigned probes;
 static void set(double value){setting=value;changes++;}
-static float native(float degrees){return 2*atanf(.75f*render_camera_get_adjusted_field_of_view_tangent(DEGREES_TO_RADIANS(degrees)));}
+/* Match the production camera's atan2(y, 1) operation exactly: libm need not
+round atanf(y) and atan2f(y, 1) to the same last bit. */
+static float native(float degrees){return 2*atan2f(.75f*render_camera_get_adjusted_field_of_view_tangent(DEGREES_TO_RADIANS(degrees)),1.f);}
 static void reset(void){
  cinematic=scripted=debug_render_freeze=0;
  for(int i=0;i<4;i++){
@@ -205,7 +207,9 @@ def main():
     source+=block(s,'float render_fov_vertical(')+'\n'
     source+=block((ROOT/'source/main/main.c').read_text(),'void set_window_camera_values(')+'\n'
     source+=block((ROOT/'source/render/render_cameras.c').read_text(),'short render_frustum_sphere_visible(')+'\n'+TESTS
-    flags=['-std=gnu11','-O2','-fuse-ld=lld']+(['--target=i686-pc-windows-msvc'] if sys.platform=='win32' else ['-m32','-lm'])
+    # Production calls halo_* math functions, which cannot be folded to the
+    # compiler host's libm. Keep the harness's host math calls opaque too.
+    flags=['-std=gnu11','-O2','-fno-builtin','-fuse-ld=lld']+(['--target=i686-pc-windows-msvc'] if sys.platform=='win32' else ['-m32','-lm'])
     with tempfile.TemporaryDirectory(prefix='halo-fov-') as d:
         path=Path(d);(path/'fov.c').write_text(source)
         subprocess.run([a.cc,*flags,str(path/'fov.c'),'-o',str(path/'fov.exe')],check=True)
