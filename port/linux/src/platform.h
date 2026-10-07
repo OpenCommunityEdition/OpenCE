@@ -98,6 +98,9 @@ host path below the data root. Components are matched case-insensitively
 against what exists on disk, as the Xbox file system is case-insensitive. */
 void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size);
 const char *platform_data_root(void);
+/* the Halo Custom Edition install the Xbox drive h:\ is (paths.custom_edition),
+or "" when none is set or it has no maps folder */
+const char *platform_custom_edition_root(void);
 /* on the desktop, when the data root has no maps folder: offers to copy it
 out of an Xbox disc image into destination (sdl_platform.c), and quits if
 the player declines; nonzero once destination has one */
@@ -111,7 +114,17 @@ that window at start-up and hands out page-granular blocks from it, so the
 physical/virtual arithmetic the game and Direct3D rely on keeps working. */
 
 #define PLATFORM_CONTIGUOUS_BASE 0x80000000UL
-#define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL /* a 128 MB development kit */
+#ifdef HALO_ANDROID
+/* 128 MB, a development kit's: Android's guest image is linked just above
+the window (port/android/include/halo_android_abi.h) */
+#define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL
+#else
+/* 512 MB on the desktop builds, whose caches outgrow the Xbox's (Custom
+Edition maps' textures and geometry: halo_port_capacity.h). Its pages are
+backed as they are used. port/windows/src/win32_memory_watch.c has the
+same size. */
+#define PLATFORM_CONTIGUOUS_SIZE 0x20000000UL
+#endif
 #define PLATFORM_ANY_PHYSICAL_ADDRESS 0xffffffffUL
 
 /* returns NULL on failure; physical_address places the block exactly */
@@ -121,6 +134,15 @@ void platform_contiguous_free(void *address);
 BOOL platform_is_contiguous(const void *address);
 #define PLATFORM_PHYSICAL_TO_VIRTUAL(physical) ((void *)((unsigned long)(physical) | PLATFORM_CONTIGUOUS_BASE))
 #define PLATFORM_VIRTUAL_TO_PHYSICAL(address) ((unsigned long)(address) & ~PLATFORM_CONTIGUOUS_BASE)
+
+/* The window Halo Custom Edition tag data are linked to (0x40440000):
+reserved at start-up when the game.custom_edition setting is on, else NULL
+(also declared for the game in halo_linux_source_fixups.h). */
+void *halo_custom_edition_tag_cache(void);
+/* which textures hold their channels where Halo PC keeps them
+(xbox_textures.c; also declared for the game there) */
+void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order);
+void halo_custom_edition_texels_forget(void);
 
 /* ---------- guest memory write tracking (memory_watch.c)
 

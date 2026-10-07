@@ -633,7 +633,9 @@ void _rasterizer_psuedo_dynamic_screen_quad_draw(
 		}
 
 		pixel_shader.combiner_count = combiner_index | 0x00011100;
-		pixel_shader.final_combiner_inputs_abcd = 0x0000000C;
+		/* (port: r0 times its alpha, as the meters' final combiner takes
+		r0 times t0's) */
+		pixel_shader.final_combiner_inputs_abcd = parameters->alpha_weighted ? 0x0C1C0000 : 0x0000000C;
 		pixel_shader.final_combiner_inputs_efg = 0x00001C00;
 	}
 

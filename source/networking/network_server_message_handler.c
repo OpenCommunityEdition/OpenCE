@@ -306,6 +306,20 @@ enum
 
 #define MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE (sizeof(word) + TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + sizeof(byte))
 
+/* port: the text of a transport error message as it is logged: printable
+ASCII only (it is a machine's to send), ending with the buffer */
+static char const *transport_error_message_text(
+	byte const *error_message)
+{
+	static char text[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + 1];
+	long index;
+
+	for (index = 0; index < TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH && error_message[index]; index++)
+		text[index] = error_message[index] >= 0x20 && error_message[index] < 0x7F ? (char)error_message[index] : '?';
+	text[index] = 0;
+	return text;
+}
+
 enum
 {
 	_message_type_error = 1,
@@ -1369,12 +1383,12 @@ boolean network_game_server_handle_client_message(
 				{
 					byte *error_message = (byte *)(message + 1);
 
-					/* (the text need not end in the message) */
+					/* (the text need not end in the message; printable only, so
+					that it forges no line of the log) */
 					network_event(
-						"server received low-level error message from a client: error= #%d (%.*s)",
+						"server received low-level error message from a client: error= #%d (%s)",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
-						error_message);
+						transport_error_message_text(error_message));
 				}
 				else
 				{
@@ -1576,10 +1590,9 @@ boolean network_game_server_handle_datagram(
 					byte *error_message = (byte *)(message + 1);
 
 					network_event(
-						"server received low-level error message: error= #%d (%.*s); sender= '%s'",
+						"server received low-level error message: error= #%d (%s); sender= '%s'",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
-						error_message,
+						transport_error_message_text(error_message),
 						transport_address_to_string(source_address));
 				}
 				else

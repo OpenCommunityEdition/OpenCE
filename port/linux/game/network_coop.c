@@ -1752,7 +1752,8 @@ static void client_apply_attach(
 	struct distributed_coop_event const *event)
 {
 	long parent_index = object_find(event->name_index, event->object_index, event->definition_index, _object_mask_all);
-	long child_index = object_find((short)event->reals[0], event->target, event->tag_index, _object_mask_all);
+	long child_index = object_find((short)PIN(event->reals[0], -1.0f, 32767.0f), event->target, event->tag_index,
+		_object_mask_all);
 	long ancestor_index;
 
 	if (parent_index == NONE || child_index == NONE || parent_index == child_index)

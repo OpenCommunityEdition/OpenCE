@@ -104,6 +104,7 @@ symbols in this file:
 #include "cseries.h"
 #include "damage.h"
 #include "ai/ai.h"
+#include "cseries/errors.h"
 #include "effects/effects.h"
 #include "effects/player_effects.h"
 #include "game/cheats.h"
@@ -368,6 +369,8 @@ static void damage_effect_new_at_location(
 static void object_destroy_region(
 	long object_index,
 	short region_index);
+static void damage_material_type_error(
+	short material_type);
 
 /* ---------- globals */
 
@@ -908,8 +911,17 @@ static void object_damage_shield(
 				damage_resistance->shield_material_type >= 0 &&
 					damage_resistance->shield_material_type < NUMBER_OF_MATERIAL_TYPES,
 				"damage_resistance->shield_material_type>=0 && damage_resistance->shield_material_type<NUMBER_OF_MATERIAL_TYPES");
-			actual_shield_damage *= damage_definition->material_modifiers[
-				damage_resistance->shield_material_type];
+			/* port: a material the modifiers have, or no modifier (a map's type;
+			retail's are 0-30) */
+			if (VALID_INDEX(damage_resistance->shield_material_type, NUMBER_OF_MATERIAL_TYPES))
+			{
+				actual_shield_damage *= damage_definition->material_modifiers[
+					damage_resistance->shield_material_type];
+			}
+			else
+			{
+				damage_material_type_error(damage_resistance->shield_material_type);
+			}
 			if (actual_shield_damage < _real_epsilon)
 				negligible_damage = TRUE;
 
@@ -1189,7 +1201,16 @@ static void object_damage_body(
 		1295,
 		damage_material->material_type>=0 && damage_material->material_type<NUMBER_OF_MATERIAL_TYPES,
 		"damage_material->type>=0 && damage_material->type<NUMBER_OF_MATERIAL_TYPES");
-	actual_damage *= damage_definition->material_modifiers[damage_material->material_type];
+	/* port: a material the modifiers have, or no modifier (a map's type;
+	retail's are 0-32) */
+	if (VALID_INDEX(damage_material->material_type, NUMBER_OF_MATERIAL_TYPES))
+	{
+		actual_damage *= damage_definition->material_modifiers[damage_material->material_type];
+	}
+	else
+	{
+		damage_material_type_error(damage_material->material_type);
+	}
 
 	if (!TEST_FLAG(object->object.damage_flags, _object_cannot_take_damage_bit))
 	{
@@ -1217,6 +1238,26 @@ static void object_damage_body(
 		}
 
 		object->object.body_vitality -= actual_damage;
+	}
+
+	/* port: only a region the resistance has and the object holds damage for
+	(a map's collision node region, or a client's report; past them are the
+	permutations and the change colors; retail's are 0-4) */
+	if (region_index != NONE &&
+		!VALID_INDEX(region_index, MIN(damage_resistance->regions.count, MAXIMUM_REGIONS_PER_OBJECT)))
+	{
+		static boolean region_index_reported = FALSE;
+
+		if (!region_index_reported)
+		{
+			region_index_reported = TRUE;
+			error(
+				_error_silent,
+				"### ERROR %s was damaged in region #%d, which it doesn't have; the region is left alone",
+				tag_get_name(object->definition_index),
+				region_index);
+		}
+		region_index = NONE;
 	}
 
 	if (region_index != NONE &&
@@ -1295,8 +1336,10 @@ static void object_damage_body(
 			{
 				short dying_region_index;
 
+				/* port: no more regions than the object holds (a map's count;
+				retail has up to 5) */
 				for (dying_region_index = 0;
-					dying_region_index < damage_resistance->regions.count;
+					dying_region_index < MIN(damage_resistance->regions.count, MAXIMUM_REGIONS_PER_OBJECT);
 					dying_region_index++)
 				{
 					struct damage_region const *region = TAG_BLOCK_GET_ELEMENT(
@@ -1466,7 +1509,11 @@ void object_cause_damage(
 	{
 		long damaged_object_index = object_index;
 
-		while (damaged_object_index != NONE)
+		/* port: no more of the object and its parents than the list holds
+		(objects attached deeper, by a map's attachments or its scripts,
+		wrote past it); the outermost ones aren't damaged */
+		while (damaged_object_index != NONE &&
+			damaged_object_count<(short)NUMBEROF(damaged_object_indices))
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\objects\\damage.c",
@@ -1476,6 +1523,20 @@ void object_cause_damage(
 			damaged_object_count++;
 			damaged_object_index =
 				object_get(damaged_object_index)->object.parent_object_index;
+		}
+		if (damaged_object_index != NONE)
+		{
+			static boolean parents_reported = FALSE;
+
+			if (!parents_reported)
+			{
+				parents_reported = TRUE;
+				error(
+					_error_silent,
+					"### ERROR %s is attached more than %d deep; its outer parents aren't damaged",
+					tag_get_name(object_get(object_index)->definition_index),
+					(int)NUMBEROF(damaged_object_indices));
+			}
 		}
 	}
 
@@ -1495,7 +1556,9 @@ void object_cause_damage(
 				_damage_resistance_parent_never_takes_body_damage_for_us_bit);
 		}
 
-		if (object->object.umbrella_shield_object_index != NONE)
+		/* port: and the umbrella shield if the list has room left for it */
+		if (object->object.umbrella_shield_object_index != NONE &&
+			damaged_object_count<(short)NUMBEROF(damaged_object_indices))
 		{
 			match_assert(
 				"c:\\halo\\SOURCE\\objects\\damage.c",
@@ -2091,6 +2154,25 @@ void object_damage_update(
 
 /* ---------- private code */
 
+/* port: a map's collision model with a material type past the damage
+modifiers, reported once */
+static void damage_material_type_error(
+	short material_type)
+{
+	static boolean material_type_reported = FALSE;
+
+	if (!material_type_reported)
+	{
+		material_type_reported = TRUE;
+		error(
+			_error_silent,
+			"### ERROR a collision model has material type #%d; its damage isn't modified",
+			material_type);
+	}
+
+	return;
+}
+
 static long get_player_index_from_object_or_parents(
 	long object_index)
 {
@@ -2552,8 +2634,11 @@ static void object_permutation_shield_regions(
 		collision_model_definition_get(definition->object.collision_model.index);
 	short region_index;
 
+	/* port: no more regions than the object's region_permutations holds (a
+	map's count; past them are the change colors and the node blocks; retail
+	has up to 5) */
 	for (region_index = 0;
-		region_index < collision_model->resistance.regions.count;
+		region_index < MIN(collision_model->resistance.regions.count, MAXIMUM_REGIONS_PER_OBJECT);
 		region_index++)
 	{
 		struct damage_region *region = TAG_BLOCK_GET_ELEMENT(

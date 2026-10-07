@@ -75,6 +75,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "math/real_math.h"
 #include "memory/byte_swapping.h"
 
@@ -212,6 +213,10 @@ void recorded_animation_initialize_unit_control(
 	struct recorded_unit_control *unit_control,
 	byte **stream,
 	byte unit_control_data_version);
+long recorded_animation_unit_control_size(
+	byte unit_control_data_version);
+static boolean recorded_animation_stream_damaged_v1(
+	void);
 
 static void apply_animation_state(
 	struct recorded_unit_control *control,
@@ -351,27 +356,70 @@ static struct recorded_animation_playback_v1_data data_002dd030 =
 
 #define apply_funcs data_002dd030.apply_funcs
 
+/* port: the bytes each event takes, its header included (what its apply proc
+reads, or the header alone), so an event is applied only when it is all in
+the stream */
+static byte const event_sizes_v1[NUMBEROF(apply_funcs)] =
+{
+	sizeof(struct recorded_animation_event_v1),
+	sizeof(struct recorded_animation_event_v1),
+	sizeof(struct recorded_animation_state_set_event_v1),
+	sizeof(struct recorded_aiming_speed_set_event_v1),
+	sizeof(struct recorded_control_flags_set_event_v1),
+	sizeof(struct recorded_weapon_index_set_event_v1),
+	sizeof(struct recorded_throttle_set_event_v1),
+	sizeof(struct recorded_animation_event_v1),
+	sizeof(struct recorded_animation_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_multi_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+	sizeof(struct recorded_angle_vector_set_event_v1),
+};
+
 /* ---------- public code */
 
-void recorded_animation_initialize_event_stream_v1(
+/* port: FALSE (and nothing read) when the unit control isn't inside the
+stream: it can't be played */
+boolean recorded_animation_initialize_event_stream_v1(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *unit_control,
 	byte **playback_stream,
-	byte unit_control_data_version)
+	byte unit_control_data_version,
+	byte const *playback_stream_end)
 {
+	long unit_control_size = recorded_animation_unit_control_size(unit_control_data_version);
+
+	if (unit_control_size == NONE ||
+		playback_stream_end - *playback_stream < unit_control_size)
+	{
+		return FALSE;
+	}
+
 	recorded_animation_initialize_unit_control(
 		unit_control,
 		playback_stream,
 		unit_control_data_version);
 
-	return;
+	return TRUE;
 }
 
+/* port: playback_stream_end is the stream's end: no read goes past it */
 boolean recorded_animation_apply_event_stream_v1(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	long *ticks,
-	byte const **playback_stream)
+	byte const **playback_stream,
+	byte const *playback_stream_end)
 {
 	struct recorded_animation_event_v1 const *anim_event_v1;
 	recorded_animation_apply_event_v1_proc apply;
@@ -381,11 +429,23 @@ boolean recorded_animation_apply_event_stream_v1(
 	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback_v1.c", 0xA4, playback_stream);
 	match_assert("c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback_v1.c", 0xA5, *playback_stream);
 
+	/* port: an event header inside the stream */
+	if (playback_stream_end - *playback_stream < (long)sizeof(*anim_event_v1))
+		return recorded_animation_stream_damaged_v1();
+
 	anim_event_v1 = (struct recorded_animation_event_v1 const *)*playback_stream;
 	while (*ticks >= anim_event_v1->time_delta)
 	{
 		if (anim_event_v1->type == _playback_v1_end)
 			break;
+
+		/* port: an event the table has, all inside the stream, and the
+		next event's header too */
+		if (!VALID_INDEX(anim_event_v1->type, (short)NUMBEROF(apply_funcs)) ||
+			playback_stream_end - *playback_stream < event_sizes_v1[anim_event_v1->type] + (long)sizeof(*anim_event_v1))
+		{
+			return recorded_animation_stream_damaged_v1();
+		}
 
 		apply = apply_funcs[anim_event_v1->type];
 		if (apply)
@@ -419,6 +479,22 @@ void byte_swap_recording_stream_v1(
 }
 
 /* ---------- private code */
+
+/* port: a stream that runs out before its end event, or holds an event the
+table doesn't have, stops playing (a map's stream; said once) */
+static boolean recorded_animation_stream_damaged_v1(
+	void)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "a recorded animation's event stream is damaged (it stops playing)");
+		reported = TRUE;
+	}
+
+	return FALSE;
+}
 
 static void apply_animation_state(
 	struct recorded_unit_control *control,

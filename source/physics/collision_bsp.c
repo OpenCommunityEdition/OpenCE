@@ -77,6 +77,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h" /* port: error */
 #include "collision_bsp.h"
 #include "collision_bsp_definitions.h"
 #include "collision_usage.h"
@@ -135,10 +136,13 @@ struct collision_bsp_test_pill_new_context
 	byte last_contents;
 	byte pad2[3];
 	long last_plane_designator;
+	/* port: how many more of the bsp's nodes the test enters
+	(collision_bsp3d_enter_node) */
+	long nodes_left;
 };
 
 typedef char collision_bsp_test_pill_new_context_size_assert[
-	sizeof(struct collision_bsp_test_pill_new_context) == 0x2C ? 1 : -1];
+	sizeof(struct collision_bsp_test_pill_new_context) == 0x2C + 4 ? 1 : -1];
 
 struct test_pill_data
 {
@@ -154,10 +158,14 @@ struct test_pill_data
 	byte pad;
 	real_point2d point2d;
 	real_vector2d vector2d;
+	/* port: how many more of the bsp's nodes, and of its bsp2d's in this
+	bsp2d test, the test enters (collision_bsp3d_enter_node) */
+	long nodes_left;
+	long bsp2d_nodes_left;
 };
 
 typedef char collision_bsp_test_pill_context_size_assert[
-	sizeof(struct test_pill_data) == 0x22C ? 1 : -1];
+	sizeof(struct test_pill_data) == 0x22C + 8 ? 1 : -1];
 
 struct test_sphere_data
 {
@@ -174,10 +182,13 @@ struct test_sphere_data
 	boolean projection_sign;
 	byte pad2;
 	real_point2d center2d;
+	/* port: (as in test_pill_data) */
+	long nodes_left;
+	long bsp2d_nodes_left;
 };
 
 typedef char collision_bsp_test_sphere_context_size_assert[
-	sizeof(struct test_sphere_data) == 0x228 ? 1 : -1];
+	sizeof(struct test_sphere_data) == 0x228 + 8 ? 1 : -1];
 typedef char collision_bsp_test_sphere_context_plane_stack_offset_assert[
 	offsetof(struct test_sphere_data, plane_stack) == 0x1C ? 1 : -1];
 typedef char collision_bsp_test_sphere_context_projection_axis_offset_assert[
@@ -217,10 +228,12 @@ struct collision_bsp_test_vector_context
 	byte last_contents;
 	byte pad2[3];
 	long last_plane_index;
+	/* port: (as in collision_bsp_test_pill_new_context) */
+	long nodes_left;
 };
 
 typedef char collision_bsp_test_vector_context_size_assert[
-	sizeof(struct collision_bsp_test_vector_context) == 0x28 ? 1 : -1];
+	sizeof(struct collision_bsp_test_vector_context) == 0x28 + 4 ? 1 : -1];
 
 struct collision_bsp_usage_times
 {
@@ -238,11 +251,25 @@ static boolean collision_surface_test_point(
 	short projection,
 	boolean sign,
 	real_point2d const *point);
+static boolean collision_bsp3d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left);
+static boolean collision_bsp2d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left);
+static boolean collision_bsp_valid_leaf(
+	struct collision_bsp const *bsp,
+	long leaf_index);
 static boolean collision_bsp_test_pill_new_recursive(
 	struct collision_bsp_test_pill_new_context *data,
 	long node_index,
 	real t0,
-	real t1);
+	real t1,
+	short depth);
 static long collision_leaf_test_vector(
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,
@@ -257,7 +284,8 @@ static boolean collision_bsp_test_vector_recursive(
 	struct collision_bsp_test_vector_context *data,
 	long node_index,
 	real t0,
-	real t1);
+	real t1,
+	short depth);
 static boolean sphere_test_vector(
 	real_point3d const *center,
 	real radius,
@@ -277,10 +305,12 @@ static boolean collision_surface_test_pill(
 	long surface_index);
 static boolean bsp2d_test_pill_recursive(
 	struct test_pill_data *data,
-	long child_index);
+	long child_index,
+	short depth);
 static boolean bsp3d_test_pill_recursive(
 	struct test_pill_data *data,
-	long child_index);
+	long child_index,
+	short depth);
 static void add_feature(
 	long *count,
 	long *indices,
@@ -290,10 +320,12 @@ static void collision_surface_test_sphere(
 	long surface_index);
 static void bsp2d_test_sphere_recursive(
 	struct test_sphere_data *data,
-	long child_index);
+	long child_index,
+	short depth);
 static void bsp3d_test_sphere_recursive(
 	struct test_sphere_data *data,
-	long node_index);
+	long node_index,
+	short depth);
 void render_debug_collision_edge(
 	struct collision_bsp *bsp,
 	long edge_index,
@@ -304,7 +336,60 @@ void render_debug_collision_edge(
 
 static struct collision_bsp_usage_times collision_bsp_usage_times = { 0 };
 
+/* port: whether a map's malformed collision bsp was reported (once each) */
+static boolean warned_about_collision_surface_edges;
+static boolean warned_about_collision_surface_index;
+static boolean warned_about_collision_bsp_nodes;
+static boolean warned_about_collision_bsp2d_nodes;
+static boolean warned_about_collision_leaf;
+
 /* ---------- public code */
+
+/* port: a ring that leaves the bsp's edges, or does not close within
+MAXIMUM_EDGES_PER_COLLISION_SURFACE edges (the most a surface has, and
+what collision_surface_polygon's callers hold: the retail rings all close
+within 3 to 8 edges), ends there */
+boolean collision_surface_edge_ring_continues(
+	struct collision_bsp const *bsp,
+	long edge_index,
+	short edge_count)
+{
+	if (edge_index >= 0 &&
+		edge_index < bsp->edges.count &&
+		edge_count < MAXIMUM_EDGES_PER_COLLISION_SURFACE)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_surface_edges)
+	{
+		error(_error_silent, "a collision surface's edges are not a ring of at most %d of the bsp's",
+			MAXIMUM_EDGES_PER_COLLISION_SURFACE);
+		warned_about_collision_surface_edges = TRUE;
+	}
+
+	return FALSE;
+}
+
+boolean collision_bsp_valid_surface_index(
+	struct collision_bsp const *bsp,
+	long surface_index)
+{
+	if (surface_index >= 0 && surface_index < bsp->surfaces.count)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_surface_index)
+	{
+		error(_error_silent, "collision surface #%ld is not one of the bsp's %ld",
+			surface_index,
+			bsp->surfaces.count);
+		warned_about_collision_surface_index = TRUE;
+	}
+
+	return FALSE;
+}
 
 short collision_surface_edge_count(
 	struct collision_bsp const *bsp,
@@ -315,12 +400,22 @@ short collision_surface_edge_count(
 	long first_edge_index;
 	long edge_index;
 
+	/* port: a surface (from the map) that is no surface, or whose first
+	edge is no edge, has none */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return 0;
+	}
 	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
 	first_edge_index = surface->first_edge_index;
 	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return 0;
+	}
 
 	do
 	{
@@ -333,7 +428,10 @@ short collision_surface_edge_count(
 		edge_count++;
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	/* port: (and its ring ends as collision_surface_edge_ring_continues
+	says) */
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, edge_count));
 
 	return edge_count;
 }
@@ -348,12 +446,22 @@ short collision_surface_polygon(
 	long first_edge_index;
 	long edge_index;
 
+	/* port: (as in collision_surface_edge_count: no more points than
+	MAXIMUM_VERTICES_PER_COLLISION_SURFACE are written) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return 0;
+	}
 	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
 	first_edge_index = surface->first_edge_index;
 	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return 0;
+	}
 
 	do
 	{
@@ -375,7 +483,8 @@ short collision_surface_polygon(
 		points[point_count++] = vertex->point;
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, point_count));
 
 	return point_count;
 }
@@ -465,13 +574,23 @@ void render_debug_collision_surface(
 	struct collision_surface const *surface;
 	long first_edge_index;
 	long edge_index;
+	short edge_count = 0;
 
+	/* port: (as in collision_surface_edge_count) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return;
+	}
 	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
 	first_edge_index = surface->first_edge_index;
 	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return;
+	}
 
 	do
 	{
@@ -488,7 +607,8 @@ void render_debug_collision_surface(
 			color);
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	return;
 }
@@ -536,12 +656,26 @@ real collision_surface_perimeter(
 	long surface_index)
 {
 	real perimeter = 0.f;
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+	short edge_count = 0;
+
+	/* port: (as in collision_surface_edge_count) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return 0.f;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
-	long const first_edge_index = surface->first_edge_index;
-	long edge_index = first_edge_index;
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return 0.f;
+	}
 
 	do
 	{
@@ -562,7 +696,8 @@ real collision_surface_perimeter(
 		perimeter += distance3d(&vertex0->point, &vertex1->point);
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	return perimeter;
 }
@@ -583,11 +718,22 @@ real collision_surface_area(
 	boolean reverse;
 	boolean owner;
 	real area = 0.f;
+	long edge_index;
+	short edge_count = 0;
 
+	/* port: (as in collision_surface_edge_count) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return 0.f;
+	}
 	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
+	if (!collision_surface_edge_ring_continues(bsp, surface->first_edge_index, 0))
+	{
+		return 0.f;
+	}
 	edge = TAG_BLOCK_GET_ELEMENT(
 		&bsp->edges,
 		surface->first_edge_index,
@@ -601,9 +747,14 @@ real collision_surface_area(
 		&bsp->bsp3d,
 		surface->plane_designator,
 		&plane);
+	edge_index = edge->edge_indices[reverse];
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count))
+	{
+		return 0.f;
+	}
 	edge = TAG_BLOCK_GET_ELEMENT(
 		&bsp->edges,
-		edge->edge_indices[reverse],
+		edge_index,
 		struct collision_edge);
 	owner = edge->surface_indices[1] == surface_index;
 	reverse = owner;
@@ -625,9 +776,14 @@ real collision_surface_area(
 			cross_product3d(&p_vector, &q_vector, &cross);
 			area += dot_product3d(&cross, &plane.n);
 
+			edge_index = edge->edge_indices[reverse];
+			if (!collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count))
+			{
+				break;
+			}
 			edge = TAG_BLOCK_GET_ELEMENT(
 				&bsp->edges,
-				edge->edge_indices[reverse],
+				edge_index,
 				struct collision_edge);
 			owner = edge->surface_indices[1] == surface_index;
 			reverse = owner;
@@ -671,12 +827,27 @@ boolean collision_surface_test_point2d(
 	boolean sign,
 	real_point2d const *point)
 {
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+	short edge_count = 0;
+
+	/* port: (as in collision_surface_edge_count: no point is in a surface
+	that is no surface) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return FALSE;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
-	long const first_edge_index = surface->first_edge_index;
-	long edge_index = first_edge_index;
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return FALSE;
+	}
 
 	do
 	{
@@ -710,7 +881,8 @@ boolean collision_surface_test_point2d(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	return TRUE;
 }
@@ -723,18 +895,35 @@ boolean collision_surface_find_closest_point2d(
 	real_point2d const *point,
 	real_point2d *result)
 {
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
-		&bsp->surfaces,
-		surface_index,
-		struct collision_surface);
-	long first_edge_index = surface->first_edge_index;
-	long edge_index = first_edge_index;
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
 	boolean previous_before;
 	boolean previous_after;
 	boolean first_before;
 	boolean first_after;
 	boolean before;
 	boolean after;
+	short edge_count = 0;
+
+	/* port: (as in collision_surface_edge_count: the point is its own
+	closest in a surface that is no surface) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		*result = *point;
+		return TRUE;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		*result = *point;
+		return TRUE;
+	}
 
 	do
 	{
@@ -810,14 +999,17 @@ boolean collision_surface_find_closest_point2d(
 		previous_after = after;
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	if ((after && (first_before || !first_after)) ||
 		(first_before && (after || !before)))
 	{
+		/* port: the first edge (where a ring that closed ended; one that
+		did not may end on no edge) */
 		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
 			&bsp->edges,
-			edge_index,
+			first_edge_index,
 			struct collision_edge);
 		boolean reverse = edge->surface_indices[1] == surface_index;
 		struct collision_vertex const *origin = TAG_BLOCK_GET_ELEMENT(
@@ -842,12 +1034,10 @@ boolean collision_surface_test_line2d(
 	real_vector2d const *direction,
 	struct collision_surface_test_line2d_result *result)
 {
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
-		&bsp->surfaces,
-		surface_index,
-		struct collision_surface);
-	long const first_edge_index = surface->first_edge_index;
-	long edge_index = first_edge_index;
+	struct collision_surface const *surface;
+	long first_edge_index;
+	long edge_index;
+	short edge_count = 0;
 
 	result->enter_t = REAL_MIN;
 	result->enter_edge_index = NONE;
@@ -855,6 +1045,23 @@ boolean collision_surface_test_line2d(
 	result->exit_t = REAL_MAX;
 	result->exit_edge_index = NONE;
 	result->exit_surface_index = NONE;
+
+	/* port: (as in collision_surface_edge_count: a line crosses no surface
+	that is no surface) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return FALSE;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	first_edge_index = surface->first_edge_index;
+	edge_index = first_edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, edge_index, 0))
+	{
+		return FALSE;
+	}
 
 	do
 	{
@@ -914,7 +1121,8 @@ boolean collision_surface_test_line2d(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != first_edge_index);
+	while (edge_index != first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	return result->enter_t > result->exit_t;
 }
@@ -942,9 +1150,11 @@ boolean collision_bsp_test_pill_new(
 	context.last_leaf_index = NONE;
 	context.last_contents = _contents_unknown;
 	context.last_plane_designator = NONE;
+	/* port: (collision_bsp3d_enter_node) */
+	context.nodes_left = bsp->bsp3d.nodes.count;
 	*t = REAL_MAX;
 
-	return collision_bsp_test_pill_new_recursive(&context, 0, 0.f, 1.f);
+	return collision_bsp_test_pill_new_recursive(&context, 0, 0.f, 1.f, 0);
 }
 
 boolean collision_bsp_test_pill(
@@ -963,10 +1173,12 @@ boolean collision_bsp_test_pill(
 	context.radius = radius;
 	context.result = result;
 	context.stack_depth = 0;
+	/* port: (collision_bsp3d_enter_node) */
+	context.nodes_left = bsp->bsp3d.nodes.count;
 	result->t = maximum_t < 0.f ? 0.f : maximum_t;
 	result->leaf_count = 0;
 
-	return bsp3d_test_pill_recursive(&context, 0);
+	return bsp3d_test_pill_recursive(&context, 0, 0);
 }
 
 boolean collision_bsp_test_sphere(
@@ -990,12 +1202,14 @@ boolean collision_bsp_test_sphere(
 	context.radius = radius;
 	context.result = result;
 	context.stack_depth = 0;
+	/* port: (collision_bsp3d_enter_node) */
+	context.nodes_left = bsp->bsp3d.nodes.count;
 	result->leaf_count = 0;
 	result->surface_count = 0;
 	result->edge_count = 0;
 	result->vertex_count = 0;
 
-	bsp3d_test_sphere_recursive(&context, 0);
+	bsp3d_test_sphere_recursive(&context, 0, 0);
 	collision_log_end_time(
 		collision_function,
 		collision_bsp_usage_times.sphere.QuadPart);
@@ -1033,9 +1247,11 @@ boolean collision_bsp_test_vector(
 	context.last_plane_index = NONE;
 	result->leaf_count = 0;
 	context.last_contents = _contents_unknown;
+	/* port: (collision_bsp3d_enter_node) */
+	context.nodes_left = bsp->bsp3d.nodes.count;
 
 	t = PIN(maximum_t, 0.f, 1.f);
-	return_value = collision_bsp_test_vector_recursive(&context, 0, 0.f, t);
+	return_value = collision_bsp_test_vector_recursive(&context, 0, 0.f, t, 0);
 	collision_log_end_time(
 		collision_function,
 		collision_bsp_usage_times.vector.QuadPart);
@@ -1044,6 +1260,98 @@ boolean collision_bsp_test_vector(
 }
 
 /* ---------- private code */
+
+/* port: whether a test may enter a node (from the map) `depth` nodes deep
+in the bsp3d. One that is no node, deeper than the plane stacks hold
+(MAXIMUM_BSP3D_TRAVERSAL_DEPTH: the retail bsps are at most 66 deep), or
+past `nodes_left` (the bsp's node count when the test begins: a test enters
+each node of a tree at most once, so nodes that make no tree, a cycle or a
+node with two parents, would make it never end) ends the test there. The
+retail bsps are all trees */
+static boolean collision_bsp3d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left)
+{
+	if (node_index < bsp->bsp3d.nodes.count &&
+		depth < MAXIMUM_BSP3D_TRAVERSAL_DEPTH &&
+		--*nodes_left >= 0)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_bsp_nodes)
+	{
+		error(_error_silent, "a collision bsp's nodes are not a tree of its nodes at most %d deep",
+			MAXIMUM_BSP3D_TRAVERSAL_DEPTH);
+		warned_about_collision_bsp_nodes = TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: (as collision_bsp3d_enter_node, in a bsp2d of the bsp, at most
+MAXIMUM_BSP2D_TRAVERSAL_DEPTH deep, where the retail bsp2ds are at most 8:
+`nodes_left` is the bsp2d's node count when a bsp2d test begins) */
+static boolean collision_bsp2d_enter_node(
+	struct collision_bsp const *bsp,
+	long node_index,
+	short depth,
+	long *nodes_left)
+{
+	if (node_index < bsp->bsp2d.nodes.count &&
+		depth < MAXIMUM_BSP2D_TRAVERSAL_DEPTH &&
+		--*nodes_left >= 0)
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_bsp2d_nodes)
+	{
+		error(_error_silent, "a collision bsp's bsp2d nodes are not a tree of its nodes at most %d deep",
+			MAXIMUM_BSP2D_TRAVERSAL_DEPTH);
+		warned_about_collision_bsp2d_nodes = TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: whether a leaf (from the map) is one of the bsp's, whose bsp2d
+references are all the bsp's (a test skips one that is not) */
+static boolean collision_bsp_valid_leaf(
+	struct collision_bsp const *bsp,
+	long leaf_index)
+{
+	struct collision_leaf const *leaf;
+
+	if (leaf_index >= 0 && leaf_index < bsp->leaves.count)
+	{
+		leaf = TAG_BLOCK_GET_ELEMENT(
+			&bsp->leaves,
+			leaf_index,
+			struct collision_leaf);
+		/* (one with no references may name none: NONE) */
+		if (leaf->bsp2d_reference_count == 0 ||
+			(leaf->first_bsp2d_reference_index >= 0 &&
+			leaf->bsp2d_reference_count > 0 &&
+			leaf->first_bsp2d_reference_index <=
+				bsp->bsp2d_references.count - leaf->bsp2d_reference_count))
+		{
+			return TRUE;
+		}
+	}
+
+	if (!warned_about_collision_leaf)
+	{
+		error(_error_silent, "collision leaf #%ld is not one of the bsp's %ld, or its references are not the bsp's",
+			leaf_index,
+			bsp->leaves.count);
+		warned_about_collision_leaf = TRUE;
+	}
+
+	return FALSE;
+}
 
 static void add_feature(
 	long *count,
@@ -1071,14 +1379,27 @@ static void collision_surface_test_sphere(
 	struct test_sphere_data *data,
 	long surface_index)
 {
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
-		&data->bsp->surfaces,
-		surface_index,
-		struct collision_surface);
+	struct collision_surface const *surface;
 	byte breakable_surface_index;
 	long edge_index;
 	real radius_squared;
 	boolean hit_feature = FALSE;
+	short edge_count;
+
+	/* port: (as in collision_surface_edge_count: a sphere touches no
+	surface that is no surface) */
+	if (!collision_bsp_valid_surface_index(data->bsp, surface_index))
+	{
+		return;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
+		&data->bsp->surfaces,
+		surface_index,
+		struct collision_surface);
+	if (!collision_surface_edge_ring_continues(data->bsp, surface->first_edge_index, 0))
+	{
+		return;
+	}
 
 	if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
 	{
@@ -1094,6 +1415,7 @@ static void collision_surface_test_sphere(
 
 	radius_squared = data->radius * data->radius;
 	edge_index = surface->first_edge_index;
+	edge_count = 0;
 	do
 	{
 		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
@@ -1125,9 +1447,11 @@ static void collision_surface_test_sphere(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != surface->first_edge_index);
+	while (edge_index != surface->first_edge_index &&
+		collision_surface_edge_ring_continues(data->bsp, edge_index, ++edge_count));
 
 	edge_index = surface->first_edge_index;
+	edge_count = 0;
 	do
 	{
 		struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
@@ -1161,11 +1485,13 @@ static void collision_surface_test_sphere(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != surface->first_edge_index);
+	while (edge_index != surface->first_edge_index &&
+		collision_surface_edge_ring_continues(data->bsp, edge_index, ++edge_count));
 
 	if (!hit_feature)
 	{
 		edge_index = surface->first_edge_index;
+		edge_count = 0;
 		do
 		{
 			struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
@@ -1203,7 +1529,8 @@ static void collision_surface_test_sphere(
 
 			edge_index = edge->edge_indices[reverse];
 		}
-		while (edge_index != surface->first_edge_index);
+		while (edge_index != surface->first_edge_index &&
+			collision_surface_edge_ring_continues(data->bsp, edge_index, ++edge_count));
 	}
 
 	add_feature(
@@ -1223,11 +1550,23 @@ static boolean collision_surface_test_point(
 	boolean sign,
 	real_point2d const *point)
 {
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+	struct collision_surface const *surface;
+	long edge_index;
+	short edge_count = 0;
+
+	/* port: (as in collision_surface_test_point2d) */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return FALSE;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
 		struct collision_surface);
-	long edge_index;
+	if (!collision_surface_edge_ring_continues(bsp, surface->first_edge_index, 0))
+	{
+		return FALSE;
+	}
 
 	if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit))
 	{
@@ -1275,7 +1614,8 @@ static boolean collision_surface_test_point(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != surface->first_edge_index);
+	while (edge_index != surface->first_edge_index &&
+		collision_surface_edge_ring_continues(bsp, edge_index, ++edge_count));
 
 	return TRUE;
 }
@@ -1325,25 +1665,41 @@ static boolean collision_bsp_test_pill_new_recursive(
 	struct collision_bsp_test_pill_new_context *data,
 	long node_index,
 	real t0,
-	real t1)
+	real t1,
+	short depth)
 {
 	while (!(node_index & LONG_MIN))
 	{
-		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
+		struct bsp3d_node const *node;
+		real_plane3d const *plane;
+		real distance;
+		real dot;
+		real distance0;
+		real distance1;
+		boolean reaches_back;
+		boolean reaches_front;
+
+		/* port: (collision_bsp3d_enter_node: the test ends with no more
+		hits) */
+		if (!collision_bsp3d_enter_node(data->bsp, node_index, depth++, &data->nodes_left))
+		{
+			return FALSE;
+		}
+		node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.nodes,
 			node_index,
 			struct bsp3d_node);
-		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+		plane = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.planes,
 			node->plane_designator,
 			real_plane3d);
-		real distance = plane3d_distance_to_point(plane, data->point);
-		real dot = dot_product3d(data->vector, &plane->n);
-		real distance0 = dot*t0 + distance;
-		real distance1 = dot*t1 + distance;
-		boolean reaches_back =
+		distance = plane3d_distance_to_point(plane, data->point);
+		dot = dot_product3d(data->vector, &plane->n);
+		distance0 = dot*t0 + distance;
+		distance1 = dot*t1 + distance;
+		reaches_back =
 			distance0 < data->radius || distance1 < data->radius;
-		boolean reaches_front =
+		reaches_front =
 			distance0 > -data->radius || distance1 > -data->radius;
 
 		if (reaches_back && reaches_front)
@@ -1374,7 +1730,8 @@ static boolean collision_bsp_test_pill_new_recursive(
 				data,
 				node->children[!front],
 				t0,
-				near_t);
+				near_t,
+				depth);
 			if (near_hit)
 			{
 				if (far_t >= *data->t)
@@ -1391,7 +1748,8 @@ static boolean collision_bsp_test_pill_new_recursive(
 				data,
 				node->children[front],
 				far_t,
-				t1);
+				t1,
+				depth);
 
 			return near_hit;
 		}
@@ -1424,20 +1782,31 @@ static boolean collision_bsp_test_pill_new_recursive(
 
 static void bsp2d_test_sphere_recursive(
 	struct test_sphere_data *data,
-	long child_index)
+	long child_index,
+	short depth)
 {
 	while (!(child_index & LONG_MIN))
 	{
-		struct bsp2d_node const *node = TAG_BLOCK_GET_ELEMENT(
+		struct bsp2d_node const *node;
+		real distance;
+		boolean reaches_first_child;
+		boolean reaches_second_child;
+
+		/* port: (collision_bsp2d_enter_node) */
+		if (!collision_bsp2d_enter_node(data->bsp, child_index, depth++, &data->bsp2d_nodes_left))
+		{
+			return;
+		}
+		node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp2d.nodes,
 			child_index,
 			struct bsp2d_node);
-		real distance = plane2d_distance_to_point(&node->plane, &data->center2d);
-		boolean reaches_first_child = distance <= data->radius;
-		boolean reaches_second_child = distance >= -data->radius;
+		distance = plane2d_distance_to_point(&node->plane, &data->center2d);
+		reaches_first_child = distance <= data->radius;
+		reaches_second_child = distance >= -data->radius;
 
 		if (reaches_first_child)
-			bsp2d_test_sphere_recursive(data, node->child_indices[0]);
+			bsp2d_test_sphere_recursive(data, node->child_indices[0], depth);
 		if (!reaches_second_child)
 			return;
 
@@ -1507,7 +1876,10 @@ static long collision_leaf_test_vector(
 				&bsp->bsp2d.nodes,
 				&point2d,
 				reference->root_index);
-			if (!test_surface ||
+			/* port: a bsp2d leaf (from the map) that is no surface is
+			passed over (the test's result names a surface of the bsp) */
+			if (collision_bsp_valid_surface_index(bsp, surface_index) &&
+				(!test_surface ||
 				collision_surface_test_point(
 					bsp,
 					breakable_surface_count,
@@ -1515,7 +1887,7 @@ static long collision_leaf_test_vector(
 					surface_index,
 					projection,
 					projection_sign,
-					&point2d))
+					&point2d)))
 			{
 				return surface_index;
 			}
@@ -1617,21 +1989,34 @@ static boolean pill_test_vector(
 
 static void bsp3d_test_sphere_recursive(
 	struct test_sphere_data *data,
-	long node_index)
+	long node_index,
+	short depth)
 {
 	while (!(node_index & LONG_MIN))
 	{
-		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
+		struct bsp3d_node const *node;
+		real_plane3d const *plane;
+		real distance;
+		boolean reaches_second_child;
+		boolean child_index;
+
+		/* port: (collision_bsp3d_enter_node: the plane stack holds a plane
+		of each node above, so it is never full) */
+		if (!collision_bsp3d_enter_node(data->bsp, node_index, depth++, &data->nodes_left))
+		{
+			return;
+		}
+		node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.nodes,
 			node_index,
 			struct bsp3d_node);
-		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+		plane = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.planes,
 			node->plane_designator,
 			real_plane3d);
-		real distance = plane3d_distance_to_point(plane, data->center);
-		boolean reaches_second_child = distance < data->radius;
-		boolean child_index = distance > -data->radius;
+		distance = plane3d_distance_to_point(plane, data->center);
+		reaches_second_child = distance < data->radius;
+		child_index = distance > -data->radius;
 
 		if (child_index && reaches_second_child)
 		{
@@ -1641,7 +2026,7 @@ static void bsp3d_test_sphere_recursive(
 				data->stack_depth>=0 && data->stack_depth<MAXIMUM_BSP3D_DEPTH);
 			data->plane_stack[data->stack_depth++] =
 				node->plane_designator | LONG_MIN;
-			bsp3d_test_sphere_recursive(data, node->children[0]);
+			bsp3d_test_sphere_recursive(data, node->children[0], depth);
 
 			data->stack_depth--;
 			match_assert(
@@ -1650,7 +2035,7 @@ static void bsp3d_test_sphere_recursive(
 				data->stack_depth>=0 && data->stack_depth<MAXIMUM_BSP3D_DEPTH);
 			data->plane_stack[data->stack_depth++] =
 				node->plane_designator & LONG_MAX;
-			bsp3d_test_sphere_recursive(data, node->children[1]);
+			bsp3d_test_sphere_recursive(data, node->children[1], depth);
 			data->stack_depth--;
 
 			return;
@@ -1659,7 +2044,10 @@ static void bsp3d_test_sphere_recursive(
 		node_index = node->children[child_index];
 	}
 
-	if (node_index != NONE)
+	/* port: a leaf (from the map) that is no leaf is not tested
+	(collision_bsp_valid_leaf) */
+	if (node_index != NONE &&
+		collision_bsp_valid_leaf(data->bsp, node_index & LONG_MAX))
 	{
 		long leaf_index = node_index & LONG_MAX;
 		struct collision_leaf const *leaf = TAG_BLOCK_GET_ELEMENT(
@@ -1723,7 +2111,9 @@ static void bsp3d_test_sphere_recursive(
 						data->projection_axis,
 						data->projection_sign,
 						&data->center2d);
-					bsp2d_test_sphere_recursive(data, reference->root_index);
+					/* port: (collision_bsp2d_enter_node) */
+					data->bsp2d_nodes_left = data->bsp->bsp2d.nodes.count;
+					bsp2d_test_sphere_recursive(data, reference->root_index, 0);
 					break;
 				}
 			}
@@ -1737,24 +2127,40 @@ static boolean collision_bsp_test_vector_recursive(
 	struct collision_bsp_test_vector_context *data,
 	long node_index,
 	real t0,
-	real t1)
+	real t1,
+	short depth)
 {
 	if (!(node_index & LONG_MIN))
 	{
-		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
+		struct bsp3d_node const *node;
+		real_plane3d const *plane;
+		real distance;
+		real dot;
+		real distance0;
+		real distance1;
+		boolean reaches_back;
+		boolean reaches_front;
+
+		/* port: (collision_bsp3d_enter_node: the test ends with no more
+		hits) */
+		if (!collision_bsp3d_enter_node(data->bsp, node_index, depth, &data->nodes_left))
+		{
+			return FALSE;
+		}
+		node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.nodes,
 			node_index,
 			struct bsp3d_node);
-		real_plane3d const *plane = TAG_BLOCK_GET_ELEMENT(
+		plane = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.planes,
 			node->plane_designator,
 			real_plane3d);
-		real distance = plane3d_distance_to_point(plane, data->point);
-		real dot = dot_product3d(data->vector, &plane->n);
-		real distance0 = dot*t0 + distance;
-		real distance1 = dot*t1 + distance;
-		boolean reaches_back = distance0 < 0.f || distance1 < 0.f;
-		boolean reaches_front = distance0 >= 0.f || distance1 >= 0.f;
+		distance = plane3d_distance_to_point(plane, data->point);
+		dot = dot_product3d(data->vector, &plane->n);
+		distance0 = dot*t0 + distance;
+		distance1 = dot*t1 + distance;
+		reaches_back = distance0 < 0.f || distance1 < 0.f;
+		reaches_front = distance0 >= 0.f || distance1 >= 0.f;
 
 		if (reaches_back && reaches_front)
 		{
@@ -1765,7 +2171,8 @@ static boolean collision_bsp_test_vector_recursive(
 				data,
 				node->children[!front],
 				t0,
-				t))
+				t,
+				depth + 1))
 			{
 				return TRUE;
 			}
@@ -1778,7 +2185,8 @@ static boolean collision_bsp_test_vector_recursive(
 				data,
 				node->children[front],
 				t,
-				t1))
+				t1,
+				depth + 1))
 			{
 				return TRUE;
 			}
@@ -1787,7 +2195,8 @@ static boolean collision_bsp_test_vector_recursive(
 			data,
 			node->children[reaches_front],
 			t0,
-			t1))
+			t1,
+			depth + 1))
 		{
 			return TRUE;
 		}
@@ -1799,7 +2208,10 @@ static boolean collision_bsp_test_vector_recursive(
 		boolean test_surface = FALSE;
 		long test_leaf_index;
 
-		if (node_index != NONE)
+		/* port: a leaf (from the map) that is no leaf is solid
+		(collision_bsp_valid_leaf) */
+		if (node_index != NONE &&
+			collision_bsp_valid_leaf(data->bsp, node_index & LONG_MAX))
 		{
 			leaf_index = node_index & LONG_MAX;
 			contents = TEST_FLAG(
@@ -1904,11 +2316,24 @@ static boolean collision_surface_test_pill(
 	long surface_index)
 {
 	boolean hit = FALSE;
-	struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(
+	struct collision_surface const *surface;
+	long edge_index;
+	short edge_count = 0;
+
+	/* port: (as in collision_surface_test_sphere) */
+	if (!collision_bsp_valid_surface_index(data->bsp, surface_index))
+	{
+		return FALSE;
+	}
+	surface = TAG_BLOCK_GET_ELEMENT(
 		&data->bsp->surfaces,
 		surface_index,
 		struct collision_surface);
-	long edge_index = surface->first_edge_index;
+	edge_index = surface->first_edge_index;
+	if (!collision_surface_edge_ring_continues(data->bsp, edge_index, 0))
+	{
+		return FALSE;
+	}
 
 	do
 	{
@@ -1975,18 +2400,22 @@ static boolean collision_surface_test_pill(
 
 		edge_index = edge->edge_indices[reverse];
 	}
-	while (edge_index != surface->first_edge_index);
+	while (edge_index != surface->first_edge_index &&
+		collision_surface_edge_ring_continues(data->bsp, edge_index, ++edge_count));
 
 	return hit;
 }
 
 static boolean bsp2d_test_pill_recursive(
 	struct test_pill_data *data,
-	long child_index)
+	long child_index,
+	short depth)
 {
 	boolean hit = FALSE;
 
-	if (!(child_index & LONG_MIN))
+	/* port: (collision_bsp2d_enter_node: no hit past where the test ends) */
+	if (!(child_index & LONG_MIN) &&
+		collision_bsp2d_enter_node(data->bsp, child_index, depth, &data->bsp2d_nodes_left))
 	{
 		struct bsp2d_node const *node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp2d.nodes,
@@ -2005,14 +2434,15 @@ static boolean bsp2d_test_pill_recursive(
 			distance1 >= -data->radius - BSP2D_TEST_PILL_EPSILON;
 
 		if ((reaches_back &&
-				bsp2d_test_pill_recursive(data, node->child_indices[0])) ||
+				bsp2d_test_pill_recursive(data, node->child_indices[0], depth + 1)) ||
 			(reaches_front &&
-				bsp2d_test_pill_recursive(data, node->child_indices[1])))
+				bsp2d_test_pill_recursive(data, node->child_indices[1], depth + 1)))
 		{
 			hit = TRUE;
 		}
 	}
-	else if (collision_surface_test_pill(data, child_index & LONG_MAX))
+	else if ((child_index & LONG_MIN) &&
+		collision_surface_test_pill(data, child_index & LONG_MAX))
 	{
 		hit = TRUE;
 	}
@@ -2022,11 +2452,15 @@ static boolean bsp2d_test_pill_recursive(
 
 static boolean bsp3d_test_pill_recursive(
 	struct test_pill_data *data,
-	long child_index)
+	long child_index,
+	short depth)
 {
 	boolean hit = FALSE;
 
-	if (!(child_index & LONG_MIN))
+	/* port: (collision_bsp3d_enter_node: no hit past where the test ends;
+	the plane stack holds a plane of each node above, so it is never full) */
+	if (!(child_index & LONG_MIN) &&
+		collision_bsp3d_enter_node(data->bsp, child_index, depth, &data->nodes_left))
 	{
 		struct bsp3d_node const *node = TAG_BLOCK_GET_ELEMENT(
 			&data->bsp->bsp3d.nodes,
@@ -2057,22 +2491,26 @@ static boolean bsp3d_test_pill_recursive(
 			data->plane_stack[data->stack_depth++] = front ?
 				(node->plane_designator | LONG_MIN) :
 				(node->plane_designator & LONG_MAX);
-			if (bsp3d_test_pill_recursive(data, node->children[!front]))
+			if (bsp3d_test_pill_recursive(data, node->children[!front], depth + 1))
 			{
 				hit = TRUE;
 			}
 			data->stack_depth--;
-			if (bsp3d_test_pill_recursive(data, node->children[front]))
+			if (bsp3d_test_pill_recursive(data, node->children[front], depth + 1))
 			{
 				hit = TRUE;
 			}
 		}
-		else if (bsp3d_test_pill_recursive(data, node->children[reaches_front]))
+		else if (bsp3d_test_pill_recursive(data, node->children[reaches_front], depth + 1))
 		{
 			hit = TRUE;
 		}
 	}
-	else if (child_index != NONE)
+	/* port: (and a leaf, from the map, that is no leaf is not tested:
+	collision_bsp_valid_leaf) */
+	else if ((child_index & LONG_MIN) &&
+		child_index != NONE &&
+		collision_bsp_valid_leaf(data->bsp, child_index & LONG_MAX))
 	{
 		long leaf_index = child_index & LONG_MAX;
 		struct collision_leaf const *leaf = TAG_BLOCK_GET_ELEMENT(
@@ -2203,7 +2641,9 @@ static boolean bsp3d_test_pill_recursive(
 							data->projection_axis,
 							data->projection_sign,
 							(real_point2d *)&data->vector2d);
-						if (bsp2d_test_pill_recursive(data, reference->root_index))
+						/* port: (collision_bsp2d_enter_node) */
+						data->bsp2d_nodes_left = data->bsp->bsp2d.nodes.count;
+						if (bsp2d_test_pill_recursive(data, reference->root_index, 0))
 						{
 							hit = TRUE;
 						}

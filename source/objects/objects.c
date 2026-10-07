@@ -61,11 +61,30 @@ OBJECTS.C
 
 #define MAXIMUM_DUMPS 1024
 
+/* port: the garbage collection (objects_garbage_collection). With many
+players spread over a level and many bodies (co-op's extra enemies), every
+body was in some player's view, none could go, and the whole collection
+(every garbage object's visibility, the memory pool compacted) ran again
+every tick on the host. In network co-op only (single player and
+multiplayer keep the game's own collection), a player sees garbage no
+further off than GARBAGE_VISIBLE_DISTANCE (world units, about 90 metres),
+and a collection of active garbage that left too much is tried again only
+after GARBAGE_ACTIVE_RETRY_TICKS. Running short of memory or objects still
+collects at once. */
+#define GARBAGE_VISIBLE_DISTANCE 30.0f
+#define GARBAGE_ACTIVE_RETRY_TICKS TICKS_PER_SECOND
+
 
 // This is dangerous, bungie returns the same value regardless of whether the index is valid
+/* port: an index is 1-4 for the incoming functions and 5-8 for the outgoing
+ones (the Xbox read both through incoming_function_values, which the
+outgoing ones follow; retail uses up to 8). Anything else is a map's bad
+index, which reads no function: 0 */
 #define OBJECT_INCOMING_FUNCTION_GET_VALUE(object, index)	\
-((index)>=NUMBER_OF_INCOMING_OBJECT_FUNCTIONS+1 ?			\
-(object)->object.incoming_function_values[(index)-1] :		\
+((unsigned long)((index)-1)>=NUMBER_OF_INCOMING_OBJECT_FUNCTIONS+NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS ? \
+0.f :														\
+(index)>=NUMBER_OF_INCOMING_OBJECT_FUNCTIONS+1 ?			\
+(object)->object.outgoing_function_values[(index)-NUMBER_OF_INCOMING_OBJECT_FUNCTIONS-1] : \
 (object)->object.incoming_function_values[(index)-1])
 
 #define OBJECT_FRAME_INDEX_GET(object_index) ((object_index) + game_time_get())
@@ -89,6 +108,11 @@ struct object_globals
 		short cluster_index;
 	} pvs_activation;
 };
+
+/* port: when a collection of active garbage may be tried again (NONE: at
+once); not in the game state, so a revert, which takes the clock back, puts
+it right (objects_garbage_active_due) */
+static long garbage_active_retry_time = NONE;
 
 struct object_memory_release_function
 {
@@ -122,6 +146,7 @@ boolean network_objects_may_delete(long object_index);
 void network_coop_note_attach(long parent_index, char const *parent_marker_name, long child_index,
 	char const *child_marker_name);
 void network_coop_note_detach(long parent_index, long child_index);
+boolean network_coop_active(void);
 
 static void object_connect_lights(long object_index, boolean disconnect, boolean reconnect);
 static void object_name_list_allocate(void);
@@ -153,6 +178,7 @@ static void object_delete_recursive(long object_index, boolean delete_siblings);
 static void object_compute_function_values(long object_index);
 static void object_compute_change_colors(long object_index);
 static void object_model_nodes_error(long model_index, struct model const *model);
+static void object_definition_data_error(long definition_index, char const *problem);
 
 /* ---------- globals */
 
@@ -349,7 +375,9 @@ void object_set_object_index_for_name_index(
 	short name_index,
 	long object_index)
 {
-	if (VALID_INDEX(name_index, global_scenario_get()->object_names.count))
+	/* port: and one the name list holds (a map's count; retail has up to
+	448 names) */
+	if (VALID_INDEX(name_index, MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO)))
 	{
 		object_name_list[name_index] = object_index;
 	}
@@ -1474,9 +1502,9 @@ void object_permute_region(
 		short region_index;
 		struct model* model = model_definition_get(object_definition->object.model.index);
 		
-		/* port: no more regions than a model has room for (a map's count; far
-		enough past it, the writes reached the object's node blocks) */
-		for (region_index = 0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL); region_index++)
+		/* port: no more regions than the object's region_permutations holds
+		(a map's count; retail has up to 8) */
+		for (region_index = 0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_OBJECT); region_index++)
 		{
 			if (desired_region_index==NONE || desired_region_index==region_index)
 			{
@@ -1486,7 +1514,10 @@ void object_permute_region(
 					region_index,
 					struct model_region);
 
-				for (permutation_index = 0; permutation_index<region->permutations.count; permutation_index++)
+				/* port: no more permutations than a region has room for (a map's
+				count, which a short counter would never reach; retail has up
+				to 12) */
+				for (permutation_index = 0; permutation_index<MIN(region->permutations.count, MAXIMUM_PERMUTATIONS_PER_MODEL_REGION); permutation_index++)
 				{
 					struct model_region_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
 						&region->permutations,
@@ -1524,9 +1555,31 @@ boolean object_get_function_value(
 	{
 		match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 1654, function_index>=0 && function_index<NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS);
 
-		*value_reference = object->object.outgoing_function_values[function_index];
-		
-		result = TEST_FLAG(object->object.functions_active_flags, function_index);
+		/* port: a function the object can have (a map's index, from an
+		attachment, a widget or a shader; retail's are NONE or 0-3), or
+		it reads as off */
+		if (VALID_INDEX(function_index, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS))
+		{
+			*value_reference = object->object.outgoing_function_values[function_index];
+
+			result = TEST_FLAG(object->object.functions_active_flags, function_index);
+		}
+		else
+		{
+			static boolean function_index_reported = FALSE;
+
+			if (!function_index_reported)
+			{
+				function_index_reported = TRUE;
+				error(
+					_error_silent,
+					"### ERROR %s asked for function #%d; it reads as off",
+					tag_get_name(object->definition_index),
+					function_index);
+			}
+			*value_reference = 0.f;
+			result = FALSE;
+		}
 	}
 	
 	return result;
@@ -1685,7 +1738,8 @@ boolean object_visible_to_any_player(
 						struct unit_datum const *unit = unit_get(player->unit_index);
 						real distance = normalize3d(vector_from_points3d(&player_position, &object->object.bounding_sphere_center, &eye_to_point));
 
-						if (dot_product3d(&unit->unit.desired_aiming_vector, &eye_to_point) > cosine(arctangent(object->object.bounding_sphere_radius, distance) + sloppy_maximum_field_of_view))
+						if ((!network_coop_active() || distance <= GARBAGE_VISIBLE_DISTANCE) &&
+							dot_product3d(&unit->unit.desired_aiming_vector, &eye_to_point) > cosine(arctangent(object->object.bounding_sphere_radius, distance) + sloppy_maximum_field_of_view))
 						{
 							visible = TRUE;
 							break;
@@ -1857,6 +1911,26 @@ real_matrix4x3 *object_get_node_matrix(
 	short node_index)
 {
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 1060, object_has_node(object_index, node_index));
+	/* port: a node the object has no matrix for (an index a map's data
+	gave) is its first node, which every object has, not whatever lies
+	past its matrices */
+	{
+		struct object_datum *object = object_get(object_index);
+
+		if (node_index < 0 ||
+			node_index >= object->object.node_matrices.size / (short)sizeof(real_matrix4x3))
+		{
+			static boolean logged = FALSE;
+
+			if (!logged)
+			{
+				logged = TRUE;
+				error(_error_silent, "object %08lx has no node #%d: its first node is used",
+					(unsigned long)object_index, node_index);
+			}
+			node_index = 0;
+		}
+	}
 
 	{
 		real_matrix4x3 *interpolated = render_interpolation_object_node_matrices(object_index);
@@ -2296,7 +2370,16 @@ void object_export_function_values(
 			default:
 				region_index = object_definition->object.function_modes[i]-_object_function_first_region_damage;
 				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2630, region_index>=0 && region_index<MAXIMUM_REGIONS_PER_OBJECT);
-				value = object->object.region_damage[region_index] / 255.f;
+				/* port: a region the object has, or 0 (a map's function mode;
+				retail's are 0-5, 10, 18 and 19) */
+				if (VALID_INDEX(region_index, MAXIMUM_REGIONS_PER_OBJECT))
+				{
+					value = object->object.region_damage[region_index] / 255.f;
+				}
+				else
+				{
+					object_definition_data_error(object->definition_index, "function mode; it reads 0");
+				}
 				break;
 			}
 			object->object.incoming_function_values[i] = value;
@@ -2464,9 +2547,11 @@ void object_compute_node_matrices(
 					overlay_index,
 					struct animation_graph_object_overlay);
 
-				/* port: an animation the graph has (a map's index) */
+				/* port: an animation the graph has (a map's index), and a function
+				the object has room for (a map's index; NONE read before the
+				functions; retail's are 0-3) */
 				if (VALID_INDEX(overlay->animation_index, animation_graph->animations.count) &&
-					overlay->function_index<object_definition->object.functions.count)
+					VALID_INDEX(overlay->function_index, MIN(object_definition->object.functions.count, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS)))
 				{
 					struct object_function_definition* function = TAG_BLOCK_GET_ELEMENT(
 						&object_definition->object.functions,
@@ -2478,7 +2563,14 @@ void object_compute_node_matrices(
 						struct animation);
 					real value= object->object.outgoing_function_values[overlay->function_index];
 
-					if (overlay->mode==_object_overlay_mode_frame)
+					/* port: no more nodes than the model has, which is all the
+					orientations hold (a map's animation; retail's overlays have
+					the model's count) */
+					if (animation->node_count>model_node_count)
+					{
+						object_definition_data_error(object->definition_index, "overlay animation (more nodes than its model); it is skipped");
+					}
+					else if (overlay->mode==_object_overlay_mode_frame)
 					{
 						real frame_index;
 						if (TEST_FLAG(function->flags, _object_function_additive_bit))
@@ -2902,7 +2994,9 @@ static void object_choose_random_change_colors(
 				), 
 				1.f);
 
-			for (permutation_index =0; permutation_index<cc->permutations.count; permutation_index++)
+			/* port: no more than the short counter reaches (a map's count;
+			retail has up to 8) */
+			for (permutation_index =0; permutation_index<MIN(cc->permutations.count, SHORT_MAX); permutation_index++)
 			{
 				struct object_change_color_permutation *permutation = TAG_BLOCK_GET_ELEMENT(
 					&cc->permutations,
@@ -3345,6 +3439,23 @@ long object_new(
 		)
 	{
 		definition_index = game_engine_remap_object_definition(definition_index);
+	}
+
+	/* port: only an object whose type is its tag's group (a map's type, which
+	picks the datum's size, the type's functions and how the rest of the tag
+	is read; retail's all match). The object isn't made */
+	if (definition_index!=NONE &&
+		object_definition_index_to_object_type(definition_index)!=object_definition_get(definition_index)->object.type)
+	{
+		if (model_data_report_once(object_definition_get(definition_index)))
+		{
+			error(
+				_error_silent,
+				"### ERROR %s has object type #%d, not its tag's; it isn't made",
+				tag_get_name(definition_index),
+				object_definition_get(definition_index)->object.type);
+		}
+		definition_index = NONE;
 	}
 
 	if (definition_index!=NONE)
@@ -3800,7 +3911,9 @@ long object_new_from_scenario(
 	
 	long result = NONE;
 
-	if (scenario_object->palette_entry_index!=NONE &&
+	/* port: a palette entry the scenario has (a map's index; retail's are
+	all NONE or in range) */
+	if (VALID_INDEX(scenario_object->palette_entry_index, palette->count) &&
 		(
 			!object_globals->initial_placement ||
 			!TEST_FLAG(scenario_object->placement_flags, _scenario_object_placement_not_automatic_bit)
@@ -3887,16 +4000,33 @@ long object_new_by_name(
 		name_index,
 		struct scenario_object_name);
 
-	struct tag_block* datum = scenario_get_object_type_scenario_datums(
+	struct tag_block* datum;
+	struct tag_block *palette;
+	struct scenario_object_datum *object;
+
+	/* port: a name that names no placement (one past the names, or whose
+	type has no placements or whose placement is not there: a map's) makes
+	no object, rather than one of whatever its fields read as */
+	if (!VALID_INDEX(name_index, scenario->object_names.count) ||
+		!VALID_INDEX(name->runtime_object_type, NUMBER_OF_OBJECT_TYPES) ||
+		object_type_definition_get(name->runtime_object_type)->placement_tag_block_offset == NONE ||
+		object_type_definition_get(name->runtime_object_type)->palette_tag_block_offset == NONE)
+	{
+		return NONE;
+	}
+
+	datum = scenario_get_object_type_scenario_datums(
 		scenario,
 		name->runtime_object_type,
 		&placement_tag_block_element_size);
+	if (!VALID_INDEX(name->runtime_scenario_datum_index, datum->count))
+		return NONE;
 
-	struct tag_block *palette = scenario_get_object_type_scenario_palette(
+	palette = scenario_get_object_type_scenario_palette(
 		scenario,
 		name->runtime_object_type);
 
-	struct scenario_object_datum *object = (struct scenario_object_datum *)tag_block_get_element_with_size(
+	object = (struct scenario_object_datum *)tag_block_get_element_with_size(
 			datum,
 			name->runtime_scenario_datum_index,
 			placement_tag_block_element_size);
@@ -3945,6 +4075,20 @@ static long active_garbage_limit(
 	return limit_per_16_players * MAX(16, player_count) / 16;
 }
 
+/* port: whether a collection of active garbage may be tried
+(GARBAGE_ACTIVE_RETRY_TICKS: in network co-op) */
+static boolean objects_garbage_active_due(
+	void)
+{
+	long now = game_time_get();
+
+	if (!network_coop_active())
+		return TRUE;
+	if (garbage_active_retry_time != NONE && garbage_active_retry_time - now > GARBAGE_ACTIVE_RETRY_TICKS)
+		garbage_active_retry_time = NONE;
+	return garbage_active_retry_time == NONE || now >= garbage_active_retry_time;
+}
+
 void objects_garbage_collection(
 	void)
 {
@@ -3971,7 +4115,8 @@ void objects_garbage_collection(
 		}
 		else
 		{
-			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER))
+			if (object_globals->active_garbage_object_count>=active_garbage_limit(GARBAGE_LIMIT_ACTIVE_GARBAGE_TRIGGER) &&
+				objects_garbage_active_due())
 			{
 				garbage_collect_mode = _garbage_collect_active_objects;
 			}
@@ -3982,6 +4127,7 @@ void objects_garbage_collection(
 	{
 		long garbage_collect_mode_wide;
 		short garbage_object_count = 0;
+		short collected_count = 0;
 		boolean should_collect = FALSE;
 
 		{
@@ -4082,12 +4228,19 @@ void objects_garbage_collection(
 
 					object_set_garbage(object_index, FALSE);
 					object_delete_immediately(object_index);
+					collected_count++;
 				}
 			}
 
 			}
 
-		memory_pool_compact(object_memory_pool);
+		/* port: in network co-op, active garbage left above its target is
+		tried again later, and nothing collected moves nothing to compact */
+		if (garbage_collect_mode == _garbage_collect_active_objects)
+			garbage_active_retry_time = should_collect ? NONE : game_time_get() + GARBAGE_ACTIVE_RETRY_TICKS;
+		if (!network_coop_active() || collected_count > 0 ||
+			garbage_collect_mode != _garbage_collect_active_objects)
+			memory_pool_compact(object_memory_pool);
 		
 		if (debug_object_garbage_collection)
 		{
@@ -4164,7 +4317,11 @@ void objects_garbage_collection(
 					break;
 				}
 
-				if (status_still_critical || garbage_collection_after_first_attempt)
+				/* (port: in network co-op as often as the warning, not every
+				tick: a host kept critical by many enemies wrote it to
+				debug.txt each tick) */
+				if ((status_still_critical || garbage_collection_after_first_attempt) &&
+					(garbage_should_warn || !network_coop_active()))
 				{
 					char tempbuffer[512];
 					const char *status;
@@ -4468,7 +4625,24 @@ static void object_name_list_new(
 		4099,
 		name_index>=0 && name_index<MAXIMUM_OBJECT_NAMES_PER_SCENARIO);
 
-	if (object_name_list[name_index]==NONE)
+	/* port: only a name the scenario has and the name list holds (a map's
+	index; the lookup gave NONE for any other, so it came here; retail's
+	are below 448) */
+	if (!VALID_INDEX(name_index, MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO)))
+	{
+		static boolean name_index_reported = FALSE;
+
+		if (!name_index_reported)
+		{
+			name_index_reported = TRUE;
+			error(
+				_error_silent,
+				"### ERROR %s was placed with name #%d, which the scenario doesn't have; it is left unnamed",
+				tag_get_name(object->definition_index),
+				name_index);
+		}
+	}
+	else if (object_name_list[name_index]==NONE)
 	{
 		object_name_list[name_index] = object_index;
 		object->object.name_index = name_index;
@@ -4495,7 +4669,9 @@ static void object_name_list_delete(
 		struct scenario *scenario = global_scenario_get();
 		object->object.name_index = NONE;
 
-		for (i =0; i<scenario->object_names.count; ++i)
+		/* port: no more than the name list holds (a map's count, which a short
+		counter would never reach; retail has up to 448) */
+		for (i =0; i<MIN(scenario->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO); ++i)
 		{
 			if (object_name_list[i]==object_index)
 			{
@@ -4697,9 +4873,10 @@ static boolean object_select_random_region_permutations_by_variant(
 	struct object_datum *object = object_get(object_index);
 	boolean result = TRUE;
 
-	/* port: no more regions than a model has room for (a map's count; far
-	enough past it, the writes reached the object's node blocks) */
-	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL); region_index++)
+	/* port: no more regions than the object's region_permutations holds (a
+	map's count; past them are the change colors and the node blocks; retail
+	has up to 8) */
+	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_OBJECT); region_index++)
 	{
 		struct model_region *region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
 		short permutation_index = object_find_region_permutations_available_with_variant(region, variant_number, available_permutation_indices);
@@ -4735,7 +4912,7 @@ static short object_determine_variant_number(
 
 	/* port: the regions object_select_random_region_permutations_by_variant
 	chose for (a map's count) */
-	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL)&& !result; region_index++)
+	for (region_index =0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_OBJECT)&& !result; region_index++)
 	{
 		struct model_region* region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
 		if (object->object.region_permutations[region_index] < region->permutations.count)
@@ -4848,6 +5025,24 @@ static void attachments_delete(
 	return;
 }
 
+/* port: a map's object definition with a bad count, index or type, reported
+once (most of these are read every tick) */
+static void object_definition_data_error(
+	long definition_index,
+	char const *problem)
+{
+	if (model_data_report_once(object_definition_get(definition_index)))
+	{
+		error(
+			_error_silent,
+			"### ERROR %s has a bad %s",
+			tag_get_name(definition_index),
+			problem);
+	}
+
+	return;
+}
+
 /* port: a map's model with a bad node list, reported once (the matrices are
 built every tick) */
 static void object_model_nodes_error(
@@ -4935,8 +5130,16 @@ static void object_compute_function_values(
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
 	real huh = (57 * DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index) + game_time_get()) * 0.033333335f;
+	/* port: no more functions than the object holds values for (a map's count;
+	past them are the attachments and the node blocks; retail has up to 4) */
+	short function_count = (short)MIN(object_definition->object.functions.count, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS);
 
-	for (function_index = 0; function_index<object_definition->object.functions.count; ++function_index)
+	if (object_definition->object.functions.count>NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS)
+	{
+		object_definition_data_error(object->definition_index, "function count; only the first 4 are computed");
+	}
+
+	for (function_index = 0; function_index<function_count; ++function_index)
 	{
 		real value;
 		real output;
@@ -5065,7 +5268,15 @@ static void object_compute_change_colors(
 	if (TEST_FLAG(object_definition->object.runtime_flags, _object_runtime_scaled_change_colors_bit))
 	{
 		short cc_index;
-		for (cc_index = 0; cc_index<object_definition->object.change_colors.count; cc_index++)
+		/* port: no more change colors than the object holds (a map's count;
+		past them are the node blocks; retail has up to 3) */
+		short change_color_count = (short)MIN(object_definition->object.change_colors.count, NUMBER_OF_OBJECT_CHANGE_COLORS);
+
+		if (object_definition->object.change_colors.count>NUMBER_OF_OBJECT_CHANGE_COLORS)
+		{
+			object_definition_data_error(object->definition_index, "change color count; only the first 4 are used");
+		}
+		for (cc_index = 0; cc_index<change_color_count; cc_index++)
 		{
 			struct object_change_color_definition *change_color = TAG_BLOCK_GET_ELEMENT(
 				&object_definition->object.change_colors,

@@ -94,6 +94,7 @@ symbols in this file:
 
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries.h"
+#include "cseries/errors.h" /* port: error */
 #include "collisions.h"
 
 #include "breakable_surfaces.h"
@@ -177,11 +178,28 @@ static void collision_fix_pill_nudge_collision(
 	real_vector3d const *vector,
 	long ignore_object_index,
 	struct collision_plane *collision);
+static void collision_material_type_report(
+	short material_index,
+	long material_type);
+static long collision_cluster_index_from_leaf(
+	long leaf_index);
+static long collision_structure_material_type(
+	struct structure_bsp const *structure_bsp,
+	short material_index);
+static boolean collision_cluster_fog_plane(
+	struct structure_bsp const *structure_bsp,
+	long cluster_index,
+	struct structure_fog_plane const **fog_plane,
+	struct fog_definition const **fog);
 /* ---------- globals */
 
 static struct collision_usage_times collision_usage_times;
 boolean debug_collision_skip_objects = FALSE;
 boolean debug_collision_skip_vectors = FALSE;
+/* port: whether a map's malformed collision data was reported (once each) */
+static boolean warned_about_collision_materials;
+static boolean warned_about_collision_leaves;
+static boolean warned_about_collision_fog;
 
 /* ---------- public code */
 
@@ -191,19 +209,188 @@ long collision_model_get_material_type(
 {
 	long material_type;
 
-	if (material_index != NONE)
+	/* port: a material (from the map) that is no material of the model, or
+	whose type is no material type (the retail ones are at most 32), is
+	none */
+	if (material_index == NONE)
+	{
+		material_type = NONE;
+	}
+	else if (material_index < 0 || material_index >= model->resistance.materials.count)
+	{
+		collision_material_type_report(material_index, NONE);
+		material_type = NONE;
+	}
+	else
 	{
 		material_type = TAG_BLOCK_GET_ELEMENT(
 			&model->resistance.materials,
 			material_index,
 			struct damage_resistance_material)->material_type;
+		if (material_type != NONE &&
+			(material_type < 0 || material_type >= NUMBER_OF_MATERIAL_TYPES))
+		{
+			collision_material_type_report(material_index, material_type);
+			material_type = NONE;
+		}
 	}
-	else
+
+	return material_type;
+}
+
+/* port: a collision material (from the map) that is not one, or whose type
+is not one, reported once */
+static void collision_material_type_report(
+	short material_index,
+	long material_type)
+{
+	if (!warned_about_collision_materials)
 	{
+		error(_error_silent, "collision material #%d (type %ld) is not one of the model's or bsp's",
+			material_index,
+			material_type);
+		warned_about_collision_materials = TRUE;
+	}
+
+	return;
+}
+
+/* port: the cluster of a collision bsp leaf (from the map), NONE if it is
+no leaf of the structure bsp (whose leaves the collision bsp's are: the
+retail ones have as many) */
+static long collision_cluster_index_from_leaf(
+	long leaf_index)
+{
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+
+	if (leaf_index == NONE)
+	{
+		return NONE;
+	}
+	if ((leaf_index & LONG_MAX) >= structure_bsp->leaves.count)
+	{
+		if (!warned_about_collision_leaves)
+		{
+			error(_error_silent, "collision leaf #%ld is not one of the structure bsp's %ld",
+				leaf_index & LONG_MAX,
+				structure_bsp->leaves.count);
+			warned_about_collision_leaves = TRUE;
+		}
+		return NONE;
+	}
+
+	return TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->leaves,
+		leaf_index & LONG_MAX,
+		struct structure_leaf)->cluster_index;
+}
+
+/* port: the material type of a structure bsp's collision material (from
+the map), NONE if it is no material of the bsp or its type is no material
+type (the retail ones are at most 31) */
+static long collision_structure_material_type(
+	struct structure_bsp const *structure_bsp,
+	short material_index)
+{
+	long material_type = NONE;
+
+	if (material_index == NONE)
+	{
+		return NONE;
+	}
+	if (material_index < 0 || material_index >= structure_bsp->collision_materials.count)
+	{
+		collision_material_type_report(material_index, NONE);
+		return NONE;
+	}
+	material_type = TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->collision_materials,
+		material_index,
+		struct structure_collision_material)->runtime_physics_material_type;
+	if (material_type != NONE &&
+		(material_type < 0 || material_type >= NUMBER_OF_MATERIAL_TYPES))
+	{
+		collision_material_type_report(material_index, material_type);
 		material_type = NONE;
 	}
 
 	return material_type;
+}
+
+/* port: TRUE with a cluster's fog plane and its fog when the cluster
+(from the map) has a fog plane of a material, as collision_test_vector
+read them; FALSE, reported once, when a link of the chain (cluster, fog
+plane, region, palette entry, fog) names nothing of the bsp's (the retail
+chains are all whole) */
+static boolean collision_cluster_fog_plane(
+	struct structure_bsp const *structure_bsp,
+	long cluster_index,
+	struct structure_fog_plane const **fog_plane,
+	struct fog_definition const **fog)
+{
+	short fog_reference;
+	struct structure_fog_region const *fog_region;
+	struct structure_fog_palette_entry const *fog_palette_entry;
+
+	if (cluster_index < 0 || cluster_index >= structure_bsp->clusters.count)
+	{
+		goto malformed;
+	}
+	fog_reference = TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->clusters,
+		cluster_index,
+		struct structure_cluster)->fog_reference;
+	if (fog_reference == NONE || !TEST_FLAG((word)fog_reference, 15))
+	{
+		return FALSE;
+	}
+	if ((fog_reference & SHORT_MAX) >= structure_bsp->fog_planes.count)
+	{
+		goto malformed;
+	}
+	*fog_plane = TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->fog_planes,
+		fog_reference & SHORT_MAX,
+		struct structure_fog_plane);
+	if ((*fog_plane)->runtime_material_type == NONE)
+	{
+		return FALSE;
+	}
+	if ((*fog_plane)->region_index < 0 ||
+		(*fog_plane)->region_index >= structure_bsp->fog_regions.count)
+	{
+		goto malformed;
+	}
+	fog_region = TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->fog_regions,
+		(*fog_plane)->region_index,
+		struct structure_fog_region);
+	if (fog_region->fog_palette_index < 0 ||
+		fog_region->fog_palette_index >= structure_bsp->fog_palette.count)
+	{
+		goto malformed;
+	}
+	fog_palette_entry = TAG_BLOCK_GET_ELEMENT(
+		&structure_bsp->fog_palette,
+		fog_region->fog_palette_index,
+		struct structure_fog_palette_entry);
+	if (fog_palette_entry->fog.index == NONE)
+	{
+		goto malformed;
+	}
+	*fog = fog_definition_get(fog_palette_entry->fog.index);
+
+	return TRUE;
+
+malformed:
+	if (!warned_about_collision_fog)
+	{
+		error(_error_silent, "cluster #%ld's fog plane, region, palette entry or fog is not the bsp's",
+			cluster_index);
+		warned_about_collision_fog = TRUE;
+	}
+
+	return FALSE;
 }
 
 boolean collision_test_sphere(
@@ -264,10 +451,8 @@ boolean collision_test_point(
 	}
 
 	{
-		short cluster_index = TAG_BLOCK_GET_ELEMENT(
-			&global_structure_bsp_get()->leaves,
-			leaf_index & LONG_MAX,
-			struct structure_leaf)->cluster_index;
+		/* port: (collision_cluster_index_from_leaf) */
+		short cluster_index = (short)collision_cluster_index_from_leaf(leaf_index);
 		long object_index;
 
 		for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
@@ -359,17 +544,10 @@ boolean collision_test_vector(
 				plane3d_negate(&collision->plane, &collision->plane);
 			}
 
-			if (bsp_result.material_index != NONE)
-			{
-				material_type = TAG_BLOCK_GET_ELEMENT(
-					&structure_bsp->collision_materials,
-					bsp_result.material_index,
-					struct structure_collision_material)->runtime_physics_material_type;
-			}
-			else
-			{
-				material_type = NONE;
-			}
+			/* port: (collision_structure_material_type) */
+			material_type = collision_structure_material_type(
+				structure_bsp,
+				bsp_result.material_index);
 
 			collision->material_type = (short)material_type;
 			collision->surface_index = bsp_result.surface_index;
@@ -385,33 +563,14 @@ boolean collision_test_vector(
 			long leaf_index = bsp_result.leaf_indices[0];
 			long cluster_index;
 
+			/* port: (collision_cluster_index_from_leaf) */
 			collision->start_location.leaf_index = leaf_index;
-			if (leaf_index == NONE)
-			{
-				cluster_index = NONE;
-			}
-			else
-			{
-				cluster_index = TAG_BLOCK_GET_ELEMENT(
-					&global_structure_bsp_get()->leaves,
-					leaf_index & LONG_MAX,
-					struct structure_leaf)->cluster_index;
-			}
+			cluster_index = collision_cluster_index_from_leaf(leaf_index);
 			collision->start_location.cluster_index = cluster_index;
 
 			leaf_index = bsp_result.leaf_indices[bsp_result.leaf_count - 1];
 			collision->location.leaf_index = leaf_index;
-			if (leaf_index == NONE)
-			{
-				cluster_index = NONE;
-			}
-			else
-			{
-				cluster_index = TAG_BLOCK_GET_ELEMENT(
-					&global_structure_bsp_get()->leaves,
-					leaf_index & LONG_MAX,
-					struct structure_leaf)->cluster_index;
-			}
+			cluster_index = collision_cluster_index_from_leaf(leaf_index);
 			collision->location.cluster_index = cluster_index;
 		}
 		collision_log_end_time(
@@ -421,29 +580,17 @@ boolean collision_test_vector(
 		if (TEST_FLAG(flags, _collision_test_media_bit) &&
 			collision->location.cluster_index != NONE)
 		{
-			short fog_reference = TAG_BLOCK_GET_ELEMENT(
-				&structure_bsp->clusters,
+			struct structure_fog_plane const *fog_plane;
+			struct fog_definition const *fog;
+
+			/* port: (collision_cluster_fog_plane) */
+			if (collision_cluster_fog_plane(
+				structure_bsp,
 				collision->location.cluster_index,
-				struct structure_cluster)->fog_reference;
-
-			if (fog_reference != NONE && TEST_FLAG((word)fog_reference, 15))
+				&fog_plane,
+				&fog))
 			{
-				struct structure_fog_plane const *fog_plane = TAG_BLOCK_GET_ELEMENT(
-					&structure_bsp->fog_planes,
-					fog_reference & SHORT_MAX,
-					struct structure_fog_plane);
-
-				if (fog_plane->runtime_material_type != NONE)
 				{
-					struct structure_fog_region const *fog_region = TAG_BLOCK_GET_ELEMENT(
-						&structure_bsp->fog_regions,
-						fog_plane->region_index,
-						struct structure_fog_region);
-					struct structure_fog_palette_entry const *fog_palette_entry = TAG_BLOCK_GET_ELEMENT(
-						&structure_bsp->fog_palette,
-						fog_region->fog_palette_index,
-						struct structure_fog_palette_entry);
-					struct fog_definition const *fog = fog_definition_get(fog_palette_entry->fog.index);
 					real_plane3d plane;
 					real point_distance;
 					real vector_dot;
@@ -475,6 +622,12 @@ boolean collision_test_vector(
 							else
 							{
 								material_type = fog_plane->runtime_material_type;
+								/* port: a type (from the map) that is no material
+								type is none (the retail ones are at most 28) */
+								if (material_type < 0 || material_type >= NUMBER_OF_MATERIAL_TYPES)
+								{
+									material_type = NONE;
+								}
 							}
 							collision->material_type = (short)material_type;
 							hit = TRUE;
@@ -500,19 +653,8 @@ boolean collision_test_vector(
 			for (leaf_index = 0; leaf_index < bsp_result.leaf_count; leaf_index++)
 			{
 				long leaf = bsp_result.leaf_indices[leaf_index];
-				long cluster_index;
-
-				if (leaf == NONE)
-				{
-					cluster_index = NONE;
-				}
-				else
-				{
-					cluster_index = TAG_BLOCK_GET_ELEMENT(
-						&global_structure_bsp_get()->leaves,
-						leaf & LONG_MAX,
-						struct structure_leaf)->cluster_index;
-				}
+				/* port: (collision_cluster_index_from_leaf) */
+				long cluster_index = collision_cluster_index_from_leaf(leaf);
 
 				if (structure_cluster_mark(cluster_index))
 				{
@@ -632,33 +774,14 @@ boolean collision_test_pill(
 		long leaf_index = bsp_result.leaf_indices[0];
 		long cluster_index;
 
+		/* port: (collision_cluster_index_from_leaf) */
 		collision->start_location.leaf_index = leaf_index;
-		if (leaf_index == NONE)
-		{
-			cluster_index = NONE;
-		}
-		else
-		{
-			cluster_index = TAG_BLOCK_GET_ELEMENT(
-				&global_structure_bsp_get()->leaves,
-				leaf_index & LONG_MAX,
-				struct structure_leaf)->cluster_index;
-		}
+		cluster_index = collision_cluster_index_from_leaf(leaf_index);
 		collision->start_location.cluster_index = cluster_index;
 
 		leaf_index = bsp_result.leaf_indices[bsp_result.leaf_count - 1];
 		collision->location.leaf_index = leaf_index;
-		if (leaf_index == NONE)
-		{
-			cluster_index = NONE;
-		}
-		else
-		{
-			cluster_index = TAG_BLOCK_GET_ELEMENT(
-				&global_structure_bsp_get()->leaves,
-				leaf_index & LONG_MAX,
-				struct structure_leaf)->cluster_index;
-		}
+		cluster_index = collision_cluster_index_from_leaf(leaf_index);
 		collision->location.cluster_index = cluster_index;
 	}
 
@@ -812,19 +935,17 @@ boolean collision_get_features_in_sphere(
 				leaf_reference_index++)
 			{
 				long leaf_index = result.leaf_indices[leaf_reference_index];
-				struct structure_leaf const *leaf = TAG_BLOCK_GET_ELEMENT(
-					&structure_bsp->leaves,
-					leaf_index & LONG_MAX,
-					struct structure_leaf);
+				/* port: (collision_cluster_index_from_leaf) */
+				short cluster_index = (short)collision_cluster_index_from_leaf(leaf_index);
 
-				if (structure_cluster_mark(leaf->cluster_index))
+				if (structure_cluster_mark(cluster_index))
 				{
 					long reference_index;
 					long object_index;
 
 					for (object_index = cluster_get_first_collideable_object(
 							&reference_index,
-							leaf->cluster_index);
+							cluster_index);
 						object_index != NONE;
 						object_index = cluster_get_next_collideable_object(&reference_index))
 					{

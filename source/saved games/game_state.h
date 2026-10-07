@@ -49,6 +49,11 @@ boolean game_state_test_persistent_storage(
 	char *map_name,
 	short *difficulty,
 	boolean *corrupted);
+/* port: takes an image of the game state read from a file, if it is one of
+this build's (game_state.c) */
+boolean game_state_image_accept(
+	void *image,
+	long size);
 void game_state_save_core(
 	const char *name);
 boolean game_state_reverted(
@@ -76,6 +81,10 @@ struct lruv_cache *game_state_lruv_cache_new(
 	long maximum_block_count,
 	void (*delete_block_proc)(long),
 	boolean (*locked_block_proc)(long));
+/* port: reports a data array gone wrong since its last tick in order
+(game_state.c), each game tick */
+void game_state_check_data_arrays(
+	void);
 void game_state_try_and_load_from_persistent_storage(
 	void);
 void game_state_load_core(

@@ -167,7 +167,9 @@ struct rasterizer_dynamic_screen_geometry_parameters
 	short map1_to_2_blend_function;
 	short framebuffer_blend_function;
 	boolean point_sampled;
-	byte pad8B;
+	/* port: the maps' color is weighted by their alpha before the
+	framebuffer blend (Halo PC's HUD overlays, hud_draw.c) */
+	boolean alpha_weighted;
 };
 
 typedef char verify_rasterizer_dynamic_screen_geometry_parameters_size[

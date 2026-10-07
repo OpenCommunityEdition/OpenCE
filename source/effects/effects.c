@@ -972,6 +972,26 @@ long effect_new_looping(
 			first_person_weapon_get_local_index(object_index);
 		effect->scale_a_function_index = scale_a_function_index;
 		effect->scale_b_function_index = scale_b_function_index;
+		/* port: the index is the map's attachment's (its change color less
+		one): one the object has no change color for is none (white), and
+		said once */
+		if (change_color_index != NONE &&
+			!VALID_INDEX(change_color_index, NUMBER_OF_OBJECT_CHANGE_COLORS))
+		{
+			static boolean bad_change_color_reported = FALSE;
+
+			if (!bad_change_color_reported)
+			{
+				bad_change_color_reported = TRUE;
+				error(
+					_error_silent,
+					"effect %s is attached with change color %d (of %d)",
+					tag_get_name(definition_index),
+					change_color_index,
+					NUMBER_OF_OBJECT_CHANGE_COLORS);
+			}
+			change_color_index = NONE;
+		}
 		effect->change_color_index = change_color_index;
 		effect->impulse_field.translational_function = NULL;
 		effect->impulse_field.angular_function = NULL;
@@ -2209,10 +2229,14 @@ static void effect_update(
 					struct object_definition *object_definition =
 						object_definition_get(object->definition_index);
 					short attachment_index;
+					/* port: no more than the object holds (the map's count;
+					objects.c makes no more than that) */
+					short attachment_count = (short)MIN(
+						object_definition->object.attachments.count,
+						MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
 
 					for (attachment_index = 0;
-						attachment_index <
-							object_definition->object.attachments.count;
+						attachment_index < attachment_count;
 						attachment_index++)
 					{
 						if (object->object.attachment_indices[attachment_index] ==

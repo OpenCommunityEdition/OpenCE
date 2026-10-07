@@ -32,6 +32,7 @@ fires for whoever walks into it, and what it starts is sent to the clients
 #include "hs/object_lists.h"
 #include "objects/objects.h"
 #include "objects/object_types.h"
+#include "scenario/scenario.h"
 #include "units/bipeds.h"
 #include "units/units.h"
 
@@ -96,6 +97,35 @@ boolean coop_scripts_any_player_will_do(
 		any = TRUE;
 	}
 	return any;
+}
+
+void coop_scripts_gather_in_volume(
+	short trigger_volume_index,
+	long object_list_index)
+{
+	long reference_index;
+	long object_index;
+	long inside_index = NONE;
+
+	for (object_index = object_list_get_first(object_list_index, &reference_index);
+		object_index != NONE && inside_index == NONE;
+		object_index = object_list_get_next(object_list_index, &reference_index))
+	{
+		if (scenario_trigger_volume_test_object(trigger_volume_index, object_index))
+			inside_index = object_index;
+	}
+	if (inside_index == NONE)
+		return;
+	for (object_index = object_list_get_first(object_list_index, &reference_index);
+		object_index != NONE;
+		object_index = object_list_get_next(object_list_index, &reference_index))
+	{
+		if (!scenario_trigger_volume_test_object(trigger_volume_index, object_index))
+		{
+			player_teleport(player_index_from_unit_index(object_index), inside_index,
+				&object_get(inside_index)->object.bounding_sphere_center);
+		}
+	}
 }
 
 /* the units of the players following player0, if `unit_index` is

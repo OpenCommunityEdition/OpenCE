@@ -484,6 +484,12 @@ static void read_bitmap(struct reader *reader, const XML_Char **attributes)
 		length = strcspn(frames, " \t\r\n");
 		if (!length)
 			break;
+		/* (a bitmap's count of frames is a short of the game's) */
+		if (bitmap.frame_count >= 32767)
+		{
+			reader_error(reader, "a bitmap has too many frames");
+			break;
+		}
 		grown = grow(reader, menus->frames, menus->frame_count, sizeof(*menus->frames));
 		if (!grown)
 			break;
@@ -535,6 +541,11 @@ static void read_frame(struct reader *reader, const XML_Char **attributes, long 
 		reader_error(reader, "a bitmap's <frame>s and frames= cannot be mixed");
 	if (frame.index < 0)
 		frame.index = 0;
+	if (menus->bitmaps[owner].frame_count >= 32767)
+	{
+		reader_error(reader, "a bitmap has too many frames");
+		return;
+	}
 	GROW(reader, menus->frames, menus->frame_count);
 	menus->frames[menus->frame_count++] = frame;
 	menus->bitmaps[owner].frame_count++;

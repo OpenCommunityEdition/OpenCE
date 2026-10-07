@@ -87,6 +87,18 @@ struct collision_bsp_test_sphere_result
 
 /* ---------- prototypes/COLLISION_BSP.C */
 
+/* port: whether a surface's ring of edges (from the map) goes on to
+`edge_index` after `edge_count` of its edges (FALSE, reported once, if it
+leaves the bsp's edges or does not close within a surface's most edges) */
+boolean collision_surface_edge_ring_continues(
+	struct collision_bsp const *bsp,
+	long edge_index,
+	short edge_count);
+/* port: whether a surface index (from the map) names one of the bsp's
+surfaces (FALSE, reported once, if not) */
+boolean collision_bsp_valid_surface_index(
+	struct collision_bsp const *bsp,
+	long surface_index);
 short collision_surface_edge_count(
 	struct collision_bsp const *bsp,
 	long surface_index);

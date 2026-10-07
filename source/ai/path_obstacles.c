@@ -249,8 +249,10 @@ void obstacles_get_discs_in_sphere(
 						short pathfinding_sphere_index;
 
 						object_get_world_matrix(object_index, &world_matrix);
+						/* port: no more than the short counter reaches (a map's
+						count; past it the counter wraps and the loop never ends) */
 						for (pathfinding_sphere_index = 0;
-							pathfinding_sphere_index < collision_model->pathfinding_spheres.count;
+							pathfinding_sphere_index < MIN(collision_model->pathfinding_spheres.count, SHORT_MAX);
 							pathfinding_sphere_index++)
 						{
 							struct pathfinding_sphere const *pathfinding_sphere = TAG_BLOCK_GET_ELEMENT(

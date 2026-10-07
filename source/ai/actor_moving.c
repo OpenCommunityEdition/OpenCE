@@ -772,8 +772,10 @@ static void actor_move_avoidance_setup(
 
 				object_get_bounding_sphere(object_index, &center, &radius);
 				object_get_world_matrix(object_index, &world_matrix);
+				/* port: no more than the short counter reaches (a map's count;
+				past it the counter wraps and the loop never ends) */
 				for (sphere_index = 0;
-					sphere_index < collision_model->pathfinding_spheres.count;
+					sphere_index < MIN(collision_model->pathfinding_spheres.count, SHORT_MAX);
 					sphere_index++)
 				{
 					struct pathfinding_sphere *sphere = TAG_BLOCK_GET_ELEMENT(

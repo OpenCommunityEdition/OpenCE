@@ -346,7 +346,15 @@ static void king_engine_prespawn_player_update(
 static void king_engine_player_added(
 	long player_index)
 {
-	player_get(player_index);
+	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	/* port: not the time of a player who quit from the slot (as slayer's) */
+	king_globals.on_the_hill[slot] = FALSE;
+	if (!game_engine_has_teams())
+	{
+		king_globals.score[slot] = 0;
+		king_globals.score_tick[slot] = 0;
+	}
 
 	return;
 }
@@ -392,7 +400,8 @@ static boolean king_engine_initialize_for_new_map(
 	void)
 {
 	struct scenario *scenario = global_scenario_get();
-	short flag_index;
+	/* port: a long counter, for a map's long count */
+	long flag_index;
 
 	csmemset(&king_globals, 0, sizeof(king_globals));
 	king_engine_num_hills = 0;
@@ -415,6 +424,13 @@ static boolean king_engine_initialize_for_new_map(
 					found = TRUE;
 					break;
 				}
+			}
+			/* port: no more hills than king_engine_hills holds (a map's
+			flags; released maps have at most 14 hills) */
+			if (!found && king_engine_num_hills >= MAXIMUM_HILLS)
+			{
+				error(_error_silent, "### ERROR more than %d king of the hill hills; the rest are ignored", MAXIMUM_HILLS);
+				break;
 			}
 			if (!found)
 				king_engine_hills[king_engine_num_hills++] = flag->team_index;
@@ -763,6 +779,8 @@ static boolean king_engine_goal_matches_player(
 static void king_engine_update(
 	void)
 {
+	short hill_tries;
+
 	/* (a client of the distributed netcode has the host's hill) */
 	if (!network_game_distributed_client() &&
 		game_engine_can_score() &&
@@ -773,10 +791,14 @@ static void king_engine_update(
 		king_globals.hill_id = find_next_hill(king_globals.hill_id);
 		find_hill();
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+		/* port: and no more tries than there are hills: a map whose hills
+		have no area (two flags, or flags in a line) has none to find, and
+		the next hill of one hill is itself */
+		hill_tries = 0;
 		while (king_globals.hill_point_count == 0)
 		{
 			error(2, "failed to find hill #%d most likely bad point placement", king_globals.hill_id);
-			if (king_globals.hill_id == 0)
+			if (king_globals.hill_id == 0 || ++hill_tries >= MAXIMUM_HILLS)
 				break;
 
 			king_globals.hill_id = find_next_hill(king_globals.hill_id);
@@ -1047,7 +1069,9 @@ static void king_calculate_hill_state(
 static long find_next_hill(
 	long hill_id)
 {
-	long next_hill_id;
+	/* port: with no other hill (a map with one), the same hill. January left
+	it unset, and king_engine_update could loop looking for a hill */
+	long next_hill_id = hill_id;
 	short start_index = random_range(0, king_engine_num_hills);
 	short i;
 

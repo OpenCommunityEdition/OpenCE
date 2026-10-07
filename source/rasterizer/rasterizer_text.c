@@ -525,6 +525,8 @@ rasterizer_draw_string(
 			parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 			parameters.meter_parameters = NULL;
 			parameters.point_sampled = FALSE;
+			/* port: (rasterizer.h) */
+			parameters.alpha_weighted = FALSE;
 			parameters.framebuffer_blend_function = _shader_framebuffer_blend_function_alpha_blend;
 			parameters.map[0] = bitmap;
 
@@ -654,6 +656,8 @@ rasterizer_draw_unicode_string(
 			parameters.map_scale[0].i = parameters.map_scale[0].j = 1.0f;
 			parameters.meter_parameters = NULL;
 			parameters.point_sampled = FALSE;
+			/* port: (rasterizer.h) */
+			parameters.alpha_weighted = FALSE;
 			parameters.framebuffer_blend_function = _shader_framebuffer_blend_function_alpha_blend;
 			parameters.map[0] = bitmap;
 

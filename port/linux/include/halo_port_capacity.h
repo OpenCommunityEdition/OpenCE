@@ -21,8 +21,9 @@ The Xbox game state is 0x345000 bytes at 0x80061000 and ends where the tag
 cache begins (0x803A6000). Cache files are linked to that tag cache address,
 so the game state cannot grow in place. The native builds put a 16 MB game
 state above the tag cache (which ends at 0x819A6000), inside the Xbox memory
-window (0x80000000-0x88000000, port/linux/src/platform.h) and below everything
-the window hands out top-down (texture and sound caches, Direct3D resources).
+window (0x80000000-0xA0000000, Android's to 0x88000000:
+port/linux/src/platform.h) and below everything the window hands out
+top-down (texture and sound caches, Direct3D resources).
 
 The CPU part holds about 17.2 MB of pools at the sizes below (the Xbox pools
 fill 3,165,260 of its 0x305000 bytes); the GPU part holds only the decal
@@ -33,6 +34,24 @@ layout: saved games of builds before it no longer load. */
 #define HALO_PORT_GAME_STATE_CPU_SIZE 0x13C0000 /* (0x305000) */
 #define HALO_PORT_GAME_STATE_GPU_SIZE 0x40000 /* (0x40000) */
 #define HALO_PORT_GAME_STATE_SIZE (HALO_PORT_GAME_STATE_CPU_SIZE+HALO_PORT_GAME_STATE_GPU_SIZE)
+
+/* ---------- textures
+
+The texture cache holds the textures being drawn in 16 KB pages, 22 MB of
+them on the Xbox, which Xbox maps were made to fit. Halo Custom Edition maps
+were made for Halo PC, which has no such bound: a texture that does not fit
+is drawn as the default one ("YOU GOT STABBED" in debug.txt; Elite_Alpha_Siege
+did at 22 MB), and a frame of bigass_v3 draws more than 64 MB (DamnationCE's
+measurement). The desktop builds' cache is 256 MB, half their 512 MB memory
+window (port/linux/src/platform.h), whose pages are backed as they are used.
+Android's window is 128 MB, and its cache the Xbox's. */
+
+#ifdef HALO_ANDROID
+#define HALO_PORT_TEXTURE_CACHE_PAGE_COUNT 0x580 /* (0x580) */
+#else
+#define HALO_PORT_TEXTURE_CACHE_PAGE_COUNT 0x4000 /* (0x580) */
+#endif
+#define HALO_PORT_TEXTURE_CACHE_SIZE (HALO_PORT_TEXTURE_CACHE_PAGE_COUNT*0x4000) /* (0x1600000) */
 
 /* ---------- AI
 

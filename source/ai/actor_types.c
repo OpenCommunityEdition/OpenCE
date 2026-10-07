@@ -259,6 +259,11 @@ static struct actor_type_definition *actor_type_definition_get(
 	short actor_type)
 {
 	match_assert("c:\\halo\\source\\ai\\actor_type_definitions.h", 46, actor_type>=0 && actor_type<NUMBER_OF_ACTOR_TYPES);
+	/* port: a type the table has (an actor tag's type: actor_new makes no
+	actor of another, but its name and race are asked for by others); else
+	the definition of none */
+	if (!VALID_INDEX(actor_type, NUMBER_OF_ACTOR_TYPES))
+		actor_type = _actor_none;
 	match_assert("c:\\halo\\source\\ai\\actor_type_definitions.h", 47, actor_type_definitions[actor_type]);
 	match_assert("c:\\halo\\source\\ai\\actor_type_definitions.h", 50, actor_type_definitions[actor_type]->name);
 	match_assert("c:\\halo\\source\\ai\\actor_type_definitions.h", 51, actor_type_definitions[actor_type]->decide_action);

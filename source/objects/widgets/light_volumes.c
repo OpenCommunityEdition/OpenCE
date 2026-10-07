@@ -340,6 +340,12 @@ void light_volume_submit(
 		if (definition->count > 0 && definition->frames.count > 0)
 		{
 			short source = definition->brightness_scale_source;
+			/* port: a source past a to d is none (a map's; it read past the
+			object's four values) */
+			if (!(source >= _object_function_reference_a && source <= _object_function_reference_d))
+			{
+				source = 0;
+			}
 			if (!source || !animation || animation->values[source - 1] > 0.f)
 			{
 				struct object_marker marker;

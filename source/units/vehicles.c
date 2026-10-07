@@ -143,6 +143,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "vehicles.h"
 #include "math/real_math.h"
@@ -1379,6 +1380,7 @@ void vehicle_preprocess_node_orientations(
 	struct animation *overlay;
 	real value;
 	short suspension_index;
+	short model_node_count;
 
 	if (definition->unit.object.animation_graph.index==NONE)
 		return;
@@ -1393,20 +1395,22 @@ void vehicle_preprocess_node_orientations(
 	if (!animation)
 		return;
 
+	/* port: here and below, only animations the graph has and that fit the
+	model (a map's index and animation; unit_animation_get_fitting) */
+	model_node_count = unit_animation_model_node_count(vehicle_index);
+
 	if (animation->animations.count>0
-		&& ((short *)animation->animations.address)[0]!=NONE)
+		&& (overlay = unit_animation_get_fitting(graph,
+			((short *)animation->animations.address)[0], model_node_count))!=NULL)
 	{
-		aiming_screen_apply(TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[0], struct animation),
+		aiming_screen_apply(overlay,
 			&animation->steering_screen_bounds, vehicle->vehicle.turn, 0.0f, node_orientations);
 	}
 
 	if (animation->animations.count>1
-		&& ((short *)animation->animations.address)[1]!=NONE)
+		&& (overlay = unit_animation_get_fitting(graph,
+			((short *)animation->animations.address)[1], model_node_count))!=NULL)
 	{
-		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[1], struct animation);
-
 		value = (triple_product3d(&vehicle->object.up, &vehicle->object.forward,
 			&vehicle->object.translational_velocity)/definition->unknown2f8+1.0f)*0.5f;
 
@@ -1415,11 +1419,9 @@ void vehicle_preprocess_node_orientations(
 	}
 
 	if (animation->animations.count>2
-		&& ((short *)animation->animations.address)[2]!=NONE)
+		&& (overlay = unit_animation_get_fitting(graph,
+			((short *)animation->animations.address)[2], model_node_count))!=NULL)
 	{
-		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[2], struct animation);
-
 		if (vehicle->vehicle.speed<0.0f)
 			value = 0.5f-vehicle->vehicle.speed/definition->unknown2fc*0.5f;
 		else
@@ -1431,11 +1433,9 @@ void vehicle_preprocess_node_orientations(
 
 
 	if (animation->animations.count>3
-		&& ((short *)animation->animations.address)[3]!=NONE)
+		&& (overlay = unit_animation_get_fitting(graph,
+			((short *)animation->animations.address)[3], model_node_count))!=NULL)
 	{
-		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[3], struct animation);
-
 		value = vehicle_dot_product3d_test(&vehicle->object.translational_velocity, &vehicle->object.forward);
 		value = PIN(value, 0.0f, 1.0f)/(real)fabs(definition->unknown2f8);
 
@@ -1444,18 +1444,16 @@ void vehicle_preprocess_node_orientations(
 	}
 
 	if (animation->animations.count>4
-		&& ((short *)animation->animations.address)[4]!=NONE)
+		&& VALID_INDEX(((short *)animation->animations.address)[4], graph->animations.count))
 	{
 		TAG_BLOCK_GET_ELEMENT(&graph->animations,
 			((short *)animation->animations.address)[4], struct animation);
 	}
 
 	if (animation->animations.count>5
-		&& ((short *)animation->animations.address)[5]!=NONE)
+		&& (overlay = unit_animation_get_fitting(graph,
+			((short *)animation->animations.address)[5], model_node_count))!=NULL)
 	{
-		overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-			((short *)animation->animations.address)[5], struct animation);
-
 		if (definition->wheel_circumference>0.0f)
 			value = vehicle->vehicle.wheel/definition->wheel_circumference;
 		else
@@ -1465,18 +1463,19 @@ void vehicle_preprocess_node_orientations(
 			node_orientations);
 	}
 
+	/* port: no more suspensions than the vehicle keeps (a map's count), and
+	only animations the graph has and that fit the model (a map's index and
+	animation) */
 	for (suspension_index = 0;
-		suspension_index<animation->suspensions.count;
+		suspension_index<MIN(animation->suspensions.count, (long)NUMBEROF(vehicle->vehicle.suspension));
 		suspension_index++)
 	{
 		struct vehicle_suspension *suspension = TAG_BLOCK_GET_ELEMENT(
 			&animation->suspensions, suspension_index, struct vehicle_suspension);
 
-		if (suspension->animation_index!=NONE)
+		if ((overlay = unit_animation_get_fitting(graph,
+			suspension->animation_index, model_node_count))!=NULL)
 		{
-			overlay = TAG_BLOCK_GET_ELEMENT(&graph->animations,
-				suspension->animation_index, struct animation);
-
 			if (vehicle->vehicle.suspension[suspension_index]==0xff)
 				value = 1.0f;
 			else
@@ -1650,8 +1649,23 @@ static boolean update_suspension(
 				matrix4x3_from_point_and_vectors(&matrix, &vehicle->object.position,
 					&vehicle->object.forward, &vehicle->object.up);
 
+				/* port: no more suspensions than the vehicle keeps (a map's
+				count; the rest wrote past the vehicle) */
+				if (animation->suspensions.count>(long)NUMBEROF(vehicle->vehicle.suspension))
+				{
+					static boolean reported = FALSE;
+
+					if (!reported)
+					{
+						reported = TRUE;
+						error(_error_silent, "### ERROR %s has %ld suspensions; only the first %d move",
+							tag_get_name(vehicle->definition_index), animation->suspensions.count,
+							(int)NUMBEROF(vehicle->vehicle.suspension));
+					}
+				}
+
 				for (suspension_index = 0;
-					suspension_index<animation->suspensions.count;
+					suspension_index<MIN(animation->suspensions.count, (long)NUMBEROF(vehicle->vehicle.suspension));
 					suspension_index++)
 				{
 					struct vehicle_suspension *suspension = TAG_BLOCK_GET_ELEMENT(
@@ -2397,6 +2411,36 @@ static void update_alien_fighter_physics(
 	return;
 }
 
+/* port: TRUE when the vehicle's mass points fit the arrays vehicle_update
+keeps on its stack (a map's counts; past them physics_update wrote over the
+stack). A vehicle that doesn't fit gets no physics. Released maps have at
+most 22 mass points and 2 powered ones. (Each mass point's powered index is
+checked where it is used: physics.c, physics_powered_mass_point_index.) */
+static boolean vehicle_mass_points_fit(
+	long vehicle_index,
+	long maximum_mass_point_count,
+	long maximum_powered_mass_point_count)
+{
+	static boolean reported = FALSE;
+	struct vehicle_datum *vehicle = vehicle_datum_get(vehicle_index);
+	struct unit_definition *definition = vehicle_definition_get(vehicle->definition_index);
+	struct physics_definition *physics = physics_definition_get(definition->object.physics.index);
+	boolean fit = physics->mass_points.count>=0 &&
+		physics->mass_points.count<=maximum_mass_point_count &&
+		physics->powered_mass_points.count>=0 &&
+		physics->powered_mass_points.count<=maximum_powered_mass_point_count;
+
+	if (!fit && !reported)
+	{
+		reported = TRUE;
+		error(_error_silent, "### ERROR %s has %ld mass points (%ld powered); it gets no physics",
+			tag_get_name(definition->object.physics.index), physics->mass_points.count,
+			physics->powered_mass_points.count);
+	}
+
+	return fit;
+}
+
 /* Full semantic reconstruction. January's vehicle_update is 2320 bytes; this
 body has the same padded size and 98 relocations. The remaining residual is
 instruction scheduling, branch layout, and relocation placement. Keep the
@@ -2405,8 +2449,9 @@ file-static call topology intact while closing it. */
 boolean vehicle_update(
 	long vehicle_index)
 {
-	struct mass_point_datum mass_points[32];
-	struct powered_mass_point_datum powered_mass_points[32];
+	/* port: (named: 32 each, as before) */
+	struct mass_point_datum mass_points[MAXIMUM_MASS_POINTS_PER_PHYSICS];
+	struct powered_mass_point_datum powered_mass_points[MAXIMUM_POWERED_MASS_POINTS_PER_PHYSICS];
 	struct vehicle_datum *vehicle;
 	real steering_angle;
 	real torque;
@@ -2589,8 +2634,10 @@ boolean vehicle_update(
 	global_current_collision_users[global_current_collision_user_depth++] =
 		_collision_user_vehicles;
 
+	/* port: and mass points that fit (a map's counts) */
 	if (definition->unit.object.physics.index!=NONE &&
-		!TEST_FLAG(vehicle->object.flags, _object_at_rest_bit))
+		!TEST_FLAG(vehicle->object.flags, _object_at_rest_bit) &&
+		vehicle_mass_points_fit(vehicle_index, NUMBEROF(mass_points), NUMBEROF(powered_mass_points)))
 	{
 		real_vector3d previous_velocity = vehicle->object.translational_velocity;
 

@@ -406,6 +406,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "render/render.h"
 #include "render/render_cameras.h"
+#include "models/model_definitions.h" /* port: MAXIMUM_NODES_PER_MODEL */
 
 /* The January object retains out-of-line copies of the D3D inline wrappers.
  * The stock XDK definition of D3DINLINE (static __forceinline) reproduces
@@ -1227,6 +1228,36 @@ void rasterizer_set_model_lighting(
 	return;
 }
 
+/* port: a node's matrix as the vertex shader's three constants */
+static void node_matrix_constants(
+	real (*constants)[4],
+	real_matrix4x3 const *matrix)
+{
+	real scale = matrix->scale;
+
+	constants[0][0] = scale * matrix->forward.i;
+	constants[0][1] = scale * matrix->left.i;
+	constants[0][2] = scale * matrix->up.i;
+	constants[0][3] = matrix->position.x;
+	constants[1][0] = scale * matrix->forward.j;
+	constants[1][1] = scale * matrix->left.j;
+	constants[1][2] = scale * matrix->up.j;
+	constants[1][3] = matrix->position.y;
+	constants[2][0] = scale * matrix->forward.k;
+	constants[2][1] = scale * matrix->left.k;
+	constants[2][2] = scale * matrix->up.k;
+	constants[2][3] = matrix->position.z;
+
+	return;
+}
+
+/* port: the matrices of the model being drawn, when it has more nodes than
+the vertex shader's constants hold (RASTERIZER_MAXIMUM_NODES_PER_MODEL - 1):
+each of its parts is then given its own nodes' matrices alone as it is
+drawn (rasterizer_model_part_skinning; port/linux/game/custom_edition_geometry.c) */
+static real_matrix4x3 const *many_node_matrices = NULL;
+static short many_node_matrix_count = 0;
+
 void rasterizer_set_model_skinning(
 	struct render_skinning const *skinning)
 {
@@ -1243,26 +1274,19 @@ void rasterizer_set_model_skinning(
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
 		2751,
-		skinning->node_matrix_count>0 && skinning->node_matrix_count<RASTERIZER_MAXIMUM_NODES_PER_MODEL);
-	for (node_index = 0; node_index < skinning->node_matrix_count; node_index++)
+		skinning->node_matrix_count>0 && skinning->node_matrix_count<=MAXIMUM_NODES_PER_MODEL);
+	/* port: a model of more nodes than the constants hold is skinned a
+	part's own nodes at a time (rasterizer_model_part_skinning) */
+	if (skinning->node_matrix_count >= RASTERIZER_MAXIMUM_NODES_PER_MODEL)
 	{
-		real scale = skinning->node_matrices[node_index].scale;
-		real_matrix4x3 const *matrix = &skinning->node_matrices[node_index];
-		real (*constants)[4] = vsh_constants__nodematrices[node_index];
-
-		constants[0][0] = scale * matrix->forward.i;
-		constants[0][1] = scale * matrix->left.i;
-		constants[0][2] = scale * matrix->up.i;
-		constants[0][3] = matrix->position.x;
-		constants[1][0] = scale * matrix->forward.j;
-		constants[1][1] = scale * matrix->left.j;
-		constants[1][2] = scale * matrix->up.j;
-		constants[1][3] = matrix->position.y;
-		constants[2][0] = scale * matrix->forward.k;
-		constants[2][1] = scale * matrix->left.k;
-		constants[2][2] = scale * matrix->up.k;
-		constants[2][3] = matrix->position.z;
+		many_node_matrices = skinning->node_matrices;
+		many_node_matrix_count = skinning->node_matrix_count;
+		return;
 	}
+	many_node_matrices = NULL;
+	many_node_matrix_count = 0;
+	for (node_index = 0; node_index < skinning->node_matrix_count; node_index++)
+		node_matrix_constants(vsh_constants__nodematrices[node_index], &skinning->node_matrices[node_index]);
 	D3DDevice_SetVertexShaderConstant(
 		-36,
 		vsh_constants__nodematrices,
@@ -1270,6 +1294,29 @@ void rasterizer_set_model_skinning(
 	if (rasterizer_debug_options.statistics_mode)
 		rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes +=
 			skinning->node_matrix_count * sizeof(vsh_constants__nodematrices[0]);
+	return;
+}
+
+/* port: (rasterizer_xbox_draw_primitives.c, before static vertices are
+drawn) a part of a model of many nodes given its own nodes' matrices, in
+the order its vertices name them; nothing for any other vertices */
+void rasterizer_model_part_skinning(
+	struct vertex_buffer const *vertex_buffer)
+{
+	extern short custom_edition_part_palette(struct vertex_buffer const *vertex_buffer, byte const **nodes);
+	byte const *nodes;
+	short node_count, node_index;
+
+	if (!many_node_matrices)
+		return;
+	node_count = custom_edition_part_palette(vertex_buffer, &nodes);
+	for (node_index = 0; node_index < node_count && node_index < RASTERIZER_MAXIMUM_NODES_PER_MODEL - 1; node_index++)
+	{
+		node_matrix_constants(vsh_constants__nodematrices[node_index],
+			&many_node_matrices[MIN(nodes[node_index], many_node_matrix_count - 1)]);
+	}
+	if (node_index)
+		D3DDevice_SetVertexShaderConstant(-36, vsh_constants__nodematrices, node_index * 3);
 	return;
 }
 

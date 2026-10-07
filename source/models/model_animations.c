@@ -1302,6 +1302,14 @@ void overlay_animation_apply_continuous(
 	real fraction;
 	short frame_index;
 
+	/* port: no frames, no overlay (a map's frame count of 0 made the frame
+	-1, read before the animation's data, every tick) */
+	if (animation->frame_count<=0)
+	{
+		animation_data_error(animation, "frame count");
+		return;
+	}
+
 	fraction = (real)fmod((double)real_frame_index, 1.0);
 	frame_index = (short)fast_ftol((real)floor(fabs(real_frame_index)));
 
@@ -1565,6 +1573,14 @@ void overlay_animation_apply_continuous_scaled(
 	real inverse_animation_scale = 1.0f-animation_scale;
 	real fraction = (real)fmod((double)real_frame_index, 1.0);
 	short frame_index = (short)fast_ftol((real)floor(real_frame_index));
+
+	/* port: no frames, no overlay (a map's frame count of 0 made the frame
+	-1, read before the animation's data, every frame) */
+	if (animation->frame_count<=0)
+	{
+		animation_data_error(animation, "frame count");
+		return;
+	}
 
 	if (real_frame_index<0.0f || real_frame_index>(real)animation->frame_count)
 	{

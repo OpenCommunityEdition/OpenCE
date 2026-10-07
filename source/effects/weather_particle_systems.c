@@ -270,6 +270,8 @@ static struct weather_particle_type *weather_particle_system_get_type(
 	short type_index);
 static void weather_particle_system_type_delete_particle(
 	struct weather_particle_type *type);
+static short weather_particle_system_type_count(
+	struct weather_particle_system_definition const *definition);
 static void weather_particle_system_wrap_point(
 	real box_width,
 	real_point3d const *point,
@@ -386,7 +388,7 @@ void weather_particle_system_new(
 	system->time_delta_sec = 0.f;
 	weather_particle_system_globals.active_system_count+= 1;
 
-	for (type_index = 0; type_index<definition->particle_types.count; type_index++)
+	for (type_index = 0; type_index<weather_particle_system_type_count(definition); type_index++)
 	{
 		struct weather_particle_type *type = weather_particle_system_get_type(system, type_index);
 		struct weather_particle_type_definition *type_definition = TAG_BLOCK_GET_ELEMENT(
@@ -521,7 +523,7 @@ static void weather_particle_system_update(
 		leftover_ticks[local_player_index]-= (real)weather_particle_update_ticks;
 	}
 
-	for (type_index = 0; type_index<definition->particle_types.count; type_index++)
+	for (type_index = 0; type_index<weather_particle_system_type_count(definition); type_index++)
 	{
 		struct weather_particle_type *type = weather_particle_system_get_type(system, type_index);
 		struct weather_particle_type_definition *type_definition = TAG_BLOCK_GET_ELEMENT(
@@ -566,7 +568,7 @@ static void weather_particle_system_render(
 
 	weather_particle_system_update(local_player_index);
 
-	for (type_index = 0; type_index<definition->particle_types.count; type_index++)
+	for (type_index = 0; type_index<weather_particle_system_type_count(definition); type_index++)
 	{
 		struct weather_particle_type *type = &system->types[type_index];
 		struct weather_particle_type_definition *type_definition = TAG_BLOCK_GET_ELEMENT(
@@ -622,7 +624,9 @@ static void weather_particle_system_render(
 							box_bounds.z0 = bounds.z0 + box_offsets[k];
 							box_bounds.z1 = bounds.z1 + box_offsets[k];
 
-							if (render_frustum_cube_visible(&render.frustum, &box_bounds, TRUE))
+							/* port: and no more boxes than the arrays hold */
+							if (box_count<MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES &&
+								render_frustum_cube_visible(&render.frustum, &box_bounds, TRUE))
 							{
 								match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 673, box_count<MAXIMUM_NUMBER_OF_VISIBLE_WEATHER_PARTICLE_BOXES);
 								box_positions[box_count].x = box_bounds.x0;
@@ -798,7 +802,7 @@ void weather_particle_system_delete(
 	struct weather_particle_system_definition *definition = weather_particle_system_definition_get(system->definition_index);
 	short type_index;
 
-	for (type_index = 0; type_index<definition->particle_types.count; type_index++)
+	for (type_index = 0; type_index<weather_particle_system_type_count(definition); type_index++)
 	{
 		struct weather_particle_type *type = weather_particle_system_get_type(system, type_index);
 
@@ -833,6 +837,31 @@ static struct weather_particle_type *weather_particle_system_get_type(
 	match_assert("c:\\halo\\SOURCE\\effects\\weather_particle_systems.c", 102, type_index>=0 && type_index<definition->particle_types.count);
 
 	return &system->types[type_index];
+}
+
+/* port: no more particle types than a system holds (the map's count; retail
+systems have up to 3). The rest are not made, and that is said once. */
+static short weather_particle_system_type_count(
+	struct weather_particle_system_definition const *definition)
+{
+	if (definition->particle_types.count > MAXIMUM_NUMBER_OF_WEATHER_PARTICLE_TYPES)
+	{
+		static boolean reported = FALSE;
+
+		if (!reported)
+		{
+			reported = TRUE;
+			error(
+				_error_silent,
+				"weather particle system has %d particle types (only %d are made)",
+				definition->particle_types.count,
+				MAXIMUM_NUMBER_OF_WEATHER_PARTICLE_TYPES);
+		}
+
+		return MAXIMUM_NUMBER_OF_WEATHER_PARTICLE_TYPES;
+	}
+
+	return (short)definition->particle_types.count;
 }
 
 static void weather_particle_system_type_delete_particle(

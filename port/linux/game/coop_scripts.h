@@ -14,6 +14,12 @@ Campaign scripts made to work for every player in network co-op
 list as inside once any of it is, because every object in it is a player */
 boolean coop_scripts_any_player_will_do(
 	long object_list_index);
+/* and when a script waits on it and one player is inside, the players of
+the list outside come beside that one, so a gate (the Maw's lift, the run
+to its bridge, a30's Pelicans) leaves no one behind */
+void coop_scripts_gather_in_volume(
+	short trigger_volume_index,
+	long object_list_index);
 
 /* What the scripts do to player0, done to the players they can't name too
 (the "followers"). Each does nothing unless `unit_index` is player0's in a

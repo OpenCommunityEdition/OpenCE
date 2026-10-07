@@ -124,7 +124,9 @@ enum
 struct animation_thread
 {
 	short identifier;
-	short pad2;
+	/* port: the animation played (pad on the Xbox), so each tick's reads
+	stay inside its stream */
+	short animation_index;
 	long unit_index;
 	word ticks_left;
 	word flags;
@@ -146,18 +148,21 @@ struct animation_thread_debug
 	short padE;
 };
 
+/* port: both bounded by the stream's end (recorded_animation_playback.h) */
 struct animation_playback
 {
-	void (*initialize_event_stream)(
+	boolean (*initialize_event_stream)(
 		void *animation_state,
 		void *controller,
 		byte **event_stream,
-		byte unit_control_data_version);
+		byte unit_control_data_version,
+		byte const *event_stream_end);
 	boolean (*apply_event_stream)(
 		void *animation_state,
 		struct unit_control_data *controller,
 		long *relative_ticks,
-		byte **event_stream);
+		byte **event_stream,
+		byte const *event_stream_end);
 };
 
 /* ---------- macros */
@@ -174,6 +179,13 @@ static boolean recorded_animation_play_internal(
 	long unit_index,
 	short animation_index,
 	word extra_flags);
+static boolean recorded_animation_playable(
+	struct recorded_animation_definition const *animation);
+static boolean recorded_animation_stream_holds(
+	struct recorded_animation_definition const *animation,
+	byte const *event_stream);
+static struct recorded_animation_definition const *animation_thread_get_animation(
+	struct animation_thread *thread);
 
 /* ---------- globals */
 
@@ -279,16 +291,29 @@ void recorded_animations_update(
 			if (!TEST_FLAG(thread->flags, _recording_thread_finished_bit))
 			{
 				struct animation_thread_debug *thread_debug;
+				struct recorded_animation_definition const *animation;
 				long *relative_ticks;
 				boolean finished;
 
 				thread->ticks_left--;
 				relative_ticks = &thread->relative_ticks;
-				finished = !playback_codec[thread->version]->apply_event_stream(
-					thread->animation_state,
-					&thread->controller,
-					relative_ticks,
-					&thread->event_stream);
+				/* port: played inside its animation's stream, by a codec the
+				table has; else it stops */
+				animation = animation_thread_get_animation(thread);
+				if (animation &&
+					VALID_INDEX(thread->version, (short)NUMBEROF(playback_codec)))
+				{
+					finished = !playback_codec[thread->version]->apply_event_stream(
+						thread->animation_state,
+						&thread->controller,
+						relative_ticks,
+						&thread->event_stream,
+						(byte const *)animation->event_stream.address + animation->event_stream.size);
+				}
+				else
+				{
+					finished = TRUE;
+				}
 
 				match_assert(
 					"c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
@@ -476,11 +501,16 @@ void recorded_animation_verify(
 	ticks_left = (word)animation->length_in_ticks;
 	relative_ticks = 0;
 
+	/* port: a stream the playback can read (recorded_animation_playable) */
+	if (!recorded_animation_playable(animation))
+		return;
+
 	playback_codec[animation->version-1]->initialize_event_stream(
 		animation_state,
 		&controller,
 		&playback_stream,
-		animation->unit_control_data_version);
+		animation->unit_control_data_version,
+		stream + size);
 
 	do
 	{
@@ -489,7 +519,8 @@ void recorded_animation_verify(
 			animation_state,
 			&controller,
 			&relative_ticks,
-			&playback_stream);
+			&playback_stream,
+			stream + size);
 
 		match_assert(
 			"c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
@@ -643,7 +674,8 @@ static boolean recorded_animation_play_internal(
 
 	if (unit_index != NONE)
 	{
-		if (animation_index != NONE && animation_index < global_scenario_get()->recorded_animations.count)
+		/* port: and not below the block (a script's index) */
+		if (VALID_INDEX(animation_index, global_scenario_get()->recorded_animations.count))
 		{
 			object_get_and_verify_type(unit_index, _object_mask_unit);
 			player_index_from_unit_index(unit_index);
@@ -654,7 +686,23 @@ static boolean recorded_animation_play_internal(
 				animation_index,
 				struct recorded_animation_definition);
 
-			if (!recorded_animation_controlling_unit(unit_index))
+			/* port: only a stream the playback can read (a map's version and
+			stream); else it isn't played, said once */
+			if (!recorded_animation_playable(animation))
+			{
+				static boolean reported = FALSE;
+
+				if (!reported)
+				{
+					error(_error_silent, "animation %s can't be played (version %d, unit control version %d, %ld bytes)",
+						animation->name,
+						animation->version,
+						animation->unit_control_data_version,
+						animation->event_stream.size);
+					reported = TRUE;
+				}
+			}
+			else if (!recorded_animation_controlling_unit(unit_index))
 			{
 				if (!thread)
 				{
@@ -671,6 +719,7 @@ static boolean recorded_animation_play_internal(
 						animation->version>0&&animation->version<=RECORDED_ANIMATION_VERSION&&playback_codec[animation->version-1]);
 
 					thread->unit_index = unit_index;
+					thread->animation_index = animation_index;
 					thread->relative_ticks = 0;
 					thread->ticks_left = animation->length_in_ticks;
 					thread->event_stream = tag_data_get_pointer(
@@ -692,7 +741,8 @@ static boolean recorded_animation_play_internal(
 						thread->animation_state,
 						&thread->controller,
 						&thread->event_stream,
-						animation->unit_control_data_version);
+						animation->unit_control_data_version,
+						(byte const *)animation->event_stream.address + animation->event_stream.size);
 
 					unit_set_actively_controlled(unit_index, TRUE);
 					SET_FLAG(
@@ -744,6 +794,85 @@ static boolean recorded_animation_play_internal(
 	else
 	{
 		error(_error_silent, "unit doesn't exist");
+	}
+
+	return result;
+}
+
+/* port: a stream the playback can read: a version the codecs have, and the
+unit control (and animation state) inside the stream (a map's) */
+static boolean recorded_animation_playable(
+	struct recorded_animation_definition const *animation)
+{
+	struct unit_control_data controller;
+	byte animation_state[0xC];
+	byte *stream = animation->event_stream.address;
+
+	if (animation->version == 0 ||
+		animation->version > RECORDED_ANIMATION_VERSION ||
+		!playback_codec[animation->version - 1] ||
+		!stream ||
+		animation->event_stream.size <= 0)
+	{
+		return FALSE;
+	}
+
+	return playback_codec[animation->version - 1]->initialize_event_stream(
+		animation_state,
+		&controller,
+		&stream,
+		animation->unit_control_data_version,
+		stream + animation->event_stream.size);
+}
+
+/* port: whether a thread's stream position is inside an animation's stream */
+static boolean recorded_animation_stream_holds(
+	struct recorded_animation_definition const *animation,
+	byte const *event_stream)
+{
+	byte const *stream = animation->event_stream.address;
+
+	return stream &&
+		animation->event_stream.size > 0 &&
+		event_stream >= stream &&
+		event_stream <= stream + animation->event_stream.size;
+}
+
+/* port: the animation whose stream a thread plays, or NULL when the thread's
+stream isn't one of the scenario's (it stops). A game saved by an older build
+has no animation index in its threads: the animation is found from the stream
+it plays, once, and kept. */
+static struct recorded_animation_definition const *animation_thread_get_animation(
+	struct animation_thread *thread)
+{
+	struct tag_block const *animations = &global_scenario_get()->recorded_animations;
+	struct recorded_animation_definition const *result = NULL;
+	short animation_index;
+
+	if (VALID_INDEX(thread->animation_index, animations->count))
+	{
+		result = TAG_BLOCK_GET_ELEMENT(
+			animations,
+			thread->animation_index,
+			struct recorded_animation_definition);
+		if (!recorded_animation_stream_holds(result, thread->event_stream))
+			result = NULL;
+	}
+
+	for (animation_index = 0;
+		!result && animation_index < (short)MIN(animations->count, SHORT_MAX);
+		animation_index++)
+	{
+		struct recorded_animation_definition const *animation = TAG_BLOCK_GET_ELEMENT(
+			animations,
+			animation_index,
+			struct recorded_animation_definition);
+
+		if (recorded_animation_stream_holds(animation, thread->event_stream))
+		{
+			thread->animation_index = animation_index;
+			result = animation;
+		}
 	}
 
 	return result;
