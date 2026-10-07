@@ -20,13 +20,17 @@ PRELUDE = r'''
 #include <math.h>
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <pthread.h>
 #endif
 typedef unsigned char boolean;
 #define FALSE 0
+#ifdef _WIN32
 typedef int pthread_mutex_t;
 #define PTHREAD_MUTEX_INITIALIZER 0
 static void pthread_mutex_lock(pthread_mutex_t *m) {(void)m;}
 static void pthread_mutex_unlock(pthread_mutex_t *m) {(void)m;}
+#endif
 static void platform_log(const char *f, ...) {(void)f;}
 static void console_printf(int b,const char *f,...) {(void)b;(void)f;}
 static void console_warning(const char *f,...) {(void)f;}
