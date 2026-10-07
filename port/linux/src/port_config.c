@@ -28,6 +28,10 @@ it exists, so that the player's edits and comments stay.
 Adding an alias never shifts Halo's compiled map-script indices. */
 static const struct console_option console_options[] =
 {
+	{ "fov_desired", "display.fov", console_option_real, 20, 150, 1,
+		"World horizontal FOV at 16:9 (20-150 degrees; 0 is authored Default)." },
+	{ "viewmodel_fov", "display.viewmodel_fov", console_option_real, 20, 150, 1,
+		"Weapon/hands horizontal FOV at 16:9 (20-150 degrees; 0 follows world FOV)." },
 	{ "display.vsync", "display.vsync", console_option_boolean, 0, 1, 0,
 		"Wait for the display between frames (0/1)." },
 };
@@ -109,6 +113,13 @@ static const struct config_setting config_settings[] =
 		"Xbox's 4:3." },
 	{ "display.vsync", _config_boolean, "true", "HALO_NO_VSYNC", _environment_set_is_false, _platform_all,
 		"Wait for the display between frames; false draws as fast as possible." },
+	{ "display.fov", _config_real, "0.0", "HALO_FOV", _environment_value, _platform_all,
+		"Console fov_desired: horizontal degrees at 16:9 (20-150); 0 uses the\n"
+		"authored view. Wider settings preserve scopes; narrower settings also\n"
+		"narrow scopes. Special cameras retain their authored views." },
+	{ "display.viewmodel_fov", _config_real, "0.0", "HALO_VIEWMODEL_FOV", _environment_value, _platform_all,
+		"Console viewmodel_fov: weapon/hands horizontal degrees at 16:9\n"
+		"(20-150); 0 follows world FOV. Attached effects use the same view." },
 	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
 		"With vsync off, the most frames a second: 0 for twice the display's\n"
 		"refresh rate, -1 for no limit (which can hang some Intel graphics)." },

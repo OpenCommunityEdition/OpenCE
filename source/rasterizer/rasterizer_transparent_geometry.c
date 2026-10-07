@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "viewmodel_fov.h"
 #include "cseries/errors.h"
 #include "rasterizer.h"
 #include "rasterizer_console_vars.h"
@@ -581,6 +582,7 @@ void rasterizer_transparent_geometry_draw(
 					global_window_parameters.rasterizer_target==_rasterizer_target_render_primary);
 				if (!first_person_flag)
 				{
+					viewmodel_projection_begin();
 					rasterizer_set_stencil_mode(0);
 					rasterizer_set_frustum_z(
 						rasterizer_globals.first_person_weapon_near_clip_distance,
@@ -608,6 +610,7 @@ void rasterizer_transparent_geometry_draw(
 		rasterizer_debug_options.transparent_pixel_counter_active = FALSE;
 		if (first_person_flag)
 		{
+			viewmodel_projection_end();
 			rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 	}

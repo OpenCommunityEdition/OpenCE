@@ -392,6 +392,7 @@ symbols in this file:
 #include "text/font_group.h"
 #include "tag_files/files.h"
 #include "custom_edition_cache.h" /* port: custom_edition_level_name */
+#include "render_fov.h" /* port: local world FOV, before projection and culling */
 
 /* ---------- constants */
 
@@ -1141,10 +1142,10 @@ void set_window_camera_values(
 		window->rasterizer_camera.forward = observer->forward;
 		window->rasterizer_camera.up = observer->up;
 		window->rasterizer_camera.vertical_field_of_view =
-			2.0f * arctangent(
+			render_fov_vertical(window->local_player_index, 2.0f * arctangent(
 				0.75f * render_camera_get_adjusted_field_of_view_tangent(
 					observer->field_of_view),
-				1.0f);
+				1.0f));
 
 		if (window->local_player_index != NONE &&
 			!console_is_active() &&

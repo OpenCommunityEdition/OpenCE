@@ -81,6 +81,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "viewmodel_fov.h"
 #include "errors.h"
 #include "bitmaps/bitmaps.h"
 #include "interface/hud_draw.h"
@@ -849,6 +850,8 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)
 			{
+				boolean first_person = (lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag) != 0;
+				if (first_person) viewmodel_projection_begin();
 				real occlusion_radius = definition->occlusion_radius;
 				real_point3d occlusion_point;
 
@@ -885,6 +888,8 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 						&occlusion_point,
 						occlusion_radius,
 						lens_flare_index);
+
+				if (first_person) viewmodel_projection_end();
 			}
 		}
 
@@ -919,6 +924,8 @@ void rasterizer_lens_flares_draw(
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)
 			{
+				boolean first_person = (lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag) != 0;
+				if (first_person) viewmodel_projection_begin();
 				struct lens_flare_definition *definition = lens_flare_parameters->definition;
 
 				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
@@ -1161,6 +1168,8 @@ void rasterizer_lens_flares_draw(
 						}
 					}
 				}
+
+				if (first_person) viewmodel_projection_end();
 			}
 		}
 

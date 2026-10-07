@@ -76,6 +76,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "viewmodel_fov.h"
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
@@ -213,6 +214,8 @@ void build_sprites_begin(
 		!TEST_FLAG(flags, _build_sprites_valid_bit));
 
 	data->bitmap_group_index = bitmap_group_index;
+	if (TEST_FLAG(flags, _build_sprites_first_person_bit))
+		viewmodel_projection_begin();
 	data->flags = flags;
 	data->shader = shader;
 	data->group_count = 0;
@@ -282,6 +285,8 @@ void build_sprites_end(
 	}
 
 	SET_FLAG(data->flags, _build_sprites_valid_bit, FALSE);
+	if (TEST_FLAG(data->flags, _build_sprites_first_person_bit))
+		viewmodel_projection_end();
 	return;
 }
 

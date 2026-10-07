@@ -50,7 +50,7 @@ TESTS = r'''
 static char *file_text(void){size_t n;return SDL_LoadFile("config.toml",&n);}
 static int execute(const char*s){int ok=0;CHECK(console_option_execute(s,&ok));return ok;}
 int main(int argc,char**argv){
- if(argc>1){CHECK(config_boolean("display.vsync")==0);CHECK(fabs(config_real("audio.volume")-.25)<1e-9);return 0;}
+ if(argc>1){if(find_option("fov_desired")){CHECK(config_real("display.fov")==110);CHECK(config_real("display.viewmodel_fov")==90);}CHECK(config_boolean("display.vsync")==0);CHECK(fabs(config_real("audio.volume")-.25)<1e-9);return 0;}
  FILE*f=fopen("config.toml","wb");CHECK(f);fputs("# retained comment\n[display]\nvsync = true\n[custom]\nmy_setting = 7 # retained unknown key\n",f);fclose(f);
  CHECK(config_boolean("display.vsync"));
  CHECK(console_option_get(0));CHECK(console_option_get(10000)==NULL);
@@ -69,6 +69,15 @@ int main(int argc,char**argv){
  CHECK(fopen("config.toml.tmp","rb")==NULL);
  CHECK(execute("display.vsync default"));CHECK(config_boolean("display.vsync"));
  CHECK(execute("display.vsync off"));
+ if(find_option("fov_desired")){
+  CHECK(execute("fov_desired 20.25"));CHECK(config_real("display.fov")==20.25);
+  CHECK(execute("fov_desired 150"));CHECK(config_real("display.fov")==150);
+  const char*invalid[]={"fov_desired 19.99","fov_desired 150.01","fov_desired nan","fov_desired inf","viewmodel_fov -1","viewmodel_fov 1e9999"};
+  for(unsigned i=0;i<sizeof(invalid)/sizeof(*invalid);i++)CHECK(!execute(invalid[i]));
+  CHECK(execute("fov_desired 0"));CHECK(config_real("display.fov")==0);
+  CHECK(execute("fov_desired 110"));CHECK(execute("viewmodel_fov 90"));
+ }
+
  CHECK(config_write("audio.volume",".25"));CHECK(fabs(config_real("audio.volume")-.25)<1e-9);
  after=file_text();CHECK(strstr(after,"# retained comment"));CHECK(strstr(after,"my_setting = 7 # retained unknown key"));CHECK(strstr(after,"volume = 0.25"));free(after);
  char oversized[500];memset(oversized,'a',sizeof(oversized));oversized[sizeof(oversized)-1]=0;CHECK(!console_option_execute(oversized,&ok));

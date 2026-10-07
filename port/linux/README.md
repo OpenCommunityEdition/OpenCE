@@ -227,6 +227,15 @@ explicitly registered local display options use this path; legacy console
 variables retain their existing behavior. These options also work for co-op
 clients and in `init.txt`, without becoming map-script functions.
 
+`fov_desired 110` changes the first-person world view; `viewmodel_fov 80`
+independently changes the weapon, hands and attached effects. Both accept
+horizontal degrees at 16:9 from 20 to 150, including fractional values.
+`fov_desired 0` restores the map's view; `viewmodel_fov 0` follows world FOV.
+Changes take effect immediately and persist. These are console options,
+not Video Setup rows. Scope views and special cameras retain their existing
+behavior; the world option narrows scopes too when narrower than the authored
+base view. Other viewport shapes preserve the vertical view.
+
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: the display, taken at the mode of `display.resolution` (the nearest the display has), or at its desktop mode. `"borderless"`: a window over the whole desktop, whose mode does not change. `"windowed"`: a window of `display.window_size`. Empty: `display.fullscreen` decides (`true`: borderless). F11 changes between the window and the fullscreen mode. Video Setup sets it. |
@@ -236,6 +245,8 @@ clients and in `init.txt`, without becoming map-script functions.
 | `display.window_size` | `""` | `HALO_WINDOW_SIZE` | The size of the window, as `"<width>x<height>"`, such as `"1920x1080"`, 640x480 or more. You can change the size of the window; the game's picture takes its shape. Empty: `display.window_scale` decides. Video Setup's Window Size sets it, from sizes of each shape (4:3, 16:10, 16:9 and 21:9) that fit the desktop; it shows with Windowed. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | Used when `display.window_size` is empty: the size of the window, as a multiple of 640x480. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
+| `display.fov` | `0.0` | `HALO_FOV` | Console `fov_desired`: world horizontal FOV at 16:9, 20–150 degrees; 0 uses the authored view. Applies to local first-person cameras on foot; scopes and special cameras retain the behavior described above. |
+| `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | Console `viewmodel_fov`: independent weapon/hands FOV at 16:9, 20–150 degrees; 0 follows world FOV. First-person models, transparent effects, particles and flares use the same projection. Invalid file/environment values follow world FOV. |
 | `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |
 | `display.anti_aliasing` | `"off"` | `HALO_ANTI_ALIASING` | The smoothing of jagged edges, which the Xbox did not have. `"off"`: none, as on the Xbox. `"fxaa"` or `"smaa"`: a pass over the 3D view after the game draws it. The HUD and the menus stay sharp. SMAA is the sharper and costs more. `"ssaa2x"`: the game draws at two times the resolution in each direction (at most the GPU's largest texture), and the picture is scaled down. The GPU does four times the work. Not with `display.resolution_scaling = "original"`. `"msaa2x"`, `"msaa4x"` or `"msaa8x"`: each pixel of the 3D view has that many samples (at most the GPU's). On Android, `"smaa"` gives FXAA and `"ssaa2x"` none. A change applies from the next frame. Refer to "Anti-aliasing" in "What operates". |
 | `debug.gpu_flush_draws` | `-1` | `HALO_GPU_FLUSH_DRAWS` | Flush the GPU's pipeline every this many draws. `-1`: every 3 on Intel graphics with Mesa's driver, which can otherwise hang in the game's long runs of small draws and reset the desktop's graphics too. `0`: never. |
