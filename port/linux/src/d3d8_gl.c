@@ -521,6 +521,13 @@ struct gl_device
 	float query_area[VISIBILITY_TEST_SLOTS];
 	GLuint active_query;
 	BOOL visibility_test_active;
+	/* (queries read on the CPU) each slot's latest count known, and whether
+	its query has yet to be read: the game spins on a result it is told is
+	incomplete, so a query is read only once it says it is available, and
+	until then the slot's earlier count stands. A frame of The Library's
+	lights makes hundreds of tests. */
+	GLuint visibility_known[VISIBILITY_TEST_SLOTS];
+	BOOL visibility_unread[VISIBILITY_TEST_SLOTS];
 #ifdef HALO_ANDROID
 	/* with atomic counters: one counter per test, used as a ring; the
 	counter a test ended in, per result slot */
@@ -2050,6 +2057,7 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	device.queries[0] = device.queries[index];
 	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
+	device.visibility_unread[index] = TRUE;
 #ifndef HALO_ANDROID
 	if (device.visibility_results)
 	{
@@ -2109,21 +2117,30 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 		return S_OK;
 	}
 #endif
-	glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
-	if (!available)
-		return D3DERR_TESTINCOMPLETE;
-	glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT, &samples);
+	/* the latest count known: from this test, or while the GPU is still
+	behind, from the slot's earlier ones */
+	if (device.visibility_unread[index])
+	{
+		glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
+		if (available)
+		{
+			glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT, &samples);
 #ifdef HALO_ANDROID
-	/* ES only says whether any sample passed. The game divides the count by
-	the test's area (lens flare brightness, rasterizer_lights.c): report
-	more than any test covers, well below what would overflow there. */
-	if (samples)
-		samples = VISIBILITY_ALL_SAMPLES;
+			/* ES only says whether any sample passed. The game divides the
+			count by the test's area (lens flare brightness,
+			rasterizer_lights.c): report more than any test covers, well
+			below what would overflow there. */
+			if (samples)
+				samples = VISIBILITY_ALL_SAMPLES;
 #else
-	samples = visibility_unscaled(samples, index);
+			samples = visibility_unscaled(samples, index);
 #endif
+			device.visibility_known[index] = samples;
+			device.visibility_unread[index] = FALSE;
+		}
+	}
 	if (result)
-		*result = samples;
+		*result = device.visibility_known[index];
 	return S_OK;
 }
 
