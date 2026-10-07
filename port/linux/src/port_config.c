@@ -30,6 +30,8 @@ static const struct console_option console_options[] =
 {
 	{ "display.vsync", "display.vsync", console_option_boolean, 0, 1, 0,
 		"Wait for the display between frames (0/1)." },
+	{ "viewmodel_vis", "display.viewmodel_visible", console_option_boolean, 0, 1, 0,
+		"Show the local first-person weapon/hands and attached visuals (0/1)." },
 };
 
 const struct console_option *console_option_get(unsigned index)
@@ -109,6 +111,9 @@ static const struct config_setting config_settings[] =
 		"Xbox's 4:3." },
 	{ "display.vsync", _config_boolean, "true", "HALO_NO_VSYNC", _environment_set_is_false, _platform_all,
 		"Wait for the display between frames; false draws as fast as possible." },
+	{ "display.viewmodel_visible", _config_boolean, "true", "HALO_VIEWMODEL_VIS", _environment_value, _platform_all,
+		"Console viewmodel_vis: show first-person weapons, hands and attached\n"
+		"visuals. Weapon updates, sound, firing and world lights continue." },
 	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
 		"With vsync off, the most frames a second: 0 for twice the display's\n"
 		"refresh rate, -1 for no limit (which can hang some Intel graphics)." },

@@ -100,6 +100,7 @@ symbols in this file:
 #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM
 #define REAL_MATH_EXTERNAL_REAL_LOCAL_RANDOM_RANGE
 #include "interface/first_person_weapons.h"
+#include "viewmodel_visibility.h"
 
 #include "cache/predicted_resources.h"
 #include "camera/director.h"
@@ -469,6 +470,8 @@ long first_person_weapon_get_local_index(
 void first_person_weapon_draw(
 	void)
 {
+	if (!viewmodel_is_visible())
+		return;
 	if (render.local_player_index!=NONE)
 	{
 		struct first_person_weapon *first_person_weapon= first_person_weapon_get(render.local_player_index);
