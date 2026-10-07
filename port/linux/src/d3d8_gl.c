@@ -513,6 +513,7 @@ struct gl_device
 	/* the pixels each of the game's pixels covered in the test's target
 	(render_target_get), which its count is divided by */
 	float query_area[VISIBILITY_TEST_SLOTS];
+	/* scratch query kept outside all game-visible result slots, including 0 */
 	GLuint active_query;
 	BOOL visibility_test_active;
 #ifdef HALO_ANDROID
@@ -529,6 +530,8 @@ struct gl_device
 	had caught up */
 	GLuint visibility_results_buffer;
 	volatile GLuint *visibility_results;
+	/* completion of each current query's write into the mapped result slot */
+	GLsync visibility_sync[VISIBILITY_TEST_SLOTS];
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
 	unsigned long flush_every;
 	unsigned long flush_draws;
@@ -1422,6 +1425,7 @@ static void gl_initialize(void)
 #endif
 	glGenSamplers(D3DTSS_MAXSTAGES, device.samplers);
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
+	glGenQueries(1, &device.active_query);
 #ifndef HALO_ANDROID
 	glGenBuffers(1, &device.visibility_results_buffer);
 	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
@@ -1429,6 +1433,8 @@ static void gl_initialize(void)
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+	/* the unmapped fallback reads query results into client memory */
+	glBindBuffer(GL_QUERY_BUFFER, 0);
 	if (!device.visibility_results)
 		platform_log("cannot map the visibility test results; tests wait for the GPU");
 	{
@@ -1923,7 +1929,7 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		return;
 	}
 #endif
-	glBeginQuery(VISIBILITY_QUERY, device.queries[0]);
+	glBeginQuery(VISIBILITY_QUERY, device.active_query);
 }
 
 HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
@@ -1934,8 +1940,6 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		return S_OK;
 	device.visibility_test_active = FALSE;
 	index %= VISIBILITY_TEST_SLOTS;
-	if (!index)
-		index = 1;
 #ifdef HALO_ANDROID
 	if (xgpu_capabilities.atomic_counters)
 	{
@@ -1952,8 +1956,8 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	screen's alike */
 	device.query_area[index] = target_scale[0] * target_scale[1] * (float)target_samples;
 	/* swap the scratch query into the requested slot */
-	scratch = device.queries[0];
-	device.queries[0] = device.queries[index];
+	scratch = device.active_query;
+	device.active_query = device.queries[index];
 	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
 #ifndef HALO_ANDROID
@@ -1964,6 +1968,9 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		glGetQueryObjectuiv, even one into a bound buffer) */
 		glGetQueryBufferObjectuiv(device.queries[index], device.visibility_results_buffer, GL_QUERY_RESULT,
 			(GLintptr)(index * sizeof(GLuint)));
+		if (device.visibility_sync[index])
+			glDeleteSync(device.visibility_sync[index]);
+		device.visibility_sync[index] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 	}
 #endif
 	return S_OK;
@@ -1986,8 +1993,6 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	if (time_stamp)
 		*time_stamp = 0;
 	index %= VISIBILITY_TEST_SLOTS;
-	if (!index)
-		index = 1;
 	if (!device.gl_ready || !device.query_pending[index])
 	{
 		if (result)
@@ -2006,13 +2011,24 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	}
 #endif
 #ifndef HALO_ANDROID
-	if (device.visibility_results)
+	if (device.visibility_results && device.visibility_sync[index])
 	{
-		/* the latest count the GPU has written: from this test, or while
-		the GPU is still behind, from the slot's earlier ones */
-		if (result)
-			*result = visibility_unscaled(device.visibility_results[index], index);
-		return S_OK;
+		/* coherent mapping does not mean the current write has completed:
+		until its fence signals, the slot may still hold another flare's
+		count. Keep the game's existing TESTINCOMPLETE polling contract. */
+		GLenum status = glClientWaitSync(device.visibility_sync[index], GL_SYNC_FLUSH_COMMANDS_BIT, 0);
+
+		if (status == GL_TIMEOUT_EXPIRED)
+			return D3DERR_TESTINCOMPLETE;
+		if (status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED)
+		{
+			if (result)
+				*result = visibility_unscaled(device.visibility_results[index], index);
+			return S_OK;
+		}
+		/* a failed sync falls back to querying this slot's current object */
+		glDeleteSync(device.visibility_sync[index]);
+		device.visibility_sync[index] = NULL;
 	}
 #endif
 	glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);

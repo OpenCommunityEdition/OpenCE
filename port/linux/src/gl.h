@@ -218,6 +218,9 @@ this list to generate the guest's entry points */
 	X(glVertexAttribBinding) \
 	X(glBindVertexBuffer) \
 	X(glGetQueryBufferObjectuiv) \
+	X(glFenceSync) \
+	X(glClientWaitSync) \
+	X(glDeleteSync) \
 	X(glVertexAttrib4fv) \
 	X(glVertexAttribI4ui) \
 	X(glDrawArrays) \
@@ -445,6 +448,9 @@ pointers, sees the declarations without these aliases */
 #define glVertexAttribBinding halo_glVertexAttribBinding
 #define glBindVertexBuffer halo_glBindVertexBuffer
 #define glGetQueryBufferObjectuiv halo_glGetQueryBufferObjectuiv
+#define glFenceSync halo_glFenceSync
+#define glClientWaitSync halo_glClientWaitSync
+#define glDeleteSync halo_glDeleteSync
 #define glVertexAttrib4fv halo_glVertexAttrib4fv
 #define glVertexAttribI4ui halo_glVertexAttribI4ui
 #define glDrawArrays halo_glDrawArrays
