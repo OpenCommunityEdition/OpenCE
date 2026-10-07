@@ -230,8 +230,15 @@ static void slayer_engine_player_added(
 	long player_index)
 {
 	struct player_datum *player = player_get(player_index);
+	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
 
 	player->multiplayer_special = NONE;
+	/* port: a player joining the game in progress can take the slot of one
+	who quit (network_game_spawn_player): not that player's score, nor in
+	free for all, where the slot is the team, the team's */
+	slayer_globals.individual_score[slot] = 0;
+	if (!game_engine_has_teams())
+		slayer_globals.team_score[slot] = 0;
 
 	return;
 }

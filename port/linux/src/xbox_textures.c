@@ -304,20 +304,22 @@ static unsigned long yuv_to_argb(long y, long u, long v)
 		clamp_byte((298 * c + 516 * d + 128) >> 8));
 }
 
+/* a texel's 16 and 32 bits, read only for the kinds that have them (the last
+texel of a 1-byte texture read 3 bytes past it) */
+#define TEXEL16(source) ((unsigned long)(source)[0] | ((unsigned long)(source)[1] << 8))
+#define TEXEL32(source) (TEXEL16(source) | ((unsigned long)(source)[2] << 16) | ((unsigned long)(source)[3] << 24))
+
 static unsigned long convert_texel(unsigned char kind, const unsigned char *source, const D3DCOLOR *palette,
 	unsigned long x, const unsigned char *row)
 {
-	unsigned long v16 = source[0] | ((unsigned long)source[1] << 8);
-	unsigned long v32 = v16 | ((unsigned long)source[2] << 16) | ((unsigned long)source[3] << 24);
-
 	switch (kind)
 	{
-	case _texel_a8r8g8b8: return v32;
-	case _texel_x8r8g8b8: return v32 | 0xff000000UL;
-	case _texel_r5g6b5: return argb(255, expand5(v16 >> 11), expand6((v16 >> 5) & 0x3f), expand5(v16 & 0x1f));
-	case _texel_a1r5g5b5: return argb((v16 & 0x8000) ? 255 : 0, expand5((v16 >> 10) & 0x1f), expand5((v16 >> 5) & 0x1f), expand5(v16 & 0x1f));
-	case _texel_x1r5g5b5: return argb(255, expand5((v16 >> 10) & 0x1f), expand5((v16 >> 5) & 0x1f), expand5(v16 & 0x1f));
-	case _texel_a4r4g4b4: return argb(expand4(v16 >> 12), expand4((v16 >> 8) & 0xf), expand4((v16 >> 4) & 0xf), expand4(v16 & 0xf));
+	case _texel_a8r8g8b8: return TEXEL32(source);
+	case _texel_x8r8g8b8: return TEXEL32(source) | 0xff000000UL;
+	case _texel_r5g6b5: return argb(255, expand5(TEXEL16(source) >> 11), expand6((TEXEL16(source) >> 5) & 0x3f), expand5(TEXEL16(source) & 0x1f));
+	case _texel_a1r5g5b5: return argb((TEXEL16(source) & 0x8000) ? 255 : 0, expand5((TEXEL16(source) >> 10) & 0x1f), expand5((TEXEL16(source) >> 5) & 0x1f), expand5(TEXEL16(source) & 0x1f));
+	case _texel_x1r5g5b5: return argb(255, expand5((TEXEL16(source) >> 10) & 0x1f), expand5((TEXEL16(source) >> 5) & 0x1f), expand5(TEXEL16(source) & 0x1f));
+	case _texel_a4r4g4b4: return argb(expand4(TEXEL16(source) >> 12), expand4((TEXEL16(source) >> 8) & 0xf), expand4((TEXEL16(source) >> 4) & 0xf), expand4(TEXEL16(source) & 0xf));
 	case _texel_l8: return argb(255, source[0], source[0], source[0]);
 	case _texel_al8: return argb(source[0], source[0], source[0], source[0]);
 	case _texel_a8: return argb(source[0], 255, 255, 255);
@@ -326,14 +328,14 @@ static unsigned long convert_texel(unsigned char kind, const unsigned char *sour
 	/* V8U8 shares this format: U (the low byte) reads as red, V as green */
 	case _texel_g8b8: return argb(255, source[0], source[1], 0);
 	case _texel_r8b8: return argb(255, source[1], 0, source[0]);
-	case _texel_r6g5b5: return argb(255, expand6(v16 >> 10), expand5((v16 >> 5) & 0x1f), expand5(v16 & 0x1f));
+	case _texel_r6g5b5: return argb(255, expand6(TEXEL16(source) >> 10), expand5((TEXEL16(source) >> 5) & 0x1f), expand5(TEXEL16(source) & 0x1f));
 	case _texel_l16: return argb(255, source[1], source[1], source[1]);
 	case _texel_v16u16: return argb(255, source[1], source[3], 0);
 	case _texel_a8b8g8r8: return argb(source[3], source[0], source[1], source[2]);
 	case _texel_b8g8r8a8: return argb(source[0], source[1], source[2], source[3]);
 	case _texel_r8g8b8a8: return argb(source[0], source[3], source[2], source[1]);
-	case _texel_r5g5b5a1: return argb((v16 & 1) ? 255 : 0, expand5(v16 >> 11), expand5((v16 >> 6) & 0x1f), expand5((v16 >> 1) & 0x1f));
-	case _texel_r4g4b4a4: return argb(expand4(v16 & 0xf), expand4(v16 >> 12), expand4((v16 >> 8) & 0xf), expand4((v16 >> 4) & 0xf));
+	case _texel_r5g5b5a1: return argb((TEXEL16(source) & 1) ? 255 : 0, expand5(TEXEL16(source) >> 11), expand5((TEXEL16(source) >> 6) & 0x1f), expand5((TEXEL16(source) >> 1) & 0x1f));
+	case _texel_r4g4b4a4: return argb(expand4(TEXEL16(source) & 0xf), expand4(TEXEL16(source) >> 12), expand4((TEXEL16(source) >> 8) & 0xf), expand4((TEXEL16(source) >> 4) & 0xf));
 	case _texel_yuy2:
 	{
 		const unsigned char *pair = row + (x & ~1UL) * 2;
@@ -348,7 +350,7 @@ static unsigned long convert_texel(unsigned char kind, const unsigned char *sour
 	}
 	case _texel_d24s8: return argb(255, source[3], source[3], source[3]);
 	case _texel_d16: return argb(255, source[1], source[1], source[1]);
-	default: return v32;
+	default: return TEXEL32(source);
 	}
 }
 
@@ -365,12 +367,21 @@ static BOOL decode_level(const struct xgpu_texture_description *description, uns
 
 	if (description->linear)
 	{
+		/* only the texels a row's pitch holds: a Size word whose pitch is
+		narrower than its width (a map's bitmap) read past the texture's
+		pitch * height bytes; the rest of such a row is black (a YUV texel
+		reads its pair's four bytes) */
+		unsigned long row_texels = information.bytes ? description->pitch / information.bytes : 0;
+
+		if (information.kind == _texel_yuy2 || information.kind == _texel_uyvy)
+			row_texels &= ~1UL;
 		for (y = 0; y < height; y++)
 		{
 			const unsigned char *row = source + y * description->pitch;
 
 			for (x = 0; x < width; x++)
-				destination[y * width + x] = convert_texel(information.kind, row + x * information.bytes, palette, x, row);
+				destination[y * width + x] = x < row_texels ?
+					convert_texel(information.kind, row + x * information.bytes, palette, x, row) : 0;
 		}
 		return TRUE;
 	}

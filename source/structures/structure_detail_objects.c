@@ -49,6 +49,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h" /* port: error */
 #define dot_product4d dot_product4d_inline
 #include "math/real_math.h"
 #undef dot_product4d
@@ -57,6 +58,7 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h" /* port: detail_object_collection_palette */
 #include "structures/structure_bsp_definitions.h"
 #include "tag_files/tag_groups.h"
 #include "rasterizer/rasterizer.h"
@@ -201,8 +203,15 @@ static struct detail_object_cell_definition *get_upper_bound_cell(
 	struct detail_object_cell_definition *begin,
 	struct detail_object_cell_definition *end,
 	struct detail_object_cell_coordinate const *key);
+static long structure_detail_objects_port_count(
+	struct structure_detail_object_data const *detail_object_data,
+	long count_index,
+	long first_detail_object_index);
 
 /* ---------- globals */
+
+/* port: whether a map's malformed detail objects were reported (once) */
+static boolean warned_about_detail_object_counts;
 
 boolean debug_detail_objects = FALSE;
 
@@ -350,6 +359,41 @@ static struct detail_object_cell_definition *get_upper_bound_cell(
 	return begin;
 }
 
+/* port: how many detail objects a cell's layer has: its count (from the
+map), none if that is none of the counts, and no more than the bsp has from
+the first (the rasterizer draws them all). The retail counts all fit */
+static long structure_detail_objects_port_count(
+	struct structure_detail_object_data const *detail_object_data,
+	long count_index,
+	long first_detail_object_index)
+{
+	long count = 0;
+
+	if (count_index >= 0 && count_index < detail_object_data->counts.count)
+	{
+		count = *detail_object_count_get(&detail_object_data->counts, count_index);
+		if (first_detail_object_index >= 0 &&
+			first_detail_object_index <= detail_object_data->detail_objects.count &&
+			count <= detail_object_data->detail_objects.count - first_detail_object_index)
+		{
+			return count;
+		}
+	}
+
+	if (!warned_about_detail_object_counts)
+	{
+		error(_error_silent, "detail object count #%ld (%ld from #%ld) is not the bsp's %ld counts and %ld objects",
+			count_index,
+			count,
+			first_detail_object_index,
+			detail_object_data->counts.count,
+			detail_object_data->detail_objects.count);
+		warned_about_detail_object_counts = TRUE;
+	}
+
+	return 0;
+}
+
 real dot_product4d(
 	real_vector4d const *a,
 	real_vector4d const *b)
@@ -388,7 +432,9 @@ void structure_render_detail_objects(
 			(short)fast_ftol(render.camera.position.y * 0.125f - 0.5f),
 			(short)fast_ftol(render.camera.position.z * 0.125f - 0.5f) };
 
-		if (detail_object_data->valid)
+		/* port: a bsp (from the map) with no detail object data has none to
+		draw (the retail bsps all have it) */
+		if (detail_object_data && detail_object_data->valid)
 		{
 			rasterizer_detail_objects_begin();
 
@@ -407,15 +453,17 @@ void structure_render_detail_objects(
 				local_player_data->cell_coordinate = camera_cell;
 				local_player_data->cell_coordinate.initialized = TRUE;
 
-				for (x_delta = -1; x_delta <= 1; x_delta++)
+				/* port: (no cells are found in a bsp, from the map, that has
+				none) */
+				for (x_delta = -1; x_delta <= 1 && detail_object_data->cells.count > 0; x_delta++)
 				{
 					for (y_delta = -1; y_delta <= 1; y_delta++)
 					{
 						struct detail_object_cell_definition *begin =
 							detail_object_cell_definition_get(&detail_object_data->cells, 0);
-						struct detail_object_cell_definition *end = detail_object_cell_definition_get(
-							&detail_object_data->cells,
-							detail_object_data->cells.count - 1) + 1;
+						/* port: the cells' end from their count (the same) */
+						struct detail_object_cell_definition *end =
+							begin + detail_object_data->cells.count;
 						struct detail_object_cell_coordinate key = {
 							(short)(camera_cell.x - x_delta),
 							(short)(camera_cell.y - y_delta),
@@ -429,7 +477,11 @@ void structure_render_detail_objects(
 						upper_bound_cell = get_upper_bound_cell(begin, end, &key) - 1;
 						key.z = camera_cell.z;
 
-						if (lower_bound_cell->cell_x == key.x &&
+						/* port: and found cells are among the cells (a bound
+						past them, read past them before, found none) */
+						if (lower_bound_cell < end &&
+							upper_bound_cell >= begin &&
+							lower_bound_cell->cell_x == key.x &&
 							lower_bound_cell->cell_y == key.y &&
 							upper_bound_cell->cell_x == key.x &&
 							upper_bound_cell->cell_y == key.y)
@@ -455,25 +507,43 @@ void structure_render_detail_objects(
 									{
 										if (TEST_FLAG(cell->valid_layers, layer_index))
 										{
-											struct detail_object_cell_data *cell_data =
-												&local_player_data->cells[layer_index][layer_cell_counts[layer_index]++];
+											long cell_count_index = cell->count_index + count_index;
+											/* port: a count (from the map) that is none of the
+											counts, or names detail objects past the bsp's, is
+											of none (structure_detail_objects_port_count) */
+											long detail_object_count = structure_detail_objects_port_count(
+												detail_object_data,
+												cell_count_index,
+												cell->start_index + first_detail_object_index);
 
-											cell_data->cell_x = cell->cell_x;
-											cell_data->cell_y = cell->cell_y;
-											cell_data->cell_z =
-												(real)cell->offset_z * (1.0f / 255.0f) + (real)cell->cell_z;
-											cell_data->first_detail_object_index =
-												cell->start_index + first_detail_object_index;
-											cell_data->detail_object_count = *detail_object_count_get(
-												&detail_object_data->counts,
-												cell->count_index + count_index);
-											cell_data->z_reference_vector = detail_object_data->z_reference_vectors.count ?
-												detail_object_z_reference_vector_get(
-													&detail_object_data->z_reference_vectors,
-													cell->count_index + count_index) :
-												&detail_object_global_runtime_data->default_z_reference_vector;
+											/* port: no more cells of a layer than the layer holds
+											(27, the cells around the camera: cells from the map
+											that repeat would be more) */
+											if (layer_cell_counts[layer_index] < NUMBEROF(local_player_data->cells[layer_index]))
+											{
+												struct detail_object_cell_data *cell_data =
+													&local_player_data->cells[layer_index][layer_cell_counts[layer_index]++];
 
-											first_detail_object_index += cell_data->detail_object_count;
+												cell_data->cell_x = cell->cell_x;
+												cell_data->cell_y = cell->cell_y;
+												cell_data->cell_z =
+													(real)cell->offset_z * (1.0f / 255.0f) + (real)cell->cell_z;
+												cell_data->first_detail_object_index =
+													cell->start_index + first_detail_object_index;
+												cell_data->detail_object_count = detail_object_count;
+												/* port: (and a z reference vector that is none of
+												theirs is the default) */
+												cell_data->z_reference_vector =
+													detail_object_data->z_reference_vectors.count &&
+														cell_count_index >= 0 &&
+														cell_count_index < detail_object_data->z_reference_vectors.count ?
+													detail_object_z_reference_vector_get(
+														&detail_object_data->z_reference_vectors,
+														cell_count_index) :
+													&detail_object_global_runtime_data->default_z_reference_vector;
+											}
+
+											first_detail_object_index += detail_object_count;
 											count_index++;
 										}
 									}
@@ -491,7 +561,12 @@ void structure_render_detail_objects(
 					local_player_data->view_data.layer_count = 0;
 					for (layer_index = 0; layer_index < 32; layer_index++)
 					{
-						if (TEST_FLAG(visible_layer_flags, layer_index) && layer_cell_counts[layer_index])
+						/* port: a layer (from the map) that is none of the
+						scenario's detail object collections is not drawn (the
+						rasterizer finds its collection in the palette: the retail
+						layers are all the palette's) */
+						if (TEST_FLAG(visible_layer_flags, layer_index) && layer_cell_counts[layer_index] &&
+							layer_index < global_scenario_get()->detail_object_collection_palette.count)
 						{
 							struct detail_object_layer_data *layer =
 								&local_player_data->layers[render_layer_index++];

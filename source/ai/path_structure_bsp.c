@@ -33,6 +33,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "path_structure_bsp.h"
 
 #include "math/real_math.h"
@@ -65,7 +66,19 @@ enum
 
 /* ---------- prototypes */
 
+static byte path_pathfinding_surface(
+	struct structure_bsp const *structure,
+	long surface_index);
+static boolean path_collision_edge_vertices_valid(
+	struct collision_bsp const *bsp,
+	long edge_index);
+
 /* ---------- globals */
+
+/* port: whether a map's malformed pathfinding surfaces or collision edges
+were reported (once each) */
+static boolean warned_about_pathfinding_surface_index;
+static boolean warned_about_collision_edge_vertices;
 
 static real const quantized_pathfinding_surface_widths[8] =
 {
@@ -91,11 +104,10 @@ boolean structure_test_ray2d(
 	struct collision_surface_test_line2d_result surface_result;
 	struct collision_bsp const *bsp;
 	byte *breakable_surface_flags;
-	byte const *pathfinding_surfaces;
+	long surface_step_count = 0;
 
 	bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
 	breakable_surface_flags = breakable_surface_flags_get();
-	pathfinding_surfaces = structure->pathfinding_surfaces.address;
 
 	collision_surface_test_line2d(
 		bsp,
@@ -106,6 +118,9 @@ boolean structure_test_ray2d(
 		direction,
 		&surface_result);
 
+	/* port: the pathfinding surfaces' flags are read through
+	path_pathfinding_surface, which keeps the read below for NONE and gives
+	no walkable surface for any other index past them (a map's index) */
 	/* BUG (preserved for exact matching): January loads
 	 * pathfinding_surfaces[surface_result.enter_surface_index] (+0x5d..+0x63) and the exit
 	 * index (+0xe6..+0xec) before any NONE test; the later /Od build does the same (0x4cfe60
@@ -122,13 +137,13 @@ boolean structure_test_ray2d(
 		long next_surface_index = NONE;
 
 		if (distance < surface_result.enter_t &&
-			pathfinding_surfaces[surface_result.enter_surface_index])
+			path_pathfinding_surface(structure, surface_result.enter_surface_index))
 		{
 			boolean surface_passable = TRUE;
 
 			if (!ignore_broken_surfaces &&
 				TEST_FLAG(
-					pathfinding_surfaces[surface_result.enter_surface_index],
+					path_pathfinding_surface(structure, surface_result.enter_surface_index),
 					_pathfinding_surface_breakable_bit))
 			{
 				struct collision_surface const *collision_surface;
@@ -154,13 +169,13 @@ boolean structure_test_ray2d(
 
 		if (next_surface_index == NONE &&
 			distance > surface_result.exit_t &&
-			pathfinding_surfaces[surface_result.exit_surface_index])
+			path_pathfinding_surface(structure, surface_result.exit_surface_index))
 		{
 			boolean surface_passable = TRUE;
 
 			if (!ignore_broken_surfaces &&
 				TEST_FLAG(
-					pathfinding_surfaces[surface_result.exit_surface_index],
+					path_pathfinding_surface(structure, surface_result.exit_surface_index),
 					_pathfinding_surface_breakable_bit))
 			{
 				struct collision_surface const *collision_surface;
@@ -185,6 +200,16 @@ boolean structure_test_ray2d(
 		}
 
 		if (next_surface_index == NONE)
+		{
+			break;
+		}
+
+		/* port: the ray crosses no more surfaces than the bsp has (each step
+		depends on the surface alone, so a walk that ends never meets one
+		twice; a map's surfaces that loop would walk forever): it stops at
+		this surface's edge */
+		surface_step_count++;
+		if (surface_step_count > bsp->surfaces.count)
 		{
 			break;
 		}
@@ -269,11 +294,11 @@ boolean structure_test_line2d(
 	struct path_collision_result *result)
 {
 	struct collision_bsp const *bsp = TAG_BLOCK_GET_ELEMENT(&structure->collision_bsp, 0, struct collision_bsp);
-	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
 	long const *breakable_surface_flags = (long const *)breakable_surface_flags_get();
 	long surface_index = p0_surface_index;
 	boolean recursed = FALSE;
 	real_vector2d p0p1;
+	long surface_step_count = 0;
 
 	match_assert("c:\\halo\\SOURCE\\ai\\path_structure_bsp.c", 217, result);
 
@@ -281,29 +306,82 @@ boolean structure_test_line2d(
 
 	while (TRUE)
 	{
-		struct collision_surface const *surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct collision_surface);
-		long edge_index = surface->first_edge_index;
+		struct collision_surface const *surface;
+		long edge_index;
 		real_point3d point_in_surface = *global_origin3d;
 		short edge_count = 0;
 		boolean crossed_any = FALSE;
 		boolean reached_target = FALSE;
 
+		/* port: the line crosses no more surfaces than the bsp has, twice
+		over for the one restart below (each step depends on the surface
+		alone, so a walk that ends never meets one twice; a map's surfaces
+		that loop would walk forever): past that it is blocked, as when it
+		can't get back to p0. So is it at a surface that is not the bsp's (a
+		map's index across an edge) */
+		surface_step_count++;
+		if (surface_step_count > 2 * bsp->surfaces.count ||
+			!collision_bsp_valid_surface_index(bsp, surface_index))
+		{
+			collision_surface_project_point2d(
+				bsp,
+				p0_surface_index,
+				_z,
+				TRUE,
+				p0,
+				&result->point);
+			result->surface_index = NONE;
+			result->edge_index = NONE;
+			result->collision = TRUE;
+			result->t = 0.0f;
+			return TRUE;
+		}
+		surface = TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct collision_surface);
+		edge_index = surface->first_edge_index;
+
 		while (TRUE)
 		{
-			struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(&bsp->edges, edge_index, struct collision_edge);
-			boolean on_right_side = surface_index == edge->surface_indices[1];
-			struct collision_vertex const *vertex0 = TAG_BLOCK_GET_ELEMENT(
-				&bsp->vertices,
-				edge->vertex_indices[!on_right_side],
-				struct collision_vertex);
-			struct collision_vertex const *vertex1 = TAG_BLOCK_GET_ELEMENT(
-				&bsp->vertices,
-				edge->vertex_indices[on_right_side],
-				struct collision_vertex);
+			struct collision_edge const *edge;
+			boolean on_right_side;
+			struct collision_vertex const *vertex0;
+			struct collision_vertex const *vertex1;
 			real_vector2d e0e1;
 			real_vector2d e0p1;
 			real_vector2d p0e0;
 			real_vector2d p0e1;
+
+			/* port: a surface's edges ring as
+			collision_surface_edge_ring_continues says (within
+			MAXIMUM_EDGES_PER_COLLISION_SURFACE of the bsp's edges), with
+			vertices that are the bsp's (a map's indices; the retail rings
+			all close within 3 to 8 edges): a ring that doesn't blocks it,
+			as when it can't get back to p0 */
+			if (!collision_surface_edge_ring_continues(bsp, edge_index, edge_count) ||
+				!path_collision_edge_vertices_valid(bsp, edge_index))
+			{
+				collision_surface_project_point2d(
+					bsp,
+					p0_surface_index,
+					_z,
+					TRUE,
+					p0,
+					&result->point);
+				result->surface_index = NONE;
+				result->edge_index = NONE;
+				result->collision = TRUE;
+				result->t = 0.0f;
+				return TRUE;
+			}
+			edge = TAG_BLOCK_GET_ELEMENT(&bsp->edges, edge_index, struct collision_edge);
+			on_right_side = surface_index == edge->surface_indices[1];
+			vertex0 = TAG_BLOCK_GET_ELEMENT(
+				&bsp->vertices,
+				edge->vertex_indices[!on_right_side],
+				struct collision_vertex);
+			vertex1 = TAG_BLOCK_GET_ELEMENT(
+				&bsp->vertices,
+				edge->vertex_indices[on_right_side],
+				struct collision_vertex);
 
 			vector_from_points2d((real_point2d const *)&vertex0->point, (real_point2d const *)&vertex1->point, &e0e1);
 			vector_from_points2d((real_point2d const *)&vertex0->point, p1, &e0p1);
@@ -335,14 +413,19 @@ boolean structure_test_line2d(
 					 * shipped 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in 82 BSPs).
 					 */
 					long next_surface_index = edge->surface_indices[!on_right_side];
+					/* port: (path_pathfinding_surface: a map's index past
+					the pathfinding surfaces is no walkable one) */
+					byte next_pathfinding_surface = path_pathfinding_surface(
+						structure,
+						next_surface_index);
 					boolean passable = TEST_FLAG(
-						pathfinding_surfaces[next_surface_index],
+						next_pathfinding_surface,
 						_pathfinding_surface_walkable_bit);
 
 					if (!ignore_broken_surfaces &&
 						passable &&
 						TEST_FLAG(
-							pathfinding_surfaces[next_surface_index],
+							next_pathfinding_surface,
 							_pathfinding_surface_breakable_bit))
 					{
 						struct collision_surface const *collision_surface = TAG_BLOCK_GET_ELEMENT(
@@ -402,7 +485,7 @@ boolean structure_test_line2d(
 					point_in_surface.y /= edge_count;
 
 					if (!recursed &&
-						pathfinding_surfaces[surface_index] &&
+						path_pathfinding_surface(structure, surface_index) &&
 						!structure_test_line2d(
 							structure,
 							ignore_broken_surfaces,
@@ -687,3 +770,61 @@ boolean structure_test_pill2d(
 }
 
 /* ---------- private code */
+
+/* port: a surface's pathfinding flags, for a surface index from the map.
+NONE reads the byte before the array, as January does (the BUG notes
+above); any other index past the pathfinding surfaces has none (0: not
+walkable). The retail bsps have as many pathfinding surfaces as surfaces,
+and every edge's surfaces are theirs */
+static byte path_pathfinding_surface(
+	struct structure_bsp const *structure,
+	long surface_index)
+{
+	byte const *pathfinding_surfaces = structure->pathfinding_surfaces.address;
+
+	if ((surface_index == NONE && structure->pathfinding_surfaces.count > 0) ||
+		VALID_INDEX(surface_index, structure->pathfinding_surfaces.count))
+	{
+		return pathfinding_surfaces[surface_index];
+	}
+	/* (NONE of a bsp with no pathfinding surfaces has none: there is no
+	array to read before) */
+	if (surface_index == NONE)
+		return 0;
+
+	if (!warned_about_pathfinding_surface_index)
+	{
+		error(_error_silent, "pathfinding surface #%ld is not one of the bsp's %ld",
+			surface_index,
+			structure->pathfinding_surfaces.count);
+		warned_about_pathfinding_surface_index = TRUE;
+	}
+
+	return 0;
+}
+
+/* port: whether an edge's vertices (from the map) are the bsp's (the
+retail ones all are) */
+static boolean path_collision_edge_vertices_valid(
+	struct collision_bsp const *bsp,
+	long edge_index)
+{
+	struct collision_edge const *edge = TAG_BLOCK_GET_ELEMENT(
+		&bsp->edges,
+		edge_index,
+		struct collision_edge);
+
+	if (VALID_INDEX(edge->vertex_indices[0], bsp->vertices.count) &&
+		VALID_INDEX(edge->vertex_indices[1], bsp->vertices.count))
+	{
+		return TRUE;
+	}
+
+	if (!warned_about_collision_edge_vertices)
+	{
+		error(_error_silent, "collision edge #%ld's vertices are not the bsp's", edge_index);
+		warned_about_collision_edge_vertices = TRUE;
+	}
+
+	return FALSE;
+}

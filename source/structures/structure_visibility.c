@@ -525,6 +525,7 @@ static void structure_visibility_traverse_surface_lists(
 			struct tag_block *materials;
 			struct structure_material *material;
 			long group_end;
+			long vertex_limit;
 
 			/* port: a group (from the map) whose header is not all in the
 			list, or names no lightmap's material, ends the list; its
@@ -548,6 +549,10 @@ static void structure_visibility_traverse_surface_lists(
 				materials,
 				surface_index_buffer[1],
 				struct structure_material);
+			/* port: how many vertices the material's compressed vertex data
+			(from the map) holds: a surface with one past them is skipped
+			(the retail clusters have no surface lists) */
+			vertex_limit = material->compressed_vertex_data.size / COMPRESSED_STRUCTURE_VERTEX_SIZE;
 
 			surface_index_buffer += 2;
 			group_end = consumed_surface_index_count + *surface_index_buffer++ + 3;
@@ -593,7 +598,11 @@ static void structure_visibility_traverse_surface_lists(
 						(byte *)material->compressed_vertex_data.address +
 						surface->vertex_indices[2] * COMPRESSED_STRUCTURE_VERTEX_SIZE);
 
-					if (render_frustum_triangle_visible(
+					/* port: (vertex_limit) */
+					if (surface->vertex_indices[0] < vertex_limit &&
+						surface->vertex_indices[1] < vertex_limit &&
+						surface->vertex_indices[2] < vertex_limit &&
+						render_frustum_triangle_visible(
 						frustum,
 						vertex0,
 						vertex1,

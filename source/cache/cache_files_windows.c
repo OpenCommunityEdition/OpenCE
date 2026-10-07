@@ -584,6 +584,9 @@ boolean cache_files_precache_map_loaded(
 	return cached_map_files_find_map(tag_name_strip_path(map_name)) != NONE;
 }
 
+/* (the port's, port/linux/src/sdl_platform.c) */
+void platform_log(char const *format, ...);
+
 boolean cache_files_precache_map_begin(
 	const char *map_name,
 	boolean copy_map)
@@ -603,6 +606,23 @@ boolean cache_files_precache_map_begin(
 				header.scenario_type);
 			void *buffer;
 			struct cached_map_file *map_file;
+
+			/* port: the cache file slots are found by the name in their
+			header (cached_map_files_find_map): a map file whose header names
+			another map would be copied again each time it was asked for, for
+			ever */
+			if (_stricmp(header.name, cache_map_name) != 0)
+			{
+				error(_error_silent, "map '%s' names itself '%s' in its header: refused", cache_map_name, header.name);
+				platform_log("map %s.map names itself '%s' in its header; a map's name must be its file's",
+					cache_map_name, header.name);
+				if (copy_map)
+				{
+					display_error_damaged_media();
+				}
+
+				return FALSE;
+			}
 
 			/* port: a map no cache file holds (of no type the cache files are
 			for, or too big for its type's) is not precached; the texture
@@ -1197,7 +1217,20 @@ static void cache_file_get_map_path(
 	const char *map_name,
 	char *path)
 {
-	sprintf(path, "%s%s.map", cache_files_map_directory(), map_name);
+	/* port: no more than the callers' paths hold (256; the name can be a
+	host's, over the network). One that doesn't fit is no path (no file is
+	found), not a cut one (another file could be). */
+	enum
+	{
+		MAXIMUM_MAP_PATH_LENGTH = 256,
+	};
+	int length = snprintf(path, MAXIMUM_MAP_PATH_LENGTH, "%s%s.map", cache_files_map_directory(), map_name);
+
+	if (length < 0 || length >= MAXIMUM_MAP_PATH_LENGTH)
+	{
+		error(_error_silent, "map path for '%.64s' is too long", map_name);
+		path[0] = 0;
+	}
 
 	return;
 }

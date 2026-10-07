@@ -20,6 +20,9 @@ struct collision_model_instance
 	const struct collision_model *model;
 	const byte *region_permutation_indices;
 	const struct real_matrix4x3 *matrices;
+	/* port: how many of the model's nodes are tested: no more than the
+	object has matrices for (collision_model_instance_new) */
+	short node_count;
 };
 
 /* ---------- prototypes/COLLISION_MODELS.C */

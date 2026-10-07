@@ -266,6 +266,17 @@ enum
 
 enum
 {
+	/* port: the stages a generic shader has room for, one combiner of the 8
+	kept for the fog stage after them (the tag's own maximum; retail has 7 at
+	most) */
+	MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES = 7,
+	/* port: how deep extra layers may nest (a map's layer can name its own
+	shader, which never ended); retail's layers have no layers of their own */
+	MAXIMUM_TRANSPARENT_GEOMETRY_LAYER_DEPTH = 4
+};
+
+enum
+{
 	_shader_radiosity_FILTHY_transparent_lit_bit = 2
 };
 
@@ -637,10 +648,19 @@ struct rasterizer_xbox_transparent_geometry_globals
 typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_xbox_transparent_geometry_globals) == 16 ? 1 : -1];
 
+/* ---------- prototypes */
+
+static void transparent_geometry_layer_draw(
+	struct transparent_geometry_group *layer_group,
+	boolean dirty);
+
 /* ---------- globals */
 
 static struct rasterizer_xbox_transparent_geometry_globals
 	rasterizer_xbox_transparent_geometry_globals = { 0 };
+
+/* port: how many extra layers deep the draw is */
+static short transparent_geometry_layer_depth = 0;
 
 /* ---------- public code */
 
@@ -841,6 +861,29 @@ void rasterizer_transparent_geometry_dispose_aux_buffer(
 }
 
 /* ---------- private code */
+
+/* port: an extra layer's draw, no deeper than the layers may nest (a map's
+layers could name each other in a loop); said once */
+static void transparent_geometry_layer_draw(
+	struct transparent_geometry_group *layer_group,
+	boolean dirty)
+{
+	static boolean reported = FALSE;
+
+	if (transparent_geometry_layer_depth<MAXIMUM_TRANSPARENT_GEOMETRY_LAYER_DEPTH)
+	{
+		transparent_geometry_layer_depth++;
+		rasterizer_transparent_geometry_group_draw(layer_group, dirty);
+		transparent_geometry_layer_depth--;
+	}
+	else if (!reported)
+	{
+		error(_error_silent, "### ERROR a transparent shader's extra layers nest too deep; the deeper ones are not drawn");
+		reported = TRUE;
+	}
+
+	return;
+}
 
 void rasterizer_transparent_geometry_group_draw__internal(
 	struct transparent_geometry_group const *group,
@@ -1815,15 +1858,19 @@ void rasterizer_transparent_geometry_group_draw(
 								layer_index++)
 							{
 								struct transparent_geometry_group layer_group;
+								long layer_shader_index = TAG_BLOCK_GET_ELEMENT(
+									&shader_transparent_generic->generic.extra_layers,
+									layer_index,
+									struct tag_reference)->index;
 
+								/* port: a layer of no shader (one a map's tags had
+								wrong) is not drawn */
+								if (layer_shader_index == NONE)
+									continue;
 								csmemcpy(&layer_group, group, sizeof(layer_group));
 								layer_group.sorted_index = NONE;
-								layer_group.shader = shader_definition_get(
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->generic.extra_layers,
-										layer_index,
-										struct tag_reference)->index);
-								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
+								layer_group.shader = shader_definition_get(layer_shader_index);
+								transparent_geometry_layer_draw(&layer_group, dirty);
 							}
 
 							rasterizer_set_vertex_shader_permutation(
@@ -1883,7 +1930,10 @@ void rasterizer_transparent_geometry_group_draw(
 												&shader_transparent_generic->generic.maps,
 												map_index,
 												struct shader_transparent_generic_map);
-										short type = shader_transparent_generic->generic.type;
+										/* port: a type the tables below have (a map's) */
+										short type = VALID_INDEX(shader_transparent_generic->generic.type, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_TYPES) ?
+											shader_transparent_generic->generic.type :
+											_shader_transparent_generic_type_2d_map;
 										short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
 										{
 											0, 2, 2, 2
@@ -2054,7 +2104,11 @@ void rasterizer_transparent_geometry_group_draw(
 
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								short stage_count = FLOOR(shader_transparent_generic->generic.stages.count, 1);
+								/* port: no more stages than the combiners hold (a map's
+								count), as shader_transparent_generic_create has */
+								short stage_count = FLOOR(
+									MIN(shader_transparent_generic->generic.stages.count, MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES),
+									1);
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
 									shader_transparent_generic->generic.framebuffer_blend_function ==
@@ -2099,7 +2153,9 @@ void rasterizer_transparent_geometry_group_draw(
 										vsh_constants__texscale[2][2] *=
 											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
+									/* port: and a source the animation has (a map's) */
 									if (fade_source > 0 &&
+										fade_source < NUMBER_OF_SHADER_ANIMATION_SOURCES &&
 										group->animation &&
 										group->animation->values)
 										vsh_constants__texscale[2][2] *=
@@ -2198,8 +2254,11 @@ void rasterizer_transparent_geometry_group_draw(
 								}
 							}
 
+							/* port: no more stages than the combiners hold (a map's
+							count) */
 							for (stage_index = 0;
-								stage_index < shader_transparent_generic->generic.stages.count;
+								stage_index < shader_transparent_generic->generic.stages.count &&
+									stage_index < MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES;
 								stage_index++)
 							{
 								struct shader_transparent_generic_stage const *stage =
@@ -2297,24 +2356,27 @@ void rasterizer_transparent_geometry_group_draw(
 							short map_index;
 							long result;
 
-							/* BUG (preserved for exact matching): January never advances layer_index, so the
-							 * loop redraws extra layer 0 for as long as the block is non-empty (the bytes push
-							 * index 0 and re-test the count). A corrected build should increment layer_index.
-							 */
+							/* port: the next layer each time: January never advanced
+							layer_index, so the loop never ended on a chicago shader with
+							a layer (retail's have none) */
 							for (layer_index = 0;
 								layer_index < shader_transparent_chicago->chicago.extra_layers.count;
-								)
+								layer_index++)
 							{
 								struct transparent_geometry_group layer_group;
+								long layer_shader_index = TAG_BLOCK_GET_ELEMENT(
+									&shader_transparent_chicago->chicago.extra_layers,
+									layer_index,
+									struct tag_reference)->index;
 
+								/* port: a layer of no shader (one a map's tags had
+								wrong) is not drawn */
+								if (layer_shader_index == NONE)
+									continue;
 								csmemcpy(&layer_group, group, sizeof(layer_group));
 								layer_group.sorted_index = NONE;
-								layer_group.shader = shader_definition_get(
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_chicago->chicago.extra_layers,
-										layer_index,
-										struct tag_reference)->index);
-								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
+								layer_group.shader = shader_definition_get(layer_shader_index);
+								transparent_geometry_layer_draw(&layer_group, dirty);
 							}
 
 							rasterizer_set_vertex_shader_permutation(
@@ -2384,7 +2446,10 @@ void rasterizer_transparent_geometry_group_draw(
 											&shader_transparent_chicago->chicago.maps,
 											map_index,
 											struct shader_transparent_chicago_map);
-									short type = shader_transparent_chicago->chicago.type;
+									/* port: a type the tables below have (a map's) */
+									short type = VALID_INDEX(shader_transparent_chicago->chicago.type, NUMBER_OF_SHADER_TRANSPARENT_CHICAGO_TYPES) ?
+										shader_transparent_chicago->chicago.type :
+										_shader_transparent_chicago_type_2d_map;
 									short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
 									{
 										0, 2, 2, 2
@@ -2567,7 +2632,12 @@ void rasterizer_transparent_geometry_group_draw(
 
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								short stage_count = shader_transparent_chicago->chicago.maps.count;
+								/* port: no more maps than the texture stages hold (a map's
+								count), as shader_transparent_chicago_create has */
+								short stage_count = (short)PIN(
+									shader_transparent_chicago->chicago.maps.count,
+									0,
+									NUMBER_OF_SHADER_TRANSPARENT_MAPS);
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
 									shader_transparent_chicago->chicago.framebuffer_blend_function ==
@@ -2614,7 +2684,9 @@ void rasterizer_transparent_geometry_group_draw(
 										vsh_constants__texscale[2][2] *=
 											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
+									/* port: and a source the animation has (a map's) */
 									if (fade_source > 0 &&
+										fade_source < NUMBER_OF_SHADER_ANIMATION_SOURCES &&
 										group->animation &&
 										group->animation->values)
 										vsh_constants__texscale[2][2] *=

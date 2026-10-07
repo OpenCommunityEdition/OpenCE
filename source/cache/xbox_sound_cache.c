@@ -111,6 +111,13 @@ symbols in this file:
 
 /* ---------- constants */
 
+/* port: the cache's pages (sound_cache_new), named for the size check */
+enum
+{
+	SOUND_CACHE_PAGE_COUNT = 1024,
+	SOUND_CACHE_PAGE_SIZE_BITS = 12,
+};
+
 /* ---------- macros */
 
 #define cache_block_index unknown0
@@ -188,6 +195,8 @@ static long sound_cache_locked_block_proc(
 	long block_index);
 static void sound_cache_delete_block_proc(
 	long block_index);
+static struct xbox_cache_sound_datum *sound_cache_sound_get_cache_sound(
+	struct sound_permutation *sound);
 
 /* ---------- globals */
 
@@ -248,7 +257,8 @@ void sound_cache_sound_new(
 void sound_cache_sound_delete(
 	struct sound_permutation *sound)
 {
-	if (sound->cache_block_index != NONE)
+	/* port: and a block that is this sound's */
+	if (sound_cache_sound_get_cache_sound(sound))
 	{
 		match_vassert(
 			"c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c",
@@ -296,9 +306,10 @@ void sound_cache_sound_finished(
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(
-		xbox_sound_cache_globals.cache_sounds,
-		sound->cache_block_index);
+	/* port: none if the sound has no block of its own */
+	cache_sound = sound_cache_sound_get_cache_sound(sound);
+	if (!cache_sound)
+		return;
 	if (debug_sound_reference_counts)
 	{
 		error(
@@ -321,9 +332,10 @@ void sound_cache_sound_hardware_lock(
 {
 	struct xbox_cache_sound_datum *cache_sound;
 
-	cache_sound = datum_get(
-		xbox_sound_cache_globals.cache_sounds,
-		sound->cache_block_index);
+	/* port: none if the sound has no block of its own */
+	cache_sound = sound_cache_sound_get_cache_sound(sound);
+	if (!cache_sound)
+		return;
 	if (cache_sound->hardware_reference_count < UNSIGNED_CHAR_MAX)
 	{
 		cache_sound->hardware_reference_count++;
@@ -339,10 +351,11 @@ void sound_cache_sound_hardware_lock(
 void sound_cache_sound_hardware_unlock(
 	struct sound_permutation *sound)
 {
-	struct xbox_cache_sound_datum *cache_sound = datum_get(
-		xbox_sound_cache_globals.cache_sounds,
-		sound->cache_block_index);
+	/* port: none if the sound has no block of its own */
+	struct xbox_cache_sound_datum *cache_sound = sound_cache_sound_get_cache_sound(sound);
 
+	if (!cache_sound)
+		return;
 	if (cache_sound->hardware_reference_count)
 	{
 		cache_sound->hardware_reference_count--;
@@ -369,8 +382,8 @@ void sound_cache_new(
 		"xbox_sound_cache_globals.cache_sounds");
 	xbox_sound_cache_globals.cache = lruv_new(
 		"xbox sound cache",
-		1024,
-		12,
+		SOUND_CACHE_PAGE_COUNT,
+		SOUND_CACHE_PAGE_SIZE_BITS,
 		512,
 		sound_cache_delete_block_proc,
 		(lruv_locked_block_proc)sound_cache_locked_block_proc);
@@ -443,6 +456,43 @@ void sound_cache_close(
 
 /* ---------- private code */
 
+/* port: a permutation's cache block and address are kept in the tag, and a
+map's tags come with them as it was built (retail: no block, no address;
+sound_cache_sound_new, which would set them, is never called). A block that
+is not this sound's own (a map's, or one of another sound) is none, and so is
+its address: the sound is loaded again. That is said once. */
+static struct xbox_cache_sound_datum *sound_cache_sound_get_cache_sound(
+	struct sound_permutation *sound)
+{
+	struct xbox_cache_sound_datum *cache_sound = NULL;
+
+	if (sound->cache_block_index != NONE)
+	{
+		cache_sound = datum_try_and_get(
+			xbox_sound_cache_globals.cache_sounds,
+			sound->cache_block_index);
+		if (!cache_sound || cache_sound->sound != sound)
+		{
+			static boolean bad_block_reported = FALSE;
+
+			if (!bad_block_reported)
+			{
+				bad_block_reported = TRUE;
+				error(
+					_error_silent,
+					"sound permutation %.32s names cache block %08x (not its own)",
+					sound->name,
+					sound->cache_block_index);
+			}
+			sound->cache_block_index = NONE;
+			sound->cache_base_address = 0;
+			cache_sound = NULL;
+		}
+	}
+
+	return cache_sound;
+}
+
 static long sound_cache_locked_block_proc(
 	long block_index)
 {
@@ -505,6 +555,27 @@ static void sound_cache_start_loading_sound(
 	struct sound_permutation *sound)
 {
 	long cache_block_index;
+
+	/* port: the size is the map's (retail: 288 bytes to 377064): none, or
+	more than the cache holds (1024 pages of 4k), is not loaded, said once
+	(the cache halts on a block of no pages) */
+	if (sound->samples.size <= 0 ||
+		sound->samples.size > SOUND_CACHE_PAGE_COUNT << SOUND_CACHE_PAGE_SIZE_BITS)
+	{
+		static boolean bad_size_reported = FALSE;
+
+		if (!bad_size_reported)
+		{
+			bad_size_reported = TRUE;
+			error(
+				_error_silent,
+				"sound permutation %.32s of %d bytes not loaded",
+				sound->name,
+				sound->samples.size);
+		}
+
+		return;
+	}
 
 	cache_block_index = lruv_block_new(
 		xbox_sound_cache_globals.cache,
@@ -596,6 +667,8 @@ boolean _sound_cache_sound_request(
 		0xC6,
 		sound->cache_tag_index!=0);
 
+	/* port: and a block that is this sound's (else it has none) */
+	sound_cache_sound_get_cache_sound(sound);
 	if (sound->cache_block_index == NONE && load)
 	{
 		sound_cache_start_loading_sound(sound);

@@ -1279,7 +1279,8 @@ boolean unit_get_seat_entrance_point(
 							&animation_seat->animations)
 								[_unit_seat_animation_seat_enter].animation_index;
 
-						if (animation_index != NONE)
+						/* port: an animation the graph has (a map's index) */
+						if (VALID_INDEX(animation_index, animation_graph->animations.count))
 						{
 							struct animation *animation = TAG_BLOCK_GET_ELEMENT(
 								&animation_graph->animations,
@@ -1297,7 +1298,10 @@ boolean unit_get_seat_entrance_point(
 								&root_matrix,
 								&entrance_matrix);
 
-							csstrcpy(enter_hint_marker_name, seat->marker_name);
+							/* port: the marker name is a map's 32 bytes, which
+							needn't end; copied up to its length */
+							csstrncpy(enter_hint_marker_name, seat->marker_name, TAG_STRING_LENGTH);
+							enter_hint_marker_name[TAG_STRING_LENGTH] = 0;
 							csstrcat(enter_hint_marker_name, " enter-hint");
 							object_get_marker_by_name(
 								target_unit_index,
@@ -2026,6 +2030,10 @@ short unit_get_grenade_count(
 	{
 		match_assert("c:\\halo\\SOURCE\\units\\units.c", 7847, grenade_type==NONE || (grenade_type>=0 && grenade_type<NUMBER_OF_UNIT_GRENADE_TYPES));
 
+		/* port: a unit carries none of a type it doesn't have (a map's type) */
+		if (!VALID_INDEX(grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES))
+			return 0;
+
 		return unit->unit.grenade_counts[grenade_type];
 	}
 
@@ -2118,6 +2126,12 @@ short unit_add_grenade_type_to_inventory(
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7309, grenade_count>=0);
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7310, (grenade_type >= 0) && (grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES));
 
+	/* port: only the types a unit carries (an actor variant's type, map
+	data; the rest wrote past the unit). Not reported: the released maps'
+	warthog gunner variant has type 28786, with no grenades */
+	if (!VALID_INDEX(grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES))
+		return 0;
+
 	unit->unit.grenade_counts[grenade_type] += grenade_count;
 	unit->unit.desired_grenade_index = grenade_type;
 	unit->unit.current_grenade_index = grenade_type;
@@ -2139,13 +2153,23 @@ boolean unit_add_grenade_to_inventory(
 		struct game_globals_grenade);
 	long local_player_index;
 	boolean result = FALSE;
+	static boolean grenade_type_reported = FALSE;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\units.c",
 		7282,
 		equipment_definition->equipment.powerup_type==_equipment_powerup_grenade);
 
+	/* port: only the types a unit carries (a map's type) */
+	if (!VALID_INDEX(equipment_definition->equipment.grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES) &&
+		!grenade_type_reported)
+	{
+		grenade_type_reported = TRUE;
+		error(_error_silent, "### ERROR %s has grenade type %d; it can't be picked up",
+			tag_get_name(equipment->definition_index), equipment_definition->equipment.grenade_type);
+	}
 	if (grenade &&
+		VALID_INDEX(equipment_definition->equipment.grenade_type, NUMBER_OF_UNIT_GRENADE_TYPES) &&
 		unit->unit.grenade_counts[equipment_definition->equipment.grenade_type] <
 			grenade->maximum_count)
 	{
@@ -5907,7 +5931,17 @@ boolean unit_update(
 
 	if (!TEST_FLAG(unit_definition->unit.flags, _unit_simple_creature_bit))
 	{
+		static boolean powered_seats_reported = FALSE;
 		short seat_index;
+
+		if (unit_definition->unit.powered_seats.count>(long)NUMBEROF(unit->unit.seat_power) &&
+			!powered_seats_reported)
+		{
+			powered_seats_reported = TRUE;
+			error(_error_silent, "### ERROR %s has %ld powered seats; only the first %d get power",
+				tag_get_name(unit->definition_index), unit_definition->unit.powered_seats.count,
+				(int)NUMBEROF(unit->unit.seat_power));
+		}
 
 		if (TEST_FLAG(unit->unit.animation.flags, _unit_animation_showing_acceleration_bit))
 		{
@@ -5917,7 +5951,9 @@ boolean unit_update(
 			unit->unit.seat_acceleration.k = unit->unit.seat_desired_acceleration.k*0.3f + unit->unit.seat_acceleration.k*0.7f;
 		}
 
-		for (seat_index = 0; seat_index<unit_definition->unit.powered_seats.count; ++seat_index)
+		/* port: no more powered seats than the unit keeps power for (a map's
+		count; the rest wrote past the unit) */
+		for (seat_index = 0; seat_index<MIN(unit_definition->unit.powered_seats.count, (long)NUMBEROF(unit->unit.seat_power)); ++seat_index)
 		{
 			boolean v96 = FALSE;
 			struct powered_seat_definition *powered_seat = TAG_BLOCK_GET_ELEMENT(&unit_definition->unit.powered_seats, seat_index, struct powered_seat_definition);
@@ -8275,6 +8311,24 @@ boolean unit_add_weapon_to_inventory(
 	short inventory_index;
 	boolean added = FALSE;
 	short mode = (short)is_starting_weapon;
+
+	/* port: only a weapon goes in a unit's weapons. A map's tag reference
+	(a starting or initial weapon, an item collection) can name any object,
+	which was then used as a weapon. In the released maps they all name
+	weapons (224 initial weapons, 32 item collection entries, every
+	starting profile) */
+	if (weapon->object.type!=_object_type_weapon)
+	{
+		static boolean reported = FALSE;
+
+		if (!reported)
+		{
+			reported = TRUE;
+			error(_error_silent, "### ERROR %s isn't a weapon; it can't be carried",
+				tag_get_name(weapon->definition_index));
+		}
+		return FALSE;
+	}
 
 	if (TEST_FLAG(weapon->object.flags, _object_connected_to_map_bit) &&
 		weapon->object.parent_object_index==NONE &&
@@ -10693,6 +10747,60 @@ static boolean unit_animation_set_state(
 done:
 	return result;
 }
+
+/* port: the nodes a unit's orientations hold: its model's, no more than a
+model can have (object_new sizes them from the model) */
+short unit_animation_model_node_count(
+	long unit_index)
+{
+	struct object_datum *object = object_get(unit_index);
+	struct object_definition *object_definition = object_definition_get(object->definition_index);
+	short model_node_count = 0;
+
+	if (object_definition->object.model.index!=NONE)
+	{
+		model_node_count = (short)PIN(
+			model_definition_get(object_definition->object.model.index)->nodes.count,
+			0, MAXIMUM_NODES_PER_MODEL);
+	}
+
+	return model_node_count;
+}
+
+/* port: the graph's animation, or NULL for one the graph doesn't have or
+one with more nodes than the model, which is all the orientations hold (a
+map's index and animation; the apply wrote past them). In the released
+maps every unit and vehicle animation has its model's node count */
+struct animation *unit_animation_get_fitting(
+	struct animation_graph *animation_graph,
+	short animation_index,
+	short model_node_count)
+{
+	static boolean reported = FALSE;
+	struct animation *animation = NULL;
+
+	if (VALID_INDEX(animation_index, animation_graph->animations.count))
+	{
+		animation = TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->animations,
+			animation_index,
+			struct animation);
+
+		if (animation->node_count>model_node_count)
+		{
+			if (!reported)
+			{
+				reported = TRUE;
+				error(_error_silent, "### ERROR animation '%s' has %d nodes, more than its model's %d; it is skipped",
+					animation->name, animation->node_count, model_node_count);
+			}
+			animation = NULL;
+		}
+	}
+
+	return animation;
+}
+
 void unit_preprocess_node_orientations(
 	long unit_index,
 	struct real_orientation *node_orientations)
@@ -10702,41 +10810,43 @@ void unit_preprocess_node_orientations(
 	struct animation_graph_unit_seat *unit_seat;
 	real_matrix4x3 matrix;
 	struct unit_definition *unit_definition;
+	struct animation *animation;
+	short model_node_count;
 
 	unit = unit_get(unit_index);
 	unit_definition = unit_definition_get(unit->definition_index);
 	animation_graph = animation_graph_definition_get(
 		unit_definition->object.animation_graph.index);
+	/* port: every animation below is one the graph has and that fits the
+	model (unit_animation_get_fitting) */
+	model_node_count = unit_animation_model_node_count(unit_index);
 
-	if (unit->unit.animation.action_animation.index != NONE)
+	if (unit->unit.animation.action_animation.index != NONE &&
+		(animation = unit_animation_get_fitting(animation_graph,
+			unit->unit.animation.action_animation.index, model_node_count)) != NULL)
 	{
 		replacement_animation_apply(
-			TAG_BLOCK_GET_ELEMENT(
-				&animation_graph->animations,
-				unit->unit.animation.action_animation.index,
-				struct animation),
+			animation,
 			unit->unit.animation.action_animation.frame_index,
 			node_orientations);
 	}
 
-	if (unit->unit.animation.overlay_action_animation.index != NONE)
+	if (unit->unit.animation.overlay_action_animation.index != NONE &&
+		(animation = unit_animation_get_fitting(animation_graph,
+			unit->unit.animation.overlay_action_animation.index, model_node_count)) != NULL)
 	{
 		overlay_animation_apply(
-			TAG_BLOCK_GET_ELEMENT(
-				&animation_graph->animations,
-				unit->unit.animation.overlay_action_animation.index,
-				struct animation),
+			animation,
 			unit->unit.animation.overlay_action_animation.frame_index,
 			node_orientations);
 	}
 
-	if (unit->unit.animation.soft_ping_animation.index != NONE)
+	if (unit->unit.animation.soft_ping_animation.index != NONE &&
+		(animation = unit_animation_get_fitting(animation_graph,
+			unit->unit.animation.soft_ping_animation.index, model_node_count)) != NULL)
 	{
 		overlay_animation_apply(
-			TAG_BLOCK_GET_ELEMENT(
-				&animation_graph->animations,
-				unit->unit.animation.soft_ping_animation.index,
-				struct animation),
+			animation,
 			unit->unit.animation.soft_ping_animation.frame_index,
 			node_orientations);
 	}
@@ -10772,13 +10882,10 @@ void unit_preprocess_node_orientations(
 				animation_index = unit->unit.override_emotion_animation_index;
 			}
 
-			if (animation_index != NONE)
+			if (animation_index != NONE &&
+				(animation = unit_animation_get_fitting(animation_graph,
+					animation_index, model_node_count)) != NULL)
 			{
-				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
-					&animation_graph->animations,
-					animation_index,
-					struct animation);
-
 				if (unit->unit.animation.emotion_index >= 0 &&
 					unit->unit.animation.emotion_index < animation->frame_count)
 				{
@@ -10798,13 +10905,10 @@ void unit_preprocess_node_orientations(
 			animation_index = animation_graph_animation_index_get(
 				&unit_seat->animations)[_unit_seat_animation_mouth_aperture].animation_index;
 
-			if (animation_index != NONE)
+			if (animation_index != NONE &&
+				(animation = unit_animation_get_fitting(animation_graph,
+					animation_index, model_node_count)) != NULL)
 			{
-				struct animation *animation = TAG_BLOCK_GET_ELEMENT(
-					&animation_graph->animations,
-					animation_index,
-					struct animation);
-
 				overlay_animation_apply_scaled(
 					animation,
 					0,
@@ -10835,13 +10939,10 @@ void unit_preprocess_node_orientations(
 							_unit_seat_animation_acceleration_front_back +
 							acceleration_index].animation_index;
 
-					if (animation_index != NONE)
+					if (animation_index != NONE &&
+						(animation = unit_animation_get_fitting(animation_graph,
+							animation_index, model_node_count)) != NULL)
 					{
-						struct animation *animation = TAG_BLOCK_GET_ELEMENT(
-							&animation_graph->animations,
-							animation_index,
-							struct animation);
-
 						overlay_animation_apply_continuous(
 							animation,
 							(animation->frame_count - 1) *
@@ -10864,7 +10965,9 @@ void unit_preprocess_node_orientations(
 
 			relative_aiming_angles = *global_zero_angles2d;
 
-			if (unit->unit.animation.aiming_screen_index != NONE)
+			if (unit->unit.animation.aiming_screen_index != NONE &&
+				(animation = unit_animation_get_fitting(animation_graph,
+					unit->unit.animation.aiming_screen_index, model_node_count)) != NULL)
 			{
 				real_vector3d relative_aiming_vector;
 				struct animation_aiming_screen_bounds const *aiming_bounds =
@@ -10922,10 +11025,7 @@ void unit_preprocess_node_orientations(
 					aiming_bounds->positive_pitch_frame_count *
 					aiming_bounds->positive_pitch_delta;
 				aiming_screen_apply(
-					TAG_BLOCK_GET_ELEMENT(
-						&animation_graph->animations,
-						unit->unit.animation.aiming_screen_index,
-						struct animation),
+					animation,
 					aiming_bounds,
 					relative_aiming_angles.yaw,
 					relative_aiming_angles.pitch,
@@ -10938,7 +11038,9 @@ void unit_preprocess_node_orientations(
 				struct animation_aiming_screen_bounds const *looking_bounds =
 					&unit_seat->looking_screen_bounds;
 
-				if (unit->unit.animation.looking_screen_index != NONE)
+				if (unit->unit.animation.looking_screen_index != NONE &&
+					(animation = unit_animation_get_fitting(animation_graph,
+						unit->unit.animation.looking_screen_index, model_node_count)) != NULL)
 				{
 					real_vector3d relative_looking_vector;
 					real_euler_angles2d relative_looking_angles;
@@ -10992,10 +11094,7 @@ void unit_preprocess_node_orientations(
 						looking_bounds->positive_pitch_frame_count *
 						looking_bounds->positive_pitch_delta;
 					aiming_screen_apply(
-						TAG_BLOCK_GET_ELEMENT(
-							&animation_graph->animations,
-							unit->unit.animation.looking_screen_index,
-							struct animation),
+						animation,
 						looking_bounds,
 						relative_looking_angles.yaw,
 						relative_looking_angles.pitch,

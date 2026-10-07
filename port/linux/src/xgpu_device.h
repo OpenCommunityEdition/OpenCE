@@ -54,6 +54,11 @@ struct vertex_shader_object
 	/* a shader lit for each pixel failed to compile or link: lit as the
 	vertex shader lights it from then on */
 	BOOL lighting_failed;
+	/* the OpenGL renderer's vertex array its draws last used, and the
+	streams they had (d3d8_gl.c setup_streams: the layout follows from the
+	two) */
+	struct vertex_array_entry *vertex_array;
+	unsigned long vertex_array_streams;
 };
 
 /* ---------- the uniforms a draw sets besides the vertex constants */

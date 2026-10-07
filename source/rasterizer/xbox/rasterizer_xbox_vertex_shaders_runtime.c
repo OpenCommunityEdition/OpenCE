@@ -221,6 +221,30 @@ void rasterizer_set_vertex_shader_permutation(
 			"### ERROR unsupported vertex shader");
 	}
 
+	/* port: a shader, vertex type and permutation the tables have (the type
+	and permutation can be a map's), before the asserts read the table; the
+	current shader stays, said once */
+	if (!translation_table ||
+		!VALID_INDEX(vertex_type, NUMBER_OF_RASTERIZER_VERTEX_TYPES) ||
+		!VALID_INDEX(permutation_index, permutation_count) ||
+		translation_table[vertex_type * permutation_count + permutation_index] == NONE)
+	{
+		static boolean reported = FALSE;
+
+		if (!reported)
+		{
+			error(
+				_error_silent,
+				"### ERROR no vertex shader #%d for vertex type #%d permutation #%d; it is not set",
+				vertex_shader_index,
+				vertex_type,
+				permutation_index);
+			reported = TRUE;
+		}
+
+		return;
+	}
+
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_vertex_shaders_runtime.c",
 		879,

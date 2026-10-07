@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 #include "memory/byte_swapping.h"
 #include "math/real_math.h"
 
@@ -202,6 +203,10 @@ void recorded_animation_initialize_unit_control(
 	struct recorded_unit_control *unit_control,
 	byte **stream,
 	byte unit_control_data_version);
+long recorded_animation_unit_control_size(
+	byte unit_control_data_version);
+static boolean recorded_animation_stream_damaged(
+	void);
 
 static void apply_animation_state(
 	struct animation_playback_controller *animation_state,
@@ -328,14 +333,54 @@ static struct recorded_animation_playback_data data_002dcf20 =
 
 #define apply_funcs data_002dcf20.apply_funcs
 
+/* port: the bytes each event's data takes after its header (what its apply
+proc reads), so an event is applied only when its data is in the stream */
+static byte const event_data_sizes[NUMBEROF(apply_funcs)] =
+{
+	0,
+	0,
+	sizeof(byte),
+	sizeof(byte),
+	sizeof(short),
+	sizeof(short),
+	sizeof(real_vector2d),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_char_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+	sizeof(struct vector_short_difference_data),
+};
+
 /* ---------- public code */
 
-void recorded_animation_initialize_event_stream(
+/* port: FALSE (and nothing read) when the unit control and the animation
+state aren't inside the stream: it can't be played */
+boolean recorded_animation_initialize_event_stream(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *unit_control,
 	byte **playback_stream,
-	byte unit_control_data_version)
+	byte unit_control_data_version,
+	byte const *playback_stream_end)
 {
+	long unit_control_size = recorded_animation_unit_control_size(unit_control_data_version);
+
+	if (unit_control_size == NONE ||
+		playback_stream_end - *playback_stream < unit_control_size + (long)sizeof(*animation_state))
+	{
+		return FALSE;
+	}
+
 	recorded_animation_initialize_unit_control(
 		unit_control,
 		playback_stream,
@@ -344,7 +389,7 @@ void recorded_animation_initialize_event_stream(
 	memcpy(animation_state, *playback_stream, sizeof(*animation_state));
 	*playback_stream += sizeof(*animation_state);
 
-	return;
+	return TRUE;
 }
 
 void recorded_animation_initialize_event_stream_with_size(
@@ -361,11 +406,13 @@ void recorded_animation_initialize_event_stream_with_size(
 	return;
 }
 
+/* port: playback_stream_end is the stream's end: no read goes past it */
 boolean recorded_animation_apply_event_stream(
 	struct animation_playback_controller *animation_state,
 	struct recorded_unit_control *control,
 	long *ticks,
-	byte const **playback_stream)
+	byte const **playback_stream,
+	byte const *playback_stream_end)
 {
 	struct animation_event_header const *header;
 	word time_delta;
@@ -379,6 +426,10 @@ boolean recorded_animation_apply_event_stream(
 
 	for (;;)
 	{
+		/* port: a header inside the stream (and its time delta, below) */
+		if (*playback_stream >= playback_stream_end)
+			return recorded_animation_stream_damaged();
+
 		header = (struct animation_event_header const *)*playback_stream;
 		header_size = 0;
 		switch (header->time_delta)
@@ -394,6 +445,8 @@ boolean recorded_animation_apply_event_stream(
 			break;
 
 		case _time_delta_byte:
+			if (playback_stream_end - *playback_stream < 2)
+				return recorded_animation_stream_damaged();
 			time_delta = *((byte const *)header + 1);
 			header_size = 2;
 			match_assert(
@@ -403,6 +456,8 @@ boolean recorded_animation_apply_event_stream(
 			break;
 
 		case _time_delta_word:
+			if (playback_stream_end - *playback_stream < 3)
+				return recorded_animation_stream_damaged();
 			memcpy(&time_delta, (byte const *)header + 1, sizeof(time_delta));
 			header_size = 3;
 			match_assert(
@@ -432,6 +487,13 @@ boolean recorded_animation_apply_event_stream(
 			0x13B,
 			header->event_type<NUMBEROF(apply_funcs));
 
+		/* port: an event the table has, whose data is inside the stream */
+		if (header->event_type >= NUMBEROF(apply_funcs) ||
+			playback_stream_end - *playback_stream < event_data_sizes[header->event_type])
+		{
+			return recorded_animation_stream_damaged();
+		}
+
 		apply = apply_funcs[header->event_type];
 		if (apply)
 		{
@@ -456,6 +518,22 @@ void byte_swap_recording_stream(
 }
 
 /* ---------- private code */
+
+/* port: a stream that runs out before its end event, or holds an event the
+table doesn't have, stops playing (a map's stream; said once) */
+static boolean recorded_animation_stream_damaged(
+	void)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "a recorded animation's event stream is damaged (it stops playing)");
+		reported = TRUE;
+	}
+
+	return FALSE;
+}
 
 static void apply_animation_state(
 	struct animation_playback_controller *animation_state,

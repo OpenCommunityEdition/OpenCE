@@ -9,6 +9,7 @@ BREAKABLE_SURFACES.C
 #include "breakable_surfaces.h"
 
 #include "collision_bsp_definitions.h"
+#include "collision_bsp.h" /* port: collision_surface_edge_ring_continues */
 
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
@@ -67,11 +68,23 @@ static void breakable_surface_effect(
 	const struct damage_data *damage_data,
 	long seed_surface_index);
 
+static boolean breakable_surface_indices_valid(
+	short breakable_surface_index);
+
 /* ---------- globals */
 
 static struct breakable_surface_globals *globals;
 
 boolean breakable_surface_effect_enabled = TRUE;
+
+/* port: what a structure bsp past the globals' (a scenario, from the map,
+with more than MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO: the retail ones have
+at most 13), or a breakable surface past MAXIMUM_BREAKABLE_SURFACES_PER_MAP
+(the retail bsps have at most 32), reads and writes instead: never broken */
+static struct breakable_surface_datum breakable_surface_scratch;
+static byte breakable_surface_flags_scratch[32];
+/* port: whether a map's malformed breakable surface was reported (once) */
+static boolean warned_about_breakable_surfaces;
 
 /* ---------- public code */
 
@@ -81,6 +94,13 @@ struct breakable_surface_datum *breakable_surface_get(
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 61, globals);
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 62, global_structure_bsp_index>=0 && global_structure_bsp_index<MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO);
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 63, breakable_surface_index>=0 && breakable_surface_index<MAXIMUM_BREAKABLE_SURFACES_PER_MAP);
+
+	/* port: (breakable_surface_scratch) */
+	if (!breakable_surface_indices_valid(breakable_surface_index))
+	{
+		breakable_surface_scratch.vitality = 1.0f;
+		return &breakable_surface_scratch;
+	}
 
 	return &globals->breakable_surfaces[global_structure_bsp_index][breakable_surface_index];
 }
@@ -152,6 +172,13 @@ byte *breakable_surface_flags_get(
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 138, globals);
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 139, global_structure_bsp_index>=0 && global_structure_bsp_index<MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO);
 
+	/* port: (breakable_surface_scratch: all there) */
+	if (!breakable_surface_indices_valid(0))
+	{
+		csmemset(breakable_surface_flags_scratch, NONE, sizeof(breakable_surface_flags_scratch));
+		return breakable_surface_flags_scratch;
+	}
+
 	return globals->breakable_surface_flags[global_structure_bsp_index];
 }
 
@@ -162,7 +189,11 @@ boolean breakable_surface_extant(
 
 	match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 147, breakable_surface_index==NONE || (breakable_surface_index>=0 && breakable_surface_index<MAXIMUM_BREAKABLE_SURFACES_PER_MAP));
 
-	result = breakable_surface_index==NONE || BIT_VECTOR_TEST_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index);
+	/* port: a breakable surface index (from the map) past the flags is
+	never broken */
+	result = breakable_surface_index==NONE ||
+		!breakable_surface_indices_valid(breakable_surface_index) ||
+		BIT_VECTOR_TEST_FLAG((long *)breakable_surface_flags_get(), breakable_surface_index);
 	return result;
 }
 
@@ -175,9 +206,13 @@ void breakable_surface_damage(
 
 	if (globals->enabled)
 	{
+		/* port: and a breakable surface that fits the globals, of a material
+		type (from the map) that is one (it indexes the damage's modifiers) */
 		if (breakable_surface_index != NONE &&
+			breakable_surface_indices_valid(breakable_surface_index) &&
 			tag_index_is_group(damage_data->definition_index, DAMAGE_EFFECT_DEFINITION_TAG) &&
-			damage_data->material_type != NONE)
+			damage_data->material_type >= 0 &&
+			damage_data->material_type < NUMBER_OF_MATERIAL_TYPES)
 		{
 			struct breakable_surface_datum *surface = breakable_surface_get(breakable_surface_index);
 
@@ -245,7 +280,12 @@ void breakable_surface_damage_area_of_effect(
 			error(_error_silent, "WARNING: area of effect breakable surface damage with radius %d", cutoff_radius);
 		}
 
-		for (breakable_surface_index = 0; breakable_surface_index < structure_bsp->breakable_surfaces.count; breakable_surface_index++)
+		/* port: no more than the globals hold (MAXIMUM_BREAKABLE_SURFACES_PER_MAP:
+		a bsp's count is from the map, and a short counts them) */
+		for (breakable_surface_index = 0;
+			breakable_surface_index < structure_bsp->breakable_surfaces.count &&
+				breakable_surface_index < MAXIMUM_BREAKABLE_SURFACES_PER_MAP;
+			breakable_surface_index++)
 		{
 			if (breakable_surface_extant(breakable_surface_index))
 			{
@@ -276,7 +316,9 @@ void breakable_surface_port_break(
 	struct structure_breakable_surface *breakable_surface;
 	struct damage_data damage;
 
+	/* port: (nor one past the globals: breakable_surface_indices_valid) */
 	if (breakable_surface_index < 0 || breakable_surface_index >= structure_bsp->breakable_surfaces.count ||
+		!breakable_surface_indices_valid(breakable_surface_index) ||
 		!breakable_surface_extant(breakable_surface_index))
 	{
 		return;
@@ -295,6 +337,32 @@ void breakable_surface_port_break(
 }
 
 /* ---------- private code */
+
+/* port: whether a structure bsp index (the scenario's, from the map) and a
+breakable surface index fit the globals (NONE, no bsp, is not reported) */
+static boolean breakable_surface_indices_valid(
+	short breakable_surface_index)
+{
+	if (global_structure_bsp_index >= 0 &&
+		global_structure_bsp_index < MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO &&
+		breakable_surface_index >= 0 &&
+		breakable_surface_index < MAXIMUM_BREAKABLE_SURFACES_PER_MAP)
+	{
+		return TRUE;
+	}
+
+	if (global_structure_bsp_index != NONE && !warned_about_breakable_surfaces)
+	{
+		error(_error_silent, "breakable surface #%d of structure bsp #%d is past the engine's %d of %d bsps",
+			breakable_surface_index,
+			global_structure_bsp_index,
+			MAXIMUM_BREAKABLE_SURFACES_PER_MAP,
+			MAXIMUM_STRUCTURE_BSPS_PER_SCENARIO);
+		warned_about_breakable_surfaces = TRUE;
+	}
+
+	return FALSE;
+}
 
 static void breakable_surface_effect(
 	short breakable_surface_index,
@@ -327,11 +395,42 @@ static void breakable_surface_effect(
 	{
 		long material_type;
 		struct material_definition *material_def;
+		short particle_effect_count;
 
+		/* port: a seed surface (from the map) that is no surface of the
+		bsp, or whose material, or its type, is none of the bsp's and the
+		game's, breaks with no effect */
+		if (!collision_bsp_valid_surface_index(collision_bsp, seed_surface_index))
+		{
+			return;
+		}
 		collision_surface = TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, seed_surface_index, struct collision_surface);
-		material_type = TAG_BLOCK_GET_ELEMENT(&structure_bsp->collision_materials, collision_surface->material_index, struct structure_collision_material)->runtime_physics_material_type;
+		material_type = NONE;
+		if (collision_surface->material_index >= 0 &&
+			collision_surface->material_index < structure_bsp->collision_materials.count)
+		{
+			material_type = TAG_BLOCK_GET_ELEMENT(&structure_bsp->collision_materials, collision_surface->material_index, struct structure_collision_material)->runtime_physics_material_type;
+		}
+		if (material_type < 0 ||
+			material_type >= scenario_get_game_globals()->materials.count)
+		{
+			if (!warned_about_breakable_surfaces)
+			{
+				error(_error_silent, "breakable surface #%d's material #%d (type %ld) is none of the bsp's and the game's",
+					breakable_surface_index,
+					collision_surface->material_index,
+					material_type);
+				warned_about_breakable_surfaces = TRUE;
+			}
+			return;
+		}
 		material_def = TAG_BLOCK_GET_ELEMENT(&scenario_get_game_globals()->materials, material_type, struct material_definition);
 		breakable_surface = &material_def->breakable_surface;
+		/* port: no more particle effects than a material has
+		(MAXIMUM_PARTICLE_EFFECTS_PER_BREAKABLE_SURFACE_DEFINITION: the count is
+		from the map, a short counts them; the retail ones have at most 1) */
+		particle_effect_count = (short)PIN(breakable_surface->particle_effects.count, 0,
+			MAXIMUM_PARTICLE_EFFECTS_PER_BREAKABLE_SURFACE_DEFINITION);
 
 		total_bounds_valid = FALSE;
 		surface_queue_read_index = 0;
@@ -354,9 +453,16 @@ static void breakable_surface_effect(
 
 			surface_index = surface_queue[surface_queue_read_index++];
 			surface = TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, surface_index, struct collision_surface);
-			
+
 			edge_index = surface->first_edge_index;
 			surface_vertex_index = 0;
+			/* port: a surface whose ring of edges (from the map) is not one
+			adds no shards; one longer than surface_vertices hold ends there
+			(collision_surface_edge_ring_continues) */
+			if (!collision_surface_edge_ring_continues(collision_bsp, edge_index, 0))
+			{
+				continue;
+			}
 
 			bsp3d_get_plane_from_designator(&collision_bsp->bsp3d, surface->plane_designator, &surface_plane);
 			projection_axis = projection_from_vector3d(&surface_plane.n);
@@ -443,7 +549,11 @@ static void breakable_surface_effect(
 					}
 				}
 
-				if (adjacent_surface_index!=NONE)
+				/* port: an adjacent surface (from the map) that is no surface
+				is not queued, nor any past the queue's room (the retail
+				breakable surfaces have at most 122 surfaces) */
+				if (adjacent_surface_index!=NONE &&
+					collision_bsp_valid_surface_index(collision_bsp, adjacent_surface_index))
 				{
 					struct collision_surface const *adjacent = TAG_BLOCK_GET_ELEMENT(&collision_bsp->surfaces, adjacent_surface_index, struct collision_surface);
 
@@ -451,16 +561,20 @@ static void breakable_surface_effect(
 						adjacent->material_index==collision_surface->material_index)
 					{
 						match_assert("c:\\halo\\SOURCE\\physics\\breakable_surfaces.c", 388, surface_queue_write_index<MAXIMUM_BREAKABLE_SURFACE_QUEUE_SIZE);
-						surface_queue[surface_queue_write_index++] = adjacent_surface_index;
+						if (surface_queue_write_index < MAXIMUM_BREAKABLE_SURFACE_QUEUE_SIZE)
+						{
+							surface_queue[surface_queue_write_index++] = adjacent_surface_index;
+						}
 					}
 				}
 
 				edge_index = collision_edge->edge_indices[reverse];
 				++surface_vertex_index;
 			}
-			while (edge_index!=surface->first_edge_index);
+			while (edge_index!=surface->first_edge_index &&
+				collision_surface_edge_ring_continues(collision_bsp, edge_index, surface_vertex_index));
 
-			for (particle_index = 0; particle_index < breakable_surface->particle_effects.count; ++particle_index)
+			for (particle_index = 0; particle_index < particle_effect_count; ++particle_index)
 			{
 				struct breakable_surface_particle_effect const *particle_effect = TAG_BLOCK_GET_ELEMENT(&breakable_surface->particle_effects, particle_index, struct breakable_surface_particle_effect);
 				

@@ -365,6 +365,14 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     )
 
     n.rule(
+        name="linux_tool_link",
+        command="$linux_cc $ldflags -o $out @$out.rsp",
+        description="LINUX LINK $out",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+    )
+
+    n.rule(
         name="linux_pgo_train",
         command="$python tools/pgo_train.py --binary $binary --work $work --output $out",
         description="LINUX PGO TRAINING: playing levels in the instrumented build",
@@ -384,8 +392,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
-             implicit_inputs: List[Path]) -> None:
-        """the objects and the executable, with the given extra flags"""
+             implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
+        """the objects and the executable, with the given extra flags (and
+        the tag validator alone, tools/map_validate.c, as validator)"""
         extra = " ".join(extra_cflags)
         # the posix_* units have glibc's 32-bit wchar_t, and LLVM will not
         # optimise them together with code that has a 16-bit one: they stay
@@ -502,6 +511,29 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             implicit=[Path("tools/linux_link_check.py")],
         )
 
+        # the tag validator (port/linux/game/tag_validate.c, tag_schema*.c)
+        # alone on map files: the game's objects of it, and a program that
+        # reads maps (tools/map_validate.c)
+        if validator is not None:
+            game_dir = Path(config["game_sources"])
+            tool = Path("tools/map_validate.c")
+            tool_object = obj_dir / tool.with_suffix(".o")
+            n.build(
+                outputs=tool_object,
+                rule="linux_cc",
+                inputs=tool,
+                variables={"cflags": " ".join([posix_cflags, f"-I{ZLIB_DIR}", *ZLIB_DEFINES, posix_extra])},
+            )
+            tool_objects = [tool_object, obj_dir / (game_dir / "tag_validate.o"),
+                            *(obj_dir / source.with_suffix(".o") for source in sorted(game_dir.glob("tag_schema*.c"))),
+                            *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES)]
+            n.build(
+                outputs=validator,
+                rule="linux_tool_link",
+                inputs=tool_objects,
+                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags])},
+            )
+
     # Profile-guided optimisation: with the committed profile, or with
     # --pgo=train one that an instrumented build records while playing
     # (tools/pgo_train.py). A profile is trained once: code changed since
@@ -521,10 +553,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # compiled together when lld links them.
     cflags, ldflags = lto_flags(sln, build_dir / "thinlto-cache")
     cflags += profile_use_flags(profile)
-    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [])
+    validator = build_dir / "map_validate"
+    emit(obj_dir, output, cflags, ldflags, [profile] if profile else [], validator)
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build_dir / "brokers.txt"
     n.rule(name="linux_copy", command="cp $in $out", description="LINUX COPY $out")
     n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="linux", rule="phony", inputs=[output, brokers])
+    n.build(outputs="linux", rule="phony", inputs=[output, brokers, validator])
     n.newline()

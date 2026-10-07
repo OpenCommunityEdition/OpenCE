@@ -2238,7 +2238,25 @@ long actor_new(
 		if (actor_definition_index != NONE)
 		{
 			actor_definition = actor_definition_get(actor_definition_index);
-			actor_index = datum_new(actor_data);
+			/* port: only an actor of a type the actor type tables have (a
+			map's type indexes their definitions and function pointers);
+			else no actor is made, as when the pool is full, said once */
+			if (!VALID_INDEX(actor_definition->type, NUMBER_OF_ACTOR_TYPES))
+			{
+				static boolean reported = FALSE;
+
+				if (!reported)
+				{
+					error(_error_silent, "actor %s is of type %d (there are %d)",
+						tag_get_name(actor_definition_index),
+						actor_definition->type,
+						NUMBER_OF_ACTOR_TYPES);
+					reported = TRUE;
+				}
+				actor_index = NONE;
+			}
+			else
+				actor_index = datum_new(actor_data);
 			if (actor_index != NONE)
 			{
 				actor = actor_get(actor_index);
@@ -2399,8 +2417,11 @@ void actor_customize_unit(
 			actor_variant_definition->unit.forced_shader_permutation_index;
 	}
 
+	/* port: no more than the object's change colors (a map's count; those
+	past them did nothing, and past SHORT_MAX the short counter wraps and the
+	loop never ends) */
 	for (change_color_index = 0;
-		change_color_index < actor_variant_definition->change_colors.count;
+		change_color_index < MIN(actor_variant_definition->change_colors.count, NUMBER_OF_OBJECT_CHANGE_COLORS);
 		change_color_index++)
 	{
 		struct actor_variant_change_colors *change_colors = TAG_BLOCK_GET_ELEMENT(

@@ -539,16 +539,21 @@ static void contrail_verify(
 				"contrail %s attachment index %d is outside the valid range.",
 				tag_get_name(contrail->definition_index),
 				contrail->attachment_index));
-		match_vassert(
-			"c:\\halo\\SOURCE\\effects\\contrails.c",
-			655,
-			object->object.attachment_indices[contrail->attachment_index] == contrail_index,
-			csprintf(
-				temporary,
-				"contrail %s (%ld) has an object that thinks it's attached to %ld",
-				tag_get_name(contrail->definition_index),
-				contrail_index,
-				object->object.attachment_indices[contrail->attachment_index]));
+		/* port: and only an index the object holds (8; the first assert
+		only logs in a release build, and the count is the map's) */
+		if (VALID_INDEX(contrail->attachment_index, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT))
+		{
+			match_vassert(
+				"c:\\halo\\SOURCE\\effects\\contrails.c",
+				655,
+				object->object.attachment_indices[contrail->attachment_index] == contrail_index,
+				csprintf(
+					temporary,
+					"contrail %s (%ld) has an object that thinks it's attached to %ld",
+					tag_get_name(contrail->definition_index),
+					contrail_index,
+					object->object.attachment_indices[contrail->attachment_index]));
+		}
 	}
 
 	for (instance_index = 0;

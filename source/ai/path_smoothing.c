@@ -37,6 +37,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/errors.h"
 
 #include "ai/path.h"
 #include "ai/path_structure_bsp.h"
@@ -62,14 +63,51 @@ enum
 
 /* ---------- prototypes */
 
+static boolean path_smoothing_edge_valid(
+	struct collision_bsp const *bsp,
+	long edge_index);
+
 /* ---------- globals */
+
+/* port: whether a map's malformed pathfinding surfaces or collision edges
+were reported (once each) */
+static boolean warned_about_pathfinding_surface_index;
+static boolean warned_about_collision_edge;
 
 /* ---------- public code */
 
 /* ---------- private code */
 
+/* port: whether an edge index (from the map) is one of the bsp's, with
+vertices that are the bsp's (reported once if not; the retail ones all are) */
+static boolean path_smoothing_edge_valid(
+	struct collision_bsp const *bsp,
+	long edge_index)
+{
+	struct collision_edge const *edge;
+
+	if (VALID_INDEX(edge_index, bsp->edges.count))
+	{
+		edge = TAG_BLOCK_GET_ELEMENT(&bsp->edges, edge_index, struct collision_edge);
+		if (VALID_INDEX(edge->vertex_indices[0], bsp->vertices.count) &&
+			VALID_INDEX(edge->vertex_indices[1], bsp->vertices.count))
+		{
+			return TRUE;
+		}
+	}
+
+	if (!warned_about_collision_edge)
+	{
+		error(_error_silent, "collision edge #%ld or its vertices are not the bsp's", edge_index);
+		warned_about_collision_edge = TRUE;
+	}
+
+	return FALSE;
+}
+
 static boolean surface_is_walkable(
 	byte const *pathfinding_surfaces,
+	long pathfinding_surface_count,
 	struct collision_bsp const *bsp,
 	byte const *breakable_surface_flags,
 	long surface_index,
@@ -88,6 +126,25 @@ static boolean surface_is_walkable(
 	 * No structure BSP in the shipped 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in
 	 * 82 BSPs).
 	 */
+	/* port: (NONE still is; any other index past the pathfinding surfaces, a
+	map's, is no walkable surface. The retail bsps have as many pathfinding
+	surfaces as surfaces, and every edge's surfaces are theirs) */
+	/* (nor is NONE of a bsp with no pathfinding surfaces: there is no array
+	to read before) */
+	if (surface_index == NONE && pathfinding_surface_count <= 0)
+		return FALSE;
+	if (surface_index != NONE &&
+		!VALID_INDEX(surface_index, pathfinding_surface_count))
+	{
+		if (!warned_about_pathfinding_surface_index)
+		{
+			error(_error_silent, "pathfinding surface #%ld is not one of the bsp's %ld",
+				surface_index,
+				pathfinding_surface_count);
+			warned_about_pathfinding_surface_index = TRUE;
+		}
+		return FALSE;
+	}
 	pathfinding_surface_flags = pathfinding_surfaces[surface_index];
 	walkable = TEST_FLAG(pathfinding_surface_flags, _pathfinding_surface_walkable_bit);
 
@@ -320,6 +377,8 @@ static boolean find_turning_point(
 	long next_vertex_index;
 	long chain_start_edge_index;
 	long candidate_surface_index;
+	long boundary_step_count;
+	long fan_step_count;
 
 	bsp = TAG_BLOCK_GET_ELEMENT(
 		&structure->collision_bsp,
@@ -333,14 +392,29 @@ static boolean find_turning_point(
 	match_assert("c:\\halo\\SOURCE\\ai\\path_smoothing.c", 0x1ff, clockwise==TRUE || clockwise==FALSE);
 
 	edge_index = first_edge_index;
+	boundary_step_count = 0;
 	while (TRUE)
 	{
+		/* port: the walk along the boundary takes no more steps than there
+		are edges, twice over for the vertex it comes from (each step depends
+		on the edge and that vertex alone, so a walk that ends never repeats
+		one; a map's edges that loop would walk forever): past that there is
+		no turning point */
+		boundary_step_count++;
+		if (boundary_step_count > 2 * bsp->edges.count + 1)
+			return FALSE;
+		/* port: nor along an edge, or to vertices, that are not the bsp's (a
+		map's indices) */
+		if (!path_smoothing_edge_valid(bsp, edge_index))
+			return FALSE;
+
 		collision_edge = TAG_BLOCK_GET_ELEMENT(
 			&bsp->edges,
 			edge_index,
 			struct collision_edge);
 		side_flag = surface_is_walkable(
 			pathfinding_surfaces,
+			structure->pathfinding_surfaces.count,
 			bsp,
 			breakable_surface_flags,
 			collision_edge->surface_indices[0],
@@ -412,12 +486,21 @@ static boolean find_turning_point(
 			starting_vertex_index = next_vertex_index;
 
 		chain_start_edge_index = edge_index;
+		fan_step_count = 0;
 		while (TRUE)
 		{
+			/* port: and the walk around the vertex no more than there are
+			edges (as above; a map's fan that doesn't close would walk
+			forever) */
+			fan_step_count++;
+			if (fan_step_count > bsp->edges.count)
+				return FALSE;
+
 			matches_end = next_vertex_index == collision_edge->vertex_indices[1];
 			candidate_surface_index = collision_edge->surface_indices[!matches_end];
 			refined_side = surface_is_walkable(
 				pathfinding_surfaces,
+				structure->pathfinding_surfaces.count,
 				bsp,
 				breakable_surface_flags,
 				candidate_surface_index,
@@ -427,6 +510,9 @@ static boolean find_turning_point(
 				break;
 
 			edge_index = collision_edge->edge_indices[!matches_end];
+			/* port: (as above) */
+			if (!path_smoothing_edge_valid(bsp, edge_index))
+				return FALSE;
 			collision_edge = TAG_BLOCK_GET_ELEMENT(
 				&bsp->edges,
 				edge_index,

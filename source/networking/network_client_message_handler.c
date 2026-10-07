@@ -480,6 +480,27 @@ boolean network_game_client_handle_message(
 	{
 		network_event("client received client message with invalid flags");
 	}
+	/* port: the host sends every message of the game over its connection,
+	only its advertisement and its answer to a ping in datagrams (and the
+	distributed netcode's messages, _message_type_data, which are checked as
+	the host's below): a datagram, which anyone can send as the host, is
+	taken for nothing else */
+	else if (message_type == _message_type_packet && network_connection_last_read_was_unreliable() &&
+		((byte *)message)[message_size - 1] != _message_server_game_advertise &&
+		((byte *)message)[message_size - 1] != _message_server_pong)
+	{
+		static unsigned long last_logged_time;
+		static boolean logged;
+		unsigned long now = system_milliseconds();
+
+		if (!logged || now - last_logged_time >= 1000)
+		{
+			network_event("ignoring a game message of type %d in a datagram @ %s",
+				((byte *)message)[message_size - 1], transport_address_to_string(source_address));
+			last_logged_time = now;
+			logged = TRUE;
+		}
+	}
 	else
 	{
 		switch (message_type)
@@ -720,11 +741,18 @@ boolean network_game_client_handle_message(
 				{
 					byte *error_message = (byte *)(message + 1);
 
+					/* (port: printable ASCII only, so that it forges no line
+					of the log) */
+					char text[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + 1];
+					long index;
+
+					for (index = 0; index < TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH && error_message[index]; index++)
+						text[index] = error_message[index] >= 0x20 && error_message[index] < 0x7F ? (char)error_message[index] : '?';
+					text[index] = 0;
 					network_event(
-						"client received low-level error message: error= #%d (%.*s)",
+						"client received low-level error message: error= #%d (%s)",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
-						(char const *)error_message);
+						text);
 				}
 				else
 				{

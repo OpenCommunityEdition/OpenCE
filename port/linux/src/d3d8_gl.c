@@ -247,6 +247,30 @@ struct vertex_binding
 
 /* a binding per stream (setup_streams); GL has at least 16 */
 #define VERTEX_BINDING_COUNT 16
+
+/* a vertex array object for each vertex layout (the attributes a draw
+enables, and each one's format and binding), made once: a draw binds its
+layout's and points the bindings at its streams, rather than enabling,
+formatting and binding each attribute again (setup_streams) */
+struct vertex_layout
+{
+	unsigned long enabled;
+	struct attribute_format formats[XGPU_VERTEX_ATTRIBUTE_COUNT];
+};
+
+struct vertex_array_entry
+{
+	struct vertex_array_entry *next;
+	unsigned long hash;
+	struct vertex_layout layout;
+	GLuint vertex_array;
+	/* its bindings, as last pointed (nothing else changes them) */
+	struct vertex_binding bindings[VERTEX_BINDING_COUNT];
+};
+
+#define VERTEX_ARRAY_BUCKET_COUNT 64
+static struct vertex_array_entry *vertex_array_buckets[VERTEX_ARRAY_BUCKET_COUNT];
+static struct vertex_array_entry *current_vertex_array;
 #endif
 
 static struct
@@ -281,8 +305,7 @@ static struct
 #ifdef HALO_ANDROID
 	struct attribute_pointer attribute_pointers[XGPU_VERTEX_ATTRIBUTE_COUNT];
 #else
-	struct attribute_format attribute_formats[XGPU_VERTEX_ATTRIBUTE_COUNT];
-	struct vertex_binding vertex_bindings[VERTEX_BINDING_COUNT];
+	GLuint vertex_array;
 #endif
 	/* a disabled attribute's value; kind 1 is the integer zero */
 	unsigned char attribute_value_kind[XGPU_VERTEX_ATTRIBUTE_COUNT];
@@ -325,9 +348,16 @@ static void state_framebuffer(GLuint framebuffer)
 	}
 }
 
+/* gl_state.textures' slot of a target */
+static int texture_slot(GLenum target)
+{
+	return target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : 0;
+}
+
+#ifdef HALO_ANDROID
 static void state_texture(int unit, GLenum target, GLuint texture)
 {
-	int slot = target == GL_TEXTURE_CUBE_MAP ? 1 : target == GL_TEXTURE_3D ? 2 : 0;
+	int slot = texture_slot(target);
 
 	if (gl_state.textures[unit][slot] == texture)
 		return;
@@ -339,6 +369,7 @@ static void state_texture(int unit, GLenum target, GLuint texture)
 	gl_state.textures[unit][slot] = texture;
 	glBindTexture(target, texture);
 }
+#endif
 
 static void state_sampler(int unit, GLuint sampler)
 {
@@ -367,15 +398,13 @@ static void state_element_array_buffer(GLuint buffer)
 	}
 }
 
+#ifdef HALO_ANDROID
 /* enables the attribute, reading size elements of type from buffer: each
 vertex is stride bytes on from the one before it, starting at
-buffer_offset, with the attribute relative_offset bytes into it.
-Attributes given the same binding share the buffer, its offset and its
-stride (on desktop GL; ES points each attribute on its own). */
+buffer_offset, with the attribute relative_offset bytes into it */
 static void state_attribute_stream(GLuint index, GLuint binding, GLuint buffer, GLint size, GLenum type,
 	GLboolean normalized, BOOL integer, GLsizei stride, unsigned long buffer_offset, unsigned long relative_offset)
 {
-#ifdef HALO_ANDROID
 	struct attribute_pointer *pointer = &gl_state.attribute_pointers[index];
 	unsigned long offset = buffer_offset + relative_offset;
 
@@ -403,53 +432,106 @@ static void state_attribute_stream(GLuint index, GLuint binding, GLuint buffer, 
 	pointer->integer = integer ? GL_TRUE : GL_FALSE;
 	pointer->stride = stride;
 	pointer->offset = offset;
+}
 #else
-	struct attribute_format *format = &gl_state.attribute_formats[index];
-	struct vertex_binding *vertex_binding = &gl_state.vertex_bindings[binding];
+/* the vertex array of a layout, made the first time (its attributes enabled,
+formatted and bound to their bindings) */
+static struct vertex_array_entry *vertex_array_get(const struct vertex_layout *layout)
+{
+	const unsigned char *bytes = (const unsigned char *)layout;
+	unsigned long hash = 2166136261UL, index;
+	struct vertex_array_entry **bucket, *entry;
 
-	if (gl_state.attribute_enabled[index] != 1)
+	for (index = 0; index < sizeof(*layout); index++)
+		hash = (hash ^ bytes[index]) * 16777619UL;
+	bucket = &vertex_array_buckets[hash % VERTEX_ARRAY_BUCKET_COUNT];
+	for (entry = *bucket; entry; entry = entry->next)
 	{
-		gl_state.attribute_enabled[index] = 1;
-		glEnableVertexAttribArray(index);
+		if (entry->hash == hash && !memcmp(&entry->layout, layout, sizeof(*layout)))
+			return entry;
 	}
-	if (format->size != size || format->type != type || format->normalized != normalized ||
-		format->integer != (integer ? GL_TRUE : GL_FALSE) || format->relative_offset != relative_offset)
+	entry = calloc(1, sizeof(*entry));
+	entry->hash = hash;
+	entry->layout = *layout;
+	memset(entry->bindings, 0xff, sizeof(entry->bindings));
+	glGenVertexArrays(1, &entry->vertex_array);
+	glBindVertexArray(entry->vertex_array);
+	gl_state.vertex_array = entry->vertex_array;
+	/* (the index buffer's binding is the vertex array's) */
+	gl_state.element_array_buffer = (GLuint)-1;
+	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
-		if (integer)
-			glVertexAttribIFormat(index, size, type, (GLuint)relative_offset);
+		const struct attribute_format *format = &layout->formats[index];
+
+		if (!(layout->enabled & (1UL << index)))
+			continue;
+		glEnableVertexAttribArray((GLuint)index);
+		if (format->integer)
+			glVertexAttribIFormat((GLuint)index, format->size, format->type, format->relative_offset);
 		else
-			glVertexAttribFormat(index, size, type, normalized, (GLuint)relative_offset);
-		format->size = size;
-		format->type = type;
-		format->normalized = normalized;
-		format->integer = integer ? GL_TRUE : GL_FALSE;
-		format->relative_offset = (GLuint)relative_offset;
+			glVertexAttribFormat((GLuint)index, format->size, format->type, format->normalized, format->relative_offset);
+		glVertexAttribBinding((GLuint)index, format->binding);
 	}
-	if (format->binding != binding)
+	entry->next = *bucket;
+	*bucket = entry;
+	return entry;
+}
+
+static void state_vertex_array(struct vertex_array_entry *entry)
+{
+	if (gl_state.vertex_array != entry->vertex_array)
 	{
-		glVertexAttribBinding(index, binding);
-		format->binding = binding;
+		gl_state.vertex_array = entry->vertex_array;
+		glBindVertexArray(entry->vertex_array);
+		/* (the index buffer's binding is the vertex array's) */
+		gl_state.element_array_buffer = (GLuint)-1;
 	}
-	if (vertex_binding->buffer != buffer || vertex_binding->offset != buffer_offset || vertex_binding->stride != stride)
+	current_vertex_array = entry;
+}
+
+/* points the bound vertex array's binding at buffer: each vertex is stride
+bytes on from the one before it, starting at offset */
+static void state_vertex_buffer(GLuint binding, GLuint buffer, unsigned long offset, GLsizei stride)
+{
+	struct vertex_binding *vertex_binding = &current_vertex_array->bindings[binding];
+
+	if (vertex_binding->buffer != buffer || vertex_binding->offset != offset || vertex_binding->stride != stride)
 	{
-		glBindVertexBuffer(binding, buffer, (GLintptr)buffer_offset, stride);
+		glBindVertexBuffer(binding, buffer, (GLintptr)offset, stride);
 		vertex_binding->buffer = buffer;
-		vertex_binding->offset = buffer_offset;
+		vertex_binding->offset = offset;
 		vertex_binding->stride = stride;
 	}
-#endif
 }
+
+/* an attribute of a layout */
+static void layout_attribute(struct vertex_layout *layout, unsigned long index, GLuint binding, GLint size,
+	GLenum type, GLboolean normalized, BOOL integer, unsigned long relative_offset)
+{
+	struct attribute_format *format = &layout->formats[index];
+
+	format->size = size;
+	format->type = type;
+	format->normalized = normalized;
+	format->integer = integer ? GL_TRUE : GL_FALSE;
+	format->relative_offset = (GLuint)relative_offset;
+	format->binding = binding;
+	layout->enabled |= 1UL << index;
+}
+#endif
 
 /* disables the attribute, which then reads value, or the integer zero */
 static void state_attribute_value(GLuint index, const float *value)
 {
 	unsigned char kind = value ? 0 : 1;
 
+#ifdef HALO_ANDROID
 	if (gl_state.attribute_enabled[index] != 0)
 	{
 		gl_state.attribute_enabled[index] = 0;
 		glDisableVertexAttribArray(index);
 	}
+#endif
 	if (gl_state.attribute_value_kind[index] == kind &&
 		(!value || !memcmp(gl_state.attribute_values[index], value, sizeof(gl_state.attribute_values[index]))))
 	{
@@ -1236,40 +1318,30 @@ static GLenum address_mode(DWORD mode)
 	}
 }
 
-/* hires: a high-res HUD texture (hud_hires.h), drawn smaller than it is, so
-filtered and from its mip levels whatever the game asks: the HUD's meters are
-point sampled for one player, to keep the Xbox bitmaps' texels sharp */
-static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
+/* ---------- sampler objects
+
+A sampler object for each sampler state the game uses, made once: a draw
+binds the one its state needs, rather than changing a sampler's parameters,
+which costs a GL call each, and on Zink a new Vulkan sampler. The game uses
+a few dozen states. */
+
+#define SAMPLER_STATE_WORDS 11
+#define SAMPLER_CACHE_SIZE 512
+
+static struct
 {
-	/* the texture stage state each sampler was last configured from */
-	static DWORD configured[D3DTSS_MAXSTAGES][11];
-	static BOOL configured_valid[D3DTSS_MAXSTAGES];
-	GLuint sampler = gl.samplers[stage];
-	DWORD *state = D3D__TextureState[stage];
-	DWORD min_filter = hires ? D3DTEXF_LINEAR : state[D3DTSS_MINFILTER];
-	DWORD mip_filter = hires ? D3DTEXF_LINEAR : mipmapped ? state[D3DTSS_MIPFILTER] : D3DTEXF_NONE;
-	DWORD mag_filter = hires ? D3DTEXF_LINEAR : state[D3DTSS_MAGFILTER];
-	DWORD maximum_mip_level = hires ? 0 : state[D3DTSS_MAXMIPLEVEL];
-	DWORD lod_bias = hires ? 0 : state[D3DTSS_MIPMAPLODBIAS];
+	DWORD inputs[SAMPLER_STATE_WORDS];
+	GLuint sampler;
+} sampler_cache[SAMPLER_CACHE_SIZE];
+static unsigned long sampler_cache_count;
+
+/* a sampler's parameters from its state (configure_sampler's inputs) */
+static void sampler_parameters(GLuint sampler, const DWORD *inputs)
+{
+	DWORD min_filter = inputs[0], mip_filter = inputs[1], mag_filter = inputs[2];
+	DWORD lod_bias = inputs[6], maximum_mip_level = inputs[7], anisotropy = inputs[8];
 	GLenum minification;
 	float border[4];
-	DWORD inputs[11];
-
-	inputs[0] = min_filter;
-	inputs[1] = mip_filter;
-	inputs[2] = mag_filter;
-	inputs[3] = state[D3DTSS_ADDRESSU];
-	inputs[4] = state[D3DTSS_ADDRESSV];
-	inputs[5] = state[D3DTSS_ADDRESSW];
-	inputs[6] = lod_bias;
-	inputs[7] = maximum_mip_level;
-	inputs[8] = state[D3DTSS_MAXANISOTROPY];
-	inputs[9] = state[D3DTSS_BORDERCOLOR];
-	inputs[10] = hires;
-	if (configured_valid[stage] && !memcmp(configured[stage], inputs, sizeof(inputs)))
-		return;
-	memcpy(configured[stage], inputs, sizeof(inputs));
-	configured_valid[stage] = TRUE;
 
 	if (min_filter == D3DTEXF_POINT)
 		minification = mip_filter == D3DTEXF_NONE ? GL_NEAREST :
@@ -1279,29 +1351,90 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
 			mip_filter == D3DTEXF_POINT ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR;
 	glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, (GLint)minification);
 	glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, mag_filter == D3DTEXF_POINT ? GL_NEAREST : GL_LINEAR);
-	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, (GLint)address_mode(state[D3DTSS_ADDRESSU]));
-	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, (GLint)address_mode(state[D3DTSS_ADDRESSV]));
-	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, (GLint)address_mode(state[D3DTSS_ADDRESSW]));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, (GLint)address_mode(inputs[3]));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, (GLint)address_mode(inputs[4]));
+	glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, (GLint)address_mode(inputs[5]));
 #ifdef HALO_ANDROID
 	/* ES has no sampler LOD bias; the pixel shader applies it
 	(texture_lod_bias) */
+	(void)lod_bias;
 	glSamplerParameterf(sampler, GL_TEXTURE_MIN_LOD, (float)maximum_mip_level);
 	if (xgpu_capabilities.anisotropy)
 		glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-			(min_filter == D3DTEXF_ANISOTROPIC && state[D3DTSS_MAXANISOTROPY] > 1) ? (float)state[D3DTSS_MAXANISOTROPY] : 1.0f);
+			(min_filter == D3DTEXF_ANISOTROPIC && anisotropy > 1) ? (float)anisotropy : 1.0f);
 	if (xgpu_capabilities.border_clamp)
 	{
-		color_to_vec4(state[D3DTSS_BORDERCOLOR], border);
+		color_to_vec4(inputs[9], border);
 		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, border);
 	}
 #else
 	glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, dword_to_float(lod_bias));
 	glSamplerParameterf(sampler, GL_TEXTURE_MIN_LOD, (float)maximum_mip_level);
 	glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY,
-		(min_filter == D3DTEXF_ANISOTROPIC && state[D3DTSS_MAXANISOTROPY] > 1) ? (float)state[D3DTSS_MAXANISOTROPY] : 1.0f);
-	color_to_vec4(state[D3DTSS_BORDERCOLOR], border);
+		(min_filter == D3DTEXF_ANISOTROPIC && anisotropy > 1) ? (float)anisotropy : 1.0f);
+	color_to_vec4(inputs[9], border);
 	glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, border);
 #endif
+}
+
+/* the sampler object of a sampler state, made the first time; with the
+cache full (never seen), the stage's own sampler set to it */
+static GLuint sampler_get(int stage, const DWORD *inputs)
+{
+	unsigned long hash = 2166136261UL, index, probe;
+	GLuint sampler;
+
+	for (index = 0; index < SAMPLER_STATE_WORDS; index++)
+		hash = (hash ^ inputs[index]) * 16777619UL;
+	for (probe = 0; probe < SAMPLER_CACHE_SIZE; probe++)
+	{
+		index = (hash + probe) % SAMPLER_CACHE_SIZE;
+		if (!sampler_cache[index].sampler)
+			break;
+		if (!memcmp(sampler_cache[index].inputs, inputs, sizeof(sampler_cache[index].inputs)))
+			return sampler_cache[index].sampler;
+	}
+	if (probe == SAMPLER_CACHE_SIZE || sampler_cache_count >= SAMPLER_CACHE_SIZE * 3 / 4)
+	{
+		sampler_parameters(gl.samplers[stage], inputs);
+		return gl.samplers[stage];
+	}
+	glGenSamplers(1, &sampler);
+	sampler_parameters(sampler, inputs);
+	memcpy(sampler_cache[index].inputs, inputs, sizeof(sampler_cache[index].inputs));
+	sampler_cache[index].sampler = sampler;
+	sampler_cache_count++;
+	return sampler;
+}
+
+/* hires: a high-res HUD texture (hud_hires.h), drawn smaller than it is, so
+filtered and from its mip levels whatever the game asks: the HUD's meters are
+point sampled for one player, to keep the Xbox bitmaps' texels sharp */
+static void configure_sampler(int stage, BOOL mipmapped, BOOL hires)
+{
+	/* the texture stage state each stage's sampler was last chosen by */
+	static DWORD configured[D3DTSS_MAXSTAGES][SAMPLER_STATE_WORDS];
+	static GLuint configured_sampler[D3DTSS_MAXSTAGES];
+	DWORD *state = D3D__TextureState[stage];
+	DWORD inputs[SAMPLER_STATE_WORDS];
+
+	inputs[0] = hires ? D3DTEXF_LINEAR : state[D3DTSS_MINFILTER];
+	inputs[1] = hires ? D3DTEXF_LINEAR : mipmapped ? state[D3DTSS_MIPFILTER] : D3DTEXF_NONE;
+	inputs[2] = hires ? D3DTEXF_LINEAR : state[D3DTSS_MAGFILTER];
+	inputs[3] = state[D3DTSS_ADDRESSU];
+	inputs[4] = state[D3DTSS_ADDRESSV];
+	inputs[5] = state[D3DTSS_ADDRESSW];
+	inputs[6] = hires ? 0 : state[D3DTSS_MIPMAPLODBIAS];
+	inputs[7] = hires ? 0 : state[D3DTSS_MAXMIPLEVEL];
+	inputs[8] = state[D3DTSS_MAXANISOTROPY];
+	inputs[9] = state[D3DTSS_BORDERCOLOR];
+	inputs[10] = hires;
+	if (!configured_sampler[stage] || memcmp(configured[stage], inputs, sizeof(inputs)))
+	{
+		memcpy(configured[stage], inputs, sizeof(inputs));
+		configured_sampler[stage] = sampler_get(stage, inputs);
+	}
+	state_sampler(stage, configured_sampler[stage]);
 }
 
 
@@ -1472,7 +1605,6 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			}
 			gl_targets[stage] = gl_target;
 			gl_textures[stage] = gl_texture;
-			state_sampler(stage, gl.samplers[stage]);
 			configure_sampler(stage, description.levels > 1, description.hires);
 			if (stage == 0)
 				key->coverage_alpha = description.hires_coverage != FALSE;
@@ -1480,8 +1612,38 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
 		}
 	}
+#ifdef HALO_ANDROID
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 		state_texture(stage, gl_targets[stage], gl_textures[stage]);
+#else
+	{
+		/* the units whose texture changes, bound in one call (GL 4.4's
+		multi-bind) rather than selecting and binding each unit; binding no
+		texture unbinds all of the unit's targets */
+		int first = -1, last = -1;
+
+		for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
+		{
+			if (gl_state.textures[stage][texture_slot(gl_targets[stage])] != gl_textures[stage])
+			{
+				if (first < 0)
+					first = stage;
+				last = stage;
+			}
+		}
+		if (first >= 0)
+		{
+			glBindTextures((GLuint)first, (GLsizei)(last - first + 1), &gl_textures[first]);
+			for (stage = first; stage <= last; stage++)
+			{
+				if (gl_textures[stage])
+					gl_state.textures[stage][texture_slot(gl_targets[stage])] = gl_textures[stage];
+				else
+					memset(gl_state.textures[stage], 0, sizeof(gl_state.textures[stage]));
+			}
+		}
+	}
+#endif
 }
 
 static GLenum stencil_operation(DWORD operation)
@@ -2131,6 +2293,13 @@ static void setup_streams(unsigned long first, unsigned long count)
 	BOOL placed[16] = { FALSE };
 	BOOL enabled[XGPU_VERTEX_ATTRIBUTE_COUNT] = { FALSE };
 	unsigned long index, total = 0;
+#ifndef HALO_ANDROID
+	struct vertex_layout layout;
+	unsigned long streams_used = 0;
+
+	/* (zeroed: layouts are compared and hashed whole) */
+	memset(&layout, 0, sizeof(layout));
+#endif
 
 	/* the mirror first; then one reservation for everything streamed */
 	for (index = 0; index < declaration->element_count; index++)
@@ -2179,6 +2348,7 @@ static void setup_streams(unsigned long first, unsigned long count)
 			stream_buffers[stream] = gl.stream_buffer;
 			stats.streamed_bytes += bytes;
 		}
+#ifdef HALO_ANDROID
 		if (element->type == D3DVSDT_NORMPACKED3)
 		{
 			state_attribute_stream(element->reg, (GLuint)stream, stream_buffers[stream], 1, GL_UNSIGNED_INT, GL_FALSE,
@@ -2190,8 +2360,36 @@ static void setup_streams(unsigned long first, unsigned long count)
 			state_attribute_stream(element->reg, (GLuint)stream, stream_buffers[stream], size, type, normalized,
 				FALSE, (GLsizei)stride, stream_offsets[stream], element->offset);
 		}
+#else
+		if (element->type == D3DVSDT_NORMPACKED3)
+		{
+			layout_attribute(&layout, element->reg, (GLuint)stream, 1, GL_UNSIGNED_INT, GL_FALSE, TRUE, element->offset);
+		}
+		else
+		{
+			attribute_format(element, &size, &type, &normalized);
+			layout_attribute(&layout, element->reg, (GLuint)stream, size, type, normalized, FALSE, element->offset);
+		}
+		streams_used |= 1UL << stream;
+#endif
 		enabled[element->reg] = TRUE;
 	}
+#ifndef HALO_ANDROID
+	/* (the layout follows from the declaration and the streams it has, so
+	the same two have the same vertex array: no need to look it up) */
+	if (!declaration->vertex_array || declaration->vertex_array_streams != streams_used)
+	{
+		declaration->vertex_array = vertex_array_get(&layout);
+		declaration->vertex_array_streams = streams_used;
+	}
+	state_vertex_array(declaration->vertex_array);
+	for (index = 0; index < 16; index++)
+	{
+		if (streams_used & (1UL << index))
+			state_vertex_buffer((GLuint)index, stream_buffers[index], stream_offsets[index],
+				(GLsizei)device.streams[index].stride);
+	}
+#endif
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		if (!enabled[index])
@@ -2302,11 +2500,30 @@ static void gl_draw_immediate(D3DPRIMITIVETYPE type, const float *vertices, unsi
 		return;
 	trace_draw("immediate", type, count, vertices);
 	offset = stream_upload(vertices, count * stride);
+#ifdef HALO_ANDROID
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		state_attribute_stream(index, 0, gl.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)stride,
 			offset, index * 4 * sizeof(float));
 	}
+#else
+	{
+		/* every attribute four floats, one after another */
+		static struct vertex_array_entry *immediate_array;
+
+		if (!immediate_array)
+		{
+			struct vertex_layout layout;
+
+			memset(&layout, 0, sizeof(layout));
+			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+				layout_attribute(&layout, index, 0, 4, GL_FLOAT, GL_FALSE, FALSE, index * 4 * sizeof(float));
+			immediate_array = vertex_array_get(&layout);
+		}
+		state_vertex_array(immediate_array);
+		state_vertex_buffer(0, gl.stream_buffer, offset, (GLsizei)stride);
+	}
+#endif
 	if (type == D3DPT_QUADLIST)
 	{
 		unsigned long index_count;

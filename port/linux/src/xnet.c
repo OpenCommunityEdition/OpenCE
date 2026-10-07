@@ -611,7 +611,13 @@ int WSAAPI halo_ws_sendto(SOCKET socket, const char *buffer, int length, int fla
 /* debug.network_latency and debug.network_loss: what this machine receives
 is held back that many milliseconds (both ways between two machines: a
 round trip of twice it) and that share of its datagrams lost, to test the
-netcode as over the internet */
+netcode as over the internet. debug.network_corrupt: that share of the
+datagrams it receives, and debug.network_corrupt_stream that share of its
+reads of streams, is damaged at random (bytes changed, cut short,
+stretched, or replaced) from debug.network_corrupt_after seconds after the
+start (so that the game can be set up and started: what a host sends its
+own client over the loopback is damaged too), to test that nothing another
+machine sends can crash the game */
 #define DELAYED_PACKET_SIZE 1500
 #define MAXIMUM_DELAYED_PACKETS 4096
 
@@ -632,6 +638,11 @@ static struct
 	int checked;
 	DWORD latency;
 	int loss_percent;
+	int corrupt_percent;
+	int corrupt_stream_percent;
+	DWORD corrupt_after;
+	DWORD started_time;
+	unsigned corrupt_seed;
 	struct delayed_packet *packets;
 	int first;
 	int count;
@@ -647,21 +658,107 @@ static int delayed_enabled(void)
 	{
 		double latency = config_real("debug.network_latency");
 		double loss = config_real("debug.network_loss");
+		double corrupt = config_real("debug.network_corrupt");
+		double corrupt_stream = config_real("debug.network_corrupt_stream");
+		double corrupt_after = config_real("debug.network_corrupt_after");
 
-		/* up to ten seconds, and a share */
+		/* up to ten seconds, and shares */
 		latency = !(latency > 0.0) ? 0.0 : latency > 10000.0 ? 10000.0 : latency;
 		loss = !(loss > 0.0) ? 0.0 : loss > 100.0 ? 100.0 : loss;
+		corrupt = !(corrupt > 0.0) ? 0.0 : corrupt > 100.0 ? 100.0 : corrupt;
+		corrupt_stream = !(corrupt_stream > 0.0) ? 0.0 : corrupt_stream > 100.0 ? 100.0 : corrupt_stream;
+		corrupt_after = !(corrupt_after > 0.0) ? 0.0 : corrupt_after > 86400.0 ? 86400.0 : corrupt_after;
 		delayed.latency = (DWORD)latency;
 		delayed.loss_percent = (int)loss;
+		delayed.corrupt_percent = (int)corrupt;
+		delayed.corrupt_stream_percent = (int)corrupt_stream;
+		delayed.corrupt_after = (DWORD)(corrupt_after * 1000.0);
+		delayed.started_time = GetTickCount();
+		delayed.corrupt_seed = (unsigned)GetTickCount() ^ (unsigned)(size_t)&delayed.checked;
 		delayed.checked = 1;
-		if (delayed.latency || delayed.loss_percent)
+		if (delayed.latency || delayed.loss_percent || delayed.corrupt_percent || delayed.corrupt_stream_percent)
 		{
 			delayed.packets = calloc(MAXIMUM_DELAYED_PACKETS, sizeof(*delayed.packets));
-			platform_log("network: receiving %lu ms late, losing %d%% of datagrams (testing)",
-				(unsigned long)delayed.latency, delayed.loss_percent);
+			platform_log("network: receiving %lu ms late, losing %d%% of datagrams, damaging %d%% of them and %d%% of stream reads after %lu s (testing)",
+				(unsigned long)delayed.latency, delayed.loss_percent, delayed.corrupt_percent,
+				delayed.corrupt_stream_percent, (unsigned long)(delayed.corrupt_after / 1000));
 		}
 	}
 	return delayed.packets != NULL;
+}
+
+/* (the test's own numbers, so that the game's rand() goes as without it) */
+static unsigned delayed_random(void)
+{
+	delayed.corrupt_seed = delayed.corrupt_seed * 1103515245u + 12345u;
+	return delayed.corrupt_seed >> 8;
+}
+
+/* damages a packet at random: a few bytes changed, cut short, stretched
+with random bytes (a datagram, up to the largest), or replaced throughout;
+the length it has after */
+static int delayed_corrupt(char *data, int length, int datagram)
+{
+	int count, index;
+
+	switch (delayed_random() % 8)
+	{
+	case 0:
+		/* (cut short, a datagram to nothing at times; a stream's read of
+		nothing would be the stream closing) */
+		if (length > 0)
+			length = datagram ? (int)(delayed_random() % (unsigned)(length + 1)) :
+				1 + (int)(delayed_random() % (unsigned)length);
+		break;
+	case 1:
+		if (datagram)
+		{
+			int stretched = (int)(delayed_random() % (unsigned)(DELAYED_PACKET_SIZE + 1));
+
+			for (index = length; index < stretched; index++)
+				data[index] = (char)delayed_random();
+			if (stretched > length)
+				length = stretched;
+		}
+		else if (length > 0)
+		{
+			data[delayed_random() % (unsigned)length] = (char)delayed_random();
+		}
+		break;
+	case 2:
+		for (index = 0; index < length; index++)
+			data[index] = (char)delayed_random();
+		break;
+	case 3:
+		/* (a run of bytes: a field, with its neighbours) */
+		if (length > 0)
+		{
+			int start = (int)(delayed_random() % (unsigned)length);
+			int run = 1 + (int)(delayed_random() % 16u);
+
+			for (index = start; index < length && index < start + run; index++)
+				data[index] = (char)delayed_random();
+		}
+		break;
+	case 4:
+		/* (the extremes a size or an index is checked against) */
+		if (length > 0)
+		{
+			static const unsigned char extremes[] = { 0x00, 0xFF, 0x7F, 0x80, 0x01, 0xFE };
+
+			count = 1 + (int)(delayed_random() % 4u);
+			for (index = 0; index < count; index++)
+				data[delayed_random() % (unsigned)length] = (char)extremes[delayed_random() % sizeof(extremes)];
+		}
+		break;
+	default:
+		/* (a few bits) */
+		count = 1 + (int)(delayed_random() % 8u);
+		for (index = 0; index < count && length > 0; index++)
+			data[delayed_random() % (unsigned)length] ^= (char)(1u << (delayed_random() % 8u));
+		break;
+	}
+	return length;
 }
 
 /* drops what is held back for socket, and what has been read (socket -1),
@@ -756,6 +853,14 @@ static int delayed_receive_locked(SOCKET socket, char *buffer, int length, int f
 			return 0;
 		if (datagram && rand() % 100 < delayed.loss_percent)
 			continue;
+		/* (a stream's reads by their own share: a damaged stream is dropped,
+		and the game must go on for its datagrams to be tested) */
+		if ((datagram ? delayed.corrupt_percent : delayed.corrupt_stream_percent) &&
+			GetTickCount() - delayed.started_time >= delayed.corrupt_after &&
+			(int)(delayed_random() % 100u) < (datagram ? delayed.corrupt_percent : delayed.corrupt_stream_percent))
+		{
+			result = delayed_corrupt(packet->data, result, datagram);
+		}
 		packet->socket = (int)socket;
 		packet->length = result;
 		packet->offset = 0;

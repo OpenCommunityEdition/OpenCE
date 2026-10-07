@@ -89,6 +89,7 @@ symbols in this file:
 #include "effects/player_effects.h"
 
 #include "camera/observer.h"
+#include "cseries/errors.h"
 #include "game/game.h"
 #include "game/game_globals.h"
 #include "game/player_rumble.h"
@@ -553,6 +554,26 @@ static void player_effect_update_screen_flash(
 	real time_scale)
 {
 	real time_factor = time_scale * TICKS_PER_SECOND;
+
+	/* port: the type is the map's (a damage effect's; retail up to 6 of 7)
+	and indexes the type map, here and as the flash is drawn: one that is
+	no type is no flash, and that is said once */
+	if (!VALID_INDEX(screen_flash->type, NUMBER_OF_SCREEN_FLASH_TYPES))
+	{
+		static boolean bad_type_reported = FALSE;
+
+		if (!bad_type_reported)
+		{
+			bad_type_reported = TRUE;
+			error(
+				_error_silent,
+				"screen flash of type %d (of %d) not shown",
+				screen_flash->type,
+				NUMBER_OF_SCREEN_FLASH_TYPES);
+		}
+
+		return;
+	}
 
 	if (!(effect->screen_flash.priority > screen_flash->priority &&
 		effect->screen_flash_time_left > screen_flash->duration * time_factor) &&

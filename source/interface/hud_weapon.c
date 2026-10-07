@@ -405,6 +405,9 @@ static void render_weapon_hud(
 	short const *new_state_flags,
 	short const *new_overlay_flags,
 	short const *new_numbers);
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count);
 
 /* ---------- globals */
 
@@ -1025,7 +1028,8 @@ static void crosshairs_draw(
 						struct weapon_hud_crosshairs_element);
 					short state_index = element->crosshair_type;
 
-					if (TEST_FLAG(render_flags, state_index) &&
+					if (weapon_hud_state_index_valid(state_index, NUMBER_OF_WEAPON_HUD_CROSSHAIR_STATES) &&
+						TEST_FLAG(render_flags, state_index) &&
 						TEST_FLAG(map_type_flags, element->use_on_map_type))
 					{
 						struct crosshair_state *state = &crosshair->states[state_index];
@@ -1317,6 +1321,31 @@ static void crosshairs_draw(
 
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0x4E2);
 	return;
+}
+
+/* port: a hud element's state (or crosshair) type is the map's, and indexes
+the state tables (8 states, 19 crosshair states; retail elements use up to 7
+and 18): an element of any other is not drawn, and that is said once */
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count)
+{
+	static boolean bad_state_reported = FALSE;
+
+	if (VALID_INDEX(state_index, state_count))
+		return TRUE;
+
+	if (!bad_state_reported)
+	{
+		bad_state_reported = TRUE;
+		error(
+			_error_silent,
+			"weapon hud element of state %d (of %d) not drawn",
+			state_index,
+			state_count);
+	}
+
+	return FALSE;
 }
 
 static void render_weapon_hud(
@@ -1684,7 +1713,8 @@ static void render_weapon_hud(
 			struct weapon_hud_static_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			/* (the zoomed view's, at the middle: hud_zoomed_layout_begin) */
 			rectangle2d window_bounds;
@@ -1714,7 +1744,8 @@ static void render_weapon_hud(
 			struct weapon_hud_meter_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			byte value;
 			rectangle2d window_bounds;
@@ -1749,7 +1780,8 @@ static void render_weapon_hud(
 			struct weapon_hud_number_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			short magazine_size = 1;
 			short value;
@@ -1768,6 +1800,10 @@ static void render_weapon_hud(
 						struct weapon_magazine_definition);
 
 				magazine_size = magazine->rounds_loaded_maximum;
+				/* port: the map's; a magazine of none divides by one (an
+				integer divide by zero halts) */
+				if (magazine_size == 0)
+					magazine_size = 1;
 			}
 
 			state_index = element->header.state_type;
@@ -1822,7 +1858,8 @@ static void render_weapon_hud(
 			struct weapon_hud_overlays_element);
 
 		if (!TEST_FLAG(element->runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->use_on_map_type))
+			TEST_FLAG(map_type_flags, element->use_on_map_type) &&
+			weapon_hud_state_index_valid(element->state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			state_index = element->state_type;
 			hud_draw_weapon_overlays(

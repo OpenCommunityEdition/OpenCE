@@ -1422,7 +1422,8 @@ static void dsound_begin_scene(
 
 	if (strlen(dsound_error_string))
 	{
-		dsound_error(interrupt_result, dsound_error_string);
+		/* port: as text, not a format (see interrupt_time_error) */
+		dsound_error(interrupt_result, "%s", dsound_error_string);
 	}
 
 	dsound_error_string[0]= 0;
@@ -2522,10 +2523,19 @@ static boolean dsound_channel_queue_packet(
 	{
 		if (channel->playing_permutation->cache_base_address)
 		{
+			/* port: the size is the map's: one that is negative, or runs
+			past the cache (the end wrapped), or that the channel has played
+			past, is outside the range too (it reached the decoder as a
+			packet of nearly 4 GB) */
 			if ((byte *)channel->playing_permutation->cache_base_address>=
 					(byte *)physical_memory_get_sound_cache_base_address() &&
-				(byte *)channel->playing_permutation->cache_base_address+channel->playing_permutation->samples.size<=
-					(byte *)physical_memory_get_sound_cache_base_address()+SOUND_CACHE_SIZE)
+				channel->playing_permutation->samples.size>=0 &&
+				channel->playing_permutation->samples.size<=SOUND_CACHE_SIZE &&
+				(unsigned long)((byte *)channel->playing_permutation->cache_base_address-
+					(byte *)physical_memory_get_sound_cache_base_address())<=
+					(unsigned long)(SOUND_CACHE_SIZE-channel->playing_permutation->samples.size) &&
+				channel->sample_offset>=0 &&
+				channel->sample_offset<=channel->playing_permutation->samples.size)
 			{
 				struct sound_permutation *sound= channel->playing_permutation;
 				XMEDIAPACKET packet;
@@ -2564,6 +2574,10 @@ static boolean dsound_channel_queue_packet(
 							(TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) ? 2 : 1);
 
 						channel->sample_offset= MAX(remaining_size/block_size/2, 1)*block_size;
+						/* port: and no more than the sound has (one smaller than
+						a block, from the map, read past its end and then played
+						on from past it) */
+						channel->sample_offset= MIN(channel->sample_offset, remaining_size);
 
 						packet.dwMaxSize= channel->sample_offset;
 					}
@@ -2599,7 +2613,8 @@ static boolean dsound_channel_queue_packet(
 			{
 				sprintf(
 					temporary,
-					"trying to queue sound %s but it's outside the valid range. (%ld)",
+					/* port: %.32s, the name is the map's 32 characters */
+					"trying to queue sound %.32s but it's outside the valid range. (%ld)",
 					channel->playing_permutation->name,
 					channel->playing_permutation->cache_base_address);
 
@@ -2718,7 +2733,8 @@ static void interrupt_time_error(
 
 	if (strlen(dsound_error_string)+strlen(message)<MAXIMUM_DSOUND_ERROR_STRING_LENGTH)
 	{
-		sprintf(dsound_error_string+strlen(dsound_error_string), message);
+		/* port: as text, not a format (it can hold a sound's name, the map's) */
+		sprintf(dsound_error_string+strlen(dsound_error_string), "%s", message);
 	}
 
 	return;

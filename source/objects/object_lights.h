@@ -22,6 +22,8 @@ void lights_initialize(void);
 void lights_dispose(void);
 void lights_initialize_for_new_map(void);
 void lights_dispose_from_old_map(void);
+/* port: the lights made again, empty, if their array is out of order (object_lights.c) */
+boolean lights_port_recover(void);
 boolean lights_enable(boolean enable);
 long light_new(long definition_index, long object_index, short object_attachment_index, short object_function_index, short object_change_color_index);
 long light_new_unattached(

@@ -372,7 +372,8 @@ void device_preprocess_node_orientations(
 				short animation_index = animation_graph_animation_index_get(
 					&device_animations->animations)[_device_animation_position].animation_index;
 
-				if (animation_index != NONE)
+				/* port: an animation the graph has (a map's index) */
+				if (VALID_INDEX(animation_index, graph->animations.count))
 				{
 					struct animation *animation = TAG_BLOCK_GET_ELEMENT(
 						&graph->animations,
@@ -402,7 +403,8 @@ void device_preprocess_node_orientations(
 				short animation_index = animation_graph_animation_index_get(
 					&device_animations->animations)[_device_animation_power].animation_index;
 
-				if (animation_index != NONE)
+				/* port: an animation the graph has (a map's index) */
+				if (VALID_INDEX(animation_index, graph->animations.count))
 				{
 					struct animation *animation = TAG_BLOCK_GET_ELEMENT(
 						&graph->animations,
@@ -1124,7 +1126,9 @@ static void create_initial_device_groups(
 	struct scenario *scenario = global_scenario_get();
 	short group_index;
 
-	for (group_index = 0; group_index < scenario->device_groups.count; group_index++)
+	/* port: no more groups than device_groups_data holds (a map's count, which
+	the short counter would never reach; retail has up to 26) */
+	for (group_index = 0; group_index < MIN(scenario->device_groups.count, device_groups_data->maximum_count); group_index++)
 	{
 		struct scenario_device_group *definition = TAG_BLOCK_GET_ELEMENT(
 			&scenario->device_groups,
