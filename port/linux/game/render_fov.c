@@ -17,7 +17,9 @@ Default follows the original projection exactly. */
 double config_real(const char *name);
 unsigned long config_changes(void);
 
-float render_fov_vertical(short local_player_index, float native_vertical_field_of_view)
+static real reticle_scales[MAXIMUM_LOCAL_PLAYERS];
+
+static float render_fov_adjust(short local_player_index, float native_vertical_field_of_view)
 {
 	static boolean initialized;
 	static unsigned long read_at;
@@ -91,4 +93,33 @@ float render_fov_vertical(short local_player_index, float native_vertical_field_
 		adjusted_tangent = native_tangent + (requested_tangent - unzoomed_tangent) * blend;
 	}
 	return 2.0f * atanf(adjusted_tangent);
+}
+
+float render_fov_vertical(short local_player_index, float native_vertical_field_of_view)
+{
+	real adjusted = render_fov_adjust(local_player_index, native_vertical_field_of_view);
+
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
+	{
+		real scale = 1.0f;
+
+		if (adjusted != native_vertical_field_of_view &&
+			native_vertical_field_of_view > 0.0f && native_vertical_field_of_view < _pi &&
+			adjusted > 0.0f && adjusted < _pi)
+		{
+			scale = tanf(native_vertical_field_of_view * 0.5f) / tanf(adjusted * 0.5f);
+			if (!isfinite(scale) || scale <= 0.0f) scale = 1.0f;
+		}
+		/* Record the projection used for this view, including its native zoom
+		 * transition. A temporary viewmodel projection must not affect the HUD. */
+		reticle_scales[local_player_index] = scale;
+	}
+	return adjusted;
+}
+
+float render_fov_reticle_scale(short local_player_index)
+{
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
+		reticle_scales[local_player_index] == 0.0f) return 1.0f;
+	return reticle_scales[local_player_index];
 }

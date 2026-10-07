@@ -210,7 +210,10 @@ def main():
     s=(ROOT/'port/linux/game/render_fov.c').read_text()
     source=PRELUDE+block((ROOT/'source/render/render_cameras.c').read_text(),'real render_camera_get_adjusted_field_of_view_tangent(')+'\n'
     source+=block((ROOT/'source/items/weapons.c').read_text(),'real weapon_get_field_of_view(')+'\n'
+    source+='static real reticle_scales[MAXIMUM_LOCAL_PLAYERS];\n'
+    source+=block(s,'static float render_fov_adjust(')+'\n'
     source+=block(s,'float render_fov_vertical(')+'\n'
+    source+=block(s,'float render_fov_reticle_scale(')+'\n'
     source+=block((ROOT/'source/main/main.c').read_text(),'void set_window_camera_values(')+'\n'
     source+=block((ROOT/'source/render/render_cameras.c').read_text(),'short render_frustum_sphere_visible(')+'\n'+TESTS
     # Production calls halo_* math functions, which cannot be folded to the

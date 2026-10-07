@@ -71,6 +71,8 @@ jobs:
           python -m pytest -q tools/test_linux_port.py
           python tools/test_light_storage.py
           python tools/test_settings_pagination.py
+          python tools/test_render_fov.py
+          python tools/test_reticle_fov.py
 
       - name: Compile cache
         run: ccache --show-stats
