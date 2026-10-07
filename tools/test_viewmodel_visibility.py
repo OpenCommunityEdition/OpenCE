@@ -1,9 +1,23 @@
 """Production display-only policy plus real parser/config restart tests."""
 from pathlib import Path
 import re
+import sys
+import xml.etree.ElementTree as ET
 import test_console_options as fixture
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools import port_settings
+
+menu_path = ROOT/'port/assets/menus/ce/main_menu.settings_select.player_setup.player_profile_edit.video_settings.xml'
+assert menu_path.read_text() == '\n'.join(port_settings.settings_files()[menu_path.name])
+menu = ET.parse(menu_path).getroot()
+spinner = next(w for w in menu.findall('widget') if w.get('setting') == 'display.viewmodel_visible')
+assert spinner.get('strings') == 'ON|OFF' and spinner.get('values') == 'true|false'
+assert [e.get('event') for e in spinner.findall('on')] == ['created']
+assert any(w.get('name').endswith('/settings_next_page') for w in menu.findall('widget'))
+print('PASS: paginated Video Setup Viewmodels ON/OFF uses the persistent display preference and normal pending-edit lifecycle')
+
 helper = (ROOT/'port/linux/game/viewmodel_visibility.c').read_text()
 fixture.PRELUDE += re.sub(r'^#include.*\n', '', helper, flags=re.M)
 fixture.TESTS = fixture.TESTS.replace('if(argc>1){', 'if(argc>1){CHECK(!viewmodel_is_visible());', 1)

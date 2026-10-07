@@ -55,6 +55,8 @@ SCREENS = {
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
+            ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
+             "Show your first-person weapon and hands. Hiding\nthem leaves firing, sound and world lights active.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
              [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("144", "144"), ("165", "165"),
               ("240", "240"), ("NONE", "-1")],
