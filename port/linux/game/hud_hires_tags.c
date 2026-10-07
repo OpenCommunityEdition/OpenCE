@@ -33,6 +33,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
+#include "scenario/scenario_definitions.h"
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
@@ -50,7 +51,9 @@ int hud_hires_asset_custom_edition(long asset);
 /* (custom_edition_cache.c) */
 boolean custom_edition_cache_stock_tag(long tag_index);
 
-void hud_hires_tags_loaded(void);
+void hud_hires_map_loaded(const long *assets, long count);
+void hud_hires_map_unloaded(void);
+void hud_hires_tags_loaded(long scenario_index);
 void hud_hires_tags_unloaded(void);
 long hud_hires_asset_at(unsigned long address, long width, long height);
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
@@ -142,7 +145,7 @@ static void hud_hires_sprite_bitmaps_forget(
 /* ---------- public code */
 
 void hud_hires_tags_loaded(
-	void)
+	long scenario_index)
 {
 	long asset_count = hud_hires_asset_count();
 	long asset;
@@ -217,6 +220,20 @@ void hud_hires_tags_loaded(
 	}
 	platform_log("high-res hud: %ld of %ld bitmaps in this map, %ld for some of their sprites (%ld not in it)",
 		hires_bitmap_count + hires_sprite_bitmap_count, asset_count, hires_sprite_bitmap_count, missing);
+	/* (their PNGs decoded now, ahead of the HUD's first frame: not the main
+	menu's, which draws no HUD) */
+	if (scenario_definition_get(scenario_index)->type != _scenario_type_main_menu)
+	{
+		long assets[MAXIMUM_HIRES_BITMAPS + MAXIMUM_HIRES_SPRITE_BITMAPS];
+		long count = 0;
+		long index;
+
+		for (index = 0; index < hires_bitmap_count; index++)
+			assets[count++] = hires_bitmaps[index].asset;
+		for (index = 0; index < hires_sprite_bitmap_count; index++)
+			assets[count++] = hires_sprite_bitmaps[index].asset;
+		hud_hires_map_loaded(assets, count);
+	}
 
 	return;
 }
@@ -227,6 +244,7 @@ void hud_hires_tags_unloaded(
 	hires_bitmap_count = 0;
 	upscale_bitmap_count = 0;
 	hud_hires_sprite_bitmaps_forget();
+	hud_hires_map_unloaded();
 
 	return;
 }
