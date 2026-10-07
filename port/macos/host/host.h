@@ -1,0 +1,125 @@
+/*
+HOST.H
+
+Internals of the macOS port's host (build/macos/halo). See
+port/macos/README.md for the design, port/android/include/halo_android_abi.h
+for the guest contract both ports share, and
+port/macos/include/halo_macos_abi.h for what the macOS one adds.
+*/
+
+#ifndef __HALO_MACOS_HOST_H
+#define __HALO_MACOS_HOST_H
+
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "halo_android_abi.h"
+#include "halo_macos_abi.h"
+
+/* ---------- the guest's addresses
+
+The guest's 4 GB start at host_guest_base, a multiple of 4 GB. A guest
+pointer arrives in a 64-bit register with only its low half meaningful
+(the guest's code may leave a host address of the same byte there); a host
+pointer into the guest's 4 GB is that guest address plus the base. Guest
+NULL stays NULL. */
+
+extern uint64_t host_guest_base;
+
+#define G2H(address) ((void *)((uint32_t)(uintptr_t)(address) ? \
+	(uintptr_t)(host_guest_base + (uint32_t)(uintptr_t)(address)) : (uintptr_t)0))
+#define H2G(pointer) ((uint32_t)(uintptr_t)(pointer))
+
+/* ---------- logging and termination (host_main.c) */
+
+void host_logf(int priority, const char *format, ...) __attribute__((format(printf, 2, 3)));
+#define HOST_LOG_INFO 4
+#define HOST_LOG_WARN 5
+#define HOST_LOG_ERROR 6
+void host_exit(int code) __attribute__((noreturn));
+/* the host's errno on this thread, as the guest's (Linux) number */
+int host_errno(void);
+/* a Darwin errno value as Linux's */
+int host_linux_errno(int error);
+
+/* logs, shows the message to the player and terminates */
+void host_fatal(const char *format, ...) __attribute__((format(printf, 1, 2), noreturn));
+
+/* what the guest takes for its executable (/proc/self/exe) and the folder
+it is in, with a final '/' (SDL_GetBasePath) */
+extern char host_executable_path[1024];
+extern char host_base_path[1024];
+
+/* ---------- guest memory (host_memory.c)
+
+The host reserves the guest's 4 GB at start-up, with the Xbox window and
+the image's range at the guest addresses the image was built for, and
+hands out the rest for the guest's own mappings and the threads' stacks.
+The guest's pages are 4 KB, the host's 16 KB: the guest's mappings are kept
+per 4 KB, and a host page is mapped while any of its four is. */
+
+/* reserves the 4 GB and the image's range; returns 0 on success */
+int host_memory_initialize(uint32_t image_base, uint32_t image_size);
+/* guest memory for the host's own use (stacks, the boot block): page
+aligned, zeroed, read and write; its guest address, or 0 */
+uint32_t host_low_map(size_t size);
+void host_low_unmap(uint32_t address, size_t size);
+/* the guest's mmap/munmap/mprotect/madvise (host_syscall.c), with Linux's
+flags; a guest address or -errno */
+long host_guest_mmap(uint32_t address, uint64_t size, int protection, int flags, int fd, int64_t offset);
+long host_guest_munmap(uint32_t address, uint64_t size);
+long host_guest_mprotect(uint32_t address, uint64_t size, int protection);
+long host_guest_madvise(uint32_t address, uint64_t size, int advice);
+/* whether [address, address + size) is guest memory that may be written */
+int host_guest_writable(uint32_t address, uint64_t size);
+
+void host_install_signal_handlers(void);
+
+/* ---------- the guest image (host_loader.c) */
+
+struct host_guest_image
+{
+	const struct halo_guest_header *header;
+	uint32_t base, end;
+};
+
+extern struct host_guest_image host_image;
+
+/* maps the image from the ELF file in memory; returns 0 on success */
+int host_load_image(const void *elf, size_t size);
+
+/* ---------- entering guest code (host_thread.c, host_entry.S) */
+
+/* calls the guest function at guest address function with up to four
+32-bit arguments on this thread, whose stack must lie in guest memory
+(host_native_thread_create, host_run_on_guest_stack), giving the thread a
+guest struct pthread first if it has none; returns the guest's w0 */
+uint32_t host_call_guest(uint32_t function, uint32_t a, uint32_t b, uint32_t c, uint32_t d);
+/* starts a thread running function(argument) with its stack in guest
+memory, so that it can call guest code; the stack is freed after it exits.
+Returns 0 or an errno value */
+int host_native_thread_create(void *(*function)(void *), void *argument, size_t stack_size);
+/* runs function(argument) on this thread with a stack of stack_size in
+guest memory (the main thread's, whose own stack is outside it) */
+void host_run_on_guest_stack(void (*function)(void *), void *argument, size_t stack_size);
+/* runs the guest's __guest_start on this thread (on a guest stack); does
+not return */
+void host_run_guest_main(uint32_t boot) __attribute__((noreturn));
+
+/* host_entry.S: calls code at the host address function with x28 = base */
+uint64_t host_enter_guest(uint64_t function, uint64_t base, uint64_t a, uint64_t b, uint64_t c, uint64_t d);
+/* host_entry.S: calls function(argument) with sp = stack */
+void host_switch_stack(uint64_t stack, void (*function)(void *), void *argument);
+
+/* ---------- import table (generated by tools/android_imports.py) */
+
+/* the host function for an import name, or NULL; the hostposix_ ones are
+port/linux/src/posix.h's functions wrapped (tools/macos_host_wrappers.py) */
+void *host_resolve_import(const char *name);
+
+/* ---------- SDL / GL (host_sdl.c, host_gl.c) */
+
+void *host_gl_resolve(const char *name);
+
+#endif

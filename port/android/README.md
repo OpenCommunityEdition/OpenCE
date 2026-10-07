@@ -175,6 +175,9 @@ The changes are in `#ifdef HALO_ANDROID` in `rasterizer_xbox.c`, `render.c`,
 `ui_widget.c`, `cinematics.c`, `main.c` and
 `rasterizer_xbox_screen_effect.c`.
 
+The macOS port (`port/macos`) runs the same guest code. Its differences from
+Android are in [port/macos/README.md](../macos/README.md).
+
 ## How the port operates
 
 ### ILP32 code
@@ -190,7 +193,8 @@ Thus the game is ILP32 AArch64 code: 64-bit ARM instructions with 32-bit
 
 ### The guest image
 
-The guest is the game, the platform layer and a small runtime:
+The guest is the game, the platform layer and a small runtime.
+`tools/guest_build.py` builds it, for this port and the macOS port:
 
 1. clang compiles the guest for `arm64_32-apple-watchos`, the only ILP32
    AArch64 target of clang. The options `-U__APPLE__` and
@@ -237,7 +241,8 @@ two ABIs use the same registers for 32-bit integers, floats and pointers.
 ### OpenGL ES
 
 The renderer (`port/linux/src/d3d8_gl.c`) uses OpenGL ES 3.0, and some
-functions of OpenGL ES 3.2 if they are available:
+functions of OpenGL ES 3.2 if they are available. This path is in
+`#ifdef HALO_GLES` (the macOS port uses it too, on OpenGL 4.1):
 
 - The vertex shaders flip y and change the depth range from 0..1. The front
   face winding is inverted.
@@ -276,7 +281,8 @@ floating-point contraction, as on x86.
 
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
-These changes are in `#ifdef HALO_ANDROID`:
+These changes are in `#ifdef HALO_GUEST`, which the guests of the Android
+and macOS ports define:
 
 - Seven `#pragma bss_seg(".bss")` lines are removed. The Darwin target does
   not accept them.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # root build script: writes build.ninja for the native ports (Linux, Windows,
-# Android)
+# Android, macOS)
 
 import argparse
 import io
@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
 from tools.linux_build import generate_linux_build, linux_configure_inputs
+from tools.macos_build import generate_macos_build, macos_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
 
 # arguments
@@ -73,6 +74,21 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument(
+    "--macos-lld",
+    metavar="BINARY",
+    help="ld.lld for the macOS guest image (default: ld.lld on PATH, or Homebrew's)",
+)
+parser.add_argument(
+    "--macos-guest-cc",
+    metavar="BINARY",
+    help="clang with the arm64_32 target for the macOS guest (default: clang)",
+)
+parser.add_argument(
+    "--macos-host-cc",
+    metavar="BINARY",
+    help="compiler for the macOS host (default: clang)",
+)
 args = parser.parse_args()
 
 # the settings the builds read
@@ -87,11 +103,18 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    macos_lld=args.macos_lld,
+    macos_guest_cc=args.macos_guest_cc,
+    macos_host_cc=args.macos_host_cc,
 )
 
 
 def is_windows() -> bool:
     return os.name == "nt"
+
+
+def is_macos() -> bool:
+    return sys.platform == "darwin"
 
 
 # build.ninja
@@ -112,6 +135,7 @@ n.newline()
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
 generate_windows_build(n, sln)
+generate_macos_build(n, sln)
 
 n.comment("Reconfigure on change")
 n.rule(
@@ -129,13 +153,14 @@ n.build(
         *linux_configure_inputs(),
         *android_configure_inputs(),
         *windows_configure_inputs(),
+        *macos_configure_inputs(),
     ],
 )
 n.newline()
 
 # the build for this computer, where it could be generated (the Windows
 # build is left out when SDL cannot be fetched, for instance)
-default = "windows" if is_windows() else "linux"
+default = "windows" if is_windows() else "macos" if is_macos() else "linux"
 if f"\nbuild {default}: " in out.getvalue():
     n.comment("Default rule: the build for this computer")
     n.default(default)

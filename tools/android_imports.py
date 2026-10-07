@@ -7,11 +7,13 @@ host's 64-bit function address from __host_import_table and branches to it.
 The arguments are left untouched in their registers; the host fills in the
 table when it loads the image (port/android/host/host_loader.c).
 
-Usage: android_imports.py [--host-table table.c] output.s list...
+Usage: android_imports.py [--host-table table.c [--posix-wrappers]] output.s list...
 
 With --host-table, also writes the host's name-to-function table for the
 names in the lists (OpenGL names, which the host resolves at run time, are
-not part of it).
+not part of it). Each hostposix_<name> is port/linux/src/posix.h's
+posix_<name> itself, or with --posix-wrappers a host function of the import's
+own name (the macOS host's, which translate the guest's pointers).
 """
 
 import sys
@@ -20,9 +22,13 @@ import sys
 def main():
     arguments = sys.argv[1:]
     host_table = None
+    posix_wrappers = False
     if arguments[0] == "--host-table":
         host_table = arguments[1]
         arguments = arguments[2:]
+    if arguments[0] == "--posix-wrappers":
+        posix_wrappers = True
+        arguments = arguments[1:]
     output, lists = arguments[0], arguments[1:]
     names = []
     for path in lists:
@@ -67,7 +73,9 @@ def main():
                  "#include <string.h>", ""]
         def symbol(n):
             # hostposix_<name> imports port/linux/src/posix.h's posix_<name>
-            return "posix_" + n[len("hostposix_"):] if n.startswith("hostposix_") else n
+            if n.startswith("hostposix_") and not posix_wrappers:
+                return "posix_" + n[len("hostposix_"):]
+            return n
         table += [f"extern void {symbol(n)}(void);" for n in host_names]
         table += ["", "static const struct { const char *name; void *function; } imports[] =", "{"]
         table += [f'\t{{ "{n}", (void *){symbol(n)} }},' for n in host_names]

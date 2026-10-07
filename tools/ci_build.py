@@ -4,6 +4,7 @@
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
+    python tools/ci_build.py macos release
 
 Builds are portable (any x86-64 processor), so they run on other
 computers. Debug builds skip link-time and profile-guided optimisation,
@@ -29,6 +30,7 @@ OUTPUTS = {
     "linux": ["build/linux/halo"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
+    "macos": [],  # the app, zipped below
 }
 APKS = {
     "debug": "port/android/app/build/outputs/apk/debug/app-debug.apk",
@@ -78,6 +80,10 @@ def main() -> int:
     if dist.exists():
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
+    if args.platform == "macos":
+        # (zipped by ditto, which keeps what a copy of the folder would lose:
+        # the executable's mode and the app's signature)
+        run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", "build/macos/Halo.app", dist / "Halo.app.zip"])
     for output in outputs:
         shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)

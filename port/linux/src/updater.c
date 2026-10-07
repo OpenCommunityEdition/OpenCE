@@ -29,7 +29,9 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #include "port_config.h"
 #include "update.h"
 
-#ifndef HALO_ANDROID
+/* (the Android app updates itself in Java; the macOS port has no release
+of its own to update to yet) */
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 
 #include "zlib_prefixed.h"
 
@@ -652,5 +654,14 @@ void updater_poll(SDL_Window *window)
 void updater_start(void)
 {
 }
+
+#ifndef HALO_ANDROID
+#include <SDL3/SDL.h>
+
+void updater_poll(SDL_Window *window)
+{
+	(void)window;
+}
+#endif
 
 #endif

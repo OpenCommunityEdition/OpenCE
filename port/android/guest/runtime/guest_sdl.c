@@ -2,7 +2,8 @@
 GUEST_SDL.C
 
 The SDL3 functions the platform layer calls (sdl_platform.c, xinput_sdl.c,
-dsound_sdl.c), for the guest. SDL itself runs in the host; objects it
+dsound_sdl.c), for the guest (the macOS port's desktop ones are in
+port/macos/guest/guest_sdl_desktop.c). SDL itself runs in the host; objects it
 returns (windows, contexts, gamepads, audio streams) are 64-bit pointers
 there, so the guest only ever sees small integer handles that the host maps
 back (host_sdl.c). Events are written by SDL straight into the guest's
@@ -82,10 +83,12 @@ char *SDL_GetClipboardText(void)
 	return strdup(buffer);
 }
 
+#ifdef HALO_ANDROID
 bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset)
 {
 	return host_sdl_show_toast(message, duration, gravity, xoffset, yoffset) != 0;
 }
+#endif
 
 /* ---------- a message for the player (sdl_platform.c): the host's own window */
 
