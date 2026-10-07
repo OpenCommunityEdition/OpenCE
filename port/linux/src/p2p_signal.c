@@ -659,7 +659,9 @@ static int broker_publish_listing(struct broker *broker, const unsigned char *pa
 	if (size)
 		memcpy(broker->in_flight[free_index].payload, payload, (size_t)size);
 	broker_publish_slot(broker, broker->in_flight[free_index].identifier, payload, size, 0);
-	return 1;
+	/* (not sent if the send closed the broker: published again once it is
+	connected, as its will cleared the slot) */
+	return broker->state == _broker_ready;
 }
 
 /* whether the broker carries the server browser: retained messages and
