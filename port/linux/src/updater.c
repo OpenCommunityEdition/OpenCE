@@ -528,13 +528,72 @@ done:
 	return succeeded;
 }
 
+/* the first count of the new files, already in place, taken back out (to
+the update folder) and the old ones (<name>.old) put back, the last first:
+the install as it was before the update. A new file that had no old one is
+deleted */
+static void updater_put_back(char names[][256], int count)
+{
+	int index, failures = 0;
+
+	for (index = count - 1; index >= 0; index--)
+	{
+		char path[1200], new_path[1200], old_path[1300];
+
+		updater_path(path, sizeof(path), names[index]);
+		updater_partial_path(new_path, sizeof(new_path), names[index]);
+		snprintf(old_path, sizeof(old_path), "%s.old", path);
+		if (SDL_GetPathInfo(old_path, NULL))
+		{
+			if (!update_replace_file(path, old_path, new_path))
+			{
+				platform_log("update: could not put back %s", names[index]);
+				failures++;
+			}
+		}
+		else
+		{
+			update_delete_file(path);
+		}
+	}
+	if (failures)
+		platform_log("update: %d of %d replaced files could not be put back", failures, count);
+	else
+		platform_log("update: the %d replaced files put back: the install is as it was", count);
+}
+
+/* the new files in place of the old ones, each old one kept as <name>.old;
+if one cannot be, the ones before it put back as they were, and 0 */
+static int updater_replace_files(char names[][256], int name_count, char *error, size_t error_size)
+{
+	int index;
+
+	for (index = 0; index < name_count; index++)
+	{
+		char path[1200], new_path[1200], old_path[1300];
+
+		updater_path(path, sizeof(path), names[index]);
+		updater_partial_path(new_path, sizeof(new_path), names[index]);
+		snprintf(old_path, sizeof(old_path), "%s.old", path);
+		if (!update_replace_file(path, new_path, old_path))
+		{
+			/* (that one is as it was: update_replace_file) */
+			snprintf(error, error_size, "could not replace %s", path);
+			if (index > 0)
+				updater_put_back(names, index);
+			return 0;
+		}
+	}
+	return 1;
+}
+
 /* downloads, unpacks and puts in place the new build, and starts it; returns
 only if something failed */
 static void updater_update(void)
 {
 	char names[MAXIMUM_UPDATE_FILES][256];
 	char zip_path[1200], partial[1200], error[512] = "";
-	int name_count = 0, index;
+	int name_count = 0;
 
 	updater_path(partial, sizeof(partial), UPDATE_DIRECTORY);
 	updater_partial_path(zip_path, sizeof(zip_path), UPDATE_ASSET);
@@ -546,21 +605,7 @@ static void updater_update(void)
 	else if (updater_download_zip(zip_path, error, sizeof(error)) &&
 		updater_unpack(zip_path, names, &name_count, error, sizeof(error)))
 	{
-		/* the new files in place of the old ones */
-		for (index = 0; index < name_count; index++)
-		{
-			char path[1200], new_path[1200], old_path[1300];
-
-			updater_path(path, sizeof(path), names[index]);
-			updater_partial_path(new_path, sizeof(new_path), names[index]);
-			snprintf(old_path, sizeof(old_path), "%s.old", path);
-			if (!update_replace_file(path, new_path, old_path))
-			{
-				snprintf(error, sizeof(error), "could not replace %s", path);
-				break;
-			}
-		}
-		if (index == name_count)
+		if (updater_replace_files(names, name_count, error, sizeof(error)))
 		{
 			update_delete_file(partial);
 			platform_log("update: starting build %ld", updater_latest_build);
