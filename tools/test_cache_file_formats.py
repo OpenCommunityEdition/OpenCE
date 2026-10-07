@@ -1,5 +1,5 @@
-"""Tests for loading Custom Edition caches, and refusing OpenSauce ones
-(port/linux/game/cache_file_formats.c).
+"""Tests for loading Custom Edition caches, and refusing those that need
+OpenSauce (port/linux/game/cache_file_formats.c).
 
 The tests build complete but tiny Custom Edition caches and resource maps in
 memory, so no game data is needed or stored, and run the report tool
@@ -392,7 +392,7 @@ class Map:
     Every option changes one thing from the valid default, and `where`
     records the file offsets of the fields tests corrupt afterwards."""
 
-    def __init__(self, opensauce_header=False, trailing=b"",
+    def __init__(self, opensauce_flags=None, trailing=b"",
                  extra_tags=(), bsp_gap=None, bitmap_pixels_size=16, sound_samples_size=32,
                  font_style_reference=NONE, pitch_ranges=1, bsp_sizes=(0x1000,), sound_compression=1,
                  model=None, bsp_material=None, shaders=(), animation_overlay=None,
@@ -416,9 +416,9 @@ class Map:
         self.strings_name = strings_name
         self.strings = strings
         self.addresses = {}
-        # OpenSauce's header signature, which a Custom Edition cache leaves as
-        # padding
-        self.opensauce_header = opensauce_header
+        # OpenSauce's header (its signature, version 1 and these flags) where a
+        # Custom Edition cache has padding, when not None
+        self.opensauce_flags = opensauce_flags
         self.trailing = trailing
         self.extra_tags = extra_tags
         self.bsp_gap = bsp_gap
@@ -578,8 +578,8 @@ class Map:
         header[0x40:0x40 + 14] = b"01.00.00.0609\0"
         struct.pack_into("<h", header, 0x60, 1)
         struct.pack_into("<I", header, 0x7FC, code("foot"))
-        if self.opensauce_header:
-            struct.pack_into("<I", header, 0x70, code("yelo"))
+        if self.opensauce_flags is not None:
+            struct.pack_into("<IhH", header, 0x70, code("yelo"), 1, self.opensauce_flags)
         checksum = zlib.crc32(bytes(data[bsp_offset:bsp_offset + sum(self.bsp_sizes)]))
         checksum = zlib.crc32(model_data, checksum)
         checksum = zlib.crc32(bytes(tag_data.bytes), checksum)
@@ -727,29 +727,31 @@ def test_checksum_mismatch_is_reported_not_rejected(report_tool, tmp_path):
     assert report["warnings"] == "checksum mismatch"
 
 
-OPENSAUCE_REFUSED = "an OpenSauce map, which this build does not run"
+OPENSAUCE_REFUSED = ("an OpenSauce map that needs OpenSauce (its header asks for memory upgrades, mod data files or "
+                     "the like), which this build does not run")
 
 
-def test_opensauce_caches_are_refused(report_tool, tmp_path):
-    """A cache with OpenSauce's header (a .yelo map, or a .map OpenSauce
-    built) is refused as it is identified."""
-    for name in ("test.yelo", "test.map"):
-        path = Map(opensauce_header=True).write(tmp_path / name.split(".")[1], name)
-        returncode, report = report_one(report_tool, path)
-        assert returncode == 1
-        assert report["identify"] == OPENSAUCE_REFUSED
-        assert "load" not in report
-
-
-@pytest.mark.parametrize("group", ["yelo", "gelo"])
-def test_opensauce_tags_are_refused(report_tool, tmp_path, group):
-    """OpenSauce's project_yellow and project_yellow_globals tags in a cache
-    without its header are refused as the cache loads."""
-    path = Map(extra_tags=[(group, "test\\project yellow", False)]).write(tmp_path)
+@pytest.mark.parametrize("flags", [1, 2, 4, 1 << 15])
+def test_caches_that_need_opensauce_are_refused(report_tool, tmp_path, flags):
+    """A cache whose OpenSauce header asks for anything of OpenSauce's
+    (memory upgrades, mod data files, any flag) is refused as it is
+    identified."""
+    path = Map(opensauce_flags=flags).write(tmp_path)
     returncode, report = report_one(report_tool, path)
     assert returncode == 1
-    assert report["identify"] == "ok"
-    assert report["load"] == OPENSAUCE_REFUSED
+    assert report["identify"] == OPENSAUCE_REFUSED
+    assert "load" not in report
+
+
+def test_caches_that_only_carry_opensauce_data_load(report_tool, tmp_path):
+    """A cache with OpenSauce's header asking for nothing, and its
+    project_yellow and project_yellow_globals tags, runs as stock Custom
+    Edition runs it: neither is read (SPV3's backwards-compatible a50.map)."""
+    path = Map(opensauce_flags=0, extra_tags=[("yelo", "test\\project yellow", False),
+                                              ("gelo", "test\\project yellow globals", False)]).write(tmp_path)
+    returncode, report = report_one(report_tool, path)
+    assert returncode == 0
+    assert report["identify"] == "ok" and report["load"] == "ok"
 
 
 def test_resource_maps_are_found_in_the_maps_directory_option(report_tool, tmp_path):
@@ -1414,15 +1416,16 @@ def test_real_maps_resource_maps_are_valid(report_tool, real_maps):
     assert [b["resource_map"] for b in blocks] == ["ok", "ok", "ok"]
 
 
-def test_real_maps_opensauce_caches_are_refused(report_tool, real_maps):
-    """Each .yelo map present is refused as it is identified."""
+def test_real_maps_opensauce_caches_are_recognized(report_tool, real_maps):
+    """Each .yelo map present is either refused for needing OpenSauce or
+    identified as a Custom Edition cache (a .yelo that asks for nothing of
+    OpenSauce's; the game never looks for .yelo files)."""
     paths = sorted(real_maps.glob("*.yelo"))
     if not paths:
         pytest.skip("no OpenSauce caches present")
-    returncode, blocks = run_report(report_tool, *paths)
-    assert returncode == 1
+    _, blocks = run_report(report_tool, *paths)
     for block in blocks:
-        assert block["identify"] == OPENSAUCE_REFUSED, block["file"]
+        assert block["identify"] in (OPENSAUCE_REFUSED, "ok"), block["file"]
 
 
 def test_real_maps_convert_as_recorded(report_tool, real_maps):

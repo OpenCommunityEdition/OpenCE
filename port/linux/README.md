@@ -676,16 +676,19 @@ allowlist in `hs/hs.c`). They cannot call the functions for files, the
 saved state of the game, the console, debugging or cheats. A script that
 calls one does not run. The developer console can call every function.
 
-Halo Custom Edition maps get the same checks (OpenSauce maps are
+Halo Custom Edition maps get the same checks (those that need OpenSauce are
 refused). Their own loader (`game/cache_file_formats.c`) reads them into
 their tag cache at 0x40440000 and converts what Custom Edition lays out
 differently, then the validator checks their tags and each of their BSPs as
 it checks this build's maps, before the game converts their models, BSP
 geometry and scripts. Put them with `bitmaps.map`, `sounds.map` and
-`loc.map` in `maps`, or set `paths.custom_edition` to a Custom Edition
-install; `game.custom_edition = false` refuses them. `map_validate` checks
-them too, with the resource maps beside each map or in `--maps <folder>`.
-See `docs/custom_edition_caches.md`.
+`loc.map` in `custom_maps`, beside `maps`, or set `paths.custom_edition` to
+a Custom Edition install; the map lists show them as CUSTOM SINGLEPLAYER and
+CUSTOM MULTIPLAYER, played as campaign levels (alone, or as network co-op)
+or as multiplayer maps by their scenario type, and `game.custom_edition =
+false` refuses them. `map_validate` checks them too, with the resource maps
+beside each map or in `--maps <folder>`. See
+`docs/custom_edition_caches.md`.
 
 Defensive checks stay in the game code too. An index into a tag block, the
 tags or a tag's data that is out of range gets zeros (`tag_empty_data` in

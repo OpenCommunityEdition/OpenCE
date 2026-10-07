@@ -1,9 +1,12 @@
 /*
 CUSTOM_EDITION_MAPS.H
 
-Custom Edition maps in the menus. With game.custom_edition on, the
-multiplayer level list (ui_widget_event_handler_functions.c) adds the CE
-multiplayer maps from the maps folder after the Xbox levels.
+Custom Edition maps in the menus. With game.custom_edition on, the CE maps
+of the custom_maps folder are listed: the multiplayer maps after the Xbox
+levels in the multiplayer level list (ui_widget_event_handler_functions.c),
+and both kinds in the map lists' CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER
+(port/linux/game/menu_functions.c). A CE map's level name is
+custom_maps\<name> (custom_edition_cache.h).
 
 The menus that show a level (ui_widget_game_data_input_functions.c) refer
 to it by an index into their own tags' strings and frames. Maps that the
@@ -13,7 +16,7 @@ ui_widget.c ask this file for their names, descriptions and pictures.
 	below 0x1000   Xbox multiplayer level (the tags' own index)
 	0x3000 + n     stock campaign level n (co-op)
 	0x4000 + n     CE multiplayer map
-	0x5000 + n     CE campaign map (co-op)
+	0x6000 + n     CE campaign map (played alone or as co-op)
 */
 
 #ifndef __CUSTOM_EDITION_MAPS_H
@@ -50,7 +53,8 @@ short custom_edition_maps_level_display_index(
 	short level_index);
 
 /* The display index for a level name (a network game's map name): a stock
-campaign level, a CE map, or NONE. Scans for maps the first time. */
+campaign level, a CE map (custom_maps\<name>) this machine has, or NONE.
+Scans for maps the first time. */
 short custom_edition_maps_display_index(
 	char const *level_name);
 
@@ -62,11 +66,19 @@ boolean custom_edition_maps_campaign(
 short custom_edition_maps_campaign_level(
 	short display_index);
 
-/* Fills in the display indices of the CE campaign maps, sorted by name.
-Returns how many (at most `maximum`). */
-short custom_edition_maps_custom_campaigns(
-	short *display_indices,
-	short maximum);
+/* whether a level name is a campaign level's, stock or CE: the game played
+on it is a campaign, or network co-op */
+boolean custom_edition_maps_level_campaign(
+	char const *level_name);
+
+/* The CE campaign maps (campaign TRUE) or multiplayer maps, sorted by name:
+how many there are, and the display index of the one at `index` (NONE past
+them). Scans for maps the first time. */
+short custom_edition_maps_count(
+	boolean campaign);
+short custom_edition_maps_display_index_of(
+	boolean campaign,
+	short index);
 
 /* the level name to load for a display index, or NULL */
 char const *custom_edition_maps_level_name(

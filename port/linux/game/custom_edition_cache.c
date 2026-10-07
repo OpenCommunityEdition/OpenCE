@@ -176,12 +176,12 @@ boolean custom_edition_install_present(
 	return platform_custom_edition_root()[0] != 0;
 }
 
-/* the maps folders looked in, in order: the game's, then the Custom Edition
-install's */
+/* the maps folders looked in, in order: the game's custom_maps, then the
+Custom Edition install's */
 static char const *maps_folder(
 	short index)
 {
-	return index == 0 ? cache_files_map_directory() : CUSTOM_EDITION_INSTALL_MAP_DIRECTORY;
+	return index == 0 ? CUSTOM_EDITION_MAP_DIRECTORY : CUSTOM_EDITION_INSTALL_MAP_DIRECTORY;
 }
 #define NUMBER_OF_MAPS_FOLDERS 2
 
@@ -204,7 +204,8 @@ static boolean maps_folder_has(
 	return file_path_exists(path);
 }
 
-/* the file that holds the map `map_name` names: <maps>\<name>.map */
+/* the file that holds the map `map_name` names (a level name or a file
+name): <custom maps folder>\<name>.map */
 static boolean custom_edition_map_path(
 	char const *map_name,
 	char *path)
@@ -536,11 +537,12 @@ boolean custom_edition_cache_refuse(
 	{
 		return FALSE;
 	}
-	/* (why the Custom Edition loader passed it by: what its checks found,
-	or why it cannot run any when they found nothing; `path` is a file's or
-	a scenario's, by the caller) */
-	if (custom_edition_file_open(&file, path) ||
-		(custom_edition_map_path(path, map_path) && custom_edition_file_open(&file, map_path)))
+	/* (why the Custom Edition loader passed it by: what its checks found, or
+	why it cannot run any when they found nothing. It reaches the Xbox loader
+	from the game's own maps folder, by `path`, a file's or a scenario's) */
+	snprintf(map_path, sizeof(map_path), "%s%s%s", cache_files_map_directory(), tag_name_strip_path(path),
+		MAP_FILE_EXTENSION);
+	if (custom_edition_file_open(&file, path) || custom_edition_file_open(&file, map_path))
 	{
 		status = cache_file_identify(&file.source, &identity);
 		custom_edition_file_close(&file);
@@ -550,17 +552,26 @@ boolean custom_edition_cache_refuse(
 		"'%.96s' is a Halo Custom Edition cache (build %.31s) this build cannot run: %s (docs/custom_edition_caches.md)",
 		path,
 		build,
-		status == _cache_file_status_ok ? custom_edition_unavailable_reason() : cache_file_status_describe(status));
+		status != _cache_file_status_ok ? cache_file_status_describe(status) :
+		halo_custom_edition_tag_cache() ? "Custom Edition maps are played from the custom_maps folder" :
+		custom_edition_unavailable_reason());
 
 	return TRUE;
 }
 
+boolean custom_edition_level_name(
+	char const *level_name)
+{
+	return level_name &&
+		!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX));
+}
+
 boolean custom_edition_cache_playable(
-	char const *map_name)
+	char const *level_name)
 {
 	struct cache_file_identity identity;
 
-	return custom_edition_cache_identify(map_name, &identity);
+	return custom_edition_level_name(level_name) && custom_edition_cache_identify(level_name, &identity);
 }
 
 boolean custom_edition_cache_campaign(
@@ -594,9 +605,16 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	short type;
 
 	assert(!globals->tags_loaded);
-	if (!tag_cache || !custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
+	if (!tag_cache)
 	{
-		error(_error_silent, "custom edition: cannot open the map '%s'", map_name);
+		error(_error_silent, "custom edition: cannot load the map '%s': %s", map_name,
+			custom_edition_unavailable_reason());
+		return NULL;
+	}
+	if (!custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
+	{
+		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the custom_maps folder)",
+			map_name);
 		return NULL;
 	}
 	status = cache_file_identify(&globals->map.source, &identity);

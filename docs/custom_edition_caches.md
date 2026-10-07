@@ -2,40 +2,64 @@
 
 The native builds (Linux, Windows, Android) load and run Halo Custom Edition
 caches (`.map`, cache version 609), with the Custom Edition resource maps
-`bitmaps.map`, `sounds.map` and `loc.map`. OpenSauce caches are refused:
-`.yelo` files are never looked for, and a `.map` file with OpenSauce's
-header or its `project_yellow` tags is refused as it loads. The loader and
-the conversions come from DamnationCE (xshxdex98/DamnationCE), whose
-documentation this file grew from; in this build a Custom Edition map's tags
-are also checked by the tag validator, as the Xbox maps' are, before
-anything reads them (`port/linux/game/tag_validate.c`, [Checks](#checks)).
+`bitmaps.map`, `sounds.map` and `loc.map`. A cache that needs OpenSauce
+(its OpenSauce header asks for memory upgrades, mod data files or the like)
+is refused, and `.yelo` files are never looked for; a `.map` that only
+carries OpenSauce's header and its `project_yellow` tags (SPV3's
+backwards-compatible releases) is run as stock Custom Edition runs it,
+neither read. The loader and the conversions come from DamnationCE
+(xshxdex98/DamnationCE), whose documentation this file grew from; in this
+build a Custom Edition map's tags are also checked by the tag validator, as
+the Xbox maps' are, before anything reads them
+(`port/linux/game/tag_validate.c`, [Checks](#checks)).
 
 ## Running a map
 
 Custom Edition maps run when the `game.custom_edition` setting is on, as it
 is by default (`custom_edition = true` under `[game]` in `config.toml`, or
 `HALO_CUSTOM_EDITION`). Put the maps and Custom Edition's `bitmaps.map`,
-`sounds.map` and `loc.map` in the data root's `maps` folder, or set
+`sounds.map` and `loc.map` in the data root's `custom_maps` folder, beside
+its `maps` folder, which holds the game's own maps only; or set
 `paths.custom_edition` to a Halo Custom Edition install, whose `maps` folder
-(the Xbox drive `h:\`) is looked in after the game's.
+(the Xbox drive `h:\`) is looked in after `custom_maps`.
 
-A map whose file is named as an Xbox level (`bloodgulch.map`) is the Xbox
-level's: Custom Edition's copies of the stock levels are only played from a
-folder without the Xbox maps. Halo PC's own levels (Ice Fields, Death
-Island, Danger Canyon, Infinity, Timberland, Gephyrophobia) and every other
-map are played by their names.
+A Custom Edition map's level name is `custom_maps\<name>`
+(`custom_edition_cache.h`, `CUSTOM_EDITION_LEVEL_NAME_PREFIX`), which none
+of the game's own levels has: only such a name is loaded from the Custom
+Edition folders, and never from `maps`. So a map named as one of the game's
+own levels (CMT's `a30.map`, Custom Edition's `bloodgulch.map`) is played as
+itself, apart from the level of its name, in the menus, the loader and
+network games, and is never taken for one of the campaign's levels (saved
+games, progress, the next level). The game engine keeps 63 characters of a
+level name, so a map whose file name is longer than 51 is not listed.
 
 ### In the menus
 
-The multiplayer map list (the PC menus' Map screen and New Game's
-MULTIPLAYER maps, and the Xbox menus' level list) offers every Custom
-Edition multiplayer map of the maps folders after the thirteen Xbox levels,
-in the order of their names; the pregame lobby and the system link game list
-show them by name and picture too (`port/linux/game/custom_edition_maps.c`).
-The folders are looked in once, and again each time a map list opens, which
-then shows maps added since. A map is listed under its file's name,
-`the_bay_of_pigs.map` as "The Bay Of Pigs". Two optional files beside the
-map give it what the Xbox levels have:
+The map lists (New Game's, and the Map screen of Create Game's INTERNET and
+LAN and of split screen) have four kinds in their first row's chooser:
+SINGLEPLAYER (the campaign's levels), MULTIPLAYER (the Xbox's maps), and
+CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER, the Custom Edition maps of the
+custom maps folders by the scenario type their files give (solo or
+multiplayer). A map is played as its kind says
+(`port/linux/game/menu_functions.c`):
+
+- **New Game**: a CUSTOM SINGLEPLAYER map is played as the campaign's
+  levels are, at the difficulty chosen next (alone, or with split screen
+  co-op's two players); a CUSTOM MULTIPLAYER map is walked around alone, as
+  MULTIPLAYER's are.
+- **The Map screen**: a CUSTOM SINGLEPLAYER map lists the difficulties and
+  is hosted as a network co-op game (Server Setup, then the lobby), as the
+  campaign's levels are; a CUSTOM MULTIPLAYER map goes on to the gametypes,
+  as MULTIPLAYER's do. Split screen hosts only the multiplayer kinds.
+
+The Xbox menus' multiplayer level list offers the Custom Edition multiplayer
+maps after the thirteen Xbox levels. The pregame lobby shows a Custom
+Edition map by its name and picture, multiplayer or campaign, and the game
+lists by its name (`port/linux/game/custom_edition_maps.c`). The folders are
+looked in once, and again each time a map list opens, which then shows maps
+added since. A map is listed under its file's name, `the_bay_of_pigs.map` as
+"The Bay Of Pigs". Two optional files beside the map give it what the Xbox
+levels have:
 
 - `<name>.bmp`, its picture: an uncompressed 24-bit or 32-bit Windows
   bitmap, up to 8192 pixels a side; the middle of it is shown with the
@@ -44,22 +68,27 @@ map give it what the Xbox levels have:
 - `<name>.txt`, its description: plain text, its lines shown as written.
   Without one, the map is described as "Halo Custom Edition map".
 
+A Custom Edition campaign map has no next level: winning it ends the game
+as the campaign's last level does (alone) or plays it again (network
+co-op), and it is not the campaign's saved game.
+
 ### From the console
 
-`map_name` takes the scenario's path, of which only the last part names the
-file (`bloodgulch.map`). A multiplayer scenario needs a game variant, or no
-starting location qualifies and no player spawns:
+`map_name` takes the level name: `custom_maps\<name>` for a Custom Edition
+map (`custom_maps\hugeass` plays `custom_maps\hugeass.map`). A multiplayer
+scenario needs a game variant, or no starting location qualifies and no
+player spawns:
 
 ```
 game_variant slayer
-map_name levels\test\hugeass\hugeass
+map_name custom_maps\hugeass
 ```
 
 ## What the native builds do
 
 - **With `game.custom_edition` on**, the platform reserves the address
-  window Custom Edition tag data is linked to, `0x40440000`-`0x426C0000`
-  (`port/linux/src/xbox_memory.c`, at start-up; 36 MB of address space,
+  window Custom Edition tag data is linked to, `0x40440000`-`0x41B40000`
+  (`port/linux/src/xbox_memory.c`, at start-up; 23 MB of address space,
   backed as it is touched), and a Custom Edition map is loaded into it,
   converted as below, checked, and run. It is read in place, never copied
   to the cache partition: every read the game makes of it (structure BSPs,
@@ -69,7 +98,8 @@ map_name levels\test\hugeass\hugeass
   that fails any check is logged in `debug.txt` and not loaded: the game
   goes back to its menus.
 - **With it off**, a Custom Edition cache is named and refused, instead of
-  being rejected as "an old version" of this build's caches.
+  being rejected as "an old version" of this build's caches; so is one put
+  in `maps`, which is told to go in `custom_maps`.
 - **Xbox caches** take the path they took before.
 
 The desktop builds' Xbox memory window is 512 MB (Android's 128 MB), in
@@ -108,16 +138,17 @@ Loading, step by step (`custom_edition_cache_load`):
    larger maps, which Chimera runs), no compression, tag data within the
    file and the tag cache (23 MB). A cache with OpenSauce's header (its
    `yelo` signature at offset `0x70`, which Custom Edition leaves as
-   padding) is refused.
+   padding) that sets any of its flags (memory upgrades, mod data files and
+   the rest) is refused; one that sets none is a Custom Edition cache.
 2. The tag data is read to the start of the tag cache, which stands for
    `0x40440000`.
 3. The tag index (`tags` signature), every tag instance (its handle must
    match its position, its name must lie in the tag data and be terminated,
    its address must lie in the tag data; only structure BSPs may have none;
    only bitmaps, sounds, fonts, unicode string lists and HUD message text may
-   be held by resource maps; none may be OpenSauce's `project_yellow` or
-   `project_yellow_globals`, which refuse the map), the model data range,
-   and the scenario tag.
+   be held by resource maps; OpenSauce's `project_yellow` and
+   `project_yellow_globals`, which nothing reads, are left as they are), the
+   model data range, and the scenario tag.
 4. Every structure BSP: its tag, its range in the file, its place in the tag
    cache (above the tag data, within the tag cache), its header (`sbsp`
    signature, no Xbox vertex buffers, its structure pointer inside it), and
@@ -346,13 +377,14 @@ or in `--maps`; `--fuzz` changes words of a map's file at random.
 
 ### Automated tests
 
-- `python -m pytest tools/test_cache_file_formats.py` (128 tests; needs
-  clang): synthetic Custom Edition caches and resource maps, OpenSauce
-  caches and tags refused, every check of the loader and the conversion, and
-  seeded random corruptions, through `port/tools/cache_file_report.c`. With
-  `HALO_CUSTOM_EDITION_MAPS` naming a folder of maps, four more check real
-  maps: against DamnationCE's recorded results (which are of its copies of
-  the stock maps), and that any `.yelo` map among them is refused.
+- `python -m pytest tools/test_cache_file_formats.py` (130 tests; needs
+  clang): synthetic Custom Edition caches and resource maps, caches that
+  need OpenSauce refused and those that only carry its data loaded, every
+  check of the loader and the conversion, and seeded random corruptions,
+  through `port/tools/cache_file_report.c`. With `HALO_CUSTOM_EDITION_MAPS`
+  naming a folder of maps, four more check real maps: against DamnationCE's
+  recorded results (which are of its copies of the stock maps), and that any
+  `.yelo` map among them is either refused or a Custom Edition cache.
 - `python -m pytest tools/test_bmp_files.py` (41 tests): the map pictures'
   reader.
 - `tools/test_linux_port.py`: with `HALO_CUSTOM_EDITION_MAPS` (or the
@@ -381,11 +413,19 @@ Run in the game (Linux release build, 40 to 50 seconds each, slayer):
 converted and played to the end of the run without a crash; `hugeass`'s
 hangar, HUD and first-person weapon were seen drawn.
 
+Two campaign maps were checked with `map_validate`: CMT's `a30.map` (2006,
+"Halo"; 13 corrections) and CMT SPV3's backwards-compatible `a50.map` (2012,
+The Truth and Reconciliation, with OpenSauce's header setting no flags and
+its two `project_yellow` tags; 43 corrections); `a30` was also run. From the
+menus (on a virtual display): New Game's CUSTOM SINGLEPLAYER `a30` played as
+a campaign level at the difficulty chosen; the Map screen's (LAN) listed its
+difficulties, set up co-op in Server Setup and showed it in the lobby as
+co-op. With `debug.network_test`, two machines on loopback played
+`custom_maps\a30` as network co-op and `custom_maps\hugeass` as slayer.
+
 ### Not tested
 
-- **Playing**: nobody played the maps, and no network game was played on one.
-- **The menus' map list** was not driven: it builds, but choosing a map from
-  it was not seen.
+- **Playing**: nobody played the maps through.
 - **Android** builds, and was not run.
 
 ## Evidence
@@ -414,7 +454,7 @@ every layout used was then checked against the sample maps.
 | --- | --- |
 | Cache header layout, version 609, `head`/`foot` signatures | OpenSauce `blamlib/Halo1/cache/cache_files_structures.hpp` (`s_cache_header`) |
 | Tag index (0x28 bytes, instances at 0x28, model data as file offsets) and tag instance (0x20 bytes, resource-map flag at 0x18) | same file (`s_cache_tag_header`, `s_cache_tag_instance`) |
-| OpenSauce's header at 0x70 begins with the `yelo` signature, where Custom Edition's header has padding | OpenSauce `YeloLib/Halo1/cache/cache_files_structures_yelo.hpp` |
+| OpenSauce's header at 0x70 begins with the `yelo` signature, where Custom Edition's header has padding, and has its flags (memory upgrades, mod data files, protected, game state upgrades, compression parameters) at 0x76 | OpenSauce `YeloLib/Halo1/cache/cache_files_structures_yelo.hpp` (`s_cache_header_yelo`) |
 | Tag cache at `0x40440000`, 23 MB; file size limits | OpenSauce `cache_constants.hpp`, `saved_game_constants.hpp` |
 | Resource map header and entries | OpenSauce `data_file_structures.hpp` |
 | Groups held by resource maps: bitmaps, sounds, fonts, unicode string lists, HUD message text | OpenSauce `blamlib/Halo1/cache/cache_files.cpp` (`cache_file_data_load`) |
@@ -499,8 +539,9 @@ every layout used was then checked against the sample maps.
   this build lacks, or a read of an engine global it lacks, does nothing
   (a constant of its type's harmless value, logged by name:
   `custom_edition_scripts.c`); only one that gives a script's index refuses
-  the map. OpenSauce maps, made for its runtime features (`project_yellow`),
-  are refused.
+  the map. Maps that need OpenSauce's runtime features are refused; a map
+  that only carries its tags (`project_yellow`) runs without them, as on
+  stock Custom Edition.
 - **Halo PC behaviours** some maps were made around (Chimera's map list,
   `custom_edition_behaviours.inc`) are followed where this build can, and
   each is logged.

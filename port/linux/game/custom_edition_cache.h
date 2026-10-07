@@ -26,10 +26,20 @@ this build's they are the same */
 
 /* ---------- constants */
 
-/* a Halo Custom Edition install's maps folder (the platform's h:\ drive, when
-paths.custom_edition names one), looked in after the game's own for a Custom
-Edition map and its resource maps */
+/* Custom Edition maps and their resource maps (bitmaps.map, sounds.map,
+loc.map) are kept apart from the game's own maps: in the data root's
+custom_maps folder, then a Halo Custom Edition install's maps folder (the
+platform's h:\ drive, when paths.custom_edition names one). */
+#define CUSTOM_EDITION_MAP_DIRECTORY "d:\\custom_maps\\"
 #define CUSTOM_EDITION_INSTALL_MAP_DIRECTORY "h:\\maps\\"
+
+/* A Custom Edition map's level name is this and its file's name
+(custom_maps\a30 for custom_maps\a30.map), which the game's own levels'
+never are: a map named as one of them (a30, bloodgulch) stays apart from it,
+in the menus, the loader and network games. The game engine keeps 63
+characters of a level name (game_engine.c, struct game_engine_stage). */
+#define CUSTOM_EDITION_LEVEL_NAME_PREFIX "custom_maps\\"
+#define CUSTOM_EDITION_MAXIMUM_LEVEL_NAME_LENGTH 63
 
 /* ---------- structures */
 
@@ -55,19 +65,24 @@ boolean custom_edition_cache_refuse(
 	char const *build,
 	char const *path);
 
-/* TRUE when Custom Edition maps may run (game.custom_edition) and the map
-`map_name` names is a Custom Edition cache whose resource maps are present:
+/* Whether a level name is a Custom Edition map's
+(CUSTOM_EDITION_LEVEL_NAME_PREFIX): the cache file loader then reads it from
+the Custom Edition maps folders alone, never from the game's own. */
+boolean custom_edition_level_name(
+	char const *level_name);
+
+/* TRUE when Custom Edition maps may run (game.custom_edition) and the level
+`level_name` is a Custom Edition map's whose file is a Custom Edition cache:
 it is then read in place, never copied to the cache partition. */
 boolean custom_edition_cache_playable(
-	char const *map_name);
-/* The same, for a map of a multiplayer scenario (the multiplayer menus,
-custom_edition_maps.c). */
-/* Whether it is a Custom Edition cache of a campaign map (a solo scenario),
-which a co-op game plays. */
+	char const *level_name);
+/* Whether the file `file_name` (custom_maps\<file_name>.map) is a Custom
+Edition cache of a campaign map (a solo scenario, played alone or as
+network co-op), or of a multiplayer map (custom_edition_maps.c). */
 boolean custom_edition_cache_campaign(
-	char const *map_name);
+	char const *file_name);
 boolean custom_edition_cache_multiplayer(
-	char const *map_name);
+	char const *file_name);
 
 /* Loads the Custom Edition map `map_name` names into its tag cache and
 converts its tags for this build, copying its cache header to `header`

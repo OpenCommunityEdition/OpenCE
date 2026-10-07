@@ -976,10 +976,10 @@ boolean cache_files_map_plays_multiplayer(
 	build[0] = 0;
 	if (!map_name || !map_name[0])
 		return TRUE;
-	/* port: a Halo Custom Edition map is converted for this build as it
-	loads (port/linux/game/custom_edition_cache.c): its header's build is
-	Halo PC's, not one to check */
-	if (custom_edition_cache_playable(tag_name_strip_path(map_name)))
+	/* port: a Halo Custom Edition map (custom_maps\<name>) is converted for
+	this build as it loads (port/linux/game/custom_edition_cache.c): its
+	header's build is Halo PC's, not one to check */
+	if (custom_edition_level_name(map_name))
 		return TRUE;
 	snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), tag_name_strip_path(map_name));
 	file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
@@ -1093,11 +1093,12 @@ long scenario_tags_load(
 	result = NONE;
 	texture_cache_open();
 	sound_cache_open();
-	/* port: a Halo Custom Edition map, when those may run, is read in place
+	/* port: a Halo Custom Edition map (custom_maps\<name>) is read in place
 	into a tag cache of its own, converted for this build and checked as its
 	own maps are (port/linux/game/custom_edition_cache.c). It has no Xbox
-	vertex or index buffers. */
-	if (custom_edition_cache_playable(stripped_scenario_name))
+	vertex or index buffers. It is never the game's own map of that file
+	name: a Custom Edition map that cannot load is not played at all. */
+	if (custom_edition_level_name(scenario_name))
 	{
 		cache_file_globals.tag_header = custom_edition_cache_tags_load(
 			stripped_scenario_name,

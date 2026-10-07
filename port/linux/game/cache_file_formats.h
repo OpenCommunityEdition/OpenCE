@@ -3,11 +3,12 @@ CACHE_FILE_FORMATS.H
 
 Recognition, validation and loading of the Halo 1 map files that this build
 did not ship with: Halo Custom Edition caches (version 609) and the Custom
-Edition resource maps bitmaps.map, sounds.map and loc.map. OpenSauce caches
-(".yelo" maps, and Custom Edition caches with OpenSauce's header or tags) are
-refused. docs/custom_edition_caches.md defines what each milestone
-(recognize, load, run) means, which of them this module reaches, and the
-evidence behind every layout used here.
+Edition resource maps bitmaps.map, sounds.map and loc.map. A cache that
+needs OpenSauce (its header asks for memory upgrades, mod data files and the
+like) is refused; one that only carries OpenSauce's header and tags is run as
+stock Custom Edition runs it, without them. docs/custom_edition_caches.md
+defines what each milestone (recognize, load, run) means, which of them this
+module reaches, and the evidence behind every layout used here.
 
 The code is standalone C with fixed-width types: the same file is compiled
 into the native game builds and into the host tool
@@ -102,8 +103,7 @@ enum cache_file_status
 	_cache_file_status_bad_file_length,
 	_cache_file_status_compressed_cache,
 	_cache_file_status_bad_tag_data_range,
-	/* OpenSauce's header, or its project_yellow ('yelo') or
-	project_yellow_globals ('gelo') tags */
+	/* OpenSauce's header, asking for what only OpenSauce has */
 	_cache_file_status_opensauce_cache,
 
 	/* the tag index */

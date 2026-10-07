@@ -582,10 +582,11 @@ boolean cache_files_precache_is_copying_map(
 boolean cache_files_precache_map_loaded(
 	const char *map_name)
 {
-	/* port: a Halo Custom Edition map, when those may run, is read in place
-	and never copied to the cache partition (port/linux/game/custom_edition_cache.c) */
-	if (custom_edition_cache_playable(tag_name_strip_path(map_name)))
-		return TRUE;
+	/* port: a Halo Custom Edition map (custom_maps\<name>) is read in place
+	and never copied to the cache partition; it is never the game's own map
+	of that file name (port/linux/game/custom_edition_cache.c) */
+	if (custom_edition_level_name(map_name))
+		return custom_edition_cache_playable(map_name);
 	return cached_map_files_find_map(tag_name_strip_path(map_name)) != NONE;
 }
 
@@ -598,6 +599,19 @@ boolean cache_files_precache_map_begin(
 {
 	const char *cache_map_name = tag_name_strip_path(map_name);
 
+	/* port: a Halo Custom Edition map (custom_maps\<name>) this machine has
+	not is missing, as a map not on the DVD is: never the game's own map of
+	its file name (port/linux/game/custom_edition_cache.c) */
+	if (custom_edition_level_name(map_name) && !custom_edition_cache_playable(map_name))
+	{
+		error(_error_silent, "couldn't find the Custom Edition map '%s' in custom_maps", map_name);
+		if (copy_map)
+		{
+			display_error_damaged_media();
+		}
+
+		return FALSE;
+	}
 	if (!cache_files_precache_map_loaded(map_name))
 	{
 		struct cache_file_header header;

@@ -35,9 +35,15 @@ docs/custom_edition_caches.md lists each with its evidence.
 #define CACHE_FOOTER_SIGNATURE 'foot'
 #define TAG_INDEX_SIGNATURE 'tags'
 #define STRUCTURE_BSP_SIGNATURE 'sbsp'
-/* the signature of OpenSauce's own header, at CACHE_HEADER_OPENSAUCE_OFFSET,
-where a Custom Edition cache has padding: such a cache is refused */
+/* OpenSauce's own header, at CACHE_HEADER_OPENSAUCE_OFFSET, where a Custom
+Edition cache has padding: its signature and its flags (OpenSauce
+cache_files_structures_yelo.hpp, s_cache_header_yelo). A cache that sets
+none of the flags (memory upgrades, mod data files and the like) needs
+nothing of OpenSauce's, and is run as stock Custom Edition runs it, the
+header and the OpenSauce tags it holds (project_yellow, project_yellow
+globals) never read; one that sets any is refused. */
 #define OPENSAUCE_HEADER_SIGNATURE 'yelo'
+#define OPENSAUCE_HEADER_FLAGS_OFFSET 0x06
 
 #define BITMAP_GROUP_TAG 'bitm'
 #define SOUND_GROUP_TAG 'snd!'
@@ -47,9 +53,6 @@ where a Custom Edition cache has padding: such a cache is refused */
 #define SCENARIO_GROUP_TAG 'scnr'
 #define STRUCTURE_BSP_GROUP_TAG 'sbsp'
 #define GBXMODEL_GROUP_TAG 'mod2'
-/* OpenSauce's project_yellow and project_yellow_globals: refused */
-#define PROJECT_YELLOW_GROUP_TAG 'yelo'
-#define PROJECT_YELLOW_GLOBALS_GROUP_TAG 'gelo'
 
 #define NO_TAG_INDEX (-1)
 #define ABSOLUTE_INDEX_MASK 0xFFFFUL
@@ -776,7 +779,7 @@ static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STA
 	"the file length in the header does not fit the file or the size limit",
 	"the cache is compressed, which Custom Edition caches never are",
 	"the tag data range in the header does not fit the file or the tag cache",
-	"an OpenSauce map, which this build does not run",
+	"an OpenSauce map that needs OpenSauce (its header asks for memory upgrades, mod data files or the like), which this build does not run",
 	"the tag index signature is not 'tags'",
 	"the tag instances do not fit in the tag data",
 	"a tag handle does not match its position in the index",
@@ -1012,7 +1015,8 @@ static enum cache_file_status custom_edition_header_verify(
 	uint8_t const *bytes,
 	struct cache_file_identity *identity)
 {
-	if (read_u32(bytes + CACHE_HEADER_OPENSAUCE_OFFSET) == OPENSAUCE_HEADER_SIGNATURE)
+	if (read_u32(bytes + CACHE_HEADER_OPENSAUCE_OFFSET) == OPENSAUCE_HEADER_SIGNATURE &&
+		read_u16(bytes + CACHE_HEADER_OPENSAUCE_OFFSET + OPENSAUCE_HEADER_FLAGS_OFFSET))
 	{
 		return _cache_file_status_opensauce_cache;
 	}
@@ -2236,10 +2240,6 @@ enum cache_file_status custom_edition_cache_load(
 		if (!tag_name_get(&state, instance))
 		{
 			return load_fail(&state, _cache_file_status_bad_tag_name, read_u32(instance + TAG_INSTANCE_NAME_OFFSET));
-		}
-		if (group_tag == PROJECT_YELLOW_GROUP_TAG || group_tag == PROJECT_YELLOW_GLOBALS_GROUP_TAG)
-		{
-			return load_fail(&state, _cache_file_status_opensauce_cache, group_tag);
 		}
 		if (read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET))
 		{
