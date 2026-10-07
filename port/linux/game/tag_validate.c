@@ -579,7 +579,8 @@ static void validate_block_extent(
 		tag_validate_refuse(validation, "has %ld elements", block->count);
 		return;
 	}
-	if (field->maximum > 0 && block->count > field->maximum)
+	if (field->maximum > 0 && block->count > field->maximum &&
+		!(tag_validate_globals.custom_edition && TEST_FLAG(field->flags, _tag_schema_tool_maximum_bit)))
 	{
 		tag_validate_correct(validation, "has %ld elements, more than the game's %ld: cut to %ld",
 			block->count, field->maximum, field->maximum);
