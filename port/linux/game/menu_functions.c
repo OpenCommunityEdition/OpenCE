@@ -76,6 +76,7 @@ their handlers open opens.
 #include "text/unicode.h"
 
 #include "halo_menus.h"
+#include "custom_edition_maps.h"
 /* (internet play's server browser: the platform layer's) */
 #include "../src/p2p.h"
 
@@ -949,9 +950,12 @@ static short map_kind_rows_update(struct widget_instance *list, short *first, sh
 	return row == NONE || row < 1 || row > shown ? NONE : (short)(*first + row - 1);
 }
 
+/* (a map past the Xbox levels is a Custom Edition map, whose name, picture
+and description the menus find by its display index:
+custom_edition_maps.c) */
 static void multiplayer_map_text(short map, wchar_t *text)
 {
-	string_get("pc\\main_menu\\mp_map_list", map, text);
+	string_get("pc\\main_menu\\mp_map_list", custom_edition_maps_level_display_index(map), text);
 }
 
 /* the description's map (each list's has both kinds' widgets): a campaign
@@ -975,6 +979,7 @@ static void map_description_show(struct widget_instance *description, short leve
 	}
 	if (map == NONE)
 		return;
+	map = custom_edition_maps_level_display_index(map);
 	if ((widget = named(description, "mp_map_right_name", 0)) != NULL)
 		widget->parameters.text_box.string_list_index = map;
 	if ((widget = named(description, "mp_map_right_pic", 0)) != NULL)
@@ -2358,6 +2363,8 @@ static boolean map_list_initialize(struct widget_instance *list)
 	short last_used = 0;
 
 	map_list.hosting = global_network_game_server_get() != NULL && !network_game_is_splitscreen_local();
+	/* (the maps folders looked for again as the list opens) */
+	custom_edition_maps_look_again();
 	map_list.map_count = ui_widget_port_multiplayer_maps(&names, &last_used);
 	map_list.kind = MAP_KIND_MULTIPLAYER;
 	map_kind_set(list, map_list.kind);

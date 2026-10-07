@@ -31,9 +31,19 @@ symbols in this file:
 /* ---------- NTSC maps' missing multiplayer strings */
 
 #include "tag_files/tag_files.h"
+#include "custom_edition_maps.h"
 
 #define MULTIPLAYER_GAME_TEXT_TAG_NAME "ui\\multiplayer_game_text"
 #define FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING 36
+
+/* the multiplayer level list's level names and descriptions, past which the
+Custom Edition maps after the Xbox levels have their display indices
+(port/linux/game/custom_edition_maps.c), and the PC menus' copies of them
+(port/linux/game/menu_tags.c) */
+#define LEVEL_NAMES_TAG_NAME "ui\\shell\\main_menu\\mp_map_list"
+#define LEVEL_DESCRIPTIONS_TAG_NAME "ui\\shell\\main_menu\\multiplayer_type_select\\mp_map_select\\map_data"
+#define PC_LEVEL_NAMES_TAG_NAME "pc\\main_menu\\mp_map_list"
+#define PC_LEVEL_DESCRIPTIONS_TAG_NAME "pc\\main_menu\\multiplayer_type_select\\mp_map_select\\map_data"
 
 /* ui\multiplayer_game_text holds 184 strings in the PAL release's maps
 (01.01.14.2342, the build this code is), but only the first 36 in the NTSC
@@ -201,11 +211,17 @@ typedef char fallback_multiplayer_game_text_string_count_check[
 or NULL */
 static wchar_t *fallback_string(long tag_index, short string_index)
 {
+	char const *tag_name = tag_get_name(tag_index);
 	short fallback_index = string_index - FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING;
 
+	/* (a Custom Edition map's name or description, by its display index) */
+	if (!csstrcasecmp(tag_name, LEVEL_NAMES_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_NAMES_TAG_NAME))
+		return custom_edition_maps_name(string_index);
+	if (!csstrcasecmp(tag_name, LEVEL_DESCRIPTIONS_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_DESCRIPTIONS_TAG_NAME))
+		return custom_edition_maps_description(string_index);
 	if (fallback_index < 0 ||
 		fallback_index >= (short)NUMBEROF(fallback_multiplayer_game_text_strings) ||
-		csstrcasecmp(tag_get_name(tag_index), MULTIPLAYER_GAME_TEXT_TAG_NAME))
+		csstrcasecmp(tag_name, MULTIPLAYER_GAME_TEXT_TAG_NAME))
 	{
 		return NULL;
 	}
