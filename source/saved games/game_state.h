@@ -81,6 +81,10 @@ struct lruv_cache *game_state_lruv_cache_new(
 	long maximum_block_count,
 	void (*delete_block_proc)(long),
 	boolean (*locked_block_proc)(long));
+/* port: reports a data array gone wrong since its last tick in order
+(game_state.c), each game tick */
+void game_state_check_data_arrays(
+	void);
 void game_state_try_and_load_from_persistent_storage(
 	void);
 void game_state_load_core(
