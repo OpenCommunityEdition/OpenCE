@@ -537,11 +537,21 @@ struct gl_device
 	unsigned long counter_of_slot[VISIBILITY_TEST_SLOTS];
 #else
 	/* each test's latest result, which the GPU writes (as a query buffer)
-	when the test's draws are done: the game waits for results at the start
-	of the next frame, and a query would stop the CPU there until the GPU
-	had caught up */
+	a frame after the test (visibility_copy_batch): the game waits for
+	results at the start of the next frame, and a query would stop the CPU
+	there until the GPU had caught up */
 	GLuint visibility_results_buffer;
 	volatile GLuint *visibility_results;
+	/* the tests of this frame and of the one before, whose counts the GPU
+	is yet to copy into their slots; each batch keeps its own query objects,
+	which are not reused until their counts are copied */
+	struct
+	{
+		GLuint queries[VISIBILITY_TEST_SLOTS];
+		unsigned short slots[VISIBILITY_TEST_SLOTS];
+		unsigned long count;
+	} visibility_batches[2];
+	unsigned long visibility_batch;
 	/* a pipeline flush every flush_every draws (draw_flush), 0 never */
 	unsigned long flush_every;
 	unsigned long flush_draws;
@@ -1530,7 +1540,12 @@ static void gl_initialize(void)
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
 	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
 		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	if (!device.visibility_results)
+	if (device.visibility_results)
+	{
+		glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[0].queries);
+		glGenQueries(VISIBILITY_TEST_SLOTS, device.visibility_batches[1].queries);
+	}
+	else
 		platform_log("cannot map the visibility test results; tests wait for the GPU");
 	{
 		long every = config_integer("debug.gpu_flush_draws");
@@ -2023,6 +2038,18 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 		return;
 	}
+#else
+	if (device.visibility_results)
+	{
+		unsigned long count = device.visibility_batches[device.visibility_batch].count;
+
+		/* the batch's next query, or (with the batch full) a scratch one
+		whose count is dropped */
+		device.active_query = count < VISIBILITY_TEST_SLOTS ?
+			device.visibility_batches[device.visibility_batch].queries[count] : device.queries[0];
+		glBeginQuery(VISIBILITY_QUERY, device.active_query);
+		return;
+	}
 #endif
 	glBeginQuery(VISIBILITY_QUERY, device.queries[0]);
 }
@@ -2052,22 +2079,27 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	(lens flares, rasterizer_lights.c), a split-screen window's or the
 	screen's alike */
 	device.query_area[index] = target_scale[0] * target_scale[1] * (float)target_samples;
+#ifndef HALO_ANDROID
+	if (device.visibility_results)
+	{
+		/* the GPU copies the count into the slot at the next frame's end
+		(visibility_copy_batch) */
+		unsigned long *count = &device.visibility_batches[device.visibility_batch].count;
+
+		if (*count < VISIBILITY_TEST_SLOTS)
+		{
+			device.visibility_batches[device.visibility_batch].slots[(*count)++] = (unsigned short)index;
+			device.query_pending[index] = TRUE;
+		}
+		return S_OK;
+	}
+#endif
 	/* swap the scratch query into the requested slot */
 	scratch = device.queries[0];
 	device.queries[0] = device.queries[index];
 	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
 	device.visibility_unread[index] = TRUE;
-#ifndef HALO_ANDROID
-	if (device.visibility_results)
-	{
-		/* the GPU writes the count into the slot once it is known (given
-		by name: Mesa's GL thread waits for everything before a
-		glGetQueryObjectuiv, even one into a bound buffer) */
-		glGetQueryBufferObjectuiv(device.queries[index], device.visibility_results_buffer, GL_QUERY_RESULT,
-			(GLintptr)(index * sizeof(GLuint)));
-	}
-#endif
 	return S_OK;
 }
 
@@ -4640,6 +4672,31 @@ static void write_screenshot(struct render_target_entry *target)
 	free(pixels);
 }
 
+#ifndef HALO_ANDROID
+/* the GPU copies the counts of the previous frame's tests into their slots
+(given by name: Mesa's GL thread waits for everything before a
+glGetQueryObjectuiv, even one into a bound buffer). A copy right after each
+test stopped the GPU until that test's draws were through, hundreds of times
+a frame in The Library; a frame later the draws are long done, so the copies
+do not wait. */
+static void visibility_copy_batch(void)
+{
+	unsigned long i;
+
+	if (!device.visibility_results)
+		return;
+	/* this frame's tests wait for the next present */
+	device.visibility_batch ^= 1;
+	for (i = 0; i < device.visibility_batches[device.visibility_batch].count; i++)
+	{
+		glGetQueryBufferObjectuiv(device.visibility_batches[device.visibility_batch].queries[i],
+			device.visibility_results_buffer, GL_QUERY_RESULT,
+			(GLintptr)(device.visibility_batches[device.visibility_batch].slots[i] * sizeof(GLuint)));
+	}
+	device.visibility_batches[device.visibility_batch].count = 0;
+}
+
+#endif
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -4661,6 +4718,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
 		render_target_resolve(&back_buffer->target);
+#ifndef HALO_ANDROID
+		visibility_copy_batch();
+#endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
 
