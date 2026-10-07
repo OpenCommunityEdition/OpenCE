@@ -2287,6 +2287,13 @@ static boolean main_framerate_throttle_enabled(
 	return rasterizer_globals.framerate_throttle;
 }
 
+/* the port's debug.frame_time (screenshot.c): each frame's real time when it
+is not the time the frame took, so that what moves with real time (weather,
+lens flares fading, cinematics) moves alike whatever draws the frames
+(tools/render_test.py): more than 0, the seconds each frame counts as;
+less than 0, none (real time held still); 0, the time frames take */
+double port_frame_time(void);
+
 /* The native ports draw a frame whenever the display can show one, paced
 by vsync, and frames fall between the 30 Hz ticks
 (port/linux/game/render_interpolation.c): no vertical blank throttle, and
@@ -2311,6 +2318,10 @@ static void main_update_time_unthrottled(
 	if (main_globals.movie)
 	{
 		seconds_elapsed = main_globals.recording_dt;
+	}
+	else if (port_frame_time() != 0.0)
+	{
+		seconds_elapsed = port_frame_time() > 0.0 ? (real)port_frame_time() : 0.0f;
 	}
 	else
 	{
@@ -2553,6 +2564,10 @@ static void main_update_time(
 	if (main_globals.movie)
 	{
 		seconds_elapsed = main_globals.recording_dt;
+	}
+	else if (port_frame_time() != 0.0)
+	{
+		seconds_elapsed = port_frame_time() > 0.0 ? (real)port_frame_time() : 0.0f;
 	}
 	else
 	{

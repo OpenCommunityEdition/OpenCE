@@ -939,6 +939,21 @@ static GLuint visibility_unscaled(GLuint samples, DWORD index)
 }
 
 #endif
+#ifndef HALO_ANDROID
+/* debug.visibility_wait: the test's own count, waited for (the frames the
+same whatever the renderer, as tools/render_test.py compares them; ES's
+results are always waited for) */
+static BOOL visibility_wait(void)
+{
+	static int wait = -1;
+
+	if (wait < 0)
+		wait = config_boolean("debug.visibility_wait") != 0;
+	return wait;
+}
+
+#endif
+
 static HRESULT gl_visibility_result(DWORD index, UINT *result)
 {
 	GLuint available = 0, samples = 0;
@@ -961,6 +976,17 @@ static HRESULT gl_visibility_result(DWORD index, UINT *result)
 	}
 #endif
 #ifndef HALO_ANDROID
+	if (gl.visibility_results && visibility_wait())
+	{
+		/* the test's own count, waited for (a query buffer bound would take
+		it in place of samples) */
+		glBindBuffer(GL_QUERY_BUFFER, 0);
+		glGetQueryObjectuiv(gl.queries[index], GL_QUERY_RESULT, &samples);
+		glBindBuffer(GL_QUERY_BUFFER, gl.visibility_results_buffer);
+		if (result)
+			*result = visibility_unscaled(samples, index);
+		return S_OK;
+	}
 	if (gl.visibility_results)
 	{
 		/* the latest count the GPU has written: from this test, or while

@@ -671,7 +671,8 @@ or last resized: platform_display_apply */
 static long platform_window_width = -1, platform_window_height = -1;
 #endif
 
-BOOL platform_video_initialize(unsigned long width, unsigned long height)
+/* the window, and with opengl its OpenGL context current on this thread */
+static BOOL platform_video_start(unsigned long width, unsigned long height, BOOL opengl)
 {
 	int version;
 
@@ -720,7 +721,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)height;
 	platform_window_size_setting(&platform_window_width, &platform_window_height);
 	platform_window = SDL_CreateWindow("Halo", (int)platform_window_width, (int)platform_window_height,
-		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
+		(opengl ? SDL_WINDOW_OPENGL : 0) | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
 		(config_boolean("debug.hidden_window") ? SDL_WINDOW_HIDDEN : 0) |
 		(platform_fullscreen_setting() ? SDL_WINDOW_FULLSCREEN : 0));
 #endif
@@ -733,6 +734,15 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_fullscreen_kind_apply();
 #endif
+	if (!opengl)
+	{
+		/* (another API draws into the window: port/windows/src/d3d12_device.c) */
+		platform_event_thread = SDL_GetCurrentThreadID();
+#ifndef HALO_ANDROID
+		platform_mouse_capture(TRUE);
+#endif
+		return TRUE;
+	}
 	platform_gl_context = SDL_GL_CreateContext(platform_window);
 #ifdef HALO_ANDROID
 	/* ES 3.2 where the driver has it, otherwise the renderer makes do with
@@ -759,6 +769,41 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	platform_mouse_capture(TRUE);
 #endif
 	return TRUE;
+}
+
+BOOL platform_video_initialize(unsigned long width, unsigned long height)
+{
+	return platform_video_start(width, height, TRUE);
+}
+
+BOOL platform_video_initialize_window(unsigned long width, unsigned long height)
+{
+	return platform_video_start(width, height, FALSE);
+}
+
+void *platform_video_native_window(void)
+{
+#ifdef _WIN32
+	return platform_window ?
+		SDL_GetPointerProperty(SDL_GetWindowProperties(platform_window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL) :
+		NULL;
+#else
+	return NULL;
+#endif
+}
+
+void platform_video_shutdown(void)
+{
+	if (platform_gl_context)
+	{
+		SDL_GL_DestroyContext(platform_gl_context);
+		platform_gl_context = NULL;
+	}
+	if (platform_window)
+	{
+		SDL_DestroyWindow(platform_window);
+		platform_window = NULL;
+	}
 }
 
 /* display.mode, display.resolution (fullscreen's display mode),
@@ -788,7 +833,8 @@ void platform_display_apply(void)
 	if (!platform_window)
 		return;
 #endif
-	SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
+	if (platform_gl_context)
+		SDL_GL_SetSwapInterval(config_boolean("display.vsync") ? 1 : 0);
 }
 
 void platform_video_drawable_size(int *width, int *height)
@@ -830,13 +876,16 @@ static Uint64 frame_interval_ns(void)
 #endif
 void platform_video_swap(void)
 {
+	SDL_GL_SwapWindow(platform_window);
+	platform_video_pace();
+}
+
+void platform_video_pace(void)
+{
 #ifndef HALO_ANDROID
 	static Uint64 next_frame;
 	Uint64 interval, now;
 
-#endif
-	SDL_GL_SwapWindow(platform_window);
-#ifndef HALO_ANDROID
 	interval = frame_interval_ns();
 	if (!interval)
 		return;

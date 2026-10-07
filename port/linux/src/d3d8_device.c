@@ -1890,7 +1890,10 @@ void WINAPI D3DDevice_End(void)
 {
 	xgpu_device.immediate_active = FALSE;
 	if (xgpu_device.immediate_count && xgpu_device.ready)
+	{
+		xgpu_draw_label.draw++;
 		xgpu_backend->draw_immediate(xgpu_device.immediate_type, xgpu_device.immediate_vertices, xgpu_device.immediate_count);
+	}
 }
 
 static void set_attribute(INT reg, float a, float b, float c, float d)
@@ -1941,18 +1944,119 @@ void WINAPI D3DDevice_SetVertexDataColor(INT reg, D3DCOLOR color)
 	set_attribute(reg, value[0], value[1], value[2], value[3]);
 }
 
+/* ---------- what the game draws (xgpu_device.h) */
+
+struct xgpu_draw_label xgpu_draw_label = { -1, { -1 } };
+/* the window's solid surfaces have been reported all drawn */
+static BOOL opaque_reported;
+
+static const char *const pass_names[NUMBER_OF_XGPU_PASSES] =
+{
+	"clear", "sky", "models", "lightmaps", "shadows", "diffuse lights", "light decals", "alpha-tested decals",
+	"environment textures", "primary decals", "secondary decals", "specular lights", "specular lightmaps",
+	"reflection lightmap masks", "reflection mirrors", "reflections", "environment transparents", "fog",
+	"fog screen", "water", "water decals", "detail objects", "transparents", "lens flare occlusion submit",
+	"lens flare occlusion query", "lens flares", "screen effect", "hud", "screen flash",
+};
+
+const char *xgpu_pass_name(short pass)
+{
+	return pass >= 0 && pass < NUMBER_OF_XGPU_PASSES ? pass_names[pass] : "";
+}
+
+BOOL xgpu_pass_opaque(short pass)
+{
+	switch (pass)
+	{
+	case _xgpu_pass_sky:
+	case _xgpu_pass_models:
+	case _xgpu_pass_lightmaps:
+	case _xgpu_pass_shadows:
+	case _xgpu_pass_diffuse_lights:
+	case _xgpu_pass_decals_light:
+	case _xgpu_pass_decals_alpha_tested:
+	case _xgpu_pass_environment_textures:
+	case _xgpu_pass_decals_primary:
+	case _xgpu_pass_decals_secondary:
+	case _xgpu_pass_specular_lights:
+	case _xgpu_pass_specular_lightmaps:
+	case _xgpu_pass_reflection_lightmap_masks:
+	case _xgpu_pass_reflection_mirrors:
+	case _xgpu_pass_reflections:
+	/* (alpha tested, as solid as the decals) */
+	case _xgpu_pass_detail_objects:
+		return TRUE;
+	default:
+		return FALSE;
+	}
+}
+
+void xgpu_game_pass(short pass, int begin)
+{
+	if (!begin)
+	{
+		if (xgpu_draw_label.pass == pass)
+			xgpu_draw_label.pass = -1;
+		return;
+	}
+	xgpu_draw_label.pass = pass;
+	/* the first pass after a window's solid surfaces */
+	if (!opaque_reported && xgpu_draw_label.view.window >= 0 && pass != _xgpu_pass_clear && !xgpu_pass_opaque(pass))
+	{
+		opaque_reported = TRUE;
+		if (xgpu_device.ready && xgpu_backend->opaque_done)
+			xgpu_backend->opaque_done();
+	}
+}
+
+void xgpu_game_window_begin(short window, int mirrored, const float *position, const float *forward, const float *up,
+	float vertical_field_of_view, float z_near, float z_far, short x0, short y0, short x1, short y1)
+{
+	struct xgpu_view *view = &xgpu_draw_label.view;
+
+	view->window = window;
+	view->mirrored = mirrored != 0;
+	memcpy(view->position, position, sizeof(view->position));
+	memcpy(view->forward, forward, sizeof(view->forward));
+	memcpy(view->up, up, sizeof(view->up));
+	view->vertical_field_of_view = vertical_field_of_view;
+	view->z_near = z_near;
+	view->z_far = z_far;
+	view->viewport[0] = x0;
+	view->viewport[1] = y0;
+	view->viewport[2] = x1;
+	view->viewport[3] = y1;
+	xgpu_draw_label.pass = -1;
+	opaque_reported = FALSE;
+	if (xgpu_device.ready && xgpu_backend->view_begin)
+		xgpu_backend->view_begin(view);
+}
+
+void xgpu_game_window_end(void)
+{
+	/* (what is drawn between windows is no window's) */
+	xgpu_draw_label.pass = -1;
+	xgpu_draw_label.view.window = -1;
+}
+
 /* ---------- draws */
 
 void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_vertex, UINT vertex_count)
 {
 	if (vertex_count && xgpu_device.ready)
+	{
+		xgpu_draw_label.draw++;
 		xgpu_backend->draw_vertices(primitive_type, start_vertex, vertex_count);
+	}
 }
 
 void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT vertex_count, CONST WORD *index_data)
 {
 	if (vertex_count && index_data && xgpu_device.ready)
+	{
+		xgpu_draw_label.draw++;
 		xgpu_backend->draw_indexed_vertices(primitive_type, vertex_count, index_data);
+	}
 }
 
 /* ---------- clearing */
@@ -1960,7 +2064,10 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags, D3DCOLOR color, float z, DWORD stencil)
 {
 	if (xgpu_device.ready)
+	{
+		xgpu_draw_label.draw++;
 		xgpu_backend->clear(count, rectangles, flags, color, z, stencil);
+	}
 }
 
 /* ---------- visibility (occlusion) tests
@@ -2072,6 +2179,8 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		xgpu_texture_cache_begin_frame();
 	}
 	xgpu_device.frame++;
+	xgpu_draw_label.frame = xgpu_device.frame;
+	xgpu_draw_label.draw = 0;
 	xgpu_statistics.presents++;
 	if (xgpu_debug_settings.statistics && xgpu_device.frame % 60 == 0)
 	{

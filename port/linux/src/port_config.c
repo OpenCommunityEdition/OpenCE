@@ -385,6 +385,17 @@ static const struct config_setting config_settings[] =
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
+	{ "debug.frame_time", _config_real, "0.0", "HALO_FRAME_TIME", _environment_value, _platform_all,
+		"Count every frame as this many seconds of real time, however long it\n"
+		"takes, so that what moves with real time (weather, lens flares,\n"
+		"cinematics) moves alike whatever draws the frames (tools/render_test.py);\n"
+		"0 counts the time frames take. Negative holds real time still until the\n"
+		"telnet console's port_screenshot, then counts each frame as its size." },
+	{ "debug.visibility_wait", _config_boolean, "false", "HALO_VISIBILITY_WAIT", _environment_set_is_true, _platform_all,
+		"Give the game each visibility test's own count (lens flares are as bright\n"
+		"as theirs), waiting for the GPU to have it, rather than the latest it has\n"
+		"written: the same frames whatever the renderer, for tests that compare\n"
+		"renderers (tools/render_test.py). Slower." },
 	{ "debug.random_seed", _config_integer, "0", "HALO_RANDOM_SEED", _environment_value, _platform_all,
 		"The seed of the random numbers that only this machine draws (effects,\n"
 		"the fog screen's layers), for tests that draw the same frame twice\n"
@@ -395,6 +406,13 @@ static const struct config_setting config_settings[] =
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
 		"Report OpenGL errors in the log." },
+	{ "debug.d3d12_debug", _config_boolean, "false", "HALO_D3D12_DEBUG", _environment_set_is_true, _platform_windows,
+		"Turn on Direct3D 12's debug layer (the Graphics Tools feature of\n"
+		"Windows) and report its errors and warnings in the log." },
+	{ "debug.d3d12_gpu_validation", _config_boolean, "false", "HALO_D3D12_GPU_VALIDATION", _environment_set_is_true,
+		_platform_windows,
+		"With debug.d3d12_debug, have the GPU check what the draws read too (much\n"
+		"slower)." },
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,
 		"Start on this screen of the menus (port/assets/menus) instead of the main\n"
 		"menu, a player profile being edited; empty for the main menu." },

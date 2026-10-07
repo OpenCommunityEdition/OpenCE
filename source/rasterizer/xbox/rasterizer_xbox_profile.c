@@ -388,9 +388,13 @@ void _rasterizer_profile_enable(
 	return;
 }
 
+/* port: the pass the draws are part of, for the renderer (xgpu_device.h) */
+void xgpu_game_pass(short pass, int begin);
+
 void rasterizer_profile_begin(
 	short profile)
 {
+	xgpu_game_pass(profile, TRUE);
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
 		259,
@@ -427,6 +431,7 @@ void rasterizer_profile_begin(
 void rasterizer_profile_end(
 	short profile)
 {
+	xgpu_game_pass(profile, FALSE);
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_profile.c",
 		294,

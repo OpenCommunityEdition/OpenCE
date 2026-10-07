@@ -17,6 +17,10 @@
     "user32",
     "advapi32",
     "winhttp",
-    "dbghelp"
+    "dbghelp",
+    "d3d12",
+    "dxgi",
+    "d3dcompiler",
+    "dxguid"
   ]
 }

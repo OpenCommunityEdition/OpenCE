@@ -1776,9 +1776,19 @@ void rasterizer_frame_end(void)
 	_rasterizer_frame_end();
 }
 
+/* port: each window's camera, for the renderer (xgpu_device.h) */
+void xgpu_game_window_begin(short window, int mirrored, const float *position, const float *forward, const float *up,
+	float vertical_field_of_view, float z_near, float z_far, short x0, short y0, short x1, short y1);
+void xgpu_game_window_end(void);
+
 void rasterizer_window_begin(
 	struct rasterizer_window_begin_parameters const *parameters)
 {
+	struct render_camera const *camera = &parameters->camera;
+
+	xgpu_game_window_begin(parameters->window_index, camera->mirrored, camera->position.n, camera->forward.n,
+		camera->up.n, camera->vertical_field_of_view, camera->z_near, camera->z_far, camera->viewport_bounds.x0,
+		camera->viewport_bounds.y0, camera->viewport_bounds.x1, camera->viewport_bounds.y1);
 	_rasterizer_window_begin(parameters);
 	return;
 }
@@ -1787,6 +1797,7 @@ void rasterizer_window_end(
 	void)
 {
 	_rasterizer_window_end();
+	xgpu_game_window_end();
 	return;
 }
 

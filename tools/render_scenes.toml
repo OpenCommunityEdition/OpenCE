@@ -16,8 +16,10 @@
 #   settle_frames, threshold, tolerance: as [defaults]
 
 [defaults]
-# frames drawn after the last command, before the one saved
-settle_frames = 8
+# frames drawn after the picture is asked for, before the one saved: real time
+# is held still until then (render_test.py's HALO_FRAME_TIME), so the weather,
+# lens flares fading in and cinematics move this many 60ths of a second
+settle_frames = 60
 # a pixel matches when no channel differs by more than this (of 255)
 threshold = 2
 # a scene passes when at least this fraction of its pixels match

@@ -92,6 +92,15 @@ BASE_SETTINGS = {
     # the random numbers only this machine draws (the fog screen's layers,
     # effects) the same in every run
     "HALO_RANDOM_SEED": "1",
+    # real time held still until the picture is asked for, then every frame a
+    # 60th of a second however long it takes: the weather, the lens flares and
+    # cinematics are where the settle frames take them, whatever renderer
+    # draws (a renderer's first frames take longer, making its programs), and
+    # however long the console's commands take to arrive
+    "HALO_FRAME_TIME": "-0.0166667",
+    # lens flares as bright as their visibility tests of the frame before,
+    # not of whichever frame the GPU has got to (renderers differ in that)
+    "HALO_VISIBILITY_WAIT": "1",
     "HALO_TELNET_CONSOLE": "1",
 }
 
@@ -502,7 +511,9 @@ def command_author(args: argparse.Namespace) -> int:
         sys.exit("render_test: a scene's name is letters, digits, '-', '_' and '.'")
     root = args.work / "data"
     ensure_data_root(args.assets, root)
-    settings = {"HALO_RENDERER": args.renderer, "HALO_SCREENSHOT_DIR": str((args.work / "author").resolve())}
+    # (real time as it goes: the map runs by itself while the scene is made)
+    settings = {"HALO_RENDERER": args.renderer, "HALO_SCREENSHOT_DIR": str((args.work / "author").resolve()),
+                "HALO_FRAME_TIME": "0"}
     (args.work / "author").mkdir(parents=True, exist_ok=True)
     game = Game(args.binary, root, args.work / "save", [f"map_name {map_path(args.map)}"], settings,
                 args.work / "author" / "game.log", args.port)

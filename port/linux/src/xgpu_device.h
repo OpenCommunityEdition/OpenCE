@@ -303,6 +303,88 @@ multisampled) */
 void xgpu_pixel_shader_key_begin(struct nv2a_pixel_shader_key *key);
 void xgpu_pixel_shader_key_finish(struct nv2a_pixel_shader_key *key, int target_samples);
 
+/* ---------- what the game draws
+
+The game's rasterizer says which of its passes it is drawing (it brackets
+each for its profiler: rasterizer_profile_begin and _end) and from which
+camera it draws each window (rasterizer_window_begin). The device keeps
+them for the renderers, which can hand them on with each draw: a raytracer
+builds its scene from the opaque passes' geometry and sees it from the
+window's camera; a capture (PIX, RenderDoc) names its draws by pass. */
+
+/* the game's passes, as rasterizer.h's _rasterizer_profile_* */
+enum
+{
+	_xgpu_pass_clear,
+	_xgpu_pass_sky,
+	_xgpu_pass_models,
+	_xgpu_pass_lightmaps,
+	_xgpu_pass_shadows,
+	_xgpu_pass_diffuse_lights,
+	_xgpu_pass_decals_light,
+	_xgpu_pass_decals_alpha_tested,
+	_xgpu_pass_environment_textures,
+	_xgpu_pass_decals_primary,
+	_xgpu_pass_decals_secondary,
+	_xgpu_pass_specular_lights,
+	_xgpu_pass_specular_lightmaps,
+	_xgpu_pass_reflection_lightmap_masks,
+	_xgpu_pass_reflection_mirrors,
+	_xgpu_pass_reflections,
+	_xgpu_pass_environment_transparents,
+	_xgpu_pass_fog,
+	_xgpu_pass_fog_screen,
+	_xgpu_pass_water,
+	_xgpu_pass_decals_water,
+	_xgpu_pass_detail_objects,
+	_xgpu_pass_transparents,
+	_xgpu_pass_lens_flare_occlusion_submit,
+	_xgpu_pass_lens_flare_occlusion_query,
+	_xgpu_pass_lens_flares,
+	_xgpu_pass_screen_effect,
+	_xgpu_pass_hud,
+	_xgpu_pass_screen_flash,
+	NUMBER_OF_XGPU_PASSES
+};
+
+/* a window's camera, as the game draws it (render_camera) */
+struct xgpu_view
+{
+	/* the window (0 for the first player's; -1 for the menus' and the
+	console's), and whether it is seen in a mirror */
+	short window;
+	BOOL mirrored;
+	float position[3], forward[3], up[3];
+	float vertical_field_of_view, z_near, z_far;
+	/* its viewport in the game's pixels: x0, y0, x1, y1 */
+	short viewport[4];
+};
+
+/* what the draws now are part of */
+struct xgpu_draw_label
+{
+	/* the pass (-1: none), and the window's camera */
+	short pass;
+	struct xgpu_view view;
+	/* the frame, and the draw's number in it (draws and clears) */
+	unsigned long frame, draw;
+};
+
+extern struct xgpu_draw_label xgpu_draw_label;
+
+/* a pass's name ("models", "lightmaps" ...); "" for none */
+const char *xgpu_pass_name(short pass);
+/* whether a pass draws the scene's solid surfaces (what a pass after them
+sees through, and what a raytracer's scene is made of) */
+BOOL xgpu_pass_opaque(short pass);
+
+/* the game's (rasterizer_xbox_profile.c, rasterizer.c), declared there as
+the port's other entry points are */
+void xgpu_game_pass(short pass, int begin);
+void xgpu_game_window_begin(short window, int mirrored, const float *position, const float *forward, const float *up,
+	float vertical_field_of_view, float z_near, float z_far, short x0, short y0, short x1, short y1);
+void xgpu_game_window_end(void);
+
 /* ---------- helpers */
 
 static inline float dword_to_float(DWORD value)
@@ -390,6 +472,12 @@ struct xgpu_backend
 	BOOL (*texture_compressed_supported)(unsigned long width, unsigned long height);
 	/* debug.texture_dump_directory: level 0 written out (NULL: none) */
 	void (*texture_dump)(unsigned int texture, const struct xgpu_texture_description *description);
+
+	/* what the game draws (xgpu_draw_label; NULL: not needed): a window's
+	camera as the window begins, and the window's solid surfaces all drawn
+	(the first pass after them begins) */
+	void (*view_begin)(const struct xgpu_view *view);
+	void (*opaque_done)(void);
 };
 
 extern const struct xgpu_backend xgpu_backend_gl;

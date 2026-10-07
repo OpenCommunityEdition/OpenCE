@@ -90,9 +90,52 @@ These files use only the Windows SDK:
 | `src/win32_posix.c` | The POSIX functions on Windows threads, critical sections, condition variables, `VirtualAlloc` and the performance counter. |
 | `src/win32_memory_watch.c` | The write tracking of textures, with a vectored exception handler. |
 | `src/win32_crash.c` | The crash reports. Refer to "Crash reports". |
+| `src/win32_d3d12_*.c` | The Direct3D 12 work of the Direct3D 12 renderer. Refer to "Direct3D 12". |
 
 `port.json` gives the Linux files that these files replace, and the Windows
 libraries of the link.
+
+## Direct3D 12
+
+The game draws with OpenGL 4.5 (`port/linux/src/d3d8_gl.c`) or, on
+Windows, with Direct3D 12. `display.renderer` in `config.toml` (or the
+`HALO_RENDERER` environment variable) chooses: `"d3d12"`, `"gl"` or
+`"auto"` (OpenGL for now). A renderer that cannot start falls back to
+OpenGL. With Direct3D 12 the game uses no OpenGL.
+
+Both renderers draw what the Xbox Direct3D 8 device holds
+(`port/linux/src/xgpu_device.h`), with the same shaders: the NV2A programs
+translated to GLSL or to HLSL (`nv2a_vsh.c`, `nv2a_psh.c`). The Direct3D 12
+renderer has two halves, because the platform layer sees the Xbox SDK
+declarations and Direct3D 12 needs the Windows SDK declarations:
+
+| File | Contents |
+| --- | --- |
+| `src/d3d12_device.c` | The renderer of the device: it reads the state of the device and describes each draw (shaders, pipeline state, textures, targets, vertices, constants). Xbox SDK. |
+| `src/d3d12_renderer.h` | The interface between the halves, in C types only. |
+| `src/win32_d3d12_device.c` | The device, the swap chain, the frames in flight, upload memory, descriptors, presentation. Windows SDK. |
+| `src/win32_d3d12_resources.c` | Textures, render targets, the buffers of the vertex mirror, samplers. |
+| `src/win32_d3d12_draw.c` | Pipeline states, the recording of the draws, clears, visibility tests. |
+| `src/win32_d3d12_passes.c` | The window blit, clears of some channels, FXAA, SMAA, mip levels. |
+
+Each draw carries the pass of the game that draws it (the sky, the models,
+the lightmaps, the transparents, the HUD...) and the window. PIX and
+RenderDoc show the draws under the names of the passes. The camera of each
+window and the end of the solid surfaces of each window also reach the
+renderer. A raytracer needs these: Direct3D 12 raytracing (DXR) is not
+available to a 32-bit process, so a raytracer runs as a 64-bit process of its
+own and takes the scene from the draws of the opaque passes.
+
+Settings for debugging:
+
+| Setting | Environment variable | Effect |
+| --- | --- | --- |
+| `debug.d3d12_debug` | `HALO_D3D12_DEBUG` | The debug layer of Direct3D 12 (the Graphics Tools feature of Windows). Its errors and warnings go to the log. |
+| `debug.d3d12_gpu_validation` | `HALO_D3D12_GPU_VALIDATION` | With the debug layer, the validation on the GPU (slow). |
+| `debug.gpu_dump_shaders` | `HALO_GPU_DUMP_SHADERS` | The HLSL of each shader is written to this folder. |
+
+`tools/render_test.py` compares the pictures of the two renderers. Refer to
+its description.
 
 ### Inline functions
 

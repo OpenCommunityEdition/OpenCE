@@ -71,6 +71,24 @@ static int name_valid(const char *name)
 	return 1;
 }
 
+/* debug.frame_time's: a request lets real time go on, held until then */
+static int frame_time_released;
+
+double port_frame_time(void)
+{
+	static int read;
+	static double setting;
+
+	if (!read)
+	{
+		setting = config_real("debug.frame_time");
+		read = 1;
+	}
+	if (setting >= 0.0)
+		return setting;
+	return frame_time_released ? -setting : -1.0;
+}
+
 int screenshot_request(const char *name, long settle_frames, char *message, unsigned long size)
 {
 	const char *directory = config_string("debug.screenshot_directory");
@@ -93,6 +111,7 @@ int screenshot_request(const char *name, long settle_frames, char *message, unsi
 	snprintf(screenshot.path, sizeof(screenshot.path), "%s/%s.bmp", directory, name);
 	screenshot.pending = 1;
 	screenshot.frames_left = settle_frames < 0 ? 0 : settle_frames;
+	frame_time_released = 1;
 	/* (a result not yet taken is dropped: this request's comes next) */
 	screenshot.finished = 0;
 	snprintf(message, size, "port_screenshot: saving %s after %ld frames", screenshot.path, screenshot.frames_left);

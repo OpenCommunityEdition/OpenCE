@@ -59,6 +59,15 @@ struct platform_keystroke
 BOOL platform_sdl_initialize(void);
 /* creates the window and makes its OpenGL context current on this thread */
 BOOL platform_video_initialize(unsigned long width, unsigned long height);
+/* creates the window without OpenGL, which another API draws into */
+BOOL platform_video_initialize_window(unsigned long width, unsigned long height);
+/* the window's HWND on Windows, else NULL */
+void *platform_video_native_window(void);
+/* the window (and its OpenGL context) gone, for another to be made */
+void platform_video_shutdown(void);
+/* with vsync off, waits out display.max_fps's time between frames
+(platform_video_swap does, after the swap) */
+void platform_video_pace(void);
 #ifndef HALO_ANDROID
 BOOL platform_screen_mode(long *width, long *height);
 #endif

@@ -17,6 +17,15 @@ destination alpha, which image viewers would show as transparency). 1 on
 success */
 int screenshot_write_bmp(const char *path, unsigned char *pixels, unsigned long width, unsigned long height);
 
+/* each frame's real time as the game counts it (main.c), from
+debug.frame_time: more than 0, those seconds; 0, the time the frame took;
+less than 0, held still (none) until the first screenshot is asked for, then
+as many seconds as it says: the effects that move with real time are where
+the settle frames move them, whatever renderer draws them, however long its
+first frames take. Returned: those seconds, 0 for the frame's own, or less
+than 0 while held */
+double port_frame_time(void);
+
 /* asks for the frame presented after settle_frames more frames, saved as
 <debug.screenshot_directory>/<name>.bmp. 0, with why in message, when it
 cannot be: a name that is not letters, digits, '-', '_' and '.', no
