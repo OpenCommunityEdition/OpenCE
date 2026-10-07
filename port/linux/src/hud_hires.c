@@ -185,6 +185,8 @@ static unsigned char *png_decode(const unsigned char *data, unsigned long size, 
 	ended when the output is exactly full: all of it is enough) */
 	if ((result != Z_OK && result != Z_BUF_ERROR) || inflated_size != filtered_size)
 		goto failed;
+	/* (each row by its filter, the first pixel's 4 bytes, which have none to
+	their left, apart; the first row has none above: zeroes) */
 	for (row = 0; row < height; row++)
 	{
 		const unsigned char *line = filtered + row * (stride + 1) + 1;
@@ -194,22 +196,38 @@ static unsigned char *png_decode(const unsigned char *data, unsigned long size, 
 
 		if (filter > 4)
 			goto failed;
-		for (column = 0; column < stride; column++)
+		if (!above && filter == 2)
+			filter = 0; /* (up: zero) */
+		else if (!above && filter == 4)
+			filter = 1; /* (Paeth of left, zero and zero: left) */
+		switch (filter)
 		{
-			unsigned char left = column >= 4 ? out[column - 4] : 0;
-			unsigned char up = above ? above[column] : 0;
-			unsigned char up_left = above && column >= 4 ? above[column - 4] : 0;
-			unsigned char predicted;
-
-			switch (filter)
-			{
-			case 1: predicted = left; break;
-			case 2: predicted = up; break;
-			case 3: predicted = (unsigned char)(((unsigned)left + up) / 2); break;
-			case 4: predicted = paeth(left, up, up_left); break;
-			default: predicted = 0; break;
-			}
-			out[column] = (unsigned char)(line[column] + predicted);
+		case 0:
+			memcpy(out, line, stride);
+			break;
+		case 1:
+			memcpy(out, line, 4);
+			for (column = 4; column < stride; column++)
+				out[column] = (unsigned char)(line[column] + out[column - 4]);
+			break;
+		case 2:
+			for (column = 0; column < stride; column++)
+				out[column] = (unsigned char)(line[column] + above[column]);
+			break;
+		case 3:
+			for (column = 0; column < 4; column++)
+				out[column] = (unsigned char)(line[column] + (above ? above[column] : 0) / 2);
+			for (column = 4; column < stride; column++)
+				out[column] = (unsigned char)(line[column] +
+					((unsigned)out[column - 4] + (above ? above[column] : 0)) / 2);
+			break;
+		default:
+			/* (Paeth of zero, up and zero: up) */
+			for (column = 0; column < 4; column++)
+				out[column] = (unsigned char)(line[column] + above[column]);
+			for (column = 4; column < stride; column++)
+				out[column] = (unsigned char)(line[column] + paeth(out[column - 4], above[column], above[column - 4]));
+			break;
 		}
 	}
 	free(compressed);
