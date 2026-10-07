@@ -465,7 +465,20 @@ static void race_engine_dispose_from_old_map(
 static void race_engine_player_added(
 	long player_index)
 {
+	long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
 	player_get(player_index)->multiplayer_special = 0;
+	/* port: not the laps of a player who quit from the slot (as slayer's):
+	a normal race starts everyone at the same flag, the others at the first
+	touched */
+	race_globals.lap_bit_vector[slot] = 0;
+	if (game_engine_get_variant()->game_engine_variant.race.race_type != _race_type_normal)
+		race_globals.first_flag[slot] = NONE;
+	if (!game_engine_has_teams())
+		race_globals.team_laps[slot] = 0;
+	race_events.touches[slot] = 0;
+	race_events.laps[slot] = 0;
+	race_events.best_laps[slot] = 0;
 
 	return;
 }
