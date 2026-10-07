@@ -50,11 +50,11 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 and its size; NULL forgets it */
 void text_hires_register_atlas(const unsigned long *texture, unsigned long width, unsigned long height);
 
-/* the GL texture of the atlas when data (a D3D texture's Data) is its
+/* the renderer's texture (xgpu.h) of the atlas when data (a D3D texture's Data) is its
 placeholder's, its rasterized glyphs uploaded; 0 otherwise */
 unsigned int text_hires_atlas_texture(unsigned long data);
 
-/* d3d8_gl.c: the display's pixels for each of the 480 lines */
+/* d3d8_device.c: the display's pixels for each of the 480 lines */
 float halo_screen_pixel_scale(void);
 
 #endif

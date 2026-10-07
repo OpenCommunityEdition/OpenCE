@@ -4,7 +4,7 @@ SCREENSHOT.H
 Frames saved as BMP files: every Nth frame (debug.screenshot_every), and one
 frame asked for by name (the telnet console's port_screenshot,
 telnet_console.c), which tools/render_test.py takes its pictures with. The
-renderer (d3d8_gl.c) reads its back buffer; the rest is here, so that every
+renderer (xgpu_device.h) reads its back buffer; the rest is here, so that every
 renderer saves the same files.
 */
 

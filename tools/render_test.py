@@ -89,6 +89,9 @@ BASE_SETTINGS = {
     "HALO_CRASH_REPORTS": "no",
     # the view follows the last tick, not the mouse: the game is frozen
     "HALO_DIRECT_CAMERA": "0",
+    # the random numbers only this machine draws (the fog screen's layers,
+    # effects) the same in every run
+    "HALO_RANDOM_SEED": "1",
     "HALO_TELNET_CONSOLE": "1",
 }
 
@@ -311,7 +314,7 @@ def load_scenes(path: Path) -> List[Scene]:
     return scenes
 
 
-def draw_scene(scene: Scene, renderer: str, args: argparse.Namespace, run_dir: Path) -> Path:
+def draw_scene(scene: Scene, renderer: str, binary: Path, args: argparse.Namespace, run_dir: Path) -> Path:
     root = args.work / "data"
     camera = None
     if scene.camera:
@@ -328,7 +331,8 @@ def draw_scene(scene: Scene, renderer: str, args: argparse.Namespace, run_dir: P
         init.append(f'core_load_name_at_startup "{scene.core}"')
     init.append(f"map_name {map_path(scene.map)}")
     settings = dict(scene.settings, HALO_RENDERER=renderer, HALO_SCREENSHOT_DIR=str(run_dir.resolve()))
-    game = Game(args.binary, root, args.work / "save", init, settings, run_dir / f"{scene.name}.log", args.port)
+    settings.update(args.overrides)
+    game = Game(binary, root, args.work / "save", init, settings, run_dir / f"{scene.name}.log", args.port)
     try:
         console = game.console
         # (the lines the harness prints are not drawn: console.capture also
@@ -451,12 +455,18 @@ def command_run(args: argparse.Namespace) -> int:
     renderers = [renderer.strip() for renderer in args.runs.split(",") if renderer.strip()]
     if len(renderers) < 2:
         sys.exit("render_test: --runs names two renderers or more (gl,gl for the noise floor)")
-    if not args.binary.is_file():
-        sys.exit(f"render_test: no game at {args.binary} (--binary)")
+    # (each run's game: --binaries, else --binary for all of them)
+    binaries = [Path(path.strip()) for path in args.binaries.split(",")] if args.binaries else []
+    if binaries and len(binaries) != len(renderers):
+        sys.exit("render_test: --binaries names one game for each of --runs")
+    binaries = binaries or [args.binary] * len(renderers)
+    for binary in binaries:
+        if not binary.is_file():
+            sys.exit(f"render_test: no game at {binary} (--binary, --binaries)")
     ensure_data_root(args.assets, args.work / "data")
 
     run_dirs = []
-    for index, renderer in enumerate(renderers, 1):
+    for index, (renderer, binary) in enumerate(zip(renderers, binaries), 1):
         run_dir = args.work / f"{index}-{renderer}"
         if run_dir.exists():
             shutil.rmtree(run_dir)
@@ -465,7 +475,7 @@ def command_run(args: argparse.Namespace) -> int:
         for scene in scenes:
             print(f"render_test: {renderer}: {scene.name}", flush=True)
             try:
-                draw_scene(scene, renderer, args, run_dir)
+                draw_scene(scene, renderer, binary, args, run_dir)
             except (OSError, RuntimeError, TimeoutError, ValueError) as error:
                 print(f"render_test: {renderer}: {scene.name}: {error} (log: {run_dir / (scene.name + '.log')})",
                       flush=True)
@@ -565,7 +575,10 @@ def main() -> int:
 
     run = commands.add_parser("run", help="draw the scenes with each renderer and compare")
     run.add_argument("--runs", default="gl,gl", help="renderers, comma-separated; the first is the reference")
+    run.add_argument("--binaries", help="each run's game, comma-separated (else --binary for all)")
     run.add_argument("--scene", action="append", help="only this scene (again for more)")
+    run.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                     help="a HALO_* environment variable for every run (again for more)")
     run.set_defaults(handler=command_run)
 
     author = commands.add_parser("author", help="make scenes on a map")
@@ -581,6 +594,7 @@ def main() -> int:
     compare.set_defaults(handler=command_compare)
 
     args = parser.parse_args()
+    args.overrides = dict(setting.split("=", 1) for setting in getattr(args, "set", []))
     return args.handler(args)
 
 

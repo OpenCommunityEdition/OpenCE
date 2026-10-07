@@ -2,7 +2,7 @@
 HUD_HIRES.C
 
 The high-res HUD's textures (hud_hires.h): which one stands for a bitmap being
-uploaded, and each one's GL texture.
+uploaded, and each one's texture (xgpu.h).
 
 Which bitmap is at an address the game knows (from the loaded map's tags:
 port/linux/game/hud_hires_tags.c). Each texture is decoded from its PNG when
@@ -222,22 +222,19 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 {
 	unsigned long width = 0, height = 0, largest;
 	unsigned char *pixels = png_decode(png, size, &width, &height);
-	GLuint texture;
+	unsigned int texture;
 
 	if (!pixels)
 		return 0;
 	*levels = 1;
 	for (largest = width > height ? width : height; largest > 1; largest >>= 1)
 		(*levels)++;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	xgpu_gl_state_invalidate();
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	xgpu_gl_state_invalidate();
+	texture = xgpu_texture_new(_xgpu_texture_2d, _xgpu_format_rgba8, width, height, 1, *levels);
+	if (texture)
+	{
+		xgpu_texture_write(texture, 0, 0, pixels);
+		xgpu_texture_mipmaps(texture, pixels);
+	}
 	free(pixels);
 	return texture;
 }

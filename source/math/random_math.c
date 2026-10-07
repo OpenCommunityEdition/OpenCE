@@ -60,6 +60,9 @@ symbols in this file:
 #include "geometry.h"
 #include "game_engine.h"
 
+/* the platform layer's (port/linux/src/port_config.c) */
+long config_integer(const char *name);
+
 /* ---------- constants */
 
 enum
@@ -166,7 +169,10 @@ random_math_initialize(
 	struct geosphere *random_direction_geosphere;
 	short index;
 
-	random_math_globals.global_local_random_seed= get_number_suitable_for_initializing_random_seed();
+	/* port: debug.random_seed, for tests that draw the same frame twice
+	(tools/render_test.py), else the clock */
+	random_math_globals.global_local_random_seed= config_integer("debug.random_seed") ?
+		(unsigned long)config_integer("debug.random_seed") : get_number_suitable_for_initializing_random_seed();
 	random_direction_geosphere= geosphere_new(RANDOM_DIRECTION_TABLE_GEOSPHERE_SEGMENT_COUNT);
 	match_assert("c:\\halo\\SOURCE\\math\\random_math.c", 174, random_direction_geosphere);
 	random_math_globals.random_direction_table= match_malloc(

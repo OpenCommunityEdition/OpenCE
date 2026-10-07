@@ -16,11 +16,11 @@ edge from the luma around a pixel, the edge's ends found by stepping along
 it, and the pixel blended across it by where it lies between them, or by how
 much it stands out from its neighbours. SMAA is port/third_party/smaa's,
 compiled as GLSL at its HIGH preset: edges from luma, blending weights from
-its lookup textures, then the blend. Android has FXAA only (d3d8_gl.c's
+its lookup textures, then the blend. Android has FXAA only (d3d8_device.c's
 anti_aliasing_values).
 */
 
-#include "xgpu.h"
+#include "xgpu_gl.h"
 
 #include <stdlib.h>
 

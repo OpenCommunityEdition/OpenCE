@@ -44,6 +44,124 @@ name = "b30-auto-player"
 map = "b30"
 core = "b30-auto"
 
+# The other campaign levels the same way (author <map> --scene <map>-auto
+# --after 60; a10 after 90)
+[[scene]]
+name = "a10-auto"
+map = "a10"
+core = "a10-auto"
+camera = "a10/a10-auto"
+
+[[scene]]
+name = "a10-auto-player"
+map = "a10"
+core = "a10-auto"
+
+[[scene]]
+name = "a30-auto"
+map = "a30"
+core = "a30-auto"
+camera = "a30/a30-auto"
+
+[[scene]]
+name = "a30-auto-player"
+map = "a30"
+core = "a30-auto"
+
+[[scene]]
+name = "b40-auto"
+map = "b40"
+core = "b40-auto"
+camera = "b40/b40-auto"
+
+[[scene]]
+name = "b40-auto-player"
+map = "b40"
+core = "b40-auto"
+
+[[scene]]
+name = "c10-auto"
+map = "c10"
+core = "c10-auto"
+camera = "c10/c10-auto"
+
+[[scene]]
+name = "c10-auto-player"
+map = "c10"
+core = "c10-auto"
+
+[[scene]]
+name = "c40-auto"
+map = "c40"
+core = "c40-auto"
+camera = "c40/c40-auto"
+
+[[scene]]
+name = "c40-auto-player"
+map = "c40"
+core = "c40-auto"
+
+[[scene]]
+name = "d40-auto"
+map = "d40"
+core = "d40-auto"
+camera = "d40/d40-auto"
+
+[[scene]]
+name = "d40-auto-player"
+map = "d40"
+core = "d40-auto"
+
+# The settings that change how the renderer draws
+[[scene]]
+name = "b30-auto-player-msaa4x"
+map = "b30"
+core = "b30-auto"
+settings = { HALO_ANTI_ALIASING = "msaa4x" }
+
+[[scene]]
+name = "b30-auto-player-fxaa"
+map = "b30"
+core = "b30-auto"
+settings = { HALO_ANTI_ALIASING = "fxaa" }
+
+[[scene]]
+name = "b30-auto-player-smaa"
+map = "b30"
+core = "b30-auto"
+settings = { HALO_ANTI_ALIASING = "smaa" }
+
+[[scene]]
+name = "a30-auto-player-ssaa2x"
+map = "a30"
+core = "a30-auto"
+settings = { HALO_ANTI_ALIASING = "ssaa2x" }
+
+[[scene]]
+name = "c40-auto-player-per-pixel"
+map = "c40"
+core = "c40-auto"
+settings = { HALO_PER_PIXEL_LIGHTING = "1" }
+
+[[scene]]
+name = "a10-auto-shadows-1024"
+map = "a10"
+core = "a10-auto"
+camera = "a10/a10-auto"
+settings = { HALO_SHADOW_RESOLUTION = "1024" }
+
+[[scene]]
+name = "d40-auto-player-original"
+map = "d40"
+core = "d40-auto"
+settings = { HALO_RESOLUTION_SCALING = "original" }
+
+[[scene]]
+name = "a30-auto-player-low-res-hud"
+map = "a30"
+core = "a30-auto"
+settings = { HALO_HIGH_RES_HUD = "0", HALO_HIGH_RES_TEXT = "0" }
+
 # Scenes made with 'render_test.py author <map>' go below, for example:
 #
 # [[scene]]

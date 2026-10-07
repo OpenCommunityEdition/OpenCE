@@ -104,6 +104,10 @@ static const struct config_setting config_settings[] =
 		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
 		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
 		"a pixel. Android has \"fxaa\" for \"smaa\", and no \"ssaa2x\"." },
+	{ "display.renderer", _config_string, "\"auto\"", "HALO_RENDERER", _environment_value, _platform_windows,
+		"What draws the game: \"d3d12\" (Direct3D 12), \"gl\" (OpenGL 4.5), or\n"
+		"\"auto\" (OpenGL for now). A renderer that cannot start falls back to\n"
+		"OpenGL." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
@@ -381,6 +385,10 @@ static const struct config_setting config_settings[] =
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens; 0 never." },
+	{ "debug.random_seed", _config_integer, "0", "HALO_RANDOM_SEED", _environment_value, _platform_all,
+		"The seed of the random numbers that only this machine draws (effects,\n"
+		"the fog screen's layers), for tests that draw the same frame twice\n"
+		"(tools/render_test.py); 0 seeds them from the clock." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
 		"Keep the window hidden (and never fullscreen)." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,

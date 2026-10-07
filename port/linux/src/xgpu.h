@@ -1,17 +1,17 @@
 /*
 XGPU.H
 
-Internals shared by the OpenGL implementation of the Xbox Direct3D API:
-the NV2A shader translators (nv2a_vsh.c, nv2a_psh.c), texture decoding
-(xbox_textures.c), guest memory write tracking (memory_watch.c) and the
-device itself (d3d8_gl.c).
+Internals shared by the renderers of the Xbox Direct3D API (xgpu_device.h):
+the NV2A shader translators (nv2a_vsh.c, nv2a_psh.c), texture decoding and
+the texture cache (xbox_textures.c), guest memory write tracking
+(memory_watch.c), the renderers' textures and render targets. The OpenGL
+renderer's own are in xgpu_gl.h.
 */
 
 #ifndef __HALO_LINUX_XGPU_H
 #define __HALO_LINUX_XGPU_H
 
 #include "platform.h"
-#include "gl.h"
 
 #ifdef HALO_ANDROID
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
@@ -39,19 +39,6 @@ void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
 #endif
 
-/* ---------- GL state
-
-The device caches the GL state it sets for draws (d3d8_gl.c); code that
-changes GL state behind it (binding a texture to upload it, deleting one)
-must call this afterwards. */
-
-void xgpu_gl_state_invalidate(void);
-
-/* a compiled shader, or a linked program of two, or 0 with the log
-written */
-GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
-GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
-
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -70,7 +57,7 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribu
 /* D3D constant register -96 is hardware register 0 */
 #define XGPU_VERTEX_CONSTANT_BIAS 96
 
-/* where one of the game's model lighting programs (d3d8_gl.c
+/* where one of the game's model lighting programs (d3d8_device.c
 halo_vertex_shader_lighting) has the normal, and the world position, that it
 lights the diffuse color by: the temporary register that holds each before
 the instruction given */
@@ -107,8 +94,8 @@ enum
 	_xgpu_sampler_cube,
 };
 
-/* everything a translated pixel shader depends on; the GLSL program cache
-is keyed by these bytes */
+/* everything a translated pixel shader depends on; the program caches are
+keyed by these bytes */
 struct nv2a_pixel_shader_key
 {
 	DWORD combiner_state[D3DRS_PS_MAX];
@@ -173,7 +160,51 @@ c[-69] (rasterizer_set_model_lighting's two point lights, two distant
 lights and the ambient light) */
 #define XGPU_MODEL_LIGHT_COUNT 12
 
-/* ---------- textures */
+/* ---------- the renderer's textures
+
+Every renderer keeps its textures behind these handles, 0 being none: the
+texture cache below, the high-res HUD and text and the menus' art make
+theirs with them (xgpu_device.h's renderer does the work). */
+
+enum
+{
+	_xgpu_texture_2d,
+	_xgpu_texture_cube,
+	_xgpu_texture_3d,
+};
+
+enum
+{
+	/* 32-bit words 0xAARRGGBB (bytes B, G, R, A), as the decoders write them */
+	_xgpu_format_bgra8,
+	/* bytes R, G, B, A, as PNGs and the text atlas have them */
+	_xgpu_format_rgba8,
+	_xgpu_format_dxt1,
+	_xgpu_format_dxt3,
+	_xgpu_format_dxt5,
+};
+
+/* a texture of type with levels mip levels; 0 if it cannot be made */
+unsigned int xgpu_texture_new(int type, int format, unsigned long width, unsigned long height, unsigned long depth,
+	unsigned long levels);
+/* the whole of one level of a face (cube faces 0 to 5; a 3D texture's
+slices one after another), its rows packed (DXT: rows of blocks) */
+void xgpu_texture_write(unsigned int texture, unsigned long face, unsigned long level, const void *data);
+/* rows of level 0 of a 2D texture, packed */
+void xgpu_texture_write_rows(unsigned int texture, unsigned long first_row, unsigned long rows, const void *data);
+/* levels 1 and up made from level 0, whose pixels (as written) are given */
+void xgpu_texture_mipmaps(unsigned int texture, const void *level0);
+void xgpu_texture_delete(unsigned int texture);
+/* whether a DXT texture of this size is kept compressed; else its texels are
+decoded to _xgpu_format_bgra8 */
+BOOL xgpu_texture_compressed_supported(unsigned long width, unsigned long height);
+
+struct xgpu_texture_description;
+/* debug.texture_dump_directory: a texture's level 0 written out, as it was
+uploaded (by the renderers that can read it back) */
+void xgpu_texture_dump(unsigned int texture, const struct xgpu_texture_description *description);
+
+/* ---------- textures of the game */
 
 struct xgpu_texture_description
 {
@@ -193,9 +224,9 @@ unsigned long xgpu_texture_face_size(const struct xgpu_texture_description *desc
 unsigned long xgpu_texture_level_offset(const struct xgpu_texture_description *description, unsigned long level);
 unsigned long xgpu_texture_level_pitch(const struct xgpu_texture_description *description, unsigned long level);
 
-/* the GL texture for an Xbox texture header, uploading or refreshing it
-from guest memory as needed; *target receives GL_TEXTURE_2D etc. */
-GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *target,
+/* the renderer's texture for an Xbox texture header, uploading or refreshing
+it from guest memory as needed; *type receives _xgpu_texture_2d etc. */
+unsigned int xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, int *type,
 	struct xgpu_texture_description *description);
 void xgpu_texture_cache_begin_frame(void);
 
@@ -206,38 +237,21 @@ struct xgpu_render_target
 	unsigned long data;  /* physical address */
 	unsigned long width, height;
 	BOOL depth;
-	GLuint texture;
+	/* the renderer's texture */
+	unsigned int texture;
 	/* pixels per unit of width and height: more than 1 for the screen's
-	targets when the game draws at the display's resolution (d3d8_gl.c) */
+	targets when the game draws at the display's resolution (d3d8_device.c) */
 	float scale[2];
-	unsigned long gl_width, gl_height;
-	/* with multisampling, the multisampled renderbuffer draws go to, its
-	samples a pixel (0 when it has none), and whether it has been drawn into
-	since the texture last had its pixels (d3d8_gl.c,
-	render_target_multisample) */
-	GLuint multisample;
+	unsigned long pixel_width, pixel_height;
+	/* with multisampling, the multisampled storage draws go to, its samples a
+	pixel (0 when it has none), and whether it has been drawn into since the
+	texture last had its pixels (the renderer's) */
+	unsigned int multisample;
 	int samples;
 	BOOL unresolved;
 };
 
-/* the GL texture holding a render target with this physical address, or 0 */
+/* the render target with this physical address drawn into last, or NULL */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
-
-/* ---------- anti-aliasing
-
-display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
-window's 3D view in place before the HUD and menus are drawn over it, so
-that their text stays sharp. Supersampling and multisampling are the
-device's (d3d8_gl.c). */
-
-/* the programs and textures of FXAA, or of SMAA, made now; FALSE if they
-cannot be (once FALSE, it stays so) */
-BOOL xgpu_post_prepare(BOOL smaa);
-
-/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
-target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
-not build */
-BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
-	const GLint corners[4]);
 
 #endif

@@ -340,7 +340,7 @@ static const char shader_prologue[] =
 	"uniform vec4 viewport_scale;\n"
 	"uniform vec4 viewport_offset;\n"
 	"uniform float point_size;\n"
-	/* columns the menus shift by to center on a wide screen (d3d8_gl.c) */
+	/* columns the menus shift by to center on a wide screen (d3d8_device.c) */
 	"uniform float screen_offset;\n"
 	"out vec4 xD0;\n"
 	"out vec4 xD1;\n"
