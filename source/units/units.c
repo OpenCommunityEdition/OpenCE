@@ -3313,6 +3313,32 @@ void unit_impulse(
 
 	return;
 }
+/* port: the animation enhancements are for the player bipeds (cyborg and
+cyborg_mp), whose animations they were made with; every other unit keeps
+the original animations */
+static char const *const enhanced_animation_units[] =
+{
+	"cyborg",
+	"cyborg_mp",
+};
+
+boolean unit_animation_enhanced(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	char const *name = tag_name_strip_path(tag_get_name(unit->definition_index));
+	long name_index;
+
+	for (name_index = 0; name_index < NUMBEROF(enhanced_animation_units); name_index++)
+	{
+		if (!_stricmp(name, enhanced_animation_units[name_index]))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
 /* port: a seat whose graph has no reload of its own (a Scorpion rider's)
 reloads with the standing seat's, the same weapon's: a reload is a
 replacement animation, which moves only the arms and the weapon */
@@ -3437,7 +3463,8 @@ void unit_animation_start_action(
 		}
 		/* port: a seat with no reload borrows the standing one's */
 		if (animation_index == NONE &&
-			(weapon_type_animation_index == 0 || weapon_type_animation_index == 1))
+			(weapon_type_animation_index == 0 || weapon_type_animation_index == 1) &&
+			unit_animation_enhanced(unit_index))
 		{
 			animation_index = unit_standing_weapon_type_animation(
 				animation_graph,
@@ -10882,6 +10909,10 @@ static boolean unit_grenade_throw_releases_vehicle_ik(
 		unit->unit.animation.state == _unit_state_throw_grenade ||
 		unit->unit.animation.action != 0;
 
+	if (!unit_animation_enhanced(unit_index))
+	{
+		return FALSE;
+	}
 	if (absolute_index < 0 || absolute_index >= GRENADE_THROW_MAXIMUM_TRACKED_UNITS)
 	{
 		return releasing;
@@ -11069,7 +11100,8 @@ static void unit_grenade_throw_keep_legs_moving(
 	short node_index;
 
 	if (unit->unit.animation.state != _unit_state_throw_grenade ||
-		unit->unit.animation.seat_index == NONE)
+		unit->unit.animation.seat_index == NONE ||
+		!unit_animation_enhanced(unit_index))
 	{
 		return;
 	}
