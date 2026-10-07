@@ -66,7 +66,7 @@ static struct menu make(long n,int packed){
  for(long i=0;i<n;i++){
   m.rows[i].name="op_test";m.rows[i].definition_tag_index=i;m.rows[i].visible=1;slots[i]=i;
   m.rows[i].vertical_offset=73+(packed?i%11*24:i*24);
-  m.rows[i].child=&m.spinners[i];m.spinners[i].name="test_spinner";m.spinners[i].type=2;m.spinners[i].definition_tag_index=i+6000;
+  m.rows[i].child=&m.spinners[i];m.spinners[i].vertical_offset=m.rows[i].vertical_offset+4;m.spinners[i].name="test_spinner";m.spinners[i].type=2;m.spinners[i].definition_tag_index=i+6000;
   m.spinners[i].parent=&m.rows[i];m.spinners[i].parameters.list.selected_index=0;settings[i].loaded_index=0;settings[i].value_count=2;settings[i].values=modes;
  }
  return m;
@@ -91,7 +91,7 @@ static void sweep(long n){
   long first=-1,visible=0;
   for(long i=0;i<n;i++){
    boolean expected=n<=12||i/11==p;CHECK(m.rows[i].visible==expected);
-   if(expected){if(first<0)first=i;visible++;CHECK(m.rows[i].vertical_offset==73+(n<=12?i:i%11)*24);}
+   if(expected){if(first<0)first=i;visible++;CHECK(m.rows[i].vertical_offset==73+(n<=12?i:i%11)*24);CHECK(m.spinners[i].vertical_offset==m.rows[i].vertical_offset+4);}
    /* A pending edit on every page must survive both navigation and refresh. */
    m.spinners[i].parameters.list.selected_index=1;
    CHECK(settings[i].loaded_index==0);probes++;
@@ -124,9 +124,14 @@ static void variants(void){
  CHECK(!m.rows[1].visible&&m.rows[2].visible&&m.list.focused_child==&m.rows[0]);
  release(&m);
  /* Platform filtering can leave <=12 rows of a packed desktop layout. */
- m=make(9,1);link(&m);for(long i=0;i<9;i++)slots[i]=i*2;
+ m=make(9,1);link(&m);for(long i=0;i<9;i++){slots[i]=i*2;m.rows[i].vertical_offset=73+(i*2)%11*24;m.spinners[i].vertical_offset=m.rows[i].vertical_offset+4;}
  settings_paginate(&m.list,FALSE);CHECK(!m.pager.visible);
- for(long i=0;i<9;i++)CHECK(m.rows[i].visible&&m.rows[i].vertical_offset==73+i*24);
+ for(long i=0;i<9;i++)CHECK(m.rows[i].visible&&m.rows[i].vertical_offset==73+i*24&&m.spinners[i].vertical_offset==m.rows[i].vertical_offset+4);
+ /* A nested screen retains its origin; every descendant moves together. */
+ m.list.vertical_offset=100;settings_paginate(&m.list,FALSE);
+ for(long i=0;i<9;i++)CHECK(m.rows[i].vertical_offset==173+i*24&&m.spinners[i].vertical_offset==m.rows[i].vertical_offset+4);
+ struct widget_instance label={0},item={0};label.vertical_offset=177;item.vertical_offset=179;label.child=&item;
+ settings_row_move(&label,24);CHECK(label.vertical_offset==201&&item.vertical_offset==203);
  m.list.focused_child=&m.buttons;settings_paginate(&m.list,FALSE);CHECK(m.list.focused_child==&m.buttons);
  release(&m);
  /* Independent screen/controller instances do not share a current page. */
@@ -167,7 +172,7 @@ def main():
     markup()
     source = (ROOT/'port/linux/game/menu_functions.c').read_text()
     body = PRELUDE + '\n'.join(block(source, marker) for marker in (
-        'static void settings_each(', 'static void video_rows_show(', 'static boolean settings_row_available(',
+        'static void settings_each(', 'static void video_rows_show(', 'static boolean settings_row_available(', 'static void settings_row_move(',
         'static void settings_paginate(', 'static boolean settings_next_page(')) + TESTS
     flags = ['-std=gnu11', '-O2', '-fuse-ld=lld'] + (['--target=i686-pc-windows-msvc'] if sys.platform == 'win32' else ['-m32'])
     with tempfile.TemporaryDirectory(prefix='halo-settings-pages-') as d:

@@ -1474,6 +1474,15 @@ static boolean settings_row_available(struct widget_instance *row)
 		((strcmp(row->name, "op_resolution") && strcmp(row->name, "op_window_size")) || row->visible);
 }
 
+/* Instance offsets are absolute, including labels and spinner items. */
+static void settings_row_move(struct widget_instance *row, short delta)
+{
+	struct widget_instance *child;
+	row->vertical_offset += delta;
+	for (child = row->child; child; child = child->next)
+		settings_row_move(child, delta);
+}
+
 static void settings_paginate(struct widget_instance *list, boolean change_page)
 {
 	struct widget_instance *pager = named(list, "settings_next_page", 0);
@@ -1502,7 +1511,7 @@ static void settings_paginate(struct widget_instance *list, boolean change_page)
 		page = 0;
 	pager->parameters.text_box.string_list_index = (short)page;
 	pager->visible = pages > 1;
-	pager->vertical_offset = 337;
+	pager->vertical_offset = (short)(list->vertical_offset + 337);
 	usnprintf(caption, ROW_TEXT_LENGTH - 1, L"Page %ld", (page + 1) % pages + 1);
 	text_set(pager, caption);
 	previous = NONE;
@@ -1516,7 +1525,7 @@ static void settings_paginate(struct widget_instance *list, boolean change_page)
 			previous = slot;
 			row->visible = ordinal / stride == page;
 			if (pages > 1 || pc_menu_string_index(pager->definition_tag_index))
-				row->vertical_offset = (short)(73 + ordinal % stride * 24);
+				settings_row_move(row, (short)(list->vertical_offset + 73 + ordinal % stride * 24 - row->vertical_offset));
 			if (row->visible && !first)
 				first = row;
 		}
