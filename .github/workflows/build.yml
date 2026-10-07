@@ -70,6 +70,7 @@ jobs:
         run: |
           python -m pytest -q tools/test_linux_port.py
           python tools/test_light_storage.py
+          python tools/test_needler_lod.py
 
       - name: Compile cache
         run: ccache --show-stats

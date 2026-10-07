@@ -868,6 +868,42 @@ static void model_data_error(
 	return;
 }
 
+static real model_detail_selection_pixels(
+	long model_index,
+	struct model const *model,
+	long object_index,
+	unsigned long flags,
+	real pixels)
+{
+#if !defined(HALO_ANDROID) && (defined(HALO_WINDOWS) || defined(__linux__))
+	struct object_datum *object;
+	struct object_definition *definition;
+
+	/* Only the stock world Needler, unattached to a character. Keep custom
+	LOD thresholds, first-person geometry and shadow selection authored. */
+	if (TEST_FLAG(flags, _render_model_first_person_bit) ||
+		TEST_FLAG(flags, _render_model_shadow_bit) || object_index == NONE ||
+		!(pixels > 0.0f && pixels <= REAL_MAX / 5.0f) ||
+		model->nodes.count != 1 || model->geometries.count != 3 ||
+		model->detail_cutoff_pixels[0] != 0.0f ||
+		model->detail_cutoff_pixels[1] != 25.0f ||
+		model->detail_cutoff_pixels[2] != 50.0f ||
+		model->detail_cutoff_pixels[3] != 50.0f ||
+		model->detail_cutoff_pixels[4] != 100.0f ||
+		csstrcmp(tag_get_name(model_index), "weapons\\needler\\needler"))
+		return pixels;
+	object = object_try_and_get(object_index);
+	if (!object || object->object.type != _object_type_weapon ||
+		object->object.parent_object_index != NONE ||
+		csstrcmp(tag_get_name(object->definition_index), "weapons\\needler\\needler"))
+		return pixels;
+	definition = object_definition_get(object->definition_index);
+	if (definition->object.model.index == model_index)
+		return pixels * 5.0f;
+#endif
+	return pixels;
+}
+
 void render_model(
 	long model_index,
 	real level_of_detail_pixels,
@@ -901,6 +937,10 @@ void render_model(
 
 	if (level_of_detail_pixels>=model->detail_cutoff_pixels[0] || TEST_FLAG(flags, _render_model_shadow_bit))
 	{
+		/* Bias geometry selection only, after the original visibility cutoff.
+		Bounds, cached object state and projected-size effects keep their size. */
+		real geometry_detail_pixels = model_detail_selection_pixels(
+			model_index, model, unique_identifier, flags, level_of_detail_pixels);
 		real_matrix4x3 relative_node_matrices[MAXIMUM_NODES_PER_MODEL];
 		struct rasterizer_model_begin_parameters model_parameters;
 		short geometry_detail_level_index;
@@ -956,7 +996,7 @@ void render_model(
 
 		geometry_detail_level_index = NUMBER_OF_DETAIL_LEVELS_PER_MODEL-1;
 		while (geometry_detail_level_index>0 &&
-			level_of_detail_pixels<model->detail_cutoff_pixels[geometry_detail_level_index])
+			geometry_detail_pixels<model->detail_cutoff_pixels[geometry_detail_level_index])
 		{
 			geometry_detail_level_index--;
 		}
