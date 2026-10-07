@@ -384,7 +384,7 @@ def _custom_edition_maps():
     they need beside them"""
     configured = os.environ.get("HALO_CUSTOM_EDITION_MAPS")
     folder = Path(configured) if configured else Path("assets/custom_edition")
-    maps = [path for path in sorted(folder.glob("*.map")) + sorted(folder.glob("*.yelo"))
+    maps = [path for path in sorted(folder.glob("*.map"))
             if path.stem.lower() not in ("bitmaps", "sounds", "loc")]
     if not maps or not (folder / "bitmaps.map").is_file() or not MAP_VALIDATE.is_file():
         pytest.skip("needs Custom Edition maps (HALO_CUSTOM_EDITION_MAPS or assets/custom_edition) and "

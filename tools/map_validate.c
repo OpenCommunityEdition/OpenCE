@@ -22,14 +22,15 @@ hang, and a map it lets through must be clean when checked again.
 With --log, each run that was corrected is written to a file as the map's
 name, the seed and the changed words (offset:value in the inflated file).
 
-A Halo Custom Edition or OpenSauce map is checked as the game checks one
+A Halo Custom Edition map is checked as the game checks one
 (port/linux/game/custom_edition_cache.c): its loader reads it, with the
 resource maps beside it (or in --maps), into its own tag cache, its bytes
 are converted for this build, then the validator checks its tags and each
 of its structure bsps. Fuzzing changes words of its file, so that the
 loader and the conversion are tried too. (The game also decodes its Ogg
 Vorbis sounds and converts its scripts and geometry, from tags the validator
-passed: not here.) Resource maps given as maps are passed over.
+passed: not here.) Resource maps given as maps are passed over; OpenSauce
+maps are refused, as the game refuses them.
 
 usage: map_validate [--strict] [--quiet] [--maps folder] [--fuzz iterations [--seed n] [--log file]] map.map...
 */
@@ -600,9 +601,8 @@ static void memory_file_close(struct memory_file *file)
 	memset(file, 0, sizeof(*file));
 }
 
-/* a map's resource maps (bitmaps.map, sounds.map, loc.map, or an OpenSauce
-mod set's data_files/<mod>-bitmaps.map and so on), beside it or in --maps;
-those missing are left closed, and the map refused if it needs them */
+/* a map's resource maps (bitmaps.map, sounds.map, loc.map), beside it or in
+--maps; those missing are left closed, and the map refused if it needs them */
 struct custom_edition_resources
 {
 	struct memory_file files[NUMBER_OF_RESOURCE_MAP_TYPES];
@@ -610,8 +610,7 @@ struct custom_edition_resources
 	struct resource_map *maps[NUMBER_OF_RESOURCE_MAP_TYPES];
 };
 
-static void custom_edition_resources_open(struct custom_edition_resources *resources, char const *map_path,
-	struct cache_file_identity const *identity)
+static void custom_edition_resources_open(struct custom_edition_resources *resources, char const *map_path)
 {
 	short type;
 
@@ -623,16 +622,8 @@ static void custom_edition_resources_open(struct custom_edition_resources *resou
 		int folder_length = resource_maps_folder ? (int)strlen(resource_maps_folder) : slash ? (int)(slash - map_path) : 1;
 		char const *folder = resource_maps_folder ? resource_maps_folder : slash ? map_path : ".";
 
-		if (identity->has_opensauce_header && (identity->opensauce.flags >> _opensauce_cache_uses_mod_data_files_bit) & 1)
-		{
-			snprintf(path, sizeof(path), "%.*s/data_files/%s-%s.map", folder_length, folder, identity->opensauce.mod_name,
-				resource_map_type_describe((enum resource_map_type)type));
-		}
-		else
-		{
-			snprintf(path, sizeof(path), "%.*s/%s.map", folder_length, folder,
-				resource_map_type_describe((enum resource_map_type)type));
-		}
+		snprintf(path, sizeof(path), "%.*s/%s.map", folder_length, folder,
+			resource_map_type_describe((enum resource_map_type)type));
 		if (memory_file_open(&resources->files[type], path) &&
 			resource_map_open(&resources->files[type].source, (enum resource_map_type)type, &resources->storage[type]) ==
 				_cache_file_status_ok)
@@ -674,8 +665,8 @@ static int custom_edition_check(struct memory_file *map, struct custom_edition_r
 
 	*corrections = 0;
 	*loaded_bytes = 0;
-	memset(tag_cache, 0xCD, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED);
-	status = custom_edition_cache_load(&map->source, resources->maps, tag_cache, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+	memset(tag_cache, 0xCD, CUSTOM_EDITION_TAG_CACHE_BYTES);
+	status = custom_edition_cache_load(&map->source, resources->maps, tag_cache, CUSTOM_EDITION_TAG_CACHE_BYTES,
 		&report);
 	if (status != _cache_file_status_ok)
 	{
@@ -782,6 +773,7 @@ static int custom_edition_validate(char const *path, unsigned char *tag_cache, l
 	struct memory_file map;
 	struct custom_edition_resources resources;
 	struct cache_file_identity identity;
+	enum cache_file_status status;
 	unsigned long loaded_bytes;
 	unsigned long *claimed = NULL;
 	long claimed_count = 0;
@@ -791,13 +783,19 @@ static int custom_edition_validate(char const *path, unsigned char *tag_cache, l
 	int failed = 0;
 
 	*corrections = 0;
-	if (!memory_file_open(&map, path) || cache_file_identify(&map.source, &identity) != _cache_file_status_ok)
+	if (!memory_file_open(&map, path))
 	{
 		printf("%s: cannot be read\n", name);
+		return 1;
+	}
+	status = cache_file_identify(&map.source, &identity);
+	if (status != _cache_file_status_ok)
+	{
+		printf("%s: its loader refuses it: %s\n", name, cache_file_status_describe(status));
 		memory_file_close(&map);
 		return 1;
 	}
-	custom_edition_resources_open(&resources, path, &identity);
+	custom_edition_resources_open(&resources, path);
 	if (!iterations)
 	{
 		failed = custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes);
@@ -858,7 +856,7 @@ static int custom_edition_validate(char const *path, unsigned char *tag_cache, l
 			case 5: value = 0x7FFFFFFFUL; break;
 			case 6: value = 0xFFFF; break;
 			case 7: value = CUSTOM_EDITION_TAG_CACHE_ADDRESS + fuzz_random() % identity.tag_data_size; break;
-			default: value = CUSTOM_EDITION_TAG_CACHE_ADDRESS + fuzz_random() % CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED; break;
+			default: value = CUSTOM_EDITION_TAG_CACHE_ADDRESS + fuzz_random() % CUSTOM_EDITION_TAG_CACHE_BYTES; break;
 			}
 			memcpy(map.bytes + offset, &value, 4);
 		}
@@ -891,7 +889,7 @@ static int custom_edition_validate(char const *path, unsigned char *tag_cache, l
 			{
 				struct tag_validate_file_range everything = { 0, 0xFFFFFFFFUL };
 
-				if (!tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+				if (!tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES,
 						&everything, 1, name) ||
 					tag_validate_corrections() != 0)
 				{
@@ -901,7 +899,7 @@ static int custom_edition_validate(char const *path, unsigned char *tag_cache, l
 					quiet = 0;
 					custom_edition_check(&map, &resources, tag_cache, name, corrections, &loaded_bytes);
 					printf("checked again:\n");
-					tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+					tag_validate_custom_edition_tags(tag_cache, (long)loaded_bytes, CUSTOM_EDITION_TAG_CACHE_BYTES,
 						&everything, 1, name);
 					quiet = 1;
 				}
@@ -929,7 +927,6 @@ static enum cache_file_format file_format(char const *path)
 	unsigned char header[CACHE_FILE_HEADER_SIZE];
 	FILE *file = fopen(path, "rb");
 	size_t read;
-	int has_opensauce_header;
 
 	if (!file)
 		return _cache_file_format_unrecognized;
@@ -937,8 +934,8 @@ static enum cache_file_format file_format(char const *path)
 	fclose(file);
 	if (read < 16)
 		return _cache_file_format_unrecognized;
-	if (read == sizeof(header) && cache_file_header_format(header, &has_opensauce_header) != _cache_file_format_unrecognized)
-		return cache_file_header_format(header, &has_opensauce_header);
+	if (read == sizeof(header) && cache_file_header_format(header) != _cache_file_format_unrecognized)
+		return cache_file_header_format(header);
 	{
 		unsigned long type = header[0] | header[1] << 8 | (unsigned long)header[2] << 16 | (unsigned long)header[3] << 24;
 
@@ -964,7 +961,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "map_validate: the tag cache's address (%08x) is taken\n", TAG_CACHE_BASE_ADDRESS);
 		return 2;
 	}
-	custom_edition_tag_cache = mmap((void *)CUSTOM_EDITION_TAG_CACHE_ADDRESS, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+	custom_edition_tag_cache = mmap((void *)CUSTOM_EDITION_TAG_CACHE_ADDRESS, CUSTOM_EDITION_TAG_CACHE_BYTES,
 		PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 	if (custom_edition_tag_cache != (unsigned char *)CUSTOM_EDITION_TAG_CACHE_ADDRESS)
 	{

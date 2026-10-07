@@ -1,16 +1,16 @@
 /*
 CACHE_FILE_FORMATS.C
 
-Halo Custom Edition caches, OpenSauce extensions and Custom Edition resource
-maps (cache_file_formats.h; docs/custom_edition_caches.md).
+Halo Custom Edition caches and Custom Edition resource maps
+(cache_file_formats.h; docs/custom_edition_caches.md).
 
 Sources for the layouts, cited per structure below:
 - OpenSauce (GPL-3.0, Kornner Studios; the snapshot examined is the
   OpenSauce-master archive of the upstream Mercurial repository, whose newest
-  version file names OpenSauce 4.0.0): the cache header, the OpenSauce header,
-  tag index, tag instance, resource map ("data file") header and item, the
-  structure BSP header and reference, and the bitmap, sound and HUD message
-  tag layouts, all with static size assertions.
+  version file names OpenSauce 4.0.0): the cache header, tag index, tag
+  instance, resource map ("data file") header and item, the structure BSP
+  header and reference, and the bitmap, sound and HUD message tag layouts,
+  all with static size assertions.
 - BlamLib, in the same archive: the font and unicode string list layouts.
 - Reclaimer (GPL-3.0, Gravemind2401; the Reclaimer-master archive): how
   bitmap tags and pixel data are found in bitmaps.map.
@@ -35,6 +35,8 @@ docs/custom_edition_caches.md lists each with its evidence.
 #define CACHE_FOOTER_SIGNATURE 'foot'
 #define TAG_INDEX_SIGNATURE 'tags'
 #define STRUCTURE_BSP_SIGNATURE 'sbsp'
+/* the signature of OpenSauce's own header, at CACHE_HEADER_OPENSAUCE_OFFSET,
+where a Custom Edition cache has padding: such a cache is refused */
 #define OPENSAUCE_HEADER_SIGNATURE 'yelo'
 
 #define BITMAP_GROUP_TAG 'bitm'
@@ -45,6 +47,7 @@ docs/custom_edition_caches.md lists each with its evidence.
 #define SCENARIO_GROUP_TAG 'scnr'
 #define STRUCTURE_BSP_GROUP_TAG 'sbsp'
 #define GBXMODEL_GROUP_TAG 'mod2'
+/* OpenSauce's project_yellow and project_yellow_globals: refused */
 #define PROJECT_YELLOW_GROUP_TAG 'yelo'
 #define PROJECT_YELLOW_GLOBALS_GROUP_TAG 'gelo'
 
@@ -63,38 +66,6 @@ docs/custom_edition_caches.md lists each with its evidence.
 #define CACHE_HEADER_CHECKSUM_OFFSET 0x64
 #define CACHE_HEADER_OPENSAUCE_OFFSET 0x70
 #define CACHE_HEADER_FOOTER_OFFSET 0x7FC
-
-/* the OpenSauce header (OpenSauce cache_files_structures_yelo.hpp,
-s_cache_header_yelo). Its build_info holds a time_t: the source does not
-define _USE_32BIT_TIME_T, so it is 64 bits aligned to 8, and in every
-OpenSauce cache examined the build string does start 8 bytes after the
-timestamp. */
-#define OPENSAUCE_VERSION_OFFSET 0x04
-#define OPENSAUCE_FLAGS_OFFSET 0x06
-#define OPENSAUCE_PROJECT_YELLOW_VERSION_OFFSET 0x08
-#define OPENSAUCE_PROJECT_YELLOW_GLOBALS_VERSION_OFFSET 0x09
-#define OPENSAUCE_MEMORY_UPGRADE_AMOUNT_OFFSET 0x0C
-#define OPENSAUCE_DEFINITIONS_SIZE_OFFSET 0x10
-#define OPENSAUCE_DEFINITIONS_DECOMPRESSED_SIZE_OFFSET 0x14
-#define OPENSAUCE_DEFINITIONS_OFFSET_OFFSET 0x18
-#define OPENSAUCE_DEFINITIONS_BUILD_OFFSET 0x20
-#define OPENSAUCE_MOD_NAME_OFFSET 0x40
-#define OPENSAUCE_BUILD_STAGE_OFFSET 0x62
-#define OPENSAUCE_BUILD_REVISION_OFFSET 0x64
-#define OPENSAUCE_BUILD_TIMESTAMP_OFFSET 0x68
-#define OPENSAUCE_BUILD_STRING_OFFSET 0x70
-#define OPENSAUCE_TOOLS_VERSION_OFFSET 0x90
-#define OPENSAUCE_MINIMUM_VERSION_OFFSET 0xA4
-#define OPENSAUCE_RESOURCE_OFFSETS_OFFSET 0xB8
-#define OPENSAUCE_HEADER_BYTES 0xC8
-/* s_cache_header_yelo::k_version and k_version_minimum_build */
-#define OPENSAUCE_HEADER_VERSION 1
-#define OPENSAUCE_HEADER_VERSION_WITH_MINIMUM_BUILD 2
-/* project_yellow::k_version and project_yellow_globals::k_version */
-#define OPENSAUCE_PROJECT_YELLOW_VERSION 2
-#define OPENSAUCE_PROJECT_YELLOW_GLOBALS_VERSION 2
-/* K_MEMORY_UPGRADE_INCREASE_AMOUNT */
-#define OPENSAUCE_MEMORY_UPGRADE_AMOUNT 1.5f
 
 /* the tag index at the start of the tag data (OpenSauce
 cache_files_structures.hpp, s_cache_tag_header and s_cache_tag_instance) */
@@ -135,21 +106,6 @@ the offset holds in every map examined) */
 #define SCENARIO_STRUCTURE_BSPS_OFFSET 0x5A4
 #define SCENARIO_BYTES 0x5B0
 
-/* The scenario's script syntax data (OpenSauce scenario_definitions.hpp,
-hs_syntax_data): a data array (this build's memory/data.h) of 20-byte
-syntax nodes. This build has room for 19001 nodes (hs.c,
-MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO), as stock Custom Edition does;
-OpenSauce's memory upgrades make room for 1.5 times as many (OpenSauce
-blam_memory_upgrades.hpp, k_maximum_hs_syntax_nodes_per_scenario_upgrade). */
-#define SCENARIO_HS_SYNTAX_DATA_OFFSET 0x474
-#define DATA_ARRAY_HEADER_BYTES 0x38
-#define DATA_ARRAY_MAXIMUM_COUNT_OFFSET 0x20
-#define DATA_ARRAY_ELEMENT_BYTES_OFFSET 0x22
-#define DATA_ARRAY_FIRST_FREE_INDEX_OFFSET 0x2C
-#define DATA_ARRAY_COUNT_OFFSET 0x2E
-#define HS_SYNTAX_NODE_BYTES 20
-#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO 19001
-#define MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED 28501
 #define STRUCTURE_BSP_REFERENCE_BYTES 0x20
 #define STRUCTURE_BSP_REFERENCE_FILE_OFFSET_OFFSET 0x00
 #define STRUCTURE_BSP_REFERENCE_SIZE_OFFSET 0x04
@@ -813,9 +769,7 @@ static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STA
 	"the file length in the header does not fit the file or the size limit",
 	"the cache is compressed, which Custom Edition caches never are",
 	"the tag data range in the header does not fit the file or the tag cache",
-	"the OpenSauce header is not valid (version, tag versions or memory upgrade)",
-	"the OpenSauce header sets flags OpenSauce does not define",
-	"the OpenSauce tag definitions lie outside the file",
+	"an OpenSauce map, which this build does not run",
 	"the tag index signature is not 'tags'",
 	"the tag instances do not fit in the tag data",
 	"a tag handle does not match its position in the index",
@@ -832,7 +786,6 @@ static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STA
 	"a model part's strip or vertices lie outside the model data or are not of the kind Custom Edition writes",
 	"an animation graph or one of its animations has more nodes than this build can pose",
 	"a shader's type is not the one Custom Edition gives its group",
-	"the scenario's scripts use more syntax nodes than this build has room for, or are not a syntax node array",
 	"a resource map header is not valid",
 	"a resource map is not of the type needed",
 	"a resource map entry lies outside the file or its name is not terminated",
@@ -1048,100 +1001,13 @@ static enum cache_file_status crc32_update_from_file(
 	return status;
 }
 
-static void opensauce_header_read(
-	uint8_t const *bytes,
-	struct opensauce_cache_header *header)
-{
-	int resource_index;
-
-	header->version = read_s16(bytes + OPENSAUCE_VERSION_OFFSET);
-	header->flags = read_u16(bytes + OPENSAUCE_FLAGS_OFFSET);
-	header->project_yellow_version = bytes[OPENSAUCE_PROJECT_YELLOW_VERSION_OFFSET];
-	header->project_yellow_globals_version = bytes[OPENSAUCE_PROJECT_YELLOW_GLOBALS_VERSION_OFFSET];
-	header->memory_upgrade_amount = read_f32(bytes + OPENSAUCE_MEMORY_UPGRADE_AMOUNT_OFFSET);
-	header->definitions_size = read_u32(bytes + OPENSAUCE_DEFINITIONS_SIZE_OFFSET);
-	header->definitions_decompressed_size = read_u32(bytes + OPENSAUCE_DEFINITIONS_DECOMPRESSED_SIZE_OFFSET);
-	header->definitions_offset = read_u32(bytes + OPENSAUCE_DEFINITIONS_OFFSET_OFFSET);
-	header->build_stage = read_s16(bytes + OPENSAUCE_BUILD_STAGE_OFFSET);
-	header->build_revision = read_u32(bytes + OPENSAUCE_BUILD_REVISION_OFFSET);
-	header->build_timestamp = (int64_t)read_s32(bytes + OPENSAUCE_BUILD_TIMESTAMP_OFFSET + 4) * 0x100000000LL +
-		(int64_t)read_u32(bytes + OPENSAUCE_BUILD_TIMESTAMP_OFFSET);
-	header->tools_version_major = bytes[OPENSAUCE_TOOLS_VERSION_OFFSET];
-	header->tools_version_minor = bytes[OPENSAUCE_TOOLS_VERSION_OFFSET + 1];
-	header->tools_version_build = read_u16(bytes + OPENSAUCE_TOOLS_VERSION_OFFSET + 2);
-	header->minimum_version_major = bytes[OPENSAUCE_MINIMUM_VERSION_OFFSET];
-	header->minimum_version_minor = bytes[OPENSAUCE_MINIMUM_VERSION_OFFSET + 1];
-	header->minimum_version_build = read_u16(bytes + OPENSAUCE_MINIMUM_VERSION_OFFSET + 2);
-	for (resource_index = 0; resource_index < 4; resource_index++)
-	{
-		header->resource_offsets[resource_index] =
-			read_u32(bytes + OPENSAUCE_RESOURCE_OFFSETS_OFFSET + resource_index * 4);
-	}
-
-	return;
-}
-
-/* the checks OpenSauce's s_cache_header_yelo::IsValid makes, except the
-minimum OpenSauce version, which only concerns OpenSauce itself */
-static enum cache_file_status opensauce_header_verify(
-	uint8_t const *bytes,
-	struct cache_file_identity *identity)
-{
-	struct opensauce_cache_header *header = &identity->opensauce;
-	float amount;
-
-	if (!copy_string_field(header->definitions_build, bytes + OPENSAUCE_DEFINITIONS_BUILD_OFFSET) ||
-		!copy_string_field(header->mod_name, bytes + OPENSAUCE_MOD_NAME_OFFSET) ||
-		!copy_string_field(header->build_string, bytes + OPENSAUCE_BUILD_STRING_OFFSET))
-	{
-		return _cache_file_status_unterminated_string;
-	}
-	opensauce_header_read(bytes, header);
-	amount = header->memory_upgrade_amount;
-	if ((header->version != OPENSAUCE_HEADER_VERSION &&
-		header->version != OPENSAUCE_HEADER_VERSION_WITH_MINIMUM_BUILD) ||
-		header->project_yellow_version != OPENSAUCE_PROJECT_YELLOW_VERSION ||
-		header->project_yellow_globals_version != OPENSAUCE_PROJECT_YELLOW_GLOBALS_VERSION ||
-		!(amount >= 0.0f && amount <= OPENSAUCE_MEMORY_UPGRADE_AMOUNT))
-	{
-		return _cache_file_status_bad_opensauce_header;
-	}
-	if (header->flags >> NUMBER_OF_OPENSAUCE_CACHE_FLAGS)
-	{
-		return _cache_file_status_unknown_opensauce_flags;
-	}
-	if (flag_is_set(header->flags, _opensauce_cache_uses_mod_data_files_bit) && !header->mod_name[0])
-	{
-		return _cache_file_status_bad_opensauce_header;
-	}
-	/* (in the file, past its header: after the cache data, or counted in
-	its length, as bigass_v3's are; only OpenSauce's editing kit reads them) */
-	if (header->definitions_size &&
-		(header->definitions_offset < CACHE_FILE_HEADER_BYTES ||
-		!range_fits(header->definitions_offset, header->definitions_size, identity->file_size) ||
-		!header->definitions_decompressed_size))
-	{
-		return _cache_file_status_bad_opensauce_definitions_range;
-	}
-
-	return _cache_file_status_ok;
-}
-
 static enum cache_file_status custom_edition_header_verify(
 	uint8_t const *bytes,
 	struct cache_file_identity *identity)
 {
-	enum cache_file_status status;
-
-	identity->has_opensauce_header =
-		read_u32(bytes + CACHE_HEADER_OPENSAUCE_OFFSET) == OPENSAUCE_HEADER_SIGNATURE;
-	if (identity->has_opensauce_header)
+	if (read_u32(bytes + CACHE_HEADER_OPENSAUCE_OFFSET) == OPENSAUCE_HEADER_SIGNATURE)
 	{
-		status = opensauce_header_verify(bytes + CACHE_HEADER_OPENSAUCE_OFFSET, identity);
-		if (status != _cache_file_status_ok)
-		{
-			return status;
-		}
+		return _cache_file_status_opensauce_cache;
 	}
 	if (identity->compressed_file_length)
 	{
@@ -1161,7 +1027,7 @@ static enum cache_file_status custom_edition_header_verify(
 	}
 	if (identity->tag_data_offset < CACHE_FILE_HEADER_BYTES ||
 		identity->tag_data_size < TAG_INDEX_BYTES ||
-		identity->tag_data_size > custom_edition_tag_cache_bytes(identity) ||
+		identity->tag_data_size > CUSTOM_EDITION_TAG_CACHE_BYTES ||
 		!range_fits(identity->tag_data_offset, identity->tag_data_size, identity->file_length))
 	{
 		return _cache_file_status_bad_tag_data_range;
@@ -2102,15 +1968,6 @@ char const *resource_map_type_describe(
 		"unknown";
 }
 
-uint32_t custom_edition_tag_cache_bytes(
-	struct cache_file_identity const *identity)
-{
-	return identity->has_opensauce_header &&
-		flag_is_set(identity->opensauce.flags, _opensauce_cache_uses_memory_upgrades_bit) ?
-		CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED :
-		CUSTOM_EDITION_TAG_CACHE_BYTES;
-}
-
 enum cache_file_status cache_file_identify(
 	struct cache_file_source *source,
 	struct cache_file_identity *identity)
@@ -2137,13 +1994,11 @@ enum cache_file_status cache_file_identify(
 }
 
 enum cache_file_format cache_file_header_format(
-	void const *header,
-	int *has_opensauce_header)
+	void const *header)
 {
 	uint8_t const *bytes = header;
 	enum cache_file_format format;
 
-	*has_opensauce_header = 0;
 	if (read_u32(bytes) != CACHE_HEADER_SIGNATURE ||
 		read_u32(bytes + CACHE_HEADER_FOOTER_OFFSET) != CACHE_FOOTER_SIGNATURE)
 	{
@@ -2156,8 +2011,6 @@ enum cache_file_format cache_file_header_format(
 		break;
 	case CACHE_FILE_VERSION_CUSTOM_EDITION:
 		format = _cache_file_format_custom_edition_cache;
-		*has_opensauce_header =
-			read_u32(bytes + CACHE_HEADER_OPENSAUCE_OFFSET) == OPENSAUCE_HEADER_SIGNATURE;
 		break;
 	default:
 		format = _cache_file_format_other_cache;
@@ -2299,7 +2152,7 @@ enum cache_file_status custom_edition_cache_load(
 	{
 		return load_fail(&state, status, 0);
 	}
-	report->tag_cache_bytes = custom_edition_tag_cache_bytes(identity);
+	report->tag_cache_bytes = CUSTOM_EDITION_TAG_CACHE_BYTES;
 	if (tag_cache_bytes < report->tag_cache_bytes)
 	{
 		return load_fail(&state, _cache_file_status_out_of_memory, tag_cache_bytes);
@@ -2373,7 +2226,7 @@ enum cache_file_status custom_edition_cache_load(
 		}
 		if (group_tag == PROJECT_YELLOW_GROUP_TAG || group_tag == PROJECT_YELLOW_GLOBALS_GROUP_TAG)
 		{
-			report->warnings |= 1UL << _custom_edition_warning_opensauce_tags_bit;
+			return load_fail(&state, _cache_file_status_opensauce_cache, group_tag);
 		}
 		if (read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET))
 		{
@@ -2519,13 +2372,8 @@ enum cache_file_status custom_edition_cache_load(
 	}
 	state.tag_index = NO_TAG_INDEX;
 
-	/* anything after the cache data and the OpenSauce definitions */
+	/* anything after the cache data */
 	data_end = identity->file_length;
-	if (identity->has_opensauce_header && identity->opensauce.definitions_size &&
-		identity->opensauce.definitions_offset + identity->opensauce.definitions_size > data_end)
-	{
-		data_end = identity->opensauce.definitions_offset + identity->opensauce.definitions_size;
-	}
 	if (identity->file_size > data_end)
 	{
 		report->trailing_bytes = identity->file_size - data_end;
@@ -2990,8 +2838,8 @@ static void weapon_functions_convert(
 /* Object overlays of the animation graph at `graph_offset` that name an
 animation the graph does not have are made to name none, which the game
 skips (objects.c, object_compute_node_matrices). Maps built with the editing
-kit can have them (beavercreek_halo3.yelo has two); Custom Edition reads
-past the graph's animations there, and this build asserts. */
+kit can have them; Custom Edition reads past the graph's animations there,
+and this build asserts. */
 static void animation_graph_overlays_repair(
 	struct load_state const *state,
 	uint32_t graph_offset,
@@ -3108,62 +2956,6 @@ static void node_links_repair(
 			report->node_links_cut++;
 		}
 	}
-}
-
-/* This build's hs_allocate takes the scenario's syntax nodes only when they
-are its own number, and otherwise frees them as if they had been allocated:
-an upgraded array whose nodes in use fit in this build's number is made
-that number. */
-static enum cache_file_status scenario_script_nodes_convert(
-	struct load_state const *state,
-	uint8_t const *instances,
-	int32_t tag_count,
-	struct custom_edition_conversion_report *report)
-{
-	uint32_t scenario_handle = read_u32(state->tag_cache + TAG_INDEX_SCENARIO_OFFSET);
-	uint32_t stock_bytes = DATA_ARRAY_HEADER_BYTES + MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO * HS_SYNTAX_NODE_BYTES;
-	uint32_t upgraded_bytes = DATA_ARRAY_HEADER_BYTES + MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED * HS_SYNTAX_NODE_BYTES;
-	uint8_t *syntax_data;
-	uint8_t *nodes;
-	uint32_t scenario_offset;
-	uint32_t nodes_offset;
-	int32_t size;
-
-	/* custom_edition_cache_load checked the scenario */
-	if ((scenario_handle & ABSOLUTE_INDEX_MASK) >= (uint32_t)tag_count ||
-		!tag_cache_offset(
-			state,
-			read_u32(instances + (scenario_handle & ABSOLUTE_INDEX_MASK) * TAG_INSTANCE_BYTES + TAG_INSTANCE_ADDRESS_OFFSET),
-			SCENARIO_BYTES,
-			&scenario_offset))
-	{
-		return _cache_file_status_bad_scenario_tag;
-	}
-	syntax_data = state->tag_cache + scenario_offset + SCENARIO_HS_SYNTAX_DATA_OFFSET;
-	size = read_s32(syntax_data + TAG_DATA_SIZE_OFFSET);
-	if (size < 0 || (uint32_t)size != upgraded_bytes)
-	{
-		return _cache_file_status_ok;
-	}
-	report->problem_tag_index = (int32_t)(scenario_handle & ABSOLUTE_INDEX_MASK);
-	if (!tag_cache_offset(state, read_u32(syntax_data + TAG_DATA_ADDRESS_OFFSET), (uint32_t)size, &nodes_offset))
-	{
-		return _cache_file_status_bad_script_nodes;
-	}
-	nodes = state->tag_cache + nodes_offset;
-	if (read_s16(nodes + DATA_ARRAY_MAXIMUM_COUNT_OFFSET) != MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO_UPGRADED ||
-		read_s16(nodes + DATA_ARRAY_ELEMENT_BYTES_OFFSET) != HS_SYNTAX_NODE_BYTES ||
-		read_s16(nodes + DATA_ARRAY_COUNT_OFFSET) > MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO ||
-		read_s16(nodes + DATA_ARRAY_FIRST_FREE_INDEX_OFFSET) > MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO)
-	{
-		return _cache_file_status_bad_script_nodes;
-	}
-	report->problem_tag_index = NO_TAG_INDEX;
-	write_u16(nodes + DATA_ARRAY_MAXIMUM_COUNT_OFFSET, MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO);
-	write_u32(syntax_data + TAG_DATA_SIZE_OFFSET, stock_bytes);
-	report->script_nodes_reduced = 1;
-
-	return _cache_file_status_ok;
 }
 
 /* the overlays block of the meter element at meter: Halo PC's minimum
@@ -3867,7 +3659,7 @@ enum cache_file_status custom_edition_cache_convert(
 		TRANSPARENT_CHICAGO_EXTENDED_GROUP_TAG,
 		TRANSPARENT_CHICAGO_GROUP_TAG);
 
-	return scenario_script_nodes_convert(&state, instances, tag_count, report);
+	return _cache_file_status_ok;
 }
 
 void custom_edition_cache_combine_resource_offsets(

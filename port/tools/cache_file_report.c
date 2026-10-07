@@ -5,19 +5,16 @@ Reports what the native builds can do with Halo 1 map files: which format
 each file is, whether it can be loaded, and why not
 (port/linux/game/cache_file_formats.c; docs/custom_edition_caches.md).
 
-	cache_file_report [--maps DIRECTORY] [--stock-data-files] [--dump-tags FILE] FILE...
+	cache_file_report [--maps DIRECTORY] [--dump-tags FILE] FILE...
 
 A Custom Edition cache is loaded with the resource maps it needs, looked for
 in DIRECTORY (by default the cache's own directory): bitmaps.map, sounds.map
-and loc.map, or data_files\<mod>-bitmaps.map and so on for OpenSauce caches
-built with mod data files. --stock-data-files loads such caches with the
-stock resource maps instead, for inspection only: OpenSauce itself refuses to
-load them without their mod set, and the report says the substitution was
-made. A cache that loads is then converted for this build as far as its
-bytes alone go (custom_edition_cache_convert), and --dump-tags writes the
-converted tags, as they would sit at 0x40440000, to FILE. Every file gets a
-block of "key: value" lines; the exit status is 0 when every file was
-recognized and every Custom Edition cache loaded and converted.
+and loc.map. OpenSauce caches are refused. A cache that loads is then
+converted for this build as far as its bytes alone go
+(custom_edition_cache_convert), and --dump-tags writes the converted tags,
+as they would sit at 0x40440000, to FILE. Every file gets a block of
+"key: value" lines; the exit status is 0 when every file was recognized and
+every Custom Edition cache loaded and converted.
 */
 
 /* ---------- headers */
@@ -134,15 +131,6 @@ static void print_flags(
 static void print_identity(
 	struct cache_file_identity const *identity)
 {
-	static char const *const opensauce_flag_names[NUMBER_OF_OPENSAUCE_CACHE_FLAGS] =
-	{
-		"memory upgrades",
-		"mod data files",
-		"protected",
-		"game state upgrades",
-		"compression parameters",
-	};
-
 	printf("format: %s\n", cache_file_format_describe(identity->format));
 	printf("file_size: 0x%" PRIx32 "\n", identity->file_size);
 	if (identity->format == _cache_file_format_resource_map)
@@ -162,100 +150,47 @@ static void print_identity(
 	printf("file_length: 0x%" PRIx32 "\n", identity->file_length);
 	printf("tag_data: 0x%" PRIx32 "+0x%" PRIx32 "\n", identity->tag_data_offset, identity->tag_data_size);
 	printf("checksum: 0x%08" PRIx32 "\n", identity->checksum);
-	printf("opensauce_header: %s\n", identity->has_opensauce_header ? "yes" : "no");
-	if (identity->has_opensauce_header)
-	{
-		struct opensauce_cache_header const *opensauce = &identity->opensauce;
-
-		printf("opensauce_version: %d\n", opensauce->version);
-		print_flags("opensauce_flags", opensauce->flags, opensauce_flag_names, NUMBER_OF_OPENSAUCE_CACHE_FLAGS);
-		printf("opensauce_memory_upgrade_amount: %.2f\n", (double)opensauce->memory_upgrade_amount);
-		printf("opensauce_mod_name: %s\n", opensauce->mod_name);
-		printf("opensauce_definitions: 0x%" PRIx32 "+0x%" PRIx32 " (0x%" PRIx32 " bytes decompressed)\n",
-			opensauce->definitions_offset,
-			opensauce->definitions_size,
-			opensauce->definitions_decompressed_size);
-		printf("opensauce_build: %s\n", opensauce->build_string);
-		printf("opensauce_tools_version: %u.%u.%u\n",
-			opensauce->tools_version_major,
-			opensauce->tools_version_minor,
-			opensauce->tools_version_build);
-		printf("opensauce_minimum_version: %u.%u.%u\n",
-			opensauce->minimum_version_major,
-			opensauce->minimum_version_minor,
-			opensauce->minimum_version_build);
-		printf("opensauce_resource_offsets: 0x%" PRIx32 " 0x%" PRIx32 " 0x%" PRIx32 " 0x%" PRIx32 "\n",
-			opensauce->resource_offsets[0],
-			opensauce->resource_offsets[1],
-			opensauce->resource_offsets[2],
-			opensauce->resource_offsets[3]);
-	}
 
 	return;
 }
 
-/* the path of the resource map of `type` a cache needs. OpenSauce keeps a
-mod's data files under maps\data_files\ (data_file_yelo.cpp); the
-"<mod>-<type>.map" file name is how released OpenSauce names them, but the
-examined source's BuildName never appends the mod name, so that part is an
-assumption (docs/custom_edition_caches.md) */
+/* the path of the resource map of `type` a cache needs */
 static void resource_map_path(
-	struct cache_file_identity const *identity,
 	char const *maps_directory,
-	int use_stock_data_files,
 	enum resource_map_type type,
 	char *path)
 {
-	if (!use_stock_data_files && identity->has_opensauce_header &&
-		((identity->opensauce.flags >> _opensauce_cache_uses_mod_data_files_bit) & 1))
-	{
-		snprintf(path, PATH_BYTES, "%sdata_files/%s-%s.map",
-			maps_directory,
-			identity->opensauce.mod_name,
-			resource_map_type_describe(type));
-	}
-	else
-	{
-		snprintf(path, PATH_BYTES, "%s%s.map", maps_directory, resource_map_type_describe(type));
-	}
+	snprintf(path, PATH_BYTES, "%s%s.map", maps_directory, resource_map_type_describe(type));
 
 	return;
 }
 
 static int report_custom_edition_cache(
 	struct cache_file_source *source,
-	struct cache_file_identity const *identity,
 	char const *maps_directory,
-	int use_stock_data_files,
 	char const *dump_path)
 {
 	static char const *const warning_names[NUMBER_OF_CUSTOM_EDITION_WARNINGS] =
 	{
 		"checksum mismatch",
 		"trailing data",
-		"OpenSauce tags",
 	};
 	struct stdio_source resource_sources[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct resource_map resource_map_storage[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct resource_map *resource_maps[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct custom_edition_load_report report;
-	uint32_t tag_cache_bytes = custom_edition_tag_cache_bytes(identity);
+	uint32_t tag_cache_bytes = CUSTOM_EDITION_TAG_CACHE_BYTES;
 	uint8_t *tag_cache;
 	enum cache_file_status status;
 	int type;
 
 	memset(resource_sources, 0, sizeof(resource_sources));
 	memset(resource_maps, 0, sizeof(resource_maps));
-	if (use_stock_data_files && identity->has_opensauce_header &&
-		((identity->opensauce.flags >> _opensauce_cache_uses_mod_data_files_bit) & 1))
-	{
-		printf("resource_maps_substituted: stock files instead of mod set '%s'\n", identity->opensauce.mod_name);
-	}
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
 	{
 		char path[PATH_BYTES];
 
-		resource_map_path(identity, maps_directory, use_stock_data_files, (enum resource_map_type)type, path);
+		resource_map_path(maps_directory, (enum resource_map_type)type, path);
 		if (!stdio_source_open(&resource_sources[type], path))
 		{
 			printf("resource_map.%s: %s (not found)\n", resource_map_type_describe((enum resource_map_type)type), path);
@@ -328,7 +263,6 @@ static int report_custom_edition_cache(
 			printf("shaders_mistyped: %" PRId32 "\n", conversion.shaders_mistyped);
 			printf("bitmaps_prepared: %" PRId32 "\n", conversion.bitmaps_prepared);
 			printf("bitmaps_made_linear: %" PRId32 "\n", conversion.bitmaps_made_linear);
-			printf("script_nodes_reduced: %" PRId32 "\n", conversion.script_nodes_reduced);
 			printf("animation_overlays_disabled: %" PRId32 "\n", conversion.animation_overlays_disabled);
 			printf("node_links_cut: %" PRId32 "\n", conversion.node_links_cut);
 			printf("sounds_undecodable: %" PRId32 "\n", conversion.sounds_undecodable);
@@ -377,7 +311,6 @@ static int report_custom_edition_cache(
 static int report_file(
 	char const *path,
 	char const *maps_directory_option,
-	int use_stock_data_files,
 	char const *dump_path)
 {
 	struct stdio_source source;
@@ -410,7 +343,7 @@ static int report_file(
 		{
 			directory_of(path, maps_directory);
 		}
-		succeeded = report_custom_edition_cache(&source.source, &identity, maps_directory, use_stock_data_files, dump_path);
+		succeeded = report_custom_edition_cache(&source.source, maps_directory, dump_path);
 	}
 	else if (succeeded && identity.format == _cache_file_format_resource_map)
 	{
@@ -438,7 +371,6 @@ int main(
 {
 	char const *maps_directory = NULL;
 	char const *dump_path = NULL;
-	int use_stock_data_files = 0;
 	int all_succeeded = 1;
 	int file_count = 0;
 	int argument_index;
@@ -450,17 +382,12 @@ int main(
 			maps_directory = arguments[++argument_index];
 			continue;
 		}
-		if (!strcmp(arguments[argument_index], "--stock-data-files"))
-		{
-			use_stock_data_files = 1;
-			continue;
-		}
 		if (!strcmp(arguments[argument_index], "--dump-tags") && argument_index + 1 < argument_count)
 		{
 			dump_path = arguments[++argument_index];
 			continue;
 		}
-		if (!report_file(arguments[argument_index], maps_directory, use_stock_data_files, dump_path))
+		if (!report_file(arguments[argument_index], maps_directory, dump_path))
 		{
 			all_succeeded = 0;
 		}
@@ -468,7 +395,7 @@ int main(
 	}
 	if (!file_count)
 	{
-		fprintf(stderr, "usage: cache_file_report [--maps DIRECTORY] [--stock-data-files] [--dump-tags FILE] FILE...\n");
+		fprintf(stderr, "usage: cache_file_report [--maps DIRECTORY] [--dump-tags FILE] FILE...\n");
 		return 2;
 	}
 

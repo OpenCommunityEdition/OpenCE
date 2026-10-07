@@ -93,8 +93,8 @@ enum
 	MAXIMUM_TAG_SCHEMA_GROUPS_PER_FIELD = 15,
 
 	/* the largest tag cache a map's tags are checked in: a Custom Edition
-	map's, with OpenSauce's memory upgrades (cache_file_formats.h) */
-	TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE = 0x02280000,
+	map's (cache_file_formats.h, CUSTOM_EDITION_TAG_CACHE_BYTES) */
+	TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE = 0x01700000,
 	/* the file ranges a Custom Edition map's bitmap pixels and sound samples
 	may be in (tag_validate_custom_edition_tags) */
 	MAXIMUM_TAG_VALIDATE_FILE_RANGES = 4,

@@ -237,7 +237,7 @@ static const struct config_setting config_settings[] =
 		"The language the game asks the Xbox for: \"ja\", \"de\", \"fr\", \"es\" or \"it\";\n"
 		"empty for English. The game data decides what is translated." },
 	{ "game.custom_edition", _config_boolean, "true", "HALO_CUSTOM_EDITION", _environment_value, _platform_all,
-		"Load and run Halo Custom Edition and OpenSauce (.yelo) maps: put them\n"
+		"Load and run Halo Custom Edition maps (not OpenSauce ones): put them\n"
 		"and Custom Edition's bitmaps.map, sounds.map and loc.map in the maps\n"
 		"folder. Their tags are checked as the game's own maps' are before they\n"
 		"run; false refuses them (docs/custom_edition_caches.md)." },

@@ -1,10 +1,11 @@
 /*
 CUSTOM_EDITION_CACHE.C
 
-Halo Custom Edition and OpenSauce caches in the native builds' cache file
-loader (custom_edition_cache.h). The loader runs only Xbox caches of this
-build; without this unit it rejects a Custom Edition cache as "an old
-version" and never looks for a ".yelo" file at all.
+Halo Custom Edition caches in the native builds' cache file loader
+(custom_edition_cache.h). The loader runs only Xbox caches of this build;
+without this unit it rejects a Custom Edition cache as "an old version".
+OpenSauce caches are refused (cache_file_formats.c), and ".yelo" files are
+never looked for.
 
 With the game.custom_edition setting on (the platform then reserves the
 Custom Edition tag cache, port/linux/src/xbox_memory.c), a Custom Edition
@@ -35,11 +36,14 @@ where its offset falls in their combined offset space.
 /* ---------- constants */
 
 #define MAP_FILE_EXTENSION ".map"
-#define OPENSAUCE_MAP_FILE_EXTENSION ".yelo"
 /* as the cache file loader's own map paths */
 #define MAP_PATH_SIZE 256
 /* where a cache header keeps the file's length (cache_files.c) */
 #define CACHE_FILE_HEADER_FILE_LENGTH_OFFSET 0x08
+
+/* (the validator has room for the tag cache's tags) */
+typedef char verify_custom_edition_tag_cache_bytes[
+	CUSTOM_EDITION_TAG_CACHE_BYTES <= TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE ? 1 : -1];
 
 /* the combined offset space: the map (CUSTOM_EDITION_CACHE_FILE_MAXIMUM_BYTES
 at most), the Ogg Vorbis sounds decoded at load (custom_edition_sounds.c)
@@ -172,8 +176,6 @@ boolean custom_edition_install_present(
 	return platform_custom_edition_root()[0] != 0;
 }
 
-/* the file that holds the map `map_name` names: <maps>\<name>.map, or the
-OpenSauce <maps>\<name>.yelo when there is no .map */
 /* the maps folders looked in, in order: the game's, then the Custom Edition
 install's */
 static char const *maps_folder(
@@ -202,6 +204,7 @@ static boolean maps_folder_has(
 	return file_path_exists(path);
 }
 
+/* the file that holds the map `map_name` names: <maps>\<name>.map */
 static boolean custom_edition_map_path(
 	char const *map_name,
 	char *path)
@@ -211,8 +214,7 @@ static boolean custom_edition_map_path(
 
 	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
 	{
-		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path) ||
-			maps_folder_has(maps_folder(folder), name, OPENSAUCE_MAP_FILE_EXTENSION, path))
+		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path))
 		{
 			return TRUE;
 		}
@@ -221,32 +223,15 @@ static boolean custom_edition_map_path(
 	return FALSE;
 }
 
-/* A cache's resource map of `type`: bitmaps.map and so on, or for an
-OpenSauce cache built with a mod set, data_files\<mod>-bitmaps.map (the mod
-set file name is an assumption: docs/custom_edition_caches.md), in the first
-maps folder that has it; the game's when none does, for the message. */
+/* A cache's resource map of `type`, bitmaps.map and so on, in the first maps
+folder that has it; the game's when none does, for the message. */
 static boolean custom_edition_resource_map_path(
-	struct cache_file_identity const *identity,
 	enum resource_map_type type,
 	char *path)
 {
-	char name[MAP_PATH_SIZE];
-	char const *type_name = resource_map_type_describe(type);
+	char const *name = resource_map_type_describe(type);
 	short folder;
 
-	if (strlen(identity->opensauce.mod_name) + strlen(type_name) + 32 >= MAP_PATH_SIZE)
-	{
-		return FALSE;
-	}
-	if (identity->has_opensauce_header &&
-		TEST_FLAG(identity->opensauce.flags, _opensauce_cache_uses_mod_data_files_bit))
-	{
-		sprintf(name, "data_files\\%s-%s", identity->opensauce.mod_name, type_name);
-	}
-	else
-	{
-		sprintf(name, "%s", type_name);
-	}
 	for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
 	{
 		if (maps_folder_has(maps_folder(folder), name, MAP_FILE_EXTENSION, path))
@@ -419,11 +404,10 @@ static boolean custom_edition_cache_tags_convert(
 	}
 	error(
 		_error_silent,
-		"custom edition: %ld shaders renumbered, %ld transparent chicago extended shaders made transparent chicago shaders, %ld bitmaps prepared%s",
+		"custom edition: %ld shaders renumbered, %ld transparent chicago extended shaders made transparent chicago shaders, %ld bitmaps prepared",
 		(long)conversion.shaders_retyped,
 		(long)conversion.chicago_extended_shaders,
-		(long)conversion.bitmaps_prepared,
-		conversion.script_nodes_reduced ? ", OpenSauce's script nodes made this build's number" : "");
+		(long)conversion.bitmaps_prepared);
 	custom_edition_cache_globals.behaviours = conversion.behaviours;
 	custom_edition_behaviours_log(conversion.behaviours);
 	if (conversion.shaders_mistyped)
@@ -547,9 +531,8 @@ boolean custom_edition_cache_refuse(
 	struct cache_file_identity identity;
 	enum cache_file_status status = _cache_file_status_read_failed;
 	char map_path[MAP_PATH_SIZE];
-	int has_opensauce_header;
 
-	if (cache_file_header_format(header, &has_opensauce_header) != _cache_file_format_custom_edition_cache)
+	if (cache_file_header_format(header) != _cache_file_format_custom_edition_cache)
 	{
 		return FALSE;
 	}
@@ -564,39 +547,12 @@ boolean custom_edition_cache_refuse(
 	}
 	error(
 		_error_silent,
-		"'%.96s' is a Halo Custom Edition cache%s (build %.31s) this build cannot run: %s (docs/custom_edition_caches.md)",
+		"'%.96s' is a Halo Custom Edition cache (build %.31s) this build cannot run: %s (docs/custom_edition_caches.md)",
 		path,
-		has_opensauce_header ? " with an OpenSauce header" : "",
 		build,
 		status == _cache_file_status_ok ? custom_edition_unavailable_reason() : cache_file_status_describe(status));
 
 	return TRUE;
-}
-
-void opensauce_cache_path_find(
-	char *path,
-	long path_size)
-{
-	long stem_length = (long)strlen(path) - (long)strlen(MAP_FILE_EXTENSION);
-	struct file_reference reference;
-
-	/* OpenSauce looks for the .map first, then the .yelo
-	(cache_files_yelo.cpp, c_map_file_finder::SearchPath) */
-	if (stem_length < 0 ||
-		strcmp(path + stem_length, MAP_FILE_EXTENSION) ||
-		stem_length + (long)strlen(OPENSAUCE_MAP_FILE_EXTENSION) >= path_size ||
-		file_exists(file_reference_create_from_path(&reference, path, FALSE)))
-	{
-		return;
-	}
-
-	strcpy(path + stem_length, OPENSAUCE_MAP_FILE_EXTENSION);
-	if (!file_exists(file_reference_create_from_path(&reference, path, FALSE)))
-	{
-		strcpy(path + stem_length, MAP_FILE_EXTENSION);
-	}
-
-	return;
 }
 
 boolean custom_edition_cache_playable(
@@ -659,16 +615,13 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 
 		memcpy((byte *)header + CACHE_FILE_HEADER_FILE_LENGTH_OFFSET, &file_length, sizeof(file_length));
 	}
-	error(_error_silent, "custom edition: loading '%s' (build %s%s)",
-		path,
-		identity.build,
-		identity.has_opensauce_header ? ", OpenSauce" : "");
+	error(_error_silent, "custom edition: loading '%s' (build %s)", path, identity.build);
 
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
 	{
 		char resource_path[MAP_PATH_SIZE];
 
-		if (!custom_edition_resource_map_path(&identity, (enum resource_map_type)type, resource_path) ||
+		if (!custom_edition_resource_map_path((enum resource_map_type)type, resource_path) ||
 			!custom_edition_file_open(&globals->resource_files[type], resource_path))
 		{
 			error(_error_silent, "custom edition: no resource map '%s'", resource_path);
@@ -702,7 +655,7 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 		&globals->map.source,
 		globals->resource_maps,
 		tag_cache,
-		CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED,
+		CUSTOM_EDITION_TAG_CACHE_BYTES,
 		&report);
 	if (status != _cache_file_status_ok)
 	{

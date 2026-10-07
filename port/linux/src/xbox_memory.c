@@ -72,10 +72,9 @@ static void contiguous_arena_reserve(void)
 	}
 }
 
-/* The Custom Edition tag cache, with room for OpenSauce's memory upgrades,
-reserved before anything else can map into it (its pages are backed as they
-are touched); only when Custom Edition maps may run, as it takes 36 MB of
-the address space. */
+/* The Custom Edition tag cache, reserved before anything else can map into
+it (its pages are backed as they are touched); only when Custom Edition maps
+may run, as it takes 23 MB of the address space. */
 __attribute__((constructor(102)))
 static void custom_edition_tag_cache_reserve(void)
 {
@@ -84,7 +83,7 @@ static void custom_edition_tag_cache_reserve(void)
 
 	if (!config_boolean("game.custom_edition"))
 		return;
-	result = mmap(wanted, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED, PROT_READ | PROT_WRITE,
+	result = mmap(wanted, CUSTOM_EDITION_TAG_CACHE_BYTES, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 	if (result == wanted)
 	{
@@ -93,7 +92,7 @@ static void custom_edition_tag_cache_reserve(void)
 	else
 	{
 		if (result != MAP_FAILED)
-			munmap(result, CUSTOM_EDITION_TAG_CACHE_BYTES_UPGRADED);
+			munmap(result, CUSTOM_EDITION_TAG_CACHE_BYTES);
 		platform_log("cannot reserve the Custom Edition tag cache at %p (%s): Custom Edition maps cannot run",
 			wanted, strerror(errno));
 	}

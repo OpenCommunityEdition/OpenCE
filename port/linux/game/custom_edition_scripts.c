@@ -9,18 +9,18 @@ global it uses, by its index in the engine's table. Halo PC's tables aren't
 this build's: Halo PC has entries this build doesn't, mixed in with the
 shared ones, so past some point the same index means a different entry
 (timberland.map's player_effect_start would call the function 29 places
-before it, and beavercreek_halo3.yelo's switch_bsp would call playback).
+before it).
 Compiled scripts also keep every name in their string data, so each call
 and engine global is looked up again here by name, with the game's own
 hs_find_function_by_name and hs_find_global_by_name.
 
 Anything this build doesn't have does nothing (missing_value). A call of a
-missing function (OpenSauce's post-processing effects, say) becomes a
-constant of the call's type, and so does a read of a missing engine global;
-a set of one becomes a constant too, so nothing is written. The constant
-is the type's default: nothing, false, 0, an enumeration's first value, the
-empty string, or NONE for objects, tags and the scenario's lists. Only a
-script index has no such default, so a map that would need one is refused.
+missing function becomes a constant of the call's type, and so does a read
+of a missing engine global; a set of one becomes a constant too, so nothing
+is written. The constant is the type's default: nothing, false, 0, an
+enumeration's first value, the empty string, or NONE for objects, tags and
+the scenario's lists. Only a script index has no such default, so a map that
+would need one is refused.
 Both builds number their value types alike: every call in the maps examined
 has the same types here (docs/custom_edition_caches.md, and
 tools/custom_edition_script_names.py checks a map's calls against this

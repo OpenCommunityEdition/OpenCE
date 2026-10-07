@@ -2,8 +2,8 @@
 CUSTOM_EDITION_CACHE.H
 
 What the native builds' cache file loader (source/cache/cache_files.c and
-cache_files_windows.c) does with Halo Custom Edition caches, OpenSauce ".yelo"
-caches among them. By default it finds them, says what they are, and refuses
+cache_files_windows.c) does with Halo Custom Edition caches (OpenSauce ones
+are refused). By default it finds them, says what they are, and refuses
 them. With the game.custom_edition setting on it loads and runs them
 instead, which is experimental: their tags are laid out for Halo PC, and
 custom_edition_cache.c and custom_edition_geometry.c convert what they know
@@ -54,13 +54,6 @@ boolean custom_edition_cache_refuse(
 	void const *header,
 	char const *build,
 	char const *path);
-
-/* When the ".map" file `path` names does not exist but an OpenSauce ".yelo"
-file of the same name does, makes `path` (`path_size` characters) name that
-instead. */
-void opensauce_cache_path_find(
-	char *path,
-	long path_size);
 
 /* TRUE when Custom Edition maps may run (game.custom_edition) and the map
 `map_name` names is a Custom Edition cache whose resource maps are present:

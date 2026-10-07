@@ -1249,12 +1249,6 @@ static void cache_file_get_map_path(
 		error(_error_silent, "map path for '%.64s' is too long", map_name);
 		path[0] = 0;
 	}
-	/* port: or the OpenSauce .yelo cache of that name, when there is no .map
-	(port/linux/game/custom_edition_cache.c) */
-	else
-	{
-		opensauce_cache_path_find(path, MAXIMUM_MAP_PATH_LENGTH);
-	}
 
 	return;
 }

@@ -4,10 +4,11 @@ CUSTOM_EDITION_MAPS.C
 Lists Custom Edition maps for the menus (custom_edition_maps.h).
 
 Whenever the level list opens, the maps folder and then the Halo Custom
-Edition install's maps folder are scanned for CE caches (.map, and
-OpenSauce's .yelo). Multiplayer maps join the level list; campaign maps
-(solo scenarios) are kept apart for co-op. The stock campaign levels get
-display indices here too, so the menus can show them the same way.
+Edition install's maps folder are scanned for CE caches (.map; OpenSauce
+caches are refused by the loader, so not listed). Multiplayer maps join the
+level list; campaign maps (solo scenarios) are kept apart for co-op. The
+stock campaign levels get display indices here too, so the menus can show
+them the same way.
 
 A map's level name is levels\test\<name>\<name>, like the Xbox levels;
 the cache loader finds a map by the last part. The game engine keeps 63
@@ -210,8 +211,8 @@ static short stock_map_index(
 }
 
 /* A map's menu name: Halo PC's name for its own maps, otherwise the file
-name with underscores as spaces and words capitalized ("beavercreek_halo3"
-becomes "Beavercreek Halo3"). */
+name with underscores as spaces and words capitalized ("the_bay_of_pigs"
+becomes "The Bay Of Pigs"). */
 static void display_name_make(
 	char const *name,
 	wchar_t *display_name)
@@ -315,8 +316,7 @@ static void custom_edition_map_description_read(
 }
 
 /* Adds the file `name`.`extension` from `folder` if it is a CE map that
-isn't listed yet. A .map and a .yelo with the same name count once (the
-loader reads the .map). */
+isn't listed yet. */
 static void custom_edition_map_add(
 	char const *folder,
 	char const *name,
@@ -327,7 +327,7 @@ static void custom_edition_map_add(
 	boolean campaign;
 	short map_index;
 
-	if (csstrcasecmp(extension, "map") && csstrcasecmp(extension, "yelo"))
+	if (csstrcasecmp(extension, "map"))
 	{
 		return;
 	}
