@@ -582,8 +582,9 @@ Only machines with the invite can find the game:
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same
   way, but keeps nothing: no line in `bans.txt`, and the player can join
-  again at once. So that every player can be named, the host trims
-  the spaces around a name and removes characters that draw as nothing. A
+  again at once. In co-op, `bringto` brings every player to the host.
+  So that every player can be named, the host trims the spaces around a
+  name and removes characters that draw as nothing. A
   letter with a mark is typed as the plain letter (`ban jose` for "José").
   A name with nothing left to type becomes "Player", and a name that another
   player already has gets a number ("Player 2"). The game refuses a profile
