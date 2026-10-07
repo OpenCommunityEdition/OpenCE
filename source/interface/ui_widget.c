@@ -1968,6 +1968,29 @@ void display_error_when_main_menu_loaded(
 	return;
 }
 
+/* port: an error of the port's own text (as display_error_text_deferred's)
+shown when the main menu is next loaded, as display_error_when_main_menu_loaded
+shows one of the game's: a network game left for a reason the game has no
+error for (a map missing: cache_files.c). The text is copied, when no error
+is queued already. */
+void display_error_text_when_main_menu_loaded(
+	wchar_t const *text)
+{
+	static wchar_t queued_text[512];
+
+	if (widget_globals.main_menu_deferred_error_code != NONE)
+	{
+		error(_error_silent, "there is already an error message queued for display at the main menu; ignoring this one");
+		return;
+	}
+	ustrncpy(queued_text, text, NUMBEROF(queued_text) - 1);
+	queued_text[NUMBEROF(queued_text) - 1] = 0;
+	ui_widget_port_error_pending_text = queued_text;
+	widget_globals.main_menu_deferred_error_code = _error_cannot_create_saved_game_file_with_empty_name;
+
+	return;
+}
+
 void display_error_abort_to_dashboard_deferred(
 	short error_code,
 	boolean optional)
@@ -5113,6 +5136,61 @@ static long search_and_replace(
 	return replacements;
 }
 
+/* port: the port's own error text (display_error_text_deferred), which may be
+longer than a line of its dialog: broken at spaces (the strings' line break,
+'\r') where a line would be wider than `width` in the font drawn with.
+FALSE when a line is still wider (a word longer than a line). */
+static boolean ui_widget_port_text_wrap(
+	wchar_t *text,
+	rectangle2d const *bounds,
+	short width)
+{
+	long line_start = 0;
+	long last_space = NONE;
+	long index;
+	boolean fits = TRUE;
+
+	for (index = 0; ; index++)
+	{
+		wchar_t character = text[index];
+
+		if (character == L'\r' || character == L'\n')
+		{
+			line_start = index + 1;
+			last_space = NONE;
+			continue;
+		}
+		if (character == L' ' || character == 0)
+		{
+			wchar_t line[256];
+			long length = MIN(index - line_start, (long)NUMBEROF(line) - 1);
+			rectangle2d text_bounds;
+			rectangle2d cursor_bounds;
+
+			csmemcpy(line, text + line_start, length * sizeof(wchar_t));
+			line[length] = 0;
+			draw_unicode_string_compute_bounds(bounds, line, &text_bounds, &cursor_bounds);
+			if (cursor_bounds.x0 - bounds->x0 > width && last_space != NONE)
+			{
+				text[last_space] = L'\r';
+				line_start = last_space + 1;
+				/* (the line begun, the word just measured: wider alone?) */
+				length = MIN(index - line_start, (long)NUMBEROF(line) - 1);
+				csmemcpy(line, text + line_start, length * sizeof(wchar_t));
+				line[length] = 0;
+				draw_unicode_string_compute_bounds(bounds, line, &text_bounds, &cursor_bounds);
+			}
+			if (cursor_bounds.x0 - bounds->x0 > width)
+				fits = FALSE;
+			if (character == 0)
+				break;
+			last_space = index;
+		}
+	}
+
+	return fits;
+}
+
 static void widget_instance_render_text_box(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -5249,6 +5327,41 @@ static void widget_instance_render_text_box(
 				SECONDS_PER_MILLISECOND * 3.0f) + 1.5f) * 0.4f) * color.alpha;
 	}
 	draw_string_set_draw_mode(font_index, NONE, justification, 0, &color);
+	/* port: the port's own error text, wrapped to its dialog: the box its
+	background draws (narrower than the text box; its picture is padded to a
+	power of two, so a margin of the text's offset on each side and as much
+	again), and as tall as the text box less its offset above and as much
+	below (the dialog's footer). Text that would be taller, or wider (a word
+	longer than a line), is drawn in the menus' smaller font. */
+	if (widget == ui_widget_port_error_text_box && ui_widget_port_error_text)
+	{
+		struct bitmap_data *background = definition->background_bitmap.index != NONE ?
+			bitmap_group_get_bitmap_from_sequence(definition->background_bitmap.index, 0, 0) : NULL;
+		short width = (short)(definition->bounds.x1 - definition->bounds.x0);
+		short height = (short)(definition->bounds.y1 - definition->bounds.y0 - 2 * definition->vertical_offset);
+		wchar_t wrapped[512];
+		rectangle2d text_bounds;
+		rectangle2d cursor_bounds;
+
+		if (background && background->width > 0 && background->width < width)
+			width = background->width;
+		width = (short)(width - 4 * definition->horizontal_offset);
+		ustrncpy(wrapped, *text, NUMBEROF(wrapped) - 1);
+		wrapped[NUMBEROF(wrapped) - 1] = 0;
+		if (!ui_widget_port_text_wrap(wrapped, &bounds, width) ||
+			(draw_unicode_string_compute_bounds(&bounds, wrapped, &text_bounds, &cursor_bounds),
+			cursor_bounds.y1 - bounds.y0 > height))
+		{
+			long small_font_index = tag_loaded('font', "ui\\small_ui");
+
+			if (small_font_index != NONE)
+			{
+				font_index = small_font_index;
+				draw_string_set_draw_mode(font_index, NONE, justification, 0, &color);
+			}
+		}
+		ui_widget_port_text_wrap(*text, &bounds, width);
+	}
 	if (string_has_icons_to_draw(*text))
 		draw_string_and_hack_in_icons(&bounds, &clip, NULL, 0, *text, FALSE);
 	else

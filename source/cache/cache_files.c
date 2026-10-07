@@ -1035,6 +1035,66 @@ void cache_files_show_multiplayer_unavailable(
 	return;
 }
 
+/* port: whether this machine has the map a network game is on (a client
+joining it: network_client_manager.c); when not, tells the player which map
+is missing and where to copy it, in the error the main menu shows next,
+rather than the damaged disc error that precaching a map that is not there
+gives (cache_files_give_time_to_precache).
+A Halo Custom Edition map (custom_maps\<name>) is looked for in the Custom
+Edition maps folders (port/linux/game/custom_edition_cache.c), any other in
+the game's own. */
+boolean cache_files_map_present(
+	char const *map_name)
+{
+	void platform_log(char const *format, ...);
+	wchar_t error_text[512];
+	char const *name = tag_name_strip_path(map_name);
+	char message[512];
+	short index;
+
+	if (!map_name || !map_name[0])
+		return TRUE;
+	if (custom_edition_level_name(map_name))
+	{
+		if (custom_edition_cache_present(map_name, message, sizeof(message)))
+			return TRUE;
+	}
+	else
+	{
+		char path[256];
+		HANDLE file;
+
+		if (cache_files_precache_map_loaded(map_name))
+			return TRUE;
+		snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), name);
+		file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+		if (file != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(file);
+			return TRUE;
+		}
+		/* (a host of another version of this port, which names a Custom
+		Edition map as the game's own maps are named) */
+		if (custom_edition_map_file_present(name))
+		{
+			snprintf(message, sizeof(message),
+				"The host's map %.64s is a Custom Edition map named for another version of this game.", name);
+		}
+		else
+		{
+			snprintf(message, sizeof(message), "You don't have the map %.64s.map. If you have it, copy it into maps.",
+				name);
+		}
+	}
+	platform_log("map missing: %s", message);
+	for (index = 0; message[index] && index < NUMBEROF(error_text) - 1; index++)
+		error_text[index] = (wchar_t)(unsigned char)message[index];
+	error_text[index] = 0;
+	display_error_text_when_main_menu_loaded(error_text);
+
+	return FALSE;
+}
+
 boolean cache_files_give_time_to_precache(
 	char const *map_name)
 {

@@ -68,6 +68,18 @@ levels have:
 - `<name>.txt`, its description: plain text, its lines shown as written.
   Without one, the map is described as "Halo Custom Edition map".
 
+A machine joining a network game on a map it has not (a Custom Edition map
+not in its `custom_maps`, or one of the game's own not in `maps`) leaves it
+with an error that names the map and the folder to copy it into, rather
+than the damaged disc error precaching a missing map gives
+(`cache_files_map_present`, called as the host's settings arrive): also when
+the map cannot run there (Custom Edition maps turned off, the file not a
+Custom Edition cache, or `bitmaps.map`, `sounds.map` and `loc.map` missing),
+and when the host names a Custom Edition map as other versions of this port
+do (`levels\test\<name>\<name>`) and the file is in `custom_maps`. The
+error's text is wrapped to its dialog, in the menus' smaller font when it
+would not fit; `debug.txt` has the details.
+
 A Custom Edition campaign map has no next level: winning it ends the game
 as the campaign's last level does (alone) or plays it again (network
 co-op), and it is not the campaign's saved game.
@@ -421,7 +433,9 @@ menus (on a virtual display): New Game's CUSTOM SINGLEPLAYER `a30` played as
 a campaign level at the difficulty chosen; the Map screen's (LAN) listed its
 difficulties, set up co-op in Server Setup and showed it in the lobby as
 co-op. With `debug.network_test`, two machines on loopback played
-`custom_maps\a30` as network co-op and `custom_maps\hugeass` as slayer.
+`custom_maps\a30` as network co-op and `custom_maps\hugeass` as slayer; a
+joining machine without the map, without the resource maps, or with a maps
+folder missing the host's Xbox map was shown each error and left the game.
 
 ### Not tested
 

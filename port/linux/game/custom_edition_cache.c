@@ -566,6 +566,78 @@ boolean custom_edition_level_name(
 		!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX));
 }
 
+boolean custom_edition_map_file_present(
+	char const *map_name)
+{
+	char path[MAP_PATH_SIZE];
+
+	return custom_edition_map_path(map_name, path);
+}
+
+boolean custom_edition_cache_present(
+	char const *level_name,
+	char *message,
+	long message_size)
+{
+	char const *name = tag_name_strip_path(level_name);
+	char path[MAP_PATH_SIZE];
+	struct custom_edition_file file;
+	struct cache_file_identity identity;
+	enum cache_file_status status = _cache_file_status_read_failed;
+	short folder;
+	short type;
+
+	if (!custom_edition_map_path(level_name, path))
+	{
+		snprintf(message, message_size, "You don't have the map %.64s.map. If you have it, copy it into custom_maps.",
+			name);
+		return FALSE;
+	}
+	if (!halo_custom_edition_tag_cache())
+	{
+		error(_error_silent, "custom edition: the map '%s' cannot be played: %s", level_name,
+			custom_edition_unavailable_reason());
+		snprintf(message, message_size, "The map %.64s can't be played: Custom Edition maps can't run (see debug.txt).",
+			name);
+		return FALSE;
+	}
+	if (custom_edition_file_open(&file, path))
+	{
+		status = cache_file_identify(&file.source, &identity);
+		custom_edition_file_close(&file);
+	}
+	if (status != _cache_file_status_ok || identity.format != _cache_file_format_custom_edition_cache)
+	{
+		error(_error_silent, "custom edition: '%s' cannot be played: %s", path,
+			status != _cache_file_status_ok ? cache_file_status_describe(status) :
+			"it is not a Halo Custom Edition cache");
+		snprintf(message, message_size, "Your %.64s.map can't be played (debug.txt says why).", name);
+		return FALSE;
+	}
+	/* (the resource maps every Custom Edition map's tags are read from) */
+	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
+	{
+		char const *resource_name = resource_map_type_describe((enum resource_map_type)type);
+		char resource_path[MAP_PATH_SIZE];
+
+		for (folder = 0; folder < NUMBER_OF_MAPS_FOLDERS; folder++)
+		{
+			if (maps_folder_has(maps_folder(folder), resource_name, MAP_FILE_EXTENSION, resource_path))
+				break;
+		}
+		if (folder == NUMBER_OF_MAPS_FOLDERS)
+		{
+			error(_error_silent, "custom edition: the map '%s' needs %s.map, which no maps folder has", level_name,
+				resource_name);
+			snprintf(message, message_size,
+				"The map %.64s needs Custom Edition's bitmaps.map, sounds.map and loc.map in custom_maps.", name);
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
 boolean custom_edition_cache_playable(
 	char const *level_name)
 {

@@ -1287,6 +1287,14 @@ boolean network_game_client_game_settings_updated(
 		{
 			char build[0x20];
 
+			/* port: a map this machine has not (a Custom Edition map not in
+			its custom_maps folder, say): the player told which and where to
+			copy it (the main menu's error, in place of the failed join's), and
+			the game left, rather than precaching it, which would give the
+			damaged disc error (cache_files.c) */
+			if (!network_game_is_splitscreen_local() && !cache_files_map_present(message_packet->map.name))
+				return FALSE;
+
 			/* port: a map of a build this version does not play with others
 			(its objects would not be the host's): said, and the game left */
 			if (!network_game_is_splitscreen_local() &&

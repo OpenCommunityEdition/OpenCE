@@ -76,6 +76,20 @@ boolean custom_edition_level_name(
 it is then read in place, never copied to the cache partition. */
 boolean custom_edition_cache_playable(
 	char const *level_name);
+/* Whether the map `map_name` (a level name or a file name) has a file in the
+Custom Edition maps folders, whatever it holds. */
+boolean custom_edition_map_file_present(
+	char const *map_name);
+/* Whether this machine can play the level `level_name` (custom_maps\<name>),
+as a network game's client must: its file present and a Custom Edition
+cache, Custom Edition maps able to run, and the resource maps present. When
+not, `message` (`message_size` characters) says why, for the player, and
+what to do. */
+boolean custom_edition_cache_present(
+	char const *level_name,
+	char *message,
+	long message_size);
+
 /* Whether the file `file_name` (custom_maps\<file_name>.map) is a Custom
 Edition cache of a campaign map (a solo scenario, played alone or as
 network co-op), or of a multiplayer map (custom_edition_maps.c). */
