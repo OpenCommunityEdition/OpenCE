@@ -576,8 +576,30 @@ boolean custom_edition_map_file_present(
 	return custom_edition_map_path(map_name, path);
 }
 
+unsigned long custom_edition_map_checksum(
+	char const *level_name)
+{
+	char path[MAP_PATH_SIZE];
+	struct custom_edition_file file;
+	struct cache_file_identity identity;
+	unsigned long checksum = 0;
+
+	if (custom_edition_map_path(level_name, path) && custom_edition_file_open(&file, path))
+	{
+		if (cache_file_identify(&file.source, &identity) == _cache_file_status_ok &&
+			identity.format == _cache_file_format_custom_edition_cache)
+		{
+			checksum = identity.checksum;
+		}
+		custom_edition_file_close(&file);
+	}
+
+	return checksum;
+}
+
 boolean custom_edition_cache_present(
 	char const *level_name,
+	unsigned long checksum,
 	char *message,
 	long message_size)
 {
@@ -614,6 +636,16 @@ boolean custom_edition_cache_present(
 			status != _cache_file_status_ok ? cache_file_status_describe(status) :
 			"it is not a Halo Custom Edition cache");
 		snprintf(message, message_size, "Your %.64s.map can't be played (debug.txt says why).", name);
+		return FALSE;
+	}
+	/* (another version's tags are not the host's: the objects the host sends
+	would be other things here) */
+	if (checksum && identity.checksum != checksum)
+	{
+		error(_error_silent, "custom edition: '%s' is another version of the host's map (checksum %08lX, the host's %08lX)",
+			path, (unsigned long)identity.checksum, checksum);
+		snprintf(message, message_size,
+			"Your %.64s.map is a different version from the host's. Copy the host's into custom_maps.", name);
 		return FALSE;
 	}
 	/* (the resource maps every Custom Edition map's tags are read from) */
