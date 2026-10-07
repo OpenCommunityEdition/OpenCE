@@ -1979,6 +1979,126 @@
    ]
   },
   {
+   "name": "hud_unit_backgrounds__8",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 8,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3988051168,
+   "replace": [
+    73,
+    11,
+    101,
+    25
+   ],
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud_vehicle_wrench_outline.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 1.0
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__11",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 11,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 1510305698,
+   "replace": [
+    73,
+    11,
+    101,
+    25
+   ],
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud_vehicle_wrench_outline.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 1.0
+    }
+   ]
+  },
+  {
+   "name": "hud_unit_backgrounds__12",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds",
+   "bitmap": 12,
+   "width": 128,
+   "height": 32,
+   "format": "ay8",
+   "scale": 8,
+   "crc": 3188769653,
+   "replace": [
+    73,
+    11,
+    101,
+    25
+   ],
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "svg": "hud_vehicle_wrench_outline.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "kind": "alpha",
+     "score": 1.0
+    }
+   ]
+  },
+  {
    "name": "hud_unit_meters__0",
    "tag": "ui\\hud\\bitmaps\\combined\\hud_unit_meters",
    "bitmap": 0,

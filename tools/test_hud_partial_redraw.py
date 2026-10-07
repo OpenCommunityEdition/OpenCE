@@ -98,7 +98,7 @@ int main(int argc,char **argv) {
 #undef LOAD
  unsigned char source[4096];FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(source,1,4096,f)==4096);fclose(f);
  unsigned char *actual=malloc(1024*256*4);GLuint fbo;glGenFramebuffers(1,&fbo);glBindFramebuffer(GL_FRAMEBUFFER,fbo);
- for(selected=0;selected<3;selected++) {
+ for(selected=0;selected<hud_hires_embedded_count;selected++) {
   CHECK(hud_hires_override_find((unsigned long)source,128,32,4096)==selected);
   enabled=0;revision++;CHECK(hud_hires_override_find((unsigned long)source,128,32,4096)==-1);
   enabled=1;revision++;source[0]^=1;CHECK(hud_hires_override_find((unsigned long)source,128,32,4096)==-1);source[0]^=1;
@@ -114,7 +114,7 @@ int main(int argc,char **argv) {
   CHECK(glGetError()==GL_NO_ERROR);free(expected);
  }
  free(actual);SDL_GL_DestroyContext(context);SDL_DestroyWindow(window);SDL_Quit();
- puts("PASS: real PNG decode/GL upload/cache for both seat patches and unchanged full redraw; disabled, modified and size-mismatch guards");return 0;
+ puts("PASS: real PNG decode/GL upload/cache for all vehicle HUD patches and unchanged full redraw; disabled, modified and size-mismatch guards");return 0;
 }
 '''
 
@@ -122,15 +122,15 @@ int main(int argc,char **argv) {
 def test_upload(compiler, entries):
     original = (np.arange(4096)*37 % 256).astype(np.uint8)
     crc = zlib.crc32(original.tobytes())
-    png = (ROOT/f'port/assets/hud/{entries[0]["name"]}.png').read_bytes()
-    words = struct.unpack('<'+'I'*((len(png)+3)//4), png+b'\0'*(-len(png)%4))
-    assets = 'static const unsigned int png[]={' + ','.join(map(str,words)) + '};\n'
-    assets += 'const unsigned int hud_hires_embedded_count=3;\nconst struct hud_hires_embedded hud_hires_embedded[]={\n'
-    for entry in [*entries, dict(replace=[0,0,0,0])]:
+    assets, table = '', ''
+    for i, entry in enumerate([*entries, dict(entries[0], replace=[0,0,0,0])]):
+        png = (ROOT/f'port/assets/hud/{entry["name"]}.png').read_bytes()
+        words = struct.unpack('<'+'I'*((len(png)+3)//4), png+b'\0'*(-len(png)%4))
+        assets += f'static const unsigned int png{i}[]={{' + ','.join(map(str,words)) + '};\n'
         w, h = (128,32) if any(entry['replace']) else (0,0)
-        assets += '{.tag="seat",.width=1024,.height=256,.crc='+str(crc)+',.png=png,.png_size='+str(len(png))
-        assets += ',.original_width='+str(w)+',.original_height='+str(h)+',.replace={' + ','.join(map(str,entry['replace']))+'}},\n'
-    assets += '};\n'
+        table += '{.tag="seat",.width=1024,.height=256,.crc='+str(crc)+f',.png=png{i},.png_size='+str(len(png))
+        table += ',.original_width='+str(w)+',.original_height='+str(h)+',.replace={' + ','.join(map(str,entry['replace']))+'}},\n'
+    assets += f'const unsigned int hud_hires_embedded_count={len(entries)+1};\nconst struct hud_hires_embedded hud_hires_embedded[]={{\n'+table+'};\n'
     production = (ROOT/'port/linux/src/hud_hires.c').read_text()
     # Link the same zlib implementation that this checkout builds.
     if 'zlib_prefixed.h' in production:
@@ -179,7 +179,7 @@ def stock_bitmaps(path):
         if data[name:data.index(b'\0', name)] != b'ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds':
             continue
         group = offset(u(tag+20))
-        for index in (9, 10):
+        for index in (8, 9, 10, 11, 12):
             bitmap = offset(u(group+100)) + index*48
             w, h, _, _, fmt, flags = struct.unpack_from('<hhhhhH', data, bitmap+4)
             position, size = struct.unpack_from('<ii', data, bitmap+24)
@@ -195,7 +195,7 @@ def main():
     parser.add_argument('--map', type=Path)
     args = parser.parse_args()
     entries = [e for e in json.loads((ROOT/'port/assets/hud/layout.json').read_text())['assets'] if 'replace' in e]
-    assert {e['bitmap'] for e in entries} == {9, 10}
+    assert {e['bitmap'] for e in entries} == {8, 9, 10, 11, 12}
     meter = np.array(Image.open(ROOT/'port/assets/hud/hud_unit_meters__0.png'))
     for entry in entries:
         art = np.array(Image.open(ROOT/f'port/assets/hud/{entry["name"]}.png'))
@@ -205,7 +205,11 @@ def main():
         outside = art.copy(); outside[y0:y1, x0:x1] = 0
         assert not outside.any(), 'Patch would overwrite seat label or another region'
         outline = art[y0:y1, x0:x1, 3] > 8
-        fill = meter[34*8+y0-80:34*8+y1-80, 122*8+x0:122*8+x1, 3] > 0
+        if entry['bitmap'] in (9, 10):
+            sx, sy, dx, dy = 122, 34, 0, 10  # passenger/gunner cross
+        else:
+            sx, sy, dx, dy = 0, 0, -1, 0   # Ghost/Banshee/Scorpion wrench
+        fill = meter[sy*8+y0-dy*8:sy*8+y1-dy*8, sx*8+x0-dx*8:sx*8+x1-dx*8, 3] > 0
         assert outline.any() and np.all(fill[outline]), 'Outline must lie on its matching meter contour'
     if args.map:
         for index, bitmap in stock_bitmaps(args.map):
@@ -242,7 +246,7 @@ def main():
                                     original[y1,x0]*(1-fx)*fy+original[y1,x1]*fx*fy+.5).astype(np.uint8)
                 expected[scale:(h-1)*scale, scale:(w-1)*scale] = 17
                 assert np.all(actual == expected[...,None]), (w,h,scale)
-    print('PASS: two matching seat outlines; original labels preserved, 12 rectangular Morton/bilinear cases; invalid and full-redraw fallbacks')
+    print('PASS: all five cross/wrench outlines; original labels preserved, 12 rectangular Morton/bilinear cases; invalid and full-redraw fallbacks')
     test_upload(compiler, entries)
 
 
