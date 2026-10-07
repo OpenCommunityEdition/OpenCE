@@ -442,9 +442,11 @@ a pregame keep-alive every five seconds from the host
      player's screen effects to that player's machine alone, but for a
      weapon's own shake of the player firing it (no one's damage), which
      that player's machine shows itself at once. The killing blow is sent
-     unreliably: an actor's body the host says is dead (the objects' states
-     say so) that is still alive half a second on is killed with nothing
-     to show (a player's the units' states kill).
+     with the tick's other damage and once more reliably (a client replays
+     one blow of a unit only), so every body falls as the host's did: a
+     body the host says is dead (the objects' states say so of an actor's,
+     the units' states of a player's) that is still alive half a second on
+     is killed with nothing to show.
    - A client's own projectiles respond to what they hit as the game has
      them: the host's shields and health, which the client has, say
      whether the shield or the body took the hit, and how much is left of
