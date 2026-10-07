@@ -15256,6 +15256,10 @@ static boolean hs_compile_and_evaluate_command(
 		if (console_option_execute(expression, &option_succeeded))
 			return option_succeeded;
 	}
+	/* port: the co-op host's bringto, which brings every player to the host
+	(players.c; a client is told it is the host's) */
+	if (hs_host_player_command(expression, "bringto"))
+		return players_coop_bring_to_host();
 	/* port: playing in another's game, the host decides the game: no
 	cheats, no game speed, nothing else a command changes of the game (the
 	game run each tick also puts back what was changed before joining,

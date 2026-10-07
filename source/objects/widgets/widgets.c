@@ -61,7 +61,7 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_WIDGETS_PER_MAP = 64
+	MAXIMUM_WIDGETS_PER_MAP = HALO_PORT_MAXIMUM_WIDGETS
 };
 
 /* ---------- macros */

@@ -72,7 +72,7 @@ static struct light_volume_globals light_volume_globals = {0};
 void light_volumes_initialize(
 	void)
 {
-	light_volume_globals.light_volume_data = game_state_data_new("light volumes", 256, 8);
+	light_volume_globals.light_volume_data = game_state_data_new("light volumes", HALO_PORT_MAXIMUM_LIGHT_VOLUMES, 8);
 	if (!light_volume_globals.light_volume_data)
 	{
 		display_assert(
