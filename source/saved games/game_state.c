@@ -123,6 +123,8 @@ symbols in this file:
 #include "memory_pool.h"
 #include "cluster_partitions.h"
 
+void platform_log(const char *format, ...);
+
 /* ---------- constants */
 
 enum
@@ -263,10 +265,27 @@ void game_state_dispose(
 	return;
 }
 
+/* port: what last rewrote the game state, and when (game time), for
+game_state_check_data_arrays' report */
+static char const *game_state_last_event = "startup";
+static long game_state_last_event_time = NONE;
+
+static void game_state_note_event(
+	char const *event)
+{
+	game_state_last_event = event;
+	game_state_last_event_time = game_time_initialized() ? game_time_get() : NONE;
+}
+
+static void game_state_data_arrays_new_map(void);
+
 void game_state_initialize_for_new_map(
 	void)
 {
 	const char *name;
+
+	game_state_note_event("map start");
+	game_state_data_arrays_new_map();
 
 	game_state_globals.locked = TRUE;
 	game_state_globals.saved_game_valid = FALSE;
@@ -300,6 +319,7 @@ void game_state_save(
 	main_stop_time();
 	game_state_globals.saved_game_valid = (game_state_write_to_file()!=FALSE);
 	main_start_time();
+	game_state_note_event("checkpoint saved");
 
 	return;
 }
@@ -330,6 +350,7 @@ void game_state_revert(
 		return;
 	}
 
+	game_state_note_event("checkpoint revert");
 	game_state_call_before_load_procs();
 	/* port: a file that is not a saved game of this build is not taken, and
 	the map starts over */
@@ -348,6 +369,7 @@ void game_state_save_to_persistent_storage(
 {
 	if (player_spawn_count==1)
 	{
+		game_state_note_event("save and quit");
 		game_state_revert();
 		game_state_write_to_persistent_storage(
 			game_state_globals.base_address,
@@ -590,6 +612,10 @@ struct game_state_allocation
 	long page_size_bits;
 	lruv_delete_block_proc delete_block_proc;
 	lruv_locked_block_proc locked_block_proc;
+	/* a data array's last tick in order this map (NONE: not yet), and
+	whether it was reported since (game_state_check_data_arrays) */
+	long good_time;
+	boolean reported;
 };
 
 static struct game_state_allocation game_state_allocations[MAXIMUM_GAME_STATE_ALLOCATIONS];
@@ -668,6 +694,12 @@ static boolean game_state_image_data_valid(
 	}
 	data->valid = data->valid != FALSE;
 	data->identifier_zero_invalid = data->identifier_zero_invalid != FALSE;
+	/* (one made for the map has its identifiers seeded, and the game's is
+	made for this map too: data_make_valid) */
+	if (data->valid && !data->next_identifier)
+		return game_state_image_refuse(name, "is a data array with no identifier to give out");
+	if (!data->valid && live->valid)
+		return game_state_image_refuse(name, "is a data array not made for the map");
 
 	return TRUE;
 }
@@ -831,9 +863,73 @@ struct data_array *game_state_data_new(
 	{
 		allocation->maximum_count = maximum_count;
 		allocation->element_size = size;
+		allocation->good_time = NONE;
 	}
 
 	return data;
+}
+
+/* port: a data array in order: an array (its signature, its own elements)
+made valid for the map, with an identifier to give out and counts that fit
+(data.c's data_usable) */
+static boolean game_state_data_array_good(
+	struct data_array const *data)
+{
+	return data->signature == 'd@t@' && data->data == (void *)(data + 1) && data->valid && data->next_identifier &&
+		data->count >= 0 && data->count <= data->maximum_count &&
+		data->actual_count >= 0 && data->actual_count <= data->count &&
+		data->first_free_absolute_index >= 0 && data->first_free_absolute_index <= data->maximum_count;
+}
+
+static void game_state_data_arrays_new_map(
+	void)
+{
+	long index;
+
+	for (index = 0; index < game_state_allocation_count; index++)
+	{
+		game_state_allocations[index].good_time = NONE;
+		game_state_allocations[index].reported = FALSE;
+	}
+}
+
+/* port: each tick, every data array that was in order this map and no
+longer is, reported once a map to halo.log (which a crash report carries):
+when it went wrong (between its last tick in order and this one), how, and
+what last rewrote the game state. A lights array found made for no map
+(Sentry NATIVE-7) was the first sign of it; data.c now gives out no datum
+from such an array, so this says where it came from. */
+void game_state_check_data_arrays(
+	void)
+{
+	long now = game_time_get();
+	long index;
+
+	for (index = 0; index < game_state_allocation_count; index++)
+	{
+		struct game_state_allocation *allocation = &game_state_allocations[index];
+		struct data_array const *data = allocation->address;
+
+		if (allocation->kind != _game_state_allocation_data)
+			continue;
+		if (game_state_data_array_good(data))
+		{
+			allocation->good_time = now;
+			continue;
+		}
+		if (allocation->good_time == NONE || allocation->reported)
+			continue;
+		allocation->reported = TRUE;
+		platform_log("game state: %.31s went wrong between ticks %ld and %ld of %.255s: signature %08lx, %s, "
+			"next identifier %04x, count %d (%d used, first free %d) of %d; last rewritten by %s at tick %ld",
+			data->name, allocation->good_time, now, game_state_globals.header->map_name,
+			(unsigned long)data->signature, data->valid ? "valid" : "not valid",
+			(unsigned short)data->next_identifier, data->count, data->actual_count,
+			data->first_free_absolute_index, data->maximum_count, game_state_last_event,
+			game_state_last_event_time);
+		error(_error_silent, "game state: %.31s went wrong between ticks %ld and %ld (last rewritten by %s at tick %ld)",
+			data->name, allocation->good_time, now, game_state_last_event, game_state_last_event_time);
+	}
 }
 
 struct memory_pool *game_state_memory_pool_new(
@@ -898,6 +994,7 @@ void game_state_try_and_load_from_persistent_storage(
 			(error(_error_silent, "the saved game is not taken: it is of difficulty %d, this game of %d",
 				header.difficulty, main_get_difficulty()), FALSE)))
 	{
+		game_state_note_event("saved game loaded");
 		game_state_call_before_load_procs();
 		game_state_read_from_persistent_storage(
 			game_state_globals.base_address,
@@ -918,6 +1015,7 @@ void game_state_load_core(
 	if (game_state_read_core_header(name, &header, sizeof(header))
 		&& game_state_header_valid(&header, TRUE))
 	{
+		game_state_note_event("core loaded");
 		game_state_call_before_load_procs();
 		game_state_read_core(
 			name,
