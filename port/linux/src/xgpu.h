@@ -131,6 +131,61 @@ struct nv2a_pixel_shader_key
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
 
+/* ---------- HLSL (the Direct3D 12 renderer; xgpu_hlsl.c)
+
+The same programs in HLSL (shader model 5.0). Their constants are in two
+constant buffers, b0 for the vertex shader and b1 for the pixel shader, laid
+out as these structures; textures t0 to t3 with samplers s0 to s3. */
+
+struct xgpu_hlsl_vertex_constants
+{
+	float c[XGPU_VERTEX_CONSTANT_COUNT][4];
+	float viewport_scale[4];
+	float viewport_offset[4];
+	/* point_size, screen_offset */
+	float misc[4];
+	/* the input registers' current values (SetVertexData), for those no
+	stream feeds */
+	float attribute_values[XGPU_VERTEX_ATTRIBUTE_COUNT][4];
+};
+
+struct xgpu_hlsl_pixel_constants
+{
+	float ps_c0[8][4];
+	float ps_c1[8][4];
+	float ps_final_c0[4];
+	float ps_final_c1[4];
+	float fog_color[4];
+	float fog_parameters[4];
+	/* alpha_reference */
+	float misc[4];
+	float bump_matrix[4][4];
+	float bump_luminance[4][4];
+	float texture_scale[4][4];
+	/* (XGPU_MODEL_LIGHT_COUNT) */
+	float model_lights[12][4];
+};
+
+/* how a vertex program's input registers are fed: from a stream or not
+(then from attribute_values), as NORMPACKED3 words, as integers (SHORTn: no
+format reads them as floats), and with w read through a format of four
+components for three (made 1) */
+struct nv2a_vertex_inputs
+{
+	unsigned long provided_mask;
+	unsigned long packed_mask;
+	unsigned long integer_mask;
+	unsigned long w_one_mask;
+};
+
+extern const char xgpu_hlsl_prologue[];
+/* GLSL's one-argument vector constructors made HLSL's casts; malloc'd */
+char *xgpu_hlsl_from_glsl(const char *text);
+
+char *nv2a_vertex_shader_to_hlsl(const DWORD *instructions, unsigned long instruction_count,
+	const struct nv2a_vertex_inputs *inputs, const struct nv2a_vertex_lighting *lighting);
+char *nv2a_pixel_shader_to_hlsl(const struct nv2a_pixel_shader_key *key);
+
 #ifdef HALO_ANDROID
 /* ES samplers have no LOD bias of their own */
 #define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"

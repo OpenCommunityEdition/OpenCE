@@ -164,6 +164,10 @@ struct xgpu_device
 
 extern struct xgpu_device xgpu_device;
 
+/* how the current declaration feeds a program's input registers
+(nv2a_vertex_inputs): immediate mode's every register as floats */
+void xgpu_vertex_inputs(BOOL immediate, struct nv2a_vertex_inputs *inputs);
+
 /* the program that runs: the one loaded at the selected address, else the
 current shader's own */
 static inline struct vertex_shader_object *current_program(void)

@@ -750,9 +750,10 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 			xgpu_device.attributes[index][3] = 1.0f;
 
 		memory_watch_initialize();
-		xgpu_debug_settings.skip_vertex_shaders = config_string("debug.gpu_skip_vertex_shaders");
+		/* (copies: the settings' strings move as config.toml is written) */
+		xgpu_debug_settings.skip_vertex_shaders = strdup(config_string("debug.gpu_skip_vertex_shaders"));
 		xgpu_debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
-			config_string("debug.gpu_dump_shaders") : NULL;
+			strdup(config_string("debug.gpu_dump_shaders")) : NULL;
 		xgpu_debug_settings.statistics = config_boolean("debug.gpu_stats");
 		if (!config_boolean("debug.null_renderer") && renderer_start(width, height))
 		{
@@ -1316,6 +1317,42 @@ void WINAPI D3DDevice_SetVertexShaderConstant(INT reg, CONST void *constant_data
 	if (first + (long)constant_count > XGPU_VERTEX_CONSTANT_COUNT)
 		constant_count = XGPU_VERTEX_CONSTANT_COUNT - first;
 	constants_store((unsigned long)first, constant_data, constant_count);
+}
+
+void xgpu_vertex_inputs(BOOL immediate, struct nv2a_vertex_inputs *inputs)
+{
+	const struct vertex_shader_object *declaration = xgpu_device.vertex_shader;
+	unsigned long index;
+
+	memset(inputs, 0, sizeof(*inputs));
+	if (immediate)
+	{
+		inputs->provided_mask = (1UL << XGPU_VERTEX_ATTRIBUTE_COUNT) - 1;
+		return;
+	}
+	if (!declaration)
+		return;
+	for (index = 0; index < declaration->element_count; index++)
+	{
+		const struct vertex_element *element = &declaration->elements[index];
+		unsigned long bit = 1UL << element->reg;
+
+		if (element->type == D3DVSDT_NORMPACKED3)
+			inputs->packed_mask |= bit;
+		if (!xgpu_device.streams[element->stream].data || element->type == D3DVSDT_NONE)
+			continue;
+		inputs->provided_mask |= bit;
+		if (element->type == D3DVSDT_SHORT1 || element->type == D3DVSDT_SHORT2 ||
+			element->type == D3DVSDT_SHORT3 || element->type == D3DVSDT_SHORT4)
+		{
+			inputs->integer_mask |= bit;
+		}
+		if (element->type == D3DVSDT_SHORT3 || element->type == D3DVSDT_NORMSHORT3 ||
+			element->type == D3DVSDT_PBYTE3)
+		{
+			inputs->w_one_mask |= bit;
+		}
+	}
 }
 
 /* ---------- the uniforms a draw sets besides the vertex constants */

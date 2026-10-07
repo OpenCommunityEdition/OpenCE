@@ -1015,6 +1015,23 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 				fputs(source, file);
 				fclose(file);
 			}
+			/* and the same program in HLSL (the Direct3D 12 renderer's) */
+			{
+				struct nv2a_vertex_inputs inputs;
+				char *hlsl;
+
+				xgpu_vertex_inputs(immediate, &inputs);
+				hlsl = nv2a_vertex_shader_to_hlsl(program->instructions, program->instruction_count, &inputs,
+					lit ? &program->lighting : NULL);
+				snprintf(path, sizeof(path), "%s/vs%03lu_%d%s.hlsl", debug_settings.dump_shaders, program->id, variant,
+					lit ? "_lit" : "");
+				if (hlsl && (file = fopen(path, "w")) != NULL)
+				{
+					fputs(hlsl, file);
+					fclose(file);
+				}
+				free(hlsl);
+			}
 		}
 		free(source);
 	}
@@ -1065,6 +1082,18 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 		{
 			fputs(source, file);
 			fclose(file);
+		}
+		/* and the same shader in HLSL (the Direct3D 12 renderer's) */
+		{
+			char *hlsl = nv2a_pixel_shader_to_hlsl(key);
+
+			snprintf(path, sizeof(path), "%s/ps_%08lx.hlsl", debug_settings.dump_shaders, hash);
+			if (hlsl && (file = fopen(path, "w")) != NULL)
+			{
+				fputs(hlsl, file);
+				fclose(file);
+			}
+			free(hlsl);
 		}
 	}
 	free(source);
