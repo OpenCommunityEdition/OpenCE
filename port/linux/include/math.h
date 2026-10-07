@@ -11,6 +11,12 @@ strnlen() cannot collide with the game's own), which hides glibc's M_*.
 
 #include_next <math.h>
 
+/* glibc hides the C99 classification macros in the game's ISO C89 mode.
+Use the compiler's classification, not a call to a nonexistent libm symbol. */
+#ifndef isfinite
+#define isfinite(value) __builtin_isfinite(value)
+#endif
+
 #ifndef M_PI
 #define M_E 2.71828182845904523536
 #define M_LOG2E 1.44269504088896340736
