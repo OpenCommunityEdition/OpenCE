@@ -567,8 +567,10 @@ boolean projectile_new(
 
 	attachments = &definition->object.attachments;
 	projectile->projectile.tracer_attachment_index = NONE;
+	/* port: only the attachments the object has (a map's count; the tracer
+	index is written through, and attachments_new reports the rest) */
 	for (attachment_index = 0;
-		attachment_index < attachments->count;
+		attachment_index < MIN(attachments->count, MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
 		attachment_index++)
 	{
 		struct object_attachment_definition const *attachment = TAG_BLOCK_GET_ELEMENT(

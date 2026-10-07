@@ -522,7 +522,8 @@ static boolean actor_state_apply(
 	SET_FLAG(unit->unit.flags, _unit_super_camouflaged_bit,
 		TEST_FLAG(state->flags, _distributed_actor_super_camouflaged_bit));
 	unit->unit.active_camouflage = (real)state->active_camouflage / 255.0f;
-	if (state->team != NO_TEAM)
+	/* (the game's 10 teams, game_allegiance.c) */
+	if (state->team != NO_TEAM && state->team < 10)
 		unit->object.owner_team_index = state->team;
 	SET_FLAG(unit->unit.flags, _unit_running_blindly_bit,
 		TEST_FLAG(state->flags, _distributed_actor_running_blindly_bit));

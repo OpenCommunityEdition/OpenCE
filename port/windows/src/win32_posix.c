@@ -28,6 +28,10 @@ graphics) run a program on the integrated one unless it exports these */
 __declspec(dllexport) DWORD NvOptimusEnablement = 1;
 __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 
+/* win32_crash.c's: whether this process is a crash reporter, which leaves
+halo.log to the game it reports */
+int crash_reporter_process(void);
+
 __attribute__((constructor))
 static void windows_startup(void)
 {
@@ -41,7 +45,7 @@ static void windows_startup(void)
 	layer's log (platform_log's stderr: invite links, the data root, crash
 	reports) goes to halo.log next to halo.exe, unless stderr already goes
 	somewhere (a pipe or a file the game was started with) */
-	if (_fileno(stderr) < 0)
+	if (_fileno(stderr) < 0 && !crash_reporter_process())
 	{
 		char path[MAX_PATH];
 		DWORD length = GetModuleFileNameA(NULL, path, sizeof(path));

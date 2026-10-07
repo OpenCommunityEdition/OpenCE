@@ -665,9 +665,13 @@ void effect_delete(
 		struct effect_definition *definition =
 			effect_definition_get(effect->definition_index);
 		short location_index;
+		/* port: no more locations than the effect holds (the map's count) */
+		short location_count = (short)MIN(
+			definition->locations.count,
+			(long)NUMBEROF(effect->location_datum_indices));
 
 		for (location_index = 0;
-			location_index < definition->locations.count;
+			location_index < location_count;
 			location_index++)
 		{
 			struct effect_location_datum *location;
@@ -968,6 +972,26 @@ long effect_new_looping(
 			first_person_weapon_get_local_index(object_index);
 		effect->scale_a_function_index = scale_a_function_index;
 		effect->scale_b_function_index = scale_b_function_index;
+		/* port: the index is the map's attachment's (its change color less
+		one): one the object has no change color for is none (white), and
+		said once */
+		if (change_color_index != NONE &&
+			!VALID_INDEX(change_color_index, NUMBER_OF_OBJECT_CHANGE_COLORS))
+		{
+			static boolean bad_change_color_reported = FALSE;
+
+			if (!bad_change_color_reported)
+			{
+				bad_change_color_reported = TRUE;
+				error(
+					_error_silent,
+					"effect %s is attached with change color %d (of %d)",
+					tag_get_name(definition_index),
+					change_color_index,
+					NUMBER_OF_OBJECT_CHANGE_COLORS);
+			}
+			change_color_index = NONE;
+		}
 		effect->change_color_index = change_color_index;
 		effect->impulse_field.translational_function = NULL;
 		effect->impulse_field.angular_function = NULL;
@@ -1057,9 +1081,13 @@ void effects_stop_on_first_person_weapon(
 		if (effect->local_player_index == local_player_index)
 		{
 			short location_index;
+			/* port: no more locations than the effect holds (the map's count) */
+			short location_count = (short)MIN(
+				definition->locations.count,
+				(long)NUMBEROF(effect->location_datum_indices));
 
 			for (location_index = 0;
-				location_index < definition->locations.count;
+				location_index < location_count;
 				location_index++)
 			{
 				long *location_datum_index =
@@ -1785,8 +1813,10 @@ static void effect_generate_parts(
 		long location_datum_index;
 		struct effect_location_datum *instance;
 
+		/* port: and a location the effect holds */
 		if (part->location_index < 0 ||
 			part->location_index >= definition->locations.count ||
+			part->location_index >= (short)NUMBEROF(effect->location_datum_indices) ||
 			part->reference.index == NONE)
 		{
 			continue;
@@ -1885,8 +1915,10 @@ static void effect_generate_particles(
 	else
 		event_fraction = 1.0f;
 
+	/* port: no more particles than the effect counts (the map's count) */
 	for (particle_index = 0;
-		particle_index < event->particles.count;
+		particle_index < event->particles.count &&
+			particle_index < (short)NUMBEROF(effect->particle_counts);
 		particle_index++)
 	{
 		struct effect_particles_definition *particles = TAG_BLOCK_GET_ELEMENT(
@@ -1898,8 +1930,10 @@ static void effect_generate_particles(
 		long location_datum_index;
 		struct effect_location_datum *instance;
 
+		/* port: and a location the effect holds */
 		if (particles->location_index < 0 ||
-			particles->location_index >= definition->locations.count)
+			particles->location_index >= definition->locations.count ||
+			particles->location_index >= (short)NUMBEROF(effect->location_datum_indices))
 		{
 			continue;
 		}
@@ -2195,10 +2229,14 @@ static void effect_update(
 					struct object_definition *object_definition =
 						object_definition_get(object->definition_index);
 					short attachment_index;
+					/* port: no more than the object holds (the map's count;
+					objects.c makes no more than that) */
+					short attachment_count = (short)MIN(
+						object_definition->object.attachments.count,
+						MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT);
 
 					for (attachment_index = 0;
-						attachment_index <
-							object_definition->object.attachments.count;
+						attachment_index < attachment_count;
 						attachment_index++)
 					{
 						if (object->object.attachment_indices[attachment_index] ==
@@ -2379,6 +2417,19 @@ static void effect_update(
 				effect_get_random_seed(effect->definition_index),
 				event->duration_lower_bound,
 				event->duration_upper_bound);
+
+			/* port: no more particles than the effect counts. A tag with more
+			is cut to that, and said once. */
+			if (event->particles.count > (long)NUMBEROF(effect->particle_counts))
+			{
+				error(
+					_error_silent,
+					"effect %s has an event with %d particles (only %d are made)",
+					tag_get_name(effect->definition_index),
+					event->particles.count,
+					(long)NUMBEROF(effect->particle_counts));
+				event->particles.count = NUMBEROF(effect->particle_counts);
+			}
 
 			for (particle_index = 0;
 				particle_index < event->particles.count;
@@ -2715,6 +2766,19 @@ static void effect_build_locations(
 		effect_definition_get(effect->definition_index);
 	struct object_marker markers[MAXIMUM_EFFECT_INSTANCES];
 	short location_index;
+
+	/* port: no more locations than the effect holds. A tag with more is
+	cut to that, and said once. */
+	if (definition->locations.count > (long)NUMBEROF(effect->location_datum_indices))
+	{
+		error(
+			_error_silent,
+			"effect %s has %d locations (only %d are used)",
+			tag_get_name(effect->definition_index),
+			definition->locations.count,
+			(long)NUMBEROF(effect->location_datum_indices));
+		definition->locations.count = NUMBEROF(effect->location_datum_indices);
+	}
 
 	for (location_index = 0;
 		location_index < definition->locations.count;

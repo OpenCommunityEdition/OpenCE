@@ -330,6 +330,17 @@ typedef char rasterizer_triangle_size_assert[
 
 static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 	struct dynamic_vertex_group const *group);
+static void draw_primitives_data_error(
+	char const *problem);
+static boolean draw_primitives_vertex_buffer_valid(
+	struct vertex_buffer const *vertex_buffer);
+static boolean draw_primitives_triangle_buffer_valid(
+	struct triangle_buffer const *triangle_buffer,
+	long *triangle_count);
+static boolean draw_primitives_dynamic_triangle_count_valid(
+	struct dynamic_triangle_buffer const *dynamic_triangle_buffer,
+	long first_triangle_index,
+	long *triangle_count);
 
 /* ---------- globals */
 
@@ -1293,6 +1304,13 @@ void rasterizer_draw_dynamic_triangles_static_vertices(
 			dynamic_triangle_buffer_index<dynamic_triangles.buffer_count);
 
 		dynamic_triangle_buffer = &dynamic_triangles.buffers[dynamic_triangle_buffer_index];
+		/* port: a vertex type the tables have (a map's), and no more triangles
+		than the dynamic buffer was filled with */
+		if (!draw_primitives_vertex_buffer_valid(vertex_buffer) ||
+			!draw_primitives_dynamic_triangle_count_valid(dynamic_triangle_buffer, first_triangle_index, &triangle_count))
+		{
+			break;
+		}
 		vertex_size = rasterizer_geometry_get_vertex_size(vertex_buffer->type);
 
 		match_assert(
@@ -1431,6 +1449,14 @@ void rasterizer_draw_dynamic_triangles_static_vertices2(
 			dynamic_triangle_buffer_index<dynamic_triangles.buffer_count);
 
 		dynamic_triangle_buffer = &dynamic_triangles.buffers[dynamic_triangle_buffer_index];
+		/* port: vertex types the tables have (a map's), and no more triangles
+		than the dynamic buffer was filled with */
+		if (!draw_primitives_vertex_buffer_valid(vertex_buffer0) ||
+			!draw_primitives_vertex_buffer_valid(vertex_buffer1) ||
+			!draw_primitives_dynamic_triangle_count_valid(dynamic_triangle_buffer, first_triangle_index, &triangle_count))
+		{
+			break;
+		}
 		vertex_size0 = rasterizer_geometry_get_vertex_size(vertex_buffer0->type);
 		vertex_size1 = rasterizer_geometry_get_vertex_size(vertex_buffer1->type);
 
@@ -1557,6 +1583,12 @@ void rasterizer_draw_static_triangles_dynamic_vertices(
 			break;
 		}
 		if (dynamic_vertex_buffer_index==NONE)
+		{
+			break;
+		}
+		/* port: a triangle buffer type the table has, and no more triangles
+		than the buffer has (a map's) */
+		if (!draw_primitives_triangle_buffer_valid(triangle_buffer, &triangle_count))
 		{
 			break;
 		}
@@ -1718,6 +1750,13 @@ void rasterizer_draw_static_triangles_static_vertices(
 			break;
 		}
 		if (!vertex_buffer->hardware_format)
+		{
+			break;
+		}
+		/* port: a triangle buffer and vertex type the tables have, and no
+		more triangles than the buffer has (a map's) */
+		if (!draw_primitives_vertex_buffer_valid(vertex_buffer) ||
+			!draw_primitives_triangle_buffer_valid(triangle_buffer, &triangle_count))
 		{
 			break;
 		}
@@ -1891,6 +1930,69 @@ void rasterizer_draw(
 }
 
 /* ---------- private code */
+
+/* port: a map's buffer with a type past the tables or more triangles than
+it has; said once */
+static void draw_primitives_data_error(
+	char const *problem)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "### ERROR a draw has a bad %s; it is cut short", problem);
+		reported = TRUE;
+	}
+
+	return;
+}
+
+static boolean draw_primitives_vertex_buffer_valid(
+	struct vertex_buffer const *vertex_buffer)
+{
+	if (VALID_INDEX(vertex_buffer->type, NUMBER_OF_RASTERIZER_VERTEX_TYPES))
+	{
+		return TRUE;
+	}
+	draw_primitives_data_error("vertex buffer type");
+
+	return FALSE;
+}
+
+/* (the static draws start at triangle 0) */
+static boolean draw_primitives_triangle_buffer_valid(
+	struct triangle_buffer const *triangle_buffer,
+	long *triangle_count)
+{
+	if (!VALID_INDEX(triangle_buffer->type, NUMBER_OF_TRIANGLE_BUFFER_TYPES))
+	{
+		draw_primitives_data_error("triangle buffer type");
+		return FALSE;
+	}
+	if (*triangle_count>triangle_buffer->count)
+	{
+		draw_primitives_data_error("triangle count");
+		*triangle_count = triangle_buffer->count;
+	}
+
+	return *triangle_count>0;
+}
+
+static boolean draw_primitives_dynamic_triangle_count_valid(
+	struct dynamic_triangle_buffer const *dynamic_triangle_buffer,
+	long first_triangle_index,
+	long *triangle_count)
+{
+	long available_count = dynamic_triangle_buffer->triangle_count - first_triangle_index;
+
+	if (first_triangle_index<0 || *triangle_count>available_count)
+	{
+		draw_primitives_data_error("dynamic triangle count");
+		*triangle_count = first_triangle_index<0 ? 0 : available_count;
+	}
+
+	return *triangle_count>0;
+}
 
 static D3DVertexBuffer *dynamic_vertex_group_get_d3d_vertex_buffer(
 	struct dynamic_vertex_group const *group)

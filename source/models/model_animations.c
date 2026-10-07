@@ -307,6 +307,30 @@ static void animation_get_keyframe_scale(
 	short adjusted_node_index,
 	short node_index,
 	real *scale);
+static long animation_frame_data_offset(
+	struct animation const *animation,
+	short frame_index);
+static boolean animation_data_contains(
+	struct animation const *animation,
+	long offset,
+	long relative_offset,
+	long first_element_index,
+	long element_count,
+	long element_size);
+static long animation_node_flag_count(
+	unsigned long low_flags,
+	unsigned long high_flags,
+	short node_count);
+static boolean animation_frame_valid(
+	struct animation const *animation,
+	short frame_index,
+	boolean reads_default_data);
+static void animation_data_error(
+	struct animation const *animation,
+	char const *problem);
+static void animation_set_rest_orientations(
+	struct real_orientation *node_orientations,
+	short node_count);
 
 /* ---------- globals */
 
@@ -369,8 +393,22 @@ void animation_get_x_offsets(
 	real x_offset = 0.f;
 	real key_x_offset = 0.f;
 	byte const *frame_info = animation->frame_info.address;
+	short frame_count = animation->frame_count;
+	long frame_info_size =
+		animation->frame_info_type==1 ? (long)sizeof(struct animation_frame_info_dx_dy) :
+		animation->frame_info_type==2 ? (long)sizeof(struct animation_frame_info_dx_dy_dyaw) :
+		animation->frame_info_type==3 ? (long)sizeof(struct animation_frame_info_dx_dy_dz_dyaw) :
+		0;
 
-	for (frame_index = 0; frame_index < animation->frame_count; frame_index++)
+	/* port: no offsets from frame info the animation doesn't have (a map's
+	frame count and size) */
+	if (frame_count>0 && frame_info_size*frame_count>animation->frame_info.size)
+	{
+		animation_data_error(animation, "frame info");
+		frame_count = 0;
+	}
+
+	for (frame_index = 0; frame_index < frame_count; frame_index++)
 	{
 		switch (animation->frame_info_type)
 		{
@@ -462,7 +500,14 @@ short animation_update_internal(
 
 	if (sound_index)
 	{
-		if (animation->sound_index!=NONE && animation->private_sound_frame_index==state->frame_index)
+		/* port: a sound the graph has (a map's index) */
+		if (animation->sound_index!=NONE &&
+			!VALID_INDEX(animation->sound_index, animation_graph->sound_references.count))
+		{
+			animation_data_error(animation, "sound");
+			*sound_index = NONE;
+		}
+		else if (animation->sound_index!=NONE && animation->private_sound_frame_index==state->frame_index)
 		{
 			struct animation_graph_sound_reference const *sound_reference = TAG_BLOCK_GET_ELEMENT(
 				&animation_graph->sound_references,
@@ -522,10 +567,12 @@ void animation_graph_node_matrices_from_orientations(
 	short node_indices[MAXIMUM_NODES_PER_MODEL];
 	short read_index;
 	short write_index;
+	/* port: the nodes the queue and the matrices hold (a map's count) */
+	short node_count = (short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_MODEL);
 
 	matrix4x3_from_point_and_vectors(&root_matrix, origin, forward, up);
 
-	if (animation_graph->nodes.count > 0)
+	if (node_count > 0)
 	{
 		read_index = 0;
 		write_index = 1;
@@ -543,19 +590,37 @@ void animation_graph_node_matrices_from_orientations(
 
 			if (!node_index)
 				parent_matrix = &root_matrix;
+			/* port: a parent the graph doesn't have is the root (a map's index) */
+			else if (!VALID_INDEX(node->parent_node_index, node_count))
+			{
+				if (model_data_report_once(animation_graph))
+				{
+					error(_error_silent, "### ERROR an animation graph has a bad node parent index");
+				}
+				parent_matrix = &node_matrices[0];
+			}
 			else
 				parent_matrix = &node_matrices[node->parent_node_index];
 
 			matrix4x3_from_orientation(&local_matrix, &node_orientations[node_index]);
 			matrix4x3_multiply(parent_matrix, &local_matrix, &node_matrices[node_index]);
 
+			/* port: only nodes the graph has, and no more than the queue holds
+			(a map's links, which could go in a loop) */
 			if (node->next_sibling_node_index != NONE)
 			{
 				match_assert(
 					"c:\\halo\\SOURCE\\models\\model_animations.c",
 					1250,
 					write_index<MAXIMUM_NODES_PER_MODEL);
-				node_indices[write_index++] = node->next_sibling_node_index;
+				if (VALID_INDEX(node->next_sibling_node_index, node_count) && write_index<MAXIMUM_NODES_PER_MODEL)
+				{
+					node_indices[write_index++] = node->next_sibling_node_index;
+				}
+				else if (model_data_report_once(animation_graph))
+				{
+					error(_error_silent, "### ERROR an animation graph has a bad node sibling index");
+				}
 			}
 
 			if (node->first_child_node_index != NONE)
@@ -564,7 +629,14 @@ void animation_graph_node_matrices_from_orientations(
 					"c:\\halo\\SOURCE\\models\\model_animations.c",
 					1256,
 					write_index<MAXIMUM_NODES_PER_MODEL);
-				node_indices[write_index++] = node->first_child_node_index;
+				if (VALID_INDEX(node->first_child_node_index, node_count) && write_index<MAXIMUM_NODES_PER_MODEL)
+				{
+					node_indices[write_index++] = node->first_child_node_index;
+				}
+				else if (model_data_report_once(animation_graph))
+				{
+					error(_error_silent, "### ERROR an animation graph has a bad node child index");
+				}
 			}
 		}
 		while (read_index != write_index);
@@ -624,6 +696,8 @@ short animation_choose_random_permutation_internal(
 {
 	struct animation_graph const *animation_graph = animation_graph_definition_get(animation_graph_index);
 	real random;
+	short first_animation_index = animation_index;
+	long permutation_count = 0;
 
 	if (render_or_affects_game_state == animation_update_kind_affects_game_state)
 	{
@@ -641,7 +715,24 @@ short animation_choose_random_permutation_internal(
 
 	while (animation_index != NONE)
 	{
-		struct animation const *animation = TAG_BLOCK_GET_ELEMENT(
+		struct animation const *animation;
+
+		/* port: only animations the graph has, each once (a map's links, which
+		could go in a loop): a bad list is its first animation, or none */
+		if (!VALID_INDEX(animation_index, animation_graph->animations.count) ||
+			permutation_count++>=animation_graph->animations.count)
+		{
+			if (model_data_report_once(animation_graph))
+			{
+				error(_error_silent, "### ERROR an animation graph has a bad animation permutation list");
+			}
+			animation_index = VALID_INDEX(first_animation_index, animation_graph->animations.count) ?
+				first_animation_index :
+				(short)NONE;
+			break;
+		}
+
+		animation = TAG_BLOCK_GET_ELEMENT(
 			&animation_graph->animations,
 			animation_index,
 			struct animation);
@@ -676,6 +767,12 @@ void interpolate_node_orientations(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
 		1278,
 		frame_index<frame_count);
+
+	/* port: no more nodes than the engine's arrays hold (a map's count) */
+	if (node_count>MAXIMUM_NODES_PER_ANIMATION)
+	{
+		node_count = MAXIMUM_NODES_PER_ANIMATION;
+	}
 
 	for (node_index = 0; node_index < node_count; node_index++)
 	{
@@ -749,14 +846,19 @@ void animation_get_node_orientations(
 	short frame_index,
 	struct real_orientation *node_orientations)
 {
+	/* port: and a node count the engine's arrays hold, and frame data inside
+	the animation's data (a map's counts and offsets; without a model, a
+	first-person weapon's, nothing else checked the count) */
 	if (animation->type==_animation_base &&
 		(!model ||
 			((!animation->node_list_checksum || animation->node_list_checksum==model->node_list_checksum || !model->node_list_checksum) &&
-			model->nodes.count==animation->node_count)))
+			model->nodes.count==animation->node_count)) &&
+		animation_frame_valid(animation, frame_index, TRUE))
 	{
 		boolean compressed = TEST_FLAG(animation->flags, _animation_compressed_bit) &&
 			(hs_model_animation_compression_enabled || !animation->compressed_data_offset);
 		byte *data = animation_get_frame_data(animation, frame_index);
+		long data_offset = animation_frame_data_offset(animation, frame_index);
 		byte *default_data = animation_get_default_data(animation);
 		long rotation_index = 0;
 		unsigned long rotation_flags;
@@ -795,10 +897,25 @@ void animation_get_node_orientations(
 			{
 				struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
 
-				quaternion_decompress_6byte(
-					(struct compressed_quaternion_6byte *)(data+header->default_rotations_offset)+node_index,
-					&orientation->rotation);
-				quaternion_normalize(&orientation->rotation);
+				/* port: a default inside the animation's data (a map's offset) */
+				if (animation_data_contains(
+					animation,
+					data_offset,
+					header->default_rotations_offset,
+					node_index,
+					1,
+					sizeof(struct compressed_quaternion_6byte)))
+				{
+					quaternion_decompress_6byte(
+						(struct compressed_quaternion_6byte *)(data+header->default_rotations_offset)+node_index,
+						&orientation->rotation);
+					quaternion_normalize(&orientation->rotation);
+				}
+				else
+				{
+					animation_data_error(animation, "compressed default rotation");
+					orientation->rotation = *global_identity_quaternion;
+				}
 			}
 			else
 			{
@@ -823,7 +940,22 @@ void animation_get_node_orientations(
 			{
 				struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
 
-				orientation->translation = *((real_point3d *)(data+header->default_translations_offset)+node_index);
+				/* port: a default inside the animation's data (a map's offset) */
+				if (animation_data_contains(
+					animation,
+					data_offset,
+					header->default_translations_offset,
+					node_index,
+					1,
+					sizeof(real_point3d)))
+				{
+					orientation->translation = *((real_point3d *)(data+header->default_translations_offset)+node_index);
+				}
+				else
+				{
+					animation_data_error(animation, "compressed default translation");
+					orientation->translation = *global_origin3d;
+				}
 			}
 			else
 			{
@@ -865,9 +997,17 @@ void animation_get_node_orientations(
 			322,
 			compressed || (byte *)default_data-(byte *)animation_get_default_data(animation)==animation->default_data.size);
 	}
-	else
+	else if (model)
 	{
 		model_get_node_orientations(model, node_orientations);
+	}
+	else
+	{
+		/* port: no model to take the default pose from (a first-person
+		weapon's), so the rest pose */
+		animation_set_rest_orientations(
+			node_orientations,
+			(short)PIN(animation->node_count, 0, MAXIMUM_NODES_PER_ANIMATION));
 	}
 
 	return;
@@ -878,7 +1018,10 @@ void replacement_animation_apply(
 	short frame_index,
 	struct real_orientation *node_orientations)
 {
-	if (animation->type==_animation_replacement && frame_index>=0 && frame_index<animation->frame_count)
+	/* port: and the frame inside the animation's data (a map's counts and
+	offsets) */
+	if (animation->type==_animation_replacement && frame_index>=0 && frame_index<animation->frame_count &&
+		animation_frame_valid(animation, frame_index, FALSE))
 	{
 		boolean compressed = animation_is_compressed(animation);
 		byte *data = animation_get_frame_data(animation, frame_index);
@@ -960,7 +1103,10 @@ void overlay_animation_apply(
 	short frame_index,
 	struct real_orientation *node_orientations)
 {
-	if (animation->type==_animation_overlay && frame_index>=0 && frame_index<animation->frame_count)
+	/* port: and the frame inside the animation's data (a map's counts and
+	offsets) */
+	if (animation->type==_animation_overlay && frame_index>=0 && frame_index<animation->frame_count &&
+		animation_frame_valid(animation, frame_index, FALSE))
 	{
 		boolean compressed = animation_is_compressed(animation);
 		byte *data = animation_get_frame_data(animation, frame_index);
@@ -1056,7 +1202,10 @@ void overlay_animation_apply_scaled(
 {
 	real inverse_animation_scale = 1.0f-animation_scale;
 
-	if (animation->type==_animation_overlay && frame_index>=0 && frame_index<animation->frame_count)
+	/* port: and the frame inside the animation's data (a map's counts and
+	offsets) */
+	if (animation->type==_animation_overlay && frame_index>=0 && frame_index<animation->frame_count &&
+		animation_frame_valid(animation, frame_index, FALSE))
 	{
 		boolean compressed = animation_is_compressed(animation);
 		byte *data = animation_get_frame_data(animation, frame_index);
@@ -1153,6 +1302,14 @@ void overlay_animation_apply_continuous(
 	real fraction;
 	short frame_index;
 
+	/* port: no frames, no overlay (a map's frame count of 0 made the frame
+	-1, read before the animation's data, every tick) */
+	if (animation->frame_count<=0)
+	{
+		animation_data_error(animation, "frame count");
+		return;
+	}
+
 	fraction = (real)fmod((double)real_frame_index, 1.0);
 	frame_index = (short)fast_ftol((real)floor(fabs(real_frame_index)));
 
@@ -1172,7 +1329,11 @@ void overlay_animation_apply_continuous(
 		real_frame_index = (real)frame_index;
 	}
 
-	if (animation->type == _animation_overlay)
+	/* port: and both frames inside the animation's data (a map's counts and
+	offsets) */
+	if (animation->type == _animation_overlay &&
+		animation_frame_valid(animation, frame_index, FALSE) &&
+		animation_frame_valid(animation, frame_index == animation->frame_count - 1 ? 0 : frame_index + 1, FALSE))
 	{
 		boolean compressed = animation_is_compressed(animation);
 		short next_frame_index = frame_index == animation->frame_count - 1 ? 0 : frame_index + 1;
@@ -1413,6 +1574,14 @@ void overlay_animation_apply_continuous_scaled(
 	real fraction = (real)fmod((double)real_frame_index, 1.0);
 	short frame_index = (short)fast_ftol((real)floor(real_frame_index));
 
+	/* port: no frames, no overlay (a map's frame count of 0 made the frame
+	-1, read before the animation's data, every frame) */
+	if (animation->frame_count<=0)
+	{
+		animation_data_error(animation, "frame count");
+		return;
+	}
+
 	if (real_frame_index<0.0f || real_frame_index>(real)animation->frame_count)
 	{
 		error(
@@ -1429,7 +1598,11 @@ void overlay_animation_apply_continuous_scaled(
 		real_frame_index = (real)frame_index;
 	}
 
-	if (animation->type==_animation_overlay)
+	/* port: and both frames inside the animation's data (a map's counts and
+	offsets) */
+	if (animation->type==_animation_overlay &&
+		animation_frame_valid(animation, frame_index, FALSE) &&
+		animation_frame_valid(animation, frame_index==animation->frame_count-1 ? 0 : frame_index+1, FALSE))
 	{
 		boolean compressed = animation_is_compressed(animation);
 		short next_frame_index = frame_index==animation->frame_count-1 ? 0 : frame_index+1;
@@ -1691,6 +1864,15 @@ void aiming_screen_apply(
 	frame_index10 = next_yaw_cell+pitch_frame_index*grid_width;
 	frame_index01 = yaw_frame_index+next_pitch_cell*grid_width;
 	frame_index11 = next_yaw_cell+next_pitch_cell*grid_width;
+	/* port: the four frames inside the animation's data (a map's counts and
+	offsets) */
+	if (!animation_frame_valid(animation, frame_index00, FALSE) ||
+		!animation_frame_valid(animation, frame_index10, FALSE) ||
+		!animation_frame_valid(animation, frame_index01, FALSE) ||
+		!animation_frame_valid(animation, frame_index11, FALSE))
+	{
+		return;
+	}
 	data00 = animation_get_frame_data(animation, frame_index00);
 	data10 = animation_get_frame_data(animation, frame_index10);
 	data01 = animation_get_frame_data(animation, frame_index01);
@@ -1931,6 +2113,21 @@ static short animation_keyframe_search(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
 			1356,
 			++infinite_loop_killer<200);
+		/* port: a map's frame indices out of order would loop forever */
+		if (infinite_loop_killer>=200)
+		{
+			break;
+		}
+	}
+
+	/* port: a keyframe with one after it, whatever the map's frame indices */
+	if (keyframe_index>keyframe_count-2)
+	{
+		keyframe_index = keyframe_count-2;
+	}
+	if (keyframe_index<0)
+	{
+		keyframe_index = 0;
 	}
 
 	match_assert(
@@ -1954,10 +2151,10 @@ static void animation_get_keyframe_rotation(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	struct compressed_quaternion_6byte const *default_rotations = (struct compressed_quaternion_6byte const *)(data+header->default_rotations_offset);
-	unsigned long node_header = header->rotation_node_headers[adjusted_node_index];
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	struct compressed_quaternion_6byte const *default_rotations;
+	unsigned long node_header;
+	short first_keyframe_index;
+	short keyframe_count;
 	word const *keyframe_frame_indices;
 	struct compressed_quaternion_6byte const *keyframe_rotations;
 	short frame_index;
@@ -1965,6 +2162,29 @@ static void animation_get_keyframe_rotation(
 	struct compressed_quaternion_6byte const *next_keyframe;
 	short this_keyframe_frame_index;
 	short next_keyframe_frame_index;
+
+	/* port: the header, this node's header and default, and its keyframes
+	inside the animation's data (a map's offsets); a bad one is no rotation */
+	if (!animation_data_contains(animation, animation->compressed_data_offset, 0, 0, 1, offsetof(struct compressed_animation_header, rotation_node_headers)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, offsetof(struct compressed_animation_header, rotation_node_headers), adjusted_node_index, 1, sizeof(unsigned long)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->default_rotations_offset, node_index, 1, sizeof(struct compressed_quaternion_6byte)))
+	{
+		animation_data_error(animation, "compressed rotation");
+		*rotation = *global_identity_quaternion;
+		return;
+	}
+	default_rotations = (struct compressed_quaternion_6byte const *)(data+header->default_rotations_offset);
+	node_header = header->rotation_node_headers[adjusted_node_index];
+	first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	if (keyframe_count>0 &&
+		(!animation_data_contains(animation, animation->compressed_data_offset, header->rotation_keyframes_offset, first_keyframe_index, keyframe_count, sizeof(struct compressed_quaternion_6byte)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->rotation_keyframe_frame_indices_offset, first_keyframe_index, keyframe_count, sizeof(word))))
+	{
+		animation_data_error(animation, "compressed rotation");
+		*rotation = *global_identity_quaternion;
+		return;
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -1999,6 +2219,15 @@ static void animation_get_keyframe_rotation(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
 		1452,
 		keyframe_frame_indices[keyframe_count-1]==animation->frame_count-1);
+
+	/* port: past the last keyframe (a map's keyframes short of the last
+	frame) holds the last one */
+	if (frame_index>keyframe_frame_indices[keyframe_count-1])
+	{
+		quaternion_decompress_6byte(&keyframe_rotations[keyframe_count-1], rotation);
+		quaternion_normalize(rotation);
+		return;
+	}
 
 	if (frame_index<keyframe_frame_indices[0])
 	{
@@ -2066,10 +2295,34 @@ static void animation_get_keyframe_translation(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	real_point3d const *default_translations = (real_point3d const *)(data+header->default_translations_offset);
-	unsigned long node_header = ((unsigned long const *)(data+header->translation_node_headers_offset))[adjusted_node_index];
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	real_point3d const *default_translations;
+	unsigned long node_header;
+	short first_keyframe_index;
+	short keyframe_count;
+
+	/* port: the header, this node's header and default, and its keyframes
+	inside the animation's data (a map's offsets); a bad one is no
+	translation */
+	if (!animation_data_contains(animation, animation->compressed_data_offset, 0, 0, 1, offsetof(struct compressed_animation_header, rotation_node_headers)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->translation_node_headers_offset, adjusted_node_index, 1, sizeof(unsigned long)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->default_translations_offset, node_index, 1, sizeof(real_point3d)))
+	{
+		animation_data_error(animation, "compressed translation");
+		*translation = *global_origin3d;
+		return;
+	}
+	default_translations = (real_point3d const *)(data+header->default_translations_offset);
+	node_header = ((unsigned long const *)(data+header->translation_node_headers_offset))[adjusted_node_index];
+	first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	if (keyframe_count>0 &&
+		(!animation_data_contains(animation, animation->compressed_data_offset, header->translation_keyframes_offset, first_keyframe_index, keyframe_count, sizeof(real_point3d)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->translation_keyframe_frame_indices_offset, first_keyframe_index, keyframe_count, sizeof(word))))
+	{
+		animation_data_error(animation, "compressed translation");
+		*translation = *global_origin3d;
+		return;
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -2106,6 +2359,14 @@ static void animation_get_keyframe_translation(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
 			1546,
 			keyframe_frame_indices[keyframe_count-1]==animation->frame_count-1);
+
+		/* port: past the last keyframe (a map's keyframes short of the last
+		frame) holds the last one */
+		if (frame_index>keyframe_frame_indices[keyframe_count-1])
+		{
+			*translation = keyframe_translations[keyframe_count-1];
+			return;
+		}
 
 		if (frame_index<keyframe_frame_indices[0])
 		{
@@ -2169,10 +2430,33 @@ static void animation_get_keyframe_scale(
 {
 	byte *data = tag_data_get_pointer(&animation->data, animation->compressed_data_offset, 0);
 	struct compressed_animation_header const *header = (struct compressed_animation_header const *)data;
-	real const *default_scales = (real const *)(data+header->default_scales_offset);
-	unsigned long node_header = ((unsigned long const *)(data+header->scale_node_headers_offset))[adjusted_node_index];
-	short first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
-	short keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	real const *default_scales;
+	unsigned long node_header;
+	short first_keyframe_index;
+	short keyframe_count;
+
+	/* port: the header, this node's header and default, and its keyframes
+	inside the animation's data (a map's offsets); a bad one is no scale */
+	if (!animation_data_contains(animation, animation->compressed_data_offset, 0, 0, 1, offsetof(struct compressed_animation_header, rotation_node_headers)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->scale_node_headers_offset, adjusted_node_index, 1, sizeof(unsigned long)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->default_scales_offset, adjusted_node_index, 1, sizeof(real)))
+	{
+		animation_data_error(animation, "compressed scale");
+		*scale = 1.0f;
+		return;
+	}
+	default_scales = (real const *)(data+header->default_scales_offset);
+	node_header = ((unsigned long const *)(data+header->scale_node_headers_offset))[adjusted_node_index];
+	first_keyframe_index = (short)(node_header>>COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS);
+	keyframe_count = (short)(node_header&(FLAG(COMPRESSED_ANIMATION_NODE_HEADER_KEYFRAME_COUNT_BITS)-1));
+	if (keyframe_count>0 &&
+		(!animation_data_contains(animation, animation->compressed_data_offset, header->scale_keyframes_offset, first_keyframe_index, keyframe_count, sizeof(real)) ||
+		!animation_data_contains(animation, animation->compressed_data_offset, header->scale_keyframe_frame_indices_offset, first_keyframe_index, keyframe_count, sizeof(word))))
+	{
+		animation_data_error(animation, "compressed scale");
+		*scale = 1.0f;
+		return;
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\models\\model_animations.c",
@@ -2209,6 +2493,14 @@ static void animation_get_keyframe_scale(
 			"c:\\halo\\SOURCE\\models\\model_animations.c",
 			1635,
 			keyframe_frame_indices[keyframe_count-1]==animation->frame_count-1);
+
+		/* port: past the last keyframe (a map's keyframes short of the last
+		frame) holds the last one */
+		if (frame_index>keyframe_frame_indices[keyframe_count-1])
+		{
+			*scale = keyframe_scales[keyframe_count-1];
+			return;
+		}
 
 		if (frame_index<keyframe_frame_indices[0])
 		{
@@ -2258,6 +2550,185 @@ static void animation_get_keyframe_scale(
 
 			scalars_interpolate(this_keyframe_scale, next_keyframe_scale, fraction, scale);
 		}
+	}
+
+	return;
+}
+
+/* port: where animation_get_frame_data's frame starts in the animation's data */
+static long animation_frame_data_offset(
+	struct animation const *animation,
+	short frame_index)
+{
+	if (TEST_FLAG(animation->flags, _animation_compressed_bit) && hs_model_animation_compression_enabled)
+	{
+		return animation->compressed_data_offset;
+	}
+
+	return (long)frame_index*animation->frame_size;
+}
+
+/* port: TRUE if element_count elements of element_size bytes, from
+first_element_index on, relative_offset bytes past offset, are inside the
+animation's data. Each part is a map's number, checked on its own so that
+none of the sums can wrap. */
+static boolean animation_data_contains(
+	struct animation const *animation,
+	long offset,
+	long relative_offset,
+	long first_element_index,
+	long element_count,
+	long element_size)
+{
+	long size = animation->data.size;
+
+	if (offset<0 || offset>size)
+	{
+		return FALSE;
+	}
+	size -= offset;
+	if (relative_offset<0 || relative_offset>size)
+	{
+		return FALSE;
+	}
+	size -= relative_offset;
+	if (first_element_index<0 || element_count<0 || element_size<0 ||
+		first_element_index>SHORT_MAX || element_count>UNSIGNED_SHORT_MAX)
+	{
+		return FALSE;
+	}
+
+	return element_size==0 || first_element_index+element_count<=size/element_size;
+}
+
+/* port: how many of the first node_count nodes have their flag set */
+static long animation_node_flag_count(
+	unsigned long low_flags,
+	unsigned long high_flags,
+	short node_count)
+{
+	unsigned long flags[2];
+	long count = 0;
+	short long_index;
+
+	flags[0] = low_flags;
+	flags[1] = high_flags;
+	for (long_index = 0; long_index<2; long_index++)
+	{
+		short bit_count = (short)(node_count-long_index*LONG_BITS);
+		unsigned long word = flags[long_index];
+
+		if (bit_count<=0)
+		{
+			break;
+		}
+		if (bit_count<LONG_BITS)
+		{
+			word &= ((unsigned long)1<<bit_count)-1;
+		}
+		word = word-((word>>1)&0x55555555UL);
+		word = (word&0x33333333UL)+((word>>2)&0x33333333UL);
+		word = (word+(word>>4))&0x0F0F0F0FUL;
+		count += (long)(((word*0x01010101UL)&0xFFFFFFFFUL)>>24);
+	}
+
+	return count;
+}
+
+/* port: TRUE if the animation's node count fits the engine's arrays and the
+frame it reads is inside its data (a map's counts, frame size, offsets and
+sizes). The node flags say how many bytes a frame and the default data
+hold. A bad animation is reported once and isn't read. */
+static boolean animation_frame_valid(
+	struct animation const *animation,
+	short frame_index,
+	boolean reads_default_data)
+{
+	long frame_offset = animation_frame_data_offset(animation, frame_index);
+	short node_count = animation->node_count;
+	char const *problem = NULL;
+
+	if (node_count<0 || node_count>MAXIMUM_NODES_PER_ANIMATION)
+	{
+		problem = "node count";
+	}
+	else if (animation_is_compressed(animation))
+	{
+		if (!animation_data_contains(animation, frame_offset, 0, 0, 1, offsetof(struct compressed_animation_header, rotation_node_headers)) ||
+			!animation_data_contains(animation, animation->compressed_data_offset, 0, 0, 1, offsetof(struct compressed_animation_header, rotation_node_headers)))
+		{
+			problem = "compressed data offset";
+		}
+	}
+	else
+	{
+		long rotation_count = animation_node_flag_count(
+			animation->nodes_with_rotation_flags[0],
+			animation->nodes_with_rotation_flags[1],
+			node_count);
+		long translation_count = animation_node_flag_count(
+			animation->nodes_with_translation_flags[0],
+			animation->nodes_with_translation_flags[1],
+			node_count);
+		long scale_count = animation_node_flag_count(
+			animation->nodes_with_scale_flags[0],
+			animation->nodes_with_scale_flags[1],
+			node_count);
+		long frame_bytes = rotation_count*(long)sizeof(struct compressed_quaternion_8byte)+
+			translation_count*(long)sizeof(real_point3d)+
+			scale_count*(long)sizeof(real);
+		long default_bytes = (node_count-rotation_count)*(long)sizeof(struct compressed_quaternion_8byte)+
+			(node_count-translation_count)*(long)sizeof(real_point3d)+
+			(node_count-scale_count)*(long)sizeof(real);
+
+		if (!animation_data_contains(animation, frame_offset, 0, 0, 1, frame_bytes))
+		{
+			problem = "frame";
+		}
+		else if (reads_default_data && default_bytes>animation->default_data.size)
+		{
+			problem = "default data";
+		}
+	}
+
+	if (problem)
+	{
+		animation_data_error(animation, problem);
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* port: a map's animation with data past what it has */
+static void animation_data_error(
+	struct animation const *animation,
+	char const *problem)
+{
+	if (model_data_report_once(animation))
+	{
+		error(
+			_error_silent,
+			"### ERROR animation '%.31s' has a bad %s; it is skipped",
+			animation->name,
+			problem);
+	}
+
+	return;
+}
+
+/* port: the rest pose, for nodes with no model to take a default pose from */
+static void animation_set_rest_orientations(
+	struct real_orientation *node_orientations,
+	short node_count)
+{
+	short node_index;
+
+	for (node_index = 0; node_index<node_count; node_index++)
+	{
+		node_orientations[node_index].rotation = *global_identity_quaternion;
+		node_orientations[node_index].translation = *global_origin3d;
+		node_orientations[node_index].scale = 1.0f;
 	}
 
 	return;

@@ -8,9 +8,10 @@ replaced and the game started again.
 The download is a plain HTTP/1.1 GET over TLS 1.2 or 1.3, following
 redirects (GitHub sends release downloads to its file host). The server's
 certificate must chain to one of the system's certificate authorities (the
-bundle the distribution keeps for OpenSSL, curl and the rest, or the file
-SSL_CERT_FILE names) and name the host; nothing is sent before that is
-checked.
+bundle the distribution keeps for OpenSSL, curl and the rest) and name the
+host; nothing is sent before that is checked. The file SSL_CERT_FILE names
+is used only on a system with no bundle, with a warning on stderr: whatever
+sets the environment would otherwise choose whom updates are trusted from.
 
 Built with the host's ABI, as the other posix_*.c.
 */
@@ -62,12 +63,6 @@ static void load_certificates(void)
 
 	crypto_ready = psa_crypto_init() == PSA_SUCCESS;
 	mbedtls_x509_crt_init(&certificates);
-	if (environment && *environment && mbedtls_x509_crt_parse_file(&certificates, environment) >= 0 &&
-		certificates.version)
-	{
-		certificates_loaded = 1;
-		return;
-	}
 	for (index = 0; index < sizeof(certificate_bundles) / sizeof(*certificate_bundles); index++)
 	{
 		/* (a bundle's certificates that do not parse are left out: the
@@ -76,8 +71,22 @@ static void load_certificates(void)
 			mbedtls_x509_crt_parse_file(&certificates, certificate_bundles[index]) >= 0 && certificates.version)
 		{
 			certificates_loaded = 1;
+			if (environment && *environment)
+			{
+				fprintf(stderr, "halo-linux: update: SSL_CERT_FILE is ignored; the update server is checked "
+					"against %s\n", certificate_bundles[index]);
+			}
 			return;
 		}
+	}
+	/* no bundle of the system's: the environment's, said loudly, since it
+	decides which servers updates are taken from */
+	if (environment && *environment && mbedtls_x509_crt_parse_file(&certificates, environment) >= 0 &&
+		certificates.version)
+	{
+		certificates_loaded = 1;
+		fprintf(stderr, "halo-linux: update: WARNING: no system certificate authorities were found; the update "
+			"server is checked against SSL_CERT_FILE (%s) instead\n", environment);
 	}
 }
 
@@ -305,8 +314,13 @@ struct download
 	unsigned long long received, total;
 };
 
+/* (a release is tens of megabytes: a body past this fills no disk) */
+#define MAXIMUM_DOWNLOAD_SIZE (512ull * 1024 * 1024)
+
 static int body_write(struct download *download, const unsigned char *data, size_t size)
 {
+	if (download->received + size > MAXIMUM_DOWNLOAD_SIZE)
+		return 0;
 	if (fwrite(data, 1, size, download->file) != size)
 		return 0;
 	download->received += size;
@@ -426,6 +440,12 @@ static int https_get(const char *url, struct download *download, char *location,
 		{
 			length = strtoull(value, NULL, 10);
 			have_length = 1;
+			if (length > MAXIMUM_DOWNLOAD_SIZE)
+			{
+				snprintf(error, (size_t)error_size, "the download from %s is too large", host);
+				connection_free(&connection);
+				return 0;
+			}
 		}
 		else if (!strcasecmp(line, "Transfer-Encoding") && strcasestr(value, "chunked"))
 		{

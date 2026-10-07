@@ -120,6 +120,8 @@ struct tag_data
 /* ---------- prototypes/TAG_GROUPS.C */
 
 long verify_tag_reference(struct tag_reference const *reference);
+/* port: zeros in place of an element, data or tag that is not there */
+void *tag_empty_data(void);
 void *tag_data_get_pointer(struct tag_data const *data, long offset, long size);
 void *tag_block_get_element_with_size(struct tag_block const *block, long index, long element_size);
 

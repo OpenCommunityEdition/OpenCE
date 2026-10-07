@@ -2093,6 +2093,38 @@ static void distributed_log_reports(
 	logged_rejected = damage_rejected_reports;
 }
 
+/* the tick's killing blows once more, reliably, to every client: sent with
+the rest they may be lost, and a body killed without its blow falls without
+the death the host's had (a client replays one blow of a unit only) */
+static void distributed_send_kills_reliably(
+	void)
+{
+	struct distributed_damage_event_message message;
+	short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, RELIABLE_ENTRIES(struct distributed_damage_event));
+	short count = 0;
+	short index;
+
+	for (index = 0; index < damage_event_count; index++)
+	{
+		if (damage_events[index].kind != _damage_event_kill)
+			continue;
+		message.events[count++] = damage_events[index];
+		if (count == limit)
+		{
+			distributed_send(&message, _distributed_message_damage_events, count,
+				(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)),
+				_distributed_to_clients_reliably);
+			count = 0;
+		}
+	}
+	if (count)
+	{
+		distributed_send(&message, _distributed_message_damage_events, count,
+			(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)),
+			_distributed_to_clients_reliably);
+	}
+}
+
 void network_damage_host_tick(
 	void)
 {
@@ -2131,6 +2163,7 @@ void network_damage_host_tick(
 				(word)(sizeof(message.header) + count * sizeof(struct distributed_damage_event)));
 		}
 	}
+	distributed_send_kills_reliably();
 	damage_event_count = 0;
 }
 

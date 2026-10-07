@@ -49,6 +49,8 @@ enum
 	_platform_desktop = 1,
 	_platform_android = 2,
 	_platform_all = _platform_desktop | _platform_android,
+	/* (of the desktop builds, only Windows) */
+	_platform_windows = 4,
 };
 
 struct config_setting
@@ -327,6 +329,10 @@ static const struct config_setting config_settings[] =
 	{ "update.auto", _config_boolean, "true", "HALO_UPDATE_AUTO", _environment_value, _platform_all,
 		"Look for a new version when the game starts, and offer to update to it;\n"
 		"false never looks (the game's \"Do not ask again\" writes false here)." },
+	{ "crash_reports.upload", _config_string, "\"ask\"", "HALO_CRASH_REPORTS", _environment_value, _platform_windows,
+		"Send a report of each crash (a minidump and halo.log) to the developers'\n"
+		"Sentry project (port/windows/src/win32_crash.c): \"yes\" sends them, \"no\"\n"
+		"never does, \"ask\" asks at the next crash and writes the answer here." },
 
 	{ "debug.network_test", _config_string, "\"\"", "HALO_NETWORK_TEST", _environment_value, _platform_all,
 		"Automated system link sessions for testing (port/linux/game/network_test.c):\n"
@@ -366,6 +372,18 @@ static const struct config_setting config_settings[] =
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
 	{ "debug.network_loss", _config_real, "0.0", "HALO_NETWORK_LOSS", _environment_value, _platform_all,
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
+	{ "debug.network_corrupt", _config_real, "0.0", "HALO_NETWORK_CORRUPT", _environment_value, _platform_all,
+		"Percent of the datagrams received that are damaged at random, to test\n"
+		"that nothing a machine sends can crash the game; 0 none." },
+	{ "debug.network_corrupt_stream", _config_real, "0.0", "HALO_NETWORK_CORRUPT_STREAM", _environment_value,
+		_platform_all,
+		"Percent of the reads of streams that are damaged at random, for the\n"
+		"same (a damaged stream is closed, so a little goes a long way); 0 none." },
+	{ "debug.network_corrupt_after", _config_real, "0.0", "HALO_NETWORK_CORRUPT_AFTER", _environment_value,
+		_platform_all,
+		"Seconds after the start before anything is damaged, so that a game can\n"
+		"be set up and started first (a host's messages to its own client are\n"
+		"damaged too)." },
 	{ "debug.test_input", _config_string, "\"\"", "HALO_TEST_INPUT", _environment_value, _platform_all,
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
@@ -422,6 +440,8 @@ static const struct config_setting config_settings[] =
 
 #ifdef HALO_ANDROID
 #define CONFIG_PLATFORM _platform_android
+#elif defined(_WIN32)
+#define CONFIG_PLATFORM (_platform_desktop | _platform_windows)
 #else
 #define CONFIG_PLATFORM _platform_desktop
 #endif

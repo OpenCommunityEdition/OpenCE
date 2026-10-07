@@ -125,7 +125,9 @@ HALO_COMMON(hs_global_data, 4); /* struct data_array *hs_global_data */
 HALO_COMMON(hs_thread_data, 4); /* struct data_array *hs_thread_data */
 HALO_COMMON(hud_msg_def, 4); /* struct hud_messaging_parameters_definition *hud_msg_def */
 HALO_COMMON(interrupt_result, 24); /* HRESULT interrupt_result */
-HALO_COMMON(light_cluster_partition, 12); /* struct cluster_partition light_cluster_partition */
+/* object_lights.c owns light_cluster_partition. On COFF a weak fallback
+can override its tentative COMMON definition; let the owner allocate the
+native struct cluster_partition, including its reference-cache fields. */
 HALO_COMMON(light_data, 4); /* struct data_array *light_data */
 HALO_COMMON(local_player_index_for_draw_string_and_hack_in_icons, 4); /* short local_player_index_for_draw_string_and_hack_in_icons */
 HALO_COMMON(looping_sound_data, 4); /* struct data_array *looping_sound_data */

@@ -1366,6 +1366,14 @@ static boolean ui_widget_load_children_recursive(
 /* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
 boolean pc_menu_tag(
 	long tag_index);
+/* port: where in its widget, and how large, the menus draw a frame of
+ui.map's that they scale (port/linux/game/menu_tags.c) */
+boolean pc_menu_frame_placement(
+	struct bitmap_data const *bitmap,
+	short *x,
+	short *y,
+	short *width,
+	short *height);
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -2222,10 +2230,17 @@ void ui_widget_delete(
 		if (handler->event_type == _widget_event_deleted &&
 			TEST_FLAG(handler->flags, _event_handler_run_function_bit))
 		{
+			/* port: an event of nothing, not none: a map's widget may name a
+			function for this handler that reads its event */
+			static struct event_record no_event;
 			boolean widget_deleted = FALSE;
-			boolean handled = ui_widget_event_handler_function_invoke(
+			boolean handled;
+
+			csmemset(&no_event, 0, sizeof(no_event));
+			no_event.controller_index = NONE;
+			handled = ui_widget_event_handler_function_invoke(
 				widget,
-				NULL,
+				&no_event,
 				handler->function,
 				&widget_deleted);
 
@@ -4039,8 +4054,27 @@ void draw_string_and_hack_in_icons(
 {
 	wchar_t *current = string_data;
 	rectangle2d cursor_bounds = *bounds;
+	unsigned long length;
 
-	wcscpy(string_data, instring);
+	/* port: no more than the buffer holds (the text is the map's: a string
+	list's or a hud message's; retail strings are up to 398 characters of
+	1024). A longer one is cut, said once. */
+	for (length = 0; length < NUMBEROF(string_data) - 1 && instring[length]; length++)
+		string_data[length] = instring[length];
+	string_data[length] = 0;
+	if (instring[length])
+	{
+		static boolean long_string_reported = FALSE;
+
+		if (!long_string_reported)
+		{
+			long_string_reported = TRUE;
+			error(
+				_error_silent,
+				"string of more than %d characters cut",
+				(long)NUMBEROF(string_data) - 1);
+		}
+	}
 	while (current)
 	{
 		wchar_t *icon_spec = wcschr(current, L'%');
@@ -6112,14 +6146,37 @@ static void widget_instance_render_recursive(
 				alpha_modifier;
 		}
 		color = modulate_pixel32_by_real_alpha(0xFFFFFFFF, alpha);
-		draw_bitmap_in_rect(
-			bitmap,
-			&bounds,
-			&bounds,
-			clip,
-			color,
-			&multitexture_params,
-			FALSE);
+		{
+			/* port: a frame of ui.map's that the menus scale (the Xbox's
+			picture of the button settings, in the profile settings' smaller
+			box): drawn at their size, from where they place it, in units of
+			that size rather than one to a texel */
+			rectangle2d texels = bounds;
+			short frame_x, frame_y, frame_width, frame_height;
+			boolean shown = TRUE;
+
+			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
+			{
+				bounds.x0 += frame_x;
+				bounds.y0 += frame_y;
+				texels.x0 = 0;
+				texels.y0 = 0;
+				texels.x1 = (short)((long)(bounds.x1 - bounds.x0) * bitmap->width / frame_width);
+				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
+				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
+			}
+			if (shown)
+			{
+				draw_bitmap_in_rect(
+					bitmap,
+					&bounds,
+					&texels,
+					clip,
+					color,
+					&multitexture_params,
+					FALSE);
+			}
+		}
 		if (use_nifty_plasma_fx)
 		{
 			ui_plasma_effect_color.alpha = 0.0f;

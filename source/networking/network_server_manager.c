@@ -529,6 +529,14 @@ enum
 	NETWORK_GAME_SERVER_CLIENT_TIMEOUT = 15 * MILLISECONDS_PER_SECOND,
 	/* a machine joining the game in progress, silent while it loads */
 	NETWORK_GAME_SERVER_LATE_JOINER_TIMEOUT = 120 * MILLISECONDS_PER_SECOND,
+	/* port: how long a frame the host spends on the messages its machines'
+	streams brought, all machines' and each one's (machines that flood it with
+	them would hold each frame for as long as they took): those left wait in
+	the queue, in order, for the next frame's. Each machine always has one
+	handled (network_game_server_handle_client_machines; the client's is
+	network_client_manager.c's) */
+	MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE = 50,
+	MAXIMUM_MESSAGE_MILLISECONDS_PER_MACHINE = 10,
 };
 
 enum
@@ -3401,7 +3409,15 @@ static boolean network_game_server_client_machine_timed_out(
 	if (TEST_FLAG(machine->flags, _network_client_machine_level_loaded_bit))
 		return silence > NETWORK_GAME_SERVER_CLIENT_TIMEOUT;
 	/* (joining the game in progress: waiting for its players to be added,
-	or loading) */
+	or loading; port: one that adds none in the time a machine has to in
+	the pregame holds its slot for nothing) */
+	if (!network_game_server_machine_has_players(server, machine->machine_index) &&
+		!network_game_server_machine_has_waiting_players(server, machine->machine_index) &&
+		system_milliseconds() - network_game_server_client_machine_join_times[machine->machine_index] >
+			NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT)
+	{
+		return TRUE;
+	}
 	return silence > NETWORK_GAME_SERVER_LATE_JOINER_TIMEOUT;
 }
 
@@ -4194,6 +4210,7 @@ static boolean network_game_server_handle_client_machines(
 {
 	boolean success = TRUE;
 	int i;
+	unsigned long start_time = system_milliseconds();
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x827, server);
 
@@ -4232,6 +4249,7 @@ static boolean network_game_server_handle_client_machines(
 			word message_buffer[MAXIMUM_NETWORK_MESSAGE_SIZE / sizeof(word)];
 			word *message = message_buffer;
 			word message_buffer_size = sizeof(message_buffer);
+			unsigned long machine_start_time = system_milliseconds();
 
 			while (success && network_connection_read(
 				client_machine->connection,
@@ -4254,6 +4272,12 @@ static boolean network_game_server_handle_client_machines(
 					if (network_game_server_client_machine_is_joined_to_game(server, client_machine))
 						network_game_server_client_machine_heard(server, client_machine);
 					message_buffer_size = sizeof(message_buffer);
+					/* port: the rest next frame (MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE) */
+					if (system_milliseconds() - machine_start_time >= MAXIMUM_MESSAGE_MILLISECONDS_PER_MACHINE ||
+						system_milliseconds() - start_time >= MAXIMUM_MESSAGE_MILLISECONDS_PER_IDLE)
+					{
+						break;
+					}
 				}
 				else
 				{

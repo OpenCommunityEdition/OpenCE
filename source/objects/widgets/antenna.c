@@ -158,7 +158,23 @@ long antenna_new(
 			short vertex_index;
 
 			antenna->initialized = FALSE;
-			antenna->disabled = definition->vertices.count < 2;
+			/* port: and no more vertices than the antenna holds, with the tip
+			past the last (a map's count; retail has up to 7) */
+			antenna->disabled = definition->vertices.count < 2 ||
+				definition->vertices.count > MAXIMUM_ANTENNA_VERTICES;
+			if (definition->vertices.count > MAXIMUM_ANTENNA_VERTICES)
+			{
+				static boolean vertex_count_reported = FALSE;
+
+				if (!vertex_count_reported)
+				{
+					vertex_count_reported = TRUE;
+					error(
+						_error_silent,
+						"### ERROR an antenna has %ld vertices; it isn't drawn",
+						definition->vertices.count);
+				}
+			}
 			antenna->definition_index = definition_index;
 			antenna->object_index = NONE;
 			antenna->updates_since_last_render = 0;
@@ -227,7 +243,9 @@ long antenna_new(
 					position.z += definition_vertex->vector_to_next.k;
 					vertex_index++;
 				}
-				while (vertex_index < definition->vertices.count);
+				/* port: the vertices the antenna holds (a map's count; it is
+				disabled past them) */
+				while (vertex_index < MIN(definition->vertices.count, MAXIMUM_ANTENNA_VERTICES));
 			}
 
 			{

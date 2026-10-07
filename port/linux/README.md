@@ -274,6 +274,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
+| `crash_reports.upload` | `"ask"` | `HALO_CRASH_REPORTS` | Windows only. `"yes"`: the game sends a report of each crash to the developers. `"no"`: the game sends no reports. `"ask"`: the game asks at the next crash and writes the answer here. Refer to "Crash reports" in [port/windows/README.md](../windows/README.md#crash-reports). |
 | `debug.update_answer` | `""` | `HALO_UPDATE_ANSWER` | The answer to the update question, for automatic tests: `yes`, `no` or `never`. Empty: the game asks. |
 | `debug.exit_after` | `0.0` | `HALO_EXIT_AFTER` | The game stops after this number of seconds. `0`: never. |
 | `debug.screenshot_directory`, `debug.screenshot_every` | `""`, `0` | `HALO_SCREENSHOT_DIR`, `HALO_SCREENSHOT_EVERY` | The game writes each Nth frame to this folder as a BMP file. |
@@ -282,7 +283,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
-| `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
+| `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
 | `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
@@ -566,16 +567,17 @@ Only machines with the invite can find the game:
   last 256 keys. Thus the proof of a player does not need more key work. A
   flood of requests can make players join more slowly. A player asks again
   for 90 seconds.
-- The host drops a player whose game runs faster than time (a speed hack)
-  for ten seconds. Each player sees who in red on the console. The host
-  adds a line to `cheaters.txt` (beside `debug.txt`) with the address and
-  hardware id of the player, and the Discord name and id that the game of
-  the player told it (a player can change these). If the messages on the
-  player's connection were also ahead, the host keeps that address out of
-  its games and bans the player: it adds the line to `bans.txt`, and refuses
-  a machine whose address or hardware id is in it. If only the player's
-  datagrams were ahead, the player can join again: another machine can send
-  datagrams with the player's address.
+- The host refuses the predicted movement of a player whose game runs
+  faster than time (a speed hack). If the messages on the player's
+  connection were also ahead for ten seconds, the host drops and bans the
+  player: each player sees who in red on the console, and the host adds a
+  line to `cheaters.txt` and `bans.txt` (beside `debug.txt`) with the
+  address and hardware id of the player, and the Discord name and id that
+  the game of the player told it, marked `(self-reported)` (a player can
+  change these). The host refuses a machine whose address or hardware id is
+  in `bans.txt`. If only the player's datagrams were ahead, the host does
+  not drop the player, because another machine can send datagrams with the
+  player's address: it adds an `unverified` line to `cheaters.txt`.
 - The host can ban a player with `ban <player name>` in the developer
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same
@@ -642,6 +644,55 @@ has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
+
+## Map checks
+
+The game reads a map's tags straight into memory and uses them as its own
+structures: every pointer, count, index and enum in them is the map's, and
+the game writes values into tags as it runs. So before anything reads a
+map's tags, the port checks every tag against a schema of its group
+(`game/tag_schema_*.c`, read by `game/tag_validate.c`), and each structure
+BSP as it loads:
+
+- Every block and every piece of data must lie in the tags (or the BSP) and
+  overlap no other. Otherwise the game refuses the map.
+- A block with more elements than the game has room for is cut to the
+  maximum. A tag reference that is not a tag of the right group becomes
+  none. So do an index past its block and an enum past its values (or they
+  become 0, where the game cannot take none). A string gets its terminator.
+  Values that the game sets as it runs are reset.
+- Checks that the schema cannot express run last: the BSPs' and the models'
+  graphs, vertex and index buffers, and indices into other tags.
+
+Each correction goes to `debug.txt`. The game's own maps need none.
+`build/linux/map_validate [--strict] map.map...` runs the same checks on map
+files without the game, and `tools/test_linux_port.py` runs it on the maps
+in `assets/maps`. `map_validate --fuzz <runs> map.map` changes a few words
+of the tags at random in each run. The checks must not crash or hang, and a
+map that they let through must need no more corrections.
+
+A map's scripts can call only the script functions that a map needs (the
+allowlist in `hs/hs.c`). They cannot call the functions for files, the
+saved state of the game, the console, debugging or cheats. A script that
+calls one does not run. The developer console can call every function.
+
+Defensive checks stay in the game code too. An index into a tag block, the
+tags or a tag's data that is out of range gets zeros (`tag_empty_data` in
+`tag_files/tag_groups.c`), not other memory.
+
+A map's name must be its file's: the cache file slots are found by the name
+in the map's header, so a map file whose header names another map (a
+renamed one) is refused, not copied again for ever. The `loading.tga` a map
+pack may put in the maps folder is read only if it is an uncompressed 24-bit
+picture of 320 by 240, the loading screen's texture.
+
+A checkpoint (`savegame.bin`, in the profile's folder) and a core are
+images of the game state's memory: with the data arrays' pointers to their
+elements, the objects' memory pool's blocks and the references to them, and
+the caches' procedures. Before one is taken, each of those is checked
+against what the game made at startup (`game_state_image_accept` in
+`saved games/game_state.c`): an image that does not match (a damaged or
+crafted file) is refused, and the level starts over.
 
 ## What operates
 

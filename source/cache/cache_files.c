@@ -135,6 +135,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_manager.h"
 #include "models/models.h"
+#include "tag_schema.h"
 
 /* ---------- constants */
 
@@ -232,6 +233,8 @@ typedef char verify_cache_file_header_size[
 
 static struct cache_file_tag_instance *cache_get_tag_instance(
 	long tag_index);
+static struct cache_file_tag_instance *cache_empty_tag_instance(
+	long tag_index);
 static boolean cache_file_region_contains(
 	void const *region,
 	unsigned long region_size,
@@ -282,6 +285,14 @@ static struct cache_file_tag_instance *cache_get_tag_instance(
 		522,
 		absolute_index >= 0 && absolute_index < cache_file_globals.tag_header->tag_count,
 		csprintf(temporary, "i don't think %08x is a tag index", tag_index));
+	/* port: an index that is not a tag (NONE, or one a map's data gave
+	that nothing checked) is the empty tag, not whatever lies around the
+	tag table */
+	if (!cache_file_globals.tags_loaded || !global_tag_instances ||
+		absolute_index < 0 || absolute_index >= cache_file_globals.tag_header->tag_count)
+	{
+		return cache_empty_tag_instance(tag_index);
+	}
 
 	tag_instance = &global_tag_instances[absolute_index];
 	match_vassert(
@@ -289,8 +300,37 @@ static struct cache_file_tag_instance *cache_get_tag_instance(
 		526,
 		!(tag_index & 0xFFFF0000) || tag_instance->tag_index == tag_index,
 		csprintf(temporary, "i don't think %08x is a tag index", tag_index));
+	if ((tag_index & 0xFFFF0000) && tag_instance->tag_index != tag_index)
+		return cache_empty_tag_instance(tag_index);
 
 	return tag_instance;
+}
+
+/* port: the tag that a tag index that is not one gets (cache_get_tag_instance,
+tag_get): no group, no name, and data that is all zeros, which whatever
+reads it reads as an empty tag of its group (no elements in its blocks,
+no tags referenced), and whatever writes it writes nowhere that matters.
+It is zeroed again each time it is given. Logged once */
+static struct cache_file_tag_instance *cache_empty_tag_instance(
+	long tag_index)
+{
+	static struct cache_file_tag_instance empty_tag_instance;
+	static boolean logged = FALSE;
+
+	if (!logged)
+	{
+		logged = TRUE;
+		error(_error_silent, "%08lx is not a tag index: an empty tag is used", (unsigned long)tag_index);
+	}
+	csmemset(&empty_tag_instance, 0, sizeof(empty_tag_instance));
+	empty_tag_instance.tag_index = NONE;
+	empty_tag_instance.group_tag = NONE;
+	empty_tag_instance.parent_group_tags[0] = NONE;
+	empty_tag_instance.parent_group_tags[1] = NONE;
+	empty_tag_instance.name = "";
+	empty_tag_instance.base_address = tag_empty_data();
+
+	return &empty_tag_instance;
 }
 
 /* port: whether count elements of element_size bytes at address all lie in
@@ -363,12 +403,30 @@ static boolean cache_file_tag_header_verify(
 	else
 	{
 		long scenario_absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_header->scenario_tag_index);
+		long absolute_index;
 
 		if (scenario_absolute_index >= tag_header->tag_count ||
 			tag_header->tag_instances[scenario_absolute_index].tag_index != tag_header->scenario_tag_index ||
 			tag_header->tag_instances[scenario_absolute_index].group_tag != SCENARIO_TAG)
 		{
 			problem = "scenario tag";
+		}
+
+		/* port: each tag's data lies in the tag cache, or there is none yet
+		(a structure bsp's, set as it loads). Every tag_get goes by these.
+		The port's own tags (menu_tags.c) are added after this, and may lie
+		elsewhere */
+		for (absolute_index = 0;
+			!problem && absolute_index < tag_header->tag_count;
+			absolute_index++)
+		{
+			void const *base_address = tag_header->tag_instances[absolute_index].base_address;
+
+			if (base_address &&
+				!cache_file_region_contains(tag_header, TAG_CACHE_SIZE, base_address, 1, 1))
+			{
+				problem = "tag data address";
+			}
 		}
 	}
 
@@ -1021,6 +1079,20 @@ long scenario_tags_load(
 
 				return NONE;
 			}
+			/* port: and every tag checked against its group's schema before
+			anything reads it (port/linux/game/tag_validate.c): a map whose
+			tags' pointers cannot be trusted is refused; what can be
+			corrected is */
+			if (!tag_validate_tags(
+				tag_cache_base_address,
+				cache_file_globals.header.tag_data_size,
+				cache_file_globals.header.file_length,
+				scenario_name))
+			{
+				cache_file_close();
+
+				return NONE;
+			}
 
 			cache_file_globals.tag_header = tag_cache_base_address;
 			match_vassert(
@@ -1151,6 +1223,16 @@ boolean scenario_structure_bsp_load(
 		}
 	}
 
+	/* port: and checked against its schema, as the map's tags were
+	(port/linux/game/tag_validate.c) */
+	if (!tag_validate_structure_bsp(
+		reference->structure_bsp.index,
+		reference->base_address,
+		reference->file_size))
+	{
+		return FALSE;
+	}
+
 	cache_file_globals.structure_bsp_header = structure_bsp_header;
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files.c",
@@ -1219,6 +1301,17 @@ void *tag_get(
 		tag_instance->base_address,
 		csprintf(temporary, "can't get() a tag with a base address!")
 	);
+	/* port: a tag of another group (one a map's data named, which nothing
+	checked) is not read as this one: the empty tag's data is given, as
+	for an index that is not a tag; nor is a tag with no data (a structure
+	bsp not loaded) */
+	if ((tag_instance->group_tag != group_tag &&
+			tag_instance->parent_group_tags[0] != group_tag &&
+			tag_instance->parent_group_tags[1] != group_tag) ||
+		!tag_instance->base_address)
+	{
+		return cache_empty_tag_instance(tag_index)->base_address;
+	}
 	
 	return tag_instance->base_address;
 }

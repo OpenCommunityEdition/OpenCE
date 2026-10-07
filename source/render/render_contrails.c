@@ -86,6 +86,9 @@ real contrail_fade(
 
 extern boolean render_contrails_enabled;
 
+/* port: said once */
+static boolean reported_bad_change_color = FALSE;
+
 /* ---------- public code */
 
 real contrail_fade(
@@ -242,12 +245,19 @@ static void render_contrail(
 						struct object_attachment_definition);
 					short change_color_index = attachment->change_color_reference - 1;
 
-					if (change_color_index != NONE)
+					/* port: and one the object has (a map's index); said once */
+					if (change_color_index != NONE &&
+						VALID_INDEX(change_color_index, NUMBER_OF_OBJECT_CHANGE_COLORS))
 					{
 						real_rgb_color const *change_color = &object->object.outgoing_change_colors[change_color_index];
 						color.red *= change_color->red;
 						color.green *= change_color->green;
 						color.blue *= change_color->blue;
+					}
+					else if (change_color_index != NONE && !reported_bad_change_color)
+					{
+						error(_error_silent, "### ERROR a contrail attachment has a bad change color index; it is left out");
+						reported_bad_change_color = TRUE;
 					}
 				}
 
