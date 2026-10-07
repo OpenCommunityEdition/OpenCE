@@ -29,6 +29,7 @@ instead (host_watch_hash.c).
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,6 +134,25 @@ enum
 	RANGE_UNKNOWN
 };
 
+/* why the fixed ranges could not be had: each reason also goes to the
+log, and the report (host_memory_report_low_mappings) starts with them, so
+memory_map.txt alone tells which case it was */
+static char findings[2048];
+
+static void finding(int priority, const char *format, ...)
+{
+	char line[512];
+	size_t used = strlen(findings);
+	va_list arguments;
+
+	va_start(arguments, format);
+	vsnprintf(line, sizeof(line), format, arguments);
+	va_end(arguments);
+	host_logf(priority, "%s", line);
+	if (used + strlen(line) + 2 < sizeof(findings))
+		snprintf(findings + used, sizeof(findings) - used, "%s\n", line);
+}
+
 struct range_usage
 {
 	uint64_t pages_in_use;
@@ -156,7 +176,7 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 
 	if (descriptor < 0)
 	{
-		host_logf(HOST_LOG_WARN, "cannot read /proc/self/pagemap (%s)", strerror(errno));
+		finding(HOST_LOG_WARN, "cannot read /proc/self/pagemap (%s)", strerror(errno));
 		return RANGE_UNKNOWN;
 	}
 	usage->method = "pagemap";
@@ -171,7 +191,7 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 		bytes = pread(descriptor, entries, wanted * sizeof(entries[0]), (off_t)(page * sizeof(entries[0])));
 		if (bytes <= 0 || bytes % sizeof(entries[0]))
 		{
-			host_logf(HOST_LOG_WARN, "cannot read /proc/self/pagemap at %08llx (%s)",
+			finding(HOST_LOG_WARN, "cannot read /proc/self/pagemap at %08llx (%s)",
 				(unsigned long long)(page * PAGE), bytes < 0 ? strerror(errno) : "short read");
 			close(descriptor);
 			return RANGE_UNKNOWN;
@@ -233,7 +253,7 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 	usage->method = "mincore";
 	if (swapped != 0)
 	{
-		host_logf(HOST_LOG_WARN, "ART's large object space at %08llx: %s", (unsigned long long)mapping_start,
+		finding(HOST_LOG_WARN, "ART's large object space at %08llx: %s", (unsigned long long)mapping_start,
 			swapped < 0 ? "cannot read its smaps entry" : "part of it is swapped out");
 		return RANGE_UNKNOWN;
 	}
@@ -246,7 +266,7 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 			length = sizeof(residency) * PAGE;
 		if (mincore((void *)address, length, residency) != 0)
 		{
-			host_logf(HOST_LOG_WARN, "mincore at %08llx failed (%s)", (unsigned long long)address, strerror(errno));
+			finding(HOST_LOG_WARN, "mincore at %08llx failed (%s)", (unsigned long long)address, strerror(errno));
 			return RANGE_UNKNOWN;
 		}
 		for (index = 0; index < length / PAGE; index++)
@@ -301,14 +321,14 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 		to = hi < address + size ? hi : address + size;
 		if (strcmp(name, ART_LARGE_OBJECT_SPACE))
 		{
-			host_logf(HOST_LOG_ERROR, "a fixed guest range is overlapped by %08llx-%08llx (%s), which is not ART's large object space; left alone",
+			finding(HOST_LOG_ERROR, "a fixed guest range is overlapped by %08llx-%08llx (%s), which is not ART's large object space; left alone",
 				lo, hi, name[0] ? name : "unnamed");
 			continue;
 		}
 		switch (range_usage(lo, from, to, &usage))
 		{
 		case RANGE_IN_USE:
-			host_logf(HOST_LOG_ERROR,
+			finding(HOST_LOG_ERROR,
 				"ART's large object space %08llx-%08llx holds objects over %08llx-%08llx "
 				"(%llu pages in use, %08llx-%08llx, by %s); left alone",
 				lo, hi, (unsigned long long)from, (unsigned long long)to,
@@ -316,7 +336,7 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 				(unsigned long long)usage.highest_in_use + PAGE, usage.method);
 			continue;
 		case RANGE_UNKNOWN:
-			host_logf(HOST_LOG_ERROR,
+			finding(HOST_LOG_ERROR,
 				"ART's large object space %08llx-%08llx covers %08llx-%08llx, and whether that part is in use "
 				"cannot be told; left alone", lo, hi, (unsigned long long)from, (unsigned long long)to);
 			continue;
@@ -381,6 +401,17 @@ void host_memory_report_low_mappings(FILE *file)
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
 
+	char model[PROP_VALUE_MAX] = "", heap[PROP_VALUE_MAX] = "", release[PROP_VALUE_MAX] = "";
+
+	__system_property_get("ro.product.model", model);
+	__system_property_get("dalvik.vm.heapsize", heap);
+	__system_property_get("ro.build.version.release", release);
+	if (file)
+	{
+		fprintf(file, "device: %s, Android %s, Java heap %s\n", model[0] ? model : "unknown",
+			release[0] ? release : "unknown", heap[0] ? heap : "unknown");
+		fprintf(file, "why:\n%s\nmappings below 4 GB:\n", findings[0] ? findings : "(no reason recorded)\n");
+	}
 	if (!maps)
 		return;
 	while (fgets(line, sizeof(line), maps))
@@ -446,14 +477,14 @@ static int reserve_fixed(void)
 	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE, 1) != 0)
 	{
 		fixed_error = errno;
-		host_logf(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx (%s)",
+		finding(HOST_LOG_ERROR, "cannot reserve the Xbox memory window at %08llx (%s)",
 			(unsigned long long)HALO_GUEST_WINDOW_BASE, strerror(errno));
 		return -1;
 	}
 	if (reserve(HALO_GUEST_IMAGE_BASE, HALO_GUEST_IMAGE_RESERVE, 1) != 0)
 	{
 		fixed_error = errno;
-		host_logf(HOST_LOG_ERROR, "cannot reserve the guest image range at %08llx (%s)",
+		finding(HOST_LOG_ERROR, "cannot reserve the guest image range at %08llx (%s)",
 			(unsigned long long)HALO_GUEST_IMAGE_BASE, strerror(errno));
 		munmap((void *)(uintptr_t)HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE);
 		return -1;
