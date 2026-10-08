@@ -12,36 +12,15 @@ device itself (d3d8_gl.c).
 
 #include "platform.h"
 #include "gl.h"
+#include "gpu.h"
 
-#ifdef HALO_ANDROID
-/* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
-struct xgpu_capabilities
-{
-	BOOL copy_image;
-	BOOL border_clamp;
-	BOOL anisotropy;
-	BOOL s3tc;
-	/* ES 3.2: glDrawElementsBaseVertex */
-	BOOL base_vertex;
-	/* ES 3.1 with fragment atomic counters: exact visibility test counts */
-	BOOL atomic_counters;
-	/* "300 es" or "310 es" */
-	const char *shading_language;
-};
-
-extern struct xgpu_capabilities xgpu_capabilities;
-
-/* port/android/guest/runtime/guest_host.h */
-int host_gl_has_extension(const char *name);
-void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
-void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
-void host_gl_fence_frame(unsigned int slot);
-void host_gl_wait_frame(unsigned int slot);
-#endif
+/* what the GPU backend can do (gpu_initialize, from d3d8_gl.c
+gl_initialize) */
+extern struct gpu_capabilities xgpu_gpu_capabilities;
 
 /* ---------- GL state
 
-The device caches the GL state it sets for draws (d3d8_gl.c); code that
+The GL backend caches the GL state it sets for draws (gpu_gl.c); code that
 changes GL state behind it (binding a texture to upload it, deleting one)
 must call this afterwards. */
 
@@ -211,9 +190,9 @@ unsigned long xgpu_texture_face_size(const struct xgpu_texture_description *desc
 unsigned long xgpu_texture_level_offset(const struct xgpu_texture_description *description, unsigned long level);
 unsigned long xgpu_texture_level_pitch(const struct xgpu_texture_description *description, unsigned long level);
 
-/* the GL texture for an Xbox texture header, uploading or refreshing it
-from guest memory as needed; *target receives GL_TEXTURE_2D etc. */
-GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *target,
+/* the texture for an Xbox texture header, uploading or refreshing it from
+guest memory as needed; *type receives GPU_TEXTURE_2D etc. */
+gpu_texture xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, unsigned char *type,
 	struct xgpu_texture_description *description);
 void xgpu_texture_cache_begin_frame(void);
 
@@ -224,24 +203,20 @@ struct xgpu_render_target
 	unsigned long data;  /* physical address */
 	unsigned long width, height;
 	BOOL depth;
-	GLuint texture;
+	gpu_texture texture;
 	/* pixels per unit of width and height: more than 1 for the screen's
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
 	unsigned long gl_width, gl_height;
-	/* with multisampling, the multisampled renderbuffer draws go to, its
-	samples a pixel (0 when it has none), and whether it has been drawn into
-	since the texture last had its pixels (d3d8_gl.c,
-	render_target_multisample) */
-	GLuint multisample;
+	/* with multisampling, the samples a pixel of its multisampled storage,
+	which draws go to (0 when it has none: d3d8_gl.c, bind_targets) */
 	int samples;
-	BOOL unresolved;
 	/* changes whenever the target is drawn into or cleared (d3d8_gl.c,
 	bind_targets) */
 	unsigned long written;
 };
 
-/* the GL texture holding a render target with this physical address, or 0 */
+/* the render target with this physical address, or NULL */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
 
 /* ---------- anti-aliasing

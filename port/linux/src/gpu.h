@@ -1,0 +1,180 @@
+/*
+GPU.H
+
+The interface between the Xbox Direct3D device (d3d8_gl.c, and its texture
+cache, xbox_textures.c) and the backend that drives the GPU for it (gpu_gl.c:
+OpenGL 4.5, or OpenGL ES 3 on Android). The device keeps the Xbox's state and
+says what it needs in the neutral terms below; the backend owns the GPU's
+objects and makes every call to its API.
+
+It includes only <stdint.h>, and its structs have fixed-width fields only, so
+that a backend built for another ABI than the game's (a 64-bit host drawing
+for the 32-bit game) can take them as they are.
+*/
+
+#ifndef __HALO_GPU_H
+#define __HALO_GPU_H
+
+#include <stdint.h>
+
+/* a texture, render targets included; 0 is none */
+typedef uint32_t gpu_texture;
+
+/* the Xbox's texture stages and vertex attributes (D3DTSS_MAXSTAGES,
+XGPU_VERTEX_ATTRIBUTE_COUNT) */
+enum { GPU_STAGE_COUNT = 4, GPU_ATTRIBUTE_COUNT = 16 };
+
+/* ---------- the backend */
+
+/* how visibility (occlusion) tests count */
+enum
+{
+	/* the samples that passed */
+	GPU_OCCLUSION_EXACT,
+	/* only whether any passed (OpenGL ES's occlusion queries) */
+	GPU_OCCLUSION_ANY_SAMPLE,
+	/* the pixel shader counts the samples (nv2a_pixel_shader_key count_samples) */
+	GPU_OCCLUSION_SHADER_COUNTER,
+};
+
+struct gpu_capabilities
+{
+	/* the GLSL version the shaders are written in: 450, or 300 or 310 with
+	shading_language_es */
+	uint16_t shading_language;
+	uint8_t shading_language_es;
+	/* samplers apply a LOD bias; otherwise each lookup in the pixel shader
+	does (nv2a_dialect lookup_lod_bias) */
+	uint8_t sampler_lod_bias;
+	/* the vertex shader turns clip space into GL's, as glClipControl does
+	on the desktop (nv2a_dialect clip_control) */
+	uint8_t shader_clip_control;
+	/* BC1, BC2 and BC3 textures; otherwise DXT textures are decoded */
+	uint8_t s3tc;
+	/* vertex attributes read D3DCOLOR's byte order (BGRA); otherwise the
+	device swaps the bytes as it streams them */
+	uint8_t vertex_bgra;
+	/* indexed draws add a base vertex; otherwise the device rebases the
+	indices */
+	uint8_t base_vertex;
+	/* GPU_OCCLUSION_* */
+	uint8_t occlusion;
+	/* a pixel shader can choose the samples it covers (gl_SampleMask:
+	nv2a_pixel_shader_key alpha_test_samples) */
+	uint8_t sample_mask;
+	uint8_t pad[2];
+	/* the most samples a pixel of a multisampled target can have, and the
+	largest render target each way */
+	uint32_t max_samples;
+	uint32_t max_target_size;
+};
+
+/* sets up the backend for the context, which must be current, and reports
+what it can do */
+void gpu_initialize(struct gpu_capabilities *capabilities);
+
+/* ---------- textures */
+
+/* gpu_texture_description.type */
+enum { GPU_TEXTURE_2D = 1, GPU_TEXTURE_3D, GPU_TEXTURE_CUBE };
+
+/* gpu_texture_description.format. A BGRA8 texel is a 32-bit ARGB word (the
+bytes blue, green, red, alpha); an RGBA8 texel the bytes red, green, blue,
+alpha. BC1 to BC3 are DXT1, DXT3 and DXT5 blocks. */
+enum
+{
+	GPU_FORMAT_BGRA8 = 1,
+	GPU_FORMAT_RGBA8,
+	GPU_FORMAT_BC1,
+	GPU_FORMAT_BC2,
+	GPU_FORMAT_BC3,
+	GPU_FORMAT_DEPTH_STENCIL,
+};
+
+/* gpu_texture_description.usage */
+enum
+{
+	/* its levels come from gpu_texture_upload */
+	GPU_USAGE_UPLOAD = 1,
+	/* drawn into, or given its levels by gpu_texture_copy_level: every
+	level is made with the texture, its texels undefined */
+	GPU_USAGE_RENDER_TARGET,
+};
+
+struct gpu_texture_description
+{
+	uint8_t type;
+	uint8_t format;
+	uint8_t usage;
+	uint8_t pad;
+	uint32_t width, height, depth, levels;
+};
+
+gpu_texture gpu_texture_create(const struct gpu_texture_description *description);
+/* the channel of the texels (0 red, 1 green, 2 blue, 3 alpha) each channel
+is sampled from, from the next upload of face 0's level 0 on; red, green,
+blue and alpha from their own until then. An RGBA8 texture's channels are
+always its own. */
+void gpu_texture_channels(gpu_texture texture, const uint8_t channels[4]);
+/* one level of one face (0 but for a cube), size bytes in the texture's
+format, or with no data the level with its texels undefined; face 0's
+level 0 first */
+void gpu_texture_upload(gpu_texture texture, uint32_t face, uint32_t level, const void *data, uint32_t size);
+/* rows first_row to first_row + rows - 1 of a 2D texture's level 0, once
+it has been uploaded */
+void gpu_texture_upload_rows(gpu_texture texture, uint32_t first_row, uint32_t rows, const void *data);
+/* level 0 of a color render target into level of another, the size that
+level 0 is */
+void gpu_texture_copy_level(gpu_texture source, gpu_texture destination, uint32_t level);
+/* the levels after base_level, made from base_level */
+void gpu_texture_generate_mipmaps(gpu_texture texture, uint32_t base_level);
+void gpu_texture_destroy(gpu_texture texture);
+/* level 0 of a 2D texture as BGRA8 rows from the top: its width times its
+height times 4 bytes. Returns 0 and writes nothing if size is short of that
+or the backend cannot read the texture (depth, and with OpenGL ES, anything
+but a color render target). */
+uint32_t gpu_texture_read(gpu_texture texture, void *pixels, uint32_t size);
+
+/* ---------- samplers */
+
+/* texture filters (D3DTSS_MINFILTER, MAGFILTER and MIPFILTER, which they
+number as D3DTEXF_* does): GL samples all but POINT linearly, and an
+ANISOTROPIC minification with anisotropy */
+enum
+{
+	GPU_FILTER_NONE, GPU_FILTER_POINT, GPU_FILTER_LINEAR, GPU_FILTER_ANISOTROPIC,
+	GPU_FILTER_QUINCUNX, GPU_FILTER_GAUSSIAN_CUBIC,
+};
+
+/* texture addressing (D3DTSS_ADDRESSU, V and W): CLAMP and CLAMP_TO_EDGE
+sample alike; BORDER becomes CLAMP_TO_EDGE where the GPU has no border
+color */
+enum { GPU_ADDRESS_WRAP, GPU_ADDRESS_MIRROR, GPU_ADDRESS_CLAMP, GPU_ADDRESS_BORDER, GPU_ADDRESS_CLAMP_TO_EDGE };
+
+struct gpu_sampler_state
+{
+	uint8_t min_filter, mag_filter, mip_filter;
+	uint8_t address_u, address_v, address_w;
+	uint8_t pad[2];
+	/* the first level sampled (D3DTSS_MAXMIPLEVEL) */
+	uint32_t max_mip_level;
+	/* the anisotropy of an ANISOTROPIC minification */
+	uint32_t max_anisotropy;
+	/* added to the level of detail: by the sampler, or without
+	sampler_lod_bias by the pixel shader (texture_lod_bias) */
+	float lod_bias;
+	/* ARGB, as D3DCOLOR */
+	uint32_t border_color;
+};
+
+/* a texture stage: the texture a draw samples there and how */
+struct gpu_stage
+{
+	gpu_texture texture;
+	/* 0: nothing is sampled; else the texture's GPU_TEXTURE_* */
+	uint8_t type;
+	uint8_t pad[3];
+	struct gpu_sampler_state sampler;
+};
+
+#endif

@@ -21,6 +21,7 @@ anti_aliasing_values).
 */
 
 #include "xgpu.h"
+#include "gpu_gl.h"
 
 #include <stdlib.h>
 
