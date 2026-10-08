@@ -67,14 +67,14 @@ CHECK_FAILED = 1  # a case's exit status when a CHECK fails (harness.h)
 
 
 @functools.lru_cache(maxsize=None)
-def build(test, generated):
+def build(test, generated, flags=()):
     """tests/<test>.c compiled with the generated includes ((name, text), ...) for the game's 32-bit ABI."""
-    work = Path(_directory.name) / f"{test}-{abs(hash(generated)):x}"
+    work = Path(_directory.name) / f"{test}-{abs(hash((generated, flags))):x}"
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated:
         (work / name).write_text(text)
     executable = work / test
-    command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
+    command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", *flags, "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
                str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
     result = subprocess.run(command, capture_output=True, text=True)

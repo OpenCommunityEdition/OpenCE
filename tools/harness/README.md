@@ -13,6 +13,8 @@ finds every `tests/test_*.py`, so a new test needs no change to CI.
 - `tests/<name>.c`: the fake world, only what the code reads, with what it calls stubbed as macros that name only the
   arguments they use; then `#include "under_test.inc"` and a `main` that runs the case named on its command line,
   checked with `CHECK`.
+- `build` accepts optional compiler `flags` when a test needs the port's arithmetic settings (for example,
+  `-march=x86-64 -ffp-contract=off` for a strict single-precision boundary).
 - `tests/test_<name>.py`: takes the code, enums and constants from the sources (`function`, `inline`, `enum_with`,
   `constant`) rather than copying them, so the test checks what the game builds; `build` compiles it (warnings are
   errors) and each case is a pytest test.
