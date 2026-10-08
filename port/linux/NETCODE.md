@@ -379,8 +379,9 @@ a pregame keep-alive every five seconds from the host
      player; damage one of their weapons (a vehicle's a driver's or
      gunner's; now or in the last ten seconds), a grenade the host's own game
      saw them throw in the last ten seconds that has not gone off (each
-     throw's explosion is taken once, its other hits that tick with it:
-     holding grenades deals nothing) or the vehicle they drove (in the
+     throw's explosion is taken once, its other hits and its other damage
+     (a frag grenade's shock wave) that tick with it: holding grenades
+     deals nothing) or the vehicle they drove (in the
      last ten seconds: its collisions) can deal (its projectiles' impacts
      and detonations, followed through the tags), no harder than it can be
      (all of it, but an airborne melee blow's half again); of the shape the
