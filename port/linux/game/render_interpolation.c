@@ -35,6 +35,7 @@ with their unit, and with what it rides.
 #include "cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "camera/camera_scripting.h"
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
@@ -780,6 +781,39 @@ static struct observer_result const *render_interpolation_blended_camera(
 		return observer;
 	}
 	camera = &interpolated_cameras[local_player_index];
+	/* A scripted camera that moves with an object (a cinematic's camera
+	point relative to a lifepod or dropship, or a unit's eyes in one) is
+	placed by the object as it stands after the last tick. Blended from its
+	own snapshots (taken at the first frame after each tick, a different
+	part of a tick each tick), it did not follow the object as drawn, which
+	is blended from the object's snapshots, or steps from tick to tick when
+	its pose snaps: it ran up to 2 m ahead of or behind the object, out
+	through the lifepod's hull in a30. It is drawn where the observer has
+	it, moved with the object from where the object is to where it is
+	drawn. (An animated camera has no such object.) */
+	if (director_get_perspective(local_player_index) == _director_perspective_scripted)
+	{
+		long relative_object_index = scripted_camera_object_relative_to();
+		real_matrix4x3 const *drawn;
+
+		if (relative_object_index != NONE &&
+			object_try_and_get_and_verify_type(relative_object_index, _object_mask_all) &&
+			(drawn = render_interpolation_object_node_matrices(relative_object_index)) != NULL)
+		{
+			/* (as of the last tick: object_get_node_matrices gives the drawn
+			pose while a frame is drawn) */
+			real_matrix4x3 const *nodes = (real_matrix4x3 const *)object_header_block_get(
+				relative_object_index, &object_get(relative_object_index)->object.node_matrices);
+
+			camera->blended = *observer;
+			camera->blended.position.x += drawn[0].position.x - nodes[0].position.x;
+			camera->blended.position.y += drawn[0].position.y - nodes[0].position.y;
+			camera->blended.position.z += drawn[0].position.z - nodes[0].position.z;
+			/* (the snapshots start again after) */
+			camera->valid = FALSE;
+			return &camera->blended;
+		}
+	}
 	/* the observer as it stood after each tick (the first frame drawn
 	after the tick) */
 	if (!camera->valid || camera->tick != interpolation_tick)

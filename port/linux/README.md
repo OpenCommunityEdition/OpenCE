@@ -332,6 +332,8 @@ Each frame shows the world between the last two ticks
 - A teleport, a respawn or a cut of the camera does not mix. It jumps.
 - After a long frame (several ticks in one frame), the camera mixes the
   last tick only, as the objects do.
+- In cinematics, a camera that moves with an object (the lifepod in a30,
+  a Pelican) moves with the object as it is drawn.
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
