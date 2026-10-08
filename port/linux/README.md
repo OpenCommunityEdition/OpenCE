@@ -341,7 +341,9 @@ values again, delete the file.
 
 The game reads the file at start-up. If a key is not correct, or a value
 has the wrong type, the game writes the line to the log and uses the default
-value. The Settings menu (Video, Mouse, Audio, Network and Controls Setup)
+value. A key in the wrong section is named with the section it goes under. A
+file that cannot be parsed leaves every setting at its default; a word value
+needs its quotes (`menus = "pc"`, not `menus = pc`). The Settings menu (Video, Mouse, Audio, Network and Controls Setup)
 changes the useful settings, writes them into the file (only their lines
 change) and applies them at once, but `audio.enabled`, and `display.menus`
 from the next main menu.
