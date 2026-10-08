@@ -2793,6 +2793,7 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "game/cheats.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/attract_mode.h"
 #include "interface/hud.h"
@@ -3377,7 +3378,7 @@ typedef void (*hs_token_enumerator)(
 
 struct hs_function_table_storage
 {
-	struct hs_function_definition const *functions[418];
+	struct hs_function_definition const *functions[418 + 2];
 	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
@@ -11624,7 +11625,72 @@ static struct hs_function_definition_with_1_parameter const xbox_set_machine_nam
 	},
 };
 
-long const hs_function_table_count= 418;
+/* port: Halo PC's sv_say and sv_end_game, which Custom Edition maps' scripts
+call (lookout_classic's and the Halo Kart maps' sv_say). They go at the end
+of the table: Xbox maps call functions by their place in it, Custom Edition
+maps by name (custom_edition_scripts.c). Every machine runs the scripts */
+
+/* (each machine shows the message to its own players) */
+static void hs_sv_say(
+	char const *message)
+{
+	wchar_t text[128];
+	short local_player_index;
+	long index;
+
+	for (index = 0; message && message[index] && index < NUMBEROF(text) - 1; index++)
+		text[index] = (unsigned char)message[index];
+	text[index] = 0;
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		if (local_player_get_player_index(local_player_index) != NONE)
+			hud_print_message(local_player_index, text);
+	}
+
+	return;
+}
+
+/* (the host ends the game, as its time running out does) */
+static void hs_sv_end_game(
+	void)
+{
+	if (global_network_game_server_get() && game_engine_running())
+		game_engine_end_game();
+
+	return;
+}
+
+HS_EVALUATE_VOID_STRING(hs_sv_say_evaluate, hs_sv_say)
+HS_EVALUATE_NO_ARGUMENTS(hs_sv_end_game_evaluate, hs_sv_end_game)
+
+static struct hs_function_definition_with_1_parameter const sv_say_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sv_say",
+		hs_macro_function_parse,
+		hs_sv_say_evaluate,
+		"Halo PC's: shows every player a message.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const sv_end_game_definition=
+{
+	_hs_type_void,
+	0,
+	"sv_end_game",
+	hs_macro_function_parse,
+	hs_sv_end_game_evaluate,
+	"Halo PC's: the host ends the game.",
+	NULL,
+	0,
+};
+
+long const hs_function_table_count= 418 + 2;
 
 struct hs_enum_definition const hs_enum_table[]=
 {
@@ -12056,6 +12122,8 @@ struct hs_function_table_storage hs_function_table=
 		&display_scenario_help_definition.definition,
 		&hs_network_game_start_now_definition,
 		&xbox_set_machine_name_definition.definition,
+		&sv_say_definition.definition,
+		&sv_end_game_definition,
 	},
 	{
 		"hs_update",
@@ -12553,6 +12621,10 @@ static boolean const hs_function_allowed_in_maps[]=
 	TRUE, /* display_scenario_help */
 	FALSE, /* network_game_start_now: starts a network game */
 	FALSE, /* xbox_set_machine_name: the machine's name */
+
+	/* Halo PC's, for Custom Edition maps */
+	TRUE, /* sv_say */
+	TRUE, /* sv_end_game: the host's */
 };
 typedef char verify_hs_function_allowed_in_maps_size[
 	NUMBEROF(hs_function_allowed_in_maps) == NUMBEROF(hs_function_table.functions) ? 1 : -1];
