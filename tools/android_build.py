@@ -71,6 +71,11 @@ GUEST_ABI_FLAGS = [
     "-D__linux__=1",
     "-D__unix__=1",
     "-DHALO_ANDROID=1",
+    # (what HALO_ANDROID implies, port/linux/include/halo_linux_prefix.h:
+    # a 32-bit guest of a 64-bit host, and the OpenGL ES renderer; given
+    # here too for the units that do not include that header)
+    "-DHALO_GUEST=1",
+    "-DHALO_GLES=1",
     # ARMv8.0: nothing the emulator's binary translation or an older
     # device could lack (Darwin targets otherwise assume pointer
     # authentication and FP16)
@@ -173,19 +178,27 @@ def _find_ndk() -> Optional[Path]:
     return None
 
 
+def fetch_musl_and_sdl(third_party: Path) -> None:
+    """Download musl and SDL3 into third_party (configure time, once); the
+    macOS build (tools/macos_build.py) keeps its own copies the same way."""
+    musl_dir = third_party / f"musl-{MUSL_VERSION}"
+    sdl_dir = third_party / "SDL3"
+    third_party.mkdir(parents=True, exist_ok=True)
+    if not musl_dir.is_dir():
+        print(f"Downloading {MUSL_URL}")
+        archive = third_party / f"musl-{MUSL_VERSION}.tar.gz"
+        subprocess.run(["curl", "-sSfL", "-o", str(archive), MUSL_URL], check=True)
+        subprocess.run(["tar", "xzf", archive.name], cwd=third_party, check=True)
+        archive.unlink()
+    if not sdl_dir.is_dir():
+        print(f"Cloning SDL3 {SDL_TAG}")
+        subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", SDL_TAG, SDL_URL, str(sdl_dir)],
+                       check=True)
+
+
 def fetch_third_party() -> None:
     """Download musl and SDL3 (configure time, once)."""
-    THIRD_PARTY.mkdir(parents=True, exist_ok=True)
-    if not MUSL_DIR.is_dir():
-        print(f"Downloading {MUSL_URL}")
-        archive = THIRD_PARTY / f"musl-{MUSL_VERSION}.tar.gz"
-        subprocess.run(["curl", "-sSfL", "-o", str(archive), MUSL_URL], check=True)
-        subprocess.run(["tar", "xzf", archive.name], cwd=THIRD_PARTY, check=True)
-        archive.unlink()
-    if not SDL_DIR.is_dir():
-        print(f"Cloning SDL3 {SDL_TAG}")
-        subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", SDL_TAG, SDL_URL, str(SDL_DIR)],
-                       check=True)
+    fetch_musl_and_sdl(THIRD_PARTY)
     # SDL 3.4.16's generic mouse listener drops captured relative motion and
     # button transitions unless they are forwarded from captured pointer events.
     # A tree patched by another version of the patch (an older checkout, or
@@ -199,8 +212,8 @@ def fetch_third_party() -> None:
         subprocess.run(["git", "-C", str(SDL_DIR), "apply", str(SDL_ANDROID_MOUSE_PATCH.resolve())], check=True)
 
 
-def _musl_sources() -> List[Path]:
-    src = MUSL_DIR / "src"
+def _musl_sources(musl_dir: Path = MUSL_DIR) -> List[Path]:
+    src = musl_dir / "src"
     result = set()
     for directory in MUSL_DIRECTORIES:
         for path in (src / directory).glob("*.c"):

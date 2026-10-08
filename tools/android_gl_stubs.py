@@ -11,12 +11,17 @@ same registers under both ABIs. What differs is
   the guest packs by size while the host expects 8-byte slots;
 - returned pointers, which point at host memory.
 
+The macOS guest (x32 code calling an x86-64 host, tools/macos_build.py)
+has six integer argument registers, not eight: --integer-registers 6. Its
+stack slots are already 8 bytes, but a 32-bit value in one has undefined
+upper bits, so the same widening applies from the seventh argument on.
+
 For each function in the Android list in port/linux/src/gl.h this writes a
 guest wrapper that widens such arguments and calls an import named
 hostgl_<function>, which the host resolves to the real entry point. Functions
 returning a string go through host_gl_get_string instead.
 
-Usage: android_gl_stubs.py gl.h gl32.h gl2ext.h output.c imports.list
+Usage: android_gl_stubs.py [--integer-registers N] gl.h gl32.h gl2ext.h output.c imports.list
 """
 
 import re
@@ -55,7 +60,12 @@ def split_parameter(param: str):
 
 
 def main():
-    gl_header, gl32, gl2ext, output, imports = sys.argv[1:6]
+    global INTEGER_REGISTER_COUNT
+    arguments = sys.argv[1:]
+    if arguments and arguments[0] == "--integer-registers":
+        INTEGER_REGISTER_COUNT = int(arguments[1])
+        arguments = arguments[2:]
+    gl_header, gl32, gl2ext, output, imports = arguments[:5]
     functions = android_functions(gl_header)
     protos = prototypes(gl32, gl2ext)
     out = [

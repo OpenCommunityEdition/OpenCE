@@ -4,6 +4,7 @@
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
+    python tools/ci_build.py macos release
 
 Builds are portable (any x86-64 processor), so they run on other
 computers. Debug builds skip link-time and profile-guided optimisation,
@@ -29,6 +30,9 @@ OUTPUTS = {
     "linux": ["build/linux/halo"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
+    # the app bundle (signed ad hoc), whose Resources hold the guest image
+    # and the brokers' list
+    "macos": ["build/macos/Halo.app"],
 }
 APKS = {
     "debug": "port/android/app/build/outputs/apk/debug/app-debug.apk",
@@ -79,7 +83,11 @@ def main() -> int:
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
     for output in outputs:
-        shutil.copy2(ROOT / output, dist)
+        if (ROOT / output).is_dir():
+            # (a bundle: its signature covers the files as they are)
+            shutil.copytree(ROOT / output, dist / Path(output).name, symlinks=True)
+        else:
+            shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)
     if args.platform == "windows":
         # the symbols of halo.exe and SDL3.dll, apart (players do not need
@@ -112,8 +120,8 @@ def main() -> int:
     # MIT license asks copies to carry its notice
     shutil.copy2(ROOT / "port/third_party/expat/COPYING", dist / "expat-COPYING.txt")
     # internet play's MQTT brokers, a file beside the game (network.brokers_file;
-    # Android's APK has its own copy)
-    if args.platform != "android":
+    # Android's APK and the macOS app have their own copies)
+    if args.platform not in ("android", "macos"):
         shutil.copy2(ROOT / "port/assets/network/brokers.txt", dist / "brokers.txt")
     return 0
 
