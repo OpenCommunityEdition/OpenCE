@@ -16,13 +16,15 @@ def buildNumber = buildNumberText.isInteger() ? buildNumberText.toInteger() : 0
 // main signed with it can install over the one before; without it, the
 // debug key of the computer that builds
 def signingKey = System.getenv("HALO_ANDROID_KEYSTORE")
+def debugSideBySide = project.hasProperty("haloDebugSideBySide")
 
 android {
     namespace "com.halo.decomp"
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.halo.decomp"
+        applicationId debugSideBySide ? "com.halo.decomp.debug" : "com.halo.decomp"
+        manifestPlaceholders = [updateAuthority: "com.halo.decomp.update"]
         minSdk 28
         targetSdk 35
         versionCode Math.max(1, buildNumber)
@@ -54,6 +56,7 @@ android {
 
     buildFeatures {
         buildConfig true
+        resValues true
     }
 
     signingConfigs {
@@ -71,6 +74,10 @@ android {
         debug {
             debuggable true
             minifyEnabled false
+            if (debugSideBySide) {
+                resValue "string", "app_name", "Halo Debug"
+                manifestPlaceholders = [updateAuthority: "com.halo.decomp.debug.update"]
+            }
             signingConfig signingKey ? signingConfigs.halo : signingConfigs.debug
         }
         release {
