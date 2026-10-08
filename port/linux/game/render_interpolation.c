@@ -726,6 +726,48 @@ struct observer_result const *render_interpolation_camera(
 		render_interpolation_blended_camera(local_player_index, observer));
 }
 
+/* between two of the observer's results: the position, the axes (up kept
+square to forward) and the field of view */
+static void observer_blend(
+	struct observer_result const *a,
+	struct observer_result const *b,
+	real t,
+	struct observer_result *result)
+{
+	real along, length;
+
+	*result = *b;
+	point_lerp(&a->position, &b->position, t, &result->position);
+	vector_nlerp(&a->forward, &b->forward, t, &result->forward);
+	vector_nlerp(&a->up, &b->up, t, &result->up);
+	along = result->up.i * result->forward.i + result->up.j * result->forward.j + result->up.k * result->forward.k;
+	result->up.i -= result->forward.i * along;
+	result->up.j -= result->forward.j * along;
+	result->up.k -= result->forward.k * along;
+	length = vector_length(&result->up);
+	if (length > 1e-6f)
+	{
+		result->up.i /= length;
+		result->up.j /= length;
+		result->up.k /= length;
+	}
+	else
+	{
+		result->up = b->up;
+	}
+	result->field_of_view = lerp(a->field_of_view, b->field_of_view, t);
+}
+
+/* a cut between two of the observer's results (so written that a position
+or direction not a number cuts) */
+static boolean observer_cut(
+	struct observer_result const *a,
+	struct observer_result const *b)
+{
+	return !(distance_squared(&a->position, &b->position) <= CAMERA_CUT_DISTANCE * CAMERA_CUT_DISTANCE) ||
+		!(a->forward.i * b->forward.i + a->forward.j * b->forward.j + a->forward.k * b->forward.k >= CAMERA_CUT_COSINE);
+}
+
 static struct observer_result const *render_interpolation_blended_camera(
 	short local_player_index,
 	struct observer_result const *observer)
@@ -751,22 +793,29 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->has_previous = camera->valid;
 		camera->previous = camera->latest;
 		camera->latest = *observer;
+		/* Several ticks since the last snapshot (a long frame): the objects
+		are drawn between the last two ticks, so the camera's previous is
+		where it was a tick ago, as nearly as a steady move from the last
+		snapshot tells. (Blended across all the ticks since, the camera
+		moved further each frame than the world it is in, out through a
+		Pelican's hull for a frame.) A cut stays a cut. */
+		if (camera->has_previous && interpolation_tick - camera->tick > 1 &&
+			!observer_cut(&camera->previous, &camera->latest))
+		{
+			real ticks = (real)(interpolation_tick - camera->tick);
+			struct observer_result previous = camera->previous;
+
+			observer_blend(&previous, &camera->latest, (ticks - 1.0f) / ticks, &camera->previous);
+		}
 		camera->tick = interpolation_tick;
 		camera->valid = TRUE;
 	}
-	/* (so written that a position or direction not a number cuts) */
-	if (!camera->has_previous ||
-		!(distance_squared(&camera->previous.position, &camera->latest.position) <=
-			CAMERA_CUT_DISTANCE * CAMERA_CUT_DISTANCE) ||
-		!(camera->previous.forward.i * camera->latest.forward.i +
-			camera->previous.forward.j * camera->latest.forward.j +
-			camera->previous.forward.k * camera->latest.forward.k >= CAMERA_CUT_COSINE))
+	if (!camera->has_previous || observer_cut(&camera->previous, &camera->latest))
 	{
 		return observer;
 	}
 
-	camera->blended = camera->latest;
-	point_lerp(&camera->previous.position, &camera->latest.position, t, &camera->blended.position);
+	observer_blend(&camera->previous, &camera->latest, t, &camera->blended);
 	if (correction_significant(&camera->correction) || correction_significant(&camera->correction_pending))
 	{
 		real_vector3d drawn;
@@ -776,31 +825,6 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->blended.position.y += drawn.j;
 		camera->blended.position.z += drawn.k;
 	}
-	vector_nlerp(&camera->previous.forward, &camera->latest.forward, t, &camera->blended.forward);
-	vector_nlerp(&camera->previous.up, &camera->latest.up, t, &camera->blended.up);
-	{
-		/* keep up perpendicular to forward */
-		real_vector3d *forward = &camera->blended.forward;
-		real_vector3d *up = &camera->blended.up;
-		real along = up->i * forward->i + up->j * forward->j + up->k * forward->k;
-		real length;
-
-		up->i -= forward->i * along;
-		up->j -= forward->j * along;
-		up->k -= forward->k * along;
-		length = vector_length(up);
-		if (length > 1e-6f)
-		{
-			up->i /= length;
-			up->j /= length;
-			up->k /= length;
-		}
-		else
-		{
-			*up = camera->latest.up;
-		}
-	}
-	camera->blended.field_of_view = lerp(camera->previous.field_of_view, camera->latest.field_of_view, t);
 	return &camera->blended;
 }
 
