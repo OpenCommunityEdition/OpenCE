@@ -41,6 +41,19 @@ def enum_with(source, member):
     return source[start:source.index("};", at) + 2]
 
 
+def structure(source, name):
+    """An actual named structure's definition, including nested unions/structures."""
+    match = re.search(r"^struct\s+" + re.escape(name) + r"\s*\{", source, re.M)
+    if not match:
+        raise LookupError(f"structure not found in the sources: {name}")
+    end = source.index("{", match.start()) + 1
+    depth = 1
+    while depth:
+        depth += (source[end] == "{") - (source[end] == "}")
+        end += 1
+    return source[match.start():source.index(";", end) + 1]
+
+
 def constant(source, name):
     """An enum constant's or #define's integer value, following a name it is set to (as the port's capacities are)."""
     match = re.search(r"\b" + re.escape(name) + r"\s*=\s*(\w+)", source) or \
@@ -76,7 +89,7 @@ def build(test, generated):
     executable = work / test
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
-               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
+               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable), "-lm"]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
