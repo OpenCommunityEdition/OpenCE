@@ -325,7 +325,9 @@ a pregame keep-alive every five seconds from the host
      indices from the upper half of the object array, clear of the host's.
    - Ten times a second, what every unit carries (the host's weapons, slot
      for slot, their ammunition, the weapon in hand, the grenades); a
-     client moves the same weapon objects in and out of its units. A
+     client moves the same weapon objects in and out of its units, which
+     carry no grenades until the host says (not the unit tag's: a player
+     spawned with the button held threw one the host's copy had not). A
      change of weapons or grenades goes to every client at once; one of
      ammunition only to the unit's player's machine at once, and to the
      others as often as they are sent that player. A client takes its own

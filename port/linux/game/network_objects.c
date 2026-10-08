@@ -2316,6 +2316,12 @@ static void distributed_client_create(
 		return;
 	}
 	objects_client_has[absolute_index] = object_index;
+	/* (a unit's grenades are the host's, which its inventories bring: none
+	until they come, not the tag's that unit_new gave it, which the host's
+	game engine replaces with the game's at a player's spawn: a player
+	spawned with the button held threw one here the host's copy had not) */
+	if (TEST_FLAG(_object_mask_unit, object_get(object_index)->object.type))
+		csmemset(unit_get(object_index)->unit.grenade_counts, 0, sizeof(unit_get(object_index)->unit.grenade_counts));
 	distributed_client_apply_change(object_index, change);
 }
 
