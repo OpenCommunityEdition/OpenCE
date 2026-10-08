@@ -76,7 +76,7 @@ menus are drawn over it (halo_screen_anti_alias, xgpu_post.c); "ssaa2x"
 draws the screen's targets at twice the resolution each way
 (screen_mode_choose), which the display blit scales down; "msaa2x" to
 "msaa8x" draw the back buffer and its depth buffer with that many samples a
-pixel (bind_targets, gpu_gl_bind_targets). The setting is read again between frames
+pixel (bind_targets). The setting is read again between frames
 (halo_screen_commit), so that a change applies from the next one. */
 
 enum
@@ -355,13 +355,9 @@ static struct render_target_entry *render_targets;
 
 /* ---------- the device */
 
-#define VISIBILITY_TEST_SLOTS 4096
-#ifdef HALO_ANDROID
-#define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
+#define VISIBILITY_TEST_SLOTS GPU_VISIBILITY_SLOTS
+/* a count from a test that only says whether any sample passed */
 #define VISIBILITY_ALL_SAMPLES 1000000
-#else
-#define VISIBILITY_QUERY GL_SAMPLES_PASSED
-#endif
 
 struct gl_device
 {
@@ -400,47 +396,13 @@ struct gl_device
 	unsigned long immediate_count;
 	unsigned long immediate_capacity;
 
-	GLuint queries[VISIBILITY_TEST_SLOTS];
 	BOOL query_pending[VISIBILITY_TEST_SLOTS];
 	/* the pixels each of the game's pixels covered in the test's target
-	(render_target_get), which its count is divided by */
+	(render_target_get), which an exact count is divided by */
 	float query_area[VISIBILITY_TEST_SLOTS];
-	GLuint active_query;
 	BOOL visibility_test_active;
-	/* (queries read on the CPU) each slot's latest count known, and whether
-	its query has yet to be read: the game spins on a result it is told is
-	incomplete, so a query is read only once it says it is available, and
-	until then the slot's earlier count stands. A frame of The Library's
-	lights makes hundreds of tests. */
-	GLuint visibility_known[VISIBILITY_TEST_SLOTS];
-	BOOL visibility_unread[VISIBILITY_TEST_SLOTS];
-#ifdef HALO_ANDROID
-	/* with atomic counters: one counter per test, used as a ring */
-	GLuint visibility_counters;
-	unsigned long counter_next;
-	unsigned long counter_active;
-	/* Reading the counters waits for the draws that counted, which stops
-	the CPU until the GPU has caught up (the game asks at the start of the
-	next frame), halving the frame rate on drivers that queue frames (Zink,
-	Turnip). Instead, at the end of each frame the GPU copies them into the
-	frame's snapshot buffer of the stream ring, and the frame's tests (each
-	a result slot and its counter) are listed with it. Once its fence has
-	passed (two frames on, D3DDevice_Present) the CPU reads the snapshot
-	into counter_values and gives each listed slot its count: a result is
-	the latest count known, as the desktop's query buffer gives. */
-	GLuint counter_snapshots[GPU_GL_FRAME_RING];
-	unsigned short ring_tests[GPU_GL_FRAME_RING][VISIBILITY_TEST_SLOTS][2];
-	unsigned long ring_test_count[GPU_GL_FRAME_RING];
-	GLuint counter_values[VISIBILITY_TEST_SLOTS];
-	GLuint visibility_latest[VISIBILITY_TEST_SLOTS];
-#else
-	/* each test's latest result, which the GPU writes (as a query buffer)
-	when the test's draws are done: the game waits for results at the start
-	of the next frame, and a query would stop the CPU there until the GPU
-	had caught up */
-	GLuint visibility_results_buffer;
-	volatile GLuint *visibility_results;
-#endif
+	/* each slot's latest count known (gpu_visibility_result) */
+	uint32_t visibility_known[VISIBILITY_TEST_SLOTS];
 
 	unsigned long frame;
 	unsigned long next_vertex_shader_id;
@@ -734,7 +696,7 @@ struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
 /* ---------- multisampling
 
 With display.anti_aliasing's multisampling, the back buffer and its depth
-buffer are drawn into multisampled storage (gpu_gl_bind_targets), and so is
+buffer are drawn into multisampled storage (bind_targets), and so is
 any target drawn together with one of them (the mirror's view goes to the
 secondary target with the back buffer's depth buffer): a framebuffer's
 attachments are all multisampled or none is. Nothing samples a depth buffer
@@ -828,35 +790,6 @@ static void gl_initialize(void)
 	shader_dialect.es = capabilities->shading_language_es != 0;
 	shader_dialect.lookup_lod_bias = !capabilities->sampler_lod_bias;
 	shader_dialect.clip_control = capabilities->shader_clip_control != 0;
-	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
-#ifndef HALO_ANDROID
-	glGenBuffers(1, &device.visibility_results_buffer);
-	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
-	glBufferStorage(GL_QUERY_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL,
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	device.visibility_results = glMapBufferRange(GL_QUERY_BUFFER, 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
-		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
-	if (!device.visibility_results)
-		platform_log("cannot map the visibility test results; tests wait for the GPU");
-#endif
-#ifdef HALO_ANDROID
-	if (xgpu_capabilities.atomic_counters)
-	{
-		int ring;
-
-		glGenBuffers(1, &device.visibility_counters);
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, device.visibility_counters);
-		glBufferData(GL_ATOMIC_COUNTER_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-		glGenBuffers(GPU_GL_FRAME_RING, device.counter_snapshots);
-		for (ring = 0; ring < GPU_GL_FRAME_RING; ring++)
-		{
-			glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[ring]);
-			glBufferData(GL_COPY_WRITE_BUFFER, VISIBILITY_TEST_SLOTS * sizeof(GLuint), NULL, GL_STREAM_READ);
-		}
-		glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-	}
-#endif
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 		device.attributes[index][3] = 1.0f;
 	memory_watch_initialize();
@@ -891,9 +824,11 @@ static void anti_aliasing_prepare(void)
 		platform_log("anti-aliasing: the GPU has at most %d samples a pixel", maximum_samples);
 		anti_aliasing_samples = maximum_samples < 2 ? 0 : maximum_samples;
 	}
-	if ((mode == _anti_aliasing_fxaa || mode == _anti_aliasing_smaa) && !xgpu_post_prepare(mode == _anti_aliasing_smaa))
+	if ((mode == _anti_aliasing_fxaa || mode == _anti_aliasing_smaa) &&
+		!gpu_anti_alias_prepare(mode == _anti_aliasing_smaa ? GPU_ANTI_ALIAS_SMAA : GPU_ANTI_ALIAS_FXAA))
+	{
 		platform_log("anti-aliasing: its programs do not build, so the 3D view is not antialiased");
-	xgpu_gl_state_invalidate();
+	}
 }
 
 Direct3D *WINAPI Direct3DCreate8(UINT sdk_version)
@@ -1267,7 +1202,7 @@ BOOL WINAPI D3DDevice_IsBusy(void)
 void WINAPI D3DDevice_KickPushBuffer(void)
 {
 	if (device.gl_ready)
-		glFlush();
+		gpu_flush();
 }
 
 void WINAPI D3DDevice_InsertCallback(D3DCALLBACKTYPE type, D3DCALLBACK callback, DWORD context)
@@ -1284,92 +1219,40 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 {
 	if (!device.gl_ready || device.visibility_test_active)
 		return;
-	/* the query object is chosen when the test ends; use a scratch one */
 	device.visibility_test_active = TRUE;
-#ifdef HALO_ANDROID
-	if (xgpu_capabilities.atomic_counters)
-	{
-		const GLuint zero = 0;
-
-		device.counter_next = (device.counter_next + 1) % VISIBILITY_TEST_SLOTS;
-		device.counter_active = device.counter_next;
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, device.visibility_counters);
-		host_gl_buffer_write(GL_ATOMIC_COUNTER_BUFFER, (unsigned int)(device.counter_active * sizeof(GLuint)),
-			sizeof(zero), &zero);
-		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-		return;
-	}
-#endif
-	glBeginQuery(VISIBILITY_QUERY, device.queries[0]);
+	gpu_visibility_begin();
 }
 
 HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 {
-	GLuint scratch;
-
 	if (!device.gl_ready || !device.visibility_test_active)
 		return S_OK;
 	device.visibility_test_active = FALSE;
 	index %= VISIBILITY_TEST_SLOTS;
 	if (!index)
 		index = 1;
-#ifdef HALO_ANDROID
-	if (xgpu_capabilities.atomic_counters)
-	{
-		unsigned long ring = gpu_gl_frame_ring();
-		unsigned long *count = &device.ring_test_count[ring];
-
-		/* (a slot tested twice in a frame is listed twice: the later
-		counter, resolved after, wins) */
-		if (*count < VISIBILITY_TEST_SLOTS)
-		{
-			device.ring_tests[ring][*count][0] = (unsigned short)index;
-			device.ring_tests[ring][*count][1] = (unsigned short)device.counter_active;
-			(*count)++;
-		}
-		device.query_pending[index] = TRUE;
-		return S_OK;
-	}
-#endif
-	glEndQuery(VISIBILITY_QUERY);
+	gpu_visibility_end((uint32_t)index);
 	/* the target's samples to a game pixel (its pixels, by its samples a
-	pixel with multisampling): the result is a count of the game's pixels
-	(visibility_unscaled), which the game divides by its own test's area
-	(lens flares, rasterizer_lights.c), a split-screen window's or the
-	screen's alike */
+	pixel with multisampling): an exact count is turned into one of the
+	game's pixels (visibility_unscaled), which the game divides by its own
+	test's area (lens flares, rasterizer_lights.c), a split-screen window's
+	or the screen's alike */
 	device.query_area[index] = target_scale[0] * target_scale[1] * (float)target_samples;
-	/* swap the scratch query into the requested slot */
-	scratch = device.queries[0];
-	device.queries[0] = device.queries[index];
-	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
-	device.visibility_unread[index] = TRUE;
-#ifndef HALO_ANDROID
-	if (device.visibility_results)
-	{
-		/* the GPU writes the count into the slot once it is known (given
-		by name: Mesa's GL thread waits for everything before a
-		glGetQueryObjectuiv, even one into a bound buffer) */
-		glGetQueryBufferObjectuiv(device.queries[index], device.visibility_results_buffer, GL_QUERY_RESULT,
-			(GLintptr)(index * sizeof(GLuint)));
-	}
-#endif
 	return S_OK;
 }
 
-#ifndef HALO_ANDROID
 /* a count of pixels in the game's pixels */
-static GLuint visibility_unscaled(GLuint samples, DWORD index)
+static uint32_t visibility_unscaled(uint32_t samples, DWORD index)
 {
 	float area = device.query_area[index];
 
-	return area > 1.0f ? (GLuint)(samples / area + 0.5f) : samples;
+	return area > 1.0f ? (uint32_t)(samples / area + 0.5f) : samples;
 }
 
-#endif
 HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULONGLONG *time_stamp)
 {
-	GLuint available = 0, samples = 0;
+	uint32_t samples = 0;
 
 	if (time_stamp)
 		*time_stamp = 0;
@@ -1382,46 +1265,27 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 			*result = 0;
 		return S_OK;
 	}
-#ifdef HALO_ANDROID
-	if (xgpu_capabilities.atomic_counters)
-	{
-		/* the latest count the GPU has finished (counter_snapshots) */
-		if (result)
-			*result = device.visibility_latest[index];
-		return S_OK;
-	}
-#endif
-#ifndef HALO_ANDROID
-	if (device.visibility_results)
-	{
-		/* the latest count the GPU has written: from this test, or while
-		the GPU is still behind, from the slot's earlier ones */
-		if (result)
-			*result = visibility_unscaled(device.visibility_results[index], index);
-		return S_OK;
-	}
-#endif
 	/* the latest count known: from this test, or while the GPU is still
 	behind, from the slot's earlier ones */
-	if (device.visibility_unread[index])
+	if (gpu_visibility_result((uint32_t)index, &samples))
 	{
-		glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT_AVAILABLE, &available);
-		if (available)
+		switch (xgpu_gpu_capabilities.occlusion)
 		{
-			glGetQueryObjectuiv(device.queries[index], GL_QUERY_RESULT, &samples);
-#ifdef HALO_ANDROID
-			/* ES only says whether any sample passed. The game divides the
-			count by the test's area (lens flare brightness,
+		case GPU_OCCLUSION_EXACT:
+			samples = visibility_unscaled(samples, index);
+			break;
+		case GPU_OCCLUSION_ANY_SAMPLE:
+			/* ES's queries only say whether any sample passed. The game
+			divides the count by the test's area (lens flare brightness,
 			rasterizer_lights.c): report more than any test covers, well
 			below what would overflow there. */
 			if (samples)
 				samples = VISIBILITY_ALL_SAMPLES;
-#else
-			samples = visibility_unscaled(samples, index);
-#endif
-			device.visibility_known[index] = samples;
-			device.visibility_unread[index] = FALSE;
+			break;
+		default:
+			break;
 		}
+		device.visibility_known[index] = samples;
 	}
 	if (result)
 		*result = device.visibility_known[index];
@@ -2370,11 +2234,6 @@ static void submit_draw(struct gpu_draw *draw)
 {
 	BOOL drawn;
 
-#ifdef HALO_ANDROID
-	if (draw_shaders.key.count_samples)
-		glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, device.visibility_counters,
-			(GLintptr)(device.counter_active * sizeof(GLuint)), sizeof(GLuint));
-#endif
 	drawn = gpu_draw(draw, &vertex_constants, &draw_uniforms) != 0;
 	if (!drawn && draw_shaders.lit)
 	{
@@ -3127,62 +2986,69 @@ void WINAPI D3DDevice_SetVertexDataColor(INT reg, D3DCOLOR color)
 
 void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags, D3DCOLOR color, float z, DWORD stencil)
 {
-	float rgba[4];
-	GLbitfield mask = 0;
-	gpu_texture color_target, depth_target;
-	uint32_t target_storage;
+	static struct gpu_rect *pixels;
+	static unsigned long pixels_capacity;
+	struct gpu_clear clear;
+	unsigned long pixel_count = 0;
 	BOOL has_depth = FALSE;
 	DWORD index;
 
-	if (!device.gl_ready || !bind_targets(&color_target, &depth_target, &target_storage, &has_depth))
+	memset(&clear, 0, sizeof(clear));
+	if (!device.gl_ready || !bind_targets(&clear.color_target, &clear.depth_target, &clear.samples, &has_depth))
 		return;
-	gpu_gl_bind_targets(color_target, depth_target, target_storage);
 	if (trace_frame())
 		platform_log("clear flags %lx color %08lx z %g count %lu target %08lx depth %08lx", (unsigned long)flags,
 			(unsigned long)color, z, (unsigned long)count,
 			device.render_target ? (unsigned long)device.render_target->Data : 0,
 			device.depth_stencil ? (unsigned long)device.depth_stencil->Data : 0);
 	stats.clears++;
-	color_to_vec4(color, rgba);
 	if (flags & D3DCLEAR_TARGET)
 	{
 		/* the Xbox clears the channels named (D3DCLEAR_TARGET_R, _G, _B, _A):
 		the fog screen clears only alpha, leaving the picture under the fog */
-		glColorMask((flags & D3DCLEAR_TARGET_R) != 0, (flags & D3DCLEAR_TARGET_G) != 0,
-			(flags & D3DCLEAR_TARGET_B) != 0, (flags & D3DCLEAR_TARGET_A) != 0);
-		glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
-		mask |= GL_COLOR_BUFFER_BIT;
+		clear.flags |= GPU_CLEAR_COLOR;
+		clear.channel_mask = (uint8_t)(((flags & D3DCLEAR_TARGET_R) ? 1 : 0) | ((flags & D3DCLEAR_TARGET_G) ? 2 : 0) |
+			((flags & D3DCLEAR_TARGET_B) ? 4 : 0) | ((flags & D3DCLEAR_TARGET_A) ? 8 : 0));
+		clear.color = (uint32_t)color;
 	}
 	if (has_depth && (flags & D3DCLEAR_ZBUFFER))
 	{
-		glDepthMask(GL_TRUE);
-		glClearDepth(z);
-		mask |= GL_DEPTH_BUFFER_BIT;
+		clear.flags |= GPU_CLEAR_DEPTH;
+		clear.depth = z;
 	}
 	if (has_depth && (flags & D3DCLEAR_STENCIL))
 	{
-		glStencilMask(0xff);
-		glClearStencil((GLint)stencil);
-		mask |= GL_STENCIL_BUFFER_BIT;
+		clear.flags |= GPU_CLEAR_STENCIL;
+		clear.stencil = (uint32_t)stencil;
 	}
-	if (!mask)
+	if (!clear.flags)
+	{
+		/* (the targets are bound all the same) */
+		gpu_clear(&clear, NULL, 0);
 		return;
+	}
+	if (pixels_capacity < (count ? count : 1))
+	{
+		free(pixels);
+		pixels_capacity = count > 16 ? count : 16;
+		pixels = malloc(pixels_capacity * sizeof(*pixels));
+		if (!pixels)
+		{
+			pixels_capacity = 0;
+			return;
+		}
+	}
 	if (!count || !rectangles)
 	{
 		/* the NV2A clips a viewport-less clear to the viewport, which is what
 		keeps a split-screen window's clear from wiping the other window */
-		GLint x0 = target_pixel((float)device.viewport.X, 0);
-		GLint y0 = target_pixel((float)device.viewport.Y, 1);
-
-		glEnable(GL_SCISSOR_TEST);
-		glScissor(x0, y0, target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0,
-			target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0);
-		glClear(mask);
-		glDisable(GL_SCISSOR_TEST);
-		xgpu_gl_state_invalidate();
+		pixels[0].x = target_pixel((float)device.viewport.X, 0);
+		pixels[0].y = target_pixel((float)device.viewport.Y, 1);
+		pixels[0].width = target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - pixels[0].x;
+		pixels[0].height = target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - pixels[0].y;
+		gpu_clear(&clear, pixels, 1);
 		return;
 	}
-	glEnable(GL_SCISSOR_TEST);
 	for (index = 0; index < count; index++)
 	{
 		INT left = rectangles[index].x1 > device.viewport.X ? rectangles[index].x1 : device.viewport.X;
@@ -3191,18 +3057,17 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 			rectangles[index].x2 : device.viewport.X + device.viewport.Width;
 		INT bottom = rectangles[index].y2 < device.viewport.Y + device.viewport.Height ?
 			rectangles[index].y2 : device.viewport.Y + device.viewport.Height;
-		GLint x0, y0;
+		struct gpu_rect *pixel = &pixels[pixel_count];
 
 		if (left >= right || top >= bottom)
 			continue;
-		x0 = target_pixel((float)(left + UI_OFFSET), 0);
-		y0 = target_pixel((float)top, 1);
-		glScissor(x0, y0, target_pixel((float)(right + UI_OFFSET), 0) - x0,
-			target_pixel((float)bottom, 1) - y0);
-		glClear(mask);
+		pixel->x = target_pixel((float)(left + UI_OFFSET), 0);
+		pixel->y = target_pixel((float)top, 1);
+		pixel->width = target_pixel((float)(right + UI_OFFSET), 0) - pixel->x;
+		pixel->height = target_pixel((float)bottom, 1) - pixel->y;
+		pixel_count++;
 	}
-	glDisable(GL_SCISSOR_TEST);
-	xgpu_gl_state_invalidate();
+	gpu_clear(&clear, pixels, (uint32_t)pixel_count);
 }
 
 /* ---------- the anti-aliasing passes */
@@ -3213,7 +3078,7 @@ game's units of the screen */
 void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 {
 	struct render_target_entry *target;
-	GLint corners[4];
+	int32_t corners[4];
 	int mode = anti_aliasing();
 
 	if (!device.gl_ready || (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa))
@@ -3223,16 +3088,13 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 	if (!target)
 		return;
 	/* (no longer multisampled, if it was before the setting changed) */
-	gpu_gl_multisample(target->target.texture, 0);
 	target->target.samples = 0;
 	corners[0] = scaled_pixel(x0, target->target.scale[0]);
 	corners[1] = scaled_pixel(y0, target->target.scale[1]);
 	corners[2] = scaled_pixel(x1, target->target.scale[0]);
 	corners[3] = scaled_pixel(y1, target->target.scale[1]);
-	xgpu_post_anti_alias(mode == _anti_aliasing_smaa, gpu_gl_framebuffer(target->target.texture, 0),
-		target->target.gl_width, target->target.gl_height, corners);
-	glBindVertexArray(gpu_gl_default_vertex_array);
-	xgpu_gl_state_invalidate();
+	gpu_anti_alias(mode == _anti_aliasing_smaa ? GPU_ANTI_ALIAS_SMAA : GPU_ANTI_ALIAS_FXAA, target->target.texture,
+		corners);
 }
 
 /* ---------- presentation */
@@ -3252,20 +3114,15 @@ static void write_screenshot(struct render_target_entry *target)
 	if (!directory)
 		return;
 	pixels = malloc(image_size);
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, gpu_gl_framebuffer(target->target.texture, 0));
-	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, pixels);
+	if (!pixels || !gpu_texture_read(target->target.texture, pixels, (uint32_t)image_size))
+	{
+		free(pixels);
+		return;
+	}
 	/* the display ignores destination alpha, which the game uses as scratch;
 	image viewers would show it as transparency */
 	for (row = 0; row < width * height; row++)
-	{
-#ifdef HALO_ANDROID
-		unsigned char red = pixels[row * 4];
-
-		pixels[row * 4] = pixels[row * 4 + 2];
-		pixels[row * 4 + 2] = red;
-#endif
 		pixels[row * 4 + 3] = 0xff;
-	}
 	snprintf(path, sizeof(path), "%s/frame%05lu.bmp", directory, device.frame);
 	file = fopen(path, "wb");
 	if (file)
@@ -3301,74 +3158,14 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	if (device.gl_ready)
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
-		int window_width, window_height, width, height, x, y;
 
 		if (trace_frame())
 			platform_log("present back buffer %08lx texture %u", (unsigned long)device.back_buffer.Data,
 				back_buffer->target.texture);
-		gpu_gl_resolve(back_buffer->target.texture);
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
-
-		platform_video_drawable_size(&window_width, &window_height);
-		/* letterbox to the back buffer's aspect ratio */
-		width = window_width;
-		height = (int)((long)window_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
-		if (height > window_height)
-		{
-			height = window_height;
-			width = (int)((long)window_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
-		}
-		x = (window_width - width) / 2;
-		y = (window_height - height) / 2;
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-		glDisable(GL_SCISSOR_TEST);
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, gpu_gl_framebuffer(back_buffer->target.texture, 0));
-		/* row 0 of the render target is the top of the picture */
-		glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
-			x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-		platform_video_swap();
-		xgpu_gl_state_invalidate();
+		gpu_present(back_buffer->target.texture);
 		xgpu_texture_cache_begin_frame();
-#ifdef HALO_ANDROID
-		if (xgpu_capabilities.atomic_counters)
-		{
-			/* this frame's counts, for when the GPU is done with it (the
-			barrier makes the shaders' counter writes visible to the copy,
-			which ES 3.1 does not promise without one) */
-			glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-			glBindBuffer(GL_COPY_READ_BUFFER, device.visibility_counters);
-			glBindBuffer(GL_COPY_WRITE_BUFFER, device.counter_snapshots[gpu_gl_frame_ring()]);
-			glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0,
-				VISIBILITY_TEST_SLOTS * sizeof(GLuint));
-			glBindBuffer(GL_COPY_READ_BUFFER, 0);
-			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-		}
-		/* the next frame's stream buffers, once the GPU has finished the
-		frame that last used them */
-		gpu_gl_frame_advance();
-		if (xgpu_capabilities.atomic_counters && device.ring_test_count[gpu_gl_frame_ring()])
-		{
-			unsigned long ring = gpu_gl_frame_ring();
-			unsigned long test;
-
-			/* the GPU has passed that frame's fence: its copy is complete,
-			and the slot is free for this frame's tests */
-			host_gl_read_buffer(device.counter_snapshots[ring], 0, VISIBILITY_TEST_SLOTS * sizeof(GLuint),
-				device.counter_values);
-			for (test = 0; test < device.ring_test_count[ring]; test++)
-			{
-				device.visibility_latest[device.ring_tests[ring][test][0]] =
-					device.counter_values[device.ring_tests[ring][test][1]];
-			}
-			device.ring_test_count[ring] = 0;
-		}
-#else
-		gpu_gl_frame_advance();
-#endif
 	}
 	device.frame++;
 	stats.presents++;

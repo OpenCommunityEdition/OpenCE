@@ -11,6 +11,7 @@ texture before anything reads it (gpu_gl_resolve).
 
 #include "gpu_gl.h"
 #include "port_config.h"
+#include "sdl_platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -735,11 +736,6 @@ static GLuint framebuffer_get(GLuint color, GLuint depth)
 	return framebuffer_find(color, depth, FALSE);
 }
 
-GLuint gpu_gl_framebuffer(gpu_texture color, gpu_texture depth)
-{
-	return framebuffer_get(color, depth);
-}
-
 /* ---------- multisampling
 
 A framebuffer's attachments are all multisampled or none is (the device
@@ -822,17 +818,9 @@ static void texture_multisample(gpu_texture texture, int samples)
 	xgpu_gl_state_invalidate();
 }
 
-void gpu_gl_resolve(gpu_texture target)
-{
-	texture_resolve(target);
-}
-
-void gpu_gl_multisample(gpu_texture target, uint32_t samples)
-{
-	texture_multisample(target, (int)samples);
-}
-
-void gpu_gl_bind_targets(gpu_texture color, gpu_texture depth, uint32_t samples)
+/* draws go to these render targets (either may be 0), into their
+multisampled storage with samples a pixel, or with 0 into their textures */
+static void bind_targets(gpu_texture color, gpu_texture depth, uint32_t samples)
 {
 	if (color)
 		texture_multisample(color, (int)samples);
@@ -1257,7 +1245,7 @@ static struct
 
 /* the vertex array the ES attributes are on, and the desktop's before its
 first draw */
-GLuint gpu_gl_default_vertex_array;
+static GLuint default_vertex_array;
 
 /* Mesa's GL thread queues a glBufferSubData of up to 8 KB; a larger one
 first waits for everything queued before it to have run. The same bytes in
@@ -1367,16 +1355,9 @@ uint32_t gpu_stream(uint32_t kind, const void *data, uint32_t size, gpu_buffer *
 	return (uint32_t)offset;
 }
 
-unsigned long gpu_gl_frame_ring(void)
-{
-#ifdef HALO_ANDROID
-	return streams.buffer_ring;
-#else
-	return 0;
-#endif
-}
-
-void gpu_gl_frame_advance(void)
+/* after a frame is presented: the stream buffers of the next (with OpenGL ES,
+the next slot's, once the GPU has finished with them) */
+static void frame_advance(void)
 {
 	streams.frame++;
 #ifdef HALO_ANDROID
@@ -1391,6 +1372,144 @@ void gpu_gl_frame_advance(void)
 	streams.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 	streams.index_offset = INDEX_BUFFER_SIZE;
 #endif
+}
+
+/* ---------- visibility (occlusion) tests */
+
+#ifdef HALO_ANDROID
+#define VISIBILITY_QUERY GL_ANY_SAMPLES_PASSED
+#else
+#define VISIBILITY_QUERY GL_SAMPLES_PASSED
+#endif
+
+static struct
+{
+	GLuint queries[GPU_VISIBILITY_SLOTS];
+	BOOL active;
+	/* (queries read on the CPU) whether a slot's query has yet to be read: the
+	game spins on a result it is told is incomplete, so a query is read only
+	once it says it is available, and until then the slot's earlier count
+	stands. A frame of The Library's lights makes hundreds of tests. */
+	BOOL unread[GPU_VISIBILITY_SLOTS];
+#ifdef HALO_ANDROID
+	/* with atomic counters: one counter per test, used as a ring */
+	GLuint counters;
+	unsigned long counter_next;
+	unsigned long counter_active;
+	/* Reading the counters waits for the draws that counted, which stops
+	the CPU until the GPU has caught up (the game asks at the start of the
+	next frame), halving the frame rate on drivers that queue frames (Zink,
+	Turnip). Instead, at the end of each frame the GPU copies them into the
+	frame's snapshot buffer of the stream ring, and the frame's tests (each
+	a result slot and its counter) are listed with it. Once its fence has
+	passed (two frames on, gpu_present) the CPU reads the snapshot into
+	counter_values and gives each listed slot its count: a result is the
+	latest count known, as the desktop's query buffer gives. */
+	GLuint counter_snapshots[GPU_GL_FRAME_RING];
+	unsigned short ring_tests[GPU_GL_FRAME_RING][GPU_VISIBILITY_SLOTS][2];
+	unsigned long ring_test_count[GPU_GL_FRAME_RING];
+	GLuint counter_values[GPU_VISIBILITY_SLOTS];
+	GLuint latest[GPU_VISIBILITY_SLOTS];
+#else
+	/* each test's latest result, which the GPU writes (as a query buffer)
+	when the test's draws are done: the game waits for results at the start
+	of the next frame, and a query would stop the CPU there until the GPU
+	had caught up */
+	GLuint results_buffer;
+	volatile GLuint *results;
+#endif
+} visibility;
+
+void gpu_visibility_begin(void)
+{
+	/* the query object is chosen when the test ends; use a scratch one */
+	visibility.active = TRUE;
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.atomic_counters)
+	{
+		const GLuint zero = 0;
+
+		visibility.counter_next = (visibility.counter_next + 1) % GPU_VISIBILITY_SLOTS;
+		visibility.counter_active = visibility.counter_next;
+		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, visibility.counters);
+		host_gl_buffer_write(GL_ATOMIC_COUNTER_BUFFER, (unsigned int)(visibility.counter_active * sizeof(GLuint)),
+			sizeof(zero), &zero);
+		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+		return;
+	}
+#endif
+	glBeginQuery(VISIBILITY_QUERY, visibility.queries[0]);
+}
+
+void gpu_visibility_end(uint32_t slot)
+{
+	GLuint scratch;
+
+	visibility.active = FALSE;
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.atomic_counters)
+	{
+		unsigned long ring = streams.buffer_ring;
+		unsigned long *count = &visibility.ring_test_count[ring];
+
+		/* (a slot tested twice in a frame is listed twice: the later
+		counter, resolved after, wins) */
+		if (*count < GPU_VISIBILITY_SLOTS)
+		{
+			visibility.ring_tests[ring][*count][0] = (unsigned short)slot;
+			visibility.ring_tests[ring][*count][1] = (unsigned short)visibility.counter_active;
+			(*count)++;
+		}
+		return;
+	}
+#endif
+	glEndQuery(VISIBILITY_QUERY);
+	/* swap the scratch query into the requested slot */
+	scratch = visibility.queries[0];
+	visibility.queries[0] = visibility.queries[slot];
+	visibility.queries[slot] = scratch;
+	visibility.unread[slot] = TRUE;
+#ifndef HALO_ANDROID
+	if (visibility.results)
+	{
+		/* the GPU writes the count into the slot once it is known (given
+		by name: Mesa's GL thread waits for everything before a
+		glGetQueryObjectuiv, even one into a bound buffer) */
+		glGetQueryBufferObjectuiv(visibility.queries[slot], visibility.results_buffer, GL_QUERY_RESULT,
+			(GLintptr)(slot * sizeof(GLuint)));
+	}
+#endif
+}
+
+uint32_t gpu_visibility_result(uint32_t slot, uint32_t *samples)
+{
+	GLuint available = 0, count = 0;
+
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.atomic_counters)
+	{
+		/* the latest count the GPU has finished (counter_snapshots) */
+		*samples = visibility.latest[slot];
+		return 1;
+	}
+#else
+	if (visibility.results)
+	{
+		/* the latest count the GPU has written: from this test, or while
+		the GPU is still behind, from the slot's earlier ones */
+		*samples = visibility.results[slot];
+		return 1;
+	}
+#endif
+	if (!visibility.unread[slot])
+		return 0;
+	glGetQueryObjectuiv(visibility.queries[slot], GL_QUERY_RESULT_AVAILABLE, &available);
+	if (!available)
+		return 0;
+	glGetQueryObjectuiv(visibility.queries[slot], GL_QUERY_RESULT, &count);
+	visibility.unread[slot] = FALSE;
+	*samples = count;
+	return 1;
 }
 
 /* ---------- draws */
@@ -1866,7 +1985,7 @@ uint32_t gpu_draw(const struct gpu_draw *draw, struct gpu_constant_store *consta
 		if (draw->stages[stage].type)
 			texture_resolve(draw->stages[stage].texture);
 	}
-	gpu_gl_bind_targets(draw->color_target, draw->depth_target, draw->samples);
+	bind_targets(draw->color_target, draw->depth_target, draw->samples);
 	apply_raster_state(draw);
 	entry = program_get(draw->vertex_shader, draw->pixel_shader);
 	if (!entry)
@@ -1877,6 +1996,11 @@ uint32_t gpu_draw(const struct gpu_draw *draw, struct gpu_constant_store *consta
 	gl_check_errors("state");
 	draw_flush();
 	state_program(entry->program);
+#ifdef HALO_ANDROID
+	if (visibility.active && xgpu_capabilities.atomic_counters)
+		glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, visibility.counters,
+			(GLintptr)(visibility.counter_active * sizeof(GLuint)), sizeof(GLuint));
+#endif
 	upload_uniforms(entry, constants, uniforms);
 	bind_stages(draw->stages);
 	setup_streams(draw);
@@ -1895,6 +2019,148 @@ uint32_t gpu_draw(const struct gpu_draw *draw, struct gpu_constant_store *consta
 	}
 	gl_check_errors("draw");
 	return 1;
+}
+
+/* ---------- clears */
+
+void gpu_clear(const struct gpu_clear *clear, const struct gpu_rect *rectangles, uint32_t count)
+{
+	GLbitfield mask = 0;
+	uint32_t index;
+
+	bind_targets(clear->color_target, clear->depth_target, clear->samples);
+	if (clear->flags & GPU_CLEAR_COLOR)
+	{
+		float rgba[4];
+
+		glColorMask((clear->channel_mask & 1) != 0, (clear->channel_mask & 2) != 0, (clear->channel_mask & 4) != 0,
+			(clear->channel_mask & 8) != 0);
+		color_to_vec4(clear->color, rgba);
+		glClearColor(rgba[0], rgba[1], rgba[2], rgba[3]);
+		mask |= GL_COLOR_BUFFER_BIT;
+	}
+	if (clear->depth_target && (clear->flags & GPU_CLEAR_DEPTH))
+	{
+		glDepthMask(GL_TRUE);
+		glClearDepth(clear->depth);
+		mask |= GL_DEPTH_BUFFER_BIT;
+	}
+	if (clear->depth_target && (clear->flags & GPU_CLEAR_STENCIL))
+	{
+		glStencilMask(0xff);
+		glClearStencil((GLint)clear->stencil);
+		mask |= GL_STENCIL_BUFFER_BIT;
+	}
+	if (!mask)
+		return;
+	glEnable(GL_SCISSOR_TEST);
+	for (index = 0; index < count; index++)
+	{
+		glScissor(rectangles[index].x, rectangles[index].y, rectangles[index].width, rectangles[index].height);
+		glClear(mask);
+	}
+	glDisable(GL_SCISSOR_TEST);
+	xgpu_gl_state_invalidate();
+}
+
+/* ---------- the anti-aliasing passes (xgpu_post.c) */
+
+uint32_t gpu_anti_alias_prepare(uint32_t pass)
+{
+	BOOL prepared = xgpu_post_prepare(pass == GPU_ANTI_ALIAS_SMAA);
+
+	xgpu_gl_state_invalidate();
+	return prepared != FALSE;
+}
+
+void gpu_anti_alias(uint32_t pass, gpu_texture target, const int32_t corners[4])
+{
+	const struct gpu_texture_description *description = &texture_record(target)->description;
+	GLint gl_corners[4];
+
+	/* (no longer multisampled, if it was before the setting changed) */
+	texture_multisample(target, 0);
+	gl_corners[0] = corners[0];
+	gl_corners[1] = corners[1];
+	gl_corners[2] = corners[2];
+	gl_corners[3] = corners[3];
+	xgpu_post_anti_alias(pass == GPU_ANTI_ALIAS_SMAA, framebuffer_get(target, 0), description->width,
+		description->height, gl_corners);
+	glBindVertexArray(default_vertex_array);
+	xgpu_gl_state_invalidate();
+}
+
+/* ---------- frames */
+
+void gpu_flush(void)
+{
+	glFlush();
+}
+
+void gpu_present(gpu_texture back_buffer)
+{
+	const struct gpu_texture_description *description = &texture_record(back_buffer)->description;
+	int window_width, window_height, width, height, x, y;
+
+	texture_resolve(back_buffer);
+	platform_video_drawable_size(&window_width, &window_height);
+	/* letterbox to the back buffer's aspect ratio */
+	width = window_width;
+	height = (int)((long)window_width * description->height / description->width);
+	if (height > window_height)
+	{
+		height = window_height;
+		width = (int)((long)window_height * description->width / description->height);
+	}
+	x = (window_width - width) / 2;
+	y = (window_height - height) / 2;
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	glDisable(GL_SCISSOR_TEST);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer, 0));
+	/* row 0 of the render target is the top of the picture */
+	glBlitFramebuffer(0, 0, (GLint)description->width, (GLint)description->height,
+		x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	platform_video_swap();
+	xgpu_gl_state_invalidate();
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.atomic_counters)
+	{
+		/* this frame's counts, for when the GPU is done with it (the
+		barrier makes the shaders' counter writes visible to the copy,
+		which ES 3.1 does not promise without one) */
+		glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+		glBindBuffer(GL_COPY_READ_BUFFER, visibility.counters);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, visibility.counter_snapshots[streams.buffer_ring]);
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0,
+			GPU_VISIBILITY_SLOTS * sizeof(GLuint));
+		glBindBuffer(GL_COPY_READ_BUFFER, 0);
+		glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+	}
+	/* the next frame's stream buffers, once the GPU has finished the frame
+	that last used them */
+	frame_advance();
+	if (xgpu_capabilities.atomic_counters && visibility.ring_test_count[streams.buffer_ring])
+	{
+		unsigned long ring = streams.buffer_ring;
+		unsigned long test;
+
+		/* the GPU has passed that frame's fence: its copy is complete, and
+		the slot is free for this frame's tests */
+		host_gl_read_buffer(visibility.counter_snapshots[ring], 0, GPU_VISIBILITY_SLOTS * sizeof(GLuint),
+			visibility.counter_values);
+		for (test = 0; test < visibility.ring_test_count[ring]; test++)
+		{
+			visibility.latest[visibility.ring_tests[ring][test][0]] =
+				visibility.counter_values[visibility.ring_tests[ring][test][1]];
+		}
+		visibility.ring_test_count[ring] = 0;
+	}
+#else
+	frame_advance();
+#endif
 }
 
 /* ---------- the backend */
@@ -1973,8 +2239,8 @@ void gpu_initialize(struct gpu_capabilities *capabilities)
 	capabilities->occlusion = GPU_OCCLUSION_EXACT;
 	capabilities->sample_mask = 1;
 #endif
-	glGenVertexArrays(1, &gpu_gl_default_vertex_array);
-	glBindVertexArray(gpu_gl_default_vertex_array);
+	glGenVertexArrays(1, &default_vertex_array);
+	glBindVertexArray(default_vertex_array);
 #ifdef HALO_ANDROID
 	{
 		int ring;
@@ -2012,6 +2278,34 @@ void gpu_initialize(struct gpu_capabilities *capabilities)
 	}
 #endif
 	glGenSamplers(GPU_STAGE_COUNT, stage_samplers);
+	glGenQueries(GPU_VISIBILITY_SLOTS, visibility.queries);
+#ifdef HALO_ANDROID
+	if (xgpu_capabilities.atomic_counters)
+	{
+		int ring;
+
+		glGenBuffers(1, &visibility.counters);
+		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, visibility.counters);
+		glBufferData(GL_ATOMIC_COUNTER_BUFFER, GPU_VISIBILITY_SLOTS * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
+		glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+		glGenBuffers(GPU_GL_FRAME_RING, visibility.counter_snapshots);
+		for (ring = 0; ring < GPU_GL_FRAME_RING; ring++)
+		{
+			glBindBuffer(GL_COPY_WRITE_BUFFER, visibility.counter_snapshots[ring]);
+			glBufferData(GL_COPY_WRITE_BUFFER, GPU_VISIBILITY_SLOTS * sizeof(GLuint), NULL, GL_STREAM_READ);
+		}
+		glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+	}
+#else
+	glGenBuffers(1, &visibility.results_buffer);
+	glBindBuffer(GL_QUERY_BUFFER, visibility.results_buffer);
+	glBufferStorage(GL_QUERY_BUFFER, GPU_VISIBILITY_SLOTS * sizeof(GLuint), NULL,
+		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+	visibility.results = glMapBufferRange(GL_QUERY_BUFFER, 0, GPU_VISIBILITY_SLOTS * sizeof(GLuint),
+		GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+	if (!visibility.results)
+		platform_log("cannot map the visibility test results; tests wait for the GPU");
+#endif
 	{
 		/* an attribute a draw does not stream reads (0, 0, 0, 1) until
 		given a value, as the Xbox's registers start */

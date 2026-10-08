@@ -405,4 +405,62 @@ struct gpu_draw
 uint32_t gpu_draw(const struct gpu_draw *draw, struct gpu_constant_store *constants,
 	const struct gpu_uniforms *uniforms);
 
+/* ---------- clears */
+
+/* gpu_clear.flags: what is cleared */
+enum { GPU_CLEAR_COLOR = 1, GPU_CLEAR_DEPTH = 2, GPU_CLEAR_STENCIL = 4 };
+
+struct gpu_clear
+{
+	/* as a draw's (struct gpu_draw); depth and stencil are cleared only with
+	a depth target */
+	gpu_texture color_target, depth_target;
+	uint32_t samples;
+	uint32_t flags;
+	/* the color channels cleared: bit 0 red, 1 green, 2 blue, 3 alpha */
+	uint8_t channel_mask;
+	uint8_t pad[3];
+	/* ARGB, as D3DCOLOR */
+	uint32_t color;
+	float depth;
+	uint32_t stencil;
+};
+
+/* clears each of the rectangles of the targets' pixels (rows from the top),
+whatever the draws' masks are; with no flags, it only makes the targets the
+current ones */
+void gpu_clear(const struct gpu_clear *clear, const struct gpu_rect *rectangles, uint32_t count);
+
+/* ---------- visibility (occlusion) tests */
+
+/* the slots a test's count is kept in; slot 0 is the backend's own */
+enum { GPU_VISIBILITY_SLOTS = 4096 };
+
+/* the draws until gpu_visibility_end count their samples */
+void gpu_visibility_begin(void);
+/* ... into slot (1 to GPU_VISIBILITY_SLOTS - 1) */
+void gpu_visibility_end(uint32_t slot);
+/* 1, and in *samples the slot's latest count the GPU has finished (as the
+capabilities' occlusion counts), if there is one not given before or the
+backend keeps them all; else 0 */
+uint32_t gpu_visibility_result(uint32_t slot, uint32_t *samples);
+
+/* ---------- frames */
+
+/* display.anti_aliasing's passes over a window's 3D view (xgpu_post.c) */
+enum { GPU_ANTI_ALIAS_FXAA = 1, GPU_ANTI_ALIAS_SMAA };
+
+/* makes the pass's programs and textures now, rather than in the middle of a
+frame; 0 if they cannot be made (once 0, always 0) */
+uint32_t gpu_anti_alias_prepare(uint32_t pass);
+/* the pass, in place, on the corners x0, y0 to x1, y1 (rows from the top) of
+a color render target, which stops being multisampled */
+void gpu_anti_alias(uint32_t pass, gpu_texture target, const int32_t corners[4]);
+
+/* sends the commands so far to the GPU */
+void gpu_flush(void);
+/* shows the back buffer, letterboxed in the window, and starts the next
+frame */
+void gpu_present(gpu_texture back_buffer);
+
 #endif

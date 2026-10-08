@@ -214,21 +214,4 @@ struct xgpu_render_target
 /* the render target with this physical address, or NULL */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
 
-/* ---------- anti-aliasing
-
-display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
-window's 3D view in place before the HUD and menus are drawn over it, so
-that their text stays sharp. Supersampling and multisampling are the
-device's (d3d8_gl.c). */
-
-/* the programs and textures of FXAA, or of SMAA, made now; FALSE if they
-cannot be (once FALSE, it stays so) */
-BOOL xgpu_post_prepare(BOOL smaa);
-
-/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
-target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
-not build */
-BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
-	const GLint corners[4]);
-
 #endif

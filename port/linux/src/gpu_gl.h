@@ -1,10 +1,8 @@
 /*
 GPU_GL.H
 
-The OpenGL backend's own declarations (gpu_gl.c), for the files that still
-make GL calls besides it: the device (d3d8_gl.c), whose clears, visibility
-tests and presentation do not go through gpu.h yet, and the anti-aliasing
-passes (xgpu_post.c).
+The OpenGL backend's own declarations (gpu_gl.c), shared with its
+anti-aliasing passes (xgpu_post.c).
 */
 
 #ifndef __HALO_LINUX_GPU_GL_H
@@ -67,21 +65,6 @@ afterwards. */
 
 void xgpu_gl_state_invalidate(void);
 
-/* ---------- render targets */
-
-/* the framebuffer of these render targets' textures (either may be 0) */
-GLuint gpu_gl_framebuffer(gpu_texture color, gpu_texture depth);
-/* draws go to these render targets (either may be 0), into their
-multisampled storage with samples a pixel, or with 0 into their textures */
-void gpu_gl_bind_targets(gpu_texture color, gpu_texture depth, uint32_t samples);
-/* a render target's texture gets the pixels drawn into its multisampled
-storage since it last had them */
-void gpu_gl_resolve(gpu_texture target);
-/* a render target's multisampled storage, with samples a pixel (0: none):
-its pixels resolved into its texture first, and the texture's put into the
-new storage */
-void gpu_gl_multisample(gpu_texture target, uint32_t samples);
-
 /* ---------- shaders */
 
 /* a compiled shader, or a linked program of two, or 0 with the log
@@ -89,17 +72,20 @@ written */
 GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
 GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
 
-/* ---------- frames */
+/* ---------- anti-aliasing
 
-/* the vertex array the ES attributes are on, and the desktop's before its
-first draw */
-extern GLuint gpu_gl_default_vertex_array;
+display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
+window's 3D view in place before the HUD and menus are drawn over it, so
+that their text stays sharp (gpu_anti_alias). */
 
-/* the frame's slot in the ring of stream buffers (GPU_GL_FRAME_RING; 0 on
-the desktop) */
-unsigned long gpu_gl_frame_ring(void);
-/* after a frame is presented: the stream buffers of the next (with OpenGL ES,
-the next slot's, once the GPU has finished with them) */
-void gpu_gl_frame_advance(void);
+/* the programs and textures of FXAA, or of SMAA, made now; FALSE if they
+cannot be (once FALSE, it stays so) */
+BOOL xgpu_post_prepare(BOOL smaa);
+
+/* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
+target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
+not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
+	const GLint corners[4]);
 
 #endif
