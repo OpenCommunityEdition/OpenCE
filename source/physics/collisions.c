@@ -116,7 +116,6 @@ symbols in this file:
 /* port: object_bounds_cache.c's */
 boolean object_bounds_cache_out_of_reach(long object_index, real_point3d const *point, real radius);
 
-
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
 /* ---------- constants */

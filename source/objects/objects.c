@@ -56,7 +56,6 @@ OBJECTS.C
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 
-
 /* ---------- constants */
 
 
