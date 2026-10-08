@@ -52,6 +52,26 @@ written */
 GLuint xgpu_compile_shader(GLenum type, const char *code, const char *what);
 GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const char *what);
 
+/* ---------- the shading language
+
+The translators write the GLSL of the context the device has: desktop GL
+4.5's, or OpenGL ES's on Android ("300 es" or "310 es"), as gl_initialize
+found it (d3d8_gl.c). */
+
+struct nv2a_dialect
+{
+	/* what follows #version: "450 core", "300 es" or "310 es" */
+	const char *version;
+	/* OpenGL ES: the precision qualifiers */
+	BOOL es;
+	/* the samplers have no LOD bias of their own: each lookup passes
+	D3DTSS_MIPMAPLODBIAS (texture_lod_bias) */
+	BOOL lookup_lod_bias;
+	/* the vertex shader does what glClipControl(GL_UPPER_LEFT,
+	GL_ZERO_TO_ONE) does on desktop GL: rows from the top, depth 0..1 */
+	BOOL clip_control;
+};
+
 /* ---------- generated source text */
 
 struct xgpu_text
@@ -89,13 +109,13 @@ BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instru
 	struct nv2a_vertex_lighting *lighting);
 
 /* GLSL for an NV2A vertex program (the instruction words after the program
-header). Attributes whose bit is set in packed_attribute_mask are fed as
-NORMPACKED3 32-bit integers and unpacked in the shader. With lighting (else
-NULL), the normal and world position go to the pixel shader too, which
-lights the diffuse color for each pixel (nv2a_pixel_shader_key
-per_pixel_lighting). Returns a malloc'd string. */
-char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
+header), in the dialect given. Attributes whose bit is set in
+packed_attribute_mask are fed as NORMPACKED3 32-bit integers and unpacked in
+the shader. With lighting (else NULL), the normal and world position go to
+the pixel shader too, which lights the diffuse color for each pixel
+(nv2a_pixel_shader_key per_pixel_lighting). Returns a malloc'd string. */
+char *nv2a_vertex_shader_to_glsl(const struct nv2a_dialect *dialect, const DWORD *instructions,
+	unsigned long instruction_count, unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting);
 
 /* ---------- pixel shaders */
 
@@ -145,14 +165,7 @@ struct nv2a_pixel_shader_key
 	unsigned char alpha_test_samples;
 };
 
-char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
-
-#ifdef HALO_ANDROID
-/* ES samplers have no LOD bias of their own */
-#define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"
-#else
-#define XGPU_PIXEL_UNIFORMS_ES ""
-#endif
+char *nv2a_pixel_shader_to_glsl(const struct nv2a_dialect *dialect, const struct nv2a_pixel_shader_key *key);
 
 /* the combiner registers that live in uniforms rather than in the program:
 C0/C1 of each stage and the final combiner, and texture constants */
@@ -166,8 +179,9 @@ C0/C1 of each stage and the final combiner, and texture constants */
 	"uniform float alpha_reference;\n" \
 	"uniform vec4 bump_matrix[4];\n" \
 	"uniform vec4 bump_luminance[4];\n" \
-	"uniform vec4 texture_scale[4];\n" \
-	XGPU_PIXEL_UNIFORMS_ES
+	"uniform vec4 texture_scale[4];\n"
+/* ... and with dialect lookup_lod_bias, each stage's LOD bias */
+#define XGPU_PIXEL_UNIFORM_LOD_BIAS "uniform vec4 texture_lod_bias;\n"
 
 /* the vertex constants the per-pixel model lighting reads, in a uniform of
 their own (the vertex shader's 192 would pass OpenGL ES's least fragment

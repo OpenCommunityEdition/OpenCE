@@ -329,13 +329,6 @@ BOOL nv2a_vertex_shader_lighting(const DWORD *instructions, unsigned long instru
 /* ---------- translation */
 
 static const char shader_prologue[] =
-#ifdef HALO_ANDROID
-	/* the #version line comes first, from the context's capabilities */
-	"precision highp float;\n"
-	"precision highp int;\n"
-#else
-	"#version 450 core\n"
-#endif
 	"uniform vec4 c[192];\n"
 	"uniform vec4 viewport_scale;\n"
 	"uniform vec4 viewport_offset;\n"
@@ -383,15 +376,15 @@ static const char shader_prologue[] =
 	"	return vec4(1.0, max(s.x, 0.0), specular, 1.0);\n"
 	"}\n";
 
-char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
-	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
+char *nv2a_vertex_shader_to_glsl(const struct nv2a_dialect *dialect, const DWORD *instructions,
+	unsigned long instruction_count, unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
 {
 	struct xgpu_text text = { 0 };
 	unsigned long index;
 
-#ifdef HALO_ANDROID
-	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
-#endif
+	xgpu_text_append(&text, "#version %s\n", dialect->version);
+	if (dialect->es)
+		xgpu_text_append(&text, "precision highp float;\nprecision highp int;\n");
 	xgpu_text_append(&text, "%s", shader_prologue);
 	/* (the pixel shader's model_lighting; the normal's length in w) */
 	if (lighting)
@@ -564,13 +557,17 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		which the clipper also takes. */
 		"\tif (!(abs(position.w) > 0.0))\n"
 		"\t\tposition = vec4(0.0, 0.0, 0.0, -1.0);\n"
-		"\tgl_Position = position;\n"
-#ifdef HALO_ANDROID
+		"\tgl_Position = position;\n",
+		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37);
+	if (dialect->clip_control)
+	{
 		/* what glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) does on desktop
 		GL: rows from the top, depth 0..1 */
-		"\tgl_Position.y = -gl_Position.y;\n"
-		"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n"
-#endif
+		xgpu_text_append(&text,
+			"\tgl_Position.y = -gl_Position.y;\n"
+			"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n");
+	}
+	xgpu_text_append(&text,
 		"\tgl_PointSize = oPts.x;\n"
 		"\txD0 = clamp(oD0, 0.0, 1.0);\n"
 		"\txD1 = clamp(oD1, 0.0, 1.0);\n"
@@ -581,8 +578,6 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT2 = oT2;\n"
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
-		"}\n",
-		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
-		);
+		"}\n");
 	return text.buffer;
 }

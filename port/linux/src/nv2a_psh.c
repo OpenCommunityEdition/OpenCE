@@ -314,49 +314,28 @@ static void dot_input(struct xgpu_text *text, const DWORD *state, int stage)
 	}
 }
 
-#ifdef HALO_ANDROID
-/* ES samplers have no LOD bias: pass D3DTSS_MIPMAPLODBIAS to the lookup */
-#define SAMPLE_BIAS ", texture_lod_bias[%d]"
-#define SHADER_VERSION \
-	"precision highp float;\n" \
-	"precision highp int;\n" \
-	"precision highp sampler2D;\n" \
-	"precision highp sampler3D;\n" \
-	"precision highp samplerCube;\n"
-#else
-#define SAMPLE_BIAS ""
-#define SHADER_VERSION "#version 450 core\n"
-#endif
-
-static void sample(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage, const char *coordinates)
+static void sample(struct xgpu_text *text, const struct nv2a_dialect *dialect, const struct nv2a_pixel_shader_key *key,
+	int stage, const char *coordinates)
 {
 	switch (key->sampler_type[stage])
 	{
 	case _xgpu_sampler_3d:
-		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
-#ifdef HALO_ANDROID
-			, stage
-#endif
-			);
-		break;
 	case _xgpu_sampler_cube:
-		xgpu_text_append(text, "texture(tex%d, (%s).xyz" SAMPLE_BIAS ")", stage, coordinates
-#ifdef HALO_ANDROID
-			, stage
-#endif
-			);
+		xgpu_text_append(text, "texture(tex%d, (%s).xyz", stage, coordinates);
 		break;
 	default:
-		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy" SAMPLE_BIAS ")", stage, coordinates, stage
-#ifdef HALO_ANDROID
-			, stage
-#endif
-			);
+		xgpu_text_append(text, "texture(tex%d, (%s).xy * texture_scale[%d].xy", stage, coordinates, stage);
 		break;
 	}
+	/* (ES samplers have no LOD bias: D3DTSS_MIPMAPLODBIAS goes to the
+	lookup) */
+	if (dialect->lookup_lod_bias)
+		xgpu_text_append(text, ", texture_lod_bias[%d]", stage);
+	xgpu_text_append(text, ")");
 }
 
-static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader_key *key, int stage)
+static void texture_stage(struct xgpu_text *text, const struct nv2a_dialect *dialect,
+	const struct nv2a_pixel_shader_key *key, int stage)
 {
 	const DWORD *state = key->combiner_state;
 	unsigned long mode = stage_mode(key, stage);
@@ -374,7 +353,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 	case _mode_project3d:
 		snprintf(coordinates, sizeof(coordinates), "vec4(xT%d.xyz / (xT%d.w != 0.0 ? xT%d.w : 1.0), 1.0)", stage, stage, stage);
 		xgpu_text_append(text, "\tt%d = ", stage);
-		sample(text, key, stage, coordinates);
+		sample(text, dialect, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
 		if (stage == 0 && key->point_threshold && key->sampler_type[stage] == _xgpu_sampler_2d)
 		{
@@ -391,7 +370,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 	case _mode_cubemap:
 		snprintf(coordinates, sizeof(coordinates), "xT%d", stage);
 		xgpu_text_append(text, "\tt%d = ", stage);
-		sample(text, key, stage, coordinates);
+		sample(text, dialect, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
 		break;
 	case _mode_passthru:
@@ -420,7 +399,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		xgpu_text_append(text, "\t\tvec2 coordinates = xT%d.xy + vec2(bump_matrix[%d].x * d.x + bump_matrix[%d].z * d.y,"
 			" bump_matrix[%d].y * d.x + bump_matrix[%d].w * d.y);\n", stage, stage, stage, stage, stage);
 		xgpu_text_append(text, "\t\tt%d = ", stage);
-		sample(text, key, stage, "vec4(coordinates, 0.0, 1.0)");
+		sample(text, dialect, key, stage, "vec4(coordinates, 0.0, 1.0)");
 		xgpu_text_append(text, ";\n");
 		if (mode == _mode_bumpenvmap_luminance)
 		{
@@ -440,7 +419,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		dot_input(text, state, stage);
 		xgpu_text_append(text, ");\n\tt%d = ", stage);
 		snprintf(coordinates, sizeof(coordinates), "vec4(dot%d, dot%d, 0.0, 1.0)", stage - 1, stage);
-		sample(text, key, stage, coordinates);
+		sample(text, dialect, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
 		break;
 	case _mode_dot_zw:
@@ -455,7 +434,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		xgpu_text_append(text, ");\n\tdot3 = dot(xT3.xyz, ");
 		dot_input(text, state, 3);
 		xgpu_text_append(text, ");\n\tt%d = ", stage);
-		sample(text, key, stage, "vec4(dot1, dot2, dot3, 1.0)");
+		sample(text, dialect, key, stage, "vec4(dot1, dot2, dot3, 1.0)");
 		xgpu_text_append(text, ";\n");
 		break;
 	case _mode_dot_reflect_specular:
@@ -468,7 +447,7 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		else
 			xgpu_text_append(text, "\t\tvec3 e = ps_c0[0].xyz;\n");
 		xgpu_text_append(text, "\t\tvec3 r = 2.0 * n * dot(n, e) / max(dot(n, n), 1.0e-20) - e;\n\t\tt%d = ", stage);
-		sample(text, key, stage, "vec4(r, 1.0)");
+		sample(text, dialect, key, stage, "vec4(r, 1.0)");
 		xgpu_text_append(text, ";\n\t}\n");
 		break;
 	case _mode_dot_str_3d:
@@ -476,19 +455,19 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		xgpu_text_append(text, "\tdot%d = dot(xT%d.xyz, ", stage, stage);
 		dot_input(text, state, stage);
 		xgpu_text_append(text, ");\n\tt%d = ", stage);
-		sample(text, key, stage, "vec4(dot1, dot2, dot3, 1.0)");
+		sample(text, dialect, key, stage, "vec4(dot1, dot2, dot3, 1.0)");
 		xgpu_text_append(text, ";\n");
 		break;
 	case _mode_dependent_ar:
 		snprintf(coordinates, sizeof(coordinates), "vec4(t%d.a, t%d.r, 0.0, 1.0)", stage_input(state, stage), stage_input(state, stage));
 		xgpu_text_append(text, "\tt%d = ", stage);
-		sample(text, key, stage, coordinates);
+		sample(text, dialect, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
 		break;
 	case _mode_dependent_gb:
 		snprintf(coordinates, sizeof(coordinates), "vec4(t%d.g, t%d.b, 0.0, 1.0)", stage_input(state, stage), stage_input(state, stage));
 		xgpu_text_append(text, "\tt%d = ", stage);
-		sample(text, key, stage, coordinates);
+		sample(text, dialect, key, stage, coordinates);
 		xgpu_text_append(text, ";\n");
 		break;
 	default:
@@ -582,7 +561,7 @@ static void model_lighting(struct xgpu_text *text, BOOL point_lights)
 	xgpu_text_append(text, "\treturn clamp(light, 0.0, 1.0);\n}\n");
 }
 
-char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
+char *nv2a_pixel_shader_to_glsl(const struct nv2a_dialect *dialect, const struct nv2a_pixel_shader_key *key)
 {
 	const DWORD *state = key->combiner_state;
 	struct xgpu_text text = { 0 };
@@ -594,8 +573,7 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (combiner_count > 8)
 		combiner_count = 8;
 
-#ifdef HALO_ANDROID
-	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
+	xgpu_text_append(&text, "#version %s\n", dialect->version);
 	if (key->count_samples)
 	{
 		/* samples that pass the depth and stencil tests, as the NV2A's
@@ -604,9 +582,16 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 			"layout(early_fragment_tests) in;\n"
 			"layout(binding = 0, offset = 0) uniform atomic_uint visible_samples;\n");
 	}
-#endif
+	if (dialect->es)
+	{
+		xgpu_text_append(&text,
+			"precision highp float;\n"
+			"precision highp int;\n"
+			"precision highp sampler2D;\n"
+			"precision highp sampler3D;\n"
+			"precision highp samplerCube;\n");
+	}
 	xgpu_text_append(&text,
-		SHADER_VERSION
 		"in vec4 xD0;\n"
 		"in vec4 xD1;\n"
 		"in vec4 xB0;\n"
@@ -618,6 +603,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"in float xFog;\n"
 		"layout(location = 0) out vec4 fragment_color;\n"
 		XGPU_PIXEL_UNIFORMS);
+	if (dialect->lookup_lod_bias)
+		xgpu_text_append(&text, XGPU_PIXEL_UNIFORM_LOD_BIAS);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->per_pixel_lighting)
@@ -642,7 +629,7 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tv0.rgb = model_lighting();\n");
 
 	for (stage = 0; stage < 4; stage++)
-		texture_stage(&text, key, stage);
+		texture_stage(&text, dialect, key, stage);
 
 	/* the fog register: rgb is the fog color, alpha the fog factor */
 	if (key->fog_enable)
@@ -741,10 +728,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "\tresult = vec4(t0.rgb, 1.0);\n");
 	if (config_boolean("debug.gpu_debug_flat"))
 		xgpu_text_append(&text, "\tresult = xD0.a > 0.0 ? vec4(xD0.rgb, 1.0) : vec4(1.0, 0.0, 1.0, 1.0);\n");
-#ifdef HALO_ANDROID
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
-#endif
 	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n}\n");
 	return text.buffer;
 }

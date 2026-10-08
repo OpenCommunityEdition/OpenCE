@@ -598,6 +598,9 @@ static void color_to_vec4(D3DCOLOR color, float *out)
 	out[3] = ((color >> 24) & 0xff) / 255.0f;
 }
 
+/* the GLSL the translators write for this context (gl_initialize) */
+static struct nv2a_dialect shader_dialect;
+
 /* ---------- debugging settings, read once (gl_initialize) */
 
 static struct
@@ -1481,6 +1484,10 @@ static void gl_initialize(void)
 		xgpu_capabilities.anisotropy = host_gl_has_extension("GL_EXT_texture_filter_anisotropic");
 		xgpu_capabilities.base_vertex = es32;
 		xgpu_capabilities.shading_language = major > 3 || (major == 3 && minor >= 1) ? "310 es" : "300 es";
+		shader_dialect.version = xgpu_capabilities.shading_language;
+		shader_dialect.es = TRUE;
+		shader_dialect.lookup_lod_bias = TRUE;
+		shader_dialect.clip_control = TRUE;
 		if (major > 3 || (major == 3 && minor >= 1))
 		{
 			GLint counters = 0;
@@ -1505,6 +1512,7 @@ static void gl_initialize(void)
 	}
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
+	shader_dialect.version = "450 core";
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
@@ -2520,7 +2528,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 
 	if (!*shader)
 	{
-		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
+		char *source = nv2a_vertex_shader_to_glsl(&shader_dialect, program->instructions, program->instruction_count,
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
@@ -2574,7 +2582,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry = calloc(1, sizeof(*entry));
 	entry->hash = hash;
 	entry->key = *key;
-	source = nv2a_pixel_shader_to_glsl(key);
+	source = nv2a_pixel_shader_to_glsl(&shader_dialect, key);
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
 	if (debug_settings.dump_shaders)
 	{
