@@ -1434,6 +1434,9 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+/* port: exact console-set Mouse Setup values (menu_functions.c) */
+wchar_t *pc_menu_setting_custom_text(long definition_index, short item_index);
+
 static long spinner_string_list_extra_count(
 	long string_list_index);
 static wchar_t *spinner_string_list_get_string(
@@ -5466,10 +5469,13 @@ static void widget_instance_render_spinner_list(
 		if (definition->text_label_string_list.index != NONE)
 		{
 			short string_index = widget->parameters.list.selected_index;
-			wchar_t *string = spinner_string_list_get_string(
-				definition->text_label_string_list.index,
-				string_index);
-			unsigned long length = ustrlen(string);
+			/* port: preserve an exact sensitivity instead of showing a nearby preset. */
+			wchar_t *string = pc_menu_setting_custom_text(widget->definition_tag_index, string_index);
+			unsigned long length;
+
+			if (!string)
+				string = spinner_string_list_get_string(definition->text_label_string_list.index, string_index);
+			length = ustrlen(string);
 
 			item_text = pool_new_pointer(
 				widget_memory_pool,

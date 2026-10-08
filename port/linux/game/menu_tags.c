@@ -257,6 +257,9 @@ struct pc_menu_setting
 	long value_count;
 	char const *values[MAXIMUM_STRINGS];
 	short loaded_index;
+	/* port: a reserved choice for an exact console-set sensitivity */
+	short custom_index;
+	char custom_value[128];
 };
 
 /* ---------- globals */
@@ -999,6 +1002,13 @@ static void setting_add(struct halo_menu_widget const *source, long definition_i
 	setting->setting = source->setting;
 	setting->loaded_index = NONE;
 	setting->value_count = spinner_split(source, TRUE, setting->values);
+	setting->custom_index = NONE;
+	if ((!strcmp(source->setting, "input.mouse_sensitivity") ||
+		!strcmp(source->setting, "input.mouse_vertical_sensitivity")) &&
+		setting->value_count > 0 && !strcmp(setting->values[setting->value_count - 1], "custom"))
+	{
+		setting->custom_index = (short)(setting->value_count - 1);
+	}
 }
 
 /* a font: large, small, terminal, or the map's by its path */

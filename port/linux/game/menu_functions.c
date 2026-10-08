@@ -209,6 +209,9 @@ struct pc_menu_setting
 	long value_count;
 	char const *values[MAXIMUM_STRINGS];
 	short loaded_index;
+	/* port: a reserved choice for an exact console-set sensitivity */
+	short custom_index;
+	char custom_value[128];
 };
 
 struct pc_menu_setting *pc_menu_setting_get(long definition_index);
@@ -389,6 +392,43 @@ static boolean setting_write(char const *name, char const *value)
 	return FALSE;
 }
 
+/* port: retain a custom sensitivity beside the presets for this menu visit.
+An exact preset hides the reserved last item; reopening rereads config.toml. */
+static short setting_custom_load(struct widget_instance *widget, struct pc_menu_setting *setting,
+	char const *current)
+{
+	double number, preset;
+	short index;
+
+	if (setting->custom_index == NONE || setting->custom_index != setting->value_count - 1 ||
+		!text_is_number(current, &number))
+		return setting_value_index(setting, current);
+	snprintf(setting->custom_value, sizeof(setting->custom_value), "%s", current);
+	/* Set this pointer after all menu tags are built: their settings array reallocates. */
+	setting->values[setting->custom_index] = setting->custom_value;
+	for (index = 0; index < setting->custom_index; index++)
+	{
+		if (text_is_number(setting->values[index], &preset) && preset == number)
+		{
+			widget->parameters.list.number_of_items = (word)setting->custom_index;
+			return index;
+		}
+	}
+	widget->parameters.list.number_of_items = (word)setting->value_count;
+	return setting->custom_index;
+}
+
+/* port: spinner rendering asks for the exact custom item's text, else uses
+the authored string list. The renderer copies this immediately. */
+wchar_t *pc_menu_setting_custom_text(long definition_index, short item_index)
+{
+	struct pc_menu_setting *setting = pc_menu_setting_get(definition_index);
+	static wchar_t text[128];
+
+	return setting && setting->custom_index != NONE && item_index == setting->custom_index &&
+		setting->custom_value[0] ? ascii_to_wide(setting->custom_value, text, sizeof(text)) : NULL;
+}
+
 static boolean setting_load(struct widget_instance *widget)
 {
 	struct pc_menu_setting *setting = pc_menu_setting_get(widget->definition_tag_index);
@@ -398,7 +438,7 @@ static boolean setting_load(struct widget_instance *widget)
 		return TRUE;
 	if (!setting || !setting_text(setting->setting, current, sizeof(current), FALSE))
 		return FALSE;
-	setting->loaded_index = setting_value_index(setting, current);
+	setting->loaded_index = setting_custom_load(widget, setting, current);
 	if (setting->loaded_index < (short)widget->parameters.list.number_of_items)
 		widget->parameters.list.selected_index = setting->loaded_index;
 	return TRUE;

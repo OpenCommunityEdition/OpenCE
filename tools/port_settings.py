@@ -89,9 +89,9 @@ SCREENS = {
         "header": ("header_profile_mouse_settings", f"{PE}/mouse_settings/header_profile_mouse_settings"),
         "spacing": 30,
         "rows": [
-            ("HORIZONTAL SENSITIVITY:", "input.mouse_sensitivity", SENSITIVITIES,
+            ("HORIZONTAL SENSITIVITY:", "input.mouse_sensitivity", SENSITIVITIES + [("CUSTOM", "custom")],
              "How fast the view turns side to side for the\nmouse's movement.", None),
-            ("VERTICAL SENSITIVITY:", "input.mouse_vertical_sensitivity", [("SAME", "0")] + SENSITIVITIES,
+            ("VERTICAL SENSITIVITY:", "input.mouse_vertical_sensitivity", [("SAME", "0")] + SENSITIVITIES + [("CUSTOM", "custom")],
              "How fast the view turns up and down; Same\nturns it as fast as side to side.", None),
             ("INVERT VERTICAL AXIS:", "input.invert_mouse", YES_NO,
              "Moving the mouse forward looks down.", None),

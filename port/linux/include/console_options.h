@@ -1,4 +1,4 @@
-/* Opt-in, local display options. Console aliases do not occupy map-script
+/* Opt-in, local presentation/input options. Console aliases do not occupy map-script
 function/global indices. Values use the same config store as Settings. */
 #ifndef CONSOLE_OPTIONS_H
 #define CONSOLE_OPTIONS_H
