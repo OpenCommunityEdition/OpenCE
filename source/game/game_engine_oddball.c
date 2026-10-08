@@ -1013,11 +1013,13 @@ static wchar_t *oddball_get_score_header_string(
 		string_index = _multiplayer_game_text_time;
 
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
-	ustrcpy(
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(
 		buffer,
 		string_list_index != NONE ?
 			unicode_string_list_get_string(string_list_index, string_index) :
-			L"");
+			L"",
+		256);
 
 	return buffer;
 }

@@ -307,7 +307,8 @@ static wchar_t *slayer_get_score_header_string(
 {
 	long string_list_index;
 
-	ustrcpy(buffer, GET_MULTIPLAYER_GAME_TEXT(_string_score));
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(buffer, GET_MULTIPLAYER_GAME_TEXT(_string_score), 256);
 
 	return buffer;
 }

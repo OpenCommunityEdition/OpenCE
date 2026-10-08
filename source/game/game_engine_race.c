@@ -1205,7 +1205,8 @@ static wchar_t *race_get_score_header_string(
 	else
 		header_string = L"";
 
-	ustrcpy(string, header_string);
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(string, header_string, 256);
 
 	return string;
 }

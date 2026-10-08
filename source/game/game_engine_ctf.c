@@ -865,7 +865,8 @@ static wchar_t *ctf_get_score_header_string(
 	else
 		string = L"";
 
-	ustrcpy(buffer, string);
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(buffer, string, 256);
 
 	return buffer;
 }
