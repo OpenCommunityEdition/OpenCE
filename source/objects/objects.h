@@ -529,6 +529,12 @@ __inline void object_get_render_bounding_sphere(
 
 	*center = object->object.bounding_sphere_center;
 	*radius = object_definition_get(object->definition_index)->object.render_bounding_radius;
+	/* port: (grown with an object scaled up, as its bounding sphere is in
+	object_compute_node_matrices; one scaled down keeps the larger sphere) */
+	if (object->object.scale > 1.f)
+	{
+		*radius *= object->object.scale;
+	}
 
 	return;
 }

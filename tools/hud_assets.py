@@ -6,6 +6,7 @@ ladder, which its weapon's folder holds), laid out as the Xbox maps' sheets:
     python tools/hud_assets.py layout --map assets/maps/bloodgulch.map \\
         --hek ../halo-pc-restored/halopc-restored --svg ../halo-pc-restored/ui-svg-handmade
     python tools/hud_assets.py build
+    python tools/hud_assets.py thresholds  # update only discrete segment data
     python tools/hud_assets.py check --map assets/maps/bloodgulch.map --out /tmp/hud_check
 
 The game draws a HUD bitmap at its tag's size and samples it with normalised
@@ -455,8 +456,15 @@ def layout(arguments) -> None:
                     kind = "meter"
                 flat = svg.replace("/", "__").replace(" ", "_")
                 sources[flat] = svg
-                matched.append({"xbox": cell, "svg": flat, "source_scale": scale,
-                                "source": corner, "clip": clip, "kind": kind, "score": round(score, 3)})
+                match = {"xbox": cell, "svg": flat, "source_scale": scale,
+                         "source": corner, "clip": clip, "kind": kind, "score": round(score, 3)}
+                if tag == HUD + "combined\\hud_unit_meters":
+                    original = xbox[top:bottom, left:right]
+                    values = set(np.unique(original[..., 2][original[..., 3] > 0]))
+                    health = set(range(30, 241, 30))
+                    if health <= values <= health | {0}:
+                        match["thresholds"] = sorted(health)
+                matched.append(match)
             if not matched:
                 if matched is not None:
                     print(f"{name}: left out, empty")
@@ -541,6 +549,58 @@ def recipe(texels: np.ndarray, kind: str) -> np.ndarray:
     return result
 
 
+def meter_thresholds(texels: np.ndarray, values: list) -> np.ndarray:
+    """Categorical segment data, independent of antialiased edge RGB/alpha.
+
+    Each solid-colour shape's opaque stroke supplies its exact threshold.
+    Assign that value to its whole core, then extend it to the nearest edge
+    and transparent texel. Low-alpha SVG texels cannot supply reliable RGB:
+    unpremultiplying 8-bit colour there can turn 150 into 128 (or 60 into 0).
+    This is only for the explicitly listed discrete health sprites; shield
+    and ammunition gradients retain their existing continuous data.
+    """
+    from scipy import ndimage
+
+    cores, count = ndimage.label(texels[..., 3] >= 127)
+    exact = np.zeros(texels.shape[:2], np.uint8)
+    seen = set()
+    for index in range(1, count + 1):
+        core = cores == index
+        opaque = texels[core & (texels[..., 3] == 255), :3]
+        if not len(opaque):
+            continue
+        colours = np.unique(opaque, axis=0)
+        if len(colours) != 1 or not np.all(colours[0] == colours[0, 0]):
+            raise ValueError("discrete meter shape must have one solid grey threshold")
+        value = int(colours[0, 0])
+        if value not in values:
+            raise ValueError(f"unexpected discrete meter threshold {value}")
+        exact[core] = value
+        seen.add(value)
+    if seen != set(values):
+        raise ValueError(f"missing discrete meter thresholds: {set(values) - seen}")
+    _, (rows, columns) = ndimage.distance_transform_edt(exact == 0, return_indices=True)
+    return exact[rows, columns]
+
+
+def add_meter_thresholds(image: np.ndarray, entry: dict) -> np.ndarray:
+    """Red is an unfiltered categorical field; zero selects normal blue data.
+    Green coverage and alpha artwork remain filtered, including their mips.
+    """
+    cells = [cell for cell in entry["cells"] if cell.get("thresholds")]
+    if cells:
+        image[..., 0] = 0
+        scale = entry["scale"]
+        for cell in cells:
+            left, top, right, bottom = [value * scale for value in cell["xbox"]]
+            texels = image[top:bottom, left:right]
+            # The meter's blue is still the original greyscale artwork data.
+            source = texels.copy()
+            source[..., :3] = source[..., 2:3]
+            texels[..., 0] = meter_thresholds(source, cell["thresholds"])
+    return image
+
+
 def build_asset(entry: dict, renders: dict) -> np.ndarray:
     scale = entry["scale"]
     image = np.zeros((entry["height"] * scale, entry["width"] * scale, 4), np.uint8)
@@ -560,7 +620,17 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
         image = bleed(image)
     if any(cell["kind"] == "meter" for cell in entry["cells"]):
         image[..., 1] = coverage(image[..., 3])
-    return image
+    return add_meter_thresholds(image, entry)
+
+
+def thresholds(arguments) -> None:
+    """Rebuild only categorical data in committed PNGs, retaining their art."""
+    for entry in json.loads(LAYOUT.read_text())["assets"]:
+        if any(cell.get("thresholds") for cell in entry["cells"]):
+            path = ASSETS / f"{entry['name']}.png"
+            image = np.asarray(Image.open(path).convert("RGBA")).copy()
+            Image.fromarray(add_meter_thresholds(image, entry), "RGBA").save(path, optimize=True)
+            print(f"{path.name}: rebuilt exact segment thresholds; artwork unchanged")
 
 
 def build(arguments) -> None:
@@ -613,11 +683,12 @@ def main() -> None:
     command.add_argument("--hek", required=True)
     command.add_argument("--svg", required=True)
     commands.add_parser("build")
+    commands.add_parser("thresholds")
     command = commands.add_parser("check")
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
-    {"layout": layout, "build": build, "check": check}[arguments.command](arguments)
+    {"layout": layout, "build": build, "thresholds": thresholds, "check": check}[arguments.command](arguments)
 
 
 if __name__ == "__main__":

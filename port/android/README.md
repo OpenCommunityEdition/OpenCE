@@ -11,6 +11,9 @@ operates on 64-bit-only devices, for example the Pixel 9 Pro XL.
 
 The Android build uses the platform layer of the Linux build
 (`port/linux/src`). Refer to [port/linux/README.md](../linux/README.md).
+Physical mice use the same control bindings. During play, F12 toggles mouse
+capture; captured mode hides Android's pointer and uses relative movement for
+continuous aiming, while releasing capture restores normal pointer behavior.
 
 ## Requirements
 
@@ -251,7 +254,11 @@ functions of OpenGL ES 3.2 if they are available:
   changes the indices.
 - On OpenGL ES 3.1 and later, the visibility tests (lens flares) count
   samples with an atomic counter, as the NV2A did. OpenGL ES 3.0 tells only
-  if a sample is visible.
+  if a sample is visible. The GPU copies the counters at the end of each
+  frame, and the CPU reads the copy two frames later, when the frame's fence
+  has passed: a result is the latest count the GPU has finished, as with
+  the query buffer of desktop OpenGL. A read of the counters themselves
+  waits for the GPU, which halved the frame rate on Turnip (Zink).
 
 ### Calling conventions
 

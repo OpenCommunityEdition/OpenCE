@@ -429,7 +429,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             sdk_flags,
         ])
         for source in game_sources(config):
-            add_object(source, game_cflags)
+            # The halt screen and version command identify this native build.
+            flags = game_cflags
+            if source.as_posix() == "source/main/main.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         # Port-specific units that must see the game exactly as its own
         # sources do (port/linux/game).
         for source in sorted(Path(config["game_sources"]).glob("*.c")):
@@ -505,7 +509,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             rule="linux_link",
             inputs=objects,
             variables={
-                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags]),
+                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags,
+                                     # (posix_trace_marker.c's, which the GPU driver's calls must reach)
+                                     *(f"-Wl,--export-dynamic-symbol={name}"
+                                       for name in ("open", "open64", "openat", "openat64"))]),
                 "libs": libs,
             },
             implicit=[Path("tools/linux_link_check.py")],

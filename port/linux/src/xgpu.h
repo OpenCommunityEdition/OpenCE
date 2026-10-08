@@ -33,7 +33,7 @@ extern struct xgpu_capabilities xgpu_capabilities;
 
 /* port/android/guest/runtime/guest_host.h */
 int host_gl_has_extension(const char *name);
-unsigned int host_gl_read_buffer_word(unsigned int buffer, unsigned int offset);
+void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
@@ -131,6 +131,9 @@ struct nv2a_pixel_shader_key
 	behind it only where it covers it (the Xbox's point-sampled meters stop
 	at their texels' edges; filtered ones have a fringe of faint texels) */
 	unsigned char coverage_alpha;
+	/* Discrete meter thresholds in texture 0's red are read at level zero,
+	without filtering. Coverage/brightness still use the filtered lookup. */
+	unsigned char point_threshold;
 	/* a model lighting program's draw lit for each pixel
 	(display.per_pixel_lighting): nv2a_vertex_lighting's lights, or 0 for
 	the diffuse color the vertex shader computed */
@@ -185,6 +188,7 @@ struct xgpu_texture_description
 	unsigned long pitch; /* linear textures */
 	BOOL hires;         /* a high-res HUD texture drawn in the texture's place (hud_hires.h) */
 	BOOL hires_coverage; /* ... whose green is its coverage (a meter's) */
+	BOOL hires_point_threshold; /* ... whose red holds discrete segment data */
 };
 
 void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_texture_description *description);

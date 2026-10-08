@@ -81,6 +81,7 @@ These files are in the data root:
 | --- | --- |
 | `debug.txt` | The log of the game. At start-up, the game shows the data root in the terminal. A crash writes its report (the faulting address and the calls that led to it) here as well; the `reference address` line at the top of each session places those addresses in the build. |
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
+| `tags/` | Sound tag files that replace the sounds of the maps (`audio.loose_sounds`). |
 
 The settings are in `config.toml` next to the executable. Refer to
 "Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
@@ -256,6 +257,7 @@ clients and in `init.txt`, without becoming map-script functions.
 | `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
 | `audio.effects_volume` | `1.0` | `HALO_EFFECTS_VOLUME` | The volume of the other sounds (effects and speech), of the master volume. |
 | `audio.reverb` | `true` | `HALO_REVERB` | `true`: the sounds of the world reverberate as the place the player is in does: the sound environments of the maps (a corridor, a cave, a large hall, outdoors) set the reverberation, as the I3DL2 reverb of the Xbox did. A sound behind a wall or a door is muffled in it too. `false`: no reverberation (sounds behind a wall are still muffled). |
+| `audio.loose_sounds` | `false` | `HALO_LOOSE_SOUNDS` | For those who make sounds. `true`: each sound of a map that has a sound tag file of its name in `tags/` in the data root (for example `tags/sound/sfx/weapons/assault rifle/fire.sound`) plays from that file. The files are Halo PC tag files, as the Halo Editing Kit and Invader write them. At the console, `loose_sounds_reload` reads the files again, and `loose_sounds false` plays the sounds of the map again. When a file changes, all sounds stop. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
 | `input.mouse_vertical_sensitivity` | `0.0` | `HALO_MOUSE_VERTICAL_SENSITIVITY` | The multiplier for the vertical mouse aim. `0`: the same as `input.mouse_sensitivity`. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
@@ -781,6 +783,14 @@ definition. Without this check, the linker gives the reference the address
   `d3d_find_flipcount`.
 - The build returns small structures and unions in registers
   (`-freg-struct-return`), as on Win32.
+- The GPU driver cannot open the kernel's `trace_marker`
+  (`src/posix_trace_marker.c`). SteamOS keeps kernel tracing on for its GPU
+  performance captures (`gpu-trace.service`), and its Mesa then writes a
+  marker for each traced driver function: on the Steam Frame, some 480,000
+  writes a second, which took the game from the headset's 72 Hz to about
+  50 frames a second. The Steam Deck runs the same service and Mesa.
+  `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
+  gpuvis.
 
 ### Game source changes
 

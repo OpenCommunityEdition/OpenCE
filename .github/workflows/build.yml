@@ -68,7 +68,7 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py
+          python -m pytest -q tools/test_linux_port.py tools/harness
           python tools/test_light_storage.py
           python tools/test_settings_pagination.py
 
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: build/android/third_party
-          key: android-third-party-${{ hashFiles('tools/android_build.py') }}
+          key: android-third-party-${{ hashFiles('tools/android_build.py', 'port/android/patches/**') }}
 
       - uses: actions/cache@v4
         with:

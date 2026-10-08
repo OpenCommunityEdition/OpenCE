@@ -206,7 +206,9 @@ enum
 	NUMBER_OF_VARIANT_VEHICLES,
 	MAXIMUM_VARIANT_VEHICLE_COUNT = 4,
 	/* a team's vehicles: those of a vehicle set (universal_variant's
-	vehicle_set values), else its counts */
+	vehicle_set values), else every one the map places, as Halo PC places
+	them (PC), else its counts */
+	VARIANT_VEHICLE_SET_PC = 0xFE,
 	VARIANT_VEHICLE_SET_CUSTOM = 0xFF
 };
 

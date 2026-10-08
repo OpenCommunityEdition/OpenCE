@@ -295,6 +295,29 @@ byte input_abstraction_port_accept(
 		keyboard_controls[controller_index].ticks[_game_control_jump] : 0;
 }
 
+/* port: how far the controller's player pulls the fire control, which a
+trigger with an analog rate of fire reads (weapons.c): a game input state's
+buttons count the ticks a control is held, not its pressure, so a click
+reads as no pull at all. The keyboard and mouse pull all the way. */
+real input_abstraction_port_primary_trigger(
+	short controller_index)
+{
+	struct gamepad_state const *gamepad;
+	short button_index;
+
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
+		return 0.f;
+	if (keyboard_controls[controller_index].ticks[_game_control_primary_trigger])
+		return 1.f;
+	gamepad = input_get_gamepad_state(controller_index);
+	if (!gamepad)
+		return 0.f;
+	button_index = input_abstraction_globals.player_control_preferences[controller_index].game_control_to_xbox_buttons[_game_control_primary_trigger];
+	if (button_index < NUMBER_OF_GAMEPAD_ANALOG_BUTTONS)
+		return gamepad->analog_buttons[button_index] * (1.f / 255.f);
+	return gamepad->buttons[button_index] ? 1.f : 0.f;
+}
+
 /* ---------- public code */
 
 void input_abstraction_initialize(

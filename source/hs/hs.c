@@ -2793,6 +2793,7 @@ symbols in this file:
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "game/cheats.h"
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/attract_mode.h"
 #include "interface/hud.h"
@@ -3378,7 +3379,7 @@ typedef void (*hs_token_enumerator)(
 
 struct hs_function_table_storage
 {
-	struct hs_function_definition const *functions[418];
+	struct hs_function_definition const *functions[418 + 4];
 	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
@@ -11625,7 +11626,115 @@ static struct hs_function_definition_with_1_parameter const xbox_set_machine_nam
 	},
 };
 
-long const hs_function_table_count= 418;
+/* port: Halo PC's sv_say and sv_end_game, which Custom Edition maps' scripts
+call (lookout_classic's and the Halo Kart maps' sv_say). They go at the end
+of the table: Xbox maps call functions by their place in it, Custom Edition
+maps by name (custom_edition_scripts.c). Every machine runs the scripts */
+
+/* (each machine shows the message to its own players) */
+static void hs_sv_say(
+	char const *message)
+{
+	wchar_t text[128];
+	short local_player_index;
+	long length = 0;
+	long index;
+
+	/* (without '|', which the HUD's text takes with the character after it
+	as one: at the end, the string's terminator) */
+	for (index = 0; message && message[index] && length < NUMBEROF(text) - 1; index++)
+	{
+		if (message[index] != '|')
+		{
+			text[length++] = (unsigned char)message[index];
+		}
+	}
+	text[length] = 0;
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		if (local_player_get_player_index(local_player_index) != NONE)
+			hud_print_message(local_player_index, text);
+	}
+
+	return;
+}
+
+/* (the host ends the game, as its time running out does) */
+static void hs_sv_end_game(
+	void)
+{
+	if (global_network_game_server_get() && game_engine_running())
+		game_engine_end_game();
+
+	return;
+}
+
+HS_EVALUATE_VOID_STRING(hs_sv_say_evaluate, hs_sv_say)
+HS_EVALUATE_NO_ARGUMENTS(hs_sv_end_game_evaluate, hs_sv_end_game)
+
+static struct hs_function_definition_with_1_parameter const sv_say_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"sv_say",
+		hs_macro_function_parse,
+		hs_sv_say_evaluate,
+		"Halo PC's: shows every player a message.",
+		NULL,
+		1,
+		{ _hs_type_string },
+	},
+};
+
+static struct hs_function_definition const sv_end_game_definition=
+{
+	_hs_type_void,
+	0,
+	"sv_end_game",
+	hs_macro_function_parse,
+	hs_sv_end_game_evaluate,
+	"Halo PC's: the host ends the game.",
+	NULL,
+	0,
+};
+
+/* port: the sounds of tag files played over the map's, for those making
+them (audio.loose_sounds: port/linux/game/loose_sounds.c), at the console */
+void loose_sounds_reload(void);
+void loose_sounds_enable(boolean enabled);
+
+HS_EVALUATE_NO_ARGUMENTS(hs_loose_sounds_reload_evaluate, loose_sounds_reload)
+HS_EVALUATE_VOID_BOOLEAN(hs_loose_sounds_evaluate, loose_sounds_enable)
+
+static struct hs_function_definition const loose_sounds_reload_definition=
+{
+	_hs_type_void,
+	0,
+	"loose_sounds_reload",
+	hs_macro_function_parse,
+	hs_loose_sounds_reload_evaluate,
+	"reads the sound tag files under the data root's tags folder again (all sounds stop if any changed).",
+	NULL,
+	0,
+};
+
+static struct hs_function_definition_with_1_parameter const loose_sounds_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"loose_sounds",
+		hs_macro_function_parse,
+		hs_loose_sounds_evaluate,
+		"plays the map's sounds from the tags folder's sound tag files, or (false) from the map, until the map changes.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+long const hs_function_table_count= 418 + 4;
 
 struct hs_enum_definition const hs_enum_table[]=
 {
@@ -12057,6 +12166,10 @@ struct hs_function_table_storage hs_function_table=
 		&display_scenario_help_definition.definition,
 		&hs_network_game_start_now_definition,
 		&xbox_set_machine_name_definition.definition,
+		&sv_say_definition.definition,
+		&sv_end_game_definition,
+		&loose_sounds_reload_definition,
+		&loose_sounds_definition.definition,
 	},
 	{
 		"hs_update",
@@ -12554,6 +12667,14 @@ static boolean const hs_function_allowed_in_maps[]=
 	TRUE, /* display_scenario_help */
 	FALSE, /* network_game_start_now: starts a network game */
 	FALSE, /* xbox_set_machine_name: the machine's name */
+
+	/* Halo PC's, for Custom Edition maps */
+	TRUE, /* sv_say */
+	TRUE, /* sv_end_game: the host's */
+
+	/* the port's, for those making sounds */
+	FALSE, /* loose_sounds_reload */
+	FALSE, /* loose_sounds */
 };
 typedef char verify_hs_function_allowed_in_maps_size[
 	NUMBEROF(hs_function_allowed_in_maps) == NUMBEROF(hs_function_table.functions) ? 1 : -1];

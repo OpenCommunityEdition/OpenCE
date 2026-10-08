@@ -2933,14 +2933,15 @@ static void multiplayer_game_directions(
 
 	if (server)
 	{
+		/* port: one machine and one player may start (server_alone) */
 		boolean waiting_for_machines = !network_game_is_splitscreen_local() &&
 			game &&
-			game->machine_count < 2;
+			game->machine_count < 1;
 
 		if (!waiting_for_machines &&
 			network_game_is_splitscreen_local() &&
 			game &&
-			game->player_count < 2)
+			game->player_count < 1)
 		{
 			widget->parameters.text_box.string_list_index =
 				_multiplayer_game_text_string_waiting_for_player;

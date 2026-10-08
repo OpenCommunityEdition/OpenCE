@@ -122,6 +122,8 @@ symbols in this file:
 #include "lruv_cache.h"
 #include "memory_pool.h"
 #include "cluster_partitions.h"
+/* port: object_bounds_cache.c's */
+void object_bounds_cache_invalidate(void);
 
 void platform_log(const char *format, ...);
 
@@ -187,6 +189,8 @@ static game_state_before_load_proc before_load_procs[] =
 	/* port: where the cluster lists' references are, which the game state
 	being loaded does not hold */
 	cluster_partitions_port_forget,
+	/* port: (the objects are put back: object_bounds_cache.c) */
+	object_bounds_cache_invalidate,
 };
 
 static game_state_after_load_proc after_load_procs[] =
@@ -284,6 +288,8 @@ void game_state_initialize_for_new_map(
 {
 	const char *name;
 
+	/* port: (the objects are put back: object_bounds_cache.c) */
+	object_bounds_cache_invalidate();
 	game_state_note_event("map start");
 	game_state_data_arrays_new_map();
 

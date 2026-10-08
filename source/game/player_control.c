@@ -240,7 +240,6 @@ enum mouse_button
 
 real const MOUSE_YAW_SCALE = 0.0031415927f;
 real const MOUSE_PITCH_SCALE = 0.0031415927f;
-static real const ANALOG_BUTTON_SCALE = 1.f / 255.f;
 
 enum
 {
@@ -1366,8 +1365,10 @@ static void get_local_player_input_blob(
 					}
 				}
 
-				input->primary_trigger =
-					(real)input_state->buttons[_button_fire] * ANALOG_BUTTON_SCALE;
+				/* port: the fire control's pull, not how long it is held
+				(input_abstraction_port_primary_trigger) */
+				input->primary_trigger = effective_buttons[_button_fire] ?
+					input_abstraction_port_primary_trigger(gamepad_index) : 0.f;
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_weapon_primary_trigger_bit,

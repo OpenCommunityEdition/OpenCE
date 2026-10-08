@@ -1201,6 +1201,9 @@ void weapon_build_weapon_interface_state(
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
 	short magazine_index;
 
+	/* port: every caller's state is unset stack, so magazines past the
+	weapon's own count read as empty rather than as whatever was there */
+	csmemset(state, 0, sizeof(*state));
 	state->heat = weapon->weapon.heat;
 	state->age = weapon->weapon.age;
 	state->overheated = TEST_FLAG(weapon->weapon.flags, 0);

@@ -712,6 +712,8 @@ struct optional_meter_hud_element
 /* ---------- prototypes */
 
 static boolean effect_part_check(struct tag_validation *validation, void *base);
+static boolean effect_particles_check(struct tag_validation *validation, void *base);
+static boolean breakable_surface_particle_effect_check(struct tag_validation *validation, void *base);
 static boolean sound_check(struct tag_validation *validation, void *base);
 static boolean multitexture_overlay_check(struct tag_validation *validation, void *base);
 static boolean optional_static_hud_element_check(struct tag_validation *validation, void *base);
@@ -769,6 +771,7 @@ static struct tag_schema_field const effect_particles_fields[] =
 	TAG_SCHEMA_REFERENCE(struct effect_particles_definition, particle, TAG_SCHEMA_GROUPS('part')),
 	TAG_SCHEMA_ENUM(struct effect_particles_definition, distribution_function,
 		NUMBER_OF_EFFECT_PARTICLE_DISTRIBUTION_FUNCTIONS, 0),
+	TAG_SCHEMA_CHECK(effect_particles_check),
 	TAG_SCHEMA_END
 };
 
@@ -1944,6 +1947,7 @@ static struct tag_schema_definition const game_globals_falling_damage_schema =
 static struct tag_schema_field const breakable_surface_particle_effect_fields[] =
 {
 	TAG_SCHEMA_REFERENCE(struct breakable_surface_particle_effect, particle, TAG_SCHEMA_GROUPS('part')),
+	TAG_SCHEMA_CHECK(breakable_surface_particle_effect_check),
 	TAG_SCHEMA_END
 };
 
@@ -2022,6 +2026,33 @@ struct tag_schema_group const tag_schema_effect_groups[] =
 };
 
 /* ---------- private code */
+
+/* (the scale of each particle's radius, which it collides with:
+particle_get_radius) */
+static boolean effect_particles_check(
+	struct tag_validation *validation,
+	void *base)
+{
+	struct effect_particles_definition *particles = base;
+
+	tag_validate_non_negative(validation, "radius", &particles->radius_lower_bound);
+	tag_validate_non_negative(validation, "radius", &particles->radius_upper_bound);
+
+	return TRUE;
+}
+
+/* (the same, for a breakable surface's particles) */
+static boolean breakable_surface_particle_effect_check(
+	struct tag_validation *validation,
+	void *base)
+{
+	struct breakable_surface_particle_effect *particles = base;
+
+	tag_validate_non_negative(validation, "radius", &particles->radius_lower_bound);
+	tag_validate_non_negative(validation, "radius", &particles->radius_upper_bound);
+
+	return TRUE;
+}
 
 /* a part's base class is what the game makes of its tag (effects.c,
 effect_generate_part): it must be the tag's */

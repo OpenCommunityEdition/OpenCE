@@ -53,6 +53,21 @@ Android's window is 128 MB, and its cache the Xbox's. */
 #endif
 #define HALO_PORT_TEXTURE_CACHE_SIZE (HALO_PORT_TEXTURE_CACHE_PAGE_COUNT*0x4000) /* (0x1600000) */
 
+/* ---------- sounds
+
+The sound cache holds the sounds being played in 4 KB pages, 4 MB of them on
+the Xbox. Halo Custom Edition maps' sounds, converted when they load
+(port/linux/game/custom_edition_sounds.c), and those of sound tags loaded
+over a map's (loose_sounds.c), are longer than the Xbox maps' and fill it (a
+campaign map's dialogue and music did, "SOUND CACHE BLOWN" in debug.txt).
+The desktop builds' cache is 16 MB; Android's window keeps the Xbox's. */
+
+#ifdef HALO_ANDROID
+#define HALO_PORT_SOUND_CACHE_SIZE 0x400000 /* (0x400000) */
+#else
+#define HALO_PORT_SOUND_CACHE_SIZE 0x1000000 /* (0x400000) */
+#endif
+
 /* ---------- AI
 
 Network co-op adds enemies for its players (port/linux/game/coop_enemies.c):
@@ -75,8 +90,12 @@ objects, noncollideable objects, lights) */
 #define HALO_PORT_MAXIMUM_CACHED_OBJECT_RENDER_STATES 1024 /* (256) */
 /* objects one explosion can damage */
 #define HALO_PORT_MAXIMUM_AREA_OF_EFFECT_OBJECTS 256 /* (64) */
-/* object references shared by all script object lists */
-#define HALO_PORT_MAXIMUM_LISTED_OBJECTS_PER_MAP 1024 /* (128) */
+/* script object lists, and the object references they all share. The
+lists of a tick's scripts are freed after it (object_list_gc): a Halo PC
+map whose scripts test (players) in many places a tick took more than the
+Xbox's 48 (coldsnap's), and its game halted */
+#define HALO_PORT_MAXIMUM_OBJECT_LISTS_PER_MAP 1024 /* (48) */
+#define HALO_PORT_MAXIMUM_LISTED_OBJECTS_PER_MAP 8192 /* (128) */
 /* widgets (light volumes, antennas, flags, glows, lightning), each made with
 its object and kept for its life: an assault rifle's flashlight beam, held or
 dropped, and a plasma bolt's light volume; a full pool draws the object

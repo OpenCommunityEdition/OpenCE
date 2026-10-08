@@ -181,6 +181,12 @@ static const struct config_setting config_settings[] =
 		"Reverberate the world's sounds as the place the player is in does (the\n"
 		"maps' sound environments, as the Xbox's I3DL2 reverb did); false keeps\n"
 		"them dry." },
+	{ "audio.loose_sounds", _config_boolean, "false", "HALO_LOOSE_SOUNDS", _environment_value, _platform_all,
+		"For those making sounds: play each of a map's sounds that has a Halo PC\n"
+		"sound tag file of its name under the data root's tags folder\n"
+		"(tags/sound/.../name.sound) from that file. At the console,\n"
+		"loose_sounds_reload reads the files again and loose_sounds false gives\n"
+		"the map's sounds back." },
 
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },

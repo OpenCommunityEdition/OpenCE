@@ -2327,7 +2327,7 @@ static struct
 	/* Server Setup's PASSWORD (a public internet game's; empty: none), kept
 	while the game runs, never written down */
 	char game_password[PASSWORD_LENGTH + 1];
-} multiplayer = { 0, 0, 0, { 0 }, 0, { 0 }, 0, 0, 0, 0, { 0 }, NUMBEROF(maximum_players) - 1 };
+} multiplayer = { .maximum_players_index = NUMBEROF(maximum_players) - 1 };
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
 types into it (Ctrl+V pastes), its row's A (enter) is done, B (escape)
@@ -4814,8 +4814,9 @@ static char const *const vehicle_spinners[NUMBER_OF_VARIANT_VEHICLES] =
 {
 	"warthog_spinner", "ghost_spinner", "scorpion_spinner", "rwarthog_spinner", "banshee_spinner", "cgturret_spinner"
 };
-/* (the presets' spinner: the vehicle sets 0 to 7, then CUSTOM) */
-#define VEHICLE_PRESET_CUSTOM 8
+/* (the presets' spinner: the vehicle sets 0 to 7, then PC and CUSTOM) */
+#define VEHICLE_PRESET_PC 8
+#define VEHICLE_PRESET_CUSTOM 9
 
 static struct widget_instance *vehicle_spinner(struct widget_instance *list, char const *name)
 {
@@ -4843,7 +4844,8 @@ static void vehicles_show(struct widget_instance *list)
 		spinner->parameters.list.selected_index = side;
 	if ((spinner = vehicle_spinner(list, "vehicle_presets_spinner")) != NULL)
 		spinner->parameters.list.selected_index = options->vehicle_set[side] == VARIANT_VEHICLE_SET_CUSTOM ?
-			VEHICLE_PRESET_CUSTOM : (short)MIN(options->vehicle_set[side], VEHICLE_PRESET_CUSTOM - 1);
+			VEHICLE_PRESET_CUSTOM : options->vehicle_set[side] == VARIANT_VEHICLE_SET_PC ?
+			VEHICLE_PRESET_PC : (short)MIN(options->vehicle_set[side], VEHICLE_PRESET_PC - 1);
 	for (index = 0; index < NUMBER_OF_VARIANT_VEHICLES; index++)
 	{
 		if ((spinner = vehicle_spinner(list, vehicle_spinners[index])) != NULL)
@@ -4865,7 +4867,8 @@ static void vehicles_keep(struct widget_instance *list)
 		return;
 	if ((spinner = vehicle_spinner(list, "vehicle_presets_spinner")) != NULL)
 		options->vehicle_set[side] = spinner->parameters.list.selected_index >= VEHICLE_PRESET_CUSTOM ?
-			VARIANT_VEHICLE_SET_CUSTOM : (byte)spinner->parameters.list.selected_index;
+			VARIANT_VEHICLE_SET_CUSTOM : spinner->parameters.list.selected_index == VEHICLE_PRESET_PC ?
+			VARIANT_VEHICLE_SET_PC : (byte)spinner->parameters.list.selected_index;
 	for (index = 0; index < NUMBER_OF_VARIANT_VEHICLES; index++)
 	{
 		if ((spinner = vehicle_spinner(list, vehicle_spinners[index])) != NULL)

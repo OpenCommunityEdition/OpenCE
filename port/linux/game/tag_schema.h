@@ -346,6 +346,13 @@ void tag_validate_correct(
 	struct tag_validation *validation,
 	char const *format,
 	...);
+/* A length the game takes as one (a radius, a width: point_physics_update's
+radius): none or more, a value below zero or not a number made 0, as the
+correction `name` says. */
+void tag_validate_non_negative(
+	struct tag_validation *validation,
+	char const *name,
+	real *value);
 /* whether size bytes at offset in the map's file are in it (or, for a
 Custom Edition map, in one of the files its offsets count in), as data in a
 file (_tag_schema_file_data) must be */

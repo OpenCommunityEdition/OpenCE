@@ -65,9 +65,10 @@ symbols in this file:
 
 enum
 {
-	MAXIMUM_OBJECT_LISTS_PER_MAP = 48,
-	/* the native builds' larger pool of listed objects (halo_port_capacity.h):
-	a (players) list alone takes one per living player */
+	/* the native builds' more lists, and larger pool of listed objects
+	(halo_port_capacity.h): a (players) list alone takes one per living
+	player */
+	MAXIMUM_OBJECT_LISTS_PER_MAP = HALO_PORT_MAXIMUM_OBJECT_LISTS_PER_MAP,
 	MAXIMUM_LISTED_OBJECTS_PER_MAP = HALO_PORT_MAXIMUM_LISTED_OBJECTS_PER_MAP,
 };
 
@@ -150,7 +151,15 @@ void object_list_add(
 	long object_list_index,
 	long object_index)
 {
-	struct object_list_header_datum *list = object_list_header_get(object_list_index);
+	struct object_list_header_datum *list;
+
+	/* port: no list (object_list_new found none free): the objects are
+	not listed, as when the listed objects run out, rather than the game
+	halting */
+	if (object_list_index == NONE)
+		return;
+
+	list = object_list_header_get(object_list_index);
 	reference_list_add(object_list_data, &list->first_reference_index, object_index);
 	list->count++;
 

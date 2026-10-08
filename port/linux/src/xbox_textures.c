@@ -897,6 +897,7 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 		{
 			description->hires = TRUE;
 			description->hires_coverage = hud_hires_override_coverage(entry->override);
+			description->hires_point_threshold = hud_hires_override_point_threshold(entry->override);
 			return texture;
 		}
 	}

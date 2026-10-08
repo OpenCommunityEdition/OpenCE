@@ -298,14 +298,17 @@ static boolean vorbis_decode(
 	return decoded;
 }
 
-/* uncompressed samples, 16-bit little-endian as Halo PC keeps them */
+/* uncompressed samples, 16-bit little-endian as Halo PC's maps keep them
+(big-endian as its tag files do: loose_sounds.c) */
 static boolean pcm_decode(
 	byte const *data,
 	long data_bytes,
 	long channels,
 	long rate,
+	boolean big_endian,
 	struct frames *frames)
 {
+	int low = big_endian ? 1 : 0;
 	long index;
 
 	frames->count = data_bytes / (2 * channels);
@@ -314,7 +317,7 @@ static boolean pcm_decode(
 	frames->samples = frames_allocate(frames->count, channels);
 	for (index = 0; frames->samples && index < frames->count * channels; index++)
 	{
-		frames->samples[index] = (short)(data[2 * index] | (data[2 * index + 1] << 8));
+		frames->samples[index] = (short)(data[2 * index + low] | (data[2 * index + 1 - low] << 8));
 	}
 
 	return frames->samples != NULL;
@@ -386,6 +389,30 @@ static boolean adpcm_decode(
 	}
 
 	return frames->samples != NULL;
+}
+
+/* the samples `data` of `compression` at `channels` and `rate` (an Ogg
+Vorbis stream's own); FALSE when they cannot be decoded */
+static boolean samples_decode(
+	byte const *data,
+	long data_bytes,
+	short compression,
+	boolean big_endian,
+	long channels,
+	long rate,
+	struct frames *frames)
+{
+	switch (compression)
+	{
+	case SOUND_COMPRESSION_OGG_VORBIS:
+		return vorbis_decode(data, data_bytes, frames);
+	case SOUND_COMPRESSION_NONE:
+		return pcm_decode(data, data_bytes, channels, rate, big_endian, frames);
+	case SOUND_COMPRESSION_XBOX_ADPCM:
+		return adpcm_decode(data, data_bytes, channels, rate, frames);
+	}
+
+	return FALSE;
 }
 
 /* `frames` at `channels` and `rate` (a mono stream fills both channels, a
@@ -504,18 +531,8 @@ static boolean permutation_convert(
 		return FALSE;
 	}
 	custom_edition_cache_read(NONE, permutation->samples.file_offset, permutation->samples.size, data);
-	switch (permutation->compression)
-	{
-	case SOUND_COMPRESSION_OGG_VORBIS:
-		decoded = vorbis_decode(data, permutation->samples.size, &frames);
-		break;
-	case SOUND_COMPRESSION_NONE:
-		decoded = pcm_decode(data, permutation->samples.size, channels, rate, &frames);
-		break;
-	case SOUND_COMPRESSION_XBOX_ADPCM:
-		decoded = adpcm_decode(data, permutation->samples.size, channels, rate, &frames);
-		break;
-	}
+	decoded = samples_decode(data, permutation->samples.size, permutation->compression, FALSE,
+		channels, rate, &frames);
 	free(data);
 
 	if (decoded && frames_conform(&frames, channels, playable_rate(sound)))
@@ -606,6 +623,35 @@ boolean custom_edition_sounds_decode(
 	}
 
 	return TRUE;
+}
+
+byte *custom_edition_sounds_encode(
+	byte const *data,
+	long data_bytes,
+	short compression,
+	boolean big_endian,
+	long channels,
+	long rate,
+	long encoded_rate,
+	unsigned long *encoded_bytes)
+{
+	struct frames frames = { 0 };
+	byte *encoded = NULL;
+
+	if (data_bytes > 0 && channels >= 1 && channels <= 2 &&
+		samples_decode(data, data_bytes, compression, big_endian, channels, rate, &frames) &&
+		frames_conform(&frames, channels, encoded_rate))
+	{
+		*encoded_bytes = adpcm_encoded_bytes(frames.count, channels);
+		encoded = malloc(*encoded_bytes);
+		if (encoded)
+		{
+			adpcm_encode(frames.samples, frames.count, channels, encoded);
+		}
+	}
+	frames_free(&frames);
+
+	return encoded;
 }
 
 unsigned long custom_edition_sounds_decoded_bytes(
