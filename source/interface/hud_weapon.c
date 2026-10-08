@@ -1492,10 +1492,6 @@ static void render_weapon_hud(
 			_hud_draw_in_multiplayer_bit,
 			local_player_count() > 1);
 		state_flags[5] = flags;
-		/* port: a weapon of one magazine has no secondary ammunition to
-		flash, show empty or reload (its overlays likewise, below) */
-		if (weapon_state->magazine_count < 2)
-			state_flags[4] = state_flags[5] = local_player_count() > 1 ? FLAG(_hud_draw_in_multiplayer_bit) : 0;
 
 		for (state_index = 0;
 			state_index < NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES;
@@ -1645,8 +1641,11 @@ static void render_weapon_hud(
 			flags == 0);
 		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
 		overlay_flags[5] = flags;
+		/* port: a weapon without a second magazine draws none of its overlays,
+		as the Xbox never set these; its states above read an empty one, whose
+		total ammunition is drawn disabled */
 		if (weapon_state->magazine_count < 2)
-			overlay_flags[4] = overlay_flags[5] = FLAG(_weapon_overlay_on_default_bit) | FLAG(_weapon_overlay_on_always_bit);
+			overlay_flags[4] = overlay_flags[5] = 0;
 
 		number_values[0] = weapon_state->magazines[0].rounds_remaining;
 		number_values[1] = weapon_state->magazines[0].rounds_loaded;
