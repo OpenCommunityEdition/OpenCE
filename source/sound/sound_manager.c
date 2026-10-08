@@ -3550,6 +3550,15 @@ static void update_channels(
 							(maximum_distance - minimum_distance);
 
 						fade *= PIN(attenuation, 0.f, 1.f);
+						/* port: positioned stereo uses a 2D stream, so it misses
+						the 3D stream's inverse-distance gain. The listener's
+						rolloff factor is 1; keep the original linear fade as a
+						smooth cutoff at the tag's maximum distance. */
+						if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) &&
+							minimum_distance > 0.f && distance > minimum_distance)
+						{
+							fade *= minimum_distance / distance;
+						}
 						/* port: and a stereo sound is panned towards where it
 						is, as the mixer pans a 3D one (port/linux/src/dsound_sdl.c,
 						spatialize: ahead is x, right -y; centred when close),
