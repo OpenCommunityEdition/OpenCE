@@ -342,7 +342,11 @@ void stack_walk_with_context(
 
 		for (frame_number = levels_dumped - 1; frame_number >= levels_to_ignore; frame_number--)
 		{
-#ifdef HALO_ANDROID
+#if defined(HALO_MACOS)
+			/* within the CALL before the return address (x86 instructions
+			vary in length), for llvm-symbolizer --obj=build/macos/halo_guest.elf */
+			unsigned long routine_address = routine_addresses[frame_number] - 1;
+#elif defined(HALO_GUEST)
 			/* the call site (the BL before the return address), for
 			llvm-symbolizer --obj=build/android/halo_guest.elf */
 			unsigned long routine_address = routine_addresses[frame_number] - 4;
@@ -762,7 +766,10 @@ static unsigned long walk_up(
 
 	if (walk_up_current_frame)
 	{
-#ifdef HALO_ANDROID
+#ifdef HALO_GUEST
+#ifdef HALO_MACOS
+		/* (x86-64's push %rbp frames have the same shape) */
+#endif
 		/* an AArch64 frame record: the caller's frame pointer, then the
 		return address, 8 bytes each (the upper halves are zero) */
 		routine_address = ((unsigned long *)walk_up_current_frame)[2];

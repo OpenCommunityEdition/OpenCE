@@ -295,7 +295,58 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
-#ifdef HALO_ANDROID
+#if defined(HALO_MACOS)
+/* x86-64 SSE (the macOS guest, x32): float and double arithmetic is SSE's,
+so the exception masks and the rounding mode go to MXCSR, whose mask bits
+(7-12) and rounding field (13-14) are the x87 control word's (0-5, 10-11)
+moved up, and whose sticky flags (0-5) are the x87 status word's. SSE has no
+precision or infinity control: those bits of the MSVC control word are only
+remembered, in an x87 control word kept for the conversions above (53-bit
+precision, as SSE's doubles; everything masked). -mlong-double-64 leaves
+no long double arithmetic to the x87 unit. */
+static unsigned short msvc_x87_control_word = 0x027f;
+
+static unsigned short mxcsr_to_control_word(unsigned int mxcsr)
+{
+	return (unsigned short)((msvc_x87_control_word & ~0x0c3f) | ((mxcsr >> 7) & 0x3f) | (((mxcsr >> 13) & 3) << 10));
+}
+
+unsigned int _control87(unsigned int new_value, unsigned int mask)
+{
+	unsigned int mxcsr = __builtin_ia32_stmxcsr();
+	unsigned short word = mxcsr_to_control_word(mxcsr);
+	unsigned int current = control_word_to_msvc(word);
+
+	if (mask)
+	{
+		current = (current & ~mask) | (new_value & mask);
+		word = msvc_to_control_word(current, word);
+		msvc_x87_control_word = word;
+		mxcsr = (mxcsr & ~0x7f80u) | ((unsigned int)(word & 0x3f) << 7) | ((unsigned int)((word >> 10) & 3) << 13);
+		__builtin_ia32_ldmxcsr(mxcsr);
+	}
+	return current;
+}
+
+unsigned int _controlfp(unsigned int new_value, unsigned int mask)
+{
+	/* _controlfp ignores the denormal mask */
+	return _control87(new_value, mask & ~_EM_DENORMAL);
+}
+
+unsigned int _statusfp(void)
+{
+	return __builtin_ia32_stmxcsr() & 0x3f;
+}
+
+unsigned int _clearfp(void)
+{
+	unsigned int mxcsr = __builtin_ia32_stmxcsr();
+
+	__builtin_ia32_ldmxcsr(mxcsr & ~0x3fu);
+	return mxcsr & 0x3f;
+}
+#elif defined(HALO_GUEST)
 /* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
 flags in FPSR. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */

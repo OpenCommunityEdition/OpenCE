@@ -13,7 +13,7 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
 struct xgpu_capabilities
 {
@@ -27,6 +27,18 @@ struct xgpu_capabilities
 	BOOL atomic_counters;
 	/* "300 es" or "310 es" */
 	const char *shading_language;
+#ifdef HALO_MACOS
+	/* desktop OpenGL (macOS's 4.1 core profile) rather than ES: the same
+	path, with the capabilities set by gl_initialize's desktop profile and
+	shading_language "410 core" */
+	BOOL desktop;
+	/* S3TC for GL_TEXTURE_3D too: macOS has it for 2D, cube and array
+	textures only (glCompressedTexImage3D of a volume is GL_INVALID_ENUM),
+	so volumes are decoded on the CPU without it */
+	BOOL s3tc_volume;
+	/* GL_SAMPLES_PASSED: exact visibility test counts from a query */
+	BOOL sample_counts;
+#endif
 };
 
 extern struct xgpu_capabilities xgpu_capabilities;
@@ -147,7 +159,7 @@ struct nv2a_pixel_shader_key
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 /* ES samplers have no LOD bias of their own */
 #define XGPU_PIXEL_UNIFORMS_ES "uniform vec4 texture_lod_bias;\n"
 #else

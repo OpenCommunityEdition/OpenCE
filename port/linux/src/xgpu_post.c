@@ -74,7 +74,7 @@ static struct
 
 static void shader_header(struct xgpu_text *text)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	xgpu_text_append(text,
 		"#version %s\n"
 		"precision highp float;\n"
@@ -478,7 +478,7 @@ BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, un
 	glDisable(GL_BLEND);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_POLYGON_OFFSET_FILL);
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #endif
 	glBindVertexArray(post.vertex_array);

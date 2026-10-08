@@ -10,7 +10,20 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-#if !defined(__i386__) && !defined(HALO_ANDROID)
+#if defined(HALO_ANDROID) || defined(HALO_MACOS)
+#ifndef HALO_GUEST
+/* Android and macOS run the game as an ILP32 guest under a 64-bit host
+(HALO_GUEST) and draw through the renderer's GLES code path (HALO_GLES);
+HALO_ANDROID and HALO_MACOS themselves select only product choices. The build
+scripts pass all three, and deriving the shared two here keeps a build that
+names only the platform correct. */
+#define HALO_GUEST 1
+#endif
+#ifndef HALO_GLES
+#define HALO_GLES 1
+#endif
+#endif
+#if !defined(__i386__) && !defined(HALO_GUEST)
 #error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
 #endif
 

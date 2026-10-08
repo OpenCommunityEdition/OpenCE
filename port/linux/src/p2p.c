@@ -624,7 +624,7 @@ static int hardware_id_source(char *text, int size)
 	int path_count = 0;
 	int index;
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GUEST
 	snprintf(android_path, sizeof(android_path), "%s/hardware_id.txt", platform_data_root());
 	paths[path_count++] = android_path;
 #else
@@ -2770,7 +2770,7 @@ static void handoff_readable(void)
 	p2p_invite_received(invite);
 }
 
-#ifdef HALO_ANDROID
+#ifdef HALO_GUEST
 /* the app's activity writes a link it was opened with here */
 static void poll_invite_file(void)
 {
@@ -2997,7 +2997,7 @@ static void *p2p_thread(void *unused)
 		update_joining();
 		update_upnp();
 		p2p_discord_update();
-#ifdef HALO_ANDROID
+#ifdef HALO_GUEST
 		poll_invite_file();
 #endif
 	}

@@ -347,7 +347,10 @@ void terminal_printf(
 	...)
 {
 	real_argb_color default_terminal_printf_color;
-	char *arglist;
+	/* port: a va_list, not the char * of the original: the two are the same
+	type on x86 (MSVC, i386) and Darwin's arm64_32, but x86-64's va_list (the
+	macOS port's x32 guest) is a structure */
+	va_list arglist;
 
 	va_start(arglist, format);
 

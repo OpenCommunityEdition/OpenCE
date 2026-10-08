@@ -1702,6 +1702,8 @@ static void main_native_build_label(char *label, size_t capacity)
 
 	#ifdef HALO_ANDROID
 	platform = "Android";
+	#elif defined(HALO_MACOS)
+	platform = "macOS";
 	#elif defined(HALO_WINDOWS)
 	platform = "Windows";
 	#else

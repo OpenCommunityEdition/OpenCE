@@ -20,7 +20,7 @@ and the debug keyboard that the game's console reads.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if !defined(_WIN32) && !defined(HALO_ANDROID)
+#if !defined(_WIN32) && !defined(HALO_GUEST)
 #include <signal.h>
 #endif
 
@@ -79,7 +79,7 @@ static long scoreboard_pages;
 static struct platform_keystroke keystroke_queue[KEYSTROKE_QUEUE_SIZE];
 static unsigned long keystroke_head, keystroke_count;
 
-#ifndef HALO_ANDROID
+#ifndef HALO_GUEST
 /* updater.c's: the desktop self-updater */
 void updater_start(void);
 void updater_poll(SDL_Window *window);
@@ -89,7 +89,7 @@ BOOL platform_sdl_initialize(void)
 {
 	if (platform_sdl_started)
 		return TRUE;
-#if !defined(_WIN32) && !defined(HALO_ANDROID)
+#if !defined(_WIN32) && !defined(HALO_GUEST)
 	/* a write to a connection the other end closed fails instead of ending
 	the game (the game's sockets and Discord's pass MSG_NOSIGNAL, but UPnP's
 	miniupnpc does not, nor does a write to a closed pipe's standard error) */
@@ -115,7 +115,7 @@ BOOL platform_sdl_initialize(void)
 		return FALSE;
 	}
 	platform_sdl_started = TRUE;
-#ifndef HALO_ANDROID
+#ifndef HALO_GUEST
 	/* found (or offered to the player, platform_offer_game_data) before the
 	game's window opens */
 	platform_data_root();
@@ -125,7 +125,7 @@ BOOL platform_sdl_initialize(void)
 	return TRUE;
 }
 
-#ifndef HALO_ANDROID
+#ifndef HALO_GUEST
 /* ---------- first start without game data (xbox_files.c) */
 
 struct data_extraction
@@ -680,7 +680,15 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	if (!platform_sdl_initialize())
 		return FALSE;
 
-#ifdef HALO_ANDROID
+#if defined(HALO_MACOS)
+	/* Apple's newest OpenGL: 4.1, core and forward compatible (macOS has
+	no other kind of 3.2+ context). The renderer draws through its ES path,
+	which needs nothing of 4.2 and later, with gl_initialize's desktop
+	profile (d3d8_gl.c). */
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#elif defined(HALO_ANDROID)
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
@@ -694,7 +702,11 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 	if (config_boolean("debug.gl_debug"))
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-#if !defined(HALO_ANDROID) && !defined(_WIN32)
+#ifdef HALO_MACOS
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
+		(config_boolean("debug.gl_debug") ? SDL_GL_CONTEXT_DEBUG_FLAG : 0));
+#endif
+#if !defined(HALO_GUEST) && !defined(_WIN32)
 	/* Mesa's GL thread: the renderer makes thousands of GL calls a frame
 	and never waits for their results, so handing them to a thread of
 	their own takes a fifth of the main thread's time off it. It leaves an
@@ -1183,6 +1195,26 @@ void platform_pump_events(void)
 	static BOOL looked_at_clipboard;
 	BOOL look_at_clipboard = !looked_at_clipboard;
 
+#ifdef HALO_MACOS
+	/* a run without a window (debug.null_renderer) ends after
+	debug.exit_after too, which nothing else would end: there is no event
+	thread to keep to then */
+	if (!platform_window)
+	{
+		if (exit_ticks == (Uint64)-1)
+		{
+			double seconds = config_real("debug.exit_after");
+
+			exit_ticks = seconds > 0.0 ? SDL_GetTicks() + (Uint64)(seconds * 1000.0) : 0;
+		}
+		if (exit_ticks && SDL_GetTicks() >= exit_ticks)
+		{
+			platform_log("exiting after debug.exit_after");
+			exit(EXIT_SUCCESS);
+		}
+		return;
+	}
+#endif
 	if (!platform_window || SDL_GetCurrentThreadID() != platform_event_thread)
 		return;
 	if (exit_ticks == (Uint64)-1)
@@ -1197,7 +1229,7 @@ void platform_pump_events(void)
 		exit(EXIT_SUCCESS);
 	}
 	platform_show_pending_message();
-#ifndef HALO_ANDROID
+#ifndef HALO_GUEST
 	updater_poll(platform_window);
 #endif
 	pthread_mutex_lock(&input_lock);
