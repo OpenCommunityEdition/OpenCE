@@ -113,6 +113,9 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/bipeds.h"
+/* port: object_bounds_cache.c's */
+boolean object_bounds_cache_out_of_reach(long object_index, real_point3d const *point, real radius);
+
 
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
@@ -949,7 +952,10 @@ boolean collision_get_features_in_sphere(
 						object_index != NONE;
 						object_index = cluster_get_next_collideable_object(&reference_index))
 					{
-						if (object_mark_function(object_index))
+						/* port: (the far ones passed over on a packed copy
+						of their bounding spheres: object_bounds_cache.c) */
+						if (object_mark_function(object_index) &&
+							!object_bounds_cache_out_of_reach(object_index, center, radius))
 						{
 							object_get_features_in_sphere(
 								flags,
