@@ -104,6 +104,7 @@ symbols in this file:
 #include "bungie_net/network/transport.h"
 #include "game/player_queues_new.h"
 #include "game/players.h"
+#include "interface/ui_widget.h" /* port: the main-menu scene is locally authoritative */
 #include "main/main.h"
 #include "memory/data_packet_groups.h"
 #include "network_client_manager.h"
@@ -297,7 +298,9 @@ boolean network_distributed_client_send_reliably(
 boolean network_game_distributed_client(
 	void)
 {
-	return game_connection() == _game_connection_network_client;
+	/* port: the shell's scene is local even while its menus have a network
+	client. Its scripts and objects must not become host-authoritative. */
+	return game_connection() == _game_connection_network_client && !main_menu_is_active();
 }
 
 boolean network_game_is_active(

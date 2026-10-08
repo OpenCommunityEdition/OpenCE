@@ -82,6 +82,7 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "interface/player_ui.h"
+#include "interface/ui_widget.h" /* port: a round reset must not stop the menu's scene */
 #include "saved games/player_profile.h"
 #include "main/main.h"
 #include "memory/data.h"
@@ -580,7 +581,10 @@ void network_game_reset_for_next_round(
 		csmemset(&game->local_data, 0, sizeof(game->local_data));
 	}
 
-	game_time_end();
+	/* port: the lobby/browser's scene keeps running while its round state
+	is cleared. A gameplay round still stops until its next start. */
+	if (!main_menu_is_active())
+		game_time_end();
 	return;
 }
 

@@ -71,6 +71,7 @@ symbols in this file:
 #include "real_math.h"
 #include "game.h"
 #include "player_queues_new.h"
+#include "interface/ui_widget.h" /* port: the shell scene owns its clock, even in network menus */
 #include "networking/network_client_manager.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
@@ -324,7 +325,9 @@ boolean game_time_held(
 {
 	struct network_game_client *client;
 
-	if (game_connection() != _game_connection_network_client)
+	/* port: browsing or joining a game does not make the menu scene wait
+	for that game's host. The loaded gameplay scene still waits normally. */
+	if (main_menu_is_active() || game_connection() != _game_connection_network_client)
 		return FALSE;
 	client = global_network_game_client_get();
 	return client && !network_game_client_server_has_started_game(client);
@@ -372,6 +375,7 @@ void game_time_update(
 
 	if (game_time_globals->active)
 	{
+		boolean main_menu = main_menu_is_active(); /* port: locally simulated shell scene */
 		long connection;
 		long ticks_elapsed;
 		real ticks_per_second = game_time_globals->speed*TICKS_PER_SECOND;
@@ -392,7 +396,7 @@ void game_time_update(
 			real game_time;
 			real ticks_elapsed_real;
 
-			connection = game_connection();
+			connection = main_menu ? _game_connection_local : game_connection();
 			switch (connection)
 			{
 			case _game_connection_film_playback:
@@ -438,27 +442,34 @@ void game_time_update(
 				long maximum_possible_server_time;
 
 				final_local_time = game_time_globals->local_time + ticks_elapsed;
-				switch (game_connection())
-				{
-				case _game_connection_local:
-					update_client_local_ticks(ticks_elapsed);
-					break;
-				case _game_connection_network_server:
-					network_game_server_update_ticks(global_network_game_server_get(), (short)ticks_elapsed);
-					break;
-				}
-
-				/* (a client of the distributed netcode ticks on its own clock,
-				with its own input and the latest the host relayed, from the
-				host's first game update, which brings the host's time: the
-				host ticks only once every machine has loaded) */
-				if (game_connection() == _game_connection_network_client)
-				{
-					maximum_possible_server_time = game_time_held() ?
-						game_time_globals->server_time : final_local_time;
-				}
+				/* port: this scene belongs to the local menu, not the game
+				being browsed/hosted. Do not consume or advance its queues. */
+				if (main_menu)
+					maximum_possible_server_time = final_local_time;
 				else
-					maximum_possible_server_time = update_client_get_maximum_possible_server_time();
+				{
+					switch (game_connection())
+					{
+					case _game_connection_local:
+						update_client_local_ticks(ticks_elapsed);
+						break;
+					case _game_connection_network_server:
+						network_game_server_update_ticks(global_network_game_server_get(), (short)ticks_elapsed);
+						break;
+					}
+
+					/* (a client of the distributed netcode ticks on its own clock,
+					with its own input and the latest the host relayed, from the
+					host's first game update, which brings the host's time: the
+					host ticks only once every machine has loaded) */
+					if (game_connection() == _game_connection_network_client)
+					{
+						maximum_possible_server_time = game_time_held() ?
+							game_time_globals->server_time : final_local_time;
+					}
+					else
+						maximum_possible_server_time = update_client_get_maximum_possible_server_time();
+				}
 				if (maximum_possible_server_time > game_time_globals->server_time)
 				{
 					long final_server_time = MIN(maximum_possible_server_time, final_local_time);
@@ -472,7 +483,8 @@ void game_time_update(
 						game_time_globals->server_time++;
 						game_time_globals->local_time++;
 						/* the distributed netcode's per-tick state */
-						network_distributed_tick();
+						if (!main_menu) /* port: no gameplay replication from a shell tick */
+							network_distributed_tick();
 					}
 				}
 
