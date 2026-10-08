@@ -2997,7 +2997,10 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			gl_textures[stage] = gl_texture;
 			configure_sampler(stage, description.levels > 1, description.hires);
 			if (stage == 0)
+			{
 				key->coverage_alpha = description.hires_coverage != FALSE;
+				key->point_threshold = description.hires_point_threshold != FALSE;
+			}
 			key->sampler_type[stage] = gl_target == GL_TEXTURE_CUBE_MAP ? _xgpu_sampler_cube :
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
 		}
@@ -3377,6 +3380,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.coverage_alpha = key.coverage_alpha && D3D__RenderState[D3DRS_ALPHABLENDENABLE] &&
 		D3D__RenderState[D3DRS_SRCBLEND] == D3DBLEND_CONSTANTCOLOR &&
 		D3D__RenderState[D3DRS_DESTBLEND] == D3DBLEND_SRCALPHA;
+	key.point_threshold = key.point_threshold && key.coverage_alpha;
 	key.alpha_test_function = D3D__RenderState[D3DRS_ALPHATESTENABLE] ? D3D__RenderState[D3DRS_ALPHAFUNC] : 0;
 #ifndef HALO_ANDROID
 	/* (gl_SampleMask: ES has it only from 3.2) */
