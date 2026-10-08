@@ -1358,6 +1358,20 @@ void tag_validate_refuse(
 	return;
 }
 
+void tag_validate_non_negative(
+	struct tag_validation *validation,
+	char const *name,
+	real *value)
+{
+	if (!(*value >= 0.0f))
+	{
+		tag_validate_correct(validation, "has a %s of %f: 0", name, *value);
+		*value = 0.0f;
+	}
+
+	return;
+}
+
 void tag_validate_correct(
 	struct tag_validation *validation,
 	char const *format,
