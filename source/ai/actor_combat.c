@@ -1572,11 +1572,11 @@ long actor_aim_grenade(
 
 	actor_combat_reaim_grenade(actor_index, origin);
 
+	aim_vector = actor->control.grenade_current_aim_vector;
 	if (actor->input.vehicle_index == NONE)
 	{
 		real_vector2d horizontal_aim_vector;
 
-		aim_vector = actor->control.grenade_current_aim_vector;
 		horizontal_aim_vector = *(real_vector2d const *)&aim_vector;
 
 		if (normalize2d(&horizontal_aim_vector) > 0.0f &&
@@ -1609,12 +1609,6 @@ long actor_aim_grenade(
 		}
 	}
 
-	/* BUG (preserved for exact matching): aim_vector is assigned only on foot.
-	 * With actor->input.vehicle_index != NONE, January branches from its vehicle
-	 * test straight to this scale and reads the unassigned local; the 2011 HCEX
-	 * and later /Od builds keep the same path. A corrected build should start
-	 * from actor->control.grenade_current_aim_vector.
-	 */
 	scale_vector3d(
 		&aim_vector,
 		actor->control.grenade_current_aim_speed,

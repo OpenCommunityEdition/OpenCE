@@ -118,14 +118,7 @@ static boolean surface_is_walkable(
 	struct collision_surface const *collision_surface;
 	byte breakable_surface_index;
 
-	/* BUG (preserved for exact matching): find_turning_point passes a collision edge's surface
-	 * index (surface_indices[0], surface_indices[!matches_end]) with no NONE test, and January
-	 * reads pathfinding_surfaces[surface_index] first (inlined in _find_turning_point at
-	 * +0x99..+0x9c and +0x274..+0x278). The index is NONE only for an edge with no surface on that
-	 * side (an open collision BSP); the byte before the array is then taken as the surface's flags.
-	 * No structure BSP in the shipped 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in
-	 * 82 BSPs).
-	 */
+	/* (an open edge, with no surface beyond it, is in no shipped map) */
 	/* port: (NONE still is; any other index past the pathfinding surfaces, a
 	map's, is no walkable surface. The retail bsps have as many pathfinding
 	surfaces as surfaces, and every edge's surfaces are theirs) */

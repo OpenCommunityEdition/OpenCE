@@ -2712,14 +2712,10 @@ void ai_handle_editing(
 						"editing caused an overflow of MAXIMUM_SQUADS_PER_MAP (%d)",
 						MAXIMUM_SQUADS_PER_MAP));
 
-				/* BUG (preserved for exact matching): January passes the squad record COUNT as the
-				 * csmemmove byte size, so only that many bytes of the trailing squad records move.
-				 * A corrected build should multiply the count by sizeof(struct squad_datum).
-				 */
 				csmemmove(
 					&squad_array[encounter->squad_base + encounter_definition->squads.count],
 					&squad_array[encounter->squad_base + encounter->squad_count],
-					last_squad_index - encounter->squad_base - encounter->squad_count);
+					(last_squad_index - encounter->squad_base - encounter->squad_count) * sizeof(struct squad_datum));
 
 				if (squad_count_delta > 0)
 				{
@@ -2746,14 +2742,10 @@ void ai_handle_editing(
 						"editing caused an overflow of MAXIMUM_PLATOONS_PER_MAP (%d)",
 						MAXIMUM_PLATOONS_PER_MAP));
 
-				/* BUG (preserved for exact matching): January passes the platoon record COUNT as the
-				 * csmemmove byte size, so only that many bytes of the trailing platoon records move.
-				 * A corrected build should multiply the count by sizeof(struct platoon_datum).
-				 */
 				csmemmove(
 					&platoon_array[encounter->platoon_base + encounter_definition->platoons.count],
 					&platoon_array[encounter->platoon_base + encounter->platoon_count],
-					last_platoon_index - encounter->platoon_base - encounter->platoon_count);
+					(last_platoon_index - encounter->platoon_base - encounter->platoon_count) * sizeof(struct platoon_datum));
 
 				if (platoon_count_delta > 0)
 				{

@@ -298,7 +298,7 @@ boolean datastore_read(
 	void *data)
 {
 	struct file_reference file_ref;
-	boolean success;
+	boolean success = FALSE;
 	unsigned long datastore_size = 0;
 	struct datastore *datastore;
 
@@ -356,13 +356,6 @@ boolean datastore_read(
 		}
 	}
 
-	/* BUG (preserved for exact matching): success is never initialised, so a missing
-	 * file, a wrong-sized datastore or an absent field returns it unassigned (January
-	 * 0x589370 keeps it in the high byte of the field_name argument slot, [ebp+0xf],
-	 * written only at +0x1f5 and read at +0x19b and +0x20c). Not reached in January:
-	 * cachebeta.exe has no call, jump or address reference to this function. A corrected
-	 * build should initialise success to FALSE. Source-policy approval pending
-	 * (2026-09-27 audit). */
 	return success;
 }
 

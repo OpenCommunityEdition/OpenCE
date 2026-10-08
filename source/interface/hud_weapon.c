@@ -894,10 +894,7 @@ static void hud_update_weapon_local_player(
 						"c:\\halo\\SOURCE\\interface\\hud_weapon.c",
 						0x16E,
 						!"unreachable");
-					/* BUG (preserved for exact matching): January (T+0x404) and the later /Od build (0x638ac2)
-					   leave result unassigned in this arm. The arm is unreachable in defined execution:
-					   crosshair_index only takes the values 0..NUMBER_OF_CROSSHAIR_STATES-1 (0..18), and each of
-					   those 19 states has a case above that assigns result. */
+					result = 0;
 					break;
 				}
 

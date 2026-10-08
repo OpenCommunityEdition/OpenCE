@@ -276,19 +276,7 @@ static long connected_geometry_find_or_add_edge(
 	long point_index0,
 	long point_index1)
 {
-	/* BUG (preserved for exact matching): January declares `direction` without an
-	 * initializer. It is written only at the two matches (+0x47, +0x4d) and on edge
-	 * creation (+0x67), and read once, at +0xbe. The only path that reaches that read
-	 * without a write requires geometry->edges.count < 0 (a deleted array, whose count is
-	 * NONE, is one way this can arise). On that path edge_index stays 0, so the
-	 * dynamic_array_get_element call (+0x9b) runs first: its unconditional
-	 * `array->count>=0` assertion fails, and match_assert's failure path (display_assert,
-	 * then system_exit -> halt_and_catch_fire, which never returns: it loops on the error
-	 * screen, or calls exit on re-entry) ends this build before `direction` is read.
-	 * The later /Od+/RTC build attests the declaration with _RTC_UninitUse("direction").
-	 * A corrected build should initialize direction to TRUE.
-	 */
-	boolean direction;
+	boolean direction = TRUE;
 	long edge_index;
 
 	for (edge_index = 0; edge_index < geometry->edges.count; edge_index++)

@@ -3383,30 +3383,7 @@ void actor_emotion_update(
 		actor->emotions.forced_to_charge = TRUE;
 	}
 
-	/* BUG (preserved for exact matching): the scan starts at
-	 * NUMBER_OF_ACTOR_THREAT_TYPES rather than NUMBER_OF_ACTOR_THREAT_TYPES-1,
-	 * so its first iteration reads specific_threats[9] - one element past the
-	 * end of the nine-element array, which is cumulative_threats[0].
-	 * Evidence: January emits `mov eax,9` at +0xf5, then the six-byte alignment
-	 * nop 8d 9b 00 00 00 00 (`lea ebx,[ebx]`, which touches neither EAX nor
-	 * memory), and falls into the loop head at +0x100, `movsx edx,ax` followed by
-	 * `cmp byte ptr [edx+esi+0x1ee],0`; the `dec eax` is at +0x10d, AFTER that
-	 * load. In the same object actor_situation_update increments
-	 * cumulative_threats for threat types 1..8 at esi+0x1f8..esi+0x1ff and
-	 * area_friends at esi+0x200, which fixes cumulative_threats at esi+0x1f7 and
-	 * so specific_threats at esi+0x1ee with exactly nine elements.
-	 * Layout is asserted, not assumed: see
-	 * actor_perception_specific_threats_size_assert and
-	 * actor_perception_threat_arrays_adjacent_assert above, which fail to compile
-	 * if the two arrays ever stop being adjacent or change length.
-	 * Consequence: none observable. cumulative_threats[_actor_threat_none] is the
-	 * one element of that array nothing ever writes - every write in the tree
-	 * uses _actor_threat_visible..._actor_threat_damaging_me, i.e. 1..8, and the
-	 * single variable-index use is a read-only csprintf argument in the
-	 * actor_debug_print_threat macro - so the stray byte is always zero, the
-	 * early-out is never taken on the stray iteration, and the scan falls through
-	 * to the intended starting index. */
-	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES;
+	for (priority = NUMBER_OF_ACTOR_THREAT_TYPES - 1;
 		priority > 0 &&
 			actor->situation.specific_threats[priority] <= 0;
 		priority--)
@@ -3858,12 +3835,8 @@ void prop_status_refresh(
 							prop->preferred_target = TRUE;
 							break;
 
-						/* BUG (preserved for exact matching): January compares a platoon
-						 * reference with the actor's squad index (actor+0x3a) and a squad
-						 * reference with its platoon index (actor+0x3c), the reverse of
-						 * actor_action_handle_vehicle_entry. A corrected build should compare
-						 * platoon references with meta.platoon_index and squad references with
-						 * meta.squad_index. */
+						/* (as the original game, kept: a platoon reference is compared with the actor's squad,
+						and a squad reference with its platoon) */
 						case _ai_reference_type_squad:
 							if ((short)(((unsigned long)actor->external_orders.desired_target_ai_index >> 16) & UNSIGNED_CHAR_MAX) ==
 								prop_actor->meta.platoon_index)
@@ -5815,10 +5788,8 @@ static void actor_perception_refresh(
 				}
 				else
 				{
-					/* BUG (preserved for exact matching): January walks the perceiving actor's
-					 * swarm unit list (actor+0x24 through the actor_get(actor_index) pointer),
-					 * not the uncached swarm actor's list. A corrected build should start from
-					 * swarm_actor->meta.swarm_unit_index. */
+					/* (as the original game, kept: the perceiving actor's swarm is walked, not the swarm
+					actor's) */
 					long unit_index = actor->meta.swarm_unit_index;
 
 					while (unit_index != NONE)
@@ -5940,9 +5911,7 @@ static void actor_perception_refresh(
 					prop_position_refresh(actor_index, prop_index, &position, FALSE, FALSE);
 				}
 
-				/* BUG (preserved for exact matching): January leaves the loop before
-				 * advancing past the entry that reached the limit, so the discard loop
-				 * below also deletes that entry when it was an existing prop. */
+				/* (as the original game, kept: the entry that reached the limit is discarded below too) */
 				if (++enemies.accepted_count >= 4)
 				{
 					break;

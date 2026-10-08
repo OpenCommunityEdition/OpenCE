@@ -2623,16 +2623,7 @@ static boolean effect_allowed_by_environment(
 				888,
 				FALSE,
 				NULL);
-			/* BUG (original, preserved for exact matching): this arm leaves allowed
-			 * unassigned, and January returns it after the fatal assertion: 0x48b160 +0x5f mov al,[ebp-1]
-			 * reads the never-written byte slot. The later /Od+/RTC build attests the uninitialised
-			 * declaration: its single exit calls _RTC_UninitUse("allowed").
-			 * The read is not executed in January: display_assert returns into an unconditional
-			 * system_exit, which never returns (it jumps to halt_and_catch_fire, which loops, or calls
-			 * _exit on re-entry), and no other path reaches the read. The arm itself is entered only for
-			 * an environment value outside the four cases above, each of which assigns allowed; the
-			 * value comes from effect tag data, so this arm is not proven unreachable. A corrected build
-			 * assigns allowed in this arm. */
+			allowed = FALSE;
 			break;
 	}
 

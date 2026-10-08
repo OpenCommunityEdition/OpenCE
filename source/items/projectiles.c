@@ -1198,9 +1198,7 @@ static void projectile_calculate_deceleration(
 			definition,
 			definition->projectile.air_damage_range_lower_bound,
 			definition->projectile.air_damage_range_upper_bound);
-		/* BUG (preserved for exact matching): January loads the water upper bound
-		 * in the air branch. A corrected build should use
-		 * definition->projectile.air_damage_range_upper_bound. */
+		/* (as the original game, kept: in the air the water damage range's upper bound is used) */
 		projectile->projectile.maximum_damage_distance =
 			definition->projectile.water_damage_range_upper_bound;
 

@@ -714,11 +714,7 @@ static long hs_parse_cond_recursive(
 			long condition_expression_index = hs_syntax_get(expression_index)->data;
 			struct hs_syntax_node *condition_expression = hs_syntax_get(condition_expression_index);
 
-			/* BUG (preserved for exact matching): January tests the logical negation of the
-			 * result index against NONE, which is never true, so a clause without a result is
-			 * not rejected here.  A corrected build tests
-			 * condition_expression->next_node_index != NONE. */
-			if (!condition_expression->next_node_index != NONE)
+			if (condition_expression->next_node_index != NONE)
 			{
 				long if_then_expression_index = datum_new(hs_syntax_data);
 				long then_value_expression_index = datum_new(hs_syntax_data);
@@ -3012,13 +3008,7 @@ boolean hs_parse_begin(
 	{
 		if (argument_count < 1)
 		{
-			/* BUG (preserved for exact matching): January passes the function name
-			 * although this format has no conversion for it; the argument is ignored. */
-			sprintf(
-				hs_compile_globals.error_buffer,
-				"a statement block must contain at least one argument.",
-				hs_function_get(function_index)->name);
-			hs_compile_globals.error = hs_compile_globals.error_buffer;
+			hs_compile_globals.error = "a statement block must contain at least one argument.";
 			hs_compile_globals.error_offset = hs_syntax_get(expression_index)->source_offset;
 			result = FALSE;
 		}

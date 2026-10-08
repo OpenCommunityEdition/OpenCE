@@ -650,9 +650,9 @@ static short action_vehicle_find_impromptu_seat(
 	struct unit_datum *vehicle = unit_get(vehicle_index);
 	struct unit_definition *vehicle_definition =
 		unit_definition_get(vehicle->definition_index);
-	real_point3d best_entry_point;
-	real_vector3d best_entry_facing;
-	real_point3d best_hint_point;
+	real_point3d best_entry_point = { 0 };
+	real_vector3d best_entry_facing = { 0 };
+	real_point3d best_hint_point = { 0 };
 	long best_seat_index = NONE;
 	real best_seat_weight = 0.0f;
 	long seat_index;
@@ -688,13 +688,6 @@ static short action_vehicle_find_impromptu_seat(
 		}
 	}
 
-	/* BUG (preserved for exact matching): when no seat qualifies, best_seat_index stays
-	 * NONE and the three copies below store the never-assigned best_* locals (January
-	 * 0x40a1b0 +0xe2..+0x11d copies them with plain dword moves). Reachable whenever no
-	 * seat qualifies; the only caller, action_vehicle_setup_impromptu, reads the outputs
-	 * only when the returned seat index is not NONE. A corrected build should copy them
-	 * only when best_seat_index != NONE. Source-policy approval pending (2026-09-27 audit).
-	 */
 	if (entry_point)
 	{
 		*entry_point = best_entry_point;

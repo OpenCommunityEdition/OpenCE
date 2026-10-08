@@ -998,12 +998,8 @@ void unit_dialogue_update(
 
 	if (unit->unit.speech.damage_minor_timer > 0)
 		unit->unit.speech.damage_minor_timer--;
-	/* BUG (preserved for exact matching): January decrements damage_minor_timer
-	 * (+0x39C) a second time here and never touches damage_major_timer (+0x39E,
-	 * the field unit_make_damage_sound tests against zero and sets to 60), so a
-	 * unit's major pain vocalization is suppressed for good once one has played.
-	 * A corrected build should decrement damage_major_timer in this statement.
-	 */
+	/* (as the original game, kept: the minor pain timer counts down twice and the major one
+	not at all, so a unit cries out in major pain once) */
 	if (unit->unit.speech.damage_minor_timer > 0)
 		unit->unit.speech.damage_minor_timer--;
 

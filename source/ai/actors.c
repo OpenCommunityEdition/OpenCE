@@ -696,11 +696,8 @@ static void actor_verify_unit_activation(
 	struct unit_datum *unit = unit_get(unit_index);
 	struct actor_datum *actor = actor_get(actor_index);
 
-	/* BUG (preserved for exact matching): January tests
-	 * unit->unit.last_vehicle_index + 30 < game_time_get() here; the exact
-	 * unit_exit_seat_end proves last_vehicle_index at 0x2DC with the exit time in
-	 * the following long.  A corrected build should compare
-	 * unit->unit.game_time_at_last_vehicle_exit. */
+	/* (as the original game, kept: the vehicle's index is compared with the time, where
+	the time of the last vehicle exit was meant) */
 	if (unit->object.parent_object_index == NONE &&
 		unit->unit.last_vehicle_index + 30 < game_time_get())
 	{
