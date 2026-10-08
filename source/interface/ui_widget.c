@@ -3715,6 +3715,13 @@ static boolean ui_widget_load_children_recursive(
 	return result;
 }
 
+static boolean widget_pause_game_requested(boolean requested)
+{
+	/* port: pause gameplay, not the main-menu scene that keeps its animation
+	and music alive. Network co-op must also keep simulating behind dialogs. */
+	return requested && !we_are_at_the_main_menu && !network_coop_active();
+}
+
 static void widget_instance_initialize(
 	struct widget_instance *widget,
 	struct widget_instance *parent,
@@ -3739,10 +3746,8 @@ static void widget_instance_initialize(
 	widget->visible = TRUE;
 	widget->render_regardless_of_controller_index =
 		TEST_FLAG(definition->flags, _widget_render_regardless_of_controller_index_bit);
-	/* port: a network co-op game never pauses (it opens the campaign's pause
-	screen, which would) */
-	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-		!network_coop_active();
+	widget->pause_game_time = widget_pause_game_requested(
+		TEST_FLAG(definition->flags, _widget_pause_game_time_bit));
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -4545,7 +4550,8 @@ void display_error(
 				widget->widget_is_error_dialog = TRUE;
 				if (!widget->pause_game_time)
 				{
-					widget->pause_game_time = pause_game_time;
+					/* port: error overrides follow the same pause policy as other widgets. */
+					widget->pause_game_time = widget_pause_game_requested(pause_game_time);
 					if (widget->pause_game_time == TRUE)
 					{
 						match_vassert(
