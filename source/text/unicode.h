@@ -223,6 +223,14 @@ int usprintf(
 	wchar_t *string,
 	wchar_t const *format,
 	...);
+/* port: a map's text used as a format (its string lists' are) */
+int ustring_format_takes(
+	wchar_t const *format,
+	char const *conversions);
+wchar_t *ustrncpy_terminated(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long size);
 int uvsnprintf(
 	wchar_t *string,
 	unsigned long size,

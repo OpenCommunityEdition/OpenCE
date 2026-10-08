@@ -1337,8 +1337,77 @@ int usnprintf(
 	va_start(arglist, format);
 	result = _vsnwprintf(string, size, format, arglist);
 	va_end(arglist);
+	/* port: terminated when it is cut short, which MSVC's is not */
+	if (size > 0)
+		string[size - 1] = 0;
 
 	return result;
+}
+
+/* port: whether a format (a map's text: its string lists' are the game's
+formats) takes exactly the arguments conversions names, in order: 'd' an
+integer (%d, %i, %u, %x, %X, %o, %c), 's' a string (%s, %S), and no
+others. %% and the flags, widths and precisions are allowed; '*' (which
+takes an argument) and %n are not. A format that does not is shown as text
+by the callers, unformatted, so that a map cannot make the game read an
+argument as something it is not */
+int ustring_format_takes(
+	wchar_t const *format,
+	char const *conversions)
+{
+	if (!format || !conversions)
+		return FALSE;
+	while (*format)
+	{
+		char kind;
+
+		if (*format++ != L'%')
+			continue;
+		if (*format == L'%')
+		{
+			format++;
+			continue;
+		}
+		while (*format == L'-' || *format == L'+' || *format == L' ' || *format == L'#' || *format == L'0' ||
+			*format == L'.' || (*format >= L'0' && *format <= L'9'))
+		{
+			format++;
+		}
+		/* (the size prefixes the game's own formats use) */
+		if (*format == L'h' || *format == L'l' || *format == L'w')
+			format++;
+		switch (*format)
+		{
+		case L'd': case L'i': case L'u': case L'x': case L'X': case L'o': case L'c':
+			kind = 'd';
+			break;
+		case L's': case L'S':
+			kind = 's';
+			break;
+		default:
+			return FALSE;
+		}
+		format++;
+		if (*conversions++ != kind)
+			return FALSE;
+	}
+
+	return *conversions == 0;
+}
+
+/* port: at most size - 1 characters of src, always terminated */
+wchar_t *ustrncpy_terminated(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long size)
+{
+	if (size > 0)
+	{
+		wcsncpy(dest, src ? src : L"", size - 1);
+		dest[size - 1] = 0;
+	}
+
+	return dest;
 }
 
 int usprintf(

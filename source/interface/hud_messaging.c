@@ -1875,10 +1875,12 @@ void hud_messaging_update(
 					wchar_t formatted[256];
 					short value_scale = MAX(item->item.hud_message_value_scale, 1);
 
-					usprintf(
-						formatted,
-						item_text,
-						message->quantity / value_scale);
+					/* port: the item's text (the map's) is the format: as
+					one only if it takes the count alone, and bounded */
+					if (item_text && ustring_format_takes(item_text, "d"))
+						usnprintf(formatted, NUMBEROF(formatted), item_text, message->quantity / value_scale);
+					else
+						ustrncpy_terminated(formatted, item_text, NUMBEROF(formatted));
 					rasterizer_draw_unicode_string(
 						&message_bounds,
 						NULL,
