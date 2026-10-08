@@ -41,6 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "following_camera.h"
+#include "errors.h"
 #include "observer.h"
 
 #include "static_camera.h"
@@ -405,6 +406,62 @@ static void camera_track_splut(
 		camera_track_index);
 	t = (pitch + _pi / 2.f) * (1.f / _pi);
 	control_point_count = camera_track->control_points.count;
+	/* The curve below reads four control points. A custom map can supply
+	fewer. Sample the points it has instead of stopping the game. */
+	if (control_point_count < 4)
+	{
+		static boolean short_track_reported = FALSE;
+		struct camera_track_control_point *start_point;
+		struct camera_track_control_point *end_point;
+		real span;
+		real fraction;
+		long sample_index;
+
+		if (!short_track_reported)
+		{
+			error(_error_silent,
+				"following camera: a camera track has %ld control points, and the curve wants four, so the camera uses the points it has",
+				control_point_count);
+			short_track_reported = TRUE;
+		}
+		if (control_point_count < 1)
+		{
+			offset->i = 0.0f;
+			offset->j = 0.0f;
+			offset->k = 0.0f;
+			return;
+		}
+		if (t < 0.0f)
+			t = 0.0f;
+		else if (t > 1.0f)
+			t = 1.0f;
+		span = (real)(control_point_count - 1) * t;
+		sample_index = (long)span;
+		if (sample_index >= control_point_count - 1)
+		{
+			sample_index = control_point_count - 1;
+			fraction = 0.0f;
+		}
+		else if (sample_index < 0)
+		{
+			sample_index = 0;
+			fraction = 0.0f;
+		}
+		else
+			fraction = span - (real)sample_index;
+		start_point = TAG_BLOCK_GET_ELEMENT(
+			&camera_track->control_points,
+			sample_index,
+			struct camera_track_control_point);
+		end_point = TAG_BLOCK_GET_ELEMENT(
+			&camera_track->control_points,
+			sample_index + 1 < control_point_count ? sample_index + 1 : sample_index,
+			struct camera_track_control_point);
+		offset->i = start_point->position.i + (end_point->position.i - start_point->position.i) * fraction;
+		offset->j = start_point->position.j + (end_point->position.j - start_point->position.j) * fraction;
+		offset->k = start_point->position.k + (end_point->position.k - start_point->position.k) * fraction;
+		return;
+	}
 	frame_index = (long)((control_point_count - 1) * t);
 	control_point_index = (short)frame_index;
 	h = 1.f / (control_point_count - 1);
