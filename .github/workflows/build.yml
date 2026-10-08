@@ -112,7 +112,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: build/android/third_party
-          key: android-third-party-${{ hashFiles('tools/android_build.py') }}
+          key: android-third-party-${{ hashFiles('tools/android_build.py', 'port/android/patches/**') }}
 
       - uses: actions/cache@v4
         with:
