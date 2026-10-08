@@ -379,8 +379,8 @@ void bitmap_fill_rectangle(
 	short alpha, inverse_alpha;
 	short x_minimum, x_maximum, y_minimum, y_maximum;
 	short width, y;
-	short mode;
-	long pixel;
+	short mode = 0;
+	long pixel = 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\bitmaps\\bitmap_drawing.c",
@@ -402,10 +402,6 @@ void bitmap_fill_rectangle(
 			mode = (alpha != 255) ? _bitmap_fill_blend_r5g6b5 : _bitmap_fill_write_16bit;
 			break;
 
-		/* mode and pixel are left unassigned only by this default arm. Not reached unassigned: the
-		 * arm's assertion failure calls system_exit, which does not return in January
-		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_drawing.c",
@@ -1050,8 +1046,8 @@ void bitmap_draw_line(
 	short y_maximum = destination->height;
 	short alpha = color >> 24;
 	short inverse_alpha = 255 - alpha;
-	short mode;
-	long pixel;
+	short mode = 0;
+	long pixel = 0;
 	point2d point0, point1;
 	struct bitmap_line_state state;
 
@@ -1079,10 +1075,6 @@ void bitmap_draw_line(
 			mode = (alpha != 255) ? _bitmap_pixel_blend_a8r8g8b8 : _bitmap_pixel_write_32bit;
 			break;
 
-		/* mode and pixel are left unassigned only by this default arm. Not reached unassigned: the
-		 * arm's assertion failure calls system_exit, which does not return in January
-		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			match_vassert(
 				"c:\\halo\\SOURCE\\bitmaps\\bitmap_drawing.c",

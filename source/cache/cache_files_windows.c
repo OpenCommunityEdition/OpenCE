@@ -917,7 +917,7 @@ short cache_file_read(
 short cache_files_precache_map_status(
 	real *progress)
 {
-	short status;
+	short status = _cached_map_file_failed;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
@@ -943,10 +943,6 @@ short cache_files_precache_map_status(
 			status = _cached_map_file_success;
 			break;
 
-		/* status is left unassigned only by this default arm. Not reached unassigned: the
-		 * arm's assertion failure calls system_exit, which does not return in January
-		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			match_vassert("c:\\halo\\SOURCE\\cache\\cache_files_windows.c", 1013, FALSE, NULL);
 			break;
@@ -1332,10 +1328,6 @@ static short cached_map_files_find_free_map(
 			last_map_file_index = 2;
 			break;
 
-		/* first_map_file_index and last_map_file_index are left unassigned only by this default arm. Not reached unassigned: the
-		 * arm's assertion failure calls system_exit, which does not return in January
-		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-		 * Source-policy approval pending (2026-09-27 audit). */
 		/* port: the type is the map's header's, and a release build's assertion
 		goes on: a type no cache file is for finds none */
 		default:

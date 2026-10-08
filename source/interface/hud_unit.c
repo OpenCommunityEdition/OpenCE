@@ -607,8 +607,8 @@ void hud_render_damage_indicators(
 	{
 		struct hud_damage_indicators_definition *definition =
 			&hud_globals->damage_indicators;
-		real theta;
-		real_point2d screen_position;
+		real theta = 0.0f;
+		real_point2d screen_position = { 0 };
 		real scale = hud_globals_get_scale(local_player_count() > 1);
 		byte damage_indicators[NUMBER_OF_HUD_DAMAGE_INDICATOR_DIRECTIONS];
 		short direction;
@@ -671,10 +671,6 @@ void hud_render_damage_indicators(
 							render.camera.viewport_bounds.y1) / 2);
 					break;
 
-				/* theta and screen_position are left unassigned only by this default arm. Not reached unassigned: the
-				 * arm's assertion failure calls system_exit, which does not return in January
-				 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-				 * Source-policy approval pending (2026-09-27 audit). */
 				default:
 					match_assert(
 						"c:\\halo\\SOURCE\\interface\\hud_unit.c",

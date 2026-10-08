@@ -787,7 +787,7 @@ static void hud_draw_multitexture_overlay(
 	{
 		static real theta;
 		struct multitexture_overlay_hud_element_effector_definition *effector;
-		real source_value;
+		real source_value = 0.0f;
 		real dest_value;
 		real_rgb_color dest_color;
 
@@ -839,10 +839,6 @@ static void hud_draw_multitexture_overlay(
 			break;
 		}
 
-		/* The switch above has no default: a source value outside the eight enumerators
-		 * leaves source_value unassigned for the interpolation below. Not shown reachable:
-		 * the value comes from hud tag data, which was not scanned. Source-policy approval
-		 * pending (2026-09-27 audit). */
 		if (effector->in_bounds[1] == effector->in_bounds[0] ||
 			effector->out_bounds[1] == effector->out_bounds[0])
 		{

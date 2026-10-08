@@ -829,8 +829,8 @@ static long actor_look_idle_timer(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct actor_definition *definition = actor_definition_get(actor->meta.definition_index);
 	struct weapon_definition *weapon_definition = actor_get_weapon_definition(actor_index);
-	real time_lower_bound;
-	real time_upper_bound;
+	real time_lower_bound = 0.0f;
+	real time_upper_bound = 0.0f;
 	real time;
 	long ticks;
 
@@ -848,10 +848,6 @@ static long actor_look_idle_timer(
 		time_lower_bound = looking_definition->idle_look_time_lower_bound;
 		time_upper_bound = looking_definition->idle_look_time_upper_bound;
 		break;
-	/* time_lower_bound and time_upper_bound are left unassigned only by this default arm. Not reached unassigned: the
-	 * arm's assertion failure calls system_exit, which does not return in January
-	 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-	 * Source-policy approval pending (2026-09-27 audit). */
 	default:
 		match_vassert(
 			"c:\\halo\\SOURCE\\ai\\actor_looking.c",

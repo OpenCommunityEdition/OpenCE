@@ -415,7 +415,7 @@ boolean recorded_animation_apply_event_stream(
 	byte const *playback_stream_end)
 {
 	struct animation_event_header const *header;
-	word time_delta;
+	word time_delta = 0;
 	word header_size;
 	recorded_animation_apply_proc apply;
 
@@ -466,10 +466,6 @@ boolean recorded_animation_apply_event_stream(
 				time_delta>UNSIGNED_CHAR_MAX);
 			break;
 
-		/* time_delta is left unassigned only by this default arm. Not reached unassigned: the
-		 * arm's assertion failure calls system_exit, which does not return in January
-		 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-		 * Source-policy approval pending (2026-09-27 audit). */
 		default:
 			match_assert(
 				"c:\\halo\\SOURCE\\cutscene\\recorded_animation_playback.c",

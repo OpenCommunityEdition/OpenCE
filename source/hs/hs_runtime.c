@@ -1046,7 +1046,7 @@ void render_debug_trigger_volumes(
 {
 	if (debug_trigger_volumes)
 	{
-		real_matrix4x3 matrix;
+		real_matrix4x3 matrix = { 0 };
 		short volume_index;
 		struct scenario *scenario = global_scenario_get();
 
@@ -1091,10 +1091,6 @@ void render_debug_trigger_volumes(
 				matrix4x3_transform_vector(&matrix, &local_extent, &world_extent);
 				break;
 
-			/* matrix is left unassigned only by this default arm. Not reached unassigned: the
-			 * arm's assertion failure calls system_exit, which does not return in January
-			 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-			 * Source-policy approval pending (2026-09-27 audit). */
 			default:
 				match_assert(
 					"c:\\halo\\SOURCE\\hs\\hs_runtime.c",

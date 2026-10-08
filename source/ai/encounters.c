@@ -2190,7 +2190,7 @@ void encounter_create(
 			struct squad_definition *squad_definition = TAG_BLOCK_GET_ELEMENT(
 				&encounter_definition->squads, squad_index, struct squad_definition);
 			short initial_variant;
-			short count;
+			short count = 0;
 			short actor_type;
 			short i;
 
@@ -2214,10 +2214,6 @@ void encounter_create(
 			case _game_difficulty_level_impossible:
 				count = squad_definition->max_count;
 				break;
-			/* count is left unassigned only by this default arm. Not reached unassigned: the
-			 * arm's assertion failure calls system_exit, which does not return in January
-			 * (0x47c960 jumps to halt_and_catch_fire 0x4f21c0, which loops or calls exit).
-			 * Source-policy approval pending (2026-09-27 audit). */
 			default:
 				match_vassert("c:\\halo\\SOURCE\\ai\\encounters.c", 1730, FALSE, NULL);
 			}

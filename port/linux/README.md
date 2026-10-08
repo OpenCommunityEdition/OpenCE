@@ -944,7 +944,7 @@ These files supply the MSVC functions that clang does not have:
 | `port/include/xdk` | The Xbox SDK declarations. The compiler reads this folder after all the other folders. |
 | `tools/linux_msvc_semantics.py` | Makes a header that declares each struct tag at file scope, as MSVC does. It also makes the header inline functions weak, as the COMDAT functions of MSVC. `game/msvc_comdat.c` gives one external copy of each. |
 | `include/halo_linux_winsock_names.h` | Gives new names to the Winsock functions of the SDK. Thus they do not link to the glibc functions with the same names. |
-| `include/halo_linux_source_fixups.h` | Repairs one declaration conflict (`rasterizer_debug_drawing_begin`). |
+| `include/halo_linux_source_fixups.h` | Declares the port's functions that the game's sources call. |
 
 `tools/linux_link_check.py` stops the link if a weak reference has no
 definition. Without this check, the linker gives the reference the address
