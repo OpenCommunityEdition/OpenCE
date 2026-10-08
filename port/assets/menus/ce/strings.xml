@@ -1111,6 +1111,7 @@
 		<string text="ROCKET WARTHOGS"/>
 		<string text="BANSHEES"/>
 		<string text="GUN TURRETS"/>
+		<string text="PC"/>
 		<string text="CUSTOM"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicles_respawn">
