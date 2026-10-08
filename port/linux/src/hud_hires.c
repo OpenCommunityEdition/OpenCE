@@ -111,7 +111,7 @@ int hud_hires_override_coverage(long asset)
 
 int hud_hires_override_point_threshold(long asset)
 {
-	return asset >= 0 && (unsigned long)asset < hud_hires_embedded_count && hud_hires_embedded[asset].point_threshold;
+	return asset >= 0 && asset < hud_hires_asset_count() && hud_hires_embedded[asset].point_threshold;
 }
 
 /* ---------- decoding */
