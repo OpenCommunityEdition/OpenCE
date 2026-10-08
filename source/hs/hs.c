@@ -3666,6 +3666,8 @@ enum
 	_hs_node_refusal_global,
 	_hs_node_refusal_arguments,
 	_hs_node_refusal_damaged,
+	_hs_node_refusal_downloaded_function,
+	_hs_node_refusal_downloaded_global,
 };
 
 /* ---------- globals */
@@ -12888,6 +12890,51 @@ static boolean hs_syntax_node_linked_twice(
 	return twice;
 }
 
+/* port: what a downloaded map's scripts (map_is_downloaded: one a map
+download brought, or game.downloaded_maps names) may not call or set, on top
+of what no map's may (hs_function_allowed_in_maps,
+hs_external_global_settable_by_maps): what changes the player's settings
+(their profile's), other players' games (ending a game for everyone, the
+HUD text every player sees), and the globals that outlive the map (they
+keep their values into the maps played after it, a host's other players'
+among them) */
+static char const *const hs_functions_denied_to_downloaded_maps[]=
+{
+	"player0_look_invert_pitch",
+	"sv_end_game",
+	"sv_say",
+	NULL
+};
+
+static char const *const hs_globals_denied_to_downloaded_maps[]=
+{
+	"cheat_deathless_player",
+	"rider_ejection",
+	"stun_enable",
+	"rasterizer_near_clip_distance",
+	"rasterizer_far_clip_distance",
+	"rasterizer_first_person_weapon_near_clip_distance",
+	"rasterizer_first_person_weapon_far_clip_distance",
+	NULL
+};
+
+/* port: whether the map whose scripts are checked is a downloaded one
+(hs_scenario_functions_check) */
+static boolean hs_scenario_downloaded = FALSE;
+
+static boolean hs_name_listed(
+	char const *name,
+	char const *const *list)
+{
+	for (; name && *list; list++)
+	{
+		if (!csstrcmp(name, *list))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 /* port: why a map's script may not have the node (_hs_node_refusal_none if
 it may), and the function or global it names. A map may not have:
 - a link (to the next argument, or a call's first node) that isn't a node:
@@ -12935,6 +12982,8 @@ static short hs_syntax_node_refusal(
 	*name = function->name;
 	if (!hs_function_allowed_in_maps[function_index])
 		return _hs_node_refusal_function;
+	if (hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
+		return _hs_node_refusal_downloaded_function;
 
 	if (function->parse == hs_macro_function_parse)
 	{
@@ -13002,6 +13051,12 @@ static short hs_syntax_node_refusal(
 		{
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
 			return _hs_node_refusal_global;
+		}
+		if ((designator & 0x8000) && hs_scenario_downloaded &&
+			hs_name_listed(hs_global_external_get(designator & 0x7FFF)->name, hs_globals_denied_to_downloaded_maps))
+		{
+			*name = hs_global_external_get(designator & 0x7FFF)->name;
+			return _hs_node_refusal_downloaded_global;
 		}
 	}
 	else if (function_index == _hs_function_wake)
@@ -13112,6 +13167,11 @@ static void hs_scenario_functions_check(
 	short disabled_global_count = 0;
 	char reason[128];
 
+	/* (a downloaded map's are held to tighter rules: map_share.c's
+	map_share_map_downloaded) */
+	hs_scenario_downloaded = map_share_map_downloaded(cache_file_loaded_map_name());
+	if (hs_scenario_downloaded)
+		error(_error_silent, "%s is a downloaded map: its scripts may call and set less", cache_file_loaded_map_name());
 	csmemset(hs_syntax_nodes_marked, 0, sizeof(hs_syntax_nodes_marked));
 	for (script_index = 0; script_index<scenario->hs_scripts.count; script_index++)
 	{
@@ -13218,6 +13278,12 @@ static void hs_scenario_functions_check(
 			break;
 		case _hs_node_refusal_global:
 			csprintf(reason, "sets %s, which a map's scripts may not", first_name);
+			break;
+		case _hs_node_refusal_downloaded_function:
+			csprintf(reason, "calls %s, which a downloaded map's scripts may not", first_name);
+			break;
+		case _hs_node_refusal_downloaded_global:
+			csprintf(reason, "sets %s, which a downloaded map's scripts may not", first_name);
 			break;
 		case _hs_node_refusal_arguments:
 			csprintf(reason, "calls %s with arguments it doesn't take", first_name);

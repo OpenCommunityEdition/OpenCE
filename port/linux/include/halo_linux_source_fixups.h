@@ -26,6 +26,11 @@ void render_interpolation_first_person(short local_player_index, struct real_mat
 	short node_count, struct render_camera const *camera);
 float render_interpolation_game_time_sec(long ticks);
 
+/* whether the map being loaded, by the name it was loaded by, is a
+downloaded one, whose scripts may call and set less: one map sharing
+downloaded, or one game.downloaded_maps names (port/linux/game/map_share.c) */
+int map_share_map_downloaded(char const *map_name);
+
 /* an IP address as the log may show it: a public one as a tag of the run's,
 never whole (port/linux/src/log_address.c, log_address.h) */
 const char *log_address(const unsigned char *bytes, int length, int port, char *text, int size);

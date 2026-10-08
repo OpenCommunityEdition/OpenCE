@@ -361,11 +361,11 @@ static const struct config_setting config_settings[] =
 		"progress; the console's profile_reset_campaign starts one over." },
 
 	{ "game.downloaded_maps", _config_string, "\"\"", "HALO_DOWNLOADED_MAPS", _environment_value, _platform_all,
-		"Maps played as downloaded ones (until the game downloads maps itself):\n"
-		"their names, as the game names them (bloodgulch, hugeass@ce), separated\n"
-		"by commas, or \"*\" for every map. A downloaded map's scripts may not\n"
-		"change the player's settings or other players' games (debug.txt names\n"
-		"what they were refused)." },
+		"Maps played as downloaded ones, besides those map sharing downloaded:\n"
+		"their names (bloodgulch, hugeass), separated by commas, or \"*\" for\n"
+		"every map. A downloaded map's scripts may not change the player's\n"
+		"settings or other players' games (debug.txt names what they were\n"
+		"refused)." },
 
 	{ "game.move_old_map_folders", _config_string, "\"ask\"", "HALO_MOVE_OLD_MAP_FOLDERS", _environment_value,
 		_platform_all,
