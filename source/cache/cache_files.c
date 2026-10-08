@@ -869,7 +869,8 @@ boolean cache_file_header_verify(
 		header->footer_signature != CACHE_FILE_FOOTER_SIGNATURE ||
 		header->file_length < 0 ||
 		header->file_length > 0x11600000 ||
-		csstrlen(header->name) > 31)
+		/* port: its name ends within its field (csstrlen read on past it) */
+		!memchr(header->name, 0, sizeof(header->name)))
 	{
 		if (fatal)
 		{
