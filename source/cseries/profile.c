@@ -276,6 +276,7 @@ symbols in this file:
 #include "main/main.h"
 #include "game/players.h"
 
+#include <stdarg.h>
 #include <xtl.h>
 
 /* ---------- constants */
@@ -1302,6 +1303,26 @@ static void profile_timesection_inherit(
 	return;
 }
 
+/* (never past maximum_length, and always terminated) */
+static void profile_append(
+	char *string,
+	short maximum_length,
+	char const *format,
+	...)
+{
+	long length = csstrlen(string);
+	va_list arguments;
+
+	if (length >= maximum_length - 1)
+		return;
+	va_start(arguments, format);
+	_vsnprintf(string + length, maximum_length - length - 1, format, arguments);
+	va_end(arguments);
+	string[maximum_length - 1] = 0;
+
+	return;
+}
+
 static void profile_describe_frame(
 	struct profile_frame *frame,
 	char *string,
@@ -1312,14 +1333,9 @@ static void profile_describe_frame(
 	short game_tick_index;
 	short window_index;
 
-	/* BUG (preserved for exact matching): January repeatedly appends with
-	 * maximum_length-strlen without handling CRT truncation or exhaustion.
-	 * A 512-byte dump buffer can be exhausted by the legal 150-tick record.
-	 * A corrected build should bound appends and guarantee NUL termination.
-	 */
 	csstrcpy(string, "");
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string),
+	profile_append(string, maximum_length,
 		"frame %5d vbl %5I64d tot%6.2f",
 		frame->frame_index,
 		frame->vertical_blank_index,
@@ -1329,113 +1345,113 @@ static void profile_describe_frame(
 	{
 		if (global_frame_rate_throttle)
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(lost%3d)", frame->lapsed_frames);
+			profile_append(string, maximum_length, "(lost%3d)", frame->lapsed_frames);
 		}
 		else
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(free%3d)", frame->lapsed_frames);
+			profile_append(string, maximum_length, "(free%3d)", frame->lapsed_frames);
 		}
 	}
 	else if (frame->lapsed_msec>0)
 	{
 		if (global_frame_rate_throttle)
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(l.%3dms)", frame->lapsed_msec);
+			profile_append(string, maximum_length, "(l.%3dms)", frame->lapsed_msec);
 		}
 		else
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(f.%3dms)", frame->lapsed_msec);
+			profile_append(string, maximum_length, "(f.%3dms)", frame->lapsed_msec);
 		}
 	}
 	else
 	{
 		if (frame->lapsed_msec_valid)
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(slowed) ");
+			profile_append(string, maximum_length, "(slowed) ");
 		}
 		else
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "(synced) ");
+			profile_append(string, maximum_length, "(synced) ");
 		}
 	}
 
 	if (frame->idle.frame_total>0.0f)
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "idle%6.2f ", frame->idle.frame_total);
+		profile_append(string, maximum_length, "idle%6.2f ", frame->idle.frame_total);
 	}
 	else
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "           ", frame->idle.frame_total);
+		profile_append(string, maximum_length, "           ");
 	}
 
 	game_tick_display_count = MAX(frame->game_tick_count, 8);
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "game%2d ", frame->game_tick_count);
+	profile_append(string, maximum_length, "game%2d ", frame->game_tick_count);
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " (");
+	profile_append(string, maximum_length, " (");
 
 	for (game_tick_index = 0; game_tick_index<game_tick_display_count; game_tick_index++)
 	{
 		if (game_tick_index<frame->game_tick_count)
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "%6.2f%s",
+			profile_append(string, maximum_length, "%6.2f%s",
 				frame->game_ticks[game_tick_index].frame_total,
 				game_tick_index<game_tick_display_count-1 ? " " : "");
 		}
 		else
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "      %s",
+			profile_append(string, maximum_length, "      %s",
 				game_tick_index<game_tick_display_count-1 ? " " : "");
 		}
 	}
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), ")");
+	profile_append(string, maximum_length, ")");
 
 	window_display_count = MAX(frame->window_count, local_player_count()+1);
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " render%6.2f", frame->render.total);
+	profile_append(string, maximum_length, " render%6.2f", frame->render.total);
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), " (");
+	profile_append(string, maximum_length, " (");
 
 	for (window_index = 0; window_index<window_display_count; window_index++)
 	{
 		if (window_index<frame->window_count)
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "%s%6.2f%s",
+			profile_append(string, maximum_length, "%s%6.2f%s",
 				frame->window_ids[window_index] ? "p" : "n",
 				frame->windows[window_index].frame_total,
 				window_index<window_display_count-1 ? " " : "");
 		}
 		else
 		{
-			_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "       %s",
+			profile_append(string, maximum_length, "       %s",
 				window_index<window_display_count-1 ? " " : "");
 		}
 	}
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), ")");
+	profile_append(string, maximum_length, ")");
 
 	if (frame->stall.frame_total>0.0f)
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "stall%6.2f ", frame->stall.frame_total);
+		profile_append(string, maximum_length, "stall%6.2f ", frame->stall.frame_total);
 	}
 	else
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "            ", frame->stall.frame_total);
+		profile_append(string, maximum_length, "            ");
 	}
 
 	if (frame->texture.frame_total>0.0f)
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "tex%6.2f ", frame->texture.frame_total);
+		profile_append(string, maximum_length, "tex%6.2f ", frame->texture.frame_total);
 	}
 	else
 	{
-		_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "          ", frame->texture.frame_total);
+		profile_append(string, maximum_length, "          ");
 	}
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "r-misc %6.2f ", frame->render.frame_total);
+	profile_append(string, maximum_length, "r-misc %6.2f ", frame->render.frame_total);
 
-	_snprintf(string+csstrlen(string), maximum_length-csstrlen(string), "f-misc %6.2f ", frame->frame.frame_total);
+	profile_append(string, maximum_length, "f-misc %6.2f ", frame->frame.frame_total);
 
 	csstrncat(string+csstrlen(string), frame->lapsed_reason, maximum_length-csstrlen(string));
 
@@ -1661,17 +1677,7 @@ int compare_profile_sections(
 
 			default:
 				match_assert("c:\\halo\\SOURCE\\cseries\\profile.c", 844, !"unreachable");
-				/* BUG (original, preserved for exact matching): this arm leaves result
-				 * unassigned, and January returns it after the fatal assertion: 0x47e840 +0x61 mov eax,[ebp+8]
-				 * reads the dead first-parameter home. The Sept-25-2001 build is identical; the Aug-15-2001
-				 * build reads its uninitialised [ebp-4] slot the same way. The later /Od+/RTC build attests the
-				 * uninitialised declaration: its single exit calls _RTC_UninitUse("result").
-				 * The arm is unreachable in defined execution. compare_type is written only by profile_dump,
-				 * after its sort_mode range assertion; January's two profile_dump callers pass 0/1 and 2; and
-				 * each of the NUMBER_OF_PROFILE_SORT_MODES (3) modes has a case above that assigns result.
-				 * Were the arm entered, display_assert returns into an unconditional system_exit, which never
-				 * returns: halt_and_catch_fire loops, or calls exit() on re-entry. So the uninitialised return
-				 * is not executed in January. A corrected build assigns result in this arm. */
+				result = 0;
 				break;
 		}
 	}
