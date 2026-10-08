@@ -84,6 +84,12 @@ int posix_find_entry_case_insensitive(const char *directory, const char *name,
 Winsock and BSD share the sockaddr_in layout, so addresses pass through as
 opaque pointers. Every call returns -1 on failure with the equivalent
 Winsock error code available from posix_socket_last_error(). */
+#ifdef __APPLE__
+/* (Not Darwin's, the macOS port's host, port/macos/host: its sockaddr
+starts with a length byte and a one-byte family where Winsock's has a 16-bit
+family. The addresses these take and give are still Winsock's, which the
+guest uses; posix_net.c converts them.) */
+#endif
 
 int posix_socket_last_error(void);
 int posix_socket(int family, int type, int protocol);

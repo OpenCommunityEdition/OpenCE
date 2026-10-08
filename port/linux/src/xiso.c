@@ -58,9 +58,15 @@ includes software developed by in <in@fishtank.com>.
 */
 
 /* (the desktop ports only: the Android app imports the game data itself) */
-#ifndef HALO_ANDROID
+#ifndef HALO_GUEST
 
+#ifdef __APPLE__
+/* (and the macOS port's host, port/macos/host/host_launcher.c, whose own
+guest has no data offer: it has no platform layer, but this log) */
+void platform_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
+#else
 #include "platform.h"
+#endif
 #include "posix.h"
 #include "xiso.h"
 

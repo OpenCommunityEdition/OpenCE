@@ -81,7 +81,17 @@ static int port_unused(unsigned short port)
 	if (socket < 0)
 		return 0;
 	memset(&address, 0, sizeof(address));
+#ifdef __APPLE__
+	{
+		/* posix_socket_bind takes the guest's (Winsock's) layout, a 16-bit
+		family where Darwin's has a length byte and a one-byte family */
+		unsigned short family = AF_INET;
+
+		memcpy(&address, &family, sizeof(family));
+	}
+#else
 	address.sin_family = AF_INET;
+#endif
 	address.sin_port = port;
 	unused = posix_socket_bind(socket, &address, sizeof(address)) == 0;
 	posix_socket_close(socket);

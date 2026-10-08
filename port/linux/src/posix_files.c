@@ -30,6 +30,16 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	if (!(st->st_mode & S_IWUSR))
 		information->flags |= _posix_file_is_read_only;
 	split64((unsigned long long)st->st_size, &information->size_low, &information->size_high);
+#ifdef __APPLE__
+	/* (the macOS port's host: Darwin names the times st_*timespec) */
+	information->modification_seconds = (posix_ulong)st->st_mtimespec.tv_sec;
+	information->modification_nanoseconds = (posix_ulong)st->st_mtimespec.tv_nsec;
+	information->access_seconds = (posix_ulong)st->st_atimespec.tv_sec;
+	information->access_nanoseconds = (posix_ulong)st->st_atimespec.tv_nsec;
+	/* Darwin keeps a real creation time, the file's birth time */
+	information->creation_seconds = (posix_ulong)st->st_birthtimespec.tv_sec;
+	information->creation_nanoseconds = (posix_ulong)st->st_birthtimespec.tv_nsec;
+#else
 	information->modification_seconds = (posix_ulong)st->st_mtim.tv_sec;
 	information->modification_nanoseconds = (posix_ulong)st->st_mtim.tv_nsec;
 	information->access_seconds = (posix_ulong)st->st_atim.tv_sec;
@@ -37,6 +47,7 @@ static void fill_information(const struct stat *st, struct posix_file_informatio
 	/* Linux has no portable creation time; the change time is the closest */
 	information->creation_seconds = (posix_ulong)st->st_ctim.tv_sec;
 	information->creation_nanoseconds = (posix_ulong)st->st_ctim.tv_nsec;
+#endif
 }
 
 int posix_stat(const char *path, struct posix_file_information *information)
