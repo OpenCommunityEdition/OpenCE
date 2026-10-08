@@ -19,6 +19,13 @@ Conventions carried over from the Xbox:
   their Data field. A texture whose data is a render target samples the GL
   render target directly (render-to-texture).
 - Vertex data is read from guest memory at draw time.
+
+The GLES path (HALO_GLES) serves Android's OpenGL ES 3 and macOS's desktop
+OpenGL 4.1, which have no glClipControl and none of desktop GL's 4.2-4.5
+functions: the vertex shaders flip y and remap depth instead, the front face
+is inverted, and dynamic vertex data streams through a fenced ring of
+buffers. gl_initialize picks the capabilities at run time
+(port/android/README.md, port/macos/README.md).
 */
 
 #include "xgpu.h"
