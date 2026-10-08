@@ -1,0 +1,22 @@
+# Host functions the macOS guest imports beyond port/android/host_imports.list
+# (which it imports too): the SDL calls of the platform layer's desktop
+# branches. Declared in port/android/guest/runtime/guest_host.h (under
+# HALO_MACOS), defined in port/macos/host/host_sdl.c. tools/android_imports.py
+# generates the stubs from both lists.
+host_sdl_ticks_ns
+host_sdl_delay_precise
+host_sdl_pump_events
+host_sdl_push_event
+host_sdl_window_flags
+host_sdl_window_size
+host_sdl_set_window_size
+host_sdl_set_window_fullscreen
+host_sdl_set_window_fullscreen_mode
+host_sdl_warp_mouse_in_window
+host_sdl_primary_display
+host_sdl_display_for_window
+host_sdl_display_usable_bounds
+host_sdl_display_mode
+host_sdl_fullscreen_display_modes
+host_sdl_closest_fullscreen_display_mode
+host_sdl_show_message_box
