@@ -1178,11 +1178,7 @@ static void bitmap_cm_smooth(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x354, bitmap->type==_bitmap_type_cube_map);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x355, filter_coefficients);
 
-	/* BUG (preserved for exact matching): January passes a newline as an
-	 * unused vararg even though the format has no conversion. A corrected
-	 * build should append the newline to the format string instead.
-	 */
-	fprintf(stdout, "### WARNING tried to smooth a cube map", "\r\n");
+	fprintf(stdout, "### WARNING tried to smooth a cube map\r\n");
 	fflush(stdout);
 
 	return;
@@ -1365,8 +1361,7 @@ static void bitmap_3d_sharpen(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E4, positive_table);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3E5, negative_table);
 
-	/* BUG (preserved for exact matching): see bitmap_cm_smooth. */
-	fprintf(stdout, "### WARNING tried to sharpen a 3d bitmap", "\r\n");
+	fprintf(stdout, "### WARNING tried to sharpen a 3d bitmap\r\n");
 	fflush(stdout);
 
 	return;
@@ -1383,8 +1378,7 @@ static void bitmap_cm_sharpen(
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F5, positive_table);
 	match_assert("c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x3F6, negative_table);
 
-	/* BUG (preserved for exact matching): see bitmap_cm_smooth. */
-	fprintf(stdout, "### WARNING tried to sharpen a cube map", "\r\n");
+	fprintf(stdout, "### WARNING tried to sharpen a cube map\r\n");
 	fflush(stdout);
 
 	return;

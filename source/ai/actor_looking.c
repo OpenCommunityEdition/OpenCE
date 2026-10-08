@@ -1116,14 +1116,10 @@ static boolean actor_look_decode_direction(
 			switch (specification->type)
 			{
 			case _direction_specification_movement:
-				/* BUG (preserved for exact matching): January loads the point's
-				 * z field twice (actor + 0x514). A corrected diagnostic should
-				 * print the y field as its second point component.
-				 */
 				sprintf(temporary, "denormalized %f: %smoving (p%f %f %f) (v%f %f %f)",
 					magnitude, actor->control.moving ? "" : "not ",
 					actor->control.moving_towards_point.x,
-					actor->control.moving_towards_point.z,
+					actor->control.moving_towards_point.y,
 					actor->control.moving_towards_point.z,
 					actor->control.moving_towards_vector.i,
 					actor->control.moving_towards_vector.j,

@@ -272,12 +272,7 @@ void breakable_surface_damage_area_of_effect(
 
 		if (cutoff_radius > 4.0f)
 		{
-			/* BUG (preserved for exact matching): %d is given a real, which the variadic call
-			 * passes as a double (January 0x536430 +0x73..+0x79 fstp qword [esp]), so the
-			 * message prints the double's low word. Reached for damaging area-of-effect damage
-			 * with a cutoff radius above 4 while breakable surfaces are enabled. A corrected
-			 * build should use %f. Source-policy approval pending (2026-09-27 audit). */
-			error(_error_silent, "WARNING: area of effect breakable surface damage with radius %d", cutoff_radius);
+			error(_error_silent, "WARNING: area of effect breakable surface damage with radius %f", cutoff_radius);
 		}
 
 		/* port: no more than the globals hold (MAXIMUM_BREAKABLE_SURFACES_PER_MAP:

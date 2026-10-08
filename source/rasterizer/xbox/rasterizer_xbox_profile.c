@@ -630,17 +630,7 @@ static void profile_assert(
 		}
 		else
 		{
-			/* BUG (preserved for exact matching): January pushes the same two
-			 * varargs (profile, message) in both branches (target push and
-			 * relocation order; the later /Od build at 0x8004c0 does the same), so
-			 * this format's %s consumes the NONE profile value, not the message.
-			 * A corrected build should pass only message here.
-			 */
-			error(
-				_error_silent,
-				"### PROFILE: %s -- tell Bernie!",
-				profile,
-				message);
+			error(_error_silent, "### PROFILE: %s -- tell Bernie!", message);
 		}
 
 		rasterizer_profile_error_count++;
