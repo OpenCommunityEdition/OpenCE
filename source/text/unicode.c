@@ -247,6 +247,7 @@ symbols in this file:
 #include <stdarg.h>
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h" /* port: ustring_format_checked */
 #include "unicode.h"
 
 /* ---------- constants */
@@ -1345,12 +1346,11 @@ int usnprintf(
 }
 
 /* port: whether a format (a map's text: its string lists' are the game's
-formats) takes exactly the arguments conversions names, in order: 'd' an
-integer (%d, %i, %u, %x, %X, %o, %c), 's' a string (%s, %S), and no
-others. %% and the flags, widths and precisions are allowed; '*' (which
-takes an argument) and %n are not. A format that does not is shown as text
-by the callers, unformatted, so that a map cannot make the game read an
-argument as something it is not */
+formats) takes no other arguments than conversions names, in order, if
+fewer: 'd' an integer (%d, %i, %u, %x, %X, %o, %c), 'f' a real (%f, %e,
+%g), 's' a string (%s, %S). %% and the flags, widths and precisions are
+allowed; '*' (which takes an argument of its own) and %n are not. A format
+that takes others would have the game read an argument as what it is not */
 int ustring_format_takes(
 	wchar_t const *format,
 	char const *conversions)
@@ -1368,8 +1368,8 @@ int ustring_format_takes(
 			format++;
 			continue;
 		}
-		while (*format == L'-' || *format == L'+' || *format == L' ' || *format == L'#' || *format == L'0' ||
-			*format == L'.' || (*format >= L'0' && *format <= L'9'))
+		while (*format == L'-' || *format == L'+' || *format == L' ' || *format == L'#' || *format == L'.' ||
+			(*format >= L'0' && *format <= L'9'))
 		{
 			format++;
 		}
@@ -1380,6 +1380,9 @@ int ustring_format_takes(
 		{
 		case L'd': case L'i': case L'u': case L'x': case L'X': case L'o': case L'c':
 			kind = 'd';
+			break;
+		case L'f': case L'e': case L'E': case L'g': case L'G':
+			kind = 'f';
 			break;
 		case L's': case L'S':
 			kind = 's';
@@ -1392,7 +1395,28 @@ int ustring_format_takes(
 			return FALSE;
 	}
 
-	return *conversions == 0;
+	return TRUE;
+}
+
+/* port: a map's format, if it takes the arguments a caller gives it
+(ustring_format_takes); else an empty one, whose message is then empty, and
+which is logged once */
+wchar_t const *ustring_format_checked(
+	wchar_t const *format,
+	char const *conversions)
+{
+	static boolean logged = FALSE;
+
+	if (ustring_format_takes(format, conversions))
+		return format;
+	if (!logged)
+	{
+		logged = TRUE;
+		error(_error_silent, "a map's text is a format of other arguments than the game gives it (%s): it is not shown",
+			conversions);
+	}
+
+	return L"";
 }
 
 /* port: at most size - 1 characters of src, always terminated */

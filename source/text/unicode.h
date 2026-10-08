@@ -227,6 +227,9 @@ int usprintf(
 int ustring_format_takes(
 	wchar_t const *format,
 	char const *conversions);
+wchar_t const *ustring_format_checked(
+	wchar_t const *format,
+	char const *conversions);
 wchar_t *ustrncpy_terminated(
 	wchar_t *dest,
 	wchar_t const *src,

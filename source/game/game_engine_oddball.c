@@ -1218,7 +1218,7 @@ static boolean oddball_engine_display_score(
 			}
 			else
 				string = L"";
-			usnprintf(buffer, buffer_size, string, other_player->name);
+			usnprintf(buffer, buffer_size, ustring_format_checked(string, "s"), other_player->name);
 		}
 		break;
 
@@ -1261,7 +1261,7 @@ static boolean oddball_engine_display_score(
 			}
 			else
 				string = L"";
-			usnprintf(buffer, buffer_size, string, other_player->name);
+			usnprintf(buffer, buffer_size, ustring_format_checked(string, "s"), other_player->name);
 		}
 		break;
 
@@ -1286,7 +1286,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, place_name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), place_name, score);
 			}
 			else if (message == _oddball_message_ally_has_the_ball_tick)
 			{
@@ -1299,7 +1299,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 			else if (message == _oddball_message_enemy_has_the_ball_tick)
 			{
@@ -1312,7 +1312,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 		}
 		break;

@@ -900,7 +900,7 @@ static boolean ctf_engine_display_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			string,
+			ustring_format_checked(string, "dd"),
 			ctf_globals.scores[_team_red],
 			ctf_globals.scores[_team_blue]);
 		break;
@@ -918,7 +918,7 @@ static boolean ctf_engine_display_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			string,
+			ustring_format_checked(string, "dd"),
 			ctf_globals.scores[team_index],
 			ctf_globals.scores[other_team_index]);
 		break;
@@ -936,7 +936,7 @@ static boolean ctf_engine_display_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			string,
+			ustring_format_checked(string, "dd"),
 			ctf_globals.scores[team_index],
 			ctf_globals.scores[other_team_index]);
 		break;
@@ -954,7 +954,7 @@ static boolean ctf_engine_display_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			string,
+			ustring_format_checked(string, "dd"),
 			ctf_globals.scores[team_index],
 			ctf_globals.scores[other_team_index]);
 		break;

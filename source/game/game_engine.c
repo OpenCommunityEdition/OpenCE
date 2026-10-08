@@ -1150,7 +1150,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				life_string,
 				NUMBEROF(life_string),
-				format_string,
+				ustring_format_checked(format_string, "d"),
 				remaining_lives);
 			life_string[NUMBEROF(life_string) - 1] = 0;
 			secondary_string = life_string;
@@ -1292,7 +1292,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				title_string,
 				80,
-				format_string,
+				ustring_format_checked(format_string, "sss"),
 				team0_name,
 				team1_name,
 				secondary_string);
@@ -1312,7 +1312,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				title_string,
 				80,
-				format_string,
+				ustring_format_checked(format_string, "sss"),
 				team1_name,
 				team0_name,
 				secondary_string);
@@ -1332,7 +1332,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				title_string,
 				80,
-				format_string,
+				ustring_format_checked(format_string, "ss"),
 				team1_name,
 				secondary_string);
 		}
@@ -1360,7 +1360,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				title_string,
 				80,
-				format_string,
+				ustring_format_checked(format_string, "sss"),
 				get_place_string(&entry),
 				score_string,
 				secondary_string);
@@ -1381,7 +1381,7 @@ static void game_engine_generate_title_string(
 			usnprintf(
 				title_string,
 				80,
-				format_string,
+				ustring_format_checked(format_string, "sss"),
 				get_place_string(&entry),
 				score_string,
 				secondary_string);
@@ -2405,7 +2405,7 @@ void game_engine_post_rasterize_post_game(
 			usnprintf(
 				row_string,
 				NUMBEROF(row_string),
-				team_formats[team_index],
+				ustring_format_checked(team_formats[team_index], "s"),
 				score_string);
 			row_string[NUMBEROF(row_string) - 1] = 0;
 			drawline(row_string, team_row + 4, 0);
@@ -7935,7 +7935,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			player->name);
 		break;
 	case _game_engine_message_killed_by_unknown:
@@ -7947,7 +7947,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			player->name);
 		break;
 	case _game_engine_message_killed_by_biped:
@@ -7959,7 +7959,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			player->name);
 		break;
 	case _game_engine_message_killed_by_vehicle:
@@ -7971,7 +7971,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			player->name);
 		break;
 	case _game_engine_message_killed_by_player:
@@ -7984,7 +7984,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "ss"),
 			player->name,
 			other_player->name);
 		break;
@@ -7998,7 +7998,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "ss"),
 			player->name,
 			other_player->name);
 		break;
@@ -8012,7 +8012,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			other_player->name);
 		break;
 	case _game_engine_message_killed_by_self:
@@ -8024,7 +8024,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			player->name);
 		break;
 	case _game_engine_message_killed_friendly:
@@ -8037,7 +8037,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			other_player->name);
 		break;
 	case _game_engine_message_multi_kill:
@@ -8110,7 +8110,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "s"),
 			other_player->name);
 		break;
 	case _game_engine_message_multi_kill_with_score:
@@ -8122,7 +8122,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			score);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_killtacular_kill);
 		break;
@@ -8135,7 +8135,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			score);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_triple_kill);
 		break;
@@ -8148,7 +8148,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			score);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_double_kill);
 		break;
@@ -8161,7 +8161,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			score);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_running_riot);
 		break;
@@ -8174,7 +8174,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			score);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_killing_spree);
 		break;
@@ -8188,7 +8188,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "sd"),
 			other_player->name,
 			score);
 		break;
@@ -8223,7 +8223,7 @@ static boolean internal_rasterize_score(
 		usnprintf(
 			buffer,
 			buffer_size,
-			format,
+			ustring_format_checked(format, "d"),
 			message_data);
 		break;
 	case _game_engine_message_waiting_for_space_to_clear:
