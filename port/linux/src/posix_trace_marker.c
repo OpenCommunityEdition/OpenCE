@@ -8,7 +8,7 @@ buffer for each traced driver function while tracing is on, and SteamOS
 keeps tracing on for its GPU performance captures (gpu-trace.service). On the
 Steam Frame that is some 480,000 writes a second: the driver's thread spends
 its time in them, and the game ran at about 50 frames a second instead of
-the headset's 72. The Steam Deck runs the same service and the same Mesa. A
+the headset's 72. The Steam Deck runs the same service (not measured there). A
 trace_marker that cannot be opened turns the markers off (gpuvis then skips
 them).
 
@@ -49,13 +49,15 @@ static int refused(const char *path)
 	return 1;
 }
 
-/* the mode, which follows only with O_CREAT or O_TMPFILE */
+/* the mode, which follows only with O_CREAT or O_TMPFILE (glibc's
+__OPEN_NEEDS_MODE: O_TMPFILE holds O_DIRECTORY's bit, which a directory
+opened without a mode has) */
 #define MODE_ARGUMENT(flags, last, mode) \
 	do \
 	{ \
 		va_list arguments; \
 		va_start(arguments, last); \
-		mode = (flags & (O_CREAT | O_TMPFILE)) ? (mode_t)va_arg(arguments, int) : 0; \
+		mode = ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) ? (mode_t)va_arg(arguments, int) : 0; \
 		va_end(arguments); \
 	} while (0)
 
