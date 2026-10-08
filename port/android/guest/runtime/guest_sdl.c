@@ -14,6 +14,9 @@ type that carries no pointer, which covers all the platform layer reads.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#if defined(HALO_MACOS)
+#include <stddef.h>
+#endif
 #include <SDL3/SDL.h>
 
 #include "guest_host.h"
@@ -234,3 +237,270 @@ bool SDL_ResumeAudioStreamDevice(SDL_AudioStream *stream)
 {
 	return host_sdl_resume_audio_stream_device((unsigned int)stream) != 0;
 }
+#if defined(HALO_MACOS)
+
+/* ---------- the desktop branches (macOS)
+
+The macOS guest takes the Linux build's desktop branches of sdl_platform.c
+(but for its data offer, which the host makes), which call more of SDL than
+Android's: window, display and frame pacing calls, which go to the host
+(port/macos/host/host_sdl.c). Its files are read with musl's stdio, as
+Android's are (port_config.c, menu_files.c), not SDL's. */
+
+/* the events the platform layer reads, where the host copies them from
+(host_sdl.c asserts the same of its SDL_Event) */
+_Static_assert(sizeof(SDL_Event) == 128, "SDL_Event");
+_Static_assert(offsetof(SDL_Event, key.scancode) == 24 && offsetof(SDL_Event, key.down) == 36 &&
+	offsetof(SDL_Event, key.repeat) == 37, "SDL_KeyboardEvent");
+_Static_assert(offsetof(SDL_Event, button.button) == 24 && offsetof(SDL_Event, button.down) == 25 &&
+	offsetof(SDL_Event, button.x) == 28 && offsetof(SDL_Event, button.y) == 32, "SDL_MouseButtonEvent");
+_Static_assert(offsetof(SDL_Event, motion.x) == 28 && offsetof(SDL_Event, motion.y) == 32 &&
+	offsetof(SDL_Event, motion.xrel) == 36 && offsetof(SDL_Event, motion.yrel) == 40, "SDL_MouseMotionEvent");
+_Static_assert(offsetof(SDL_Event, wheel.y) == 28 && offsetof(SDL_Event, gdevice.which) == 16 &&
+	offsetof(SDL_Event, window.windowID) == 16, "SDL_Event");
+
+void *SDL_malloc(size_t size)
+{
+	return malloc(size);
+}
+
+void *SDL_calloc(size_t count, size_t size)
+{
+	return calloc(count, size);
+}
+
+void *SDL_realloc(void *memory, size_t size)
+{
+	return realloc(memory, size);
+}
+
+Uint64 SDL_GetTicksNS(void)
+{
+	return (Uint64)host_sdl_ticks_ns();
+}
+
+void SDL_DelayPrecise(Uint64 nanoseconds)
+{
+	host_sdl_delay_precise((long long)nanoseconds);
+}
+
+void SDL_PumpEvents(void)
+{
+	host_sdl_pump_events();
+}
+
+bool SDL_PushEvent(SDL_Event *event)
+{
+	return event && host_sdl_push_event(event) != 0;
+}
+
+bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *button)
+{
+	struct host_sdl_message_box_button buttons[16];
+	int count = data && data->numbuttons > 0 ? data->numbuttons : 0;
+	int answer = -1;
+	int index;
+
+	if (!data)
+		return false;
+	if (count > (int)(sizeof(buttons) / sizeof(*buttons)))
+		count = (int)(sizeof(buttons) / sizeof(*buttons));
+	for (index = 0; index < count; index++)
+	{
+		buttons[index].flags = data->buttons[index].flags;
+		buttons[index].id = data->buttons[index].buttonID;
+		buttons[index].text = (unsigned int)data->buttons[index].text;
+	}
+	/* (in the host's own window: data->window is a handle, and Cocoa puts
+	the box in front anyway) */
+	if (!host_sdl_show_message_box(data->flags, data->title ? data->title : "",
+		data->message ? data->message : "", count, buttons, &answer))
+	{
+		return false;
+	}
+	if (button)
+		*button = answer;
+	return true;
+}
+
+/* ---------- windows */
+
+SDL_WindowFlags SDL_GetWindowFlags(SDL_Window *window)
+{
+	return (SDL_WindowFlags)host_sdl_window_flags((unsigned int)window);
+}
+
+bool SDL_GetWindowSize(SDL_Window *window, int *width, int *height)
+{
+	int w = 0, h = 0;
+	int result = host_sdl_window_size((unsigned int)window, &w, &h);
+
+	if (width)
+		*width = w;
+	if (height)
+		*height = h;
+	return result != 0;
+}
+
+bool SDL_SetWindowSize(SDL_Window *window, int width, int height)
+{
+	return host_sdl_set_window_size((unsigned int)window, width, height) != 0;
+}
+
+bool SDL_SetWindowFullscreen(SDL_Window *window, bool fullscreen)
+{
+	return host_sdl_set_window_fullscreen((unsigned int)window, fullscreen) != 0;
+}
+
+void SDL_WarpMouseInWindow(SDL_Window *window, float x, float y)
+{
+	host_sdl_warp_mouse_in_window((unsigned int)window, x, y);
+}
+
+/* ---------- displays and their modes */
+
+static void display_mode_from_host(SDL_DisplayMode *mode, const struct host_sdl_display_mode *host)
+{
+	memset(mode, 0, sizeof(*mode));
+	mode->displayID = host->display;
+	mode->format = (SDL_PixelFormat)host->format;
+	mode->w = host->w;
+	mode->h = host->h;
+	mode->pixel_density = host->pixel_density;
+	mode->refresh_rate = host->refresh_rate;
+	mode->refresh_rate_numerator = host->refresh_rate_numerator;
+	mode->refresh_rate_denominator = host->refresh_rate_denominator;
+}
+
+static void display_mode_to_host(struct host_sdl_display_mode *host, const SDL_DisplayMode *mode)
+{
+	host->display = mode->displayID;
+	host->format = (unsigned int)mode->format;
+	host->w = mode->w;
+	host->h = mode->h;
+	host->pixel_density = mode->pixel_density;
+	host->refresh_rate = mode->refresh_rate;
+	host->refresh_rate_numerator = mode->refresh_rate_numerator;
+	host->refresh_rate_denominator = mode->refresh_rate_denominator;
+}
+
+SDL_DisplayID SDL_GetPrimaryDisplay(void)
+{
+	return (SDL_DisplayID)host_sdl_primary_display();
+}
+
+SDL_DisplayID SDL_GetDisplayForWindow(SDL_Window *window)
+{
+	return (SDL_DisplayID)host_sdl_display_for_window((unsigned int)window);
+}
+
+bool SDL_GetDisplayUsableBounds(SDL_DisplayID display, SDL_Rect *rect)
+{
+	SDL_Rect bounds = { 0, 0, 0, 0 };
+	int result = host_sdl_display_usable_bounds(display, &bounds);
+
+	if (rect)
+		*rect = bounds;
+	return result != 0;
+}
+
+/* SDL's own copies of a display's desktop and current modes stay put while
+the modes do; these are kept the same way, one per display and kind (the
+video calls are the main thread's) */
+#define DISPLAY_MODE_SLOTS 16
+
+static struct
+{
+	SDL_DisplayID display;
+	int which;
+	SDL_DisplayMode mode;
+} display_modes[DISPLAY_MODE_SLOTS];
+
+static const SDL_DisplayMode *display_mode(SDL_DisplayID display, int which)
+{
+	struct host_sdl_display_mode host;
+	static int next;
+	int slot;
+
+	if (!host_sdl_display_mode(display, which, &host))
+		return NULL;
+	for (slot = 0; slot < DISPLAY_MODE_SLOTS; slot++)
+	{
+		if (display_modes[slot].display == display && display_modes[slot].which == which)
+			break;
+	}
+	if (slot == DISPLAY_MODE_SLOTS)
+	{
+		slot = next;
+		next = (next + 1) % DISPLAY_MODE_SLOTS;
+		display_modes[slot].display = display;
+		display_modes[slot].which = which;
+	}
+	display_mode_from_host(&display_modes[slot].mode, &host);
+	return &display_modes[slot].mode;
+}
+
+const SDL_DisplayMode *SDL_GetDesktopDisplayMode(SDL_DisplayID display)
+{
+	return display_mode(display, 0);
+}
+
+const SDL_DisplayMode *SDL_GetCurrentDisplayMode(SDL_DisplayID display)
+{
+	return display_mode(display, 1);
+}
+
+/* one allocation, as SDL's: the pointers, then the modes they point to */
+SDL_DisplayMode **SDL_GetFullscreenDisplayModes(SDL_DisplayID display, int *count)
+{
+	struct host_sdl_display_mode host[128];
+	int found = host_sdl_fullscreen_display_modes(display, host, (int)(sizeof(host) / sizeof(*host)));
+	SDL_DisplayMode **result;
+	SDL_DisplayMode *modes;
+	int index;
+
+	if (count)
+		*count = 0;
+	if (found < 0)
+		return NULL;
+	if (found > (int)(sizeof(host) / sizeof(*host)))
+		found = (int)(sizeof(host) / sizeof(*host));
+	result = malloc((size_t)(found + 1) * sizeof(*result) + (size_t)found * sizeof(*modes));
+	if (!result)
+		return NULL;
+	modes = (SDL_DisplayMode *)(result + found + 1);
+	for (index = 0; index < found; index++)
+	{
+		display_mode_from_host(&modes[index], &host[index]);
+		result[index] = &modes[index];
+	}
+	result[found] = NULL;
+	if (count)
+		*count = found;
+	return result;
+}
+
+bool SDL_GetClosestFullscreenDisplayMode(SDL_DisplayID display, int width, int height, float refresh_rate,
+	bool include_high_density_modes, SDL_DisplayMode *closest)
+{
+	struct host_sdl_display_mode host;
+
+	if (!closest || !host_sdl_closest_fullscreen_display_mode(display, width, height, refresh_rate,
+		include_high_density_modes, &host))
+	{
+		return false;
+	}
+	display_mode_from_host(closest, &host);
+	return true;
+}
+
+bool SDL_SetWindowFullscreenMode(SDL_Window *window, const SDL_DisplayMode *mode)
+{
+	struct host_sdl_display_mode host;
+
+	if (!mode)
+		return host_sdl_set_window_fullscreen_mode((unsigned int)window, NULL) != 0;
+	display_mode_to_host(&host, mode);
+	return host_sdl_set_window_fullscreen_mode((unsigned int)window, &host) != 0;
+}
+#endif

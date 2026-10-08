@@ -11,6 +11,11 @@ musl provides.
 #include <math.h>
 #include <string.h>
 
+#if defined(HALO_MACOS)
+/* (the macOS guest's code generator, clang's x32 Linux target, calls
+musl's own names, never the Darwin library functions below, which the
+Android guest's Darwin arm64_32 target substitutes) */
+#else
 /* Darwin's combined sine and cosine, which clang substitutes for
 sin()/cos() pairs of the same argument */
 struct guest_sincos_result { double sine, cosine; };
@@ -80,6 +85,7 @@ __attribute__((no_builtin)) void memset_pattern16(void *buffer, const void *patt
 	for (index = 0; index < size; index++)
 		out[index] = ((const unsigned char *)pattern)[index & 15];
 }
+#endif
 
 void __stack_chk_fail(void)
 {

@@ -85,6 +85,62 @@ called on the audio thread */
 unsigned int host_sdl_open_audio_stream(unsigned int device, const void *spec, unsigned int callback, unsigned int userdata);
 int host_sdl_put_audio_stream_data(unsigned int stream, const void *data, int length);
 int host_sdl_resume_audio_stream_device(unsigned int stream);
+#if defined(HALO_MACOS)
+
+/* ---------- SDL for the macOS port's desktop branches (guest_sdl.c)
+
+Listed in port/macos/host_imports_macos.list, defined in
+port/macos/host/host_sdl.c. Displays are SDL's own 32-bit ids. A display
+mode crosses as struct host_sdl_display_mode, SDL_DisplayMode without the
+driver's pointer that ends it; a message box's buttons as
+struct host_sdl_message_box_button, whose text is a guest address. */
+
+struct host_sdl_display_mode
+{
+	unsigned int display;
+	unsigned int format;
+	int w;
+	int h;
+	float pixel_density;
+	float refresh_rate;
+	int refresh_rate_numerator;
+	int refresh_rate_denominator;
+};
+
+struct host_sdl_message_box_button
+{
+	unsigned int flags;
+	int id;
+	unsigned int text;
+};
+
+long long host_sdl_ticks_ns(void);
+void host_sdl_delay_precise(long long nanoseconds);
+void host_sdl_pump_events(void);
+/* the guest pushes only events without pointers (a quit) */
+int host_sdl_push_event(const void *event);
+long long host_sdl_window_flags(unsigned int window);
+int host_sdl_window_size(unsigned int window, int *width, int *height);
+int host_sdl_set_window_size(unsigned int window, int width, int height);
+int host_sdl_set_window_fullscreen(unsigned int window, int fullscreen);
+/* mode may be 0: fullscreen is then a window over the whole desktop */
+int host_sdl_set_window_fullscreen_mode(unsigned int window, const struct host_sdl_display_mode *mode);
+void host_sdl_warp_mouse_in_window(unsigned int window, float x, float y);
+unsigned int host_sdl_primary_display(void);
+unsigned int host_sdl_display_for_window(unsigned int window);
+/* rect: an SDL_Rect, the same in both ABIs */
+int host_sdl_display_usable_bounds(unsigned int display, void *rect);
+/* which: 0 the display's desktop mode, 1 its current one; 1 on success */
+int host_sdl_display_mode(unsigned int display, int which, struct host_sdl_display_mode *mode);
+/* copies up to capacity of the display's fullscreen modes into modes;
+returns how many it has (perhaps more), or -1 */
+int host_sdl_fullscreen_display_modes(unsigned int display, struct host_sdl_display_mode *modes, int capacity);
+int host_sdl_closest_fullscreen_display_mode(unsigned int display, int width, int height, float refresh_rate,
+	int include_high_density, struct host_sdl_display_mode *mode);
+/* *answer: the id of the button chosen, or -1 if the box was closed */
+int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message, int button_count,
+	const struct host_sdl_message_box_button *buttons, int *answer);
+#endif
 
 /* ---------- OpenGL ES */
 

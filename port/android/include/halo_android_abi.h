@@ -26,6 +26,19 @@ This header is included by both halves.
 
 #include <stdint.h>
 
+#if defined(HALO_MACOS)
+/* The macOS guest (port/macos/README.md) is x32 code, x86-64 instructions
+with 32-bit pointers, built without position independence: its absolute
+addresses are sign-extended 32-bit displacements, so the image must lie
+below 2 GB (port/macos/guest/guest.ld). The host claims the whole low 4 GB
+at start-up, so nothing else competes for the range. */
+#define HALO_GUEST_IMAGE_BASE 0x10000000u
+
+/* the Xbox contiguous memory window, the desktop's 512 MB
+(port/linux/src/platform.h) */
+#define HALO_GUEST_WINDOW_BASE 0x80000000u
+#define HALO_GUEST_WINDOW_SIZE 0x20000000u
+#else
 /* the guest image is linked to run here, just above the Xbox window: ART
 keeps its heaps low in the address space and fills it upwards */
 #define HALO_GUEST_IMAGE_BASE 0x88000000u
@@ -33,6 +46,7 @@ keeps its heaps low in the address space and fills it upwards */
 /* the Xbox contiguous memory window (port/linux/src/platform.h) */
 #define HALO_GUEST_WINDOW_BASE 0x80000000u
 #define HALO_GUEST_WINDOW_SIZE 0x08000000u
+#endif
 
 #define HALO_GUEST_MAGIC 0x4f4c4148u /* 'HALO' */
 #define HALO_GUEST_ABI_VERSION 1
