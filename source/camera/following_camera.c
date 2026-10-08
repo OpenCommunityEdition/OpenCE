@@ -41,7 +41,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "following_camera.h"
-#include "errors.h"
+#include "cseries/errors.h" /* port: (error, for a short camera track) */
 #include "observer.h"
 
 #include "static_camera.h"
@@ -406,8 +406,9 @@ static void camera_track_splut(
 		camera_track_index);
 	t = (pitch + _pi / 2.f) * (1.f / _pi);
 	control_point_count = camera_track->control_points.count;
-	/* The curve below reads four control points. A custom map can supply
-	fewer. Sample the points it has instead of stopping the game. */
+	/* port: the curve below reads four control points, and a custom map's
+	track can have fewer: the camera goes between the points it has (none:
+	no offset) rather than reading past them (NaN with one point) */
 	if (control_point_count < 4)
 	{
 		static boolean short_track_reported = FALSE;
@@ -426,36 +427,33 @@ static void camera_track_splut(
 		}
 		if (control_point_count < 1)
 		{
-			offset->i = 0.0f;
-			offset->j = 0.0f;
-			offset->k = 0.0f;
+			offset->i = 0.f;
+			offset->j = 0.f;
+			offset->k = 0.f;
 			return;
 		}
-		if (t < 0.0f)
-			t = 0.0f;
-		else if (t > 1.0f)
-			t = 1.0f;
-		span = (real)(control_point_count - 1) * t;
+
+		span = (control_point_count - 1) * PIN(t, 0.f, 1.f);
 		sample_index = (long)span;
+		fraction = span - sample_index;
 		if (sample_index >= control_point_count - 1)
 		{
 			sample_index = control_point_count - 1;
-			fraction = 0.0f;
+			fraction = 0.f;
 		}
+		/* (a pitch not a number) */
 		else if (sample_index < 0)
 		{
 			sample_index = 0;
-			fraction = 0.0f;
+			fraction = 0.f;
 		}
-		else
-			fraction = span - (real)sample_index;
 		start_point = TAG_BLOCK_GET_ELEMENT(
 			&camera_track->control_points,
 			sample_index,
 			struct camera_track_control_point);
 		end_point = TAG_BLOCK_GET_ELEMENT(
 			&camera_track->control_points,
-			sample_index + 1 < control_point_count ? sample_index + 1 : sample_index,
+			MIN(sample_index + 1, control_point_count - 1),
 			struct camera_track_control_point);
 		offset->i = start_point->position.i + (end_point->position.i - start_point->position.i) * fraction;
 		offset->j = start_point->position.j + (end_point->position.j - start_point->position.j) * fraction;
