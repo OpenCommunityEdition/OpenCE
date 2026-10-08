@@ -31,9 +31,9 @@ static const struct console_option console_options[] =
 {
 	{ "display.vsync", "display.vsync", console_option_boolean, 0, 1, 0,
 		"Wait for the display between frames (0/1)." },
-	{ "input.mouse_sensitivity", "input.mouse_sensitivity", console_option_real, FLT_MIN, FLT_MAX, 0,
+	{ "mouse_sensitivity", "input.mouse_sensitivity", console_option_real, FLT_MIN, FLT_MAX, 0,
 		"Horizontal mouse sensitivity multiplier (positive); Mouse Setup shows custom values." },
-	{ "input.mouse_vertical_sensitivity", "input.mouse_vertical_sensitivity", console_option_real, FLT_MIN, FLT_MAX, 1,
+	{ "mouse_vertical_sensitivity", "input.mouse_vertical_sensitivity", console_option_real, FLT_MIN, FLT_MAX, 1,
 		"Vertical mouse sensitivity multiplier (positive), or 0 for Same as horizontal." },
 };
 

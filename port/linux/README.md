@@ -220,9 +220,9 @@ Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
 Registered local console options use the same settings store. Mouse sensitivity
-uses `input.mouse_sensitivity` and `input.mouse_vertical_sensitivity`: a positive
+uses `mouse_sensitivity` and `mouse_vertical_sensitivity`: a positive
 multiplier, with vertical `0` meaning **Same** as horizontal. For example,
-`input.mouse_sensitivity 0.333` takes effect immediately, persists in `config.toml`,
+`mouse_sensitivity 0.333` takes effect immediately, persists in `config.toml`,
 and Mouse Setup displays the exact value instead of rounding to a preset.
 Query either name without a value, or use `default` to restore its default.
 Other registered local console options work the same way. For example,
