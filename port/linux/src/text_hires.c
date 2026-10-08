@@ -59,7 +59,7 @@ static float atlas_scale;   /* the pixels per unit its glyphs have */
 static int pack_x, pack_y, pack_row_height;
 static int dirty_top = ATLAS_SIZE, dirty_bottom;
 static unsigned long placeholder_data, placeholder_width, placeholder_height;
-static GLuint atlas_texture;
+static gpu_texture atlas_texture;
 
 /* tag names compared as the game does, ignoring case (and without the POSIX
 strcasecmp, which the Windows build has not) */
@@ -259,12 +259,18 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 		return 0;
 	if (!atlas_texture)
 	{
-		glGenTextures(1, &atlas_texture);
-		glBindTexture(GL_TEXTURE_2D, atlas_texture);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ATLAS_SIZE, ATLAS_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		xgpu_gl_state_invalidate();
+		struct gpu_texture_description description;
+
+		memset(&description, 0, sizeof(description));
+		description.type = GPU_TEXTURE_2D;
+		description.format = GPU_FORMAT_RGBA8;
+		description.usage = GPU_USAGE_UPLOAD;
+		description.width = ATLAS_SIZE;
+		description.height = ATLAS_SIZE;
+		description.depth = 1;
+		description.levels = 1;
+		atlas_texture = gpu_texture_create(&description);
+		gpu_texture_upload(atlas_texture, 0, 0, NULL, ATLAS_SIZE * ATLAS_SIZE * 4);
 		dirty_top = 0;
 		dirty_bottom = ATLAS_SIZE;
 	}
@@ -284,10 +290,7 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 				texels[index * 4 + 0] = texels[index * 4 + 1] = texels[index * 4 + 2] = 255;
 				texels[index * 4 + 3] = coverage[index];
 			}
-			glBindTexture(GL_TEXTURE_2D, atlas_texture);
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, dirty_top, ATLAS_SIZE, (GLsizei)rows, GL_RGBA, GL_UNSIGNED_BYTE, texels);
-			xgpu_gl_state_invalidate();
+			gpu_texture_upload_rows(atlas_texture, (uint32_t)dirty_top, (uint32_t)rows, texels);
 			free(texels);
 			dirty_top = ATLAS_SIZE;
 			dirty_bottom = 0;

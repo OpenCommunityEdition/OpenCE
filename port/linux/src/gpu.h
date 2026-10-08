@@ -1,11 +1,12 @@
 /*
 GPU.H
 
-The interface between the Xbox Direct3D device (d3d8_gl.c, and its texture
-cache, xbox_textures.c) and the backend that drives the GPU for it (gpu_gl.c:
-OpenGL 4.5, or OpenGL ES 3 on Android). The device keeps the Xbox's state and
-says what it needs in the neutral terms below; the backend owns the GPU's
-objects and makes every call to its API.
+The interface between the Xbox Direct3D device (d3d8_device.c, with its
+texture cache, xbox_textures.c, and the high-res HUD, text and menu art) and
+the backend that drives the GPU for it (gpu_gl.c: OpenGL 4.5, or OpenGL ES 3
+on Android). The device keeps the Xbox's state and says what it needs in the
+neutral terms below, one self-contained packet per draw; the backend owns
+the GPU's objects and makes every call to its API.
 
 It includes only <stdint.h>, and its structs have fixed-width fields only, so
 that a backend built for another ABI than the game's (a 64-bit host drawing
@@ -447,7 +448,7 @@ uint32_t gpu_visibility_result(uint32_t slot, uint32_t *samples);
 
 /* ---------- frames */
 
-/* display.anti_aliasing's passes over a window's 3D view (xgpu_post.c) */
+/* display.anti_aliasing's passes over a window's 3D view (gpu_gl_post.c) */
 enum { GPU_ANTI_ALIAS_FXAA = 1, GPU_ANTI_ALIAS_SMAA };
 
 /* makes the pass's programs and textures now, rather than in the middle of a

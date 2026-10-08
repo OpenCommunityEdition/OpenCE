@@ -263,7 +263,7 @@ static void *game_main(void *unused)
 	environment_set(&environment, "HALO_SAVE_ROOT", save_root);
 	{
 		/* the game renders 480 lines at the display's aspect ratio
-		(landscape) unless display.screen_width says otherwise (d3d8_gl.c) */
+		(landscape) unless display.screen_width says otherwise (d3d8_device.c) */
 		const SDL_DisplayMode *mode;
 		char width[16];
 

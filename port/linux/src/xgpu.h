@@ -1,36 +1,27 @@
 /*
 XGPU.H
 
-Internals shared by the OpenGL implementation of the Xbox Direct3D API:
-the NV2A shader translators (nv2a_vsh.c, nv2a_psh.c), texture decoding
+Internals shared by the implementation of the Xbox Direct3D API: the NV2A
+shader translators (nv2a_vsh.c, nv2a_psh.c), texture decoding
 (xbox_textures.c), guest memory write tracking (memory_watch.c) and the
-device itself (d3d8_gl.c).
+device itself (d3d8_device.c). The GPU is reached through gpu.h only.
 */
 
 #ifndef __HALO_LINUX_XGPU_H
 #define __HALO_LINUX_XGPU_H
 
 #include "platform.h"
-#include "gl.h"
 #include "gpu.h"
 
-/* what the GPU backend can do (gpu_initialize, from d3d8_gl.c
-gl_initialize) */
+/* what the GPU backend can do (gpu_initialize, from d3d8_device.c
+gpu_start) */
 extern struct gpu_capabilities xgpu_gpu_capabilities;
-
-/* ---------- GL state
-
-The GL backend caches the GL state it sets for draws (gpu_gl.c); code that
-changes GL state behind it (binding a texture to upload it, deleting one)
-must call this afterwards. */
-
-void xgpu_gl_state_invalidate(void);
 
 /* ---------- the shading language
 
 The translators write the GLSL of the context the device has: desktop GL
-4.5's, or OpenGL ES's on Android ("300 es" or "310 es"), as gl_initialize
-found it (d3d8_gl.c). */
+4.5's, or OpenGL ES's on Android ("300 es" or "310 es"), as gpu_start
+found it (d3d8_device.c). */
 
 struct nv2a_dialect
 {
@@ -64,7 +55,7 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...) __attribu
 /* D3D constant register -96 is hardware register 0 */
 #define XGPU_VERTEX_CONSTANT_BIAS 96
 
-/* where one of the game's model lighting programs (d3d8_gl.c
+/* where one of the game's model lighting programs (d3d8_device.c
 halo_vertex_shader_lighting) has the normal, and the world position, that it
 lights the diffuse color by: the temporary register that holds each before
 the instruction given */
@@ -200,13 +191,13 @@ struct xgpu_render_target
 	BOOL depth;
 	gpu_texture texture;
 	/* pixels per unit of width and height: more than 1 for the screen's
-	targets when the game draws at the display's resolution (d3d8_gl.c) */
+	targets when the game draws at the display's resolution (d3d8_device.c) */
 	float scale[2];
-	unsigned long gl_width, gl_height;
+	unsigned long pixel_width, pixel_height;
 	/* with multisampling, the samples a pixel of its multisampled storage,
-	which draws go to (0 when it has none: d3d8_gl.c, bind_targets) */
+	which draws go to (0 when it has none: d3d8_device.c, bind_targets) */
 	int samples;
-	/* changes whenever the target is drawn into or cleared (d3d8_gl.c,
+	/* changes whenever the target is drawn into or cleared (d3d8_device.c,
 	bind_targets) */
 	unsigned long written;
 };

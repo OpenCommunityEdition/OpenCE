@@ -59,7 +59,7 @@ enum
 	_bitmap_group_type_sprites = 3,
 	NUMBER_OF_BITMAP_GROUP_TYPES = 5,
 
-	/* the device's (d3d8_gl.c, D3DDevice_GetDeviceCaps; xbox_textures.c
+	/* the device's (d3d8_device.c, D3DDevice_GetDeviceCaps; xbox_textures.c
 	uploads nothing larger) */
 	MAXIMUM_BITMAP_SIZE = 4096,
 	MAXIMUM_VOLUME_BITMAP_SIZE = 512,

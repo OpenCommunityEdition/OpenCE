@@ -36,7 +36,7 @@ FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
-# SMAA's files and the names port/linux/src/xgpu_post.c declares them by
+# SMAA's files and the names port/linux/src/gpu_gl_post.c declares them by
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
               ("search_tex.zlib", "xgpu_smaa_search_texture"))
@@ -207,7 +207,7 @@ def main() -> None:
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
-    # and its lookup textures (xgpu_post.c); each of size 0 that the
+    # and its lookup textures (gpu_gl_post.c); each of size 0 that the
     # checkout does not have. Android has no SMAA.
     lines.append("#ifndef HALO_ANDROID")
     present = dict(smaa_files())

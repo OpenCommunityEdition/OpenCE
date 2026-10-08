@@ -57,7 +57,7 @@ int host_gl_has_extension(const char *name)
 }
 
 /* copies size bytes of a buffer object (the snapshots of the visibility
-tests' counters, d3d8_gl.c); ES has no glGetBufferSubData, and the mapping
+tests' counters, gpu_gl.c); ES has no glGetBufferSubData, and the mapping
 it offers instead is a host pointer. Binds GL_COPY_READ_BUFFER, which the
 renderer uses only for its copies, and leaves it unbound. */
 void host_gl_read_buffer(uint32_t buffer, uint32_t offset, uint32_t size, void *data)
@@ -79,7 +79,7 @@ void host_gl_read_buffer(uint32_t buffer, uint32_t offset, uint32_t size, void *
 }
 
 /* The renderer streams each frame's vertices and indices into the next of
-a ring of buffers (d3d8_gl.c). A fence marks the end of each frame's work,
+a ring of buffers (gpu_gl.c). A fence marks the end of each frame's work,
 and a buffer is written again only once the GPU has passed the fence of the
 frame that last used it: drivers queue several frames, and a draw still
 waiting to run would otherwise read a later frame's vertices. */

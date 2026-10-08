@@ -10,7 +10,7 @@ first drawn and kept: up to 69 of the HUD's, about 225 MB with their mip
 levels, though a game draws only some (the scopes' only when zoomed), and
 the titles of the menus shown, about 3 MB each (11 MB for the carnage
 report's, a whole panel).
-They are drawn with linear filtering and their mip levels (d3d8_gl.c,
+They are drawn with linear filtering and their mip levels (d3d8_device.c,
 configure_sampler), as they are larger than they appear.
 
 The PNGs are the ones tools/hud_assets.py and title_assets.py write, so only
@@ -227,22 +227,25 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 {
 	unsigned long width = 0, height = 0, largest;
 	unsigned char *pixels = png_decode(png, size, &width, &height);
-	GLuint texture;
+	struct gpu_texture_description description;
+	gpu_texture texture;
 
 	if (!pixels)
 		return 0;
 	*levels = 1;
 	for (largest = width > height ? width : height; largest > 1; largest >>= 1)
 		(*levels)++;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	xgpu_gl_state_invalidate();
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width, (GLsizei)height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	xgpu_gl_state_invalidate();
+	memset(&description, 0, sizeof(description));
+	description.type = GPU_TEXTURE_2D;
+	description.format = GPU_FORMAT_RGBA8;
+	description.usage = GPU_USAGE_UPLOAD;
+	description.width = (uint32_t)width;
+	description.height = (uint32_t)height;
+	description.depth = 1;
+	description.levels = (uint32_t)*levels;
+	texture = gpu_texture_create(&description);
+	gpu_texture_upload(texture, 0, 0, pixels, (uint32_t)(width * height * 4));
+	gpu_texture_generate_mipmaps(texture, 0);
 	free(pixels);
 	return texture;
 }

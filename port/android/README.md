@@ -239,7 +239,7 @@ two ABIs use the same registers for 32-bit integers, floats and pointers.
 
 ### OpenGL ES
 
-The renderer (`port/linux/src/d3d8_gl.c`) uses OpenGL ES 3.0, and some
+The renderer's OpenGL backend (`port/linux/src/gpu_gl.c`) uses OpenGL ES 3.0, and some
 functions of OpenGL ES 3.2 if they are available:
 
 - The vertex shaders flip y and change the depth range from 0..1. The front

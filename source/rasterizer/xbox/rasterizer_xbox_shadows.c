@@ -1026,7 +1026,7 @@ static void rasterizer_shadow_convolve(
 }
 
 /* port: the shadow maps can be drawn larger than the Xbox's 128x128
-(display.shadow_resolution, port/linux/src/d3d8_gl.c): scale times as many
+(display.shadow_resolution, port/linux/src/d3d8_device.c): scale times as many
 texels each way, a power of two. The Xbox's blur takes four taps diagonally
 half a texel off each texel, on the corners it shares with its neighbours.
 Each tap averages the four texels there, and together they weigh the texel

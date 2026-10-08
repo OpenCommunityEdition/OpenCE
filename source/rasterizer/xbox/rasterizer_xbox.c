@@ -2408,7 +2408,7 @@ void _rasterizer_frame_end(
 
 /* The native ports can change the width of the screen between frames (F11
 switches the desktop builds between fullscreen at the display's shape and a
-640x480 window: halo_screen_commit, port/linux/src/d3d8_gl.c, which resizes
+640x480 window: halo_screen_commit, port/linux/src/d3d8_device.c, which resizes
 the back buffer). The screen and the title-safe frame follow, as set up in
 rasterizer_initialize, and so do the textures the game made of the back
 buffer and its copy. */

@@ -54,7 +54,7 @@ void text_hires_register_atlas(const unsigned long *texture, unsigned long width
 placeholder's, its rasterized glyphs uploaded; 0 otherwise */
 unsigned int text_hires_atlas_texture(unsigned long data);
 
-/* d3d8_gl.c: the display's pixels for each of the 480 lines */
+/* d3d8_device.c: the display's pixels for each of the 480 lines */
 float halo_screen_pixel_scale(void);
 
 #endif

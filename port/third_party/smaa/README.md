@@ -15,6 +15,6 @@ unchanged. `area_tex.zlib` and `search_tex.zlib` are the bytes of
     re.findall(r'0x([0-9a-fA-F]{2})', t[t.index('{'):])), 9))" AreaTex.h area_tex.zlib
 
 `display.anti_aliasing = "smaa"` antialiases the 3D view with it, compiled
-as GLSL (`port/linux/src/xgpu_post.c`); the files are embedded in the Linux
+as GLSL (`port/linux/src/gpu_gl_post.c`); the files are embedded in the Linux
 and Windows platform layers by `tools/embed_assets.py`. Android has FXAA in
 its place.

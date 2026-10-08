@@ -4,7 +4,7 @@ HALO_UI_POINTER.H
 The mouse in the menus of the desktop builds. While a menu is up, the mouse
 is released and its pointer shows (port/linux/src/sdl_platform.c); each frame
 the menus (source/interface/ui_widget.c) ask where it is, in their own 640x480
-coordinates (port/linux/src/d3d8_gl.c undoes the letterbox, the scale and the
+coordinates (port/linux/src/d3d8_device.c undoes the letterbox, the scale and the
 widescreen centering), and what it did since.
 */
 

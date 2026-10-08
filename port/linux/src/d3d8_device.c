@@ -1,28 +1,30 @@
 /*
-D3D8_GL.C
+D3D8_DEVICE.C
 
-The Xbox Direct3D 8 device, implemented with OpenGL 4.5.
+The Xbox Direct3D 8 device, drawing through a GPU backend (gpu.h; OpenGL's
+is gpu_gl.c). It makes no graphics API calls of its own.
 
 The game drives the device through the XDK's inline functions, which keep
 the "simple" render states in D3D__RenderState and call into this file for
 everything else. At each draw the full state is read back from there and
 translated: the vertex program into GLSL once per shader (nv2a_vsh.c), the
 pixel shader - texture stages and register combiners, 57 render states -
-into GLSL once per combination (nv2a_psh.c), and the rest into GL state.
+into GLSL once per combination (nv2a_psh.c), and the rest into one
+struct gpu_draw, which gpu_draw applies whole.
 
 Conventions carried over from the Xbox:
-- Clip space is D3D's (depth 0..1, y down in window space). glClipControl
-  (GL_UPPER_LEFT, GL_ZERO_TO_ONE) makes GL agree, so viewports, scissors and
-  texture rows line up with D3D's top-left origin; the window blit at
-  Present flips the image back for display.
+- Clip space is D3D's (depth 0..1, y down in window space). The backend
+  makes the GPU agree (glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE) on the
+  desktop), so viewports, scissors and texture rows line up with D3D's
+  top-left origin; the window blit at Present flips the image back for
+  display.
 - Render targets and textures are identified by the physical address in
-  their Data field. A texture whose data is a render target samples the GL
+  their Data field. A texture whose data is a render target samples the
   render target directly (render-to-texture).
 - Vertex data is read from guest memory at draw time.
 */
 
 #include "xgpu.h"
-#include "gpu_gl.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
@@ -36,7 +38,7 @@ Conventions carried over from the Xbox:
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 
-/* what the GPU backend can do (gl_initialize) */
+/* what the GPU backend can do (gpu_start) */
 struct gpu_capabilities xgpu_gpu_capabilities;
 
 /* ---------- the screen's width
@@ -66,13 +68,13 @@ render target the size of the screen has per unit of it */
 static long screen_width;
 static float screen_scale[2] = { 1.0f, 1.0f };
 static long ui_offset;
-#define UI_OFFSET ((GLint)ui_offset)
+#define UI_OFFSET ((int32_t)ui_offset)
 
 /* ---------- anti-aliasing
 
 display.anti_aliasing, off unless it is set: the Xbox drew without any.
 "fxaa" and "smaa" are passes over each window's 3D view before the HUD and
-menus are drawn over it (halo_screen_anti_alias, xgpu_post.c); "ssaa2x"
+menus are drawn over it (halo_screen_anti_alias, gpu_gl_post.c); "ssaa2x"
 draws the screen's targets at twice the resolution each way
 (screen_mode_choose), which the display blit scales down; "msaa2x" to
 "msaa8x" draw the back buffer and its depth buffer with that many samples a
@@ -115,8 +117,8 @@ static const struct
 
 /* the value in effect, -1 until the setting is first read; and
 multisampling's samples a pixel, at most the GPU's (anti_aliasing_prepare;
-the GPU's most samples and largest target are 0 until the GL context
-exists, xgpu_gpu_capabilities) */
+the GPU's most samples and largest target are 0 until the GPU backend
+starts, xgpu_gpu_capabilities) */
 static int anti_aliasing_value = -1;
 static int anti_aliasing_samples;
 
@@ -359,7 +361,7 @@ static struct render_target_entry *render_targets;
 /* a count from a test that only says whether any sample passed */
 #define VISIBILITY_ALL_SAMPLES 1000000
 
-struct gl_device
+struct xbox_device
 {
 	D3DPRESENT_PARAMETERS presentation;
 	D3DSurface back_buffer;
@@ -406,11 +408,11 @@ struct gl_device
 
 	unsigned long frame;
 	unsigned long next_vertex_shader_id;
-	BOOL gl_ready;
+	BOOL gpu_ready;
 	BOOL created;
 };
 
-static struct gl_device device;
+static struct xbox_device device;
 
 /* debug.gpu_stats prints these once a second */
 static struct
@@ -443,10 +445,10 @@ static void color_to_vec4(D3DCOLOR color, float *out)
 	out[3] = ((color >> 24) & 0xff) / 255.0f;
 }
 
-/* the GLSL the translators write for this context (gl_initialize) */
+/* the GLSL the translators write for this context (gpu_start) */
 static struct nv2a_dialect shader_dialect;
 
-/* ---------- debugging settings, read once (gl_initialize) */
+/* ---------- debugging settings, read once (gpu_start) */
 
 static struct
 {
@@ -658,8 +660,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.depth = depth;
 	entry->target.scale[0] = scale[0];
 	entry->target.scale[1] = scale[1];
-	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
-	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
+	entry->target.pixel_width = (unsigned long)(width * scale[0] + 0.5f);
+	entry->target.pixel_height = (unsigned long)(height * scale[1] + 0.5f);
 	{
 		struct gpu_texture_description description;
 
@@ -667,8 +669,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		description.type = GPU_TEXTURE_2D;
 		description.format = depth ? GPU_FORMAT_DEPTH_STENCIL : GPU_FORMAT_BGRA8;
 		description.usage = GPU_USAGE_RENDER_TARGET;
-		description.width = (uint32_t)entry->target.gl_width;
-		description.height = (uint32_t)entry->target.gl_height;
+		description.width = (uint32_t)entry->target.pixel_width;
+		description.height = (uint32_t)entry->target.pixel_height;
 		description.depth = 1;
 		description.levels = 1;
 		entry->target.texture = gpu_texture_create(&description);
@@ -717,10 +719,10 @@ static float target_scale[2] = { 1.0f, 1.0f };
 /* the pixel edge of a coordinate in a target's units, at its scale:
 floorf's, without its call (on 32-bit x86 it saves and restores the FPU's
 rounding, several times a draw) */
-static GLint scaled_pixel(float coordinate, float scale)
+static int32_t scaled_pixel(float coordinate, float scale)
 {
 	float value = coordinate * scale + 0.5f;
-	GLint pixel = (GLint)value;
+	int32_t pixel = (int32_t)value;
 
 	/* (the conversion is toward zero: a negative value with a fraction
 	rounds down one more) */
@@ -730,7 +732,7 @@ static GLint scaled_pixel(float coordinate, float scale)
 }
 
 /* ... in the bound targets' units */
-static GLint target_pixel(float coordinate, int axis)
+static int32_t target_pixel(float coordinate, int axis)
 {
 	return scaled_pixel(coordinate, target_scale[axis]);
 }
@@ -779,7 +781,7 @@ static BOOL bind_targets(gpu_texture *color_target, gpu_texture *depth_target, u
 
 /* ---------- device creation */
 
-static void gl_initialize(void)
+static void gpu_start(void)
 {
 	struct gpu_capabilities *capabilities = &xgpu_gpu_capabilities;
 	int index;
@@ -797,15 +799,14 @@ static void gl_initialize(void)
 	debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
 		config_string("debug.gpu_dump_shaders") : NULL;
 	debug_settings.statistics = config_boolean("debug.gpu_stats");
-	xgpu_gl_state_invalidate();
-	device.gl_ready = TRUE;
+	device.gpu_ready = TRUE;
 	if (anti_aliasing_value < 0)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
 }
 
-/* what display.anti_aliasing's value needs of the GL context, once there is
+/* what display.anti_aliasing's value needs of the GPU backend, once there is
 one: multisampling's samples, at most the GPU's, and the passes' programs,
 built as the value is chosen rather than in the middle of a frame (SMAA's
 are large) */
@@ -813,7 +814,7 @@ static void anti_aliasing_prepare(void)
 {
 	int mode;
 
-	if (!device.gl_ready || anti_aliasing_value < 0)
+	if (!device.gpu_ready || anti_aliasing_value < 0)
 		return;
 	mode = anti_aliasing_values[anti_aliasing_value].mode;
 	anti_aliasing_samples = anti_aliasing_values[anti_aliasing_value].samples;
@@ -973,7 +974,7 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 		viewport_update_constants();
 
 		if (!config_boolean("debug.null_renderer") && platform_video_initialize(width, height))
-			gl_initialize();
+			gpu_start();
 		else
 			platform_log("Direct3D: running without a window (nothing is displayed)");
 		device.created = TRUE;
@@ -1009,11 +1010,11 @@ static void ui_point_from_window(float window_x, float window_y, short *x, short
 	if (window_width <= 0 || window_height <= 0)
 		return;
 	width = pixel_width;
-	height = (int)((long)pixel_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
+	height = (int)((long)pixel_width * back_buffer->target.pixel_height / back_buffer->target.pixel_width);
 	if (height > pixel_height)
 	{
 		height = pixel_height;
-		width = (int)((long)pixel_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
+		width = (int)((long)pixel_height * back_buffer->target.pixel_width / back_buffer->target.pixel_height);
 	}
 	left = (pixel_width - width) / 2;
 	top = (pixel_height - height) / 2;
@@ -1029,7 +1030,7 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 
 	platform_menus_set_active(menus_active != 0);
 	platform_ui_pointer_set_active(menus_active != 0);
-	if (!menus_active || !device.gl_ready || !platform_ui_pointer_read(&state))
+	if (!menus_active || !device.gpu_ready || !platform_ui_pointer_read(&state))
 		return 0;
 	memset(pointer, 0, sizeof(*pointer));
 	ui_point_from_window(state.x, state.y, &pointer->x, &pointer->y);
@@ -1192,7 +1193,7 @@ void WINAPI D3DDevice_SetShaderConstantMode(D3DSHADERCONSTANTMODE mode)
 	viewport_update_constants();
 }
 
-/* ---------- GPU synchronisation: GL keeps its own ordering */
+/* ---------- GPU synchronisation: the backend keeps its own ordering */
 
 BOOL WINAPI D3DDevice_IsBusy(void)
 {
@@ -1201,7 +1202,7 @@ BOOL WINAPI D3DDevice_IsBusy(void)
 
 void WINAPI D3DDevice_KickPushBuffer(void)
 {
-	if (device.gl_ready)
+	if (device.gpu_ready)
 		gpu_flush();
 }
 
@@ -1217,7 +1218,7 @@ void WINAPI D3DDevice_InsertCallback(D3DCALLBACKTYPE type, D3DCALLBACK callback,
 
 void WINAPI D3DDevice_BeginVisibilityTest(void)
 {
-	if (!device.gl_ready || device.visibility_test_active)
+	if (!device.gpu_ready || device.visibility_test_active)
 		return;
 	device.visibility_test_active = TRUE;
 	gpu_visibility_begin();
@@ -1225,7 +1226,7 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 
 HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 {
-	if (!device.gl_ready || !device.visibility_test_active)
+	if (!device.gpu_ready || !device.visibility_test_active)
 		return S_OK;
 	device.visibility_test_active = FALSE;
 	index %= VISIBILITY_TEST_SLOTS;
@@ -1259,7 +1260,7 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	index %= VISIBILITY_TEST_SLOTS;
 	if (!index)
 		index = 1;
-	if (!device.gl_ready || !device.query_pending[index])
+	if (!device.gpu_ready || !device.query_pending[index])
 	{
 		if (result)
 			*result = 0;
@@ -1723,7 +1724,7 @@ static unsigned long stage_texture_mode(int stage)
 }
 
 /* a D3DTSS_*FILTER value as gpu.h's (any other is linear, as the Xbox's
-filters but POINT are in GL) */
+filters but POINT are in gpu.h) */
 static unsigned char sampler_filter(DWORD filter)
 {
 	return filter <= D3DTEXF_GAUSSIANCUBIC ? (unsigned char)filter : GPU_FILTER_LINEAR;
@@ -1767,7 +1768,7 @@ static void sampler_state(int stage, BOOL mipmapped, BOOL hires, struct gpu_samp
 
 The game renders some textures one mip level at a time, each level being a
 surface of its own (the water's ripple map). Sampling such a texture needs
-every level in one GL texture, so the levels' render targets are copied into
+every level in one texture, so the levels' render targets are copied into
 a mipmapped composite. Each draw of the water binds it, some maps (a30) more
 than once a frame, so the copy (and the mipmaps of the levels the game did not
 render) is redone only once a level's target has been drawn into since the
@@ -1836,7 +1837,7 @@ static gpu_texture mip_composite_get(const struct xgpu_texture_description *desc
 			xgpu_render_target_find(data + xgpu_texture_level_offset(description, level));
 
 		if (!target || target->width != width || target->height != height ||
-			target->gl_width != width || target->gl_height != height)
+			target->pixel_width != width || target->pixel_height != height)
 			break;
 		targets[level] = target;
 		rendered_levels++;
@@ -2084,7 +2085,7 @@ static BOOL prepare_draw(struct gpu_draw *draw, BOOL immediate)
 	BOOL has_depth = FALSE;
 	int stage;
 
-	if (!device.gl_ready || !program || !device.vertex_shader || !program->instructions)
+	if (!device.gpu_ready || !program || !device.vertex_shader || !program->instructions)
 	{
 		stats.skipped_no_program++;
 		return FALSE;
@@ -2352,7 +2353,7 @@ static void trace_draw(const char *kind, D3DPRIMITIVETYPE type, unsigned long co
 /* ---------- the contiguous window in GPU buffers
 
 Vertex and index buffers live in the Xbox's contiguous memory, where most
-never change once loaded. The mirror keeps a copy of that memory in GL
+never change once loaded. The mirror keeps a copy of that memory in GPU
 buffers (one per segment, created when first needed) and uploads a page
 only when it is first drawn from or after the game has written it: pages
 are write-protected once uploaded, as cached textures are (memory_watch.c).
@@ -2994,7 +2995,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	DWORD index;
 
 	memset(&clear, 0, sizeof(clear));
-	if (!device.gl_ready || !bind_targets(&clear.color_target, &clear.depth_target, &clear.samples, &has_depth))
+	if (!device.gpu_ready || !bind_targets(&clear.color_target, &clear.depth_target, &clear.samples, &has_depth))
 		return;
 	if (trace_frame())
 		platform_log("clear flags %lx color %08lx z %g count %lu target %08lx depth %08lx", (unsigned long)flags,
@@ -3081,7 +3082,7 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 	int32_t corners[4];
 	int mode = anti_aliasing();
 
-	if (!device.gl_ready || (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa))
+	if (!device.gpu_ready || (mode != _anti_aliasing_fxaa && mode != _anti_aliasing_smaa))
 		return;
 	/* (the primary target's view: the back buffer's) */
 	target = render_target_get(&device.back_buffer);
@@ -3103,7 +3104,7 @@ static void write_screenshot(struct render_target_entry *target)
 {
 	const char *directory = *config_string("debug.screenshot_directory") ?
 		config_string("debug.screenshot_directory") : NULL;
-	unsigned long width = target->target.gl_width, height = target->target.gl_height;
+	unsigned long width = target->target.pixel_width, height = target->target.pixel_height;
 	unsigned char *pixels;
 	char path[512];
 	FILE *file;
@@ -3155,7 +3156,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	if (screenshot_every < 0)
 		screenshot_every = config_integer("debug.screenshot_every");
 
-	if (device.gl_ready)
+	if (device.gpu_ready)
 	{
 		struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
 

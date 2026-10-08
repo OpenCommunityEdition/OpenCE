@@ -2,7 +2,7 @@
 GPU_GL.H
 
 The OpenGL backend's own declarations (gpu_gl.c), shared with its
-anti-aliasing passes (xgpu_post.c).
+anti-aliasing passes (gpu_gl_post.c).
 */
 
 #ifndef __HALO_LINUX_GPU_GL_H
@@ -74,7 +74,7 @@ GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const cha
 
 /* ---------- anti-aliasing
 
-display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
+display.anti_aliasing's passes (gpu_gl_post.c): FXAA or SMAA antialias each
 window's 3D view in place before the HUD and menus are drawn over it, so
 that their text stays sharp (gpu_anti_alias). */
 

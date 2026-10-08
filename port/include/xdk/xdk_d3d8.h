@@ -296,7 +296,7 @@ by default, they must be declared extern to be shared) */
 #endif
 
 /* state the inline functions below read and write, which the platform
-layer defines (port/linux/src/d3d8_gl.c); the library's own copies are
+layer defines (port/linux/src/d3d8_device.c); the library's own copies are
 public symbols of the January build (D3D__RenderState, D3D__TextureState,
 D3D__IndexData) */
 extern DWORD D3D__RenderState[D3DRS_MAX];
