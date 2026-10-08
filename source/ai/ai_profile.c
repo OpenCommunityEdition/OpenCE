@@ -272,9 +272,9 @@ void ai_profile_update(
 			meter->history_sum -= meter->history[meter->history_next_index];
 		}
 		meter->history[meter->history_next_index] = meter->current_value;
-		/* BUG (original): January and October subtract the evicted sample but
-		 * never add the new sample to history_sum. A corrected build should add
-		 * current_value here before computing the average. */
+		/* port: the new sample counted too (the original only took the old one
+		off, so the averages were wrong) */
+		meter->history_sum += meter->current_value;
 		meter->history_next_index++;
 		meter->history_count = MAX(meter->history_count, meter->history_next_index);
 		meter->history_next_index %= AI_METER_HISTORY_TICKS;
@@ -460,8 +460,7 @@ static void ai_profile_render_actors(
 {
 	short tab_stops[] = {150, 300};
 
-	/* Preserve January's missing tab marker and final unit-count separator. */
-	sprintf(profilestring, "actors %d/%d/%d|units %d/%d%d",
+	sprintf(profilestring, "actors %d/%d/%d|tunits %d/%d/%d",
 		ai_profile.meters[_ai_meter_actors_active].current_value,
 		ai_profile.meters[_ai_meter_actors_updated].current_value,
 		ai_profile.meters[_ai_meter_actors].current_value,
