@@ -17,8 +17,9 @@ for the 32-bit game) can take them as they are.
 
 #include <stdint.h>
 
-/* a texture, render targets included; 0 is none */
-typedef uint32_t gpu_texture;
+/* a texture (render targets included), a buffer and a compiled shader; 0
+is none */
+typedef uint32_t gpu_texture, gpu_buffer, gpu_shader;
 
 /* the Xbox's texture stages and vertex attributes (D3DTSS_MAXSTAGES,
 XGPU_VERTEX_ATTRIBUTE_COUNT) */
@@ -176,5 +177,232 @@ struct gpu_stage
 	uint8_t pad[3];
 	struct gpu_sampler_state sampler;
 };
+
+/* ---------- buffers
+
+The device's copy of the Xbox's contiguous memory (vertex and index data
+that stays put) lives in buffers it writes as the game changes it; what a
+draw streams goes into the backend's own buffers for the frame. */
+
+/* gpu_buffer_write flags: no draw queued so far reads the range (pages
+written for the first time), so the write need not wait for one */
+enum { GPU_WRITE_UNUSED = 1 };
+
+gpu_buffer gpu_buffer_create(uint32_t size);
+void gpu_buffer_write(gpu_buffer buffer, uint32_t offset, uint32_t size, const void *data, uint32_t flags);
+
+/* gpu_stream kinds */
+enum { GPU_STREAM_VERTEX = 1, GPU_STREAM_INDEX };
+
+/* room for bytes of vertices before a draw's first gpu_stream of them:
+starting a new buffer between two of a draw's streams would leave the
+earlier ones in the old one */
+void gpu_stream_reserve(uint32_t bytes);
+/* copies size bytes (rounded up to 16) into the frame's vertex or index
+buffer; returns their offset there, and the buffer in *buffer */
+uint32_t gpu_stream(uint32_t kind, const void *data, uint32_t size, gpu_buffer *buffer);
+
+/* ---------- shaders */
+
+enum { GPU_SHADER_VERTEX = 1, GPU_SHADER_PIXEL };
+
+/* source is GLSL in the dialect the capabilities name; 0 if it does not
+compile (the log says why) */
+gpu_shader gpu_shader_create(uint32_t stage, const char *source);
+
+/* ---------- what a draw's shaders read
+
+The vertex constants: the device's copy of the 192 registers. Each register's
+serial is the value serial had when the register last changed, and log
+holds the register each of the latest serials changed (modulo its size), so
+a backend that uploaded a program's registers at serial s finds what has
+changed since without looking at them all. The checkpoint is what changed
+since the backend last uploaded registers to any program, which the backend
+resets as it does. The serials are 64-bit: a skinned model's draw changes up
+to 132 registers, and 32 bits wrapped within minutes at a high frame rate. */
+
+enum { GPU_CONSTANT_COUNT = 192, GPU_CONSTANT_LOG_SIZE = 1024 };
+
+struct gpu_constant_store
+{
+	float c[GPU_CONSTANT_COUNT][4];
+	uint64_t serials[GPU_CONSTANT_COUNT];
+	uint64_t serial;
+	uint8_t log[GPU_CONSTANT_LOG_SIZE];
+	uint64_t checkpoint_serial;
+	uint32_t checkpoint_first, checkpoint_last;
+};
+
+/* the per-pixel model lighting's registers (nv2a_psh.c model_lighting):
+c[-82] and c[-79] to c[-69], at 96 + those */
+enum { GPU_MODEL_LIGHT_COUNT = 12 };
+
+/* the other uniforms (nv2a_vsh.c, nv2a_psh.c), and a serial that changes
+whenever any of them does */
+struct gpu_uniforms
+{
+	float viewport_scale[4];
+	float viewport_offset[4];
+	float point_size;
+	float ps_c0[8][4];
+	float ps_c1[8][4];
+	float ps_final_c0[4];
+	float ps_final_c1[4];
+	float fog_color[4];
+	float fog_parameters[4];
+	float alpha_reference;
+	float bump_matrix[4][4];
+	float bump_luminance[4][4];
+	float texture_scale[4][4];
+	float screen_offset;
+	float texture_lod_bias[4];
+	uint32_t serial;
+};
+
+/* ---------- draw state */
+
+/* depth and stencil tests' comparisons, as D3DCMP_* orders them */
+enum
+{
+	GPU_COMPARE_NEVER, GPU_COMPARE_LESS, GPU_COMPARE_EQUAL, GPU_COMPARE_LESS_EQUAL,
+	GPU_COMPARE_GREATER, GPU_COMPARE_NOT_EQUAL, GPU_COMPARE_GREATER_EQUAL, GPU_COMPARE_ALWAYS,
+};
+
+enum
+{
+	GPU_STENCIL_KEEP, GPU_STENCIL_ZERO, GPU_STENCIL_REPLACE, GPU_STENCIL_INCREMENT_CLAMP,
+	GPU_STENCIL_DECREMENT_CLAMP, GPU_STENCIL_INVERT, GPU_STENCIL_INCREMENT_WRAP, GPU_STENCIL_DECREMENT_WRAP,
+};
+
+enum
+{
+	GPU_BLEND_ZERO, GPU_BLEND_ONE,
+	GPU_BLEND_SOURCE_COLOR, GPU_BLEND_ONE_MINUS_SOURCE_COLOR,
+	GPU_BLEND_SOURCE_ALPHA, GPU_BLEND_ONE_MINUS_SOURCE_ALPHA,
+	GPU_BLEND_DESTINATION_ALPHA, GPU_BLEND_ONE_MINUS_DESTINATION_ALPHA,
+	GPU_BLEND_DESTINATION_COLOR, GPU_BLEND_ONE_MINUS_DESTINATION_COLOR,
+	GPU_BLEND_SOURCE_ALPHA_SATURATE,
+	GPU_BLEND_CONSTANT_COLOR, GPU_BLEND_ONE_MINUS_CONSTANT_COLOR,
+	GPU_BLEND_CONSTANT_ALPHA, GPU_BLEND_ONE_MINUS_CONSTANT_ALPHA,
+};
+
+enum { GPU_BLEND_OP_ADD, GPU_BLEND_OP_SUBTRACT, GPU_BLEND_OP_REVERSE_SUBTRACT, GPU_BLEND_OP_MIN, GPU_BLEND_OP_MAX };
+
+/* the faces discarded; the winding of the front ones; how polygons fill */
+enum { GPU_CULL_NONE, GPU_CULL_FRONT, GPU_CULL_BACK };
+enum { GPU_FRONT_CLOCKWISE, GPU_FRONT_COUNTER_CLOCKWISE };
+enum { GPU_FILL_SOLID, GPU_FILL_LINE, GPU_FILL_POINT };
+
+/* a rectangle of the targets' pixels, rows from the top; the scissor test
+is off when width or height is not above 0 */
+struct gpu_rect
+{
+	int32_t x, y, width, height;
+};
+
+struct gpu_viewport
+{
+	struct gpu_rect rect;
+	float min_z, max_z;
+};
+
+/* each comparison and operation is used only while its test is on */
+struct gpu_depth_stencil_state
+{
+	uint8_t depth_test, depth_write, depth_function;
+	uint8_t stencil_test, stencil_function;
+	uint8_t stencil_fail, stencil_depth_fail, stencil_pass;
+	uint32_t stencil_reference, stencil_read_mask, stencil_write_mask;
+};
+
+/* the factors, operation and color are used only while enable is on */
+struct gpu_blend_state
+{
+	uint8_t enable;
+	uint8_t source, destination, operation;
+	/* ARGB, as D3DCOLOR */
+	uint32_t color;
+	/* bit 0 red, 1 green, 2 blue, 3 alpha */
+	uint8_t color_write_mask;
+	uint8_t pad[3];
+};
+
+struct gpu_raster_state
+{
+	uint8_t cull_mode, front_face, fill_mode;
+	/* the depth bias, with a slope term, while enabled */
+	uint8_t depth_bias;
+	float depth_bias_slope, depth_bias_constant;
+};
+
+/* vertex attribute formats: BGRA8 is D3DCOLOR (with vertex_bgra; RGBA8 the
+same swapped), SHORT a plain integer read as a float, NORMSHORT and UBYTE
+normalized, and NORMPACKED3 one unsigned integer the vertex shader unpacks */
+enum
+{
+	GPU_ATTRIBUTE_FLOAT1 = 1, GPU_ATTRIBUTE_FLOAT2, GPU_ATTRIBUTE_FLOAT3, GPU_ATTRIBUTE_FLOAT4,
+	GPU_ATTRIBUTE_BGRA8, GPU_ATTRIBUTE_RGBA8,
+	GPU_ATTRIBUTE_SHORT1, GPU_ATTRIBUTE_SHORT2, GPU_ATTRIBUTE_SHORT3, GPU_ATTRIBUTE_SHORT4,
+	GPU_ATTRIBUTE_NORMSHORT1, GPU_ATTRIBUTE_NORMSHORT2, GPU_ATTRIBUTE_NORMSHORT3, GPU_ATTRIBUTE_NORMSHORT4,
+	GPU_ATTRIBUTE_UBYTE1, GPU_ATTRIBUTE_UBYTE2, GPU_ATTRIBUTE_UBYTE3, GPU_ATTRIBUTE_UBYTE4,
+	GPU_ATTRIBUTE_NORMPACKED3,
+};
+
+/* an attribute's source other than streams 0 to 15: the value in
+constant_values, or the integer zero */
+enum { GPU_STREAM_COUNT = 16, GPU_STREAM_CONSTANT = 16, GPU_STREAM_ZERO = 255 };
+
+struct gpu_vertex_stream
+{
+	gpu_buffer buffer;
+	uint32_t offset;
+	uint32_t stride;
+};
+
+struct gpu_vertex_attribute
+{
+	uint8_t format;
+	uint8_t stream;
+	/* bytes from the start of the stream's vertex */
+	uint16_t offset;
+};
+
+enum
+{
+	GPU_PRIMITIVE_POINTS, GPU_PRIMITIVE_LINES, GPU_PRIMITIVE_LINE_LOOP, GPU_PRIMITIVE_LINE_STRIP,
+	GPU_PRIMITIVE_TRIANGLES, GPU_PRIMITIVE_TRIANGLE_STRIP, GPU_PRIMITIVE_TRIANGLE_FAN,
+};
+
+/* one draw, complete: the backend applies it without reference to the draws
+before it */
+struct gpu_draw
+{
+	/* at least one; a depth target is a depth-stencil texture */
+	gpu_texture color_target, depth_target;
+	/* 0: the targets' textures are drawn into; else their multisampled
+	storage, with this many samples a pixel */
+	uint32_t samples;
+	gpu_shader vertex_shader, pixel_shader;
+	struct gpu_viewport viewport;
+	struct gpu_rect scissor;
+	struct gpu_depth_stencil_state depth_stencil;
+	struct gpu_blend_state blend;
+	struct gpu_raster_state raster;
+	struct gpu_stage stages[GPU_STAGE_COUNT];
+	struct gpu_vertex_stream streams[GPU_STREAM_COUNT];
+	struct gpu_vertex_attribute attributes[GPU_ATTRIBUTE_COUNT];
+	float constant_values[GPU_ATTRIBUTE_COUNT][4];
+	/* 0: the vertices are drawn in order; else their 16-bit indices */
+	gpu_buffer index_buffer;
+	uint32_t index_offset;
+	uint32_t primitive;
+	uint32_t count;
+	/* added to each index */
+	int32_t base_vertex;
+};
+
+/* draws; returns 0 if nothing was drawn because the shaders do not link */
+uint32_t gpu_draw(const struct gpu_draw *draw, struct gpu_constant_store *constants,
+	const struct gpu_uniforms *uniforms);
 
 #endif
