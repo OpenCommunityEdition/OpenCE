@@ -92,9 +92,12 @@ struct sdl_stream
 	float volume;             /* SetVolume */
 	float mix_left, mix_right;
 	/* a stereo voice of a sound in the world: panned towards it, -1 left
-	to 1 right (dsound_sdl_stream_set_stereo_pan) */
+	to 1 right, its distance, and the fade of its volume with distance that
+	the game made (dsound_sdl_stream_set_stereo_position) */
 	BOOL stereo_positioned;
 	float stereo_pan;
+	float stereo_distance;
+	float stereo_distance_fade;
 	float headroom;
 
 	/* 3D */
@@ -406,11 +409,32 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 	else if (stream->channels == 2 && stream->stereo_positioned)
 	{
 		/* the equal power pan of a 3D voice, at the gains of a 2D one when
-		centred (the game fades it with distance) */
+		centred (the game fades it with distance), its direct path muffled
+		and its room send made as a 3D voice's are (SetI3DL2Source) */
 		float angle = (stream->stereo_pan + 1.0f) * 0.25f * 3.14159265f;
+		float direct = gain_from_millibels(stream->direct);
+		float cosine = frequency_cosine(environment.flHFReference);
 
-		*left = cosf(angle) * 1.41421356f * stream->mix_left;
-		*right = sinf(angle) * 1.41421356f * stream->mix_right;
+		*left = cosf(angle) * 1.41421356f * stream->mix_left * direct;
+		*right = sinf(angle) * 1.41421356f * stream->mix_right * direct;
+		if (stream->direct_hf < stream->direct)
+			*direct_lowpass = lowpass_coefficient(gain_from_millibels(stream->direct_hf - stream->direct), cosine);
+		if (reverb_enabled)
+		{
+			LONG level = environment.lRoom + stream->room;
+			LONG high_level = environment.lRoom + environment.lRoomHF + stream->room_hf;
+
+			/* the room's rolloff with distance, a 3D voice's; the volume
+			holds the game's fade with it, which a 3D voice's room send does
+			not take, so it is taken back out (no further than a twentieth:
+			past that the send fades out with the sound) */
+			*room = gain_from_millibels(level) *
+				distance_attenuation(stream, stream->stereo_distance,
+					environment.flRoomRolloffFactor + stream->room_rolloff_factor) /
+				(stream->stereo_distance_fade > 0.05f ? stream->stereo_distance_fade : 0.05f);
+			if (*room > 0.0f && high_level < level)
+				*room_lowpass = lowpass_coefficient(gain_from_millibels(high_level - level), cosine);
+		}
 	}
 	else
 	{
@@ -1396,16 +1420,25 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 }
 
 /* A stereo voice of a sound in the world (`positioned`) is panned towards
-it, `pan` from -1 (left) to 1 (right); not positioned, it plays as the Xbox
-played every stereo sound, unpanned. The game fades it with distance itself
-(sound_manager.c, update_channels: sound_dsound_xbox.c calls this). */
-void dsound_sdl_stream_set_stereo_pan(IDirectSoundStream *object, BOOL positioned, float pan)
+it, `pan` from -1 (left) to 1 (right), and muffled and reverberated as a 3D
+voice is (its I3DL2 source, which the game sets as a 3D channel's), its room
+send rolling off from `minimum_distance` with `distance`. The game fades its
+volume with distance itself, by `distance_fade`. Not positioned, it plays as
+the Xbox played every stereo sound, unpanned and dry. (sound_manager.c,
+update_channels: sound_dsound_xbox.c calls this.) */
+void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *object, BOOL positioned, float pan,
+	float distance, float minimum_distance, float distance_fade)
 {
 	struct sdl_stream *stream = stream_from_interface(object);
 
 	pthread_mutex_lock(&mixer_lock);
 	stream->stereo_positioned = positioned && stream->channels == 2;
 	stream->stereo_pan = pan < -1.0f ? -1.0f : (pan > 1.0f ? 1.0f : pan);
+	stream->stereo_distance = distance > 0.0f ? distance : 0.0f;
+	stream->stereo_distance_fade = distance_fade < 0.0f ? 0.0f : (distance_fade > 1.0f ? 1.0f : distance_fade);
+	/* (as the game gives a 3D channel: no maximum) */
+	stream->minimum_distance = minimum_distance > 0.0f ? minimum_distance : 0.0f;
+	stream->maximum_distance = 3.4e38f;
 	pthread_mutex_unlock(&mixer_lock);
 }
 

@@ -1929,15 +1929,24 @@ static void dsound_virtual_set_location(
 	return;
 }
 
-/* port: a stereo channel's sound in the world is panned towards it, which
-the Xbox's stereo channels were not (sound_manager.c, update_channels;
+/* port: a stereo channel's sound in the world is panned towards it, and
+muffled and reverberated as a 3D channel's is (its I3DL2 source, from the
+same occlusion, obstruction and underwater listener), which the Xbox's
+stereo channels never were (sound_manager.c, update_channels;
 port/linux/src/dsound_sdl.c) */
-void dsound_port_set_channel_stereo_pan(
+void dsound_port_set_channel_stereo_position(
 	short virtual_channel_index,
 	boolean positioned,
-	real pan)
+	real pan,
+	real distance,
+	real minimum_distance,
+	real distance_fade,
+	real occlusion,
+	real obstruction,
+	boolean attenuate_direct_path)
 {
-	extern void dsound_sdl_stream_set_stereo_pan(IDirectSoundStream *stream, BOOL positioned, float pan);
+	extern void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *stream, BOOL positioned, float pan,
+		float distance, float minimum_distance, float distance_fade);
 	short channel_index= dsound_virtual_touch(virtual_channel_index);
 
 	if (channel_index!=NONE)
@@ -1946,7 +1955,19 @@ void dsound_port_set_channel_stereo_pan(
 
 		if (channel->stream && TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
 		{
-			dsound_sdl_stream_set_stereo_pan(channel->stream, positioned, pan);
+			if (channel->spatialized!=positioned ||
+				!realcmp_epsilon(occlusion, channel->occlusion, 0.001f) ||
+				!realcmp_epsilon(obstruction, channel->obstruction, 0.001f) ||
+				channel->attenuate_direct_path!=attenuate_direct_path)
+			{
+				channel->spatialized= positioned;
+				channel->occlusion= occlusion;
+				channel->obstruction= obstruction;
+				channel->attenuate_direct_path= attenuate_direct_path;
+				dsound_channel_set_I3DL2_properties(channel_index);
+			}
+			dsound_sdl_stream_set_stereo_position(channel->stream, positioned, pan,
+				distance, minimum_distance, distance_fade);
 		}
 	}
 
@@ -2530,6 +2551,17 @@ static void dsound_channel_set_properties(
 			{
 				channel->reverb_attenuation= properties->reverb_attenuation;
 
+				dsound_channel_set_I3DL2_properties(channel_index);
+			}
+		}
+		/* port: and a stereo channel's, whose sound in the world reverberates
+		as a 3D channel's does (dsound_port_set_channel_stereo_position) */
+		else if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) &&
+			!realcmp_epsilon(properties->reverb_attenuation, channel->reverb_attenuation, 0.001f))
+		{
+			channel->reverb_attenuation= properties->reverb_attenuation;
+			if (channel->spatialized)
+			{
 				dsound_channel_set_I3DL2_properties(channel_index);
 			}
 		}

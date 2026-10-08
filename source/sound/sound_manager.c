@@ -244,9 +244,11 @@ symbols in this file:
 #include <math.h>
 #include <stdio.h>
 
-/* port: a stereo channel's sound in the world panned towards it
-(sound_dsound_xbox.c; update_channels) */
-void dsound_port_set_channel_stereo_pan(short virtual_channel_index, boolean positioned, real pan);
+/* port: a stereo channel's sound in the world panned towards it, muffled
+and reverberated as a 3D channel's is (sound_dsound_xbox.c; update_channels) */
+void dsound_port_set_channel_stereo_position(short virtual_channel_index, boolean positioned, real pan,
+	real distance, real minimum_distance, real distance_fade, real occlusion, real obstruction,
+	boolean attenuate_direct_path);
 
 /* ---------- constants */
 
@@ -3495,14 +3497,20 @@ static void update_channels(
 			else
 			{
 				real_point3d relative_position = sound->source.location.position;
+				/* port: what a 3D channel is given of its sound's surroundings,
+				for a stereo one's (dsound_port_set_channel_stereo_position) */
+				real stereo_obstruction = 0.f;
+				real stereo_occlusion = 0.f;
+				boolean stereo_underwater = FALSE;
 
 				switch (sound->source.spatialization_mode)
 				{
 				case _sound_spatialization_mode_none:
-					/* port: (unpanned: dsound_port_set_channel_stereo_pan) */
+					/* port: (unpanned and dry: dsound_port_set_channel_stereo_position) */
 					if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
 					{
-						dsound_port_set_channel_stereo_pan(channel_index, FALSE, 0.f);
+						dsound_port_set_channel_stereo_position(channel_index, FALSE, 0.f, 0.f, 0.f, 1.f,
+							0.f, 0.f, FALSE);
 					}
 					break;
 
@@ -3519,6 +3527,9 @@ static void update_channels(
 							&listener->matrix,
 							&sound->source.location.position,
 							&relative_position);
+						stereo_obstruction = sound->source.obstruction;
+						stereo_occlusion = sound->source.occlusion;
+						stereo_underwater = listener->underwater;
 					}
 					/* fall through */
 
@@ -3542,8 +3553,10 @@ static void update_channels(
 						/* port: and a stereo sound is panned towards where it
 						is, as the mixer pans a 3D one (port/linux/src/dsound_sdl.c,
 						spatialize: ahead is x, right -y; centred when close),
-						which the Xbox's stereo channels never were: a Custom
-						Edition map's stereo gunfire came from nowhere */
+						and muffled and reverberated as one is, which the Xbox's
+						stereo channels never were: a Custom Edition map's stereo
+						gunfire came from nowhere. (Obstruction and occlusion go
+						where the 3D channels' call above puts them.) */
 						if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
 						{
 							real horizontal = square_root(
@@ -3555,7 +3568,9 @@ static void update_channels(
 							{
 								pan *= distance / minimum_distance;
 							}
-							dsound_port_set_channel_stereo_pan(channel_index, TRUE, 0.75f * pan);
+							dsound_port_set_channel_stereo_position(channel_index, TRUE, 0.75f * pan,
+								distance, minimum_distance, PIN(attenuation, 0.f, 1.f),
+								stereo_obstruction, stereo_occlusion, stereo_underwater);
 						}
 					}
 					break;
