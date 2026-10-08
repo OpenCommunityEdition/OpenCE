@@ -1929,6 +1929,30 @@ static void dsound_virtual_set_location(
 	return;
 }
 
+/* port: a stereo channel's sound in the world is panned towards it, which
+the Xbox's stereo channels were not (sound_manager.c, update_channels;
+port/linux/src/dsound_sdl.c) */
+void dsound_port_set_channel_stereo_pan(
+	short virtual_channel_index,
+	boolean positioned,
+	real pan)
+{
+	extern void dsound_sdl_stream_set_stereo_pan(IDirectSoundStream *stream, BOOL positioned, float pan);
+	short channel_index= dsound_virtual_touch(virtual_channel_index);
+
+	if (channel_index!=NONE)
+	{
+		struct sound_channel *channel= channel_get(channel_index);
+
+		if (channel->stream && TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+		{
+			dsound_sdl_stream_set_stereo_pan(channel->stream, positioned, pan);
+		}
+	}
+
+	return;
+}
+
 static void dsound_virtual_set_properties(
 	short virtual_channel_index,
 	struct platform_sound_channel_properties const *properties,

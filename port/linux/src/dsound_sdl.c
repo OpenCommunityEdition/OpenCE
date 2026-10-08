@@ -91,6 +91,10 @@ struct sdl_stream
 	/* 2D gains */
 	float volume;             /* SetVolume */
 	float mix_left, mix_right;
+	/* a stereo voice of a sound in the world: panned towards it, -1 left
+	to 1 right (dsound_sdl_stream_set_stereo_pan) */
+	BOOL stereo_positioned;
+	float stereo_pan;
 	float headroom;
 
 	/* 3D */
@@ -399,6 +403,15 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 				*room_lowpass = lowpass_coefficient(gain_from_millibels(high_level - level), cosine);
 		}
 	}
+	else if (stream->channels == 2 && stream->stereo_positioned)
+	{
+		/* the equal power pan of a 3D voice, at the gains of a 2D one when
+		centred (the game fades it with distance) */
+		float angle = (stream->stereo_pan + 1.0f) * 0.25f * 3.14159265f;
+
+		*left = cosf(angle) * 1.41421356f * stream->mix_left;
+		*right = sinf(angle) * 1.41421356f * stream->mix_right;
+	}
 	else
 	{
 		*left = stream->mix_left;
@@ -554,6 +567,8 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float ramp_direct_lowpass, ramp_room_lowpass;
 	long width;
 	unsigned long frame;
+	/* (a stereo voice panned towards its sound: voice_gains) */
+	BOOL positioned = stream->channels == 2 && stream->stereo_positioned;
 
 	if (stream->paused || !stream->packet_count || !stream->sample_rate)
 		return;
@@ -664,6 +679,18 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		{
 			output[frame * 2] += sample_left * left;
 			output[frame * 2 + 1] += sample_left * right;
+		}
+		else if (positioned)
+		{
+			/* the channels' middle panned, and their difference kept as
+			wide as the far ear's gain: the sound comes from where it is,
+			still stereo */
+			float middle = 0.5f * (sample_left + sample_right);
+			float side = 0.5f * (sample_left - sample_right);
+			float far_gain = left < right ? left : right;
+
+			output[frame * 2] += middle * left + side * far_gain;
+			output[frame * 2 + 1] += middle * right - side * far_gain;
 		}
 		else
 		{
@@ -1362,8 +1389,24 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	}
 	stream->cursor = 0;
 	resampler_reset(stream);
+	/* (the next sound on the channel says where it is) */
+	stream->stereo_positioned = FALSE;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
+}
+
+/* A stereo voice of a sound in the world (`positioned`) is panned towards
+it, `pan` from -1 (left) to 1 (right); not positioned, it plays as the Xbox
+played every stereo sound, unpanned. The game fades it with distance itself
+(sound_manager.c, update_channels: sound_dsound_xbox.c calls this). */
+void dsound_sdl_stream_set_stereo_pan(IDirectSoundStream *object, BOOL positioned, float pan)
+{
+	struct sdl_stream *stream = stream_from_interface(object);
+
+	pthread_mutex_lock(&mixer_lock);
+	stream->stereo_positioned = positioned && stream->channels == 2;
+	stream->stereo_pan = pan < -1.0f ? -1.0f : (pan > 1.0f ? 1.0f : pan);
+	pthread_mutex_unlock(&mixer_lock);
 }
 
 static IDirectSoundStreamVtbl stream_vtable =

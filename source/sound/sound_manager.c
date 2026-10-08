@@ -244,6 +244,10 @@ symbols in this file:
 #include <math.h>
 #include <stdio.h>
 
+/* port: a stereo channel's sound in the world panned towards it
+(sound_dsound_xbox.c; update_channels) */
+void dsound_port_set_channel_stereo_pan(short virtual_channel_index, boolean positioned, real pan);
+
 /* ---------- constants */
 
 enum
@@ -3495,6 +3499,11 @@ static void update_channels(
 				switch (sound->source.spatialization_mode)
 				{
 				case _sound_spatialization_mode_none:
+					/* port: (unpanned: dsound_port_set_channel_stereo_pan) */
+					if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+					{
+						dsound_port_set_channel_stereo_pan(channel_index, FALSE, 0.f);
+					}
 					break;
 
 				case _sound_spatialization_mode_absolute:
@@ -3530,6 +3539,24 @@ static void update_channels(
 							(maximum_distance - minimum_distance);
 
 						fade *= PIN(attenuation, 0.f, 1.f);
+						/* port: and a stereo sound is panned towards where it
+						is, as the mixer pans a 3D one (port/linux/src/dsound_sdl.c,
+						spatialize: ahead is x, right -y; centred when close),
+						which the Xbox's stereo channels never were: a Custom
+						Edition map's stereo gunfire came from nowhere */
+						if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+						{
+							real horizontal = square_root(
+								relative_position.x * relative_position.x +
+								relative_position.y * relative_position.y);
+							real pan = horizontal > 1.0e-4f ? -relative_position.y / horizontal : 0.f;
+
+							if (distance < minimum_distance && minimum_distance > 0.f)
+							{
+								pan *= distance / minimum_distance;
+							}
+							dsound_port_set_channel_stereo_pan(channel_index, TRUE, 0.75f * pan);
+						}
 					}
 					break;
 
