@@ -60,6 +60,7 @@ machine (their datum identifiers need not be).
 #include "game/players.h"
 #include "game/game_engine.h"
 #include "main/main.h"
+#include "interface/ui_widget.h"
 #include "game/player_queues_new.h"
 #include "networking/network_game_globals.h"
 #include "objects/objects.h"
@@ -3556,6 +3557,14 @@ static void distributed_printable(
 	destination[length] = 0;
 }
 
+/* port: the main-menu scene has a running clock too. It must not accept
+gameplay packets or use identities/notices belonging to the previous round. */
+static boolean distributed_game_in_progress(
+	void)
+{
+	return game_in_progress() && !main_menu_is_active();
+}
+
 /* (the host) a line in a list of players (CHEATERS_FILE, BANS_FILE): when,
 their address, Discord user and names, and why; separated by tabs, each
 part kept to the characters allowed and their lengths (what a player could
@@ -3579,7 +3588,7 @@ static void distributed_write_player_record(
 	struct tm *local = localtime(&now);
 	FILE *file;
 
-	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES && game_in_progress())
+	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES && distributed_game_in_progress())
 	{
 		p2p_discord_sanitize(discord_id, sizeof(discord_id), distributed_client_identities[machine_index].discord_id, 0);
 		p2p_discord_sanitize(discord_name, sizeof(discord_name),
@@ -3690,7 +3699,7 @@ void network_distributed_ban(
 	distributed_address_text(address, text, sizeof(text));
 	distributed_write_player_record(BANS_FILE, text, machine_index, names, "banned by the host");
 	distributed_printable(kept_names, sizeof(kept_names), names);
-	if (game_in_progress() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+	if (distributed_game_in_progress() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 	{
 		p2p_discord_sanitize(discord_id, sizeof(discord_id), distributed_client_identities[machine_index].discord_id, 0);
 		p2p_discord_sanitize(discord_name, sizeof(discord_name),
@@ -3700,7 +3709,7 @@ void network_distributed_ban(
 		snprintf(discord, sizeof(discord), " (Discord: %s, %s)", discord_name, discord_id);
 	snprintf(notice, sizeof(notice), "%s%s banned by the host", kept_names, discord);
 	/* (to every client in the game: in the lobby, the host's own) */
-	if (game_in_progress())
+	if (distributed_game_in_progress())
 		distributed_send_notice(notice);
 	else
 	{
@@ -3721,7 +3730,7 @@ void network_distributed_kick(
 	distributed_printable(kept_names, sizeof(kept_names), names);
 	snprintf(notice, sizeof(notice), "%s kicked by the host", kept_names);
 	/* (to every client in the game: in the lobby, the host's own) */
-	if (game_in_progress())
+	if (distributed_game_in_progress())
 		distributed_send_notice(notice);
 	else
 	{
@@ -3864,7 +3873,7 @@ void network_distributed_handle_message(
 	word entry_size;
 
 	/* (none between games: loading, or in the menus) */
-	if (size < sizeof(header) || !game_in_progress())
+	if (size < sizeof(header) || !distributed_game_in_progress())
 		return;
 	csmemcpy(&header, message, sizeof(header));
 	/* a tick's messages in one: each as if it came alone */
