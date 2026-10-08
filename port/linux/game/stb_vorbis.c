@@ -1243,12 +1243,18 @@ static int vorbis_validate(uint8 *data)
 // (formula implied by specification)
 static int lookup1_values(int entries, int dim)
 {
-   int r = (int) floor(exp((float) log((float) entries) / dim));
-   if ((int) floor(pow((float) r+1, dim)) <= entries)   // (int) cast for MinGW warning;
-      ++r;                                              // floor() to avoid _ftol() when non-CRT
+   int r;
+   // port: a code book of no dimensions or entries has no values (the
+   // division below is by zero)
+   if (dim <= 0 || entries <= 0) return -1;
+   r = (int) floor(exp((float) log((float) entries) / dim));
+   // port: the powers compared as they are, not cast to int first (a large
+   // dim's are past an int, where the cast is undefined)
+   if (floor(pow((float) r+1, dim)) <= entries)
+      ++r;
    if (pow((float) r+1, dim) <= entries)
       return -1;
-   if ((int) floor(pow((float) r, dim)) > entries)
+   if (floor(pow((float) r, dim)) > entries)
       return -1;
    return r;
 }
