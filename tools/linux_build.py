@@ -509,7 +509,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             rule="linux_link",
             inputs=objects,
             variables={
-                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags]),
+                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *extra_ldflags,
+                                     # (posix_trace_marker.c's, which the GPU driver's calls must reach)
+                                     *(f"-Wl,--export-dynamic-symbol={name}"
+                                       for name in ("open", "open64", "openat", "openat64"))]),
                 "libs": libs,
             },
             implicit=[Path("tools/linux_link_check.py")],

@@ -772,6 +772,14 @@ definition. Without this check, the linker gives the reference the address
   `d3d_find_flipcount`.
 - The build returns small structures and unions in registers
   (`-freg-struct-return`), as on Win32.
+- The GPU driver cannot open the kernel's `trace_marker`
+  (`src/posix_trace_marker.c`). SteamOS keeps kernel tracing on for its GPU
+  performance captures (`gpu-trace.service`), and its Mesa then writes a
+  marker for each traced driver function: on the Steam Frame, some 480,000
+  writes a second, which took the game from the headset's 72 Hz to about
+  50 frames a second. The Steam Deck runs the same service and Mesa.
+  `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
+  gpuvis.
 
 ### Game source changes
 
