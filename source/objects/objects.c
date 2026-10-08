@@ -3680,7 +3680,9 @@ long object_new(
 	if (object_index==NONE && definition_index!=NONE)
 	{
 		char string[512];
-		sprintf(string, "OUT OF OBJECTS: cannot create %s", tag_name_strip_path(tag_get_name(definition_index)));
+		/* port: snprintf (a map's tag's name may be any length) */
+		snprintf(string, sizeof(string), "OUT OF OBJECTS: cannot create %s",
+			tag_name_strip_path(tag_get_name(definition_index)));
 		console_printf(FALSE, "%s", string);
 		error(_error_log, "%s", string);
 	}
