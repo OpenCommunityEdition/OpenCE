@@ -862,6 +862,54 @@ void rasterizer_transparent_geometry_dispose_aux_buffer(
 
 /* ---------- private code */
 
+/* port: mesh and material checks run only when model tags load. */
+#include "rasterizer/rasterizer_transparent_enclosure.h"
+
+boolean rasterizer_transparent_geometry_is_enclosure(
+	struct shader const *glass, struct vertex_buffer const *outer,
+	struct triangle_buffer const *triangles,
+	struct shader const *energy, struct vertex_buffer const *inner)
+{
+	struct shader_transparent_glass_definition const *shell = (void const *)glass;
+	struct shader_transparent_generic const *core;
+	byte *outer_data = NULL, *inner_data = NULL, *index_data = NULL;
+	boolean result;
+
+	if (!glass || !energy || glass->base.type != _shader_type_transparent_glass ||
+		energy->base.type != _shader_type_transparent_generic)
+	{
+		return FALSE;
+	}
+	core = &((struct shader_transparent_generic_definition const *)energy)->generic;
+	if (!TEST_FLAG(shell->flags, _shader_transparent_glass_flag_two_sided_bit) ||
+		TEST_FLAG(shell->flags, _shader_transparent_glass_flag_decal_bit) ||
+		shell->reflection_type == _shader_transparent_glass_reflection_type_dynamic_mirror ||
+		core->flags != FLAG(_shader_transparent_flag_two_sided_bit) ||
+		TEST_FLAG(energy->base.radiosity.flags, _shader_radiosity_FILTHY_transparent_lit_bit) ||
+		core->framebuffer_blend_function != _framebuffer_blend_function_add ||
+		core->framebuffer_fade_mode != _framebuffer_fade_mode_none ||
+		core->extra_layers.count || core->lens_flare.index != NONE ||
+		!outer || !inner || !triangles || !outer->hardware_format || !inner->hardware_format ||
+		!triangles->hardware_format || outer->offset || inner->offset ||
+		(outer->type != _rasterizer_vertex_type_model_compressed && outer->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(inner->type != _rasterizer_vertex_type_model_compressed && inner->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(triangles->type != _triangle_buffer_type_triangles && triangles->type != _triangle_buffer_type_precompiled_strip))
+	{
+		return FALSE;
+	}
+	IDirect3DVertexBuffer8_Lock(outer->hardware_format, 0, 0, &outer_data, D3DLOCK_READONLY);
+	IDirect3DVertexBuffer8_Lock(inner->hardware_format, 0, 0, &inner_data, D3DLOCK_READONLY);
+	IDirect3DIndexBuffer8_Lock(triangles->hardware_format, 0, 0, &index_data, D3DLOCK_READONLY);
+	result = rasterizer_transparent_encloses(outer_data, outer->count,
+		rasterizer_geometry_get_vertex_size(outer->type), (word const *)index_data,
+		triangles->count, triangles->type == _triangle_buffer_type_precompiled_strip,
+		inner_data, inner->count, rasterizer_geometry_get_vertex_size(inner->type));
+	IDirect3DIndexBuffer8_Unlock(triangles->hardware_format);
+	IDirect3DVertexBuffer8_Unlock(inner->hardware_format);
+	IDirect3DVertexBuffer8_Unlock(outer->hardware_format);
+	return result;
+}
+
 /* port: an extra layer's draw, no deeper than the layers may nest (a map's
 layers could name each other in a loop); said once */
 static void transparent_geometry_layer_draw(

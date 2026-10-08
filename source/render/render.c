@@ -87,6 +87,8 @@ symbols in this file:
 #include "effects/weather_particle_systems.h"
 #include "main/main.h"
 #include "structures/structures.h"
+/* port: static transparent part links for the newly loaded model tags. */
+#include "models/models.h"
 
 /* ---------- constants */
 
@@ -170,6 +172,8 @@ void render_initialize(
 void render_initialize_for_new_map(
 	void)
 {
+	/* port: preserve retail's energy-then-two-sided-glass compositing. */
+	models_fix_transparent_part_links();
 	render_objects_initialize_for_new_map();
 }
 
