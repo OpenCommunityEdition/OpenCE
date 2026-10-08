@@ -11636,11 +11636,19 @@ static void hs_sv_say(
 {
 	wchar_t text[128];
 	short local_player_index;
+	long length = 0;
 	long index;
 
-	for (index = 0; message && message[index] && index < NUMBEROF(text) - 1; index++)
-		text[index] = (unsigned char)message[index];
-	text[index] = 0;
+	/* (without '|', which the HUD's text takes with the character after it
+	as one: at the end, the string's terminator) */
+	for (index = 0; message && message[index] && length < NUMBEROF(text) - 1; index++)
+	{
+		if (message[index] != '|')
+		{
+			text[length++] = (unsigned char)message[index];
+		}
+	}
+	text[length] = 0;
 	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
 	{
 		if (local_player_get_player_index(local_player_index) != NONE)
