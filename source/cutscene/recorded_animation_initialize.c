@@ -72,6 +72,9 @@ extern struct byte_swap_definition byte_bs_definition;
 extern struct byte_swap_definition word_bs_definition;
 extern struct byte_swap_definition long_bs_definition;
 
+static short recorded_animation_unit_control_version_count(
+	byte unit_control_data_version);
+
 /* ---------- globals */
 
 static struct recorded_animation_layout_data real_vector2d_bs_codes =
@@ -115,11 +118,37 @@ static struct recorded_animation_layout_data real_vector2d_bs_codes =
 
 /* ---------- public code */
 
+/* port: the bytes a stream's unit control takes, or NONE for a version the
+field tables don't have (the stream can't be read) */
+long recorded_animation_unit_control_size(
+	byte unit_control_data_version)
+{
+	long size = 0;
+	short version_index;
+
+	if (MAX(unit_control_data_version, 1) > (short)NUMBEROF(real_vector2d_bs_codes.fields_by_version))
+		return NONE;
+
+	for (version_index = 0; version_index < recorded_animation_unit_control_version_count(unit_control_data_version); version_index++)
+	{
+		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
+
+		while (field->size != NONE)
+		{
+			size += field->size;
+			field++;
+		}
+	}
+
+	return size;
+}
+
 void recorded_animation_byteswap_unit_control(byte **stream, byte unit_control_data_version)
 {
 	short version_index;
 
-	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	/* port: only the versions the field tables have (a map's version) */
+	for (version_index = 0; version_index < recorded_animation_unit_control_version_count(unit_control_data_version); version_index++)
 	{
 		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
@@ -142,7 +171,8 @@ void recorded_animation_initialize_unit_control(
 	csmemset(unit_control, 0, sizeof(*unit_control));
 	unit_control->version3_field = NONE;
 
-	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	/* port: only the versions the field tables have (a map's version) */
+	for (version_index = 0; version_index < recorded_animation_unit_control_version_count(unit_control_data_version); version_index++)
 	{
 		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
@@ -169,7 +199,8 @@ void recorded_animation_write_unit_control(
 {
 	short version_index;
 
-	for (version_index = 0; version_index < MAX(unit_control_data_version, 1); version_index++)
+	/* port: only the versions the field tables have (a map's version) */
+	for (version_index = 0; version_index < recorded_animation_unit_control_version_count(unit_control_data_version); version_index++)
 	{
 		struct recorded_animation_control_field *field = real_vector2d_bs_codes.fields_by_version[version_index];
 
@@ -186,3 +217,13 @@ void recorded_animation_write_unit_control(
 }
 
 /* ---------- private code */
+
+/* port: the field tables' versions a stream's unit control holds (a map's
+version: one past the tables reads past them) */
+static short recorded_animation_unit_control_version_count(
+	byte unit_control_data_version)
+{
+	return (short)MIN(
+		MAX(unit_control_data_version, 1),
+		(short)NUMBEROF(real_vector2d_bs_codes.fields_by_version));
+}

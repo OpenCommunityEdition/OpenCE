@@ -178,7 +178,9 @@ real sound_permutation_get_real_mouth_aperture(
 	struct sound_permutation *permutation,
 	long tick_index)
 {
-	if (permutation->mouth_data.size)
+	/* port: and a size above none (the map's: a negative one pinned the
+	tick to before the data) */
+	if (permutation->mouth_data.size > 0)
 	{
 		long aperture = *sound_permutation_get_mouth_aperture(
 			permutation,

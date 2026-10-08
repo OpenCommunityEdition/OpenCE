@@ -137,6 +137,8 @@ void display_error_deferred(
 void display_error_text_deferred(
 	wchar_t const *text,
 	short local_player_index);
+void display_error_text_when_main_menu_loaded(
+	wchar_t const *text);
 void display_error_abort_to_dashboard_deferred(
 	short error_code,
 	boolean optional);

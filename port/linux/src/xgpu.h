@@ -218,6 +218,9 @@ struct xgpu_render_target
 	GLuint multisample;
 	int samples;
 	BOOL unresolved;
+	/* changes whenever the target is drawn into or cleared (d3d8_gl.c,
+	bind_targets) */
+	unsigned long written;
 };
 
 /* the GL texture holding a render target with this physical address, or 0 */

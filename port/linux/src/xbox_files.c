@@ -7,6 +7,9 @@ Xbox paths are translated below two roots. d:\ is the data root, the
 directory holding the game's maps/ folder: paths.data (port_config.c), else the current
 directory when it has maps/, else assets/ in the current directory or two
 levels above the executable (the repository root for build/linux/halo).
+h:\ is the Halo Custom Edition install paths.custom_edition names, if any
+(its maps folder holds the resource maps Custom Edition maps need, and more
+maps).
 Every other drive letter X:\ is the subdirectory X/ of the save root (z:\ holds the persistent cache and saves,
 u:\ user data, t:\ title data): paths.saves, else
 $XDG_DATA_HOME/halo-linux or ~/.local/share/halo-linux. Path components are
@@ -176,6 +179,31 @@ const char *platform_save_root(void)
 	return root;
 }
 
+const char *platform_custom_edition_root(void)
+{
+	static char root[MAX_PATH];
+	static int found;
+
+	if (!found)
+	{
+		char maps[MAX_PATH + 8];
+		struct posix_file_information information;
+
+		found = 1;
+		snprintf(root, sizeof(root), "%s", config_string("paths.custom_edition"));
+		trim_separators(root);
+		snprintf(maps, sizeof(maps), "%s/maps", root);
+		if (root[0] && posix_stat(maps, &information) != 0)
+		{
+			platform_log("Halo Custom Edition: %s has no maps folder; not using it", root);
+			root[0] = 0;
+		}
+		if (root[0])
+			platform_log("Halo Custom Edition: using the install at %s", root);
+	}
+	return root;
+}
+
 void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size)
 {
 	char resolved[1024];
@@ -187,7 +215,11 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 	{
 		char drive = (char)(cursor[0] | 0x20);
 
-		if (drive != 'd')
+		if (drive == 'h' && platform_custom_edition_root()[0])
+		{
+			snprintf(resolved, sizeof(resolved), "%s", platform_custom_edition_root());
+		}
+		else if (drive != 'd')
 		{
 			struct posix_file_information information;
 

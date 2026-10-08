@@ -9,7 +9,10 @@ Automated system link sessions for testing the netcode without the menus
   (slayer by default; game_engine_get_variant_by_name), as the pregame
   screen's fast setup does, and starts it debug.network_test_start seconds
   later; with more variants, once a game is over (debug.network_test_score
-  makes it short) the next, as the host's button on the scores does;
+  makes it short) the next, as the host's button on the scores does. A map
+  with a path is that level (custom_maps\a30, a Custom Edition map's), and
+  the variant "coop" makes the game network co-op on it, at normal
+  difficulty, as the Map screen does for a campaign level;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does.
 
@@ -931,24 +934,36 @@ void network_test_update(
 			if (!network_test.map_set && network_test.setup_seconds >= 1.0f && global_network_game_server_get())
 			{
 				char path[128];
-
+				char variant_name[64];
 				struct game_variant variant;
 
-				snprintf(path, sizeof(path), "levels\\test\\%s\\%s", network_test.map_name, network_test.map_name);
-				network_game_server_change_map_name(global_network_game_server_get(), path);
-				/* the variant, as picking the game settings does */
+				/* (a level of its own path, else a multiplayer map's name) */
+				if (strchr(network_test.map_name, '\\'))
+					snprintf(path, sizeof(path), "%s", network_test.map_name);
+				else
+					snprintf(path, sizeof(path), "levels\\test\\%s\\%s", network_test.map_name, network_test.map_name);
+				network_test_variant(network_test.variant_index, variant_name, sizeof(variant_name));
+				if (!strcmp(variant_name, "coop"))
 				{
-					char variant_name[64];
+					/* (the Map screen's co-op: menu_functions.c) */
+					extern boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
 
-					network_test_variant(network_test.variant_index, variant_name, sizeof(variant_name));
+					if (!ui_widget_port_cooperative_level_choose(path, _game_difficulty_level_normal))
+						platform_log("network test: %s is not a campaign level, for co-op", path);
+					platform_log("network test: game %d, co-op", network_test.variant_index + 1);
+				}
+				else
+				{
+					network_game_server_change_map_name(global_network_game_server_get(), path);
+					/* the variant, as picking the game settings does */
 					variant = *game_engine_get_variant_by_name(&variant, variant_name);
 					platform_log("network test: game %d, %s", network_test.variant_index + 1, variant_name);
+					/* debug.network_test_score: a short game, to test the next */
+					if (network_test.score_to_win > 0)
+						variant.universal_variant.score_to_win = network_test.score_to_win;
+					player_ui_set_game_variant(&variant);
+					network_game_server_change_game_variant(global_network_game_server_get(), &variant);
 				}
-				/* debug.network_test_score: a short game, to test the next */
-				if (network_test.score_to_win > 0)
-					variant.universal_variant.score_to_win = network_test.score_to_win;
-				player_ui_set_game_variant(&variant);
-				network_game_server_change_game_variant(global_network_game_server_get(), &variant);
 				network_test.map_set = TRUE;
 			}
 			if (!network_test.player_added && network_test.setup_seconds >= 2.0f && global_network_game_client_get())

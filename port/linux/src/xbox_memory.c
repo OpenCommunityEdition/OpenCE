@@ -12,9 +12,15 @@ kernel owns the whole 4 GB address space, so the layer reserves the same
 virtual window at start-up and allocates page-granular blocks inside it:
 placed requests at exactly the address asked for, the rest top-down as the
 Xbox kernel does.
+
+Halo Custom Edition maps need the window their tag data is linked to,
+0x40440000, reserved the same way when the game.custom_edition setting is on
+(port/linux/game/custom_edition_cache.c).
 */
 
 #include "platform.h"
+#include "port_config.h"
+#include "../game/cache_file_formats.h"
 
 #include <errno.h>
 #include <string.h>
@@ -30,6 +36,7 @@ static DWORD page_protection[CONTIGUOUS_PAGE_COUNT];
 static unsigned long block_page_count[CONTIGUOUS_PAGE_COUNT];
 static BOOL arena_reserved = FALSE;
 static pthread_mutex_t arena_lock = PTHREAD_MUTEX_INITIALIZER;
+static void *custom_edition_tag_cache = NULL;
 
 static int protection_to_host(DWORD protect)
 {
@@ -63,6 +70,37 @@ static void contiguous_arena_reserve(void)
 		platform_log("cannot reserve the Xbox contiguous memory window at %p (%s)",
 			wanted, strerror(errno));
 	}
+}
+
+/* The Custom Edition tag cache, reserved before anything else can map into
+it (its pages are backed as they are touched); only when Custom Edition maps
+may run, as it takes 23 MB of the address space. */
+__attribute__((constructor(102)))
+static void custom_edition_tag_cache_reserve(void)
+{
+	void *wanted = (void *)CUSTOM_EDITION_TAG_CACHE_ADDRESS;
+	void *result;
+
+	if (!config_boolean("game.custom_edition"))
+		return;
+	result = mmap(wanted, CUSTOM_EDITION_TAG_CACHE_BYTES, PROT_READ | PROT_WRITE,
+		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
+	if (result == wanted)
+	{
+		custom_edition_tag_cache = result;
+	}
+	else
+	{
+		if (result != MAP_FAILED)
+			munmap(result, CUSTOM_EDITION_TAG_CACHE_BYTES);
+		platform_log("cannot reserve the Custom Edition tag cache at %p (%s): Custom Edition maps cannot run",
+			wanted, strerror(errno));
+	}
+}
+
+void *halo_custom_edition_tag_cache(void)
+{
+	return custom_edition_tag_cache;
 }
 
 BOOL platform_is_contiguous(const void *address)

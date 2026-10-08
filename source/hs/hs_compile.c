@@ -2432,6 +2432,100 @@ static boolean hs_parse_nonprimitive(
 	return result;
 }
 
+/* (hs.c's function table's count) */
+extern long const hs_function_table_count;
+
+/* port: the argument nodes of a function call node, after its name: the
+first, and the one after `node` */
+static struct hs_syntax_node *hs_postprocess_next_argument(
+	struct hs_syntax_node const *node)
+{
+	return node && node->next_node_index != NONE ? datum_try_and_get(hs_syntax_data, node->next_node_index) : NULL;
+}
+
+/* port: whether every argument a pass-through function call node (its
+function's return type _hs_passthrough) may return is of the node's type,
+as the compiler parsed them, and the others of the types it parsed them as;
+TRUE for every other node. Every node has been through the checks above:
+its type is valid, its predicate is a node naming its function. A node that
+is not so is left to those checks. */
+static boolean hs_postprocess_passthrough_arguments(
+	long expression_index)
+{
+	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+	struct hs_syntax_node *predicate;
+	struct hs_syntax_node *argument;
+	struct hs_function_definition const *function;
+
+	if (!hs_type_valid(expression->type) ||
+		TEST_FLAG(expression->flags, _hs_syntax_node_primitive_bit) ||
+		TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ||
+		expression->data == NONE ||
+		!(predicate = datum_try_and_get(hs_syntax_data, expression->data)) ||
+		expression->function_index < 0 ||
+		expression->function_index >= hs_function_table_count ||
+		(function = hs_function_get(expression->function_index))->return_type != _hs_passthrough)
+	{
+		return TRUE;
+	}
+	argument = hs_postprocess_next_argument(predicate);
+	switch (expression->function_index)
+	{
+	case _hs_function_begin:
+		/* (every argument but the last is of type void) */
+		for (; argument; argument = hs_postprocess_next_argument(argument))
+		{
+			short expected = argument->next_node_index == NONE ? expression->type : _hs_type_void;
+
+			if (argument->type != expected)
+				return FALSE;
+		}
+		return TRUE;
+	case _hs_function_begin_random:
+		for (; argument; argument = hs_postprocess_next_argument(argument))
+		{
+			if (argument->type != expression->type)
+				return FALSE;
+		}
+		return TRUE;
+	case _hs_function_if:
+		/* (a condition, then one or two values) */
+		if (!argument || argument->type != _hs_type_boolean)
+			return FALSE;
+		for (argument = hs_postprocess_next_argument(argument); argument; argument = hs_postprocess_next_argument(argument))
+		{
+			if (argument->type != expression->type)
+				return FALSE;
+		}
+		return TRUE;
+	case _hs_function_set:
+		/* (a variable, then a value of its type; the node's type is cast
+		from the variable's: hs_evaluate_set, hs_syntax_node_refusal) */
+		if (!argument ||
+			!TEST_FLAG(argument->flags, _hs_syntax_node_primitive_bit) ||
+			!TEST_FLAG(argument->flags, _hs_syntax_node_variable_bit) ||
+			!hs_type_valid(argument->type) ||
+			!hs_can_cast(argument->type, expression->type))
+		{
+			return FALSE;
+		}
+		{
+			struct hs_syntax_node *value = hs_postprocess_next_argument(argument);
+
+			return value && value->type == argument->type && value->next_node_index == NONE;
+		}
+	default:
+		/* (cond is made ifs by the compiler; nothing else passes through.
+		Whatever is returned must be of the node's type) */
+		for (; argument; argument = hs_postprocess_next_argument(argument))
+		{
+			if (argument->type != expression->type)
+				return FALSE;
+		}
+		return TRUE;
+	}
+}
+
 boolean hs_compile_postprocess(
 	char const **error_message_pointer,
 	char const **error_source_pointer)
@@ -2468,9 +2562,24 @@ boolean hs_compile_postprocess(
 				}
 
 				if (success && TEST_FLAG(expression->flags, _hs_syntax_node_variable_bit))
+				{
 					resolved_type = hs_global_get_type((short)expression->data);
+				}
+				else if (success && expression->type < _hs_type_string &&
+					expression->constant_type != expression->type)
+				{
+					/* port: a constant that is not parsed again keeps the value
+					the map gave it, which is read as its type: the compiler
+					makes its constant type its type (hs_parse_primitive), so one
+					of another type is a map's, whose value a cast would read as
+					that type (a string's, as a pointer) */
+					hs_compile_globals.error = "constant type is inconsistent with its type (you need to recompile scripts.)";
+					success = FALSE;
+				}
 				else
+				{
 					resolved_type = expression->constant_type;
+				}
 			}
 			else if (TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
 			{
@@ -2544,6 +2653,22 @@ boolean hs_compile_postprocess(
 		else if (expression->type != _hs_function_name)
 		{
 			hs_compile_globals.error = "missing type (you need to recompile scripts.)";
+			success = FALSE;
+		}
+	}
+
+	/* port: the special forms that return one of their arguments' values
+	(begin, begin_random, if, set) return it as the value of their own type
+	without a cast, so each such argument must be of that type, as the
+	compiler parsed it (hs_parse_begin, hs_parse_if, hs_parse_set); a map's
+	nodes are only checked above against their own functions and constants */
+	for (expression_index = data_next_index(hs_syntax_data, NONE);
+		success && expression_index != NONE;
+		expression_index = data_next_index(hs_syntax_data, expression_index))
+	{
+		if (!hs_postprocess_passthrough_arguments(expression_index))
+		{
+			hs_compile_globals.error = "a value is not of the type it is returned as (you need to recompile scripts.)";
 			success = FALSE;
 		}
 	}

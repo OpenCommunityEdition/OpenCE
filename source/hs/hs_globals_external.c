@@ -2390,6 +2390,503 @@ struct hs_external_global_definition *hs_external_globals[443] =
 	&run_game_scripts_definition,
 };
 
+/* port: the external globals a map's scripts may set, by
+hs_external_globals' index (hs_scenario_functions_check). Any may be read
+(that copies a value), and the console's expressions may set any. Allowed
+are the three the shipped maps' scripts set (c10's near clip distance and
+weather, b30's cheat_deathless_player) and a few of gameplay's. Not
+allowed are the rasterizer's, the debug displays and switches, profiling,
+cheats, the console, the network, and the player's own settings. A global
+added to the table may not be set until it is listed here */
+static boolean const hs_external_global_settable_in_maps[]=
+{
+	/* the camera's clip distances (c10 sets the near one) */
+	TRUE, /* rasterizer_near_clip_distance */
+	TRUE, /* rasterizer_far_clip_distance */
+	TRUE, /* rasterizer_first_person_weapon_near_clip_distance */
+	TRUE, /* rasterizer_first_person_weapon_far_clip_distance */
+
+	/* the rasterizer: buffers, the frame rate, the frame bounds, its debug and profile toggles */
+	FALSE, /* rasterizer_pushbuffer_size */
+	FALSE, /* rasterizer_pushbuffer_kickoff_size */
+	FALSE, /* rasterizer_floating_point_zbuffer */
+	FALSE, /* rasterizer_framerate_throttle */
+	FALSE, /* rasterizer_framerate_stabilization */
+	FALSE, /* rasterizer_refresh_rate */
+	FALSE, /* rasterizer_frame_bounds_left */
+	FALSE, /* rasterizer_frame_bounds_right */
+	FALSE, /* rasterizer_frame_bounds_top */
+	FALSE, /* rasterizer_frame_bounds_bottom */
+	FALSE, /* rasterizer_stats */
+	FALSE, /* rasterizer_mode */
+	FALSE, /* rasterizer_wireframe */
+	FALSE, /* rasterizer_smart */
+	FALSE, /* rasterizer_debug_model_vertices */
+	FALSE, /* rasterizer_debug_model_lod */
+	FALSE, /* rasterizer_debug_transparents */
+	FALSE, /* rasterizer_debug_meter_shader */
+	FALSE, /* rasterizer_models */
+	FALSE, /* rasterizer_model_transparents */
+	FALSE, /* rasterizer_draw_first_person_weapon_first */
+	FALSE, /* rasterizer_stencil_mask */
+	FALSE, /* rasterizer_environment */
+	FALSE, /* rasterizer_environment_lightmaps */
+	FALSE, /* rasterizer_environment_shadows */
+	FALSE, /* rasterizer_environment_diffuse_lights */
+	FALSE, /* rasterizer_environment_diffuse_textures */
+	FALSE, /* rasterizer_environment_decals */
+	FALSE, /* rasterizer_environment_specular_lights */
+	FALSE, /* rasterizer_environment_specular_lightmaps */
+	FALSE, /* rasterizer_environment_reflection_lightmap_mask */
+	FALSE, /* rasterizer_environment_reflection_mirrors */
+	FALSE, /* rasterizer_environment_reflections */
+	FALSE, /* rasterizer_environment_transparents */
+	FALSE, /* rasterizer_environment_fog */
+	FALSE, /* rasterizer_environment_fog_screen */
+	FALSE, /* rasterizer_water */
+	FALSE, /* rasterizer_lens_flares */
+	FALSE, /* rasterizer_dynamic_unlit_geometry */
+	FALSE, /* rasterizer_dynamic_lit_geometry */
+	FALSE, /* rasterizer_dynamic_screen_geometry */
+	FALSE, /* rasterizer_hud_motion_sensor */
+	FALSE, /* rasterizer_detail_objects */
+	FALSE, /* rasterizer_debug_geometry */
+	FALSE, /* rasterizer_debug_geometry_multipass */
+	FALSE, /* rasterizer_fog_atmosphere */
+	FALSE, /* rasterizer_fog_plane */
+	FALSE, /* rasterizer_bump_mapping */
+	FALSE, /* rasterizer_lightmap_ambient */
+	FALSE, /* rasterizer_lightmap_mode */
+	FALSE, /* rasterizer_lightmaps_incident_radiosity */
+	FALSE, /* rasterizer_lightmaps_filtering */
+	FALSE, /* rasterizer_model_lighting_ambient */
+	FALSE, /* rasterizer_environment_alpha_testing */
+	FALSE, /* rasterizer_environment_specular_mask */
+	FALSE, /* rasterizer_shadows_convolution */
+	FALSE, /* rasterizer_shadows_debug */
+	FALSE, /* rasterizer_water_mipmapping */
+	FALSE, /* rasterizer_active_camouflage */
+	FALSE, /* rasterizer_active_camouflage_multipass */
+	FALSE, /* rasterizer_plasma_energy */
+	FALSE, /* rasterizer_lens_flares_occlusion */
+	FALSE, /* rasterizer_lens_flares_occlusion_debug */
+	FALSE, /* rasterizer_ray_of_buddha */
+	FALSE, /* rasterizer_screen_flashes */
+	FALSE, /* rasterizer_screen_effects */
+	FALSE, /* rasterizer_DXTC_noise */
+	FALSE, /* rasterizer_soft_filter */
+	FALSE, /* rasterizer_secondary_render_target_debug */
+	FALSE, /* rasterizer_profile_log */
+	FALSE, /* rasterizer_detail_objects_offset_multiplier */
+	FALSE, /* rasterizer_zbias */
+	FALSE, /* rasterizer_zoffset */
+	FALSE, /* force_all_player_views_to_default_player */
+	FALSE, /* rasterizer_safe_frame_bounds */
+	FALSE, /* freeze_flying_camera */
+	FALSE, /* rasterizer_zsprites */
+	FALSE, /* rasterizer_filthy_decal_fog_hack */
+	FALSE, /* rasterizer_splitscreen_VB_optimization */
+	FALSE, /* rasterizer_profile_print_locks */
+	FALSE, /* rasterizer_profile_objectlock_time */
+
+	/* the rasterizer: tuning values */
+	FALSE, /* pad3 */
+	FALSE, /* pad3_scale */
+	FALSE, /* f0 */
+	FALSE, /* f1 */
+	FALSE, /* f2 */
+	FALSE, /* f3 */
+	FALSE, /* f4 */
+	FALSE, /* f5 */
+
+	/* debug displays, screenshots, the console */
+	FALSE, /* rasterizer_transparent_pixel_counter */
+	FALSE, /* debug_no_frustum_clip */
+	FALSE, /* debug_frustum */
+	FALSE, /* debug_bink */
+	FALSE, /* screenshot_size */
+	FALSE, /* screenshot_count */
+	FALSE, /* terminal_render */
+	FALSE, /* console_dump_to_file */
+	FALSE, /* player_spawn_count */
+	FALSE, /* debug_object_garbage_collection */
+	FALSE, /* debug_render_freeze */
+	FALSE, /* debug_no_drawing */
+	FALSE, /* debug_input_target */
+	FALSE, /* temporary_hud */
+	FALSE, /* debug_leaf_index */
+	FALSE, /* debug_leaf_portal_index */
+	FALSE, /* debug_leaf_portals */
+	FALSE, /* debug_unit_all_animations */
+	FALSE, /* debug_unit_animations */
+	FALSE, /* debug_unit_illumination */
+	FALSE, /* debug_damage_taken */
+
+	/* cheats: b30 sets cheat_deathless_player (around its cinematics) */
+	TRUE, /* cheat_deathless_player */
+	FALSE, /* cheat_jetpack */
+	FALSE, /* cheat_infinite_ammo */
+	FALSE, /* cheat_bottomless_clip */
+	FALSE, /* cheat_bump_possession */
+	FALSE, /* cheat_super_jump */
+	FALSE, /* cheat_reflexive_damage_effects */
+	FALSE, /* cheat_medusa */
+	FALSE, /* cheat_omnipotent */
+	FALSE, /* cheat_controller */
+
+	/* the player's content setting, sound debugging and tuning */
+	FALSE, /* effects_corpse_nonviolent */
+	FALSE, /* debug_effects_nonviolent */
+	FALSE, /* debug_sound_cache */
+	FALSE, /* debug_sound */
+	FALSE, /* debug_looping_sound */
+	FALSE, /* debug_sound_channels */
+	FALSE, /* loud_dialog_hack */
+	FALSE, /* sound_gain_under_dialog */
+	FALSE, /* debug_sound_environment */
+
+	/* object lighting tuning, animation compression statistics */
+	FALSE, /* object_light_ambient_base */
+	FALSE, /* object_light_ambient_scale */
+	FALSE, /* object_light_secondary_scale */
+	FALSE, /* object_light_interpolate */
+	FALSE, /* model_animation_compression */
+	FALSE, /* model_animation_data_compressed_size */
+	FALSE, /* model_animation_data_uncompressed_size */
+	FALSE, /* model_animation_data_compression_savings_in_bytes */
+	FALSE, /* model_animation_data_compression_savings_in_bytes_at_import */
+	FALSE, /* model_animation_data_compression_savings_in_percent */
+	FALSE, /* model_animation_bullshit0 */
+	FALSE, /* model_animation_bullshit1 */
+	FALSE, /* model_animation_bullshit2 */
+	FALSE, /* model_animation_bullshit3 */
+
+	/* gameplay */
+	TRUE, /* rider_ejection */
+	TRUE, /* stun_enable */
+
+	/* debug displays: sprites, portals, objects, models, damage, scripting */
+	FALSE, /* debug_sprites */
+	FALSE, /* debug_portals */
+	FALSE, /* debug_inactive_objects */
+	FALSE, /* render_contrails */
+	FALSE, /* render_particles */
+	FALSE, /* render_psystems */
+	FALSE, /* render_wsystems */
+	FALSE, /* debug_objects */
+	FALSE, /* debug_objects_position_velocity */
+	FALSE, /* debug_objects_root_node */
+	FALSE, /* debug_objects_bounding_spheres */
+	FALSE, /* debug_objects_collision_models */
+	FALSE, /* debug_objects_physics */
+	FALSE, /* debug_objects_names */
+	FALSE, /* debug_objects_pathfinding_spheres */
+	FALSE, /* debug_objects_unit_vectors */
+	FALSE, /* debug_objects_unit_seats */
+	FALSE, /* debug_objects_unit_mouth_apeture */
+	FALSE, /* debug_objects_biped_physics_pills */
+	FALSE, /* debug_objects_biped_autoaim_pills */
+	FALSE, /* debug_objects_vehicle_powered_mass_points */
+	FALSE, /* debug_objects_devices */
+	FALSE, /* render_model_nodes */
+	FALSE, /* render_model_vertex_counts */
+	FALSE, /* render_model_index_counts */
+	FALSE, /* render_model_markers */
+	FALSE, /* render_model_no_geometry */
+	FALSE, /* render_shadows */
+	FALSE, /* debug_damage */
+	FALSE, /* debug_scripting */
+	FALSE, /* debug_trigger_volumes */
+
+	/* physics and collision debugging */
+	FALSE, /* debug_point_physics */
+	FALSE, /* debug_physics_disable_penetration_freeze */
+	FALSE, /* debug_motion_sensor_draw_all_units */
+	FALSE, /* collision_debug */
+	FALSE, /* collision_debug_spray */
+	FALSE, /* collision_debug_features */
+	FALSE, /* collision_debug_repeat */
+	FALSE, /* collision_debug_flag_front_facing_surfaces */
+	FALSE, /* collision_debug_flag_back_facing_surfaces */
+	FALSE, /* collision_debug_flag_ignore_two_sided_surfaces */
+	FALSE, /* collision_debug_flag_ignore_invisible_surfaces */
+	FALSE, /* collision_debug_flag_ignore_breakable_surfaces */
+	FALSE, /* collision_debug_flag_structure */
+	FALSE, /* collision_debug_flag_media */
+	FALSE, /* collision_debug_flag_objects */
+	FALSE, /* collision_debug_flag_objects_bipeds */
+	FALSE, /* collision_debug_flag_objects_vehicles */
+	FALSE, /* collision_debug_flag_objects_weapons */
+	FALSE, /* collision_debug_flag_objects_equipment */
+	FALSE, /* collision_debug_flag_objects_projectiles */
+	FALSE, /* collision_debug_flag_objects_scenery */
+	FALSE, /* collision_debug_flag_objects_machines */
+	FALSE, /* collision_debug_flag_objects_controls */
+	FALSE, /* collision_debug_flag_objects_light_fixtures */
+	FALSE, /* collision_debug_flag_objects_placeholders */
+	FALSE, /* collision_debug_flag_try_to_keep_location_valid */
+	FALSE, /* collision_debug_flag_skip_passthrough_bipeds */
+	FALSE, /* collision_debug_flag_use_vehicle_physics */
+	FALSE, /* collision_debug_point_x */
+	FALSE, /* collision_debug_point_y */
+	FALSE, /* collision_debug_point_z */
+	FALSE, /* collision_debug_vector_i */
+	FALSE, /* collision_debug_vector_j */
+	FALSE, /* collision_debug_vector_k */
+	FALSE, /* collision_debug_length */
+	FALSE, /* collision_debug_width */
+	FALSE, /* collision_debug_height */
+	FALSE, /* collision_debug_phantom_bsp */
+	FALSE, /* collision_log_render */
+	FALSE, /* collision_log_detailed */
+	FALSE, /* collision_log_extended */
+	FALSE, /* collision_log_totals_only */
+	FALSE, /* collision_log_time */
+
+	/* path and camera debugging, the world's debug displays */
+	FALSE, /* debug_obstacle_path */
+	FALSE, /* debug_obstacle_path_on_failure */
+	FALSE, /* debug_obstacle_path_start_point_x */
+	FALSE, /* debug_obstacle_path_start_point_y */
+	FALSE, /* debug_obstacle_path_start_surface_index */
+	FALSE, /* debug_obstacle_path_goal_point_x */
+	FALSE, /* debug_obstacle_path_goal_point_y */
+	FALSE, /* debug_obstacle_path_goal_surface_index */
+	FALSE, /* debug_camera */
+	FALSE, /* debug_player */
+	FALSE, /* debug_structure */
+	FALSE, /* debug_bsp */
+	FALSE, /* debug_input */
+	FALSE, /* debug_permanent_decals */
+	FALSE, /* debug_fog_planes */
+	FALSE, /* decals */
+	FALSE, /* debug_decals */
+	FALSE, /* debug_object_lights */
+	FALSE, /* debug_lights */
+	FALSE, /* debug_biped_physics */
+	FALSE, /* debug_biped_skip_update */
+	FALSE, /* debug_biped_skip_collision */
+	FALSE, /* debug_biped_limp_body_disable */
+	FALSE, /* debug_collision_skip_objects */
+	FALSE, /* debug_collision_skip_vectors */
+	FALSE, /* debug_material_effects */
+
+	/* the weather (c10 sets it), breakable surfaces, decals */
+	TRUE, /* weather */
+	FALSE, /* breakable_surfaces */
+	FALSE, /* decals */
+
+	/* profiling, the saved-game hack, radiosity, the texture cache */
+	FALSE, /* profile_graph */
+	FALSE, /* profile_display */
+	FALSE, /* profile_timebase_ticks */
+	FALSE, /* profile_dump_frames */
+	FALSE, /* profile_dump_lost_frames */
+	FALSE, /* recover_saved_games_hack */
+	FALSE, /* radiosity_quality */
+	FALSE, /* radiosity_step_count */
+	FALSE, /* radiosity_lines */
+	FALSE, /* radiosity_normals */
+	FALSE, /* structures_use_pvs_for_vs */
+	FALSE, /* debug_texture_cache */
+	FALSE, /* debug_detail_objects */
+
+	/* AI debug displays, prints and switches */
+	FALSE, /* ai_render */
+	FALSE, /* ai_render_all_actors */
+	FALSE, /* ai_render_inactive_actors */
+	FALSE, /* ai_render_lineoffire_crouching */
+	FALSE, /* ai_render_lineoffire */
+	FALSE, /* ai_render_lineofsight */
+	FALSE, /* ai_render_ballistic_lineoffire */
+	FALSE, /* ai_render_encounter_activeregion */
+	FALSE, /* ai_render_vision_cones */
+	FALSE, /* ai_render_current_state */
+	FALSE, /* ai_render_detailed_state */
+	FALSE, /* ai_render_props */
+	FALSE, /* ai_render_props_web */
+	FALSE, /* ai_render_props_no_friends */
+	FALSE, /* ai_render_props_target_weight */
+	FALSE, /* ai_render_props_unreachable */
+	FALSE, /* ai_render_props_unopposable */
+	FALSE, /* ai_render_idle_look */
+	FALSE, /* ai_render_support_surfaces */
+	FALSE, /* ai_render_recent_damage */
+	FALSE, /* ai_render_threats */
+	FALSE, /* ai_render_emotions */
+	FALSE, /* ai_render_audibility */
+	FALSE, /* ai_render_aiming_vectors */
+	FALSE, /* ai_render_secondary_looking */
+	FALSE, /* ai_render_targets */
+	FALSE, /* ai_render_targets_last_visible */
+	FALSE, /* ai_render_states */
+	FALSE, /* ai_render_vitality */
+	FALSE, /* ai_render_active_cover_seeking */
+	FALSE, /* ai_render_evaluations */
+	FALSE, /* ai_render_pursuit */
+	FALSE, /* ai_render_shooting */
+	FALSE, /* ai_render_trigger */
+	FALSE, /* ai_render_projectile_aiming */
+	FALSE, /* ai_render_aiming_validity */
+	FALSE, /* ai_render_speech */
+	FALSE, /* ai_render_teams */
+	FALSE, /* ai_render_player_ratings */
+	FALSE, /* ai_render_spatial_effects */
+	FALSE, /* ai_render_firing_positions */
+	FALSE, /* ai_render_gun_positions */
+	FALSE, /* ai_render_burst_geometry */
+	FALSE, /* ai_render_vehicle_avoidance */
+	FALSE, /* ai_render_vehicles_enterable */
+	FALSE, /* ai_render_melee_check */
+	FALSE, /* ai_render_dialogue_variants */
+	FALSE, /* ai_render_grenade_decisions */
+	FALSE, /* ai_render_danger_zones */
+	FALSE, /* ai_render_charge_decisions */
+	FALSE, /* ai_render_control */
+	FALSE, /* ai_render_activation */
+	FALSE, /* ai_render_paths */
+	FALSE, /* ai_render_paths_selected_only */
+	FALSE, /* ai_render_paths_destination */
+	FALSE, /* ai_render_paths_current */
+	FALSE, /* ai_render_paths_failed */
+	FALSE, /* ai_render_paths_raw */
+	FALSE, /* ai_render_paths_smoothed */
+	FALSE, /* ai_render_paths_avoided */
+	FALSE, /* ai_render_paths_avoidance_segment */
+	FALSE, /* ai_render_paths_avoidance_obstacles */
+	FALSE, /* ai_render_paths_avoidance_search */
+	FALSE, /* ai_render_paths_nodes */
+	FALSE, /* ai_render_paths_nodes_all */
+	FALSE, /* ai_render_paths_nodes_polygons */
+	FALSE, /* ai_render_paths_nodes_costs */
+	FALSE, /* ai_render_paths_nodes_closest */
+	FALSE, /* ai_render_player_aiming_blocked */
+	FALSE, /* ai_render_vector_avoidance */
+	FALSE, /* ai_render_vector_avoidance_rays */
+	FALSE, /* ai_render_vector_avoidance_sense_t */
+	FALSE, /* ai_render_vector_avoidance_avoid_t */
+	FALSE, /* ai_render_vector_avoidance_clear_time */
+	FALSE, /* ai_render_vector_avoidance_weights */
+	FALSE, /* ai_render_vector_avoidance_objects */
+	FALSE, /* ai_render_vector_avoidance_intermediate */
+	FALSE, /* ai_render_postcombat */
+	FALSE, /* ai_print_pursuit_checks */
+	FALSE, /* ai_print_rules */
+	FALSE, /* ai_print_rule_values */
+	FALSE, /* ai_print_major_upgrade */
+	FALSE, /* ai_print_respawn */
+	FALSE, /* ai_print_evaluation_statistics */
+	FALSE, /* ai_print_communication */
+	FALSE, /* ai_print_communication_player */
+	FALSE, /* ai_print_vocalizations */
+	FALSE, /* ai_print_placement */
+	FALSE, /* ai_print_speech */
+	FALSE, /* ai_print_speech_timers */
+	FALSE, /* ai_print_allegiance */
+	FALSE, /* ai_print_lost_speech */
+	FALSE, /* ai_print_migration */
+	FALSE, /* ai_print_automatic_migration */
+	FALSE, /* ai_print_scripting */
+	FALSE, /* ai_print_surprise */
+	FALSE, /* ai_print_command_lists */
+	FALSE, /* ai_print_damage_modifiers */
+	FALSE, /* ai_print_secondary_looking */
+	FALSE, /* ai_print_oversteer */
+	FALSE, /* ai_print_conversations */
+	FALSE, /* ai_print_killing_sprees */
+	FALSE, /* ai_print_acknowledgement */
+	FALSE, /* ai_print_unfinished_paths */
+	FALSE, /* ai_print_bsp_transition */
+	FALSE, /* ai_print_uncovering */
+	FALSE, /* ai_profile_disable */
+	FALSE, /* ai_profile_random */
+	FALSE, /* ai_show */
+	FALSE, /* ai_show_stats */
+	FALSE, /* ai_show_actors */
+	FALSE, /* ai_show_swarms */
+	FALSE, /* ai_show_paths */
+	FALSE, /* ai_show_line_of_sight */
+	FALSE, /* ai_show_prop_types */
+	FALSE, /* ai_show_sound_distance */
+	FALSE, /* ai_debug_fast_los */
+	FALSE, /* ai_debug_oversteer_disable */
+	FALSE, /* ai_debug_evaluate_all_positions */
+	FALSE, /* ai_debug_path */
+	FALSE, /* ai_debug_path_start_freeze */
+	FALSE, /* ai_debug_path_end_freeze */
+	FALSE, /* ai_debug_path_flood */
+	FALSE, /* ai_debug_path_maximum_radius */
+	FALSE, /* ai_debug_path_attractor */
+	FALSE, /* ai_debug_path_attractor_radius */
+	FALSE, /* ai_debug_path_attractor_weight */
+	FALSE, /* ai_debug_path_accept_radius */
+	FALSE, /* ai_debug_ballistic_lineoffire_freeze */
+	FALSE, /* ai_debug_communication_random_disabled */
+	FALSE, /* ai_debug_communication_timeout_disabled */
+	FALSE, /* ai_debug_communication_unit_repeat_disabled */
+	FALSE, /* ai_debug_communication_focus_enable */
+	FALSE, /* ai_debug_blind */
+	FALSE, /* ai_debug_deaf */
+	FALSE, /* ai_debug_invisible_player */
+	FALSE, /* ai_debug_ignore_player */
+	FALSE, /* ai_debug_flee_always */
+	FALSE, /* ai_debug_force_all_active */
+	FALSE, /* ai_debug_disable_wounded_sounds */
+	FALSE, /* ai_debug_force_vocalizations */
+	FALSE, /* ai_debug_force_crouch */
+	FALSE, /* ai_debug_path_disable_smoothing */
+	FALSE, /* ai_debug_path_disable_obstacle_avoidance */
+	FALSE, /* ai_fix_defending_guard_firing_positions */
+	FALSE, /* ai_fix_actor_variants */
+
+	/* the player's controls, look rates and aiming assists */
+	FALSE, /* controls_enable_crouch */
+	FALSE, /* controls_swapped */
+	FALSE, /* controls_enable_doubled_spin */
+	FALSE, /* controls_swap_doubled_spin_state */
+	FALSE, /* player0_look_yaw_rate */
+	FALSE, /* player1_look_yaw_rate */
+	FALSE, /* player2_look_yaw_rate */
+	FALSE, /* player3_look_yaw_rate */
+	FALSE, /* player0_look_pitch_rate */
+	FALSE, /* player1_look_pitch_rate */
+	FALSE, /* player2_look_pitch_rate */
+	FALSE, /* player3_look_pitch_rate */
+	FALSE, /* player_autoaim */
+	FALSE, /* player_magnetism */
+
+	/* debug toggles, the frame rate display, the network, the game's scripts */
+	FALSE, /* debug_player_teleport */
+	FALSE, /* texture_cache_graph */
+	FALSE, /* texture_cache_list */
+	FALSE, /* director_camera_switch_fast */
+	FALSE, /* debug_recording */
+	FALSE, /* debug_recording_newlines */
+	FALSE, /* debug_player_color */
+	FALSE, /* debug_framerate */
+	FALSE, /* display_framerate */
+	FALSE, /* display_vblank_deltas */
+	FALSE, /* framerate_throttle */
+	FALSE, /* framerate_lock */
+	FALSE, /* display_precache_progress */
+	FALSE, /* debug_game_save */
+	FALSE, /* allow_out_of_sync */
+	FALSE, /* global_connection_dont_timeout */
+	FALSE, /* find_all_fucked_up_shit */
+	FALSE, /* run_game_scripts */
+};
+typedef char verify_hs_external_global_settable_in_maps_size[
+	NUMBEROF(hs_external_global_settable_in_maps) == NUMBEROF(hs_external_globals) ? 1 : -1];
+
 /* ---------- public code */
+
+/* port: whether a map's scripts may set the external global */
+boolean hs_external_global_settable_by_maps(
+	short global_index)
+{
+	return global_index>=0 &&
+		global_index<(short)NUMBEROF(hs_external_global_settable_in_maps) &&
+		hs_external_global_settable_in_maps[global_index];
+}
 
 /* ---------- private code */

@@ -527,6 +527,9 @@ static boolean script_error(
 	long thread_index,
 	char const *reason,
 	char const *expression);
+/* port: a type's default value (hs_scenario_functions_check) */
+static long hs_type_default_value(
+	short type);
 static void hs_script_evaluate(
 	short script_index,
 	long thread_index,
@@ -809,10 +812,20 @@ void hs_runtime_initialize_for_new_map(
 			global_datum = datum_get(hs_global_data, global_datum_index);
 			internal_thread->script_index = NONE;
 			internal_thread->stack->size = 0;
-			hs_evaluate(
-				internal_thread_index,
-				global->initialization_expression_index,
-				&global_datum->value);
+			/* port: an initializer that calls a function a map's scripts
+			may not isn't evaluated: the global starts at its type's
+			default (hs_scenario_functions_check) */
+			if (hs_scenario_global_initializer_disabled(global_index))
+			{
+				global_datum->value = hs_type_default_value(global->type);
+			}
+			else
+			{
+				hs_evaluate(
+					internal_thread_index,
+					global->initialization_expression_index,
+					&global_datum->value);
+			}
 
 			if (TEST_FLAG(internal_thread->flags, _hs_thread_in_function_call_bit))
 			{
@@ -837,8 +850,11 @@ void hs_runtime_initialize_for_new_map(
 				script_index,
 				struct hs_script);
 
+			/* port: none for a script that calls a function a map's
+			scripts may not (hs_scenario_functions_check) */
 			if (script->script_type!=_hs_script_static &&
-				script->script_type!=_hs_script_stub)
+				script->script_type!=_hs_script_stub &&
+				!hs_scenario_script_disabled(script_index))
 			{
 				if (hs_thread_new(_hs_thread_type_script, script_index)==NONE)
 					error(_error_immediate, "ran out of script threads.");
@@ -894,6 +910,10 @@ static char const *expression_get_function_name(
 		if (syntax_node->index != 0 ||
 			expression_index != thread->stack->expression_index)
 		{
+			/* port: an index past the table (a damaged map's) names none */
+			if ((word)syntax_node->index>=hs_function_table_count)
+				return "(corrupt function)";
+
 			return hs_function_get((word)syntax_node->index)->name;
 		}
 
@@ -906,10 +926,33 @@ static char const *expression_get_function_name(
 		thread = hs_thread_get(thread_index);
 	}
 
+	/* port: as for a function's */
+	if (syntax_node->index<0 ||
+		syntax_node->index>=global_scenario_get()->hs_scripts.count)
+	{
+		return "(corrupt script)";
+	}
+
 	return TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->hs_scripts,
 		syntax_node->index,
 		struct hs_script)->name;
+}
+
+boolean hs_runtime_waiting_on_call(
+	void)
+{
+	struct hs_stack_frame *frame;
+	struct hs_syntax_node *caller;
+
+	if (hs_runtime_globals.executing_thread_index == NONE)
+		return FALSE;
+	frame = hs_thread_get(hs_runtime_globals.executing_thread_index)->stack;
+	if (!frame || !frame->previous)
+		return FALSE;
+	caller = hs_syntax_get(frame->previous->expression_index);
+
+	return !TEST_FLAG(caller->flags, _hs_syntax_node_script_bit) && caller->function_index == _hs_function_sleep_until;
 }
 
 char const *hs_runtime_get_executing_thread_name(
@@ -2142,9 +2185,26 @@ void hs_evaluate_set(
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	long variable_expression_index = hs_syntax_get(hs_syntax_get(
 		thread->stack->expression_index)->data)->next_node_index;
-	struct hs_syntax_node *variable = hs_syntax_get(variable_expression_index);
+	/* port: (none to get when there's no variable) */
+	struct hs_syntax_node *variable = variable_expression_index!=NONE ?
+		hs_syntax_get(variable_expression_index) :
+		NULL;
 	short type;
 	long global_index;
+
+	/* port: a variable that isn't a global's name ends the thread: its
+	index would pick the global (the external one too) written through. Only
+	a damaged map's are (the compiler and hs_scenario_functions_check let
+	none run) */
+	if (!variable ||
+		!TEST_FLAG(variable->flags, _hs_syntax_node_primitive_bit) ||
+		!TEST_FLAG(variable->flags, _hs_syntax_node_global_bit) ||
+		hs_global_get_type((short)variable->data)==_hs_unparsed)
+	{
+		hs_syntax_error(thread_index);
+
+		return;
+	}
 
 	/* port: none on a stack overflow (hs_stack_overflow) */
 	if (!hs_stack_allocate(thread_index, sizeof(long)))
@@ -2650,6 +2710,15 @@ static void hs_thread_main(
 			script->script_type!=_hs_script_static &&
 			script->script_type!=_hs_script_stub,
 			"found a static script at toplevel.");
+		/* port: a script that doesn't run (hs_scenario_functions_check)
+		gets no thread; one a saved game brings back sleeps for good */
+		if (hs_scenario_script_disabled((short)thread->script_index))
+		{
+			thread->sleep_until = NONE;
+			hs_runtime_globals.executing_thread_index = NONE;
+
+			return;
+		}
 	}
 
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2bd, thread_index,
@@ -2752,12 +2821,47 @@ static void hs_script_evaluate(
 	if (!result)
 		return;
 
-	if (initialize)
+	/* port: a static script that calls a function a map's scripts may not
+	isn't evaluated: it returns its type's default
+	(hs_scenario_functions_check) */
+	if (hs_scenario_script_disabled(script_index))
+		hs_return(thread_index, hs_type_default_value(script->return_type));
+	else if (initialize)
 		hs_evaluate(thread_index, script->root_expression_index, result);
 	else
 		hs_return(thread_index, *result);
 
 	return;
+}
+
+static long hs_type_default_value(
+	short type)
+{
+	union
+	{
+		real real_value;
+		long long_value;
+	} real_default;
+
+	switch (type)
+	{
+	case _hs_type_void:
+		return 0;
+	case _hs_type_boolean:
+		return _hs_type_boolean_default;
+	case _hs_type_real:
+		real_default.real_value = _hs_type_real_default;
+		return real_default.long_value;
+	case _hs_type_short_integer:
+		return _hs_type_short_integer_default;
+	case _hs_type_long_integer:
+		return _hs_type_long_integer_default;
+	case _hs_type_string:
+		return (long)_hs_type_string_default;
+	default:
+		/* (the rest's defaults, hs.c's _hs_type_*_default, are all NONE) */
+		return NONE;
+	}
 }
 
 static void *hs_stack_allocate(

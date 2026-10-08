@@ -571,6 +571,9 @@ static void encounter_update_timers(
 	long encounter_index);
 static short squad_get_actor_type(
 	struct squad_definition *squad_definition);
+static boolean encounter_definition_cluster_index_valid(
+	short cluster_index,
+	long bit_vector_size);
 
 /* ---------- globals */
 
@@ -798,7 +801,9 @@ void encounter_compute_activation_cluster_bit_vector(
 					"c:\\halo\\SOURCE\\ai\\encounters.c",
 					487,
 					(firing_position->cluster_index >= 0) && (firing_position->cluster_index < bit_vector_size));
-				BIT_VECTOR_SET_FLAG(bit_vector, firing_position->cluster_index, TRUE);
+				/* port: only a cluster the bit vector holds (a map's index) */
+				if (encounter_definition_cluster_index_valid(firing_position->cluster_index, bit_vector_size))
+					BIT_VECTOR_SET_FLAG(bit_vector, firing_position->cluster_index, TRUE);
 			}
 		}
 	}
@@ -834,7 +839,9 @@ void encounter_compute_activation_cluster_bit_vector(
 							"c:\\halo\\SOURCE\\ai\\encounters.c",
 							511,
 							(move_position->cluster_index >= 0) && (move_position->cluster_index < bit_vector_size));
-						BIT_VECTOR_SET_FLAG(bit_vector, move_position->cluster_index, TRUE);
+						/* port: only a cluster the bit vector holds (a map's index) */
+						if (encounter_definition_cluster_index_valid(move_position->cluster_index, bit_vector_size))
+							BIT_VECTOR_SET_FLAG(bit_vector, move_position->cluster_index, TRUE);
 					}
 				}
 			}
@@ -2324,6 +2331,28 @@ void encounters_update(
 
 /* ---------- private code */
 
+/* port: a firing or move position's cluster (a map's index) is one the
+activation bit vector holds; one that isn't is skipped, said once */
+static boolean encounter_definition_cluster_index_valid(
+	short cluster_index,
+	long bit_vector_size)
+{
+	static boolean reported = FALSE;
+
+	if (VALID_INDEX(cluster_index, bit_vector_size))
+		return TRUE;
+
+	if (!reported)
+	{
+		error(_error_silent, "an encounter position is in cluster #%d (there is room for %ld)",
+			cluster_index,
+			bit_vector_size);
+		reported = TRUE;
+	}
+
+	return FALSE;
+}
+
 static void encounter_clear_pursuit(
 	long encounter_index)
 {
@@ -3771,7 +3800,10 @@ static void encounter_update_follow(
 						firing_position_index,
 						struct firing_position_definition);
 
-					if (TEST_FLAG(firing_position_groups, firing_position->group_index))
+					/* port: and a group the distances hold (a map's index; a group
+					past them, or below them, is shifted into the mask's bits) */
+					if (VALID_INDEX(firing_position->group_index, NUMBER_OF_FIRING_POSITION_GROUP_INDICES) &&
+						TEST_FLAG(firing_position_groups, firing_position->group_index))
 					{
 						real distance_squared = distance_squared3d(&firing_position->position, &follow_position);
 
