@@ -82,6 +82,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "viewmodel_fov.h"
+#include "viewmodel_visibility.h"
 #include "errors.h"
 #include "bitmaps/bitmaps.h"
 #include "interface/hud_draw.h"
@@ -546,6 +547,8 @@ void rasterizer_lens_flare_submit(
 		268,
 		(parameters->compressed_window_index&_lens_flare_window_index_mask)==global_window_parameters.window_index);
 
+	if (!viewmodel_draws_geometry(parameters->compressed_window_index & _lens_flare_first_person_weapon_flag))
+		return;
 	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress() &&
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
 	{
