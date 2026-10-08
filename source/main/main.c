@@ -3351,7 +3351,8 @@ void main_loop(
 			process_ui_widgets();
 			bink_playback_update();
 
-			if ((!game_in_editor() && (input_key_is_down(_key_end) || input_key_is_down(_key_escape))) || editor_should_exit())
+			if ((!game_in_editor() && !console_is_active() &&
+				(input_key_is_down(_key_end) || input_key_is_down(_key_escape))) || editor_should_exit())
 			{
 				main_movie_stop();
 

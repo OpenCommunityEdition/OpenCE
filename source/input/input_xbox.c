@@ -267,6 +267,7 @@ static DWORD WINAPI input_keyboard_thread(
 static struct input_globals input_globals = {0};
 static long gamepad_button_down_times[MAXIMUM_GAMEPADS][NUMBER_OF_GAMEPAD_BUTTONS];
 static long key_down_times[NUMBER_OF_KEYS];
+static boolean consumed_keys[NUMBER_OF_KEYS];
 
 static const byte gamepad_analog_button_indices[NUMBER_OF_GAMEPAD_ANALOG_BUTTONS] =
 {
@@ -432,6 +433,17 @@ static void release_input_mutex(
 	return;
 }
 
+void input_consume_key(short key_code)
+{
+	if (key_code >= 0 && key_code < NUMBER_OF_KEYS)
+	{
+		/* A press and release can arrive in the same update. In that case
+		 * clear the current pulse without consuming the next fresh press. */
+		consumed_keys[key_code] = input_globals.key_latches[key_code] != FALSE;
+		input_globals.key_ticks[key_code] = 0;
+	}
+}
+
 void input_suppress(
 	void)
 {
@@ -479,6 +491,7 @@ void input_dispose(
 void input_flush(
 	void)
 {
+	csmemset(consumed_keys, 0, sizeof(consumed_keys));
 	csmemset(
 		input_globals.gamepad_states,
 		0,
@@ -568,7 +581,8 @@ boolean input_key_is_down(
 {
 	boolean result = FALSE;
 
-	if (!input_globals.suppressed)
+	if (!input_globals.suppressed &&
+		!(key_code >= 0 && key_code < NUMBER_OF_KEYS && consumed_keys[key_code]))
 	{
 		switch (key_code)
 		{
@@ -1098,13 +1112,16 @@ static void input_update_keyboard_devices(
 				if (keystroke.Flags & XINPUT_DEBUG_KEYSTROKE_FLAG_KEYUP)
 				{
 					input_globals.key_latches[key.key_code] = FALSE;
-					if (input_globals.key_ticks[key.key_code] > 1)
+					if (consumed_keys[key.key_code] || input_globals.key_ticks[key.key_code] > 1)
 					{
 						input_globals.key_ticks[key.key_code] = 0;
 					}
+					consumed_keys[key.key_code] = FALSE;
 				}
 				else
 				{
+					if (consumed_keys[key.key_code])
+						continue;
 					if (input_globals.buffered_key_write_index < MAXIMUM_BUFFERED_KEYSTROKES)
 					{
 						input_globals.buffered_keys[

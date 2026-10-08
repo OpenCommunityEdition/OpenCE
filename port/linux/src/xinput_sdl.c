@@ -299,18 +299,20 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB]);
 }
 
-/* the keys held when the game and the menus switch count as up until let go
+/* the keys held when the game, menus or console switch count as up until let go
 of: the escape that opens the pause menu does not also back out of it, nor
-the one that closes it pause the game again */
+the one that closes it pause the game again. Closing the console must also
+consume its held keys before gameplay or menu bindings see them. */
 static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
-	static int menus = -1;
+	static int context = -1;
+	int next_context = (input->menus != FALSE) | (console_is_active() ? 2 : 0);
 	int scancode;
 
-	if (menus != (input->menus != FALSE))
+	if (context != next_context)
 	{
-		menus = input->menus != FALSE;
+		context = next_context;
 		memcpy(held, input->keys, sizeof(held));
 	}
 	for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
