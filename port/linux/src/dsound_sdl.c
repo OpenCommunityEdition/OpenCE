@@ -1355,7 +1355,9 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	{
 		struct voice_packet *head = &stream->packets[stream->packet_head];
 
-		stream_complete_head(stream, head->finished ? XMEDIAPACKET_STATUS_SUCCESS : XMEDIAPACKET_STATUS_FLUSHED,
+		/* Cancellation is synchronous. SUCCESS would let the game's
+		completion callback refill the stream we are stopping. */
+		stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
 	stream->cursor = 0;
