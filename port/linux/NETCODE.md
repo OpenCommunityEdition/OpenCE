@@ -231,6 +231,24 @@ machine tells them: anyone with administrator or root access can change
 them, and players behind one address share it. The console's `kick <player
 name>` drops a player as `ban` does (every machine told), but adds no line
 and keeps no address out: the player may join again at once.
+
+The players' votes to kick a player (`network_votekick.c`): a client sends
+`_distributed_message_votekick` (the player's absolute index) reliably, and
+the host takes it only from the client's stream. The host alone counts:
+one vote per real address (an internet play peer's endpoint, not its
+stand-in), and votes again deduplicated by hardware id, which only ever
+removes votes (the players who may vote are counted by address alone, so a
+copied hardware id cannot lower the votes needed). A vote needs more than
+half of the players who may vote, the target counted, and at least two;
+starting one needs `network.votekick_minutes` played on this host in its
+own ticks, voting two minutes; one vote runs at a time, and a failed vote
+cools its starter down and protects its target. A vote that passes kicks as
+the `kick` command does, and the host refuses the address and hardware id
+for `network.votekick_ban_minutes`. The host sends each client
+`_distributed_message_votekick_status` every second while a vote runs (and
+as it changes), for the scoreboard, whose right click frees the mouse to
+pick a player; the host's own scoreboard adds Kick and Ban. Builds without
+votes drop both kinds as unknown, so the network version is unchanged.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.

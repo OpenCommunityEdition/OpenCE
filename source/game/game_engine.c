@@ -569,6 +569,7 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
@@ -1862,15 +1863,148 @@ static boolean scoreboard_team_columns(
 	return (boolean)setting;
 }
 
+/* a network game's scoreboard picks players with the mouse
+(halo_scoreboard_pointer_update: a right click frees it): a player's name
+picked opens a menu of what may be done to them, the players' vote to kick
+them (network_votekick.c), and the host's Kick and Ban, Ban picked twice */
+enum
+{
+	_scoreboard_item_vote,
+	_scoreboard_item_kick,
+	_scoreboard_item_ban,
+	_scoreboard_item_cancel,
+	NUMBER_OF_SCOREBOARD_ITEMS,
+
+	/* the menu's width (the scoreboard's text, before it is scaled) */
+	SCOREBOARD_MENU_WIDTH = 220,
+};
+
+/* the menu: the player it is for (NONE: none open), the row under whose
+name it opens (from the title's), that name's left, and whether Ban was
+picked once */
+static struct
+{
+	long player_index;
+	long row_index;
+	short left;
+	boolean ban_picked;
+} scoreboard_menu = { NONE, 0, 0, FALSE };
+
 /* the scoreboard closed: its scroll forgotten, the wheel the weapons' again */
 static void game_engine_scoreboard_closed(
 	void)
 {
 	if (scoreboard_open)
 	{
+		struct halo_ui_pointer pointer;
+
 		scoreboard_open = FALSE;
 		platform_scoreboard_scroll(FALSE, NULL, NULL);
+		halo_scoreboard_pointer_update(FALSE, &pointer);
 	}
+	scoreboard_menu.player_index = NONE;
+}
+
+/* the menu's items for the player: whether each is offered, and what it says */
+static void scoreboard_menu_items(
+	wchar_t (*labels)[48],
+	boolean *offered)
+{
+	struct network_votekick_status status;
+	short item;
+
+	for (item = 0; item < NUMBER_OF_SCOREBOARD_ITEMS; item++)
+	{
+		offered[item] = FALSE;
+		labels[item][0] = 0;
+	}
+	offered[_scoreboard_item_vote] = TRUE;
+	if (network_votekick_get_status(&status) &&
+		status.player_index == DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index))
+	{
+		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to kick (%d of %d)" :
+			L"Vote to kick (%d of %d)", status.votes, status.needed);
+	}
+	else
+	{
+		usprintf(labels[_scoreboard_item_vote], L"Start a vote to kick");
+	}
+	if (network_votekick_host())
+	{
+		offered[_scoreboard_item_kick] = TRUE;
+		offered[_scoreboard_item_ban] = TRUE;
+		usprintf(labels[_scoreboard_item_kick], L"Kick");
+		usprintf(labels[_scoreboard_item_ban], scoreboard_menu.ban_picked ? L"Ban: pick again to ban" : L"Ban");
+	}
+	offered[_scoreboard_item_cancel] = TRUE;
+	usprintf(labels[_scoreboard_item_cancel], L"Cancel");
+}
+
+/* the menu's first row (from the title's): under the name, or above it when
+there is no room below (last_row: the screen's) */
+static long scoreboard_menu_first_row(
+	short item_count,
+	long last_row)
+{
+	if (scoreboard_menu.row_index + 1 + item_count <= last_row)
+		return scoreboard_menu.row_index + 1;
+	return MAX(scoreboard_menu.row_index - item_count, 0);
+}
+
+/* a rectangle of the scoreboard's text (laid out at full size, from left
+and the row from the title's) as it is drawn: scaled about the title's top
+left (bounds_left, top) */
+static void scoreboard_rectangle(
+	rectangle2d *rectangle,
+	short bounds_left,
+	short top,
+	long line_height,
+	short left,
+	short width,
+	long row_index,
+	long row_count)
+{
+	rectangle->x0 = (short)(bounds_left + (left - bounds_left) * SCOREBOARD_SCALE);
+	rectangle->x1 = (short)(rectangle->x0 + width * SCOREBOARD_SCALE);
+	rectangle->y0 = (short)(top + row_index * line_height * SCOREBOARD_SCALE);
+	rectangle->y1 = (short)(top + (row_index + row_count) * line_height * SCOREBOARD_SCALE);
+}
+
+static boolean scoreboard_point_in(
+	rectangle2d const *rectangle,
+	short x,
+	short y)
+{
+	return x >= rectangle->x0 && x < rectangle->x1 && y >= rectangle->y0 && y < rectangle->y1;
+}
+
+/* the item picked, done */
+static void scoreboard_menu_pick(
+	short item)
+{
+	short player_index = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index);
+
+	switch (item)
+	{
+	case _scoreboard_item_vote:
+		network_votekick_request(player_index);
+		break;
+	case _scoreboard_item_kick:
+		network_votekick_host_kick(player_index, FALSE);
+		break;
+	case _scoreboard_item_ban:
+		/* (a ban lasts: picked twice) */
+		if (!scoreboard_menu.ban_picked)
+		{
+			scoreboard_menu.ban_picked = TRUE;
+			return;
+		}
+		network_votekick_host_kick(player_index, TRUE);
+		break;
+	default:
+		break;
+	}
+	scoreboard_menu.player_index = NONE;
 }
 
 static void game_engine_rasterize_scoreboard(
@@ -1910,6 +2044,24 @@ static void game_engine_rasterize_scoreboard(
 	short top;
 	wchar_t *column_name;
 	wchar_t *score_name;
+	/* port: the pointer (1: picking; -1: none on this platform), where it
+	is in the drawing's coordinates, and whether its click was taken */
+	struct halo_ui_pointer pointer;
+	int pointer_state;
+	short pointer_x;
+	short pointer_y;
+	short click_x;
+	short click_y;
+	boolean clicked;
+	struct network_votekick_status vote;
+	boolean voting;
+	long extra_rows;
+	long next_row;
+	wchar_t menu_labels[NUMBER_OF_SCOREBOARD_ITEMS][48];
+	boolean menu_offered[NUMBER_OF_SCOREBOARD_ITEMS];
+	short menu_item_count = 0;
+	long menu_first_row = 0;
+	long last_row;
 
 	if (font_index == NONE)
 		return;
@@ -1924,8 +2076,13 @@ static void game_engine_rasterize_scoreboard(
 	/* (laid out at full size, then drawn scaled about the title's top left:
 	the screen holds 1/SCOREBOARD_SCALE as much) */
 	width = (short)((bounds.x1 - bounds.x0) / SCOREBOARD_SCALE);
+	/* (port: a network game's lines beneath, the vote running and how to
+	pick a player, have their rows) */
+	pointer_state = halo_scoreboard_pointer_update(network && network_votekick_available(), &pointer);
+	voting = network && network_votekick_get_status(&vote);
+	extra_rows = (voting ? 1 : 0) + (network && pointer_state >= 0 ? 1 : 0);
 	rows = (long)((bounds.y1 - SCOREBOARD_LAYOUT_TOP_ROWS * line_height) / SCOREBOARD_SCALE / line_height) - 2 -
-		SCOREBOARD_BOTTOM_ROWS;
+		SCOREBOARD_BOTTOM_ROWS - extra_rows;
 	rows = MAX(rows, 1);
 	if (campaign)
 	{
@@ -1990,6 +2147,7 @@ static void game_engine_rasterize_scoreboard(
 	shown_rows = MIN(rows, total);
 	if (total > page)
 		shown_rows++;
+	shown_rows += extra_rows;
 	{
 		real height = (2 + shown_rows) * line_height * SCOREBOARD_SCALE;
 
@@ -2017,6 +2175,50 @@ static void game_engine_rasterize_scoreboard(
 		}
 	}
 	rasterizer_text_set_scale(SCOREBOARD_SCALE, (real)bounds.x0, (real)top);
+
+	/* port: the pointer's click, on the menu's items (where they are
+	drawn), else on a player's row (below); one elsewhere closes the menu */
+	pointer_x = (short)(pointer.x - render.camera.viewport_bounds.x0);
+	pointer_y = (short)(pointer.y - render.camera.viewport_bounds.y0);
+	click_x = (short)(pointer.click_x - render.camera.viewport_bounds.x0);
+	click_y = (short)(pointer.click_y - render.camera.viewport_bounds.y0);
+	clicked = pointer_state > 0 && pointer.left_clicks > 0;
+	/* (the menu opens below its row, beyond the scoreboard if need be, but
+	above the motion sensor's rows) */
+	last_row = (long)((bounds.y1 - top) / (line_height * SCOREBOARD_SCALE)) - SCOREBOARD_BOTTOM_ROWS;
+	if (pointer_state <= 0 || (scoreboard_menu.player_index != NONE && !player_try_and_get(scoreboard_menu.player_index)))
+		scoreboard_menu.player_index = NONE;
+	if (scoreboard_menu.player_index != NONE)
+	{
+		short item;
+
+		scoreboard_menu_items(menu_labels, menu_offered);
+		for (item = 0; item < NUMBER_OF_SCOREBOARD_ITEMS; item++)
+			menu_item_count += menu_offered[item] ? 1 : 0;
+		menu_first_row = scoreboard_menu_first_row(menu_item_count, last_row);
+		if (clicked)
+		{
+			rectangle2d rectangle;
+			short shown = 0;
+
+			for (item = 0; item < NUMBER_OF_SCOREBOARD_ITEMS && clicked; item++)
+			{
+				if (!menu_offered[item])
+					continue;
+				scoreboard_rectangle(&rectangle, bounds.x0, top, line_height, scoreboard_menu.left,
+					SCOREBOARD_MENU_WIDTH, menu_first_row + shown++, 1);
+				if (scoreboard_point_in(&rectangle, click_x, click_y))
+				{
+					scoreboard_menu_pick(item);
+					clicked = FALSE;
+				}
+			}
+			if (clicked)
+				scoreboard_menu.player_index = NONE;
+			else if (scoreboard_menu.player_index != NONE)
+				scoreboard_menu_items(menu_labels, menu_offered);
+		}
+	}
 
 	team_colors[0].alpha = alpha;
 	team_colors[0].red = 0.6f;
@@ -2116,6 +2318,32 @@ static void game_engine_rasterize_scoreboard(
 			status_string,
 			ping_string);
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
+		/* port: another machine's player, picked with the pointer: lit
+		under it (not under the menu), and its menu opened when clicked */
+		if (pointer_state > 0 && player->local_player_index == NONE)
+		{
+			rectangle2d rectangle;
+			rectangle2d menu_rectangle;
+			short row_left = (short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP));
+
+			scoreboard_rectangle(&rectangle, bounds.x0, top, line_height, row_left, SCOREBOARD_COLUMN_WIDTH,
+				2 + row, 1);
+			scoreboard_rectangle(&menu_rectangle, bounds.x0, top, line_height, scoreboard_menu.left,
+				SCOREBOARD_MENU_WIDTH, menu_first_row, menu_item_count);
+			if (scoreboard_point_in(&rectangle, pointer_x, pointer_y) &&
+				(scoreboard_menu.player_index == NONE || !scoreboard_point_in(&menu_rectangle, pointer_x, pointer_y)))
+			{
+				draw_quad(&rectangle, ((pixel32)(long)(80 * PIN(alpha, 0.0f, 1.0f)) << 24) | 0x00FFFFFF);
+			}
+			if (clicked && scoreboard_point_in(&rectangle, click_x, click_y))
+			{
+				scoreboard_menu.player_index = entry->player_index;
+				scoreboard_menu.row_index = 2 + row;
+				scoreboard_menu.left = (short)(row_left + SCOREBOARD_PLACE_WIDTH);
+				scoreboard_menu.ban_picked = FALSE;
+				clicked = FALSE;
+			}
+		}
 		scoreboard_draw_row(
 			row_string,
 			player_index == entry->player_index,
@@ -2135,6 +2363,74 @@ static void game_engine_rasterize_scoreboard(
 		color.red = color.green = color.blue = 0.6f;
 		usprintf(row_string, L"%ld-%ld of %ld   (Page Up / Page Down, mouse wheel)", first, last, total);
 		scoreboard_draw_row(row_string, FALSE, &color, 2 + rows, top, left, FALSE);
+	}
+	/* port: the vote running, and how to pick a player */
+	next_row = 2 + MIN(rows, total) + (total > page ? 1 : 0);
+	if (voting)
+	{
+		struct data_iterator iterator;
+		struct player_datum *target;
+		wchar_t const *name = L"?";
+		wchar_t const *note = vote.voted ? L" (you voted)" : vote.may_vote ? L"" : L" (too new to vote)";
+
+		data_iterator_new(&iterator, player_data);
+		while ((target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) == vote.player_index)
+			{
+				name = target->name;
+				if (target->local_player_index != NONE)
+					note = L" (against you)";
+			}
+		}
+		color.alpha = alpha;
+		color.red = 1.0f;
+		color.green = 0.75f;
+		color.blue = 0.3f;
+		usprintf(row_string, L"Vote to kick %s: %d of %d, %d s left%s", name, vote.votes, vote.needed,
+			vote.seconds_left, note);
+		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
+	}
+	if (network && pointer_state >= 0)
+	{
+		color.alpha = alpha;
+		color.red = color.green = color.blue = 0.6f;
+		if (pointer_state == 0)
+			usprintf(row_string, L"Right-click to pick a player");
+		else
+			usprintf(row_string, L"Pick a player   (right-click to aim)");
+		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
+	}
+	/* port: the picked player's menu, over the rows, its item under the
+	pointer lit */
+	if (scoreboard_menu.player_index != NONE && menu_item_count > 0)
+	{
+		rectangle2d rectangle;
+		short item;
+		short shown = 0;
+		long panel_alpha = (long)(255 * PIN(alpha, 0.0f, 1.0f));
+
+		scoreboard_rectangle(&rectangle, bounds.x0, top, line_height, scoreboard_menu.left, SCOREBOARD_MENU_WIDTH,
+			menu_first_row, menu_item_count);
+		draw_quad(&rectangle, ((pixel32)panel_alpha << 24) | 0x00202830);
+		for (item = 0; item < NUMBER_OF_SCOREBOARD_ITEMS; item++)
+		{
+			if (!menu_offered[item])
+				continue;
+			scoreboard_rectangle(&rectangle, bounds.x0, top, line_height, scoreboard_menu.left,
+				SCOREBOARD_MENU_WIDTH, menu_first_row + shown, 1);
+			if (scoreboard_point_in(&rectangle, pointer_x, pointer_y))
+				draw_quad(&rectangle, ((pixel32)(long)(90 * PIN(alpha, 0.0f, 1.0f)) << 24) | 0x00FFFFFF);
+			color.alpha = alpha;
+			color.red = color.green = color.blue = 0.9f;
+			if (item == _scoreboard_item_ban)
+			{
+				color.green = color.blue = 0.45f;
+			}
+			scoreboard_draw_row(menu_labels[item], FALSE, &color, menu_first_row + shown, top,
+				(short)(scoreboard_menu.left + 6), FALSE);
+			shown++;
+		}
 	}
 	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
 

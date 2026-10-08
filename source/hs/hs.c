@@ -2805,6 +2805,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h"
+#include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
 #include "objects/damage.h"
 #include "objects/object_lights.h"
 #include "objects/scenery.h"
@@ -15361,6 +15362,27 @@ static boolean hs_compile_and_evaluate_command(
 	(players.c; a client is told it is the host's) */
 	if (hs_host_player_command(expression, "bringto"))
 		return players_coop_bring_to_host();
+	/* port: the players' vote to kick a player ("votekick <player name>",
+	or the name's start: Tab completes it), on any machine of a network
+	game: the host counts (network_votekick.c) */
+	{
+		char const *text = hs_host_player_command(expression, "votekick");
+
+		if (text)
+		{
+			char name[64];
+			long length = 0;
+
+			while (*text == ' ' || *text == '\t' || *text == '"')
+				text++;
+			while (*text && *text != '"' && *text != ')' && length < (long)sizeof(name) - 1)
+				name[length++] = *text++;
+			while (length > 0 && (name[length - 1] == ' ' || name[length - 1] == '\t'))
+				length--;
+			name[length] = 0;
+			return network_votekick_player_named(name);
+		}
+	}
 	/* port: playing in another's game, the host decides the game: no
 	cheats, no game speed, nothing else a command changes of the game (the
 	game run each tick also puts back what was changed before joining,

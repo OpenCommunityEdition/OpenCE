@@ -83,6 +83,11 @@ boolean network_game_server_ban_player(
 bans.txt line, the address not kept out): the player may join again at once */
 boolean network_game_server_kick_player(
 	char const *text);
+/* port: the host's Kick and Ban on the scoreboard: the client machine
+(its index), kicked or banned as those commands do */
+boolean network_game_server_kick_machine_of_player(
+	long machine_index,
+	boolean ban);
 short network_game_server_matching_player_names(
 	char const *text,
 	char (*names)[NETWORK_GAME_SERVER_NAME_TEXT_SIZE],

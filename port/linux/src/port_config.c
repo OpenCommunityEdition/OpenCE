@@ -295,6 +295,18 @@ static const struct config_setting config_settings[] =
 		"in everyone's server browser: anyone can see and join it) or, false,\n"
 		"PRIVATE (only players with its invite link can join). Server Setup's\n"
 		"LISTING changes it for each game." },
+	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
+		"Hosting: let the players vote to kick a player (the scoreboard's\n"
+		"right-click, or the console's votekick). More than half of the players\n"
+		"must vote, counted once per address." },
+	{ "network.votekick_minutes", _config_integer, "5", "HALO_NET_VOTEKICK_MINUTES", _environment_value,
+		_platform_all,
+		"Hosting: the minutes a player must have played on this server to start\n"
+		"a vote to kick (0 to 60); to vote, 2 minutes or this, the less." },
+	{ "network.votekick_ban_minutes", _config_integer, "30", "HALO_NET_VOTEKICK_BAN_MINUTES", _environment_value,
+		_platform_all,
+		"Hosting: the minutes a player kicked by a vote cannot join again (1 to\n"
+		"1440)." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

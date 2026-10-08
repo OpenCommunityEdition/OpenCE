@@ -73,6 +73,16 @@ static Uint64 scoreboard_open_until_ms;
 static float scoreboard_wheel;
 static long scoreboard_notches;
 static long scoreboard_pages;
+#ifndef HALO_ANDROID
+/* the scoreboard's pointer (platform_scoreboard_pointer): while the game
+offers it (a network game's scoreboard is open), a right click frees the
+mouse, whose pointer then picks a player; its motion and clicks go to it,
+not to the aim and the triggers. Another right click, or the scoreboard
+closing, takes the mouse back for the aim. */
+static BOOL scoreboard_pointer_offered;
+static struct platform_ui_pointer scoreboard_pointer;
+#endif
+static BOOL scoreboard_pointer_active;
 
 /* debug keyboard queue */
 #define KEYSTROKE_QUEUE_SIZE 64
@@ -1153,6 +1163,52 @@ void platform_request_quit(void)
 #endif
 }
 
+#ifndef HALO_ANDROID
+/* (under input_lock, on the event thread) the scoreboard's pointer on: the
+mouse freed, at the window's middle, and nothing held for the triggers */
+static void scoreboard_pointer_start(void)
+{
+	int width, height;
+
+	scoreboard_pointer_active = TRUE;
+	memset(&scoreboard_pointer, 0, sizeof(scoreboard_pointer));
+	memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
+	memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
+	input_state.mouse_dx = input_state.mouse_dy = 0.0f;
+	platform_mouse_capture(FALSE);
+	SDL_GetWindowSize(platform_window, &width, &height);
+	SDL_WarpMouseInWindow(platform_window, width * 0.5f, height * 0.5f);
+	scoreboard_pointer.x = width * 0.5f;
+	scoreboard_pointer.y = height * 0.5f;
+}
+
+/* ... off: the mouse the aim's again (unless freed: F12, or the menus) */
+static void scoreboard_pointer_stop(void)
+{
+	if (!scoreboard_pointer_active)
+		return;
+	scoreboard_pointer_active = FALSE;
+	memset(&scoreboard_pointer, 0, sizeof(scoreboard_pointer));
+	platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
+}
+
+BOOL platform_scoreboard_pointer(BOOL offered, struct platform_ui_pointer *pointer)
+{
+	BOOL active;
+
+	pthread_mutex_lock(&input_lock);
+	scoreboard_pointer_offered = offered;
+	active = scoreboard_pointer_active && offered;
+	*pointer = scoreboard_pointer;
+	scoreboard_pointer.moved = FALSE;
+	scoreboard_pointer.left_clicks = 0;
+	scoreboard_pointer.right_clicks = 0;
+	scoreboard_pointer.wheel_steps = 0;
+	pthread_mutex_unlock(&input_lock);
+	return active;
+}
+#endif
+
 void platform_scoreboard_scroll(int open, long *notches, long *pages)
 {
 	Uint64 now = SDL_GetTicks();
@@ -1165,6 +1221,10 @@ void platform_scoreboard_scroll(int open, long *notches, long *pages)
 		scoreboard_pages = 0;
 	}
 	scoreboard_open_until_ms = open ? now + SCOREBOARD_OPEN_MS : 0;
+#ifndef HALO_ANDROID
+	if (!open)
+		scoreboard_pointer_offered = FALSE;
+#endif
 	if (notches)
 		*notches = scoreboard_notches;
 	if (pages)
@@ -1201,6 +1261,14 @@ void platform_pump_events(void)
 	updater_poll(platform_window);
 #endif
 	pthread_mutex_lock(&input_lock);
+#ifndef HALO_ANDROID
+	/* (the scoreboard closed, or no longer offering it: the pointer goes) */
+	if (scoreboard_pointer_active && (SDL_GetTicks() >= scoreboard_open_until_ms || !scoreboard_pointer_offered ||
+		input_state.ui_pointer))
+	{
+		scoreboard_pointer_stop();
+	}
+#endif
 	while (SDL_PollEvent(&event))
 	{
 		switch (event.type)
@@ -1237,7 +1305,8 @@ void platform_pump_events(void)
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F12)
 			{
 				input_state.mouse_released = !input_state.mouse_released;
-				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer);
+				platform_mouse_capture(!input_state.mouse_released && !input_state.ui_pointer &&
+					!scoreboard_pointer_active);
 			}
 #ifndef HALO_ANDROID
 			/* F11 switches between fullscreen and the window (SDL keeps the
@@ -1250,6 +1319,13 @@ void platform_pump_events(void)
 			break;
 		case SDL_EVENT_MOUSE_MOTION:
 #ifndef HALO_ANDROID
+			if (scoreboard_pointer_active)
+			{
+				scoreboard_pointer.x = event.motion.x;
+				scoreboard_pointer.y = event.motion.y;
+				scoreboard_pointer.moved = TRUE;
+				break;
+			}
 			/* in the menus the mouse moves the pointer, not the view */
 			if (input_state.ui_pointer)
 			{
@@ -1281,6 +1357,26 @@ void platform_pump_events(void)
 				break;
 			}
 #ifndef HALO_ANDROID
+			/* the open scoreboard's pointer: a right click frees it (and
+			fires nothing), and another takes it back; its clicks pick */
+			if (!input_state.ui_pointer && SDL_GetTicks() < scoreboard_open_until_ms && scoreboard_pointer_offered &&
+				(scoreboard_pointer_active || (event.button.down && event.button.button == SDL_BUTTON_RIGHT)))
+			{
+				if (event.button.down && event.button.button == SDL_BUTTON_RIGHT)
+				{
+					if (scoreboard_pointer_active)
+						scoreboard_pointer_stop();
+					else
+						scoreboard_pointer_start();
+				}
+				else if (event.button.down && event.button.button == SDL_BUTTON_LEFT)
+				{
+					scoreboard_pointer.left_clicks++;
+					scoreboard_pointer.click_x = event.button.x;
+					scoreboard_pointer.click_y = event.button.y;
+				}
+				break;
+			}
 			/* clicks in the menus go to the pointer; a button held down
 			when the menu closes stays up until pressed again, so the click
 			that resumes the game does not also fire */
@@ -1356,12 +1452,15 @@ void platform_pump_events(void)
 			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
 			memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
 			input_state.focused = FALSE;
+			/* (the scoreboard's pointer goes; the mouse is taken back for
+			the aim as the window has the focus again) */
+			scoreboard_pointer_active = FALSE;
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			input_state.focused = TRUE;
 			look_at_clipboard = TRUE;
 #ifndef HALO_ANDROID
-			if (!input_state.mouse_released && !input_state.ui_pointer)
+			if (!input_state.mouse_released && !input_state.ui_pointer && !scoreboard_pointer_active)
 				platform_mouse_capture(TRUE);
 #endif
 			break;

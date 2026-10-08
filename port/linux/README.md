@@ -271,6 +271,9 @@ the setting for one start of the game. It has priority over the file.
 | `network.coop_enemies_mode` | `"per_player"` | `HALO_NET_COOP_ENEMIES_MODE` | Online co-op's extra enemies: `"none"`; `"per_player"`, each squad of enemies that a level places grows by `network.coop_enemies` for each player past the first; or `"multiplier"`, each squad is `network.coop_enemies_multiplier` times as large, for any number of players. The extra enemies stand around the squad's places, and those that a dropship has no seats for drop out of it after its passengers. EXTRA ENEMIES in co-op's Server Setup writes its choice here. |
 | `network.coop_enemies` | `50` | `HALO_NET_COOP_ENEMIES` | The extra enemies per player, a percentage from `25` to `200`: for each player past the first, each squad of enemies gets this much of itself more (`100`: as many again, so four players meet four times the squad), up to 8 times the squad however many players there are. PER PLAYER in co-op's Server Setup writes its choice here. |
 | `network.coop_enemies_multiplier` | `2` | `HALO_NET_COOP_ENEMIES_MULTIPLIER` | The static multiplier of the enemies, `2` to `32`: each squad of enemies is this many times as large. MULTIPLIER in co-op's Server Setup writes its choice here. |
+| `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. |
+| `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
+| `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
@@ -585,6 +588,36 @@ Only machines with the invite can find the game:
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same
   way, but keeps nothing: no line in `bans.txt`, and the player can join
   again at once. In co-op, `bringto` brings every player to the host.
+- Players can vote to kick a player (`network.votekick`). Hold the
+  scoreboard key, right-click to show the pointer, and click the name of
+  the player. Then click **Start a vote to kick**. Other players vote in
+  the same way, and see the vote on the scoreboard. `votekick <player
+  name>` in the developer console does the same. The host also gets
+  **Kick** and **Ban** in this menu: these do the same as the `kick` and
+  `ban` commands (click **Ban** two times). The host counts the votes, and
+  these rules prevent abuse:
+  - The vote passes when more than half of the players vote for it, and at
+    least two players. The player of the vote is counted, but cannot vote.
+    Thus, in a game of two equal teams, one team cannot kick a player of
+    the other team without help.
+  - The host counts one vote for each internet address (for internet
+    play, the real address of the player, not the address of the tunnel).
+    Two machines at one address, or with one hardware id, have one vote.
+  - To start a vote, a player must have played for
+    `network.votekick_minutes` (5) on this server. To vote, a player must
+    have played for 2 minutes (or less, if that setting is less). The host
+    counts the time. When a player joins again, the time starts again.
+    Players who cannot vote yet are not counted.
+  - The host only accepts a vote that comes on the connection of the
+    player, not a datagram, which another machine can send with the
+    address of the player.
+  - One vote runs at a time, for 45 seconds, with 30 seconds before the
+    next vote. If a vote fails, the player who started it cannot start a
+    vote for 5 minutes, and nobody can start a vote against the same player
+    for 10 minutes.
+  - Nobody can vote to kick a player of the host.
+  - A player kicked by a vote cannot join again for
+    `network.votekick_ban_minutes` (30), by address and hardware id.
   So that every player can be named, the host trims the spaces around a
   name and removes characters that draw as nothing. A
   letter with a mark is typed as the plain letter (`ban jose` for "José").

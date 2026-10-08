@@ -98,6 +98,9 @@ struct platform_ui_pointer
 };
 void platform_ui_pointer_set_active(BOOL active);
 BOOL platform_ui_pointer_read(struct platform_ui_pointer *pointer);
+/* the open scoreboard's pointer, offered (a network game's) or not: TRUE
+while a right click has freed it, with what it did since the last call */
+BOOL platform_scoreboard_pointer(BOOL offered, struct platform_ui_pointer *pointer);
 void platform_video_window_size(int *width, int *height);
 #endif
 BOOL platform_next_keystroke(struct platform_keystroke *keystroke);
