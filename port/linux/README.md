@@ -279,7 +279,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.voice_mode` | `"team_global_enemy_proximity"` | `HALO_NET_VOICE_MODE` | When you host: who hears whom during a game. `"off"`; `"team_proximity"` (teammates who are near); `"team_enemy_proximity"` (all players who are near); `"team_global"` (all teammates); `"team_global_enemy_proximity"` (all teammates, and enemies who are near). Refer to "Voice chat". |
 | `network.voice_kbps` | `24` | `HALO_NET_VOICE_KBPS` | When you host: the voice quality in the lobby and in a game, in kilobits per second, `8` to `64`. |
 | `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
-| `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. |
+| `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options writes its choice here. |
 | `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
@@ -636,14 +636,15 @@ Only machines with the invite can find the game:
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same
   way, but keeps nothing: no line in `bans.txt`, and the player can join
   again at once. In co-op, `bringto` brings every player to the host.
-- Players can vote to kick a player (`network.votekick`). Hold the
-  scoreboard key, right-click to show the pointer, and click the name of
-  the player. Then click **Start a vote to kick**. Other players vote in
-  the same way, and see the vote on the scoreboard. `votekick <player
-  name>` in the developer console does the same. The host also gets
-  **Kick** and **Ban** in this menu: these do the same as the `kick` and
-  `ban` commands (click **Ban** two times). The host counts the votes, and
-  these rules prevent abuse:
+- Players can vote to kick a player. The host turns this on or off with
+  VOTE KICK in Server Setup > Teamplay Options (`network.votekick`; in
+  co-op, only in `config.toml`). Hold the scoreboard key, right-click to
+  show the pointer, and click the name of the player. Then click **Start
+  a vote to kick**. Other players vote in the same way, and see the vote on
+  the scoreboard. `votekick <player name>` in the developer console does
+  the same. The host also gets **Kick** and **Ban** in this menu: these do
+  the same as the `kick` and `ban` commands (click **Ban** two times). The
+  host counts the votes, and these rules prevent abuse:
   - The vote passes when more than half of the players vote for it, and at
     least two players. The player of the vote is counted, but cannot vote.
     Thus, in a game of two equal teams, one team cannot kick a player of

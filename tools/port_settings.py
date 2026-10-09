@@ -184,12 +184,13 @@ CONTROL_ROWS = 7
 # the settings whose rows have the wider spinner (a device's name)
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device"}
 
-# the host's voice chat, on Teamplay Options (_teamplay_options_extras):
-# each row's key, its label, its choices' words (menu_functions.c's
-# gametype_options give their settings' values) and their helps
+# the host's voice chat and vote kicks, on Teamplay Options
+# (_teamplay_options_extras): each row's key, its label, its choices' words
+# (menu_functions.c's gametype_options give their settings' values) and
+# their helps
 TEAMPLAY_EDIT = "main_menu/settings_select/multiplayer_setup/teamplay_options_edit"
 VOICE_QUALITIES = (8, 12, 16, 24, 32, 48, 64)
-VOICE_ROWS = [
+TEAMPLAY_ROWS = [
     ("voice_mode", "VOICE CHAT:", ["OFF", "TEAM NEAR", "ANYONE NEAR", "TEAM", "TEAM, ENEMIES NEAR"], [
         "No voice chat during the game.",
         "Players hear their teammates who are near them.",
@@ -205,6 +206,11 @@ VOICE_ROWS = [
      [f"Voices at {kbps} kilobits a second, in the lobby\\nand in the game." for kbps in VOICE_QUALITIES]),
     ("voice_proximity", "VOICE NEAR DISTANCE:", ["15 M", "30 M", "45 M", "60 M", "90 M", "150 M"],
      [f"Players {metres} metres apart or less are near\\nfor voice chat." for metres in (15, 30, 45, 60, 90, 150)]),
+    # (network_votekick.c)
+    ("votekick", "VOTE KICK:", ["ON", "OFF"], [
+        "Players can vote to kick a player, from the\\nscoreboard.",
+        "Players cannot vote to kick anyone.",
+    ]),
 ]
 
 # the profile menu's words for what its items now open
@@ -415,9 +421,10 @@ MT = "main_menu/multiplayer_type_select"
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
 STRING_INSERTS = {
-    # (Teamplay Options' voice chat rows, after its own: VOICE_ROWS)
-    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in VOICE_ROWS])],
-    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in VOICE_ROWS for text in helps])],
+    # (Teamplay Options' voice chat and vote kick rows, after its own:
+    # TEAMPLAY_ROWS)
+    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in TEAMPLAY_ROWS])],
+    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
@@ -567,12 +574,12 @@ WIDGET_PATCHES = {
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
-    # (Teamplay Options' voice chat rows, over its buttons: Server Setup's
-    # only, _teamplay_options_extras)
+    # (Teamplay Options' voice chat and vote kick rows, over its buttons:
+    # Server Setup's only, _teamplay_options_extras)
     f"{TEAMPLAY_EDIT}/teamplay_options_menu": {"insert_before": {
         f"{TEAMPLAY_EDIT}/teamplay_button_bar": [
             f'<child widget="{TEAMPLAY_EDIT}/op_{key}" x="54" y="{163 + 30 * index}"/>'
-            for index, (key, *_) in enumerate(VOICE_ROWS)]}},
+            for index, (key, *_) in enumerate(TEAMPLAY_ROWS)]}},
     # (the PC's Vehicles row's Start opened Item Options)
     "main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item": {"handlers": [
         '<on event="a" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>',
@@ -1204,10 +1211,11 @@ def _item_options_extras() -> list:
 
 def _teamplay_options_extras() -> list:
     """Teamplay Options' rows of the port's: the host's voice chat
-    (port/linux/game/network_voice.c), in Server Setup's copy only
-    (menu_functions.c's gametype_options_init), kept in config.toml"""
+    (port/linux/game/network_voice.c) and vote kicks (network_votekick.c),
+    in Server Setup's copy only (menu_functions.c's gametype_options_init),
+    kept in config.toml"""
     lines = []
-    for index, (key, label, strings, _) in enumerate(VOICE_ROWS):
+    for index, (key, label, strings, _) in enumerate(TEAMPLAY_ROWS):
         lines += _widget(f"{TEAMPLAY_EDIT}/op_{key}", [("width", 512), ("height", 28),
                                                        ("flags", "pass_unhandled_to_focused_child"),
                                                        ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],

@@ -1043,6 +1043,8 @@
 		<string text="Players 60 metres apart or less are near\nfor voice chat."/>
 		<string text="Players 90 metres apart or less are near\nfor voice chat."/>
 		<string text="Players 150 metres apart or less are near\nfor voice chat."/>
+		<string text="Players can vote to kick a player, from the\nscoreboard."/>
+		<string text="Players cannot vote to kick anyone."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels">
 		<string text="FRIENDLY FIRE:"/>
@@ -1052,6 +1054,7 @@
 		<string text="LOBBY VOICE CHAT:"/>
 		<string text="VOICE QUALITY:"/>
 		<string text="VOICE NEAR DISTANCE:"/>
+		<string text="VOTE KICK:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_friendly_fire">
 		<string text="OFF"/>
