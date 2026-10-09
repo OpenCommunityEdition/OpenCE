@@ -2372,7 +2372,7 @@ static boolean network_game_client_map_name_is_valid(
 		for (device = 0; device < (short)NUMBEROF(devices); device++)
 		{
 			if (!_strnicmp(leaf, devices[device], 3) &&
-				(stem == 3 || (device >= 4 && stem == 4 && leaf[3] >= '0' && leaf[3] <= '9')))
+				((device < 4 && stem == 3) || (device >= 4 && stem == 4 && leaf[3] >= '0' && leaf[3] <= '9')))
 			{
 				return FALSE;
 			}
