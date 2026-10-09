@@ -83,6 +83,9 @@ symbols in this file:
 #include "shaders/shaders.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+/* port: model tags and static enclosure recognition at map initialization. */
+#include "cache/cache_files.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
 
 /* ---------- constants */
 
@@ -385,7 +388,8 @@ static void render_model_parts(
 									if (sort_filth_count<MAXIMUM_PARTS_PER_MODEL_GEOMETRY &&
 										sort_filth[sort_filth_count].group_index!=NONE &&
 										!immediate &&
-										(part->next_part_index>0 || part->previous_part_index>0))
+									/* port: part zero can be the head of a link to a nonzero part. */
+									(part->next_part_index>0 || part->previous_part_index>=0))
 									{
 										sort_filth[sort_filth_count].part_index = part_index;
 										sort_filth[sort_filth_count].next_part_index = part->next_part_index;
@@ -457,6 +461,85 @@ static void render_model_parts(
 }
 
 /* ---------- public code */
+
+/* port: use native energy-before-glass links, without changing glass passes.
+   Keep authored links and ambiguous/skinned models as they are. */
+static void model_geometry_fix_transparent_part_links(
+	struct model const *model, struct model_geometry *geometry)
+{
+	short i, glass = NONE, energy = NONE, transparent_count = 0;
+	struct model_geometry_part *parts = geometry->parts.address;
+
+	if (model->nodes.count != 1 || geometry->parts.count < 2 ||
+		geometry->parts.count > MAXIMUM_PARTS_PER_MODEL_GEOMETRY || !parts)
+	{
+		return;
+	}
+	for (i = 0; i < geometry->parts.count; ++i)
+	{
+		struct shader *shader;
+		struct model_shader_reference const *reference;
+		if (parts[i].flags || parts[i].previous_part_index != NONE || parts[i].next_part_index != NONE ||
+			!VALID_INDEX(parts[i].shader_index, model->shaders.count))
+		{
+			return;
+		}
+		reference = TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[i].shader_index, struct model_shader_reference);
+		shader = shader_definition_get(reference->shader.index);
+		if (shader_type_is_transparent(shader->base.type))
+		{
+			++transparent_count;
+			if (shader->base.type == _shader_type_transparent_glass)
+			{
+				glass = i;
+			}
+			else if (shader->base.type == _shader_type_transparent_generic)
+			{
+				energy = i;
+			}
+		}
+	}
+	if (transparent_count == 2 && glass != NONE && energy != NONE &&
+		rasterizer_transparent_geometry_is_enclosure(
+			shader_definition_get(TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[glass].shader_index, struct model_shader_reference)->shader.index),
+			&parts[glass].vertex_buffer, &parts[glass].triangle_buffer,
+			shader_definition_get(TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[energy].shader_index, struct model_shader_reference)->shader.index),
+			&parts[energy].vertex_buffer))
+	{
+		/* A native link cannot target part zero. These parts have no authored
+		   links; swap their complete descriptors only when glass is part zero. */
+		if (glass == 0)
+		{
+			struct model_geometry_part swap = parts[glass];
+			parts[glass] = parts[energy];
+			parts[energy] = swap;
+			glass = energy;
+			energy = 0;
+		}
+		parts[energy].next_part_index = (char)glass;
+		parts[glass].previous_part_index = (char)energy;
+	}
+}
+
+/* port: the meshes do not change between frames; their links need no cache
+   invalidation beyond loading fresh tags for the next map. */
+void models_fix_transparent_part_links(void)
+{
+	struct tag_iterator iterator;
+	long index;
+
+	tag_iterator_new(&iterator, MODELS_GROUP_TAG);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct model *model = model_definition_get(index);
+		long geometry;
+		for (geometry = 0; geometry < model->geometries.count; ++geometry)
+		{
+			model_geometry_fix_transparent_part_links(model,
+				TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry, struct model_geometry));
+		}
+	}
+}
 
 void model_interpolate_node_orientations(
 	struct model const *model,
