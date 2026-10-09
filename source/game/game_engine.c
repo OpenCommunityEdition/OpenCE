@@ -2345,8 +2345,8 @@ static void game_engine_rasterize_scoreboard(
 			status_string,
 			ping_string);
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
-		/* port: a player talking (or muted) in voice chat, its speaker at the
-		right of the place column */
+		/* port: a player talking (or muted) in voice chat, its speaker just
+		right of the name */
 		if (network && (network_voice_machine_speaking(player->network_player_data.machine_index) ||
 			network_voice_machine_muted(player->network_player_data.machine_index)))
 		{
@@ -2356,18 +2356,26 @@ static void game_engine_rasterize_scoreboard(
 			short size;
 			short middle;
 
-			/* (centred on the row's capitals: the middle measured as the row
-			is laid out, then scaled as it is drawn, as scoreboard_rectangle
-			has it) */
-			text.x0 = row_left;
-			text.x1 = (short)(row_left + SCOREBOARD_COLUMN_WIDTH);
+			rectangle2d ink;
+			rectangle2d cursor;
+			short name_end;
+
+			/* (after the name's last letter, centred on its capitals: both
+			measured as the row is laid out, the name at its column's tab
+			stop, then scaled as it is drawn, as scoreboard_rectangle has it;
+			within the name's column) */
+			text.x0 = (short)(row_left + SCOREBOARD_PLACE_WIDTH);
+			text.x1 = (short)(text.x0 + SCOREBOARD_NAME_WIDTH);
 			text.y0 = (short)(top + (2 + row) * line_height);
 			text.y1 = (short)(text.y0 + line_height);
 			draw_string_set_draw_mode(font_index, NONE, 0, 0, row_color);
-			middle = (short)(top + (draw_unicode_string_capital_middle(&text, L"H") - top) * SCOREBOARD_SCALE);
-			scoreboard_rectangle(&icon, bounds.x0, top, line_height, (short)(row_left + SCOREBOARD_PLACE_WIDTH - 24),
-				20, 2 + row, 1);
+			draw_unicode_string_compute_bounds(&text, player->name, &ink, &cursor);
+			middle = (short)(top + (draw_unicode_string_capital_middle(&text, player->name) - top) * SCOREBOARD_SCALE);
+			scoreboard_rectangle(&icon, bounds.x0, top, line_height, text.x0, SCOREBOARD_NAME_WIDTH, 2 + row, 1);
 			size = (short)((icon.y1 - icon.y0) * 2 / 3);
+			name_end = (short)(bounds.x0 + (MAX(ink.x1, text.x0) - bounds.x0) * SCOREBOARD_SCALE);
+			icon.x0 = (short)MIN(name_end + 4, icon.x1 - size);
+			icon.x1 = (short)(icon.x0 + size);
 			icon.y0 = (short)(middle - size / 2);
 			icon.y1 = (short)(icon.y0 + size);
 			network_voice_draw_icon(&icon, network_voice_machine_muted(player->network_player_data.machine_index),
