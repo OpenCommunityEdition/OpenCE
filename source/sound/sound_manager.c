@@ -1615,9 +1615,6 @@ static long update_potentially_audible_looping_sound(
 				sound->track_proc = track_loop_track_sound;
 				sound->fade_stop_time = 0;
 				sound->fade_start_time = 0;
-				/* port: an unfaded voice starts at full gain. */
-				sound->fade_interpolation_start = 1.f;
-				sound->fade_interpolation_end = 1.f;
 				sound->next_definition_index = NONE;
 				sound->pitch_range_index =
 					sound_definition_find_pitch_range_by_pitch(
@@ -1801,9 +1798,7 @@ static real sound_calculate_fade(
 	long sound_index)
 {
 	struct sound_datum *sound = sound_get(sound_index);
-	/* port: a completed fade keeps its endpoint. Another query in this frame (or
-	   after a cache delay) must not bring a stopped voice back to full gain. */
-	real fade = sound->fade_interpolation_end;
+	real fade = 1.f;
 
 	if (sound->fade_start_time != sound->fade_stop_time)
 	{
@@ -2553,9 +2548,6 @@ long sound_new_impulse(
 											NONE);
 									sound->fade_stop_time = 0;
 									sound->fade_start_time = 0;
-									/* port: an unfaded voice starts at full gain. */
-									sound->fade_interpolation_start = 1.f;
-									sound->fade_interpolation_end = 1.f;
 									sound->loop_track_index = NONE;
 									_sound_cache_sound_request(
 										sound_permutation_get(

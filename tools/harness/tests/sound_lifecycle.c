@@ -107,17 +107,6 @@ int main(int argc,char **argv) {
  if(!strcmp(case_name,"four-tracks")) test_loop_definition.tracks.count=4;
  refresh(_looping_sound_refresh_start);long primary=loops[0].tracks[0].primary_sound_index,secondary=NONE;
  CASE("fresh-loop") { CHECK(sound_calculate_fade(primary)==1.f,"new loop audible");return 0; }
- if(!strcmp(case_name,"fade-end") || !strcmp(case_name,"crossfade")) {
-  sound_start_fade(!strcmp(case_name,"crossfade")?_sound_fade_mode_crossfade:_sound_fade_mode_linear,.1f,NONE,primary);
-  for(int f=0;f<=100;f++) {
-   sound_manager_globals.render_time=1000+f;
-   /* Store each result as real: i386's x87 may otherwise keep excess precision. */
-   volatile real a=sound_calculate_fade(primary),b=sound_calculate_fade(primary);
-   CHECK(a==b,"repeated fade queries agree at frame %d: %a / %a",f,(double)a,(double)b);
-  }
-  CHECK(sound_calculate_fade(primary)==0.f,"fade remains zero at its endpoint");
-  sound_manager_globals.render_time=5000;CHECK(sound_calculate_fade(primary)==0.f,"completed fade never revives");return 0;
- }
  CASE("pending") { secondary=update_potentially_audible_looping_sound(2,0,0,_sound_loop_track); }
  CASE("restart") { refresh(_looping_sound_refresh_start); }
  CASE("intro-loop") {

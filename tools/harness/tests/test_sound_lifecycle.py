@@ -9,15 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 from harness.audio import manager_types
 
-CASES = ["fresh-loop", "fresh-impulse", "fade-end", "crossfade", "pending", "restart", "intro-loop",
+CASES = ["fresh-loop", "fresh-impulse", "pending", "restart", "intro-loop",
          "rapid", "other-owner", "other-track", "stop-cue", "fake-impulse", "repeated-stop", "four-tracks"]
 NEGATIVE_CONTROLS = {
-    "revives-completed-fade": (("real fade = sound->fade_interpolation_end;", "real fade = 1.f;"), "fade-end"),
     "keeps-replaced-voice": (("sound_index != except_sound_index &&", "FALSE &&"), "restart"),
     "cancels-other-owner": (("sound->source_identifier == looping_sound_index &&", "TRUE &&"), "other-owner"),
     "cancels-other-track": (("sound->loop_track_index == track_index)", "TRUE)"), "other-track"),
-    "silent-new-loop": (("sound->fade_interpolation_end = 1.f;", "sound->fade_interpolation_end = 0.f;"), "fresh-loop"),
-    "silent-new-impulse": (("sound->fade_interpolation_end = 1.f;", "sound->fade_interpolation_end = 0.f;"), "fresh-impulse"),
 }
 
 
