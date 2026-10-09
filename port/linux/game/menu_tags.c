@@ -354,6 +354,7 @@ static char const *const port_function_names[] =
 	"mp level select", "mp profiles list initialize", "mp profiles list dispose", "mp profile set for game",
 	"port lobby preview join",
 	"port setup edit",
+	"port setup options init", "port setup options save",
 	"port map list back",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
