@@ -305,12 +305,13 @@ the one that closes it pause the game again */
 static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
-	static int menus = -1;
+	static int context = -1;
+	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0);
 	int scancode;
 
-	if (menus != (input->menus != FALSE))
+	if (context != next_context)
 	{
-		menus = input->menus != FALSE;
+		context = next_context;
 		memcpy(held, input->keys, sizeof(held));
 	}
 	for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)

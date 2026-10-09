@@ -32,7 +32,7 @@
 	</widget>
 	<widget name="main_menu/main_menu_item_profile" type="text" width="256" height="33" bitmap="main_menu/menu_profile" string_list="main_menu/main_menu_options" string_index="2" font="ui\small_ui" color="#000080FF">
 		<on event="a" run="new game if no plyr profiles" open="main_menu/profile_manager/player_profile_manager" branch="true"/>
-		<on event="start" run="new game if no plyr profiles" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen" branch="true"/>
+		<on event="start" run="new game if no plyr profiles" open="main_menu/profile_manager/player_profile_manager" branch="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<conditional widget="main_menu/profile_manager/pm_entry_creating_profile" if_failed="true"/>
 	</widget>
