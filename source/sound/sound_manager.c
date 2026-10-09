@@ -1615,6 +1615,9 @@ static long update_potentially_audible_looping_sound(
 				sound->track_proc = track_loop_track_sound;
 				sound->fade_stop_time = 0;
 				sound->fade_start_time = 0;
+				/* port: an unfaded voice starts at full gain. */
+				sound->fade_interpolation_start = 1.f;
+				sound->fade_interpolation_end = 1.f;
 				sound->next_definition_index = NONE;
 				sound->pitch_range_index =
 					sound_definition_find_pitch_range_by_pitch(
@@ -1798,7 +1801,9 @@ static real sound_calculate_fade(
 	long sound_index)
 {
 	struct sound_datum *sound = sound_get(sound_index);
-	real fade = 1.f;
+	/* port: a completed fade keeps its endpoint. Another query in this frame (or
+	   after a cache delay) must not bring a stopped voice back to full gain. */
+	real fade = sound->fade_interpolation_end;
 
 	if (sound->fade_start_time != sound->fade_stop_time)
 	{
@@ -1906,6 +1911,31 @@ static void sound_start_fade(
 	}
 
 	return;
+}
+
+/* port: retire every owned intro/loop voice when the primary handle changes. */
+static void sound_fade_looping_track_components(
+	long looping_sound_index,
+	short track_index,
+	long except_sound_index,
+	real seconds)
+{
+	long sound_index;
+
+	for (sound_index = data_next_index(sound_data, NONE);
+		sound_index != NONE;
+		sound_index = data_next_index(sound_data, sound_index))
+	{
+		struct sound_datum *sound = sound_get(sound_index);
+
+		if (sound_index != except_sound_index &&
+			(sound->type == _sound_start_track || sound->type == _sound_loop_track) &&
+			sound->source_identifier == looping_sound_index &&
+			sound->loop_track_index == track_index)
+		{
+			sound_start_fade(_sound_fade_mode_linear, seconds, NONE, sound_index);
+		}
+	}
 }
 
 static short channel_get_state(
@@ -2523,6 +2553,9 @@ long sound_new_impulse(
 											NONE);
 									sound->fade_stop_time = 0;
 									sound->fade_start_time = 0;
+									/* port: an unfaded voice starts at full gain. */
+									sound->fade_interpolation_start = 1.f;
+									sound->fade_interpolation_end = 1.f;
 									sound->loop_track_index = NONE;
 									_sound_cache_sound_request(
 										sound_permutation_get(
@@ -2664,6 +2697,14 @@ boolean sound_refresh_looping(
 
 					if (refresh_state == _looping_sound_refresh_start)
 					{
+						/* port: a restart must retire the old primary and pending components. */
+						if (track->start_sound.index != NONE ||
+							TEST_FLAG(track->flags, _fade_in_at_start_bit))
+						{
+							sound_fade_looping_track_components(
+								looping_sound_index, track_index, NONE,
+								track->fade_out_duration);
+						}
 						if (track->start_sound.index != NONE)
 						{
 							*playing_sound_index =
@@ -2759,6 +2800,16 @@ boolean sound_refresh_looping(
 					}
 					else if (loop->state != _looping_sound_refresh_stop)
 					{
+						/* port: stopping the loop also stops its other owned components. */
+						if (fade_time != 0.f ||
+							TEST_FLAG(track->flags, _fade_out_at_stop_bit) ||
+							(track->stop_sound.index == NONE &&
+								!TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit)))
+						{
+							sound_fade_looping_track_components(
+								looping_sound_index, track_index, *playing_sound_index,
+								fade_time != 0.f ? fade_time : track->fade_out_duration);
+						}
 						if (fade_time != 0.f)
 						{
 							sound_start_fade(
