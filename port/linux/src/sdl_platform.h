@@ -111,6 +111,10 @@ BOOL platform_ui_pointer_read(struct platform_ui_pointer *pointer);
 while a right click has freed it, with what it did since the last call */
 BOOL platform_scoreboard_pointer(BOOL offered, struct platform_ui_pointer *pointer);
 void platform_video_window_size(int *width, int *height);
+/* a menu's text field typed into or not (a password's or not): the system's
+on-screen keyboard up while it is, where there is one that text input shows
+(Steam's); each field begun brings it up again */
+void platform_screen_keyboard(BOOL show, BOOL password);
 #endif
 BOOL platform_next_keystroke(struct platform_keystroke *keystroke);
 /* the multiplayer scoreboard (game_engine.c) open or not: while it is, the
