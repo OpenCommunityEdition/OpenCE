@@ -667,6 +667,10 @@ Only machines with the invite can find the game:
   - Nobody can vote to kick a player of the host.
   - A player kicked by a vote cannot join again for
     `network.votekick_ban_minutes` (30), by address and hardware id.
+  - A player who leaves during a vote against them is kept out the same
+    way, as if the vote passed. While the vote runs, the host refuses the
+    player if they try to join again. Thus nobody can avoid a vote by
+    leaving.
   So that every player can be named, the host trims the spaces around a
   name and removes characters that draw as nothing. A
   letter with a mark is typed as the plain letter (`ban jose` for "José").
