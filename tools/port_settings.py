@@ -176,6 +176,34 @@ SCREENS = {
     },
 }
 
+# Video Setup's categories open ordinary settings screens. Each has the same
+# pending edits, Defaults, OK and Cancel as the other settings screens.
+_video = SCREENS["video_settings"]
+_graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
+             "display.shadow_resolution", "display.per_pixel_lighting"}
+SCREENS["video_settings/graphics"] = {
+    "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
+    "same_place": ["anti_aliasing_android"],
+    "rows": [row for row in _video["rows"] if row[1] in _graphics],
+}
+_video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics]
+_video["categories"] = [
+    ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows and\nlighting."),
+    ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
+     "Optional field of view and first-person weapon\ndisplay settings. Defaults keep the original view."),
+]
+SCREENS["video_settings/fov_viewmodels"] = {
+    "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("FOV:", "display.fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
+         "On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes.", None),
+        ("VIEWMODEL FOV:", "display.viewmodel_fov", [("SAME", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
+         "Weapon/hands horizontal FOV at 16:9, in degrees.\nSame follows the world view.", None),
+        ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
+         "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
+    ],
+}
+
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
 CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
@@ -330,14 +358,30 @@ def _setting_screen(folder: str, spec: dict) -> list:
                           ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
                           ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
+    for index, (label, category_folder, _) in enumerate(spec.get("categories", ())):
+        key = category_folder.rsplit("/", 1)[-1]
+        row = f"{base}/op_{key}"
+        target = f"{PE}/{category_folder}/{SCREENS[category_folder]['screen']}"
+        rows.append((row, None, place + 1 + index))
+        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<on event="a" open="{target}"/>', f'<on event="start" open="{target}"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          f'<child widget="{base}/{key}_label"/>'])
+        extra += _widget(f"{base}/{key}_label",
+                         [("type", "text"), ("controller", 1), ("width", 512), ("height", 22),
+                          ("string_list", f"{base}/labels"), ("string_index", len(spec["rows"]) + index),
+                          ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
     extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port settings defaults"/>',
                                                     '<on event="start" run="port settings defaults"/>'])
     extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port settings save" back="true"/>',
                                               '<on event="start" run="port settings save" back="true"/>'])
-    extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]])
+    extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]] +
+                      [label for label, *_ in spec.get("categories", ())])
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
-                      [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]])
+                      [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
+                      [help_text.replace("\n", "\\n") for _, _, help_text in spec.get("categories", ())])
     return _screen(folder, spec, rows, ["port settings help"], [], extra)
 
 

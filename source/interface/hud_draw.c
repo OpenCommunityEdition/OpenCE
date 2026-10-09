@@ -95,6 +95,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
+#include "render_fov.h"
 #include "interface/interface.h"
 #include "interface/unit_hud_interface_definition.h"
 #include "items/weapon_definitions.h"
@@ -395,7 +396,8 @@ static void hud_draw_bitmap_internal(
 	real_rectangle2d const *bounds,
 	real_vector2d const *xy_scale,
 	real theta,
-	pixel32 color);
+	pixel32 color,
+	real reticle_scale);
 static void hud_draw_bitmap_with_meter(
 	void *meter_parameters,
 	struct bitmap_data const *bitmap,
@@ -1555,7 +1557,8 @@ static void hud_draw_bitmap_internal(
 	real_rectangle2d const *bounds,
 	real_vector2d const *xy_scale,
 	real theta,
-	pixel32 color)
+	pixel32 color,
+	real reticle_scale)
 {
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
@@ -1584,6 +1587,24 @@ static void hud_draw_bitmap_internal(
 		vertices[vertex_index].texture_coordinates.x = texture_x;
 		vertices[vertex_index].texture_coordinates.y = texture_y;
 		vertices[vertex_index].color = color;
+	}
+
+	if (reticle_scale != 1.0f)
+	{
+		real center_x = (render.camera.window_bounds.x1 + render.camera.window_bounds.x0) / 2 -
+			render.camera.viewport_bounds.x0;
+		real center_y = (render.camera.window_bounds.y1 + render.camera.window_bounds.y0) / 2 -
+			render.camera.viewport_bounds.y0;
+
+		/* Transform the complete authored reticle about its aiming anchor:
+		 * offsets and separate sprites must shrink along with their artwork. */
+		for (vertex_index = 0; vertex_index < 4; vertex_index++)
+		{
+			vertices[vertex_index].position.x = center_x +
+				(vertices[vertex_index].position.x - center_x) * reticle_scale;
+			vertices[vertex_index].position.y = center_y +
+				(vertices[vertex_index].position.y - center_y) * reticle_scale;
+		}
 	}
 
 	csmemset(&parameters, 0, sizeof(parameters));
@@ -1669,7 +1690,9 @@ static void hud_draw_bitmap_with_meter(
 		&bounds,
 		&xy_scale,
 		theta,
-		color);
+		color,
+		is_crosshair_bitmap && absolute_placement->corner == _hud_anchor_center ?
+			render_fov_reticle_scale(render.local_player_index) : 1.0f);
 
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 814);
 
@@ -1831,7 +1854,8 @@ void hud_draw_bitmap_direct(
 		&bounds,
 		&xy_scale,
 		theta,
-		color);
+		color,
+		1.0f);
 
 	match_assert_stack_frame("c:\\halo\\SOURCE\\interface\\hud_draw.c", 856);
 
