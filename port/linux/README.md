@@ -497,9 +497,11 @@ In co-op, Server Setup has no Teamplay Options: the same settings are in
 Server Setup > Voice and Voting.
 
 A speaker shows next to the name of a player who talks: in the lobby, on
-the scoreboard, and in a list at the left of the screen during a game. To
-mute a player, open the scoreboard, right-click, click the player, and
-click Mute voice. You no longer hear them, and nobody else is told.
+the scoreboard, in a list at the left of the screen during a game, and
+beside the name above their head (when names are shown there:
+`display.player_names`). To mute a player, open the scoreboard,
+right-click, click the player, and click Mute voice. You no longer hear
+them, and nobody else is told.
 
 The host sends each voice on to the players who can hear it. The host
 accepts a voice only from the machine of the player (with a key that it
