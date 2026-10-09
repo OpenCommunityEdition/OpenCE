@@ -1156,6 +1156,9 @@ static struct
 	/* the frames the output is delayed by, and the gain each needs */
 	float delay[LIMITER_LOOKAHEAD][OUTPUT_CHANNELS];
 	float needed[LIMITER_LOOKAHEAD];
+	/* how many of them are under 1: none while nothing is too loud, when the
+	smallest is 1 without looking */
+	unsigned long limiting;
 	/* the gain held down to what the frames ahead need, coming back up */
 	float held;
 	/* its last LIMITER_LOOKAHEAD values, and their sum */
@@ -1195,12 +1198,18 @@ static void limit(float *output, unsigned long frames)
 				peak = fabsf(sample[channel]);
 			limiter.delay[position][channel] = sample[channel];
 		}
+		limiter.limiting -= limiter.needed[position] < 1.0f;
 		limiter.needed[position] = peak > LIMITER_CEILING ? LIMITER_CEILING / peak : 1.0f;
-		lowest = limiter.needed[0];
-		for (index = 1; index < LIMITER_LOOKAHEAD; index++)
+		limiter.limiting += limiter.needed[position] < 1.0f;
+		lowest = 1.0f;
+		if (limiter.limiting)
 		{
-			if (limiter.needed[index] < lowest)
-				lowest = limiter.needed[index];
+			lowest = limiter.needed[0];
+			for (index = 1; index < LIMITER_LOOKAHEAD; index++)
+			{
+				if (limiter.needed[index] < lowest)
+					lowest = limiter.needed[index];
+			}
 		}
 		if (lowest < limiter.held)
 			limiter.held = lowest;
