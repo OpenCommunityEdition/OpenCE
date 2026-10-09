@@ -23,9 +23,10 @@ VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
 # menu opens), its header (widget, bitmap), the row spacing, and its rows:
-# (label, setting, [(shown, value)], help, platform[, key]): key names the
-# row's widgets where two rows set one setting (one for each platform), else
-# the setting's name does
+# (label, setting, [(shown, value)], help, platform[, key]): platform is
+# "desktop" or "android" for one of them, None for all
+# (port/linux/src/menu_files.c); key names the row's widgets where two
+# rows set one setting (one for each platform), else the setting's name does
 SCREENS = {
     "video_settings": {
         "screen": "video_settings_screen",
@@ -36,13 +37,24 @@ SCREENS = {
         "help_top": 364,
         # (rows in the place of the row before them: Window Size in
         # Resolution's, port/linux/game/menu_functions.c showing the one the
-        # display mode chosen uses; Android's anti-aliasing in the desktop's)
-        "same_place": ["display.window_size", "anti_aliasing_android"],
+        # display mode chosen uses; Android's anti-aliasing in the desktop's;
+        # Android's backend and Vulkan driver in Display Mode's and
+        # Resolution's, which it has not got)
+        "same_place": ["display.window_size", "anti_aliasing_android", "display.renderer", "display.vk_driver"],
+        # lines of text among the rows, in a place no row of theirs uses:
+        # (text, platform, place). Under Android's backend and driver, in
+        # Resolution Scaling's place, which it has not got either
+        "notes": [("The graphics backend and driver change when the game restarts.", "android", 2)],
         "rows": [
             ("DISPLAY MODE:", "display.mode",
              [("FULLSCREEN", "fullscreen"), ("BORDERLESS", "borderless"), ("WINDOWED", "windowed")],
              "Fullscreen takes the display; borderless covers it\nwith a window. F11 switches to the window.",
              "desktop"),
+            # (read by the Android app as the game starts, which loads the game
+            # image built with that renderer: port/android/host/host_main.c)
+            ("GRAPHICS BACKEND:", "display.renderer", [("OPENGL", "gl"), ("VULKAN", "vulkan")],
+             "How the game draws: OpenGL ES, or Vulkan. Takes\neffect the next time the game starts.",
+             "android"),
             # (port/linux/game/menu_tags.c adds the display's resolutions)
             ("RESOLUTION:", "display.resolution", [("NATIVE", "native")],
              "What fullscreen and borderless draw at. Fullscreen\nsets the display to it; borderless scales it.",
@@ -51,6 +63,12 @@ SCREENS = {
             # in place of this one)
             ("WINDOW SIZE:", "display.window_size", [("1280 x 960", "1280x960")],
              "The window's size: 4:3, then 16:10, 16:9 and 21:9\n(its edges can also be dragged).", "desktop"),
+            # (port/linux/game/menu_functions.c shows it while the backend
+            # shown is Vulkan; a driver archive's name left there by hand is
+            # kept unless another is chosen: port/android/host/host_vk_driver.c)
+            ("VULKAN DRIVER:", "display.vk_driver", [("STOCK", ""), ("TURNIP", "auto")],
+             "The phone's own driver, or Turnip on an Adreno\nGPU. Takes effect the next time the game starts.",
+             "android"),
             ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop"),
             ("V-SYNC:", "display.vsync", ON_OFF,
@@ -260,9 +278,17 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
                       ("bitmap", "bitmaps/gradient")],
                      ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
                       f'<child{attributes([("widget", f"{base}/{header}")])}/>',
-                      f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
+                      f'<child{attributes([("widget", f"{base}/options_menu")])}/>',
+                      *[f'<child{attributes([("widget", f"{base}/note_{index}"), ("x", 54), ("y", 73 + place * spec["spacing"]), ("platform", platform)])}/>'
+                        for index, (_, platform, place) in enumerate(spec.get("notes", []))]])
     lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", 11), ("width", 605), ("height", 59),
                                           ("bitmap", header_bitmap)], [])
+    # (a note is text alone, which the focus never lands on)
+    for index, (text, platform, _) in enumerate(spec.get("notes", [])):
+        lines += _widget(f"{base}/note_{index}", [("type", "text"), ("width", 512), ("height", 24), ("text", text),
+                                                  ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("text_x", 13),
+                                                  ("text_y", 5), ("text_flags", "no_focus_test"),
+                                                  ("platform", platform)], [])
     lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
                                       ("top", spec.get("help_top", 350)), ("width", 482),
                                       ("height", 60), ("string_list", f"{base}/help_strings"),

@@ -157,6 +157,31 @@ These settings are only for Android:
 | `debug.vk_self_test` | `true`: the Vulkan renderer tests its clears and its copies of draw data at the start, and logs `ok` or `FAILED`. |
 | `debug.vk_present_marker` | `true`: the Vulkan renderer draws a red square at the upper left and a green square at the upper right, to show which way up the picture is. |
 
+## Graphics: OpenGL ES and Vulkan
+
+The game draws with OpenGL ES (the default) or with Vulkan. Vulkan can
+also use another driver than the phone's own: on a Qualcomm Adreno GPU,
+Turnip, the open-source Vulkan driver of the Mesa project. Some phones'
+own drivers draw the game with errors (shapes that stretch across the
+screen, wrong or missing textures), which another driver avoids.
+
+To change the renderer:
+
+1. In the main menu, open **SETTINGS**, choose a profile, and open
+   **VIDEO SETUP**.
+2. Set **GRAPHICS BACKEND** to `VULKAN` or `OPENGL`. With `VULKAN`, set
+   **VULKAN DRIVER** to `STOCK` (the phone's own driver) or `TURNIP`.
+3. Select **OK**, close the game and start it again. The renderer and the
+   driver change only when the game starts.
+
+The menu writes `display.renderer` and `display.vk_driver` in
+`config.toml`. If Vulkan cannot start on the phone, the game uses OpenGL ES,
+and the log says why (`renderer:`).
+
+To try another build, put its archive (an adrenotools zip) in the data
+folder and set `display.vk_driver` to its file name. If a driver archive
+does not load, the game uses the phone's own driver and the log says why.
+
 ## Internet play
 
 Internet play operates as on Linux, but without Discord. When the game
