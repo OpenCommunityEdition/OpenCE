@@ -4,6 +4,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
+import android.opengl.EGL14;
+import android.opengl.EGLConfig;
+import android.opengl.EGLContext;
+import android.opengl.EGLDisplay;
+import android.opengl.EGLSurface;
+import android.opengl.GLES20;
 import android.util.TypedValue;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -21,8 +27,12 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -45,6 +55,9 @@ import java.util.zip.ZipInputStream;
  *
  * Every build of main is signed with the same key (the workflow's), which an
  * app must keep for Android to install a new version over it.
+ *
+ * It also downloads the open-source Vulkan driver for Adreno GPUs, for
+ * LauncherActivity (driverDownload): see there.
  */
 final class Updater {
     private static final String REPOSITORY = "OpenCommunityEdition/OpenCE";
@@ -68,6 +81,195 @@ final class Updater {
         }, "update check").start();
     }
 
+    /* ---------- the open-source Vulkan driver for Adreno GPUs
+
+    When the player has chosen Turnip (display.vk_driver = "auto", Video Setup's Vulkan driver), the Turnip build (Mesa's
+    Vulkan driver for Adreno) for an Adreno's series is downloaded into the data folder when it is not there, from the project
+    that releases it (port/android/README.md, "Graphics: OpenGL ES and Vulkan"). The download must have the size and SHA-256 of
+    the build that was chosen, or it is dropped. It is looked for whatever update.auto says: the driver is not an update of
+    the game. LauncherActivity does it before the game starts, with the download's progress on screen, so that the game finds
+    the driver as it starts.
+
+    Which archive is this phone's is decided once, from the GPU's name, and written to vk_driver_auto.txt in the data folder
+    (the archive's name, or an empty line for a GPU that has none): display.vk_driver = "auto" is that archive
+    (port/android/host/host_vk_driver.c), so that a player turns Turnip on with one setting. The default driver is the
+    phone's own (display.vk_driver = ""), for which nothing is downloaded. */
+
+    static final class Driver {
+        final String name, url, sha256, series;
+        final long size;
+        final int firstModel, lastModel;
+
+        Driver(String name, String url, long size, String sha256, int firstModel, int lastModel, String series) {
+            this.name = name;
+            this.url = url;
+            this.size = size;
+            this.sha256 = sha256;
+            this.firstModel = firstModel;
+            this.lastModel = lastModel;
+            this.series = series;
+        }
+    }
+
+    private static final String RELEASE = "https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/v26.0.0-rc08/";
+    private static final Driver[] DRIVERS = {
+        // the build the Vulkan renderer was tested with (Adreno 750)
+        new Driver("Turnip_v26.0.0_R8.zip", RELEASE + "Turnip_v26.0.0_R8.zip", 3478359,
+            "e634db0f929e2205e95511c769071817d0390180ec72c8e690bc76375e813715", 600, 799, "6xx or 7xx"),
+        // the same release's build for the A8xx series ("Turnip A8XX Draft"), not tried here
+        new Driver("Turnip_v26.0.0_R8_A8xx.zip", RELEASE + "turnip_a8xx.zip", 2477437,
+            "27e400a39cae06ac22695d74b837449868f712c679662c5793776bd575eca3bd", 800, 899, "8xx"),
+    };
+    private static final String AUTO_FILE = "vk_driver_auto.txt";
+
+    private static Driver driverNamed(String name) {
+        for (Driver driver : DRIVERS) {
+            if (driver.name.equals(name))
+                return driver;
+        }
+        return null;
+    }
+
+    /** whether this phone's archive was decided and is in the data folder at root (or it has none) */
+    static boolean driverReady(File root) {
+        if (root == null)
+            return true;
+        List<String> lines = readLines(new File(root, AUTO_FILE));
+
+        if (lines.isEmpty())
+            return false;
+        Driver driver = driverNamed(lines.get(0).trim());
+
+        return driver == null || new File(root, driver.name).length() == driver.size;
+    }
+
+    /** the GPU's name, and this phone's archive (null for a GPU that has none) */
+    static final class Choice {
+        final String gpu;
+        final Driver driver;
+
+        Choice(String gpu, Driver driver) {
+            this.gpu = gpu;
+            this.driver = driver;
+        }
+    }
+
+    /** decides this phone's archive from its GPU and records it in vk_driver_auto.txt; null if the GPU cannot be named */
+    static Choice driverChoose(File root) {
+        String renderer = glRenderer();
+        int model = adrenoModel(renderer);
+        Driver chosen = null;
+
+        if (renderer.isEmpty()) {
+            android.util.Log.i("halo", "driver: the GPU could not be named; nothing is downloaded this time");
+            return null;
+        }
+        for (Driver driver : DRIVERS) {
+            if (model >= driver.firstModel && model <= driver.lastModel)
+                chosen = driver;
+        }
+        android.util.Log.i("halo", "driver: the GPU is \"" + renderer + "\": " + (chosen != null ? chosen.name
+            : "no Turnip build for it; Vulkan runs on the phone's own driver"));
+        File partial = new File(root, AUTO_FILE + ".tmp");
+        try (OutputStream out = new FileOutputStream(partial)) {
+            out.write(((chosen != null ? chosen.name : "") + "\n").getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            partial.delete();
+            return new Choice(renderer, chosen);
+        }
+        if (!partial.renameTo(new File(root, AUTO_FILE)))
+            partial.delete();
+        return new Choice(renderer, chosen);
+    }
+
+    /** whether an archive is in the data folder at root */
+    static boolean driverPresent(File root, Driver driver) {
+        return new File(root, driver.name).length() == driver.size;
+    }
+
+    /** the archive downloaded into root (as a .partial file, renamed once it is checked); throws why it could not be */
+    static void driverDownload(File root, Driver driver, String gpu, Progress progress) throws Exception {
+        File archive = new File(root, driver.name);
+        File partial = new File(root, driver.name + ".partial");
+
+        try {
+            android.util.Log.i("halo", "driver: downloading " + driver.url + " for the " + gpu);
+            download(driver.url, partial, progress);
+            if (partial.length() != driver.size || !driver.sha256.equals(sha256(partial)))
+                throw new IOException("the download is not the build that was chosen (" + partial.length() + " bytes)");
+            archive.delete();
+            if (!partial.renameTo(archive))
+                throw new IOException("it could not be renamed to " + archive);
+            android.util.Log.i("halo", "driver: " + driver.name + " is in the data folder");
+        } catch (Exception e) {
+            partial.delete();
+            android.util.Log.i("halo", "driver: could not download " + driver.name + ": " + e);
+            throw e;
+        }
+    }
+
+    /** the number of an Adreno GPU from its OpenGL ES renderer string ("Adreno (TM) 750"), 0 for any other GPU */
+    private static int adrenoModel(String renderer) {
+        Matcher matcher = Pattern.compile("adreno\\D*(\\d{3})").matcher(renderer.toLowerCase(Locale.ROOT));
+
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
+    }
+
+    /**
+     * The GPU's OpenGL ES renderer string, from a context of its own on a 1x1 pbuffer ("" if none can be made). The display
+     * is not terminated: the game's renderer shares it.
+     */
+    private static String glRenderer() {
+        EGLDisplay display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+        EGLContext context = EGL14.EGL_NO_CONTEXT;
+        EGLSurface surface = EGL14.EGL_NO_SURFACE;
+        int[] version = new int[2];
+
+        if (display == EGL14.EGL_NO_DISPLAY || !EGL14.eglInitialize(display, version, 0, version, 1))
+            return "";
+        try {
+            int[] attributes = { EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT, EGL14.EGL_SURFACE_TYPE,
+                EGL14.EGL_PBUFFER_BIT, EGL14.EGL_NONE };
+            EGLConfig[] configs = new EGLConfig[1];
+            int[] count = new int[1];
+
+            if (!EGL14.eglChooseConfig(display, attributes, 0, configs, 0, 1, count, 0) || count[0] < 1)
+                return "";
+            context = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
+                new int[] { EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE }, 0);
+            surface = EGL14.eglCreatePbufferSurface(display, configs[0],
+                new int[] { EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE }, 0);
+            if (context == EGL14.EGL_NO_CONTEXT || surface == EGL14.EGL_NO_SURFACE
+                || !EGL14.eglMakeCurrent(display, surface, surface, context))
+                return "";
+            String renderer = GLES20.glGetString(GLES20.GL_RENDERER);
+
+            return renderer != null ? renderer : "";
+        } finally {
+            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
+            if (surface != EGL14.EGL_NO_SURFACE)
+                EGL14.eglDestroySurface(display, surface);
+            if (context != EGL14.EGL_NO_CONTEXT)
+                EGL14.eglDestroyContext(display, context);
+        }
+    }
+
+    private static String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        StringBuilder text = new StringBuilder();
+
+        try (InputStream stream = new FileInputStream(file)) {
+            byte[] buffer = new byte[65536];
+            int count;
+
+            while ((count = stream.read(buffer)) > 0)
+                digest.update(buffer, 0, count);
+        }
+        for (byte b : digest.digest())
+            text.append(String.format(Locale.ROOT, "%02x", b));
+        return text.toString();
+    }
+
     static File configFile(Activity activity) {
         File root = activity.getExternalFilesDir(null);
 
@@ -77,6 +279,18 @@ final class Updater {
     /* ---------- config.toml's update.auto */
 
     private static boolean autoUpdate(File config) {
+        String value = readSetting(config, "update", "auto");
+
+        return value == null || !value.startsWith("false");
+    }
+
+    /** update.auto = false written into config.toml (only its line changed) */
+    static boolean writeAutoUpdateOff(File config) {
+        return writeSetting(config, "update", "auto", "false");
+    }
+
+    /** a setting's value as config.toml has it (a string with its quotes), null when it is not there */
+    static String readSetting(File config, String wantedSection, String key) {
         String section = "";
 
         for (String line : readLines(config)) {
@@ -84,15 +298,15 @@ final class Updater {
 
             if (trimmed.startsWith("[") && trimmed.contains("]")) {
                 section = trimmed.substring(1, trimmed.indexOf(']')).trim();
-            } else if (section.equals("update") && isKey(trimmed, "auto")) {
-                return !trimmed.substring(trimmed.indexOf('=') + 1).trim().startsWith("false");
+            } else if (section.equals(wantedSection) && isKey(trimmed, key)) {
+                return trimmed.substring(trimmed.indexOf('=') + 1).trim();
             }
         }
-        return true;
+        return null;
     }
 
-    /** update.auto = false written into config.toml (only its line changed) */
-    static boolean writeAutoUpdateOff(File config) {
+    /** key = value written into config.toml's section (only its line changed; added when it is not there) */
+    static boolean writeSetting(File config, String wantedSection, String key, String value) {
         List<String> lines = readLines(config);
         List<String> out = new ArrayList<>();
         String section = "";
@@ -103,13 +317,13 @@ final class Updater {
 
             if (trimmed.startsWith("[") && trimmed.contains("]")) {
                 if (inSection && !written) {
-                    out.add("auto = false");
+                    out.add(key + " = " + value);
                     written = true;
                 }
                 section = trimmed.substring(1, trimmed.indexOf(']')).trim();
-                inSection = section.equals("update");
-            } else if (inSection && !written && isKey(trimmed, "auto")) {
-                out.add("auto = false");
+                inSection = section.equals(wantedSection);
+            } else if (inSection && !written && isKey(trimmed, key)) {
+                out.add(key + " = " + value);
                 written = true;
                 continue;
             }
@@ -118,9 +332,9 @@ final class Updater {
         if (!written) {
             if (!inSection) {
                 out.add("");
-                out.add("[update]");
+                out.add("[" + wantedSection + "]");
             }
-            out.add("auto = false");
+            out.add(key + " = " + value);
         }
         StringBuilder text = new StringBuilder();
         for (String line : out)
@@ -282,7 +496,7 @@ final class Updater {
         }, "update download").start();
     }
 
-    private interface Progress {
+    interface Progress {
         void report(long received, long total);
     }
 

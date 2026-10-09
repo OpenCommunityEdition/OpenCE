@@ -178,6 +178,19 @@ The menu writes `display.renderer` and `display.vk_driver` in
 `config.toml`. If Vulkan cannot start on the phone, the game uses OpenGL ES,
 and the log says why (`renderer:`).
 
+With `TURNIP` (`display.vk_driver = "auto"`), the app downloads the Turnip
+build for the GPU's series into the data folder before the game starts, one
+time: from
+[K11MCH1/AdrenoToolsDrivers](https://github.com/K11MCH1/AdrenoToolsDrivers/releases)
+(release `v26.0.0-rc08`, about 2.5 to 3.5 MB), and the app keeps the file
+only if it has the size and SHA-256 of the build in `Updater.java`.
+
+| GPU | Turnip build |
+| --- | --- |
+| Adreno 6xx or 7xx | `Turnip_v26.0.0_R8.zip`, tested on an Adreno 750 |
+| Adreno 8xx | `Turnip_v26.0.0_R8_A8xx.zip`, not tested |
+| Other GPUs | None: Vulkan uses the phone's own driver |
+
 To try another build, put its archive (an adrenotools zip) in the data
 folder and set `display.vk_driver` to its file name. If a driver archive
 does not load, the game uses the phone's own driver and the log says why.
