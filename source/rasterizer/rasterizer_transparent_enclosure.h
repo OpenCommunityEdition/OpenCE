@@ -1,5 +1,6 @@
-/* port: recognize a closed convex shell once when model tags load. Positions
-   are the first three floats in both supported model vertex formats. */
+/* port: whether a closed convex shell holds every vertex of another part
+(models_fix_transparent_part_links, once as a map's tags load); a position is
+the first three reals of both model vertex formats */
 #ifndef __RASTERIZER_TRANSPARENT_ENCLOSURE_H
 #define __RASTERIZER_TRANSPARENT_ENCLOSURE_H
 

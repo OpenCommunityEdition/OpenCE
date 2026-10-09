@@ -895,9 +895,12 @@ boolean rasterizer_transparent_geometry_is_enclosure(
 		core->extra_layers.count || core->lens_flare.index != NONE ||
 		!outer || !inner || !triangles || !outer->hardware_format || !inner->hardware_format ||
 		!triangles->hardware_format || outer->offset || inner->offset ||
-		(outer->type != _rasterizer_vertex_type_model_compressed && outer->type != _rasterizer_vertex_type_model_uncompressed) ||
-		(inner->type != _rasterizer_vertex_type_model_compressed && inner->type != _rasterizer_vertex_type_model_uncompressed) ||
-		(triangles->type != _triangle_buffer_type_triangles && triangles->type != _triangle_buffer_type_precompiled_strip))
+		(outer->type != _rasterizer_vertex_type_model_compressed &&
+			outer->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(inner->type != _rasterizer_vertex_type_model_compressed &&
+			inner->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(triangles->type != _triangle_buffer_type_triangles &&
+			triangles->type != _triangle_buffer_type_precompiled_strip))
 	{
 		return FALSE;
 	}
