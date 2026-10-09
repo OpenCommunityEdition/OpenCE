@@ -211,8 +211,6 @@ void input_dispose(void);
 void input_activate(void);
 void input_deactivate(void);
 void input_flush(void);
-/* Consume a debug keyboard key until release without flushing other input. */
-void input_consume_key(short key_code);
 boolean input_key_is_down(short key_code);
 boolean input_get_key(struct key_stroke *key);
 const struct mouse_state *input_get_mouse_state(void);
