@@ -339,6 +339,7 @@ static boolean warned_about_portal_hull_vertices;
 static boolean warned_about_invalid_structure_bsp;
 static boolean warned_about_rendered_clusters;
 static boolean warned_about_structure_bsp_depth;
+static boolean warned_about_environment_surfaces;
 static struct structure_visibility_globals structure_visibility_globals;
 static struct profile_section render_structure_visibility_portal_traversal =
 	{ "render_structure_visibility_portal_traversal", NONE, TRUE };
@@ -469,8 +470,10 @@ static void structure_visibility_traverse_subclusters(
 			}
 
 			surface_index_buffer = TAG_BLOCK_GET_ELEMENT(&subcluster->surface_indices, 0, long);
+			/* a short index stops, and then never finishes, once a subcluster
+			passes 32767 surfaces */
 			for (surface_list_index = 0;
-				(short)surface_list_index < subcluster->surface_indices.count;
+				surface_list_index < subcluster->surface_indices.count;
 				surface_index_buffer++, surface_list_index++)
 			{
 				/* port: a surface index (from the map) that is no surface is
@@ -1245,7 +1248,7 @@ static short structure_visibility_build_surfaces_traverse_clusters(
 				long surface_list_index;
 
 				for (surface_list_index = 0;
-					(short)surface_list_index < subcluster->surface_indices.count;
+					surface_list_index < subcluster->surface_indices.count;
 					surface_index_buffer++, surface_list_index++)
 				{
 					/* port: (as in structure_visibility_traverse_subclusters) */
@@ -1997,6 +2000,14 @@ void structure_visibility_compute(
 		}
 
 		structure_visibility_traverse_surface_lists(structure);
+	}
+
+	if (render.environment_surface_count >= MAXIMUM_RENDERED_ENVIRONMENT_SURFACES &&
+		!warned_about_environment_surfaces)
+	{
+		error(_error_silent, "a frame stopped at %d structure triangles",
+			MAXIMUM_RENDERED_ENVIRONMENT_SURFACES);
+		warned_about_environment_surfaces = TRUE;
 	}
 
 	return;
