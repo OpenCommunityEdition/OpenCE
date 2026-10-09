@@ -233,6 +233,8 @@ static struct
 	struct game_variant_options current;
 } player_ui_edit_options;
 static struct game_variant_options player_ui_multiplayer_options;
+/* port: which saved gametype those options belong to */
+static long player_ui_chosen_variant_index = NONE;
 static char player1_profile_path[0x100] = { 0 };
 
 /* ---------- public code */
@@ -603,6 +605,18 @@ struct game_variant_options const *player_ui_get_game_variant_options(
 	return &player_ui_multiplayer_options;
 }
 
+void player_ui_set_chosen_variant_index(
+	long profile_index)
+{
+	player_ui_chosen_variant_index = profile_index;
+}
+
+long player_ui_get_chosen_variant_index(
+	void)
+{
+	return player_ui_chosen_variant_index;
+}
+
 boolean player_ui_game_variant_specified(
 	struct game_variant *variant)
 {
@@ -880,6 +894,29 @@ boolean player_ui_save_profile(
 		default:
 			error(_error_silent, "failed to save profile because we are not editing one");
 			break;
+	}
+
+	/* port: saving this session's gametype keeps a vehicle change from that
+	save. Another change leaves the match's vehicles alone. */
+	if (result &&
+		saved_game_file_get_type(player_ui_globals.edit_profile_index) == _saved_game_file_type_game_variant &&
+		player_ui_globals.edit_profile_index == player_ui_chosen_variant_index &&
+		player_ui_globals.multiplayer_variant_specified &&
+		(player_ui_edit_options.original.vehicle_respawn_time != player_ui_edit_options.current.vehicle_respawn_time ||
+			csmemcmp(player_ui_edit_options.original.vehicle_set, player_ui_edit_options.current.vehicle_set,
+				sizeof(player_ui_edit_options.current.vehicle_set)) ||
+			csmemcmp(player_ui_edit_options.original.vehicle_counts, player_ui_edit_options.current.vehicle_counts,
+				sizeof(player_ui_edit_options.current.vehicle_counts)) ||
+			player_ui_globals.edit_profile.original.variant.universal_variant.vehicle_set !=
+				player_ui_globals.edit_profile.current.variant.universal_variant.vehicle_set))
+	{
+		player_ui_multiplayer_options.vehicle_respawn_time = player_ui_edit_options.current.vehicle_respawn_time;
+		csmemcpy(player_ui_multiplayer_options.vehicle_set, player_ui_edit_options.current.vehicle_set,
+			sizeof(player_ui_multiplayer_options.vehicle_set));
+		csmemcpy(player_ui_multiplayer_options.vehicle_counts, player_ui_edit_options.current.vehicle_counts,
+			sizeof(player_ui_multiplayer_options.vehicle_counts));
+		player_ui_globals.multiplayer_variant.universal_variant.vehicle_set =
+			player_ui_globals.edit_profile.current.variant.universal_variant.vehicle_set;
 	}
 
 	clear_profile_edit_data();

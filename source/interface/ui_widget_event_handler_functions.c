@@ -6084,14 +6084,30 @@ boolean ui_widget_port_gametype_choose(
 	server = global_network_game_server_get();
 	if (saved_game_file_get_path_to_enclosing_directory(profile_index, directory_path))
 		saved_game_file_remember_last_used_multiplayer_variant_directory(directory_path);
-	player_ui_set_game_variant(&profile);
-	/* (and its PC options: game_engine.h) */
+	/* (and its PC options: game_engine.h. Choosing this gametype again, after
+	a match, keeps the vehicles already set instead of the file's.) */
 	{
+		struct game_variant kept_variant;
 		struct game_variant_options options;
+		boolean keep_vehicles = profile_index == player_ui_get_chosen_variant_index() &&
+			player_ui_game_variant_specified(&kept_variant);
+		struct game_variant_options kept_options;
 
+		if (keep_vehicles)
+			kept_options = *player_ui_get_game_variant_options();
 		playlist_profile_get_options(profile_index, &options);
+		if (keep_vehicles)
+		{
+			options.vehicle_respawn_time = kept_options.vehicle_respawn_time;
+			csmemcpy(options.vehicle_set, kept_options.vehicle_set, sizeof(options.vehicle_set));
+			csmemcpy(options.vehicle_counts, kept_options.vehicle_counts, sizeof(options.vehicle_counts));
+			profile.universal_variant.vehicle_set = kept_variant.universal_variant.vehicle_set;
+		}
+		/* set_game_variant fills the options with this variant's defaults */
+		player_ui_set_game_variant(&profile);
 		player_ui_set_game_variant_options(&options);
 	}
+	player_ui_set_chosen_variant_index(profile_index);
 	if (server)
 		network_game_server_change_game_variant(server, &profile);
 	return TRUE;

@@ -54,6 +54,12 @@ void player_ui_set_game_variant_options(
 	struct game_variant_options const *options);
 struct game_variant_options const *player_ui_get_game_variant_options(
 	void);
+/* port: the saved gametype this session is using. Choosing it again keeps
+the vehicles already set for the match. */
+void player_ui_set_chosen_variant_index(
+	long profile_index);
+long player_ui_get_chosen_variant_index(
+	void);
 boolean player_ui_edit_profile_is_dirty(
 	void);
 boolean player_ui_save_profile(
