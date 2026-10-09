@@ -215,7 +215,7 @@ gamepads' only.
 
 Always: \` opens the developer console, F12 releases or captures the mouse,
 F11 changes between fullscreen and window. Screenshot (default F10,
-rebindable under Controls Setup > Actions, below Pause Menu) saves a PNG of the completed
+rebindable under Controls Setup > Actions, below Pause Menu; not on Android) saves a PNG of the completed
 frame to `screenshots/` beside `maps/`, named `YYYY-MM-DD_HH.MM.SS.png` in
 local time, and prints the filename in the console. Captures in the same
 second get a numeric suffix so previous screenshots are preserved.

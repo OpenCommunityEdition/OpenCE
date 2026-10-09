@@ -4715,6 +4715,9 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
+#ifndef HALO_ANDROID
+/* the screenshot key's PNG (controls.screenshot; the Android guest has none
+of the SDL calls it takes) */
 static void write_key_screenshot(struct render_target_entry *target)
 {
 	char directory[512], path[640], timestamp[32], filename[64];
@@ -4756,11 +4759,7 @@ static void write_key_screenshot(struct render_target_entry *target)
 		SDL_SetError("Invalid screenshot dimensions");
 		goto failed;
 	}
-#ifdef HALO_ANDROID
-	surface = SDL_CreateSurface((int)width, (int)height, SDL_PIXELFORMAT_RGBA32);
-#else
 	surface = SDL_CreateSurface((int)width, (int)height, SDL_PIXELFORMAT_BGRA32);
-#endif
 	if (!surface)
 		goto failed;
 
@@ -4779,13 +4778,7 @@ static void write_key_screenshot(struct render_target_entry *target)
 	glPixelStorei(GL_PACK_ROW_LENGTH, surface->pitch / 4);
 	glPixelStorei(GL_PACK_SKIP_ROWS, 0);
 	glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
-	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
-#ifdef HALO_ANDROID
-		GL_RGBA,
-#else
-		GL_BGRA,
-#endif
-		GL_UNSIGNED_BYTE, surface->pixels);
+	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_BGRA, GL_UNSIGNED_BYTE, surface->pixels);
 	error = glGetError();
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_framebuffer);
@@ -4819,6 +4812,7 @@ failed:
 		SDL_DestroySurface(surface);
 }
 
+#endif
 static void write_screenshot(struct render_target_entry *target)
 {
 	const char *directory = *config_string("debug.screenshot_directory") ?
@@ -4919,8 +4913,10 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
+#ifndef HALO_ANDROID
 		if (platform_screenshot_take_request())
 			write_key_screenshot(back_buffer);
+#endif
 
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */
