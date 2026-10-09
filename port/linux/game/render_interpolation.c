@@ -790,13 +790,16 @@ static struct observer_result const *render_interpolation_blended_camera(
 	its pose snaps: it ran up to 2 m ahead of or behind the object, out
 	through the lifepod's hull in a30. It is drawn where the observer has
 	it, moved with the object from where the object is to where it is
-	drawn. (An animated camera has no such object.) */
+	drawn. (An animated camera has no such object; a scripted first-person
+	camera looks along its unit's aim, which turns once a tick, and is
+	blended from its snapshots as the player's camera is.) */
 	if (director_get_perspective(local_player_index) == _director_perspective_scripted)
 	{
 		long relative_object_index = scripted_camera_object_relative_to();
 		real_matrix4x3 const *drawn;
 
 		if (relative_object_index != NONE &&
+			!scripted_camera_object_is_first_person_camera(relative_object_index) &&
 			object_try_and_get_and_verify_type(relative_object_index, _object_mask_all) &&
 			(drawn = render_interpolation_object_node_matrices(relative_object_index)) != NULL)
 		{
