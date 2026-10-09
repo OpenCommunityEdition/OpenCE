@@ -522,6 +522,8 @@ static void biped_update_jumping(
 	struct unit_animation_update_data *animation);
 static void biped_update_physics(
 	struct biped_physics *physics);
+/* units.c's: whether the unit gets the animation enhancements */
+boolean unit_animation_enhanced(long unit_index);
 static void biped_snap_facing(
 	long biped_index);
 
@@ -3336,14 +3338,21 @@ static void biped_update_turning(
 		biped_snap_facing(biped_index);
 		biped_verify_object_vectors(biped_index, "post-fly-turn");
 	}
-	else if (biped->unit.animation.base_seat_index!=_unit_base_seat_asleep)
-	{
-		boolean flaming =
-			biped->unit.animation.base_seat_index==_unit_base_seat_flaming;
-		real_vector3d turn_axis;
-		real turn_error;
-		real facing_alignment;
-		boolean turn_right;
+		else if (biped->unit.animation.base_seat_index!=_unit_base_seat_asleep)
+		{
+			boolean flaming =
+				biped->unit.animation.base_seat_index==_unit_base_seat_flaming;
+			/* port: a player throwing a grenade turns with the aim, as one
+			meleeing does: the melee plays over the moving or idle state, the
+			throw is a state of its own, which the original never turned in */
+		boolean throwing_turn =
+			biped->unit.player_index!=NONE &&
+			biped->unit.animation.state==_unit_state_throw_grenade &&
+			unit_animation_enhanced(biped_index);
+			real_vector3d turn_axis;
+			real turn_error;
+			real facing_alignment;
+			boolean turn_right;
 
 		if (TEST_FLAG(flags, _biped_climbs_anything_bit))
 		{
@@ -3403,7 +3412,8 @@ static void biped_update_turning(
 		}
 
 		if (biped->biped.state==biped_state_moving ||
-			TEST_FLAG(flags, _biped_turns_without_animating_bit))
+			TEST_FLAG(flags, _biped_turns_without_animating_bit) ||
+			throwing_turn)
 		{
 			if (!TEST_FLAG(biped->unit.control_flags, _unit_control_look_dont_turn_bit))
 			{
