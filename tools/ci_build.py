@@ -114,6 +114,9 @@ def main() -> int:
     # voice chat's codec (port/third_party/opus), in every build, whose BSD
     # license asks binaries to carry its notice
     shutil.copy2(ROOT / "port/third_party/opus/COPYING", dist / "opus-COPYING.txt")
+    # voice chat's speaker icons (port/assets/icons/lucide, drawn into the
+    # menus' bitmaps), whose ISC license asks copies to carry its notice
+    shutil.copy2(ROOT / "port/assets/icons/lucide/LICENSE", dist / "lucide-LICENSE.txt")
     # internet play's MQTT brokers, a file beside the game (network.brokers_file;
     # Android's APK has its own copy)
     if args.platform != "android":

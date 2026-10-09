@@ -4237,7 +4237,8 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 		size = (short)MIN(14, bounds->y1 - bounds->y0);
 		icon.x1 = (short)(bounds->x1 - 4);
 		icon.y0 = (short)((bounds->y0 + bounds->y1 - size) / 2);
-		/* (the name's ink: the icon just left of it) */
+		/* (the name's ink: the icon just left of it, centred on its
+		capitals) */
 		if (widget->parameters.text_box.text && widget->parameters.text_box.text[0])
 		{
 			rectangle2d text;
@@ -4246,7 +4247,7 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 			draw_unicode_string_compute_bounds(bounds, widget->parameters.text_box.text, &text, &cursor);
 			if (text.x0 - size - 6 >= bounds->x0)
 				icon.x1 = (short)(text.x0 - 6);
-			icon.y0 = (short)((text.y0 + text.y1 - size) / 2);
+			icon.y0 = (short)(draw_unicode_string_capital_middle(bounds, widget->parameters.text_box.text) - size / 2);
 		}
 		icon.x0 = (short)(icon.x1 - size);
 		icon.y1 = (short)(icon.y0 + size);

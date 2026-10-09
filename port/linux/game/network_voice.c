@@ -37,6 +37,10 @@ game_engine.c), which it does not tell anyone.
 #include "cseries/errors.h"
 #include "memory/data.h"
 #include "math/integer_math.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmap_group_lookup.h"
+#include "interface/ui_widget.h"
+#include "tag_files/tag_groups.h"
 #include "camera/observer.h"
 #include "game/game.h"
 #include "game/game_engine.h"
@@ -64,8 +68,6 @@ boolean network_distributed_server_send_to_machine(long machine_index, void *mes
 boolean network_distributed_server_send_to_machine_reliably(long machine_index, void *message, word size);
 short network_distributed_server_machines(long *machine_indices, short maximum);
 int halo_push_to_talk_held(void);
-/* cinematics.c's */
-void draw_quad(rectangle2d *rectangle, pixel32 color);
 void posix_random_bytes(void *buffer, unsigned int size);
 unsigned long system_milliseconds(void);
 
@@ -99,6 +101,9 @@ enum
 	VOICE_MAXIMUM_KBPS = 64,
 };
 
+/* the speaker's bitmap (network_voice_draw_icon): the menus' voice/speaker,
+as their bitmaps are named (menu_tags.c) */
+#define VOICE_ICON_BITMAP "pc\\voice\\speaker"
 #define VOICE_OPEN_MIC_LEVEL 0.01f
 /* proximity: full volume this near, quieter further (world units) */
 #define VOICE_NEAR_DISTANCE 3.0f
@@ -988,60 +993,24 @@ boolean network_voice_available(
 	return voice_session && voice_settings_heard;
 }
 
-/* a speaker drawn in the rectangle (its height the icon's size, at its left;
-muted: grey, struck through in red), fading with alpha */
+/* a speaker drawn in the rectangle (a square of its height, at its left;
+muted: struck through, in red), fading with alpha: Lucide's icons
+(port/assets/icons/lucide), drawn white as the menus' bitmap voice/speaker,
+a frame each (tools/ce_menus.py), and tinted; none without the menus'
+bitmaps */
 void network_voice_draw_icon(
 	rectangle2d const *bounds,
 	boolean muted,
 	real alpha)
 {
-	short size = (short)(bounds->y1 - bounds->y0);
-	short x = bounds->x0;
-	short y = bounds->y0;
+	long bitmap_index = tag_loaded(BITMAP_GROUP_TAG, VOICE_ICON_BITMAP);
+	struct bitmap_data *bitmap = bitmap_index != NONE ? bitmap_group_try_and_get_bitmap(bitmap_index, muted ? 1 : 0) :
+		NULL;
 	pixel32 a = (pixel32)(PIN(alpha, 0.0f, 1.0f) * 255.0f + 0.5f) << 24;
-	pixel32 color = a | (muted ? 0x00909090 : 0x0050E050);
-	rectangle2d part;
-	short slice;
+	rectangle2d square = *bounds;
 
-	if (size < 4)
+	if (!bitmap || bounds->y1 - bounds->y0 < 4)
 		return;
-	/* (the body, the cone in slices widening, and two waves) */
-	part.x0 = x;
-	part.x1 = (short)(x + size * 3 / 10);
-	part.y0 = (short)(y + size * 35 / 100);
-	part.y1 = (short)(y + size * 65 / 100);
-	draw_quad(&part, color);
-	for (slice = 0; slice < 3; slice++)
-	{
-		part.x0 = (short)(x + size * (30 + slice * 8) / 100);
-		part.x1 = (short)(x + size * (38 + slice * 8) / 100);
-		part.y0 = (short)(y + size * (30 - slice * 10) / 100);
-		part.y1 = (short)(y + size * (70 + slice * 10) / 100);
-		draw_quad(&part, color);
-	}
-	if (!muted)
-	{
-		part.x0 = (short)(x + size * 66 / 100);
-		part.x1 = (short)(part.x0 + MAX(2, size / 8));
-		part.y0 = (short)(y + size * 30 / 100);
-		part.y1 = (short)(y + size * 70 / 100);
-		draw_quad(&part, color);
-		part.x0 = (short)(x + size * 84 / 100);
-		part.x1 = (short)(part.x0 + MAX(2, size / 8));
-		part.y0 = (short)(y + size * 15 / 100);
-		part.y1 = (short)(y + size * 85 / 100);
-		draw_quad(&part, color);
-		return;
-	}
-	/* (struck through: a slash of small squares) */
-	for (slice = 0; slice < 6; slice++)
-	{
-		short step = (short)(size * slice / 6);
-
-		part.x0 = (short)(x + step);
-		part.x1 = (short)(part.x0 + MAX(2, size / 6));
-		part.y0 = (short)(y + step);
-		part.y1 = (short)(part.y0 + MAX(2, size / 6));
-		draw_quad(&part, a | 0x00E03030);
-	}
+	square.x1 = (short)(square.x0 + (square.y1 - square.y0));
+	draw_bitmap_in_rect(bitmap, &square, NULL, NULL, a | (muted ? 0x00E05A5A : 0x0050E050), NULL, TRUE);
 }

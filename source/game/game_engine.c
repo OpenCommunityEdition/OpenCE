@@ -2351,12 +2351,25 @@ static void game_engine_rasterize_scoreboard(
 			network_voice_machine_muted(player->network_player_data.machine_index)))
 		{
 			rectangle2d icon;
+			rectangle2d text;
 			short row_left = (short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP));
+			short size;
+			short middle;
 
+			/* (centred on the row's capitals: the middle measured as the row
+			is laid out, then scaled as it is drawn, as scoreboard_rectangle
+			has it) */
+			text.x0 = row_left;
+			text.x1 = (short)(row_left + SCOREBOARD_COLUMN_WIDTH);
+			text.y0 = (short)(top + (2 + row) * line_height);
+			text.y1 = (short)(text.y0 + line_height);
+			draw_string_set_draw_mode(font_index, NONE, 0, 0, row_color);
+			middle = (short)(top + (draw_unicode_string_capital_middle(&text, L"H") - top) * SCOREBOARD_SCALE);
 			scoreboard_rectangle(&icon, bounds.x0, top, line_height, (short)(row_left + SCOREBOARD_PLACE_WIDTH - 24),
 				20, 2 + row, 1);
-			icon.y0 = (short)(icon.y0 + (icon.y1 - icon.y0) / 6);
-			icon.y1 = (short)(icon.y1 - (icon.y1 - icon.y0) / 6);
+			size = (short)((icon.y1 - icon.y0) * 2 / 3);
+			icon.y0 = (short)(middle - size / 2);
+			icon.y1 = (short)(icon.y0 + size);
 			network_voice_draw_icon(&icon, network_voice_machine_muted(player->network_player_data.machine_index),
 				alpha);
 		}
@@ -3905,18 +3918,19 @@ static void game_engine_rasterize_voice_speakers(
 		machines_listed[listed_count++] = machine_index;
 		if (!network_voice_machine_speaking(machine_index))
 			continue;
-		icon.x0 = (short)(bounds.x0 + 16);
-		icon.y0 = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100 + row * line_height);
-		icon.x1 = (short)(icon.x0 + line_height);
-		icon.y1 = (short)(icon.y0 + line_height - 2);
-		network_voice_draw_icon(&icon, FALSE, 1.0f);
-		text = icon;
-		text.x0 = (short)(icon.x1 + 4);
+		/* (the name after the speaker, which is centred on its capitals) */
+		text.x0 = (short)(bounds.x0 + 16 + line_height + 4);
 		text.x1 = bounds.x1;
-		text.y1 = (short)(icon.y0 + line_height);
+		text.y0 = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100 + row * line_height);
+		text.y1 = (short)(text.y0 + line_height);
 		color.alpha = 1.0f;
 		color.red = color.green = color.blue = 0.9f;
 		draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
+		icon.x0 = (short)(bounds.x0 + 16);
+		icon.x1 = (short)(icon.x0 + line_height);
+		icon.y0 = (short)(draw_unicode_string_capital_middle(&text, player->name) - line_height / 2);
+		icon.y1 = (short)(icon.y0 + line_height);
+		network_voice_draw_icon(&icon, FALSE, 1.0f);
 		rasterizer_draw_unicode_string(&text, NULL, NULL, 0, player->name);
 		row++;
 	}
