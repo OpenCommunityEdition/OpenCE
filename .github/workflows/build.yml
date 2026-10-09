@@ -78,7 +78,7 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_host_watch_hash.py tools/harness
+          python -m pytest -q tools/test_linux_port.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness
           python tools/test_light_storage.py
 
       - name: Compile cache

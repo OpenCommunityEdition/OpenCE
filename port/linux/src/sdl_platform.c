@@ -15,6 +15,7 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "xiso.h"
+#include "touch_input.h"
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -1563,6 +1564,9 @@ void platform_pump_events(void)
 			/* (the scoreboard's pointer goes; the mouse is taken back for
 			the aim as the window has the focus again) */
 			scoreboard_pointer_active = FALSE;
+#ifdef HALO_ANDROID
+			touch_input_cancel();
+#endif
 			break;
 		case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			input_state.focused = TRUE;
@@ -1572,6 +1576,14 @@ void platform_pump_events(void)
 				platform_mouse_capture(TRUE);
 #endif
 			break;
+#ifdef HALO_ANDROID
+		case SDL_EVENT_FINGER_DOWN:
+		case SDL_EVENT_FINGER_MOTION:
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED:
+			touch_input_event(event.type, &event.tfinger);
+			break;
+#endif
 		case SDL_EVENT_GAMEPAD_ADDED:
 #ifdef HALO_ANDROID
 			/* (the guest reaches SDL only through host_imports.list, which
@@ -1763,6 +1775,40 @@ static void screen_keyboard_update(void)
 		SDL_StartTextInputWithProperties(platform_window, properties);
 		SDL_DestroyProperties(properties);
 	}
+}
+
+#else
+/* ---------- the menus' pointer (the touchscreen)
+
+While a menu is up, taps and drags go to the menus (touch_input.c,
+halo_ui_pointer_update in d3d8_gl.c). */
+void platform_ui_pointer_set_active(BOOL active)
+{
+	pthread_mutex_lock(&input_lock);
+	if ((active != FALSE) != (input_state.ui_pointer != FALSE))
+	{
+		input_state.ui_pointer = active;
+		touch_input_menu_set_active(active != FALSE);
+	}
+	pthread_mutex_unlock(&input_lock);
+}
+
+BOOL platform_ui_pointer_read(struct platform_ui_pointer *pointer)
+{
+	BOOL active;
+
+	pthread_mutex_lock(&input_lock);
+	active = input_state.ui_pointer;
+	touch_input_menu_read(pointer);
+	pthread_mutex_unlock(&input_lock);
+	return active;
+}
+
+/* the window is its pixels on Android (no display scaling): touch_input.c
+scales the fingers' 0..1 by the drawable's size */
+void platform_video_window_size(int *width, int *height)
+{
+	platform_video_drawable_size(width, height);
 }
 
 #endif

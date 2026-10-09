@@ -25,6 +25,7 @@ that runs here.
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <android/log.h>
+#include <jni.h>
 #include <errno.h>
 #include <ftw.h>
 #include <stdarg.h>
@@ -135,6 +136,52 @@ struct environment
 	char *entries[ENVIRONMENT_MAXIMUM];
 	int count;
 };
+
+/* asks the activity for Android's system gesture insets via JNI
+(HaloActivity.getSystemGestureInsetsPixels); the guest calls it at every
+finger down because the insets change when the phone rotates; the method is
+found on the activity's own class because the game's native thread has the
+system's class loader, which does not know the app's classes; a change is
+logged so the log shows the value the game works with; all 0 on any failure
+(the touch controls then use the whole screen) */
+void host_gesture_insets(int *insets)
+{
+	static int logged[4] = { -1, -1, -1, -1 };
+	JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+	jobject activity = (jobject)SDL_GetAndroidActivity();
+	jint values[4] = { 0, 0, 0, 0 };
+	int index;
+
+	if (env && activity)
+	{
+		jclass activity_class = (*env)->GetObjectClass(env, activity);
+		jmethodID method = activity_class ? (*env)->GetMethodID(env, activity_class, "getSystemGestureInsetsPixels", "()[I") : NULL;
+		jintArray array = method ? (jintArray)(*env)->CallObjectMethod(env, activity, method) : NULL;
+
+		if (array && !(*env)->ExceptionCheck(env) && (*env)->GetArrayLength(env, array) == 4)
+			(*env)->GetIntArrayRegion(env, array, 0, 4, values);
+		/* a Java exception left pending would break the next JNI call of the
+		thread, and a failed read must leave zeros */
+		if ((*env)->ExceptionCheck(env))
+		{
+			(*env)->ExceptionClear(env);
+			for (index = 0; index < 4; index++)
+				values[index] = 0;
+		}
+		if (array)
+			(*env)->DeleteLocalRef(env, array);
+		if (activity_class)
+			(*env)->DeleteLocalRef(env, activity_class);
+		(*env)->DeleteLocalRef(env, activity);
+	}
+	for (index = 0; index < 4; index++)
+		insets[index] = (int)values[index];
+	if (memcmp(logged, insets, sizeof(logged)))
+	{
+		memcpy(logged, insets, sizeof(logged));
+		host_logf(HOST_LOG_INFO, "system gesture insets %d,%d,%d,%d", insets[0], insets[1], insets[2], insets[3]);
+	}
+}
 
 static void environment_set(struct environment *environment, const char *name, const char *value)
 {
@@ -265,10 +312,11 @@ static uint32_t make_boot(const struct environment *environment)
 
 #define MAIN_STACK_SIZE (16 * 1024 * 1024)
 
-/* the thread that runs the game: passes the display and the settings to the
-guest through its environment, chooses the write tracking (page
-protection, or page hashes when translated or when debug.memory_watch is
-false), and runs the guest's main */
+/* the thread that runs the game: passes the display and its density, the
+time zone and the data and save folders to the guest through its
+environment, chooses the write tracking (page protection, or page hashes when
+translated or when debug.memory_watch is false), and runs the guest's main;
+never returns normally */
 static void *game_main(void *unused)
 {
 	struct environment environment = { { 0 }, 0 };
@@ -313,6 +361,19 @@ static void *game_main(void *unused)
 			snprintf(width, sizeof(width), "%d", (480 * longer / shorter) & ~1);
 			environment_set(&environment, "HALO_DISPLAY_WIDTH", width);
 			host_logf(HOST_LOG_INFO, "display %dx%d: rendering %sx480", mode->w, mode->h, width);
+		}
+		{
+			/* dp for the touch controls (port/linux/src/touch_input.c): SDL
+			gives Android's densityDpi / 160 */
+			float density = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+			char text[16];
+
+			if (density > 0.0f)
+			{
+				snprintf(text, sizeof(text), "%g", density);
+				environment_set(&environment, "HALO_DISPLAY_DENSITY", text);
+				host_logf(HOST_LOG_INFO, "display density %s", text);
+			}
 		}
 	}
 	time_zone(zone, sizeof(zone));

@@ -1833,25 +1833,11 @@ HRESULT WINAPI Direct3D_CreateDevice(UINT adapter, D3DDEVTYPE device_type, void 
 
 /* ---------- the menus' pointer */
 
-#ifdef HALO_ANDROID
-int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
-{
-	(void)pointer;
-	platform_menus_set_active(menus_active != 0);
-	return 0;
-}
-
-int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer)
-{
-	(void)offered;
-	(void)pointer;
-	return -1;
-}
-#else
 /* a point in the window, as SDL reports it, in the menus' coordinates: the
 inverse of the letterboxed display blit at presentation, the screen's
 width and the menus' centering (halo_screen_ui_offset); or, not centered,
-the screen's (the game's drawing: the scoreboard's) */
+the screen's (the game's drawing: the scoreboard's); x and y are -1 if there
+is no back buffer or window yet */
 static void ui_point_from_window_on(float window_x, float window_y, int centered, short *x, short *y)
 {
 	struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
@@ -1885,6 +1871,14 @@ static void ui_point_from_window(float window_x, float window_y, short *x, short
 	ui_point_from_window_on(window_x, window_y, TRUE, x, y);
 }
 
+#ifdef HALO_ANDROID
+int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer)
+{
+	(void)offered;
+	(void)pointer;
+	return -1;
+}
+#else
 int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer)
 {
 	struct platform_ui_pointer state;
@@ -1898,6 +1892,7 @@ int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer)
 	pointer->left_clicks = (unsigned char)(state.left_clicks < 255 ? state.left_clicks : 255);
 	return 1;
 }
+#endif
 
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
@@ -1914,9 +1909,11 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 	pointer->left_clicks = (unsigned char)(state.left_clicks < 255 ? state.left_clicks : 255);
 	pointer->right_clicks = (unsigned char)(state.right_clicks < 255 ? state.right_clicks : 255);
 	pointer->wheel_steps = (signed char)(state.wheel_steps < -8 ? -8 : state.wheel_steps > 8 ? 8 : state.wheel_steps);
+	pointer->touch = state.touch != FALSE;
+	pointer->downs = (unsigned char)(state.downs < 255 ? state.downs : 255);
+	ui_point_from_window(state.down_x, state.down_y, &pointer->down_x, &pointer->down_y);
 	return 1;
 }
-#endif
 
 /* takes up the display's shape and resolution, or the window's, if they
 have changed; between frames, since the game's layout and the targets must
