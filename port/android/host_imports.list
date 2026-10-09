@@ -13,6 +13,7 @@ host_memory_watch_generation
 host_memory_watch_serial
 host_memory_watch_prepare_write
 host_memory_watch_forget
+host_memory_watch_begin_frame
 host_sdl_init
 host_sdl_set_hint
 host_sdl_get_error
@@ -43,9 +44,12 @@ host_sdl_scancode_from_name
 host_sdl_open_audio_stream
 host_sdl_put_audio_stream_data
 host_sdl_resume_audio_stream_device
+host_sdl_get_audio_stream_data
+host_sdl_get_audio_stream_available
+host_sdl_destroy_audio_stream
 host_gl_get_string
 host_gl_has_extension
-host_gl_read_buffer_word
+host_gl_read_buffer
 host_gl_buffer_write
 host_gl_fence_frame
 host_gl_wait_frame

@@ -851,17 +851,22 @@ void saved_game_file_remember_last_used_multiplayer_map(
 	char const *map_name)
 {
 	struct file_reference file;
+	/* port: the name in a buffer of the size written (callers' may be
+	smaller: the menus' map list's are 64 bytes), the rest zeros */
+	char name[MAXIMUM_FILENAME_LENGTH+1];
 
 	match_assert(
 		"c:\\halo\\SOURCE\\saved games\\saved_game_files.c",
 		1207,
 		map_name);
+	csmemset(name, 0, sizeof(name));
+	csstrncpy(name, map_name, sizeof(name) - 1);
 
 	if (file_reference_create_from_path(&file, "z:\\lastmpmp.txt", FALSE) &&
 		file_create(&file) &&
 		file_open(&file, FLAG(_permission_write_bit)))
 	{
-		if (!file_write(&file, MAXIMUM_FILENAME_LENGTH+1, map_name))
+		if (!file_write(&file, MAXIMUM_FILENAME_LENGTH+1, name))
 		{
 			error(_error_silent, "failed to write to '%s'", "z:\\lastmpmp.txt");
 		}
@@ -1593,7 +1598,7 @@ void saved_game_file_get_useable_untitled_profile_name(
 		for (index = 0; index < MAXIMUM_UNTITLED_SAVED_GAMES; index++)
 		{
 			usnprintf(display_name, MAX_GAMENAME-1,
-				unicode_string_list_get_string(string_list_index, _saved_game_file_string_untitled_name_format),
+				ustring_format_checked(unicode_string_list_get_string(string_list_index, _saved_game_file_string_untitled_name_format), "d"),
 				index+1);
 			display_name[MAX_GAMENAME-1] = 0;
 

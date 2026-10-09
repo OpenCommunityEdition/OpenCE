@@ -70,7 +70,11 @@ enum
 
 enum
 {
-	NUMBER_OF_PIXEL_SHADER_STAGES = 8
+	NUMBER_OF_PIXEL_SHADER_STAGES = 8,
+	/* port: the stages a generic shader has room for, one combiner kept for
+	the fog stage rasterizer_xbox_transparent_geometry.c adds after them
+	(the tag's own maximum; retail has 7 at most) */
+	MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES = NUMBER_OF_PIXEL_SHADER_STAGES - 1
 };
 
 /* ---------- macros */
@@ -160,6 +164,8 @@ static boolean shader_map_verify(
 static boolean shader_stage_verify(
 	struct shader_transparent_generic_stage *stage,
 	short stage_index);
+static void shader_stage_data_error(
+	void);
 
 /* ---------- globals */
 
@@ -232,6 +238,22 @@ static const long shader_stage_alpha_output_mappings[NUMBER_OF_SHADER_TRANSPAREN
 
 /* ---------- private code */
 
+/* port: a map's generic shader with a stage field past the tables, or more
+stages than the combiners hold; said once */
+static void shader_stage_data_error(
+	void)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "### ERROR a transparent generic shader has a bad stage register, mapping or count");
+		reported = TRUE;
+	}
+
+	return;
+}
+
 static long shader_stage_color_input(
 	short register_index,
 	short mapping_index)
@@ -241,6 +263,15 @@ static long shader_stage_color_input(
 #line 212 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_generic_preprocessor.c"
 	match_assert(__FILE__, __LINE__, register_index>=0 && register_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUTS);
 	match_assert(__FILE__, __LINE__, mapping_index>=0 && mapping_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUT_MAPPINGS);
+
+	/* port: a register or mapping the tables don't have (a map's) reads the
+	zero register */
+	if (!VALID_INDEX(register_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUTS) ||
+		!VALID_INDEX(mapping_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUT_MAPPINGS))
+	{
+		shader_stage_data_error();
+		return 0;
+	}
 
 	register_value = shader_stage_color_input_registers[register_index];
 
@@ -258,6 +289,13 @@ static long shader_stage_color_output(
 #line 233 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_generic_preprocessor.c"
 	match_assert(__FILE__, __LINE__, register_index>=0 && register_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUTS);
 
+	/* port: an output the table doesn't have (a map's) is discarded */
+	if (!VALID_INDEX(register_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUTS))
+	{
+		shader_stage_data_error();
+		return 0;
+	}
+
 	return shader_stage_color_output_registers[register_index];
 }
 
@@ -272,7 +310,16 @@ static long shader_stage_color_output_flags(
 	match_assert(__FILE__, __LINE__, stage->color_output_AB_function>=0 && stage->color_output_AB_function<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUT_FUNCTIONS);
 	match_assert(__FILE__, __LINE__, stage->color_output_CD_function>=0 && stage->color_output_CD_function<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUT_FUNCTIONS);
 
-	flags = shader_stage_color_output_mappings[stage->color_output_mapping];
+	/* port: a mapping the table doesn't have (a map's) is the first */
+	if (!VALID_INDEX(stage->color_output_mapping, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUT_MAPPINGS))
+	{
+		shader_stage_data_error();
+		flags = 0;
+	}
+	else
+	{
+		flags = shader_stage_color_output_mappings[stage->color_output_mapping];
+	}
 
 	if (stage->color_output_AB_function == _shader_transparent_generic_stage_output_function_dot_product)
 	{
@@ -302,6 +349,15 @@ static long shader_stage_alpha_input(
 	match_assert(__FILE__, __LINE__, register_index>=0 && register_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUTS);
 	match_assert(__FILE__, __LINE__, mapping_index>=0 && mapping_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUT_MAPPINGS);
 
+	/* port: a register or mapping the tables don't have (a map's) reads the
+	zero register */
+	if (!VALID_INDEX(register_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUTS) ||
+		!VALID_INDEX(mapping_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_INPUT_MAPPINGS))
+	{
+		shader_stage_data_error();
+		return 0;
+	}
+
 	register_value = shader_stage_alpha_input_registers[register_index];
 
 	if (register_value == NONE)
@@ -318,6 +374,13 @@ static long shader_stage_alpha_output(
 #line 287 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_generic_preprocessor.c"
 	match_assert(__FILE__, __LINE__, register_index>=0 && register_index<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUTS);
 
+	/* port: an output the table doesn't have (a map's) is discarded */
+	if (!VALID_INDEX(register_index, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUTS))
+	{
+		shader_stage_data_error();
+		return 0;
+	}
+
 	return shader_stage_alpha_output_registers[register_index];
 }
 
@@ -330,7 +393,16 @@ static long shader_stage_alpha_output_flags(
 	match_assert(__FILE__, __LINE__, stage);
 	match_assert(__FILE__, __LINE__, stage->alpha_output_mapping>=0 && stage->alpha_output_mapping<NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUT_MAPPINGS);
 
-	flags = shader_stage_alpha_output_mappings[stage->alpha_output_mapping];
+	/* port: a mapping the table doesn't have (a map's) is the first */
+	if (!VALID_INDEX(stage->alpha_output_mapping, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_STAGE_OUTPUT_MAPPINGS))
+	{
+		shader_stage_data_error();
+		flags = 0;
+	}
+	else
+	{
+		flags = shader_stage_alpha_output_mappings[stage->alpha_output_mapping];
+	}
 
 	if (TEST_FLAG(stage->flags, _shader_transparent_generic_stage_flag_alpha_mux_bit))
 	{
@@ -420,6 +492,7 @@ boolean shader_transparent_generic_create(
 	boolean result = TRUE;
 	short map_index;
 	short stage_index;
+	short stage_count;
 
 #line 388 "c:\\halo\\SOURCE\\rasterizer\\xbox\\shader_transparent_generic_preprocessor.c"
 	match_assert(__FILE__, __LINE__, shader);
@@ -457,11 +530,18 @@ boolean shader_transparent_generic_create(
 		result = FALSE;
 	}
 
-	pixel_shader->combiner_count = (FLOOR(generic->stages.count, 1) + 1) | 0x11100;
-
-	if (generic->stages.count > 0)
+	/* port: no more stages than the combiners hold (a map's count) */
+	stage_count = (short)MIN(generic->stages.count, MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES);
+	if (generic->stages.count > stage_count)
 	{
-		for (stage_index = 0; stage_index < generic->stages.count; stage_index++)
+		shader_stage_data_error();
+	}
+
+	pixel_shader->combiner_count = (FLOOR(stage_count, 1) + 1) | 0x11100;
+
+	if (stage_count > 0)
+	{
+		for (stage_index = 0; stage_index < stage_count; stage_index++)
 		{
 			struct shader_transparent_generic_stage *stage = TAG_BLOCK_GET_ELEMENT(
 				&generic->stages,

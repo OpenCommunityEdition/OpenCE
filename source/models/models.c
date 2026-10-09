@@ -83,6 +83,9 @@ symbols in this file:
 #include "shaders/shaders.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+/* port: model tags and static enclosure recognition at map initialization. */
+#include "cache/cache_files.h"
+#include "rasterizer/rasterizer_transparent_geometry.h"
 
 /* ---------- constants */
 
@@ -232,6 +235,7 @@ typedef char verify_rasterizer_model_begin_parameters_size[sizeof(struct rasteri
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
+	short region_permutation_count,
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
@@ -265,6 +269,7 @@ static struct profile_section render_model_section = { "render_model", NONE, TRU
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
+	short region_permutation_count,
 	struct render_skinning const *skinning,
 	long object_index,
 	short geometry_detail_level_index,
@@ -282,9 +287,11 @@ static void render_model_parts(
 		short sort_filth_count = 0;
 		short region_index;
 		short i, j;
-		/* port: no more regions than a model has room for (a map's count; the
-		permutations passed in are that long at most) */
-		short region_count = (short)MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL);
+		/* port: no more regions than the permutations passed in hold: an
+		object's MAXIMUM_REGIONS_PER_OBJECT, or the default's
+		MAXIMUM_REGIONS_PER_MODEL (a map's count; retail models have 8 at
+		most) */
+		short region_count = (short)MIN(model->regions.count, region_permutation_count);
 
 		for (region_index = 0; region_index<region_count; region_index++)
 		{
@@ -374,12 +381,17 @@ static void render_model_parts(
 										&part->vertex_buffer,
 										NONE,
 										&centroid,
-										&sort_filth[sort_filth_count]);
+										/* port: no sort record once all of sort_filth is
+										used (it wrote one past it) */
+										sort_filth_count<MAXIMUM_PARTS_PER_MODEL_GEOMETRY ? &sort_filth[sort_filth_count] : NULL);
 
 									if (sort_filth_count<MAXIMUM_PARTS_PER_MODEL_GEOMETRY &&
 										sort_filth[sort_filth_count].group_index!=NONE &&
 										!immediate &&
-										(part->next_part_index>0 || part->previous_part_index>0))
+										/* port: part zero can head a link
+										(models_fix_transparent_part_links); no stock
+										model's part has a previous part of 0 */
+										(part->next_part_index>0 || part->previous_part_index>=0))
 									{
 										sort_filth[sort_filth_count].part_index = part_index;
 										sort_filth[sort_filth_count].next_part_index = part->next_part_index;
@@ -451,6 +463,89 @@ static void render_model_parts(
 }
 
 /* ---------- public code */
+
+/* port: a pickup's energy inside its two-sided glass shell is drawn before
+the shell with the engine's own part links (render_model_parts), as Halo CE
+Restored's tags link them, so that the centroid sort cannot put it after the
+glass; models with links of their own, skinned ones and those with other
+transparent parts are left as they are */
+static void model_geometry_fix_transparent_part_links(
+	struct model const *model, struct model_geometry *geometry)
+{
+	short i, glass = NONE, energy = NONE, transparent_count = 0;
+	struct model_geometry_part *parts = geometry->parts.address;
+
+	if (model->nodes.count != 1 || geometry->parts.count < 2 ||
+		geometry->parts.count > MAXIMUM_PARTS_PER_MODEL_GEOMETRY || !parts)
+	{
+		return;
+	}
+	for (i = 0; i < geometry->parts.count; ++i)
+	{
+		struct shader *shader;
+		struct model_shader_reference const *reference;
+
+		if (parts[i].flags || parts[i].previous_part_index != NONE || parts[i].next_part_index != NONE ||
+			!VALID_INDEX(parts[i].shader_index, model->shaders.count))
+		{
+			return;
+		}
+		reference = TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[i].shader_index, struct model_shader_reference);
+		shader = shader_definition_get(reference->shader.index);
+		if (shader_type_is_transparent(shader->base.type))
+		{
+			++transparent_count;
+			if (shader->base.type == _shader_type_transparent_glass)
+			{
+				glass = i;
+			}
+			else if (shader->base.type == _shader_type_transparent_generic)
+			{
+				energy = i;
+			}
+		}
+	}
+	if (transparent_count == 2 && glass != NONE && energy != NONE &&
+		rasterizer_transparent_geometry_is_enclosure(
+			shader_definition_get(TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[glass].shader_index, struct model_shader_reference)->shader.index),
+			&parts[glass].vertex_buffer, &parts[glass].triangle_buffer,
+			shader_definition_get(TAG_BLOCK_GET_ELEMENT(&model->shaders, parts[energy].shader_index, struct model_shader_reference)->shader.index),
+			&parts[energy].vertex_buffer))
+	{
+		/* (a link to part zero is none: with the glass part zero, the two
+		parts, which have no links of their own, change places) */
+		if (glass == 0)
+		{
+			struct model_geometry_part swap = parts[glass];
+			parts[glass] = parts[energy];
+			parts[energy] = swap;
+			glass = energy;
+			energy = 0;
+		}
+		parts[energy].next_part_index = (char)glass;
+		parts[glass].previous_part_index = (char)energy;
+	}
+}
+
+/* port: the links of every model the map loaded (at its start: the meshes
+do not change, and the next map's tags are loaded afresh) */
+void models_fix_transparent_part_links(void)
+{
+	struct tag_iterator iterator;
+	long index;
+
+	tag_iterator_new(&iterator, MODELS_GROUP_TAG);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct model *model = model_definition_get(index);
+		long geometry;
+		for (geometry = 0; geometry < model->geometries.count; ++geometry)
+		{
+			model_geometry_fix_transparent_part_links(model,
+				TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry, struct model_geometry));
+		}
+	}
+}
 
 void model_interpolate_node_orientations(
 	struct model const *model,
@@ -767,8 +862,9 @@ short model_get_marker_by_name(
 			struct model_marker_instance* instance = TAG_BLOCK_GET_ELEMENT(&marker->instances, i, struct model_marker_instance);
 
 			/* port: a marker on a region or node the model doesn't have is
-			skipped (a map's indices) */
-			if ((region_permutations && instance->region_index>=MAXIMUM_REGIONS_PER_MODEL) ||
+			skipped (a map's indices); the permutations passed in are an
+			object's (retail's markers are on regions 5 at most) */
+			if ((region_permutations && instance->region_index>=MAXIMUM_REGIONS_PER_OBJECT) ||
 				instance->node_index>=MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL))
 			{
 				model_data_error(model, "marker");
@@ -898,6 +994,11 @@ void render_model(
 		struct rasterizer_model_begin_parameters model_parameters;
 		short geometry_detail_level_index;
 		short node_index;
+		/* port: how many regions the permutations passed in hold (an
+		object's; the default's otherwise) */
+		short region_permutation_count = region_permutation_indices ?
+			MAXIMUM_REGIONS_PER_OBJECT :
+			MAXIMUM_REGIONS_PER_MODEL;
 		/* port: no more nodes than relative_node_matrices holds (a map's count) */
 		short node_count = (short)MIN(model->nodes.count, MAXIMUM_NODES_PER_MODEL);
 
@@ -996,7 +1097,7 @@ void render_model(
 
 						/* port: and the region and node are ones the model has room
 						for (a map's indices) */
-						if (instance->region_index<MAXIMUM_REGIONS_PER_MODEL &&
+						if (instance->region_index<region_permutation_count &&
 							instance->node_index<node_count &&
 							region_permutation_indices[instance->region_index]==instance->permutation_index)
 						{
@@ -1022,7 +1123,7 @@ void render_model(
 
 				/* port: the regions and permutations render_model_parts draws (a
 				map's counts and indices) */
-				for (region_index = 0; region_index<MIN(model->regions.count, MAXIMUM_REGIONS_PER_MODEL); region_index++)
+				for (region_index = 0; region_index<MIN(model->regions.count, region_permutation_count); region_index++)
 				{
 					struct model_region *region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
 					char permutation_index = region_permutation_indices[region_index];
@@ -1160,6 +1261,7 @@ void render_model(
 		render_model_parts(
 			model,
 			region_permutation_indices,
+			region_permutation_count,
 			&model_parameters.skinning,
 			unique_identifier,
 			geometry_detail_level_index,
@@ -1189,6 +1291,10 @@ boolean model_data_report_once(
 {
 	static void const *reported_data[32];
 	static long next_reported_index = 0;
+	/* (and no more than this many reports in all: with more bad tags than
+	the list holds, each would push another out and be reported again
+	every frame) */
+	static long report_count = 0;
 	long reported_index;
 
 	for (reported_index = 0; reported_index<(long)NUMBEROF(reported_data); reported_index++)
@@ -1198,6 +1304,11 @@ boolean model_data_report_once(
 			return FALSE;
 		}
 	}
+	if (report_count >= 4 * (long)NUMBEROF(reported_data))
+	{
+		return FALSE;
+	}
+	report_count++;
 	reported_data[next_reported_index] = data;
 	next_reported_index = (next_reported_index+1)%(long)NUMBEROF(reported_data);
 

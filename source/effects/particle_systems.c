@@ -460,7 +460,27 @@ long particle_system_new_attached(
 		system->attachment_index = attachment_index;
 		system->function_index = attachment->primary_scale_function_reference - 1;
 
-		if (attachment->change_color_reference)
+		/* port: and a change color the object has (the reference is the
+		map's, and indexes the colors as it is; retail particle systems are
+		never attached with one). Any other is white, said once. */
+		if (attachment->change_color_reference &&
+			!VALID_INDEX(attachment->change_color_reference, NUMBER_OF_OBJECT_CHANGE_COLORS))
+		{
+			static boolean bad_change_color_reported = FALSE;
+
+			if (!bad_change_color_reported)
+			{
+				bad_change_color_reported = TRUE;
+				error(
+					_error_silent,
+					"particle system %s is attached with change color %d (of %d)",
+					tag_get_name(definition_index),
+					attachment->change_color_reference,
+					NUMBER_OF_OBJECT_CHANGE_COLORS);
+			}
+		}
+		if (attachment->change_color_reference &&
+			VALID_INDEX(attachment->change_color_reference, NUMBER_OF_OBJECT_CHANGE_COLORS))
 		{
 			system->color.rgb = object->object.outgoing_change_colors[attachment->change_color_reference];
 			system->color.alpha = 1.0f;
@@ -1528,6 +1548,16 @@ static void particle_system_render(
 					else
 					{
 						sequence_index = state_definition->sequence_index;
+					}
+					/* port: a bitmap without that sequence, or with no sprites in it,
+					draws nothing (a Custom Edition map's can: Hornets Nest's), where
+					this read past its sequences and divided by its sprite count */
+					if (!VALID_INDEX(sequence_index, bitmap->sequences.count) ||
+						TAG_BLOCK_GET_ELEMENT(&bitmap->sequences, sequence_index,
+							struct bitmap_group_sequence)->sprites.count <= 0)
+					{
+						particle_index = (short)particle->next_particle_index;
+						continue;
 					}
 					sequence = TAG_BLOCK_GET_ELEMENT(
 						&bitmap->sequences,

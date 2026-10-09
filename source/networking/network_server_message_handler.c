@@ -267,6 +267,9 @@ symbols in this file:
 
 /* port/linux/game/network_distributed.c's */
 void network_distributed_handle_message(long machine_index, word const *message, word size);
+/* port/linux/game/network_voice.c's: voice chat, in the lobby too */
+boolean network_voice_handles_message(word const *message, word size);
+void network_voice_handle_message(long machine_index, word const *message, word size);
 void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
 /* ---------- constants */
@@ -305,6 +308,20 @@ enum
 };
 
 #define MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE (sizeof(word) + TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + sizeof(byte))
+
+/* port: the text of a transport error message as it is logged: printable
+ASCII only (it is a machine's to send), ending with the buffer */
+static char const *transport_error_message_text(
+	byte const *error_message)
+{
+	static char text[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH + 1];
+	long index;
+
+	for (index = 0; index < TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH && error_message[index]; index++)
+		text[index] = error_message[index] >= 0x20 && error_message[index] < 0x7F ? (char)error_message[index] : '?';
+	text[index] = 0;
+	return text;
+}
 
 enum
 {
@@ -1350,6 +1367,19 @@ boolean network_game_server_handle_client_message(
 
 			case _message_type_data:
 				/* the distributed netcode's messages (port/linux/NETCODE.md) */
+				/* (port: voice chat's from any machine that joined, in the
+				lobby too: network_voice.c) */
+				if (network_voice_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_voice_handle_message(machine_index, message, message_buffer_size);
+					}
+					break;
+				}
 				/* (in game, from a machine that has loaded it, as a datagram
 				is: else dropped) */
 				if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
@@ -1369,12 +1399,12 @@ boolean network_game_server_handle_client_message(
 				{
 					byte *error_message = (byte *)(message + 1);
 
-					/* (the text need not end in the message) */
+					/* (the text need not end in the message; printable only, so
+					that it forges no line of the log) */
 					network_event(
-						"server received low-level error message from a client: error= #%d (%.*s)",
+						"server received low-level error message from a client: error= #%d (%s)",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
-						error_message);
+						transport_error_message_text(error_message));
 				}
 				else
 				{
@@ -1547,6 +1577,18 @@ boolean network_game_server_handle_datagram(
 
 			case _message_type_data:
 				/* the distributed netcode's messages (port/linux/NETCODE.md) */
+				/* (port: voice chat's from any machine that joined, in the
+				lobby too, its key checked: network_voice.c) */
+				if (network_voice_handles_message(message, datagram_size))
+				{
+					struct network_game_server_client_machine *client_machine =
+						network_game_server_get_client_machine_at_address(server, source_address->address.long_words[0]);
+					long machine_index;
+
+					if (client_machine && network_game_server_get_client_machine(server, client_machine, &machine_index))
+						network_voice_handle_message(machine_index, message, datagram_size);
+					break;
+				}
 				/* (from a machine in the game, which the lookup finds only among
 				those that joined, and only in game: else dropped) */
 				if (network_game_server_get_state(server, NULL) == _network_game_server_state_ingame)
@@ -1576,10 +1618,9 @@ boolean network_game_server_handle_datagram(
 					byte *error_message = (byte *)(message + 1);
 
 					network_event(
-						"server received low-level error message: error= #%d (%.*s); sender= '%s'",
+						"server received low-level error message: error= #%d (%s); sender= '%s'",
 						error_message[TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH],
-						(int)TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH,
-						error_message,
+						transport_error_message_text(error_message),
 						transport_address_to_string(source_address));
 				}
 				else

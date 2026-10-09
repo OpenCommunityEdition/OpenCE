@@ -120,12 +120,17 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "text/draw_string.h"
 #include <xtl.h>
+#include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 
 /* ---------- constants */
 
+typedef char verify_xbox_texture_cache_size[
+	HALO_PORT_TEXTURE_CACHE_SIZE == HALO_PORT_TEXTURE_CACHE_PAGE_COUNT * 0x4000 ? 1 : -1];
+
 enum
 {
-	XBOX_TEXTURE_CACHE_PAGE_COUNT = 0x580,
+	/* port: the native builds' larger cache (halo_port_capacity.h) */
+	XBOX_TEXTURE_CACHE_PAGE_COUNT = HALO_PORT_TEXTURE_CACHE_PAGE_COUNT,
 	XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS = 14,
 	XBOX_TEXTURE_CACHE_PAGE_SIZE = 1 << XBOX_TEXTURE_CACHE_PAGE_SIZE_BITS,
 	XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE = 0x104000,
@@ -133,7 +138,7 @@ enum
 		XBOX_TEXTURE_CACHE_PAGE_COUNT -
 		2 * (XBOX_TEXTURE_CACHE_STEAL_GUARD_SIZE / XBOX_TEXTURE_CACHE_PAGE_SIZE),
 	XBOX_TEXTURE_CACHE_ENTRY_SIZE = 0x20,
-	XBOX_TEXTURE_CACHE_SIZE = 0x1600000,
+	XBOX_TEXTURE_CACHE_SIZE = HALO_PORT_TEXTURE_CACHE_SIZE,
 	XBOX_TEXTURE_CACHE_PROTECTION = 0x404,
 };
 
@@ -279,6 +284,8 @@ static void render_inverse_transform_screen_point(
 static boolean texture_cache_start_loading_bitmap(
 	struct bitmap_data *bitmap,
 	boolean block);
+static boolean texture_cache_bitmap_valid(
+	struct bitmap_data *bitmap);
 
 /* ---------- globals */
 
@@ -725,13 +732,83 @@ void texture_cache_close(
 	return;
 }
 
+/* port: whether a map's bitmap is one the hardware format can describe and
+the texture cache can size: a type and format the tables have, sizes up to
+the device's (D3DDevice_GetDeviceCaps: 4096, a volume 512; retail's are 2048
+and 32 at most), mipmaps its sizes have, the compressed flag its format's,
+and a linear one's rows as Size can hold them. Its pixels are read and its
+hardware format built from these; a bad one isn't loaded, said once. */
+static boolean texture_cache_bitmap_valid(
+	struct bitmap_data *bitmap)
+{
+	static boolean reported = FALSE;
+	boolean linear = TEST_FLAG(bitmap->flags, _bitmap_linear_bit);
+	short maximum_dimension = bitmap->type==_bitmap_type_3d ? 512 : 4096;
+	boolean valid =
+		VALID_INDEX(bitmap->type, NUMBER_OF_BITMAP_TYPES) &&
+		VALID_INDEX(bitmap->format, NUMBER_OF_BITMAP_FORMATS) &&
+		bitmap->width>0 && bitmap->width<=maximum_dimension &&
+		bitmap->height>0 && bitmap->height<=maximum_dimension &&
+		bitmap->depth>0 && bitmap->depth<=maximum_dimension &&
+		bitmap->mipmap_count>=0 &&
+		bitmap->mipmap_count<=floor_log2(MAX(bitmap->width, MAX(bitmap->height, bitmap->depth))) &&
+		bitmap->pixels_size>=0;
+
+	if (valid)
+	{
+		boolean compressed_format =
+			bitmap->format>=_bitmap_format_dxt1 && bitmap->format<=_bitmap_format_dxt5;
+		boolean compressed_flag = TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) ? TRUE : FALSE;
+
+		valid =
+			bitmap_d3d_format_tables[linear ? _bitmap_d3d_format_table_linear : _bitmap_d3d_format_table_regular][bitmap->format]!=NONE &&
+			compressed_flag==compressed_format;
+	}
+	/* port: a Custom Edition map's linear rows need not be whole steps of the
+	pitch: they are padded to them as its pixels load
+	(port/linux/game/custom_edition_bitmaps.c) */
+	if (valid && linear)
+	{
+		long row_pitch = bitmap_mipmap_get_row_pitch(bitmap, 0);
+		long steps = (row_pitch+D3DTEXTURE_PITCH_ALIGNMENT-1)/D3DTEXTURE_PITCH_ALIGNMENT;
+
+		valid =
+			row_pitch>0 &&
+			(row_pitch%D3DTEXTURE_PITCH_ALIGNMENT==0 || custom_edition_cache_tags_loaded()) &&
+			steps<=(long)((D3DSIZE_PITCH_MASK>>D3DSIZE_PITCH_SHIFT)+1);
+	}
+	if (!valid && !reported)
+	{
+		error(
+			_error_silent,
+			"### ERROR bitmap %s (#%dx#%dx#%d, format #%d, type #%d) can't be cached; it isn't drawn",
+			tag_get_name(bitmap->tag_index),
+			bitmap->width,
+			bitmap->height,
+			bitmap->depth,
+			bitmap->format,
+			bitmap->type);
+		reported = TRUE;
+	}
+
+	return valid;
+}
+
 static boolean texture_cache_start_loading_bitmap(
 	struct bitmap_data *bitmap,
 	boolean block)
 {
 	long cache_block_index;
 	byte *base_address;
-	long size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
+	long size;
+
+	/* port: only a bitmap the hardware format and the cache can hold (a
+	map's fields) */
+	if (!texture_cache_bitmap_valid(bitmap))
+	{
+		return FALSE;
+	}
+	size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
 
 	size = MAX(size, bitmap->pixels_size);
 	cache_block_index = lruv_block_new(
@@ -920,6 +997,19 @@ void *_texture_cache_bitmap_get_hardware_format(
 		load || !block);
 	if (TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
 	{
+		/* port: a cache block that isn't this bitmap's (a map's stale index)
+		is none */
+		if (bitmap->cache_block_index != NONE)
+		{
+			struct xbox_texture_cache_texture *cached_texture = datum_try_and_get(
+				xbox_texture_cache_globals.textures,
+				bitmap->cache_block_index);
+
+			if (!cached_texture || cached_texture->bitmap != bitmap)
+			{
+				bitmap->cache_block_index = NONE;
+			}
+		}
 		if (bitmap->cache_block_index == NONE && load)
 		{
 			texture_cache_start_loading_bitmap(bitmap, block);

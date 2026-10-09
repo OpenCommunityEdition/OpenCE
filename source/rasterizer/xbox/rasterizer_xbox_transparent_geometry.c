@@ -138,6 +138,10 @@ symbols in this file:
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_active_camouflage.h"
 #include "rasterizer/rasterizer_geometry.h"
+/* port: vertex layouts for conservative world-space model bounds. */
+#include "rasterizer/rasterizer_model_types.h"
+/* port: use the model's node limit when validating skinning. */
+#include "models/model_definitions.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "render/render.h"
@@ -262,6 +266,17 @@ enum
 enum
 {
 	NUMBER_OF_SHADER_TRANSPARENT_MAPS = 4
+};
+
+enum
+{
+	/* port: the stages a generic shader has room for, one combiner of the 8
+	kept for the fog stage after them (the tag's own maximum; retail has 7 at
+	most) */
+	MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES = 7,
+	/* port: how deep extra layers may nest (a map's layer can name its own
+	shader, which never ended); retail's layers have no layers of their own */
+	MAXIMUM_TRANSPARENT_GEOMETRY_LAYER_DEPTH = 4
 };
 
 enum
@@ -637,10 +652,19 @@ struct rasterizer_xbox_transparent_geometry_globals
 typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
 	sizeof(struct rasterizer_xbox_transparent_geometry_globals) == 16 ? 1 : -1];
 
+/* ---------- prototypes */
+
+static void transparent_geometry_layer_draw(
+	struct transparent_geometry_group *layer_group,
+	boolean dirty);
+
 /* ---------- globals */
 
 static struct rasterizer_xbox_transparent_geometry_globals
 	rasterizer_xbox_transparent_geometry_globals = { 0 };
+
+/* port: how many extra layers deep the draw is */
+static short transparent_geometry_layer_depth = 0;
 
 /* ---------- public code */
 
@@ -841,6 +865,80 @@ void rasterizer_transparent_geometry_dispose_aux_buffer(
 }
 
 /* ---------- private code */
+
+/* port: mesh and material checks run only when model tags load. */
+#include "rasterizer/rasterizer_transparent_enclosure.h"
+
+boolean rasterizer_transparent_geometry_is_enclosure(
+	struct shader const *glass, struct vertex_buffer const *outer,
+	struct triangle_buffer const *triangles,
+	struct shader const *energy, struct vertex_buffer const *inner)
+{
+	struct shader_transparent_glass_definition const *shell = (void const *)glass;
+	struct shader_transparent_generic const *core;
+	byte *outer_data = NULL, *inner_data = NULL, *index_data = NULL;
+	boolean result;
+
+	if (!glass || !energy || glass->base.type != _shader_type_transparent_glass ||
+		energy->base.type != _shader_type_transparent_generic)
+	{
+		return FALSE;
+	}
+	core = &((struct shader_transparent_generic_definition const *)energy)->generic;
+	if (!TEST_FLAG(shell->flags, _shader_transparent_glass_flag_two_sided_bit) ||
+		TEST_FLAG(shell->flags, _shader_transparent_glass_flag_decal_bit) ||
+		shell->reflection_type == _shader_transparent_glass_reflection_type_dynamic_mirror ||
+		core->flags != FLAG(_shader_transparent_flag_two_sided_bit) ||
+		TEST_FLAG(energy->base.radiosity.flags, _shader_radiosity_FILTHY_transparent_lit_bit) ||
+		core->framebuffer_blend_function != _framebuffer_blend_function_add ||
+		core->framebuffer_fade_mode != _framebuffer_fade_mode_none ||
+		core->extra_layers.count || core->lens_flare.index != NONE ||
+		!outer || !inner || !triangles || !outer->hardware_format || !inner->hardware_format ||
+		!triangles->hardware_format || outer->offset || inner->offset ||
+		(outer->type != _rasterizer_vertex_type_model_compressed &&
+			outer->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(inner->type != _rasterizer_vertex_type_model_compressed &&
+			inner->type != _rasterizer_vertex_type_model_uncompressed) ||
+		(triangles->type != _triangle_buffer_type_triangles &&
+			triangles->type != _triangle_buffer_type_precompiled_strip))
+	{
+		return FALSE;
+	}
+	IDirect3DVertexBuffer8_Lock(outer->hardware_format, 0, 0, &outer_data, D3DLOCK_READONLY);
+	IDirect3DVertexBuffer8_Lock(inner->hardware_format, 0, 0, &inner_data, D3DLOCK_READONLY);
+	IDirect3DIndexBuffer8_Lock(triangles->hardware_format, 0, 0, &index_data, D3DLOCK_READONLY);
+	result = rasterizer_transparent_encloses(outer_data, outer->count,
+		rasterizer_geometry_get_vertex_size(outer->type), (word const *)index_data,
+		triangles->count, triangles->type == _triangle_buffer_type_precompiled_strip,
+		inner_data, inner->count, rasterizer_geometry_get_vertex_size(inner->type));
+	IDirect3DIndexBuffer8_Unlock(triangles->hardware_format);
+	IDirect3DVertexBuffer8_Unlock(inner->hardware_format);
+	IDirect3DVertexBuffer8_Unlock(outer->hardware_format);
+	return result;
+}
+
+/* port: an extra layer's draw, no deeper than the layers may nest (a map's
+layers could name each other in a loop); said once */
+static void transparent_geometry_layer_draw(
+	struct transparent_geometry_group *layer_group,
+	boolean dirty)
+{
+	static boolean reported = FALSE;
+
+	if (transparent_geometry_layer_depth<MAXIMUM_TRANSPARENT_GEOMETRY_LAYER_DEPTH)
+	{
+		transparent_geometry_layer_depth++;
+		rasterizer_transparent_geometry_group_draw(layer_group, dirty);
+		transparent_geometry_layer_depth--;
+	}
+	else if (!reported)
+	{
+		error(_error_silent, "### ERROR a transparent shader's extra layers nest too deep; the deeper ones are not drawn");
+		reported = TRUE;
+	}
+
+	return;
+}
 
 void rasterizer_transparent_geometry_group_draw__internal(
 	struct transparent_geometry_group const *group,
@@ -1815,15 +1913,19 @@ void rasterizer_transparent_geometry_group_draw(
 								layer_index++)
 							{
 								struct transparent_geometry_group layer_group;
+								long layer_shader_index = TAG_BLOCK_GET_ELEMENT(
+									&shader_transparent_generic->generic.extra_layers,
+									layer_index,
+									struct tag_reference)->index;
 
+								/* port: a layer of no shader (one a map's tags had
+								wrong) is not drawn */
+								if (layer_shader_index == NONE)
+									continue;
 								csmemcpy(&layer_group, group, sizeof(layer_group));
 								layer_group.sorted_index = NONE;
-								layer_group.shader = shader_definition_get(
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_generic->generic.extra_layers,
-										layer_index,
-										struct tag_reference)->index);
-								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
+								layer_group.shader = shader_definition_get(layer_shader_index);
+								transparent_geometry_layer_draw(&layer_group, dirty);
 							}
 
 							rasterizer_set_vertex_shader_permutation(
@@ -1883,7 +1985,10 @@ void rasterizer_transparent_geometry_group_draw(
 												&shader_transparent_generic->generic.maps,
 												map_index,
 												struct shader_transparent_generic_map);
-										short type = shader_transparent_generic->generic.type;
+										/* port: a type the tables below have (a map's) */
+										short type = VALID_INDEX(shader_transparent_generic->generic.type, NUMBER_OF_SHADER_TRANSPARENT_GENERIC_TYPES) ?
+											shader_transparent_generic->generic.type :
+											_shader_transparent_generic_type_2d_map;
 										short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
 										{
 											0, 2, 2, 2
@@ -2054,7 +2159,11 @@ void rasterizer_transparent_geometry_group_draw(
 
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								short stage_count = FLOOR(shader_transparent_generic->generic.stages.count, 1);
+								/* port: no more stages than the combiners hold (a map's
+								count), as shader_transparent_generic_create has */
+								short stage_count = FLOOR(
+									MIN(shader_transparent_generic->generic.stages.count, MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES),
+									1);
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
 									shader_transparent_generic->generic.framebuffer_blend_function ==
@@ -2099,7 +2208,9 @@ void rasterizer_transparent_geometry_group_draw(
 										vsh_constants__texscale[2][2] *=
 											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
+									/* port: and a source the animation has (a map's) */
 									if (fade_source > 0 &&
+										fade_source < NUMBER_OF_SHADER_ANIMATION_SOURCES &&
 										group->animation &&
 										group->animation->values)
 										vsh_constants__texscale[2][2] *=
@@ -2198,8 +2309,11 @@ void rasterizer_transparent_geometry_group_draw(
 								}
 							}
 
+							/* port: no more stages than the combiners hold (a map's
+							count) */
 							for (stage_index = 0;
-								stage_index < shader_transparent_generic->generic.stages.count;
+								stage_index < shader_transparent_generic->generic.stages.count &&
+									stage_index < MAXIMUM_SHADER_TRANSPARENT_GENERIC_STAGES;
 								stage_index++)
 							{
 								struct shader_transparent_generic_stage const *stage =
@@ -2297,24 +2411,27 @@ void rasterizer_transparent_geometry_group_draw(
 							short map_index;
 							long result;
 
-							/* BUG (preserved for exact matching): January never advances layer_index, so the
-							 * loop redraws extra layer 0 for as long as the block is non-empty (the bytes push
-							 * index 0 and re-test the count). A corrected build should increment layer_index.
-							 */
+							/* port: the next layer each time: January never advanced
+							layer_index, so the loop never ended on a chicago shader with
+							a layer (retail's have none) */
 							for (layer_index = 0;
 								layer_index < shader_transparent_chicago->chicago.extra_layers.count;
-								)
+								layer_index++)
 							{
 								struct transparent_geometry_group layer_group;
+								long layer_shader_index = TAG_BLOCK_GET_ELEMENT(
+									&shader_transparent_chicago->chicago.extra_layers,
+									layer_index,
+									struct tag_reference)->index;
 
+								/* port: a layer of no shader (one a map's tags had
+								wrong) is not drawn */
+								if (layer_shader_index == NONE)
+									continue;
 								csmemcpy(&layer_group, group, sizeof(layer_group));
 								layer_group.sorted_index = NONE;
-								layer_group.shader = shader_definition_get(
-									TAG_BLOCK_GET_ELEMENT(
-										&shader_transparent_chicago->chicago.extra_layers,
-										layer_index,
-										struct tag_reference)->index);
-								rasterizer_transparent_geometry_group_draw(&layer_group, dirty);
+								layer_group.shader = shader_definition_get(layer_shader_index);
+								transparent_geometry_layer_draw(&layer_group, dirty);
 							}
 
 							rasterizer_set_vertex_shader_permutation(
@@ -2384,7 +2501,10 @@ void rasterizer_transparent_geometry_group_draw(
 											&shader_transparent_chicago->chicago.maps,
 											map_index,
 											struct shader_transparent_chicago_map);
-									short type = shader_transparent_chicago->chicago.type;
+									/* port: a type the tables below have (a map's) */
+									short type = VALID_INDEX(shader_transparent_chicago->chicago.type, NUMBER_OF_SHADER_TRANSPARENT_CHICAGO_TYPES) ?
+										shader_transparent_chicago->chicago.type :
+										_shader_transparent_chicago_type_2d_map;
 									short map_type_bitmap_type[NUMBER_OF_SHADER_TRANSPARENT_MAPS] =
 									{
 										0, 2, 2, 2
@@ -2567,7 +2687,12 @@ void rasterizer_transparent_geometry_group_draw(
 
 							if (rasterizer_debug_options.draw_environment_fog)
 							{
-								short stage_count = shader_transparent_chicago->chicago.maps.count;
+								/* port: no more maps than the texture stages hold (a map's
+								count), as shader_transparent_chicago_create has */
+								short stage_count = (short)PIN(
+									shader_transparent_chicago->chicago.maps.count,
+									0,
+									NUMBER_OF_SHADER_TRANSPARENT_MAPS);
 
 								if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_sky_bit) &&
 									shader_transparent_chicago->chicago.framebuffer_blend_function ==
@@ -2614,7 +2739,9 @@ void rasterizer_transparent_geometry_group_draw(
 										vsh_constants__texscale[2][2] *=
 											PIN(1.0f-group->effect_intensity, 0.0f, 1.0f);
 
+									/* port: and a source the animation has (a map's) */
 									if (fade_source > 0 &&
+										fade_source < NUMBER_OF_SHADER_ANIMATION_SOURCES &&
 										group->animation &&
 										group->animation->values)
 										vsh_constants__texscale[2][2] *=
@@ -3473,4 +3600,369 @@ void rasterizer_transparent_geometry_group_draw(
 	}
 
 	return;
+}
+
+/* port: use only a static BSP glass surface with a usable supplied plane. */
+static boolean transparent_planar_glass(struct transparent_geometry_group const *surface)
+{
+	real const *normal = (real const *)&surface->plane.n;
+	real length = 0;
+	short k;
+
+	if (!surface->shader || surface->shader->base.type != _shader_type_transparent_glass ||
+		surface->object_index || surface->source_object_index || surface->node_matrix_count ||
+		surface->effect_type || surface->active_camouflage_transparent_source_object_index ||
+		surface->cortana_hack || surface->previous_group_presorted_index != NONE ||
+		surface->next_group_presorted_index != NONE ||
+		!TEST_FLAG(surface->geometry_flags, _rasterizer_geometry_no_sort_bit) ||
+		(surface->geometry_flags & ~(FLAG(_rasterizer_geometry_no_sort_bit) | FLAG(_rasterizer_geometry_no_fog_bit) |
+			FLAG(_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit))) ||
+		!(surface->plane.d > -1000000.0f && surface->plane.d < 1000000.0f))
+	{
+		return FALSE;
+	}
+	if (TEST_FLAG(((struct shader_transparent_glass_definition const *)surface->shader)->flags,
+		_shader_transparent_glass_flag_decal_bit) ||
+		((struct shader_transparent_glass_definition const *)surface->shader)->reflection_type ==
+			_shader_transparent_glass_reflection_type_dynamic_mirror)
+	{
+		return FALSE;
+	}
+	for (k = 0; k < 3; ++k)
+	{
+		if (!(normal[k] >= -1.001f && normal[k] <= 1.001f))
+		{
+			return FALSE;
+		}
+		length += normal[k] * normal[k];
+	}
+	return length > 0.998f && length < 1.002f;
+}
+
+/* port: bound the actual skinned positions once per group, only when planar
+   glass is queued. Unsupported or invalid geometry retains centroid sorting. */
+static boolean transparent_model_world_bounds(
+	struct transparent_geometry_group const *group, real bounds[2][3])
+{
+	struct vertex_buffer const *vertices = group->vertex_buffer;
+	real_matrix4x3 const *matrices = group->node_matrices;
+	byte *data = NULL;
+	long i, k, stride;
+	boolean valid = TRUE;
+
+	if (!group->shader || !shader_type_is_transparent(group->shader->base.type) ||
+		!shader_type_is_valid_for_model(group->shader->base.type) ||
+		group->shader->base.type == _shader_type_transparent_water ||
+		shader_is_water_decal(group->shader) || group->effect_type ||
+		group->cortana_hack || group->active_camouflage_transparent_source_object_index ||
+		(group->geometry_flags & ~(FLAG(_rasterizer_geometry_no_fog_bit) |
+			FLAG(_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit) |
+			FLAG(_rasterizer_geometry_parts_define_local_nodes_bit))) ||
+		!vertices || !vertices->hardware_format || vertices->offset || vertices->count <= 0 ||
+		vertices->count > UNSIGNED_SHORT_MAX || !matrices || group->node_matrix_count <= 0 ||
+		group->node_matrix_count > MAXIMUM_NODES_PER_MODEL ||
+		(vertices->type != _rasterizer_vertex_type_model_compressed &&
+			vertices->type != _rasterizer_vertex_type_model_uncompressed))
+	{
+		return FALSE;
+	}
+	stride = rasterizer_geometry_get_vertex_size(vertices->type);
+	IDirect3DVertexBuffer8_Lock(vertices->hardware_format, 0, 0, &data, D3DLOCK_READONLY);
+	if (!data)
+	{
+		valid = FALSE;
+	}
+	for (i = 0; valid && i < vertices->count; ++i)
+	{
+		real_point3d const *point = (real_point3d const *)(data + i * stride);
+		real_point3d world;
+		real const *p = (real const *)&world;
+		if (group->node_matrix_count == 1)
+		{
+			matrix4x3_transform_point(matrices, point, &world);
+		}
+		else
+		{
+			short nodes[2], node;
+			real weights[2];
+			world.x = world.y = world.z = 0;
+			if (vertices->type == _rasterizer_vertex_type_model_compressed)
+			{
+				struct model_vertex_compressed const *vertex = (void const *)point;
+				nodes[0] = vertex->nodes[0] / 3;
+				nodes[1] = vertex->nodes[1] / 3;
+				/* The draw declaration reads v6 as NORMSHORT1. Match GPU
+				   skinning rather than the legacy byte-based decompressor. */
+				weights[0] = (real)vertex->node_weight * (1.0f / 32767.0f);
+				weights[1] = 1.f - weights[0];
+				if ((weights[0] > 0 && vertex->nodes[0] % 3) ||
+					(weights[1] > 0 && vertex->nodes[1] % 3))
+				{
+					valid = FALSE;
+				}
+			}
+			else
+			{
+				struct model_vertex_uncompressed const *vertex = (void const *)point;
+				nodes[0] = vertex->nodes[0];
+				nodes[1] = vertex->nodes[1];
+				weights[0] = vertex->node_weights[0];
+				weights[1] = vertex->node_weights[1];
+				if (!(fabs(weights[0] + weights[1] - 1.f) < 0.00001f))
+				{
+					valid = FALSE;
+				}
+			}
+			for (node = 0; valid && node < 2; ++node)
+			{
+				real_point3d transformed;
+				if (!(weights[node] >= 0 && weights[node] <= 1))
+				{
+					valid = FALSE;
+				}
+				else if (weights[node] > 0)
+				{
+					if (!VALID_INDEX(nodes[node], group->node_matrix_count))
+					{
+						valid = FALSE;
+						break;
+					}
+					matrix4x3_transform_point(matrices + nodes[node], point, &transformed);
+					world.x += weights[node] * transformed.x;
+					world.y += weights[node] * transformed.y;
+					world.z += weights[node] * transformed.z;
+				}
+			}
+		}
+		for (k = 0; valid && k < 3; ++k)
+		{
+			if (!(p[k] > -1000000.0f && p[k] < 1000000.0f))
+			{
+				valid = FALSE;
+				break;
+			}
+			bounds[0][k] = i ? MIN(bounds[0][k], p[k]) : p[k];
+			bounds[1][k] = i ? MAX(bounds[1][k], p[k]) : p[k];
+		}
+	}
+	IDirect3DVertexBuffer8_Unlock(vertices->hardware_format);
+	return valid;
+}
+
+/* port: the whole model block must lie on one side. Touching the plane within
+   float error is allowed; intersections and cameras on the plane are ambiguous. */
+static short transparent_plane_model_order(
+	struct transparent_geometry_group const *surface, real const bounds[2][3])
+{
+	real const *normal = (real const *)&surface->plane.n;
+	real const *camera = (real const *)&global_window_parameters.camera.position;
+	real low = -surface->plane.d, high = low, distance = low;
+	real epsilon = 0.0001f + 0.0000005f * fabs(surface->plane.d);
+	short side, k;
+
+	for (k = 0; k < 3; ++k)
+	{
+		if (!(camera[k] > -1000000.0f && camera[k] < 1000000.0f))
+		{
+			return 0;
+		}
+		low += normal[k] * bounds[normal[k] < 0 ? 1 : 0][k];
+		high += normal[k] * bounds[normal[k] < 0 ? 0 : 1][k];
+		distance += normal[k] * camera[k];
+	}
+	side = low >= -epsilon && high > epsilon ? 1 : high <= epsilon && low < -epsilon ? -1 : 0;
+	if (!side || !(fabs(distance) > epsilon))
+	{
+		return 0;
+	}
+	return (distance > 0) == (side > 0) ? -1 : 1;
+}
+
+/* port: native links dispatch a whole chain from either queued member. */
+static short transparent_chain_root(short index, long count)
+{
+	long steps;
+	for (steps = 0; steps < count; ++steps)
+	{
+		struct transparent_geometry_group const *group = rasterizer_transparent_geometry_get_group_from_presorted_index(index);
+		short previous = group->previous_group_presorted_index;
+		if (previous == NONE)
+		{
+			return index;
+		}
+		if (!VALID_INDEX(previous, count) ||
+			((struct transparent_geometry_group *)rasterizer_transparent_geometry_get_group_from_presorted_index(previous))->next_group_presorted_index != index)
+		{
+			return NONE;
+		}
+		index = previous;
+	}
+	return NONE;
+}
+
+/* port: preserve the order of surfaces and unrelated groups. Move a model
+   block immediately after its last required surface, or before its first.
+   Stable gaps avoid the old topological sort moving a floor across other
+   objects. Conflicting planes or malformed links leave the input untouched. */
+void rasterizer_transparent_geometry_order_models(short *order, long count)
+{
+	short roots[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	short units[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	short surfaces[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	short original_gap[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	short target_gap[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	short result[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS];
+	boolean seen[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS] = {0};
+	boolean unit_seen[RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS] = {0};
+	long i, j, gap, phase, unit_count = 0, surface_count = 0, emitted = 0;
+	boolean changed = FALSE;
+
+	if (count < 2 || count > RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS)
+	{
+		return;
+	}
+	/* Avoid reading any model vertices in scenes without eligible BSP glass. */
+	for (i = 0; i < count; ++i)
+	{
+		if (transparent_planar_glass(rasterizer_transparent_geometry_get_group_from_presorted_index((short)i)))
+		{
+			++surface_count;
+		}
+	}
+	if (!surface_count)
+	{
+		return;
+	}
+	surface_count = 0;
+	for (i = 0; i < count; ++i)
+	{
+		short root;
+		if (!VALID_INDEX(order[i], count) || seen[order[i]])
+		{
+			return;
+		}
+		seen[order[i]] = TRUE;
+		root = transparent_chain_root(order[i], count);
+		if (root == NONE)
+		{
+			return;
+		}
+		roots[order[i]] = root;
+		if (!unit_seen[root])
+		{
+			unit_seen[root] = TRUE;
+			units[unit_count++] = root;
+			original_gap[root] = target_gap[root] = (short)surface_count;
+			if (transparent_planar_glass(rasterizer_transparent_geometry_get_group_from_presorted_index(root)))
+			{
+				surfaces[surface_count++] = root;
+				original_gap[root] = target_gap[root] = NONE;
+			}
+		}
+	}
+	for (i = 0; i < unit_count; ++i)
+	{
+		short root = units[i], member = root;
+		long steps = 0, k, lower = 0, upper = surface_count;
+		real bounds[2][3], part_bounds[2][3];
+		boolean valid = TRUE;
+		if (original_gap[root] == NONE)
+		{
+			continue;
+		}
+		do
+		{
+			struct transparent_geometry_group const *group;
+			if (!VALID_INDEX(member, count) || roots[member] != root || steps++ >= count)
+			{
+				return;
+			}
+			group = rasterizer_transparent_geometry_get_group_from_presorted_index(member);
+			if (group->object_index != ((struct transparent_geometry_group *)rasterizer_transparent_geometry_get_group_from_presorted_index(root))->object_index)
+			{
+				valid = FALSE;
+			}
+			if (valid && !transparent_model_world_bounds(group, part_bounds))
+			{
+				valid = FALSE;
+			}
+			if (valid)
+			{
+				for (k = 0; k < 3; ++k)
+				{
+					bounds[0][k] = steps == 1 ? part_bounds[0][k] : MIN(bounds[0][k], part_bounds[0][k]);
+					bounds[1][k] = steps == 1 ? part_bounds[1][k] : MAX(bounds[1][k], part_bounds[1][k]);
+				}
+			}
+			member = group->next_group_presorted_index;
+		}
+		while (member != NONE);
+		if (!valid)
+		{
+			continue;
+		}
+		for (j = 0; j < surface_count; ++j)
+		{
+			short relation = transparent_plane_model_order(
+				rasterizer_transparent_geometry_get_group_from_presorted_index(surfaces[j]), bounds);
+			if (relation < 0)
+			{
+				lower = MAX(lower, j + 1);
+			}
+			else if (relation > 0)
+			{
+				upper = MIN(upper, j);
+			}
+		}
+		if (lower > upper)
+		{
+			return;
+		}
+		target_gap[root] = (short)PIN(original_gap[root], lower, upper);
+		changed |= target_gap[root] != original_gap[root];
+	}
+	if (!changed)
+	{
+		return;
+	}
+	for (gap = 0; gap <= surface_count; ++gap)
+	{
+		/* Arrivals from earlier gaps, unchanged objects, arrivals from later
+		   gaps: each category retains its original centroid order. */
+		for (phase = -1; phase <= 1; ++phase)
+		{
+			for (i = 0; i < unit_count; ++i)
+			{
+				short root = units[i], member = root;
+				long direction = original_gap[root] < target_gap[root] ? -1 :
+					original_gap[root] > target_gap[root] ? 1 : 0;
+				if (target_gap[root] != gap || direction != phase)
+				{
+					continue;
+				}
+				do
+				{
+					if (emitted >= count)
+					{
+						return;
+					}
+					result[emitted++] = member;
+					member = ((struct transparent_geometry_group *)rasterizer_transparent_geometry_get_group_from_presorted_index(member))->next_group_presorted_index;
+				}
+				while (member != NONE);
+			}
+		}
+		if (gap < surface_count)
+		{
+			if (emitted >= count)
+			{
+				return;
+			}
+			result[emitted++] = surfaces[gap];
+		}
+	}
+	if (emitted == count)
+	{
+		memcpy(order, result, count * sizeof(*order));
+	}
 }

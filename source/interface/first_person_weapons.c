@@ -328,6 +328,9 @@ static void first_person_weapon_set_visibility(
 	boolean visible);
 static void first_person_weapon_build_node_matrices(
 	short local_player_index);
+static boolean first_person_weapon_animation_fits(
+	struct animation_graph const *animation_graph,
+	struct animation const *animation);
 static void first_person_weapon_predict(
 	short local_player_index);
 static void first_person_weapon_start_interpolation(
@@ -1063,6 +1066,39 @@ static void first_person_weapon_set_state(
 	return;
 }
 
+/* port: the weapon's orientations are the animation graph's nodes (64 at
+most, the weapon's arrays): an animation of more nodes than the graph has,
+or than the arrays hold (the map's counts), is not applied, said once. Every
+retail first-person animation has the graph's count (up to 54). That is not
+the first-person model's count (up to 17, the weapon without the hands),
+which every retail animation is above. */
+static boolean first_person_weapon_animation_fits(
+	struct animation_graph const *animation_graph,
+	struct animation const *animation)
+{
+	static boolean too_many_nodes_reported = FALSE;
+
+	if (animation->node_count>=0 &&
+		animation->node_count<=animation_graph->nodes.count &&
+		animation->node_count<=MAXIMUM_NODES_PER_ANIMATION)
+	{
+		return TRUE;
+	}
+
+	if (!too_many_nodes_reported)
+	{
+		too_many_nodes_reported= TRUE;
+		error(
+			_error_silent,
+			"first person animation %.32s of %d nodes (the graph has %d) not applied",
+			animation->name,
+			animation->node_count,
+			animation_graph->nodes.count);
+	}
+
+	return FALSE;
+}
+
 static void first_person_weapon_build_node_matrices(
 	short local_player_index)
 {
@@ -1195,7 +1231,12 @@ static void first_person_weapon_build_node_matrices(
 						firing_animation_index,
 						struct animation);
 
-					if (weapon_definition->weapon.weapon_type==_weapon_type_needler &&
+					/* port: and one of the graph's nodes (see first_person_weapon_animation_fits) */
+					if (!first_person_weapon_animation_fits(animation_graph, firing_animation))
+					{
+						/* (not applied) */
+					}
+					else if (weapon_definition->weapon.weapon_type==_weapon_type_needler &&
 						(first_person_weapons->state==_first_person_weapon_state_reload_while_empty ||
 						first_person_weapons->state==_first_person_weapon_state_reload_while_full))
 					{
@@ -1243,10 +1284,14 @@ static void first_person_weapon_build_node_matrices(
 						first_person_weapon->moving_animation.index,
 						struct animation);
 
-					overlay_animation_apply(
-						moving_animation,
-						first_person_weapon->moving_animation.frame_index,
-						first_person_weapon->node_orientations);
+					/* port: and one of the graph's nodes */
+					if (first_person_weapon_animation_fits(animation_graph, moving_animation))
+					{
+						overlay_animation_apply(
+							moving_animation,
+							first_person_weapon->moving_animation.frame_index,
+							first_person_weapon->node_orientations);
+					}
 				}
 
 				if (first_person_weapon->overcharged_jitter_animation.index!=NONE)
@@ -1256,11 +1301,15 @@ static void first_person_weapon_build_node_matrices(
 						first_person_weapon->overcharged_jitter_animation.index,
 						struct animation);
 
-					overlay_animation_apply_continuous_scaled(
-						overcharged_jitter_animation,
-						first_person_weapon->overcharged_jitter_animation.frame_index,
-						weapon->weapon.overcharged+0.5f,
-						first_person_weapon->node_orientations);
+					/* port: and one of the graph's nodes */
+					if (first_person_weapon_animation_fits(animation_graph, overcharged_jitter_animation))
+					{
+						overlay_animation_apply_continuous_scaled(
+							overcharged_jitter_animation,
+							first_person_weapon->overcharged_jitter_animation.frame_index,
+							weapon->weapon.overcharged+0.5f,
+							first_person_weapon->node_orientations);
+					}
 				}
 
 				overlay_animation_index= VALID_INDEX(
@@ -1277,7 +1326,9 @@ static void first_person_weapon_build_node_matrices(
 						overlay_animation_index,
 						struct animation);
 
-					if (overlay_animation->frame_count>=NUMBER_OF_FIRST_PERSON_WEAPON_OVERLAY_FRAMES)
+					/* port: and one of the graph's nodes */
+					if (overlay_animation->frame_count>=NUMBER_OF_FIRST_PERSON_WEAPON_OVERLAY_FRAMES &&
+						first_person_weapon_animation_fits(animation_graph, overlay_animation))
 					{
 						if (first_person_weapon->position.i>0.0f)
 						{

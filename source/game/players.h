@@ -385,6 +385,9 @@ cutscene ends and a teammate has been free on foot a few seconds (not
 riding a vehicle, nor held by the scripts). */
 boolean players_coop_waiting_to_start(
 	long player_index);
+/* port: the co-op host's bringto command: everyone comes to the host */
+boolean players_coop_bring_to_host(
+	void);
 void players_note_checkpoint(
 	void);
 void players_respawn_at_checkpoint(

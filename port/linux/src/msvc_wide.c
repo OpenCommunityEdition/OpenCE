@@ -520,6 +520,10 @@ long msvc_wtol(const wchar_t *string)
 
 /* ---------- formatted output */
 
+/* the widest field and the longest precision a conversion is given (a
+format's own, or an argument's) */
+#define WIDE_FORMAT_MAXIMUM_WIDTH 4096L
+
 struct wide_output
 {
 	wchar_t *buffer;
@@ -599,54 +603,32 @@ static int wide_format(struct wide_output *output, const wchar_t *format, va_lis
 			continue;
 		}
 
-		specification[specification_length++] = '%';
-		/* flags */
-		while (*format == '-' || *format == '+' || *format == ' ' || *format == '#' || *format == '0')
+		/* (the specification handed to snprintf below is built from what
+		was parsed, bounded: a format may be a map's text, ui strings and
+		HUD messages among them, so its flags and digits may be any number,
+		and its width and precision are capped at WIDE_FORMAT_MAXIMUM_WIDTH) */
 		{
-			if (*format == '-')
-				left = TRUE;
-			specification[specification_length++] = (char)*format++;
-		}
-		/* width */
-		if (*format == '*')
-		{
-			width = va_arg(arguments, int);
-			if (width < 0)
+			char flags[8];
+			size_t flag_count = 0;
+
+			while (*format == '-' || *format == '+' || *format == ' ' || *format == '#' || *format == '0')
 			{
-				left = TRUE;
-				width = -width;
-				specification[specification_length++] = '-';
+				if (*format == '-')
+					left = TRUE;
+				if (flag_count < sizeof(flags) - 1)
+					flags[flag_count++] = (char)*format;
+				format++;
 			}
-			specification_length += (size_t)snprintf(specification + specification_length,
-				sizeof(specification) - specification_length, "%ld", width);
-			format++;
-		}
-		else
-		{
-			while (*format >= '0' && *format <= '9')
-			{
-				width = width * 10 + (*format - '0');
-				specification[specification_length++] = (char)*format++;
-			}
-		}
-		/* precision */
-		if (*format == '.')
-		{
-			precision = 0;
-			specification[specification_length++] = '.';
-			format++;
+			/* width */
 			if (*format == '*')
 			{
-				precision = va_arg(arguments, int);
-				if (precision < 0)
+				width = va_arg(arguments, int);
+				if (width < 0)
 				{
-					precision = -1;
-					specification_length--;
-				}
-				else
-				{
-					specification_length += (size_t)snprintf(specification + specification_length,
-						sizeof(specification) - specification_length, "%ld", precision);
+					left = TRUE;
+					width = width < -WIDE_FORMAT_MAXIMUM_WIDTH ? WIDE_FORMAT_MAXIMUM_WIDTH : -width;
+					if (flag_count < sizeof(flags) - 1)
+						flags[flag_count++] = '-';
 				}
 				format++;
 			}
@@ -654,10 +636,44 @@ static int wide_format(struct wide_output *output, const wchar_t *format, va_lis
 			{
 				while (*format >= '0' && *format <= '9')
 				{
-					precision = precision * 10 + (*format - '0');
-					specification[specification_length++] = (char)*format++;
+					if (width <= WIDE_FORMAT_MAXIMUM_WIDTH)
+						width = width * 10 + (*format - '0');
+					format++;
 				}
 			}
+			if (width > WIDE_FORMAT_MAXIMUM_WIDTH)
+				width = WIDE_FORMAT_MAXIMUM_WIDTH;
+			flags[flag_count] = '\0';
+			/* precision */
+			if (*format == '.')
+			{
+				precision = 0;
+				format++;
+				if (*format == '*')
+				{
+					precision = va_arg(arguments, int);
+					if (precision < 0)
+						precision = -1;
+					format++;
+				}
+				else
+				{
+					while (*format >= '0' && *format <= '9')
+					{
+						if (precision <= WIDE_FORMAT_MAXIMUM_WIDTH)
+							precision = precision * 10 + (*format - '0');
+						format++;
+					}
+				}
+				if (precision > WIDE_FORMAT_MAXIMUM_WIDTH)
+					precision = WIDE_FORMAT_MAXIMUM_WIDTH;
+			}
+			if (precision >= 0)
+				specification_length = (size_t)snprintf(specification, sizeof(specification), "%%%s%ld.%ld", flags,
+					width, precision);
+			else
+				specification_length = (size_t)snprintf(specification, sizeof(specification), "%%%s%ld", flags,
+					width);
 		}
 		/* size */
 		if (*format == 'h')
@@ -716,13 +732,10 @@ static int wide_format(struct wide_output *output, const wchar_t *format, va_lis
 			break;
 		}
 		case 'n':
-		{
-			int *count = va_arg(arguments, int *);
-
-			if (count)
-				*count = (int)output->length;
+			/* (never written: a format may be a map's text. Its argument
+			is passed over, as UCRT does with %n disabled) */
+			(void)va_arg(arguments, int *);
 			break;
-		}
 		case 'd': case 'i': case 'u': case 'x': case 'X': case 'o':
 		case 'e': case 'E': case 'f': case 'g': case 'G': case 'p':
 		{

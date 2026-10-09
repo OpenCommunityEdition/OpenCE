@@ -626,6 +626,12 @@ def main() -> None:
         lines.append(art.port_picture(f"pause/pausebox_{piece}", [
             (port_settings.pause_box_svg(piece, port_settings.pause_box_height(buttons)), 4 if piece == "center" else 16,
              256) for buttons in port_settings.PAUSE_BOX_BUTTONS]))
+    # (voice chat's speaker, of a player who talks and of one muted: Lucide's
+    # icons, port/assets/icons/lucide, white for network_voice.c to tint)
+    lines.append(art.port_picture("voice/speaker", [
+        ((ROOT / "port/assets/icons/lucide" / f"{icon}.svg").read_text().replace('stroke="currentColor"',
+                                                                                 'stroke="#FFFFFF"'), 24, 24)
+        for icon in ("volume-2", "volume-x")]))
     # (nothing: what a game map draws for a frame of ui.map's it has not,
     # menu_tags.c)
     lines.append(art.port_picture("blank", [

@@ -31,7 +31,8 @@ enum
 	MAXIMUM_SOUND_PACKETS = 4,
 	MAXIMUM_SOUND_PACKET_SIZE = 8192,
 	MAXIMUM_COMPRESSED_SOUND_PACKET_SIZE = 2304,
-	SOUND_CACHE_SIZE = 0x400000,
+	/* port: the native builds' cache (halo_port_capacity.h) */
+	SOUND_CACHE_SIZE = HALO_PORT_SOUND_CACHE_SIZE,
 	SOUND_COMPRESSED_BLOCK_SIZE = 36,
 	SOUND_COMPRESSED_SAMPLES_PER_BLOCK = 64,
 	MAXIMUM_DSOUND_MIXBINS = 8
@@ -1422,7 +1423,8 @@ static void dsound_begin_scene(
 
 	if (strlen(dsound_error_string))
 	{
-		dsound_error(interrupt_result, dsound_error_string);
+		/* port: as text, not a format (see interrupt_time_error) */
+		dsound_error(interrupt_result, "%s", dsound_error_string);
 	}
 
 	dsound_error_string[0]= 0;
@@ -1922,6 +1924,51 @@ static void dsound_virtual_set_location(
 			occlusion,
 			obstruction,
 			attenuate_direct_path);
+	}
+
+	return;
+}
+
+/* port: a stereo channel's sound in the world is panned towards it, and
+muffled and reverberated as a 3D channel's is (its I3DL2 source, from the
+same occlusion, obstruction and underwater listener), which the Xbox's
+stereo channels never were (sound_manager.c, update_channels;
+port/linux/src/dsound_sdl.c) */
+void dsound_port_set_channel_stereo_position(
+	short virtual_channel_index,
+	boolean positioned,
+	real pan,
+	real distance,
+	real minimum_distance,
+	real distance_fade,
+	real occlusion,
+	real obstruction,
+	boolean attenuate_direct_path)
+{
+	extern void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *stream, BOOL positioned, float pan,
+		float distance, float minimum_distance, float distance_fade);
+	short channel_index= dsound_virtual_touch(virtual_channel_index);
+
+	if (channel_index!=NONE)
+	{
+		struct sound_channel *channel= channel_get(channel_index);
+
+		if (channel->stream && TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+		{
+			if (channel->spatialized!=positioned ||
+				!realcmp_epsilon(occlusion, channel->occlusion, 0.001f) ||
+				!realcmp_epsilon(obstruction, channel->obstruction, 0.001f) ||
+				channel->attenuate_direct_path!=attenuate_direct_path)
+			{
+				channel->spatialized= positioned;
+				channel->occlusion= occlusion;
+				channel->obstruction= obstruction;
+				channel->attenuate_direct_path= attenuate_direct_path;
+				dsound_channel_set_I3DL2_properties(channel_index);
+			}
+			dsound_sdl_stream_set_stereo_position(channel->stream, positioned, pan,
+				distance, minimum_distance, distance_fade);
+		}
 	}
 
 	return;
@@ -2507,6 +2554,17 @@ static void dsound_channel_set_properties(
 				dsound_channel_set_I3DL2_properties(channel_index);
 			}
 		}
+		/* port: and a stereo channel's, whose sound in the world reverberates
+		as a 3D channel's does (dsound_port_set_channel_stereo_position) */
+		else if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) &&
+			!realcmp_epsilon(properties->reverb_attenuation, channel->reverb_attenuation, 0.001f))
+		{
+			channel->reverb_attenuation= properties->reverb_attenuation;
+			if (channel->spatialized)
+			{
+				dsound_channel_set_I3DL2_properties(channel_index);
+			}
+		}
 	}
 
 	return;
@@ -2522,10 +2580,19 @@ static boolean dsound_channel_queue_packet(
 	{
 		if (channel->playing_permutation->cache_base_address)
 		{
+			/* port: the size is the map's: one that is negative, or runs
+			past the cache (the end wrapped), or that the channel has played
+			past, is outside the range too (it reached the decoder as a
+			packet of nearly 4 GB) */
 			if ((byte *)channel->playing_permutation->cache_base_address>=
 					(byte *)physical_memory_get_sound_cache_base_address() &&
-				(byte *)channel->playing_permutation->cache_base_address+channel->playing_permutation->samples.size<=
-					(byte *)physical_memory_get_sound_cache_base_address()+SOUND_CACHE_SIZE)
+				channel->playing_permutation->samples.size>=0 &&
+				channel->playing_permutation->samples.size<=SOUND_CACHE_SIZE &&
+				(unsigned long)((byte *)channel->playing_permutation->cache_base_address-
+					(byte *)physical_memory_get_sound_cache_base_address())<=
+					(unsigned long)(SOUND_CACHE_SIZE-channel->playing_permutation->samples.size) &&
+				channel->sample_offset>=0 &&
+				channel->sample_offset<=channel->playing_permutation->samples.size)
 			{
 				struct sound_permutation *sound= channel->playing_permutation;
 				XMEDIAPACKET packet;
@@ -2564,6 +2631,10 @@ static boolean dsound_channel_queue_packet(
 							(TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) ? 2 : 1);
 
 						channel->sample_offset= MAX(remaining_size/block_size/2, 1)*block_size;
+						/* port: and no more than the sound has (one smaller than
+						a block, from the map, read past its end and then played
+						on from past it) */
+						channel->sample_offset= MIN(channel->sample_offset, remaining_size);
 
 						packet.dwMaxSize= channel->sample_offset;
 					}
@@ -2599,7 +2670,8 @@ static boolean dsound_channel_queue_packet(
 			{
 				sprintf(
 					temporary,
-					"trying to queue sound %s but it's outside the valid range. (%ld)",
+					/* port: %.32s, the name is the map's 32 characters */
+					"trying to queue sound %.32s but it's outside the valid range. (%ld)",
 					channel->playing_permutation->name,
 					channel->playing_permutation->cache_base_address);
 
@@ -2718,7 +2790,8 @@ static void interrupt_time_error(
 
 	if (strlen(dsound_error_string)+strlen(message)<MAXIMUM_DSOUND_ERROR_STRING_LENGTH)
 	{
-		sprintf(dsound_error_string+strlen(dsound_error_string), message);
+		/* port: as text, not a format (it can hold a sound's name, the map's) */
+		sprintf(dsound_error_string+strlen(dsound_error_string), "%s", message);
 	}
 
 	return;

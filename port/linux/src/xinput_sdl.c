@@ -22,8 +22,9 @@ In the menus the keys drive the controller, to move about them:
 on-screen keyboard takes what is typed, and the mouse is free and drives a
 pointer
 (port/linux/include/halo_ui_pointer.h, source/interface/ui_widget.c).
-F11 switches between fullscreen and the window, and F12 releases or
-recaptures the mouse, always.
+Screenshot is a normal bound action (default F10), also available in the
+menus. F11 switches between fullscreen and the window, and F12 releases
+or recaptures the mouse, always.
 
 Mouse aim does not go through the right stick: the game's look code asks
 halo_linux_mouse_look for the motion since its last call and adds it to the
@@ -231,10 +232,16 @@ void platform_text_typing(int typing)
 	text_typing_update();
 }
 
-void platform_text_field(int typing)
+void platform_text_field(int typing, int password)
 {
 	text_typing_field = typing != 0;
 	text_typing_update();
+#ifndef HALO_ANDROID
+	/* (with no keyboard: Steam's on-screen one, sdl_platform.c) */
+	platform_screen_keyboard(text_typing_field, typing && password);
+#else
+	(void)password;
+#endif
 }
 
 static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
@@ -299,18 +306,21 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB]);
 }
 
-/* the keys held when the game and the menus switch count as up until let go
-of: the escape that opens the pause menu does not also back out of it, nor
-the one that closes it pause the game again */
+/* the keys held when the game and the menus switch, or typing or the
+console starts or ends, count as up until let go of: the escape that opens
+the pause menu does not also back out of it, nor the one that closes it (or
+the console) pause the game again, nor the Enter that ends typing press the
+next screen's A */
 static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
-	static int menus = -1;
+	static int context = -1;
+	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0);
 	int scancode;
 
-	if (menus != (input->menus != FALSE))
+	if (context != next_context)
 	{
-		menus = input->menus != FALSE;
+		context = next_context;
 		memcpy(held, input->keys, sizeof(held));
 	}
 	for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
@@ -331,7 +341,8 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.move_forward", "controls.move_backward", "controls.strafe_left", "controls.strafe_right",
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
-	"controls.flashlight", "controls.scoreboard", "controls.pause",
+	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
+	"controls.push_to_talk",
 };
 
 static const struct
@@ -460,9 +471,8 @@ static BOOL input_held(const struct platform_input_state *input, int code)
 	return wheel && wheel_direction == (code == INPUT_WHEEL_UP ? 1 : -1);
 }
 
-/* in the game: the actions held, and the controller's Start and Back for
-the pause menu and the scoreboard */
-static void keyboard_controls(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
+/* Shared binding lookup for gameplay and Screenshot, including in menus. */
+static unsigned long keyboard_bound_actions(const struct platform_input_state *input)
 {
 	unsigned long held = 0;
 	int action, slot;
@@ -476,6 +486,23 @@ static void keyboard_controls(const struct platform_input_state *input, XINPUT_G
 				held |= 1UL << action;
 		}
 	}
+	return held;
+}
+
+/* One capture per press, regardless of how long the binding is held. */
+static void keyboard_screenshot(unsigned long held)
+{
+	static BOOL was_down;
+	BOOL down = (held & (1UL << HALO_KEYBOARD_SCREENSHOT)) != 0;
+
+	if (down && !was_down)
+		platform_screenshot_request();
+	was_down = down;
+}
+
+/* in the game: the actions held, and Start/Back for pause/scores */
+static void keyboard_controls(unsigned long held, XINPUT_GAMEPAD *pad)
+{
 	if (held & (1UL << HALO_KEYBOARD_PAUSE))
 		pad->wButtons |= XINPUT_GAMEPAD_START;
 	if (held & (1UL << HALO_KEYBOARD_SCOREBOARD))
@@ -486,6 +513,22 @@ static void keyboard_controls(const struct platform_input_state *input, XINPUT_G
 unsigned long halo_keyboard_actions(short controller_index)
 {
 	return controller_index == 0 ? keyboard_actions_held : 0;
+}
+
+int halo_push_to_talk_held(void)
+{
+	struct platform_input_state input;
+	int slot;
+
+	/* (the window losing the focus lets every key go: sdl_platform.c) */
+	bindings_read();
+	platform_input_read(&input, FALSE);
+	for (slot = 0; slot < MAXIMUM_BINDINGS; slot++)
+	{
+		if (input_held(&input, bindings[HALO_KEYBOARD_PUSH_TO_TALK][slot]))
+			return 1;
+	}
+	return 0;
 }
 
 /* A scroll of the wheel switches weapons once: it holds Y for WHEEL_PRESS_MS
@@ -846,18 +889,23 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	if (port == 0)
 	{
 		struct platform_input_state input;
+		unsigned long held;
+		BOOL console_active;
 
 		platform_input_read(&input, TRUE);
 		mouse_poll(&input);
 		wheel_update();
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
-		if (!console_is_active())
+		console_active = console_is_active();
+		held = console_active ? 0 : keyboard_bound_actions(&input);
+		keyboard_screenshot(held);
+		if (!console_active)
 		{
 			if (input.menus)
 				keyboard_gamepad(&input, &state->Gamepad);
 			else
-				keyboard_controls(&input, &state->Gamepad);
+				keyboard_controls(held, &state->Gamepad);
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);

@@ -72,6 +72,7 @@ machine (their datum identifiers need not be).
 #include "units/bipeds.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "network_voice.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -163,6 +164,10 @@ enum
 	(or the other way round) before it is put where the host has it: its
 	own prediction reaches the host and comes back in about a round trip */
 	SEAT_DISAGREEMENT_TICKS = 15,
+	/* how long a client waits for a player's killing blow once the host's
+	states say the player died, before the unit dies without it (an
+	actor's waits as long: network_objects.c) */
+	DEATH_BLOW_WAIT_TICKS = TICKS_PER_SECOND / 2,
 	/* the machines, and the host: a client's messages' sender */
 	MAXIMUM_SENDERS = HALO_PORT_MAXIMUM_NETWORK_MACHINES + 1,
 	HOST_SENDER = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
@@ -462,6 +467,10 @@ static struct distributed_death
 	short killing_player_index;
 	boolean friendly_fire;
 	boolean killed_by_vehicle;
+	/* a client: when the host's states first said the player's living unit
+	here was dead (NONE: not), to wait for the killing blow
+	(DEATH_BLOW_WAIT_TICKS) */
+	long dead_since;
 } distributed_deaths[MAXIMUM_TRACKED_PLAYERS];
 /* the host: a kill this tick, whose statistics the clients should have
 with it */
@@ -2153,12 +2162,22 @@ static void distributed_handle_unit_state(
 	unit_index = distributed_living_unit(player);
 	if (!alive)
 	{
-		/* died on the host (who counts it; the damage that killed it,
-		network_damage.c, usually kills it here first) */
-		if (unit_index != NONE)
-			unit_kill_no_statistics(unit_index);
+		/* died on the host, who counts it. Its killing blow (network_damage.c)
+		kills it here with the death the host's had, so it is given a while
+		to come before the unit dies without one, as it falls. */
+		if (unit_index != NONE && state->player_index < MAXIMUM_TRACKED_PLAYERS)
+		{
+			long *dead_since = &distributed_deaths[state->player_index].dead_since;
+
+			if (*dead_since == NONE)
+				*dead_since = game_time_get();
+			else if (game_time_get() - *dead_since >= DEATH_BLOW_WAIT_TICKS)
+				unit_kill_no_statistics(unit_index);
+		}
 		return;
 	}
+	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
+		distributed_deaths[state->player_index].dead_since = NONE;
 	/* spawned on the host: the host's unit is the player's here too, once
 	this machine has it (network_objects.c) */
 	if (state->unit_index == NONE || !network_objects_client_has(state->unit_index) ||
@@ -2227,12 +2246,24 @@ static void distributed_handle_unit_state(
 	if (TEST_FLAG(state->flags, _distributed_unit_placed_bit) &&
 		object_get(unit_index)->object.parent_object_index == NONE)
 	{
+		real_point3d before = object_get(unit_index)->object.position;
+
 		if (local)
 			distributed_correct_own_unit(player, unit_index, state);
 		else
 		{
 			distributed_apply_state(unit_index, state, &state->position, REMOTE_CORRECTION_TOLERANCE,
 				REMOTE_BLEND_DISTANCE, 0.0f, 0.0f);
+		}
+		/* moved further than a step at once (the host's teleporter sent
+		it): on the teleporter it lands on, as a teleporter leaves the
+		player it sends, so that this machine's does not send it back each
+		time the host's word puts it there until it steps off
+		(game_engine_update_teleporter) */
+		if (distance_squared3d(&before, &object_get(unit_index)->object.position) > 1.0f)
+		{
+			player->teleporter_index = find_netgame_flag(&object_get(unit_index)->object.position, 1.0f, 0.0f,
+				_netgame_flag_teleporter_source, NONE);
 		}
 	}
 }
@@ -2814,8 +2845,8 @@ static void distributed_handle_actions(
 		action.control_flags = relayed.control_flags[0];
 		action.desired_facing.yaw = distributed_angle_unpack(relayed.yaw, FALSE);
 		action.desired_facing.pitch = distributed_angle_unpack(relayed.pitch, TRUE);
-		action.throttle.i = (real)relayed.throttle_i / 127.0f;
-		action.throttle.j = (real)relayed.throttle_j / 127.0f;
+		action.throttle.i = PIN((real)relayed.throttle_i / 127.0f, -1.0f, 1.0f);
+		action.throttle.j = PIN((real)relayed.throttle_j / 127.0f, -1.0f, 1.0f);
 		action.primary_trigger = (real)relayed.primary_trigger / 255.0f;
 		action.desired_weapon_index = relayed.desired_weapon_index;
 		action.desired_grenade_index = relayed.desired_grenade_index;
@@ -3241,6 +3272,7 @@ void network_distributed_new_game(
 	distributed_host_update_number = NONE;
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
+		distributed_deaths[player_index].dead_since = NONE;
 		distributed_sent_units[player_index].flags = 0;
 		distributed_sent_units[player_index].unit_index = NONE;
 		distributed_sent_units[player_index].vehicle_index = NONE;
@@ -3280,6 +3312,7 @@ void network_distributed_new_game(
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
+	network_votekick_new_game();
 }
 
 /* after each tick (game_time.c) */
@@ -3335,6 +3368,7 @@ void network_distributed_tick(
 		distributed_send_pickups();
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)
 			distributed_send_game_state(NONE);
+		network_votekick_host_tick();
 	}
 	else if (connection == _game_connection_network_client)
 	{
@@ -3384,6 +3418,7 @@ static boolean distributed_message_stale(
 	case _distributed_message_damage_animations:
 	case _distributed_message_coop_screen_effect:
 	case _distributed_message_coop_device_states:
+	case _distributed_message_votekick_status:
 		break;
 	default:
 		return FALSE;
@@ -3400,7 +3435,7 @@ static boolean distributed_message_stale(
 
 /* (the host) a text shown in red on every machine's console: its own, and
 every client's (_distributed_message_notice) */
-static void distributed_send_notice(
+void distributed_send_notice(
 	char const *text)
 {
 	struct
@@ -3420,9 +3455,34 @@ static void distributed_send_notice(
 		_distributed_to_clients_reliably);
 }
 
+/* (the host) ... on one client's console only, or (NONE) the host's own */
+void distributed_send_notice_to_machine(
+	long machine_index,
+	char const *text)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		char text[MAXIMUM_NOTICE_LENGTH];
+	} message;
+	long length = csstrlen(text);
+
+	if (length > MAXIMUM_NOTICE_LENGTH - 1)
+		length = MAXIMUM_NOTICE_LENGTH - 1;
+	csmemset(&message, 0, sizeof(message));
+	csmemcpy(message.text, text, length);
+	if (machine_index == NONE)
+	{
+		console_warning("%s", message.text);
+		return;
+	}
+	distributed_send_to_machine_reliably(machine_index, &message, _distributed_message_notice, 0,
+		(word)(sizeof(message.header) + length + 1));
+}
+
 /* (the host) the names of a client machine's players, in ASCII, for a
 notice ("?" for what is not ASCII) */
-static void distributed_machine_player_names(
+void distributed_machine_player_names(
 	long machine_index,
 	char *names,
 	long size)
@@ -3481,6 +3541,31 @@ void distributed_client_send_identity(
 		_distributed_to_host_reliably);
 }
 
+/* (the host) a client machine's address (host byte order) as it really is:
+an internet play peer's endpoint for its stand-in in 100.64.0.0/10 (p2p.c,
+which numbers the stand-in from the peer's identifier: a peer makes a new
+one at will), 0 if that is not known */
+unsigned long distributed_real_address(
+	unsigned long address)
+{
+	if ((address & 0xFFC00000) == 0x64400000)
+	{
+		/* (p2p.c's in network byte order: the first number the lowest byte) */
+		unsigned long network = (address >> 24) | ((address >> 8) & 0xFF00) | ((address << 8) & 0xFF0000) |
+			(address << 24);
+		unsigned long real = p2p_peer_endpoint_address(network);
+
+		return (real >> 24) | ((real >> 8) & 0xFF00) | ((real << 8) & 0xFF0000) | (real << 24);
+	}
+	return address;
+}
+
+unsigned long distributed_machine_real_address(
+	long machine_index)
+{
+	return distributed_real_address(network_game_server_machine_address(machine_index));
+}
+
 /* (the host) a client machine's address as text: its real one, for an
 internet play peer's stand-in (p2p.c) */
 static void distributed_address_text(
@@ -3488,21 +3573,9 @@ static void distributed_address_text(
 	char *text,
 	long size)
 {
-	/* 100.64.0.0/10: an internet play peer's, by its real address (network
-	byte order: its first number the lowest byte) */
-	if ((address & 0xFFC00000) == 0x64400000)
-	{
-		unsigned long network = (address >> 24) | ((address >> 8) & 0xFF00) | ((address << 8) & 0xFF0000) |
-			(address << 24);
-		unsigned long real = p2p_peer_endpoint_address(network);
-
-		if (real)
-		{
-			snprintf(text, size, "%lu.%lu.%lu.%lu", real & 255, (real >> 8) & 255, (real >> 16) & 255,
-				(real >> 24) & 255);
-			return;
-		}
-	}
+	/* 100.64.0.0/10: an internet play peer's, by its real address */
+	if ((address & 0xFFC00000) == 0x64400000 && distributed_real_address(address))
+		address = distributed_real_address(address);
 	if (address)
 	{
 		snprintf(text, size, "%lu.%lu.%lu.%lu", (address >> 24) & 255, (address >> 16) & 255, (address >> 8) & 255,
@@ -3826,6 +3899,12 @@ boolean distributed_machine_clock_fast(
 		distributed_client_clocks[machine_index].fast;
 }
 
+/* whether the messages handled now came in a batch (the unreliable ones;
+one sent reliably comes on its own): a killing blow sent again reliably is
+not overtaken by the newer damage sent with the ticks since
+(distributed_message_stale) */
+static boolean distributed_handling_batch;
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
 void network_distributed_handle_message(
@@ -3838,6 +3917,12 @@ void network_distributed_handle_message(
 	short index;
 	word entry_size;
 
+	/* (voice chat's, in the lobby too: network_voice.c) */
+	if (network_voice_handles_message(message, size))
+	{
+		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
 	/* (none between games: loading, or in the menus) */
 	if (size < sizeof(header) || !game_in_progress())
 		return;
@@ -3864,7 +3949,11 @@ void network_distributed_handle_message(
 			offset += length;
 			/* (no batch in a batch) */
 			if (((struct distributed_message_header const *)buffer)->type != _distributed_message_batch)
+			{
+				distributed_handling_batch = TRUE;
 				network_distributed_handle_message(machine_index, buffer, (word)(sizeof(message_header) + length));
+				distributed_handling_batch = FALSE;
+			}
 		}
 		return;
 	}
@@ -3890,6 +3979,8 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_screen_effect: entry_size = network_coop_screen_effect_entry_size(); break;
 	case _distributed_message_coop_device_states: entry_size = network_coop_device_state_entry_size(); break;
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
+	case _distributed_message_votekick: entry_size = network_votekick_request_entry_size(); break;
+	case _distributed_message_votekick_status: entry_size = network_votekick_status_entry_size(); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
@@ -3913,6 +4004,8 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_presentation:
 	case _distributed_message_coop_object_names:
 	case _distributed_message_coop_skip_vote:
+	case _distributed_message_votekick:
+	case _distributed_message_votekick_status:
 		if (header.count < 1)
 			return;
 		break;
@@ -3931,6 +4024,7 @@ void network_distributed_handle_message(
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
 	case _distributed_message_coop_skip_vote:
+	case _distributed_message_votekick:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
 		break;
@@ -3943,8 +4037,11 @@ void network_distributed_handle_message(
 			distributed_host_time = header.game_time;
 		break;
 	}
-	if (distributed_message_stale(machine_index, &header))
+	if ((distributed_handling_batch || header.type != _distributed_message_damage_events) &&
+		distributed_message_stale(machine_index, &header))
+	{
 		return;
+	}
 	/* (the host: a client's clock, by its messages' ticks; and its players'
 	predictions not taken while its game runs fast) */
 	if (machine_index != NONE)
@@ -3981,6 +4078,12 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_coop_skip_vote:
 		network_coop_handle_skip_vote(machine_index, entries);
+		break;
+	case _distributed_message_votekick:
+		network_votekick_handle_request(machine_index, entries, distributed_handling_stream_message);
+		break;
+	case _distributed_message_votekick_status:
+		network_votekick_handle_status(entries);
 		break;
 	case _distributed_message_coop_device_groups:
 		network_coop_handle_device_groups(entries, header.count);

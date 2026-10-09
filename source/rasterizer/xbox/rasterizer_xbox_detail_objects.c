@@ -229,6 +229,9 @@ typedef char detail_object_view_data_size_assert[
 
 /* ---------- prototypes */
 
+static void detail_object_data_error(
+	char const *problem);
+
 /* ---------- globals */
 
 static D3DVertexBuffer *bss_0045e904 = NULL;
@@ -236,6 +239,21 @@ static D3DVertexBuffer *bss_0045e904 = NULL;
 #define local_d3d_vertex_buffer bss_0045e904
 
 /* ---------- private code */
+
+/* port: a map's detail objects past what the draw has room for; said once */
+static void detail_object_data_error(
+	char const *problem)
+{
+	static boolean reported = FALSE;
+
+	if (!reported)
+	{
+		error(_error_silent, "### ERROR detail objects have a bad %s; the rest are left out", problem);
+		reported = TRUE;
+	}
+
+	return;
+}
 
 static void detail_object_build_vertices(
 	long detail_object_count,
@@ -249,6 +267,14 @@ static void detail_object_build_vertices(
 	word color;
 	byte color_low;
 	byte color_high;
+
+	/* port: a collection without types (a map's) has none to pick (it
+	divided by zero) */
+	if (detail_object_count > 0 && collection->type_definitions.count <= 0)
+	{
+		detail_object_data_error("type count");
+		detail_object_count = 0;
+	}
 
 	if (detail_object_count > 0)
 	{
@@ -276,10 +302,12 @@ static void detail_object_build_vertices(
 				type_definitions,
 				(short)type_index,
 				struct detail_object_type_definition);
+			/* port: a type without sprites (a map's) draws its first (it
+			divided by zero) */
 			vertex.sprite = (word)(
 				(type_index << 4) |
 				((type_definition->first_sprite_index +
-					((detail_object->data & 0xF) % type_definition->sprite_count)) << 8));
+					(type_definition->sprite_count ? (detail_object->data & 0xF) % type_definition->sprite_count : 0)) << 8));
 
 			*vertices++ = vertex;
 			vertex.sprite++;
@@ -490,6 +518,12 @@ void _rasterizer_detail_objects_rebuild_vertices(
 	{
 		detail_object_data = NULL;
 	}
+	/* port: a BSP without detail object data has no objects to build */
+	if (!detail_object_data)
+	{
+		IDirect3DVertexBuffer8_Unlock(local_d3d_vertex_buffer);
+		return;
+	}
 	detail_objects = TAG_BLOCK_GET_ELEMENT(
 		&detail_object_data->detail_objects,
 		0,
@@ -517,6 +551,14 @@ void _rasterizer_detail_objects_rebuild_vertices(
 				do
 				{
 					cell = &layer->cells[(short)cell_index];
+					/* port: only objects the BSP has (a map's range) */
+					if (cell->detail_object_count < 0 ||
+						cell->first_detail_object_index < 0 ||
+						cell->detail_object_count > detail_object_data->detail_objects.count - cell->first_detail_object_index)
+					{
+						detail_object_data_error("cell range");
+						cell->detail_object_count = 0;
+					}
 					detail_object_count = cell->detail_object_count;
 					if (detail_object_count > MAXIMUM_DETAIL_OBJECTS_PER_FRAME - submitted_count)
 					{
@@ -581,6 +623,7 @@ void _rasterizer_detail_objects_draw(
 	long sprite_index;
 	long frame_count;
 	long cell_index;
+	long type_count;
 	boolean success;
 
 	success = TRUE;
@@ -665,7 +708,13 @@ void _rasterizer_detail_objects_draw(
 			frame_count = 0;
 			state.counter = 0;
 			type_definitions = &collection->type_definitions;
-			if (type_definitions->count > 0)
+			/* port: no more types than type_data holds (a map's count) */
+			type_count = MIN(type_definitions->count, MAXIMUM_DETAIL_OBJECT_TYPES_PER_COLLECTION);
+			if (type_definitions->count > type_count)
+			{
+				detail_object_data_error("type count");
+			}
+			if (type_count > 0)
 			{
 				long type_index = 0;
 				struct detail_object_bitmap_group_sequence *type_sequence;
@@ -699,7 +748,7 @@ void _rasterizer_detail_objects_draw(
 					state.counter++;
 					type_index = (short)state.counter;
 				}
-				while (type_index < type_definitions->count);
+				while (type_index < type_count);
 			}
 
 			state.counter = 0;
@@ -721,6 +770,13 @@ void _rasterizer_detail_objects_draw(
 						{
 							do
 							{
+								/* port: no more sprites than frame_data holds (a
+								map's counts) */
+								if (frame_count >= MAXIMUM_DETAIL_OBJECT_SPRITES_PER_COLLECTION)
+								{
+									detail_object_data_error("sprite count");
+									break;
+								}
 								sprite = TAG_BLOCK_GET_ELEMENT(
 									&sequence->sprites,
 									(short)sprite_index,
@@ -750,7 +806,7 @@ void _rasterizer_detail_objects_draw(
 				global_d3d_device,
 				-0x4B,
 				type_data,
-				type_definitions->count) >= 0 && success)
+				type_count) >= 0 && success)
 			{
 				success = TRUE;
 			}

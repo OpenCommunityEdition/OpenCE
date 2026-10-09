@@ -28,4 +28,11 @@ for aiming when not; while menus are active returns nonzero and what the
 pointer did since the last call. Always 0 on Android. */
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer);
 
+/* the open scoreboard's pointer (game_engine.c), offered (a network game's)
+or not: 1 while a right click has freed it, with where it is and what it
+did since the last call, in the screen's coordinates (the game's drawing,
+not the menus' centered 640); 0 while it is not; -1 where there is none
+(Android) */
+int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer);
+
 #endif

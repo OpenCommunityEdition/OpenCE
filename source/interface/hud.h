@@ -133,7 +133,14 @@ void hud_play_sound(
 	unsigned long state_flags,
 	struct tag_block const *sounds,
 	long *sound_indices,
-	word *played_flags);
+	word *played_flags,
+	short maximum_sound_count); /* port: what sound_indices holds */
+
+/* port: a player's name's colour above their head: an ally's, or an
+enemy's (hud.c) */
+void hud_player_name_color(
+	boolean ally,
+	union real_argb_color *color);
 
 /* ---------- globals */
 

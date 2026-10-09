@@ -46,6 +46,8 @@ void platform_log(char const *format, ...);
 char const *config_string(char const *name);
 int platform_display_resolutions(long *widths, long *heights, int maximum);
 int platform_window_sizes(long *widths, long *heights, int maximum);
+/* (sdl_platform.c's PLATFORM_AUDIO_DEVICE_NAME_SIZE) */
+int platform_audio_devices(int recording, char (*names)[128], int maximum);
 
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
@@ -352,6 +354,7 @@ static char const *const port_function_names[] =
 	"mp level select", "mp profiles list initialize", "mp profiles list dispose", "mp profile set for game",
 	"port lobby preview join",
 	"port setup edit",
+	"port setup options init", "port setup options save",
 	"port map list back",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
@@ -445,7 +448,17 @@ static void *allocate(long size)
 		return NULL;
 	}
 	memset(block, 0, size > 0 ? size : 1);
-	menu_tags.blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+	{
+		void **blocks = realloc(menu_tags.blocks, (menu_tags.block_count + 1) * sizeof(*menu_tags.blocks));
+
+		if (!blocks)
+		{
+			free(block);
+			build.failed = TRUE;
+			return NULL;
+		}
+		menu_tags.blocks = blocks;
+	}
 	menu_tags.blocks[menu_tags.block_count++] = block;
 	return block;
 }
@@ -724,13 +737,50 @@ static long split(char const *text, char const **pieces)
 /* a spinner's strings, or its values, split: its own, but Video Setup's
 sizes are the display's (sdl_platform.c), shown "1920 x 1080" and set
 "1920x1080": its resolutions after Resolution's own (NATIVE), and the
-window sizes that fit it in place of Window Size's own */
+window sizes that fit it in place of Window Size's own; and Audio Setup's
+devices SDL finds, after their SYSTEM DEFAULT, each set by its name and
+shown by it (in capitals, as the menus' words are, and cut short) */
 static long spinner_split(struct halo_menu_widget const *widget, boolean values, char const **pieces)
 {
 	long count = split(values ? widget->values : widget->strings, pieces);
 	long widths[MAXIMUM_STRINGS], heights[MAXIMUM_STRINGS];
 	long added, index;
 
+	if (widget->setting && (!strcmp(widget->setting, "audio.output_device") ||
+		!strcmp(widget->setting, "audio.input_device")))
+	{
+		static char names[MAXIMUM_STRINGS][128];
+
+		added = platform_audio_devices(!strcmp(widget->setting, "audio.input_device"), names,
+			(int)(MAXIMUM_STRINGS - count));
+		for (index = 0; index < added; index++)
+		{
+			char shown[32];
+			char const *name = names[index];
+			char *piece;
+			long length;
+
+			if (!values)
+			{
+				long at;
+
+				for (at = 0; name[at] && at < (long)sizeof(shown) - 1; at++)
+					shown[at] = name[at] >= 'a' && name[at] <= 'z' ? (char)(name[at] - 'a' + 'A') : name[at];
+				shown[at] = 0;
+				/* (cut short: what the spinner shows) */
+				if (strlen(name) > 18)
+					strcpy(shown + 15, "...");
+				name = shown;
+			}
+			length = (long)strlen(name);
+			piece = allocate(length + 1);
+			if (!piece)
+				break;
+			strcpy(piece, name);
+			pieces[count++] = piece;
+		}
+		return count;
+	}
 	if (widget->setting && !strcmp(widget->setting, "display.resolution"))
 		added = platform_display_resolutions(widths, heights, (int)(MAXIMUM_STRINGS - count));
 	else if (widget->setting && !strcmp(widget->setting, "display.window_size"))
@@ -1339,7 +1389,9 @@ static void instance_set(struct cache_file_tag_instance *instances, long group_t
 	instance->parent_group_tags[0] = NONE;
 	instance->parent_group_tags[1] = NONE;
 	instance->tag_index = tag_index;
-	instance->name = copy;
+	/* (the name is read by tag_loaded: of none, when the copy failed, which
+	fails the build) */
+	instance->name = copy ? copy : "";
 	instance->base_address = definition;
 }
 
@@ -1673,6 +1725,8 @@ void menu_tags_loaded(
 	build.spinner_tags = malloc((widget_count + 1) * sizeof(long));
 	build.bitmap_tags = malloc((menus->bitmap_count + 1) * sizeof(long));
 	build.strings_tags = malloc((menus->string_list_count + 1) * sizeof(long));
+	if (!build.widget_tags || !build.text_tags || !build.spinner_tags || !build.bitmap_tags || !build.strings_tags)
+		goto failed;
 	for (index = 0; index < widget_count; index++)
 	{
 		own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);

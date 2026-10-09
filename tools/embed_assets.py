@@ -46,6 +46,8 @@ MENU_LIST = MENU_ASSETS / "menus.json"
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
               ("search_tex.zlib", "xgpu_smaa_search_texture"))
+# the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
+WINDOW_ICON = Path("port/assets/icon/opence-icon-256.png")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -87,7 +89,8 @@ def hud_asset_inputs() -> List[Path]:
               if (ROOT / listing).is_file()]
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
-            *(SMAA_ASSETS / name for name, _ in smaa_files())]
+            *(SMAA_ASSETS / name for name, _ in smaa_files()),
+            *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else [])]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -160,13 +163,14 @@ def main() -> None:
         lines.append("")
         tag = asset["tag"].replace("\\", "\\\\")
         coverage = int(any(cell["kind"] == "meter" for cell in asset.get("cells", [])))
+        point_threshold = int(any(cell.get("thresholds") for cell in asset.get("cells", [])))
         # (the sequences whose sprites it stands for, a bit each of 32; 0: the whole bitmap)
         sequences = [sprite["sequence"] for sprite in asset.get("sprites", [])]
         if any(not 0 <= sequence < 32 for sequence in sequences):
             sys.exit(f"{name}: sprite sequences must be 0 to 31 (hud_hires.h: sprites)")
         sprites = sum(1 << sequence for sequence in sequences)
         table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
-                     f'{int(title)}, 0x{sprites:x}u, asset{index}, {len(data)} }},')
+                     f'{point_threshold}, {int(title)}, 0x{sprites:x}u, asset{index}, {len(data)} }},')
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)
@@ -233,6 +237,13 @@ def main() -> None:
         lines.extend(words(data) if data else ["\t0,"])
         lines.append("};")
         lines.append(f"const unsigned long {symbol}_size = {len(data)};")
+    # the windows' icon, a PNG (of size 0 where the checkout has none)
+    data = (ROOT / WINDOW_ICON).read_bytes() if (ROOT / WINDOW_ICON).is_file() else b""
+    lines.append("")
+    lines.append("const unsigned int platform_window_icon[] = {")
+    lines.extend(words(data) if data else ["\t0,"])
+    lines.append("};")
+    lines.append(f"const unsigned long platform_window_icon_size = {len(data)};")
     lines.append("")
     lines.append("#endif")
     output = Path(sys.argv[1])

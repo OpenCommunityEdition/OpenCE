@@ -59,6 +59,7 @@ symbols in this file:
 #include "editor/editor_stubs.h"
 #include "hs/hs.h"
 #include "networking/network_server_manager.h"
+#include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
 #include "input/input.h"
 #include "interface/terminal.h"
 #include "math/real_math.h"
@@ -260,12 +261,13 @@ static char *console_get_text_to_autocomplete(
 }
 
 /* port: the text after the host's ban or kick command ("ban ", "kick "),
-which completes as a player's name (network_game_server_matching_player_names);
-NULL if the input is not one */
+or any player's votekick ("votekick "), which completes as a player's name
+(network_game_server_matching_player_names, network_votekick_matching_player_names;
+the command's index: votekick's, 2); NULL if the input is not one */
 static char *console_player_command_name(
-	void)
+	short *command_index)
 {
-	static char const *const commands[] = { "ban", "kick" };
+	static char const *const commands[] = { "ban", "kick", "votekick" };
 	char *text = console_globals.input_state.result;
 	short command;
 
@@ -286,6 +288,7 @@ static char *console_player_command_name(
 		}
 		if (index == length && text[length] == ' ')
 		{
+			*command_index = command;
 			text += length;
 			while (*text == ' ' || *text == '"')
 				text++;
@@ -303,14 +306,19 @@ static void console_complete(
 	/* (port: the players' names the ban and kick commands complete) */
 	static char player_names[64][NETWORK_GAME_SERVER_NAME_TEXT_SIZE];
 
-	char *token = console_player_command_name();
+	short command_index = NONE;
+	char *token = console_player_command_name(&command_index);
 	short count;
 
 	if (token)
 	{
 		short index;
 
-		count = network_game_server_matching_player_names(token, player_names, NUMBEROF(player_names));
+		/* (the votekick's: any machine's, from the game's players) */
+		if (command_index == 2)
+			count = network_votekick_matching_player_names(token, player_names, NUMBEROF(player_names));
+		else
+			count = network_game_server_matching_player_names(token, player_names, NUMBEROF(player_names));
 		for (index = 0; index < count; index++)
 			matching_items[index] = player_names[index];
 	}
@@ -447,6 +455,10 @@ boolean console_update(
 			match_assert("c:\\halo\\SOURCE\\main\\console.c", 184, key->key_code!=NONE);
 			switch (key->key_code)
 			{
+			/* port: escape closes it too */
+			case _key_escape:
+				console_close();
+				return FALSE;
 			case _key_backquote:
 				console_close();
 				break;

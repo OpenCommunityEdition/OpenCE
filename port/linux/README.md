@@ -21,13 +21,65 @@ To build:
 - The 32-bit glibc development files: `lib32-glibc` on Arch Linux,
   `gcc-multilib` and `libc6-dev-i386` on Debian and Ubuntu.
 - The 32-bit SDL3: `lib32-sdl3` on Arch Linux, `libsdl3-dev:i386` on Debian
-  and Ubuntu.
+  and Ubuntu. The portable build does not need it: refer to "Portable
+  build".
 
 To start the game:
 
+- glibc 2.29 or later (32-bit), for the builds from GitHub Actions, which
+  are built against glibc 2.31. They start on SteamOS 3 (Steam Deck). They
+  should also start on Debian 11, Ubuntu 20.04, Fedora 32 and later
+  distributions, but this is not tested. A build that you make without
+  `--portable` needs the glibc of the computer that built it, or a later
+  one.
 - The 32-bit OpenGL libraries (`lib32-mesa`).
 - The 32-bit PipeWire or PulseAudio client libraries (`lib32-pipewire` or
   `lib32-libpulse`).
+- The 32-bit X11 libraries (`lib32-libx11`, `lib32-libxext`). In a Wayland
+  session, the game uses them through XWayland. SDL uses Wayland itself
+  only if the 32-bit Wayland libraries are version 1.20 or later
+  (`lib32-wayland`, `lib32-libxkbcommon`; Debian 11, Ubuntu 20.04 and
+  Fedora 32 have older ones) and the compositor has the fifo-v1 protocol.
+  On GNOME, the window then has borders only with the 32-bit libdecor
+  (`lib32-libdecor`).
+
+SteamOS has all of these. Its system is read-only, and the builds from
+GitHub Actions need no package: they bring their own SDL3
+(`libSDL3.so.0`, next to the executable).
+
+### Portable build
+
+The builds from GitHub Actions are portable builds (`--portable`; refer to
+"Build options" in the main [README](../../README.md#build-options)). The
+portable build starts on more systems than the build machine's:
+
+- It is compiled and linked against the 32-bit glibc 2.31 of Debian 11, the
+  glibc of the Steam Runtime 3 ("sniper"), not against the glibc of the
+  build machine. An executable needs the glibc version that it was built
+  against, or a later one.
+- It brings SDL 3 (`libSDL3.so.0`), built from source against the same
+  glibc. The executable looks for it in its own folder first (a `DT_RPATH`
+  of `$ORIGIN`, which comes before `LD_LIBRARY_PATH`), so that it uses this
+  SDL even when Steam sets `LD_LIBRARY_PATH`. Few distributions have a
+  32-bit SDL 3. This SDL loads X11, Wayland, libdecor, PipeWire, PulseAudio
+  and ALSA when it starts, so it starts with whichever of them the system
+  has. It is linked only to glibc. Its license is `SDL3-LICENSE.txt`.
+
+At the first build, `tools/linux_sysroot.py` downloads the Debian packages
+(about 25 MB) and the source of SDL. Each package comes from
+`archive.debian.org` or `deb.debian.org`, or else from
+`snapshot.debian.org`; the source of SDL comes from GitHub or from
+`libsdl.org`. It checks each download against its SHA-256 sum. The system root is in
+`build/linux/third_party/sysroot`. `tools/linux_sysroot.cmake` builds SDL
+against it.
+
+To make the portable build you need, in addition to the tools above,
+CMake, `pkg-config` (`pkgconf`) and `wayland-scanner` (`wayland` on Arch
+Linux, `libwayland-bin` on Debian and Ubuntu). You do not need the 32-bit
+SDL3. You need the 32-bit glibc only for the tests.
+
+To see the glibc version that a build needs, enter
+`readelf -V build/linux/halo | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1`.
 
 ## Build the game
 
@@ -38,6 +90,11 @@ To start the game:
 ## Start the game
 
 Enter `build/linux/halo`.
+
+To play on a Steam Deck, unpack `halo-linux-release.zip` into a folder (in
+Desktop Mode), and add `halo` to Steam as a non-Steam game ("Add a Game" in
+the Games menu of Steam). The game then starts in Game Mode as well. Refer
+to "Steam Deck".
 
 The game data is the folder that contains `maps/`, from an Xbox disc image
 of any version of the game. The game looks for this folder in this
@@ -60,6 +117,38 @@ The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
 the game asks for the disc image again at the next start.
 
+### Steam Deck
+
+Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
+`halo` (or start the game one time to copy it from a disc image), and add
+`halo` to Steam. Then start the game from the library in Game Mode.
+
+- Screen: the game fills the screen without borders (`display.mode` empty,
+  thus borderless). The 3D view and the HUD have the shape of the screen
+  (16:10) and are drawn at its resolution; the menus are at the center.
+- Controls: Steam Input gives the game a virtual controller, which the game
+  operates as the controller of the Xbox. With the template that Steam selects
+  ("Gamepad With Joystick Trackpad"), the buttons, sticks and triggers have
+  the functions of the same controls on an Xbox controller, the right
+  trackpad operates as the right stick, and the back buttons (L4, L5, R4,
+  R5) do nothing until you assign them in the controller settings of the
+  game in Steam. With a template that makes a trackpad a mouse, the mouse
+  aims in the game and moves the pointer in the menus.
+- Text: names of profiles and gametypes use the keyboard of the game, which
+  the controller operates. The text fields of the menus (the name and the
+  password in Server Setup, and the password of a game in the server
+  browser) open the keyboard of Steam. Type the text, then select Enter on
+  that keyboard.
+- Frame rate: the game shows one frame for each refresh of the display. It
+  follows the refresh rate and the frame limit of Quick Access >
+  Performance (40 to 60 Hz on the LCD model, up to 90 Hz on the OLED model).
+  The world is calculated at 30 Hz at all rates. Keep `display.vsync =
+  true`. Refer to "Frame rate".
+- Sleep: the clocks of the game do not count the time that the Deck sleeps,
+  so the game continues from where it stopped. A network game does not
+  wait: the host drops a machine that it has not heard from for 15 seconds,
+  and while a Deck that hosts sleeps, the other players have no host.
+
 ## Files and folders
 
 | Xbox drive | Folder |
@@ -81,6 +170,7 @@ These files are in the data root:
 | --- | --- |
 | `debug.txt` | The log of the game. At start-up, the game shows the data root in the terminal. A crash writes its report (the faulting address and the calls that led to it) here as well; the `reference address` line at the top of each session places those addresses in the build. |
 | `init.txt` | Console commands that the game does at start-up. For example, `map_name levels\a10\a10` starts the first campaign level. |
+| `tags/` | Sound tag files that replace the sounds of the maps (`audio.loose_sounds`). |
 
 The settings are in `config.toml` next to the executable. Refer to
 "Settings". Internet play's MQTT brokers are in `brokers.txt` next to it
@@ -120,9 +210,15 @@ gamepads' only.
 | zoom | Z, middle mouse button |
 | show the scores (hold) | tab |
 | pause menu | escape |
+| screenshot | F10 |
+| talk in voice chat (hold) | V |
 
 Always: \` opens the developer console, F12 releases or captures the mouse,
-F11 changes between fullscreen and window.
+F11 changes between fullscreen and window. Screenshot (default F10,
+rebindable under Controls Setup > Actions, below Pause Menu; not on Android) saves a PNG of the completed
+frame to `screenshots/` beside `maps/`, named `YYYY-MM-DD_HH.MM.SS.png` in
+local time, and prints the filename in the console. Captures in the same
+second get a numeric suffix so previous screenshots are preserved.
 
 One movement of the mouse wheel changes the weapon one time. A second
 movement after a short pause changes it again.
@@ -247,13 +343,18 @@ the setting for one start of the game. It has priority over the file.
 | `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
 | `audio.effects_volume` | `1.0` | `HALO_EFFECTS_VOLUME` | The volume of the other sounds (effects and speech), of the master volume. |
 | `audio.reverb` | `true` | `HALO_REVERB` | `true`: the sounds of the world reverberate as the place the player is in does: the sound environments of the maps (a corridor, a cave, a large hall, outdoors) set the reverberation, as the I3DL2 reverb of the Xbox did. A sound behind a wall or a door is muffled in it too. `false`: no reverberation (sounds behind a wall are still muffled). |
+| `audio.voice_chat` | `"push_to_talk"` | `HALO_VOICE_CHAT` | How you talk in voice chat: `"push_to_talk"` (while `controls.push_to_talk` is held; the microphone opens when you first press it), `"open_mic"` (when the microphone hears speech), or `"off"`. You hear the other players in every case. Refer to "Voice chat". |
+| `audio.voice_volume` | `1.0` | `HALO_VOICE_VOLUME` | The volume of the voices of the other players, `0` to `2`. |
+| `audio.output_device`, `audio.input_device` | `"default"` | `HALO_AUDIO_OUTPUT_DEVICE`, `HALO_AUDIO_INPUT_DEVICE` | The speakers and the microphone, by the name that Settings > Audio shows, or `"default"` for the device of the system. If the device is not found, the game uses the device of the system. Not on Android. |
+| `audio.loose_sounds` | `false` | `HALO_LOOSE_SOUNDS` | For those who make sounds. `true`: each sound of a map that has a sound tag file of its name in `tags/` in the data root (for example `tags/sound/sfx/weapons/assault rifle/fire.sound`) plays from that file. The files are Halo PC tag files, as the Halo Editing Kit and Invader write them. At the console, `loose_sounds_reload` reads the files again, and `loose_sounds false` plays the sounds of the map again. When a file changes, all sounds stop. |
 | `input.mouse_sensitivity` | `1.0` | `HALO_MOUSE_SENSITIVITY` | The multiplier for the mouse aim. |
 | `input.mouse_vertical_sensitivity` | `0.0` | `HALO_MOUSE_VERTICAL_SENSITIVITY` | The multiplier for the vertical mouse aim. `0`: the same as `input.mouse_sensitivity`. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
 | `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
-| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
+| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`. Keys by their names (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`), and `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.console_log` | `"important"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. `"none"`: only the asserts that stop the game. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
+| `game.enhanced_animations` | `true` | `HALO_ENHANCED_ANIMATIONS` | `true`: the player bipeds' grenade throws keep their legs moving, blended by speed and direction (crouched throws stay crouched, throws in the air use the jump's legs), Warthog and Scorpion riders stay seated to throw and let go of the grips to throw and reload, and a player turns with the aim while throwing, as while meleeing. `false`: the original animations, which freeze the legs during a throw and stand a rider up. Only in config.toml, not in the menus. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
@@ -264,11 +365,18 @@ the setting for one start of the game. It has priority over the file.
 | `network.allow_upnp` | `true` | `HALO_NET_ALLOW_UPNP` | `true`: internet play can ask the router to forward its port (UPnP). `false`: the game does not ask. Refer to "Internet play". |
 | `network.public_lobby` | `true` | `HALO_NET_PUBLIC_LOBBY` | `true`: the server browser. Public games are listed, and Join Game > Server Browser shows them. `false`: no games are listed or shown. Refer to "Server browser". |
 | `network.host_public` | `true` | `HALO_NET_HOST_PUBLIC` | `true`: a new game of Create Game > Internet starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in Server Setup changes it for each game. Refer to "Server browser". |
-| `network.coop_friendly_fire` | `"on"` | `HALO_NET_COOP_FRIENDLY_FIRE` | Whether the players of an online co-op game hurt each other: `"off"`, `"on"`, `"shields_only"` or `"explosives_only"`. FRIENDLY FIRE in co-op's Server Setup writes its choice here. Their AI allies they always can, as in the campaign. |
-| `network.coop_player_collisions` | `true` | `HALO_NET_COOP_PLAYER_COLLISIONS` | Whether the players of an online co-op game bump into each other. `false`: they walk through each other, so that one cannot block a doorway or stand on another; they still bump into the AI's characters. PLAYER COLLISIONS in co-op's Server Setup writes its choice here. |
-| `network.coop_enemies_mode` | `"per_player"` | `HALO_NET_COOP_ENEMIES_MODE` | Online co-op's extra enemies: `"none"`; `"per_player"`, each squad of enemies that a level places grows by `network.coop_enemies` for each player past the first; or `"multiplier"`, each squad is `network.coop_enemies_multiplier` times as large, for any number of players. The extra enemies stand around the squad's places, and those that a dropship has no seats for drop out of it after its passengers. EXTRA ENEMIES in co-op's Server Setup writes its choice here. |
-| `network.coop_enemies` | `50` | `HALO_NET_COOP_ENEMIES` | The extra enemies per player, a percentage from `25` to `200`: for each player past the first, each squad of enemies gets this much of itself more (`100`: as many again, so four players meet four times the squad). PER PLAYER in co-op's Server Setup writes its choice here. |
-| `network.coop_enemies_multiplier` | `2` | `HALO_NET_COOP_ENEMIES_MULTIPLIER` | The static multiplier of the enemies, `2` to `32`: each squad of enemies is this many times as large. MULTIPLIER in co-op's Server Setup writes its choice here. |
+| `network.coop_friendly_fire` | `"on"` | `HALO_NET_COOP_FRIENDLY_FIRE` | Whether the players of an online co-op game hurt each other: `"off"`, `"on"`, `"shields_only"` or `"explosives_only"`. FRIENDLY FIRE in co-op's Server Setup > Co-op Options writes its choice here. Their AI allies they always can, as in the campaign. |
+| `network.coop_player_collisions` | `true` | `HALO_NET_COOP_PLAYER_COLLISIONS` | Whether the players of an online co-op game bump into each other. `false`: they walk through each other, so that one cannot block a doorway or stand on another; they still bump into the AI's characters. PLAYER COLLISIONS in co-op's Server Setup > Co-op Options writes its choice here. |
+| `network.coop_enemies_mode` | `"per_player"` | `HALO_NET_COOP_ENEMIES_MODE` | Online co-op's extra enemies: `"none"`; `"per_player"`, each squad of enemies that a level places grows by `network.coop_enemies` for each player past the first; or `"multiplier"`, each squad is `network.coop_enemies_multiplier` times as large, for any number of players. The extra enemies stand around the squad's places, and those that a dropship has no seats for drop out of it after its passengers. EXTRA ENEMIES in co-op's Server Setup > Co-op Options writes its choice here. |
+| `network.coop_enemies` | `50` | `HALO_NET_COOP_ENEMIES` | The extra enemies per player, a percentage from `25` to `200`: for each player past the first, each squad of enemies gets this much of itself more (`100`: as many again, so four players meet four times the squad), up to 8 times the squad however many players there are. PER PLAYER in co-op's Server Setup > Co-op Options writes its choice here. |
+| `network.coop_enemies_multiplier` | `2` | `HALO_NET_COOP_ENEMIES_MULTIPLIER` | The static multiplier of the enemies, `2` to `32`: each squad of enemies is this many times as large. MULTIPLIER in co-op's Server Setup > Co-op Options writes its choice here. |
+| `network.voice_lobby` | `true` | `HALO_NET_VOICE_LOBBY` | When you host: `true`, all players hear all players in the lobby, before and after a game. |
+| `network.voice_mode` | `"team_global_enemy_proximity"` | `HALO_NET_VOICE_MODE` | When you host: who hears whom during a game. `"off"`; `"team_proximity"` (teammates who are near); `"team_enemy_proximity"` (all players who are near); `"team_global"` (all teammates); `"team_global_enemy_proximity"` (all teammates, and enemies who are near). Refer to "Voice chat". |
+| `network.voice_kbps` | `24` | `HALO_NET_VOICE_KBPS` | When you host: the voice quality in the lobby and in a game, in kilobits per second, `8` to `64`. |
+| `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
+| `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. |
+| `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
+| `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
 | `network.stun_servers` | Google and Cloudflare | `HALO_NET_STUN` | The public STUN servers (`host:port`, with commas between them) that give the internet address of a machine. |
@@ -283,7 +391,8 @@ the setting for one start of the game. It has priority over the file.
 | `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
-| `debug.network_latency`, `debug.network_loss` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS` | The game holds all the data that it receives for this number of milliseconds, and ignores this percentage of the datagrams. Use these settings to test the netcode as on the internet. |
+| `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
+| `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
 | `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
@@ -330,6 +439,10 @@ Each frame shows the world between the last two ticks
   the last tick.
 - Rotations use quaternions. Positions and scales are linear.
 - A teleport, a respawn or a cut of the camera does not mix. It jumps.
+- After a long frame (several ticks in one frame), the camera mixes the
+  last tick only, as the objects do.
+- In cinematics, a camera that moves with an object (the lifepod in a30,
+  a Pelican) moves with the object as it is drawn.
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
@@ -453,6 +566,47 @@ To join a game, do one of these steps:
 When the machines connect, the game of the host shows in Multiplayer,
 System Link. Join the game as on a local network. System link on a local
 network does not need an invite.
+
+### Voice chat
+
+Network games have voice chat, on the local network and on the internet.
+Hold V (`controls.push_to_talk`, Settings > Controls Setup) to talk, or set
+VOICE CHAT in Settings > Audio to OPEN MIC. VOICE VOLUME sets the volume of
+the other players. On Android, set VOICE CHAT to OPEN MIC to talk: the game
+then asks for the microphone.
+
+OUTPUT DEVICE and INPUT DEVICE in Settings > Audio select the speakers and
+the microphone (SYSTEM DEFAULT, the default, follows the system). The list
+has the devices that the computer had when the game started.
+
+The host sets voice chat for all players in Server Setup > Teamplay Options
+(`network.voice_*` in `config.toml`):
+
+- In the lobby, before and after a game, all players hear all players
+  (LOBBY VOICE CHAT).
+- During a game (VOICE CHAT): OFF; TEAM NEAR; ANYONE NEAR; TEAM; or TEAM,
+  ENEMIES NEAR (the default). Near is VOICE NEAR DISTANCE (45 metres is the
+  default), and both players must be alive. A player who is near sounds
+  quieter when further, and from their direction. In a game without teams
+  all players are enemies; in co-op, all are teammates.
+- The quality (VOICE QUALITY), 8 to 64 kilobits per second (24 is the
+  default), in the lobby and in the game.
+
+In co-op, Server Setup has no Teamplay Options: the same settings are in
+Server Setup > Voice and Voting.
+
+A speaker shows next to the name of a player who talks: in the lobby, on
+the scoreboard, in a list at the left of the screen during a game, and
+beside the name above their head (when names are shown there:
+`display.player_names`). To mute a player, open the scoreboard,
+right-click, click the player, and click Mute voice. You no longer hear
+them, and nobody else is told.
+
+The host sends each voice on to the players who can hear it. The host
+accepts a voice only from the machine of the player (with a key that it
+gives each machine on its connection), only at the quality it set, at most
+50 frames each second from a machine, and from at most 8 players at a time.
+The voices are compressed with Opus (`port/third_party/opus`).
 
 ### Server browser
 
@@ -582,8 +736,44 @@ Only machines with the invite can find the game:
   console (Tab completes the name). Remove a line from `bans.txt` to unban.
   Refer to `NETCODE.md`. `kick <player name>` drops the player the same
   way, but keeps nothing: no line in `bans.txt`, and the player can join
-  again at once. So that every player can be named, the host trims
-  the spaces around a name and removes characters that draw as nothing. A
+  again at once. In co-op, `bringto` brings every player to the host.
+- Players can vote to kick a player. The host turns this on or off with
+  VOTE KICK in Server Setup > Teamplay Options (`network.votekick`; in
+  co-op, Server Setup > Voice and Voting). Hold the scoreboard key, right-click to
+  show the pointer, and click the name of the player. Then click **Start
+  a vote to kick**. Other players vote in the same way, and see the vote on
+  the scoreboard. `votekick <player name>` in the developer console does
+  the same. The host also gets **Kick** and **Ban** in this menu: these do
+  the same as the `kick` and `ban` commands (click **Ban** two times). The
+  host counts the votes, and these rules prevent abuse:
+  - The vote passes when more than half of the players vote for it, and at
+    least two players. The player of the vote is counted, but cannot vote.
+    Thus, in a game of two equal teams, one team cannot kick a player of
+    the other team without help.
+  - The host counts one vote for each internet address (for internet
+    play, the real address of the player, not the address of the tunnel).
+    Two machines at one address, or with one hardware id, have one vote.
+  - To start a vote, a player must have played for
+    `network.votekick_minutes` (5) on this server. To vote, a player must
+    have played for 2 minutes (or less, if that setting is less). The host
+    counts the time. When a player joins again, the time starts again.
+    Players who cannot vote yet are not counted.
+  - The host only accepts a vote that comes on the connection of the
+    player, not a datagram, which another machine can send with the
+    address of the player.
+  - One vote runs at a time, for 45 seconds, with 30 seconds before the
+    next vote. If a vote fails, the player who started it cannot start a
+    vote for 5 minutes, and nobody can start a vote against the same player
+    for 10 minutes.
+  - Nobody can vote to kick a player of the host.
+  - A player kicked by a vote cannot join again for
+    `network.votekick_ban_minutes` (30), by address and hardware id.
+  - A player who leaves during a vote against them is kept out the same
+    way, as if the vote passed. While the vote runs, the host refuses the
+    player if they try to join again. Thus nobody can avoid a vote by
+    leaving.
+  So that every player can be named, the host trims the spaces around a
+  name and removes characters that draw as nothing. A
   letter with a mark is typed as the plain letter (`ban jose` for "José").
   A name with nothing left to type becomes "Player", and a name that another
   player already has gets a number ("Player 2"). The game refuses a profile
@@ -644,6 +834,69 @@ has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
+
+## Map checks
+
+The game reads a map's tags straight into memory and uses them as its own
+structures: every pointer, count, index and enum in them is the map's, and
+the game writes values into tags as it runs. So before anything reads a
+map's tags, the port checks every tag against a schema of its group
+(`game/tag_schema_*.c`, read by `game/tag_validate.c`), and each structure
+BSP as it loads:
+
+- Every block and every piece of data must lie in the tags (or the BSP) and
+  overlap no other. Otherwise the game refuses the map.
+- A block with more elements than the game has room for is cut to the
+  maximum. A tag reference that is not a tag of the right group becomes
+  none. So do an index past its block and an enum past its values (or they
+  become 0, where the game cannot take none). A string gets its terminator.
+  Values that the game sets as it runs are reset.
+- Checks that the schema cannot express run last: the BSPs' and the models'
+  graphs, vertex and index buffers, and indices into other tags.
+
+Each correction goes to `debug.txt`. The game's own maps need none.
+`build/linux/map_validate [--strict] map.map...` runs the same checks on map
+files without the game, and `tools/test_linux_port.py` runs it on the maps
+in `assets/maps`. `map_validate --fuzz <runs> map.map` changes a few words
+of the tags at random in each run. The checks must not crash or hang, and a
+map that they let through must need no more corrections.
+
+A map's scripts can call only the script functions that a map needs (the
+allowlist in `hs/hs.c`). They cannot call the functions for files, the
+saved state of the game, the console, debugging or cheats. A script that
+calls one does not run. The developer console can call every function.
+
+Halo Custom Edition maps get the same checks (those that need OpenSauce are
+refused). Their own loader (`game/cache_file_formats.c`) reads them into
+their tag cache at 0x40440000 and converts what Custom Edition lays out
+differently, then the validator checks their tags and each of their BSPs as
+it checks this build's maps, before the game converts their models, BSP
+geometry and scripts. Put them with `bitmaps.map`, `sounds.map` and
+`loc.map` in `custom_maps`, beside `maps`, or set `paths.custom_edition` to
+a Custom Edition install; the map lists show them as CUSTOM SINGLEPLAYER and
+CUSTOM MULTIPLAYER, played as campaign levels (alone, or as network co-op)
+or as multiplayer maps by their scenario type, and `game.custom_edition =
+false` refuses them. `map_validate` checks them too, with the resource maps
+beside each map or in `--maps <folder>`. See
+`docs/custom_edition_caches.md`.
+
+Defensive checks stay in the game code too. An index into a tag block, the
+tags or a tag's data that is out of range gets zeros (`tag_empty_data` in
+`tag_files/tag_groups.c`), not other memory.
+
+A map's name must be its file's: the cache file slots are found by the name
+in the map's header, so a map file whose header names another map (a
+renamed one) is refused, not copied again for ever. The `loading.tga` a map
+pack may put in the maps folder is read only if it is an uncompressed 24-bit
+picture of 320 by 240, the loading screen's texture.
+
+A checkpoint (`savegame.bin`, in the profile's folder) and a core are
+images of the game state's memory: with the data arrays' pointers to their
+elements, the objects' memory pool's blocks and the references to them, and
+the caches' procedures. Before one is taken, each of those is checked
+against what the game made at startup (`game_state_image_accept` in
+`saved games/game_state.c`): an image that does not match (a damaged or
+crafted file) is refused, and the level starts over.
 
 ## What operates
 
@@ -708,6 +961,16 @@ definition. Without this check, the linker gives the reference the address
   `d3d_find_flipcount`.
 - The build returns small structures and unions in registers
   (`-freg-struct-return`), as on Win32.
+- The GPU driver cannot open the kernel's `trace_marker`
+  (`src/posix_trace_marker.c`). SteamOS keeps kernel tracing on for its GPU
+  performance captures (`gpu-trace.service`), and its Mesa then writes a
+  marker for each traced driver function: on the Steam Frame, some 480,000
+  writes a second, which took the game from the headset's 72 Hz to about
+  50 frames a second. The Steam Deck runs the same service, but its Mesa
+  (25.3, 32-bit and 64-bit) has no markers to write: there the refusal
+  changes nothing (measured: the same frame times and power either way).
+  `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
+  gpuvis.
 
 ### Game source changes
 

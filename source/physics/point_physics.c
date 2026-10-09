@@ -5,6 +5,7 @@ POINT_PHYSICS.C
 /* ---------- headers */
 
 #include "cseries.h"
+#include "errors.h"
 #include "real_math.h"
 #include "point_physics.h"
 #include "physics.h"
@@ -78,6 +79,19 @@ unsigned long point_physics_update(
 	match_assert_valid_real_point3d("c:\\halo\\SOURCE\\physics\\point_physics.c", 185, position);
 	match_assert_valid_real_vector3d("c:\\halo\\SOURCE\\physics\\point_physics.c", 186, translational_velocity);
 	match_assert("c:\\halo\\SOURCE\\physics\\point_physics.c", 187, !translational_force || valid_real_vector3d(translational_force));
+	/* A custom map can author a particle radius below zero. Collision uses
+	the radius as a distance, so that value is no radius. */
+	if (!(radius >= 0.0f))
+	{
+		static boolean radius_reported = FALSE;
+
+		if (!radius_reported)
+		{
+			error(_error_silent, "point physics: a radius below zero is treated as zero");
+			radius_reported = TRUE;
+		}
+		radius = 0.0f;
+	}
 	match_assert("c:\\halo\\SOURCE\\physics\\point_physics.c", 188, radius>=0.f);
 
 	if (dt != 0.0f)

@@ -192,6 +192,11 @@ unsigned int hud_hires_placeholder_texture(unsigned long data, unsigned long *le
 	return 0;
 }
 
+int hud_hires_override_point_threshold(long asset)
+{
+	return asset >= 0 && asset < hud_hires_asset_count() && hud_hires_embedded[asset].point_threshold;
+}
+
 /* ---------- decoding */
 
 static unsigned long big_endian_long(const unsigned char *bytes)

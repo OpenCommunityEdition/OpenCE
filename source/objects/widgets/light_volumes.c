@@ -72,7 +72,7 @@ static struct light_volume_globals light_volume_globals = {0};
 void light_volumes_initialize(
 	void)
 {
-	light_volume_globals.light_volume_data = game_state_data_new("light volumes", 256, 8);
+	light_volume_globals.light_volume_data = game_state_data_new("light volumes", HALO_PORT_MAXIMUM_LIGHT_VOLUMES, 8);
 	if (!light_volume_globals.light_volume_data)
 	{
 		display_assert(
@@ -340,6 +340,12 @@ void light_volume_submit(
 		if (definition->count > 0 && definition->frames.count > 0)
 		{
 			short source = definition->brightness_scale_source;
+			/* port: a source past a to d is none (a map's; it read past the
+			object's four values) */
+			if (!(source >= _object_function_reference_a && source <= _object_function_reference_d))
+			{
+				source = 0;
+			}
 			if (!source || !animation || animation->values[source - 1] > 0.f)
 			{
 				struct object_marker marker;

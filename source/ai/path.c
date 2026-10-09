@@ -1215,6 +1215,12 @@ static short build_path_edges_for_surface(
 		"c:\\halo\\SOURCE\\ai\\path.c",
 		0x5D8,
 		(surface_index >= 0) && (surface_index < bsp->surfaces.count));
+	/* port: a surface that is not the bsp's (a node's surface, from a map's
+	edge) has no edges to leave by */
+	if (!collision_bsp_valid_surface_index(bsp, surface_index))
+	{
+		return 0;
+	}
 	surface = TAG_BLOCK_GET_ELEMENT(
 		&bsp->surfaces,
 		surface_index,
@@ -1223,14 +1229,38 @@ static short build_path_edges_for_surface(
 
 	do
 	{
-		struct collision_edge const *collision_edge = TAG_BLOCK_GET_ELEMENT(
+		struct collision_edge const *collision_edge;
+		boolean right_surface;
+		struct path_edge *edge;
+		struct collision_vertex const *start_vertex;
+		struct collision_vertex const *end_vertex;
+
+		/* port: the surface's ring of edges ends as
+		collision_surface_edge_ring_continues says, or at an edge whose
+		vertices aren't the bsp's (a map's indices; the retail rings all
+		close within 3 to 8 edges) */
+		if (!collision_surface_edge_ring_continues(bsp, edge_index, edge_count))
+		{
+			break;
+		}
+		collision_edge = TAG_BLOCK_GET_ELEMENT(
 			&bsp->edges,
 			edge_index,
 			struct collision_edge);
-		boolean right_surface = surface_index == collision_edge->surface_indices[1];
-		struct path_edge *edge = &edges[edge_count++];
-		struct collision_vertex const *start_vertex;
-		struct collision_vertex const *end_vertex;
+		if (!VALID_INDEX(collision_edge->vertex_indices[0], bsp->vertices.count) ||
+			!VALID_INDEX(collision_edge->vertex_indices[1], bsp->vertices.count))
+		{
+			static boolean reported = FALSE;
+
+			if (!reported)
+			{
+				reported = TRUE;
+				error(_error_silent, "collision edge #%ld's vertices are not the bsp's", edge_index);
+			}
+			break;
+		}
+		right_surface = surface_index == collision_edge->surface_indices[1];
+		edge = &edges[edge_count++];
 
 		edge->adjacent_surface_index =
 			collision_edge->surface_indices[!right_surface];
@@ -1249,8 +1279,22 @@ static short build_path_edges_for_surface(
 		 * search treats as walkable when bit 0x40 is set. No structure BSP in the shipped
 		 * 01.10.12.2276 maps has an open edge (0 of 2,066,607 edges in 82 BSPs).
 		 */
-		edge->adjacent_pathfinding_surface =
-			pathfinding_surfaces[edge->adjacent_surface_index];
+		/* port: (and a neighbor, not NONE, that is no surface of the bsp's
+		or has no pathfinding surface is not walkable: a map's index; nor is
+		NONE of a bsp with no pathfinding surfaces, with no array to read
+		before) */
+		if ((edge->adjacent_surface_index != NONE &&
+			(!collision_bsp_valid_surface_index(bsp, edge->adjacent_surface_index) ||
+			!VALID_INDEX(edge->adjacent_surface_index, structure->pathfinding_surfaces.count))) ||
+			(edge->adjacent_surface_index == NONE && structure->pathfinding_surfaces.count <= 0))
+		{
+			edge->adjacent_pathfinding_surface = 0;
+		}
+		else
+		{
+			edge->adjacent_pathfinding_surface =
+				pathfinding_surfaces[edge->adjacent_surface_index];
+		}
 
 		start_vertex = TAG_BLOCK_GET_ELEMENT(
 			&bsp->vertices,

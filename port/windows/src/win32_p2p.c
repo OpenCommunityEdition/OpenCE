@@ -195,7 +195,8 @@ int posix_hardware_id_source(char *text, int size)
 			BYTE *structure = table + 8;
 			BYTE *end = table + 8 + (length < table_size - 8 ? length : table_size - 8);
 
-			while (structure + 4 <= end && structure[1] >= 4)
+			/* (each structure's formatted part within the table) */
+			while (structure + 4 <= end && structure[1] >= 4 && structure[1] <= end - structure)
 			{
 				BYTE *strings = structure + structure[1];
 

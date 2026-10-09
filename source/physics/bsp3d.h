@@ -16,6 +16,15 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	/* port: how many nodes deep a walk of a bsp3d (from the map) goes
+	before it stops: the engine's MAXIMUM_BSP3D_DEPTH (the plane stacks of
+	collision_bsp.c, the path render_debug_bsp prints), where the retail
+	bsps are at most 66 deep. A cycle of nodes would never end */
+	MAXIMUM_BSP3D_TRAVERSAL_DEPTH = 128,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */

@@ -15,6 +15,14 @@ header included in hcex build.
 
 /* ---------- constants */
 
+enum
+{
+	/* port: how many nodes deep a walk of a bsp2d (from the map) goes
+	before it stops (the engine has no limit): far above the retail bsps,
+	which are at most 8 deep. A cycle of nodes would never end */
+	MAXIMUM_BSP2D_TRAVERSAL_DEPTH = 128,
+};
+
 /* ---------- macros */
 
 /* ---------- structures */

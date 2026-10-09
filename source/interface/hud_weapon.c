@@ -405,6 +405,9 @@ static void render_weapon_hud(
 	short const *new_state_flags,
 	short const *new_overlay_flags,
 	short const *new_numbers);
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count);
 
 /* ---------- globals */
 
@@ -857,8 +860,11 @@ static void hud_update_weapon_local_player(
 						weapon_state->magazines[1].rounds_loaded <= root_definition->flash_cutoffs.loaded_ammo;
 					break;
 
+				/* port: these two read a weapon of one magazine's missing second
+				as empty, flashing it and showing it fired empty at each pull */
 				case _crosshair_state_flash_secondary_total_ammo:
-					result = weapon_state->magazines[1].rounds_remaining <=
+					result = weapon_state->magazine_count > 1 &&
+						weapon_state->magazines[1].rounds_remaining <=
 							root_definition->flash_cutoffs.total_ammo &&
 						!weapon_state->magazines[1].reloading;
 					break;
@@ -870,10 +876,11 @@ static void hud_update_weapon_local_player(
 				case _crosshair_state_fired_secondary_with_no_ammo:
 					/* January (T+0x3b7 shared tail `test ch,8`) and the later /Od build (0x638a07
 					   `and edx,0x800`) both test the primary trigger for this secondary state. */
-					result = (!weapon_state->magazines[1].rounds_loaded &&
+					result = weapon_state->magazine_count > 1 &&
+						((!weapon_state->magazines[1].rounds_loaded &&
 							!weapon_state->magazines[1].rounds_remaining &&
 							TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit)) ||
-						state->value.reference_data != NONE;
+						state->value.reference_data != NONE);
 					break;
 
 				case _crosshair_state_flash_secondary_ammo_none_for_reload:
@@ -1025,7 +1032,8 @@ static void crosshairs_draw(
 						struct weapon_hud_crosshairs_element);
 					short state_index = element->crosshair_type;
 
-					if (TEST_FLAG(render_flags, state_index) &&
+					if (weapon_hud_state_index_valid(state_index, NUMBER_OF_WEAPON_HUD_CROSSHAIR_STATES) &&
+						TEST_FLAG(render_flags, state_index) &&
 						TEST_FLAG(map_type_flags, element->use_on_map_type))
 					{
 						struct crosshair_state *state = &crosshair->states[state_index];
@@ -1319,6 +1327,31 @@ static void crosshairs_draw(
 	return;
 }
 
+/* port: a hud element's state (or crosshair) type is the map's, and indexes
+the state tables (8 states, 19 crosshair states; retail elements use up to 7
+and 18): an element of any other is not drawn, and that is said once */
+static boolean weapon_hud_state_index_valid(
+	short state_index,
+	short state_count)
+{
+	static boolean bad_state_reported = FALSE;
+
+	if (VALID_INDEX(state_index, state_count))
+		return TRUE;
+
+	if (!bad_state_reported)
+	{
+		bad_state_reported = TRUE;
+		error(
+			_error_silent,
+			"weapon hud element of state %d (of %d) not drawn",
+			state_index,
+			state_count);
+	}
+
+	return FALSE;
+}
+
 static void render_weapon_hud(
 	long hud_index,
 	short local_player_index,
@@ -1566,7 +1599,9 @@ static void render_weapon_hud(
 		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
 		overlay_flags[3] = flags;
 
-		flags = overlay_flags[0];
+		/* port: the secondary magazine's overlays are 4 and 5, as its states
+		and numbers are: these wrote over the primary's 0 and 1 */
+		flags = overlay_flags[4];
 		SET_FLAG(
 			flags,
 			_weapon_overlay_on_flashing_bit,
@@ -1585,9 +1620,9 @@ static void render_weapon_hud(
 			_weapon_overlay_on_default_bit,
 			flags == 0);
 		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
-		overlay_flags[0] = flags;
+		overlay_flags[4] = flags;
 
-		flags = overlay_flags[1];
+		flags = overlay_flags[5];
 		SET_FLAG(
 			flags,
 			_weapon_overlay_on_flashing_bit,
@@ -1605,7 +1640,12 @@ static void render_weapon_hud(
 			_weapon_overlay_on_default_bit,
 			flags == 0);
 		SET_FLAG(flags, _weapon_overlay_on_always_bit, TRUE);
-		overlay_flags[1] = flags;
+		overlay_flags[5] = flags;
+		/* port: a weapon without a second magazine draws none of its overlays,
+		as the Xbox never set these; its states above read an empty one, whose
+		total ammunition is drawn disabled */
+		if (weapon_state->magazine_count < 2)
+			overlay_flags[4] = overlay_flags[5] = 0;
 
 		number_values[0] = weapon_state->magazines[0].rounds_remaining;
 		number_values[1] = weapon_state->magazines[0].rounds_loaded;
@@ -1684,7 +1724,8 @@ static void render_weapon_hud(
 			struct weapon_hud_static_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			/* (the zoomed view's, at the middle: hud_zoomed_layout_begin) */
 			rectangle2d window_bounds;
@@ -1714,7 +1755,8 @@ static void render_weapon_hud(
 			struct weapon_hud_meter_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			byte value;
 			rectangle2d window_bounds;
@@ -1749,7 +1791,8 @@ static void render_weapon_hud(
 			struct weapon_hud_number_element);
 
 		if (!TEST_FLAG(element->header.runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->header.use_on_map_type))
+			TEST_FLAG(map_type_flags, element->header.use_on_map_type) &&
+			weapon_hud_state_index_valid(element->header.state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			short magazine_size = 1;
 			short value;
@@ -1768,6 +1811,10 @@ static void render_weapon_hud(
 						struct weapon_magazine_definition);
 
 				magazine_size = magazine->rounds_loaded_maximum;
+				/* port: the map's; a magazine of none divides by one (an
+				integer divide by zero halts) */
+				if (magazine_size == 0)
+					magazine_size = 1;
 			}
 
 			state_index = element->header.state_type;
@@ -1822,7 +1869,8 @@ static void render_weapon_hud(
 			struct weapon_hud_overlays_element);
 
 		if (!TEST_FLAG(element->runtime_flags, _hud_element_runtime_invalid_bit) &&
-			TEST_FLAG(map_type_flags, element->use_on_map_type))
+			TEST_FLAG(map_type_flags, element->use_on_map_type) &&
+			weapon_hud_state_index_valid(element->state_type, NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES))
 		{
 			state_index = element->state_type;
 			hud_draw_weapon_overlays(

@@ -164,6 +164,13 @@ static int zip_extract_entry(SDL_IOStream *zip, unsigned long local_offset, int 
 				if (result != Z_OK && result != Z_STREAM_END)
 					break;
 				produced = sizeof(output) - stream.avail_out;
+				/* (no more than the entry says, before it is on the disk) */
+				if (written + (unsigned long)produced > size)
+				{
+					snprintf(reason, reason_size, "it unpacks to more than %lu bytes", size);
+					result = Z_ERRNO;
+					break;
+				}
 				if (SDL_WriteIO(file, output, produced) != produced)
 				{
 					snprintf(reason, reason_size, "could not write %s after %lu bytes (%s)", path, written, SDL_GetError());
@@ -518,7 +525,8 @@ static void updater_clean_up(void)
 {
 	static const char *const names[] =
 	{
-		"halo.old", "halo.exe.old", "SDL3.dll.old", "extract-xiso-LICENSE.txt.old", "mbedtls-LICENSE.txt.old",
+		"halo.old", "halo.exe.old", "SDL3.dll.old", "libSDL3.so.0.old", "SDL3-LICENSE.txt.old",
+		"extract-xiso-LICENSE.txt.old", "mbedtls-LICENSE.txt.old",
 	};
 	char path[1200];
 	size_t index;
