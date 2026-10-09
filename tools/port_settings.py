@@ -30,10 +30,11 @@ SCREENS = {
     "video_settings": {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
-        # (closer than the other screens' rows, and the help lower, for all
-        # twelve places to fit above it)
-        "spacing": 24,
+        # the other screens' 30px step. each platform packs its own rows, so
+        # a row hidden on this machine does not leave a gap
+        "spacing": 30,
         "help_top": 364,
+        "platform_places": True,
         # (rows in the place of the row before them: Window Size in
         # Resolution's, port/linux/game/menu_functions.c showing the one the
         # display mode chosen uses; Android's anti-aliasing in the desktop's)
@@ -198,7 +199,7 @@ SCREENS["video_settings/fov_viewmodels"] = {
         ("FOV:", "display.fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
          "On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes.", None),
         ("VIEWMODEL FOV:", "display.viewmodel_fov", [("SAME", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
-         "Weapon/hands horizontal FOV at 16:9, in degrees.\nSame follows the world view.", None),
+         "Weapon and hands horizontal FOV at 16:9, in degrees.\nSame keeps the original weapon view.", None),
         ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
     ],
@@ -325,9 +326,10 @@ def _setting_screen(folder: str, spec: dict) -> list:
     for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
         key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
+        shares = setting in spec.get("same_place", ()) or key in spec.get("same_place", ())
         if spec.get("platform_places"):
             for name in places:
-                if platform in (None, name):
+                if platform in (None, name) and not shares:
                     places[name] += 1
             if platform or places["desktop"] == places["android"]:
                 rows.append((row, platform, places[platform or "desktop"]))
@@ -362,7 +364,15 @@ def _setting_screen(folder: str, spec: dict) -> list:
         key = category_folder.rsplit("/", 1)[-1]
         row = f"{base}/op_{key}"
         target = f"{PE}/{category_folder}/{SCREENS[category_folder]['screen']}"
-        rows.append((row, None, place + 1 + index))
+        if spec.get("platform_places"):
+            for name in places:
+                places[name] += 1
+            if places["desktop"] == places["android"]:
+                rows.append((row, None, places["desktop"]))
+            else:
+                rows += [(row, name, places[name]) for name in ("desktop", "android")]
+        else:
+            rows.append((row, None, place + 1 + index))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                          [f'<on event="a" open="{target}"/>', f'<on event="start" open="{target}"/>',

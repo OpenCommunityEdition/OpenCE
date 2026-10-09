@@ -1,5 +1,6 @@
 #include "cseries.h"
 #include "viewmodel_fov.h"
+#include "render_fov.h"
 #include "camera/director.h"
 #include "cutscene/cinematics.h"
 #include "game/players.h"
@@ -42,6 +43,10 @@ void viewmodel_projection_begin(void)
 	if (projection_depth++ != 0) return;
 	projection_applied = FALSE;
 	angle = viewmodel_vertical();
+	/* SAME keeps the weapon at this frame's own angle. A wide world view
+	stretches arms and a gun that sit against the camera. */
+	if (!angle)
+		angle = render_fov_authored_vertical(render.local_player_index);
 	if (!angle || render.local_player_index < 0 || render.local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
 		global_window_parameters.rasterizer_target != 0 /* primary view */ ||
 		cinematic_in_progress() || (director_camera_scripted && *director_camera_scripted) ||

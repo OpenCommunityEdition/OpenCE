@@ -68,7 +68,7 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/help_strings">
 		<string text=""/>
 		<string text="On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes."/>
-		<string text="Weapon/hands horizontal FOV at 16:9, in degrees.\nSame follows the world view."/>
+		<string text="Weapon and hands horizontal FOV at 16:9, in degrees.\nSame keeps the original weapon view."/>
 		<string text="Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off."/>
 	</strings>
 </menus>

@@ -116,8 +116,8 @@ static const struct config_setting config_settings[] =
 		"On-foot first-person horizontal FOV at 16:9, in degrees (20-150);\n"
 		"0 keeps the authored view. Other cameras keep their own FOV." },
 	{ "display.viewmodel_fov", _config_real, "0.0", "HALO_VIEWMODEL_FOV", _environment_value, _platform_all,
-		"Weapon/hands horizontal FOV at 16:9, in degrees (20-150);\n"
-		"0 follows the world view. Attached visuals use the same projection." },
+		"Weapon and hands horizontal FOV at 16:9, in degrees (20 to 150);\n"
+		"0 keeps the original weapon view. Attached visuals use the same projection." },
 	{ "display.viewmodel_visible", _config_boolean, "true", "HALO_VIEWMODEL_VIS", _environment_value, _platform_all,
 		"Draw the first-person weapon, hands and attached visuals. Turning\n"
 		"this off does not change firing, animation, sound or world lights." },

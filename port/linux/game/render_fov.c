@@ -18,6 +18,7 @@ double config_real(const char *name);
 unsigned long config_changes(void);
 
 static real reticle_scales[MAXIMUM_LOCAL_PLAYERS];
+static real authored_vertical[MAXIMUM_LOCAL_PLAYERS];
 
 static float render_fov_adjust(short local_player_index, float native_vertical_field_of_view)
 {
@@ -113,8 +114,18 @@ float render_fov_vertical(short local_player_index, float native_vertical_field_
 		/* Record the projection used for this view, including its native zoom
 		 * transition. A temporary viewmodel projection must not affect the HUD. */
 		reticle_scales[local_player_index] = scale;
+		/* A widened world view. The weapon can return to this frame's own angle. */
+		authored_vertical[local_player_index] =
+			adjusted != native_vertical_field_of_view ? native_vertical_field_of_view : 0.0f;
 	}
 	return adjusted;
+}
+
+float render_fov_authored_vertical(short local_player_index)
+{
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return 0.0f;
+	return authored_vertical[local_player_index];
 }
 
 float render_fov_reticle_scale(short local_player_index)

@@ -6,5 +6,7 @@ camera's projection and visibility frustum are built. */
 float render_fov_vertical(short local_player_index, float native_vertical_field_of_view);
 /* HUD pixel ratio relative to the native projection of the last local view. */
 float render_fov_reticle_scale(short local_player_index);
+/* The view's own vertical angle when the world FOV replaced it, else 0. */
+float render_fov_authored_vertical(short local_player_index);
 
 #endif
