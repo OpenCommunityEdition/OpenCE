@@ -12,8 +12,10 @@ dsound_sdl.c (the mix).
 
 /* a frame: 20 ms at 48 kHz, mono */
 #define VOICE_FRAME_SAMPLES 960
-/* the longest packet sent or taken (64 kbps is 160 bytes a frame) */
-#define VOICE_MAXIMUM_PACKET 400
+/* the longest packet sent or taken: the voice messages give its length in a
+byte (network_voice.c). 64 kbps is 160 bytes a frame; the encoder fits a
+louder one to it rather than going over */
+#define VOICE_MAXIMUM_PACKET 255
 
 /* opens the microphone (on another thread: not at once) or closes it;
 whether it is open */
