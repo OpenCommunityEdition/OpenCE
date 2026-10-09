@@ -90,7 +90,9 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
 - **Corrections.** The host sends each client the authoritative state of
   the players' units and the game's moving objects; a client moves its
   copies toward it, a small error half of the way each tick, a larger one
-  at once, drawn gliding from where they were. A client's own unit and
+  at once, drawn gliding from where they were (a player's moved at once
+  is on the teleporter it lands on, as a teleporter leaves one it sends,
+  so the client's does not send it back). A client's own unit and
   vehicle are only corrected past a tolerance, so prediction does not
   rubber-band: the host tells the client which of the client's ticks it
   has its player at (its prediction come back), and the client compares
