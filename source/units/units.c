@@ -676,6 +676,7 @@ symbols in this file:
 #include "main/console.h"
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
+#include "models/models.h" /* port: model_find_node (the grenade throw's legs) */
 #include "objects/damage.h"
 #include "objects/damage_effect_definitions.h"
 #include "objects/object_lights.h"
@@ -3313,7 +3314,13 @@ void unit_impulse(
 
 	return;
 }
-/* port: the animation enhancements are for the player bipeds (cyborg and
+
+/* the platform layer's (port/linux/src/port_config.c) */
+int config_boolean(const char *name);
+unsigned long config_changes(void);
+
+/* port: the animation enhancements (game.enhanced_animations, on unless
+config.toml turns them off) are for the player bipeds (cyborg and
 cyborg_mp), whose animations they were made with; every other unit keeps
 the original animations */
 static char const *const enhanced_animation_units[] =
@@ -3325,10 +3332,24 @@ static char const *const enhanced_animation_units[] =
 boolean unit_animation_enhanced(
 	long unit_index)
 {
-	struct unit_datum *unit = unit_get(unit_index);
-	char const *name = tag_name_strip_path(tag_get_name(unit->definition_index));
+	static boolean enhanced = TRUE;
+	static unsigned long read_at = (unsigned long)-1;
+	struct unit_datum *unit;
+	char const *name;
 	long name_index;
 
+	/* (read again when the settings change) */
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		enhanced = config_boolean("game.enhanced_animations") != 0;
+	}
+	if (!enhanced)
+	{
+		return FALSE;
+	}
+	unit = unit_get(unit_index);
+	name = tag_name_strip_path(tag_get_name(unit->definition_index));
 	for (name_index = 0; name_index < NUMBEROF(enhanced_animation_units); name_index++)
 	{
 		if (!_stricmp(name, enhanced_animation_units[name_index]))
@@ -3339,6 +3360,7 @@ boolean unit_animation_enhanced(
 
 	return FALSE;
 }
+
 /* port: a seat whose graph has no reload of its own (a Scorpion rider's)
 reloads with the standing seat's, the same weapon's: a reload is a
 replacement animation, which moves only the arms and the weapon */
@@ -3383,6 +3405,7 @@ static short unit_standing_weapon_type_animation(
 
 	return NONE;
 }
+
 void unit_animation_start_action(
 	long unit_index,
 	short action)
@@ -10826,6 +10849,7 @@ static boolean unit_animation_set_state(
 done:
 	return result;
 }
+
 /* port: a unit throwing a grenade on the move keeps its lower body (the
 pelvis and the legs) in the movement animation; the throw keeps the spine
 and everything above it. The throw is a base animation, which sets every
@@ -10846,6 +10870,7 @@ static boolean unit_node_is_at_or_below(
 
 	return FALSE;
 }
+
 /* the speed, in world units per second, at and above which the legs move
 fully; below it they blend toward the rest pose */
 #define GRENADE_THROW_FULL_MOVE_SPEED 0.75f
@@ -10960,8 +10985,8 @@ static struct animation *unit_weapon_class_base_animation(
 		return NULL;
 	}
 
-   	return animation;
-   }
+	return animation;
+}
 
 /* port: the nodes a unit's orientations hold: its model's, no more than a
 model can have (object_new sizes them from the model) */
@@ -11111,7 +11136,7 @@ static void unit_grenade_throw_keep_legs_moving(
 	weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, unit->unit.animation.weapon_index, struct animation_graph_weapon_class);
 	model = model_definition_get(unit_definition->object.model.index);
 	now = game_time_get();
-		if (model->nodes.count > MAXIMUM_NODES_PER_MODEL)
+	if (model->nodes.count > MAXIMUM_NODES_PER_MODEL)
 	{
 		return;
 	}
@@ -11272,6 +11297,7 @@ static void unit_grenade_throw_keep_legs_moving(
 
 	return;
 }
+
 void unit_preprocess_node_orientations(
 	long unit_index,
 	struct real_orientation *node_orientations)
@@ -11288,8 +11314,10 @@ void unit_preprocess_node_orientations(
 	unit_definition = unit_definition_get(unit->definition_index);
 	animation_graph = animation_graph_definition_get(
 		unit_definition->object.animation_graph.index);
+	/* port: every animation below is one the graph has and that fits the
+	model (unit_animation_get_fitting) */
+	model_node_count = unit_animation_model_node_count(unit_index);
 	unit_grenade_throw_keep_legs_moving(unit_index, node_orientations);
-
 
 	if (unit->unit.animation.action_animation.index != NONE &&
 		(animation = unit_animation_get_fitting(animation_graph,

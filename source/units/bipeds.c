@@ -3338,21 +3338,22 @@ static void biped_update_turning(
 		biped_snap_facing(biped_index);
 		biped_verify_object_vectors(biped_index, "post-fly-turn");
 	}
-		else if (biped->unit.animation.base_seat_index!=_unit_base_seat_asleep)
-		{
-			boolean flaming =
-				biped->unit.animation.base_seat_index==_unit_base_seat_flaming;
-			/* port: a player throwing a grenade turns with the aim, as one
-			meleeing does: the melee plays over the moving or idle state, the
-			throw is a state of its own, which the original never turned in */
+	else if (biped->unit.animation.base_seat_index!=_unit_base_seat_asleep)
+	{
+		boolean flaming =
+			biped->unit.animation.base_seat_index==_unit_base_seat_flaming;
+		/* port: a player throwing a grenade turns with the aim, as one
+		meleeing does: the melee plays over the moving or idle state, the
+		throw is a state of its own, which the original never turned in
+		(game.enhanced_animations: unit_animation_enhanced) */
 		boolean throwing_turn =
 			biped->unit.player_index!=NONE &&
 			biped->unit.animation.state==_unit_state_throw_grenade &&
 			unit_animation_enhanced(biped_index);
-			real_vector3d turn_axis;
-			real turn_error;
-			real facing_alignment;
-			boolean turn_right;
+		real_vector3d turn_axis;
+		real turn_error;
+		real facing_alignment;
+		boolean turn_right;
 
 		if (TEST_FLAG(flags, _biped_climbs_anything_bit))
 		{
