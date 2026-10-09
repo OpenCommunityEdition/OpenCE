@@ -645,6 +645,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "units.h"
+#include "network_campaign.h"
 
 #include "bipeds.h"
 #include "biped_definitions.h"
@@ -691,6 +692,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "sound/game_sound.h"
 #include "vehicles.h"
+#include "halo_vr.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
@@ -4101,6 +4103,35 @@ boolean unit_start_user_animation(
 	return animation_started;
 }
 
+/* port: a network co-op client's copy of the host's user animation (the
+host's choice of permutation, at the host's frame), as
+unit_start_user_animation starts one (network_campaign_actors.c checked the
+indices); test26 */
+void unit_network_start_user_animation(
+	long unit_index,
+	long animation_graph_index,
+	short animation_index,
+	short frame_index,
+	boolean interpolate)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+
+	if (interpolate)
+	{
+		object_start_interpolation(unit_index, 6);
+	}
+	unit->unit.animation.state = _unit_state_user_animation;
+	unit_set_animation(unit_index, animation_graph_index, animation_index);
+	unit->object.animation.state.frame_index = frame_index;
+	SET_FLAG(
+		unit->unit.animation.flags,
+		_unit_animation_postpone_weapon_ik_until_interpolation_ends_bit,
+		TRUE);
+	object_compute_node_matrices_recursive(unit_index);
+
+	return;
+}
+
 boolean unit_set_seat(
 	long unit_index,
 	char const *seat_label)
@@ -4410,9 +4441,8 @@ boolean unit_throw_grenade_begin(
 			break;
 
 		default:
-			/* port: and with no weapon (a loadout of none), as melee
-			(bipeds.c), which weapon_prevents_grenade_throwing(NONE) prevents;
-			not from a vehicle's seat, which holds no weapon either */
+			/* port: with no weapon too (a loadout of none), but not from a
+			vehicle's seat, which holds no weapon either (upstream 1a15a171) */
 			if ((weapon_index == NONE && unit->unit.parent_seat_index == NONE) ||
 				(weapon_index != NONE && !weapon_prevents_grenade_throwing(weapon_index)))
 			{
@@ -4892,6 +4922,10 @@ void unit_adjust_projectile_ray(
 		real_point3d camera_position;
 
 		unit_get_camera_position(unit_index, &camera_position);
+#ifdef HALO_VR
+		/* shots from the hand that aims (port/linux/game/vr_render.c) */
+		vr_render_hand_origin(unit_index, &camera_position);
+#endif
 		vector_from_points3d(&camera_position, origin, &relative);
 		projection =
 			((relative.i*direction->i + relative.k*direction->k) +
@@ -5376,6 +5410,9 @@ boolean unit_update(
 	profile_enter(unit_update_section);
 
 	unit_verify_vectors(unit_index, "unit-update-begin");
+	/* Remote campaign actors are controlled by the host, with a bounded
+	 * input lifetime; no local AI actor is created on the client. */
+	network_campaign_actor_update(unit_index);
 
 	++unit->unit.timer;
 
@@ -8609,6 +8646,20 @@ boolean unit_start_animation_impulse(
 	long animation_graph_index;
 	boolean result = FALSE;
 
+	/* A newly replicated NPC can receive its event before its first local
+	 * animation/weapon-class update. Never index an uninitialized graph. */
+	if (network_campaign_client())
+	{
+		if (!unit_animation_impulse_valid(animation_impulse)) return FALSE;
+		unit_definition = unit_definition_get(unit->definition_index);
+		if (unit_definition->object.animation_graph.index == NONE) return FALSE;
+		animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
+		if (!VALID_INDEX(unit->unit.animation.seat_index, animation_graph->unit_seats.count)) return FALSE;
+		unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, unit->unit.animation.seat_index,
+			struct animation_graph_unit_seat);
+		if (!VALID_INDEX(unit->unit.animation.weapon_index, unit_seat->weapon_classes.count)) return FALSE;
+	}
+
 	if (unit_can_play_animation_impulse(unit_index, animation_impulse))
 	{
 		unit_definition = unit_definition_get(unit->definition_index);
@@ -8669,7 +8720,12 @@ boolean unit_start_animation_impulse(
 		}
 	}
 
+	if (result) network_campaign_actor_impulse_capture(unit_index, animation_impulse, alignment_vector);
 	return result;
+}
+boolean unit_animation_impulse_valid(short impulse)
+{
+	return VALID_INDEX(impulse, NUMBER_OF_UNIT_ANIMATION_IMPULSES);
 }
 static void unit_melee_sound(
 	long unit_index,
@@ -8836,9 +8892,15 @@ enum
 	_collision_result_breakable_surface_bit = 3,
 };
 
+/* port: the melee damage of a unit with no weapon (a gametype's loadout of
+none): its own, else (a player's biped has none: players always had a
+weapon) the blow of the globals' first multiplayer weapon, the assault
+rifle's. network_damage.c takes it as the player's. */
 /* the globals' first multiplayer weapon, NONE where there is none: a
 campaign map's globals list no multiplayer weapons (and its player starts
-some levels unarmed, a10's), so its unarmed blow stays the game's, none */
+some levels unarmed, a10's), so its unarmed blow stays the game's, none
+(upstream ce77db84: a co-op campaign's host halted on its first tick in
+network_damage.c, which notes every player's unarmed blow) */
 static long unarmed_melee_weapon_definition_index(
 	void)
 {
@@ -8848,10 +8910,6 @@ static long unarmed_melee_weapon_definition_index(
 		list_index_to_weapon_definition_index(0) : NONE;
 }
 
-/* port: the melee damage of a unit with no weapon (a gametype's loadout of
-none): its own, else (a player's biped has none: players always had a
-weapon) the blow of the globals' first multiplayer weapon, the assault
-rifle's. network_damage.c takes it as the player's. */
 long unit_unarmed_melee_damage(
 	long unit_index)
 {
@@ -9177,6 +9235,193 @@ void unit_cause_player_melee_damage(
 
 	return;
 }
+
+#ifdef HALO_VR
+/* port: a melee struck by the headset's hand (port/linux/game/vr_render.c,
+vr.melee "impact"): what the hand swept through this tick, from `from`
+along `sweep`, takes the blow unit_cause_player_melee_damage gives what is
+ahead of the unit - the weapon's melee damage (the unit's without one) and
+its response, a vehicle's shove, a breakable surface's damage, the sound -
+at the point struck, along the swing, scaled by `scale` (the swing's
+speed). Unlike the game's own, every object struck takes the damage, a
+vehicle too. TRUE when the hand struck something. */
+boolean unit_vr_impact_melee(
+	long unit_index,
+	real_point3d const *from,
+	real_vector3d const *sweep,
+	real scale, boolean weapon_hand, real radius)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+	struct collision_result collision;
+	long hit_object_index = NONE;
+	short hit_material_type;
+	short breakable_surface_index = NONE;
+	long breakable_surface_seed_surface_index = NONE;
+	long melee_damage_effect_index = NONE;
+	long melee_response_effect_index = NONE;
+	real_vector3d direction = *sweep;
+	boolean hit = FALSE;
+	int probe;
+	real nearest = 1.0f;
+	real_point3d eye;
+
+	if (global_current_collision_user_depth >= MAXIMUM_COLLISION_USER_STACK_DEPTH)
+		return FALSE;
+	global_current_collision_users[global_current_collision_user_depth++] = 8;
+	unit_get_camera_position(unit_index, &eye);
+	/* Seven bounded sweeps give the fist a volume. Reject occluded starting
+	points so a controller already through a wall cannot damage beyond it. */
+	for (probe = 0; probe < 7; probe++)
+	{
+		real_point3d origin = *from;
+		real_vector3d sight;
+		struct collision_result candidate, obstruction;
+		if (probe) origin.n[(probe - 1) / 2] += (probe & 1 ? radius : -radius);
+		vector_from_points3d(&eye, &origin, &sight);
+		if (collision_test_vector(_collision_test_for_projectiles_flags, &eye, &sight, unit_index, &obstruction))
+		{
+			/* test26: a hand a tick's swing carried inside what it strikes
+			(a fast swing's last tick lands it there, and the bodies'
+			collision keeps the player from reaching further): the object
+			between the eye and the hand is what it struck. A wall there
+			still stops the blow. */
+			if (obstruction.type == _collision_result_object && obstruction.t >= 0.0f && obstruction.t <= 1.0f &&
+				!hit)
+			{
+				collision = obstruction;
+				nearest = 0.0f;
+				hit = TRUE;
+			}
+			continue;
+		}
+		if (collision_test_vector(_collision_test_for_projectiles_flags, &origin, sweep, unit_index, &candidate) &&
+			candidate.t >= 0.0f && candidate.t <= nearest)
+		{
+			nearest = candidate.t;
+			collision = candidate;
+			hit = TRUE;
+		}
+	}
+	--global_current_collision_user_depth;
+	if (!hit)
+		return FALSE;
+
+	hit_material_type = collision.material_type;
+	if (collision.type == _collision_result_structure)
+	{
+		if (TEST_FLAG(collision.flags, _collision_result_breakable_surface_bit))
+		{
+			breakable_surface_index = collision.breakable_surface_index;
+			breakable_surface_seed_surface_index = collision.surface_index;
+		}
+	}
+	else if (collision.type == _collision_result_object)
+	{
+		struct object_datum *hit_object;
+
+		hit_object_index = collision.object_index;
+		hit_object = object_get(hit_object_index);
+		if (hit_object->object.type != _object_type_weapon &&
+			hit_object->object.parent_object_index != NONE)
+		{
+			hit_object_index = hit_object->object.parent_object_index;
+		}
+	}
+	normalize3d(&direction);
+
+	/* Prefer the biped's authored unarmed effect for a fist. Some player
+	tags have none; retain the carried weapon's authored damage as fallback. */
+	if ((weapon_hand || unit_definition->unit.melee_damage.index == NONE) &&
+		unit->unit.current_weapon_index != NONE)
+	{
+		long weapon_index = unit->unit.weapon_object_indices[unit->unit.current_weapon_index];
+
+		if (weapon_index != NONE)
+		{
+			struct weapon_definition *weapon_definition =
+				weapon_definition_get(weapon_get(weapon_index)->definition_index);
+
+			melee_damage_effect_index = weapon_definition->weapon.melee_attack_damage.index;
+			melee_response_effect_index = weapon_definition->weapon.melee_attack_response.index;
+		}
+	}
+	if (melee_damage_effect_index == NONE)
+		melee_damage_effect_index = unit_definition->unit.melee_damage.index;
+
+	if (hit_object_index != NONE && object_get(hit_object_index)->object.type == _object_type_vehicle)
+	{
+		struct object_definition *vehicle_definition =
+			object_definition_get(object_get(hit_object_index)->definition_index);
+		real acceleration_scale = vehicle_definition->object.acceleration_scale * 0.035f * scale;
+		real_vector3d acceleration;
+
+		acceleration.i = acceleration_scale * direction.i;
+		acceleration.j = acceleration_scale * direction.j;
+		acceleration.k = acceleration_scale * direction.k;
+		vehicle_accelerate(hit_object_index, &acceleration);
+	}
+
+	if (melee_damage_effect_index != NONE)
+	{
+		struct damage_data damage_data;
+
+		damage_data_new(&damage_data, melee_damage_effect_index);
+		damage_data.location = unit->object.location;
+		damage_data.owner_object_index = unit_index;
+		damage_data.owner_team_index = unit->object.owner_team_index;
+		damage_data.owner_player_index = unit->unit.player_index;
+		damage_data.origin = collision.point;
+		damage_data.epicenter = collision.point;
+		damage_data.direction = direction;
+		damage_data.material_type = hit_material_type;
+		damage_data.scale = scale;
+		if (hit_object_index == NONE)
+		{
+			if (breakable_surface_index != NONE)
+			{
+				breakable_surface_damage(
+					breakable_surface_index,
+					&damage_data,
+					breakable_surface_seed_surface_index);
+			}
+		}
+		else
+		{
+			boolean struck_itself = hit_object_index == collision.object_index;
+
+			if (object_get(hit_object_index)->object.type == _object_type_machine)
+				machine_try_to_open_with_damage(hit_object_index);
+			object_cause_damage(
+				&damage_data,
+				hit_object_index,
+				struck_itself ? collision.node_index : NONE,
+				struck_itself ? collision.region_index : NONE,
+				struck_itself ? collision.material_index : NONE,
+				&collision.plane.n);
+		}
+	}
+
+	if (hit_material_type != NONE)
+	{
+		unit_melee_sound(unit_index, hit_material_type, melee_damage_effect_index);
+		if (melee_response_effect_index != NONE)
+		{
+			struct damage_data damage_data;
+
+			damage_data_new(&damage_data, melee_response_effect_index);
+			damage_data.direction.i = -direction.i;
+			damage_data.direction.j = -direction.j;
+			damage_data.direction.k = -direction.k;
+			damage_data.epicenter = unit->object.bounding_sphere_center;
+			damage_data.origin = unit->object.bounding_sphere_center;
+			SET_FLAG(damage_data.flags, _damage_from_weapon_bit, TRUE);
+			object_cause_damage(&damage_data, unit_index, NONE, NONE, NONE, NULL);
+		}
+	}
+	return TRUE;
+}
+#endif
 
 static void unit_align_facing(
 	long unit_index,
@@ -11290,6 +11535,7 @@ void unit_control(
 	unit->unit.animation.desired_state = control_data->animation_state;
 
 	unit_verify_vectors(unit_index, "unit-control");
+	network_campaign_actor_capture(unit_index, control_data);
 
 	return;
 }

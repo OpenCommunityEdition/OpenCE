@@ -85,6 +85,7 @@ symbols in this file:
 #include "shaders/shader_definitions.h"
 #include "structures/structure_bsp_definitions.h"
 #include "tag_files/tag_groups.h"
+#include "halo_vr.h"
 
 /* ---------- constants */
 
@@ -566,7 +567,9 @@ static void weather_particle_system_render(
 	struct structure_bsp *structure = global_structure_bsp_get();
 	short type_index;
 
-	weather_particle_system_update(local_player_index);
+	/* once a frame: not again for the second eye (halo_vr.h) */
+	if (!VR_RENDER_REPEAT())
+		weather_particle_system_update(local_player_index);
 
 	for (type_index = 0; type_index<weather_particle_system_type_count(definition); type_index++)
 	{

@@ -39,6 +39,14 @@ drive the controller.
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "vr.h"
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+#include "guest_host.h"
+#include "halo_touch.h"
+#endif
+#ifdef HALO_VR
+#include "halo_android_abi.h"
+#endif
 #include "halo_keyboard.h"
 
 #include <SDL3/SDL.h>
@@ -80,6 +88,10 @@ static BOOL reported_keyboard = FALSE;
 
 static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+static float touch_pending_yaw, touch_pending_pitch;
+static unsigned int touch_generation;
+#endif
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
 /* the wheel's switch (wheel_update): when the wheel last moved, until when
@@ -144,11 +156,15 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	mouse_pending_x = 0.0f;
 	mouse_pending_y = 0.0f;
 	mouse_polls_unconsumed = 0;
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+    *yaw = touch_pending_yaw; *pitch = touch_pending_pitch;
+    touch_pending_yaw = touch_pending_pitch = 0.f;
+#endif
 	pthread_mutex_unlock(&mouse_lock);
-	if (x == 0.0f && y == 0.0f)
+	if (x == 0.0f && y == 0.0f && *yaw == 0.f && *pitch == 0.f)
 		return FALSE;
-	*yaw = -x * scale * mouse_sensitivity();
-	*pitch = (invert ? y : -y) * scale * vertical_sensitivity;
+	*yaw += -x * scale * mouse_sensitivity();
+	*pitch += (invert ? y : -y) * scale * vertical_sensitivity;
 	return TRUE;
 }
 
@@ -186,6 +202,9 @@ static void mouse_poll(const struct platform_input_state *input)
 	{
 		mouse_pending_x = 0.0f;
 		mouse_pending_y = 0.0f;
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+        touch_pending_yaw = touch_pending_pitch = 0.f;
+#endif
 	}
 	if (!input->mouse_released)
 	{
@@ -617,6 +636,14 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 
 				if (!gamepad)
 					continue;
+#ifdef HALO_VR
+				/* a standalone headset lists its own controllers (Meta's,
+				vendor 0x2833) as gamepads too: while the headset plays, they
+				come through OpenXR (vr_controller), and as gamepads they
+				would also be another player's (split screen) */
+				if (vr_active() && SDL_GetGamepadVendor(gamepad) == 0x2833)
+					continue;
+#endif
 				type = SDL_GetGamepadType(gamepad);
 				recognised = type != SDL_GAMEPAD_TYPE_UNKNOWN && type != SDL_GAMEPAD_TYPE_STANDARD;
 				if (recognised == (pass == 0))
@@ -744,6 +771,96 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
 }
 
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+/* Phone input shares player one without changing physical controller order.
+ * The zero snapshot cannot release a physical button or override its sticks. */
+static void touch_gamepad_state(XINPUT_GAMEPAD *pad)
+{
+	struct halo_touch_state touch;
+	static const WORD digital[] = {
+		XINPUT_GAMEPAD_LEFT_THUMB, XINPUT_GAMEPAD_RIGHT_THUMB,
+		XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_DPAD_UP,
+		XINPUT_GAMEPAD_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_RIGHT
+	};
+	int index;
+	host_touch_read(&touch);
+    pthread_mutex_lock(&mouse_lock);
+    if (touch_generation != touch.generation) {
+        touch_generation = touch.generation; touch_pending_yaw = touch_pending_pitch = 0.f;
+    }
+    touch_pending_yaw = fmaxf(-1.5708f, fminf(1.5708f, touch_pending_yaw + touch.yaw));
+    touch_pending_pitch = fmaxf(-1.5708f, fminf(1.5708f, touch_pending_pitch + touch.pitch));
+    if (touch.yaw != 0.f || touch.pitch != 0.f) mouse_aimed_ms = SDL_GetTicks();
+    pthread_mutex_unlock(&mouse_lock);
+	merge_button(pad, XINPUT_GAMEPAD_A, touch.buttons & HALO_TOUCH_A);
+	merge_button(pad, XINPUT_GAMEPAD_B, touch.buttons & HALO_TOUCH_B);
+	merge_button(pad, XINPUT_GAMEPAD_X, touch.buttons & HALO_TOUCH_X);
+	merge_button(pad, XINPUT_GAMEPAD_Y, touch.buttons & HALO_TOUCH_Y);
+	merge_button(pad, XINPUT_GAMEPAD_WHITE, touch.buttons & HALO_TOUCH_WHITE);
+	merge_button(pad, XINPUT_GAMEPAD_BLACK, touch.buttons & HALO_TOUCH_BLACK);
+	merge_button(pad, XINPUT_GAMEPAD_LEFT_TRIGGER, touch.buttons & HALO_TOUCH_GRENADE);
+	merge_button(pad, XINPUT_GAMEPAD_RIGHT_TRIGGER, touch.buttons & HALO_TOUCH_FIRE);
+	for (index = 0; index < 8; ++index)
+		if (touch.buttons & (1u << (index + 6))) pad->wButtons |= digital[index];
+	if (abs(touch.lx) > abs(pad->sThumbLX)) pad->sThumbLX = (SHORT)touch.lx;
+	if (abs(touch.ly) > abs(pad->sThumbLY)) pad->sThumbLY = (SHORT)touch.ly;
+	if (abs(touch.rx) > abs(pad->sThumbRX)) pad->sThumbRX = (SHORT)touch.rx;
+	if (abs(touch.ry) > abs(pad->sThumbRY)) pad->sThumbRY = (SHORT)touch.ry;
+}
+#endif
+
+/* the headset's controllers (HALO_VR), merged as a second pad would be */
+static void vr_gamepad_state(XINPUT_GAMEPAD *pad)
+{
+#ifdef HALO_VR
+	static const struct
+	{
+		unsigned int bit;
+		int analog_index;
+	} analog[] =
+	{
+		{ HALO_XR_BUTTON_A, XINPUT_GAMEPAD_A },
+		{ HALO_XR_BUTTON_B, XINPUT_GAMEPAD_B },
+		{ HALO_XR_BUTTON_X, XINPUT_GAMEPAD_X },
+		{ HALO_XR_BUTTON_Y, XINPUT_GAMEPAD_Y },
+		{ HALO_XR_BUTTON_WHITE, XINPUT_GAMEPAD_WHITE },
+		{ HALO_XR_BUTTON_BLACK, XINPUT_GAMEPAD_BLACK },
+	};
+	unsigned int buttons, index;
+	float trigger[2], thumb[4];
+	SHORT value;
+	int axis;
+
+	if (!vr_controller(&buttons, trigger, thumb))
+		return;
+	/* the digital bits are the Xbox pad's own (halo_android_abi.h) */
+	pad->wButtons |= (WORD)(buttons & 0xff);
+	for (index = 0; index < sizeof(analog) / sizeof(analog[0]); index++)
+		merge_button(pad, analog[index].analog_index, (buttons & analog[index].bit) != 0);
+	for (axis = 0; axis < 2; axis++)
+	{
+		int value8 = (int)(trigger[axis] * 255.0f + 0.5f);
+		int which = axis ? XINPUT_GAMEPAD_RIGHT_TRIGGER : XINPUT_GAMEPAD_LEFT_TRIGGER;
+
+		if (value8 > 255) value8 = 255;
+		if (value8 > pad->bAnalogButtons[which])
+			pad->bAnalogButtons[which] = (BYTE)value8;
+	}
+	for (axis = 0; axis < 4; axis++)
+	{
+		float v = thumb[axis] < -1.0f ? -1.0f : thumb[axis] > 1.0f ? 1.0f : thumb[axis];
+		SHORT *target = axis == 0 ? &pad->sThumbLX : axis == 1 ? &pad->sThumbLY :
+			axis == 2 ? &pad->sThumbRX : &pad->sThumbRY;
+
+		value = (SHORT)(v * 32767.0f);
+		if (abs(value) > abs(*target))
+			*target = value;
+	}
+#else
+	(void)pad;
+#endif
+}
+
 /* ---------- XAPI */
 
 VOID WINAPI XInitDevices(DWORD preallocation_type_count, PXDEVICE_PREALLOC_TYPE preallocation_types)
@@ -861,6 +978,10 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		vr_gamepad_state(&state->Gamepad);
+#if defined(HALO_ANDROID) && !defined(HALO_VR)
+		if (!console_is_active()) touch_gamepad_state(&state->Gamepad);
+#endif
 		test_input_gamepad(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
@@ -875,6 +996,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
 	}
 
+	if (port == 0)
+		platform_scoreboard_gamepad(&state->Gamepad.wButtons, &state->Gamepad.sThumbRY);
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{
 		controllers[port].packet_number++;

@@ -124,6 +124,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "sound/sound_manager.h"
 #include "units/units.h"
+#include "halo_vr.h"
 
 /* ---------- constants */
 
@@ -469,6 +470,11 @@ long first_person_weapon_get_local_index(
 void first_person_weapon_draw(
 	void)
 {
+#ifdef HALO_VR
+	/* the scope's view along the gun: the gun is behind it */
+	if (VR_RENDER_SCOPE())
+		return;
+#endif
 	if (render.local_player_index!=NONE)
 	{
 		struct first_person_weapon *first_person_weapon= first_person_weapon_get(render.local_player_index);
@@ -515,8 +521,16 @@ void first_person_weapon_draw(
 						model_effect.type= _render_model_effect_type_none;
 					}
 
+#ifdef HALO_VR
+					/* held in the left hand the model is mirrored (vr_render.c) */
+					halo_vr_mirror_winding(vr_render_first_person_mirrored());
+#endif
 					if (first_person_weapon->weapon_node_remapping_table_valid &&
-						weapon_definition->weapon.interface_definition.first_person_model.index!=NONE)
+						weapon_definition->weapon.interface_definition.first_person_model.index!=NONE
+#ifdef HALO_VR
+						&& !vr_render_first_person_gun_hidden()
+#endif
+						)
 					{
 						model_remap_node_matrices_to_match_animation_graph(
 							weapon_definition->weapon.interface_definition.first_person_model.index,
@@ -564,6 +578,9 @@ void first_person_weapon_draw(
 							0,
 							FLAG(_render_model_first_person_bit));
 					}
+#ifdef HALO_VR
+					halo_vr_mirror_winding(FALSE);
+#endif
 				}
 			}
 		}
@@ -625,6 +642,18 @@ void first_person_weapon_render_update(
 		{
 			boolean visible= director_get_perspective(render.local_player_index)==_director_perspective_first_person &&
 				player_control_get_zoom_level(render.local_player_index)==NONE;
+#ifdef HALO_VR
+			/* the headset's eyes are not zoomed: the gun stays in the hand
+			(the scope shows the zoom) */
+			if (director_get_perspective(render.local_player_index)==_director_perspective_first_person &&
+				vr_render_unzoomed_view())
+			{
+				visible= TRUE;
+			}
+			/* put away driving or on a turret (port/linux/game/vr_render.c) */
+			if (vr_render_hide_first_person_weapon())
+				visible= FALSE;
+#endif
 
 			first_person_weapon_set_visibility(render.local_player_index, visible);
 			if (first_person_weapon->visible)
@@ -1066,6 +1095,34 @@ static void first_person_weapon_set_state(
 	return;
 }
 
+#ifdef HALO_VR
+/* Model-side bits: bit 0 support/left arm, bit 1 gun/right arm. Mirroring
+ * maps these to the opposite controllers without changing the animation. */
+static unsigned first_person_weapon_vr_action_mask(short state)
+{
+    switch (state) {
+    case _first_person_weapon_state_throw_grenade: return 1;
+    case _first_person_weapon_state_throw_grenade_overheated:
+    case _first_person_weapon_state_overheating:
+    case _first_person_weapon_state_overheating_again:
+    case _first_person_weapon_state_overheated:
+    case _first_person_weapon_state_overheated_exit:
+    case _first_person_weapon_state_overheating_super_recoil:
+    case _first_person_weapon_state_melee:
+    case _first_person_weapon_state_light_on:
+    case _first_person_weapon_state_light_off:
+    case _first_person_weapon_state_reload_while_empty:
+    case _first_person_weapon_state_reload_while_full:
+    case _first_person_weapon_state_shotgun_enter_reload:
+    case _first_person_weapon_state_shotgun_exit_reload_empty:
+    case _first_person_weapon_state_shotgun_exit_reload_full:
+    case _first_person_weapon_state_put_away:
+    case _first_person_weapon_state_ready: return 3;
+    default: return 0; /* idle, posing, charge and firing retain tracked IK */
+    }
+}
+#endif
+
 /* port: the weapon's orientations are the animation graph's nodes (64 at
 most, the weapon's arrays): an animation of more nodes than the graph has,
 or than the arrays hold (the map's counts), is not applied, said once. Every
@@ -1435,6 +1492,13 @@ static void first_person_weapon_build_node_matrices(
 			first_person_weapon->node_matrices,
 			(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
 			&render.camera);
+#ifdef HALO_VR
+		/* the arms reach for the headset's hands (port/linux/game/vr_render.c) */
+		vr_render_first_person_ik(first_person_weapon->node_matrices, animation_graph,
+                        first_person_weapon->unit_index, first_person_weapon->weapon_index,
+                        first_person_weapon->state_animation.index != NONE ?
+                        first_person_weapon_vr_action_mask(first_person_weapon->state) : 0);
+#endif
 	}
 
 	return;

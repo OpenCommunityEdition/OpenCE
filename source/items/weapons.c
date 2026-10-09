@@ -230,6 +230,7 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "halo_vr.h"
 
 /* port/linux/game/pal_tags.c's */
 short pal_tags_first_person_frames(long graph_index, short animation_index, short frames);
@@ -1201,9 +1202,6 @@ void weapon_build_weapon_interface_state(
 	struct weapon_definition *weapon_definition = weapon_definition_get(weapon->definition_index);
 	short magazine_index;
 
-	/* port: every caller's state is unset stack, so magazines past the
-	weapon's own count read as empty rather than as whatever was there */
-	csmemset(state, 0, sizeof(*state));
 	state->heat = weapon->weapon.heat;
 	state->age = weapon->weapon.age;
 	state->overheated = TEST_FLAG(weapon->weapon.flags, 0);
@@ -2306,6 +2304,49 @@ static void projectile_distribute(
 	return;
 }
 
+#ifdef HALO_VR
+/* Read-only preview of trigger_create_projectiles, before spread/ballistics.
+The first primary muzzle is used for multi-barrel guns. No ammo, timers,
+effects, player target state or native weapon control is changed. */
+boolean weapon_vr_preview_primary_ray(long weapon_index, long player_index,
+	real_point3d *origin, real_vector3d *forward)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *definition = weapon_definition_get(weapon->definition_index);
+	long owner = weapon_get_owner_object_index(weapon_index);
+	struct unit_datum *unit = unit_try_and_get(owner);
+	struct weapon_trigger_definition *trigger;
+	struct object_marker markers[MAXIMUM_MARKERS_PER_OBJECT];
+	real_point3d muzzle;
+	real velocity = 0.0f;
+	if (!unit || TEST_FLAG(unit->object.damage_flags, _object_dead_bit) ||
+		definition->weapon.triggers.count < 1 ||
+		!object_get_marker_by_name(weapon_get_effect_object_index(weapon_index), "primary trigger", markers, MAXIMUM_MARKERS_PER_OBJECT))
+		return FALSE;
+	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, 0, struct weapon_trigger_definition);
+	*origin = muzzle = markers[0].matrix.position;
+	*forward = markers[0].matrix.forward;
+	if (!TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+	{
+		struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
+		real_vector3d left, up;
+		unit_adjust_projectile_ray(owner, origin, forward, &velocity,
+			TEST_FLAG(unit_definition->unit.flags, _unit_fires_from_camera_bit), unit->unit.gunner_object_index == NONE);
+		cross_product3d(global_up3d, forward, &left);
+		if (normalize3d(&left) == 0.0f) left = *global_left3d;
+		cross_product3d(forward, &left, &up);
+		normalize3d(&up);
+		point_from_line3d(origin, forward, trigger->first_person_weapon_offset.x, origin);
+		point_from_line3d(origin, &left, trigger->first_person_weapon_offset.y, origin);
+		point_from_line3d(origin, &up, trigger->first_person_weapon_offset.z, origin);
+		vr_preview_player_projectile(player_index, origin, forward);
+	}
+	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit)) *origin = muzzle;
+	return isfinite(origin->x) && isfinite(origin->y) && isfinite(origin->z) &&
+		isfinite(forward->i) && isfinite(forward->j) && isfinite(forward->k) && normalize3d(forward) > 0.0f;
+}
+#endif
+
 static void trigger_create_projectiles(
 	long weapon_index,
 	short trigger_index)
@@ -2348,6 +2389,9 @@ static void trigger_create_projectiles(
 		long target_object_index= NONE;
 		long projectile_definition_index;
 		short projectile_count;
+#ifdef HALO_VR
+		boolean vr_hand_shot= FALSE;
+#endif
 
 		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
 			unit &&
@@ -2379,6 +2423,19 @@ static void trigger_create_projectiles(
 			}
 
 			unit_adjust_projectile_ray(owner_object_index, &origin, &forward, &velocity, adjust_origin, use_aiming_vector);
+#ifdef HALO_VR
+			/* test21: the shot left from the VR hand (a local game, the hand
+			aiming): a gun that fires from its own model ("uses weapon
+			origin", the pistol) keeps it too, on the reticle's ray, instead
+			of starting at the unseen third-person gun (shots landed above and
+			beside the reticle) */
+			if (adjust_origin)
+			{
+				real_point3d hand;
+
+				vr_hand_shot= vr_render_hand_origin(owner_object_index, &hand) != 0;
+			}
+#endif
 
 			if (player_index!=NONE)
 			{
@@ -2409,7 +2466,22 @@ static void trigger_create_projectiles(
 					trigger_definition->first_person_weapon_offset.z,
 					&origin);
 
+#ifdef HALO_VR
+				{
+					real_vector3d vr_aimed= forward;
+
+					target_object_index= player_aim_projectile(player_index, &origin, &forward);
+					/* test22: where the shot went against the aim and the
+					reticle, logged now and then (port/linux/game/vr_render.c) */
+					vr_render_shot_diagnostic(weapon_index, player_index, &origin, &vr_aimed, &forward, vr_hand_shot);
+				}
+#else
 				target_object_index= player_aim_projectile(player_index, &origin, &forward);
+#endif
+#ifdef HALO_VR
+				/* the headset's hands feel the shot (port/linux/game/vr_render.c) */
+				vr_render_weapon_fired(weapon_index, player_index);
+#endif
 			}
 			else if (actor_index!=NONE)
 			{
@@ -2419,6 +2491,9 @@ static void trigger_create_projectiles(
 
 		if (TEST_FLAG(trigger_definition->flags, _weapon_trigger_uses_weapon_origin_bit))
 		{
+#ifdef HALO_VR
+			if (!vr_hand_shot)
+#endif
 			origin= markers[marker_index].matrix.position;
 		}
 

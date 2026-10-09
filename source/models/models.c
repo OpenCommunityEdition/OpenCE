@@ -83,6 +83,11 @@ symbols in this file:
 #include "shaders/shaders.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#include <stdlib.h>
+void platform_log(char const *format, ...);
+#endif
 
 /* ---------- constants */
 
@@ -263,6 +268,112 @@ static struct profile_section render_model_section = { "render_model", NONE, TRU
 
 /* ---------- private code */
 
+#ifdef HALO_VR
+/* Collapsing hidden bones alone leaves triangles weighted partly to the
+torso stretched into ribbons. Remove those triangles from the local avatar's
+draw only. Authored buffers, other players and shadows stay untouched.
+One bounded cache per map; subsequent eyes/frames do no allocation or scan. */
+static struct vr_body_geometry_entry {
+	struct model_geometry_part const *part;
+	unsigned long long hidden;
+	struct triangle_buffer triangles;
+	word *indices;
+	boolean valid;
+} vr_body_geometry[128];
+static short vr_body_geometry_count;
+static boolean vr_body_geometry_full;
+
+void vr_body_geometry_dispose(void)
+{
+	for (short i = 0; i < vr_body_geometry_count; i++) {
+		rasterizer_triangle_buffer_delete(&vr_body_geometry[i].triangles);
+		free(vr_body_geometry[i].indices);
+	}
+	memset(vr_body_geometry, 0, sizeof(vr_body_geometry));
+	vr_body_geometry_count = 0;
+	vr_body_geometry_full = FALSE;
+}
+
+static struct triangle_buffer const *vr_body_triangles(
+	struct model_geometry_part const *part, struct render_skinning const *skinning)
+{
+	unsigned long long hidden = 0;
+	struct vr_body_geometry_entry *entry;
+	struct model_vertex_compressed const *vertices = part->vertex_buffer.base_address;
+	word const *source = part->triangle_buffer.base_address;
+	long vertex_count = part->vertex_buffer.count, count = part->triangle_buffer.count;
+	long kept = 0;
+	if (skinning->node_matrix_count <= 0 || skinning->node_matrix_count > 64)
+		return &part->triangle_buffer;
+	for (short i = 0; i < skinning->node_matrix_count; i++)
+		if (skinning->node_matrices[i].scale == 0.0f) hidden |= 1ULL << i;
+	if (!hidden) return &part->triangle_buffer;
+	for (short cache_index = 0; cache_index < vr_body_geometry_count; cache_index++)
+		if (vr_body_geometry[cache_index].part == part && vr_body_geometry[cache_index].hidden == hidden)
+			return vr_body_geometry[cache_index].valid ? &vr_body_geometry[cache_index].triangles : &part->triangle_buffer;
+	if (vr_body_geometry_count == 128) {
+		if (!vr_body_geometry_full) platform_log("vr: body mesh cache full; additional parts retain stock geometry");
+		vr_body_geometry_full = TRUE;
+		return &part->triangle_buffer;
+	}
+	entry = &vr_body_geometry[vr_body_geometry_count++];
+	entry->part = part; entry->hidden = hidden;
+	/* Xbox map buffers need their registered hardware address; cache tags'
+	base_address is not the renderer's source of truth. CE uses this too. */
+	if (!rasterizer_model_buffer_data(&part->vertex_buffer, &part->triangle_buffer,
+		(void const **)&vertices, (void const **)&source)) goto fallback;
+	if (!vertices || !source || vertex_count <= 0 || vertex_count > 65535 ||
+		count <= 0 || count > 65535 ||
+		part->vertex_buffer.type != _rasterizer_vertex_type_model_compressed ||
+		(part->triangle_buffer.type != _triangle_buffer_type_precompiled_strip &&
+		part->triangle_buffer.type != _triangle_buffer_type_triangles)) goto fallback;
+	entry->indices = malloc((size_t)count * 3 * sizeof(word));
+	if (!entry->indices) goto fallback;
+	for (long t = 0; t < count; t++) {
+		word triangle[3];
+		boolean omit = FALSE;
+		for (short corner = 0; corner < 3; corner++) {
+			long at = part->triangle_buffer.type == _triangle_buffer_type_triangles ? t * 3 + corner : t + corner;
+			word index = source[at];
+			struct model_vertex_compressed const *vertex;
+			real weight;
+			if (index >= vertex_count) goto fallback;
+			triangle[corner] = index;
+			vertex = &vertices[index];
+			/* The actual compressed skinning declaration uses signed SHORT
+			normalization (32767), as rasterizer_debug_model_vertices does. */
+			weight = (real)vertex->node_weight / 32767.0f;
+			if (weight < 0.0f || weight > 1.0f) goto fallback;
+			for (short influence = 0; influence < 2; influence++) {
+				short node = vertex->nodes[influence] / 3;
+				real amount = influence ? 1.0f - weight : weight;
+				if (amount <= 0.001f) continue;
+				if (vertex->nodes[influence] % 3 || node >= skinning->node_matrix_count) goto fallback;
+				if (hidden & (1ULL << node)) omit = TRUE;
+			}
+		}
+		if (omit || triangle[0] == triangle[1] || triangle[1] == triangle[2] || triangle[0] == triangle[2]) continue;
+		/* Expanding a strip must alternate winding, including skipped
+		degenerate triangles; t is the original strip position. */
+		if (part->triangle_buffer.type == _triangle_buffer_type_precompiled_strip && (t & 1)) {
+			word swap = triangle[0]; triangle[0] = triangle[1]; triangle[1] = swap;
+		}
+		memcpy(&entry->indices[kept * 3], triangle, sizeof(triangle));
+		kept++;
+	}
+	if (kept && !rasterizer_triangle_buffer_new(&entry->triangles,
+		_triangle_buffer_type_triangles, kept, entry->indices)) goto fallback;
+	entry->valid = TRUE;
+	platform_log("vr: body mesh: kept %ld / %ld triangles; hidden head/duplicate arm influences removed", kept, count);
+	return &entry->triangles;
+fallback:
+	free(entry->indices); entry->indices = NULL;
+	platform_log("vr: body mesh filtering unavailable for part; keeping stock geometry (type %d, vertices %ld, triangles %ld)",
+		part->vertex_buffer.type, vertex_count, count);
+	return &part->triangle_buffer;
+}
+#endif
+
 static void render_model_parts(
 	struct model const *model,
 	char const *region_permutation_indices,
@@ -278,6 +389,11 @@ static void render_model_parts(
 	struct render_sort_filth sort_filth[MAXIMUM_PARTS_PER_MODEL_GEOMETRY];
 	real_point3d centroid;
 	short pass;
+#ifdef HALO_VR
+	boolean vr_body = !TEST_FLAG(flags, _render_model_shadow_bit) &&
+		((!TEST_FLAG(flags, _render_model_first_person_bit) && object_index != NONE && vr_render_full_body(object_index)) ||
+		 (TEST_FLAG(flags, _render_model_first_person_bit) && vr_render_hands_only()));
+#endif
 
 	for (pass = _render_model_pass_solid; pass<=last_pass; pass++)
 	{
@@ -340,7 +456,13 @@ static void render_model_parts(
 							&model->shaders,
 							part->shader_index,
 							struct model_shader_reference);
+						struct triangle_buffer const *triangles = &part->triangle_buffer;
+
 						shader = shader_definition_get(shader_reference->shader.index);
+#ifdef HALO_VR
+						if (vr_body) triangles = vr_body_triangles(part, skinning);
+#endif
+						if (!triangles->count) continue;
 
 						if (shader_type_is_valid_for_model(shader->base.type) &&
 							!TEST_FLAG(part->flags, _model_geometry_part_stripped_bit))
@@ -372,9 +494,9 @@ static void render_model_parts(
 									rasterizer_model_transparent_geometry_submit(
 										shader,
 										forced_shader_permutation_index ? forced_shader_permutation_index : shader_reference->permutation_index,
-										&part->triangle_buffer,
+										triangles,
 										NONE,
-										part->triangle_buffer.count,
+										triangles->count,
 										&part->vertex_buffer,
 										NONE,
 										&centroid,
@@ -403,9 +525,9 @@ static void render_model_parts(
 									rasterizer_model_draw(
 										shader,
 										forced_shader_permutation_index ? forced_shader_permutation_index : shader_reference->permutation_index,
-										&part->triangle_buffer,
+										triangles,
 										NONE,
-										part->triangle_buffer.count,
+										triangles->count,
 										&part->vertex_buffer,
 										NONE);
 								}
@@ -417,7 +539,7 @@ static void render_model_parts(
 									rasterizer_environment_shadow_model_draw(
 										shader,
 										forced_shader_permutation_index ? forced_shader_permutation_index : shader_reference->permutation_index,
-										&part->triangle_buffer,
+										triangles,
 										&part->vertex_buffer);
 								}
 								else
@@ -425,9 +547,9 @@ static void render_model_parts(
 									rasterizer_model_draw(
 										shader,
 										forced_shader_permutation_index ? forced_shader_permutation_index : shader_reference->permutation_index,
-										&part->triangle_buffer,
+										triangles,
 										NONE,
-										part->triangle_buffer.count,
+										triangles->count,
 										&part->vertex_buffer,
 										NONE);
 									rasterizer_debug_model_vertices(object_index, skinning, part);

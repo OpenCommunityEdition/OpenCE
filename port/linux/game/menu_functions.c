@@ -64,10 +64,12 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "cseries/cseries_windows.h"
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
+#include "interface/virtual_keyboard.h"
 #include "main/main.h"
 #include "networking/network_game_manager.h"
 #include "saved games/player_profile.h"
@@ -1362,10 +1364,11 @@ static boolean saved_game_delete(short controller)
 
 /* the settings' screens (tools/port_settings.py): every spinner of a
 setting in the screen */
-static void settings_each(struct widget_instance *widget, boolean (*visit)(struct widget_instance *spinner,
+static boolean settings_each(struct widget_instance *widget, boolean (*visit)(struct widget_instance *spinner,
 	struct pc_menu_setting *setting))
 {
 	struct widget_instance *child;
+	boolean success = TRUE;
 
 	for (child = widget->child; child; child = child->next)
 	{
@@ -1373,10 +1376,11 @@ static void settings_each(struct widget_instance *widget, boolean (*visit)(struc
 			pc_menu_setting_get(child->definition_tag_index) : NULL;
 
 		if (setting)
-			visit(child, setting);
+			success = visit(child, setting) && success;
 		else
-			settings_each(child, visit);
+			success = settings_each(child, visit) && success;
 	}
+	return success;
 }
 
 static struct widget_instance *screen_of(struct widget_instance *widget)
@@ -1400,6 +1404,19 @@ static boolean setting_changed_save(struct widget_instance *spinner, struct pc_m
 	}
 	platform_log("menus: %s = %s", setting->setting, setting->values[index]);
 	setting->loaded_index = index;
+	return TRUE;
+}
+
+/* A failed write must suppress the button's back=true event. Successful
+rows keep their loaded index, while failed rows remain available for retry. */
+static boolean settings_save(struct widget_instance *widget)
+{
+	if (!settings_each(screen_of(widget), setting_changed_save))
+	{
+		display_error_text_deferred(L"Some settings could not be saved.\r\nCheck available storage and try OK again.\r\nSee the launch log for the setting name.", NONE);
+		return campaign_fail();
+	}
+	platform_display_apply();
 	return TRUE;
 }
 
@@ -1781,12 +1798,29 @@ Multiplayer go back to one player (main_menu_initialize,
 multiplayer_type_menu_initialize).
 With one gamepad, it is player 2's (pc_menu_split_players) */
 
+/* The Quest compositor and tracked input have one local player owner.
+ * A second local player creates three render windows, which cannot enter
+ * vr_render_windows' single-player stereo path. Network co-op is separate. */
+static boolean local_split_screen_allowed(void)
+{
+#ifdef HALO_VR
+    display_error_text_deferred(L"Quest supports one local VR player.\r\n"
+        L"For network co-op choose Multiplayer,\r\n"
+        L"CREATE GAME > INTERNET or LAN,\r\nthen SINGLEPLAYER.", NONE);
+    return FALSE;
+#else
+    return TRUE;
+#endif
+}
+
 /* "port coop begin": two players, player 1 on its profile (campaign_profile)
 and the controller that chose co-op */
 static boolean coop_begin(short controller)
 {
 	struct player_profile profile;
 
+    if (!local_split_screen_allowed())
+        return FALSE;
 	player_spawn_count = 1;
 	player_ui_reset_single_player_local_player_controllers();
 	if (!campaign_profile(controller, &profile))
@@ -2099,6 +2133,7 @@ Xbox's networking, run by the engine's port entry points
 #define BROWSER_ROWS 15
 #define LOBBY_ROWS 11
 #define TEXT_FIELD_LENGTH 128
+typedef char verify_menu_invite_fits_text_field[TEXT_FIELD_LENGTH >= P2P_LISTING_INVITE_SIZE ? 1 : -1];
 #define PLAYLIST_READ_ONLY_BIT 0x40000000UL
 /* (a key stroke's modifier, as input_xbox.c has them: shift, control) */
 #define KEY_MODIFIER_CONTROL_BIT 1
@@ -2240,7 +2275,9 @@ static struct
 	/* Server Setup's PASSWORD (a public internet game's; empty: none), kept
 	while the game runs, never written down */
 	char game_password[PASSWORD_LENGTH + 1];
-} multiplayer = { .maximum_players_index = NUMBEROF(maximum_players) - 1 };
+	/* Identifiers copied with displayed rows survive native slot reuse. */
+	byte game_identifiers[MAXIMUM_ADVERTISED_GAMES][6];
+} multiplayer = { 0, 0, 0, { 0 }, 0, { 0 }, 0, 0, 0, 0, { 0 }, NUMBEROF(maximum_players) - 1 };
 
 /* ---- a text field (Direct Link's link, the game's name): the keyboard
 types into it (Ctrl+V pastes), its row's A (enter) is done, B (escape)
@@ -2254,6 +2291,8 @@ static struct
 	void (*done)(char const *text);
 	/* a password's: shown as stars (text_field_begin_masked) */
 	boolean masked;
+	boolean native_keyboard;
+	wchar_t keyboard_text[TEXT_FIELD_LENGTH];
 } text_field;
 
 /* when the field was last shown (a field not shown for a while is let go
@@ -2265,42 +2304,98 @@ static boolean text_field_editing(struct widget_instance *row)
 	return text_field.row && (!row || text_field.row == row);
 }
 
-static void text_field_begin(struct widget_instance *row, char const *text, short maximum,
-	void (*done)(char const *text))
+static void text_field_begin_internal(struct widget_instance *row, char const *text, short maximum,
+	void (*done)(char const *text), wchar_t const *caption, boolean masked)
 {
 	struct key_stroke key;
+	short index;
+	if (text_field.row || virtual_keyboard_active())
+		return;
 
 	text_field.row = row;
 	snprintf(text_field.text, sizeof(text_field.text), "%s", text);
 	snprintf(text_field.before, sizeof(text_field.before), "%s", text);
 	text_field.maximum = (short)MIN(maximum, TEXT_FIELD_LENGTH - 1);
 	text_field.done = done;
-	text_field.masked = FALSE;
+	text_field.masked = masked;
 	text_field_shown_time = system_milliseconds();
 	while (input_get_key(&key))
 		;
+#ifdef HALO_ANDROID
+	for (index = 0; text[index] && index < text_field.maximum; index++)
+		text_field.keyboard_text[index] = (wchar_t)(unsigned char)text[index];
+	text_field.keyboard_text[index] = 0;
+	text_field.native_keyboard = virtual_keyboard_launch_text(text_field.keyboard_text,
+		(word)((text_field.maximum + 1) * sizeof(wchar_t)), caption, masked);
+	if (!text_field.native_keyboard)
+	{
+		platform_log("menus: on-screen text keyboard unavailable; field left unchanged");
+		text_field.row = NULL;
+		text_field.done = NULL;
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+	}
+#else
 	platform_text_field(TRUE);
+#endif
+}
+
+static void text_field_begin(struct widget_instance *row, char const *text, short maximum,
+	void (*done)(char const *text))
+{
+	text_field_begin_internal(row, text, maximum, done, L"SERVER NAME", FALSE);
 }
 
 /* a password's field: as text_field_begin, its text shown as stars */
 static void text_field_begin_masked(struct widget_instance *row, char const *text, short maximum,
 	void (*done)(char const *text))
 {
-	text_field_begin(row, text, maximum, done);
-	text_field.masked = TRUE;
+	text_field_begin_internal(row, text, maximum, done, L"PASSWORD", TRUE);
 }
 
 static void text_field_end(boolean keep)
 {
 	void (*done)(char const *text) = text_field.done;
+	if (text_field.native_keyboard && virtual_keyboard_active())
+	{
+		virtual_keyboard_close();
+		keep = FALSE;
+	}
 
 	platform_text_field(FALSE);
 	text_field.row = NULL;
 	text_field.done = NULL;
+	text_field.native_keyboard = FALSE;
 	if (!keep)
 		snprintf(text_field.text, sizeof(text_field.text), "%s", text_field.before);
 	else if (done)
 		done(text_field.text);
+	csmemset(text_field.keyboard_text, 0, sizeof(text_field.keyboard_text));
+}
+
+/* Called on widget/map teardown before the row's storage can be freed. */
+void pc_menu_text_input_reset(void)
+{
+	text_field_end(FALSE);
+	csmemset(&text_field, 0, sizeof(text_field));
+}
+
+void pc_menu_text_input_update(void)
+{
+	short index;
+	if (!text_field.native_keyboard || virtual_keyboard_active())
+		return;
+	if (virtual_keyboard_last_exit_saved_text())
+	{
+		for (index = 0; text_field.keyboard_text[index] && index < text_field.maximum; index++)
+		{
+			wchar_t character = text_field.keyboard_text[index];
+			text_field.text[index] = character >= ' ' && character <= '~' ? (char)character : '?';
+		}
+		text_field.text[index] = 0;
+		text_field_end(TRUE);
+	}
+	else
+		text_field_end(FALSE);
 }
 
 static void text_field_insert(char const *text)
@@ -2323,7 +2418,7 @@ static void text_field_show(struct widget_instance *value, char const *text, boo
 	wchar_t shown[TEXT_FIELD_LENGTH + 2];
 	short index;
 
-	if (editing)
+	if (editing && !text_field.native_keyboard)
 	{
 		text_field_shown_time = system_milliseconds();
 		struct key_stroke key;
@@ -3064,31 +3159,128 @@ static boolean advertised_in_progress(struct advertised_game *game)
 	return network_game_client_advertised_game_in_progress(global_network_game_client_get(), game);
 }
 
+
+/* Filter values are cached config reads; catalog checks never open files in
+   a menu update. The native join preflight still validates actual content. */
+static struct
+{
+    boolean empty, full, known;
+    short engine, teams, passwords;
+} browser_filters;
+
+static void browser_filters_read(void)
+{
+    char value[32];
+    browser_filters.empty = config_boolean("browser.show_empty");
+    browser_filters.full = config_boolean("browser.show_full");
+    browser_filters.known = !strcmp(config_string("browser.maps"), "known");
+    browser_filters.engine = config_text("browser.engine", value, sizeof(value)) ? (short)atoi(value) : NONE;
+    browser_filters.engine = (short)PIN(browser_filters.engine, -1, 5);
+    browser_filters.teams = !strcmp(config_string("browser.teams"), "teams") ? 1 :
+        !strcmp(config_string("browser.teams"), "ffa") ? 2 : 0;
+    browser_filters.passwords = !strcmp(config_string("browser.passwords"), "locked") ? 1 :
+        !strcmp(config_string("browser.passwords"), "unlocked") ? 2 : 0;
+}
+
+static char const *browser_map_stem(char const *name)
+{
+    char const *slash = strrchr(name, '\\');
+    return slash ? slash + 1 : name;
+}
+
+static boolean browser_map_known(char const *map)
+{
+    char const *const *maps;
+    short last, count, index;
+    if (custom_edition_level_name(map))
+        return custom_edition_maps_display_index(map) != NONE;
+    count = ui_widget_port_multiplayer_maps(&maps, &last);
+    for (index = 0; index < count; index++)
+    {
+        if (!_stricmp(browser_map_stem(maps[index]), browser_map_stem(map)))
+            return TRUE;
+    }
+    for (index = 0; index < NUMBER_OF_SINGLE_PLAYER_LEVELS; index++)
+    {
+        if (!_stricmp(browser_map_stem(main_get_solo_level_name(index)), browser_map_stem(map)))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static boolean browser_filter_match(short players, short maximum, boolean open, short engine,
+    boolean teams, boolean locked, char const *map)
+{
+    return (browser_filters.empty || players > 0) &&
+        (browser_filters.full || (open && players < maximum)) &&
+        (browser_filters.engine == NONE || browser_filters.engine == engine) &&
+        (!browser_filters.teams || teams == (browser_filters.teams == 1)) &&
+        (!browser_filters.passwords || locked == (browser_filters.passwords == 1)) &&
+        (!browser_filters.known || browser_map_known(map));
+}
+
+static int browser_game_order(void const *left, void const *right)
+{
+    struct advertised_game const *a = *(struct advertised_game const *const *)left;
+    struct advertised_game const *b = *(struct advertised_game const *const *)right;
+    int name;
+    if (a->player_count != b->player_count)
+        return b->player_count - a->player_count;
+    if (a->open != b->open)
+        return b->open - a->open;
+    name = ustrcmp(a->game_name, b->game_name);
+    return name ? name : memcmp(a->xnaddr + 2, b->xnaddr + 2, 6);
+}
+
+static boolean browser_filters_saved;
+static boolean browser_filter_save(struct widget_instance *spinner, struct pc_menu_setting *setting)
+{
+    if (!setting_changed_save(spinner, setting))
+        browser_filters_saved = FALSE;
+    return TRUE;
+}
+
+static boolean browser_filters_apply(struct widget_instance *widget, boolean *deleted)
+{
+    browser_filters_saved = TRUE;
+    settings_each(screen_of(widget), browser_filter_save);
+    if (!browser_filters_saved)
+        return campaign_fail();
+    ui_widget_port_go_back(widget);
+    *deleted = TRUE;
+    return TRUE;
+}
+
 static void browser_games_read(void)
 {
-	void *client = global_network_game_client_get();
-	struct advertised_game *games = client ? network_game_client_get_available_games(client) : NULL;
-	short pass, index;
-
-	multiplayer.game_count = 0;
-	if (!games || multiplayer.mode == _multiplayer_mode_server_browser)
-		return;
-	/* (the open games, then those under way) */
-	for (pass = 0; pass < 2; pass++)
-	{
-		for (index = 0; index < MAXIMUM_ADVERTISED_GAMES; index++)
-		{
-			struct advertised_game *game = &games[index];
-
-			if (network_game_client_advertised_game_is_valid(game) && !advertised_in_progress(game) == (pass == 0) &&
-				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link))
-			{
-				multiplayer.games[multiplayer.game_count++] = game;
-			}
-		}
-	}
-	if (multiplayer.game_chosen >= multiplayer.game_count)
-		multiplayer.game_chosen = (short)MAX(0, multiplayer.game_count - 1);
+    void *client = global_network_game_client_get();
+    struct advertised_game *games = client ? network_game_client_get_available_games(client) : NULL;
+    short index;
+    byte selected[6];
+    boolean had_selection = multiplayer.game_chosen >= 0 && multiplayer.game_chosen < multiplayer.game_count;
+    if (had_selection)
+        memcpy(selected, multiplayer.game_identifiers[multiplayer.game_chosen], sizeof(selected));
+    multiplayer.game_count = 0;
+    if (!games || multiplayer.mode == _multiplayer_mode_server_browser)
+        return;
+    browser_filters_read();
+    for (index = 0; index < MAXIMUM_ADVERTISED_GAMES; index++)
+    {
+        struct advertised_game *game = &games[index];
+        if (network_game_client_advertised_game_is_valid(game) &&
+            game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link) &&
+            browser_filter_match(game->player_count, game->maximum_player_count, game->open,
+                game->engine_type, game->has_teams, FALSE, game->map_name))
+            multiplayer.games[multiplayer.game_count++] = game;
+    }
+    qsort(multiplayer.games, multiplayer.game_count, sizeof(multiplayer.games[0]), browser_game_order);
+    multiplayer.game_chosen = (short)PIN(multiplayer.game_chosen, 0, MAX(0, multiplayer.game_count - 1));
+    for (index = 0; index < multiplayer.game_count; index++)
+    {
+        memcpy(multiplayer.game_identifiers[index], multiplayer.games[index]->xnaddr + 2, 6);
+        if (had_selection && !memcmp(selected, multiplayer.game_identifiers[index], 6))
+            multiplayer.game_chosen = index;
+    }
 }
 
 static short browser_row_index(struct widget_instance *row)
@@ -3170,7 +3362,7 @@ static boolean browser_initialize(struct widget_instance *screen, struct event_r
 	char const *title = multiplayer.mode == _multiplayer_mode_lan ? "header_lan" :
 		multiplayer.mode == _multiplayer_mode_direct_link ? "header_direct_link" : "header_server_browser";
 	char const *const titles[] = { "header_internet", "header_lan", "header_direct_link", "header_server_browser" };
-	char const *const unused[] = { "op_browser_mode", "join_game_button_update", "join_game_button_filters" };
+	char const *const unused[] = { "op_browser_mode", "join_game_button_update" };
 	short index;
 
 	server_browser_initialize(screen);
@@ -3179,6 +3371,7 @@ static boolean browser_initialize(struct widget_instance *screen, struct event_r
 	for (index = 0; index < NUMBEROF(unused); index++)
 		visible_set(named(screen, unused[index], 0), FALSE);
 	visible_set(named(screen, "button_clipboard", 0), multiplayer.mode == _multiplayer_mode_direct_link);
+	visible_set(named(screen, "button_edit_link", 0), multiplayer.mode == _multiplayer_mode_direct_link);
 	visible_set(named(screen, "join_game_button_refresh", 0), multiplayer.mode == _multiplayer_mode_server_browser);
 	{
 		struct widget_instance *list = named(screen, "join_game_items_list", 0);
@@ -3193,7 +3386,7 @@ static boolean browser_initialize(struct widget_instance *screen, struct event_r
 	visible_set(named(screen, "scroll_up_button", 0), FALSE);
 	visible_set(named(screen, "scroll_down_button", 0), FALSE);
 	/* (the columns' sort arrows, both of each over its title: the list is
-	not sorted) */
+	sorted by population; no unsupported header actions) */
 	for (index = 0; named(screen, "header_sort_arrows", index); index++)
 		visible_set(named(screen, "header_sort_arrows", index), FALSE);
 	multiplayer.game_chosen = 0;
@@ -3362,12 +3555,16 @@ static short lobby_browser_valid_games(struct p2p_listing *games, short count)
 {
 	short read;
 	short written = 0;
+	browser_filters_read();
 
 	for (read = 0; read < count; read++)
 	{
 		wchar_t name[P2P_LISTING_NAME_SIZE + 1];
 		short index;
 
+		if (!browser_filter_match(games[read].player_count, games[read].maximum_player_count, games[read].open,
+			games[read].engine_type, games[read].has_teams, games[read].locked, games[read].map))
+			continue;
 		text_to_wide(games[read].name, name, NUMBEROF(name));
 		if (!player_name_clean(name, NUMBEROF(name)))
 			continue;
@@ -3431,19 +3628,53 @@ static void lobby_browser_update(struct widget_instance *list)
 	unsigned long now = system_milliseconds();
 	short chosen;
 
-	lobby_browser.count = lobby_browser_valid_games(lobby_browser.games,
-		(short)p2p_lobby_games(lobby_browser.games, LOBBY_BROWSER_GAMES));
-	if (focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
-	{
-		lobby_browser.first++;
-		lobby_browser_focus_row(list, --focused);
-	}
-	else if (focused == 0 && lobby_browser.first > 0)
-	{
-		lobby_browser.first--;
-		lobby_browser_focus_row(list, ++focused);
-	}
-	lobby_browser.first = (short)PIN(lobby_browser.first, 0, MAX(0, lobby_browser.count - BROWSER_ROWS));
+    byte selected_identifier[6];
+    boolean had_selection = FALSE;
+    short old_chosen = focused != NONE ? (short)(lobby_browser.first + focused) : lobby_browser.chosen;
+    if (old_chosen >= 0 && old_chosen < lobby_browser.count)
+    {
+        memcpy(selected_identifier, lobby_browser.games[old_chosen].identifier, 6);
+        had_selection = TRUE;
+    }
+    if (focused == BROWSER_ROWS - 1 && lobby_browser.first + BROWSER_ROWS < lobby_browser.count)
+    {
+        lobby_browser.first++;
+        lobby_browser_focus_row(list, --focused);
+    }
+    else if (focused == 0 && lobby_browser.first > 0)
+    {
+        lobby_browser.first--;
+        lobby_browser_focus_row(list, ++focused);
+    }
+    /* p2p_lobby_games already sorts population descending. Filtering keeps
+       that order; the pending join separately retains its host identifier. */
+    lobby_browser.count = lobby_browser_valid_games(lobby_browser.games,
+        (short)p2p_lobby_games(lobby_browser.games, LOBBY_BROWSER_GAMES));
+    lobby_browser.chosen = (short)PIN(old_chosen, 0, MAX(0, lobby_browser.count - 1));
+    if (had_selection)
+    {
+        short index;
+        for (index = 0; index < lobby_browser.count; index++)
+        {
+            if (!memcmp(selected_identifier, lobby_browser.games[index].identifier, 6))
+            {
+                lobby_browser.chosen = index;
+                if (focused != NONE)
+                    lobby_browser.first = (short)(index - focused);
+                break;
+            }
+        }
+    }
+    lobby_browser.first = (short)PIN(lobby_browser.first, 0, MAX(0, lobby_browser.count - BROWSER_ROWS));
+    if (lobby_browser.count && lobby_browser.chosen < lobby_browser.first)
+        lobby_browser.first = lobby_browser.chosen;
+    else if (lobby_browser.count && lobby_browser.chosen >= lobby_browser.first + BROWSER_ROWS)
+        lobby_browser.first = (short)(lobby_browser.chosen - BROWSER_ROWS + 1);
+    if (focused != NONE && lobby_browser.count)
+    {
+        focused = (short)PIN(lobby_browser.chosen - lobby_browser.first, 0, BROWSER_ROWS - 1);
+        lobby_browser_focus_row(list, focused);
+    }
 	/* (the first game found takes the focus from the buttons, which had it
 	while there were none) */
 	if (lobby_browser.count && !lobby_browser.shown)
@@ -3559,7 +3790,7 @@ static void lobby_browser_update(struct widget_instance *list)
 		else if (!lobby_browser.count)
 		{
 			usnprintf(text, NUMBEROF(text) - 1, L"%s", now - lobby_browser.begin_time < LOBBY_BROWSER_LOOK_TIME ?
-				L"Looking for public games..." : L"No public games found");
+				L"Looking for public games..." : L"No matching games. Check FILTERS or refresh.");
 		}
 		else if (chosen < lobby_browser.count)
 		{
@@ -3792,9 +4023,11 @@ static void browser_update(struct widget_instance *list)
 		lobby_browser_update(list);
 		return;
 	}
-	browser_games_read();
 	if (focused != NONE && focused < multiplayer.game_count)
 		multiplayer.game_chosen = focused;
+	browser_games_read();
+	if (focused != NONE && multiplayer.game_count)
+		lobby_browser_focus_row(list, multiplayer.game_chosen);
 	for (row = list->child; row; row = row->next)
 	{
 		short index = browser_row_index(row);
@@ -3887,6 +4120,21 @@ static boolean direct_link_from_clipboard(void)
 	return TRUE;
 }
 
+static void direct_link_done(char const *text)
+{
+	if (!*text || !p2p_join_invite(text))
+	{
+		platform_log("menus: entered text is not a supported invite link");
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+	}
+}
+
+static boolean direct_link_edit(struct widget_instance *row)
+{
+	text_field_begin_internal(row, "", P2P_LISTING_INVITE_SIZE - 1, direct_link_done, L"INVITE LINK", FALSE);
+	return TRUE;
+}
+
 /* joining the game chosen: player 1 in, then the lobby */
 static boolean browser_join(struct widget_instance *widget, short controller, boolean *widget_deleted)
 {
@@ -3904,6 +4152,13 @@ static boolean browser_select(struct widget_instance *widget, struct event_recor
 {
 	short row = browser_row_index(widget);
 
+    if (strstr(widget->name, "button_filters"))
+    {
+        if (multiplayer.mode == _multiplayer_mode_server_browser && lobby_browser.joining)
+            return lobby_browser.ready ? lobby_browser_select(widget, controller, row, widget_deleted) : campaign_fail();
+        return ui_widget_port_open(widget,
+            "pc\\main_menu\\multiplayer_type_select\\join_game\\filters\\filters_screen", widget_deleted);
+    }
 	if (multiplayer.mode == _multiplayer_mode_server_browser)
 		return lobby_browser_select(widget, controller, row, widget_deleted);
 	if (row != NONE)
@@ -4052,6 +4307,8 @@ static boolean lobby_join_reset(void)
 joins (one gamepad leaves the keyboard's controller for its own) */
 static boolean lobby_add_player(void)
 {
+    if (!local_split_screen_allowed())
+        return FALSE;
 	if (lobby_local_player_count() >= MAXIMUM_LOCAL_PLAYERS)
 		return campaign_fail();
 	lobby_join.adding = TRUE;
@@ -4072,6 +4329,8 @@ static boolean lobby_join_start(struct widget_instance *widget, short controller
 		ui_widget_port_dispatch_event(focused_leaf(widget), BUTTON_START, controller, widget_deleted);
 		return FALSE;
 	}
+    if (!local_split_screen_allowed())
+        return FALSE;
 	if (!game || network_game_client_get_state(client, &state_data) != _client_state_pregame)
 		return campaign_fail();
 	if (lobby_player_count >= game->maximum_players)
@@ -4727,7 +4986,7 @@ static char const *const vehicle_spinners[NUMBER_OF_VARIANT_VEHICLES] =
 {
 	"warthog_spinner", "ghost_spinner", "scorpion_spinner", "rwarthog_spinner", "banshee_spinner", "cgturret_spinner"
 };
-/* (the presets' spinner: the vehicle sets 0 to 7, then PC and CUSTOM) */
+/* (the presets' spinner: vehicle sets 0 to 7, then PC and CUSTOM) */
 #define VEHICLE_PRESET_PC 8
 #define VEHICLE_PRESET_CUSTOM 9
 
@@ -5255,6 +5514,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return direct_link_from_clipboard();
 		}
+		else if (!strcmp(name, "port direct link edit"))
+		{
+			return direct_link_edit(widget);
+		}
 		else if (!strcmp(name, "join controller to mp game"))
 		{
 			return multiplayer_host(widget, event, controller, widget_deleted);
@@ -5321,10 +5584,13 @@ boolean pc_menu_event_function_invoke(
 		{
 			item_activated(widget, event_controller(widget, event), widget_deleted);
 		}
+		else if (!strcmp(name, "port browser filters apply"))
+		{
+			return browser_filters_apply(widget, widget_deleted);
+		}
 		else if (!strcmp(name, "port settings save"))
 		{
-			settings_each(screen_of(widget), setting_changed_save);
-			platform_display_apply();
+			return settings_save(widget);
 		}
 		else if (!strcmp(name, "port settings defaults"))
 		{
@@ -5472,8 +5738,11 @@ void pc_menu_game_data_function_invoke(
 
 	if (!name)
 		return;
+	/* Completing a modal keyboard may take minutes: handle its result
+	   before the vanished-row timeout, which protects only inline fields. */
+	pc_menu_text_input_update();
 	/* (a text field whose screen has gone: let go of) */
-	if (text_field.row && system_milliseconds() - text_field_shown_time > 500)
+	if (text_field.row && !text_field.native_keyboard && system_milliseconds() - text_field_shown_time > 500)
 		text_field_end(FALSE);
 	if (!strcmp(name, "solo map list update"))
 		level_list_update(widget);

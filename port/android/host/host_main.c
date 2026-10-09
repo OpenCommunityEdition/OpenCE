@@ -21,12 +21,16 @@ that runs here.
 
 #include "host.h"
 #include "tomlc17.h"
+#include "game_data_profile.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <android/log.h>
+#include <jni.h>
+#include <dirent.h>
 #include <errno.h>
 #include <ftw.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,20 +42,167 @@ that runs here.
 
 void host_install_signal_handlers(void);
 
+/* ---------- the log file
+
+The launcher creates a timestamped MediaStore Downloads log before native
+startup, then passes an append descriptor through JNI. This works with
+Android scoped storage; direct fopen into Download is only a legacy fallback.
+The app-private halo_log.txt remains a second native log. */
+
+#define LOG_DIRECTORY "/sdcard/Download/HaloCE"
+#define LOGS_KEPT 10
+
+/* the log in Download (a new file each run) and its copy in the app's own
+storage (which an app can always write) */
+static FILE *log_files[2];
+static pthread_mutex_t log_file_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int compare_names(const void *a, const void *b)
+{
+	return strcmp(*(char *const *)a, *(char *const *)b);
+}
+
+/* the oldest of the logs in Download beyond the newest LOGS_KEPT, deleted
+(their names sort by when they were made) */
+static void old_logs_delete(void)
+{
+	DIR *directory = opendir(LOG_DIRECTORY);
+	struct dirent *entry;
+	char *names[256];
+	int count = 0, index;
+
+	if (!directory)
+		return;
+	while ((entry = readdir(directory)) && count < 256)
+	{
+		if (!strncmp(entry->d_name, "halo_log_", 9) && strstr(entry->d_name, ".txt"))
+			names[count++] = strdup(entry->d_name);
+	}
+	closedir(directory);
+	qsort(names, (size_t)count, sizeof(names[0]), compare_names);
+	for (index = 0; index < count; index++)
+	{
+		if (index < count - LOGS_KEPT)
+		{
+			char path[600];
+
+			snprintf(path, sizeof(path), "%s/%s", LOG_DIRECTORY, names[index]);
+			unlink(path);
+		}
+		free(names[index]);
+	}
+}
+
+static void log_file_open(void)
+{
+	char path[600], package[256] = "";
+	time_t now = time(NULL);
+	struct tm local;
+	FILE *command;
+	JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+	jobject activity = env ? (jobject)SDL_GetAndroidActivity() : NULL;
+	if (activity)
+	{
+		jclass type = (*env)->GetObjectClass(env, activity);
+		jmethodID method = type ? (*env)->GetMethodID(env, type, "openGameLog", "()I") : NULL;
+		int descriptor = method ? (*env)->CallIntMethod(env, activity, method) : -1;
+		if ((*env)->ExceptionCheck(env))
+		{
+			(*env)->ExceptionClear(env);
+			descriptor = -1;
+		}
+		if (descriptor >= 0)
+		{
+			log_files[0] = fdopen(descriptor, "a");
+			if (!log_files[0]) close(descriptor);
+		}
+		if (type) (*env)->DeleteLocalRef(env, type);
+		(*env)->DeleteLocalRef(env, activity);
+	}
+
+	/* Download/HaloCE/halo_log_<date>_<time>.txt: made new each run, never
+	renamed or replaced (another installation's file may not be this
+	one's to change) */
+	if (!log_files[0])
+	{
+		localtime_r(&now, &local);
+		mkdir("/sdcard/Download", 0775);
+		mkdir(LOG_DIRECTORY, 0775);
+		old_logs_delete();
+		snprintf(path, sizeof(path), "%s/halo_log_%04d-%02d-%02d_%02d-%02d-%02d.txt", LOG_DIRECTORY,
+			local.tm_year + 1900, local.tm_mon + 1, local.tm_mday, local.tm_hour, local.tm_min, local.tm_sec);
+		log_files[0] = fopen(path, "w");
+		if (log_files[0])
+			__android_log_print(ANDROID_LOG_INFO, "halo", "the log is also written to %s", path);
+		else
+			__android_log_print(ANDROID_LOG_WARN, "halo", "no log in Download (%s: %s)", path, strerror(errno));
+	}
+
+	/* and the app's own storage: /sdcard/Android/data/<package>/files, the
+	package from the process's name ("com.halo.decomp.vr:halo_game") */
+	command = fopen("/proc/self/cmdline", "r");
+	if (command)
+	{
+		size_t length = fread(package, 1, sizeof(package) - 1, command);
+		char *colon;
+
+		package[length] = 0;
+		colon = strchr(package, ':');
+		if (colon)
+			*colon = 0;
+		fclose(command);
+	}
+	if (package[0])
+	{
+		snprintf(path, sizeof(path), "/sdcard/Android/data/%s/files/halo_log.txt", package);
+		log_files[1] = fopen(path, "w");
+	}
+}
+
+void host_log_file_line(const char *line)
+{
+	struct timespec now;
+	struct tm local;
+	size_t length = strlen(line);
+	int which;
+
+	if (!log_files[0] && !log_files[1])
+		return;
+	while (length && (line[length - 1] == '\r' || line[length - 1] == '\n'))
+		length--;
+	clock_gettime(CLOCK_REALTIME, &now);
+	localtime_r(&now.tv_sec, &local);
+	pthread_mutex_lock(&log_file_lock);
+	for (which = 0; which < 2; which++)
+	{
+		if (!log_files[which])
+			continue;
+		fprintf(log_files[which], "%02d:%02d:%02d.%03ld %.*s\n", local.tm_hour, local.tm_min, local.tm_sec,
+			now.tv_nsec / 1000000, (int)length, line);
+		/* at once: a crash must not lose the lines before it */
+		fflush(log_files[which]);
+	}
+	pthread_mutex_unlock(&log_file_lock);
+}
+
 /* ---------- logging and termination */
 
 void host_logf(int priority, const char *format, ...)
 {
 	va_list arguments;
+	char line[1024];
 
 	va_start(arguments, format);
-	__android_log_vprint(priority, "halo", format, arguments);
+	vsnprintf(line, sizeof(line), format, arguments);
 	va_end(arguments);
+	__android_log_write(priority, "halo", line);
+	host_log_file_line(line);
 }
 
 void host_log(int priority, const char *text)
 {
 	__android_log_write(priority, "halo", text);
+	host_log_file_line(text);
 }
 
 void host_fatal(const char *format, ...)
@@ -63,6 +214,7 @@ void host_fatal(const char *format, ...)
 	vsnprintf(message, sizeof(message), format, arguments);
 	va_end(arguments);
 	__android_log_write(ANDROID_LOG_FATAL, "halo", message);
+	host_log_file_line(message);
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
 	_exit(1);
 }
@@ -70,11 +222,28 @@ void host_fatal(const char *format, ...)
 void host_abort(const char *reason)
 {
 	__android_log_print(ANDROID_LOG_FATAL, "halo", "guest abort: %s", reason);
+	{
+		char line[600];
+
+		snprintf(line, sizeof(line), "guest abort: %s", reason);
+		host_log_file_line(line);
+	}
 	abort();
 }
 
 void host_exit(int code)
 {
+	JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+	jobject activity = env ? (jobject)SDL_GetAndroidActivity() : NULL;
+	if (activity)
+	{
+		jclass type = (*env)->GetObjectClass(env, activity);
+		jmethodID method = type ? (*env)->GetMethodID(env, type, "prepareGameExit", "()V") : NULL;
+		if (method) (*env)->CallVoidMethod(env, activity, method);
+		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+		if (type) (*env)->DeleteLocalRef(env, type);
+		(*env)->DeleteLocalRef(env, activity);
+	}
 	host_logf(HOST_LOG_INFO, "the game exited (%d)", code);
 	/* the process ends with the game; Android restarts it from the
 	launcher next time */
@@ -95,6 +264,10 @@ void host_android_path(int which, char *buffer, uint32_t size)
 {
 	snprintf(buffer, size, "%s", which ? save_root : data_root);
 }
+
+#ifdef HALO_VR
+#define SHARED_DATA_ROOT "/sdcard/Documents/HaloCE"
+#endif
 
 static int directory_has_maps(const char *root)
 {
@@ -248,19 +421,55 @@ static void *game_main(void *unused)
 	if (!external)
 		host_fatal("Android storage is unavailable: %s", SDL_GetError());
 	snprintf(data_root, sizeof(data_root), "%s", external);
-	snprintf(save_root, sizeof(save_root), "%s/save", external);
+#ifdef HALO_VR
+	/* The Steam Frame runs Android in a container (Lepton) that can be
+	reset, taking the app's own storage with it; its Documents folder is
+	the headset's, which stays. Game data put there is preferred, with the
+	saves and settings beside it. */
+	if (directory_has_maps(SHARED_DATA_ROOT))
+		snprintf(data_root, sizeof(data_root), "%s", SHARED_DATA_ROOT);
+#endif
+    {
+        char selected[sizeof(data_root)];
+        int profile=halo_game_data_profile(data_root,selected,sizeof(selected));
+        if(profile<0)host_fatal("The selected game-data set is incomplete. Open Game files & versions in the launcher and select or import a complete set.");
+        if(profile>0)snprintf(data_root,sizeof(data_root),"%s",selected);
+    }
+	snprintf(save_root, sizeof(save_root), "%s/save", data_root);
 	/* readable by adb (the shell user), for managing saves */
 	mkdir(save_root, 0775);
 	share_save_tree(save_root);
 	if (!directory_has_maps(data_root))
 	{
-		host_fatal("The Halo game data was not found.\n\nCopy the PAL game data (build 01.01.14.2342), "
-			"the folder that contains maps, into\n%s\nor import it from the launcher screen.", data_root);
+		host_fatal("The Halo game data was not found.\n\nCopy supported Xbox Halo CE data, "
+			"the folder that contains maps, into\n%s\nor use Game files & versions in the launcher.", data_root);
 	}
 
 	environment_set(&environment, "HOME", save_root);
 	environment_set(&environment, "HALO_DATA_ROOT", data_root);
 	environment_set(&environment, "HALO_SAVE_ROOT", save_root);
+	{
+		/* a mod the launcher installed that is made of Custom Edition maps
+		(LauncherActivity.java, the mods) leaves this file while it is in:
+		the game then loads such maps (game.custom_edition) */
+		struct stat information;
+
+		snprintf(path, sizeof(path), "%s/mods/custom_edition.on", data_root);
+		if (stat(path, &information) == 0)
+		{
+			environment_set(&environment, "HALO_CUSTOM_EDITION", "1");
+			host_logf(HOST_LOG_INFO, "a Custom Edition mod is installed: Custom Edition maps load");
+		}
+		/* the launcher's main menu choice (the VR build): a flat screen
+		leaves this file, which the main menu's 3D setting gives way to
+		(vr.menu_3d, which has no place in the pause menu's settings) */
+		snprintf(path, sizeof(path), "%s/vr_menu_flat.on", data_root);
+		if (stat(path, &information) == 0)
+		{
+			environment_set(&environment, "HALO_VR_MENU_3D", "false");
+			host_logf(HOST_LOG_INFO, "the launcher asks for the main menu on a flat screen");
+		}
+	}
 	{
 		/* the game renders 480 lines at the display's aspect ratio
 		(landscape) unless display.screen_width says otherwise (d3d8_gl.c) */
@@ -281,25 +490,17 @@ static void *game_main(void *unused)
 	}
 	time_zone(zone, sizeof(zone));
 	environment_set(&environment, "TZ", zone);
-	/* internet play's MQTT brokers (network.brokers_file): the APK's list,
-	written beside config.toml at each start, as a desktop update replaces
-	the file beside its game */
-	{
-		size_t brokers_size = 0;
-		void *brokers = SDL_LoadFile("brokers.txt", &brokers_size);
-
-		snprintf(path, sizeof(path), "%s/brokers.txt", data_root);
-		if (!brokers || !SDL_SaveFile(path, brokers, brokers_size))
-			host_logf(HOST_LOG_ERROR, "cannot write %s: %s", path, SDL_GetError());
-		SDL_free(brokers);
-	}
 	snprintf(path, sizeof(path), "%s/config.toml", data_root);
 
 	image = SDL_LoadFile("halo_guest.elf", &image_size);
 	if (!image)
 		host_fatal("cannot read the game image from the APK: %s", SDL_GetError());
+	/* test26: the files were found (the launcher checked them); this is the
+	device's memory, said so in words, with the log for the details */
 	if (host_load_image(image, image_size) != 0)
-		host_fatal("cannot load the game image; see logcat (tag \"halo\") for details");
+		host_fatal("The game files are fine, but the game could not start on this device: %s "
+			"Restart the headset or phone and try again. If it keeps happening, send the log "
+			"(Download/HaloCE).", host_memory_failure ? host_memory_failure : "it could not load its code.");
 	SDL_free(image);
 
 	{
@@ -307,6 +508,8 @@ static void *game_main(void *unused)
 
 		if (config_sample_seconds(path, seconds, sizeof(seconds)))
 			host_debug_start_sampler(seconds);
+		/* stacks in the log when the game stops showing frames */
+		host_debug_start_watchdog();
 	}
 	boot = make_boot(&environment);
 	host_logf(HOST_LOG_INFO, "data %s, saves %s", data_root, save_root);
@@ -317,6 +520,7 @@ int main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
+	log_file_open();
 	host_logf(HOST_LOG_INFO, "Halo for Android starting");
 	host_install_signal_handlers();
 	if (host_native_thread_create(game_main, NULL, MAIN_STACK_SIZE) != 0)

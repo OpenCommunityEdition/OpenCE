@@ -74,6 +74,9 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "text/draw_string.h"
 #include "text/text_group.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -298,6 +301,9 @@ void cinematic_render(
 {
 	if ((cinematic_globals->show_letterbox ||
 		cinematic_globals->letterbox_amount > 0.0f) &&
+#ifdef HALO_VR
+		!vr_render_immersive_cutscene() &&
+#endif
 		!ui_widgets_active())
 	{
 		long game_time;

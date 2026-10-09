@@ -163,6 +163,10 @@ symbols in this file:
 #include "interface/progress_bar_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#ifdef HALO_VR
+/* port/linux/game/vr_render.c */
+boolean vr_render_seat_transparent(long object_index, short shader_type, short glass_type);
+#endif
 #include "rasterizer/xbox/rasterizer_xbox_plasma_energy.h"
 #include "rasterizer/xbox/rasterizer_xbox_water.h"
 #include "rasterizer/xbox/shader_transparent_chicago_preprocessor.h"
@@ -1009,7 +1013,11 @@ real_vector4d *offset_vector4d(
 	return result;
 }
 
+#ifdef HALO_VR
+static void rasterizer_transparent_geometry_group_draw_scoped(
+#else
 void rasterizer_transparent_geometry_group_draw(
+#endif
 	struct transparent_geometry_group *group,
 	boolean dirty)
 {
@@ -1448,6 +1456,13 @@ void rasterizer_transparent_geometry_group_draw(
 					{
 						break;
 					}
+#ifdef HALO_VR
+					/* test25: a first-person seat's own vehicle: its glass
+					not drawn from inside (port/linux/game/vr_render.c) */
+					if (vr_render_seat_transparent(group->object_index, group->shader->base.type,
+						_shader_type_transparent_glass))
+						continue;
+#endif
 
 					switch (group->shader->base.type)
 					{
@@ -2356,9 +2371,12 @@ void rasterizer_transparent_geometry_group_draw(
 							short map_index;
 							long result;
 
-							/* port: the next layer each time: January never advanced
-							layer_index, so the loop never ended on a chicago shader with
-							a layer (retail's have none) */
+							/* port: January never advances layer_index (a bug), so its loop redraws extra
+							 * layer 0 for as long as the block is non-empty (the bytes push index 0 and
+							 * re-test the count). No Xbox map has such layers; Halo Custom Edition maps have
+							 * chicago shaders with them, which would hang the game
+							 * (port/linux/game/custom_edition_cache.c), so the port advances it.
+							 */
 							for (layer_index = 0;
 								layer_index < shader_transparent_chicago->chicago.extra_layers.count;
 								layer_index++)
@@ -3546,3 +3564,20 @@ void rasterizer_transparent_geometry_group_draw(
 
 	return;
 }
+
+#ifdef HALO_VR
+/* A queued first-person part outlives the submitting model's mirror scope.
+Use its captured flag for every shader path, including recursive extra layers
+and active camouflage. The body can return early (e.g. a skipped camouflage pass);
+restoration still happens here, without changing the flat rendering path. */
+void rasterizer_transparent_geometry_group_draw(
+	struct transparent_geometry_group *group,
+	boolean dirty)
+{
+	int previous = halo_vr_winding_state();
+	halo_vr_mirror_winding(group &&
+		(group->geometry_flags & RASTERIZER_VR_MIRRORED_GEOMETRY_FLAG));
+	rasterizer_transparent_geometry_group_draw_scoped(group, dirty);
+	halo_vr_restore_winding_state(previous);
+}
+#endif

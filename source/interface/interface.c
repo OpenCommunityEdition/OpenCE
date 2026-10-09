@@ -99,6 +99,9 @@ symbols in this file:
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_cinematics.h"
 #include "render/render.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "render/render_cameras_internal.h"
 #include "scenario/scenario.h"
 #include "text/draw_string.h"
@@ -584,6 +587,13 @@ void interface_draw_screen(
 				struct hud_screen_effect_definition);
 			boolean zoomed = player_control_get_zoom_level(render.local_player_index) != NONE;
 			struct rasterizer_cinematic_screen_effect_parameters parameters;
+
+#ifdef HALO_VR
+			/* the headset's eyes are not zoomed (the scope is): no mask over
+			its HUD */
+			if (vr_render_unzoomed_view())
+				zoomed = FALSE;
+#endif
 
 			csmemset(&parameters, 0, sizeof(parameters));
 

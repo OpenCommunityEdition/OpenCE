@@ -1,0 +1,12 @@
+# Host functions the guest imports in HALO_VR builds only (port/android/host/host_xr.c),
+# declared in port/android/guest/runtime/guest_host.h. tools/android_build.py adds this
+# list to host_imports.list when configured with --vr.
+host_xr_init
+host_xr_begin_frame
+host_xr_acquire
+host_xr_release
+host_xr_end_frame
+host_xr_recenter
+host_xr_set_refresh_rate
+host_xr_haptic
+host_xr_resize_eyes

@@ -2501,6 +2501,12 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 
 			group = NULL;
 			geometry_flags = local_parameters->geometry_flags;
+#ifdef HALO_VR
+			/* The draw may happen after first_person_weapons.c restores the
+			mirror scope. Keep that model's handedness with its queued group. */
+			geometry_flags = rasterizer_vr_capture_geometry_flags(geometry_flags,
+				TEST_FLAG(geometry_flags, _rasterizer_geometry_first_person_bit));
+#endif
 
 			if (submit_decals)
 			{

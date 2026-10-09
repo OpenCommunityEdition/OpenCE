@@ -53,11 +53,16 @@ Window, context, gamepad and audio stream objects are small integer
 handles on this side. */
 
 int host_sdl_init(unsigned int flags);
+/* halo_touch_state from halo_touch.h; flat Android player-one snapshot. */
+void host_touch_read(void *buffer);
+void host_touch_menu(int active);
+void host_touch_pointer_read(void *buffer);
 int host_sdl_set_hint(const char *name, const char *value);
 void host_sdl_get_error(char *buffer, unsigned int size);
 long long host_sdl_ticks(void);
 long long host_sdl_thread_id(void);
 unsigned int host_sdl_create_window(const char *title, int width, int height, long long flags);
+void host_sdl_window_size(unsigned int window, int *width, int *height);
 void host_sdl_window_size_in_pixels(unsigned int window, int *width, int *height);
 int host_sdl_set_relative_mouse(unsigned int window, int enabled);
 int host_sdl_gl_set_attribute(int attribute, int value);
@@ -68,9 +73,6 @@ int host_sdl_gl_swap_window(unsigned int window);
 int host_sdl_poll_event(void *event);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
-/* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
-void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
-int host_sdl_scancode_from_name(const char *name);
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);
@@ -79,6 +81,8 @@ unsigned int host_sdl_gamepad_from_id(unsigned int id);
 int host_sdl_gamepad_axis(unsigned int gamepad, int axis);
 int host_sdl_gamepad_button(unsigned int gamepad, int button);
 int host_sdl_gamepad_type(unsigned int gamepad);
+/* the gamepad's USB vendor id (Meta's headsets' own controllers: 0x2833) */
+int host_sdl_gamepad_vendor(unsigned int gamepad);
 int host_sdl_rumble_gamepad(unsigned int gamepad, unsigned int low, unsigned int high, unsigned int milliseconds);
 /* callback: void (*)(void *userdata, unsigned int stream, int additional, int total),
 called on the audio thread */
@@ -92,19 +96,55 @@ int host_sdl_resume_audio_stream_device(unsigned int stream);
 void host_gl_get_string(unsigned int name, int index, char *buffer, unsigned int size);
 /* nonzero if the context supports the named extension */
 int host_gl_has_extension(const char *name);
-/* copies size bytes at offset of a GL buffer object into data, waiting for
-the GPU's writes to it */
+/* a 32-bit word of a GL buffer object, waiting for the GPU */
+unsigned int host_gl_read_buffer_word(unsigned int buffer, unsigned int offset);
+/* size bytes of a buffer object from offset, waiting for the GPU once */
 void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 /* unsynchronized write into the buffer bound to target */
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
+/* storage for the buffer bound to target, mapped once for good; 1 on success */
+int host_gl_buffer_persist(unsigned int target, unsigned int size);
+/* a write into such a buffer: a copy, no GL call; 0 if it is not one */
+int host_gl_buffer_write_persistent(unsigned int buffer, unsigned int offset, unsigned int size, const void *data);
 /* fences the GPU work queued so far as that of ring slot `slot`; waits for
 the GPU to finish the work last fenced for a slot */
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
+/* 1 once the GPU has passed the work last fenced for the slot, without waiting */
+int host_gl_frame_done(unsigned int slot);
 
 /* ---------- Android */
 
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
+
+/* ---------- OpenXR (HALO_VR builds: host_imports_vr.list, host/host_xr.c)
+
+The structures are halo_android_abi.h's. */
+
+struct halo_xr_info;
+struct halo_xr_frame;
+struct halo_xr_layers;
+/* creates the session for the current GL context, with a quad swapchain
+of the size given; 0 on success */
+int host_xr_init(struct halo_xr_info *info, unsigned int quad_width, unsigned int quad_height);
+/* waits for and begins the runtime's next frame; 0 when none was begun
+(the session not running: it has polled and slept briefly) */
+int host_xr_begin_frame(struct halo_xr_frame *frame);
+/* the acquired image's index in info->images[which], or -1 */
+int host_xr_acquire(unsigned int which);
+void host_xr_release(unsigned int which);
+/* ends the frame begun, showing these layers (NULL: none) */
+void host_xr_end_frame(const struct halo_xr_layers *layers);
+/* the head's heading and position next frame become the origin */
+void host_xr_recenter(void);
+/* asks for the display refresh rate nearest at or below hertz; returns it,
+or 0 when the runtime cannot change it */
+float host_xr_set_refresh_rate(float hertz);
+void host_xr_haptic(unsigned int hand, float amplitude, float seconds);
+/* remakes both eye swapchains at this size (within the runtime's maximum),
+none of their images acquired, and describes them in info again; 0 on
+success, else the old ones stay */
+int host_xr_resize_eyes(struct halo_xr_info *info, unsigned int width, unsigned int height);
 
 #endif

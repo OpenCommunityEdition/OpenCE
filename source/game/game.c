@@ -120,6 +120,9 @@ struct game_options;
 
 #include "cseries/cseries.h"
 #include "game/game.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
@@ -187,6 +190,8 @@ struct game_options;
 boolean network_game_distributed_client(void);
 /* port: a client drives the host's actors' units as the host sent them (port/linux/game/network_actors.c) */
 void network_actors_drive(void);
+
+#include "network_campaign.h"
 
 /* ---------- constants */
 
@@ -466,7 +471,7 @@ void game_set_game_variant(
 void game_set_game_variant_options(
 	struct game_variant_options const *options)
 {
-	if (options)
+	if (game_variant_options_valid(options))
 		game_variant_options_global = *options;
 	else
 		game_variant_options_default(&game_variant_global, &game_variant_options_global);
@@ -578,7 +583,7 @@ boolean game_safe_to_speak(
 boolean game_is_cooperative(
 	void)
 {
-	return player_spawn_count > 1;
+	return player_spawn_count > 1 || network_campaign_playing();
 }
 
 boolean game_load(
@@ -613,6 +618,9 @@ void network_objects_placed(void);
 void game_initialize_for_new_map(
 	void)
 {
+#ifdef HALO_VR
+	vr_render_reset_vehicle_view();
+#endif
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game.c",
 		0x1D1,
@@ -876,6 +884,10 @@ void game_precache_new_map(
 void game_dispose_from_old_map(
 	void)
 {
+#ifdef HALO_VR
+	vr_render_reset_vehicle_view();
+	vr_body_geometry_dispose();
+#endif
 	rasterizer_dispose_from_old_map();
 	game_state_dispose_from_old_map();
 	cheats_dispose_from_old_map();

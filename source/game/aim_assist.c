@@ -65,6 +65,9 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 
 /* ---------- constants */
 
@@ -539,10 +542,52 @@ boolean aim_assist(
 	return FALSE;
 }
 
-long player_aim_projectile(
+/* the direction from `position` to where the camera's line hits (from the
+camera at the aiming unit's distance along its direction), as
+player_aim_projectile aims a player's shot; `direction` when they meet.
+test21: shared with the VR reticle (vr_aim_assist_converge), so the
+reticle marks where the engine sends the shot */
+static void aim_assist_collision_direction(
+	long ignore_unit_index,
+	long aiming_unit_index,
+	real_point3d camera_position,
+	real_vector3d camera_direction,
+	real_point3d const *position,
+	real_vector3d const *direction,
+	real_vector3d *collision_direction)
+{
+	real_vector3d camera_vector;
+	struct collision_result collision;
+	real_vector3d camera_to_unit;
+	real_vector3d camera_displacement;
+	struct unit_datum *unit= unit_get(aiming_unit_index);
+	real camera_to_unit_distance;
+
+	vector_from_points3d(&unit->object.position, &camera_position, &camera_to_unit);
+	camera_to_unit_distance= magnitude3d(&camera_to_unit);
+	camera_displacement= camera_direction;
+	normalize3d(&camera_displacement);
+	scale_vector3d(&camera_displacement, camera_to_unit_distance, &camera_displacement);
+	set_real_point3d(&camera_position, camera_position.x + camera_displacement.i,
+		camera_position.y + camera_displacement.j, camera_position.z + camera_displacement.k);
+	scale_vector3d(&camera_direction, 128.f, &camera_vector);
+	collision_test_vector(_collision_test_for_projectiles_flags, &camera_position, &camera_vector,
+		ignore_unit_index, &collision);
+
+	vector_from_points3d(position, &collision.point, collision_direction);
+	if (normalize3d(collision_direction)==0.f)
+	{
+		*collision_direction= *direction;
+	}
+
+	return;
+}
+
+static long player_aim_projectile_internal(
 	long player_index,
 	real_point3d const *position,
-	real_vector3d *direction)
+	real_vector3d *direction,
+	boolean record_target)
 {
 	long target_object_index= NONE;
 	struct player_datum *player= player_get(player_index);
@@ -589,31 +634,8 @@ long player_aim_projectile(
 		}
 
 		/* Trace from the camera at the aiming unit's distance along the camera direction. */
-		{
-			real_vector3d camera_vector;
-			struct collision_result collision;
-			real_vector3d camera_to_unit;
-			real_vector3d camera_displacement;
-			struct unit_datum *unit= unit_get(aiming_unit_index);
-			real camera_to_unit_distance;
-
-			vector_from_points3d(&unit->object.position, &camera_position, &camera_to_unit);
-			camera_to_unit_distance= magnitude3d(&camera_to_unit);
-			camera_displacement= camera_direction;
-			normalize3d(&camera_displacement);
-			scale_vector3d(&camera_displacement, camera_to_unit_distance, &camera_displacement);
-			set_real_point3d(&camera_position, camera_position.x + camera_displacement.i,
-				camera_position.y + camera_displacement.j, camera_position.z + camera_displacement.k);
-			scale_vector3d(&camera_direction, 128.f, &camera_vector);
-			collision_test_vector(_collision_test_for_projectiles_flags, &camera_position, &camera_vector,
-				player->unit_index, &collision);
-
-			vector_from_points3d(position, &collision.point, &collision_direction);
-			if (normalize3d(&collision_direction)==0.f)
-			{
-				collision_direction= *direction;
-			}
-		}
+		aim_assist_collision_direction(player->unit_index, aiming_unit_index, camera_position, camera_direction,
+			position, direction, &collision_direction);
 
 		/* Blend toward the autoaim target, then pin inside the deviation cone. */
 		{
@@ -631,11 +653,67 @@ long player_aim_projectile(
 		global_current_collision_user_depth > 1);
 	--global_current_collision_user_depth;
 
-	player->aim_assist_unit_index= target_object_index;
-	player->aim_assist_timestamp= game_time_get();
+	if (record_target)
+	{
+		player->aim_assist_unit_index= target_object_index;
+		player->aim_assist_timestamp= game_time_get();
+	}
 
 	return target_object_index;
 }
+
+long player_aim_projectile(long player_index, real_point3d const *position, real_vector3d *direction)
+{
+	return player_aim_projectile_internal(player_index, position, direction, TRUE);
+}
+
+#ifdef HALO_VR
+/* The mounted-weapon sight uses the very same aim/convergence calculation,
+without recording a fictitious shot's target or timestamp on the player. */
+void vr_preview_player_projectile(long player_index, real_point3d const *position, real_vector3d *direction)
+{
+	player_aim_projectile_internal(player_index, position, direction, FALSE);
+}
+#endif
+
+
+#ifdef HALO_VR
+/* test21: the VR reticle's aim. A player's shot from `position` along
+`direction` is turned toward where the camera's line hits, within the
+weapon's deviation cone (player_aim_projectile, without the pull toward
+an autoaim target). The reticle passes this frame's camera and hand aim;
+nothing about the player or the game changes. FALSE (direction as it
+was) when the weapon has no aim assist at its zoom */
+boolean vr_aim_assist_converge(
+	long player_index,
+	real_point3d const *camera_position,
+	real_vector3d const *camera_direction,
+	real_point3d const *position,
+	real_vector3d *direction)
+{
+	struct player_datum *player= player_get(player_index);
+	long aiming_unit_index= unit_get_aiming_unit_index(player->unit_index);
+	struct aim_assist_parameters parameters;
+	real_vector3d collision_direction;
+	real_vector3d target_direction= *direction;
+	real_vector3d desired_direction;
+
+	if (global_current_collision_user_depth >= MAXIMUM_COLLISION_USER_STACK_DEPTH ||
+		!unit_get_aim_assist_parameters(aiming_unit_index, unit_get_zoom_level(aiming_unit_index), &parameters))
+	{
+		return FALSE;
+	}
+	global_current_collision_users[global_current_collision_user_depth++] = _collision_user_aim_assist;
+	aim_assist_collision_direction(player->unit_index, aiming_unit_index, *camera_position, *camera_direction,
+		position, direction, &collision_direction);
+	--global_current_collision_user_depth;
+	fast_normals_interpolate(&collision_direction, &target_direction, 0.f, &desired_direction);
+	pin_normal_to_cone3d(&desired_direction, direction, sine(parameters.deviation_angle),
+		cosine(parameters.deviation_angle), direction);
+
+	return TRUE;
+}
+#endif
 
 long local_player_aim_assist(
 	short local_player_index,

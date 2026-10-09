@@ -908,12 +908,12 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "network_browser.h"
 #include "cache/cache_files.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "cseries/errors.h"
 #include "game/game_engine.h"
-#include "game/players.h"
 #include "interface/marketing_and_strategic_business_development.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
@@ -921,6 +921,7 @@ symbols in this file:
 #include "main/main.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_client_manager.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
@@ -930,7 +931,16 @@ symbols in this file:
 #include "custom_edition_maps.h" /* port: port/linux/game/custom_edition_maps.c */
 #include "saved games/saved_game_files.h"
 #include "text/unicode.h"
+#include "custom_edition_maps.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "halo_menus.h" /* port: PC_MENU_FUNCTION_BASE */
+
+void platform_log(char const *format, ...);
+
+/* network_game_client_state's first value in the pinned OpenCE manager */
+enum { _port_network_game_client_state_searching = 0 };
 
 /* ---------- constants */
 
@@ -1030,33 +1040,6 @@ boolean virtual_keyboard_launch(
 	void *text,
 	long maximum_length,
 	long keyboard_type);
-void *network_game_client_get_game(
-	void *client);
-short network_game_client_get_machine_index(
-	void *client);
-boolean network_game_client_request_start_time_change(
-	void *client,
-	boolean start);
-boolean network_game_client_request_remove_player(
-	void *client,
-	void *player);
-boolean network_game_client_initiate_join_game(
-	void *client,
-	void *server,
-	struct network_game_join_descriptor *join_descriptor,
-	struct transport_address *address);
-/* network_client_manager.c's: whether the host's network version is this
-machine's (else the player is told, and it is not joined) */
-boolean network_game_client_advertised_game_compatible(
-	void *client,
-	void const *game,
-	boolean tell);
-boolean network_game_client_update_local_player_data(
-	void *client,
-	struct network_player *player);
-boolean network_game_client_add_player(
-	void *client,
-	short controller_index);
 void playlist_profiles_enumerate_available_to_local_player_index(
 	short local_player_index,
 	long *profile_count,
@@ -1066,9 +1049,6 @@ static boolean new_campaign_chosen(
 	struct widget_instance *widget,
 	struct event_record *event,
 	boolean *widget_deleted);
-short network_game_client_get_state(
-	void *client,
-	short *state);
 static boolean network_game_start_new_server(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -1920,6 +1900,8 @@ static boolean network_game_join_game_from_server_list(
 			if ((word)generated_count > (word)zero)
 			{
 				server = ((byte **)widget->generated_list)[widget->data3C.selected_index];
+                server=(byte *)network_browser_select((struct network_advertised_game *)server,event->controller_index);
+                if(!server)return TRUE;
 				if (server[0xE0] == TRUE)
 				{
 					if (*(short *)(server + 0xDE) == zero)
@@ -2101,6 +2083,7 @@ static boolean clear_multiplayer_player_joins(
 {
 	dispose_global_network_game_client();
 	dispose_global_network_game_server();
+	network_browser_end();
 	player_ui_clear_multiplayer_joins();
 	player_ui_clear_multiplayer_variant();
 	return TRUE;
@@ -2111,6 +2094,7 @@ static boolean network_server_list_dispose(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+	network_browser_end();
 	widget->generated_list = NULL;
 	widget->generated_count = 0;
 	return TRUE;
@@ -2121,6 +2105,7 @@ static boolean network_game_cancel(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+    network_browser_end();
 	dispose_global_network_game_server();
 	dispose_global_network_game_client();
 	player_ui_clear_multiplayer_variant();
@@ -2321,7 +2306,10 @@ static boolean network_game_server_list_initialize(
 	dispose_global_network_game_server();
 	player_ui_clear_multiplayer_variant();
 	if (create_global_network_game_client())
-		game_connection_set(1);
+    {
+        game_connection_set(1);
+        network_browser_begin();
+    }
 	else
 	{
 		error(2, "failed to create network client to initiate game search");
@@ -2335,6 +2323,7 @@ static boolean main_menu_initialize(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
+    network_browser_end();
 	player_ui_clear_multiplayer_joins();
 	player_ui_clear_multiplayer_variant();
 	dispose_global_network_game_client();
@@ -3017,7 +3006,8 @@ static boolean multiplayer_level_list_initialize(
 	{
 		widget->data3C.selected_index = 0;
 		while (widget->data3C.selected_index < level_count &&
-			_stricmp(map_name, levels[widget->data3C.selected_index]))
+			_stricmp(map_name,
+				levels[widget->data3C.selected_index]))
 		{
 			widget->data3C.selected_index++;
 		}
@@ -3397,6 +3387,11 @@ boolean ui_widget_event_handler_function_invoke(
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 478,
 		widget != NULL && widget_deleted != NULL,
 		"(widget != NULL) && (widget_deleted != NULL)");
+#ifdef HALO_VR
+	/* the pause menu's VR settings (port/linux/game/vr_menu.c) */
+	if (function_index == VR_MENU_NEXT_FUNCTION || function_index == VR_MENU_PREVIOUS_FUNCTION)
+		return vr_menu_setting_change(widget->definition_tag_index, function_index == VR_MENU_NEXT_FUNCTION ? 1 : -1);
+#endif
 	/* port: the menus' own functions (port/linux/game/menu_functions.c) */
 	if (function_index >= PC_MENU_FUNCTION_BASE && function_index < 0x8000)
 	{
@@ -3408,7 +3403,11 @@ boolean ui_widget_event_handler_function_invoke(
 	if ((short)function_index >= 0 && function_index < 102)
 	{
 		result = event_handler_function_list.functions[(short)function_index](widget, event, widget_deleted);
-		if (!result)
+		/* port: with the public browser (network_browser.c) the System Link
+		list always has rows, so its "start server if none advertised" always
+		declines; that is not a failure worth a red line on the screen */
+		if (!result && !(event_handler_function_list.functions[(short)function_index] ==
+			start_network_game_if_no_advertised_servers && network_browser_active()))
 			console_warning("event handler '%s' failed", event_handler_function_list.names[(short)function_index]);
 		return result;
 	}
@@ -4047,16 +4046,6 @@ static boolean player_profile_set_for_game_1wide(
 	}
 	if (player_profile_get(available_profiles[spinner_list->data3C.selected_index], &profile))
 	{
-		/* port: not a profile whose name the host's ban command could not
-		name (one made before names were checked: player_name_valid) */
-		if (!player_name_valid(profile.player_name, NUMBEROF(profile.player_name)))
-		{
-			display_error_text_deferred(
-				L"Sorry, this profile's\r\nname can't be used in\r\nmultiplayer. Please\r\nrename the profile.",
-				controller_index);
-			ui_play_audio_feedback_sound(4);
-			return FALSE;
-		}
 		player_ui_set_active_player_profile(controller_index, available_profiles[spinner_list->data3C.selected_index], &profile);
 		return TRUE;
 	}
@@ -5637,6 +5626,7 @@ static boolean multiplayer_level_select(
 	struct widget_instance *level_list;
 	struct ui_widget_definition *definition;
 	long level_index;
+	char **levels;
 
 	definition = ui_widget_definition_get(widget->definition_tag_index);
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1280,
@@ -6057,7 +6047,20 @@ boolean ui_widget_port_browse(
 	struct event_record *event,
 	boolean *widget_deleted)
 {
-	return global_network_game_client_get() || network_game_server_list_initialize(widget, event, widget_deleted);
+	struct network_game_client *client = global_network_game_client_get();
+	short state = client ? network_game_client_get_state(client, NULL) : _port_network_game_client_state_searching;
+
+	/* A previous local host flow leaves a client joined to its own 127.0.0.1
+	server. Reusing it here makes the public invite connect at P2P level, but
+	that client is no longer searching and can never discover the remote Halo
+	advertisement. Start the same clean search used by the stock browser. */
+	if (client && state != _port_network_game_client_state_searching)
+	{
+		platform_log("menus: resetting network client in state %d before browser search",
+			(int)state);
+		return network_game_server_list_initialize(widget, event, widget_deleted);
+	}
+	return client != NULL || network_game_server_list_initialize(widget, event, widget_deleted);
 }
 
 /* joining a found game (as network_game_join_game_from_server_list), then
@@ -6230,4 +6233,3 @@ boolean ui_widget_port_gametype_save(
 	}
 	return player_ui_save_profile();
 }
-

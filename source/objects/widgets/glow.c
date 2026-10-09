@@ -93,6 +93,7 @@ symbols in this file:
 #include "render/render.h"
 #include "render/render_sprite.h"
 #include "saved games/game_state.h"
+#include "halo_vr.h"
 
 /* ---------- constants */
 
@@ -1496,7 +1497,9 @@ void glow_submit(
 			struct glow_definition *definition = glow_definition_get(glow->definition_index);
 			struct object_marker marker;
 
-			glow_update(glow_get(glow_index), object_index);
+			/* once a frame: not again for the second eye (halo_vr.h) */
+			if (!VR_RENDER_REPEAT())
+				glow_update(glow_get(glow_index), object_index);
 		object_get_marker_by_name(object_index, definition->attachment_marker, &marker, 1);
 		glow_render(object_index, glow_index);
 	}

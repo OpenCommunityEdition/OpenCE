@@ -105,6 +105,9 @@ symbols in this file:
 #include "units/units.h"
 #include "hs/hs.h"
 #include "object_lists.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 
@@ -168,11 +171,16 @@ boolean hs_not(
 void hs_print(
 	char const *message)
 {
+#ifdef HALO_VR
+	if (!vr_render_script_message(message))
+		terminal_printf(global_real_argb_green, "%s", message ? message : "");
+#else
 	/* port: printed through "%s". January passes the text as the format
 	(0x4b8970 +0x0c pushes it as terminal_printf's format), so a '%' in it,
 	from a scenario script or typed at the console, read arguments that
 	were never passed */
 	terminal_printf(global_real_argb_green, "%s", message);
+#endif
 
 	return;
 }
@@ -248,6 +256,17 @@ boolean hs_trigger_volume_test_objects(
 	return result;
 }
 
+/* Only script gaze checks use the headset. AI vision and weapon aiming retain
+ * their native vectors; remote players retain their replicated native view. */
+static boolean hs_script_can_see_point(long unit_index, const real_point3d *point, real field_of_view)
+{
+#ifdef HALO_VR
+    boolean result;
+    if (vr_script_can_see_point(unit_index, point, field_of_view, &result)) return result;
+#endif
+    return unit_can_see_point(unit_index, point, field_of_view);
+}
+
 boolean hs_unit_can_see_object(
 	long unit_index,
 	long object_index,
@@ -265,7 +284,7 @@ boolean hs_unit_can_see_object(
 		else
 			target_point = object_get(object_index)->object.bounding_sphere_center;
 
-		result = unit_can_see_point(
+		result = hs_script_can_see_point(
 			unit_index,
 			&target_point,
 			DEGREES_TO_RADIANS(degrees));
@@ -310,9 +329,9 @@ boolean hs_unit_can_see_flag(
 	boolean result;
 
 	result = FALSE;
-	if (cutscene_flag_index)
+	if (cutscene_flag_index >= 0 && cutscene_flag_index < global_scenario_get()->cutscene_flags.count)
 	{
-		result = unit_can_see_point(
+		result = hs_script_can_see_point(
 			unit_index,
 			&TAG_BLOCK_GET_ELEMENT(
 				&global_scenario_get()->cutscene_flags,

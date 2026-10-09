@@ -109,6 +109,16 @@ void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
 void rasterizer_set_model_skinning(
 	struct render_skinning const *skinning);
+
+#ifdef HALO_VR
+/* Bit 9 is private draw metadata: existing geometry flags use bits 0..8.
+This does not extend the transparent group, a map tag, or a game/save packet. */
+#define RASTERIZER_VR_MIRRORED_GEOMETRY_FLAG (1ul << 9)
+unsigned long rasterizer_vr_capture_geometry_flags(unsigned long flags, boolean first_person);
+int halo_vr_winding_state(void);
+void halo_vr_restore_winding_state(int state);
+void halo_vr_mirror_winding(int mirrored);
+#endif
 union point2d *rasterizer_set_texture(
 	short stage,
 	short bitmap_type,

@@ -11,11 +11,23 @@ def staged = new File(rootDir, "../../build/android")
 // none and never look for updates
 def buildNumberText = System.getenv("HALO_BUILD_NUMBER") ?: "0"
 def buildNumber = buildNumberText.isInteger() ? buildNumberText.toInteger() : 0
+def requestedVersionName = System.getenv("HALO_VERSION_NAME")
 
 // the workflow's signing key (.github/workflows/build.yml): every build of
 // main signed with it can install over the one before; without it, the
 // debug key of the computer that builds
 def signingKey = System.getenv("HALO_ANDROID_KEYSTORE")
+
+// the VR headset build (configure.py --android-vr): its own app, com.halo.decomp.vr,
+// with the OpenXR manifest entries of src/vr
+def haloVr = project.hasProperty("haloVr")
+// Keep browser compatibility in step with the native join gate.
+def networkLimits = new File(rootDir, "../linux/include/halo_port_limits.h").text
+def networkValue = { name ->
+    def match = networkLimits =~ /(?m)^#define ${name} (\d+)\s*$/
+    if (!match.find()) throw new GradleException("Missing native network constant: ${name}")
+    match.group(1)
+}
 
 android {
     namespace "com.halo.decomp"
@@ -25,11 +37,24 @@ android {
         applicationId "com.halo.decomp"
         minSdk 28
         targetSdk 35
-        versionCode Math.max(1, buildNumber)
-        versionName buildNumber > 0 ? "build " + buildNumber : "1.0"
+        versionCode Math.max(47, buildNumber)
+        versionName requestedVersionName ?: (buildNumber > 0 ? "build " + buildNumber : "1.0.18-test37")
         buildConfigField "int", "HALO_BUILD_NUMBER", "${buildNumber}"
+        buildConfigField "int", "HALO_NETWORK_VERSION", networkValue("HALO_PORT_NETWORK_VERSION")
+        buildConfigField "int", "HALO_NETWORK_MINIMUM", networkValue("HALO_PORT_NETWORK_VERSION_MINIMUM")
+        buildConfigField "int", "HALO_NETWORK_MAXIMUM", networkValue("HALO_PORT_NETWORK_VERSION_MAXIMUM")
         ndk {
             abiFilters "arm64-v8a"
+        }
+    }
+
+    if (haloVr) {
+        flavorDimensions = ["display"]
+        productFlavors {
+            vr {
+                dimension "display"
+                applicationIdSuffix ".vr"
+            }
         }
     }
 
@@ -37,7 +62,13 @@ android {
         main {
             java.srcDirs += new File(staged, "third_party/SDL3/android-project/app/src/main/java")
             jniLibs.srcDirs = [new File(staged, "jniLibs")]
-            assets.srcDirs = [new File(staged, "assets")]
+            assets.srcDirs = [new File(staged, "assets"), "src/main/assets"]
+        }
+        if (haloVr) {
+            // the OpenXR loader (configure.py --android-vr)
+            vr {
+                jniLibs.srcDirs = [new File(staged, "jniLibs-vr")]
+            }
         }
     }
 

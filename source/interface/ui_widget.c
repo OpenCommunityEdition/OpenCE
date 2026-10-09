@@ -628,6 +628,9 @@ symbols in this file:
 struct widget_instance;
 
 #include "cseries.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
@@ -639,6 +642,7 @@ struct widget_instance;
 #include "cutscene/cinematics.h"
 #include "event_manager.h"
 #include "game/game_engine.h"
+#include "network_campaign.h"
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "hs/hs.h"
@@ -679,6 +683,7 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+#include "custom_edition_maps.h"
 
 /* ---------- constants */
 
@@ -1470,11 +1475,12 @@ static wchar_t const *const kills_to_win_extra_descriptions[] =
 
 /* port: an error message of the port's own text (display_error_text_deferred):
 the text waiting for its dialog, then the dialog's text box showing it */
-static wchar_t const *ui_widget_port_error_pending_text = NULL;
-static wchar_t const *ui_widget_port_error_text = NULL;
-static struct widget_instance *ui_widget_port_error_text_box = NULL;
 
 static struct ui_widget_bss_prefix ui_widget_globals_storage;
+
+static wchar_t const *ui_widget_port_error_pending_text;
+static wchar_t const *ui_widget_port_error_text;
+static struct widget_instance *ui_widget_port_error_text_box;
 
 #define string_data ui_widget_globals_storage.string_data
 #define widget_globals ui_widget_globals_storage.widget_globals
@@ -1826,8 +1832,8 @@ void draw_bitmap_in_rect(
 
 		parameters.meter_parameters = NULL;
 		parameters.point_sampled = FALSE;
-		/* port: (rasterizer.h) */
-		parameters.alpha_weighted = FALSE;
+		/* This GLES port retains the original unweighted screen-geometry
+		blend path; desktop's later alpha_weighted field is not in its ABI. */
 		parameters.framebuffer_blend_function = 0;
 		rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	}
@@ -2904,6 +2910,7 @@ void ui_widgets_close_all(
 	whose text it edits is still there): left open, it drew on after a game
 	loaded, with the menu map's font, which the game's tags no longer have
 	(a player typing when the host started the game) */
+	{ extern void pc_menu_text_input_reset(void); pc_menu_text_input_reset(); }
 	if (virtual_keyboard_active())
 		virtual_keyboard_close();
 	for (local_player_index = 0;
@@ -3743,6 +3750,14 @@ static void widget_instance_initialize(
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
 		!network_coop_active();
+#ifdef HALO_VR
+	/* Opening another root deletes the caller, including its pause ownership.
+	 * VR screens retain solo pause across categories/pages; online play and
+	 * the main-menu scene must continue normally. Evaluate at opening time. */
+	if (vr_menu_is_screen(tag_index))
+		widget->pause_game_time = widget->pause_game_time &&
+			!we_are_at_the_main_menu && game_connection() == _game_connection_local;
+#endif
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -4303,8 +4318,6 @@ void display_error_deferred(
 	return;
 }
 
-/* port: an error message of the port's own text (the maps have only the
-Xbox's), in the dialog of an error whose text it takes the place of */
 void display_error_text_deferred(
 	wchar_t const *text,
 	short local_player_index)
@@ -4545,7 +4558,7 @@ void display_error(
 				widget->widget_is_error_dialog = TRUE;
 				if (!widget->pause_game_time)
 				{
-					widget->pause_game_time = pause_game_time;
+					widget->pause_game_time = pause_game_time && !network_campaign_active();
 					if (widget->pause_game_time == TRUE)
 					{
 						match_vassert(
@@ -5625,6 +5638,7 @@ struct ui_mouse_target
 {
 	struct widget_instance *widget;
 	rectangle2d bounds;
+	point2d value_center;
 	short kind;
 	short button_index;
 };
@@ -5751,6 +5765,40 @@ static boolean ui_mouse_widget_is_item(
 		widget->type == _ui_widget_type_column_list;
 }
 
+/* OpenCE draws a value spinner's arrows separately, often outside its text
+bounds. Include exactly that visible art in the pointer target without moving
+its text's left/right divider or enlarging unrelated action buttons. */
+static void ui_mouse_value_bounds(
+	struct widget_instance *widget,
+	struct ui_widget_definition const *definition,
+	point2d offset,
+	rectangle2d *bounds)
+{
+	long arrow_index;
+
+	if (!pc_menu_tag(widget->definition_tag_index))
+		return;
+	for (arrow_index = 0; arrow_index < 2; arrow_index++)
+	{
+		rectangle2d arrow = arrow_index ? definition->list_footer_bounds : definition->list_header_bounds;
+		long bitmap_index = arrow_index ? definition->list_footer_bitmap.index : definition->list_header_bitmap.index;
+
+		if (bitmap_index == NONE || arrow.x1 <= arrow.x0 || arrow.y1 <= arrow.y0)
+			continue;
+		if (!arrow_index && spinner_string_list_extra_count(definition->text_label_string_list.index))
+		{
+			arrow.x0 -= SPINNER_EXTRA_WIDTH;
+			arrow.x1 -= SPINNER_EXTRA_WIDTH;
+		}
+		bounds->x0 = MIN(bounds->x0, arrow.x0 + offset.x);
+		bounds->x1 = MAX(bounds->x1, arrow.x1 + offset.x);
+		bounds->y0 = MIN(bounds->y0, arrow.y0 + offset.y);
+		bounds->y1 = MAX(bounds->y1, arrow.y1 + offset.y);
+	}
+
+	return;
+}
+
 static void ui_mouse_note_target(
 	struct widget_instance *widget,
 	struct ui_widget_definition const *definition,
@@ -5837,6 +5885,10 @@ static void ui_mouse_note_target(
 	}
 	target = &ui_mouse_targets[ui_mouse_target_count++];
 	target->widget = widget;
+	target->value_center.x = (short)((bounds.x0 + bounds.x1) / 2);
+	target->value_center.y = (short)((bounds.y0 + bounds.y1) / 2);
+	if (kind == _ui_mouse_target_value)
+		ui_mouse_value_bounds(widget, definition, offset, &bounds);
 	target->bounds = bounds;
 	target->kind = kind;
 	target->button_index = button_index;
@@ -6002,6 +6054,16 @@ static boolean ui_mouse_selection_row(
 		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12));
 }
 
+/* server rows have no row-specific action buttons: moving the menu pointer
+over one should select it immediately, just as moving the d-pad does. Keep
+profile/map rows click-to-select because pointer travel can pass their action
+buttons. */
+static boolean ui_mouse_selection_row_tracks_hover(
+	struct widget_instance *widget)
+{
+	return widget && !strncmp(widget->name, "server_item_", 12);
+}
+
 /* port: a press the menus post from their updates (menu_functions.c: the
 server browser's join, once its game is reached), posted where the mouse's
 are: one posted while the widgets update or draw would be overwritten by the
@@ -6025,9 +6087,23 @@ static void ui_widgets_process_mouse(
 	struct halo_ui_pointer pointer;
 	struct ui_mouse_target *target;
 	short controller_index = 0;
+	boolean have_pointer = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer);
 
-	if (!halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) ||
-		virtual_keyboard_active())
+	if (virtual_keyboard_active())
+	{
+		/* Use the pointer already fetched for this frame; a second fetch
+		would consume Quest/touch click edges. Stationary pointers must not
+		override keyboard/gamepad navigation. */
+		if (have_pointer && (pointer.moved || pointer.left_clicks || pointer.right_clicks))
+			virtual_keyboard_pointer(pointer.left_clicks ? pointer.click_x : pointer.x,
+				pointer.left_clicks ? pointer.click_y : pointer.y,
+				pointer.left_clicks != 0, pointer.right_clicks != 0);
+		ui_mouse_press_count = 0;
+		ui_mouse_hover_pending = FALSE;
+		ui_mouse_click_pending = FALSE;
+		return;
+	}
+	if (!have_pointer)
 	{
 		ui_mouse_press_count = 0;
 		ui_mouse_hover_pending = FALSE;
@@ -6071,8 +6147,10 @@ static void ui_widgets_process_mouse(
 				case _ui_mouse_target_item:
 				case _ui_mouse_target_value:
 					/* (a selection list's row is chosen by a click, not
-					by passing over it on the way to its buttons) */
-					if (!ui_mouse_selection_row(target->widget))
+					by passing over it on the way to its buttons; server rows
+					are the exception because they have no row actions) */
+					if (!ui_mouse_selection_row(target->widget) ||
+						ui_mouse_selection_row_tracks_hover(target->widget))
 						ui_mouse_give_focus(target->widget);
 					break;
 				case _ui_mouse_target_list_slot:
@@ -6099,6 +6177,12 @@ static void ui_widgets_process_mouse(
 						break;
 					}
 					ui_mouse_give_focus(target->widget);
+#ifdef HALO_VR
+					if (vr_menu_is_setting(target->widget->definition_tag_index))
+						ui_mouse_press(ui_mouse_click_x < (target->bounds.x0 + target->bounds.x1) / 2 ?
+							_widget_event_dpad_left : _widget_event_dpad_right);
+					else
+#endif
 					ui_mouse_press(_gamepad_analog_button_a);
 					break;
 				case _ui_mouse_target_value:
@@ -6109,8 +6193,8 @@ static void ui_widgets_process_mouse(
 					ui_mouse_give_focus(target->widget);
 					ui_mouse_list_directions(target->widget, &back, &forward);
 					first_half = back == _widget_event_dpad_left ?
-						ui_mouse_click_x < (target->bounds.x0 + target->bounds.x1) / 2 :
-						ui_mouse_click_y < (target->bounds.y0 + target->bounds.y1) / 2;
+						ui_mouse_click_x < target->value_center.x :
+						ui_mouse_click_y < target->value_center.y;
 					ui_mouse_press(first_half ? back : forward);
 					break;
 				}
@@ -6188,11 +6272,13 @@ static void widget_instance_render_recursive(
 	if (!widget->visible)
 		return;
 	ui_mouse_note_target(widget, definition, offset);
-	/* port: a Custom Edition map's picture, drawn over the whole widget, or
-	the unknown level's frame for a map without one
+	/* a Custom Edition map's picture, drawn over the whole widget, or the
+	unknown level's frame for a map without one
 	(port/linux/game/custom_edition_maps.c) */
 	frame_index = widget->animation.current_frame_index;
-	custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
+	custom_edition_picture = custom_edition_maps_picture(
+		definition->background_bitmap.index,
+		&frame_index);
 	bitmap = custom_edition_picture ? custom_edition_picture : bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -7399,6 +7485,10 @@ static boolean ui_check_for_pause_game(
 						widget_name = NULL;
 						break;
 					}
+					/* Campaign map caches do not contain the competitive pause
+					 * widgets. Use their authored campaign menu (and VR settings). */
+					if (network_campaign_active())
+						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
 					if (widget_name &&
 						!ui_widget_load_by_name_or_tag(
 							widget_name,
@@ -7546,6 +7636,10 @@ void process_ui_widgets(
 	boolean pause_pressed;
 	boolean modal_widget_active[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 	long widget_index;
+
+	/* The native keyboard suspends widget updates while it is open. Finish
+	its menu-field transaction before normal widgets run again. */
+	{ extern void pc_menu_text_input_update(void); pc_menu_text_input_update(); }
 
 	match_assert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget.c",

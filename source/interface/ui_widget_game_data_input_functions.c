@@ -335,6 +335,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "network_browser.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "bungie_net/network/transport.h"
@@ -354,6 +355,10 @@ symbols in this file:
 #include "saved games/playlist_profile.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
+#include "custom_edition_maps.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "custom_edition_maps.h" /* port: port/linux/game/custom_edition_maps.c */
 #include "halo_menus.h" /* port: PC_MENU_FUNCTION_BASE */
 
@@ -709,6 +714,32 @@ void ui_widget_game_data_function_invoke(
 		0x10A,
 		widget);
 
+#ifdef HALO_VR
+	/* the pause menu's VR settings (port/linux/game/vr_menu.c): the text of
+	their buttons */
+	if (function == VR_MENU_GAME_DATA_FUNCTION)
+	{
+		wchar_t text[64];
+		long length;
+
+		if (widget->type == _ui_widget_type_text_box &&
+			vr_menu_setting_text(widget->definition_tag_index, text, NUMBEROF(text)))
+		{
+			length = ustrlen(text);
+			widget->parameters.text_box.text = ui_widget_realloc(
+				widget->parameters.text_box.text,
+				(word)(2 * length + 2),
+				"port/linux/game/vr_menu.c",
+				0);
+			if (widget->parameters.text_box.text)
+			{
+				ustrncpy(widget->parameters.text_box.text, text, length);
+				widget->parameters.text_box.text[length] = 0;
+			}
+		}
+		return;
+	}
+#endif
 	/* port: the menus' own functions (port/linux/game/menu_functions.c) */
 	if (function >= PC_MENU_FUNCTION_BASE && function < 0x8000)
 	{
@@ -949,11 +980,8 @@ static void server_list_menu_update(
 	{
 		struct ui_widget_definition *definition = ui_widget_definition_get(
 			widget->definition_tag_index);
-		struct network_advertised_game *available_games =
-			network_game_client_get_available_games(client);
-		struct widget_instance *item;
+				struct widget_instance *item;
 		unsigned long milliseconds_since_creation;
-		long game_index;
 		long item_index;
 
 		match_vassert(
@@ -963,31 +991,8 @@ static void server_list_menu_update(
 				definition->child_count == 9,
 			"this doesn't look like the net game server list widget");
 
-		for (game_index = 0;
-			game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
-			game_index++)
-		{
-			if (network_game_client_advertised_game_is_valid(&available_games[game_index]) &&
-				available_games[game_index].platform == _network_game_platform_xbox &&
-				available_games[game_index].open)
-			{
-				displayed_servers[displayed_server_count] = &available_games[game_index];
-				displayed_server_count++;
-			}
-		}
-
-		for (game_index = 0;
-			game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES;
-			game_index++)
-		{
-			if (network_game_client_advertised_game_is_valid(&available_games[game_index]) &&
-				available_games[game_index].platform == _network_game_platform_xbox &&
-				!available_games[game_index].open)
-			{
-				displayed_servers[displayed_server_count] = &available_games[game_index];
-				displayed_server_count++;
-			}
-		}
+        displayed_server_count = network_browser_rows(displayed_servers,
+            widget->parameters.list.selected_list_item_index, widget->local_player_index);
 
 		widget->parameters.list.list_items = displayed_servers;
 		widget->parameters.list.number_of_items = (word)displayed_server_count;
@@ -1029,6 +1034,7 @@ static void server_list_menu_update(
 						displayed_servers[item_index]->game_name);
 				}
 				item->parameters.text_box.text[0x1F] = 0;
+                network_browser_text(item_index, item->parameters.text_box.text, 32);
 			}
 		}
 
@@ -1109,6 +1115,7 @@ static void server_list_menu_update(
 				struct network_advertised_game *server = displayed_servers[
 					widget->parameters.list.selected_list_item_index];
 				char const *map_name;
+				short custom_edition_map_index;
 
 				switch (server->engine_type)
 				{
@@ -1167,9 +1174,12 @@ static void server_list_menu_update(
 					map_bitmap->animation.current_frame_index = 12;
 				else
 					map_bitmap->animation.current_frame_index = 13;
-				/* port: a Custom Edition map shows its own name and picture */
-				if (custom_edition_map_display_index(map_name) != NONE)
-					map_bitmap->animation.current_frame_index = custom_edition_map_display_index(map_name);
+				/* a Custom Edition map this machine has shows its own name and
+				picture, even one whose name holds an Xbox level's
+				(port/linux/game/custom_edition_maps.c) */
+				custom_edition_map_index = custom_edition_maps_display_index(map_name);
+				if (custom_edition_map_index != NONE)
+					map_bitmap->animation.current_frame_index = custom_edition_map_index;
 
 				open_closed_text->parameters.text_box.string_list_index =
 					(server->open == TRUE) ? 20 : 21;
@@ -1308,6 +1318,21 @@ static void server_list_menu_update(
 					(milliseconds_since_creation >= 1000) ? 1 : 0;
 				message_text->visible = TRUE;
 			}
+            {
+                char const *status=network_browser_status();long k,length=(long)strlen(status);
+                short choice=widget->parameters.list.selected_list_item_index;
+                struct network_advertised_game *chosen=choice>=0 && choice<displayed_server_count?displayed_servers[choice]:NULL;
+                boolean details=chosen && chosen->valid;
+                game_type_bitmap->visible=map_bitmap->visible=description_container->visible=details;
+                score_limit_text->visible=score_limit_type_text->visible=details && chosen->score_limit!=NONE;
+                message_text->parameters.text_box.text=ui_widget_realloc(message_text->parameters.text_box.text,
+                    (word)((length+1)*2), "port/linux/game/network_browser.c", 0);
+                if(message_text->parameters.text_box.text) {
+                    for(k=0;k<=length;k++)message_text->parameters.text_box.text[k]=(unsigned char)status[k];
+                    message_text->parameters.text_box.string_list_index=NONE;message_text->visible=TRUE;
+                }
+            }
+
 		}
 	}
 	return;
@@ -2422,6 +2447,7 @@ static void multiplayer_game_set_text_box_for_map_name(
 {
 	struct network_game *game;
 	char const *map_name;
+	short custom_edition_map_index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -2433,12 +2459,14 @@ static void multiplayer_game_set_text_box_for_map_name(
 	if (game)
 	{
 		map_name = game->map.name;
-	/* port: a Custom Edition map shows its own name */
-	if (custom_edition_map_display_index(map_name) != NONE)
-	{
-		widget->parameters.text_box.string_list_index = custom_edition_map_display_index(map_name);
-		return;
-	}
+		/* a Custom Edition map shows its own name, even one whose name holds
+		an Xbox level's (port/linux/game/custom_edition_maps.c) */
+		custom_edition_map_index = custom_edition_maps_display_index(map_name);
+		if (custom_edition_map_index != NONE)
+		{
+			widget->parameters.text_box.string_list_index = custom_edition_map_index;
+			return;
+		}
 	if (strstr(map_name, "beavercreek"))
 	{
 		widget->parameters.text_box.string_list_index = 0;
@@ -2696,6 +2724,7 @@ static void multiplayer_game_set_bitmap_for_map(
 {
 	struct network_game *game;
 	char const *map_name;
+	short custom_edition_map_index;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
@@ -2707,12 +2736,14 @@ static void multiplayer_game_set_bitmap_for_map(
 	if (game)
 	{
 		map_name = game->map.name;
-	/* port: a Custom Edition map shows its own picture */
-	if (custom_edition_map_display_index(map_name) != NONE)
-	{
-		widget->animation.current_frame_index = custom_edition_map_display_index(map_name);
-		return;
-	}
+		/* a Custom Edition map shows its own picture, even one whose name
+		holds an Xbox level's (port/linux/game/custom_edition_maps.c) */
+		custom_edition_map_index = custom_edition_maps_display_index(map_name);
+		if (custom_edition_map_index != NONE)
+		{
+			widget->animation.current_frame_index = custom_edition_map_index;
+			return;
+		}
 	if (strstr(map_name, "beavercreek"))
 	{
 		widget->animation.current_frame_index = 0;
@@ -2933,7 +2964,6 @@ static void multiplayer_game_directions(
 
 	if (server)
 	{
-		/* port: one machine and one player may start (server_alone) */
 		boolean waiting_for_machines = !network_game_is_splitscreen_local() &&
 			game &&
 			game->machine_count < 1;
@@ -4257,8 +4287,8 @@ static void mp_level_select_list_update_displayed_items(
 				_ui_widget_type_text_box,
 			"expected a text box widget for the list item's third child (map description)");
 
-		/* port: the Custom Edition maps after the Xbox levels show their own
-		names, pictures and descriptions (port/linux/game/custom_edition_maps.c) */
+		/* the Custom Edition maps after the Xbox levels show their own names,
+		pictures and descriptions (port/linux/game/custom_edition_maps.c) */
 		displayed_item_indices[item_index] = custom_edition_maps_level_display_index(
 			(short)displayed_item_indices[item_index]);
 		map_name->parameters.text_box.string_list_index =

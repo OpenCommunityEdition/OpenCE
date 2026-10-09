@@ -112,6 +112,10 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
+#include "network_vr_pose.h"
 
 /* ---------- constants */
 
@@ -470,8 +474,16 @@ static void render_object_list(
 	while (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
+#ifdef HALO_VR
+		/* port: the headset's full body (vr.body "full"): the player's own
+		biped drawn in first person too, posed to the headset, without what it
+		carries */
+		boolean vr_body = !data->shadow && vr_render_full_body(object_index);
+#else
+		boolean vr_body = FALSE;
+#endif
 
-		if (!object_is_first_person_camera(object_index) || render.camera.mirrored)
+		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || vr_body)
 		{
 			struct render_model_effect model_effect;
 
@@ -602,7 +614,10 @@ static void render_object_list(
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels,
-						object_get_node_matrices(object_index),
+#ifdef HALO_VR
+						vr_body ? vr_render_body_matrices(object_index) :
+#endif
+						network_vr_pose_render(object_index, object_get_node_matrices(object_index)),
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
@@ -624,7 +639,7 @@ static void render_object_list(
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels * 0.3f,
-						object_get_node_matrices(object_index),
+						network_vr_pose_render(object_index, object_get_node_matrices(object_index)),
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
@@ -647,7 +662,7 @@ static void render_object_list(
 				widgets_render(object_index, data->lighting, &animation);
 			}
 
-			if (object->object.first_child_object_index != NONE)
+			if (object->object.first_child_object_index != NONE && !vr_body)
 			{
 				render_object_list(
 					data,

@@ -228,6 +228,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "network_campaign.h"
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "ai/ai.h"
@@ -753,15 +754,6 @@ short local_player_count(
 	void)
 {
 	return players_globals->local_player_count;
-}
-
-/* port: local_player_count, 0 before the players' globals are made (the
-input's first polls ask it: port/linux/game/menu_functions.c's
-pc_menu_split_players) */
-short players_port_local_player_count(
-	void)
-{
-	return players_globals ? players_globals->local_player_count : 0;
 }
 
 short local_player_get_next(
@@ -1316,17 +1308,15 @@ long find_best_starting_location_index(
 		}
 	}
 
-	/* port: a multiplayer map played alone (New Game's MULTIPLAYER maps:
-	no game engine) has no starting location for no game type, every one
-	being for its game types: the player starts at any of them, not at none
-	(outside the map, with no pause menu) */
-	if (best_starting_location_index == NONE && !game_engine_running() && starting_location_count > 0)
-	{
-		best_starting_location_index = (short)PIN(
-			(short)(real_random_range(0.0f, 1.0f) * starting_location_count), 0, starting_location_count - 1);
-	}
-
 	return best_starting_location_index;
+}
+
+/* The two campaign players retain independent saved-unit slots even when
+ * one is remote. A remote player's local controller index is NONE. */
+static short player_saved_unit_slot(long player_index, struct player_datum const *player)
+{
+	short slot = network_campaign_playing() ? DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) : player->local_player_index;
+	return VALID_INDEX(slot, MAXIMUM_LOCAL_PLAYERS) ? slot : NONE;
 }
 
 /* port: paints a network co-op player's unit in their profile colour. The
@@ -1375,14 +1365,16 @@ static void player_spawn(
 	long unit_index;
 	long starting_equipment_count;
 	short starting_location_index;
+	short saved_unit_slot;
 
 	player = player_get(player_index);
+	saved_unit_slot = player_saved_unit_slot(player_index, player);
 	saved_unit_index = NONE;
-	if (!game_engine_running() && player->local_player_index != NONE)
+	if (!game_engine_running() && saved_unit_slot != NONE)
 	{
 		saved_unit_index =
-			players_globals->dead_units[player->local_player_index];
-		players_globals->dead_units[player->local_player_index] = NONE;
+			players_globals->dead_units[saved_unit_slot];
+		players_globals->dead_units[saved_unit_slot] = NONE;
 		if (saved_unit_index != NONE)
 		{
 			unit = unit_get(saved_unit_index);
@@ -1403,12 +1395,13 @@ static void player_spawn(
 		match_assert(
 			"c:\\halo\\SOURCE\\game\\players.c",
 			0x73A,
-			player->local_player_index!=NONE);
+			saved_unit_slot != NONE);
 		object_activate(saved_unit_index);
 		object_set_visibility(saved_unit_index, TRUE);
-		players_set_local_player_unit(
-			player->local_player_index,
-			saved_unit_index);
+		if (player->local_player_index != NONE && !network_campaign_active())
+			players_set_local_player_unit(player->local_player_index, saved_unit_index);
+		else
+			network_player_attach_unit(player_index, saved_unit_index);
 		if (weapon_index != NONE)
 			object_set_visibility(weapon_index, TRUE);
 	}
@@ -1494,7 +1487,7 @@ static void player_spawn(
 							starting_equipment_count =
 								*(long *)((byte *)scenario + 0x348);
 							if (starting_equipment_count > 1 &&
-								*(short *)((byte *)player2 + 0xAA) > 0)
+								(network_campaign_playing() ? saved_unit_slot > 0 : player2->local_player_index > 0))
 							{
 								player_add_equipment(
 									player2->unit_index,
@@ -1746,8 +1739,11 @@ static void player_pseudo_kill(
 	struct unit_datum *unit;
 	long dead_unit_index;
 	long weapon_index;
+	short saved_unit_slot;
 
 	player = player_get(player_index);
+	saved_unit_slot = player_saved_unit_slot(player_index, player);
+	if (saved_unit_slot == NONE) return;
 	if (player->unit_index != NONE)
 	{
 		if (game_engine_can_score())
@@ -1759,12 +1755,12 @@ static void player_pseudo_kill(
 				NONE);
 		}
 
-		players_globals->dead_units[player->local_player_index] =
+		players_globals->dead_units[saved_unit_slot] =
 			player->unit_index;
 		player_died(player_index);
 
 		dead_unit_index =
-			players_globals->dead_units[player->local_player_index];
+			players_globals->dead_units[saved_unit_slot];
 		unit = unit_get(dead_unit_index);
 		weapon_index = unit_inventory_get_weapon(
 			dead_unit_index,
@@ -3558,6 +3554,72 @@ static boolean player_handle_weapon_swap(
 	return result;
 }
 
+#ifdef HALO_VR
+/* port: the headset's weapon hand gripping by a weapon lying within its
+reach (port/linux/game/vr_render.c, vr.weapons "physical"): the nearest is
+taken as player_handle_weapon_swap takes the one the action button chose,
+into a free slot or in place of the gun held */
+boolean player_vr_grab_weapon(
+	long player_index,
+	real_point3d const *hand,
+	real radius)
+{
+	struct player_datum *player = player_get(player_index);
+	struct unit_datum *unit;
+	long object_indices[16];
+	long nearest_index = NONE;
+	real nearest_distance = radius;
+	short object_count, object_number;
+	struct weapon_datum *weapon;
+
+	if (!players_decide_pickups() || player->unit_index == NONE)
+		return FALSE;
+	unit = unit_get(player->unit_index);
+	object_count = objects_in_sphere(
+		0,
+		_object_mask_player_interaction,
+		&unit->object.location,
+		hand,
+		radius,
+		object_indices,
+		NUMBEROF(object_indices));
+	for (object_number = 0; object_number < object_count; object_number++)
+	{
+		struct object_datum *object = object_get(object_indices[object_number]);
+		struct item_datum *item;
+		real distance;
+
+		if (object->object.type != _object_type_weapon)
+			continue;
+		item = item_get(object_indices[object_number]);
+		if (item->object.parent_object_index != NONE ||
+			item->item.ignore_object_index == player->unit_index)
+		{
+			continue;
+		}
+		distance = distance3d(hand, &object->object.bounding_sphere_center);
+		if (distance <= nearest_distance)
+		{
+			nearest_distance = distance;
+			nearest_index = object_indices[object_number];
+		}
+	}
+	if (nearest_index == NONE)
+		return FALSE;
+	if (!unit_add_weapon_to_inventory(player->unit_index, nearest_index, TRUE) &&
+		!(unit_drop_current_weapon(player->unit_index, TRUE) &&
+		  unit_add_weapon_to_inventory(player->unit_index, nearest_index, TRUE)))
+	{
+		return FALSE;
+	}
+	weapon = weapon_get(nearest_index);
+	hud_picked_up_weapon(player->local_player_index, weapon->definition_index);
+	player_network_picked_up(player, player_index, _network_pickup_weapon, weapon->definition_index, 0);
+	player_control_unzoom(player->unit_index);
+	return TRUE;
+}
+#endif
+
 boolean player_handle_powerup(
 	long player_index,
 	short powerup_type,
@@ -4595,12 +4657,10 @@ void players_update_before_game(
 				if (!players_globals->input_disabled)
 				{
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
-					/* port: not for the keyboard's action key, which only acts
-					(units.h, UNIT_CONTROL_PORT_ACTION_ONLY_BIT) */
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
 						unit->object.parent_object_index == NONE &&
 						!player_handle_action(iterator.datum_index) &&
-						!TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT))
+                        !TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT))
 					{
 						SET_FLAG(action->control_flags, _unit_control_weapon_reload_bit, TRUE);
 					}
@@ -4639,7 +4699,7 @@ void players_update_before_game(
 					}
 
 					control_data.control_flags =
-						(word)(action->control_flags & ~FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT));
+                        (word)(action->control_flags & ~FLAG(UNIT_CONTROL_PORT_ACTION_ONLY_BIT));
 					player_aiming_vector_from_facing(
 						iterator.datum_index,
 						&control_data.aiming_vector,
@@ -4747,6 +4807,7 @@ void players_update_after_game(
 	long telefrag_ticks;
 	long root_object_index;
 	short bsp_switch_trigger_volume_index;
+	short triggering_player;
 
 	profile_enter(PLAYERS_UPDATE_AFTER_GAME_PROFILE);
 
@@ -4805,7 +4866,7 @@ void players_update_after_game(
 		if (player->unit_index != NONE)
 			player_update_powerups(iterator.datum_index);
 
-		if (player->unit_index != NONE)
+		if (player->unit_index != NONE && !network_campaign_client())
 		{
 			root_object_index = object_get_ultimate_parent(player->unit_index);
 			root_object = object_get(root_object_index);
@@ -4832,10 +4893,11 @@ void players_update_after_game(
 						(!network_coop_active() ||
 							players_coop_bsp_switch_allowed(player->unit_index)))
 					{
+						triggering_player = network_campaign_playing()
+							? DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) : player->local_player_index;
 						if (players_globals->local_player_triggered_switch !=
 							_local_player_triggered_switch_none &&
-							players_globals->local_player_triggered_switch !=
-							player->local_player_index)
+							players_globals->local_player_triggered_switch != triggering_player)
 						{
 							error(
 								2,
@@ -4843,8 +4905,7 @@ void players_update_after_game(
 						}
 
 						players_globals->bsp_check_recursive_switch_ticks = 0;
-						players_globals->local_player_triggered_switch =
-							player->local_player_index;
+						players_globals->local_player_triggered_switch = triggering_player;
 						players_globals->pending_teleport_starting_location_index =
 							bsp_switch_trigger_volume_index;
 						main_switch_structure_bsp(
@@ -4871,7 +4932,7 @@ void players_update_after_game(
 		}
 	}
 
-	if (players_globals->all_dead)
+	if (players_globals->all_dead && !network_campaign_client())
 	{
 		if (!game_engine_running() && !players_lost_map_started && !network_game_distributed_client())
 		{
@@ -4889,6 +4950,9 @@ void players_update_after_game(
 	return;
 }
 
+/* ---------- private code */
+
+/* (OpenCE build 138's, for its host's name cleaning: test27) */
 /* port: a character of a player's name as the host's ban command reads it
 (typed in ASCII): itself in ASCII, a Latin letter with a mark its plain
 letter (an English keyboard has no "é"), else "?" */
@@ -4981,4 +5045,10 @@ boolean player_name_valid(
 	return TRUE;
 }
 
-/* ---------- private code */
+
+/* OpenCE menu: actual local players, separate from online peers. */
+short players_port_local_player_count(
+	void)
+{
+	return players_globals ? players_globals->local_player_count : 0;
+}

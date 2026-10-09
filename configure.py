@@ -73,6 +73,11 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument(
+    "--android-vr",
+    action="store_true",
+    help="Android: the VR headset build (OpenXR; HALO_VR), packaged as com.halo.decomp.vr",
+)
 args = parser.parse_args()
 
 # the settings the builds read
@@ -87,6 +92,7 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    android_vr=args.android_vr,
 )
 
 

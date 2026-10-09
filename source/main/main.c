@@ -391,7 +391,10 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "text/font_group.h"
 #include "tag_files/files.h"
-#include "custom_edition_cache.h" /* port: custom_edition_level_name */
+#include "halo_vr.h"
+
+#include "network_campaign.h"
+#include "network_pvp_session.h"
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
 #define HALO_NATIVE_BUILD_INFO 1
@@ -1258,11 +1261,6 @@ short main_get_solo_level_from_name(
 	char lower_name[128] = { 0 };
 	short level;
 
-	/* port: a Custom Edition map (custom_maps\a30) is never one of the
-	campaign's levels, whatever its name holds
-	(port/linux/game/custom_edition_cache.c) */
-	if (custom_edition_level_name(name))
-		return NONE;
 	csstrncpy(lower_name, name, NUMBEROF(lower_name) - 1);
 	lower_name[NUMBEROF(lower_name) - 1] = 0;
 	strlwr(lower_name);
@@ -1716,8 +1714,7 @@ static void main_native_build_label(char *label, size_t capacity)
 	label[capacity - 1] = 0;
 }
 
-/* The 2 KB error buffer keeps recent lines at its end. Put the newest first
-   so the failure is visible even if older messages run off the screen. */
+/* Put the newest errors first so they remain visible on the halt screen. */
 static char const *main_native_error_tail(char const *messages)
 {
 	enum { MAX_LINES = 8, MAX_LINE_BYTES = 110 };
@@ -1821,6 +1818,7 @@ void main_save_current_solo_map(
 {
 	FILE *file;
 
+	if (network_campaign_active()) return;
 	if ((short)main_get_solo_level_from_name(map_name) != NONE)
 	{
 		file = fopen("z:\\last_solo.txt", "w");
@@ -2337,10 +2335,7 @@ static void main_won_map_private(
 	}
 	main_globals.want_to_be_at_main_menu = TRUE;
 	main_globals.won_map = FALSE;
-	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name);
-	/* port: a level not in the campaign (a Custom Edition map's) has no next
-	one, rather than the first */
-	level = level == NONE ? NONE : level + 1;
+	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name) + 1;
 	if (level >= 10)
 		level = NONE;
 	for (local_player_index = 0; local_player_index < player_spawn_count; local_player_index++)
@@ -2823,6 +2818,11 @@ static void main_initialize_time(
 static void main_reset_map_private(
 	void)
 {
+	if (network_campaign_change_level(FALSE))
+	{
+		main_globals.reset_map = FALSE;
+		return;
+	}
 	if (!game_time_get_paused())
 	{
 		scenario_switch_structure_bsp(0);
@@ -3165,7 +3165,7 @@ void halt_and_catch_fire(
 					banner);
 				#else
 					"halobeta xbox 01.01.14.2342 built at: Jan 14 2002 12:49:20");
-				#endif
+					#endif
 				bounds.y0 = cursor.y - 1;
 				rasterizer_draw_string(
 					&bounds,
@@ -3176,7 +3176,7 @@ void halt_and_catch_fire(
 					main_native_error_tail(error_get()));
 				#else
 					error_get());
-				#endif
+					#endif
 			}
 
 			rasterizer_transparent_geometry_draw(TRUE);
@@ -3293,9 +3293,15 @@ static void main_game_render(
 
 	if (global_screenshot_count.count <= 0)
 	{
+		short render_window_count = (short)(player_window_count + 1);
+
+#ifdef HALO_VR
+		/* the headset's eyes and HUD in place of the one player window */
+		render_window_count = vr_render_windows(global_screenshot_count.windows, render_window_count);
+#endif
 		render_frame(
 			global_screenshot_count.windows,
-			player_window_count + 1,
+			render_window_count,
 			NULL,
 			NULL,
 			main_globals.movie,
@@ -3437,6 +3443,8 @@ void main_loop(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			network_campaign_session_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			network_pvp_session_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
 			connection = main_globals.connection;
 			if (connection==_game_connection_network_client)
 			{
@@ -3467,6 +3475,7 @@ void main_loop(
 				break;
 			}
 
+			network_campaign_frame();
 			main_update_time();
 			process_ui_widgets();
 			bink_playback_update();

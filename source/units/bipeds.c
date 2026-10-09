@@ -275,11 +275,10 @@ symbols in this file:
 #include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
-
-/* port: port/linux/game/network_objects.c's (a client deletes the host's
-objects on the host's word alone) */
-boolean network_objects_may_delete(long object_index);
 
 /* port: an unarmed player's melee's length, in ticks (a weapon's is about
 this: its first person melee animation, sped up a quarter) */
@@ -648,6 +647,15 @@ void biped_disconnect_from_structure_bsp(
 	return;
 }
 
+static real biped_effective_collision_radius(long biped_index, real stock)
+{
+#ifdef HALO_VR
+	return vr_player_collision_radius(biped_index, stock);
+#else
+	return stock;
+#endif
+}
+
 void biped_get_physics_pill(
 	long biped_index,
 	real_point3d *base,
@@ -659,7 +667,7 @@ void biped_get_physics_pill(
 
 	object_get_origin(biped_index, base);
 	if (!TEST_FLAG(definition->biped.flags, _biped_pill_centered_at_origin_bit))
-		base->z += definition->biped.collision_radius;
+		base->z += biped_effective_collision_radius(biped_index, definition->biped.collision_radius);
 
 	if (!TEST_FLAG(definition->biped.flags, _biped_spherical_bit) &&
 		(biped->unit.player_index!=NONE ||
@@ -668,13 +676,13 @@ void biped_get_physics_pill(
 		*height = definition->biped.collision_height_standing +
 			(definition->biped.collision_height_crouching -
 			definition->biped.collision_height_standing)*biped->biped.crouch -
-			2.f*definition->biped.collision_radius;
+			2.f*biped_effective_collision_radius(biped_index, definition->biped.collision_radius);
 	}
 	else
 	{
 		*height = 0.f;
 	}
-	*width = definition->biped.collision_radius;
+	*width = biped_effective_collision_radius(biped_index, definition->biped.collision_radius);
 
 	return;
 }
@@ -787,6 +795,28 @@ static void biped_bumped_object(
 	return;
 }
 
+/* port: whether this machine may erase the biped. A network client never
+deletes the host's objects (network_objects_may_delete, objects.c): its
+copy of the host's fallen biped stayed, and was "erased" (logged) every tick
+for minutes, until the host put it right (test26: a co-op client's log of a
+cutscene crewman). Said once for each biped; the host's word decides. */
+boolean network_objects_may_delete(long object_index);
+static boolean biped_port_may_discard(
+	long biped_index)
+{
+	static long noted_biped_index = NONE;
+
+	if (network_objects_may_delete(biped_index))
+		return TRUE;
+	if (noted_biped_index != biped_index)
+	{
+		noted_biped_index = biped_index;
+		error(_error_silent, "WARNING: the host's biped %s left the world here; it is the host's to erase",
+			tag_name_strip_path(tag_get_name(biped_get(biped_index)->definition_index)));
+	}
+	return FALSE;
+}
+
 static void biped_falling_damage(
 	long biped_index,
 	real collision_velocity)
@@ -834,12 +864,10 @@ static void biped_falling_damage(
 				object_cause_damage(&damage, biped_index, NONE, NONE, NONE, NULL);
 			}
 
-			/* (port: not the host's biped on a client, which the host erases:
-			the delete was refused, and logged as done) */
 			if (!game_engine_running() &&
 				TEST_FLAG(biped->object.flags, _object_outside_of_map_bit) &&
 				player_index_from_unit_index(biped_index) == NONE &&
-				network_objects_may_delete(biped_index))
+				biped_port_may_discard(biped_index))
 			{
 				long actor_index = biped->unit.swarm_actor_index;
 
@@ -939,7 +967,7 @@ void biped_adjust_placement(
 	if (TEST_FLAG(flags, _biped_pill_centered_at_origin_bit) &&
 		!TEST_FLAG(flags, _biped_flying_bit))
 	{
-		real height_offset = definition->biped.collision_radius;
+		real height_offset = biped_effective_collision_radius(object_index, definition->biped.collision_radius);
 
 		data->position.x += data->up.i*height_offset;
 		data->position.y += data->up.j*height_offset;
@@ -1301,7 +1329,7 @@ boolean biped_fix_position(
 						definition->biped.flags,
 						_biped_pill_centered_at_origin_bit))
 					{
-						fixed_position.z -= definition->biped.collision_radius;
+						fixed_position.z -= biped_effective_collision_radius(biped_index, definition->biped.collision_radius);
 					}
 
 					if (biped_index != NONE && !dont_teleport)
@@ -3050,7 +3078,7 @@ static void biped_update_physics(
 					&center,
 					radius,
 					0.f,
-					definition->biped.collision_radius,
+					biped_effective_collision_radius(physics->biped_index, definition->biped.collision_radius),
 					physics->biped_index,
 					&features))
 				{
@@ -3060,7 +3088,7 @@ static void biped_update_physics(
 					scale_vector3d(
 						global_up3d,
 						definition->biped.collision_height_standing -
-							2.f * definition->biped.collision_radius,
+							2.f * biped_effective_collision_radius(physics->biped_index, definition->biped.collision_radius),
 						&standing_vector);
 					if (collision_features_test_vector(
 						&features,
@@ -3544,6 +3572,10 @@ static void biped_update_moving(
 		&physics.position,
 		&physics.height,
 		&physics.width);
+#ifdef HALO_VR
+	/* the headset's room-scale steps (port/linux/game/vr_render.c) */
+	vr_render_room_scale(biped_index, &physics.position, physics.height, physics.width);
+#endif
 	physics.minimum_normal_k = definition->biped.runtime_minimum_normal_k;
 	physics.downhill_k0 = definition->biped.runtime_downhill_k0;
 	physics.downhill_k1 = definition->biped.runtime_downhill_k1;
@@ -3814,6 +3846,17 @@ static void biped_update_moving(
 				}
 
 				physics.acceleration_maximum = acceleration / TICKS_PER_SECOND;
+#ifdef HALO_VR
+				/* Gesture sprint is an offline local-instance speed change.
+				Crouching, stun and authored movement restrictions still apply. */
+				if (crouch < 0.1f && biped->unit.animation.base_seat_index != _unit_base_seat_alert)
+				{
+					real sprint = vr_player_sprint_scale(biped_index);
+					forward_speed *= sprint;
+					sideways_speed *= sprint;
+					physics.acceleration_maximum *= sprint;
+				}
+#endif
 				physics.movement_desired.i =
 					biped->unit.throttle.i * stun_scale * forward_speed /
 					TICKS_PER_SECOND;
@@ -4172,7 +4215,8 @@ static boolean biped_check_discard(
 	if (!game_engine_running() &&
 		(TEST_FLAG(biped->object.flags, _object_outside_of_map_bit) ||
 		biped->object.location.cluster_index==NONE) &&
-		biped->object.position.z<-2000.f)
+		biped->object.position.z<-2000.f &&
+		biped_port_may_discard(biped_index))
 	{
 		long actor_index = biped->unit.swarm_actor_index;
 

@@ -91,9 +91,9 @@ void rasterizer_geometry_compress_vertices(
 
 /* ---------- prototypes/RASTERIZER_XBOX_HARDWARE_GEOMETRY.C */
 
-/* port: the native builds make buffers for the geometry of Halo Custom
-Edition maps, which Xbox caches carry ready made
-(port/linux/game/custom_edition_geometry.c) */
+/* The native builds make buffers for the geometry of Halo Custom Edition
+maps, which Xbox caches carry ready made (port/linux/game/
+custom_edition_geometry.c). Nothing in January calls these. */
 boolean rasterizer_vertex_buffer_new(
 	struct vertex_buffer *vertex_buffer,
 	long vertex_type,
@@ -109,6 +109,11 @@ boolean rasterizer_triangle_buffer_new(
 	void const *triangles);
 void rasterizer_triangle_buffer_delete(
 	struct triangle_buffer *triangle_buffer);
+#ifdef HALO_VR
+/* CPU addresses of the same registered buffers used by the native renderer. */
+boolean rasterizer_model_buffer_data(struct vertex_buffer const *vertices,
+	struct triangle_buffer const *triangles, void const **vertex_data, void const **index_data);
+#endif
 
 /* ---------- globals */
 

@@ -108,6 +108,9 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#ifdef HALO_VR
+#include "halo_vr.h"
+#endif
 
 /* ---------- constants */
 
@@ -578,6 +581,16 @@ static void update_motion_sensor(
 			sensor->yaw =
 				player_control_get_facing_angles(local_player_index)->yaw +
 				1.5707964f;
+#ifdef HALO_VR
+			/* in the headset the sensor turns with the head, which the HUD
+			is locked to, not with the hand's aim */
+			{
+				real yaw;
+
+				if (vr_render_motion_sensor_yaw(local_player_index, &yaw))
+					sensor->yaw = yaw + 1.5707964f;
+			}
+#endif
 			{
 				real_point3d camera_position;
 				real_point2d custom_positions[MAXIMUM_MOTION_SENSOR_BLIPS];

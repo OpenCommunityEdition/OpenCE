@@ -73,6 +73,23 @@ symbols in this file:
 
 /* ---------- public code */
 
+#ifdef HALO_VR
+boolean rasterizer_model_buffer_data(struct vertex_buffer const *vertices,
+	struct triangle_buffer const *triangles, void const **vertex_data, void const **index_data)
+{
+	byte *v = NULL, *t = NULL;
+	if (!vertices->hardware_format || !triangles->hardware_format) return FALSE;
+	IDirect3DVertexBuffer8_Lock((D3DVertexBuffer *)vertices->hardware_format, 0, 0, &v, D3DLOCK_READONLY);
+	IDirect3DIndexBuffer8_Lock((D3DIndexBuffer *)triangles->hardware_format, 0, 0, &t, D3DLOCK_READONLY);
+	/* Native buffers are backed by CPU memory throughout their lifetime;
+	these addresses do not depend on the GL mirror or a GPU readback. */
+	IDirect3DVertexBuffer8_Unlock((D3DVertexBuffer *)vertices->hardware_format);
+	IDirect3DIndexBuffer8_Unlock((D3DIndexBuffer *)triangles->hardware_format);
+	*vertex_data = v; *index_data = t;
+	return v != NULL && t != NULL;
+}
+#endif
+
 void __stdcall code_00158450(
 	void *resource,
 	void *data)

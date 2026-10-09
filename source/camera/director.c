@@ -137,6 +137,7 @@ symbols in this file:
 
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "halo_vr.h"
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -372,6 +373,12 @@ short director_desired_perspective(
 		if (*perspective == 1 || *perspective == 3)
 			following = TRUE;
 	}
+#ifdef HALO_VR
+	/* in the headset vehicles are seen from their seat, getting in and out
+	too (port/linux/game/vr_render.c) */
+	if (vr_render_first_person_vehicles())
+		following = FALSE;
+#endif
 
 	return following;
 }

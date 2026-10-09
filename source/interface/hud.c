@@ -97,8 +97,6 @@ symbols in this file:
 #include "memory/data.h"
 #include "objects/object_definitions.h"
 #include "objects/objects.h"
-#include "physics/collision_usage.h"
-#include "physics/collisions.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "render/render_camera_projection.h"
@@ -106,6 +104,8 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "tag_files/tag_files.h"
+#include "physics/collision_usage.h"
+#include "physics/collisions.h"
 #include "text/draw_string.h"
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
@@ -113,6 +113,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "halo_vr.h" /* port: the VR HUD tap, test26 */
 
 /* ---------- constants */
 
@@ -1172,9 +1173,8 @@ static void hud_draw_player_name(
 	}
 	/* (centred: 2; scaled about its bottom's middle, over the head) */
 	draw_string_set_draw_mode(font_index, NONE, 2, 0, &color);
-	rasterizer_text_set_scale(hud_player_name_scale(), (real)x, (real)y);
+	(void)hud_player_name_scale;
 	rasterizer_draw_unicode_string(&bounds, NULL, NULL, 0, name);
-	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
 
 	return;
 }
@@ -1389,9 +1389,15 @@ void hud_draw_screen(
 				hud_render_weapon_interface(player);
 				hud_show_action_response(player_index);
 				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
-				hud_render_unit_interface(player);
-				hud_render_nav_points(render.local_player_index);
-				hud_render_damage_indicators(render.local_player_index);
+				/* port: the VR HUD tapped away (test26): the player's state,
+				waypoints and damage arrows undrawn; the reticle
+				(hud_render_weapon_interface), prompts and messages stay */
+				if (!VR_HUD_HIDDEN())
+				{
+					hud_render_unit_interface(player);
+					hud_render_nav_points(render.local_player_index);
+					hud_render_damage_indicators(render.local_player_index);
+				}
 			}
 			else
 			{

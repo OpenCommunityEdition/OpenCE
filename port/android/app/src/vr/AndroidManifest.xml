@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged over src/main's manifest in the VR build (configure.py with the vr option):
+     an OpenXR app for standalone headsets such as the Meta Quest 3 and the Steam Frame.
+
+     The launcher (the disc image picker) stays an ordinary 2D activity, which
+     the Quest shows on a panel; the game's activity is the immersive one. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
+
+    <!-- the Khronos loader (libopenxr_loader.so) finds the runtime through
+         its broker or the system's active_runtime.json -->
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR" />
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR_SYSTEM" />
+    <queries>
+        <provider android:authorities="org.khronos.openxr.runtime_broker;org.khronos.openxr.system_runtime_broker" />
+        <intent>
+            <action android:name="org.khronos.openxr.OpenXRRuntimeService" />
+        </intent>
+        <intent>
+            <action android:name="org.khronos.openxr.OpenXRApiLayerService" />
+        </intent>
+    </queries>
+
+    <application>
+        <!-- the Quest headsets the app is offered on -->
+        <meta-data
+            android:name="com.oculus.supportedDevices"
+            android:value="quest|quest2|questpro|quest3|quest3s" />
+
+        <!-- the game, immersive. Its own process: the game ends its process
+             when it quits (host_exit), which leaves the launcher's alone, and
+             the headset switches from the launcher's panel to VR cleanly. -->
+        <activity
+            android:name=".HaloActivity"
+            android:process=":halo_game"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            tools:replace="android:exported,android:launchMode">
+            <meta-data
+                android:name="com.oculus.vr.focusaware"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="org.khronos.openxr.intent.category.IMMERSIVE_HMD" />
+                <category android:name="com.oculus.intent.category.VR" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

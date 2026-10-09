@@ -181,6 +181,9 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#ifdef HALO_VR
+#include "cseries/errors.h"
+#endif
 #define limit2d limit2d_inline
 #include "game/game.h"
 #undef limit2d
@@ -209,6 +212,7 @@ symbols in this file:
 #include "units/vehicles.h"
 
 #include "real_math.h"
+#include "halo_vr.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -622,6 +626,45 @@ static void handle_one_player_input(
 		local_player_index,
 		time_delta_sec,
 		&input);
+#ifdef HALO_VR
+	/* the headset's gestures (port/linux/game/vr_render.c): before a
+	cutscene's inhibition below clears them with the rest */
+	{
+		unsigned long actions = vr_render_actions(local_player_index);
+
+		if (actions & VR_RENDER_ACTION_MELEE)
+			SET_FLAG(input.unit_control_flags, _unit_control_use_equipment_bit, TRUE);
+		if (actions & VR_RENDER_ACTION_FLASHLIGHT)
+			SET_FLAG(input.unit_control_flags, _unit_control_integrated_light_bit, TRUE);
+		if (actions & VR_RENDER_ACTION_CROUCH)
+			SET_FLAG(input.unit_control_flags, _unit_control_crouch_modifier_bit, TRUE);
+		if (actions & VR_RENDER_ACTION_SWITCH_WEAPON)
+			SET_FLAG(input.player_control_flags, _player_control_rotate_weapons_bit, TRUE);
+		if (actions & VR_RENDER_ACTION_ZOOM)
+			SET_FLAG(input.player_control_flags, _player_control_input_zoom_bit, TRUE);
+		/* physical weapons: a gun let go falls; a grip near one lying about
+		takes it (on foot, while the player has control) */
+		if (actions & (VR_RENDER_ACTION_DROP_WEAPON | VR_RENDER_ACTION_GRAB_WEAPON))
+		{
+			long player_index = local_player_get_player_index(local_player_index);
+			long unit_index = player_index != NONE ? player_get(player_index)->unit_index : NONE;
+			real_point3d hand;
+
+			if (unit_index != NONE && object_get(unit_index)->object.parent_object_index == NONE &&
+				!director_inhibited_input(local_player_index))
+			{
+				if ((actions & VR_RENDER_ACTION_GRAB_WEAPON) && vr_render_grab_point(unit_index, &hand) &&
+					player_vr_grab_weapon(player_index, &hand, 0.25f * vr_render_units_per_metre()))
+				{
+					error(_error_silent, "vr: a weapon lying within reach was taken");
+				}
+				if (actions & VR_RENDER_ACTION_DROP_WEAPON)
+					unit_drop_current_weapon(unit_index, TRUE);
+			}
+		}
+		vr_render_impact_melee(local_player_index);
+	}
+#endif
 	if (local_player_get_player_index(local_player_index) != NONE)
 	{
 		match_assert_valid_real(
@@ -738,6 +781,16 @@ static void handle_one_player_input(
 				input.facing_delta.yaw,
 				input.facing_delta.pitch);
 			player_control_angle_step_ticks = 1.f;
+#ifdef HALO_VR
+            vr_player_control_facing(local_player_index);
+            if (local_player_index == local_player_get_next(NONE)) {
+                unsigned int look = vr_head_look_actions();
+                if (look & 1) player_control_globals->action_flags |= FLAG(_player_control_look_relative_up_bit);
+                if (look & 2) player_control_globals->action_flags |= FLAG(_player_control_look_relative_down_bit);
+                if (look & 4) player_control_globals->action_flags |= FLAG(_player_control_look_relative_left_bit);
+                if (look & 8) player_control_globals->action_flags |= FLAG(_player_control_look_relative_right_bit);
+            }
+#endif
 		}
 
 		if (unit->object.parent_object_index == NONE)
@@ -1240,6 +1293,13 @@ static void get_local_player_input_blob(
 							{
 								control->magnetism_level = 0.f;
 							}
+#ifdef HALO_VR
+							/* nor for the head: the view must not turn under it */
+							if (vr_render_aiming())
+							{
+								control->magnetism_level = 0.f;
+							}
+#endif
 						}
 						if (player_magnetism_flag && control->magnetism_level > 0.f &&
 							(fabs(clamped_yaw) > _real_epsilon ||
@@ -1365,8 +1425,7 @@ static void get_local_player_input_blob(
 					}
 				}
 
-				/* port: the fire control's pull, not how long it is held
-				(input_abstraction_port_primary_trigger) */
+				/* port (OpenCE Build 157): keep the trigger's analog pressure. */
 				input->primary_trigger = effective_buttons[_button_fire] ?
 					input_abstraction_port_primary_trigger(gamepad_index) : 0.f;
 				SET_FLAG(
@@ -1389,20 +1448,6 @@ static void get_local_player_input_blob(
 					input->unit_control_flags,
 					_unit_control_action_bit,
 					effective_buttons[_button_action_reload]);
-				/* port: the keyboard's reload key (port/linux/include/
-				halo_keyboard.h), which the controller's X shares with the
-				action */
-				if (!TEST_FLAG(control->inhibited_button_bit_vector, _button_action_reload) &&
-					input_abstraction_port_reload(gamepad_index))
-				{
-					SET_FLAG(input->unit_control_flags, _unit_control_weapon_reload_bit, TRUE);
-				}
-				/* port: and its action key acts only, never reloading */
-				if (TEST_FLAG(input->unit_control_flags, _unit_control_action_bit) &&
-					input_abstraction_port_action_only(gamepad_index))
-				{
-					SET_FLAG(input->unit_control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT, TRUE);
-				}
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_swap_weapons_bit,
@@ -1440,9 +1485,6 @@ static void get_local_player_input_blob(
 					_button_action_reload))
 				{
 					input->accept = gamepad->buttons[_gamepad_analog_button_a];
-					/* port: and the keyboard's jump key */
-					if (!input->accept)
-						input->accept = input_abstraction_port_accept(gamepad_index);
 				}
 			}
 		}
@@ -1564,6 +1606,9 @@ void player_control_action_test_reset(
 
 	globals->action_flags = 0;
 	globals->action_test_flags = 0;
+#ifdef HALO_VR
+	vr_head_look_reset();
+#endif
 	return;
 }
 
