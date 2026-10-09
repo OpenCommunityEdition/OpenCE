@@ -37,6 +37,7 @@ turns the reverb off; audio.enabled = false skips opening a device
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "voice_audio.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -1143,6 +1144,8 @@ static void mix(float *output, unsigned long frames)
 		if ((!enabled && reverb.level <= 0.0f) || reverb.quiet > REVERB_QUIET_FRAMES)
 			reverb_clear();
 	}
+	/* the players' voices (voice_audio.c), dry, under the limiter */
+	voice_audio_mix(output, frames);
 	limit(output, frames);
 }
 
@@ -1150,6 +1153,17 @@ static void mix(float *output, unsigned long frames)
 
 static SDL_AudioStream *audio_stream;
 static BOOL audio_started = FALSE;
+/* the device it plays on (audio.output_device), and when it was looked at */
+static char audio_device_name[PLATFORM_AUDIO_DEVICE_NAME_SIZE];
+static unsigned long audio_device_read_at = (unsigned long)-1;
+
+/* audio.output_device ("default": the system's; none on Android) */
+static const char *audio_device_setting(void)
+{
+	const char *name = config_string("audio.output_device");
+
+	return name && name[0] ? name : "default";
+}
 
 static void SDLCALL audio_callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
 {
@@ -1220,7 +1234,12 @@ static void audio_start(void)
 #else
 		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
 #endif
-		audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
+		snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
+		audio_device_read_at = config_changes();
+		audio_stream = SDL_OpenAudioDeviceStream(platform_audio_device(FALSE, audio_device_name), &spec,
+			audio_callback, NULL);
+		if (!audio_stream && strcmp(audio_device_name, "default"))
+			audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
 		if (audio_stream)
 		{
 			SDL_ResumeAudioStreamDevice(audio_stream);
@@ -1231,6 +1250,44 @@ static void audio_start(void)
 	{
 		pthread_t thread;
 
+		pthread_create(&thread, NULL, silent_clock_thread, NULL);
+		pthread_detach(thread);
+	}
+}
+
+/* (the event thread, each frame: sdl_platform.c) audio.output_device
+changed (Settings > Audio): the sound goes on on the new device, else the
+system's default */
+void dsound_sdl_output_device_check(void)
+{
+	SDL_AudioSpec spec;
+	SDL_AudioStream *stream;
+
+	if (!audio_stream || audio_device_read_at == config_changes())
+		return;
+	audio_device_read_at = config_changes();
+	if (!strcmp(audio_device_name, audio_device_setting()))
+		return;
+	snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
+	spec.format = SDL_AUDIO_F32;
+	spec.channels = OUTPUT_CHANNELS;
+	spec.freq = OUTPUT_RATE;
+	SDL_DestroyAudioStream(audio_stream);
+	stream = SDL_OpenAudioDeviceStream(platform_audio_device(FALSE, audio_device_name), &spec, audio_callback, NULL);
+	if (!stream)
+		stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
+	audio_stream = stream;
+	if (audio_stream)
+	{
+		SDL_ResumeAudioStreamDevice(audio_stream);
+		platform_log("audio: playing on %s", audio_device_name);
+	}
+	else
+	{
+		pthread_t thread;
+
+		/* (none at all: the voices drained in real time, as at the start) */
+		platform_log("audio: cannot open an audio device (%s); sound is silent", SDL_GetError());
 		pthread_create(&thread, NULL, silent_clock_thread, NULL);
 		pthread_detach(thread);
 	}

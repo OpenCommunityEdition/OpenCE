@@ -570,6 +570,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
+#include "network_voice.h" /* port: port/linux/game/network_voice.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
 #include "objects.h"
@@ -1866,10 +1867,12 @@ static boolean scoreboard_team_columns(
 /* a network game's scoreboard picks players with the mouse
 (halo_scoreboard_pointer_update: a right click frees it): a player's name
 picked opens a menu of what may be done to them, the players' vote to kick
-them (network_votekick.c), and the host's Kick and Ban, Ban picked twice */
+them (network_votekick.c), muting their voice (network_voice.c), and the
+host's Kick and Ban, Ban picked twice */
 enum
 {
 	_scoreboard_item_vote,
+	_scoreboard_item_mute,
 	_scoreboard_item_kick,
 	_scoreboard_item_ban,
 	_scoreboard_item_cancel,
@@ -1928,6 +1931,18 @@ static void scoreboard_menu_items(
 	else
 	{
 		usprintf(labels[_scoreboard_item_vote], L"Start a vote to kick");
+	}
+	/* (its machine's voice: this machine's own choice) */
+	{
+		struct player_datum *player = player_try_and_get(scoreboard_menu.player_index);
+
+		if (player && network_voice_available())
+		{
+			offered[_scoreboard_item_mute] = TRUE;
+			usprintf(labels[_scoreboard_item_mute],
+				network_voice_machine_muted(player->network_player_data.machine_index) ? L"Unmute voice" :
+					L"Mute voice");
+		}
 	}
 	if (network_votekick_host())
 	{
@@ -1989,6 +2004,18 @@ static void scoreboard_menu_pick(
 	case _scoreboard_item_vote:
 		network_votekick_request(player_index);
 		break;
+	case _scoreboard_item_mute:
+	{
+		struct player_datum *player = player_try_and_get(scoreboard_menu.player_index);
+
+		if (player)
+		{
+			long machine_index = player->network_player_data.machine_index;
+
+			network_voice_mute_machine(machine_index, !network_voice_machine_muted(machine_index));
+		}
+		break;
+	}
 	case _scoreboard_item_kick:
 		network_votekick_host_kick(player_index, FALSE);
 		break;
@@ -2318,6 +2345,21 @@ static void game_engine_rasterize_scoreboard(
 			status_string,
 			ping_string);
 		row_color = has_teams ? &team_colors[PIN(player->team_index, 0, 1)] : &color;
+		/* port: a player talking (or muted) in voice chat, its speaker at the
+		right of the place column */
+		if (network && (network_voice_machine_speaking(player->network_player_data.machine_index) ||
+			network_voice_machine_muted(player->network_player_data.machine_index)))
+		{
+			rectangle2d icon;
+			short row_left = (short)(left + column * (SCOREBOARD_COLUMN_WIDTH + SCOREBOARD_COLUMN_GAP));
+
+			scoreboard_rectangle(&icon, bounds.x0, top, line_height, (short)(row_left + SCOREBOARD_PLACE_WIDTH - 24),
+				20, 2 + row, 1);
+			icon.y0 = (short)(icon.y0 + (icon.y1 - icon.y0) / 6);
+			icon.y1 = (short)(icon.y1 - (icon.y1 - icon.y0) / 6);
+			network_voice_draw_icon(&icon, network_voice_machine_muted(player->network_player_data.machine_index),
+				alpha);
+		}
 		/* port: another machine's player, picked with the pointer: lit
 		under it (not under the menu), and its menu opened when clicked */
 		if (pointer_state > 0 && player->local_player_index == NONE)
@@ -3818,6 +3860,68 @@ void game_engine_rasterize_message(
 	return;
 }
 
+/* port: who is talking in voice chat (network_voice.c), down the view's
+left from below its middle: each machine's first player's name after its
+speaker (this machine's own too, as it talks); while the scores are hidden */
+static void game_engine_rasterize_voice_speakers(
+	void)
+{
+	enum
+	{
+		MAXIMUM_SPEAKER_ROWS = 8,
+	};
+	rectangle2d bounds = render.camera.window_bounds;
+	long font_index = hud_get_font_index();
+	long machines_listed[MULTIPLAYER_MAXIMUM_PLAYERS];
+	short listed_count = 0;
+	struct data_iterator iterator;
+	struct player_datum *player;
+	struct font_header *font;
+	short line_height;
+	short row = 0;
+
+	if (font_index == NONE || !network_voice_available())
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	font = font_definition_get(font_index);
+	line_height = (short)(font->leading_height + font->descending_height + font->ascending_height);
+	if (line_height <= 0)
+		return;
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL && row < MAXIMUM_SPEAKER_ROWS)
+	{
+		long machine_index = player->network_player_data.machine_index;
+		real_argb_color color;
+		rectangle2d icon;
+		rectangle2d text;
+		short index;
+
+		if (player->quit_out_of_game)
+			continue;
+		for (index = 0; index < listed_count && machines_listed[index] != machine_index; index++)
+			;
+		if (index < listed_count || listed_count >= (short)NUMBEROF(machines_listed))
+			continue;
+		machines_listed[listed_count++] = machine_index;
+		if (!network_voice_machine_speaking(machine_index))
+			continue;
+		icon.x0 = (short)(bounds.x0 + 16);
+		icon.y0 = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100 + row * line_height);
+		icon.x1 = (short)(icon.x0 + line_height);
+		icon.y1 = (short)(icon.y0 + line_height - 2);
+		network_voice_draw_icon(&icon, FALSE, 1.0f);
+		text = icon;
+		text.x0 = (short)(icon.x1 + 4);
+		text.x1 = bounds.x1;
+		text.y1 = (short)(icon.y0 + line_height);
+		color.alpha = 1.0f;
+		color.red = color.green = color.blue = 0.9f;
+		draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
+		rasterizer_draw_unicode_string(&text, NULL, NULL, 0, player->name);
+		row++;
+	}
+}
+
 static void game_engine_post_rasterize_in_game(
 	void)
 {
@@ -3870,6 +3974,10 @@ static void game_engine_post_rasterize_in_game(
 		/* (port: the full-screen scoreboard's scroll forgotten) */
 		game_engine_scoreboard_closed();
 	}
+	/* (port: who is talking, in the first view, while the scores are not
+	shown) */
+	if (fade <= 0.0f && local_player_index == local_player_get_next(NONE))
+		game_engine_rasterize_voice_speakers();
 
 	game_engine_globals.hud_message_timers[local_player_index] = fade;
 

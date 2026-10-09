@@ -43,6 +43,9 @@ host_sdl_scancode_from_name
 host_sdl_open_audio_stream
 host_sdl_put_audio_stream_data
 host_sdl_resume_audio_stream_device
+host_sdl_get_audio_stream_data
+host_sdl_get_audio_stream_available
+host_sdl_destroy_audio_stream
 host_gl_get_string
 host_gl_has_extension
 host_gl_read_buffer

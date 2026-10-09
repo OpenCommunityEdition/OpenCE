@@ -234,3 +234,18 @@ bool SDL_ResumeAudioStreamDevice(SDL_AudioStream *stream)
 {
 	return host_sdl_resume_audio_stream_device((unsigned int)stream) != 0;
 }
+
+int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *data, int length)
+{
+	return host_sdl_get_audio_stream_data((unsigned int)stream, data, length);
+}
+
+int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream)
+{
+	return host_sdl_get_audio_stream_available((unsigned int)stream);
+}
+
+void SDL_DestroyAudioStream(SDL_AudioStream *stream)
+{
+	host_sdl_destroy_audio_stream((unsigned int)stream);
+}

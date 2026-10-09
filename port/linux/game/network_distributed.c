@@ -72,6 +72,7 @@ machine (their datum identifiers need not be).
 #include "units/bipeds.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "network_voice.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -3904,6 +3905,12 @@ void network_distributed_handle_message(
 	short index;
 	word entry_size;
 
+	/* (voice chat's, in the lobby too: network_voice.c) */
+	if (network_voice_handles_message(message, size))
+	{
+		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
 	/* (none between games: loading, or in the menus) */
 	if (size < sizeof(header) || !game_in_progress())
 		return;

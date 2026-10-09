@@ -112,6 +112,12 @@ enum
 	/* the vote running as the host counts it, to each client, every second
 	and when it changes (unreliable: network_votekick.c) */
 	_distributed_message_votekick_status = 79,
+	/* voice chat (network_voice.c), in the lobby too: a client's frame to
+	the host, unreliably, with its key; a frame the host relays to a
+	client; the host's settings and the client's key, reliably */
+	_distributed_message_voice_up = 80,
+	_distributed_message_voice_down = 81,
+	_distributed_message_voice_config = 82,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

@@ -103,7 +103,14 @@ SCREENS = {
         "screen": "audio_settings_screen",
         "header": ("header_profile_audio_settings", f"{PE}/audio_settings/header_profile_audio_settings"),
         "spacing": 30,
+        # (the devices, desktop only, first: Android's rows from the top)
+        "platform_places": True,
         "rows": [
+            # (port/linux/game/menu_tags.c adds the devices SDL finds)
+            ("OUTPUT DEVICE:", "audio.output_device", [("SYSTEM DEFAULT", "default")],
+             "Where the game's sound and the voices play.", "desktop"),
+            ("INPUT DEVICE:", "audio.input_device", [("SYSTEM DEFAULT", "default")],
+             "The microphone voice chat listens to.", "desktop"),
             ("MASTER VOLUME:", "audio.volume", VOLUMES, "The volume of everything.", None),
             ("MUSIC VOLUME:", "audio.music_volume", VOLUMES, "The music's volume.", None),
             ("EFFECTS VOLUME:", "audio.effects_volume", VOLUMES,
@@ -112,6 +119,11 @@ SCREENS = {
              "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
+            # voice chat: this machine's own (port/linux/game/network_voice.c)
+            ("VOICE CHAT:", "audio.voice_chat",
+             [("PUSH TO TALK", "push_to_talk"), ("OPEN MIC", "open_mic"), ("OFF", "off")],
+             "Talk in network games: while PUSH TO TALK is held\n(Controls), whenever you speak, or never.", None),
+            ("VOICE VOLUME:", "audio.voice_volume", VOLUMES, "The other players' voices.", None),
         ],
     },
     "network_setup": {
@@ -168,6 +180,32 @@ SCREENS = {
 # port/linux/game/menu_functions.c's table of them)
 CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
 CONTROL_ROWS = 7
+
+# the settings whose rows have the wider spinner (a device's name)
+WIDE_SETTINGS = {"audio.output_device", "audio.input_device"}
+
+# the host's voice chat, on Teamplay Options (_teamplay_options_extras):
+# each row's key, its label, its choices' words (menu_functions.c's
+# gametype_options give their settings' values) and their helps
+TEAMPLAY_EDIT = "main_menu/settings_select/multiplayer_setup/teamplay_options_edit"
+VOICE_QUALITIES = (8, 12, 16, 24, 32, 48, 64)
+VOICE_ROWS = [
+    ("voice_mode", "VOICE CHAT:", ["OFF", "TEAM NEAR", "ANYONE NEAR", "TEAM", "TEAM, ENEMIES NEAR"], [
+        "No voice chat during the game.",
+        "Players hear their teammates who are near them.",
+        "Players hear everyone who is near them.",
+        "Players hear all their teammates, wherever they\\nare.",
+        "Players hear all their teammates, and the enemies\\nwho are near them.",
+    ]),
+    ("voice_lobby", "LOBBY VOICE CHAT:", ["ON", "OFF"], [
+        "Everyone hears everyone in the lobby, before and\\nafter the game.",
+        "No voice chat in the lobby.",
+    ]),
+    ("voice_kbps", "VOICE QUALITY:", [f"{kbps} KBPS" for kbps in VOICE_QUALITIES],
+     [f"Voices at {kbps} kilobits a second, in the lobby\\nand in the game." for kbps in VOICE_QUALITIES]),
+    ("voice_proximity", "VOICE NEAR DISTANCE:", ["15 M", "30 M", "45 M", "60 M", "90 M", "150 M"],
+     [f"Players {metres} metres apart or less are near\\nfor voice chat." for metres in (15, 30, 45, 60, 90, 150)]),
+]
 
 # the profile menu's words for what its items now open
 STRING_OVERRIDES = {
@@ -247,28 +285,44 @@ def _setting_screen(folder: str, spec: dict) -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     place = -1
+    # (platform_places: each platform's rows in places of their own, with
+    # no gap where the other's are; a row for both, a child for each)
+    places = {"desktop": -1, "android": -1}
     for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
         key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
-        if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
-            place += 1
-        rows.append((row, platform, place))
+        if spec.get("platform_places"):
+            for name in places:
+                if platform in (None, name):
+                    places[name] += 1
+            if platform or places["desktop"] == places["android"]:
+                rows.append((row, platform, places[platform or "desktop"]))
+            else:
+                rows += [(row, name, places[name]) for name in places]
+        else:
+            if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
+                place += 1
+            rows.append((row, platform, place))
+        # (a device's name wants the wider spinner Server Setup's co-op rows
+        # have: WIDE_SETTINGS)
+        wide = setting in WIDE_SETTINGS
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
-                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 320), ("y", 1)])}/>'])
+                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 320), ("y", 1)])}/>'])
         extra += _widget(f"{base}/{key}_label",
                          [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                           ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
                           ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
         extra += _widget(f"{base}/{key}_spinner",
-                         [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147), ("height", 20),
-                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                         [("type", "spinner"), ("left", None if wide else 3), ("top", 2), ("width", 206 if wide else 147),
+                          ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                           ("strings", "|".join(shown for shown, _ in choices)), ("setting", setting),
                           ("values", "|".join(value for _, value in choices)), ("font", "ui\\large_ui"),
-                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4 if wide else 1),
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                          ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
+                          ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
+                          ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
     extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port settings defaults"/>',
                                                     '<on event="start" run="port settings defaults"/>'])
@@ -361,6 +415,9 @@ MT = "main_menu/multiplayer_type_select"
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
 STRING_INSERTS = {
+    # (Teamplay Options' voice chat rows, after its own: VOICE_ROWS)
+    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in VOICE_ROWS])],
+    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in VOICE_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
@@ -510,6 +567,12 @@ WIDGET_PATCHES = {
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
+    # (Teamplay Options' voice chat rows, over its buttons: Server Setup's
+    # only, _teamplay_options_extras)
+    f"{TEAMPLAY_EDIT}/teamplay_options_menu": {"insert_before": {
+        f"{TEAMPLAY_EDIT}/teamplay_button_bar": [
+            f'<child widget="{TEAMPLAY_EDIT}/op_{key}" x="54" y="{163 + 30 * index}"/>'
+            for index, (key, *_) in enumerate(VOICE_ROWS)]}},
     # (the PC's Vehicles row's Start opened Item Options)
     "main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item": {"handlers": [
         '<on event="a" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>',
@@ -1139,6 +1202,35 @@ def _item_options_extras() -> list:
     return lines
 
 
+def _teamplay_options_extras() -> list:
+    """Teamplay Options' rows of the port's: the host's voice chat
+    (port/linux/game/network_voice.c), in Server Setup's copy only
+    (menu_functions.c's gametype_options_init), kept in config.toml"""
+    lines = []
+    for index, (key, label, strings, _) in enumerate(VOICE_ROWS):
+        lines += _widget(f"{TEAMPLAY_EDIT}/op_{key}", [("width", 512), ("height", 28),
+                                                       ("flags", "pass_unhandled_to_focused_child"),
+                                                       ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{TEAMPLAY_EDIT}/{key}_label"/>',
+                          f'<child widget="{TEAMPLAY_EDIT}/{key}_spinner" x="286" y="1"/>'])
+        lines += _widget(f"{TEAMPLAY_EDIT}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                                          ("height", 22),
+                                                          ("string_list", f"{TEAMPLAY_EDIT}/teamplay_options_labels"),
+                                                          ("string_index", 3 + index), ("font", "ui\\large_ui"),
+                                                          ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        lines += _widget(f"{TEAMPLAY_EDIT}/{key}_spinner",
+                         [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("string_list", f"{TEAMPLAY_EDIT}/var_{key}"), ("font", "ui\\large_ui"),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                          ("list_flags", "items_from_strings"),
+                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                          ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
+                         ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        lines += _strings(f"{TEAMPLAY_EDIT}/var_{key}", strings)
+    return lines
+
+
 def _map_kind() -> list:
     """the map lists' first row (New Game's and the Map screen's), as the
     gametype list's chooser: a spinner of SINGLEPLAYER or MULTIPLAYER maps,
@@ -1175,6 +1267,7 @@ def multiplayer_files() -> dict:
         f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
+        TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
     }
 
 

@@ -90,6 +90,8 @@ static struct platform_keystroke keystroke_queue[KEYSTROKE_QUEUE_SIZE];
 static unsigned long keystroke_head, keystroke_count;
 
 #ifndef HALO_ANDROID
+/* dsound_sdl.c's: the output device followed */
+void dsound_sdl_output_device_check(void);
 /* updater.c's: the desktop self-updater */
 void updater_start(void);
 void updater_poll(SDL_Window *window);
@@ -675,6 +677,73 @@ int platform_window_sizes(long *widths, long *heights, int maximum)
 }
 
 #endif
+
+/* ---------- audio devices (Settings > Audio: audio.output_device,
+audio.input_device) */
+
+#ifndef HALO_ANDROID
+int platform_audio_devices(int recording, char (*names)[PLATFORM_AUDIO_DEVICE_NAME_SIZE], int maximum)
+{
+	SDL_AudioDeviceID *devices;
+	int device_count = 0, count = 0, index;
+
+	if (maximum < 1 || !platform_sdl_initialize())
+		return 0;
+	devices = recording ? SDL_GetAudioRecordingDevices(&device_count) : SDL_GetAudioPlaybackDevices(&device_count);
+	for (index = 0; devices && index < device_count && count < maximum; index++)
+	{
+		const char *name = SDL_GetAudioDeviceName(devices[index]);
+
+		/* (a name a setting can hold, and a menu show: no "|", which
+		separates a spinner's values) */
+		if (!name || !name[0] || strchr(name, '|') || strlen(name) >= PLATFORM_AUDIO_DEVICE_NAME_SIZE)
+			continue;
+		snprintf(names[count++], PLATFORM_AUDIO_DEVICE_NAME_SIZE, "%s", name);
+	}
+	SDL_free(devices);
+	return count;
+}
+
+SDL_AudioDeviceID platform_audio_device(int recording, const char *name)
+{
+	SDL_AudioDeviceID *devices;
+	SDL_AudioDeviceID found = recording ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+	int device_count = 0, index;
+
+	if (!name || !name[0] || !strcmp(name, "default"))
+		return found;
+	devices = recording ? SDL_GetAudioRecordingDevices(&device_count) : SDL_GetAudioPlaybackDevices(&device_count);
+	for (index = 0; devices && index < device_count; index++)
+	{
+		const char *device_name = SDL_GetAudioDeviceName(devices[index]);
+
+		if (device_name && !strcmp(device_name, name))
+		{
+			found = devices[index];
+			break;
+		}
+	}
+	SDL_free(devices);
+	if (found == (recording ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK))
+		platform_log("audio: no %s device named \"%s\": the system's default", recording ? "input" : "output", name);
+	return found;
+}
+#else
+int platform_audio_devices(int recording, char (*names)[PLATFORM_AUDIO_DEVICE_NAME_SIZE], int maximum)
+{
+	(void)recording;
+	(void)names;
+	(void)maximum;
+	return 0;
+}
+
+SDL_AudioDeviceID platform_audio_device(int recording, const char *name)
+{
+	(void)name;
+	return recording ? SDL_AUDIO_DEVICE_DEFAULT_RECORDING : SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+}
+#endif
+
 #ifndef HALO_ANDROID
 /* the window's size (platform_window_size_setting), as the window was made
 or last resized: platform_display_apply */
@@ -1259,6 +1328,8 @@ void platform_pump_events(void)
 	platform_show_pending_message();
 #ifndef HALO_ANDROID
 	updater_poll(platform_window);
+	/* (Settings > Audio's output device, as it changes: dsound_sdl.c) */
+	dsound_sdl_output_device_check();
 #endif
 	pthread_mutex_lock(&input_lock);
 #ifndef HALO_ANDROID

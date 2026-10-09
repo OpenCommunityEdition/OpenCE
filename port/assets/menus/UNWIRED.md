@@ -21,7 +21,7 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 | `gamespy update filter settings` | 2 | PC function |
 | `gt edit list update` | 1 | PC function |
 | `gt select list update` | 1 | PC function |
-| `mouse spinner 1wide click` | 72 | PC function |
+| `mouse spinner 1wide click` | 76 | PC function |
 | `mp map list update` | 1 | PC function |
 | `mp prof init teamplay options` | 1 | PC function |
 | `mp prof init vehicle options` | 1 | PC function |

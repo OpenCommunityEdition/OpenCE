@@ -380,6 +380,7 @@ symbols in this file:
 #include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h" /* port: a co-op game's level won */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
@@ -3437,6 +3438,8 @@ void main_loop(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			/* port: voice chat, in the lobby and in game (port/linux/game/network_voice.c) */
+			network_voice_update();
 			connection = main_globals.connection;
 			if (connection==_game_connection_network_client)
 			{
