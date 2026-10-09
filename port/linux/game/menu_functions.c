@@ -10,9 +10,6 @@ calls them from PC_MENU_FUNCTION_BASE on):
 - the PC version's "profile set edit begin" begins editing the first player
   profile, as its settings screens need, and fails with none (its handlers
   then open the screens that make one);
-- in the campaign, "port active profile edit begin" and "port active profile
-  edit end" edit the player's active profile for GAMEPADS (in_game.xml) and
-  keep the controller settings it sets;
 - "gamespy screen init" hides the server browser's error and filter panels,
   and the title of the mode "mp type set mode" did not choose (Internet or
   LAN);
@@ -515,64 +512,6 @@ boolean pc_menu_profile_edit_begin(void)
 	if (!campaign_profile(0, &profile))
 		return FALSE;
 	player_ui_begin_editing_profile(player_ui_get_active_player_profile_index(0));
-	return TRUE;
-}
-
-/* in a game, GAMEPADS (port/assets/menus/ce/in_game.xml) sets the player's
-active profile, which no Edit Profile screen is there to save: "port active
-profile edit begin" (A on its row) edits the profile, and "port active
-profile edit end" (its screen gone) puts the controller settings OK wrote
-into the profile as it is stored and as the game has it, nothing else (the
-game's copy can be older than the file: Edit Profile saves only the file),
-then saves the one and applies the other, as the game's own pause menu does
-with its inverted look (player0_look_invert_pitch). FALSE if the player has
-no profile. */
-static long active_profile_edited = NONE;
-
-static boolean active_profile_edit_begin(short local_player)
-{
-	long index = player_ui_get_active_player_profile_index(local_player);
-
-	active_profile_edited = NONE;
-	if (index == NONE)
-		return FALSE;
-	player_ui_begin_editing_profile(index);
-	if (!player_ui_get_edit_player_profile())
-		return FALSE;
-	active_profile_edited = index;
-	return TRUE;
-}
-
-static boolean active_profile_edit_end(short local_player)
-{
-	struct player_profile *edited = player_ui_get_edit_player_profile();
-	long index = active_profile_edited;
-
-	active_profile_edited = NONE;
-	if (index == NONE)
-		return TRUE;
-	if (edited && player_ui_edit_profile_is_dirty())
-	{
-		struct player_profile profile;
-
-		if (player_profile_get(index, &profile))
-		{
-			profile.controller_settings = edited->controller_settings;
-			player_profile_save(index, &profile);
-			if (player_ui_get_active_player_profile_index(local_player) == index)
-			{
-				player_ui_get_active_player_profile(local_player, &profile);
-				profile.controller_settings = edited->controller_settings;
-				player_ui_set_active_player_profile(local_player, index, &profile);
-			}
-			platform_log("menus: the profile's controller settings saved");
-		}
-		else
-		{
-			platform_log("menus: could not read the profile; its controller settings not saved");
-		}
-	}
-	player_ui_end_editing_profile();
 	return TRUE;
 }
 
@@ -4002,6 +3941,57 @@ static boolean profile_save_changes(struct widget_instance *widget, boolean *wid
 	return TRUE;
 }
 
+/* only what changed from before to after, into the local player's active
+profile, which the campaign saves its progress from */
+static void active_profile_take_changes(short local_player, long index, struct player_profile const *before,
+	struct player_profile const *after)
+{
+	struct player_profile active;
+	byte const *from = (byte const *)before;
+	byte const *to = (byte const *)after;
+	byte *changed = (byte *)&active;
+	long offset;
+
+	player_ui_get_active_player_profile(local_player, &active);
+	for (offset = 0; offset < (long)sizeof(active); offset++)
+	{
+		if (to[offset] != from[offset])
+			changed[offset] = to[offset];
+	}
+	player_ui_set_active_player_profile(local_player, index, &active);
+}
+
+/* "port profile settings save" (Gamepads' OK in a single-player campaign:
+menu_tags.c's pause_settings_patch): the profile saved at once, not on
+Settings' OK, its changes made the player's own, and edited again from what
+was saved, for Settings to go on with */
+static boolean profile_settings_save(struct widget_instance *widget)
+{
+	struct player_profile *edited = player_ui_get_edit_player_profile();
+	long index = player_ui_get_edit_profile_index();
+	struct player_profile before, after;
+	short local_player;
+
+	if (edited)
+		before = *edited;
+	settings_each(screen_of(widget), setting_changed_save);
+	if (!edited || !player_ui_edit_profile_is_dirty())
+		return TRUE;
+	after = *edited;
+	if (!player_ui_save_profile())
+	{
+		platform_log("menus: could not save the profile's changes");
+		return campaign_fail();
+	}
+	for (local_player = 0; local_player < MAXIMUM_LOCAL_PLAYERS; local_player++)
+	{
+		if (player_ui_get_active_player_profile_index(local_player) == index)
+			active_profile_take_changes(local_player, index, &before, &after);
+	}
+	player_ui_begin_editing_profile(index);
+	return TRUE;
+}
+
 /* "port pause end game" (the in-game pause menu's END GAME, the host's:
 menu_tags.c's pause_patch): the game ends as its time limit would, its
 players staying for the next (the carnage report, then the host's PICK GAME) */
@@ -5369,14 +5359,6 @@ boolean pc_menu_event_function_invoke(
 		{
 			return pc_menu_profile_edit_begin();
 		}
-		else if (!strcmp(name, "port active profile edit begin"))
-		{
-			return active_profile_edit_begin(controller_of(widget));
-		}
-		else if (!strcmp(name, "port active profile edit end"))
-		{
-			return active_profile_edit_end(controller_of(widget));
-		}
 		/* (the press posted is the controller's that chose the button: a
 		split screen player's LEAVE is theirs) */
 		else if (!strcmp(name, "mouse emit accept event"))
@@ -5494,6 +5476,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "player profile save changes"))
 		{
 			return profile_save_changes(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port profile settings save"))
+		{
+			return profile_settings_save(widget);
 		}
 		else if (!strcmp(name, "direct ip connect go"))
 		{

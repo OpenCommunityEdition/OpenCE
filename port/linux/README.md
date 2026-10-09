@@ -289,6 +289,11 @@ stay. The Xbox's pause box is drawn taller to hold them (a redraw,
 what is below its list moves down. The few pictures of the settings that
 come from the main menu's map are not drawn there.
 
+In a single-player campaign, the pause menu has SETTINGS too, after RESUME
+GAME, its rows closer in the same box. It opens the same settings, while the
+game stays paused, with only Controls, Gamepads, Mouse, Audio and Video
+Setup; Gamepads' OK saves the profile at once.
+
 The menus are XML files in `port/assets/menus` (`tools/ce_menus.py` writes
 them from the PC version's tags), which the game contains. To change them,
 put files in a `menus` folder next to `config.toml`: a file with the same

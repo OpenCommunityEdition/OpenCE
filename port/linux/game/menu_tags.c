@@ -29,15 +29,13 @@ A multiplayer map gets them too, for its in-game pause menu's SETTINGS
 pictures, sounds and screens) are none, a missing picture drawn blank, and
 no screen pauses the game (a network game's clock runs on).
 
-The campaign's maps get the in-game widgets (in_game/..., which ui.map and
-the multiplayer maps do not get: they are drawn with the pause menus' art,
-which ui.map has not), and only what they lead to: the settings screens they
-open, with their bitmaps and strings (ui_widget.c adds SETTINGS to the
-campaign's pause menu).
+So does a single-player campaign's map (pause_campaign_patch), whose screens
+pause it as its pause menu does.
 */
 
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
+#include "game/game.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
@@ -57,6 +55,7 @@ int platform_audio_devices(int recording, char (*names)[128], int maximum);
 
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
+boolean network_game_is_active(void);
 
 /* cache_files.c's (port) */
 void *cache_files_tag_instances(long *count);
@@ -77,10 +76,11 @@ boolean pc_menu_frame_placement(struct bitmap_data const *bitmap, short *x, shor
 /* ---------- constants */
 
 #define PC_MENU_TAG_PREFIX "pc\\"
-#define IN_GAME_WIDGET_PREFIX "in_game/"
 /* the multiplayer maps' widget collection, whose pause screens pause_patch
 adds to */
 #define MULTIPLAYER_COLLECTION "ui\\shell\\multiplayer"
+/* the campaign's full screen pause screen, which pause_campaign_patch adds to */
+#define CAMPAIGN_PAUSE_SCREEN "ui\\shell\\solo_game\\pause_game\\pause_game"
 /* the tags pause_patch adds: two buttons and their texts */
 #define PAUSE_PATCH_TAGS 4
 /* what a frame of ui.map's is drawn as in a game map, which has not got it */
@@ -380,10 +380,10 @@ static char const *const port_function_names[] =
 	/* (Settings' OK: the Xbox's fails when the profile has no changes, the
 	settings' screens having written theirs to config.toml) */
 	"player profile save changes",
-	/* (in the campaign: GAMEPADS on the player's active profile) */
-	"port active profile edit begin", "port active profile edit end",
 	/* (the server browser's password screen) */
 	"port password init", "port password edit", "port password join", "port password back",
+	/* (Gamepads' OK in a single-player campaign: pause_settings_patch) */
+	"port profile settings save",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -421,8 +421,6 @@ static struct
 	struct pc_menu_setting *settings;
 	long setting_count;
 	boolean loaded;
-	/* built in a campaign map: the in-game widgets, not the main menu */
-	boolean in_game;
 	char root[300];
 } menu_tags;
 
@@ -440,14 +438,12 @@ static struct
 	long *strings_tags;
 	long *text_tags;
 	long *spinner_tags;
-	/* which widgets, bitmaps and string lists are built */
-	boolean *wanted_widgets;
-	boolean *wanted_bitmaps;
-	boolean *wanted_strings;
 	boolean failed;
-	/* a multiplayer map's build (the pause menu's SETTINGS): what the map
-	has not got is none, not a failure */
+	/* a game map's build (the pause menu's SETTINGS): what the map has not
+	got is none, not a failure */
 	boolean game_map;
+	/* a single-player campaign's map's, whose screens pause the game */
+	boolean campaign;
 } build;
 
 /* ---------- private code */
@@ -565,70 +561,6 @@ static char const *strings_name(long index) { return build.menus->string_lists[i
 static long widget_named(char const *name)
 {
 	return find(name, build.menus->widget_count, widget_name);
-}
-
-static boolean in_game_widget(char const *name)
-{
-	return !strncmp(name, IN_GAME_WIDGET_PREFIX, strlen(IN_GAME_WIDGET_PREFIX));
-}
-
-/* one of ours by its name (not the map's, with a backslash) wanted */
-static void want_named(char const *name, long count, char const *(*name_of)(long), boolean *wanted)
-{
-	long index = name && !strchr(name, '\\') ? find(name, count, name_of) : NONE;
-
-	if (index != NONE)
-		wanted[index] = TRUE;
-}
-
-static void want_widget(long index);
-
-static void want_widget_named(char const *name)
-{
-	long index = name && !strchr(name, '\\') ? widget_named(name) : NONE;
-
-	if (index != NONE)
-		want_widget(index);
-}
-
-/* a widget wanted, and what it names: its bitmaps and strings, its children,
-its description, the widgets its handlers open and its conditional ones */
-static void want_widget(long index)
-{
-	struct halo_menus const *menus = build.menus;
-	struct halo_menu_widget const *widget = &menus->widgets[index];
-	long child, handler, conditional;
-
-	if (build.wanted_widgets[index])
-		return;
-	build.wanted_widgets[index] = TRUE;
-	want_named(widget->bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
-	want_named(widget->header_bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
-	want_named(widget->footer_bitmap, menus->bitmap_count, bitmap_name, build.wanted_bitmaps);
-	want_named(widget->string_list, menus->string_list_count, strings_name, build.wanted_strings);
-	want_widget_named(widget->description);
-	for (child = widget->first_child; child != HALO_MENU_NONE; child = menus->children[child].next)
-	{
-		if (menus->children[child].nested != HALO_MENU_NONE)
-			want_widget(menus->children[child].nested);
-		else
-			want_widget_named(menus->children[child].widget);
-	}
-	for (handler = widget->first_handler; handler != HALO_MENU_NONE; handler = menus->handlers[handler].next)
-	{
-		struct halo_menu_handler const *on = &menus->handlers[handler];
-
-		want_widget_named(on->open);
-		want_widget_named(on->replace);
-		want_widget_named(on->focus);
-		want_widget_named(on->widget);
-		want_widget_named(on->otherwise);
-	}
-	for (conditional = widget->first_conditional; conditional != HALO_MENU_NONE;
-		conditional = menus->conditionals[conditional].next)
-	{
-		want_widget_named(menus->conditionals[conditional].widget);
-	}
 }
 
 static long map_tag(long group_tag, char const *name, char const *file, long line)
@@ -1166,7 +1098,7 @@ static void *widget_build(long widget_index)
 	definition->flags = flags_parse(source->flags, widget_flag_names, NUMBEROF(widget_flag_names),
 		source->file, source->line);
 	/* (in a network game the clock runs on) */
-	if (build.game_map)
+	if (build.game_map && !build.campaign)
 		definition->flags &= ~FLAG(1); /* pause_game */
 	definition->milliseconds_to_auto_close = source->auto_close;
 	definition->auto_close_fade_time = source->auto_close_fade;
@@ -1777,71 +1709,188 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 		platform_log("menus: the pause menu has SETTINGS%s", host ? " and END GAME" : "");
 }
 
+/* ---------- the single-player campaign's pause menu
+
+Its list gets the same SETTINGS (pause_list_patch) after RESUME GAME, a copy
+of REVERT TO SAVED; its box, beside the mission objectives', keeps its size,
+the rows closer. Settings there has only the items that work in a game
+(pause_settings_patch), and Gamepads' OK saves the profile itself. */
+
+#define PAUSE_SETTINGS_LIST "main_menu/settings_select/player_setup/player_profile_edit/profile_edit_select_list"
+#define PAUSE_SETTINGS_GAMEPADS_OK "main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_ok"
+
+/* Change Name's keyboard and Change Color's pictures are ui.map's, Network
+Setup's settings are not for a game under way, and About is nothing to it */
+static char const *const pause_settings_hidden_items[] =
+{
+	"main_menu/settings_select/player_setup/player_profile_edit/name_profile_item",
+	"main_menu/settings_select/player_setup/player_profile_edit/network_settings_profile_item",
+	"main_menu/settings_select/player_setup/player_profile_edit/color_profile_item",
+	"main_menu/settings_select/player_setup/player_profile_edit/about_item",
+};
+
+/* the list's rows spaced evenly over the span its rows had */
+static void pause_list_fit(struct ui_widget_definition *list, short span)
+{
+	struct ui_widget_child_reference *children = list->child_widgets.address;
+	long count = list->child_widgets.count, child;
+
+	for (child = 1; child < count; child++)
+		children[child].vertical_offset = (short)(children[0].vertical_offset + child * span / (count - 1));
+}
+
+static boolean pause_settings_item_hidden(long tag_index)
+{
+	short index;
+
+	for (index = 0; index < (short)NUMBEROF(pause_settings_hidden_items); index++)
+	{
+		long widget = widget_named(pause_settings_hidden_items[index]);
+
+		if (widget != NONE && build.widget_tags[widget] == tag_index)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+/* the hidden items stay in the list, empty and taking no events (which it
+passes over), as an item's description is the one at its place in the list;
+the others move up into the first places */
+static void pause_settings_patch(void)
+{
+	long list_widget = widget_named(PAUSE_SETTINGS_LIST);
+	long ok_widget = widget_named(PAUSE_SETTINGS_GAMEPADS_OK);
+	long settings_save = function_index("port settings save", "pause", 0);
+	struct ui_widget_definition *list, *ok;
+	struct ui_widget_child_reference *children;
+	struct ui_widget_event_handler_reference *handlers;
+	short places[16];
+	long child, handler, place_count = 0, place = 0;
+
+	if (list_widget == NONE || ok_widget == NONE)
+		return;
+	list = tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[list_widget]);
+	children = list->child_widgets.address;
+	for (child = 0; child < list->child_widgets.count && place_count < (long)NUMBEROF(places); child++)
+	{
+		struct ui_widget_definition *item = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+
+		if (item->type == _widget_type_text_box)
+			places[place_count++] = (short)(item->bounds.y0 + children[child].vertical_offset);
+	}
+	for (child = 0; child < list->child_widgets.count && place < place_count; child++)
+	{
+		struct ui_widget_definition *item = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+
+		if (item->type != _widget_type_text_box)
+			continue;
+		if (pause_settings_item_hidden(children[child].widget_tag.index))
+		{
+			item->event_handlers.count = 0;
+			reference_clear(&item->background_bitmap, BITMAP_GROUP_TAG);
+			reference_clear(&item->text_label_string_list, UNICODE_STRING_LIST_TAG);
+			/* (nowhere for the mouse to focus it) */
+			item->bounds.y1 = item->bounds.y0;
+			item->bounds.x1 = item->bounds.x0;
+		}
+		else
+		{
+			children[child].vertical_offset = (short)(places[place++] - item->bounds.y0);
+		}
+	}
+	ok = tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[ok_widget]);
+	handlers = ok->event_handlers.address;
+	for (handler = 0; handler < ok->event_handlers.count; handler++)
+	{
+		if (handlers[handler].function == settings_save)
+			handlers[handler].function = (short)function_index("port profile settings save", "pause", 0);
+	}
+}
+
+static void pause_campaign_patch(struct cache_file_tag_instance *instances)
+{
+	long screen = tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN);
+	struct ui_widget_definition *definition;
+	struct ui_widget_child_reference *children;
+	long child;
+
+	if (screen == NONE)
+		return;
+	definition = tag_get(UI_WIDGET_DEFINITION_TAG, screen);
+	children = definition->child_widgets.address;
+	for (child = 0; child < definition->child_widgets.count; child++)
+	{
+		struct ui_widget_definition *list;
+		struct ui_widget_child_reference const *rows;
+		short span;
+
+		if (children[child].widget_tag.index == NONE)
+			continue;
+		list = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		if (list->type != _widget_type_column_list || list->child_widgets.count < 2)
+			continue;
+		rows = list->child_widgets.address;
+		span = (short)(rows[list->child_widgets.count - 1].vertical_offset - rows[0].vertical_offset);
+		if (pause_list_patch(instances, list, 1, FALSE))
+		{
+			pause_list_fit(list, span);
+			pause_settings_patch();
+			platform_log("menus: the pause menu has SETTINGS");
+		}
+		return;
+	}
+}
+
+/* the campaign played here by one player: not network co-op, nor split
+screen */
+static boolean single_player_campaign_map(void)
+{
+	return tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE &&
+		tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE &&
+		game_connection() == _game_connection_local && !network_game_is_active() && !game_is_cooperative();
+}
+
 void menu_tags_loaded(
 	char const *map_name)
 {
 	struct halo_menus const *menus;
 	struct cache_file_tag_instance *instances;
 	long widget_count, own_lists = 0, total, index;
-	long widgets_built = 0, strings_built = 0, bitmaps_built = 0;
-	/* (ui.map; a multiplayer map: its pause menu's SETTINGS, pause_patch;
-	any other map is the campaign's: the in-game widgets) */
-	boolean game_map = strcmp(map_name, "ui") != 0 && tag_loaded('Soul', MULTIPLAYER_COLLECTION) != NONE;
-	boolean in_game = strcmp(map_name, "ui") != 0 && !game_map;
 
-	if (strcmp(config_string("display.menus"), "pc"))
+	boolean game_map = strcmp(map_name, "ui") != 0;
+	boolean campaign = game_map && single_player_campaign_map();
+
+	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS; a
+	single-player campaign's too) */
+	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
+		strcmp(config_string("display.menus"), "pc"))
+	{
 		return;
+	}
 	menus = halo_menus_load();
 	if (!menus)
 		return;
 	memset(&build, 0, sizeof(build));
 	build.menus = menus;
 	build.game_map = game_map;
+	build.campaign = campaign;
 	widget_count = menus->widget_count;
 	build.widget_tags = malloc((widget_count + 1) * sizeof(long));
 	build.text_tags = malloc((widget_count + 1) * sizeof(long));
 	build.spinner_tags = malloc((widget_count + 1) * sizeof(long));
 	build.bitmap_tags = malloc((menus->bitmap_count + 1) * sizeof(long));
 	build.strings_tags = malloc((menus->string_list_count + 1) * sizeof(long));
-	build.wanted_widgets = malloc((widget_count + 1) * sizeof(boolean));
-	build.wanted_bitmaps = malloc((menus->bitmap_count + 1) * sizeof(boolean));
-	build.wanted_strings = malloc((menus->string_list_count + 1) * sizeof(boolean));
-	if (!build.widget_tags || !build.text_tags || !build.spinner_tags || !build.bitmap_tags ||
-		!build.strings_tags || !build.wanted_widgets || !build.wanted_bitmaps || !build.wanted_strings)
+	if (!build.widget_tags || !build.text_tags || !build.spinner_tags || !build.bitmap_tags || !build.strings_tags)
 		goto failed;
-	/* ui.map and a multiplayer map: all but the in-game widgets; a campaign
-	map: those, and what they lead to */
-	for (index = 0; index < widget_count; index++)
-		build.wanted_widgets[index] = !in_game && !in_game_widget(menus->widgets[index].name);
-	for (index = 0; index < menus->bitmap_count; index++)
-		build.wanted_bitmaps[index] = !in_game;
-	for (index = 0; index < menus->string_list_count; index++)
-		build.wanted_strings[index] = !in_game;
-	for (index = 0; in_game && index < widget_count; index++)
-	{
-		if (in_game_widget(menus->widgets[index].name))
-			want_widget(index);
-	}
 	for (index = 0; index < widget_count; index++)
 	{
-		if (build.wanted_widgets[index])
-		{
-			widgets_built++;
-			own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);
-		}
+		own_lists += (menus->widgets[index].text != NULL) + (menus->widgets[index].strings != NULL);
 		/* (names are unique) */
 		if (widget_named(menus->widgets[index].name) != index)
 			problem(menus->widgets[index].file, menus->widgets[index].line, "two widgets are named",
 				menus->widgets[index].name);
 	}
-	for (index = 0; index < menus->string_list_count; index++)
-		strings_built += build.wanted_strings[index] != FALSE;
-	for (index = 0; index < menus->bitmap_count; index++)
-		bitmaps_built += build.wanted_bitmaps[index] != FALSE;
-	/* (a campaign map with no in-game widgets: nothing to add) */
-	if (in_game && !widgets_built && !build.failed)
-		goto done;
-	total = widgets_built + own_lists + strings_built + bitmaps_built +
+	total = widget_count + own_lists + menus->string_list_count + menus->bitmap_count +
 		(game_map ? PAUSE_PATCH_TAGS : 0);
 	instances = build.failed ? NULL : instances_grow(total, &build.first_index, &build.first_salt);
 	if (!instances)
@@ -1849,22 +1898,18 @@ void menu_tags_loaded(
 	/* each new tag's index */
 	for (index = 0; index < widget_count; index++)
 	{
-		boolean wanted = build.wanted_widgets[index];
-
-		build.widget_tags[index] = wanted ? next_tag() : NONE;
-		build.text_tags[index] = wanted && menus->widgets[index].text ? next_tag() : NONE;
-		build.spinner_tags[index] = wanted && menus->widgets[index].strings ? next_tag() : NONE;
+		build.widget_tags[index] = next_tag();
+		build.text_tags[index] = menus->widgets[index].text ? next_tag() : NONE;
+		build.spinner_tags[index] = menus->widgets[index].strings ? next_tag() : NONE;
 	}
 	for (index = 0; index < menus->string_list_count; index++)
-		build.strings_tags[index] = build.wanted_strings[index] ? next_tag() : NONE;
+		build.strings_tags[index] = next_tag();
 	for (index = 0; index < menus->bitmap_count; index++)
-		build.bitmap_tags[index] = build.wanted_bitmaps[index] ? next_tag() : NONE;
+		build.bitmap_tags[index] = next_tag();
 	/* the tags: the bitmaps and strings first, which the widgets name; the
 	widgets' names in the table before any is built, which they find there */
 	for (index = 0; index < menus->bitmap_count && !build.failed; index++)
 	{
-		if (!build.wanted_bitmaps[index])
-			continue;
 		instance_set(instances, BITMAP_GROUP_TAG, build.bitmap_tags[index], menus->bitmaps[index].name, "",
 			bitmap_build(&menus->bitmaps[index], build.bitmap_tags[index]));
 	}
@@ -1872,8 +1917,6 @@ void menu_tags_loaded(
 	{
 		struct halo_menu_strings const *list = &menus->string_lists[index];
 
-		if (!build.wanted_strings[index])
-			continue;
 		instance_set(instances, UNICODE_STRING_LIST_TAG, build.strings_tags[index], list->name, "",
 			string_list_build(menus->strings + list->first, list->count));
 	}
@@ -1881,8 +1924,6 @@ void menu_tags_loaded(
 	{
 		struct halo_menu_widget const *widget = &menus->widgets[index];
 
-		if (!build.wanted_widgets[index])
-			continue;
 		if (widget->text)
 		{
 			instance_set(instances, UNICODE_STRING_LIST_TAG, build.text_tags[index], widget->name, " text",
@@ -1909,23 +1950,18 @@ void menu_tags_loaded(
 	}
 	cache_files_set_tag_instances(instances, build.first_index + total);
 	for (index = 0; index < widget_count && !build.failed; index++)
-	{
-		if (build.wanted_widgets[index])
-			instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
-	}
+		instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(build.widget_tags[index])].base_address = widget_build(index);
 	if (build.failed)
 		goto failed;
 	if (game_map)
 	{
 		pause_patch(instances);
+		if (campaign)
+			pause_campaign_patch(instances);
 		if (build.failed)
 			goto failed;
 		/* (those it made) */
 		cache_files_set_tag_instances(instances, build.first_index + build.next);
-	}
-	else if (in_game)
-	{
-		/* (no main menu here) */
 	}
 	else if (widget_named(menus->root) != NONE)
 	{
@@ -1941,14 +1977,12 @@ void menu_tags_loaded(
 		platform_log("menus: there is no widget named %s, the main menu", menus->root);
 	}
 	menu_tags.loaded = TRUE;
-	menu_tags.in_game = in_game;
 	platform_log("menus: %ld widgets, %ld string lists and %ld bitmaps added to the map's %ld tags",
-		widgets_built, own_lists + strings_built, bitmaps_built, build.first_index);
+		widget_count, own_lists + menus->string_list_count, menus->bitmap_count, build.first_index);
 	goto done;
 
 failed:
-	platform_log(in_game ? "menus: not added; no SETTINGS in the pause menu" :
-		"menus: not added; using the game's own menus");
+	platform_log("menus: not added; using the game's own menus");
 	menu_tags_release();
 
 done:
@@ -1957,9 +1991,6 @@ done:
 	free(build.spinner_tags);
 	free(build.strings_tags);
 	free(build.bitmap_tags);
-	free(build.wanted_widgets);
-	free(build.wanted_bitmaps);
-	free(build.wanted_strings);
 	memset(&build, 0, sizeof(build));
 }
 
@@ -1977,7 +2008,7 @@ char const *pc_menus_root_name(
 	settings' screens) */
 	char const *open = config_string("debug.menu_open");
 
-	if (menu_tags.loaded && !menu_tags.in_game && *open && build.menus == NULL)
+	if (menu_tags.loaded && *open && build.menus == NULL)
 	{
 		static char name[300];
 		long index;
@@ -2068,7 +2099,7 @@ char const *pc_menus_screen(
 	};
 	short index;
 
-	if (!menu_tags.loaded || menu_tags.in_game)
+	if (!menu_tags.loaded)
 		return name;
 	for (index = 0; index < NUMBEROF(screens); index++)
 	{
