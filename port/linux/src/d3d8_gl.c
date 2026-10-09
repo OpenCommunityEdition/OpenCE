@@ -520,6 +520,11 @@ struct gl_device
 	(render_target_get), which its count is divided by */
 	float query_area[VISIBILITY_TEST_SLOTS];
 	GLuint active_query;
+	/* the query a test runs on until it ends (swapped into its slot, or with
+	the results mapped and the batch full, dropped): a slot of its own, so
+	that every slot, 0 too, is a test's (the game's lens flares number
+	theirs from 0) */
+	GLuint scratch_query;
 	BOOL visibility_test_active;
 	/* (queries read on the CPU) each slot's latest count known, and whether
 	its query has yet to be read: the game spins on a result it is told is
@@ -1545,6 +1550,7 @@ static void gl_initialize(void)
 #endif
 	glGenSamplers(D3DTSS_MAXSTAGES, device.samplers);
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
+	glGenQueries(1, &device.scratch_query);
 #ifndef HALO_ANDROID
 	glGenBuffers(1, &device.visibility_results_buffer);
 	glBindBuffer(GL_QUERY_BUFFER, device.visibility_results_buffer);
@@ -1559,6 +1565,9 @@ static void gl_initialize(void)
 	}
 	else
 		platform_log("cannot map the visibility test results; tests wait for the GPU");
+	/* (unbound: a query read into a bound query buffer takes its pointer
+	for an offset into it) */
+	glBindBuffer(GL_QUERY_BUFFER, 0);
 	{
 		long every = config_integer("debug.gpu_flush_draws");
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -2094,12 +2103,12 @@ void WINAPI D3DDevice_BeginVisibilityTest(void)
 		/* the batch's next query, or (with the batch full) a scratch one
 		whose count is dropped */
 		device.active_query = count < VISIBILITY_TEST_SLOTS ?
-			device.visibility_batches[device.visibility_batch].queries[count] : device.queries[0];
+			device.visibility_batches[device.visibility_batch].queries[count] : device.scratch_query;
 		glBeginQuery(VISIBILITY_QUERY, device.active_query);
 		return;
 	}
 #endif
-	glBeginQuery(VISIBILITY_QUERY, device.queries[0]);
+	glBeginQuery(VISIBILITY_QUERY, device.scratch_query);
 }
 
 HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
@@ -2110,8 +2119,6 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 		return S_OK;
 	device.visibility_test_active = FALSE;
 	index %= VISIBILITY_TEST_SLOTS;
-	if (!index)
-		index = 1;
 #ifdef HALO_ANDROID
 	if (xgpu_capabilities.atomic_counters)
 	{
@@ -2152,8 +2159,8 @@ HRESULT WINAPI D3DDevice_EndVisibilityTest(DWORD index)
 	}
 #endif
 	/* swap the scratch query into the requested slot */
-	scratch = device.queries[0];
-	device.queries[0] = device.queries[index];
+	scratch = device.scratch_query;
+	device.scratch_query = device.queries[index];
 	device.queries[index] = scratch;
 	device.query_pending[index] = TRUE;
 	device.visibility_unread[index] = TRUE;
@@ -2177,8 +2184,6 @@ HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULON
 	if (time_stamp)
 		*time_stamp = 0;
 	index %= VISIBILITY_TEST_SLOTS;
-	if (!index)
-		index = 1;
 	if (!device.gl_ready || !device.query_pending[index])
 	{
 		if (result)
