@@ -155,3 +155,8 @@ void memory_watch_forget(void *address, unsigned long size)
 		page_generation[page] = InterlockedIncrement(&current_generation);
 	}
 }
+
+/* page protection sees each write at once: nothing to do per frame */
+void memory_watch_begin_frame(void)
+{
+}
