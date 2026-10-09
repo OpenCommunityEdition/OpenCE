@@ -7362,10 +7362,14 @@ void render_ui_widgets(
 		{
 			/* fit the legends while the rows are still targets (merging
 			removes them); widen after merging (the merged values are
-			row-tall) */
+			row-tall). A finger's targets only: the mouse clicks the
+			labels and values where CE's menus have them */
 			ui_mouse_fit_button_targets();
-			ui_mouse_merge_setting_rows();
-			ui_mouse_widen_values();
+			if (ui_mouse_pointer_is_touch)
+			{
+				ui_mouse_merge_setting_rows();
+				ui_mouse_widen_values();
+			}
 			ui_mouse_targets_settled = TRUE;
 		}
 		if (widget_globals.fade_to_black >= 0.0f &&
