@@ -156,11 +156,15 @@ def test_game_sources_leave_out_the_excluded(tmp_path, monkeypatch):
     write(tmp_path / "source" / "a.c", "")
     write(tmp_path / "source" / "zlib" / "b.c", "")
     write(tmp_path / "source" / "zlib" / "example.c", "")
+    write(tmp_path / "source" / "tiff" / "c.c", "")
+    write(tmp_path / "source" / "tiff" / "deep" / "d.c", "")
+    write(tmp_path / "source" / "tiffx.c", "")
     write(tmp_path / "source" / "a.h", "")
     monkeypatch.chdir(tmp_path)
-    config = {"game": {"root": "source", "exclude": ["source/zlib/example.c"],
+    # (a folder is a name ending in "/": not a file that only starts like it)
+    config = {"game": {"root": "source", "exclude": ["source/zlib/example.c", "source/tiff/"],
                        "defines": ["DEBUG"], "include_dirs": ["source", "source/saved games"]}}
-    assert linux_build.game_sources(config) == [Path("source/a.c"), Path("source/zlib/b.c")]
+    assert linux_build.game_sources(config) == [Path("source/a.c"), Path("source/tiffx.c"), Path("source/zlib/b.c")]
     assert linux_build.game_defines_and_includes(config) == '-DDEBUG -Isource -I"source/saved games"'
 
 

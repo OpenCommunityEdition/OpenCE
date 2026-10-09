@@ -26,6 +26,11 @@ final class TouchLayout {
     static final float MAX_OPACITY = 1f;
     static final float MIN_SENSITIVITY = 0.25f;
     static final float MAX_SENSITIVITY = 4f;
+    /**
+     * the largest minimum radius: a finger's width is capped here on a small,
+     * dense display, where the D-pad's buttons (69 apart) would overlap
+     */
+    static final float MAX_MINIMUM_RADIUS = 34;
 
     /** the saved grid */
     private static final float GRID_WIDTH = 960;
@@ -100,10 +105,11 @@ final class TouchLayout {
 
     /**
      * the smallest radius, in logical units, at which a control is drawn and
-     * touched (a finger's width, whatever the display's density)
+     * touched (a finger's width, whatever the display's density), at most
+     * MAX_MINIMUM_RADIUS
      */
     void setMinimumRadius(float radius) {
-        minimumRadius = Float.isFinite(radius) && radius > 0 ? radius : 0;
+        minimumRadius = Float.isFinite(radius) && radius > 0 ? Math.min(radius, MAX_MINIMUM_RADIUS) : 0;
         keepAllInside();
     }
 

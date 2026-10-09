@@ -41,10 +41,11 @@ import java.util.Locale;
  * aiming and an editor for the layout (TouchLayout). Its state goes to the
  * game through port/android/host/host_touch.c, as port 0's controller.
  *
- * It shows only in a game, never over the menus or a cinematic (which take
- * taps themselves, port/linux/src/touch_input.c), and with
- * input.touch_controls = "auto" only on a touchscreen while no controller
- * is connected. While hidden it lets every finger through to the game.
+ * It shows only in a game, never at the main menu, over a menu (which
+ * takes taps itself, port/linux/src/touch_input.c) or during a cinematic,
+ * only on a touchscreen, and with input.touch_controls = "auto" only while
+ * no controller is connected. While it is not shown it lets every finger
+ * through to the game.
  */
 public final class TouchControls extends View implements SensorEventListener, InputManager.InputDeviceListener {
     /** what a finger holds besides a control: the view swipe */
@@ -77,6 +78,8 @@ public final class TouchControls extends View implements SensorEventListener, In
     /** a label is at most this many radii wide */
     private static final float LABEL_WIDTH = 1.7f;
     private static final long POLL_MS = 16;
+    /** the game is in play this long before the controls show (no flash at a level's first frame) */
+    private static final long SHOW_DELAY_MS = 200;
     private static final long VIBRATION_MS = 110;
     private static final long VIBRATION_RENEW_MS = 70;
 
@@ -145,6 +148,7 @@ public final class TouchControls extends View implements SensorEventListener, In
 
     private static native void nativeState(int lx, int ly, int rx, int ry, int lt, int rt, int buttons);
     private static native void nativeLook(float dx, float dy);
+    private static native void nativeGyro(float dx, float dy);
     private static native void nativeLookReset();
     private static native int nativeRumble();
     private static native int nativeScene();
@@ -169,7 +173,8 @@ public final class TouchControls extends View implements SensorEventListener, In
     /** the controls removed by the toolbar's Hide, until its Touch */
     private boolean hidden;
     private boolean editing;
-    private boolean optionsOpen;
+    /** the option dialogs open (one opens before the last one's dismissal is told) */
+    private int openDialogs;
 
     /** what each finger holds: a control, LOOK, or (in toolbarFingers) a toolbar item */
     private final SparseIntArray owners = new SparseIntArray();
@@ -201,10 +206,14 @@ public final class TouchControls extends View implements SensorEventListener, In
     private boolean controllerConnected;
     private boolean touchscreen;
     private boolean deviceInputActive;
+    /** the controls are on screen: shown() for SHOW_DELAY_MS */
+    private boolean showing;
+    private long shownSince = -1;
     private boolean gyroRegistered;
     private int lastAmplitude;
     private long lastVibration;
     private final int[] bindings = DEFAULT_BINDINGS.clone();
+    private final int[] bindingsRead = new int[bindings.length];
     private int bindingsSerial;
 
     /** reads what the game says every frame: when to show, the buttons' names, and the rumble */
@@ -213,12 +222,8 @@ public final class TouchControls extends View implements SensorEventListener, In
         public void run() {
             if (!deviceInputActive)
                 return;
-            boolean wasShown = shown();
             scene = nativeScene();
-            if (shown() != wasShown) {
-                reset();
-                updateSensors();
-            }
+            updateShowing();
             readBindings();
             updateRumble();
             postDelayed(this, POLL_MS);
@@ -244,13 +249,17 @@ public final class TouchControls extends View implements SensorEventListener, In
         setFocusable(false);
         setContentDescription("Halo touch controller");
         setOnApplyWindowInsetsListener((view, insets) -> {
+            // (only the toolbar moves: the fingers stay held as the system bars come and go)
+            int right = insetRight;
+            int top = insetTop;
             insetRight = insets.getSystemWindowInsetRight();
             insetTop = insets.getSystemWindowInsetTop();
             if (insets.getDisplayCutout() != null) {
                 insetRight = Math.max(insetRight, insets.getDisplayCutout().getSafeInsetRight());
                 insetTop = Math.max(insetTop, insets.getDisplayCutout().getSafeInsetTop());
             }
-            layoutControls();
+            if (insetRight != right || insetTop != top)
+                invalidate();
             return insets;
         });
     }
@@ -316,9 +325,10 @@ public final class TouchControls extends View implements SensorEventListener, In
         invalidate();
     }
 
-    /** a finger's width, in logical units */
+    /** a finger's width, in logical units (at most TouchLayout.MAX_MINIMUM_RADIUS) */
     private float minimumRadius() {
-        return MINIMUM_RADIUS_DP * getResources().getDisplayMetrics().density / scale;
+        float radius = MINIMUM_RADIUS_DP * getResources().getDisplayMetrics().density / scale;
+        return Math.min(radius, TouchLayout.MAX_MINIMUM_RADIUS);
     }
 
     private float logical(float pixels) {
@@ -340,14 +350,32 @@ public final class TouchControls extends View implements SensorEventListener, In
     // ---------- when the controls show
 
     /**
-     * whether the controls are on screen: in a game (no menu or cinematic),
-     * never without a touchscreen, and with input.touch_controls = "auto"
-     * only while no controller is connected
+     * whether the controls belong on screen: in a game (no menu or
+     * cinematic), never without a touchscreen, and with
+     * input.touch_controls = "auto" only while no controller is connected
      */
     private boolean shown() {
         if ((scene & SCENE_KNOWN) == 0 || (scene & (SCENE_MENUS | SCENE_OFF)) != 0 || !touchscreen)
             return false;
         return (scene & SCENE_ON) != 0 || !controllerConnected;
+    }
+
+    /** shows the controls once shown() has held for SHOW_DELAY_MS; hides them at once */
+    private void updateShowing() {
+        boolean show = false;
+        if (!shown()) {
+            shownSince = -1;
+        } else {
+            long now = SystemClock.uptimeMillis();
+            if (shownSince < 0)
+                shownSince = now;
+            show = now - shownSince >= SHOW_DELAY_MS;
+        }
+        if (show != showing) {
+            showing = show;
+            reset();
+            updateSensors();
+        }
     }
 
     /** a game controller: a stick or a hat, not a phone's few gamepad keys */
@@ -373,13 +401,9 @@ public final class TouchControls extends View implements SensorEventListener, In
             if (!device.isVirtual() && touchSource)
                 touch = true;
         }
-        boolean wasShown = shown();
         controllerConnected = controller;
         touchscreen = touch;
-        if (shown() != wasShown) {
-            reset();
-            updateSensors();
-        }
+        updateShowing();
     }
 
     @Override
@@ -401,6 +425,7 @@ public final class TouchControls extends View implements SensorEventListener, In
         reset();
         this.hidden = hidden;
         preferences.edit().putBoolean(KEY_HIDDEN, hidden).apply();
+        updateSensors();
     }
 
     // ---------- the controller state the game reads
@@ -422,7 +447,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     }
 
     private void publish() {
-        if (editing || optionsOpen) {
+        if (editing || openDialogs > 0) {
             nativeState(0, 0, 0, 0, 0, 0, 0);
             return;
         }
@@ -454,12 +479,11 @@ public final class TouchControls extends View implements SensorEventListener, In
         return stickFloating ? stickY : layout.y(TouchLayout.LEFT);
     }
 
-    /** the floating stick, centred where a thumb landed, kept on the display */
+    /** the floating stick, centred where a thumb landed (at rest there, even near an edge) */
     private void floatStick(float x, float y) {
-        float radius = layout.radius(TouchLayout.LEFT);
         stickFloating = true;
-        stickX = Math.max(radius, Math.min(logicalWidth - radius, x));
-        stickY = Math.max(radius, Math.min(logicalHeight - radius, y));
+        stickX = x;
+        stickY = y;
     }
 
     private boolean inFloatingZone(float x, float y) {
@@ -527,7 +551,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
-        if (!shown() && !editing && !optionsOpen) {
+        if (!showing && !editing && openDialogs == 0) {
             // the menus and cinematics take the fingers (SDL's surface below)
             if (action == MotionEvent.ACTION_DOWN)
                 return false;
@@ -583,7 +607,7 @@ public final class TouchControls extends View implements SensorEventListener, In
         int target = hit(x, y);
         int stick = TouchLayout.LEFT;
         if (target == NOTHING && layout.floatingStick && !hidden && layout.shown(stick) && !held(stick)
-                && inFloatingZone(x, y)) {
+                && inFloatingZone(x, y) && !inGestureZone(px, py, false)) {
             floatStick(x, y);
             target = stick;
         }
@@ -624,6 +648,11 @@ public final class TouchControls extends View implements SensorEventListener, In
                 startLook(id, toolbar[0], toolbar[1]);
         }
         float[] origin = buttonTouches.get(id);
+        if (origin != null && lookPointer >= 0 && lookPointer != id) {
+            // while another finger aims, a held button's finger may only take over from where it is
+            origin[0] = px;
+            origin[1] = py;
+        }
         if (lookPointer < 0 && origin != null && movedPastSlop(origin, px, py)) {
             // a held button (either Fire too) also aims
             lookPointer = id;
@@ -708,13 +737,12 @@ public final class TouchControls extends View implements SensorEventListener, In
     // ---------- the buttons' names, from the player's profile
 
     private void readBindings() {
-        int[] controls = new int[bindings.length];
-        int serial = nativeBindings(controls);
+        int serial = nativeBindings(bindingsRead);
         if (serial == 0 || serial == bindingsSerial)
             return;
         bindingsSerial = serial;
-        if (!Arrays.equals(controls, bindings)) {
-            System.arraycopy(controls, 0, bindings, 0, bindings.length);
+        if (!Arrays.equals(bindingsRead, bindings)) {
+            System.arraycopy(bindingsRead, 0, bindings, 0, bindings.length);
             invalidate();
         }
     }
@@ -759,20 +787,24 @@ public final class TouchControls extends View implements SensorEventListener, In
         layout = imported.layout;
         sensitivity = imported.sensitivity;
         setHidden(false);
-        updateSensors();
         cancelRumble();
         invalidate();
     }
 
     // ---------- the options
 
+    /** opens an option dialog; the controls are released while any is open, and saved when the last closes */
     private void openDialog(AlertDialog dialog) {
         dialog.setOnDismissListener(d -> {
-            optionsOpen = false;
+            openDialogs--;
+            if (openDialogs > 0)
+                return;
+            openDialogs = 0;
+            saveLayout();
             reset();
             updateSensors();
         });
-        optionsOpen = true;
+        openDialogs++;
         reset();
         dialog.show();
     }
@@ -922,8 +954,8 @@ public final class TouchControls extends View implements SensorEventListener, In
             Runnable refresh = () -> {
                 int percent = Math.round(layout.sizeScale(control) * 100);
                 value.setText(percent + "%");
-                smaller.setEnabled(percent > 50);
-                larger.setEnabled(percent < 200);
+                smaller.setEnabled(percent > Math.round(TouchLayout.MIN_SIZE * 100));
+                larger.setEnabled(percent < Math.round(TouchLayout.MAX_SIZE * 100));
             };
             smaller.setText("-");
             smaller.setOnClickListener(view -> resize(control, -10, refresh));
@@ -946,7 +978,8 @@ public final class TouchControls extends View implements SensorEventListener, In
 
     private void resize(int control, int percent, Runnable refresh) {
         int size = Math.round(layout.sizeScale(control) * 100) + percent;
-        layout.setSize(control, Math.max(50, Math.min(200, size)) / 100f);
+        size = Math.max(Math.round(TouchLayout.MIN_SIZE * 100), Math.min(Math.round(TouchLayout.MAX_SIZE * 100), size));
+        layout.setSize(control, size / 100f);
         saveLayout();
         refresh.run();
         invalidate();
@@ -1075,7 +1108,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     // ---------- the gyroscope and the vibration
 
     private void updateSensors() {
-        boolean needed = deviceInputActive && shown() && layout.gyroscopeEnabled && gyroscope != null;
+        boolean needed = deviceInputActive && showing && !hidden && layout.gyroscopeEnabled && gyroscope != null;
         if (needed && !gyroRegistered) {
             gyroAim.reset();
             gyroRegistered = sensors.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME);
@@ -1088,15 +1121,15 @@ public final class TouchControls extends View implements SensorEventListener, In
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (!deviceInputActive || !shown() || hidden || !layout.gyroscopeEnabled || editing || optionsOpen) {
+        if (!deviceInputActive || !showing || hidden || !layout.gyroscopeEnabled || editing || openDialogs > 0) {
             gyroAim.reset();
             return;
         }
         int rotation = ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE))
             .getDefaultDisplay().getRotation();
         if (gyroAim.sample(event.timestamp, event.values[0], event.values[1], rotation, gyroDelta)) {
-            // as a swipe of this many logical units
-            nativeLook(-gyroDelta[0] / LOOK_RADIANS_PER_UNIT * sensitivity,
+            // as a swipe of this many logical units (which the profile's invert leaves alone)
+            nativeGyro(-gyroDelta[0] / LOOK_RADIANS_PER_UNIT * sensitivity,
                 -gyroDelta[1] / LOOK_RADIANS_PER_UNIT * sensitivity);
         }
     }
@@ -1109,7 +1142,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     private void updateRumble() {
         if (vibrator == null || !vibrator.hasVibrator())
             return;
-        boolean active = shown() && !hidden && layout.rumbleEnabled && !editing && !optionsOpen;
+        boolean active = showing && !hidden && layout.rumbleEnabled && !editing && openDialogs == 0;
         int amplitude = active ? nativeRumble() : 0;
         if (amplitude == 0) {
             cancelRumble();
@@ -1191,8 +1224,9 @@ public final class TouchControls extends View implements SensorEventListener, In
         int stick = TouchLayout.LEFT;
         float radius = layout.radius(stick);
         float size = layout.sizeScale(stick);
-        float x = stickCenterX();
-        float y = stickCenterY();
+        // (a floating stick near an edge is drawn whole, nearer the middle than its centre)
+        float x = Math.max(radius, Math.min(logicalWidth - radius, stickCenterX()));
+        float y = Math.max(radius, Math.min(logicalHeight - radius, stickCenterY()));
         circle(canvas, x, y, radius, "Move", false, 11 * size, layout.opacity);
         circle(canvas, x + axes[0] / 32767f * radius, y + axes[1] / 32767f * radius,
             Math.max(STICK_KNOB_RADIUS * size, radius * 0.375f), "", held(stick), 11, layout.opacity);
@@ -1200,7 +1234,7 @@ public final class TouchControls extends View implements SensorEventListener, In
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (!shown() && !editing)
+        if (!showing && !editing)
             return;
         canvas.save();
         canvas.scale(scale, scale);

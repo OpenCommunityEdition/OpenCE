@@ -40,6 +40,9 @@ int touch_game_playing(void)
 	return cinematic_globals && game_in_progress() && !main_menu_is_active();
 }
 
+/* (touch_input.c's TOUCH_BUTTONS and the overlay count 16 buttons) */
+typedef char verify_touch_buttons[NUMBER_OF_GAMEPAD_BUTTONS == 16 ? 1 : -1];
+
 /* the game control on each of player 1's 16 controller buttons, as the
 gamepad's buttons are numbered (input.h), -1 for none: the touch controls
 name their buttons by them, so a profile's own mapping shows */

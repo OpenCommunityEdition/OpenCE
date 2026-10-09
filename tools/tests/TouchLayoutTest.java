@@ -115,12 +115,22 @@ public final class TouchLayoutTest {
         }
         // A finger-sized minimum radius enlarges small buttons and keeps them on the display.
         TouchLayout fingers = new TouchLayout();
-        fingers.setMinimumRadius(40);
-        check(fingers.radius(12) == 40 && fingers.radius(TouchLayout.LEFT) == 64,
+        fingers.setMinimumRadius(30);
+        check(fingers.radius(12) == 30 && fingers.radius(TouchLayout.LEFT) == 64,
               "The minimum radius enlarges small controls only");
         fingers.move(12, 0, 0);
-        check(fingers.x(12) == 40 && fingers.y(12) == 40, "Enlarged controls stay inside the display");
-        check(fingers.savedX(12) == 40, "The minimum radius does not change saved places");
+        check(fingers.x(12) == 30 && fingers.y(12) == 30, "Enlarged controls stay inside the display");
+        check(fingers.savedX(12) == 30, "The minimum radius does not change saved places");
+        fingers.setMinimumRadius(80);
+        check(fingers.radius(12) == TouchLayout.MAX_MINIMUM_RADIUS, "The minimum radius is capped");
+        TouchLayout dense = new TouchLayout();
+        dense.setMinimumRadius(80);
+        for (int a = 12; a <= 15; a++) {
+            for (int b = a + 1; b <= 15; b++) {
+                check(Math.hypot(dense.x(a) - dense.x(b), dense.y(a) - dense.y(b)) >= dense.radius(a) + dense.radius(b),
+                      "At the capped minimum radius the D-pad's buttons stay apart");
+            }
+        }
         fingers.setMinimumRadius(Float.NaN);
         check(fingers.radius(12) == 25, "An invalid minimum radius is none");
         wide.resetDefaults();

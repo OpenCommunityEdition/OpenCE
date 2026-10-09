@@ -1,8 +1,8 @@
 /*
 MSVC_CRT.C
 
-Microsoft C runtime functions the game (and its copies of libtiff and zlib)
-call that glibc does not provide under the same names, plus the Xbox-path
+Microsoft C runtime functions the game (and its copy of zlib) call that
+glibc does not provide under the same names, plus the Xbox-path
 aware fopen/open family that the game's headers redirect to (see
 port/linux/include/stdio.h).
 */
@@ -678,7 +678,8 @@ int _fileno(FILE *stream)
 	return fileno(stream);
 }
 
-/* libtiff maps its POSIX calls onto the MSVC underscore names itself */
+/* the MSVC underscore names of the POSIX file calls (the game's libtiff
+used them; the builds leave it out: port.json) */
 
 int _open(const char *path, int flags, ...)
 {

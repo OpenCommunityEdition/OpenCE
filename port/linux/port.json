@@ -1,7 +1,7 @@
 {
   "comment": "Native build inputs, shared by the Windows and Android builds. See port/linux/README.md.",
   "game": {
-    "comment": "The game: every C file under root but those excluded (a folder ends in /: libtiff and the TIFF writer that uses it, which only the Xbox's movie recorder called, port/linux/game/tiff_file.c; zlib's own programs), built with these defines and include directories.",
+    "comment": "The game: every C file under root but those excluded (a folder ends in /: libtiff and the TIFF writer that uses it, port/linux/game/tiff_file.c has why; zlib's own programs), built with these defines and include directories.",
     "root": "source",
     "exclude": [
       "source/bitmaps/libtiff/",

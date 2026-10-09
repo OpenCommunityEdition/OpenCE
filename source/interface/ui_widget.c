@@ -5675,7 +5675,8 @@ static boolean ui_mouse_click_pending = FALSE;
 static short ui_mouse_hover_x, ui_mouse_hover_y;
 static short ui_mouse_click_x, ui_mouse_click_y;
 /* whether the latest pointer read was the touchscreen: the taller legend
-areas are for a finger only, the desktop mouse keeps their original height */
+areas, the merged setting rows and the widened values are for a finger only
+(render_ui_widgets); the desktop mouse keeps their original areas */
 static boolean ui_mouse_pointer_is_touch = FALSE;
 
 /* ---------- the debug view of the targets (debug.touch_targets)

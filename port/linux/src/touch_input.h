@@ -31,8 +31,8 @@ void touch_input_menu_set_active(int active);
 marked as touch */
 void touch_input_menu_read(struct platform_ui_pointer *pointer);
 
-/* adds the touch controls to the gamepad state; outside the menus a tap
-presses A for a few polls when a cinematic can be skipped */
+/* outside the menus, presses A for a few polls after a tap when a
+cinematic can be skipped (the on-screen controls: touch_input_controls) */
 void touch_input_gamepad(XINPUT_GAMEPAD *pad);
 
 #ifdef HALO_ANDROID
@@ -45,9 +45,10 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus);
 strafe to the left); nonzero while it is pushed */
 int touch_input_move(float *forward, float *strafe);
 
-/* adds the touch controls' view swipe since the last call to yaw and
-pitch, in radians at `scale` radians per pixel */
-void touch_input_look(float scale, float *yaw, float *pitch);
+/* adds the touch controls' view swipe and gyroscope turn since the last
+call to yaw and pitch and to gyro_yaw and gyro_pitch, in radians at `scale`
+radians per pixel */
+void touch_input_look(float scale, float *yaw, float *pitch, float *gyro_yaw, float *gyro_pitch);
 
 /* whether the swipe gets the stick's aim assist (input.touch_aim_assist) */
 int touch_input_aim_assist(void);
