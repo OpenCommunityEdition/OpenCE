@@ -64,6 +64,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "cutscene/cinematics.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "cseries/profile_sections.h"
 
 #include <math.h>
 
@@ -1976,15 +1977,22 @@ void network_objects_apply_vehicle_predictions(
 	}
 }
 
+/* the host tick's steps, timed in the profiling build */
+PROFILE_SECTION(objects_host_tick_update_objects_section, "network_objects_host_tick.update_objects")
+PROFILE_SECTION(objects_host_tick_find_viewers_section, "network_objects_host_tick.find_viewers")
+PROFILE_SECTION(objects_host_tick_send_states_section, "network_objects_host_tick.send_states")
+PROFILE_SECTION(objects_host_tick_send_inventories_section, "network_objects_host_tick.send_inventories")
+PROFILE_SECTION(objects_host_tick_send_damage_animations_section, "network_objects_host_tick.send_damage_animations")
+
 void network_objects_host_tick(
 	void)
 {
-	distributed_host_update_objects();
-	distributed_host_find_viewers();
-	distributed_host_send_states();
+	profile_scope(objects_host_tick_update_objects_section, distributed_host_update_objects();)
+	profile_scope(objects_host_tick_find_viewers_section, distributed_host_find_viewers();)
+	profile_scope(objects_host_tick_send_states_section, distributed_host_send_states();)
 	if (game_time_get() % INVENTORY_INTERVAL_TICKS == 0)
-		distributed_host_send_inventories();
-	distributed_host_send_damage_animations();
+		profile_scope(objects_host_tick_send_inventories_section, distributed_host_send_inventories();)
+	profile_scope(objects_host_tick_send_damage_animations_section, distributed_host_send_damage_animations();)
 }
 
 /* ---------- a client */

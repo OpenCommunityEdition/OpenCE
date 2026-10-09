@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
-                          compile_launcher, game_defines_and_includes, game_sources, miniupnpc_sources,
+                          compile_launcher, configuration_defines, game_defines_and_includes, game_sources, miniupnpc_sources,
                           musl_math_sources, pgo_mode, pgo_profile,
                           profile_use_flags, updater_defines, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
@@ -378,7 +378,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-isystem {libc_include}", f"-isystem {arch}", f"-isystem {MUSL_DIR}/arch/generic",
         f"-isystem {MUSL_DIR}/include",
     ]
-    guest_abi = " ".join(GUEST_ABI_FLAGS + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False) else []))
+    guest_abi = " ".join(GUEST_ABI_FLAGS + configuration_defines(sln))
     guest_code = " ".join(GUEST_CODE_FLAGS)
     tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
     # profile-guided optimisation with the Linux build's profile (committed,
