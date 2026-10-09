@@ -300,7 +300,9 @@ void game_state_initialize_for_new_map(
 	memset(game_state_globals.header, 0, sizeof(*game_state_globals.header));
 
 	name = tag_get_name(global_scenario_index);
-	strcpy(game_state_globals.header->map_name, name);
+	/* port: no longer than the header has room for (a map's scenario's
+	name is the map's) */
+	strncpy(game_state_globals.header->map_name, name, sizeof(game_state_globals.header->map_name) - 1);
 	strcpy(game_state_globals.header->build_number, "01.01.14.2342");
 
 	game_state_globals.header->player_count = player_spawn_count;
