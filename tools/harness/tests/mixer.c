@@ -13,9 +13,10 @@ signals:
 	- a voice out of earshot, which is not resampled, moves on as one heard
 	  does, and is heard the same once it comes into earshot;
 	- mono voices heard as stereo ones with both channels the same are.
-"render" writes voices at each rate and a scene's whole mix as raw floats,
-to compare one mixer with another; "metrics" prints the figures and "bench"
-times a game's worth of voices.
+"render" writes voices at each rate and a scene's whole mix as raw floats
+(test_mixer.py compares the resampler adding four taps at a time with it
+adding tap by tap), "metrics" prints the figures and "bench" times a game's
+worth of voices.
 */
 
 #include "harness.h"

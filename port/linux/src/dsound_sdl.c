@@ -62,6 +62,11 @@ turns the reverb off; audio.enabled = false skips opening a device
 #define RESAMPLER_KAISER_BETA 6.5
 #define RESAMPLER_MAXIMUM_STRETCH 2
 #define RESAMPLER_HISTORY 128
+#if defined(__GNUC__) || defined(__clang__)
+#define RESAMPLER_ALIGNED __attribute__((aligned(16)))
+#else
+#define RESAMPLER_ALIGNED
+#endif
 
 /* ---------- voices */
 
@@ -121,9 +126,12 @@ struct sdl_stream
 	/* the next frame to take from the first packet not finished */
 	unsigned long cursor;
 	/* the resampler's (resampler_reset): the last RESAMPLER_HISTORY frames
-	taken, how many were taken, the frame the output is at and how far past
-	it, and the frames of silence taken since the packets ran out */
-	float history[RESAMPLER_HISTORY][2];
+	taken, each channel's apart and each frame twice, RESAMPLER_HISTORY apart,
+	so that the frames a low pass reaches are side by side however the ring
+	wraps (resampler_dot); how many were taken, the frame the output is at and
+	how far past it, and the frames of silence taken since the packets ran
+	out */
+	float history[2][2 * RESAMPLER_HISTORY];
 	unsigned long history_count;
 	unsigned long center;
 	double phase;
@@ -469,8 +477,11 @@ static float resampler_table[RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 
 to RESAMPLER_ZERO_CROSSINGS, at each of RESAMPLER_TABLE_STEPS phases between two
 source frames (and one row more, for the last's blend): a voice at the output
 rate or slower blends two rows by its phase, which is what the table gave tap
-by tap, a third of the work */
-static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][2 * RESAMPLER_ZERO_CROSSINGS];
+by tap, a third of the work. resampler_deltas holds each row's step to the
+next, so the blend is a multiply and an add a tap */
+#define RESAMPLER_TAPS (2 * RESAMPLER_ZERO_CROSSINGS)
+static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
+static float resampler_deltas[RESAMPLER_TABLE_STEPS][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 
 static double bessel_i0(double x)
 {
@@ -529,6 +540,77 @@ static void resampler_phases_initialize(void)
 			resampler_phases[phase][tap] = resampler_weight(distance * RESAMPLER_TABLE_STEPS);
 		}
 	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS; phase++)
+	{
+		for (tap = 0; tap < RESAMPLER_TAPS; tap++)
+			resampler_deltas[phase][tap] = resampler_phases[phase + 1][tap] - resampler_phases[phase][tap];
+	}
+}
+
+/* The low pass over a voice's frames, the sum of each frame times its weight:
+four taps at a time where the compiler has vectors (SSE, NEON), summed in four
+lanes, then the lanes together. Only the order of the additions differs from
+tap by tap, a difference of the order of float's rounding (-140 dB);
+RESAMPLER_SCALAR adds them tap by tap (tools/harness/tests/test_mixer.py). */
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(RESAMPLER_SCALAR)
+typedef float resampler_vector __attribute__((vector_size(16)));
+typedef float resampler_unaligned_vector __attribute__((vector_size(16), aligned(4)));
+/* (each row of the phase tables whole vectors, aligned) */
+typedef char resampler_taps_in_fours[RESAMPLER_TAPS % 4 ? -1 : 1];
+#define RESAMPLER_LANES 4
+#else
+#define RESAMPLER_LANES 1
+#endif
+
+/* frames[0, RESAMPLER_TAPS) weighted by the phase table's row blended blend of
+the way to the next */
+static float resampler_dot(const float *frames, const float *weights, const float *deltas, float blend)
+{
+#if RESAMPLER_LANES == 4
+	resampler_vector sum = { 0.0f, 0.0f, 0.0f, 0.0f }, blends = { blend, blend, blend, blend };
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+
+		sum += *(const resampler_unaligned_vector *)(frames + tap) * weight;
+	}
+	return (sum[0] + sum[1]) + (sum[2] + sum[3]);
+#else
+	float sum = 0.0f;
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap++)
+		sum += frames[tap] * (weights[tap] + deltas[tap] * blend);
+	return sum;
+#endif
+}
+
+/* resampler_dot of two channels' frames, with the same weights */
+static void resampler_dot2(const float *left_frames, const float *right_frames, const float *weights,
+	const float *deltas, float blend, float *left, float *right)
+{
+#if RESAMPLER_LANES == 4
+	resampler_vector left_sum = { 0.0f, 0.0f, 0.0f, 0.0f }, right_sum = left_sum;
+	resampler_vector blends = { blend, blend, blend, blend };
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+
+		left_sum += *(const resampler_unaligned_vector *)(left_frames + tap) * weight;
+		right_sum += *(const resampler_unaligned_vector *)(right_frames + tap) * weight;
+	}
+	*left = (left_sum[0] + left_sum[1]) + (left_sum[2] + left_sum[3]);
+	*right = (right_sum[0] + right_sum[1]) + (right_sum[2] + right_sum[3]);
+#else
+	*left = resampler_dot(left_frames, weights, deltas, blend);
+	*right = resampler_dot(right_frames, weights, deltas, blend);
+#endif
 }
 
 /* a voice starting (over): silence before its first frame, which the output
@@ -591,6 +673,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float target_left, target_right, target_room, left, right, room, ramp_left, ramp_right, ramp_room, scale;
 	float target_direct_lowpass, target_room_lowpass, direct_lowpass, room_lowpass;
 	float ramp_direct_lowpass, ramp_room_lowpass;
+	float direct_state[2], room_state;
 	long width;
 	unsigned long frame;
 	/* (a stereo voice panned towards its sound: voice_gains) */
@@ -620,6 +703,11 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	room = stream->current_room;
 	direct_lowpass = stream->current_direct_lowpass;
 	room_lowpass = stream->current_room_lowpass;
+	/* the low passes' states, here while the mix writes the output (which
+	the compiler cannot tell from them) */
+	direct_state[0] = stream->direct_lowpass[0];
+	direct_state[1] = stream->direct_lowpass[1];
+	room_state = stream->room_lowpass;
 	ramp_left = (target_left - left) / (float)frames;
 	ramp_right = (target_right - right) / (float)frames;
 	ramp_room = (target_room - room) / (float)frames;
@@ -635,17 +723,20 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		silence, until what was taken has played out */
 		while ((long)(stream->history_count - stream->center) <= width)
 		{
-			float *slot = stream->history[stream->history_count % RESAMPLER_HISTORY];
+			unsigned long slot = stream->history_count % RESAMPLER_HISTORY;
+			float taken[2];
 
-			if (take_frame(stream, slot))
+			if (take_frame(stream, taken))
 			{
 				stream->silence = 0;
 			}
 			else
 			{
-				slot[0] = slot[1] = 0.0f;
+				taken[0] = taken[1] = 0.0f;
 				stream->silence++;
 			}
+			stream->history[0][slot] = stream->history[0][slot + RESAMPLER_HISTORY] = taken[0];
+			stream->history[1][slot] = stream->history[1][slot + RESAMPLER_HISTORY] = taken[1];
 			stream->history_count++;
 		}
 		if (stream->silence > (unsigned long)(2 * width))
@@ -661,46 +752,53 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			double position = stream->phase * RESAMPLER_TABLE_STEPS;
 			unsigned long row = (unsigned long)position;
 			float blend = (float)(position - (double)row);
-			const float *weights = resampler_phases[row], *next_weights = resampler_phases[row + 1];
-			unsigned long first = stream->center + 1 - RESAMPLER_ZERO_CROSSINGS;
+			unsigned long first = (stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY;
 
-			for (tap = 0; tap < 2 * RESAMPLER_ZERO_CROSSINGS; tap++)
+			/* (a mono voice's two channels are the same: take_frame) */
+			if (stream->channels == 1)
 			{
-				const float *source = stream->history[(first + (unsigned long)tap) % RESAMPLER_HISTORY];
-				float weight = weights[tap] + (next_weights[tap] - weights[tap]) * blend;
-
-				sample_left += source[0] * weight;
-				sample_right += source[1] * weight;
+				sample_left = sample_right = resampler_dot(stream->history[0] + first, resampler_phases[row],
+					resampler_deltas[row], blend);
+			}
+			else
+			{
+				resampler_dot2(stream->history[0] + first, stream->history[1] + first, resampler_phases[row],
+					resampler_deltas[row], blend, &sample_left, &sample_right);
 			}
 		}
 		else
 		{
+			unsigned long first = (stream->center + 1 - (unsigned long)width) % RESAMPLER_HISTORY;
+			const float *left_frames = stream->history[0] + first, *right_frames = stream->history[1] + first;
+
 			for (tap = 1 - width; tap <= width; tap++)
 			{
-				const float *source = stream->history[(stream->center + (unsigned long)tap) % RESAMPLER_HISTORY];
 				float weight = scale * resampler_weight(fabsf((float)tap - (float)stream->phase) * scale * RESAMPLER_TABLE_STEPS);
 
-				sample_left += source[0] * weight;
-				sample_right += source[1] * weight;
+				sample_left += left_frames[tap + width - 1] * weight;
+				if (stream->channels == 2)
+					sample_right += right_frames[tap + width - 1] * weight;
 			}
+			if (stream->channels == 1)
+				sample_right = sample_left;
 		}
 		/* the room send, with its own low pass */
 		if (room || ramp_room)
 		{
 			float mono = stream->channels == 1 ? sample_left : 0.5f * (sample_left + sample_right);
 
-			stream->room_lowpass = flush_denormal(mono + room_lowpass * (stream->room_lowpass - mono));
-			send[frame] += stream->room_lowpass * room;
+			room_state = flush_denormal(mono + room_lowpass * (room_state - mono));
+			send[frame] += room_state * room;
 		}
 		/* the direct path, muffled, or as it is; a mono voice's mix bins or pan
 		split it across the speakers */
 		if (direct_lowpass || ramp_direct_lowpass)
 		{
-			sample_left = flush_denormal(sample_left + direct_lowpass * (stream->direct_lowpass[0] - sample_left));
-			sample_right = flush_denormal(sample_right + direct_lowpass * (stream->direct_lowpass[1] - sample_right));
+			sample_left = flush_denormal(sample_left + direct_lowpass * (direct_state[0] - sample_left));
+			sample_right = flush_denormal(sample_right + direct_lowpass * (direct_state[1] - sample_right));
 		}
-		stream->direct_lowpass[0] = sample_left;
-		stream->direct_lowpass[1] = sample_right;
+		direct_state[0] = sample_left;
+		direct_state[1] = sample_right;
 		if (stream->channels == 1)
 		{
 			output[frame * 2] += sample_left * left;
@@ -735,6 +833,9 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			stream->center++;
 		}
 	}
+	stream->direct_lowpass[0] = direct_state[0];
+	stream->direct_lowpass[1] = direct_state[1];
+	stream->room_lowpass = room_state;
 	stream->current_left = target_left;
 	stream->current_right = target_right;
 	stream->current_room = target_room;
