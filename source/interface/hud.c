@@ -1105,6 +1105,27 @@ static real hud_player_name_enemy_range(
 	return hud_globals ? hud_globals->defaults.motion_sensor_range : 0.0f;
 }
 
+/* port: a player's name's colour above their head, an ally's (the HUD's
+text) or an enemy's (red), whole (game_engine.c's list of who talks in
+voice chat colours its names the same) */
+void hud_player_name_color(
+	boolean ally,
+	real_argb_color *color)
+{
+	if (ally)
+	{
+		hud_get_text_color(color);
+		color->alpha = 1.0f;
+	}
+	else
+	{
+		color->alpha = 1.0f;
+		color->red = 1.0f;
+		color->green = 0.3f;
+		color->blue = 0.25f;
+	}
+}
+
 static void hud_draw_player_name(
 	long player_index,
 	boolean ally,
@@ -1160,18 +1181,15 @@ static void hud_draw_player_name(
 	for (index = 0; index < (short)NUMBEROF(player->name); index++)
 		name[index] = player->name[index];
 	name[NUMBEROF(player->name)] = 0;
+	hud_player_name_color(ally, &color);
 	if (ally)
 	{
-		hud_get_text_color(&color);
 		/* (whole up to 15 world units away, then fading to 0.4 at 75) */
 		depth_factor = 1.0f - (-view_position.z - 15.0f) / 60.0f;
 		color.alpha = PIN(depth_factor, 0.4f, 1.0f);
 	}
 	else
 	{
-		color.red = 1.0f;
-		color.green = 0.3f;
-		color.blue = 0.25f;
 		/* (whole up to four fifths of the range, then fading out) */
 		color.alpha = PIN((enemy_range - distance) / (0.2f * enemy_range), 0.0f, 1.0f);
 	}

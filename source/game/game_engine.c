@@ -3876,7 +3876,9 @@ void game_engine_rasterize_message(
 /* port: who is talking in voice chat (network_voice.c), down the view's
 left from below its middle: each machine's first player's name after its
 speaker (this machine's own too, as it talks), VOICE_SPEAKERS_SCALE times
-the HUD's text; while the scores are hidden */
+the HUD's text, in the colours of the names above players' heads (an ally's
+or an enemy's: hud_player_name_color; in co-op every player an ally), this
+machine's own white; while the scores are hidden */
 #define VOICE_SPEAKERS_SCALE 0.8f
 
 static void game_engine_rasterize_voice_speakers(
@@ -3897,6 +3899,7 @@ static void game_engine_rasterize_voice_speakers(
 	short row = 0;
 	short left;
 	short top;
+	struct player_datum *viewer;
 
 	if (font_index == NONE || !network_voice_available())
 		return;
@@ -3910,6 +3913,8 @@ static void game_engine_rasterize_voice_speakers(
 	left = (short)(bounds.x0 + 16);
 	top = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100);
 	rasterizer_text_set_scale(VOICE_SPEAKERS_SCALE, (real)left, (real)top);
+	viewer = local_player_get_next(NONE) != NONE ?
+		player_try_and_get(local_player_get_player_index(local_player_get_next(NONE))) : NULL;
 	data_iterator_new(&iterator, player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL && row < MAXIMUM_SPEAKER_ROWS)
 	{
@@ -3934,8 +3939,16 @@ static void game_engine_rasterize_voice_speakers(
 		text.x1 = (short)(left + (bounds.x1 - left) / VOICE_SPEAKERS_SCALE);
 		text.y0 = (short)(top + row * line_height);
 		text.y1 = (short)(text.y0 + line_height);
-		color.alpha = 1.0f;
-		color.red = color.green = color.blue = 0.9f;
+		/* (allies as the names above heads have them: the same team) */
+		if (player->local_player_index != NONE)
+		{
+			color.alpha = 1.0f;
+			color.red = color.green = color.blue = 1.0f;
+		}
+		else
+		{
+			hud_player_name_color(!game_engine || (viewer && player->team_index == viewer->team_index), &color);
+		}
 		draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
 		icon.x0 = left;
 		icon.x1 = (short)(left + line_height * VOICE_SPEAKERS_SCALE);
