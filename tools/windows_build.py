@@ -183,6 +183,15 @@ PROFILE_RUNTIME_HEADERS = [
 ]
 
 
+def windows_rc(cc: str) -> str:
+    """LLVM's resource compiler of the clang named cc: beside it, where cc is
+    a path, else the one on the PATH"""
+    path = Path(cc)
+    if path.parent == Path("."):
+        return "llvm-rc"
+    return str(path.with_name("llvm-rc" + path.suffix))
+
+
 def clang_release(cc: str) -> Optional[str]:
     """the release (22.1.0) of the clang named cc, or None"""
     try:
@@ -293,6 +302,16 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
+    # the executable's resources (port/windows/halo.rc: its icon), compiled
+    # by LLVM's resource compiler, beside the clang that builds the game
+    n.variable("windows_rc", windows_rc(cc))
+    n.rule(
+        name="windows_rc",
+        command="$windows_rc /no-preprocess /FO $out $in",
+        description="WINDOWS RC $out",
+    )
+    resources = BUILD / "halo.res"
+    n.build(outputs=resources, rule="windows_rc", inputs=PORT_DIR / "halo.rc", implicit=[PORT_DIR / "opence-icon.ico"])
     n.rule(
         name="windows_copy",
         command="$python -c \"import shutil,sys; shutil.copyfile(sys.argv[1], sys.argv[2])\" $in $out",
@@ -454,7 +473,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         n.build(
             outputs=output,
             rule="windows_link",
-            inputs=objects + extra_objects,
+            inputs=objects + extra_objects + [resources],
             variables={"ldflags": " ".join(base_ldflags + extra_ldflags), "libs": libs},
         )
 

@@ -1,5 +1,10 @@
 # Authors
 
+## Art
+
+- **The game's icon** (the Android app's launcher icon, `halo.exe`'s icon
+  and the desktop windows' icon): by ORION (`port/assets/icon`).
+
 ## Third-party art
 
 - **Voice chat's speaker icons** (who talks, and who is muted, in the lobby,
