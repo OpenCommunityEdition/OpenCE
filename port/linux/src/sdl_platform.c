@@ -1536,7 +1536,24 @@ void platform_pump_events(void)
 #endif
 			break;
 		case SDL_EVENT_GAMEPAD_ADDED:
+#ifdef HALO_ANDROID
+			/* (the guest reaches SDL only through host_imports.list, which
+			has no SDL_GetGamepadName) */
 			SDL_OpenGamepad(event.gdevice.which);
+#else
+			{
+				SDL_Gamepad *gamepad = SDL_OpenGamepad(event.gdevice.which);
+
+				/* (which pads the game drives: under Steam Input, Steam's
+				virtual ones, named for the controllers behind them) */
+				if (gamepad)
+				{
+					const char *name = SDL_GetGamepadName(gamepad);
+
+					platform_log("gamepad: %s", name ? name : "(unnamed)");
+				}
+			}
+#endif
 			break;
 		default:
 			break;
