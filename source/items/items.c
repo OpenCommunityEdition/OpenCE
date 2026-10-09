@@ -102,10 +102,51 @@ enum
 
 /* ---------- prototypes */
 
+/* the surface an item rests on is a signed short in the datum. a collision
+surface past 32767 is negative there (39748 is kept as its low 16 bits).
+read back unsigned, it is that surface. none stays none, and 65535 is
+none's pattern, so a surface that high is not recorded */
+static long item_rested_surface_index(
+	struct item_datum const *item);
+static struct collision_surface const *item_rested_surface(
+	struct item_datum const *item);
+static void item_set_rested_surface(
+	struct item_datum *item,
+	long surface_index);
+
 /* ---------- globals */
 
 static struct profile_section item_update_section = { "item_update", NONE, TRUE };
 static real const item_maximum_impact_velocity = 0.1f;
+
+static long item_rested_surface_index(
+	struct item_datum const *item)
+{
+	if (item->item.rested_surface_index == NONE)
+		return NONE;
+	return (unsigned short)item->item.rested_surface_index;
+}
+
+static struct collision_surface const *item_rested_surface(
+	struct item_datum const *item)
+{
+	struct collision_bsp const *bsp = global_collision_bsp_get();
+	long surface_index = item_rested_surface_index(item);
+
+	if (!bsp || surface_index < 0 || surface_index >= bsp->surfaces.count)
+		return NULL;
+	return TAG_BLOCK_GET_ELEMENT(&bsp->surfaces, surface_index, struct collision_surface);
+}
+
+static void item_set_rested_surface(
+	struct item_datum *item,
+	long surface_index)
+{
+	if (surface_index < 0 || surface_index >= 65535)
+		item->item.rested_surface_index = NONE;
+	else
+		item->item.rested_surface_index = (short)surface_index;
+}
 
 /* ---------- public code */
 
@@ -356,10 +397,9 @@ void item_accelerate(
 				real distance_above;
 
 				collision_bsp = global_collision_bsp_get();
-				surface = TAG_BLOCK_GET_ELEMENT(
-					&collision_bsp->surfaces,
-					item->item.rested_surface_index,
-					struct collision_surface);
+				surface = item_rested_surface(item);
+				if (surface)
+				{
 				bsp3d_get_plane_from_designator(
 					&collision_bsp->bsp3d,
 					surface->plane_designator,
@@ -373,6 +413,7 @@ void item_accelerate(
 					distance_above,
 					&new_position);
 				object_translate(item_index, &new_position, NULL);
+				}
 			}
 
 			item->object.flags &= ~FLAG(_object_at_rest_bit);
@@ -679,8 +720,7 @@ boolean item_update(
 					{
 					case _collision_result_structure:
 						SET_FLAG(item->item.flags, _item_on_structure_bit, TRUE);
-						item->item.rested_surface_index =
-							(short)collision.surface_index;
+						item_set_rested_surface(item, collision.surface_index);
 						item->item.bsp_index =
 							global_structure_bsp_index_get();
 						break;
@@ -766,18 +806,18 @@ boolean item_update(
 				1);
 
 			if (TEST_FLAG(item->item.flags, _item_on_structure_bit) &&
-				item->item.rested_surface_index != NONE &&
+				item_rested_surface_index(item) != NONE &&
 				item->item.bsp_index == global_structure_bsp_index_get())
 			{
-				struct collision_bsp *collision_bsp;
 				struct collision_surface const *surface;
 
-				collision_bsp = global_collision_bsp_get();
-				surface = TAG_BLOCK_GET_ELEMENT(
-					&collision_bsp->surfaces,
-					item->item.rested_surface_index,
-					struct collision_surface);
-				if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit) &&
+				surface = item_rested_surface(item);
+				if (!surface)
+				{
+					SET_FLAG(item->item.flags, _item_on_structure_bit, FALSE);
+					item->item.rested_surface_index = NONE;
+				}
+				else if (TEST_FLAG(surface->flags, _collision_surface_breakable_bit) &&
 					!breakable_surface_extant(
 						surface->breakable_surface_index))
 				{
