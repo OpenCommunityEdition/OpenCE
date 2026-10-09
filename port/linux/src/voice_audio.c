@@ -23,6 +23,7 @@ one's redundancy (Opus's in-band FEC), or by concealment.
 
 #include <SDL3/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
