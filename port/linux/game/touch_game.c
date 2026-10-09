@@ -9,6 +9,8 @@ game. The platform layer cannot see the game's types, so it asks here
 #include "cseries.h"
 #include "game/game.h"
 #include "cutscene/cinematics.h"
+#include "input/input.h"
+#include "input/input_abstraction.h"
 
 /* asks whether a cinematic is playing that A would skip
 (player_control.c, player_control_action_test_check_reset_input_blob); tests
@@ -26,4 +28,19 @@ controls, so the on-screen touch controls hide (touch_input.c) */
 int touch_game_cinematic_playing(void)
 {
 	return cinematic_globals && game_in_progress() && cinematic_in_progress();
+}
+
+/* the game control on each of player 1's 16 controller buttons, as the
+gamepad's buttons are numbered (input.h), -1 for none: the touch controls
+name their buttons by them, so a profile's own mapping shows */
+void touch_game_button_controls(int *controls)
+{
+	short buttons[NUMBER_OF_GAMEPAD_BUTTONS];
+	short index;
+
+	input_abstraction_port_button_controls(0, buttons);
+	for (index = 0; index < NUMBER_OF_GAMEPAD_BUTTONS; index++)
+	{
+		controls[index] = buttons[index];
+	}
 }

@@ -41,6 +41,10 @@ an Android view over the game: tells them whether a menu is up and
 input.touch_controls, and adds their stick and buttons to port 0's state */
 void touch_input_controls(XINPUT_GAMEPAD *pad, int menus);
 
+/* the touch controls' stick as the player's movement, -1..1 (forward, and
+strafe to the left); nonzero while it is pushed */
+int touch_input_move(float *forward, float *strafe);
+
 /* adds the touch controls' view swipe since the last call to yaw and
 pitch, in radians at `scale` radians per pixel */
 void touch_input_look(float scale, float *yaw, float *pitch);

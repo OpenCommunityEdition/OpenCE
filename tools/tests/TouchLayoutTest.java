@@ -62,7 +62,7 @@ public final class TouchLayoutTest {
         check(wide.add(4) == 4 && wide.shown(4), "Add must restore a hidden button first");
         wide.setShown(TouchLayout.LEFT, false);
         check(wide.add(TouchLayout.LEFT) == TouchLayout.LEFT, "Hidden move stick must be restorable");
-        reject(exported.replace("version=2", "version=9"));
+        reject(exported.replace("version=3", "version=9"));
         reject(exported.replace("control.18.type=4", "control.18.type=16"));
         reject(exported.replace("control.18.x=240.0", "control.18.x=NaN"));
         reject(exported.replace("count=19", "count=10000"));
@@ -86,11 +86,43 @@ public final class TouchLayoutTest {
         reject(sizedText.replace("control.18.size=1.6", "control.18.size=3.0"));
         reject(sizedText.replace("rumble=false", "rumble=invalid"));
         reject(sizedText.replace("gyroscope=true", "gyroscope=invalid"));
-        String legacy = sizedText.replace("version=2", "version=1").replaceAll("(?m)^.*\\.size=.*\\R", "")
-            .replaceAll("(?m)^(rumble|gyroscope)=.*\\R", "");
+        String legacy = sizedText.replace("version=3", "version=1").replaceAll("(?m)^.*\\.size=.*\\R", "")
+            .replaceAll("(?m)^(rumble|gyroscope|opacity|floating-stick)=.*\\R", "");
         TouchLayout.Configuration old = TouchLayout.importConfiguration(legacy);
         check(old.layout.sizeScale(copy) == 1 && old.layout.rumbleEnabled && !old.layout.gyroscopeEnabled,
               "Legacy layouts must load with default sizes and gyro disabled");
+        // Opacity (version 3) round-trips; version 2 files load fully opaque.
+        sized.layout.setOpacity(0.45f);
+        String translucent = sized.layout.exportConfiguration(2.25f);
+        check(TouchLayout.importConfiguration(translucent).layout.opacity == 0.45f, "Opacity must survive export/import");
+        reject(translucent.replace("opacity=0.45", "opacity=0.05"));
+        reject(translucent.replace("opacity=0.45", "opacity=NaN"));
+        sized.layout.floatingStick = true;
+        check(TouchLayout.importConfiguration(sized.layout.exportConfiguration(2.25f)).layout.floatingStick,
+              "The floating stick must survive export/import");
+        sized.layout.floatingStick = false;
+        reject(translucent.replace("floating-stick=false", "floating-stick=maybe"));
+        String version2 = translucent.replace("version=3", "version=2").replaceAll("(?m)^(opacity|floating-stick)=.*\\R", "");
+        check(TouchLayout.importConfiguration(version2).layout.opacity == 1f
+              && !TouchLayout.importConfiguration(version2).layout.floatingStick,
+              "Version 2 layouts load fully opaque, with the stick in its place");
+        reject(translucent.replaceAll("(?m)^opacity=.*\\R", ""));
+        try {
+            sized.layout.setOpacity(1.5f);
+            throw new AssertionError("Out-of-range opacity was accepted");
+        } catch (IllegalArgumentException expected) {
+            // refused
+        }
+        // A finger-sized minimum radius enlarges small buttons and keeps them on the display.
+        TouchLayout fingers = new TouchLayout();
+        fingers.setMinimumRadius(40);
+        check(fingers.radius(12) == 40 && fingers.radius(TouchLayout.LEFT) == 64,
+              "The minimum radius enlarges small controls only");
+        fingers.move(12, 0, 0);
+        check(fingers.x(12) == 40 && fingers.y(12) == 40, "Enlarged controls stay inside the display");
+        check(fingers.savedX(12) == 40, "The minimum radius does not change saved places");
+        fingers.setMinimumRadius(Float.NaN);
+        check(fingers.radius(12) == 25, "An invalid minimum radius is none");
         wide.resetDefaults();
         check(wide.size() == 18 && wide.shown(4) && wide.x(4) == 915*1200f/960,
               "Reset restores defaults on the current display and removes all copies");

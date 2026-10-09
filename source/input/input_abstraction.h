@@ -62,7 +62,11 @@ boolean input_abstraction_port_action_only(
 	short controller_index);
 real input_abstraction_port_primary_trigger(
 	short controller_index);
-/* port: the player's look inverted, as its stick is (the touch controls) */
+/* port: the game control on each of the controller's buttons, and the
+player's look inverted as its stick is (the touch controls) */
+void input_abstraction_port_button_controls(
+	short controller_index,
+	short *controls);
 boolean input_abstraction_port_look_inverted(
 	short controller_index);
 

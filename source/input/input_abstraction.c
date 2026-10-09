@@ -273,6 +273,19 @@ static void keyboard_controls_update(
 		state->forward_movement = y * length;
 		state->strafe = -x * length;
 	}
+	{
+		/* port: the touch controls' stick (port/linux/src/xinput_sdl.c)
+		moves the player whatever the profile's sticks do, as the keys do */
+		extern int halo_linux_touch_move(short controller_index, real *forward, real *strafe);
+		real forward;
+		real strafe;
+
+		if (halo_linux_touch_move((short)controller_index, &forward, &strafe))
+		{
+			state->forward_movement = forward;
+			state->strafe = strafe;
+		}
+	}
 	return;
 }
 
@@ -321,6 +334,34 @@ real input_abstraction_port_primary_trigger(
 	if (button_index < NUMBER_OF_GAMEPAD_ANALOG_BUTTONS)
 		return gamepad->analog_buttons[button_index] * (1.f / 255.f);
 	return gamepad->buttons[button_index] ? 1.f : 0.f;
+}
+
+/* port: the game control on each of the controller's buttons by its
+profile's mapping (NONE for none), numbered as the gamepad's buttons are
+(input.h): the touch controls name their buttons by it (touch_game.c) */
+void input_abstraction_port_button_controls(
+	short controller_index,
+	short *controls)
+{
+	short button_index;
+	short control_index;
+
+	for (button_index = 0; button_index < NUMBER_OF_GAMEPAD_BUTTONS; button_index++)
+	{
+		controls[button_index] = NONE;
+	}
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
+		return;
+	for (control_index = 0; control_index < NUMBER_OF_GAME_CONTROLS; control_index++)
+	{
+		byte button_index_bound = input_abstraction_globals.player_control_preferences[controller_index].
+			game_control_to_xbox_buttons[control_index];
+
+		if (button_index_bound < NUMBER_OF_GAMEPAD_BUTTONS && controls[button_index_bound] == NONE)
+		{
+			controls[button_index_bound] = control_index;
+		}
+	}
 }
 
 /* port: whether the controller's player looks inverted, as its right stick

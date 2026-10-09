@@ -128,5 +128,8 @@ void host_touch_look_read(float *delta);
 void host_touch_rumble(unsigned int low, unsigned int high);
 /* tells the overlay when to show: HALO_TOUCH_SCENE_* (xinput_sdl.c) */
 void host_touch_scene(int scene);
+/* the game control on each of the 16 controller buttons (touch_game.c),
+for the overlay's labels */
+void host_touch_bindings(const int *controls);
 
 #endif

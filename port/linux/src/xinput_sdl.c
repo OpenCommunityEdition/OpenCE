@@ -154,6 +154,22 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	return TRUE;
 }
 
+/* the touch controls' stick as the player's movement (input_abstraction.c's
+keyboard_controls_update), forward and strafe -1..1, whatever the
+profile's sticks do; nonzero while it is pushed. Nothing but on Android. */
+int halo_linux_touch_move(short controller_index, float *forward, float *strafe)
+{
+	*forward = 0.0f;
+	*strafe = 0.0f;
+	if (controller_index != 0)
+		return FALSE;
+#ifdef HALO_ANDROID
+	return touch_input_move(forward, strafe);
+#else
+	return FALSE;
+#endif
+}
+
 /* the touch controls' swipe since the last call, in radians at the mouse's
 rate per pixel (the view applies its own sensitivity), and whether it gets
 the stick's aim assist (input.touch_aim_assist): player_control.c makes it

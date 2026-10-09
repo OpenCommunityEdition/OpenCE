@@ -37,6 +37,11 @@ static int64_t look_ns;
 static int rumble_amplitude;
 static int64_t rumble_ns;
 static volatile int touch_scene;
+/* the game control on each controller button (-1: none), and a count of
+its changes, which the overlay polls */
+#define TOUCH_BUTTONS 16
+static int32_t touch_bindings[TOUCH_BUTTONS];
+static int touch_bindings_serial;
 
 static int64_t now_ns(void)
 {
@@ -162,6 +167,34 @@ JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeRumble(JNIEnv *e
 void host_touch_scene(int scene)
 {
 	touch_scene = scene;
+}
+
+/* the guest's, when the profile's mapping changes: the game control on
+each of the 16 controller buttons (port/linux/game/touch_game.c) */
+void host_touch_bindings(const int32_t *controls)
+{
+	pthread_mutex_lock(&touch_lock);
+	memcpy(touch_bindings, controls, sizeof(touch_bindings));
+	touch_bindings_serial++;
+	pthread_mutex_unlock(&touch_lock);
+}
+
+/* the mapping into controls[16]; returns its count of changes (0 before the
+game has sent it) */
+JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeBindings(JNIEnv *env, jclass cls,
+	jintArray controls)
+{
+	int32_t copy[TOUCH_BUTTONS];
+	int serial;
+
+	(void)cls;
+	pthread_mutex_lock(&touch_lock);
+	memcpy(copy, touch_bindings, sizeof(copy));
+	serial = touch_bindings_serial;
+	pthread_mutex_unlock(&touch_lock);
+	if (controls && (*env)->GetArrayLength(env, controls) >= TOUCH_BUTTONS)
+		(*env)->SetIntArrayRegion(env, controls, 0, TOUCH_BUTTONS, (const jint *)copy);
+	return serial;
 }
 
 /* 0 until the game has read its controller once */
