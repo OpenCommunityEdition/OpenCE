@@ -638,7 +638,8 @@ static long looping_sound_new(
 	long definition_index,
 	long identifier,
 	struct sound_source const *source);
-static void sound_set_definition_end(
+/* port: report whether instance limiting leaves this voice alive. */
+static boolean sound_set_definition_end(
 	long sound_index);
 static long update_potentially_audible_looping_sound(
 	long definition_index,
@@ -1503,7 +1504,7 @@ static long looping_sound_new(
 	return looping_sound_index;
 }
 
-static void sound_set_definition_end(
+static boolean sound_set_definition_end(
 	long sound_index)
 {
 	struct sound_datum *sound = sound_get(sound_index);
@@ -1544,18 +1545,23 @@ static void sound_set_definition_end(
 		}
 		else
 		{
-			return;
+			return TRUE;
 		}
 
 		if (channel_index != NONE)
 		{
-			sound_index = channel_get(channel_index)->sound_index;
+			/* port: sound_find_like_channel excludes the current voice. */
+			sound_stop(channel_get(channel_index)->sound_index);
+			return TRUE;
 		}
 
+		/* port: no other voice can be preempted; tell the caller this one
+		was retired before it writes to the freed channel. */
 		sound_stop(sound_index);
+		return FALSE;
 	}
 
-	return;
+	return TRUE;
 }
 
 static long update_potentially_audible_looping_sound(
@@ -2962,7 +2968,11 @@ static void update_channel_for_looping_sound(
 					(!channel->playing_permutation ||
 						channel->playing_permutation->next_permutation_index == NONE))
 				{
-					sound_set_definition_end(channel->sound_index);
+					/* port: a definition transition can retire its own voice. */
+					if (!sound_set_definition_end(channel->sound_index))
+					{
+						return;
+					}
 					definition = sound_definition_get(sound->definition_index);
 					pitch_range = TAG_BLOCK_GET_ELEMENT(
 						&definition->pitch_ranges,
