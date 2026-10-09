@@ -7,7 +7,9 @@ typedef unsigned char BYTE;
 typedef short SHORT;
 #include "config.inc"
 
-struct platform_input_state { unsigned char keys[TEST_SCANCODE_COUNT], mouse_buttons[8]; BOOL mouse_released; };
+struct platform_input_state { unsigned char keys[TEST_SCANCODE_COUNT], mouse_buttons[8]; BOOL mouse_released, menus; };
+#define SDL_SCANCODE_COUNT TEST_SCANCODE_COUNT
+#define console_is_active() FALSE
 typedef struct { unsigned short wButtons; BYTE bAnalogButtons[8]; SHORT sThumbLX, sThumbLY; } XINPUT_GAMEPAD;
 #define SDL_BUTTON_X1 4
 static BOOL text_typing, text_typing_enter_armed, text_typing_keyboard, text_typing_field;
@@ -107,6 +109,22 @@ int main(int argc, char **argv)
     {
         virtual_keyboard_dispose(); keyboard_available=FALSE; virtual_keyboard_initialize();
         CHECK(!virtual_keyboard_launch(name,sizeof(name),8), "missing keyboard launched");
+    }
+    else CASE("held-enter")
+    {
+        struct platform_input_state input = { .menus = TRUE }; XINPUT_GAMEPAD pad = {0};
+        keys_held_over_switch(&input);
+        input.keys[SDL_SCANCODE_RETURN] = 1;
+        keys_held_over_switch(&input); keyboard_gamepad(&input,&pad);
+        CHECK(pad.wButtons & XINPUT_GAMEPAD_START, "Enter did not accept keyboard");
+        virtual_keyboard_select();
+        memset(&pad,0,sizeof(pad));
+        keys_held_over_switch(&input); keyboard_gamepad(&input,&pad);
+        CHECK(!pad.wButtons && !pad.bAnalogButtons[XINPUT_GAMEPAD_A], "held Done also activated the next menu");
+        input.keys[SDL_SCANCODE_RETURN] = 0; keys_held_over_switch(&input);
+        input.keys[SDL_SCANCODE_RETURN] = 1; keys_held_over_switch(&input);
+        keyboard_gamepad(&input,&pad);
+        CHECK(pad.bAnalogButtons[XINPUT_GAMEPAD_A], "fresh Enter was still suppressed");
     }
     else CHECK(FALSE, "unknown case");
     ordinary_input();
