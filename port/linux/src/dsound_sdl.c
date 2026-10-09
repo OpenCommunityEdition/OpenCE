@@ -550,7 +550,7 @@ static void resampler_phases_initialize(void)
 /* The low pass over a voice's frames, the sum of each frame times its weight:
 four taps at a time where the compiler has vectors (SSE, NEON), summed in four
 lanes, then the lanes together. Only the order of the additions differs from
-tap by tap, a difference of the order of float's rounding (-140 dB);
+tap by tap, a difference of the order of float's rounding (-115 dB or less);
 RESAMPLER_SCALAR adds them tap by tap (tools/harness/tests/test_mixer.py). */
 #if (defined(__GNUC__) || defined(__clang__)) && !defined(RESAMPLER_SCALAR)
 typedef float resampler_vector __attribute__((vector_size(16)));

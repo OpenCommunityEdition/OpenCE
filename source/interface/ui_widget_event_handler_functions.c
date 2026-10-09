@@ -3449,9 +3449,11 @@ boolean ui_widget_event_handler_function_invoke(
 		widget != NULL && widget_deleted != NULL,
 		"(widget != NULL) && (widget_deleted != NULL)");
 	/* port: a map's own widgets (not the menus' tags the port adds) may not
-	run what changes the player's files or settings: ui_widget_function_denied */
+	run what changes the player's files or settings: ui_widget_function_denied
+	(failed, as an invalid function is, so the handler opens and closes no
+	screens after it) */
 	if (ui_widget_function_denied(widget, function_index))
-		return TRUE;
+		return FALSE;
 	/* port: the menus' own functions (port/linux/game/menu_functions.c) */
 	if (function_index >= PC_MENU_FUNCTION_BASE && function_index < 0x8000)
 	{
