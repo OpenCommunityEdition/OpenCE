@@ -340,11 +340,19 @@ static int read_body(struct connection *connection, struct download *download, i
 		for (;;)
 		{
 			char line[128];
+			char *after;
 			unsigned long long remaining;
 
 			if (!connection_read_line(connection, line, sizeof(line)))
 				return 0;
-			remaining = strtoull(line, NULL, 16);
+			/* (a size in hexadecimal, perhaps with extensions after a ";": a
+			line without one is no chunk, and not the last) */
+			remaining = strtoull(line, &after, 16);
+			if (after == line || (*after && *after != ';' && *after != ' ' && *after != '\t' &&
+				*after != '\r' && *after != '\n'))
+			{
+				return 0;
+			}
 			if (!remaining)
 				return 1;
 			while (remaining)
