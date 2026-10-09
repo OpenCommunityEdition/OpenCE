@@ -93,7 +93,8 @@ Enter `build/linux/halo`.
 
 To play on a Steam Deck, unpack `halo-linux-release.zip` into a folder (in
 Desktop Mode), and add `halo` to Steam as a non-Steam game ("Add a Game" in
-the Games menu of Steam). The game then starts in Game Mode as well.
+the Games menu of Steam). The game then starts in Game Mode as well. Refer
+to "Steam Deck".
 
 The game data is the folder that contains `maps/`, from an Xbox disc image
 of any version of the game. The game looks for this folder in this
@@ -115,6 +116,38 @@ If the game finds no data, it asks for an Xbox disc image (`.xiso` or
 The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
 the game asks for the disc image again at the next start.
+
+### Steam Deck
+
+Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
+`halo` (or start the game one time to copy it from a disc image), and add
+`halo` to Steam. Then start the game from the library in Game Mode.
+
+- Screen: the game fills the screen without borders (`display.mode` empty,
+  thus borderless). The 3D view and the HUD have the shape of the screen
+  (16:10) and are drawn at its resolution; the menus are at the center.
+- Controls: Steam Input gives the game a virtual controller, which the game
+  operates as the controller of the Xbox. With the template that Steam selects
+  ("Gamepad With Joystick Trackpad"), the buttons, sticks and triggers have
+  the functions of the same controls on an Xbox controller, the right
+  trackpad operates as the right stick, and the back buttons (L4, L5, R4,
+  R5) do nothing until you assign them in the controller settings of the
+  game in Steam. With a template that makes a trackpad a mouse, the mouse
+  aims in the game and moves the pointer in the menus.
+- Text: names of profiles and gametypes use the keyboard of the game, which
+  the controller operates. The text fields of the menus (the name and the
+  password in Server Setup, and the password of a game in the server
+  browser) open the keyboard of Steam. Type the text, then select Enter on
+  that keyboard.
+- Frame rate: the game shows one frame for each refresh of the display. It
+  follows the refresh rate and the frame limit of Quick Access >
+  Performance (40 to 60 Hz on the LCD model, up to 90 Hz on the OLED model).
+  The world is calculated at 30 Hz at all rates. Keep `display.vsync =
+  true`. Refer to "Frame rate".
+- Sleep: the clocks of the game do not count the time that the Deck sleeps,
+  so the game continues from where it stopped. A network game does not
+  wait: the host drops a machine that it has not heard from for 15 seconds,
+  and while a Deck that hosts sleeps, the other players have no host.
 
 ## Files and folders
 
