@@ -3290,6 +3290,9 @@ static void event_handler_dispatch(
 	struct ui_widget_event_handler_reference *handler,
 	boolean *calling_widget_deleted)
 {
+	/* port: the widget's tag, named when its function fails (which may have
+	deleted the widget) */
+	long definition_tag_index = widget->definition_tag_index;
 	boolean widget_deleted = FALSE;
 	boolean success = TRUE;
 	boolean function_failed = FALSE;
@@ -3312,7 +3315,8 @@ static void event_handler_dispatch(
 			handler->function,
 			&widget_deleted))
 	{
-		error(_error_silent, "event handler function failed");
+		error(_error_silent, "event handler function %d of %s failed", handler->function,
+			tag_get_name(definition_tag_index));
 		function_failed = TRUE;
 	}
 	else
