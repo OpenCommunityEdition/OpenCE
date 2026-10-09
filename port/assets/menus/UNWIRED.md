@@ -10,7 +10,7 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 
 | Function | Uses | |
 | --- | --- | --- |
-| `common button bar update` | 25 | PC function |
+| `common button bar update` | 27 | PC function |
 | `direct ip connect init` | 1 | PC function |
 | `direct ip connect update` | 1 | PC function |
 | `direct ip edit field` | 4 | PC function |
@@ -21,7 +21,7 @@ do (save a setting, join a game) does not happen; the screens open and close as 
 | `gamespy update filter settings` | 2 | PC function |
 | `gt edit list update` | 1 | PC function |
 | `gt select list update` | 1 | PC function |
-| `mouse spinner 1wide click` | 72 | PC function |
+| `mouse spinner 1wide click` | 82 | PC function |
 | `mp map list update` | 1 | PC function |
 | `mp prof init teamplay options` | 1 | PC function |
 | `mp prof init vehicle options` | 1 | PC function |

@@ -18,7 +18,7 @@ from xml.sax.saxutils import quoteattr
 PE = "main_menu/settings_select/player_setup/player_profile_edit"
 YES_NO = [("YES", "true"), ("NO", "false")]
 ON_OFF = [("ON", "true"), ("OFF", "false")]
-SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
+SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
@@ -103,7 +103,14 @@ SCREENS = {
         "screen": "audio_settings_screen",
         "header": ("header_profile_audio_settings", f"{PE}/audio_settings/header_profile_audio_settings"),
         "spacing": 30,
+        # (the devices, desktop only, first: Android's rows from the top)
+        "platform_places": True,
         "rows": [
+            # (port/linux/game/menu_tags.c adds the devices SDL finds)
+            ("OUTPUT DEVICE:", "audio.output_device", [("SYSTEM DEFAULT", "default")],
+             "Where the game's sound and the voices play.", "desktop"),
+            ("INPUT DEVICE:", "audio.input_device", [("SYSTEM DEFAULT", "default")],
+             "The microphone voice chat listens to.", "desktop"),
             ("MASTER VOLUME:", "audio.volume", VOLUMES, "The volume of everything.", None),
             ("MUSIC VOLUME:", "audio.music_volume", VOLUMES, "The music's volume.", None),
             ("EFFECTS VOLUME:", "audio.effects_volume", VOLUMES,
@@ -112,6 +119,11 @@ SCREENS = {
              "Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did.", None),
             ("SOUND:", "audio.enabled", ON_OFF,
              "Play sound at all; from the next time the game\nstarts.", None),
+            # voice chat: this machine's own (port/linux/game/network_voice.c)
+            ("VOICE CHAT:", "audio.voice_chat",
+             [("PUSH TO TALK", "push_to_talk"), ("OPEN MIC", "open_mic"), ("OFF", "off")],
+             "Talk in network games: while PUSH TO TALK is held\n(Controls), whenever you speak, or never.", None),
+            ("VOICE VOLUME:", "audio.voice_volume", VOLUMES, "The other players' voices.", None),
         ],
     },
     "network_setup": {
@@ -168,6 +180,38 @@ SCREENS = {
 # port/linux/game/menu_functions.c's table of them)
 CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS"]
 CONTROL_ROWS = 7
+
+# the settings whose rows have the wider spinner (a device's name)
+WIDE_SETTINGS = {"audio.output_device", "audio.input_device"}
+
+# the host's voice chat and vote kicks, on Teamplay Options
+# (_teamplay_options_extras): each row's key, its label, its choices' words
+# (menu_functions.c's gametype_options give their settings' values) and
+# their helps
+TEAMPLAY_EDIT = "main_menu/settings_select/multiplayer_setup/teamplay_options_edit"
+VOICE_QUALITIES = (8, 12, 16, 24, 32, 48, 64)
+TEAMPLAY_ROWS = [
+    ("voice_mode", "VOICE CHAT:", ["OFF", "TEAM NEAR", "ANYONE NEAR", "TEAM", "TEAM, ENEMIES NEAR"], [
+        "No voice chat during the game.",
+        "Players hear their teammates who are near them.",
+        "Players hear everyone who is near them.",
+        "Players hear all their teammates, wherever they\\nare.",
+        "Players hear all their teammates, and the enemies\\nwho are near them.",
+    ]),
+    ("voice_lobby", "LOBBY VOICE CHAT:", ["ON", "OFF"], [
+        "Everyone hears everyone in the lobby, before and\\nafter the game.",
+        "No voice chat in the lobby.",
+    ]),
+    ("voice_kbps", "VOICE QUALITY:", [f"{kbps} KBPS" for kbps in VOICE_QUALITIES],
+     [f"Voices at {kbps} kilobits a second, in the lobby\\nand in the game." for kbps in VOICE_QUALITIES]),
+    ("voice_proximity", "VOICE NEAR DISTANCE:", ["15 M", "30 M", "45 M", "60 M", "90 M", "150 M"],
+     [f"Players {metres} metres apart or less are near\\nfor voice chat." for metres in (15, 30, 45, 60, 90, 150)]),
+    # (network_votekick.c)
+    ("votekick", "VOTE KICK:", ["ON", "OFF"], [
+        "Players can vote to kick a player, from the\\nscoreboard.",
+        "Players cannot vote to kick anyone.",
+    ]),
+]
 
 # the profile menu's words for what its items now open
 STRING_OVERRIDES = {
@@ -247,28 +291,44 @@ def _setting_screen(folder: str, spec: dict) -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     place = -1
+    # (platform_places: each platform's rows in places of their own, with
+    # no gap where the other's are; a row for both, a child for each)
+    places = {"desktop": -1, "android": -1}
     for index, (label, setting, choices, _, platform, *named) in enumerate(spec["rows"]):
         key = named[0] if named else setting.split(".", 1)[1]
         row = f"{base}/op_{key}"
-        if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
-            place += 1
-        rows.append((row, platform, place))
+        if spec.get("platform_places"):
+            for name in places:
+                if platform in (None, name):
+                    places[name] += 1
+            if platform or places["desktop"] == places["android"]:
+                rows.append((row, platform, places[platform or "desktop"]))
+            else:
+                rows += [(row, name, places[name]) for name in places]
+        else:
+            if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
+                place += 1
+            rows.append((row, platform, place))
+        # (a device's name wants the wider spinner Server Setup's co-op rows
+        # have: WIDE_SETTINGS)
+        wide = setting in WIDE_SETTINGS
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                          [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
-                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 320), ("y", 1)])}/>'])
+                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 320), ("y", 1)])}/>'])
         extra += _widget(f"{base}/{key}_label",
                          [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                           ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
                           ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
         extra += _widget(f"{base}/{key}_spinner",
-                         [("type", "spinner"), ("left", 3), ("top", 2), ("width", 147), ("height", 20),
-                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                         [("type", "spinner"), ("left", None if wide else 3), ("top", 2), ("width", 206 if wide else 147),
+                          ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
                           ("strings", "|".join(shown for shown, _ in choices)), ("setting", setting),
                           ("values", "|".join(value for _, value in choices)), ("font", "ui\\large_ui"),
-                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4 if wide else 1),
                           ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                          ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
+                          ("header_bounds", "7 -13 19 -7" if wide else "7 -6 19 0"),
+                          ("footer_bounds", "7 208 19 214" if wide else "7 150 19 156")],
                          ['<on event="created" run="port setting load"/>'])
     extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port settings defaults"/>',
                                                     '<on event="start" run="port settings defaults"/>'])
@@ -361,6 +421,10 @@ MT = "main_menu/multiplayer_type_select"
 # in turn: menu_functions.c's gametype_option_help)
 SLAYER_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit/slayer_edit"
 STRING_INSERTS = {
+    # (Teamplay Options' voice chat and vote kick rows, after its own:
+    # TEAMPLAY_ROWS)
+    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in TEAMPLAY_ROWS])],
+    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
@@ -510,6 +574,12 @@ WIDGET_PATCHES = {
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
+    # (Teamplay Options' voice chat and vote kick rows, over its buttons:
+    # Server Setup's only, _teamplay_options_extras)
+    f"{TEAMPLAY_EDIT}/teamplay_options_menu": {"insert_before": {
+        f"{TEAMPLAY_EDIT}/teamplay_button_bar": [
+            f'<child widget="{TEAMPLAY_EDIT}/op_{key}" x="54" y="{163 + 30 * index}"/>'
+            for index, (key, *_) in enumerate(TEAMPLAY_ROWS)]}},
     # (the PC's Vehicles row's Start opened Item Options)
     "main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_vehicles_list_item": {"handlers": [
         '<on event="a" open="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/vehicle_options_screen"/>',
@@ -734,73 +804,25 @@ def _server_settings() -> list:
     rows.append((f"{base}/op_listing", None))
     # PASSWORD (a public internet game's: menu_functions.c's server_settings_update),
     # which players from the server browser must type
-    extra += _value_row(base, "password", 15, "ss edit server password")
+    extra += _value_row(base, "password", 10 + len(COOP_SETUP_SCREENS), "ss edit server password")
     rows.append((f"{base}/op_password", None))
-    # co-op's FRIENDLY FIRE (between its players), in the place of the
-    # gametype's rows, which co-op hides as multiplayer hides it, laid out
-    # as Teamplay Options' (menu_functions.c's server_settings_update); its
-    # choice kept in network.coop_friendly_fire
-    extra += _widget(f"{base}/op_friendly_fire", [("width", 512), ("height", 28),
-                                                  ("flags", "pass_unhandled_to_focused_child"),
-                                                  ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                     [f'<child widget="{base}/friendly_fire_label"/>',
-                      f'<child widget="{base}/friendly_fire_spinner" x="286" y="1"/>'])
-    extra += _widget(f"{base}/friendly_fire_label", [("type", "text"), ("controller", 1), ("width", 300),
-                                                     ("height", 22), ("string_list", f"{base}/labels"),
-                                                     ("string_index", 10), ("font", "ui\\large_ui"),
-                                                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-    extra += _widget(f"{base}/friendly_fire_spinner",
-                     [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
-                      ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
-                      ("strings", "OFF|ON|SHIELD ONLY|EXPLOSIVES ONLY"), ("setting", "network.coop_friendly_fire"),
-                      ("values", "|".join(COOP_FRIENDLY_FIRE_VALUES)), ("font", "ui\\large_ui"),
-                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
-                      ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                      ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
-                     ['<on event="created" run="port setting load"/>', '<on event="deleted" run="port setting save"/>',
-                      '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-    rows.append((f"{base}/op_friendly_fire", None, 5))
-    # ... and its EXTRA ENEMIES (port/linux/game/coop_enemies.c), below it:
-    # NONE, PER PLAYER or STATIC MULTIPLIER, and below that the amount of the
-    # one chosen (its own row, the other hidden: menu_functions.c's
-    # server_settings_update); each kept in its network.coop_enemies setting
-    def spinner_row(key, label_index, strings, setting, values):
-        nonlocal extra
+    # co-op's options, in the place of the gametype's rows, which co-op hides
+    # as multiplayer hides co-op's (menu_functions.c's server_settings_update):
+    # rows opening their screens, as the gametype's options' do
+    # (_setup_option_screen; COOP_SETUP_SCREENS)
+    for index, (key, title, _, _) in enumerate(COOP_SETUP_SCREENS):
+        target = f"{base}/{key}/{key}_screen"
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
-                                              ("flags", "pass_unhandled_to_focused_child"),
-                                              ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                         [f'<child widget="{base}/{key}_label"/>',
-                          f'<child widget="{base}/{key}_spinner" x="286" y="1"/>'])
-        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
-                                                 ("height", 22), ("string_list", f"{base}/labels"),
-                                                 ("string_index", label_index), ("font", "ui\\large_ui"),
-                                                 ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-        extra += _widget(f"{base}/{key}_spinner",
-                         [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
-                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
-                          ("strings", "|".join(strings)), ("setting", setting),
-                          ("values", "|".join(str(value) for value in values)), ("font", "ui\\large_ui"),
-                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
-                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                          ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
-                         ['<on event="created" run="port setting load"/>',
-                          '<on event="deleted" run="port setting save"/>',
-                          '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-
-    spinner_row("extra_enemies", 11, ["NONE", "PER PLAYER", "STATIC MULTIPLIER"], "network.coop_enemies_mode",
-                COOP_ENEMIES_MODES)
-    rows.append((f"{base}/op_extra_enemies", None, 6))
-    spinner_row("enemies_per_player", 12, [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
-                "network.coop_enemies", COOP_ENEMIES_PERCENTAGES)
-    rows.append((f"{base}/op_enemies_per_player", None, 7))
-    spinner_row("enemies_multiplier", 13, [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
-                "network.coop_enemies_multiplier", COOP_ENEMIES_MULTIPLIERS)
-    rows.append((f"{base}/op_enemies_multiplier", None, 7))
-    # ... and its PLAYER COLLISIONS, below them (network.coop_player_collisions,
-    # which the host sends its players as the game begins: menu_functions.c's
-    # server_start)
-    spinner_row("player_collisions", 14, ["ON", "OFF"], "network.coop_player_collisions", ["true", "false"])
-    rows.append((f"{base}/op_player_collisions", None, 8))
+                                             ("flags", "pass_unhandled_to_focused_child"),
+                                             ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<on event="a" open="{target}"/>', f'<on event="start" open="{target}"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          f'<child widget="{base}/{key}_label"/>'])
+        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                                                 ("string_list", f"{base}/labels"), ("string_index", 10 + index),
+                                                 ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13),
+                                                 ("text_y", 4)], [])
+        rows.append((f"{base}/op_{key}", None, 5 + index))
     # the gametype's options for this game (the gametype editor's screens,
     # editing a copy of the gametype chosen: "port setup edit")
     for index, (key, screen) in enumerate(SETUP_OPTION_SCREENS):
@@ -830,8 +852,8 @@ def _server_settings() -> list:
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
-                                         "TEAMPLAY OPTIONS:", "LISTING:", "FRIENDLY FIRE:", "EXTRA ENEMIES:",
-                                         "PER PLAYER:", "MULTIPLIER:", "PLAYER COLLISIONS:", "PASSWORD:"])
+                                         "TEAMPLAY OPTIONS:", "LISTING:",
+                                         *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -846,26 +868,16 @@ def _server_settings() -> list:
         # (LISTING's, by its choice)
         "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
         "Only players with your invite link can join.",
-        # (FRIENDLY FIRE's, by its choice, as Teamplay Options' words them)
-        "Players can not be hurt by weapons and explosives\\nfired by the other players.",
-        "Players can be hurt by weapons or explosives\\nfired by the other players.",
-        "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
-        "Players can be hurt by damage from explosives\\nfired by the other players.",
-        # (EXTRA ENEMIES', by its choice: COOP_ENEMIES_MODES' order)
-        "Enemy squads are as the campaign has them.",
-        "Enemy squads grow with the players: by the amount\\nbelow for each player past the first.",
-        "Enemy squads are the amount below times as large,\\nhowever many players there are.",
-        # (PER PLAYER's and MULTIPLIER's)
-        "For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again).",
-        "Each enemy squad is this many times as large.",
-        # (PLAYER COLLISIONS', by its choice)
-        "Players bump into each other, as in the campaign.",
-        "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
+        # (co-op's options' rows: COOP_SETUP_SCREENS)
+        *(help_text for _, _, help_text, _ in COOP_SETUP_SCREENS),
         # (PASSWORD's)
         "Players from the Server Browser must type it to\\njoin (an invite link needs none). Enter sets it.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
+    # (co-op's options' screens)
+    for key, title, _, screen_rows in COOP_SETUP_SCREENS:
+        lines += _setup_option_screen(f"{base}/{key}", key, screen_rows)
     # (no Defaults: the bar is START and CANCEL; B cancels the name's edit
     # first)
     lines = [line.replace(f'<child widget="{base}/button_defaults" y="1"/>', "") for line in lines]
@@ -875,15 +887,102 @@ def _server_settings() -> list:
 
 
 MAXIMUM_PLAYERS = [2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128]
-# network.coop_friendly_fire's values, as Server Setup's FRIENDLY FIRE shows
-# them (menu_functions.c's cooperative_friendly_fire_modes, in this order)
-COOP_FRIENDLY_FIRE_VALUES = ["off", "on", "shields_only", "explosives_only"]
-# Server Setup's EXTRA ENEMIES: network.coop_enemies_mode's values (in
-# coop_enemies.c's order), and the amounts of PER PLAYER (network.coop_enemies,
-# percentages) and STATIC MULTIPLIER (network.coop_enemies_multiplier)
-COOP_ENEMIES_MODES = ["none", "per_player", "multiplier"]
+# CO-OP OPTIONS' amounts of PER PLAYER (network.coop_enemies, percentages)
+# and STATIC MULTIPLIER (network.coop_enemies_multiplier), as menu_functions.c's
+# gametype_options have their values
 COOP_ENEMIES_PERCENTAGES = [25, 50, 100, 150, 200]
 COOP_ENEMIES_MULTIPLIERS = [2, 4, 8, 16, 32]
+# co-op's Server Setup options, in screens of their own as the gametype's
+# are (its rows: _server_settings), each its key, its title, its row's help
+# and its rows (as TEAMPLAY_ROWS: each spinner's key, label, words and the
+# help of each of them; menu_functions.c's gametype_options give their
+# settings' values)
+COOP_SETUP_SCREENS = [
+    ("coop_options", "CO-OP OPTIONS", "Friendly fire, the enemies and player collisions,\\nfor this game.", [
+        ("coop_friendly_fire", "FRIENDLY FIRE:", ["OFF", "ON", "SHIELD ONLY", "EXPLOSIVES ONLY"], [
+            "Players can not be hurt by weapons and explosives\\nfired by the other players.",
+            "Players can be hurt by weapons or explosives\\nfired by the other players.",
+            "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
+            "Players can be hurt by damage from explosives\\nfired by the other players.",
+        ]),
+        ("coop_extra_enemies", "EXTRA ENEMIES:", ["NONE", "PER PLAYER", "STATIC MULTIPLIER"], [
+            "Enemy squads are as the campaign has them.",
+            "Enemy squads grow with the players: by the amount\\nbelow for each player past the first.",
+            "Enemy squads are the amount below times as large,\\nhowever many players there are.",
+        ]),
+        ("coop_enemies_per_player", "PER PLAYER:", [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
+         ["For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again)."] *
+         len(COOP_ENEMIES_PERCENTAGES)),
+        ("coop_enemies_multiplier", "MULTIPLIER:", [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
+         ["Each enemy squad is this many times as large."] * len(COOP_ENEMIES_MULTIPLIERS)),
+        ("coop_player_collisions", "PLAYER COLLISIONS:", ["ON", "OFF"], [
+            "Players bump into each other, as in the campaign.",
+            "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
+        ]),
+    ]),
+    ("voice_options", "VOICE AND VOTING", "Voice chat and votes to kick a player, for this\\ngame.", TEAMPLAY_ROWS),
+]
+# (their screens' titles)
+TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title for key, title, _, _ in COOP_SETUP_SCREENS})
+# (the rows of a co-op options screen in one place, the one shown: PER
+# PLAYER's and MULTIPLIER's, by EXTRA ENEMIES')
+SETUP_OPTION_SAME_PLACE = {"coop_enemies_multiplier"}
+
+
+def _setup_option_screen(base: str, key: str, rows: list) -> list:
+    """a screen of options laid out as the gametype's are (Teamplay
+    Options'), its spinners setting config.toml's settings (menu_functions.c's
+    "port setup options init" and "port setup options save", OK), each
+    choice's help shown as the gametype's are ("game settings lists text
+    update": the help strings, each spinner's choices' in turn)"""
+    lines = _widget(f"{base}/{key}_screen", [("width", 640), ("height", 480),
+                                            ("flags", "pass_unhandled_to_focused_child"),
+                                            ("bitmap", "bitmaps/gradient")],
+                    [f'<child widget="{base}/header_{key}"/>', f'<child widget="{base}/{key}_menu"/>'])
+    lines += _header(f"{base}/header_{key}", f"{base}/header_{key}")
+    lines += _widget(f"{base}/{key}_help", [("type", "text"), ("controller", 1), ("left", 68), ("top", 341),
+                                           ("width", 482), ("height", 79), ("string_list", f"{base}/cap_{key}"),
+                                           ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
+    children = ['<data input="game settings lists text update"/>',
+                '<on event="created" run="port setup options init"/>']
+    place = -1
+    for row_key, *_ in rows:
+        if row_key not in SETUP_OPTION_SAME_PLACE:
+            place += 1
+        children.append(f'<child widget="{base}/op_{row_key}" x="54" y="{73 + 30 * place}"/>')
+    children.append(f'<child widget="{base}/{key}_button_bar" y="414"/>')
+    lines += _widget(f"{base}/{key}_menu", [("type", "column_list"), ("width", 640), ("height", 480),
+                                           ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                                           ("description", f"{base}/{key}_help")], children)
+    lines += _widget(f"{base}/{key}_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                 ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     ['<data input="common button bar update"/>', f'<child widget="{base}/{key}_button_ok" x="380" y="1"/>',
+                      '<child widget="common_button_cancel" x="510" y="1"/>'])
+    lines += _button(f"{base}/{key}_button_ok", 1, ['<on event="a" run="port setup options save" back="true"/>',
+                                                     '<on event="start" run="port setup options save" back="true"/>'])
+    for index, (row_key, label, strings, _) in enumerate(rows):
+        lines += _widget(f"{base}/op_{row_key}", [("width", 512), ("height", 28),
+                                                 ("flags", "pass_unhandled_to_focused_child"),
+                                                 ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{base}/{row_key}_label"/>',
+                          f'<child widget="{base}/{row_key}_spinner" x="286" y="1"/>'])
+        lines += _widget(f"{base}/{row_key}_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                                     ("height", 22), ("string_list", f"{base}/{key}_labels"),
+                                                     ("string_index", index), ("font", "ui\\large_ui"),
+                                                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        lines += _widget(f"{base}/{row_key}_spinner",
+                         [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("string_list", f"{base}/var_{row_key}"), ("font", "ui\\large_ui"),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                          ("list_flags", "items_from_strings"),
+                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                          ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
+                         ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        lines += _strings(f"{base}/var_{row_key}", strings)
+    lines += _strings(f"{base}/{key}_labels", [label for _, label, *_ in rows])
+    lines += _strings(f"{base}/cap_{key}", [text for *_, helps in rows for text in helps])
+    return lines
 # Server Setup's rows of the gametype's options: the gametype editor's
 # screens
 SETUP_OPTION_SCREENS = [
@@ -1139,6 +1238,36 @@ def _item_options_extras() -> list:
     return lines
 
 
+def _teamplay_options_extras() -> list:
+    """Teamplay Options' rows of the port's: the host's voice chat
+    (port/linux/game/network_voice.c) and vote kicks (network_votekick.c),
+    in Server Setup's copy only (menu_functions.c's gametype_options_init),
+    kept in config.toml"""
+    lines = []
+    for index, (key, label, strings, _) in enumerate(TEAMPLAY_ROWS):
+        lines += _widget(f"{TEAMPLAY_EDIT}/op_{key}", [("width", 512), ("height", 28),
+                                                       ("flags", "pass_unhandled_to_focused_child"),
+                                                       ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{TEAMPLAY_EDIT}/{key}_label"/>',
+                          f'<child widget="{TEAMPLAY_EDIT}/{key}_spinner" x="286" y="1"/>'])
+        lines += _widget(f"{TEAMPLAY_EDIT}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300),
+                                                          ("height", 22),
+                                                          ("string_list", f"{TEAMPLAY_EDIT}/teamplay_options_labels"),
+                                                          ("string_index", 3 + index), ("font", "ui\\large_ui"),
+                                                          ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        lines += _widget(f"{TEAMPLAY_EDIT}/{key}_spinner",
+                         [("type", "spinner"), ("top", 2), ("width", 206), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("string_list", f"{TEAMPLAY_EDIT}/var_{key}"), ("font", "ui\\large_ui"),
+                          ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                          ("list_flags", "items_from_strings"),
+                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                          ("header_bounds", "7 -13 19 -7"), ("footer_bounds", "7 208 19 214")],
+                         ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        lines += _strings(f"{TEAMPLAY_EDIT}/var_{key}", strings)
+    return lines
+
+
 def _map_kind() -> list:
     """the map lists' first row (New Game's and the Map screen's), as the
     gametype list's chooser: a spinner of SINGLEPLAYER or MULTIPLAYER maps,
@@ -1175,6 +1304,7 @@ def multiplayer_files() -> dict:
         f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
+        TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
     }
 
 

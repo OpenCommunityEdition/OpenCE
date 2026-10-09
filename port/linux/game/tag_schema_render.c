@@ -1247,13 +1247,15 @@ static boolean bitmap_data_check(
 		bitmap->mipmap_count = (short)PIN(bitmap->mipmap_count, 0, maximum_mipmap_count);
 	}
 	/* (a linear texture has a format with a linear form, and a pitch of
-	64-byte steps) */
+	64-byte steps: a Custom Edition map's rows are padded to them as its
+	pixels load, custom_edition_bitmaps.c) */
 	if (TEST_FLAG(bitmap->flags, _bitmap_linear_bit))
 	{
 		long pitch = (long)bitmap->width * bitmap_format_bits_per_pixel[bitmap->format] / 8;
+		long padded_pitch = (pitch + BITMAP_PITCH_ALIGNMENT - 1) / BITMAP_PITCH_ALIGNMENT * BITMAP_PITCH_ALIGNMENT;
 
 		if (compressed || bitmap->format == _bitmap_format_p8_bump || bitmap->type != _bitmap_type_2d ||
-			pitch % BITMAP_PITCH_ALIGNMENT || pitch > MAXIMUM_BITMAP_PITCH)
+			(pitch != padded_pitch && !tag_validate_custom_edition(validation)) || padded_pitch > MAXIMUM_BITMAP_PITCH)
 		{
 			tag_validate_correct(validation, "is linear, but of format %d, type %d, pitch %ld: not linear",
 				bitmap->format, bitmap->type, pitch);
@@ -1587,6 +1589,9 @@ static boolean particle_check(
 {
 	struct particle_definition *particle = base;
 
+	/* (the radius it collides with: point_physics_update, particle_get_radius) */
+	tag_validate_non_negative(validation, "radius", &particle->radius_lower_bound);
+	tag_validate_non_negative(validation, "radius", &particle->radius_upper_bound);
 	rate_check(validation, "frame rate", &particle->frames_per_second_lower_bound, MAXIMUM_ANIMATION_FRAMES_PER_SECOND);
 	rate_check(validation, "frame rate", &particle->frames_per_second_upper_bound, MAXIMUM_ANIMATION_FRAMES_PER_SECOND);
 	/* (seconds added to a frame's on contact) */
@@ -1603,6 +1608,9 @@ static boolean particle_system_type_state_check(
 {
 	struct particle_system_type_state *state = base;
 
+	/* (a factor of its particles' radius: particle_system_update_particle) */
+	tag_validate_non_negative(validation, "particle radius multiplier",
+		&state->variables.particle_state_multipliers.radius);
 	time_check(validation, "duration", &state->duration_lower_bound);
 	time_check(validation, "duration", &state->duration_upper_bound);
 	time_check(validation, "transition time", &state->transition_time_lower_bound);
@@ -1617,6 +1625,8 @@ static boolean particle_system_particle_state_check(
 {
 	struct particle_system_type_particle_state *state = base;
 
+	/* (a factor of the particle's radius: particle_system_update_particle) */
+	tag_validate_non_negative(validation, "radius", &state->variables.radius);
 	time_check(validation, "duration", &state->duration_lower_bound);
 	time_check(validation, "duration", &state->duration_upper_bound);
 	time_check(validation, "transition time", &state->transition_time_lower_bound);
@@ -1637,6 +1647,8 @@ static boolean particle_system_type_check(
 	real loop_time;
 	long state_index;
 
+	/* (a factor of its particles' radius: particle_system_update_particle) */
+	tag_validate_non_negative(validation, "particle radius", &type->variables.radius);
 	/* (the states' checks have run: their times are none or more) */
 	loop_time = 0.0f;
 	for (state_index = 0; state_index < type->type_states.count; state_index++)
@@ -1681,6 +1693,18 @@ static boolean particle_system_type_check(
 }
 
 /* contrails */
+
+/* (half its width is the radius its points collide with: contrail_update) */
+static boolean contrail_point_state_check(
+	struct tag_validation *validation,
+	void *base)
+{
+	struct contrail_point_state *state = base;
+
+	tag_validate_non_negative(validation, "width", &state->width);
+
+	return TRUE;
+}
 
 static boolean contrail_check(
 	struct tag_validation *validation,
@@ -2311,6 +2335,7 @@ static struct tag_schema_field const particle_system_fields[] =
 static struct tag_schema_field const contrail_point_state_fields[] =
 {
 	TAG_SCHEMA_REFERENCE(struct contrail_point_state, physics, TAG_SCHEMA_GROUPS('pphy')),
+	TAG_SCHEMA_CHECK(contrail_point_state_check),
 	TAG_SCHEMA_END
 };
 
@@ -2331,6 +2356,19 @@ static struct tag_schema_field const contrail_fields[] =
 
 /* weather particle systems */
 
+/* (a particle's radius, which it collides with: weather_particle_systems.c) */
+static boolean weather_particle_type_check(
+	struct tag_validation *validation,
+	void *base)
+{
+	struct weather_particle_type_definition *type = base;
+
+	tag_validate_non_negative(validation, "radius", &type->radius_lower_bound);
+	tag_validate_non_negative(validation, "radius", &type->radius_upper_bound);
+
+	return TRUE;
+}
+
 static struct tag_schema_field const weather_particle_type_fields[] =
 {
 	TAG_SCHEMA_STRING(struct weather_particle_type_definition, name),
@@ -2340,6 +2378,7 @@ static struct tag_schema_field const weather_particle_type_fields[] =
 	TAG_SCHEMA_ENUM(struct weather_particle_type_definition, render_direction_source,
 		NUMBER_OF_WEATHER_PARTICLE_RENDER_DIRECTION_SOURCES, 0),
 	TAG_SCHEMA_STRUCT(struct weather_particle_type_definition, shader, shader_effect_schema),
+	TAG_SCHEMA_CHECK(weather_particle_type_check),
 	TAG_SCHEMA_END
 };
 

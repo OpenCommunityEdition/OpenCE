@@ -3386,6 +3386,57 @@ static boolean multiplayer_profiles_list_initialize(
 	return TRUE;
 }
 
+/* port: whether a widget of a map's may not run an event handler's function.
+A widget's handlers name the functions they run by their index in the
+function table, which nothing checks, so a game map's widget could run the
+main menu's functions (deleting player and playlist profiles, saving them,
+running the demos) and the port's own (writing config.toml, quitting,
+connecting), on its created event too, as its screen opens. The shipped
+game maps' widgets (their pause screens) run none of these: the port's own
+menus' tags (pc_menu_tag) may run the port's, and the main menu (ui.map)
+the main menu's. Logged once */
+static boolean ui_widget_function_denied(
+	struct widget_instance *widget,
+	word function_index)
+{
+	extern boolean pc_menu_tag(long tag_index);
+	static short const main_menu_functions[] =
+	{
+		41, /* mp profile change name */
+		60, /* mp profile save changes */
+		64, 65, 66, 67, /* player profile begin and end editing, change name, save changes */
+		68, 69, 70, 71, /* player profile controller settings */
+		74, 75, 76, 77, 78, 79, 80, /* profile deletion and creation */
+		86, 87, /* the demos */
+	};
+	static boolean logged = FALSE;
+	boolean denied = FALSE;
+	short index;
+
+	if (pc_menu_tag(widget->definition_tag_index))
+		return FALSE;
+	if (function_index >= PC_MENU_FUNCTION_BASE && function_index < 0x8000)
+	{
+		denied = TRUE;
+	}
+	else if (!main_menu_is_active())
+	{
+		for (index = 0; index < (short)NUMBEROF(main_menu_functions); index++)
+		{
+			if (function_index == (word)main_menu_functions[index])
+				denied = TRUE;
+		}
+	}
+	if (denied && !logged)
+	{
+		logged = TRUE;
+		error(_error_silent, "a map's widget may not run event handler function %d; it is skipped",
+			function_index);
+	}
+
+	return denied;
+}
+
 boolean ui_widget_event_handler_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -3397,6 +3448,12 @@ boolean ui_widget_event_handler_function_invoke(
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 478,
 		widget != NULL && widget_deleted != NULL,
 		"(widget != NULL) && (widget_deleted != NULL)");
+	/* port: a map's own widgets (not the menus' tags the port adds) may not
+	run what changes the player's files or settings: ui_widget_function_denied
+	(failed, as an invalid function is, so the handler opens and closes no
+	screens after it) */
+	if (ui_widget_function_denied(widget, function_index))
+		return FALSE;
 	/* port: the menus' own functions (port/linux/game/menu_functions.c) */
 	if (function_index >= PC_MENU_FUNCTION_BASE && function_index < 0x8000)
 	{
@@ -5895,7 +5952,9 @@ static boolean solo_level_initialize_list_single_player(
 /* port: the PC version's multiplayer menus (port/linux/game/menu_functions.c),
 on our lists rather than the Xbox's spinners: */
 
-/* the multiplayer maps (the Xbox's 13), and the one used last (else 0) */
+/* the multiplayer maps (the Xbox's 13), and the one used last (else 0),
+unless last_used is NULL: it is read from a file of the save root, which the
+menus that name maps each frame need not do */
 short ui_widget_port_multiplayer_maps(
 	char const *const **names,
 	short *last_used)
@@ -5908,6 +5967,8 @@ short ui_widget_port_multiplayer_maps(
 	char **levels = custom_edition_maps_level_list(event_handler_functions.multiplayer_levels, 13, &level_count);
 
 	*names = (char const *const *)levels;
+	if (!last_used)
+		return level_count;
 	*last_used = 0;
 	if (saved_game_file_retrieve_last_used_multiplayer_map(map_name))
 	{

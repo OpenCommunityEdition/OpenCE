@@ -46,6 +46,8 @@ unsigned int host_memory_watch_generation(unsigned int address, unsigned int siz
 unsigned int host_memory_watch_serial(void);
 void host_memory_watch_prepare_write(unsigned int address, unsigned int size);
 void host_memory_watch_forget(unsigned int address, unsigned int size);
+/* memory_watch_begin_frame (port/linux/src/platform.h) */
+void host_memory_watch_begin_frame(void);
 
 /* ---------- SDL (guest/runtime/guest_sdl.c)
 
@@ -85,6 +87,10 @@ called on the audio thread */
 unsigned int host_sdl_open_audio_stream(unsigned int device, const void *spec, unsigned int callback, unsigned int userdata);
 int host_sdl_put_audio_stream_data(unsigned int stream, const void *data, int length);
 int host_sdl_resume_audio_stream_device(unsigned int stream);
+/* (voice chat's microphone, a stream without a callback) */
+int host_sdl_get_audio_stream_data(unsigned int stream, void *data, int length);
+int host_sdl_get_audio_stream_available(unsigned int stream);
+void host_sdl_destroy_audio_stream(unsigned int stream);
 
 /* ---------- OpenGL ES */
 
@@ -92,8 +98,9 @@ int host_sdl_resume_audio_stream_device(unsigned int stream);
 void host_gl_get_string(unsigned int name, int index, char *buffer, unsigned int size);
 /* nonzero if the context supports the named extension */
 int host_gl_has_extension(const char *name);
-/* a 32-bit word of a GL buffer object, waiting for the GPU */
-unsigned int host_gl_read_buffer_word(unsigned int buffer, unsigned int offset);
+/* copies size bytes at offset of a GL buffer object into data, waiting for
+the GPU's writes to it */
+void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 /* unsynchronized write into the buffer bound to target */
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);
 /* fences the GPU work queued so far as that of ring slot `slot`; waits for

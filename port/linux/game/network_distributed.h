@@ -106,6 +106,18 @@ enum
 	/* co-op: where the host's devices are (doors, elevators), when they move
 	(network_coop.c) */
 	_distributed_message_coop_device_states = 77,
+	/* a player's vote to kick a player (network_votekick.c): to the host,
+	reliably, which takes it only from the voter's own stream */
+	_distributed_message_votekick = 78,
+	/* the vote running as the host counts it, to each client, every second
+	and when it changes (unreliable: network_votekick.c) */
+	_distributed_message_votekick_status = 79,
+	/* voice chat (network_voice.c), in the lobby too: a client's frame to
+	the host, unreliably, with its key; a frame the host relays to a
+	client; the host's settings and the client's key, reliably */
+	_distributed_message_voice_up = 80,
+	_distributed_message_voice_down = 81,
+	_distributed_message_voice_config = 82,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -249,6 +261,31 @@ real distributed_angle_unpack(short value, boolean signed_angle);
 /* shields and health in 16 bits */
 word distributed_vitality_pack(real value);
 real distributed_vitality_unpack(word value);
+
+/* (the host) a text in red on every machine's console, or on one client's
+(machine_index; NONE: the host's own) */
+void distributed_send_notice(char const *text);
+void distributed_send_notice_to_machine(long machine_index, char const *text);
+/* (the host) the names of a client machine's players, in ASCII */
+void distributed_machine_player_names(long machine_index, char *names, long size);
+/* (the host) a client machine's real IPv4 address (host byte order): an
+internet play peer's endpoint, not its stand-in; 0 if not known */
+unsigned long distributed_machine_real_address(long machine_index);
+/* ... and the real address of a machine's address, as it joined from */
+unsigned long distributed_real_address(unsigned long address);
+
+/* ---------- prototypes/NETWORK_VOTEKICK.C */
+
+void network_votekick_new_game(void);
+/* after each tick, on the host */
+void network_votekick_host_tick(void);
+/* (the host) a client's vote; from_stream: it came over the machine's own
+stream (anything else is refused) */
+void network_votekick_handle_request(long machine_index, void const *entries, boolean from_stream);
+word network_votekick_request_entry_size(void);
+/* (a client) the host's count */
+void network_votekick_handle_status(void const *entries);
+word network_votekick_status_entry_size(void);
 
 /* ---------- prototypes/NETWORK_ACTORS.C */
 

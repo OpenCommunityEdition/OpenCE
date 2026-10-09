@@ -598,6 +598,13 @@ void scenario_tags_unload(
 		hud_hires_tags_unloaded();
 	}
 	sound_cache_close();
+	/* port: the sounds of tag files go, after the sound cache that held them
+	(port/linux/game/loose_sounds.c) */
+	{
+		extern void loose_sounds_tags_unloaded(void);
+
+		loose_sounds_tags_unloaded();
+	}
 	texture_cache_close();
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
@@ -1035,16 +1042,29 @@ void cache_files_show_multiplayer_unavailable(
 	return;
 }
 
+/* port: the version of the map a network game is on, which the host sends
+in its game record (network_game_map's version, which the Xbox's left 0):
+a Custom Edition map's header checksum, which differs between versions of
+it. 0, which a client checks nothing for, for the game's own maps, whose
+builds of other regions play together. */
+unsigned long cache_files_map_version(
+	char const *map_name)
+{
+	return custom_edition_level_name(map_name) ? custom_edition_map_checksum(map_name) : 0;
+}
+
 /* port: whether this machine has the map a network game is on (a client
 joining it: network_client_manager.c); when not, tells the player which map
 is missing and where to copy it, in the error the main menu shows next,
 rather than the damaged disc error that precaching a map that is not there
 gives (cache_files_give_time_to_precache).
 A Halo Custom Edition map (custom_maps\<name>) is looked for in the Custom
-Edition maps folders (port/linux/game/custom_edition_cache.c), any other in
-the game's own. */
+Edition maps folders (port/linux/game/custom_edition_cache.c), and must be
+the host's version (`version`, cache_files_map_version's on the host); any
+other map in the game's own. */
 boolean cache_files_map_present(
-	char const *map_name)
+	char const *map_name,
+	unsigned long version)
 {
 	void platform_log(char const *format, ...);
 	wchar_t error_text[512];
@@ -1056,7 +1076,7 @@ boolean cache_files_map_present(
 		return TRUE;
 	if (custom_edition_level_name(map_name))
 	{
-		if (custom_edition_cache_present(map_name, message, sizeof(message)))
+		if (custom_edition_cache_present(map_name, version, message, sizeof(message)))
 			return TRUE;
 	}
 	else
@@ -1174,6 +1194,12 @@ long scenario_tags_load(
 
 				menu_tags_loaded(cache_file_globals.header.name);
 			}
+			/* (and the sounds of tag files, as below) */
+			{
+				extern void loose_sounds_tags_loaded(void);
+
+				loose_sounds_tags_loaded();
+			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
 
@@ -1257,6 +1283,13 @@ long scenario_tags_load(
 
 				pal_tags_loaded(cache_file_globals.header.build);
 			}
+			/* port: the powerups' render spheres, grown to hold their meshes
+			(port/linux/game/powerup_render_bounds.c) */
+			{
+				extern void powerup_render_bounds_tags_loaded(void);
+
+				powerup_render_bounds_tags_loaded();
+			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
@@ -1268,6 +1301,13 @@ long scenario_tags_load(
 				extern void hud_hires_tags_loaded(void);
 
 				hud_hires_tags_loaded();
+			}
+			/* port: the sounds of tag files played over the map's
+			(audio.loose_sounds: port/linux/game/loose_sounds.c) */
+			{
+				extern void loose_sounds_tags_loaded(void);
+
+				loose_sounds_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}

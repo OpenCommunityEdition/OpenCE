@@ -244,6 +244,12 @@ symbols in this file:
 #include <math.h>
 #include <stdio.h>
 
+/* port: a stereo channel's sound in the world panned towards it, muffled
+and reverberated as a 3D channel's is (sound_dsound_xbox.c; update_channels) */
+void dsound_port_set_channel_stereo_position(short virtual_channel_index, boolean positioned, real pan,
+	real distance, real minimum_distance, real distance_fade, real occlusion, real obstruction,
+	boolean attenuate_direct_path);
+
 /* ---------- constants */
 
 enum
@@ -632,7 +638,8 @@ static long looping_sound_new(
 	long definition_index,
 	long identifier,
 	struct sound_source const *source);
-static void sound_set_definition_end(
+/* port: report whether instance limiting leaves this voice alive. */
+static boolean sound_set_definition_end(
 	long sound_index);
 static long update_potentially_audible_looping_sound(
 	long definition_index,
@@ -1497,7 +1504,7 @@ static long looping_sound_new(
 	return looping_sound_index;
 }
 
-static void sound_set_definition_end(
+static boolean sound_set_definition_end(
 	long sound_index)
 {
 	struct sound_datum *sound = sound_get(sound_index);
@@ -1538,18 +1545,23 @@ static void sound_set_definition_end(
 		}
 		else
 		{
-			return;
+			return TRUE;
 		}
 
 		if (channel_index != NONE)
 		{
-			sound_index = channel_get(channel_index)->sound_index;
+			/* port: sound_find_like_channel excludes the current voice. */
+			sound_stop(channel_get(channel_index)->sound_index);
+			return TRUE;
 		}
 
+		/* port: no other voice can be preempted; tell the caller this one
+		was retired before it writes to the freed channel. */
 		sound_stop(sound_index);
+		return FALSE;
 	}
 
-	return;
+	return TRUE;
 }
 
 static long update_potentially_audible_looping_sound(
@@ -1894,6 +1906,31 @@ static void sound_start_fade(
 	}
 
 	return;
+}
+
+/* port: retire every owned intro/loop voice when the primary handle changes. */
+static void sound_fade_looping_track_components(
+	long looping_sound_index,
+	short track_index,
+	long except_sound_index,
+	real seconds)
+{
+	long sound_index;
+
+	for (sound_index = data_next_index(sound_data, NONE);
+		sound_index != NONE;
+		sound_index = data_next_index(sound_data, sound_index))
+	{
+		struct sound_datum *sound = sound_get(sound_index);
+
+		if (sound_index != except_sound_index &&
+			(sound->type == _sound_start_track || sound->type == _sound_loop_track) &&
+			sound->source_identifier == looping_sound_index &&
+			sound->loop_track_index == track_index)
+		{
+			sound_start_fade(_sound_fade_mode_linear, seconds, NONE, sound_index);
+		}
+	}
 }
 
 static short channel_get_state(
@@ -2652,6 +2689,14 @@ boolean sound_refresh_looping(
 
 					if (refresh_state == _looping_sound_refresh_start)
 					{
+						/* port: a restart must retire the old primary and pending components. */
+						if (track->start_sound.index != NONE ||
+							TEST_FLAG(track->flags, _fade_in_at_start_bit))
+						{
+							sound_fade_looping_track_components(
+								looping_sound_index, track_index, NONE,
+								track->fade_out_duration);
+						}
 						if (track->start_sound.index != NONE)
 						{
 							*playing_sound_index =
@@ -2747,6 +2792,16 @@ boolean sound_refresh_looping(
 					}
 					else if (loop->state != _looping_sound_refresh_stop)
 					{
+						/* port: stopping the loop also stops its other owned components. */
+						if (fade_time != 0.f ||
+							TEST_FLAG(track->flags, _fade_out_at_stop_bit) ||
+							(track->stop_sound.index == NONE &&
+								!TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit)))
+						{
+							sound_fade_looping_track_components(
+								looping_sound_index, track_index, *playing_sound_index,
+								fade_time != 0.f ? fade_time : track->fade_out_duration);
+						}
 						if (fade_time != 0.f)
 						{
 							sound_start_fade(
@@ -2956,7 +3011,11 @@ static void update_channel_for_looping_sound(
 					(!channel->playing_permutation ||
 						channel->playing_permutation->next_permutation_index == NONE))
 				{
-					sound_set_definition_end(channel->sound_index);
+					/* port: a definition transition can retire its own voice. */
+					if (!sound_set_definition_end(channel->sound_index))
+					{
+						return;
+					}
 					definition = sound_definition_get(sound->definition_index);
 					pitch_range = TAG_BLOCK_GET_ELEMENT(
 						&definition->pitch_ranges,
@@ -3491,10 +3550,21 @@ static void update_channels(
 			else
 			{
 				real_point3d relative_position = sound->source.location.position;
+				/* port: what a 3D channel is given of its sound's surroundings,
+				for a stereo one's (dsound_port_set_channel_stereo_position) */
+				real stereo_obstruction = 0.f;
+				real stereo_occlusion = 0.f;
+				boolean stereo_underwater = FALSE;
 
 				switch (sound->source.spatialization_mode)
 				{
 				case _sound_spatialization_mode_none:
+					/* port: (unpanned and dry: dsound_port_set_channel_stereo_position) */
+					if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+					{
+						dsound_port_set_channel_stereo_position(channel_index, FALSE, 0.f, 0.f, 0.f, 1.f,
+							0.f, 0.f, FALSE);
+					}
 					break;
 
 				case _sound_spatialization_mode_absolute:
@@ -3510,6 +3580,9 @@ static void update_channels(
 							&listener->matrix,
 							&sound->source.location.position,
 							&relative_position);
+						stereo_obstruction = sound->source.obstruction;
+						stereo_occlusion = sound->source.occlusion;
+						stereo_underwater = listener->underwater;
 					}
 					/* fall through */
 
@@ -3528,8 +3601,42 @@ static void update_channels(
 						real attenuation = 1.f -
 							(distance - minimum_distance) /
 							(maximum_distance - minimum_distance);
+						real distance_fade = PIN(attenuation, 0.f, 1.f);
 
-						fade *= PIN(attenuation, 0.f, 1.f);
+						/* port: positioned stereo uses a 2D stream, so it misses
+						the 3D stream's inverse-distance gain: it takes that
+						instead of the linear fade (the listener's rolloff
+						factor is 1), so that it fades as a mono sound does. A
+						3D sound is not cut off at the tag's maximum distance
+						either: none starts past it. */
+						if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+						{
+							distance_fade = minimum_distance > 0.f && distance > minimum_distance ?
+								minimum_distance / distance : 1.f;
+						}
+						fade *= distance_fade;
+						/* port: and a stereo sound is panned towards where it
+						is, as the mixer pans a 3D one (port/linux/src/dsound_sdl.c,
+						spatialize: ahead is x, right -y; centred when close),
+						and muffled and reverberated as one is, which the Xbox's
+						stereo channels never were: a Custom Edition map's stereo
+						gunfire came from nowhere. (Obstruction and occlusion go
+						where the 3D channels' call above puts them.) */
+						if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
+						{
+							real horizontal = square_root(
+								relative_position.x * relative_position.x +
+								relative_position.y * relative_position.y);
+							real pan = horizontal > 1.0e-4f ? -relative_position.y / horizontal : 0.f;
+
+							if (distance < minimum_distance && minimum_distance > 0.f)
+							{
+								pan *= distance / minimum_distance;
+							}
+							dsound_port_set_channel_stereo_position(channel_index, TRUE, 0.75f * pan,
+								distance, minimum_distance, distance_fade,
+								stereo_obstruction, stereo_occlusion, stereo_underwater);
+						}
 					}
 					break;
 

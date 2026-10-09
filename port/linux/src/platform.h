@@ -162,6 +162,10 @@ unsigned long memory_watch_serial(void);
 void memory_watch_prepare_write(void *address, unsigned long size);
 /* the range was remapped or reprotected: treat it as written and unwatched */
 void memory_watch_forget(void *address, unsigned long size);
+/* a new frame starts (Present): tracking that compares page contents
+(Android under ARM translation, host_watch_hash.h) hashes a page at most
+once a frame, so it sees a write in the next frame, not at once */
+void memory_watch_begin_frame(void);
 
 /* ---------- time */
 

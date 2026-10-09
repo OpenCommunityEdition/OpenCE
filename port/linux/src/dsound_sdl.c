@@ -37,9 +37,11 @@ turns the reverb off; audio.enabled = false skips opening a device
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "voice_audio.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -54,12 +56,17 @@ turns the reverb off; audio.enabled = false skips opening a device
 #define XBOX_ADPCM_BLOCK_SAMPLES 64
 
 /* the resampler (resampling) */
-#define RESAMPLER_ZERO_CROSSINGS 16
+#define RESAMPLER_ZERO_CROSSINGS 24
 #define RESAMPLER_TABLE_STEPS 256
-#define RESAMPLER_CUTOFF 0.88
+#define RESAMPLER_CUTOFF 0.96
 #define RESAMPLER_KAISER_BETA 6.5
 #define RESAMPLER_MAXIMUM_STRETCH 2
 #define RESAMPLER_HISTORY 128
+#if defined(__GNUC__) || defined(__clang__)
+#define RESAMPLER_ALIGNED __attribute__((aligned(16)))
+#else
+#define RESAMPLER_ALIGNED
+#endif
 
 /* ---------- voices */
 
@@ -91,6 +98,13 @@ struct sdl_stream
 	/* 2D gains */
 	float volume;             /* SetVolume */
 	float mix_left, mix_right;
+	/* a stereo voice of a sound in the world: panned towards it, -1 left
+	to 1 right, its distance, and the fade of its volume with distance that
+	the game made (dsound_sdl_stream_set_stereo_position) */
+	BOOL stereo_positioned;
+	float stereo_pan;
+	float stereo_distance;
+	float stereo_distance_fade;
 	float headroom;
 
 	/* 3D */
@@ -112,9 +126,12 @@ struct sdl_stream
 	/* the next frame to take from the first packet not finished */
 	unsigned long cursor;
 	/* the resampler's (resampler_reset): the last RESAMPLER_HISTORY frames
-	taken, how many were taken, the frame the output is at and how far past
-	it, and the frames of silence taken since the packets ran out */
-	float history[RESAMPLER_HISTORY][2];
+	taken, each channel's apart and each frame twice, RESAMPLER_HISTORY apart,
+	so that the frames a low pass reaches are side by side however the ring
+	wraps (resampler_dot); how many were taken, the frame the output is at and
+	how far past it, and the frames of silence taken since the packets ran
+	out */
+	float history[2][2 * RESAMPLER_HISTORY];
 	unsigned long history_count;
 	unsigned long center;
 	double phase;
@@ -399,6 +416,36 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 				*room_lowpass = lowpass_coefficient(gain_from_millibels(high_level - level), cosine);
 		}
 	}
+	else if (stream->channels == 2 && stream->stereo_positioned)
+	{
+		/* the equal power pan of a 3D voice, at the gains of a 2D one when
+		centred (the game fades it with distance), its direct path muffled
+		and its room send made as a 3D voice's are (SetI3DL2Source) */
+		float angle = (stream->stereo_pan + 1.0f) * 0.25f * 3.14159265f;
+		float direct = gain_from_millibels(stream->direct);
+		float cosine = frequency_cosine(environment.flHFReference);
+
+		*left = cosf(angle) * 1.41421356f * stream->mix_left * direct;
+		*right = sinf(angle) * 1.41421356f * stream->mix_right * direct;
+		if (stream->direct_hf < stream->direct)
+			*direct_lowpass = lowpass_coefficient(gain_from_millibels(stream->direct_hf - stream->direct), cosine);
+		if (reverb_enabled)
+		{
+			LONG level = environment.lRoom + stream->room;
+			LONG high_level = environment.lRoom + environment.lRoomHF + stream->room_hf;
+
+			/* the room's rolloff with distance, a 3D voice's; the volume
+			holds the game's fade with it, which a 3D voice's room send does
+			not take, so it is taken back out (no further than a twentieth:
+			past that the send fades out with the sound) */
+			*room = gain_from_millibels(level) *
+				distance_attenuation(stream, stream->stereo_distance,
+					environment.flRoomRolloffFactor + stream->room_rolloff_factor) /
+				(stream->stereo_distance_fade > 0.05f ? stream->stereo_distance_fade : 0.05f);
+			if (*room > 0.0f && high_level < level)
+				*room_lowpass = lowpass_coefficient(gain_from_millibels(high_level - level), cosine);
+		}
+	}
 	else
 	{
 		*left = stream->mix_left;
@@ -414,9 +461,11 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 Each voice is resampled to the output rate by band-limited interpolation (J.
 O. Smith's): an output sample is the source frames around its moment, each
 weighted by a windowed sinc low pass centred there. The low pass keeps
-RESAMPLER_CUTOFF of the source's band and takes the images of it out (65 dB
-down): linear interpolation, which the mixer did before, left them only 8 to
-20 dB down, a gritty haze above 11 kHz over every 22 kHz voice. A voice
+RESAMPLER_CUTOFF of the source's band (a 22 kHz voice is 0.5 dB down at 10
+kHz) and takes the images of it out (80 dB down), but for those of its last
+few hundred hertz, which lie beside them, about 20 dB down. Linear
+interpolation, which the mixer did before, left the images only 8 to 20 dB
+down, a gritty haze above 11 kHz over every 22 kHz voice. A voice
 played faster than the output rate takes its frames (a step over 1) gets the
 low pass narrowed to match, up to RESAMPLER_MAXIMUM_STRETCH times, so it
 does not alias. The frames come from the voice's packets in turn, so the low
@@ -428,8 +477,11 @@ static float resampler_table[RESAMPLER_ZERO_CROSSINGS * RESAMPLER_TABLE_STEPS + 
 to RESAMPLER_ZERO_CROSSINGS, at each of RESAMPLER_TABLE_STEPS phases between two
 source frames (and one row more, for the last's blend): a voice at the output
 rate or slower blends two rows by its phase, which is what the table gave tap
-by tap, a third of the work */
-static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][2 * RESAMPLER_ZERO_CROSSINGS];
+by tap, a third of the work. resampler_deltas holds each row's step to the
+next, so the blend is a multiply and an add a tap */
+#define RESAMPLER_TAPS (2 * RESAMPLER_ZERO_CROSSINGS)
+static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
+static float resampler_deltas[RESAMPLER_TABLE_STEPS][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 
 static double bessel_i0(double x)
 {
@@ -488,6 +540,77 @@ static void resampler_phases_initialize(void)
 			resampler_phases[phase][tap] = resampler_weight(distance * RESAMPLER_TABLE_STEPS);
 		}
 	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS; phase++)
+	{
+		for (tap = 0; tap < RESAMPLER_TAPS; tap++)
+			resampler_deltas[phase][tap] = resampler_phases[phase + 1][tap] - resampler_phases[phase][tap];
+	}
+}
+
+/* The low pass over a voice's frames, the sum of each frame times its weight:
+four taps at a time where the compiler has vectors (SSE, NEON), summed in four
+lanes, then the lanes together. Only the order of the additions differs from
+tap by tap, a difference of the order of float's rounding (-115 dB or less);
+RESAMPLER_SCALAR adds them tap by tap (tools/harness/tests/test_mixer.py). */
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(RESAMPLER_SCALAR)
+typedef float resampler_vector __attribute__((vector_size(16)));
+typedef float resampler_unaligned_vector __attribute__((vector_size(16), aligned(4)));
+/* (each row of the phase tables whole vectors, aligned) */
+typedef char resampler_taps_in_fours[RESAMPLER_TAPS % 4 ? -1 : 1];
+#define RESAMPLER_LANES 4
+#else
+#define RESAMPLER_LANES 1
+#endif
+
+/* frames[0, RESAMPLER_TAPS) weighted by the phase table's row blended blend of
+the way to the next */
+static float resampler_dot(const float *frames, const float *weights, const float *deltas, float blend)
+{
+#if RESAMPLER_LANES == 4
+	resampler_vector sum = { 0.0f, 0.0f, 0.0f, 0.0f }, blends = { blend, blend, blend, blend };
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+
+		sum += *(const resampler_unaligned_vector *)(frames + tap) * weight;
+	}
+	return (sum[0] + sum[1]) + (sum[2] + sum[3]);
+#else
+	float sum = 0.0f;
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap++)
+		sum += frames[tap] * (weights[tap] + deltas[tap] * blend);
+	return sum;
+#endif
+}
+
+/* resampler_dot of two channels' frames, with the same weights */
+static void resampler_dot2(const float *left_frames, const float *right_frames, const float *weights,
+	const float *deltas, float blend, float *left, float *right)
+{
+#if RESAMPLER_LANES == 4
+	resampler_vector left_sum = { 0.0f, 0.0f, 0.0f, 0.0f }, right_sum = left_sum;
+	resampler_vector blends = { blend, blend, blend, blend };
+	int tap;
+
+	for (tap = 0; tap < RESAMPLER_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+
+		left_sum += *(const resampler_unaligned_vector *)(left_frames + tap) * weight;
+		right_sum += *(const resampler_unaligned_vector *)(right_frames + tap) * weight;
+	}
+	*left = (left_sum[0] + left_sum[1]) + (left_sum[2] + left_sum[3]);
+	*right = (right_sum[0] + right_sum[1]) + (right_sum[2] + right_sum[3]);
+#else
+	*left = resampler_dot(left_frames, weights, deltas, blend);
+	*right = resampler_dot(right_frames, weights, deltas, blend);
+#endif
 }
 
 /* a voice starting (over): silence before its first frame, which the output
@@ -540,6 +663,26 @@ static BOOL take_frame(struct sdl_stream *stream, float *frame)
 	}
 }
 
+/* whether the voice has a frame to take; the packets with none left are
+marked finished on the way, as take_frame marks them */
+static BOOL voice_has_frames(struct sdl_stream *stream)
+{
+	unsigned long position;
+
+	for (position = 0; position < stream->packet_count; position++)
+	{
+		struct voice_packet *packet = &stream->packets[(stream->packet_head + position) % MAXIMUM_STREAM_PACKETS];
+
+		if (packet->finished)
+			continue;
+		if (stream->cursor < packet->frames)
+			return TRUE;
+		stream->cursor = 0;
+		packet->finished = TRUE;
+	}
+	return FALSE;
+}
+
 /* ---------- mixing */
 
 /* mixes one voice into output (frames of stereo float), and into the reverb's
@@ -550,8 +693,11 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float target_left, target_right, target_room, left, right, room, ramp_left, ramp_right, ramp_room, scale;
 	float target_direct_lowpass, target_room_lowpass, direct_lowpass, room_lowpass;
 	float ramp_direct_lowpass, ramp_room_lowpass;
+	float direct_state[2], room_state;
 	long width;
 	unsigned long frame;
+	/* (a stereo voice panned towards its sound: voice_gains) */
+	BOOL positioned = stream->channels == 2 && stream->stereo_positioned;
 
 	if (stream->paused || !stream->packet_count || !stream->sample_rate)
 		return;
@@ -560,6 +706,16 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	rate, and the frames it reaches on each side */
 	scale = step > 1.0 ? (float)(1.0 / (step < RESAMPLER_MAXIMUM_STRETCH ? step : RESAMPLER_MAXIMUM_STRETCH)) : 1.0f;
 	width = (long)ceilf(RESAMPLER_ZERO_CROSSINGS / scale);
+	/* a voice that ran dry and stopped (below) starts over once it has
+	frames again: stream_process starts over only a stream with no packets,
+	and the next can come before the finished ones are completed */
+	if (stream->silence > (unsigned long)(2 * width))
+	{
+		if (!voice_has_frames(stream))
+			return;
+		resampler_reset(stream);
+		stream->gains_valid = FALSE;
+	}
 	voice_gains(stream, &target_left, &target_right, &target_room, &target_direct_lowpass, &target_room_lowpass);
 	if (!stream->gains_valid)
 	{
@@ -577,6 +733,11 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	room = stream->current_room;
 	direct_lowpass = stream->current_direct_lowpass;
 	room_lowpass = stream->current_room_lowpass;
+	/* the low passes' states, here while the mix writes the output (which
+	the compiler cannot tell from them) */
+	direct_state[0] = stream->direct_lowpass[0];
+	direct_state[1] = stream->direct_lowpass[1];
+	room_state = stream->room_lowpass;
 	ramp_left = (target_left - left) / (float)frames;
 	ramp_right = (target_right - right) / (float)frames;
 	ramp_room = (target_room - room) / (float)frames;
@@ -592,17 +753,20 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		silence, until what was taken has played out */
 		while ((long)(stream->history_count - stream->center) <= width)
 		{
-			float *slot = stream->history[stream->history_count % RESAMPLER_HISTORY];
+			unsigned long slot = stream->history_count % RESAMPLER_HISTORY;
+			float taken[2];
 
-			if (take_frame(stream, slot))
+			if (take_frame(stream, taken))
 			{
 				stream->silence = 0;
 			}
 			else
 			{
-				slot[0] = slot[1] = 0.0f;
+				taken[0] = taken[1] = 0.0f;
 				stream->silence++;
 			}
+			stream->history[0][slot] = stream->history[0][slot + RESAMPLER_HISTORY] = taken[0];
+			stream->history[1][slot] = stream->history[1][slot + RESAMPLER_HISTORY] = taken[1];
 			stream->history_count++;
 		}
 		if (stream->silence > (unsigned long)(2 * width))
@@ -618,50 +782,69 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			double position = stream->phase * RESAMPLER_TABLE_STEPS;
 			unsigned long row = (unsigned long)position;
 			float blend = (float)(position - (double)row);
-			const float *weights = resampler_phases[row], *next_weights = resampler_phases[row + 1];
-			unsigned long first = stream->center + 1 - RESAMPLER_ZERO_CROSSINGS;
+			unsigned long first = (stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY;
 
-			for (tap = 0; tap < 2 * RESAMPLER_ZERO_CROSSINGS; tap++)
+			/* (a mono voice's two channels are the same: take_frame) */
+			if (stream->channels == 1)
 			{
-				const float *source = stream->history[(first + (unsigned long)tap) % RESAMPLER_HISTORY];
-				float weight = weights[tap] + (next_weights[tap] - weights[tap]) * blend;
-
-				sample_left += source[0] * weight;
-				sample_right += source[1] * weight;
+				sample_left = sample_right = resampler_dot(stream->history[0] + first, resampler_phases[row],
+					resampler_deltas[row], blend);
+			}
+			else
+			{
+				resampler_dot2(stream->history[0] + first, stream->history[1] + first, resampler_phases[row],
+					resampler_deltas[row], blend, &sample_left, &sample_right);
 			}
 		}
 		else
 		{
+			unsigned long first = (stream->center + 1 - (unsigned long)width) % RESAMPLER_HISTORY;
+			const float *left_frames = stream->history[0] + first, *right_frames = stream->history[1] + first;
+
 			for (tap = 1 - width; tap <= width; tap++)
 			{
-				const float *source = stream->history[(stream->center + (unsigned long)tap) % RESAMPLER_HISTORY];
 				float weight = scale * resampler_weight(fabsf((float)tap - (float)stream->phase) * scale * RESAMPLER_TABLE_STEPS);
 
-				sample_left += source[0] * weight;
-				sample_right += source[1] * weight;
+				sample_left += left_frames[tap + width - 1] * weight;
+				if (stream->channels == 2)
+					sample_right += right_frames[tap + width - 1] * weight;
 			}
+			if (stream->channels == 1)
+				sample_right = sample_left;
 		}
 		/* the room send, with its own low pass */
 		if (room || ramp_room)
 		{
 			float mono = stream->channels == 1 ? sample_left : 0.5f * (sample_left + sample_right);
 
-			stream->room_lowpass = flush_denormal(mono + room_lowpass * (stream->room_lowpass - mono));
-			send[frame] += stream->room_lowpass * room;
+			room_state = flush_denormal(mono + room_lowpass * (room_state - mono));
+			send[frame] += room_state * room;
 		}
 		/* the direct path, muffled, or as it is; a mono voice's mix bins or pan
 		split it across the speakers */
 		if (direct_lowpass || ramp_direct_lowpass)
 		{
-			sample_left = flush_denormal(sample_left + direct_lowpass * (stream->direct_lowpass[0] - sample_left));
-			sample_right = flush_denormal(sample_right + direct_lowpass * (stream->direct_lowpass[1] - sample_right));
+			sample_left = flush_denormal(sample_left + direct_lowpass * (direct_state[0] - sample_left));
+			sample_right = flush_denormal(sample_right + direct_lowpass * (direct_state[1] - sample_right));
 		}
-		stream->direct_lowpass[0] = sample_left;
-		stream->direct_lowpass[1] = sample_right;
+		direct_state[0] = sample_left;
+		direct_state[1] = sample_right;
 		if (stream->channels == 1)
 		{
 			output[frame * 2] += sample_left * left;
 			output[frame * 2 + 1] += sample_left * right;
+		}
+		else if (positioned)
+		{
+			/* the channels' middle panned, and their difference kept as
+			wide as the far ear's gain: the sound comes from where it is,
+			still stereo */
+			float middle = 0.5f * (sample_left + sample_right);
+			float side = 0.5f * (sample_left - sample_right);
+			float far_gain = left < right ? left : right;
+
+			output[frame * 2] += middle * left + side * far_gain;
+			output[frame * 2 + 1] += middle * right - side * far_gain;
 		}
 		else
 		{
@@ -680,6 +863,9 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			stream->center++;
 		}
 	}
+	stream->direct_lowpass[0] = direct_state[0];
+	stream->direct_lowpass[1] = direct_state[1];
+	stream->room_lowpass = room_state;
 	stream->current_left = target_left;
 	stream->current_right = target_right;
 	stream->current_room = target_room;
@@ -1000,6 +1186,9 @@ static struct
 	/* the frames the output is delayed by, and the gain each needs */
 	float delay[LIMITER_LOOKAHEAD][OUTPUT_CHANNELS];
 	float needed[LIMITER_LOOKAHEAD];
+	/* how many of them are under 1: none while nothing is too loud, when the
+	smallest is 1 without looking */
+	unsigned long limiting;
 	/* the gain held down to what the frames ahead need, coming back up */
 	float held;
 	/* its last LIMITER_LOOKAHEAD values, and their sum */
@@ -1039,12 +1228,18 @@ static void limit(float *output, unsigned long frames)
 				peak = fabsf(sample[channel]);
 			limiter.delay[position][channel] = sample[channel];
 		}
+		limiter.limiting -= limiter.needed[position] < 1.0f;
 		limiter.needed[position] = peak > LIMITER_CEILING ? LIMITER_CEILING / peak : 1.0f;
-		lowest = limiter.needed[0];
-		for (index = 1; index < LIMITER_LOOKAHEAD; index++)
+		limiter.limiting += limiter.needed[position] < 1.0f;
+		lowest = 1.0f;
+		if (limiter.limiting)
 		{
-			if (limiter.needed[index] < lowest)
-				lowest = limiter.needed[index];
+			lowest = limiter.needed[0];
+			for (index = 1; index < LIMITER_LOOKAHEAD; index++)
+			{
+				if (limiter.needed[index] < lowest)
+					lowest = limiter.needed[index];
+			}
 		}
 		if (lowest < limiter.held)
 			limiter.held = lowest;
@@ -1090,6 +1285,8 @@ static void mix(float *output, unsigned long frames)
 		if ((!enabled && reverb.level <= 0.0f) || reverb.quiet > REVERB_QUIET_FRAMES)
 			reverb_clear();
 	}
+	/* the players' voices (voice_audio.c), dry, under the limiter */
+	voice_audio_mix(output, frames);
 	limit(output, frames);
 }
 
@@ -1097,6 +1294,17 @@ static void mix(float *output, unsigned long frames)
 
 static SDL_AudioStream *audio_stream;
 static BOOL audio_started = FALSE;
+/* the device it plays on (audio.output_device), and when it was looked at */
+static char audio_device_name[PLATFORM_AUDIO_DEVICE_NAME_SIZE];
+static unsigned long audio_device_read_at = (unsigned long)-1;
+
+/* audio.output_device ("default": the system's; none on Android) */
+static const char *audio_device_setting(void)
+{
+	const char *name = config_string("audio.output_device");
+
+	return name && name[0] ? name : "default";
+}
 
 static void SDLCALL audio_callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount)
 {
@@ -1158,8 +1366,21 @@ static void audio_start(void)
 		spec.format = SDL_AUDIO_F32;
 		spec.channels = OUTPUT_CHANNELS;
 		spec.freq = OUTPUT_RATE;
+#ifdef HALO_ANDROID
+		/* frames per callback: on Android each callback is handed to a thread
+		that can run the guest (host_sdl.c): 512 left it too little time and
+		the menus' music broke up, which 1024 does not (about 21 ms at 48 kHz,
+		11 ms more than 512) */
+		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "1024");
+#else
 		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
-		audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
+#endif
+		snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
+		audio_device_read_at = config_changes();
+		audio_stream = SDL_OpenAudioDeviceStream(platform_audio_device(FALSE, audio_device_name), &spec,
+			audio_callback, NULL);
+		if (!audio_stream && strcmp(audio_device_name, "default"))
+			audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
 		if (audio_stream)
 		{
 			SDL_ResumeAudioStreamDevice(audio_stream);
@@ -1170,6 +1391,44 @@ static void audio_start(void)
 	{
 		pthread_t thread;
 
+		pthread_create(&thread, NULL, silent_clock_thread, NULL);
+		pthread_detach(thread);
+	}
+}
+
+/* (the event thread, each frame: sdl_platform.c) audio.output_device
+changed (Settings > Audio): the sound goes on on the new device, else the
+system's default */
+void dsound_sdl_output_device_check(void)
+{
+	SDL_AudioSpec spec;
+	SDL_AudioStream *stream;
+
+	if (!audio_stream || audio_device_read_at == config_changes())
+		return;
+	audio_device_read_at = config_changes();
+	if (!strcmp(audio_device_name, audio_device_setting()))
+		return;
+	snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());
+	spec.format = SDL_AUDIO_F32;
+	spec.channels = OUTPUT_CHANNELS;
+	spec.freq = OUTPUT_RATE;
+	SDL_DestroyAudioStream(audio_stream);
+	stream = SDL_OpenAudioDeviceStream(platform_audio_device(FALSE, audio_device_name), &spec, audio_callback, NULL);
+	if (!stream)
+		stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, audio_callback, NULL);
+	audio_stream = stream;
+	if (audio_stream)
+	{
+		SDL_ResumeAudioStreamDevice(audio_stream);
+		platform_log("audio: playing on %s", audio_device_name);
+	}
+	else
+	{
+		pthread_t thread;
+
+		/* (none at all: the voices drained in real time, as at the start) */
+		platform_log("audio: cannot open an audio device (%s); sound is silent", SDL_GetError());
 		pthread_create(&thread, NULL, silent_clock_thread, NULL);
 		pthread_detach(thread);
 	}
@@ -1347,13 +1606,40 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	{
 		struct voice_packet *head = &stream->packets[stream->packet_head];
 
-		stream_complete_head(stream, head->finished ? XMEDIAPACKET_STATUS_SUCCESS : XMEDIAPACKET_STATUS_FLUSHED,
+		/* Cancellation is synchronous. SUCCESS would let the game's
+		completion callback refill the stream we are stopping. */
+		stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
 	stream->cursor = 0;
 	resampler_reset(stream);
+	/* (the next sound on the channel says where it is) */
+	stream->stereo_positioned = FALSE;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
+}
+
+/* A stereo voice of a sound in the world (`positioned`) is panned towards
+it, `pan` from -1 (left) to 1 (right), and muffled and reverberated as a 3D
+voice is (its I3DL2 source, which the game sets as a 3D channel's), its room
+send rolling off from `minimum_distance` with `distance`. The game fades its
+volume with distance itself, by `distance_fade`. Not positioned, it plays as
+the Xbox played every stereo sound, unpanned and dry. (sound_manager.c,
+update_channels: sound_dsound_xbox.c calls this.) */
+void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *object, BOOL positioned, float pan,
+	float distance, float minimum_distance, float distance_fade)
+{
+	struct sdl_stream *stream = stream_from_interface(object);
+
+	pthread_mutex_lock(&mixer_lock);
+	stream->stereo_positioned = positioned && stream->channels == 2;
+	stream->stereo_pan = pan < -1.0f ? -1.0f : (pan > 1.0f ? 1.0f : pan);
+	stream->stereo_distance = distance > 0.0f ? distance : 0.0f;
+	stream->stereo_distance_fade = distance_fade < 0.0f ? 0.0f : (distance_fade > 1.0f ? 1.0f : distance_fade);
+	/* (as the game gives a 3D channel: no maximum) */
+	stream->minimum_distance = minimum_distance > 0.0f ? minimum_distance : 0.0f;
+	stream->maximum_distance = 3.4e38f;
+	pthread_mutex_unlock(&mixer_lock);
 }
 
 static IDirectSoundStreamVtbl stream_vtable =

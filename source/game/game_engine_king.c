@@ -560,7 +560,7 @@ static boolean king_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, place_name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), place_name, score);
 			}
 			else if (message == king_message_ally_on_the_hill)
 			{
@@ -573,7 +573,7 @@ static boolean king_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 			else if (message == king_message_enemy_on_the_hill)
 			{
@@ -586,7 +586,7 @@ static boolean king_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 			else
 			{
@@ -762,7 +762,8 @@ static wchar_t *king_get_score_header_string(
 	{
 		string = L"";
 	}
-	ustrcpy(buffer, string);
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(buffer, string, 256);
 
 	return buffer;
 }

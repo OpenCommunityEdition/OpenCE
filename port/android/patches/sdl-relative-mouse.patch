@@ -1,0 +1,39 @@
+diff --git a/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java b/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java
+index 8681d05..1beeac4 100644
+--- a/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java
++++ b/android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java
+@@ -787,6 +787,34 @@ class SDLGenericMotionListener_API14 implements View.OnGenericMotionListener {
+                         consumed = true;
+                         break;
+ 
++                    case MotionEvent.ACTION_BUTTON_PRESS:
++                        if (checkRelativeEvent(event)) {
++                            x = getEventX(event, i);
++                            y = getEventY(event, i);
++                            SDLActivity.onNativeMouse(event.getButtonState(), MotionEvent.ACTION_DOWN, x, y, true);
++                            consumed = true;
++                        }
++                        break;
++
++                    case MotionEvent.ACTION_BUTTON_RELEASE:
++                        if (checkRelativeEvent(event)) {
++                            x = getEventX(event, i);
++                            y = getEventY(event, i);
++                            SDLActivity.onNativeMouse(event.getButtonState(), MotionEvent.ACTION_UP, x, y, true);
++                            consumed = true;
++                        }
++                        break;
++
++                    case MotionEvent.ACTION_MOVE:
++                        // Pointer capture delivers relative mouse motion as ACTION_MOVE.
++                        if (checkRelativeEvent(event)) {
++                            x = getEventX(event, i);
++                            y = getEventY(event, i);
++                            SDLActivity.onNativeMouse(0, action, x, y, true);
++                            consumed = true;
++                        }
++                        break;
++
+                     case MotionEvent.ACTION_HOVER_MOVE:
+                         x = getEventX(event, i);
+                         y = getEventY(event, i);

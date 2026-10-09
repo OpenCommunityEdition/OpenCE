@@ -349,8 +349,10 @@ char *csprintf(
 	
 	va_start(arglist, format);
 	/* port: no longer than the longest a string is (MAXIMUM_STRING_SIZE,
-	as csstrlen asserts): the caller's buffer's size isn't passed */
-	vsnprintf(buffer, MAXIMUM_STRING_SIZE, format, arglist);
+	as csstrlen asserts): the caller's buffer's size isn't passed. But
+	temporary, which most callers format into (often with a map's tag
+	names), is only its own size */
+	vsnprintf(buffer, buffer == temporary ? sizeof(temporary) : MAXIMUM_STRING_SIZE, format, arglist);
 	va_end(arglist);
 	
 	return buffer;

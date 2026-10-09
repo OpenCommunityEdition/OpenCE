@@ -1,0 +1,4 @@
+/* halo.exe's resources (tools/windows_build.py): its icon (tools/app_icon.py),
+which Explorer and the taskbar show and SDL's windows take, as the first icon
+of the executable */
+1 ICON "opence-icon.ico"

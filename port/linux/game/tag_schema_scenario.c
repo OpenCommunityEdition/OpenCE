@@ -1288,7 +1288,8 @@ static struct tag_schema_field const scenario_fields[] =
 	TAG_SCHEMA_BLOCK(struct scenario, bipeds, biped_schema, MAXIMUM_BIPED_DATUMS_PER_SCENARIO),
 	TAG_SCHEMA_BLOCK(struct scenario, biped_palette, biped_palette_schema,
 		MAXIMUM_SCENARIO_OBJECT_PALETTE_ENTRIES_PER_BLOCK),
-	TAG_SCHEMA_BLOCK(struct scenario, vehicles, vehicle_schema, MAXIMUM_VEHICLE_DATUMS_PER_SCENARIO),
+	/* (the game places them as many as there are: object_types_place_all) */
+	TAG_SCHEMA_TOOL_BLOCK(struct scenario, vehicles, vehicle_schema, MAXIMUM_VEHICLE_DATUMS_PER_SCENARIO),
 	TAG_SCHEMA_BLOCK(struct scenario, vehicle_palette, vehicle_palette_schema,
 		MAXIMUM_SCENARIO_OBJECT_PALETTE_ENTRIES_PER_BLOCK),
 	TAG_SCHEMA_BLOCK(struct scenario, equipment, equipment_schema, MAXIMUM_EQUIPMENT_DATUMS_PER_SCENARIO),

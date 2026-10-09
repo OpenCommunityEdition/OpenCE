@@ -114,7 +114,8 @@ symbols in this file:
 /* port: the cache's pages (sound_cache_new), named for the size check */
 enum
 {
-	SOUND_CACHE_PAGE_COUNT = 1024,
+	/* port: the native builds' cache (halo_port_capacity.h; 1024 pages) */
+	SOUND_CACHE_PAGE_COUNT = HALO_PORT_SOUND_CACHE_SIZE >> 12,
 	SOUND_CACHE_PAGE_SIZE_BITS = 12,
 };
 
@@ -557,7 +558,7 @@ static void sound_cache_start_loading_sound(
 	long cache_block_index;
 
 	/* port: the size is the map's (retail: 288 bytes to 377064): none, or
-	more than the cache holds (1024 pages of 4k), is not loaded, said once
+	more than the cache holds (its pages of 4k), is not loaded, said once
 	(the cache halts on a block of no pages) */
 	if (sound->samples.size <= 0 ||
 		sound->samples.size > SOUND_CACHE_PAGE_COUNT << SOUND_CACHE_PAGE_SIZE_BITS)
@@ -603,13 +604,26 @@ static void sound_cache_start_loading_sound(
 		sound->cache_block_index = cache_block_index;
 		sound->cache_base_address = (unsigned long)cache_address;
 		cache_sound->sound = sound;
-		cache_file_read(
-			sound->cache_tag_index,
-			sound->samples.file_offset,
-			sound->samples.size,
-			cache_address,
-			&cache_sound->loaded,
-			FALSE);
+		/* port: or, the sound of a tag file played over the map's, from
+		memory, at once (port/linux/game/loose_sounds.c) */
+		{
+			extern boolean loose_sounds_read(struct sound_permutation const *permutation, void *buffer);
+
+			if (loose_sounds_read(sound, cache_address))
+			{
+				cache_sound->loaded = TRUE;
+			}
+			else
+			{
+				cache_file_read(
+					sound->cache_tag_index,
+					sound->samples.file_offset,
+					sound->samples.size,
+					cache_address,
+					&cache_sound->loaded,
+					FALSE);
+			}
+		}
 	}
 	else if (
 		system_milliseconds() -
@@ -772,8 +786,9 @@ void sound_cache_debug_render(
 {
 	if (debug_sound_cache)
 	{
-		short rows = 1024 / 640;
-		byte page_usage[1024];
+		/* port: (of the native builds' pages: the cache fills page_usage) */
+		short rows = SOUND_CACHE_PAGE_COUNT / 640;
+		byte page_usage[SOUND_CACHE_PAGE_COUNT];
 		long x;
 		real_argb_color const *colors[4];
 

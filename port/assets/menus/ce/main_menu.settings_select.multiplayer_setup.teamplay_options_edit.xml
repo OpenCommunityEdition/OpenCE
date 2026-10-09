@@ -48,6 +48,11 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_friendly_fire" x="54" y="73"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_friendly_fire_penalty" x="54" y="103"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_autobalance" x="54" y="133"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_mode" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_lobby" x="54" y="193"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_kbps" x="54" y="223"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_proximity" x="54" y="253"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_votekick" x="54" y="283"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

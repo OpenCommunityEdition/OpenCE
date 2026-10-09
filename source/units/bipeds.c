@@ -277,6 +277,10 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
+/* port: port/linux/game/network_objects.c's (a client deletes the host's
+objects on the host's word alone) */
+boolean network_objects_may_delete(long object_index);
+
 /* port: an unarmed player's melee's length, in ticks (a weapon's is about
 this: its first person melee animation, sped up a quarter) */
 #define UNARMED_MELEE_TICKS 16
@@ -518,6 +522,8 @@ static void biped_update_jumping(
 	struct unit_animation_update_data *animation);
 static void biped_update_physics(
 	struct biped_physics *physics);
+/* units.c's: whether the unit gets the animation enhancements */
+boolean unit_animation_enhanced(long unit_index);
 static void biped_snap_facing(
 	long biped_index);
 
@@ -830,9 +836,12 @@ static void biped_falling_damage(
 				object_cause_damage(&damage, biped_index, NONE, NONE, NONE, NULL);
 			}
 
+			/* (port: not the host's biped on a client, which the host erases:
+			the delete was refused, and logged as done) */
 			if (!game_engine_running() &&
 				TEST_FLAG(biped->object.flags, _object_outside_of_map_bit) &&
-				player_index_from_unit_index(biped_index) == NONE)
+				player_index_from_unit_index(biped_index) == NONE &&
+				network_objects_may_delete(biped_index))
 			{
 				long actor_index = biped->unit.swarm_actor_index;
 
@@ -3333,6 +3342,14 @@ static void biped_update_turning(
 	{
 		boolean flaming =
 			biped->unit.animation.base_seat_index==_unit_base_seat_flaming;
+		/* port: a player throwing a grenade turns with the aim, as one
+		meleeing does: the melee plays over the moving or idle state, the
+		throw is a state of its own, which the original never turned in
+		(game.enhanced_animations: unit_animation_enhanced) */
+		boolean throwing_turn =
+			biped->unit.player_index!=NONE &&
+			biped->unit.animation.state==_unit_state_throw_grenade &&
+			unit_animation_enhanced(biped_index);
 		real_vector3d turn_axis;
 		real turn_error;
 		real facing_alignment;
@@ -3396,7 +3413,8 @@ static void biped_update_turning(
 		}
 
 		if (biped->biped.state==biped_state_moving ||
-			TEST_FLAG(flags, _biped_turns_without_animating_bit))
+			TEST_FLAG(flags, _biped_turns_without_animating_bit) ||
+			throwing_turn)
 		{
 			if (!TEST_FLAG(biped->unit.control_flags, _unit_control_look_dont_turn_bit))
 			{

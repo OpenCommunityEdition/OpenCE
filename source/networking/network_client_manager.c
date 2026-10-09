@@ -1283,17 +1283,22 @@ boolean network_game_client_game_settings_updated(
 			network_event("invalid message_server_game_settings_update message received: its players");
 			return FALSE;
 		}
-		if (csstrcmp(message_packet->map.name, client->game.map.name))
+		if (csstrcmp(message_packet->map.name, client->game.map.name) ||
+			message_packet->map.version != client->game.map.version)
 		{
 			char build[0x20];
 
 			/* port: a map this machine has not (a Custom Edition map not in
-			its custom_maps folder, say): the player told which and where to
-			copy it (the main menu's error, in place of the failed join's), and
-			the game left, rather than precaching it, which would give the
-			damaged disc error (cache_files.c) */
-			if (!network_game_is_splitscreen_local() && !cache_files_map_present(message_packet->map.name))
+			its custom_maps folder, or another version of it than the host's,
+			say): the player told which and where to copy it (the main menu's
+			error, in place of the failed join's), and the game left, rather
+			than precaching it, which would give the damaged disc error
+			(cache_files.c) */
+			if (!network_game_is_splitscreen_local() &&
+				!cache_files_map_present(message_packet->map.name, (unsigned long)message_packet->map.version))
+			{
 				return FALSE;
+			}
 
 			/* port: a map of a build this version does not play with others
 			(its objects would not be the host's): said, and the game left */
@@ -2336,7 +2341,8 @@ static boolean network_game_client_map_name_is_valid(
 {
 	/* (a scenario's tag path, of which the cache takes the name after the
 	last backslash: letters, digits and a few more, none that a path reads
-	otherwise) */
+	otherwise; the [ ] ( ) + that Custom Edition maps' names use, as in
+	[H2]_Lockout, too) */
 	char const *character;
 	char const *leaf;
 
@@ -2346,7 +2352,8 @@ static boolean network_game_client_map_name_is_valid(
 	{
 		if (!((*character >= 'a' && *character <= 'z') || (*character >= 'A' && *character <= 'Z') ||
 			(*character >= '0' && *character <= '9') || *character == '_' || *character == '-' ||
-			*character == '.' || *character == ' ' || *character == '\\'))
+			*character == '.' || *character == ' ' || *character == '\\' ||
+			*character == '[' || *character == ']' || *character == '(' || *character == ')' || *character == '+'))
 		{
 			return FALSE;
 		}
@@ -2355,6 +2362,22 @@ static boolean network_game_client_map_name_is_valid(
 		return FALSE;
 	leaf = strrchr(map_name, '\\');
 	leaf = leaf ? leaf + 1 : map_name;
+	/* port: and not one of Windows's devices (con, nul, com1...), whatever
+	follows it: maps\com1.map opens the serial port there */
+	{
+		static char const *const devices[] = { "con", "prn", "aux", "nul", "com", "lpt" };
+		long stem = (long)strcspn(leaf, ". ");
+		short device;
+
+		for (device = 0; device < (short)NUMBEROF(devices); device++)
+		{
+			if (!_strnicmp(leaf, devices[device], 3) &&
+				((device < 4 && stem == 3) || (device >= 4 && stem == 4 && leaf[3] >= '0' && leaf[3] <= '9')))
+			{
+				return FALSE;
+			}
+		}
+	}
 	return *leaf && leaf[strspn(leaf, ". ")] != 0;
 }
 

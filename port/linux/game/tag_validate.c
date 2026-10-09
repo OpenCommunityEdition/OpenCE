@@ -61,6 +61,11 @@ enum
 
 	/* how deep blocks go in a schema (the deepest are 6 or 7) */
 	MAXIMUM_VALIDATION_DEPTH = 32,
+	/* the longest a tag's name is, with its terminator (Halo's tools' paths:
+	the game's buffers for them, game_state.c's, objects.c's, are this
+	size) */
+	MAXIMUM_TAG_NAME_LENGTH = 256,
+
 	/* how many corrections are logged one by one, for each map or bsp */
 	MAXIMUM_LOGGED_CORRECTIONS = 64,
 	MAXIMUM_MESSAGE_LENGTH = 512,
@@ -431,12 +436,18 @@ static boolean string_valid(
 	/* (the name a nameless tag or reference is given) */
 	if (string == tag_validate_empty_name)
 		return TRUE;
+	/* (and no longer than a tag's path is, MAXIMUM_TAG_NAME_LENGTH: the
+	game copies and formats names into buffers of that size) */
 	if (region_contains(validation, string, 1))
-		return memchr(string, 0, validation->region_size - offset) != NULL;
+	{
+		return memchr(string, 0, MIN(validation->region_size - offset, (unsigned long)MAXIMUM_TAG_NAME_LENGTH)) !=
+			NULL;
+	}
 	if (tags && (unsigned long)string >= (unsigned long)tags &&
 		tags_offset < (unsigned long)tag_validate_globals.tag_data_size)
 	{
-		return memchr(string, 0, tag_validate_globals.tag_data_size - tags_offset) != NULL;
+		return memchr(string, 0, MIN(tag_validate_globals.tag_data_size - tags_offset,
+			(unsigned long)MAXIMUM_TAG_NAME_LENGTH)) != NULL;
 	}
 
 	return FALSE;
@@ -579,7 +590,8 @@ static void validate_block_extent(
 		tag_validate_refuse(validation, "has %ld elements", block->count);
 		return;
 	}
-	if (field->maximum > 0 && block->count > field->maximum)
+	if (field->maximum > 0 && block->count > field->maximum &&
+		!(tag_validate_globals.custom_edition && TEST_FLAG(field->flags, _tag_schema_tool_maximum_bit)))
 	{
 		tag_validate_correct(validation, "has %ld elements, more than the game's %ld: cut to %ld",
 			block->count, field->maximum, field->maximum);
@@ -1353,6 +1365,20 @@ void tag_validate_refuse(
 	va_start(arguments, format);
 	validation_message(validation, "cannot be played", format, arguments);
 	va_end(arguments);
+
+	return;
+}
+
+void tag_validate_non_negative(
+	struct tag_validation *validation,
+	char const *name,
+	real *value)
+{
+	if (!(*value >= 0.0f))
+	{
+		tag_validate_correct(validation, "has a %s of %f: 0", name, *value);
+		*value = 0.0f;
+	}
 
 	return;
 }

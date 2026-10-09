@@ -1443,8 +1443,9 @@ static wchar_t *spinner_string_list_get_string(
 /* ---------- globals */
 
 /* port: text boxes' string list indices from here are the descriptions of
-spinners' extra items (kills_to_win_extra_descriptions) */
-#define SPINNER_EXTRA_DESCRIPTION_BASE 0x5000
+spinners' extra items (kills_to_win_extra_descriptions), above the Custom
+Edition maps' display indices (custom_edition_maps.c keeps them below 0x7000) */
+#define SPINNER_EXTRA_DESCRIPTION_BASE 0x7000
 /* ... and the pixels a spinner with extra items is wider (for three digits) */
 #define SPINNER_EXTRA_WIDTH 12
 
@@ -5727,6 +5728,10 @@ static void widget_instance_render_spinner_list(
 	return;
 }
 
+/* port/linux/game/menu_functions.c's: a text box drawn, at the bounds its
+text was drawn in (the lobby's speaker icons) */
+void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d const *bounds);
+
 /* ---------- the mouse (desktop builds)
 
 The menus were made for a controller: the d-pad moves the focus through a
@@ -6455,6 +6460,18 @@ static void widget_instance_render_recursive(
 			clip_rect,
 			offset,
 			widget_instance_text_box_is_focused(widget));
+		/* port: what the menus draw beside a text (the lobby's speaker
+		icons: port/linux/game/menu_functions.c), its bounds as it was
+		drawn in them (widget_instance_render_text_box), its font and
+		justification still set */
+		{
+			rectangle2d text_bounds = definition->bounds;
+
+			offset_rectangle2d(&text_bounds, offset.x, offset.y);
+			text_bounds.x0 += definition->horizontal_offset;
+			text_bounds.y0 += definition->vertical_offset;
+			menu_functions_text_box_drawn(widget, &text_bounds);
+		}
 		break;
 
 	case _ui_widget_type_spinner_list:

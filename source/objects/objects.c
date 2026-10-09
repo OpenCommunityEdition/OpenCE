@@ -53,6 +53,8 @@ OBJECTS.C
 #include "sound/game_sound.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+/* port: object_bounds_cache.c's */
+void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 
 /* ---------- constants */
 
@@ -558,7 +560,8 @@ void object_pvs_set_camera_point(
 void objects_port_set_activating_cluster(
 	short cluster_index)
 {
-	if (cluster_index == NONE || cluster_index >= global_structure_bsp_get()->clusters.count)
+	/* (port: a co-op host sends it, so any index outside the BSP's clusters is none) */
+	if (cluster_index < 0 || cluster_index >= global_structure_bsp_get()->clusters.count)
 	{
 		object_globals->pvs_activation_type = _pvs_activation_normal;
 		return;
@@ -2937,6 +2940,8 @@ void object_compute_node_matrices(
 	{
 		object->object.bounding_sphere_radius *= object->object.scale;
 	}
+	/* port: (and in the packed copy collision reads: object_bounds_cache.c) */
+	object_bounds_cache_update(object_index, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
 
 	return;
 }
@@ -3676,7 +3681,9 @@ long object_new(
 	if (object_index==NONE && definition_index!=NONE)
 	{
 		char string[512];
-		sprintf(string, "OUT OF OBJECTS: cannot create %s", tag_name_strip_path(tag_get_name(definition_index)));
+		/* port: snprintf (a map's tag's name may be any length) */
+		snprintf(string, sizeof(string), "OUT OF OBJECTS: cannot create %s",
+			tag_name_strip_path(tag_get_name(definition_index)));
 		console_printf(FALSE, "%s", string);
 		error(_error_log, "%s", string);
 	}
