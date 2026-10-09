@@ -265,14 +265,10 @@ static void keyboard_controls_update(
 		/* (diagonals on the unit circle) */
 		real length = x && y ? 0.70710678f : 1.f;
 
-		/* port: full stick uncrouches a grounded biped (player_control.c).
-		Keep keyboard crouch below its strict 0.98f magnitude cutoff: this
-		is the largest float below 0.98f, applied after diagonal normalization.
-		Only keyboard movement with the keyboard's crouch action is scaled. */
+		/* port: crouched, below the full stick's 0.98 that stands a grounded
+		biped up (player_control.c), as a stick's crouch walk is */
 		if (TEST_FLAG(held, HALO_KEYBOARD_CROUCH))
-		{
-			length *= 0.97999996f;
-		}
+			length *= 0.97f;
 
 		state->forward_movement = y * length;
 		state->strafe = -x * length;
