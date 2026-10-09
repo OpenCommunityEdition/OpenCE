@@ -79,7 +79,7 @@
         <!-- the downloaded new version, for the package installer (Updater) -->
         <provider
             android:name=".UpdateProvider"
-            android:authorities="com.halo.decomp.update"
+            android:authorities="${updateAuthority}"
             android:exported="false"
             android:grantUriPermissions="true" />
 
