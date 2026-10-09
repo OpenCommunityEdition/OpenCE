@@ -1150,6 +1150,10 @@ static BOOL surface_is_shadow_map(const D3DSurface *surface)
 		description.height == SHADOW_MAP_SIZE;
 }
 
+/* the secondary render target, the size of the Xbox's (rasterizer_xbox.c) */
+#define SECONDARY_TARGET_WIDTH 320
+#define SECONDARY_TARGET_HEIGHT 240
+
 /* the targets render_target_get found last, by what it found them from:
 each draw asks again for the same two (bind_targets) */
 #define RECENT_RENDER_TARGET_COUNT 4
@@ -1202,9 +1206,13 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		}
 	}
 	surface_dimensions(surface, &width, &height, &depth);
-	/* the screen's targets are drawn at the screen's scale, and the shadow
-	maps at display.shadow_resolution's (halo_shadow_map_scale) */
-	if (width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT)
+	/* the screen's targets are drawn at the screen's scale, and so is the
+	secondary target (the reflections' and active camouflage's: its size is
+	rasterizer_xbox.c's), which keeps the game's 320x240 units, that its
+	shaders' constants are in, and gets the screen's pixels a unit; the
+	shadow maps at display.shadow_resolution's (halo_shadow_map_scale) */
+	if ((width == (unsigned long)halo_screen_width() && height == SCREEN_HEIGHT) ||
+		(!depth && width == SECONDARY_TARGET_WIDTH && height == SECONDARY_TARGET_HEIGHT))
 	{
 		scale[0] = screen_scale[0];
 		scale[1] = screen_scale[1];
