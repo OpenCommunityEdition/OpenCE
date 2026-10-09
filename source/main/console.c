@@ -141,6 +141,10 @@ void console_close(
 {
 	if (console_globals.active)
 	{
+		/* The reset hotkeys belong to the console until their release, even
+		 * when it closes with backquote or an empty command instead of Escape. */
+		input_consume_key(_key_escape);
+		input_consume_key(_key_end);
 		terminal_gets_end(&console_globals.input_state);
 		console_globals.active = FALSE;
 	}
@@ -455,6 +459,9 @@ boolean console_update(
 			match_assert("c:\\halo\\SOURCE\\main\\console.c", 184, key->key_code!=NONE);
 			switch (key->key_code)
 			{
+			case _key_escape:
+				console_close();
+				return FALSE;
 			case _key_backquote:
 				console_close();
 				break;
