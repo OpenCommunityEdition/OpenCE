@@ -8,7 +8,8 @@ buffer for each traced driver function while tracing is on, and SteamOS
 keeps tracing on for its GPU performance captures (gpu-trace.service). On the
 Steam Frame that is some 480,000 writes a second: the driver's thread spends
 its time in them, and the game ran at about 50 frames a second instead of
-the headset's 72. The Steam Deck runs the same service (not measured there). A
+the headset's 72. The Steam Deck runs the same service, but its Mesa (25.3)
+has no markers to write, so there this changes nothing (measured). A
 trace_marker that cannot be opened turns the markers off (gpuvis then skips
 them).
 

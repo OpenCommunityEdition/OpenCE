@@ -861,7 +861,9 @@ definition. Without this check, the linker gives the reference the address
   performance captures (`gpu-trace.service`), and its Mesa then writes a
   marker for each traced driver function: on the Steam Frame, some 480,000
   writes a second, which took the game from the headset's 72 Hz to about
-  50 frames a second. The Steam Deck runs the same service and Mesa.
+  50 frames a second. The Steam Deck runs the same service, but its Mesa
+  (25.3, 32-bit and 64-bit) has no markers to write: there the refusal
+  changes nothing (measured: the same frame times and power either way).
   `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
   gpuvis.
 
