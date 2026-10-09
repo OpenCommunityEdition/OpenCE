@@ -147,16 +147,29 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	mouse_pending_y = 0.0f;
 	mouse_polls_unconsumed = 0;
 	pthread_mutex_unlock(&mouse_lock);
-#ifdef HALO_ANDROID
-	/* the touch controls' swipe; it is not the mouse's aiming
-	(halo_linux_mouse_aiming), so a thumb keeps the stick's magnetism */
-	touch_input_look(scale, yaw, pitch);
-#endif
 	if (x == 0.0f && y == 0.0f)
-		return *yaw != 0.0f || *pitch != 0.0f;
-	*yaw += -x * scale * mouse_sensitivity();
-	*pitch += (invert ? y : -y) * scale * vertical_sensitivity;
+		return FALSE;
+	*yaw = -x * scale * mouse_sensitivity();
+	*pitch = (invert ? y : -y) * scale * vertical_sensitivity;
 	return TRUE;
+}
+
+/* the touch controls' swipe since the last call, in radians at the mouse's
+rate per pixel (the view applies its own sensitivity), and whether it gets
+the stick's aim assist (input.touch_aim_assist): player_control.c makes it
+the stick's rate before the magnetism. Nothing but on Android. */
+int halo_linux_touch_look(short gamepad_index, float *yaw, float *pitch, int *assisted)
+{
+	*yaw = 0.0f;
+	*pitch = 0.0f;
+	*assisted = FALSE;
+	if (gamepad_index != 0)
+		return FALSE;
+#ifdef HALO_ANDROID
+	touch_input_look(0.0022f, yaw, pitch);
+	*assisted = touch_input_aim_assist();
+#endif
+	return *yaw != 0.0f || *pitch != 0.0f;
 }
 
 /* whether the player on the gamepad aims with the mouse (it moved after the

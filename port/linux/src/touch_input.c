@@ -286,6 +286,19 @@ void touch_input_look(float scale, float *yaw, float *pitch)
 	*pitch -= delta[1] * scale;
 }
 
+int touch_input_aim_assist(void)
+{
+	static int assisted;
+	static unsigned long read_at = (unsigned long)-1;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		assisted = config_boolean("input.touch_aim_assist") != 0;
+	}
+	return assisted;
+}
+
 void touch_input_rumble(unsigned int left, unsigned int right)
 {
 	host_touch_rumble(left, right);

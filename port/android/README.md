@@ -162,8 +162,11 @@ controller for player 1:
 A finger that holds a button can also swipe to look, so you can fire and
 aim with one thumb. A short tap reaches the game even when it is shorter
 than one frame. Swipes that start in the edge-gesture zones of Android do
-not turn the view. The view does not use the mouse settings: the swipe
-keeps the aim assist of the controller.
+not turn the view. The swipe aims as the controller's stick does, not as
+a mouse: the aim slows over a target and follows a moving one, as with a
+controller, and it follows the profile's "invert look" (the setting
+`input.touch_aim_assist` turns the aim assist off). "Look sensitivity" sets
+how far a swipe turns; the mouse settings do not apply.
 
 The touch controls show only in a game. In the menus and during
 cinematics they hide, and the touchscreen operates the menus as described
@@ -206,6 +209,7 @@ These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
+| `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
 | `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps with each value. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |

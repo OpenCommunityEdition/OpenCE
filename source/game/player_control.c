@@ -1143,6 +1143,10 @@ static void get_local_player_input_blob(
 					real yaw_spin_scale;
 					real pitch_spin_scale;
 					real_euler_angles2d look_delta;
+					/* port: the touch controls' swipe this frame, and whether it
+					gets the stick's aim assist */
+					boolean touching = FALSE;
+					int touch_assisted = FALSE;
 
 					if (input_state->buttons[_button_scope_zoom] &&
 						controls_enable_doubled_spin)
@@ -1176,6 +1180,29 @@ static void get_local_player_input_blob(
 						constants->look_function.count,
 						constants->look_function.address,
 						clamped_pitch) * pitch_spin_scale * look_pitch_rate;
+					{
+						/* port: the touch controls' swipe (port/linux/src/xinput_sdl.c),
+						a turn this frame, made a rate as the stick's look is: the
+						zoom, the stun and the magnetism below act on it as on the
+						stick's, so that it slows over a target and follows a moving
+						one (input.touch_aim_assist); inverted as the stick is */
+						extern int halo_linux_touch_look(short gamepad_index, real *yaw, real *pitch, int *assisted);
+						real touch_yaw;
+						real touch_pitch;
+						real touch_scale = time_delta_sec * TICKS_PER_SECOND;
+
+						if (halo_linux_touch_look(gamepad_index, &touch_yaw, &touch_pitch, &touch_assisted) &&
+							touch_scale > _real_epsilon)
+						{
+							touching = TRUE;
+							if (input_abstraction_port_look_inverted(gamepad_index))
+							{
+								touch_pitch = -touch_pitch;
+							}
+							look_delta.yaw += touch_yaw / touch_scale;
+							look_delta.pitch += touch_pitch / touch_scale;
+						}
+					}
 
 					if (player->unit_index != NONE && control->zoom_level != NONE)
 					{
@@ -1233,16 +1260,18 @@ static void get_local_player_input_blob(
 							&target_angular_position,
 							&target_angular_velocity);
 						{
-							/* no magnetism for the mouse (port/linux/src/xinput_sdl.c) */
+							/* no magnetism for the mouse (port/linux/src/xinput_sdl.c),
+							nor for the touch controls' swipe without its aim assist */
 							extern int halo_linux_mouse_aiming(short gamepad_index);
 
-							if (halo_linux_mouse_aiming(gamepad_index))
+							if (halo_linux_mouse_aiming(gamepad_index) || (touching && !touch_assisted))
 							{
 								control->magnetism_level = 0.f;
 							}
 						}
 						if (player_magnetism_flag && control->magnetism_level > 0.f &&
-							(fabs(clamped_yaw) > _real_epsilon ||
+							(touching ||
+							fabs(clamped_yaw) > _real_epsilon ||
 							fabs(clamped_pitch) > _real_epsilon ||
 							fabs(input->throttle.i) > _real_epsilon ||
 							fabs(input->throttle.j) > _real_epsilon))

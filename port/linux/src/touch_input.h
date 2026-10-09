@@ -45,6 +45,9 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus);
 pitch, in radians at `scale` radians per pixel */
 void touch_input_look(float scale, float *yaw, float *pitch);
 
+/* whether the swipe gets the stick's aim assist (input.touch_aim_assist) */
+int touch_input_aim_assist(void);
+
 /* port 0's motors, for the phone's vibration while the touch controls show */
 void touch_input_rumble(unsigned int left, unsigned int right);
 #endif

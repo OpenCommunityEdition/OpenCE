@@ -323,6 +323,22 @@ real input_abstraction_port_primary_trigger(
 	return gamepad->buttons[button_index] ? 1.f : 0.f;
 }
 
+/* port: whether the controller's player looks inverted, as its right stick
+does (input_abstraction_update): its profile's invert, or flying an aircraft
+with its profile's aircraft invert; the touch controls' swipe follows it
+(player_control.c) */
+boolean input_abstraction_port_look_inverted(
+	short controller_index)
+{
+	struct game_input_preferences const *preferences;
+
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS)
+		return FALSE;
+	preferences = &input_abstraction_globals.player_control_preferences[controller_index];
+	return preferences->invert_look ||
+		(preferences->invert_look_aircraft_control && local_player_is_piloting_aircraft(controller_index));
+}
+
 /* ---------- public code */
 
 void input_abstraction_initialize(
