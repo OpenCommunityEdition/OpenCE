@@ -30,6 +30,7 @@ PORT_DIR = Path("port/windows")
 PORT_CONFIG = PORT_DIR / "port.json"
 BUILD = Path("build/windows")
 
+# (as tools/android_build.py's SDL_TAG and tools/linux_sysroot.py's SDL_VERSION)
 SDL_VERSION = "3.4.16"
 SDL_URL = (
     f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL_VERSION}/"

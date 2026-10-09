@@ -10,6 +10,7 @@ typedef short SHORT;
 struct platform_input_state { unsigned char keys[TEST_SCANCODE_COUNT], mouse_buttons[8]; BOOL mouse_released, menus; };
 #define SDL_SCANCODE_COUNT TEST_SCANCODE_COUNT
 #define console_is_active() FALSE
+#define platform_screen_keyboard(show, password) ((void)0)
 typedef struct { unsigned short wButtons; BYTE bAnalogButtons[8]; SHORT sThumbLX, sThumbLY; } XINPUT_GAMEPAD;
 #define SDL_BUTTON_X1 4
 static BOOL text_typing, text_typing_enter_armed, text_typing_keyboard, text_typing_field;
@@ -96,9 +97,9 @@ int main(int argc, char **argv)
     else CASE("duplicate-name") { unique = FALSE; wcscpy(name,L"Other"); virtual_keyboard_select(); CHECK(errors==1 && !virtual_keyboard_globals.last_exit_saved_text, "duplicate name accepted"); }
     else CASE("field-owner")
     {
-        platform_text_field(TRUE); virtual_keyboard_select();
+        platform_text_field(TRUE, FALSE); virtual_keyboard_select();
         CHECK(!virtual_keyboard_globals.active && text_typing, "closing keyboard cleared text field ownership");
-        platform_text_field(FALSE);
+        platform_text_field(FALSE, FALSE);
     }
     else CASE("reopen")
     {

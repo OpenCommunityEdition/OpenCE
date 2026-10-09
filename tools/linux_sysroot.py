@@ -167,6 +167,7 @@ PACKAGES: List[Tuple[str, str, str]] = [
 
 # SDL3's source release (the version of the other ports' SDL), from GitHub
 # or libsdl.org
+# (as tools/windows_build.py's SDL_VERSION and tools/android_build.py's SDL_TAG)
 SDL_VERSION = "3.4.16"
 SDL_URLS = [
     f"https://github.com/libsdl-org/SDL/releases/download/release-{SDL_VERSION}/SDL3-{SDL_VERSION}.tar.gz",
@@ -256,12 +257,16 @@ UNUSED = (("usr", "share", "doc"), ("usr", "share", "man"), ("usr", "share", "lo
 
 def extract(archive: tarfile.TarFile, destination: Path, strip: int = 0) -> None:
     """an archive's files, folders and links into destination, nothing
-    outside it (no device files, no absolute or upward names)"""
+    outside it (no device files, no absolute or upward names, nothing
+    through a link of its own that leads out of it)"""
+    root = destination.resolve()
     for member in archive.getmembers():
         parts = [part for part in Path(member.name).parts if part not in (".", "/")][strip:]
         if not parts or ".." in parts or any(tuple(parts[:len(unused)]) == unused for unused in UNUSED):
             continue
         target = destination.joinpath(*parts)
+        if not target.parent.resolve().is_relative_to(root):
+            continue
         if member.isdir():
             target.mkdir(parents=True, exist_ok=True)
         elif member.isfile() or member.islnk():

@@ -1658,13 +1658,14 @@ void platform_video_window_size(int *width, int *height)
 /* ---------- the system's on-screen keyboard */
 
 /* A menu's text field is typed into (platform_text_field, xinput_sdl.c).
-Where the system has an on-screen keyboard that text input brings up (Steam's,
-in Big Picture and in the Steam Deck's Game Mode, which ask for it with
-SDL_ENABLE_STEAM_SCREEN_KEYBOARD; a Wayland touch screen without a keyboard),
-SDL's text input runs while the field is typed into: the keyboard comes up
-with the field and goes with it, and what it types arrives as keys. Elsewhere
-text input stays off, as before, so that no input method takes the keys the
-field reads. */
+Where Steam's on-screen keyboard is there to bring up (in Big Picture and in
+the Steam Deck's Game Mode, which ask for it with
+SDL_ENABLE_STEAM_SCREEN_KEYBOARD), SDL's text input runs while the field is
+typed into: the keyboard comes up with the field and goes with it, and what
+it types arrives as keys. Elsewhere text input stays off, as before, so that
+no input method takes the keys the field reads: a Wayland touch screen's
+keyboard (text-input-v3) would type text events, which the field does not
+read. */
 static SDL_AtomicInt screen_keyboard_wanted;
 /* (each field begun, which brings the keyboard up again: Steam does not say
 when its keyboard goes, by its own Enter or closed by hand, so SDL holds it
@@ -1702,8 +1703,11 @@ static void screen_keyboard_update(void)
 	if (requests != requests_handled)
 	{
 		requests_handled = requests;
-		if (!SDL_HasScreenKeyboardSupport())
+		if (!SDL_HasScreenKeyboardSupport() ||
+			!SDL_GetHintBoolean(SDL_HINT_ENABLE_STEAM_SCREEN_KEYBOARD, false))
+		{
 			return;
+		}
 		open_time = SDL_GetTicks();
 		if (SDL_TextInputActive(platform_window))
 		{
