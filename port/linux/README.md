@@ -316,10 +316,11 @@ the setting for one start of the game. It has priority over the file.
 
 Video Setup's **FOV AND VIEWMODELS** category offers optional world and
 weapon field of view settings and first person visibility. **DEFAULT** keeps
-the authored world projection. **SAME** keeps the original weapon view, and
-viewmodels start **ON**. OK saves and applies changes. Cancel discards them.
-The menu offers 80 to 150 degrees in steps of five. The config file accepts
-20 to 150 degrees, including fractional values, or zero for Default and Same.
+the authored world projection. **DEFAULT** for the weapon keeps its original
+view, and viewmodels start **ON**. A chosen weapon angle is that FOV. OK
+saves and applies changes. Cancel discards them. The menu offers 80 to 150
+degrees in steps of five. The config file accepts 20 to 150 degrees,
+including fractional values, or zero for Default.
 Angles are horizontal at 16:9; other aspect ratios retain the same vertical
 view. World FOV applies to on-foot first-person views, preserving authored
 vehicle, death and cinematic cameras. Completed scopes keep their native
@@ -343,7 +344,7 @@ only their display; firing, animation, sound and world lights continue.
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `display.fov` | `0.0` | `HALO_FOV` | On-foot first-person horizontal FOV at 16:9, from 20 to 150 degrees. `0` keeps the authored view. Video Setup's FOV and Viewmodels screen sets it. |
-| `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | Independent weapon and hands horizontal FOV at 16:9, 20 to 150 degrees. `0` keeps the original weapon view. |
+| `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | Weapon and hands horizontal FOV at 16:9, 20 to 150 degrees. `0` is Default and keeps the original weapon view. A chosen angle is that FOV. |
 | `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VIS` | Show first-person weapons, hands and attached visuals. This does not change gameplay or other players' models. |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the resolution the game draws at, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |

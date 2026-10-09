@@ -38,7 +38,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_fov_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_fov_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SAME|80|85|90|95|100|105|110|115|120|125|130|135|140|145|150" setting="display.viewmodel_fov" values="0|80|85|90|95|100|105|110|115|120|125|130|135|140|145|150" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_fov_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|80|85|90|95|100|105|110|115|120|125|130|135|140|145|150" setting="display.viewmodel_fov" values="0|80|85|90|95|100|105|110|115|120|125|130|135|140|145|150" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_viewmodel_visible" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -68,7 +68,7 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/help_strings">
 		<string text=""/>
 		<string text="On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes."/>
-		<string text="Weapon and hands horizontal FOV at 16:9, in degrees.\nSame keeps the original weapon view."/>
+		<string text="Weapon and hands horizontal FOV at 16:9, in degrees.\nA number sets that FOV. Default keeps the original weapon view."/>
 		<string text="Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off."/>
 	</strings>
 </menus>

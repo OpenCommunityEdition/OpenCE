@@ -198,8 +198,8 @@ SCREENS["video_settings/fov_viewmodels"] = {
     "rows": [
         ("FOV:", "display.fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
          "On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes.", None),
-        ("VIEWMODEL FOV:", "display.viewmodel_fov", [("SAME", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
-         "Weapon and hands horizontal FOV at 16:9, in degrees.\nSame keeps the original weapon view.", None),
+        ("VIEWMODEL FOV:", "display.viewmodel_fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
+         "Weapon and hands horizontal FOV at 16:9, in degrees.\nA number sets that FOV. Default keeps the original weapon view.", None),
         ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
     ],

@@ -43,8 +43,9 @@ void viewmodel_projection_begin(void)
 	if (projection_depth++ != 0) return;
 	projection_applied = FALSE;
 	angle = viewmodel_vertical();
-	/* SAME keeps the weapon at this frame's own angle. A wide world view
-	stretches arms and a gun that sit against the camera. */
+	/* Default keeps the weapon at this frame's own angle. A chosen angle
+	is that FOV and is left as it is. A wide world view stretches arms
+	and a gun that sit against the camera, so Default does not follow it. */
 	if (!angle)
 		angle = render_fov_authored_vertical(render.local_player_index);
 	if (!angle || render.local_player_index < 0 || render.local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
