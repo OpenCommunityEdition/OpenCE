@@ -1218,12 +1218,12 @@ static void platform_show_pending_message(void)
 
 /* ---------- events */
 
-/* quits as closing the window does (the menus' Quit:
-port/linux/game/menu_functions.c) */
+/* quits as closing the window does, when the events are next read (the
+menus' Quit: port/linux/game/menu_functions.c); on Android at once */
 void platform_request_quit(void)
 {
 #ifdef HALO_ANDROID
-	/* The Android guest does not import SDL_PushEvent; exit reaches host_exit. */
+	/* (the guest has no SDL_PushEvent: exit ends the process, host_exit) */
 	exit(EXIT_SUCCESS);
 #else
 	SDL_Event event;
