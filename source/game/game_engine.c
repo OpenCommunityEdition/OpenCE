@@ -3875,7 +3875,10 @@ void game_engine_rasterize_message(
 
 /* port: who is talking in voice chat (network_voice.c), down the view's
 left from below its middle: each machine's first player's name after its
-speaker (this machine's own too, as it talks); while the scores are hidden */
+speaker (this machine's own too, as it talks), VOICE_SPEAKERS_SCALE times
+the HUD's text; while the scores are hidden */
+#define VOICE_SPEAKERS_SCALE 0.8f
+
 static void game_engine_rasterize_voice_speakers(
 	void)
 {
@@ -3892,6 +3895,8 @@ static void game_engine_rasterize_voice_speakers(
 	struct font_header *font;
 	short line_height;
 	short row = 0;
+	short left;
+	short top;
 
 	if (font_index == NONE || !network_voice_available())
 		return;
@@ -3900,6 +3905,11 @@ static void game_engine_rasterize_voice_speakers(
 	line_height = (short)(font->leading_height + font->descending_height + font->ascending_height);
 	if (line_height <= 0)
 		return;
+	/* (laid out at full size, from the list's top left, and drawn scaled
+	about it) */
+	left = (short)(bounds.x0 + 16);
+	top = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100);
+	rasterizer_text_set_scale(VOICE_SPEAKERS_SCALE, (real)left, (real)top);
 	data_iterator_new(&iterator, player_data);
 	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL && row < MAXIMUM_SPEAKER_ROWS)
 	{
@@ -3918,22 +3928,25 @@ static void game_engine_rasterize_voice_speakers(
 		machines_listed[listed_count++] = machine_index;
 		if (!network_voice_machine_speaking(machine_index))
 			continue;
-		/* (the name after the speaker, which is centred on its capitals) */
-		text.x0 = (short)(bounds.x0 + 16 + line_height + 4);
-		text.x1 = bounds.x1;
-		text.y0 = (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 55 / 100 + row * line_height);
+		/* (the name after the speaker, which is centred on its capitals:
+		where they are drawn, scaled) */
+		text.x0 = (short)(left + line_height + 4);
+		text.x1 = (short)(left + (bounds.x1 - left) / VOICE_SPEAKERS_SCALE);
+		text.y0 = (short)(top + row * line_height);
 		text.y1 = (short)(text.y0 + line_height);
 		color.alpha = 1.0f;
 		color.red = color.green = color.blue = 0.9f;
 		draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
-		icon.x0 = (short)(bounds.x0 + 16);
-		icon.x1 = (short)(icon.x0 + line_height);
-		icon.y0 = (short)(draw_unicode_string_capital_middle(&text, player->name) - line_height / 2);
-		icon.y1 = (short)(icon.y0 + line_height);
+		icon.x0 = left;
+		icon.x1 = (short)(left + line_height * VOICE_SPEAKERS_SCALE);
+		icon.y0 = (short)(top + (draw_unicode_string_capital_middle(&text, player->name) - top) * VOICE_SPEAKERS_SCALE -
+			line_height * VOICE_SPEAKERS_SCALE / 2);
+		icon.y1 = (short)(icon.y0 + line_height * VOICE_SPEAKERS_SCALE);
 		network_voice_draw_icon(&icon, FALSE, 1.0f);
 		rasterizer_draw_unicode_string(&text, NULL, NULL, 0, player->name);
 		row++;
 	}
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
 }
 
 static void game_engine_post_rasterize_in_game(
