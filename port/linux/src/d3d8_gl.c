@@ -332,6 +332,10 @@ struct vertex_shader_object
 	struct vertex_array_entry *vertex_array;
 	unsigned long vertex_array_streams;
 #endif
+	/* which of shader[] and lit_shader[] have been compiled (bits 0 and 1,
+	and 2 and 3): one that failed stays 0 and is not compiled again at each
+	draw */
+	unsigned char shaders_tried;
 };
 
 /* ---------- programs */
@@ -2581,12 +2585,14 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 {
 	int variant = immediate ? 1 : 0;
 	GLuint *shader = lit ? &program->lit_shader[variant] : &program->shader[variant];
+	unsigned char tried = (unsigned char)(1 << (variant + (lit ? 2 : 0)));
 
-	if (!*shader)
+	if (!*shader && !(program->shaders_tried & tried))
 	{
 		char *source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
+		program->shaders_tried |= tried;
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
 		{
