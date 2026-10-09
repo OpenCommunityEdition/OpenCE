@@ -8,8 +8,8 @@ name: Build
 # - one job per platform builds both configurations, so its set-up (tools,
 #   downloads, caches) is paid once;
 # - compiles go through ccache, whose cache carries over from run to run, so
-#   a commit only recompiles what it changed; downloads (SDL, musl, Gradle)
-#   are cached too;
+#   a commit only recompiles what it changed; downloads (SDL, musl, Gradle,
+#   the Linux build's system root) are cached too;
 # - a newer push to the same branch cancels a run still going;
 # - pushes that only change documentation do not build;
 # - Windows, whose minutes cost twice Linux's, builds only Windows;
@@ -41,7 +41,11 @@ env:
 jobs:
   linux:
     # Arch Linux has what the build needs as packages: clang 22 (for the
-    # profile-guided optimisation in pgo/) and 32-bit SDL 3.
+    # profile-guided optimisation in pgo/), and CMake, pkg-config and
+    # wayland-scanner for the SDL 3 that the portable build brings. The build
+    # links against Debian 11's 32-bit glibc (tools/linux_sysroot.py), not
+    # Arch's, so that it starts on SteamOS and older distributions; Arch's
+    # 32-bit glibc is for the tests.
     runs-on: ubuntu-24.04
     container: archlinux:latest
     timeout-minutes: 40
@@ -50,7 +54,7 @@ jobs:
         run: |
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Syu --noconfirm --needed git zstd python python-pytest ninja ccache \
-            clang lld gcc lib32-glibc lib32-gcc-libs lib32-sdl3
+            clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
 
       - uses: actions/checkout@v4
 
@@ -59,6 +63,12 @@ jobs:
           path: .ccache
           key: ccache-linux-${{ github.sha }}
           restore-keys: ccache-linux-
+
+      # the system root and SDL's source, which the build downloads
+      - uses: actions/cache@v4
+        with:
+          path: build/linux/third_party
+          key: linux-third-party-${{ hashFiles('tools/linux_sysroot.py') }}
 
       - name: Debug
         run: python tools/ci_build.py linux debug
