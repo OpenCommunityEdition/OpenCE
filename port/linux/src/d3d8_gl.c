@@ -2192,6 +2192,17 @@ static GLuint visibility_unscaled(GLuint samples, DWORD index)
 }
 
 #endif
+
+/* the main menu's line under the version number (menu_functions.c) */
+char const *d3d8_renderer_description(void)
+{
+#ifdef HALO_ANDROID
+	return "OpenGL ES";
+#else
+	return "OpenGL";
+#endif
+}
+
 HRESULT WINAPI D3DDevice_GetVisibilityTestResult(DWORD index, UINT *result, ULONGLONG *time_stamp)
 {
 	GLuint available = 0, samples = 0;

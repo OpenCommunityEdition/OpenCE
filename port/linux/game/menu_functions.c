@@ -5300,6 +5300,26 @@ static void gametype_engine_name(struct widget_instance *text_box)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
 }
 
+/* ---------- the renderer, under the version number */
+
+/* the renderer the game draws with, and the driver it was given if it is not the system's own, as a line for the main menu
+(a second, the driver's, after a '\r'); each renderer says (d3d8_gl.c, port/android/guest/d3d8_vk.c). A renderer that does
+not leaves the line empty. */
+__attribute__((weak)) char const *d3d8_renderer_description(void)
+{
+	return NULL;
+}
+
+static void renderer_text_update(struct widget_instance *text_box)
+{
+	char const *description = d3d8_renderer_description();
+	wchar_t text[ROW_TEXT_LENGTH];
+
+	if (!description || !ascii_to_wide(description, text, sizeof(text)))
+		return;
+	text_set(text_box, text);
+}
+
 /* ---------- public code */
 
 boolean pc_menu_event_function_invoke(
@@ -5717,4 +5737,6 @@ void pc_menu_game_data_function_invoke(
 		saved_game_list_update(widget);
 	else if (!strcmp(name, "port gamepad layout preview"))
 		profile_gamepad_layout(widget);
+	else if (!strcmp(name, "port renderer textbox"))
+		renderer_text_update(widget);
 }

@@ -396,6 +396,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the profile settings' picture: the Xbox's of the button settings,
 	on Gamepad Setup's row) */
 	"port gamepad layout preview",
+	/* (the main menu's line under the version number: the renderer, and its driver) */
+	"port renderer textbox",
 };
 
 static struct

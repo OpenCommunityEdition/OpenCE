@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's additions to the main menu (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/renderer" type="text" controller="1" width="190" height="60" font="ui\small_ui" color="#FFFF8000">
+		<data input="port renderer textbox"/>
+	</widget>
+</menus>

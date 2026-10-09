@@ -17,6 +17,7 @@
 		<child widget="main_menu/halo_logo" y="28"/>
 		<child widget="main_menu/main_menu_select_list"/>
 		<child widget="main_menu/build_number" x="450" y="400"/>
+		<child widget="main_menu/renderer" x="450" y="420"/>
 	</widget>
 	<widget name="main_menu/main_menu_item_load_camp" type="text" width="256" height="33" bitmap="main_menu/menu_load_campaign" string_list="main_menu/main_menu_options" string_index="1" font="ui\small_ui" color="#000080FF">
 		<on event="a" run="new game if no plyr profiles" label="load_campaign" open="main_menu/campaign_select/campaign_menu" branch="true"/>

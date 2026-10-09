@@ -178,6 +178,10 @@ The menu writes `display.renderer` and `display.vk_driver` in
 `config.toml`. If Vulkan cannot start on the phone, the game uses OpenGL ES,
 and the log says why (`renderer:`).
 
+The line below the build number on the main menu says which renderer
+runs: `OpenGL ES`, `Vulkan`, or `Vulkan` and, on a second line, the name of
+the driver archive in use.
+
 With `TURNIP` (`display.vk_driver = "auto"`), the app downloads the Turnip
 build for the GPU's series into the data folder before the game starts, one
 time: from

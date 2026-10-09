@@ -534,6 +534,9 @@ MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    # (the renderer the game draws with, under the build number:
+    # main_menu_files)
+    "main_menu/main_menu": {"children": ['<child widget="main_menu/renderer" x="450" y="420"/>']},
     # (the profile settings' picture: on Gamepad Setup's row, the profile's
     # button settings, BITMAP_FRAMES; menu_functions.c's
     # profile_gamepad_layout)
@@ -1331,6 +1334,21 @@ def multiplayer_files() -> dict:
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
+    }
+
+
+def main_menu_files() -> dict:
+    """the port's additions to the main menu: under the build number, the
+    renderer the game draws with and the driver it was given, if it is not
+    the system's own (menu_functions.c's "port renderer textbox")"""
+    return {
+        "main_menu.port.xml": [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            "<!-- The port's additions to the main menu (tools/port_settings.py) -->", "<menus>",
+            *_widget("main_menu/renderer", [("type", "text"), ("controller", 1), ("width", 190), ("height", 60),
+                                            ("font", "ui\\small_ui"), ("color", "#FFFF8000")],
+                     ['<data input="port renderer textbox"/>']),
+            "</menus>", ""],
     }
 
 
