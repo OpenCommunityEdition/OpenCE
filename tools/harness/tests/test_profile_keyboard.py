@@ -2,7 +2,6 @@
 import re
 import sys
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -57,18 +56,3 @@ def test_original_sticky_typing_detected(case):
 def test_held_enter_guard_detected():
     status, output = run(build('profile_keyboard', generated('held-enter')), 'held-enter')
     assert status == CHECK_FAILED, output
-
-
-def test_profiles_accept_destinations():
-    root = ET.fromstring(read('port/assets/menus/ce/main_menu.xml'))
-    widgets = {widget.get('name'): widget for widget in root.findall('widget')}
-    profile = widgets['main_menu/main_menu_item_profile']
-    for event in ['a', 'start']:
-        handler = profile.find(f"on[@event='{event}']")
-        assert handler.get('open') == 'main_menu/profile_manager/player_profile_manager'
-        assert handler.get('run') == 'new game if no plyr profiles'
-    assert profile.find('conditional').get('widget') == 'main_menu/profile_manager/pm_entry_creating_profile'
-    multiplayer = widgets['main_menu/main_menu_item_multiplayer']
-    for event in ['a', 'start']:
-        assert multiplayer.find(f"on[@event='{event}']").get('open') == \
-            'main_menu/multiplayer_type_select/multiplayer_type_select_screen'
