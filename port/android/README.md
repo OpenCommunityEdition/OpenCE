@@ -151,6 +151,11 @@ These settings are only for Android:
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
+| `display.renderer` | `"gl"` (the default): OpenGL ES. `"vulkan"`: Vulkan. Refer to "Graphics: OpenGL ES and Vulkan". |
+| `display.vk_driver` | The Vulkan driver. `""` (the default): the phone's own. `"auto"`: Turnip on an Adreno GPU. Or the file name of a driver archive in the data folder. |
+| `debug.vk_validation` | `true`: Vulkan's validation layer, if the APK has it (`configure.py --android-vulkan-validation`). |
+| `debug.vk_self_test` | `true`: the Vulkan renderer tests its clears and its copies of draw data at the start, and logs `ok` or `FAILED`. |
+| `debug.vk_present_marker` | `true`: the Vulkan renderer draws a red square at the upper left and a green square at the upper right, to show which way up the picture is. |
 
 ## Internet play
 
@@ -292,6 +297,38 @@ functions of OpenGL ES 3.2 if they are available:
   has passed: a result is the latest count the GPU has finished, as with
   the query buffer of desktop OpenGL. A read of the counters themselves
   waits for the GPU, which halved the frame rate on Turnip (Zink).
+
+### Vulkan
+
+The Vulkan renderer is a second guest image, `halo_guest_vk.elf`: the same
+game, with `guest/d3d8_vk.c` and `guest/xbox_textures_vk.c` in place of
+`port/linux/src/d3d8_gl.c` and `xbox_textures.c`, and the shader generators
+`guest/nv2a_vsh_vk.c` and `guest/nv2a_psh_vk.c`, which write GLSL for
+Vulkan. The host chooses the image from `display.renderer` before the game
+starts (`host/host_main.c`), after it brings Vulkan up on the chosen driver
+(`host/host_vk.c`, `host/host_vk_driver.c`).
+
+- The guest records each frame's work as a command stream
+  (`guest/vk_commands.h`): render targets, clears, draws with the data they
+  read copied into the stream, textures, and visibility tests. The host
+  copies the draws' data into upload rings the GPU reads
+  (`host/host_vk_data.c`). It hands the
+  stream to the host in one call a frame (`host_vk_submit`).
+- The host turns the stream into Vulkan commands (`host/host_vk_render.c`,
+  `host/host_vk_draw.c`, `host/host_vk_texture.c`,
+  `host/host_vk_visibility.c`), with dynamic rendering, and presents on the
+  game's window (`host/host_vk_present.c`). The FXAA pass of
+  `display.anti_aliasing` is in `host/host_vk_post.c`.
+- glslang compiles the generated GLSL to SPIR-V on a thread of its own, and
+  the host keeps the SPIR-V and a pipeline cache for each driver in the
+  app's private storage, in `vk_cache` (`host/host_vk_shaders.c`). A draw whose shader or pipeline is not ready
+  is skipped. glslang is built as `libhalo_glslang.so` (`glslang/`) and
+  loaded with `dlopen`.
+- A driver other than the phone's is loaded with libadrenotools
+  (`adrenotools.patch` is applied to it by `tools/android_build.py`). Under
+  Vulkan the host makes no GL context: the game's GL imports resolve to a
+  stub that returns zero (`host/host_gl.c`), and the window's context is a
+  stand-in (`host/host_sdl.c`).
 
 ### Calling conventions
 

@@ -120,9 +120,25 @@ int64_t host_sdl_thread_id(void)
 
 /* ---------- video */
 
+/* Under Vulkan the guest's window is real, but made without SDL_WINDOW_OPENGL so
+that SDL makes no EGL surface on it (Android lets one API own a window, and the
+Vulkan renderer makes its surface on this one: host_vk_present.c), and its GL
+context is a stand-in: a handle to nothing, which the functions below accept.
+The platform layer opens a context and swaps at each present as it does under
+GL ES, and its event loop runs only while it has a window and a context. */
+static char standin_context;
+
 uint32_t host_sdl_create_window(const char *title, int width, int height, int64_t flags)
 {
-	return handle_new(_handle_window, SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags));
+	SDL_Window *window;
+
+	if (host_renderer_vulkan)
+		flags &= ~(int64_t)SDL_WINDOW_OPENGL;
+	window = SDL_CreateWindow(title, width, height, (SDL_WindowFlags)flags);
+	/* the Vulkan backend makes its surface on the game's window: the last made (host.h) */
+	if (host_renderer_vulkan && window)
+		host_vk_window = window;
+	return handle_new(_handle_window, window);
 }
 
 void host_sdl_window_size_in_pixels(uint32_t window, int *width, int *height)
@@ -144,6 +160,8 @@ int host_sdl_set_relative_mouse(uint32_t window, int enabled)
 
 int host_sdl_gl_set_attribute(int attribute, int value)
 {
+	if (host_renderer_vulkan)
+		return 1;
 	return SDL_GL_SetAttribute((SDL_GLAttr)attribute, value);
 }
 
@@ -151,23 +169,59 @@ uint32_t host_sdl_gl_create_context(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
+	if (host_renderer_vulkan)
+		return object ? handle_new(_handle_context, &standin_context) : 0;
 	return object ? handle_new(_handle_context, SDL_GL_CreateContext(object)) : 0;
 }
 
 int host_sdl_gl_make_current(uint32_t window, uint32_t context)
 {
+	if (host_renderer_vulkan)
+		return handle_get(window, _handle_window) != NULL && handle_get(context, _handle_context) == &standin_context;
 	return SDL_GL_MakeCurrent(handle_get(window, _handle_window), handle_get(context, _handle_context));
 }
 
+static int swap_interval = 1;
+
 int host_sdl_gl_set_swap_interval(int interval)
 {
+	swap_interval = interval;
+	if (host_renderer_vulkan)
+		return 1;
 	return SDL_GL_SetSwapInterval(interval);
+}
+
+/* The stand-in swap: until the Vulkan backend presents (host_vk_presenting) and
+its swapchain waits for the display, frames are held to the display's refresh
+rate here, as the swap's vsync holds them under GL ES. */
+static int standin_swap(SDL_Window *window)
+{
+	static Uint64 next;
+	Uint64 now = SDL_GetTicksNS();
+
+	if (swap_interval > 0 && !host_vk_presenting)
+	{
+		SDL_DisplayID display = SDL_GetDisplayForWindow(window);
+		const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
+		Uint64 interval = (Uint64)(1e9f / (mode && mode->refresh_rate > 1.0f ? mode->refresh_rate : 60.0f));
+
+		if (next > now)
+		{
+			SDL_DelayPrecise(next - now);
+			now = next;
+		}
+		/* a frame more than an interval late starts the count again */
+		next = now - next > interval ? now + interval : next + interval;
+	}
+	return 1;
 }
 
 int host_sdl_gl_swap_window(uint32_t window)
 {
 	SDL_Window *object = handle_get(window, _handle_window);
 
+	if (host_renderer_vulkan)
+		return object ? standin_swap(object) : 0;
 	return object ? SDL_GL_SwapWindow(object) : 0;
 }
 

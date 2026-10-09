@@ -15,8 +15,11 @@ maps/) is the app's external files directory,
 /sdcard/Android/data/<package>/files, where the launcher activity copies it
 on first run; saves go to its save/ subdirectory. The settings,
 config.toml, live there too (port/linux/src/port_config.c, which the game
-reads); this file reads only debug.sample_seconds from it, for the sampler
-that runs here.
+reads); this file reads debug.sample_seconds from it, for the sampler that
+runs here, and display.renderer, to choose between the two game images:
+halo_guest.elf, drawing with OpenGL ES (the default), and halo_guest_vk.elf,
+drawing with Vulkan (port/android/host/host_vk*.c) on the driver that
+display.vk_driver names, with the Vulkan renderer's debug switches.
 */
 
 #include "host.h"
@@ -38,6 +41,8 @@ that runs here.
 #include <unistd.h>
 
 void host_install_signal_handlers(void);
+
+int host_renderer_vulkan;
 
 /* ---------- logging and termination */
 
@@ -77,6 +82,8 @@ void host_abort(const char *reason)
 void host_exit(int code)
 {
 	host_logf(HOST_LOG_INFO, "the game exited (%d)", code);
+	if (host_renderer_vulkan)
+		host_vk_exit();
 	/* the process ends with the game; Android restarts it from the
 	launcher next time */
 	_exit(code);
@@ -199,6 +206,24 @@ static int config_boolean_or(const char *path, const char *name, int otherwise)
 	}
 	toml_free(result);
 	return value;
+}
+
+/* a string setting of config.toml (a dotted name) into buffer, or otherwise
+when the file or the setting is missing */
+static void config_string_or(const char *path, const char *name, const char *otherwise, char *buffer, size_t size)
+{
+	toml_result_t result = toml_parse_file_ex(path);
+
+	snprintf(buffer, size, "%s", otherwise);
+	if (!result.ok)
+		return;
+	{
+		toml_datum_t datum = toml_seek(result.toptab, name);
+
+		if (datum.type == TOML_STRING)
+			snprintf(buffer, size, "%s", datum.u.s);
+	}
+	toml_free(result);
 }
 
 /* Whether the app runs through an ARM translator. The x86 emulator runs the
@@ -331,7 +356,32 @@ static void *game_main(void *unused)
 	}
 	snprintf(path, sizeof(path), "%s/config.toml", data_root);
 
-	image = SDL_LoadFile("halo_guest.elf", &image_size);
+	/* the renderer decides the image (host.h): Vulkan only where it comes up,
+	the GL ES image otherwise, and the log says which and why */
+	{
+		char renderer[32];
+
+		config_string_or(path, "display.renderer", "gl", renderer, sizeof(renderer));
+		if (!strcmp(renderer, "vulkan"))
+		{
+			char vk_driver[256], line[600];
+
+			config_string_or(path, "display.vk_driver", "", vk_driver, sizeof(vk_driver));
+			host_vk_present_marker = config_boolean_or(path, "debug.vk_present_marker", 0);
+			host_vk_self_test = config_boolean_or(path, "debug.vk_self_test", 0);
+			host_renderer_vulkan = host_vk_startup(vk_driver, config_boolean_or(path, "debug.vk_validation", 0),
+				line, sizeof(line));
+			host_logf(host_renderer_vulkan ? HOST_LOG_INFO : HOST_LOG_WARN, "renderer: %s", line);
+		}
+		else
+		{
+			if (strcmp(renderer, "gl"))
+				host_logf(HOST_LOG_WARN, "display.renderer \"%s\" is not \"gl\" or \"vulkan\"; using GL ES", renderer);
+			host_logf(HOST_LOG_INFO, "renderer: GL ES");
+		}
+	}
+
+	image = SDL_LoadFile(host_renderer_vulkan ? "halo_guest_vk.elf" : "halo_guest.elf", &image_size);
 	if (!image)
 		host_fatal("cannot read the game image from the APK: %s", SDL_GetError());
 	if (host_load_image(image, image_size) != 0)

@@ -295,3 +295,18 @@ unsigned int text_hires_atlas_texture(unsigned long data)
 	}
 	return atlas_texture;
 }
+
+#ifdef HALO_ANDROID
+/* the Vulkan renderer's (port/android/guest/xbox_textures_vk.c) */
+const unsigned char *text_hires_atlas_rows(unsigned long data, long *size, int all, long *top, long *bottom)
+{
+	if (!data || data != placeholder_data || !atlas)
+		return NULL;
+	*size = ATLAS_SIZE;
+	*top = all ? 0 : dirty_top;
+	*bottom = all ? ATLAS_SIZE : dirty_bottom;
+	dirty_top = ATLAS_SIZE;
+	dirty_bottom = 0;
+	return atlas;
+}
+#endif

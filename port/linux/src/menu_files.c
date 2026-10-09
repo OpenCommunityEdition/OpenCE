@@ -1009,6 +1009,10 @@ static struct
 	int failed;
 } art[MAXIMUM_ART];
 static long art_count;
+#ifdef HALO_ANDROID
+/* changed whenever the art registered changes (menu_art_serial) */
+static unsigned long art_serial = 1;
+#endif
 
 void halo_menus_art_register(void const *texture, char const *png)
 {
@@ -1042,6 +1046,9 @@ void halo_menus_art_register(void const *texture, char const *png)
 	memset(&art[index], 0, sizeof(art[index]));
 	art[index].data = data;
 	art[index].png = strdup(png);
+#ifdef HALO_ANDROID
+	art_serial++;
+#endif
 }
 
 void halo_menus_art_forget(void)
@@ -1055,6 +1062,9 @@ void halo_menus_art_forget(void)
 			glDeleteTextures(1, &art[index].texture);
 	}
 	art_count = 0;
+#ifdef HALO_ANDROID
+	art_serial++;
+#endif
 }
 
 unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
@@ -1085,3 +1095,29 @@ unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 	*levels = art[index].levels;
 	return art[index].texture;
 }
+
+#ifdef HALO_ANDROID
+/* the Vulkan renderer's (port/android/guest/xbox_textures_vk.c) */
+unsigned long menu_art_serial(void)
+{
+	return art_serial;
+}
+
+const char *menu_art_name(unsigned long data)
+{
+	long index;
+
+	for (index = 0; index < art_count; index++)
+	{
+		if (art[index].data == data)
+			return art[index].png;
+	}
+	return NULL;
+}
+
+const unsigned char *menu_art_png(const char *name, unsigned long *size)
+{
+	*size = 0;
+	return file_data(name, size);
+}
+#endif

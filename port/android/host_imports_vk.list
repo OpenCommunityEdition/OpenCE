@@ -1,0 +1,13 @@
+# Host functions only the Android Vulkan image imports, beside host_imports.list:
+# the Vulkan renderer's (port/android/guest/d3d8_vk.c, defined in
+# port/android/host/host_vk*.c).
+# tools/android_imports.py generates the stubs.
+host_vk_submit
+host_vk_retired
+host_vk_shader_find
+host_vk_shader_compile
+host_vk_format_supported
+host_vk_bc_supported
+host_vk_samples_supported
+host_vk_visibility
+host_vk_driver_name

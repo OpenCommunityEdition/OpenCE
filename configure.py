@@ -77,6 +77,11 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument(
+    "--android-vulkan-validation",
+    action="store_true",
+    help="put the Vulkan validation layer in the Android APK (debug.vk_validation; adds about 30 MB)",
+)
 args = parser.parse_args()
 
 # the settings the builds read
@@ -91,6 +96,7 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    android_vulkan_validation=args.android_vulkan_validation,
 )
 
 

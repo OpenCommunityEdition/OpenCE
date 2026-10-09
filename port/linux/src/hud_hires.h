@@ -60,4 +60,10 @@ int hud_hires_override_coverage(long asset);
 nv2a_psh.c: point_threshold) */
 int hud_hires_override_point_threshold(long asset);
 
+#ifdef HALO_ANDROID
+/* the Vulkan renderer's: an 8-bit RGBA PNG's pixels (malloc'd, red first,
+rows top down) and size; NULL if it could not be decoded */
+unsigned char *hud_hires_png_pixels(const void *png, unsigned long size, unsigned long *width, unsigned long *height);
+#endif
+
 #endif

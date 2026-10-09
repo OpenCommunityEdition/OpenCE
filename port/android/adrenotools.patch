@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 16c6092..647f173 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -21,7 +21,7 @@ add_library(adrenotools ${LIB_SOURCES})
+ target_include_directories(adrenotools PUBLIC include)
+ target_include_directories(adrenotools PRIVATE .)
+ target_compile_options(adrenotools PRIVATE -Wall -Wextra)
+-target_link_libraries(adrenotools android linkernsbypass)
++target_link_libraries(adrenotools android log linkernsbypass)
+ 
+ add_subdirectory(src/hook)
+ if (${BUILD_SHARED_LIBS})

@@ -269,3 +269,12 @@ unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 	*levels = textures[asset].levels;
 	return textures[asset].texture;
 }
+
+#ifdef HALO_ANDROID
+/* the Vulkan renderer's (port/android/guest/xbox_textures_vk.c) */
+unsigned char *hud_hires_png_pixels(const void *png, unsigned long size, unsigned long *width, unsigned long *height)
+{
+	*width = *height = 0;
+	return png_decode(png, size, width, height);
+}
+#endif

@@ -4,6 +4,11 @@ HOST_GL.C
 OpenGL ES for the guest. Its generated entry points (guest_gl.c) import
 hostgl_<function>, resolved here to the driver's function; the arguments
 already have host types by then. Only strings need copying back.
+
+Under the Vulkan renderer (host_renderer_vulkan) there is no GL context: the
+game image is halo_guest_vk.elf, whose device draws with Vulkan, and any GL
+import resolves to a stub that returns zero without reaching a driver, and the
+host's own GL helpers below do nothing.
 */
 
 #include "host.h"
@@ -13,10 +18,26 @@ already have host types by then. Only strings need copying back.
 #include <dlfcn.h>
 #include <string.h>
 
+/* the GL imports' stand-in under Vulkan: returns zero in the integer and the
+floating point result registers, touching nothing else */
+__asm__(
+	".text\n"
+	".balign 16\n"
+	".globl host_gl_absent\n"
+	".hidden host_gl_absent\n"
+	"host_gl_absent:\n"
+	"mov x0, xzr\n"
+	"movi v0.2d, #0\n"
+	"ret\n");
+extern char host_gl_absent[];
+
 void *host_gl_resolve(const char *name)
 {
 	static void *library;
 	void *function = NULL;
+
+	if (host_renderer_vulkan)
+		return host_gl_absent;
 
 	if (!library)
 		library = dlopen("libGLESv3.so", RTLD_NOW | RTLD_GLOBAL);
@@ -29,11 +50,21 @@ void *host_gl_resolve(const char *name)
 
 void host_gl_get_string(uint32_t name, int index, char *buffer, uint32_t size)
 {
-	const GLubyte *text = index >= 0 ? glGetStringi(name, (GLuint)index) : glGetString(name);
+	const GLubyte *text;
 
 	if (!size)
 		return;
 	buffer[0] = 0;
+	/* under Vulkan there is no GL context, in which a GL library answers NULL,
+	and the platform layer prints what it is told: "OpenGL %s on %s" */
+	if (host_renderer_vulkan)
+	{
+		if (index < 0)
+			strncpy(buffer, "Vulkan", size - 1);
+		buffer[size - 1] = 0;
+		return;
+	}
+	text = index >= 0 ? glGetStringi(name, (GLuint)index) : glGetString(name);
 	if (text)
 	{
 		strncpy(buffer, (const char *)text, size - 1);
@@ -45,6 +76,8 @@ int host_gl_has_extension(const char *name)
 {
 	GLint count = 0, index;
 
+	if (host_renderer_vulkan)
+		return 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &count);
 	for (index = 0; index < count; index++)
 	{
@@ -64,6 +97,11 @@ void host_gl_read_buffer(uint32_t buffer, uint32_t offset, uint32_t size, void *
 {
 	const void *mapping;
 
+	if (host_renderer_vulkan)
+	{
+		memset(data, 0, size);
+		return;
+	}
 	glBindBuffer(GL_COPY_READ_BUFFER, buffer);
 	mapping = glMapBufferRange(GL_COPY_READ_BUFFER, offset, size, GL_MAP_READ_BIT);
 	if (mapping)
@@ -89,7 +127,7 @@ static GLsync frame_fences[FRAME_FENCE_SLOTS];
 
 void host_gl_fence_frame(uint32_t slot)
 {
-	if (slot >= FRAME_FENCE_SLOTS)
+	if (host_renderer_vulkan || slot >= FRAME_FENCE_SLOTS)
 		return;
 	if (frame_fences[slot])
 		glDeleteSync(frame_fences[slot]);
@@ -98,7 +136,7 @@ void host_gl_fence_frame(uint32_t slot)
 
 void host_gl_wait_frame(uint32_t slot)
 {
-	if (slot >= FRAME_FENCE_SLOTS || !frame_fences[slot])
+	if (host_renderer_vulkan || slot >= FRAME_FENCE_SLOTS || !frame_fences[slot])
 		return;
 	/* at most a second: a lost context must not hang the game */
 	glClientWaitSync(frame_fences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
@@ -124,9 +162,11 @@ makes still holds: the renderer only writes ranges that no queued draw reads,
 because host_gl_wait_frame releases the ring slot first. */
 void host_gl_buffer_write(uint32_t target, uint32_t offset, uint32_t size, const void *data)
 {
-	void *mapping = glMapBufferRange(target, offset, size,
-		GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+	void *mapping;
 
+	if (host_renderer_vulkan)
+		return;
+	mapping = glMapBufferRange(target, offset, size, GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 	if (!mapping)
 	{
 		glBufferSubData(target, offset, size, data);

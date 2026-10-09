@@ -48,7 +48,9 @@ android {
 
     packaging {
         jniLibs {
-            useLegacyPackaging false
+            // extracted: libadrenotools installs its hooks by their file names in the
+            // native library folder, for the Vulkan renderer's own drivers (Turnip)
+            useLegacyPackaging true
         }
     }
 
