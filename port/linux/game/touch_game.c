@@ -11,6 +11,7 @@ game. The platform layer cannot see the game's types, so it asks here
 #include "cutscene/cinematics.h"
 #include "input/input.h"
 #include "input/input_abstraction.h"
+#include "interface/ui_widget.h"
 
 /* asks whether a cinematic is playing that A would skip
 (player_control.c, player_control_action_test_check_reset_input_blob); tests
@@ -28,6 +29,15 @@ controls, so the on-screen touch controls hide (touch_input.c) */
 int touch_game_cinematic_playing(void)
 {
 	return cinematic_globals && game_in_progress() && cinematic_in_progress();
+}
+
+/* asks whether a game is being played: not while the game starts, nor
+between maps, nor at the main menu (whose ui.map is a game too), where the
+on-screen touch controls do not show (touch_input.c); cinematic_globals
+first, as touch_game_cinematic_skippable has it */
+int touch_game_playing(void)
+{
+	return cinematic_globals && game_in_progress() && !main_menu_is_active();
 }
 
 /* the game control on each of player 1's 16 controller buttons, as the

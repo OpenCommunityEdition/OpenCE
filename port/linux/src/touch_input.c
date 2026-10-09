@@ -29,6 +29,7 @@ void host_touch_bindings(const int *controls);
 /* the game's (port/linux/game/touch_game.c) */
 int touch_game_cinematic_skippable(void);
 int touch_game_cinematic_playing(void);
+int touch_game_playing(void);
 void touch_game_button_controls(int *controls);
 
 /* the gamepad's buttons (input.h), which the touch controls are named by */
@@ -252,8 +253,10 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 	int state[7];
 	int index;
 
+	/* (the controls show only in a game: not while it starts, at the main
+	menu, in a menu or during a cinematic) */
 	host_touch_scene(_touch_scene_known | touch_controls_setting() |
-		(menus || touch_game_cinematic_playing() ? _touch_scene_menus : 0));
+		(menus || !touch_game_playing() || touch_game_cinematic_playing() ? _touch_scene_menus : 0));
 	/* (the profile's mapping, for the buttons' names; only when it changes) */
 	touch_game_button_controls(bindings);
 	if (!bindings_known || memcmp(bindings, bindings_sent, sizeof(bindings)))
