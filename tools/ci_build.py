@@ -26,7 +26,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # what each port's build leaves, and what goes into dist/
 OUTPUTS = {
-    "linux": ["build/linux/halo"],
+    # (and the SDL3 the portable build brings, tools/linux_build.py, with its
+    # zlib license, as the release carries the other libraries')
+    "linux": ["build/linux/halo", "build/linux/libSDL3.so.0", "build/linux/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
 }

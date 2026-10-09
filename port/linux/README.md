@@ -21,13 +21,65 @@ To build:
 - The 32-bit glibc development files: `lib32-glibc` on Arch Linux,
   `gcc-multilib` and `libc6-dev-i386` on Debian and Ubuntu.
 - The 32-bit SDL3: `lib32-sdl3` on Arch Linux, `libsdl3-dev:i386` on Debian
-  and Ubuntu.
+  and Ubuntu. The portable build does not need it: refer to "Portable
+  build".
 
 To start the game:
 
+- glibc 2.29 or later (32-bit), for the builds from GitHub Actions, which
+  are built against glibc 2.31. They start on SteamOS 3 (Steam Deck). They
+  should also start on Debian 11, Ubuntu 20.04, Fedora 32 and later
+  distributions, but this is not tested. A build that you make without
+  `--portable` needs the glibc of the computer that built it, or a later
+  one.
 - The 32-bit OpenGL libraries (`lib32-mesa`).
 - The 32-bit PipeWire or PulseAudio client libraries (`lib32-pipewire` or
   `lib32-libpulse`).
+- The 32-bit X11 libraries (`lib32-libx11`, `lib32-libxext`). In a Wayland
+  session, the game uses them through XWayland. SDL uses Wayland itself
+  only if the 32-bit Wayland libraries are version 1.20 or later
+  (`lib32-wayland`, `lib32-libxkbcommon`; Debian 11, Ubuntu 20.04 and
+  Fedora 32 have older ones) and the compositor has the fifo-v1 protocol.
+  On GNOME, the window then has borders only with the 32-bit libdecor
+  (`lib32-libdecor`).
+
+SteamOS has all of these. Its system is read-only, and the builds from
+GitHub Actions need no package: they bring their own SDL3
+(`libSDL3.so.0`, next to the executable).
+
+### Portable build
+
+The builds from GitHub Actions are portable builds (`--portable`; refer to
+"Build options" in the main [README](../../README.md#build-options)). The
+portable build starts on more systems than the build machine's:
+
+- It is compiled and linked against the 32-bit glibc 2.31 of Debian 11, the
+  glibc of the Steam Runtime 3 ("sniper"), not against the glibc of the
+  build machine. An executable needs the glibc version that it was built
+  against, or a later one.
+- It brings SDL 3 (`libSDL3.so.0`), built from source against the same
+  glibc. The executable looks for it in its own folder first (a `DT_RPATH`
+  of `$ORIGIN`, which comes before `LD_LIBRARY_PATH`), so that it uses this
+  SDL even when Steam sets `LD_LIBRARY_PATH`. Few distributions have a
+  32-bit SDL 3. This SDL loads X11, Wayland, libdecor, PipeWire, PulseAudio
+  and ALSA when it starts, so it starts with whichever of them the system
+  has. It is linked only to glibc. Its license is `SDL3-LICENSE.txt`.
+
+At the first build, `tools/linux_sysroot.py` downloads the Debian packages
+(about 25 MB) and the source of SDL. Each package comes from
+`archive.debian.org` or `deb.debian.org`, or else from
+`snapshot.debian.org`; the source of SDL comes from GitHub or from
+`libsdl.org`. It checks each download against its SHA-256 sum. The system root is in
+`build/linux/third_party/sysroot`. `tools/linux_sysroot.cmake` builds SDL
+against it.
+
+To make the portable build you need, in addition to the tools above,
+CMake, `pkg-config` (`pkgconf`) and `wayland-scanner` (`wayland` on Arch
+Linux, `libwayland-bin` on Debian and Ubuntu). You do not need the 32-bit
+SDL3. You need the 32-bit glibc only for the tests.
+
+To see the glibc version that a build needs, enter
+`readelf -V build/linux/halo | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1`.
 
 ## Build the game
 
@@ -38,6 +90,11 @@ To start the game:
 ## Start the game
 
 Enter `build/linux/halo`.
+
+To play on a Steam Deck, unpack `halo-linux-release.zip` into a folder (in
+Desktop Mode), and add `halo` to Steam as a non-Steam game ("Add a Game" in
+the Games menu of Steam). The game then starts in Game Mode as well. Refer
+to "Steam Deck".
 
 The game data is the folder that contains `maps/`, from an Xbox disc image
 of any version of the game. The game looks for this folder in this
@@ -59,6 +116,38 @@ If the game finds no data, it asks for an Xbox disc image (`.xiso` or
 The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
 the game asks for the disc image again at the next start.
+
+### Steam Deck
+
+Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
+`halo` (or start the game one time to copy it from a disc image), and add
+`halo` to Steam. Then start the game from the library in Game Mode.
+
+- Screen: the game fills the screen without borders (`display.mode` empty,
+  thus borderless). The 3D view and the HUD have the shape of the screen
+  (16:10) and are drawn at its resolution; the menus are at the center.
+- Controls: Steam Input gives the game a virtual controller, which the game
+  operates as the controller of the Xbox. With the template that Steam selects
+  ("Gamepad With Joystick Trackpad"), the buttons, sticks and triggers have
+  the functions of the same controls on an Xbox controller, the right
+  trackpad operates as the right stick, and the back buttons (L4, L5, R4,
+  R5) do nothing until you assign them in the controller settings of the
+  game in Steam. With a template that makes a trackpad a mouse, the mouse
+  aims in the game and moves the pointer in the menus.
+- Text: names of profiles and gametypes use the keyboard of the game, which
+  the controller operates. The text fields of the menus (the name and the
+  password in Server Setup, and the password of a game in the server
+  browser) open the keyboard of Steam. Type the text, then select Enter on
+  that keyboard.
+- Frame rate: the game shows one frame for each refresh of the display. It
+  follows the refresh rate and the frame limit of Quick Access >
+  Performance (40 to 60 Hz on the LCD model, up to 90 Hz on the OLED model).
+  The world is calculated at 30 Hz at all rates. Keep `display.vsync =
+  true`. Refer to "Frame rate".
+- Sleep: the clocks of the game do not count the time that the Deck sleeps,
+  so the game continues from where it stopped. A network game does not
+  wait: the host drops a machine that it has not heard from for 15 seconds,
+  and while a Deck that hosts sleeps, the other players have no host.
 
 ## Files and folders
 
