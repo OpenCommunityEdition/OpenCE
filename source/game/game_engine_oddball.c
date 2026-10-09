@@ -1013,11 +1013,13 @@ static wchar_t *oddball_get_score_header_string(
 		string_index = _multiplayer_game_text_time;
 
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
-	ustrcpy(
+	/* port: bounded (a map's text, into its callers' score_string[256]) */
+	ustrncpy_terminated(
 		buffer,
 		string_list_index != NONE ?
 			unicode_string_list_get_string(string_list_index, string_index) :
-			L"");
+			L"",
+		256);
 
 	return buffer;
 }
@@ -1216,7 +1218,7 @@ static boolean oddball_engine_display_score(
 			}
 			else
 				string = L"";
-			usnprintf(buffer, buffer_size, string, other_player->name);
+			usnprintf(buffer, buffer_size, ustring_format_checked(string, "s"), other_player->name);
 		}
 		break;
 
@@ -1259,7 +1261,7 @@ static boolean oddball_engine_display_score(
 			}
 			else
 				string = L"";
-			usnprintf(buffer, buffer_size, string, other_player->name);
+			usnprintf(buffer, buffer_size, ustring_format_checked(string, "s"), other_player->name);
 		}
 		break;
 
@@ -1284,7 +1286,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, place_name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), place_name, score);
 			}
 			else if (message == _oddball_message_ally_has_the_ball_tick)
 			{
@@ -1297,7 +1299,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 			else if (message == _oddball_message_enemy_has_the_ball_tick)
 			{
@@ -1310,7 +1312,7 @@ static boolean oddball_engine_display_score(
 				}
 				else
 					string = L"";
-				usnprintf(buffer, buffer_size, string, other_player->name, score);
+				usnprintf(buffer, buffer_size, ustring_format_checked(string, "sd"), other_player->name, score);
 			}
 		}
 		break;

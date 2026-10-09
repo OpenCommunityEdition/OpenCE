@@ -1598,7 +1598,7 @@ void saved_game_file_get_useable_untitled_profile_name(
 		for (index = 0; index < MAXIMUM_UNTITLED_SAVED_GAMES; index++)
 		{
 			usnprintf(display_name, MAX_GAMENAME-1,
-				unicode_string_list_get_string(string_list_index, _saved_game_file_string_untitled_name_format),
+				ustring_format_checked(unicode_string_list_get_string(string_list_index, _saved_game_file_string_untitled_name_format), "d"),
 				index+1);
 			display_name[MAX_GAMENAME-1] = 0;
 

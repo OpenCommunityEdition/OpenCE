@@ -247,6 +247,7 @@ symbols in this file:
 #include <stdarg.h>
 
 #include "cseries/cseries.h"
+#include "cseries/errors.h" /* port: ustring_format_checked */
 #include "unicode.h"
 
 /* ---------- constants */
@@ -1337,8 +1338,100 @@ int usnprintf(
 	va_start(arglist, format);
 	result = _vsnwprintf(string, size, format, arglist);
 	va_end(arglist);
+	/* port: terminated when it is cut short, which MSVC's is not */
+	if (size > 0)
+		string[size - 1] = 0;
 
 	return result;
+}
+
+/* port: whether a format (a map's text: its string lists' are the game's
+formats) takes no other arguments than conversions names, in order, if
+fewer: 'd' an integer (%d, %i, %u, %x, %X, %o, %c), 'f' a real (%f, %e,
+%g), 's' a string (%s, %S). %% and the flags, widths and precisions are
+allowed; '*' (which takes an argument of its own) and %n are not. A format
+that takes others would have the game read an argument as what it is not */
+int ustring_format_takes(
+	wchar_t const *format,
+	char const *conversions)
+{
+	if (!format || !conversions)
+		return FALSE;
+	while (*format)
+	{
+		char kind;
+
+		if (*format++ != L'%')
+			continue;
+		if (*format == L'%')
+		{
+			format++;
+			continue;
+		}
+		while (*format == L'-' || *format == L'+' || *format == L' ' || *format == L'#' || *format == L'.' ||
+			(*format >= L'0' && *format <= L'9'))
+		{
+			format++;
+		}
+		/* (the size prefixes the game's own formats use) */
+		if (*format == L'h' || *format == L'l' || *format == L'w')
+			format++;
+		switch (*format)
+		{
+		case L'd': case L'i': case L'u': case L'x': case L'X': case L'o': case L'c':
+			kind = 'd';
+			break;
+		case L'f': case L'e': case L'E': case L'g': case L'G':
+			kind = 'f';
+			break;
+		case L's': case L'S':
+			kind = 's';
+			break;
+		default:
+			return FALSE;
+		}
+		format++;
+		if (*conversions++ != kind)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+/* port: a map's format, if it takes the arguments a caller gives it
+(ustring_format_takes); else an empty one, whose message is then empty, and
+which is logged once */
+wchar_t const *ustring_format_checked(
+	wchar_t const *format,
+	char const *conversions)
+{
+	static boolean logged = FALSE;
+
+	if (ustring_format_takes(format, conversions))
+		return format;
+	if (!logged)
+	{
+		logged = TRUE;
+		error(_error_silent, "a map's text is a format of other arguments than the game gives it (%s): it is not shown",
+			conversions);
+	}
+
+	return L"";
+}
+
+/* port: at most size - 1 characters of src, always terminated */
+wchar_t *ustrncpy_terminated(
+	wchar_t *dest,
+	wchar_t const *src,
+	unsigned long size)
+{
+	if (size > 0)
+	{
+		wcsncpy(dest, src ? src : L"", size - 1);
+		dest[size - 1] = 0;
+	}
+
+	return dest;
 }
 
 int usprintf(
