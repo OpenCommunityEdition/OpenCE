@@ -29,12 +29,13 @@ def xdk_headers() -> List[Path]:
 
 def game_sources(config: Dict[str, Any]) -> List[Path]:
     """the game's C sources (port.json "game"): every one under its root but
-    those excluded"""
+    those excluded (a file, or a folder: a name ending in "/")"""
     game = config["game"]
-    excluded = set(game.get("exclude", []))
+    excluded = game.get("exclude", [])
     return sorted(
         source for source in Path(game["root"]).rglob("*.c")
-        if source.as_posix() not in excluded
+        if not any(source.as_posix() == name or (name.endswith("/") and source.as_posix().startswith(name))
+                   for name in excluded)
     )
 
 
