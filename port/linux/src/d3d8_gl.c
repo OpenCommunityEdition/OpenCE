@@ -25,6 +25,9 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "main/console.h"
+
+#include <SDL3/SDL.h>
 
 #include <math.h>
 #include <stdio.h>
@@ -4712,6 +4715,110 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
+static void write_key_screenshot(struct render_target_entry *target)
+{
+	char directory[512], path[640], timestamp[32], filename[64];
+	SDL_Time now;
+	SDL_DateTime date;
+	SDL_Surface *surface = NULL;
+	unsigned int collision;
+	unsigned long width = target->target.gl_width, height = target->target.gl_height;
+	GLint framebuffer, draw_framebuffer, pack_buffer, alignment, row_length, skip_rows, skip_pixels;
+	GLenum error;
+	unsigned long row, column;
+
+	if (snprintf(directory, sizeof(directory), "%s/screenshots", platform_data_root()) >= (int)sizeof(directory))
+	{
+		SDL_SetError("Screenshot directory path is too long");
+		goto failed;
+	}
+	if (!SDL_CreateDirectory(directory) || !SDL_GetCurrentTime(&now) || !SDL_TimeToDateTime(now, &date, true))
+		goto failed;
+	snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d_%02d.%02d.%02d",
+		date.year, date.month, date.day, date.hour, date.minute, date.second);
+	for (collision = 0; collision < 1000; collision++)
+	{
+		if (collision)
+			snprintf(filename, sizeof(filename), "%s_%u.png", timestamp, collision + 1);
+		else
+			snprintf(filename, sizeof(filename), "%s.png", timestamp);
+		snprintf(path, sizeof(path), "%s/%s", directory, filename);
+		if (!SDL_GetPathInfo(path, NULL))
+			break;
+	}
+	if (collision == 1000)
+	{
+		SDL_SetError("Too many screenshots with the same timestamp");
+		goto failed;
+	}
+	if (!width || !height || width > INT_MAX / 4 || height > INT_MAX)
+	{
+		SDL_SetError("Invalid screenshot dimensions");
+		goto failed;
+	}
+#ifdef HALO_ANDROID
+	surface = SDL_CreateSurface((int)width, (int)height, SDL_PIXELFORMAT_RGBA32);
+#else
+	surface = SDL_CreateSurface((int)width, (int)height, SDL_PIXELFORMAT_BGRA32);
+#endif
+	if (!surface)
+		goto failed;
+
+	/* Read the render target before the display blit's vertical flip. Its
+	row zero is the top of the image. Preserve the caller's readback state. */
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &framebuffer);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_framebuffer);
+	glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &pack_buffer);
+	glGetIntegerv(GL_PACK_ALIGNMENT, &alignment);
+	glGetIntegerv(GL_PACK_ROW_LENGTH, &row_length);
+	glGetIntegerv(GL_PACK_SKIP_ROWS, &skip_rows);
+	glGetIntegerv(GL_PACK_SKIP_PIXELS, &skip_pixels);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	glPixelStorei(GL_PACK_ROW_LENGTH, surface->pitch / 4);
+	glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+	glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+	glReadPixels(0, 0, (GLsizei)width, (GLsizei)height,
+#ifdef HALO_ANDROID
+		GL_RGBA,
+#else
+		GL_BGRA,
+#endif
+		GL_UNSIGNED_BYTE, surface->pixels);
+	error = glGetError();
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_framebuffer);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, pack_buffer);
+	glPixelStorei(GL_PACK_ALIGNMENT, alignment);
+	glPixelStorei(GL_PACK_ROW_LENGTH, row_length);
+	glPixelStorei(GL_PACK_SKIP_ROWS, skip_rows);
+	glPixelStorei(GL_PACK_SKIP_PIXELS, skip_pixels);
+	if (error != GL_NO_ERROR)
+	{
+		SDL_SetError("OpenGL screenshot readback failed (%04x)", (unsigned)error);
+		goto failed;
+	}
+	/* Destination alpha is scratch data in the game, not transparency. */
+	for (row = 0; row < height; row++)
+	{
+		unsigned char *pixels = (unsigned char *)surface->pixels + (size_t)row * surface->pitch;
+
+		for (column = 0; column < width; column++)
+			pixels[column * 4 + 3] = 0xff;
+	}
+	if (!SDL_SavePNG(surface, path))
+		goto failed;
+	SDL_DestroySurface(surface);
+	console_printf(FALSE, "Saved screenshot as %s", filename);
+	return;
+
+failed:
+	console_printf(FALSE, "Screenshot failed: %.180s", SDL_GetError());
+	if (surface)
+		SDL_DestroySurface(surface);
+}
+
 static void write_screenshot(struct render_target_entry *target)
 {
 	const char *directory = *config_string("debug.screenshot_directory") ?
@@ -4812,6 +4919,8 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
+		if (platform_screenshot_take_request())
+			write_key_screenshot(back_buffer);
 
 		platform_video_drawable_size(&window_width, &window_height);
 		/* letterbox to the back buffer's aspect ratio */

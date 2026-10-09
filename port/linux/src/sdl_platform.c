@@ -33,6 +33,8 @@ static struct platform_input_state input_state;
 /* keys pressed since the last read, so a press and release between two
 reads still counts as a press (input injected on Android, or a slow frame) */
 static unsigned char keys_pressed[SDL_SCANCODE_COUNT];
+/* The bound Screenshot action requests capture at the next presentation. */
+static BOOL screenshot_requested;
 /* likewise the mouse buttons pressed since the last read, so that a click
 quicker than a frame still counts */
 static unsigned char mouse_buttons_pressed[PLATFORM_MOUSE_BUTTON_COUNT];
@@ -1304,6 +1306,24 @@ void platform_scoreboard_scroll(int open, long *notches, long *pages)
 	scoreboard_notches = 0;
 	scoreboard_pages = 0;
 	pthread_mutex_unlock(&input_lock);
+}
+
+void platform_screenshot_request(void)
+{
+	pthread_mutex_lock(&input_lock);
+	screenshot_requested = TRUE;
+	pthread_mutex_unlock(&input_lock);
+}
+
+BOOL platform_screenshot_take_request(void)
+{
+	BOOL requested;
+
+	pthread_mutex_lock(&input_lock);
+	requested = screenshot_requested;
+	screenshot_requested = FALSE;
+	pthread_mutex_unlock(&input_lock);
+	return requested;
 }
 
 void platform_pump_events(void)

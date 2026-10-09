@@ -247,6 +247,8 @@ static const struct config_setting config_settings[] =
 		"Showing the scores (the controller's Back)." },
 	{ "controls.pause", _config_string, "\"Escape\"", "HALO_KEY_PAUSE", _environment_value, _platform_all,
 		"The pause menu (the controller's Start)." },
+	{ "controls.screenshot", _config_string, "\"F10\"", "HALO_KEY_SCREENSHOT", _environment_value, _platform_all,
+		"Save a PNG screenshot beside maps/ (press once per capture)." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
 
