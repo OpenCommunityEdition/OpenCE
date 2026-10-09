@@ -23,4 +23,7 @@ void rasterizer_transparent_geometry_group_draw__internal(
 	struct transparent_geometry_group const *group,
 	boolean has_lightmap);
 
+/* port: refine centroid sorting using planar BSP glass and model bounds. */
+void rasterizer_transparent_geometry_order_models(short *order, long count);
+
 #endif /* __RASTERIZER_TRANSPARENT_GEOMETRY_H */
