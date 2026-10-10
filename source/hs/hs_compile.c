@@ -2259,6 +2259,21 @@ static boolean hs_parse_primitive(
 	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result = FALSE;
 
+	{
+		extern int mcc_script_parse_ai(struct hs_syntax_node *node, char const *text);
+		int mcc_result = mcc_script_parse_ai(expression,
+			hs_compile_globals.compiled_source);
+		if (mcc_result >= 0)
+		{
+			if (!mcc_result)
+			{
+				hs_compile_globals.error = "this is not a valid MCC AI encounter or squad.";
+				hs_compile_globals.error_offset = expression->source_offset;
+			}
+			return mcc_result != 0;
+		}
+	}
+
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
 		0x4AF,
@@ -2553,6 +2568,19 @@ boolean hs_compile_postprocess(
 		expression_index = data_next_index(hs_syntax_data, expression_index))
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+		{
+			extern int mcc_parameter_compile(struct hs_syntax_node const *node);
+			int mcc_parameter = mcc_parameter_compile(expression);
+			if (mcc_parameter >= 0)
+			{
+				if (!mcc_parameter)
+				{
+					hs_compile_globals.error = "invalid MCC script parameter.";
+					success = FALSE;
+				}
+				continue;
+			}
+		}
 
 		if (hs_type_valid(expression->type))
 		{

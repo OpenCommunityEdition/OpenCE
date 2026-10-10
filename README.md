@@ -48,6 +48,12 @@ so players of the two versions can play together.
 2. At the first start, the game asks for the disc image. Select it.
 3. The game extracts the `maps/` folder. Then the game starts.
 
+Halo 1 MCC custom maps use a separate `mcc_maps/` directory and the
+**MCC SINGLEPLAYER** and **MCC MULTIPLAYER** map categories. The experimental
+adapter supports modern, self-contained version-13 maps; it does not need
+Custom Edition's shared resource files. See [MCC map support](docs/mcc_maps.md)
+for supported features, installation and compatibility limits.
+
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md).

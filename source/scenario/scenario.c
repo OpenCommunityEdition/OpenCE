@@ -167,6 +167,7 @@ symbols in this file:
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "cache/cache_files.h"
+#include "mcc_cache.h"
 #include "cseries/errors.h"
 #include "effects/contrails.h"
 #include "effects/decals.h"
@@ -1111,6 +1112,18 @@ boolean scenario_switch_structure_bsp(
 		checked. (A map's first bsp refused refuses the map: scenario_load) */
 		if (!loaded)
 		{
+			/* MCC admission failures must reach scenario_load's cleanup and
+			main_new_map's menu recovery without entering the modal error loop. */
+			if (mcc_cache_tags_loaded() && old_structure_bsp_index == NONE)
+			{
+				error(_error_silent, "mcc: failed to load initial structure bsp #%d", structure_bsp_index);
+				global_structure_bsp = NULL;
+				global_collision_bsp = NULL;
+				global_bsp3d = NULL;
+				collision_log_enable(TRUE);
+				main_start_time();
+				return FALSE;
+			}
 			error(_error_immediate, "failed to load structure bsp #%d", structure_bsp_index);
 			global_structure_bsp = NULL;
 			global_collision_bsp = NULL;
@@ -1238,6 +1251,11 @@ missing_tag_loop:
 		if (missing_tag)
 			goto missing_tag_loop;
 	}
+
+	/* A rejected initial MCC BSP never reaches game_load's map_loaded state.
+	Release its tags here so the following menu or map has its own I/O owner. */
+	if (!result && mcc_cache_tags_loaded())
+		scenario_unload();
 
 	return result;
 }

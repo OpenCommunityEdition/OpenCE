@@ -136,6 +136,7 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "tag_schema.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "mcc_cache.h" /* independent MCC dispatch */
 #include "cache_file_formats.h" /* port: CUSTOM_EDITION_TAG_CACHE_BYTES */
 
 /* ---------- constants */
@@ -370,6 +371,9 @@ boolean cache_file_tag_cache_contains(
 {
 	void const *tag_cache = physical_memory_get_tag_cache_base_address();
 	unsigned long tag_cache_size = TAG_CACHE_SIZE;
+
+	if (mcc_cache_tags_loaded())
+		return mcc_cache_contains(address, size);
 
 	if (custom_edition_cache_tags_loaded())
 	{
@@ -606,6 +610,11 @@ void scenario_tags_unload(
 		loose_sounds_tags_unloaded();
 	}
 	texture_cache_close();
+	/* MCC's appended pause table unwinds before the native menu table. */
+	{
+		extern void mcc_pause_runtime_unload(void);
+		mcc_pause_runtime_unload();
+	}
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
 	the bitmaps it has loaded as it closes, theirs among them */
@@ -617,6 +626,14 @@ void scenario_tags_unload(
 	cache_file_close();
 	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
 	(port/linux/game/custom_edition_cache.c) */
+	if (mcc_cache_tags_loaded())
+	{
+		mcc_cache_tags_unload();
+		cache_file_globals.tags_loaded = FALSE;
+		global_tag_instances = NULL;
+		global_tag_count = 0;
+		return;
+	}
 	if (custom_edition_cache_tags_loaded())
 		custom_edition_cache_tags_unload();
 	else
@@ -984,6 +1001,8 @@ boolean cache_files_map_plays_multiplayer(
 	build[0] = 0;
 	if (!map_name || !map_name[0])
 		return TRUE;
+	if (mcc_level_name(map_name))
+		return TRUE;
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is converted for
 	this build as it loads (port/linux/game/custom_edition_cache.c): its
 	header's build is Halo PC's, not one to check */
@@ -1051,6 +1070,8 @@ builds of other regions play together. */
 unsigned long cache_files_map_version(
 	char const *map_name)
 {
+	if (mcc_level_name(map_name))
+		return mcc_cache_checksum(map_name);
 	return custom_edition_level_name(map_name) ? custom_edition_map_checksum(map_name) : 0;
 }
 
@@ -1075,6 +1096,8 @@ boolean cache_files_map_present(
 
 	if (!map_name || !map_name[0])
 		return TRUE;
+	if (mcc_level_name(map_name))
+		return mcc_cache_require(map_name, version);
 	if (custom_edition_level_name(map_name))
 	{
 		if (custom_edition_cache_present(map_name, version, message, sizeof(message)))
@@ -1120,6 +1143,9 @@ boolean cache_files_give_time_to_precache(
 	char const *map_name)
 {
 	boolean result = FALSE;
+
+	if (mcc_level_name(map_name))
+		return mcc_cache_require(map_name, 0);
 
 	/* port: no map named yet is nothing to precache. A client joining over
 	the internet asks for its multiplayer map (network_game_client_update_precache_status)
@@ -1174,6 +1200,35 @@ long scenario_tags_load(
 	result = NONE;
 	texture_cache_open();
 	sound_cache_open();
+	if (mcc_level_name(scenario_name))
+	{
+		cache_file_globals.tag_header = mcc_cache_tags_load(scenario_name, &cache_file_globals.header);
+		if (cache_file_globals.tag_header)
+		{
+			extern void menu_tags_loaded(char const *map_name);
+			extern void loose_sounds_tags_loaded(void);
+			global_tag_instances = cache_file_globals.tag_header->tag_instances;
+			global_tag_count = cache_file_globals.tag_header->tag_count;
+			cache_file_globals.tags_loaded = TRUE;
+			menu_tags_loaded(scenario_name);
+			{
+				extern boolean mcc_pause_runtime_load(void);
+				if (!mcc_pause_runtime_load())
+				{
+					scenario_tags_unload();
+					return NONE;
+				}
+			}
+			loose_sounds_tags_loaded();
+			result = cache_file_globals.tag_header->scenario_tag_index;
+		}
+		else
+		{
+			sound_cache_close();
+			texture_cache_close();
+		}
+		return result;
+	}
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is read in place
 	into a tag cache of its own, converted for this build and checked as its
 	own maps are (port/linux/game/custom_edition_cache.c). It has no Xbox
@@ -1330,6 +1385,17 @@ boolean scenario_structure_bsp_load(
 	/* port: the bsp's header, once read and checked */
 	struct cache_file_structure_bsp_header *structure_bsp_header;
 
+	if (mcc_cache_tags_loaded())
+	{
+		void *mcc_header, *mcc_structure;
+		if (!cache_file_structure_bsp_tag_valid(reference) ||
+			!mcc_cache_bsp_load(reference, &mcc_header, &mcc_structure))
+			return FALSE;
+		cache_file_globals.structure_bsp_header = mcc_header;
+		cache_get_tag_instance(reference->structure_bsp.index)->base_address = mcc_structure;
+		return TRUE;
+	}
+
 	/* port: the tag data's size was checked as the map loaded
 	(cache_file_header_verify); the bsp's reference is the map's, and is
 	checked before anything is read where it says (a Custom Edition map's
@@ -1453,6 +1519,14 @@ void scenario_structure_bsp_unload(
 	struct scenario_structure_bsp_reference *reference)
 {
 	struct cache_file_tag_instance *tag_instance;
+
+	if (mcc_cache_tags_loaded())
+	{
+		mcc_cache_bsp_unload();
+		cache_get_tag_instance(reference->structure_bsp.index)->base_address = NULL;
+		cache_file_globals.structure_bsp_header = NULL;
+		return;
+	}
 
 	structure_bsp_header_deregister_vertex_buffers(cache_file_globals.structure_bsp_header);
 	/* port: the buffers a Halo Custom Edition bsp was given

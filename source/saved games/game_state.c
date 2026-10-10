@@ -122,6 +122,8 @@ symbols in this file:
 #include "lruv_cache.h"
 #include "memory_pool.h"
 #include "cluster_partitions.h"
+#include "mcc_cache.h"
+#include "mcc_checkpoint.h"
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -323,6 +325,13 @@ void game_state_save(
 	void)
 {
 	game_state_call_before_save_procs();
+	/* MCC extra slots occupy only proven-unused CPU bytes in this image. */
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+	{
+		game_state_globals.saved_game_valid = FALSE;
+		return;
+	}
 
 	main_stop_time();
 	game_state_globals.saved_game_valid = (game_state_write_to_file()!=FALSE);
@@ -426,6 +435,9 @@ boolean game_state_test_persistent_storage(
 void game_state_save_core(
 	const char *name)
 {
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+		return;
 	/* the whole of the native builds' larger game state */
 	if (game_state_write_core(name, game_state_globals.base_address, GAME_STATE_SIZE))
 	{
@@ -850,7 +862,13 @@ boolean game_state_image_accept(
 		if (!valid)
 			return FALSE;
 	}
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_validate(image, size,
+		game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE, game_state_globals.base_address))
+		return FALSE;
 	csmemcpy(game_state_globals.base_address, image, size);
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_restore(game_state_globals.base_address, size,
+		game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+		return FALSE;
 	error(_error_silent, "the saved game is taken");
 
 	return TRUE;

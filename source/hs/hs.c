@@ -12790,6 +12790,12 @@ script nodes it has room for. The shipped maps' all are, of 19001 nodes
 static boolean hs_scenario_syntax_data_valid(
 	struct scenario const *scenario)
 {
+	{
+		extern int mcc_syntax_scenario_valid(struct scenario const *scenario);
+		int mcc_valid = mcc_syntax_scenario_valid(scenario);
+		if (mcc_valid >= 0)
+			return mcc_valid != 0;
+	}
 	long const syntax_data_size =
 		sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
 	byte const *address = (byte const *)scenario->hs_syntax_data.address;
@@ -12912,6 +12918,16 @@ static short hs_syntax_node_refusal(
 		return _hs_node_refusal_none;
 
 	function_index = expression->function_index;
+	{
+		extern struct hs_function_definition *mcc_script_function(short index);
+		extern boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax);
+		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
+		if (mcc_function)
+		{
+			*name = mcc_function->name;
+			return mcc_script_call_valid(expression, hs_syntax_data) ? _hs_node_refusal_none : _hs_node_refusal_damaged;
+		}
+	}
 	if (function_index<0 || function_index>=(short)NUMBEROF(hs_function_allowed_in_maps))
 		return _hs_node_refusal_damaged;
 	function = hs_function_get(function_index);
@@ -12966,6 +12982,13 @@ static short hs_syntax_node_refusal(
 	if (function_index == _hs_function_set)
 	{
 		short designator = (short)first_argument->data;
+		{
+			extern int mcc_parameter_set_valid(struct hs_syntax_node const *node, struct hs_syntax_node const *value);
+			int mcc_parameter = mcc_parameter_set_valid(first_argument,
+				hs_syntax_try_get(first_argument->next_node_index));
+			if (mcc_parameter >= 0)
+				return mcc_parameter ? _hs_node_refusal_none : _hs_node_refusal_damaged;
+		}
 
 		if (!TEST_FLAG(first_argument->flags, _hs_syntax_node_primitive_bit) ||
 			!TEST_FLAG(first_argument->flags, _hs_syntax_node_variable_bit) ||
@@ -13080,6 +13103,14 @@ console's expressions, compiled later, may call and set anything */
 static void hs_scenario_functions_check(
 	struct scenario *scenario)
 {
+	{
+		extern boolean mcc_syntax_functions_check(struct scenario *scenario, struct data_array *syntax,
+			short (*node_refusal)(struct hs_syntax_node const *, char const **),
+			unsigned long *disabled_scripts, unsigned long *disabled_globals);
+		if (mcc_syntax_functions_check(scenario, hs_syntax_data, hs_syntax_node_refusal,
+			hs_scenario_disabled_scripts, hs_scenario_disabled_globals))
+			return;
+	}
 	long expression_index;
 	short script_index;
 	short global_index;
@@ -13242,6 +13273,11 @@ static void hs_allocate(
 	struct scenario *scenario;
 
 	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+	{
+		extern int mcc_syntax_scenario_valid(struct scenario const *scenario);
+		if (mcc_syntax_scenario_valid(scenario) > 0)
+			return;
+	}
 	/* port: as the map holds it only when it is sound */
 	if (scenario &&
 		scenario->hs_syntax_data.size ==
@@ -13597,6 +13633,12 @@ void hs_recompile(
 struct hs_function_definition *hs_function_get(
 	short function_index)
 {
+	{
+		extern struct hs_function_definition *mcc_script_function(short index);
+		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
+		if (mcc_function)
+			return mcc_function;
+	}
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs.c",
 		522,
@@ -13731,6 +13773,13 @@ short hs_find_function_by_name(
 	char const *name)
 {
 	short function_index;
+
+	{
+		extern short mcc_script_find(char const *name);
+		short mcc_index = mcc_script_find(name);
+		if (mcc_index != NONE)
+			return mcc_index;
+	}
 
 	for (function_index = 0; function_index<hs_function_table_count; function_index++)
 	{

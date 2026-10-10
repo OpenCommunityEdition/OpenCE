@@ -125,6 +125,7 @@ symbols in this file:
 #include "cseries.h"
 #include "errors.h"
 #include "object_types.h"
+#include "mcc_objects.h"
 
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
@@ -1219,6 +1220,10 @@ void object_types_place_all(
 							scenario_datums,
 							scenario_datum_index,
 							element_size);
+
+					if (object_type == _object_type_vehicle &&
+						!mcc_vehicle_placement_allowed(scenario_object))
+						continue;
 
 					/* port: a Halo Custom Edition map's vehicles are those its
 					placements' multiplayer spawn flags name for the game type, as

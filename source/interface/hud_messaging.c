@@ -114,6 +114,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "mcc_hud_draw.h"
 #include "cseries/cseries.h"
 
 #include "cseries/errors.h"
@@ -543,6 +544,8 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, FALSE))
+			return;
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);

@@ -1118,11 +1118,17 @@ static void object_damage_aftermath(
 		no statistics on a machine that joined after, is no player's) */
 		if (player_index != NONE)
 		{
+			/* An MCC team-change death must come from this exact no-statistics
+			 * cause, not a real suicide racing the pending unit flag. */
+			extern void mcc_ui_team_respawn_damage(long, long, boolean);
+			mcc_ui_team_respawn_damage(player_index, object_index,
+				TEST_FLAG(damage->flags, _damage_no_statistics_bit) != 0);
 			game_engine_player_killed(
 				player_index,
 				object_index,
 				player_index,
 				TRUE);
+			mcc_ui_team_respawn_damage(player_index, object_index, FALSE);
 		}
 	}
 

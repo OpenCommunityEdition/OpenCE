@@ -737,6 +737,8 @@ boolean debug_trigger_volumes;
 
 /* ---------- public code */
 
+#include "mcc_script_runtime.inl"
+
 void hs_runtime_initialize(
 	void)
 {
@@ -911,6 +913,12 @@ static char const *expression_get_function_name(
 			expression_index != thread->stack->expression_index)
 		{
 			/* port: an index past the table (a damaged map's) names none */
+			{
+				extern struct hs_function_definition *mcc_script_function(short index);
+				struct hs_function_definition *mcc_function = mcc_script_function(syntax_node->index);
+				if (mcc_function)
+					return mcc_function->name;
+			}
 			if ((word)syntax_node->index>=hs_function_table_count)
 				return "(corrupt function)";
 
@@ -1349,6 +1357,7 @@ static long hs_thread_new(
 static void hs_thread_delete(
 	long thread_index)
 {
+	mcc_hs_release_thread(thread_index);
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x290,
 		hs_thread_get(thread_index)->type!=_hs_thread_type_script);
 
@@ -1795,6 +1804,12 @@ boolean hs_can_cast(
 {
 	short object_type;
 
+	{
+		extern boolean mcc_script_ai_cast(short actual_type, short desired_type);
+		if (mcc_script_ai_cast(actual_type, desired_type))
+			return TRUE;
+	}
+
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a4,
 		actual_type==_hs_passthrough || hs_type_valid(actual_type));
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5a5,
@@ -1847,6 +1862,13 @@ long hs_cast(
 	short desired_type,
 	long value)
 {
+	{
+		extern boolean mcc_script_ai_cast(short actual_type, short desired_type);
+		extern long mcc_script_cast_ai(short desired_type, long reference);
+		if (mcc_script_ai_cast(actual_type, desired_type))
+			return mcc_script_cast_ai(desired_type, value);
+	}
+
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5d8, thread_index,
 		hs_can_cast(actual_type, desired_type), "bad typecast.");
 
@@ -2148,6 +2170,8 @@ void hs_evaluate_set(
 		NULL;
 	short type;
 	long global_index;
+	if (mcc_hs_parameter_set(thread_index, variable, initialize))
+		return;
 
 	/* port: a variable that isn't a global's name ends the thread: its
 	index would pick the global (the external one too) written through. Only
@@ -2711,6 +2735,11 @@ static void hs_thread_main(
 		index_count = TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ?
 			global_scenario_get()->hs_scripts.count :
 			hs_function_table_count;
+		{
+			extern struct hs_function_definition *mcc_script_function(short index);
+			if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) && mcc_script_function(expression->index))
+				index_count = expression->index + 1;
+		}
 		if (expression->index<0 || expression->index>=index_count)
 		{
 			hs_syntax_error(thread_index);
@@ -2735,6 +2764,7 @@ static void hs_thread_main(
 		frames are let go, and a script's thread doesn't run again */
 		if (TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
 		{
+			mcc_hs_release_thread(thread_index);
 			thread->stack = (struct hs_stack_frame *)thread->stack_data;
 			thread->flags = 0;
 			thread->sleep_until = thread->type==_hs_thread_type_script ? NONE : 0;
@@ -2767,6 +2797,8 @@ static void hs_script_evaluate(
 	long thread_index,
 	boolean initialize)
 {
+	if (mcc_hs_script_evaluate(script_index, thread_index, initialize))
+		return;
 	struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->hs_scripts,
 		script_index,
@@ -2877,6 +2909,8 @@ static void hs_evaluate(
 
 		return;
 	}
+	if (mcc_hs_parameter_evaluate(thread_index, expression, destination))
+		return;
 
 	if (TEST_FLAG(hs_syntax_get(expression_index)->flags, _hs_syntax_node_primitive_bit))
 	{

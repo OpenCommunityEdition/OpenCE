@@ -1,0 +1,77 @@
+name: MCC map validation
+
+# Asset-free checks only. Real map files remain outside the repository and
+# require explicit MCC_TEST_MAP/HALO_CUSTOM_EDITION_MAPS locally.
+on:
+  push:
+    paths:
+      - "port/linux/game/**"
+      - "port/linux/src/**"
+      - "port/tools/**"
+      - "port/third_party/bcdec/**"
+      - "source/**"
+      - "tools/test_mcc_*.py"
+      - "tools/test_cache_file_formats.py"
+      - "tools/harness/**"
+      - ".github/workflows/mcc.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcc-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reader-and-validator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld gcc-multilib python3-pytest
+      - name: Check MCC parsing, validation, codecs and existing CE parsing
+        run: >-
+          python3 -m pytest -q
+          tools/test_mcc_cache_format.py
+          tools/test_mcc_tag_validation.py
+          tools/test_mcc_media.py
+          tools/test_mcc_bitmap_flags.py
+          tools/test_mcc_shader_channels.py
+          tools/test_mcc_hud.py
+          tools/test_mcc_vorbis.py
+          tools/test_mcc_texture_bridge.py
+          tools/test_mcc_maps.py
+          tools/test_mcc_menu.py
+          tools/test_mcc_pause.py
+          tools/test_mcc_pause_runtime.py
+          tools/test_mcc_ui.py
+          tools/test_mcc_ui_teams.py
+          tools/test_mcc_ui_network.py
+          tools/test_mcc_lifecycle.py
+          tools/test_mcc_saved_games.py
+          tools/test_mcc_network.py
+          tools/test_mcc_checkpoint.py
+          tools/test_mcc_grenades.py
+          tools/test_cache_file_formats.py
+
+  windows-adapters:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python test runner
+        run: python -m pip install pytest
+      - name: Check native x86 MCC adapters and legacy isolation
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "MCC_VS_INSTALL=%%i"
+          if not defined MCC_VS_INSTALL exit /b 1
+          call "%MCC_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -host_arch=x64 -arch=x86
+          if errorlevel 1 exit /b 1
+          clang --version
+          python -m pytest -q tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py tools/test_mcc_media.py tools/test_mcc_bitmap_flags.py tools/test_mcc_shader_channels.py tools/test_mcc_hud.py tools/test_mcc_vorbis.py tools/test_mcc_texture_bridge.py tools/test_mcc_geometry.py tools/test_mcc_scripts.py tools/test_mcc_parameters.py tools/test_mcc_syntax.py tools/test_mcc_maps.py tools/test_mcc_menu.py tools/test_mcc_pause.py tools/test_mcc_pause_runtime.py tools/test_mcc_ui.py tools/test_mcc_ui_network.py tools/test_mcc_ui_teams.py tools/test_mcc_lifecycle.py tools/test_mcc_saved_games.py tools/test_mcc_network.py tools/test_mcc_checkpoint.py tools/test_mcc_grenades.py tools/test_cache_file_formats.py

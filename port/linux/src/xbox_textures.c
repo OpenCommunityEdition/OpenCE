@@ -794,6 +794,115 @@ static void upload(GLuint texture, GLenum target, const struct xgpu_texture_desc
 	texture_dump(target, description);
 }
 
+/* MCC bounded immutable upload. The original guest-memory uploader above
+ * remains unchanged; native format decoding is shared, ownership is separate. */
+BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_texture_description *description,
+	void const *pixels, unsigned long bytes, const D3DCOLOR *palette)
+{
+	const unsigned char *base = pixels;
+	struct format_information information = format_information(description->format);
+	unsigned long face_count = description->cube_map ? 6 : 1;
+	unsigned long face_size = xgpu_texture_face_size(description);
+	unsigned long largest = description->width * description->height * description->depth;
+	BOOL decode_compressed = FALSE;
+	unsigned long *converted;
+	unsigned long face, level;
+	GLenum gl_error;
+	if (!base || !texture_size_supported(description) || !description->levels ||
+		description->levels > 13 || !face_size || face_size > bytes / face_count ||
+		information.kind == _texel_unknown) return FALSE;
+	/* Account for this upload's errors independently of earlier rendering. */
+	gl_error = glGetError();
+	if (gl_error != GL_NO_ERROR)
+		platform_log("mcc textures: prior GL error %lx", (unsigned long)gl_error);
+
+#ifdef HALO_GLES
+	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
+#endif
+	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
+	if (!converted && !(description->compressed && !decode_compressed))
+	{
+		platform_log("mcc textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+			description->width, description->height, description->depth);
+		return FALSE;
+	}
+	glBindTexture(target, texture);
+	xgpu_gl_state_invalidate();
+	/* the channel of the texels each channel is sampled from, set on every
+	upload: a texture object can be reused for other texels */
+	{
+		GLint channels[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
+
+#ifdef HALO_GLES
+		/* converted texels are BGRA in memory (32-bit ARGB words); ES takes
+		RGBA */
+		if (converted)
+		{
+			channels[0] = GL_BLUE;
+			channels[2] = GL_RED;
+		}
+#endif
+
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, channels[0]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_G, channels[1]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, channels[2]);
+		glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, channels[3]);
+	}
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (GLint)description->levels - 1);
+	for (face = 0; face < face_count; face++)
+	{
+		GLenum image_target = description->cube_map ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + face : target;
+
+		for (level = 0; level < description->levels; level++)
+		{
+			const unsigned char *source = base + face * face_size + xgpu_texture_level_offset(description, level);
+			GLsizei width = (GLsizei)level_dimension(description->width, level);
+			GLsizei height = (GLsizei)level_dimension(description->height, level);
+			GLsizei depth = (GLsizei)level_dimension(description->depth, level);
+
+			if (description->compressed && !decode_compressed)
+			{
+				if (target == GL_TEXTURE_3D)
+					glCompressedTexImage3D(image_target, (GLint)level, compressed_format(information.kind), width, height, depth, 0,
+						(GLsizei)level_bytes(description, level), source);
+				else
+					glCompressedTexImage2D(image_target, (GLint)level, compressed_format(information.kind), width, height, 0,
+						(GLsizei)level_bytes(description, level), source);
+			}
+			else
+			{
+#ifdef HALO_GLES
+				if (decode_compressed)
+					dxt_decode_level(information.kind, source, (unsigned long)width, (unsigned long)height,
+						(unsigned long)depth, converted);
+				else
+#endif
+				if (!decode_level(description, level, source, palette, converted))
+				{
+					platform_log("mcc textures: no memory to convert a %lux%lux%lu texture; it is not drawn",
+						description->width, description->height, description->depth);
+					free(converted);
+					return FALSE;
+				}
+				if (target == GL_TEXTURE_3D)
+					glTexImage3D(image_target, (GLint)level, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);
+				else
+					glTexImage2D(image_target, (GLint)level, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);
+			}
+		}
+	}
+	free(converted);
+	gl_error = glGetError();
+	if (gl_error != GL_NO_ERROR) {
+		platform_log("mcc textures: upload failed, GL error %lx", (unsigned long)gl_error);
+		return FALSE;
+	}
+	texture_dump(target, description);
+	return TRUE;
+}
+
 /* ---------- cache */
 
 struct texture_entry
@@ -918,6 +1027,10 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *target,
 	struct xgpu_texture_description *description)
 {
+	GLuint mcc_texture;
+	if (xgpu_mcc_texture_get(resource, palette, &mcc_texture, target, description))
+		return mcc_texture;
+
 	DWORD data = resource[1], format_word = resource[3], size_word = resource[4];
 	struct texture_entry **bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
 	struct texture_entry *entry;
