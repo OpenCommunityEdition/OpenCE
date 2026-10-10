@@ -372,6 +372,10 @@ void render_objects(
 	return;
 }
 
+/* port: port/linux/game/first_person_legs.c */
+boolean first_person_legs_wanted(long object_index);
+real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+
 void render_object_shadows(
 	void)
 {
@@ -470,8 +474,16 @@ static void render_object_list(
 	while (object_index != NONE)
 	{
 		struct object_datum *object = object_get(object_index);
+		/* port: the player's own legs, seen looking down in first person
+		(port/linux/game/first_person_legs.c): its body drawn from the waist
+		down, nothing it carries */
+		boolean legs = !data->shadow && !render.camera.mirrored &&
+			object_is_first_person_camera(object_index) && first_person_legs_wanted(object_index);
+		real_matrix4x3 const *node_matrices = legs ?
+			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
+			object_get_node_matrices(object_index);
 
-		if (!object_is_first_person_camera(object_index) || render.camera.mirrored)
+		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
 			struct render_model_effect model_effect;
 
@@ -602,7 +614,7 @@ static void render_object_list(
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels,
-						object_get_node_matrices(object_index),
+						node_matrices,
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
@@ -624,7 +636,7 @@ static void render_object_list(
 					render_model(
 						definition->object.model.index,
 						level_of_detail_pixels * 0.3f,
-						object_get_node_matrices(object_index),
+						node_matrices,
 						object->object.region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
@@ -638,7 +650,7 @@ static void render_object_list(
 				}
 			}
 
-			if (!data->shadow && object->object.first_widget_index != NONE)
+			if (!data->shadow && !legs && object->object.first_widget_index != NONE)
 			{
 				struct render_animation animation;
 
@@ -647,7 +659,7 @@ static void render_object_list(
 				widgets_render(object_index, data->lighting, &animation);
 			}
 
-			if (object->object.first_child_object_index != NONE)
+			if (object->object.first_child_object_index != NONE && !legs)
 			{
 				render_object_list(
 					data,

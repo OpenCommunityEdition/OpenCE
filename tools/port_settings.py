@@ -204,6 +204,8 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
         ("ARM SHIELDS:", "display.viewmodel_shield", ON_OFF,
          "The energy shield's flare on your first-person\narms too, as on your body.", None),
+        ("LEGS:", "display.first_person_legs", ON_OFF,
+         "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
     ],
 }
 
