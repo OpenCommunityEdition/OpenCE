@@ -341,14 +341,17 @@
 	<bitmap name="pause/pausebox_left">
 		<frame png="ce/port/pause/pausebox_left__0.png" width="16" height="256"/>
 		<frame png="ce/port/pause/pausebox_left__1.png" width="16" height="256"/>
+		<frame png="ce/port/pause/pausebox_left__2.png" width="16" height="256"/>
 	</bitmap>
 	<bitmap name="pause/pausebox_center">
 		<frame png="ce/port/pause/pausebox_center__0.png" width="4" height="256"/>
 		<frame png="ce/port/pause/pausebox_center__1.png" width="4" height="256"/>
+		<frame png="ce/port/pause/pausebox_center__2.png" width="4" height="256"/>
 	</bitmap>
 	<bitmap name="pause/pausebox_right">
 		<frame png="ce/port/pause/pausebox_right__0.png" width="16" height="256"/>
 		<frame png="ce/port/pause/pausebox_right__1.png" width="16" height="256"/>
+		<frame png="ce/port/pause/pausebox_right__2.png" width="16" height="256"/>
 	</bitmap>
 	<bitmap name="voice/speaker">
 		<frame png="ce/port/voice/speaker__0.png" width="24" height="24"/>
