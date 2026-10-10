@@ -103,7 +103,9 @@ int main(int argc, char **argv) {
     char *strings;
     uint32_t pointer;
     int expected = 1;
+    short segment_index;
     CHECK(argc == 2);
+    segment_index = !strcmp(argv[1], "core_segment") ? MCC_HS_CORE_SEGMENT : MCC_HS_MISSION_SEGMENT;
     runtime.used = 0x100000;
     runtime.tags = malloc(runtime.used);
     CHECK(runtime.tags);
@@ -158,8 +160,8 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "unterminated")) { memset(strings, 'x', 128); expected = 0; }
     if (!strcmp(argv[1], "alias")) strcpy(strings, "player_effect_set_max_vibrate");
     if (!strcmp(argv[1], "extension")) strcpy(strings, "objects_distance_to_object");
-    if (!strcmp(argv[1], "segment")) {
-        strcpy(strings, "mcc_mission_segment");
+    if (!strcmp(argv[1], "segment") || !strcmp(argv[1], "core_segment")) {
+        strcpy(strings, segment_index == MCC_HS_CORE_SEGMENT ? "core_save_name" : "mcc_mission_segment");
         nodes[0].type = _hs_type_boolean;
         nodes[2].type = _hs_type_string;
         nodes[2].next_node_index = NONE;
@@ -189,6 +191,8 @@ int main(int argc, char **argv) {
     }
     CHECK(!mcc_script_function(MCC_HS_DISTANCE_TO_OBJECT));
     CHECK(!mcc_script_function(MCC_HS_MISSION_SEGMENT));
+    CHECK(!mcc_script_function(MCC_HS_CORE_SEGMENT));
+    CHECK(mcc_script_find("core_save_name") == NONE);
     CHECK(mcc_script_find("objects_distance_to_object") == NONE);
     CHECK(mcc_script_find("mcc_mission_segment") == NONE);
     loaded = TRUE;
@@ -210,6 +214,7 @@ int main(int argc, char **argv) {
     }
     CHECK(mcc_script_find("player_effect_set_max_vibrate") == 322);
     CHECK(mcc_script_find("MCC_MISSION_SEGMENT") == MCC_HS_MISSION_SEGMENT);
+    CHECK(mcc_script_find("CORE_SAVE_NAME") == MCC_HS_CORE_SEGMENT);
     if (!strcmp(argv[1], "global")) CHECK((unsigned short)nodes[0].short_value == 0x8009);
     else if (!strcmp(argv[1], "alias")) CHECK(nodes[0].function_index == 322);
     else if (!strcmp(argv[1], "extension")) {
@@ -228,12 +233,12 @@ int main(int argc, char **argv) {
         extension->evaluate(MCC_HS_DISTANCE_TO_OBJECT, 0, TRUE);
         result.bits = returned;
         CHECK(result.value == -1.f);
-    } else if (!strcmp(argv[1], "segment")) {
+    } else if (!strcmp(argv[1], "segment") || !strcmp(argv[1], "core_segment")) {
         char long_segment[200];
-        CHECK(nodes[0].function_index == MCC_HS_MISSION_SEGMENT);
-        CHECK(nodes[1].function_index == MCC_HS_MISSION_SEGMENT);
+        CHECK(nodes[0].function_index == segment_index);
+        CHECK(nodes[1].function_index == segment_index);
         CHECK(mcc_script_call_valid(&nodes[0], syntax));
-        extension = mcc_script_function(MCC_HS_MISSION_SEGMENT);
+        extension = mcc_script_function(segment_index);
         CHECK(extension && extension->return_type == _hs_type_boolean);
         CHECK(extension->parameter_count == 1 && extension->parameter_types[0] == _hs_type_string);
         nodes[2].type = _hs_type_real;
@@ -249,24 +254,24 @@ int main(int argc, char **argv) {
         nodes[2].next_node_index = NONE;
         arguments[0] = (long)(uintptr_t)"cine1_intro";
         returned = -123;
-        extension->evaluate(MCC_HS_MISSION_SEGMENT, 0, FALSE);
+        extension->evaluate(segment_index, 0, FALSE);
         CHECK(returned == -123 && !segment_events); /* argument expression still yielding */
-        extension->evaluate(MCC_HS_MISSION_SEGMENT, 0, TRUE);
+        extension->evaluate(segment_index, 0, TRUE);
         CHECK(returned == TRUE && segment_events == 1);
         CHECK(!strcmp(last_event, "mcc: mission segment 'cine1_intro'"));
         arguments[0] = (long)(uintptr_t)"03_escape"; /* use the evaluated argument each time */
-        extension->evaluate(MCC_HS_MISSION_SEGMENT, 0, TRUE);
+        extension->evaluate(segment_index, 0, TRUE);
         CHECK(returned == TRUE && segment_events == 2);
         CHECK(!strcmp(last_event, "mcc: mission segment '03_escape'"));
         memset(long_segment, 'x', sizeof(long_segment)); long_segment[199] = 0;
         arguments[0] = (long)(uintptr_t)long_segment;
-        extension->evaluate(MCC_HS_MISSION_SEGMENT, 0, TRUE);
+        extension->evaluate(segment_index, 0, TRUE);
         CHECK(returned == TRUE && segment_events == 3 && strlen(last_event) == 151);
         arguments[0] = 0;
-        extension->evaluate(MCC_HS_MISSION_SEGMENT, 0, TRUE);
+        extension->evaluate(segment_index, 0, TRUE);
         CHECK(returned == FALSE && segment_events == 3);
         loaded = FALSE;
-        CHECK(!mcc_script_function(MCC_HS_MISSION_SEGMENT));
+        CHECK(!mcc_script_function(segment_index));
         CHECK(mcc_script_find("mcc_mission_segment") == NONE);
     } else CHECK(nodes[0].function_index == 321 && nodes[1].function_index == 321);
     free(runtime.tags);

@@ -476,15 +476,50 @@ map playability.
 
 ### Solar Flare, Spasm and Combat Revolved compatibility checks
 
-The October 10 compatibility changes were checked in the development build
-against all 16 supplied
-maps: Solar Flare `m0` through `m3`, Spasm Playground, and Combat Revolved
-`a10`, `a30`, `a50`, `b30`, `b40`, `c10`, `c20`, `c40`, `d20`, `d40` and
-`credits`. Each passed a bounded native Windows x86 load with rendering
-and opening scripts enabled. Combat Revolved used its matching external
-`sounds.map` and `bitmaps.map`; source assets remained read-only and were
-not added to the repository. These are initial-load checks, not complete
-campaign playthroughs or automatic level-progression tests.
+The initial October 10 load checks incorrectly classified all 16 supplied
+maps as passing. They accepted the tag-loader's `mcc: loaded` message and
+exit code zero, but missed `type is inconsistent with usage` during the
+subsequent script initialization. The retained logs contained this fatal
+error for Combat Revolved `a10`, `a50`, `b30`, `b40`, `c10` and `d20`.
+Those results did not establish successful startup and are withdrawn.
+
+B40's first failing expression called `core_save_name` as a boolean.
+The legacy Xbox function with that name returns void and writes a debug
+save. H1A repurposed it for campaign segments, as documented in the
+[public scripting reference](https://c20.reclaimers.net/h1/scripting/#functions).
+The MCC linker now gives this spelling its own boolean function definition
+and the existing MCC segment evaluator. It logs the evaluated segment and
+acknowledges it without writing a core file or contacting MCC telemetry.
+The native Xbox/CE function table, compiler, validator and save functions
+are unchanged. MCC console lookups use the same segment meaning; use the
+existing `core_save`/`core_load` commands for an explicit debug core instead.
+
+`tools/mcc_native_smoke.py` replaces the old private load-only checker.
+It runs one hidden Windows instance at a time with a disposable data root,
+rejects script failures in the logs, and requires a unique console marker
+after a 150-tick sleep, followed by normal exit. An echoed command, a loader
+message or a zero exit code alone cannot pass. Asset-free tests include
+the previously missed fatal log and verify rejection of echoed markers.
+For example, with privately supplied maps and any matching resource files:
+
+```powershell
+python tools/mcc_native_smoke.py --executable build/windows/halo.exe `
+  --data-root build/private-mcc-data --output build/mcc-startup-check b40
+```
+
+The checker needs the Xbox UI maps and each selected MCC map in that test
+data root. Its logs and map assets must remain outside version control.
+These are bounded startup checks, not complete campaign playthroughs or
+automatic level-progression tests.
+
+After the segment fix, all 16 supplied maps passed 45-second native Windows
+x86 runs in the development build with rendering enabled: Combat Revolved
+`a10`, `a30`, `a50`, `b30`,
+`b40`, `c10`, `c20`, `c40`, `d20`, `d40` and `credits`; Solar Flare `m0`
+through `m3`; and Spasm Playground. Each produced its delayed marker and
+exited normally without fatal script diagnostics. B40 also reached the
+opening pilot/Cortana dialogue. Combat Revolved used its matching external
+resources; no map assets are included in this contribution.
 
 The production Vorbis decoder was compared with libvorbis through
 libsndfile for all 158 permutations in Solar Flare's reported sound tag
@@ -510,19 +545,20 @@ Both exited normally. This tests the new state message on loopback; it
 does not establish Internet reliability, every campaign's co-op behavior,
 or a full campaign playthrough.
 
-After applying the fixes to the OpenCE contribution, the combined MCC,
-existing cache-format and BMP suite passed 738 tests, with six
-optional-fixture skips, and the Windows x86 release build passed.
-That contribution build also passed targeted rendered loads of Solar Flare
-`m0`, Combat Revolved `b40` and Spasm Playground. Checkpoint/core restoration,
-the MCC-to-Xbox-to-CE-to-MCC transition, and the two-process cooperative
-gravity/gain/marker checks were repeated on that build successfully.
-
-Linux and Android builds of these particular changes have not been verified
-locally; the Windows build configuration did not provide an Android target.
-Earlier CI results above predate these changes. The MCC validation workflow
-includes the new portable resource-reader cases and native Windows campaign
-cases so they run with the existing checks when the branch is published.
+After transferring the segment fix to the OpenCE contribution, the combined
+MCC, existing cache-format and BMP suite passed 746 tests, with six
+optional-fixture skips. The Windows x86 release build passed. B40 was then
+rechecked on that contribution build: its 45-second hidden rendered run
+produced the delayed script marker, reached the opening dialogue and exited
+normally without fatal script diagnostics.
+The earlier contribution build's B40 load claim was also a false positive
+and is withdrawn. Its separately checked checkpoint/core restoration,
+MCC-to-Xbox-to-CE-to-MCC transition and cooperative state checks remain
+historical results; they have not been repeated for this segment fix.
+Linux and Android builds of these
+particular changes have not been verified locally; the Windows build
+configuration did not provide an Android target. Earlier CI results
+above apply to their named commits, not these changes.
 
 Run the isolated tests with a C compiler and Python/pytest available:
 

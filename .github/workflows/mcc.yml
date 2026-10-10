@@ -11,6 +11,7 @@ on:
       - "port/third_party/bcdec/**"
       - "source/**"
       - "tools/test_mcc_*.py"
+      - "tools/mcc_native_smoke.py"
       - "tools/test_cache_file_formats.py"
       - "tools/harness/**"
       - ".github/workflows/mcc.yml"
@@ -54,6 +55,7 @@ jobs:
           tools/test_mcc_ui_teams.py
           tools/test_mcc_ui_network.py
           tools/test_mcc_lifecycle.py
+          tools/test_mcc_native_smoke.py
           tools/test_mcc_saved_games.py
           tools/test_mcc_network.py
           tools/test_mcc_checkpoint.py

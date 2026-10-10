@@ -91,8 +91,9 @@ static void mcc_mission_segment_evaluate(short function, long thread, boolean in
     segment = (char const *)(uintptr_t)arguments[0];
     /* This port acknowledges a local segment event, without MCC's external
      * telemetry service. Keep the boolean result: shipped scripts use it in
-     * conditional expressions before cinematics. core_save_name is unrelated
-     * in the Xbox runtime and would create a debug save, not a segment event.
+     * conditional expressions before cinematics. MCC also uses the older
+     * core_save_name spelling for segments; the Xbox function with that name
+     * instead writes a debug save and must not be called by MCC map scripts.
      * Argument expressions still run normally, including any sleep/yield. */
     if (segment) error(_error_log, "mcc: mission segment '%.128s'", segment);
     hs_return(thread, segment != NULL);
@@ -104,11 +105,21 @@ static struct hs_function_definition mcc_mission_segment_definition = {
     NULL, 1, { _hs_type_string }
 };
 
+/* H1A repurposed this name for campaign segments with a boolean result.
+ * Keep it outside the legacy table, including its original debug-save API.
+ * Format reference: https://c20.reclaimers.net/h1/scripting/#functions */
+static struct hs_function_definition mcc_core_segment_definition = {
+    _hs_type_boolean, 0, "core_save_name", hs_macro_function_parse,
+    mcc_mission_segment_evaluate, "Records a local mission segment and acknowledges it.",
+    NULL, 1, { _hs_type_string }
+};
+
 struct hs_function_definition *mcc_script_function(short index)
 {
     if (!mcc_cache_tags_loaded()) return NULL;
     if (index == MCC_HS_DISTANCE_TO_OBJECT) return &mcc_distance_definition.definition;
     if (index == MCC_HS_MISSION_SEGMENT) return &mcc_mission_segment_definition;
+    if (index == MCC_HS_CORE_SEGMENT) return &mcc_core_segment_definition;
     return mcc_campaign_function(index);
 }
 
@@ -117,6 +128,7 @@ short mcc_script_find(char const *name)
     if (!mcc_cache_tags_loaded() || !name) return NONE;
     if (!csstrcasecmp(name, "objects_distance_to_object")) return MCC_HS_DISTANCE_TO_OBJECT;
     if (!csstrcasecmp(name, "mcc_mission_segment")) return MCC_HS_MISSION_SEGMENT;
+    if (!csstrcasecmp(name, "core_save_name")) return MCC_HS_CORE_SEGMENT;
     if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
         return hs_find_function_by_name("player_effect_set_max_rumble");
     return mcc_campaign_find(name);
@@ -203,6 +215,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
             }
             if (!csstrcasecmp(name, "objects_distance_to_object")) index = MCC_HS_DISTANCE_TO_OBJECT;
             else if (!csstrcasecmp(name, "mcc_mission_segment")) index = MCC_HS_MISSION_SEGMENT;
+            else if (!csstrcasecmp(name, "core_save_name")) index = MCC_HS_CORE_SEGMENT;
             else if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
                 index = hs_find_function_by_name("player_effect_set_max_rumble");
             else {
