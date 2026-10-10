@@ -2547,6 +2547,7 @@ void _rasterizer_present(
 				error(_error_silent, "### ERROR rasterizer_present: failed to get backbuffer surface");
 				success = FALSE;
 			}
+			IDirect3DSurface8_Release(d3d_surface);
 		}
 		else
 		{

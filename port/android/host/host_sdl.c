@@ -32,6 +32,8 @@ struct handle
 {
 	int type;
 	void *object;
+	/* an audio stream with a callback: its binding (below) */
+	void *binding;
 };
 
 static struct handle handles[HANDLE_COUNT];
@@ -59,6 +61,7 @@ static uint32_t handle_new(int type, void *object)
 		{
 			handles[index].type = type;
 			handles[index].object = object;
+			handles[index].binding = NULL;
 			pthread_mutex_unlock(&handle_lock);
 			return index;
 		}
@@ -77,6 +80,30 @@ static void *handle_get(uint32_t handle, int type)
 	pthread_mutex_lock(&handle_lock);
 	if (handles[handle].type == type)
 		object = handles[handle].object;
+	pthread_mutex_unlock(&handle_lock);
+	return object;
+}
+
+/* the object of a handle, which the handle no longer refers to; NULL when
+there is none. *binding gets what handle_new's caller stored (audio) */
+static void *handle_release(uint32_t handle, int type, void **binding)
+{
+	void *object = NULL;
+
+	if (binding)
+		*binding = NULL;
+	if (handle == 0 || handle >= HANDLE_COUNT)
+		return NULL;
+	pthread_mutex_lock(&handle_lock);
+	if (handles[handle].type == type)
+	{
+		object = handles[handle].object;
+		if (binding)
+			*binding = handles[handle].binding;
+		handles[handle].type = _handle_free;
+		handles[handle].object = NULL;
+		handles[handle].binding = NULL;
+	}
 	pthread_mutex_unlock(&handle_lock);
 	return object;
 }
@@ -217,6 +244,15 @@ uint32_t host_sdl_gamepad_from_id(uint32_t id)
 	return handle_new(_handle_gamepad, SDL_GetGamepadFromID((SDL_JoystickID)id));
 }
 
+/* (the event thread, when the controller goes: sdl_platform.c) */
+void host_sdl_close_gamepad(uint32_t gamepad)
+{
+	SDL_Gamepad *object = handle_release(gamepad, _handle_gamepad, NULL);
+
+	if (object)
+		SDL_CloseGamepad(object);
+}
+
 int host_sdl_gamepad_axis(uint32_t gamepad, int axis)
 {
 	SDL_Gamepad *object = handle_get(gamepad, _handle_gamepad);
@@ -263,6 +299,8 @@ struct audio_binding
 	pthread_cond_t requested;
 	pthread_cond_t done;
 	int pending;
+	/* the stream is destroyed: the thread frees the binding and ends */
+	int quit;
 	int additional;
 	int total;
 	unsigned char *buffer;
@@ -282,8 +320,10 @@ static void *audio_thread(void *context)
 	{
 		int additional, total;
 
-		while (!binding->pending)
+		while (!binding->pending && !binding->quit)
 			pthread_cond_wait(&binding->requested, &binding->lock);
+		if (binding->quit)
+			break;
 		additional = binding->additional;
 		total = binding->total;
 		pthread_mutex_unlock(&binding->lock);
@@ -294,6 +334,12 @@ static void *audio_thread(void *context)
 		binding->pending = 0;
 		pthread_cond_signal(&binding->done);
 	}
+	pthread_mutex_unlock(&binding->lock);
+	pthread_cond_destroy(&binding->done);
+	pthread_cond_destroy(&binding->requested);
+	pthread_mutex_destroy(&binding->lock);
+	SDL_free(binding->buffer);
+	SDL_free(binding);
 	return NULL;
 }
 
@@ -350,7 +396,8 @@ uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t 
 		return stream ? handle_new(_handle_audio, stream) : 0;
 	}
 	binding = SDL_calloc(1, sizeof(*binding));
-
+	if (!binding)
+		return 0;
 	binding->callback = callback;
 	binding->userdata = userdata;
 	pthread_mutex_init(&binding->lock, NULL);
@@ -365,7 +412,19 @@ uint32_t host_sdl_open_audio_stream(uint32_t device, const void *spec, uint32_t 
 	}
 	/* the device starts paused, so no callback can run before this */
 	binding->handle = handle_new(_handle_audio, stream);
-	if (callback && host_native_thread_create(audio_thread, binding, 256 * 1024) != 0)
+	if (!binding->handle)
+	{
+		SDL_DestroyAudioStream(stream);
+		pthread_cond_destroy(&binding->done);
+		pthread_cond_destroy(&binding->requested);
+		pthread_mutex_destroy(&binding->lock);
+		SDL_free(binding);
+		return 0;
+	}
+	pthread_mutex_lock(&handle_lock);
+	handles[binding->handle].binding = binding;
+	pthread_mutex_unlock(&handle_lock);
+	if (host_native_thread_create(audio_thread, binding, 256 * 1024) != 0)
 		host_fatal("cannot start the audio thread");
 	return binding->handle;
 }
@@ -403,19 +462,26 @@ int host_sdl_get_audio_stream_available(uint32_t stream)
 	return object ? SDL_GetAudioStreamAvailable(object) : -1;
 }
 
-/* (a stream opened without a callback only: one with a callback has a
-thread the guest's callbacks run on) */
+/* (a stream with a callback has a thread the guest's callbacks run on:
+once no callback can run any more, it is told to end, and frees the
+binding and its stack as it goes) */
 void host_sdl_destroy_audio_stream(uint32_t stream)
 {
-	SDL_AudioStream *object = handle_get(stream, _handle_audio);
+	void *context;
+	SDL_AudioStream *object = handle_release(stream, _handle_audio, &context);
+	struct audio_binding *binding = context;
 
 	if (!object)
 		return;
-	pthread_mutex_lock(&handle_lock);
-	handles[stream].type = _handle_free;
-	handles[stream].object = NULL;
-	pthread_mutex_unlock(&handle_lock);
+	/* (returns once a callback that is running has finished) */
 	SDL_DestroyAudioStream(object);
+	if (binding)
+	{
+		pthread_mutex_lock(&binding->lock);
+		binding->quit = 1;
+		pthread_cond_signal(&binding->requested);
+		pthread_mutex_unlock(&binding->lock);
+	}
 }
 
 /* ---------- the clipboard (internet play's invite links) */

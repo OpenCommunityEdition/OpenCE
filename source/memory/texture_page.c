@@ -145,11 +145,8 @@ struct texture_page *texture_page_new(
 			return texture_page;
 		}
 
-		{
-			struct data_array *textures = texture_page->textures;
-			texture_page = NULL;
-			match_free("c:\\halo\\SOURCE\\memory\\texture_page.c", 56, textures);
-		}
+		match_free("c:\\halo\\SOURCE\\memory\\texture_page.c", 56, texture_page);
+		texture_page = NULL;
 	}
 
 	return texture_page;

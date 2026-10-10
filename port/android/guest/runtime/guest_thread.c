@@ -125,6 +125,18 @@ unsigned int __guest_thread_attach(void)
 	return (unsigned int)thread;
 }
 
+/* a host thread that ran guest code (__guest_thread_attach) is ending:
+its struct pthread goes */
+void __guest_thread_detach(void)
+{
+	struct guest_thread *thread = (struct guest_thread *)host_get_tp();
+
+	if (!thread || thread == &main_thread)
+		return;
+	host_set_tp(0);
+	thread_free(thread);
+}
+
 int pthread_create(pthread_t *restrict result, const pthread_attr_t *restrict attributes,
 	void *(*start)(void *), void *restrict argument)
 {

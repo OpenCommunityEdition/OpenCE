@@ -414,6 +414,7 @@ static int updater_download_zip(const char *zip_path, char *error, size_t error_
 	thread = SDL_CreateThread(updater_download_thread, "update download", &download);
 	if (!thread)
 	{
+		SDL_DestroyMutex(download.lock);
 		snprintf(error, error_size, "could not start the download");
 		return 0;
 	}

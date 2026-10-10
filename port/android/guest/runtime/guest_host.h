@@ -82,6 +82,7 @@ int host_sdl_gamepad_axis(unsigned int gamepad, int axis);
 int host_sdl_gamepad_button(unsigned int gamepad, int button);
 int host_sdl_gamepad_type(unsigned int gamepad);
 int host_sdl_rumble_gamepad(unsigned int gamepad, unsigned int low, unsigned int high, unsigned int milliseconds);
+void host_sdl_close_gamepad(unsigned int gamepad);
 /* callback: void (*)(void *userdata, unsigned int stream, int additional, int total),
 called on the audio thread */
 unsigned int host_sdl_open_audio_stream(unsigned int device, const void *spec, unsigned int callback, unsigned int userdata);

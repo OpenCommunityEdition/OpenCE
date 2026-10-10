@@ -25,6 +25,7 @@ extern void (*__guest_init_end[])(void);
 void __guest_start(const struct halo_guest_boot *boot);
 void __guest_thread_start(unsigned int thread);
 unsigned int __guest_thread_attach(void);
+void __guest_thread_detach(void);
 void __guest_thread_initialize_main(void);
 
 extern char **__environ;
@@ -41,6 +42,7 @@ const struct halo_guest_header __guest_header =
 	(uint32_t)__guest_start,
 	(uint32_t)__guest_thread_start,
 	(uint32_t)__guest_thread_attach,
+	(uint32_t)__guest_thread_detach,
 	(uint32_t)__guest_init_start,
 	(uint32_t)__guest_init_end,
 };

@@ -216,6 +216,11 @@ bool SDL_RumbleGamepad(SDL_Gamepad *gamepad, Uint16 low, Uint16 high, Uint32 mil
 	return host_sdl_rumble_gamepad((unsigned int)gamepad, low, high, milliseconds) != 0;
 }
 
+void SDL_CloseGamepad(SDL_Gamepad *gamepad)
+{
+	host_sdl_close_gamepad((unsigned int)gamepad);
+}
+
 /* ---------- audio */
 
 SDL_AudioStream *SDL_OpenAudioDeviceStream(SDL_AudioDeviceID device, const SDL_AudioSpec *spec,

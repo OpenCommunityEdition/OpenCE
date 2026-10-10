@@ -26,7 +26,15 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...)
 			text->length += (unsigned long)needed;
 			return;
 		}
-		text->capacity = (text->capacity + (unsigned long)needed + 1) * 2;
-		text->buffer = realloc(text->buffer, text->capacity);
+		{
+			unsigned long capacity = (text->capacity + (unsigned long)needed + 1) * 2;
+			char *buffer = realloc(text->buffer, capacity);
+
+			/* (out of memory: the text stays as it is, short) */
+			if (!buffer)
+				return;
+			text->buffer = buffer;
+			text->capacity = capacity;
+		}
 	}
 }

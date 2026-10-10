@@ -901,7 +901,18 @@ static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 		}
 		bitmap->width = (short)width;
 		bitmap->height = (short)height;
-		menu_tags.bitmaps = realloc(menu_tags.bitmaps, (menu_tags.bitmap_count + 1) * sizeof(*menu_tags.bitmaps));
+		{
+			struct bitmap_data **bitmaps = realloc(menu_tags.bitmaps,
+				(menu_tags.bitmap_count + 1) * sizeof(*menu_tags.bitmaps));
+
+			if (!bitmaps)
+			{
+				rasterizer_bitmap_delete(bitmap);
+				problem(source->file, source->line, "out of memory for the bitmaps of", source->name);
+				return group;
+			}
+			menu_tags.bitmaps = bitmaps;
+		}
 		menu_tags.bitmaps[menu_tags.bitmap_count++] = bitmap;
 		/* (none without a renderer: debug.null_renderer) */
 		if (bitmap->hardware_format)
@@ -1031,8 +1042,15 @@ static void handler_build(struct ui_widget_event_handler_reference *handler, str
 static void setting_add(struct halo_menu_widget const *source, long definition_index)
 {
 	struct pc_menu_setting *setting;
+	struct pc_menu_setting *settings = realloc(menu_tags.settings,
+		(menu_tags.setting_count + 1) * sizeof(*menu_tags.settings));
 
-	menu_tags.settings = realloc(menu_tags.settings, (menu_tags.setting_count + 1) * sizeof(*menu_tags.settings));
+	if (!settings)
+	{
+		problem(source->file, source->line, "out of memory for the settings of", source->name);
+		return;
+	}
+	menu_tags.settings = settings;
 	setting = &menu_tags.settings[menu_tags.setting_count++];
 	memset(setting, 0, sizeof(*setting));
 	setting->definition_index = definition_index;
