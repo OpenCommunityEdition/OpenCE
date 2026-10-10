@@ -20,7 +20,7 @@ casting a dark shadow down and to the right. -->
 <ellipse id="oval" rx="8.659" ry="12.932" fill="url(#body)"/>
 <ellipse rx="8.082" ry="12.355" fill="none" stroke="url(#rim)" stroke-width="1.154"/>
 </g>
-<path transform="matrix(1 0 -0.185 1 10.387 16.978)" fill="#3c1e00" fill-opacity="0.60"
+<path id="shadow" transform="matrix(1 0 -0.185 1 10.387 16.978)" fill="#3c1e00" fill-opacity="0.60"
 d="M-5.184,-11.167 L-2.927,-11.167 L1.047,-4.308 L-1.047,-4.308 Z M2.927,-11.167 L5.184,-11.167 L1.047,-4.308 L-1.047,-4.308 Z M-1.047,-4.908 L1.047,-4.908 L1.047,0.000 L-1.047,0.000 Z"/>
 <path id="letter" transform="matrix(1 0 -0.185 1 8.887 15.778)" fill="#ffffff"
 d="M-5.184,-11.167 L-2.927,-11.167 L1.047,-4.308 L-1.047,-4.308 Z M2.927,-11.167 L5.184,-11.167 L1.047,-4.308 L-1.047,-4.308 Z M-1.047,-4.908 L1.047,-4.908 L1.047,0.000 L-1.047,0.000 Z"/>

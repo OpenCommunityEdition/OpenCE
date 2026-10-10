@@ -29,6 +29,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 
 /* the platform layer's (port/linux/src) */
 void platform_log(char const *format, ...);
+unsigned long config_changes(void);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 long hud_hires_asset_bitmap(long asset);
@@ -61,7 +62,8 @@ static long hires_bitmap_count = 0;
 
 /* the bitmaps some of whose sprites have a texture, with their placeholder,
 and whether the texture can be drawn for the pixels at checked_address
-(checked again when the texture cache loads them elsewhere) */
+(checked again when the texture cache loads them elsewhere, or the settings
+change) */
 static struct
 {
 	struct bitmap_data *bitmap;
@@ -69,6 +71,7 @@ static struct
 	struct bitmap_data *placeholder;
 	boolean placeholder_failed;
 	void *checked_address;
+	unsigned long checked_at;
 	boolean drawable;
 } hires_sprite_bitmaps[MAXIMUM_HIRES_SPRITE_BITMAPS];
 static long hires_sprite_bitmap_count = 0;
@@ -172,9 +175,11 @@ struct bitmap_data const *hud_hires_sprite_bitmap(
 		/* (checked on its pixels in the texture cache, once they are loaded) */
 		if (sprite_bitmap->cache_block_index == NONE || !sprite_bitmap->base_address)
 			break;
-		if (hires_sprite_bitmaps[index].checked_address != sprite_bitmap->base_address)
+		if (hires_sprite_bitmaps[index].checked_address != sprite_bitmap->base_address ||
+			hires_sprite_bitmaps[index].checked_at != config_changes())
 		{
 			hires_sprite_bitmaps[index].checked_address = sprite_bitmap->base_address;
+			hires_sprite_bitmaps[index].checked_at = config_changes();
 			hires_sprite_bitmaps[index].drawable = hud_hires_sprites_drawable(
 				hires_sprite_bitmaps[index].asset,
 				(unsigned long)sprite_bitmap->base_address,

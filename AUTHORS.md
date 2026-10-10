@@ -4,6 +4,8 @@
 
 - **The game's icon** (the Android app's launcher icon, `halo.exe`'s icon
   and the desktop windows' icon): by ORION (`port/assets/icon`).
+- **The controller's A, B, X and Y buttons** (the menus' button icons and
+  the HUD messages'): redraws by saulob (`port/assets/buttons`).
 
 ## Third-party art
 

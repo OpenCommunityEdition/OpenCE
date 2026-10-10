@@ -9,8 +9,8 @@ port/linux/game/hud_hires_tags.c). Each texture is decoded from its PNG when
 first drawn and kept: up to 69 of the HUD's, about 225 MB with their mip
 levels, though a game draws only some (the scopes' only when zoomed), and
 the titles of the menus shown, about 3 MB each (11 MB for the carnage
-report's, a whole panel), and their button icons, about 0.3 MiB each (5.3
-MiB for the message icons' sheet).
+report's, a whole panel), and their button icons, about 0.3 MB each (5.3
+MB for the message icons' sheet).
 They are drawn with linear filtering and their mip levels (d3d8_gl.c,
 configure_sampler), as they are larger than they appear.
 
@@ -136,11 +136,13 @@ level0_size bytes): its setting on, the pixels those it was drawn for, and
 the texture decoded */
 int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long level0_size)
 {
-	static int hud_enabled = -1, titles_enabled = -1;
+	static int hud_enabled, titles_enabled;
+	static unsigned long read_at = (unsigned long)-1;
 	unsigned long levels;
 
-	if (hud_enabled < 0)
+	if (read_at != config_changes())
 	{
+		read_at = config_changes();
 		hud_enabled = config_boolean("display.high_res_hud");
 		titles_enabled = config_boolean("display.high_res_text");
 	}

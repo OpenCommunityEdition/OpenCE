@@ -37,7 +37,11 @@ layout: reads each icon's bitmap from the map (its size, format and the CRC
     place) and places its redraw on it: a small icon's scaled and moved as
     the map's small art is from its large art (so that their shapes' area
     and centre are the same), and a message icon's stencil where it covers
-    the sprite's best. Writes port/assets/buttons/buttons.json.
+    the sprite's best. Then each icon's letter (id "letter", with Y's
+    shadow, id "shadow") is moved on its oval to where the map's letter is
+    on that icon: the map's letters do not sit alike on every icon, so one
+    redraw's letter does not fit them all. Writes
+    port/assets/buttons/buttons.json.
 build: renders the redraws as buttons.json places them into
     port/assets/buttons/*.png (committed; the builds embed them:
     tools/embed_assets.py).
@@ -49,7 +53,6 @@ Needs rsvg-convert, Pillow, NumPy and SciPy.
 
 import argparse
 import json
-import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ElementTree
@@ -91,29 +94,43 @@ def document(width: int, height: int, body: str) -> str:
             f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n')
 
 
-def placed(svg: Path, width: int, height: int, place: list) -> str:
+# the redraws' letter, and the shadow Y's letter casts, which move together
+LETTER_IDS = ("letter", "shadow")
+
+ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
+
+
+def placed(svg: Path, width: int, height: int, place: list, letter: list = (0, 0)) -> str:
     """The redraw as a picture of its bitmap's size, scaled by place[0] and
-    moved by place[1:] (texels)."""
-    body = re.search(r"<svg\b[^>]*>(.*)</svg>", svg.read_text(), re.S).group(1)
+    moved by place[1:] (texels), its letter moved a further letter (texels
+    of the bitmap) on its oval."""
+    root = ElementTree.parse(svg).getroot()
     scale, x, y = place
+    for element in root.iter():
+        if element.get("id") in LETTER_IDS:
+            element.set("transform",
+                        f"translate({letter[0] / scale} {letter[1] / scale}) {element.get('transform', '')}")
+    body = "".join(ElementTree.tostring(child, encoding="unicode") for child in root)
     return document(width, height, f'<g transform="translate({x} {y}) scale({scale})">{body}</g>')
 
 
-def stencil(svg: str, cell: list, place: list, index: int) -> str:
+def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)) -> str:
     """A redraw as the message icons draw its button, in a sprite's cell
     (texels of its sheet): its oval in white with its letter cut out,
-    scaled by place[0] and moved by place[1:] from the cell's corner, and
-    kept to the cell; index names its clip and mask."""
+    scaled by place[0] and moved by place[1:] from the cell's corner, its
+    letter moved a further letter (texels of the sheet), and kept to the
+    cell; index names its clip and mask."""
     root = ElementTree.parse(ASSETS / "svg" / svg).getroot()
     parents = {child: parent for parent in root.iter() for child in parent}
-    oval, letter = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
+    oval, cut = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
     left, top, right, bottom = cell
     scale, x, y = place
     moved = f"translate({left + x} {top + y}) scale({scale})"
     area = f'x="{left}" y="{top}" width="{right - left}" height="{bottom - top}"'
     return (f'<defs><clipPath id="cell{index}"><rect {area}/></clipPath>\n'
             f'<mask id="letter{index}" maskUnits="userSpaceOnUse" {area}><rect {area} fill="#ffffff"/>\n'
-            f'<path transform="{moved} {letter.get("transform")}" fill="#000000" d="{letter.get("d")}"/></mask></defs>\n'
+            f'<path transform="{moved} translate({letter[0] / scale} {letter[1] / scale}) {cut.get("transform")}" '
+            f'fill="#000000" d="{cut.get("d")}"/></mask></defs>\n'
             f'<g clip-path="url(#cell{index})" mask="url(#letter{index})">'
             f'<ellipse transform="{moved} {parents[oval].get("transform")}" rx="{oval.get("rx")}" '
             f'ry="{oval.get("ry")}" fill="#ffffff"/></g>')
@@ -170,6 +187,53 @@ def stencil_place(svg: str, alpha: np.ndarray) -> list:
     return [round(float(best[0]), 4), round(float(best[1]), 3), round(float(best[2]), 3)]
 
 
+def whiteness(image: np.ndarray) -> np.ndarray:
+    """How white each texel is, over black: the letters' white against the
+    ovals' colours and rims, which do not move with the letter."""
+    alpha = image[..., 3:4].astype(float) / 255
+    return (image[..., :3].astype(float) * alpha).min(axis=2) / 255
+
+
+def best_letter(error) -> list:
+    """The letter's move (texels) with the least error, from none."""
+    from scipy import optimize
+
+    best = optimize.minimize(lambda move: error(list(move)), [0.0, 0.0], method="Powell",
+                             options={"xtol": 1e-3, "ftol": 1e-8}).x
+    return [round(float(best[0]), 3), round(float(best[1]), 3)]
+
+
+def button_letter(entry: dict, bitmap: dict) -> list:
+    """Where a button's letter goes on its oval (a move, in texels): where
+    its white is closest to the map's."""
+    target = whiteness(decode_bitmap(bitmap))
+    width, height = entry["width"], entry["height"]
+
+    def error(move: list) -> float:
+        drawn = render(placed(ASSETS / "svg" / entry["svg"], width, height, entry["place"], move), SCALE)
+        reduced = np.asarray(Image.fromarray(drawn, "RGBA").resize((width, height), Image.BOX))
+        return float(((whiteness(reduced) - target) ** 2).sum())
+
+    return best_letter(error)
+
+
+def sprite_letter(sprite: dict, alpha: np.ndarray) -> list:
+    """Where a message icon's letter goes on its oval (a move, in texels of
+    the sheet): where its cut-out is closest to the map's sprite, whose
+    alpha it is."""
+    left, top, right, bottom = sprite["cell"]
+    width, height = right - left, bottom - top
+    target = alpha.astype(float) / 255
+    cell = [0, 0, width, height]
+
+    def error(move: list) -> float:
+        drawn = render(document(width, height, stencil(sprite["svg"], cell, sprite["place"], 0, move)), SCALE)
+        reduced = drawn[..., 3].astype(float).reshape(height, SCALE, width, SCALE).mean(axis=(1, 3)) / 255
+        return float(((reduced - target) ** 2).sum())
+
+    return best_letter(error)
+
+
 def layout(arguments) -> None:
     xbox_map = XboxMap(Path(arguments.map))
     entries = []
@@ -183,7 +247,7 @@ def layout(arguments) -> None:
             drawn_area, drawn_x, drawn_y = shape(decode_bitmap(icon(xbox_map, drawn_over))[..., 3])
             scale = (area / drawn_area) ** 0.5
             place = [round(scale, 4), round(x - scale * drawn_x, 3), round(y - scale * drawn_y, 3)]
-        entries.append({
+        entry = {
             "name": tag.split("\\")[-1] + "__0",
             "tag": tag,
             "bitmap": 0,
@@ -196,8 +260,11 @@ def layout(arguments) -> None:
             "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
             "svg": svg,
             "place": place,
-        })
-        print(f"{tag}: {width}x{height} {FORMATS[bitmap['format']]}, {svg} at {place[0]}x, moved {place[1]}, {place[2]}")
+        }
+        entry["letter"] = button_letter(entry, bitmap)
+        entries.append(entry)
+        print(f"{tag}: {width}x{height} {FORMATS[bitmap['format']]}, {svg} at {place[0]}x, moved {place[1]}, "
+              f"{place[2]}; its letter moved {entry['letter'][0]}, {entry['letter'][1]}")
     # the message icons' buttons
     if ("bitm", MESSAGE_ICONS) not in xbox_map.tags:
         sys.exit(f"{MESSAGE_ICONS}: not in this map")
@@ -212,8 +279,11 @@ def layout(arguments) -> None:
             sys.exit(f"{MESSAGE_ICONS}: sequence {sequence} is not one sprite of its first bitmap")
         cell = pixel_rectangle(cells[0], width, height)
         place = stencil_place(svg, alpha[cell[1]:cell[3], cell[0]:cell[2]])
-        sprites.append({"sequence": sequence, "cell": cell, "svg": svg, "place": place})
-        print(f"{MESSAGE_ICONS} sequence {sequence}: cell {cell}, {svg} at {place[0]}x, moved {place[1]}, {place[2]}")
+        sprite = {"sequence": sequence, "cell": cell, "svg": svg, "place": place}
+        sprite["letter"] = sprite_letter(sprite, alpha[cell[1]:cell[3], cell[0]:cell[2]])
+        sprites.append(sprite)
+        print(f"{MESSAGE_ICONS} sequence {sequence}: cell {cell}, {svg} at {place[0]}x, moved {place[1]}, "
+              f"{place[2]}; its letter moved {sprite['letter'][0]}, {sprite['letter'][1]}")
     entries.append({
         "name": MESSAGE_ICONS.split("\\")[-1] + "__0",
         "tag": MESSAGE_ICONS,
@@ -237,14 +307,15 @@ def build(arguments) -> None:
             stale.unlink()
     for entry in description["assets"]:
         if "sprites" in entry:
-            body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index)
+            body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index,
+                                     sprite.get("letter", (0, 0)))
                              for index, sprite in enumerate(entry["sprites"]))
             image = render(document(entry["width"], entry["height"], body), entry["scale"])
             # (grey the same as alpha, as the sheet's)
             image[..., :3] = image[..., 3:4]
         else:
-            image = render(placed(ASSETS / "svg" / entry["svg"], entry["width"], entry["height"], entry["place"]),
-                           entry["scale"])
+            image = render(placed(ASSETS / "svg" / entry["svg"], entry["width"], entry["height"], entry["place"],
+                                  entry.get("letter", (0, 0))), entry["scale"])
             # (the colour carried into the transparent texels, so that
             # filtering and the mip levels keep it at the oval's edge)
             image = bleed(image)
