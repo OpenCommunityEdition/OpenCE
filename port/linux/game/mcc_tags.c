@@ -3,6 +3,7 @@
 #include "cseries.h"
 #include "errors.h"
 #include "mcc_runtime.h"
+#include "mcc_recordings.h"
 #include <string.h>
 
 static uint32_t mcc_word(void const *p)
@@ -33,6 +34,30 @@ static void mcc_hud_placement(unsigned char *p)
     memcpy(p + 8, &y, 4);
     flags &= ~4u;
     memcpy(p + 12, &flags, 2);
+}
+
+static int mcc_scenario_recordings(struct mcc_runtime *r, unsigned char *scenario)
+{
+    uint32_t count, i;
+    unsigned char *recordings = mcc_block(r, scenario + 0x36C, 0x40, &count);
+    if (count && !recordings) return FALSE;
+    for (i = 0; i < count; ++i) {
+        unsigned char *recording = recordings + i * 0x40;
+        uint32_t size = mcc_word(recording + 0x2C), corrected;
+        unsigned char *stream = mcc_runtime_pointer(r, mcc_word(recording + 0x38), size);
+        /* Preserve an explicitly disabled, empty recording. */
+        if (!recording[0x20] && !recording[0x24] && !recording[0x25] &&
+            !size && !mcc_word(recording + 0x38)) continue;
+        if (!mcc_recording_prepare(stream, size, recording[0x20], recording[0x22], &corrected)) {
+            error(_error_silent, "mcc: recorded animation #%lu has an unsupported or damaged control stream",
+                (unsigned long)i);
+            return FALSE;
+        }
+        if (corrected) error(_error_silent,
+            "mcc: recorded animation #%lu: %lu invalid weapon selections changed to NONE",
+            (unsigned long)i, (unsigned long)corrected);
+    }
+    return TRUE;
 }
 
 static int mcc_hud(struct mcc_runtime *r, uint32_t group, unsigned char *p)
@@ -96,6 +121,7 @@ int mcc_tags_prepare(struct mcc_runtime *r)
         case 'hudg': size = 0x450; break;
         case 'weap': size = 0x508; break;
         case 'DeLa': size = 0x60; break;
+        case 'scnr': size = 0x5B0; break;
         default: break;
         }
         if (shader >= 0) size = group == 'scex' ? 0x78 : 0x28;
@@ -106,6 +132,7 @@ int mcc_tags_prepare(struct mcc_runtime *r)
             return FALSE;
         }
         if (shader >= 0) memcpy(p + 0x24, &shader, 2);
+        if (group == 'scnr' && !mcc_scenario_recordings(r, p)) return FALSE;
         if (group == 'scex') {
             uint32_t flags = mcc_word(p + 0x6C), new_group = 'schi';
             if (!mcc_word(p + 0x54)) memcpy(p + 0x54, p + 0x60, 12);

@@ -205,6 +205,7 @@ struct mcc_runtime {unsigned char *tag_index;uint32_t used;struct {uint32_t tag_
 static unsigned char metadata[0x400];
 static void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t address,uint32_t bytes){(void)r;return address<=sizeof(metadata)&&bytes<=sizeof(metadata)-address?metadata+address:NULL;}
 static int mcc_hud(struct mcc_runtime *r,uint32_t group,unsigned char *p){(void)r;(void)group;(void)p;return TRUE;}
+static int mcc_scenario_recordings(struct mcc_runtime *r,unsigned char *p){(void)r;(void)p;abort();return FALSE;}
 ''' + '\n'.join(function(tags, name) for name in ["mcc_word", "mcc_block", "mcc_tags_prepare"]) + r'''
 #define CHECK(c,n) do{if(!(c)){fprintf(stderr,"check %d failed\n",n);return n;}}while(0)
 static boolean fire(struct widget_instance *widget,short button,struct ui_widget_event_handler_reference *handler){

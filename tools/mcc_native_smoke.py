@@ -20,7 +20,7 @@ import uuid
 
 FAILURES = ("recompile scripts", "recompile.)", "error loading scripts",
             "scripts won't run", "unsupported script", "invalid script",
-            "mcc: refused", "exception halt", "assertion failed",
+            "mcc: refused", "exception halt", "exception assert", "assertion failed",
             "failed to allocate", "could not load", "invalid mcc script parameter")
 
 

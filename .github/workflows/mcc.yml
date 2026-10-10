@@ -56,6 +56,7 @@ jobs:
           tools/test_mcc_ui_network.py
           tools/test_mcc_lifecycle.py
           tools/test_mcc_native_smoke.py
+          tools/test_mcc_recordings.py
           tools/test_mcc_saved_games.py
           tools/test_mcc_network.py
           tools/test_mcc_checkpoint.py
@@ -77,4 +78,4 @@ jobs:
           call "%MCC_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -host_arch=x64 -arch=x86
           if errorlevel 1 exit /b 1
           clang --version
-          python -m pytest -q tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py tools/test_mcc_media.py tools/test_mcc_resources.py tools/test_mcc_bitmap_flags.py tools/test_mcc_shader_channels.py tools/test_mcc_hud.py tools/test_mcc_vorbis.py tools/test_mcc_texture_bridge.py tools/test_mcc_geometry.py tools/test_mcc_scripts.py tools/test_mcc_campaign.py tools/test_mcc_parameters.py tools/test_mcc_syntax.py tools/test_mcc_maps.py tools/test_mcc_menu.py tools/test_mcc_pause.py tools/test_mcc_pause_runtime.py tools/test_mcc_ui.py tools/test_mcc_ui_network.py tools/test_mcc_ui_teams.py tools/test_mcc_lifecycle.py tools/test_mcc_saved_games.py tools/test_mcc_network.py tools/test_mcc_checkpoint.py tools/test_mcc_grenades.py tools/test_cache_file_formats.py
+          python -m pytest -q tools/test_mcc_recordings.py tools/test_mcc_native_smoke.py tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py tools/test_mcc_media.py tools/test_mcc_resources.py tools/test_mcc_bitmap_flags.py tools/test_mcc_shader_channels.py tools/test_mcc_hud.py tools/test_mcc_vorbis.py tools/test_mcc_texture_bridge.py tools/test_mcc_geometry.py tools/test_mcc_scripts.py tools/test_mcc_campaign.py tools/test_mcc_parameters.py tools/test_mcc_syntax.py tools/test_mcc_maps.py tools/test_mcc_menu.py tools/test_mcc_pause.py tools/test_mcc_pause_runtime.py tools/test_mcc_ui.py tools/test_mcc_ui_network.py tools/test_mcc_ui_teams.py tools/test_mcc_lifecycle.py tools/test_mcc_saved_games.py tools/test_mcc_network.py tools/test_mcc_checkpoint.py tools/test_mcc_grenades.py tools/test_cache_file_formats.py

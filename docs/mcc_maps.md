@@ -512,6 +512,47 @@ data root. Its logs and map assets must remain outside version control.
 These are bounded startup checks, not complete campaign playthroughs or
 automatic level-progression tests.
 
+Solar Flare M1 exposed a later runtime failure that a startup check cannot
+cover. Its five pilot/dropship recordings contain `0xFF00` in their initial
+weapon selection field. The Xbox playback code reads this as the signed
+short `-256`, outside the four-slot unit inventory. Triggering `r_a_ds1` on
+`a_pilot` in the published Windows release build 32 reproduced the reported
+`units.c` assertions at original lines 1512 and 8371. The release's matching
+symbols place the subsequent invalid object lookup in `unit_can_use_weapon`.
+For a targeted reproduction in M1, create the pilot with
+`(object_create_anew a_pilot)` and start `(recording_play a_pilot r_a_ds1)`
+through the console. This exercises the control stream independently of the
+mission trigger volumes.
+
+`mcc_recordings.c` validates each recording stream before normalizing invalid
+initial or event weapon selections to `NONE` (retain the unit's current
+weapon). Valid slots 0 through 3 and the existing `NONE` sentinel are unchanged,
+as are event timing, movement, flags and the remaining control fields. The
+conversion writes only to the MCC loader's private tag buffer through
+`mcc_tags.c`; it changes neither the Xbox playback interpreter nor Xbox/CE
+loaders, unit code, inventory limits or network messages. Unsupported or
+truncated streams are refused with a recording-specific diagnostic;
+explicitly disabled empty recordings remain disabled.
+
+Generated regression fixtures cover both playback codecs, all supported
+control versions, selection events, truncation at every byte, unknown formats,
+idempotence and checked scenario pointers/counts. A private audit of 377
+recordings across the 17 supplied MCC maps found no parsing failures. It
+normalized 23 invalid selections: five in each Solar Flare map, one in Combat
+Revolved's credits and two in its D40. No map contents are included in tests.
+The native startup checker now also treats `EXCEPTION assert` as a failure,
+even if the process subsequently exits normally.
+
+The recording fix passed a 65-second native M1 reproduction, followed by a
+270-second Windows x86 run invoking all five recordings sequentially. Each
+invocation was followed by a 1,290-tick wait (longer than the longest recording)
+and a fresh completion marker. The run exited normally without assertions.
+Only one hidden game instance ran at a time. These targeted checks do not
+establish a full M1 playthrough. The final combined MCC/cache/BMP suite passed
+821 tests with six optional-fixture skips, and the Windows release build
+passed. Android could not be verified because this local configuration has
+no Android build target; Linux was not built locally.
+
 After the segment fix, all 16 supplied maps passed 45-second native Windows
 x86 runs in the development build with rendering enabled: Combat Revolved
 `a10`, `a30`, `a50`, `b30`,
@@ -577,6 +618,7 @@ python -m pytest -q tools/test_mcc_checkpoint.py tools/test_mcc_grenades.py tool
 python -m pytest -q tools/test_mcc_parameters.py tools/test_mcc_scripts.py tools/test_mcc_syntax.py
 python -m pytest -q tools/test_mcc_campaign.py tools/test_mcc_resources.py
 python -m pytest -q tools/test_mcc_lifecycle.py
+python -m pytest -q tools/test_mcc_recordings.py tools/test_mcc_native_smoke.py
 ```
 
 Set `MCC_TEST_MAP` to an existing map path to opt into the real-fixture
