@@ -384,6 +384,9 @@ static char const *const port_function_names[] =
 	"port password init", "port password edit", "port password join", "port password back",
 	/* (Gamepads' OK in a single-player campaign: pause_settings_patch) */
 	"port profile settings save",
+	/* (a new profile's screens: Settings' is then being edited, which the
+	Xbox's leaves to its own screens) */
+	"new campaign decision",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
