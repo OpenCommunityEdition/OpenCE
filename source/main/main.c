@@ -2698,7 +2698,6 @@ void main_rasterizer_throttle(
 	unsigned long start_milliseconds;
 	short lapsed_frames;
 	boolean did_throttle;
-	boolean precache_in_progress;
 	boolean synchronized;
 	char const *description;
 
@@ -2713,18 +2712,16 @@ void main_rasterizer_throttle(
 		if ((__int64)rasterizer_globals.frame_and_vertical_blank_index < target_index)
 		{
 			start_milliseconds = system_milliseconds();
-			precache_in_progress = cache_files_precache_in_progress();
 			did_throttle = TRUE;
 			profile_idle_start();
 			while ((__int64)rasterizer_globals.frame_and_vertical_blank_index < target_index)
 			{
-				/* the native builds sleep between looks: the Xbox spun here,
-				and on a port each look at the clock is a system call, so a
-				game held at 30 frames a second (display.interpolation off)
-				spent half its game thread asking the time. A millisecond is
-				well inside a 33 ms frame (Windows sets its timer to 1 ms:
+				/* port: a sleep between looks, not only while a map
+				precaches: the Xbox spun here, which on a port holds a core
+				busy for most of each frame of a game held at 30 frames a
+				second (display.interpolation off). A millisecond is well
+				inside a 33 ms frame (Windows sets its timer to 1 ms:
 				win32_posix.c) */
-				(void)precache_in_progress;
 				Sleep(1);
 				if (system_milliseconds() > start_milliseconds + 1000)
 				{
