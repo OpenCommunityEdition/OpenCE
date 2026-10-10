@@ -198,9 +198,13 @@ enum
 
 enum
 {
-	MAXIMUM_DECALS_PER_MAP = 2048,
+	/* port: room for game.decals "insane", twelve times the game's; with
+	"default", the game's own (DEFAULT_...) */
+	DEFAULT_MAXIMUM_DECALS = 2048,
+	DEFAULT_DECAL_VERTEX_CACHE_PAGE_COUNT = 2560,
+	MAXIMUM_DECALS_PER_MAP = DEFAULT_MAXIMUM_DECALS * 12,
 	DECAL_VERTEX_CACHE_PAGE_SIZE_BITS = 6,
-	DECAL_VERTEX_CACHE_PAGE_COUNT = 2560,
+	DECAL_VERTEX_CACHE_PAGE_COUNT = DEFAULT_DECAL_VERTEX_CACHE_PAGE_COUNT * 12,
 	DECAL_VERTEX_CACHE_SIZE = DECAL_VERTEX_CACHE_PAGE_COUNT << DECAL_VERTEX_CACHE_PAGE_SIZE_BITS
 };
 
@@ -451,9 +455,69 @@ void _rasterizer_decals_dispose(
 	return;
 }
 
+/* port: game.decals (port/linux/src/port_config.c): "default", the game's
+own limits, the cache's pages and decals held to its; "insane", all the
+room there is. Changed in the menu, it takes at the next decal made */
+const char *config_string(const char *name);
+unsigned long config_changes(void);
+
+boolean rasterizer_decals_insane(
+	void)
+{
+	static unsigned long changes = (unsigned long)-1;
+	static boolean insane = FALSE;
+
+	if (changes != config_changes())
+	{
+		const char *limit = config_string("game.decals");
+
+		changes = config_changes();
+		insane = limit && !strcmp(limit, "insane");
+	}
+	return insane;
+}
+
+static void rasterizer_decal_limits_apply(
+	void)
+{
+	boolean insane = rasterizer_decals_insane();
+	long page_count;
+
+	page_count = insane ? DECAL_VERTEX_CACHE_PAGE_COUNT : DEFAULT_DECAL_VERTEX_CACHE_PAGE_COUNT;
+	if (local_vertex_cache->page_count != page_count)
+		lruv_resize(local_vertex_cache, page_count);
+	/* (the game's count of decals: the oldest, not in use this tick, give way) */
+	while (!insane && local_vertex_cache->blocks->actual_count >= DEFAULT_MAXIMUM_DECALS)
+	{
+		struct data_iterator iterator;
+		struct lruv_cache_block *block;
+		long oldest = NONE;
+		unsigned long oldest_tick = 0;
+
+		data_iterator_new(&iterator, local_vertex_cache->blocks);
+		while ((block = data_iterator_next(&iterator)) != NULL)
+		{
+			if ((unsigned long)block->last_used_tick == (unsigned long)local_vertex_cache->tick ||
+				(local_vertex_cache->locked_block_proc && local_vertex_cache->locked_block_proc(iterator.datum_index)))
+			{
+				continue;
+			}
+			if (oldest == NONE || (unsigned long)block->last_used_tick < oldest_tick)
+			{
+				oldest = iterator.datum_index;
+				oldest_tick = (unsigned long)block->last_used_tick;
+			}
+		}
+		if (oldest == NONE)
+			break;
+		lruv_block_delete(local_vertex_cache, oldest);
+	}
+}
+
 long _rasterizer_decal_vertices_new(
 	long cache_size)
 {
+	rasterizer_decal_limits_apply();
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
 		204,

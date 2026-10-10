@@ -32,7 +32,7 @@ layout: saved games of builds before it no longer load. */
 
 #define HALO_PORT_GAME_STATE_BASE_ADDRESS 0x81A00000 /* (0x80061000) */
 #define HALO_PORT_GAME_STATE_CPU_SIZE 0x13C0000 /* (0x305000) */
-#define HALO_PORT_GAME_STATE_GPU_SIZE 0x40000 /* (0x40000) */
+#define HALO_PORT_GAME_STATE_GPU_SIZE 0x200000 /* (0x40000): decal vertices for twelve times the Xbox's decals (game.decals "insane") */
 #define HALO_PORT_GAME_STATE_SIZE (HALO_PORT_GAME_STATE_CPU_SIZE+HALO_PORT_GAME_STATE_GPU_SIZE)
 
 /* ---------- textures
