@@ -432,6 +432,10 @@ void object_permute_region(long object_index, char *permutation_name, short desi
 boolean object_get_function_value(long object_index, short function_index, real *value_reference);
 short objects_in_clusters_by_indices(unsigned long class_flags, short cluster_count, short const *cluster_indices, short maximum_object_count, long *object_indices);
 long object_index_from_name_index(short name_index);
+/* port: this object takes a scenario name nobody holds, the way a placed
+vehicle does. A respawned vehicle keeps the name of the one it replaces, so
+a script that teleports that name still finds it. */
+void object_claim_scenario_name(long object_index, short name_index);
 void objects_disconnect_from_structure_bsp(void);
 boolean object_visible_to_any_player(long object_index);
 void object_pvs_activate(long object_index);
