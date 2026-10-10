@@ -185,6 +185,10 @@ the Xbox tools' limits, so both place the same objects; version 24 sends the
 gametype's PC vehicle set; version 25 sends a unit's integrated light with
 its object state.
 
+`port/linux/network_format.txt` records the wire format of the current
+version (`tools/network_format.py`): `test_linux_port.py` fails when the
+sources' messages, kinds, bits or structs sent whole differ from it.
+
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
 and the cheat buttons run only commands that change nothing of the game
