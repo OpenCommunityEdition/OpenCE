@@ -4665,6 +4665,23 @@ static void object_name_list_new(
 	return;
 }
 
+/* the name is free: deleting the vehicle that held it cleared the slot.
+A name something else still holds stays with that object. */
+void object_claim_scenario_name(
+	long object_index,
+	short name_index)
+{
+	if (object_index == NONE ||
+		!VALID_INDEX(name_index, MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO)) ||
+		object_name_list[name_index] != NONE)
+	{
+		return;
+	}
+
+	object_name_list_new(object_index, name_index);
+	return;
+}
+
 static void object_name_list_delete(
 	long object_index)
 {
