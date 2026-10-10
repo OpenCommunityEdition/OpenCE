@@ -470,8 +470,8 @@ static void structure_visibility_traverse_subclusters(
 			}
 
 			surface_index_buffer = TAG_BLOCK_GET_ELEMENT(&subcluster->surface_indices, 0, long);
-			/* a short index stops, and then never finishes, once a subcluster
-			passes 32767 surfaces */
+			/* port: compared whole: a short index wraps past 32767 surfaces
+			and the walk never ends */
 			for (surface_list_index = 0;
 				surface_list_index < subcluster->surface_indices.count;
 				surface_index_buffer++, surface_list_index++)
@@ -2002,6 +2002,7 @@ void structure_visibility_compute(
 		structure_visibility_traverse_surface_lists(structure);
 	}
 
+	/* port: a frame that reaches the structure triangles' limit is said once */
 	if (render.environment_surface_count >= MAXIMUM_RENDERED_ENVIRONMENT_SURFACES &&
 		!warned_about_environment_surfaces)
 	{

@@ -20,8 +20,7 @@ enum
 {
 	MAXIMUM_RENDERED_DISTANT_LIGHTS = 2,
 	MAXIMUM_RENDERED_POINT_LIGHTS = 2,
-	/* retail stops a frame at 16384 structure triangles. 32768 is the
-	HAC2 and MCC count */
+	/* port: twice the Xbox's 16384 structure triangles a frame */
 	MAXIMUM_RENDERED_ENVIRONMENT_SURFACES = 32768,
 	MAXIMUM_RENDERED_CLUSTERS = 128,
 	MAXIMUM_SURFACES_PER_STRUCTURE = 0x20000,
@@ -96,7 +95,7 @@ struct render_globals
 	struct rendered_cluster rendered_clusters[MAXIMUM_RENDERED_CLUSTERS];
 	short rendered_cluster_count;
 	unsigned long environment_surface_flags[MAXIMUM_SURFACES_PER_STRUCTURE];
-	/* a short wraps at 32768, so the raised triangle count lives in a long */
+	/* port: a long, as a short would wrap at the raised count */
 	long environment_surface_count;
 	long environment_surface_indices[MAXIMUM_RENDERED_ENVIRONMENT_SURFACES];
 };

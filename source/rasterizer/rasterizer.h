@@ -33,9 +33,9 @@ enum
 	RASTERIZER_MAXIMUM_DEBUG_VERTICES = 393216,
 	RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS = 384,
 	RASTERIZER_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS2 = 32,
-	/* the structure list can ask for 32768 triangles. a request that would
-	fill this buffer is refused, so the room above 32768 is what a frame
-	still has for lights, shadows, and contrails */
+	/* port: the structure's 32768 triangles (render.h) and, past them, as
+	much again as the Xbox's 16384 left a frame for its lights, shadows and
+	contrails (a request that would fill the buffer is refused) */
 	RASTERIZER_MAXIMUM_DYNAMIC_TRIANGLES = 49152,
 	RASTERIZER_MAXIMUM_DYNAMIC_TRIANGLE_BUFFERS = 1024,
 	/* four per particle (build_sprites_begin), for the native builds' larger
