@@ -1292,7 +1292,7 @@ static void crosshairs_draw(
 												color,
 												in_multiplayer,
 												interface_bitmap,
-												TRUE);
+												FALSE);
 										}
 										else
 										{
@@ -1308,7 +1308,8 @@ static void crosshairs_draw(
 												color,
 												in_multiplayer,
 												bitmap_group->type == _bitmap_group_type_interface_bitmaps,
-												TRUE);
+												/* Scope artwork keeps its authored layout. */
+												state_index != _crosshair_state_zoom);
 										}
 									}
 								}

@@ -22,6 +22,7 @@ symbols in this file:
 #include "effects/particles.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
+#include "viewmodel_visibility.h"
 #include "render.h"
 #include "render_cameras_internal.h"
 #include "render_particles.h"
@@ -160,6 +161,8 @@ void render_particles(
 				particle->local_player_index == local_player_index;
 
 			if (render_location_visible(&particle->location) &&
+				viewmodel_draws_geometry(owned_by_local_player &&
+					TEST_FLAG(particle->flags, _particle_datum_dont_draw_third_person_bit)) &&
 				(!TEST_FLAG(
 					particle->flags,
 					_particle_datum_dont_draw_first_person_bit) ||

@@ -112,6 +112,16 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
+	{ "display.fov", _config_real, "0.0", "HALO_FOV", _environment_value, _platform_all,
+		"On-foot first-person horizontal FOV at 16:9, in degrees (20-150);\n"
+		"0 keeps the authored view. Other cameras keep their own FOV." },
+	{ "display.viewmodel_fov", _config_real, "0.0", "HALO_VIEWMODEL_FOV", _environment_value, _platform_all,
+		"Weapon and hands horizontal FOV at 16:9, in degrees (20 to 150);\n"
+		"0 is Default and keeps the original weapon view. A chosen angle is\n"
+		"that FOV. Attached visuals use the same projection." },
+	{ "display.viewmodel_visible", _config_boolean, "true", "HALO_VIEWMODEL_VIS", _environment_value, _platform_all,
+		"Draw the first-person weapon, hands and attached visuals. Turning\n"
+		"this off does not change firing, animation, sound or world lights." },
 	{ "display.high_res_hud", _config_boolean, "true", "HALO_HIGH_RES_HUD", _environment_value, _platform_all,
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
 		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"

@@ -111,6 +111,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_models.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
+#include "viewmodel_fov.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 
@@ -615,6 +616,7 @@ void _rasterizer_model_end(
 			!local_do_not_change_z_stencil_states)
 		{
 			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
+			viewmodel_projection_end();
 			rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 		local_parameters = NULL;
@@ -643,6 +645,7 @@ void _rasterizer_model_begin(
 			!do_not_change_z_stencil_states)
 		{
 			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_WRITE);
+			viewmodel_projection_begin();
 			rasterizer_set_frustum_z(
 				rasterizer_globals.first_person_weapon_near_clip_distance,
 				rasterizer_globals.first_person_weapon_far_clip_distance);
