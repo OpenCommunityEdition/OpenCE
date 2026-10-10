@@ -696,6 +696,32 @@ long find_unused_local_player_index(
 void player_delete(
 	long player_index)
 {
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	/* A quit player's slot can be reused while their dropped items,
+	projectiles and damage history still exist. Retire the full handle,
+	without changing the objects' teams or their remaining damage. */
+	object_iterator_new(&iterator, _object_mask_all, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL)
+	{
+		if (object->object.owner_player_index == player_index)
+			object->object.owner_player_index = NONE;
+		if (TEST_FLAG(_object_mask_unit, object->object.type))
+		{
+			struct unit_datum *unit = (struct unit_datum *)object;
+			short attacker_index;
+
+			if (unit->unit.player_index == player_index)
+				unit->unit.player_index = NONE;
+			for (attacker_index = 0; attacker_index < MAXIMUM_ATTACKERS_PER_UNIT; attacker_index++)
+			{
+				if (unit->unit.attackers[attacker_index].player_index == player_index)
+					unit->unit.attackers[attacker_index].player_index = NONE;
+			}
+		}
+	}
+
 	datum_delete(
 		player_data,
 		player_index);
