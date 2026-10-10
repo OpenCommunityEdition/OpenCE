@@ -2226,7 +2226,9 @@ static void progress_bar_make_stuff_ready(
 		IDirect3DDevice8_SetRenderTarget(global_d3d_device, front_buffer, depth_buffer);
 		IDirect3DSurface8_Release(back_buffer);
 		IDirect3DSurface8_Release(front_buffer);
-		IDirect3DSurface8_Release(depth_buffer);
+		/* port: (none, when no depth buffer is set) */
+		if (depth_buffer)
+			IDirect3DSurface8_Release(depth_buffer);
 	}
 
 	return;
