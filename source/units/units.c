@@ -6368,8 +6368,8 @@ void unit_record_damage(
 	struct player_datum *attacker_player = attacker_player_index != NONE ?
 		player_try_and_get(attacker_player_index) : NULL;
 
-	/* Damage can outlive its player, including in an older checkpoint.
-	Do not record or dereference a deleted/reused player handle. */
+	/* port: damage can outlive its player (an older checkpoint's): a handle
+	that is no player's now is neither recorded nor read */
 	if (!attacker_player)
 		attacker_player_index = NONE;
 
@@ -6452,6 +6452,7 @@ void unit_record_damage(
 	if (notify_ai && attacker_team != NONE &&
 		game_team_is_enemy(unit->object.owner_team_index, attacker_team))
 	{
+		/* port: (the player looked up above) */
 		if (attacker_player)
 		{
 			player_unit_index = attacker_player->unit_index;

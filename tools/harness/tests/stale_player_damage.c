@@ -140,7 +140,9 @@ int main(int argc, char **argv)
 				if (i < 2) expected_objects[i].unit.player_index = NONE;
 			}
 			expected_objects[0].unit.attackers[0].player_index = NONE;
-			player_delete(old_player);
+			/* (network_game_spawn_player's, before player_delete) */
+			network_game_player_forget(old_player);
+			datum_delete(player_data, old_player);
 			CHECK(!player_try_and_get(old_player), "player datum not deleted");
 			CHECK(!memcmp(expected_objects, objects, sizeof(objects)), "retirement changed teams/damage or left stale references");
 			index = datum_new(player_data);

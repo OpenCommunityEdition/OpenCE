@@ -28,7 +28,7 @@ def generated(fault=None):
     config += structure(read('source/objects/objects.h'), 'location') + '\n'
     config += structure(read('source/objects/damage.h'), 'damage_data') + '\n'
     code = '\n'.join([
-        function(read('source/game/players.c'), 'player_delete'),
+        function(read('source/networking/network_game_manager.c'), 'network_game_player_forget'),
         function(units, 'unit_record_damage'),
         function(damage, 'damage_data_validate_owner'),
         function(network, 'network_damage_deals'),

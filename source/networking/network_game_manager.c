@@ -467,6 +467,37 @@ void network_game_invalidate_machine(
 	return;
 }
 
+/* port: a player who quit, whose slot another player takes: the objects
+forget him (the units he played, the objects he owns, the damage he did to
+units), so that none refers to the new player by the slot, nor to a datum
+that is gone; their teams and the damage itself stay */
+static void network_game_player_forget(
+	long player_index)
+{
+	struct object_iterator iterator;
+	struct object_datum *object;
+
+	object_iterator_new(&iterator, _object_mask_all, 0);
+	while ((object = (struct object_datum *)object_iterator_next(&iterator)) != NULL)
+	{
+		if (object->object.owner_player_index == player_index)
+			object->object.owner_player_index = NONE;
+		if (TEST_FLAG(_object_mask_unit, object->object.type))
+		{
+			struct unit_datum *unit = (struct unit_datum *)object;
+			short attacker_index;
+
+			if (unit->unit.player_index == player_index)
+				unit->unit.player_index = NONE;
+			for (attacker_index = 0; attacker_index < MAXIMUM_ATTACKERS_PER_UNIT; attacker_index++)
+			{
+				if (unit->unit.attackers[attacker_index].player_index == player_index)
+					unit->unit.attackers[attacker_index].player_index = NONE;
+			}
+		}
+	}
+}
+
 boolean network_game_spawn_player(
 	struct network_player *player)
 {
@@ -483,8 +514,8 @@ boolean network_game_spawn_player(
 	give it) */
 	if (VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS))
 	{
-		/* port: a player who quit there gives way (network_game_player_slot_held);
-		player_delete retires the objects' references before the slot is reused */
+		/* port: a player who quit there gives way (network_game_player_slot_held),
+		and the objects forget him (network_game_player_forget) */
 		if (player_data && player_data->valid && player->player_list_index < player_data->maximum_count)
 		{
 			struct player_datum *quitter = (struct player_datum *)((byte *)player_data->data +
@@ -500,6 +531,8 @@ boolean network_game_spawn_player(
 			{
 				long quitter_index = ((long)(word)((struct datum_header *)quitter)->identifier << 16) |
 					player->player_list_index;
+
+				network_game_player_forget(quitter_index);
 				player_delete(quitter_index);
 			}
 		}
