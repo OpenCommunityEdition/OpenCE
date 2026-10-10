@@ -167,13 +167,18 @@ static void note_in_use(struct range_usage *usage, uint64_t address)
 	usage->highest_in_use = address;
 }
 
+/* debug.halo.art_overlap's -nopagemap (simulate_art_overlap) */
+static int simulated_no_pagemap;
+
 /* from /proc/self/pagemap: bit 63 present, bit 62 swapped out */
 static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *usage)
 {
-	int descriptor = open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC);
+	int descriptor = simulated_no_pagemap ? -1 : open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC);
 	uint64_t entries[512];
 	uint64_t page = from / PAGE;
 
+	if (simulated_no_pagemap)
+		errno = EACCES;
 	if (descriptor < 0)
 	{
 		finding(HOST_LOG_WARN, "cannot read /proc/self/pagemap (%s)", strerror(errno));
@@ -210,14 +215,17 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 
 /* the Swap: line of the /proc/self/smaps entry starting at start, in kB; -1
 if it cannot be read (or no entry starts there); with end, the entry must
-also end there */
-static long mapping_swap_kb_ending(uint64_t start, uint64_t end)
+also end there. dont_dump, if not NULL, tells whether its VmFlags have dd
+(MADV_DONTDUMP). */
+static long mapping_swap_kb_ending(uint64_t start, uint64_t end, int *dont_dump)
 {
 	FILE *smaps = fopen("/proc/self/smaps", "r");
 	char line[512];
 	int inside = 0;
 	long result = -1;
 
+	if (dont_dump)
+		*dont_dump = 0;
 	if (!smaps)
 		return -1;
 	while (fgets(line, sizeof(line), smaps))
@@ -232,11 +240,12 @@ static long mapping_swap_kb_ending(uint64_t start, uint64_t end)
 			inside = lo == start && (!end || hi == end);
 			continue;
 		}
-		if (inside && sscanf(line, "Swap: %ld kB", &kb) == 1)
-		{
+		if (!inside)
+			continue;
+		if (sscanf(line, "Swap: %ld kB", &kb) == 1)
 			result = kb;
-			break;
-		}
+		else if (dont_dump && !strncmp(line, "VmFlags:", 8))
+			*dont_dump = strstr(line, " dd") != NULL;
 	}
 	fclose(smaps);
 	return result;
@@ -244,22 +253,45 @@ static long mapping_swap_kb_ending(uint64_t start, uint64_t end)
 
 static long mapping_swap_kb(uint64_t start)
 {
-	return mapping_swap_kb_ending(start, 0);
+	return mapping_swap_kb_ending(start, 0, NULL);
 }
 
-/* whether any of from..to is swapped out, when the mapping holding it has
-swap somewhere: smaps counts swap per mapping, so the range is made a
-mapping of its own for a moment (MADV_DONTDUMP splits it off and changes
-nothing about its pages: neither ART nor the game ever dumps core), read,
-and merged back (MADV_DODUMP). -1 if that cannot be done */
-static long range_swap_kb(uint64_t from, uint64_t to)
+/* whether any of from..to (in the mapping starting at mapping_start) is
+swapped out, when that mapping has swap somewhere: smaps counts swap per
+mapping, so the range is made a mapping of its own for a moment
+(MADV_DONTDUMP splits it off and changes nothing about its pages: neither
+ART nor the game ever dumps core), read, and merged back (MADV_DODUMP). Not
+for a mapping already marked so (the restore would then change it). -1 if
+that cannot be done */
+static long range_swap_kb(uint64_t mapping_start, uint64_t from, uint64_t to)
 {
+	int dont_dump;
 	long kb;
 
-	if (madvise((void *)from, (size_t)(to - from), MADV_DONTDUMP) != 0)
+	if (mapping_swap_kb_ending(mapping_start, 0, &dont_dump) < 0)
+	{
+		finding(HOST_LOG_WARN, "cannot read the smaps entry of ART's large object space at %08llx",
+			(unsigned long long)mapping_start);
 		return -1;
-	kb = mapping_swap_kb_ending(from, to);
+	}
+	if (dont_dump)
+	{
+		finding(HOST_LOG_WARN, "ART's large object space at %08llx is marked not to be dumped; "
+			"the swap of %08llx-%08llx cannot be read on its own", (unsigned long long)mapping_start,
+			(unsigned long long)from, (unsigned long long)to);
+		return -1;
+	}
+	if (madvise((void *)from, (size_t)(to - from), MADV_DONTDUMP) != 0)
+	{
+		finding(HOST_LOG_WARN, "cannot split %08llx-%08llx off ART's large object space (%s)",
+			(unsigned long long)from, (unsigned long long)to, strerror(errno));
+		return -1;
+	}
+	kb = mapping_swap_kb_ending(from, to, NULL);
 	madvise((void *)from, (size_t)(to - from), MADV_DODUMP);
+	if (kb < 0)
+		finding(HOST_LOG_WARN, "no smaps entry for %08llx-%08llx once split off", (unsigned long long)from,
+			(unsigned long long)to);
 	return kb;
 }
 
@@ -273,25 +305,30 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 	long swapped = mapping_swap_kb(mapping_start);
 
 	usage->method = "mincore";
+	if (swapped < 0)
+	{
+		finding(HOST_LOG_WARN, "cannot read the smaps entry of ART's large object space at %08llx",
+			(unsigned long long)mapping_start);
+		return RANGE_UNKNOWN;
+	}
 	if (swapped > 0)
 	{
 		/* (swap somewhere in the space: only the range's own matters) */
-		long range_swapped = range_swap_kb(from, to);
+		long range_swapped = range_swap_kb(mapping_start, from, to);
 
-		if (range_swapped == 0)
+		if (range_swapped < 0)
+			return RANGE_UNKNOWN;
+		if (range_swapped > 0)
 		{
-			finding(HOST_LOG_INFO, "ART's large object space at %08llx: %ld kB of it swapped out, none of %08llx-%08llx",
-				(unsigned long long)mapping_start, swapped, (unsigned long long)from, (unsigned long long)to);
-			swapped = 0;
+			/* (objects there, swapped out: which pages smaps does not say) */
+			usage->method = "the range's swap in smaps";
+			usage->pages_in_use = (uint64_t)range_swapped * 1024 / PAGE;
+			usage->lowest_in_use = from;
+			usage->highest_in_use = to - PAGE;
+			return RANGE_IN_USE;
 		}
-		else
-			swapped = range_swapped;
-	}
-	if (swapped != 0)
-	{
-		finding(HOST_LOG_WARN, "ART's large object space at %08llx: %s", (unsigned long long)mapping_start,
-			swapped < 0 ? "cannot read its smaps entry" : "part of the range is swapped out");
-		return RANGE_UNKNOWN;
+		finding(HOST_LOG_INFO, "ART's large object space at %08llx: %ld kB of it swapped out, none of %08llx-%08llx",
+			(unsigned long long)mapping_start, swapped, (unsigned long long)from, (unsigned long long)to);
 	}
 	while (address < to)
 	{
@@ -542,7 +579,15 @@ int host_memory_fixed_unavailable(void)
 debug.halo.art_overlap set (adb shell setprop debug.halo.art_overlap idle,
 or busy), a mapping named as ART's large object space is put over the fixed
 ranges first, idle, or with a page in use inside the window, the way ART's
-is on the devices that need the reclaim. Players never set it. */
+is on the devices that need the reclaim. Players never set it.
+
+Either may be followed by -nopagemap, for devices that refuse
+/proc/self/pagemap (the check then falls back to mincore and smaps), and
+by -swapped, which pushes the stand-in's objects (its bottom pages, and the
+window's page if busy) out to swap, as they can be on those devices. */
+#ifndef MADV_PAGEOUT
+#define MADV_PAGEOUT 21
+#endif
 #define PR_SET_VMA_ 0x53564d41
 #define PR_SET_VMA_ANON_NAME_ 0
 #define SIMULATED_SPACE_BASE 0x7c000000ULL
@@ -551,10 +596,13 @@ is on the devices that need the reclaim. Players never set it. */
 static void simulate_art_overlap(void)
 {
 	char value[PROP_VALUE_MAX] = "";
+	char *window_page = (char *)(uintptr_t)HALO_GUEST_WINDOW_BASE + 0x100000;
+	int busy;
 	void *space;
 
-	if (__system_property_get("debug.halo.art_overlap", value) <= 0 || (strcmp(value, "idle") && strcmp(value, "busy")))
+	if (__system_property_get("debug.halo.art_overlap", value) <= 0 || (strncmp(value, "idle", 4) && strncmp(value, "busy", 4)))
 		return;
+	busy = !strncmp(value, "busy", 4);
 	space = mmap((void *)SIMULATED_SPACE_BASE, SIMULATED_SPACE_SIZE, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 	if (space != (void *)SIMULATED_SPACE_BASE)
@@ -568,10 +616,17 @@ static void simulate_art_overlap(void)
 	prctl(PR_SET_VMA_, PR_SET_VMA_ANON_NAME_, space, SIMULATED_SPACE_SIZE, "dalvik-free list large object space");
 	/* objects at its bottom, as ART allocates them */
 	memset(space, 0x5a, 4 * PAGE);
-	if (!strcmp(value, "busy"))
-		memset((char *)(uintptr_t)HALO_GUEST_WINDOW_BASE + 0x100000, 0x5a, PAGE);
-	host_logf(HOST_LOG_WARN, "debug.halo.art_overlap=%s: a stand-in for ART's large object space at %08llx-%08llx",
-		value, SIMULATED_SPACE_BASE, SIMULATED_SPACE_BASE + SIMULATED_SPACE_SIZE);
+	if (busy)
+		memset(window_page, 0x5a, PAGE);
+	if (strstr(value, "-swapped"))
+	{
+		if (madvise(space, 4 * PAGE, MADV_PAGEOUT) != 0 || (busy && madvise(window_page, PAGE, MADV_PAGEOUT) != 0))
+			host_logf(HOST_LOG_WARN, "debug.halo.art_overlap: cannot page out the stand-in (%s)", strerror(errno));
+	}
+	simulated_no_pagemap = strstr(value, "-nopagemap") != NULL;
+	host_logf(HOST_LOG_WARN, "debug.halo.art_overlap=%s: a stand-in for ART's large object space at %08llx-%08llx "
+		"(%ld kB of it swapped out)", value, SIMULATED_SPACE_BASE, SIMULATED_SPACE_BASE + SIMULATED_SPACE_SIZE,
+		mapping_swap_kb(SIMULATED_SPACE_BASE));
 }
 
 void host_memory_reserve_early(void)

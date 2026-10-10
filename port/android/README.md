@@ -365,9 +365,9 @@ Thus:
    allocates large objects.
 3. If ART's large object space is in the way, the host takes back only the
    part that covers the fixed addresses, and only if no page of it is in
-   use (`/proc/self/pagemap`, or `mincore` and the swap total of the space
-   if the device refuses `pagemap`). The host never takes the other spaces
-   of ART.
+   use (`/proc/self/pagemap`, or `mincore` and the swap of that part if
+   the device refuses `pagemap`). The host never takes the other spaces of
+   ART.
 
 If the addresses are not available, the game shows a message, and writes
 the mappings below 4 GB to `memory_map.txt` in the data folder and to the
@@ -382,6 +382,10 @@ the fixed addresses:
   starts.
 - `adb shell setprop debug.halo.art_overlap busy`: a page at `0x80100000`
   is in use. The game shows the message and writes `memory_map.txt`.
+- Add `-nopagemap` to either value (`idle-nopagemap`) to test as on a
+  device that refuses `/proc/self/pagemap`. Add `-swapped`
+  (`idle-nopagemap-swapped`) to also move the objects of the stand-in to
+  swap; with `busy`, the page in the fixed addresses too.
 - `adb shell setprop debug.halo.art_overlap ""`: normal operation.
 
 ### OpenGL ES
