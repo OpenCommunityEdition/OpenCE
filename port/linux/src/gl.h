@@ -135,7 +135,8 @@ this list to generate the guest's entry points */
 	X(glGenQueries) \
 	X(glBeginQuery) \
 	X(glEndQuery) \
-	X(glGetQueryObjectuiv)
+	X(glGetQueryObjectuiv) \
+	X(glGetInternalformativ)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
@@ -196,6 +197,7 @@ this list to generate the guest's entry points */
 	X(glBindFramebuffer) \
 	X(glFramebufferTexture2D) \
 	X(glCheckFramebufferStatus) \
+	X(glGetFramebufferAttachmentParameteriv) \
 	X(glBlitFramebuffer) \
 	X(glDrawBuffers) \
 	X(glGenRenderbuffers) \
@@ -370,6 +372,7 @@ pointers, sees the declarations without these aliases */
 #define glBeginQuery halo_glBeginQuery
 #define glEndQuery halo_glEndQuery
 #define glGetQueryObjectuiv halo_glGetQueryObjectuiv
+#define glGetInternalformativ halo_glGetInternalformativ
 #else
 #define glGetString halo_glGetString
 #define glGetIntegerv halo_glGetIntegerv
@@ -428,6 +431,7 @@ pointers, sees the declarations without these aliases */
 #define glBindFramebuffer halo_glBindFramebuffer
 #define glFramebufferTexture2D halo_glFramebufferTexture2D
 #define glCheckFramebufferStatus halo_glCheckFramebufferStatus
+#define glGetFramebufferAttachmentParameteriv halo_glGetFramebufferAttachmentParameteriv
 #define glBlitFramebuffer halo_glBlitFramebuffer
 #define glDrawBuffers halo_glDrawBuffers
 #define glGenRenderbuffers halo_glGenRenderbuffers

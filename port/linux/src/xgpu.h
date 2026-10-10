@@ -25,6 +25,9 @@ struct xgpu_capabilities
 	BOOL base_vertex;
 	/* ES 3.1 with fragment atomic counters: exact visibility test counts */
 	BOOL atomic_counters;
+	/* GL_RGBA16F can be drawn into and blended (EXT_color_buffer_half_float
+	or EXT_color_buffer_float): display.hdr's back buffer */
+	BOOL color_buffer_half_float;
 	/* "300 es" or "310 es" */
 	const char *shading_language;
 };
@@ -219,6 +222,10 @@ struct xgpu_render_target
 	unsigned long width, height;
 	BOOL depth;
 	GLuint texture;
+	/* the texture's (and the multisampled renderbuffer's) internal format:
+	GL_RGBA8, GL_DEPTH24_STENCIL8, or GL_RGBA16F for the back buffer with
+	display.hdr (d3d8_gl.c) */
+	GLenum format;
 	/* pixels per unit of width and height: more than 1 for the screen's
 	targets when the game draws at the display's resolution (d3d8_gl.c) */
 	float scale[2];
@@ -250,9 +257,54 @@ cannot be (once FALSE, it stays so) */
 BOOL xgpu_post_prepare(BOOL smaa);
 
 /* FXAA, or SMAA, on the corners x0, y0 to x1, y1 (from row 0) of a render
-target's framebuffer, width by height, GL_RGBA8; FALSE if its programs do
-not build */
-BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, unsigned long height,
-	const GLint corners[4]);
+target's framebuffer, width by height, of that internal format (GL_RGBA8, or
+GL_RGBA16F with display.hdr); FALSE if its programs do not build */
+BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, GLenum format, unsigned long width,
+	unsigned long height, const GLint corners[4]);
+
+/* ---------- high dynamic range
+
+display.hdr (d3d8_gl.c): the back buffer is GL_RGBA16F, so that what the
+game's blending adds up past white is kept rather than clipped, and each
+window's 3D view is tone mapped here before the HUD and menus are drawn
+over it. The back buffer's values stay the game's, gamma encoded, 1.0 the
+display's white; past 1.0 only where an HDR display (display.hdr_output)
+can show it. Presentation then draws the back buffer into the window with a
+program of its own, which for an HDR display's scRGB framebuffer makes the
+values linear. */
+
+enum
+{
+	_xgpu_tone_mapping_neutral,
+	_xgpu_tone_mapping_aces,
+	_xgpu_tone_mapping_reinhard,
+	NUMBER_OF_XGPU_TONE_MAPPINGS
+};
+
+struct xgpu_tone_mapping
+{
+	int curve;
+	/* the scale of the linear values before the curve */
+	float exposure;
+	/* the brightest value the curve gives, in the display's whites: 1.0 for
+	SDR, an HDR display's headroom */
+	float peak;
+};
+
+/* the tone mapping and presentation programs made now; FALSE if they
+cannot be (once FALSE, it stays so) */
+BOOL xgpu_post_prepare_hdr(void);
+
+/* tone maps the corners (as xgpu_post_anti_alias's) of a GL_RGBA16F target:
+reads its pixels from source (its texture's framebuffer), writes the colour
+(not alpha) into destination (the same, or its multisampled renderbuffer's) */
+BOOL xgpu_post_tone_map(GLuint source, GLuint destination, unsigned long width, unsigned long height,
+	const GLint corners[4], const struct xgpu_tone_mapping *tone_mapping);
+
+/* draws a GL_RGBA16F target's texture into the bound draw framebuffer's x,
+y, width, height (the window's, row 0 at the bottom), turned the right way
+up: as it is (SDR), or, with scale more than 0, made linear and scaled by
+it (an HDR display's scRGB framebuffer: scale is its SDR white) */
+BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, float scale);
 
 #endif
