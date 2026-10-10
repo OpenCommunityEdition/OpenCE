@@ -365,10 +365,10 @@ static int reserve(uint64_t address, uint64_t size, int reclaim_art)
 		return 0;
 	if (result != MAP_FAILED)
 	{
-		/* (a kernel older than 4.17 takes MAP_FIXED_NOREPLACE as a hint) */
+		/* (a kernel older than 4.17 takes MAP_FIXED_NOREPLACE as a hint,
+		and maps elsewhere when something is in the way) */
 		munmap(result, size);
 		errno = EEXIST;
-		return -1;
 	}
 	if (reclaim_art && errno == EEXIST)
 	{
@@ -400,7 +400,6 @@ void host_memory_report_low_mappings(FILE *file)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
-
 	char model[PROP_VALUE_MAX] = "", heap[PROP_VALUE_MAX] = "", release[PROP_VALUE_MAX] = "";
 
 	__system_property_get("ro.product.model", model);
@@ -470,10 +469,15 @@ image (HALO_GUEST_IMAGE_RESERVE), reserved as early as the process allows
 static int fixed_reserved;
 static int fixed_error;
 
-static int reserve_fixed(void)
+/* when: the attempt, as the report names it (the reasons below it are
+those of that attempt) */
+static int reserve_fixed(const char *when)
 {
+	size_t used = strlen(findings);
+
 	if (fixed_reserved)
 		return 0;
+	snprintf(findings + used, sizeof(findings) - used, "%s:\n", when);
 	if (reserve(HALO_GUEST_WINDOW_BASE, HALO_GUEST_WINDOW_SIZE, 1) != 0)
 	{
 		fixed_error = errno;
@@ -537,7 +541,7 @@ static void simulate_art_overlap(void)
 void host_memory_reserve_early(void)
 {
 	simulate_art_overlap();
-	if (reserve_fixed() == 0)
+	if (reserve_fixed("at start-up (JNI_OnLoad)") == 0)
 		host_logf(HOST_LOG_INFO, "reserved the Xbox memory window and the image range at start-up");
 }
 
@@ -548,7 +552,7 @@ int host_memory_initialize(uint32_t base, uint32_t size)
 		host_logf(HOST_LOG_ERROR, "the guest image (%08x, %u bytes) does not fit its range", base, size);
 		return -1;
 	}
-	if (reserve_fixed() != 0)
+	if (reserve_fixed("when the image loaded") != 0)
 	{
 		errno = fixed_error;
 		return -1;
