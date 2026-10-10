@@ -17,8 +17,9 @@ the site. Nothing is uploaded.
   work. The page checks what it needs and says what is missing.
 - A 64-bit browser that gives the page 2.1 GB of memory (the Xbox's memory
   window is at its top: "How it operates"). Phones are not supported yet.
-- About 2 GB of the browser's storage for the maps (more where they are
-  bigger), and the disc image (`.iso` or `.xiso`) on the computer.
+- About 3 GB of the browser's storage: the maps (about 2 GB), and the
+  game's copies of the maps it played (up to about 800 MB, as on the Xbox's
+  hard disk), and the disc image (`.iso` or `.xiso`) on the computer.
 - The site over https (or `localhost`): the game's threads need
   `SharedArrayBuffer`, and so a cross-origin isolated page. GitHub Pages
   cannot send the headers for that; the site's service worker adds them, so
@@ -60,9 +61,10 @@ The controls are the desktop builds' (refer to "Controls" in
 - The sound starts at the first click or key press (browsers allow sound only
   then).
 
-The game keeps `config.toml`, the saved games (`save/`) and `debug.txt` in
-the browser's storage beside `maps/`. **Settings and data** exports the saved
-games and `config.toml` as a zip, downloads the log, and deletes the game
+The game keeps `config.toml`, the saved games and profiles (`save/`) and
+`debug.txt` in the browser's storage beside `maps/`. **Settings and data**
+exports the saved games, the profiles and `config.toml` as a zip (not the
+game's copies of the maps), downloads the log, and deletes the game
 data. The game's own Settings screens have the settings that apply in a
 browser.
 

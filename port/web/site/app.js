@@ -301,6 +301,15 @@ $('delete-data').addEventListener('click', async () => {
   if (!confirm('Delete the maps copied into this browser? Saved games stay.')) return;
   const root = await navigator.storage.getDirectory();
   await root.removeEntry('maps', { recursive: true }).catch(() => {});
+  // (and the game's copies of them, save/z/cache000.map and on)
+  try {
+    const drive = await (await root.getDirectoryHandle('save')).getDirectoryHandle('z');
+    for await (const [name] of drive.entries()) {
+      if (/^cache\d+\.map$/i.test(name)) await drive.removeEntry(name).catch(() => {});
+    }
+  } catch {
+    // no saved games yet
+  }
   await refreshData();
 });
 
@@ -367,8 +376,12 @@ function zip(entries) {
   return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }
 
+// the saved games and profiles, not the maps the game keeps a copy of as the
+// Xbox's hard disk did (save/z/cache000.map and on: hundreds of MB the game
+// makes again)
 async function collect(directory, prefix, entries) {
   for await (const [name, handle] of directory.entries()) {
+    if (/^cache\d+\.map$/i.test(name) || (prefix === 'save/z/' && name === 'maps')) continue;
     if (handle.kind === 'directory') await collect(handle, prefix + name + '/', entries);
     else entries.push({ name: prefix + name, data: new Uint8Array(await (await handle.getFile()).arrayBuffer()) });
   }
@@ -482,7 +495,7 @@ function loadScript(src) {
 async function play() {
   if (!canPlay()) return;
   gameStarted = true;
-  watchFirstFrame();
+  watchFrames();
   $('launcher').hidden = true;
   $('update').hidden = true;
   $('game').hidden = false;
@@ -496,7 +509,7 @@ async function play() {
   try {
     await prepareInit();
     await loadScript('halo.js');
-    await window.createHalo({
+    game = await window.createHalo({
       canvas,
       arguments: gameArguments(),
       print: (text) => { logLine(text); console.log(text); },
@@ -520,21 +533,32 @@ async function play() {
   }
 }
 
-// the game's window made takes the spinner away
-function watchFirstFrame() {
-  const started = performance.now();
+// The game counts the frames it shows in its memory (web_state,
+// port/web/src/web_main.c), which the page reads: while the count stands
+// still, the game is starting or loading a map, and the page says so.
+let game = null;
+
+function watchFrames() {
+  let shown = -1;
+  let changed = performance.now();
   const timer = setInterval(() => {
     if (gameStopped) {
       clearInterval(timer);
+      $('starting').hidden = true;
       return;
     }
-    // (the menus' music starts as they first draw)
-    if (log.some((line) => /starting main menu music|screen: \d+x\d+ drawn/.test(line)) ||
-        performance.now() - started > 60000) {
+    if (!game || !game._web_state) return;
+    const now = game.HEAPU32[game._web_state() >> 2];
+    if (now !== shown) {
+      if (shown < 0 && now === 0) return;
+      shown = now;
+      changed = performance.now();
       $('starting').hidden = true;
-      clearInterval(timer);
+    } else if (performance.now() - changed > 600 && $('starting').hidden) {
+      $('starting-text').textContent = 'Loading…';
+      $('starting').hidden = false;
     }
-  }, 250);
+  }, 200);
 }
 
 $('play').addEventListener('click', play);

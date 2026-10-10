@@ -929,6 +929,11 @@ static Uint64 frame_interval_ns(void)
 }
 
 #endif
+#ifdef HALO_WEB
+/* port/web/src/web_main.c's: the frames shown, which the page reads */
+void web_frame_shown(void);
+#endif
+
 void platform_video_swap(void)
 {
 #ifndef HALO_ANDROID
@@ -937,6 +942,9 @@ void platform_video_swap(void)
 
 #endif
 	SDL_GL_SwapWindow(platform_window);
+#ifdef HALO_WEB
+	web_frame_shown();
+#endif
 #ifndef HALO_ANDROID
 	interval = frame_interval_ns();
 	if (!interval)

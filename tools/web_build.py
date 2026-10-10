@@ -318,6 +318,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         # the page gives the game its arguments and reads its output
         "-sMODULARIZE=1",
         "-sEXPORT_NAME=createHalo",
+        # (the memory, which the page reads web_state's words from)
+        "-sEXPORTED_RUNTIME_METHODS=HEAPU32",
         f"-sASSERTIONS={0 if release else 1}",
         # function names in stack traces (the name section only)
         "--profiling-funcs",
