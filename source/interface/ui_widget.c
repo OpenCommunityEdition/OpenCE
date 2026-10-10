@@ -1367,6 +1367,14 @@ static boolean ui_widget_load_children_recursive(
 /* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
 boolean pc_menu_tag(
 	long tag_index);
+/* port: whether this machine has, or is adding, a second player: co-op,
+split screen, the lobby's (port/linux/game/menu_functions.c) */
+unsigned char pc_menu_split_players(
+	void);
+/* port: local_player_count, 0 before the players' globals are made
+(source/game/players.c) */
+short players_port_local_player_count(
+	void);
 /* port: where in its widget, and how large, the menus draw a frame of
 ui.map's that they scale (port/linux/game/menu_tags.c) */
 boolean pc_menu_frame_placement(
@@ -7636,27 +7644,18 @@ static void widget_instance_tab_to_previous_valid_widget(
 	return;
 }
 
-/* port: whether a widget of the local player (NONE: any) takes the
-controller's events. In co-op's menus (Multiplayer's CO-OP CAMPAIGN,
-port/linux/game/menu_functions.c) the screens it shares with one player's
-campaign, New Game's levels and the difficulty, are player 1's (their rows
-the first controller's), and either player's controller uses them: player 1's
-is the one that chose co-op, player 2's the one that chose their profile */
-/* port: whether this machine has, or is adding, a second player
-(port/linux/game/menu_functions.c): co-op, split screen, the lobby's */
-extern unsigned char pc_menu_split_players(void);
-
 /* port: with one person playing, any controller drives the first player's
 menus, not only the first port's: a phone can list a device of its own (its
 touch controls) before the gamepad, which then reads port 2, and a player
 picks up whichever pad is at hand. Its screens read every controller's
-events (ui_widgets_update), and take them (below). With two or more
-players, each controller keeps to its own player's menus */
+events (process_ui_widgets), and take them
+(widget_takes_events_of_controller). With two or more players, each
+controller keeps to its own player's menus */
 static boolean widget_takes_any_controller(
 	struct widget_instance const *widget)
 {
 	return widget->local_player_index == 0 && !pc_menu_split_players() &&
-		(we_are_at_the_main_menu || local_player_count() <= 1);
+		(we_are_at_the_main_menu || players_port_local_player_count() <= 1);
 }
 
 /* port: the controller whose events a screen reads (NONE: every one's) */
@@ -7666,6 +7665,12 @@ static short widget_event_controller(
 	return widget_takes_any_controller(widget) ? NONE : widget->local_player_index;
 }
 
+/* port: whether a widget of the local player (NONE: any) takes the
+controller's events. In co-op's menus (Multiplayer's CO-OP CAMPAIGN,
+port/linux/game/menu_functions.c) the screens it shares with one player's
+campaign, New Game's levels and the difficulty, are player 1's (their rows
+the first controller's), and either player's controller uses them: player 1's
+is the one that chose co-op, player 2's the one that chose their profile */
 static boolean widget_takes_events_of_controller(
 	struct widget_instance const *widget,
 	short controller_index)
@@ -7674,8 +7679,8 @@ static boolean widget_takes_events_of_controller(
 
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
-	if (widget->local_player_index == 0 && controller_index > 0 &&
-		controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS && widget_takes_any_controller(widget))
+	if (controller_index > 0 && controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
+		widget_takes_any_controller(widget))
 	{
 		return TRUE;
 	}
