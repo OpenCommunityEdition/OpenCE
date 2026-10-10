@@ -207,7 +207,17 @@ _video["categories"] = [
     ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows and\nlighting."),
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
+    ("DEATH AND BLOOD:", "video_settings/death_blood", "How bodies fall when they die."),
 ]
+SCREENS["video_settings/death_blood"] = {
+    "screen": "death_blood_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        # (Jolt Physics, which the desktop builds have)
+        ("DEATH PHYSICS:", "game.death_physics", [("CLASSIC", "classic"), ("RAGDOLL", "ragdoll")],
+         "Ragdoll: bodies fall limp, thrown by what killed\nthem. Classic: the game's own death animations.",
+         "desktop"),
+    ],
+}
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
     "rows": [

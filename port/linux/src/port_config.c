@@ -322,6 +322,11 @@ static const struct config_setting config_settings[] =
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
 		"gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,\n"
 		"brown, tan, maroon or salmon." },
+	{ "game.death_physics", _config_string, "\"classic\"", "HALO_DEATH_PHYSICS", _environment_value, _platform_desktop,
+		"How bodies fall when they die: \"classic\" (the game's own death\n"
+		"animations) or \"ragdoll\" (limp, thrown by what killed them, tumbling\n"
+		"down stairs and over ledges: Jolt Physics, port/third_party/JoltPhysics).\n"
+		"How this machine draws its dead: nothing sent between machines changes." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

@@ -695,6 +695,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "ragdoll.h" /* port: port/linux/game/ragdoll.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -2819,6 +2820,12 @@ void unit_died(
 
 	fresh_unit = unit_get(unit_index);
 	fresh_unit->unit.flags &= ~FLAG(_unit_running_blindly_bit);
+#if RAGDOLLS
+	/* port: killed in a seat (a pilot blown out of a Banshee): it falls as the
+	game has it fall, no ragdoll (port/linux/game/ragdoll.c) */
+	if (unit->object.parent_object_index != NONE)
+		ragdoll_unit_killed_in_seat(unit_index);
+#endif
 	if (unit->object.parent_object_index != NONE)
 	{
 		if (unit->unit.parent_seat_index != NONE)
@@ -2826,6 +2833,9 @@ void unit_died(
 		else
 			unit_detach_from_parent(unit_index);
 	}
+#if RAGDOLLS
+	ragdoll_unit_left_seat(unit_index);
+#endif
 
 	unit->unit.speech.queued.priority = 0;
 	unit_drop_inventory_weapons(unit_index);
