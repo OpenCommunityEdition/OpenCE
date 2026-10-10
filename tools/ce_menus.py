@@ -623,9 +623,10 @@ def main() -> None:
     lines += [art.title(name, text) for name, text in sorted(port_settings.TITLES.items())]
     # (the in-game pause menu's taller box: menu_tags.c's pause_patch)
     for piece in ("left", "center", "right"):
+        heights = [port_settings.pause_box_height(buttons) for buttons in port_settings.PAUSE_BOX_BUTTONS]
+        heights += list(port_settings.PAUSE_BOX_EXTRA_HEIGHTS)
         lines.append(art.port_picture(f"pause/pausebox_{piece}", [
-            (port_settings.pause_box_svg(piece, port_settings.pause_box_height(buttons)), 4 if piece == "center" else 16,
-             256) for buttons in port_settings.PAUSE_BOX_BUTTONS]))
+            (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256) for height in heights]))
     # (voice chat's speaker, of a player who talks and of one muted: Lucide's
     # icons, port/assets/icons/lucide, white for network_voice.c to tint)
     lines.append(art.port_picture("voice/speaker", [

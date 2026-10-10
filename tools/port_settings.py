@@ -695,6 +695,10 @@ def title_backdrop(width: float) -> str:
 # hold each number of buttons, one frame each (the Xbox's 2-button box is
 # 159 units high, and each button 35 more)
 PAUSE_BOX_BUTTONS = [3, 4]
+# the campaign pause box, tall enough for five rows at the profile settings
+# list's pitch (33) with the prompts still under the last row: the stock box
+# is 159, and those rows need 48 more
+PAUSE_BOX_EXTRA_HEIGHTS = [207]
 
 
 def pause_box_height(buttons: int) -> int:
