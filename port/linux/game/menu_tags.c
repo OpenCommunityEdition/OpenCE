@@ -1748,9 +1748,10 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 
 /* ---------- the single-player campaign's pause menu
 
-Its list gets the same SETTINGS (pause_list_patch) after RESUME GAME, a copy
-of REVERT TO SAVED; its box, beside the mission objectives', keeps its size,
-the rows closer. Settings there has only the items that work in a game
+Its list gets the same SETTINGS (pause_list_patch) before REVERT TO SAVED, a
+copy of it; a list with room centres its rows (Halo PC's), and one that has
+none keeps its size, its rows closer, as its box beside the mission
+objectives' does. Settings there has only the items that work in a game
 (pause_settings_patch), and Gamepads' OK saves the profile itself. */
 
 #define PAUSE_SETTINGS_LIST "main_menu/settings_select/player_setup/player_profile_edit/profile_edit_select_list"
@@ -1766,7 +1767,8 @@ static char const *const pause_settings_hidden_items[] =
 	"main_menu/settings_select/player_setup/player_profile_edit/about_item",
 };
 
-/* the list's rows spaced evenly over the span its rows had */
+/* the list's rows spaced evenly over the span its rows had (a list that grew
+for SETTINGS, back to its own size) */
 static void pause_list_fit(struct ui_widget_definition *list, short span)
 {
 	struct ui_widget_child_reference *children = list->child_widgets.address;
@@ -1859,7 +1861,8 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 	{
 		struct ui_widget_definition *list;
 		struct ui_widget_child_reference const *rows;
-		short span, grow;
+		short span, grow, bottom;
+		long revert;
 
 		if (children[child].widget_tag.index == NONE)
 			continue;
@@ -1867,10 +1870,24 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 		if (list->type != _widget_type_column_list || list->child_widgets.count < 2)
 			continue;
 		rows = list->child_widgets.address;
-		span = (short)(rows[list->child_widgets.count - 1].vertical_offset - rows[0].vertical_offset);
-		if (pause_list_patch(instances, list, 1, FALSE, &grow))
+		/* (REVERT TO SAVED, by its tag: it opens its confirmation rather
+		than running a function, and a map's list need not have it second) */
+		for (revert = 0; revert < list->child_widgets.count; revert++)
 		{
-			pause_list_fit(list, span);
+			if (tag_name_ends(rows[revert].widget_tag.index, "\\restart_at_save_point_button"))
+				break;
+		}
+		if (revert == list->child_widgets.count)
+			return;
+		span = (short)(rows[list->child_widgets.count - 1].vertical_offset - rows[0].vertical_offset);
+		bottom = list->bounds.y1;
+		if (pause_list_patch(instances, list, revert, FALSE, &grow))
+		{
+			if (grow)
+			{
+				pause_list_fit(list, span);
+				list->bounds.y1 = bottom;
+			}
 			pause_settings_patch();
 			platform_log("menus: the pause menu has SETTINGS");
 		}

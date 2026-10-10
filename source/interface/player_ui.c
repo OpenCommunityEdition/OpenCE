@@ -367,7 +367,7 @@ struct player_profile *player_ui_get_edit_player_profile(
 	return result;
 }
 
-/* port */
+/* port: the saved game file being edited (NONE for none) */
 long player_ui_get_edit_profile_index(
 	void)
 {
