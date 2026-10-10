@@ -180,14 +180,6 @@ sends each killing blow again reliably and an object come to rest three
 times (a client waits for a player's blow before its body dies without one),
 and switches co-op's BSP on the host's crossing alone.
 
-Version 26 adds MCC custom-map support, including a separate message for
-the extra grenade inventories and the corresponding grenade action values.
-All participants need the same protocol version, including on Xbox or
-Custom Edition maps; their existing inventory packet layouts are unchanged.
-MCC sessions use this netcode and the existing host-controlled co-op systems,
-not the official MCC client or matchmaking. See [MCC map support](../../docs/mcc_maps.md)
-for map requirements and the bounds of gameplay testing.
-
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
 and the cheat buttons run only commands that change nothing of the game
