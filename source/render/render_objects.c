@@ -372,6 +372,9 @@ void render_objects(
 	return;
 }
 
+/* port: port/linux/game/shield_color.c */
+real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
+
 void render_object_shadows(
 	void)
 {
@@ -520,8 +523,12 @@ static void render_object_list(
 						if (shader_type_is_valid_for_modifier(
 							model_effect.modifier_shader->base.type))
 						{
+							/* port: a local player's shield in the color
+							chosen for it (port/linux/game/shield_color.c) */
 							model_effect.modifier_animation.colors =
-								object->object.outgoing_change_colors;
+								TEST_FLAG(_object_mask_unit, object->object.type) ?
+									shield_color_colors(object_index, object->object.outgoing_change_colors) :
+									object->object.outgoing_change_colors;
 							model_effect.modifier_animation.values =
 								object->object.outgoing_function_values;
 						}

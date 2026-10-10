@@ -126,6 +126,10 @@ void rasterizer_set_vertex_shader_permutation(
 void rasterizer_set_pixel_shader(
 	struct pixel_shader_definition const *definition);
 
+/* port: port/linux/game/shield_color.c */
+boolean shield_color_override(real_rgb_color const *colors, real_rgb_color *chosen);
+void shield_color_apply(real_rgb_color const *chosen, real_rgb_color const *original, real_rgb_color *result);
+
 /* ---------- globals */
 
 extern void *global_d3d_device;
@@ -151,6 +155,9 @@ void rasterizer_plasma_energy_draw(
 	real vertex_constants[6][4];
 	real color_constants[3][4];
 	short source;
+	real_rgb_color perpendicular_color; /* port: (shield_color.c) */
+	real_rgb_color parallel_color;
+	real_rgb_color chosen;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_plasma_energy.c",
@@ -185,6 +192,17 @@ void rasterizer_plasma_energy_draw(
 						(double)runtime->exponents[source - 1],
 						(double)plasma->offset_exponent) * plasma->offset_amount;
 			}
+		}
+
+		/* port: a local player's shield in the color chosen for it
+		(port/linux/game/shield_color.c) */
+		perpendicular_color = plasma->perpendicular_color;
+		parallel_color = plasma->parallel_color;
+		if (shield_color_override(runtime ? runtime->colors : NULL, &chosen))
+		{
+			shield_color_apply(&chosen, &plasma->perpendicular_color, &perpendicular_color);
+			shield_color_apply(&chosen, &plasma->parallel_color, &parallel_color);
+			tint = global_real_rgb_white;
 		}
 
 		rasterizer_set_texture(0, 1, 0, plasma->primary_noise_map, group->bitmap_sequence_index);
@@ -267,13 +285,13 @@ void rasterizer_plasma_energy_draw(
 		vertex_constants[4][3] = secondary_time * plasma->secondary_noise_map_animation_direction.j;
 		vertex_constants[5][2] = secondary_scale;
 		vertex_constants[5][3] = secondary_time * plasma->secondary_noise_map_animation_direction.k;
-		color_constants[1][0] = (plasma->perpendicular_color.red - plasma->parallel_color.red) * tint->red;
-		color_constants[1][1] = (plasma->perpendicular_color.green - plasma->parallel_color.green) * tint->green;
-		color_constants[1][2] = (plasma->perpendicular_color.blue - plasma->parallel_color.blue) * tint->blue;
+		color_constants[1][0] = (perpendicular_color.red - parallel_color.red) * tint->red;
+		color_constants[1][1] = (perpendicular_color.green - parallel_color.green) * tint->green;
+		color_constants[1][2] = (perpendicular_color.blue - parallel_color.blue) * tint->blue;
 		color_constants[1][3] = (plasma->perpendicular_alpha - plasma->parallel_alpha) * intensity;
-		color_constants[2][0] = plasma->parallel_color.red * tint->red;
-		color_constants[2][1] = plasma->parallel_color.green * tint->green;
-		color_constants[2][2] = plasma->parallel_color.blue * tint->blue;
+		color_constants[2][0] = parallel_color.red * tint->red;
+		color_constants[2][1] = parallel_color.green * tint->green;
+		color_constants[2][2] = parallel_color.blue * tint->blue;
 		color_constants[2][3] = intensity * plasma->parallel_alpha;
 
 		IDirect3DDevice8_SetVertexShaderConstant(global_d3d_device, -81, vertex_constants, 6);
