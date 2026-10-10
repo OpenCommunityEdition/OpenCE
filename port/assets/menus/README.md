@@ -167,7 +167,10 @@ The port's functions: `port quit game` quits; `port setting load` (on a
 spinner's `created`) shows its setting's value and `port setting save` (on
 its `deleted`) writes the value shown to `config.toml`, if it changed. Of
 the PC version's: `main menu quit game` quits, `profile set edit begin`
-begins editing the first player profile, `mouse emit back event` and
+begins editing the first player profile (with none it fails, and the main
+menu's asks for a new one's name first, as `new game if no plyr profiles`
+does, for its `<conditional>` to make the profile, which the port's `new
+campaign decision` then has Settings edit), `mouse emit back event` and
 `mouse emit x event` push B and X, `emit custom activation event` and
 `single prev cl item activated` run the screen's or the list's
 `custom_activation` handlers, and its back handlers go back. Its
