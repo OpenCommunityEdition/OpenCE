@@ -122,7 +122,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   than the player goes of their own (and up, what its tick added but a
   jump's), so a client that says it goes faster (a copy said to hover and
   fall, gaining the host's gravity each tick) gains nothing by it. A
-  teleporter, which moves the host's own copy too, starts afresh.
+  teleporter, which moves the host's own copy too, starts afresh. On a
+  moving elevator the host takes only where a client's player is across,
+  not how high: the client's elevator follows the host's (co-op's device
+  sync), so its player's height reaches the host a round trip behind the
+  host's elevator, under its floor going up, where the host's copy would
+  fall through it. Each machine's elevator carries its own copy up and
+  down, and they meet where it stops.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, fired from within
   its reach, the target where the host had it when the shooter saw it, no
