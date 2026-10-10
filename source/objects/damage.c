@@ -1012,6 +1012,16 @@ static void object_damage_shield(
 	return;
 }
 
+/* Old checkpoints and pending damage may already contain a retired owner.
+Keep the source object and team, but never attribute its damage to a new
+player occupying the old slot. Call only after network damage admission. */
+static void damage_data_validate_owner(
+	struct damage_data *damage)
+{
+	if (damage->owner_player_index != NONE && !player_try_and_get(damage->owner_player_index))
+		damage->owner_player_index = NONE;
+}
+
 static void object_damage_aftermath(
 	long object_index,
 	struct damage_data *damage,
@@ -1026,6 +1036,9 @@ static void object_damage_aftermath(
 		object_definition_get(object->definition_index);
 	struct damage_effect_definition *damage_effect =
 		damage_effect_definition_get(damage->definition_index);
+
+	/* Also covers the client's nonlethal aftermath replay. */
+	damage_data_validate_owner(damage);
 
 	if (object_definition->object.acceleration_scale > _real_epsilon)
 	{
@@ -1435,6 +1448,8 @@ void object_cause_damage(
 	{
 		return;
 	}
+
+	damage_data_validate_owner(damage);
 
 	damage_effect = damage_effect_definition_get(damage->definition_index);
 	damage_definition = &damage_effect->damage;

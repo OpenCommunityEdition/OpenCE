@@ -483,8 +483,8 @@ boolean network_game_spawn_player(
 	give it) */
 	if (VALID_INDEX(player->player_list_index, NETWORK_GAME_PLAYER_SLOTS))
 	{
-		/* port: a player who quit there gives way (network_game_player_slot_held),
-		and his units forget him */
+		/* port: a player who quit there gives way (network_game_player_slot_held);
+		player_delete retires the objects' references before the slot is reused */
 		if (player_data && player_data->valid && player->player_list_index < player_data->maximum_count)
 		{
 			struct player_datum *quitter = (struct player_datum *)((byte *)player_data->data +
@@ -500,16 +500,6 @@ boolean network_game_spawn_player(
 			{
 				long quitter_index = ((long)(word)((struct datum_header *)quitter)->identifier << 16) |
 					player->player_list_index;
-				struct object_iterator iterator;
-
-				object_iterator_new(&iterator, _object_mask_unit, 0);
-				while (object_iterator_next(&iterator))
-				{
-					struct unit_datum *unit = unit_get(iterator.index);
-
-					if (unit->unit.player_index == quitter_index)
-						unit->unit.player_index = NONE;
-				}
 				player_delete(quitter_index);
 			}
 		}
