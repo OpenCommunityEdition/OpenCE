@@ -19,7 +19,8 @@ rest as the host has it:
   (player_queues_new.c).
 - Every tick, a client sends the host where its own players' units are (it
   predicts them from its own input); the host takes that as they are,
-  within a tolerance, as later Halo engines do, at its next tick.
+  within a tolerance, as later Halo engines do, at its next tick (on a
+  moving elevator, only across: its own elevator takes them up and down).
 - Every tick, the host sends every client every player's unit: which unit
   the player has, alive or not, the seat it rides, its shields and health
   (down, recharging, the damage they show), and where it is (dead: who
@@ -54,6 +55,7 @@ machine (their datum identifiers need not be).
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
+#include "devices/devices.h"
 #include "models/model_animation_definitions.h"
 #include "game/game.h"
 #include "game/game_globals.h"
@@ -2024,8 +2026,31 @@ static boolean distributed_on_foot_move_valid(
 	return dx * dx + dy * dy + rise * rise <= reach * reach && -dz <= fall_reach;
 }
 
+/* (the host) whether a unit rides an elevator that is moving (bipeds.c's
+elevator, kept a moment after the unit leaves its floor, as in a jump) */
+static boolean distributed_riding_moving_elevator(
+	long unit_index)
+{
+	struct biped_datum *biped = (struct biped_datum *)object_try_and_get_and_verify_type(unit_index,
+		_object_mask_biped);
+	struct device_datum *elevator;
+
+	if (!biped || biped->biped.elevator_object_index == NONE)
+		return FALSE;
+	elevator = (struct device_datum *)object_try_and_get_and_verify_type(biped->biped.elevator_object_index,
+		_object_mask_device);
+	return elevator && elevator->device.position_velocity != 0.0f;
+}
+
 /* (the host) a client's player's prediction of its unit on foot, taken
-where it says within a tolerance (distributed_apply_predictions) */
+where it says within a tolerance (distributed_apply_predictions). Riding a
+moving elevator, only across: a client's elevator follows the host's
+(network_coop.c), behind it by the time the host's word takes to come, and
+the client's prediction a round trip behind the host's elevator when it
+comes. Taken up and down too, it would put the host's unit under its own
+elevator's floor going up, to fall through it, and the client's after it
+(distributed_correct_own_unit); each machine's elevator carries its own
+unit up and down as it moves, and they meet where it stops. */
 static void distributed_take_prediction(
 	short player_index,
 	long unit_index,
@@ -2034,10 +2059,14 @@ static void distributed_take_prediction(
 	struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
 	struct object_datum *object = object_get(unit_index);
 	long now = game_time_get();
-	real dx = state->position.x - object->object.position.x;
-	real dy = state->position.y - object->object.position.y;
-	real dz = state->position.z - object->object.position.z;
+	real_point3d position = state->position;
+	real dx, dy, dz;
 
+	if (distributed_riding_moving_elevator(unit_index))
+		position.z = object->object.position.z;
+	dx = position.x - object->object.position.x;
+	dy = position.y - object->object.position.y;
+	dz = position.z - object->object.position.z;
 	if (!(dx * dx + dy * dy + dz * dz <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE))
 		return;
 	if (distributed_accepted[player_index].valid)
@@ -2057,7 +2086,7 @@ static void distributed_take_prediction(
 			distributed_host_speeds[player_index].ground_time = now;
 		}
 		else if (ticks <= 0 || !distributed_on_foot_move_valid(bound, &distributed_accepted[player_index].position,
-			&state->position, ticks))
+			&position, ticks))
 		{
 			return;
 		}
@@ -2065,14 +2094,14 @@ static void distributed_take_prediction(
 	/* (no higher above where the host last had it on the ground than a
 	jump, or a throw its ticks gave it, takes it, and in the air falling:
 	past that the host's copy falls as its ticks have it) */
-	if (!(state->position.z - distributed_host_speeds[player_index].ground_height <=
+	if (!(position.z - distributed_host_speeds[player_index].ground_height <=
 		distributed_on_foot_ceiling(player_index, bound)))
 	{
 		return;
 	}
 	/* (the client told which of its ticks the host has it at) */
-	if (distributed_apply_state(unit_index, state, &state->position, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
-		distributed_on_foot_fall_speed(bound, state->position.z)))
+	if (distributed_apply_state(unit_index, state, &position, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
+		distributed_on_foot_fall_speed(bound, position.z)))
 	{
 		distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 		distributed_predictions[player_index].taken_host_time = now;
@@ -2084,7 +2113,7 @@ static void distributed_take_prediction(
 			distributed_accepted[player_index].unit_index = unit_index;
 			distributed_accepted[player_index].time = distributed_predictions[player_index].time;
 			distributed_accepted[player_index].host_time = now;
-			distributed_accepted[player_index].position = state->position;
+			distributed_accepted[player_index].position = position;
 		}
 		distributed_accepted[player_index].taken_host_time = now;
 		distributed_accepted[player_index].taken_host_position = object->object.position;
