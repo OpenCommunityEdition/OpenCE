@@ -195,6 +195,10 @@ too), so that browsers play (port/linux/README.md, "Browsers"); version 27
 shares Custom Edition maps (below, "Map sharing"): a client asks the host for
 a map it lacks, and the game's players reach each other to send it.
 
+`port/linux/network_format.txt` records the wire format of the current
+version (`tools/network_format.py`): `test_linux_port.py` fails when the
+sources' messages, kinds, bits or structs sent whole differ from it.
+
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
 and the cheat buttons run only commands that change nothing of the game
