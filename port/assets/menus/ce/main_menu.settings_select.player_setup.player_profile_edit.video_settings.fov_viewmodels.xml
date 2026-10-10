@@ -16,6 +16,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_fov" x="54" y="73"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_viewmodel_fov" x="54" y="103"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_viewmodel_visible" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_viewmodel_shield" x="54" y="163"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -50,6 +51,15 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_visible_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.viewmodel_visible" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/op_viewmodel_shield" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_shield_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_shield_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_shield_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/viewmodel_shield_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.viewmodel_shield" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
 		<on event="start" run="port settings defaults"/>
@@ -64,11 +74,13 @@
 		<string text="FOV:"/>
 		<string text="VIEWMODEL FOV:"/>
 		<string text="VIEWMODELS:"/>
+		<string text="ARM SHIELDS:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/help_strings">
 		<string text=""/>
 		<string text="On foot, horizontal at 16:9, in degrees.\nDefault keeps the stock view."/>
 		<string text="The weapon and hands, horizontal at 16:9.\nDefault keeps the weapon's stock view."/>
 		<string text="Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off."/>
+		<string text="The energy shield's flare on your first-person\narms too, as on your body."/>
 	</strings>
 </menus>
