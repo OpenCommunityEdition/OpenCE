@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- crescent brackets (ellipse minus ellipse) with inward-pointing triangles; right half mirrors the left -->
-  <g id="half" fill="#fff">
-    <path d="M57.943,96.694 A47.599,33.535 0 0 0 57.943,163.306 A83.117,43.797 0 0 1 57.943,96.694Z"/>
-    <polygon points="44,120 58,130 44,140"/>
-  </g>
-  <use href="#half" transform="matrix(-1 0 0 1 256 0)"/>
-</svg>

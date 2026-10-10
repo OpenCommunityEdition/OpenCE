@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- three wedges pointing at the centre, 120 degrees apart -->
-  <polygon id="w" points="127.97,76.69 139.97,15.62 115.98,15.62" fill="#fff"/>
-  <use href="#w" transform="rotate(120 127.97 129.61)"/>
-  <use href="#w" transform="rotate(240 127.97 129.61)"/>
-</svg>

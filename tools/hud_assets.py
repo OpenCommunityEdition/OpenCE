@@ -24,6 +24,16 @@ layout: reads the Xbox map's HUD bitmaps (sizes, formats, sprite rectangles,
     (numbers only) with copies of the redraws used in port/assets/hud/svg.
     Needs a map and the restored tags; its output is committed. A bitmap
     with a cell that no redraw matches is left out.
+reticles: puts the reticle redraws that match the Xbox's exactly (RETICLES,
+    from the PC HUD sheet's own drawing, at its scale) in the cells of the
+    Xbox sequences they draw, in place of what layout chose: each copied
+    unchanged into port/assets/hud/svg, at the size and place that match the
+    Xbox sprite best. The sniper's zoom labels beside its reticle, which no
+    redraw has, are set in a font (LABELS). Updates layout.json's reticle
+    entries only; run it after layout, which puts back the reticles it chose.
+
+        python tools/hud_assets.py reticles --map assets/maps/bloodgulch.map \\
+            --reticles ../halo-pc-restored/HUD2_left_reticles
 build: renders port/assets/hud/svg with layout.json into port/assets/hud/*.png
     (committed; the builds embed them).
 check: compares each PNG, reduced to the tag's size, with the map's bitmap
@@ -111,6 +121,42 @@ KINDS = {0: "a8", 1: "y8", 2: "alpha", 3: "grey", 6: "colour", 8: "colour", 9: "
 # little even where they match)
 SEARCH = 4
 MATCH = 0.25
+
+# the reticle redraws that match the Xbox's exactly (the same design, only
+# the strokes' weight differs), by the sheet and sequence they draw: cut from
+# the PC HUD sheet's drawing, each at that drawing's own scale
+RETICLES = {
+    HUD + "combined\\hud_reticles": {
+        0: "reticle_20.svg",   # assault rifle
+        1: "reticle_17.svg",   # banshee gun
+        3: "reticle_06.svg",   # plasma pistol
+        4: "reticle_07.svg",   # plasma rifle
+        5: "reticle_14.svg",   # (no weapon's; probably the flamethrower's)
+        6: "reticle_08.svg",   # needler
+        7: "reticle_28.svg",   # no weapon
+        8: "reticle_19.svg",   # pistol
+        9: "reticle_27.svg",   # rocket launcher, wraith mortar
+        10: "reticle_23.svg",  # shotgun
+        12: "reticle_25.svg",  # covenant gun turret
+        13: "reticle_16.svg",  # ghost gun
+        14: "reticle_30.svg",  # (no weapon's; a small chevron)
+    },
+    HUD + "sniper\\hud_reticles_scope": {
+        0: "reticle_18.svg",   # sniper rifle
+    },
+}
+# the zoom labels beside the sniper's reticle, by sequence and sprite: no
+# redraw has the Xbox's (the PC's say 2x and 8x), so they are set in a font
+# that matches them, with the spacing between their glyphs that fits best
+LABELS = {
+    HUD + "sniper\\hud_reticles_scope": {(1, 0): "2x", (1, 1): "10x"},
+}
+LABEL_FONT = Path("port/assets/fonts/Overpass-900.ttf")
+LABEL_SPACINGS = (-10, -8, -6, -4, -2, 0, 2, 4)
+# render texels per Xbox texel while fitting one, and the scales tried
+# around the one its extent gives
+FIT_TEXELS = 8
+FIT_SCALES = np.linspace(0.85, 1.15, 31)
 
 
 # ---------- Xbox maps
@@ -456,15 +502,15 @@ def layout(arguments) -> None:
                     kind = "meter"
                 flat = svg.replace("/", "__").replace(" ", "_")
                 sources[flat] = svg
-                match = {"xbox": cell, "svg": flat, "source_scale": scale,
-                         "source": corner, "clip": clip, "kind": kind, "score": round(score, 3)}
+                laid = {"xbox": cell, "svg": flat, "source_scale": scale,
+                        "source": corner, "clip": clip, "kind": kind, "score": round(score, 3)}
                 if tag == HUD + "combined\\hud_unit_meters":
                     original = xbox[top:bottom, left:right]
                     values = set(np.unique(original[..., 2][original[..., 3] > 0]))
                     health = set(range(30, 241, 30))
                     if health <= values <= health | {0}:
-                        match["thresholds"] = sorted(health)
-                matched.append(match)
+                        laid["thresholds"] = sorted(health)
+                matched.append(laid)
             if not matched:
                 if matched is not None:
                     print(f"{name}: left out, empty")
@@ -493,6 +539,172 @@ def layout(arguments) -> None:
     for svg in sorted({cell["svg"] for entry in entries for cell in entry["cells"]}):
         shutil.copyfile(svg_root / sources[svg], ASSETS / "svg" / svg)
     LAYOUT.write_text(json.dumps({"assets": entries}, indent=1) + "\n")
+
+
+# ---------- the reticles
+
+
+def soften(image: np.ndarray) -> np.ndarray:
+    """A shape with its edges softened, so that a thinner stroke on one side
+    still lines up with the other's (the Xbox's are heavier and blurred)."""
+    from scipy import ndimage
+
+    return ndimage.gaussian_filter(image.astype(float), 0.8)
+
+
+def likeness(a: np.ndarray, b: np.ndarray) -> float:
+    a, b = a - a.mean(), b - b.mean()
+    norm = np.sqrt((a * a).sum() * (b * b).sum())
+    return float((a * b).sum() / norm) if norm else 0.0
+
+
+def extent(alpha: np.ndarray) -> tuple:
+    """The box (left, top, right, bottom) of a shape's clearly covered texels."""
+    ys, xs = np.nonzero(alpha >= alpha.max() / 4)
+    return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
+
+
+def text_svg(font: Path, text: str, spacing: float = 0) -> str:
+    """text's outlines in a font, as an SVG (an em of 100 units), for a
+    label that has no redraw: the glyphs as the font draws them, set with
+    its advances and spacing (in hundredths of an em) between them."""
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.ttLib import TTFont
+
+    face = TTFont(str(font))
+    glyphs = face.getGlyphSet()
+    cmap = face.getBestCmap()
+    scale = 100 / face["head"].unitsPerEm
+    paths, x = [], 0
+    for index, character in enumerate(text):
+        name = cmap[ord(character)]
+        pen = SVGPathPen(glyphs)
+        glyphs[name].draw(pen)
+        paths.append(f'<path transform="translate({x:g} 0)" d="{pen.getCommands()}"/>')
+        x += face["hmtx"][name][0] + (spacing / scale if index + 1 < len(text) else 0)
+    ascent, descent = face["hhea"].ascent, face["hhea"].descent
+    width, height = x * scale, (ascent - descent) * scale
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.2f}" height="{height:.2f}" '
+            f'viewBox="0 0 {width:.2f} {height:.2f}">\n'
+            f'<!-- "{text}" in {font.name} -->\n'
+            f'<g fill="#ffffff" transform="scale({scale:g} {-scale:g}) translate(0 {-ascent})">\n'
+            + "\n".join(paths) + "\n</g>\n</svg>\n")
+
+
+def fit_reticle(svg: Path, alpha: np.ndarray) -> tuple:
+    """The size and place at which a redraw best matches an Xbox cell's
+    alpha: (likeness, redraw units per Xbox texel, the redraw's point at the
+    cell's corner)."""
+    height, width = alpha.shape
+    target = soften(alpha / 255.0)
+
+    def drawn(zoom):
+        return render_svg(svg, zoom)[..., 3].astype(float) / 255
+
+    base = drawn(FIT_TEXELS)
+    svg_box = [value / FIT_TEXELS for value in extent(base)]
+    xbox_box = extent(alpha)
+    # (the Xbox's extent with its blur's texel taken off each side)
+    units = max((svg_box[2] - svg_box[0]) / max(xbox_box[2] - xbox_box[0] - 1, 1),
+                (svg_box[3] - svg_box[1]) / max(xbox_box[3] - xbox_box[1] - 1, 1))
+    best = (-2.0, units, [0.0, 0.0])
+    for factor in FIT_SCALES:
+        per_texel = units * factor
+        zoom = FIT_TEXELS / per_texel
+        render = drawn(zoom)
+        box = extent(render)
+        # (centred on the Xbox shape's centre, then moved by eighths of a texel)
+        centre = ((box[0] + box[2]) / 2 - (xbox_box[0] + xbox_box[2]) / 2 * FIT_TEXELS,
+                  (box[1] + box[3]) / 2 - (xbox_box[1] + xbox_box[3]) / 2 * FIT_TEXELS)
+        for dy in range(-FIT_TEXELS * 3 // 2, FIT_TEXELS * 3 // 2 + 1):
+            for dx in range(-FIT_TEXELS * 3 // 2, FIT_TEXELS * 3 // 2 + 1):
+                at = (round(centre[0]) + dx, round(centre[1]) + dy)
+                reduced = window(render, at[0], at[1], width * FIT_TEXELS, height * FIT_TEXELS).reshape(
+                    height, FIT_TEXELS, width, FIT_TEXELS).mean(axis=(1, 3))
+                score = likeness(soften(reduced), target)
+                if score > best[0]:
+                    best = (score, per_texel, [at[0] / zoom, at[1] / zoom])
+    return best
+
+
+def reticles(arguments) -> None:
+    xbox_map = XboxMap(Path(arguments.map))
+    source = Path(arguments.reticles)
+    description = json.loads(LAYOUT.read_text())
+    entries = description["assets"]
+    for tag, redraws in RETICLES.items():
+        group = xbox_map.bitmap_group(tag)
+        labels = LABELS.get(tag, {})
+        for index, bitmap in enumerate(group["bitmaps"]):
+            width, height = bitmap["width"], bitmap["height"]
+            xbox = decode_bitmap(bitmap)
+            # (named as layout names them)
+            name = tag[len(HUD):].replace("combined\\", "").replace("\\", "__").replace(" ", "_") + f"__{index}"
+            old = next((entry for entry in entries if entry["name"] == name), None)
+            cells = {}
+            for sequence_index, sequence in enumerate(group["sequences"]):
+                for sprite_index, sprite in enumerate(sequence):
+                    if sprite[0] == index:
+                        cells.setdefault(tuple(pixel_rectangle(sprite, width, height)), set()).add(
+                            (sequence_index, sprite_index))
+            laid = []
+            for cell, numbers in sorted(cells.items()):
+                left, top, right, bottom = cell
+                alpha = xbox[top:bottom, left:right, 3].astype(float)
+                exact = sorted(redraws[sequence] for sequence, _ in numbers if sequence in redraws)
+                text = next((labels[number] for number in sorted(numbers) if number in labels), None)
+                if exact:
+                    svg = "hud2_left_reticles__" + exact[0]
+                    shutil.copyfile(source / exact[0], ASSETS / "svg" / svg)
+                    score, per_texel, corner = fit_reticle(ASSETS / "svg" / svg, alpha)
+                    what = exact[0]
+                elif text:
+                    best = None
+                    for spacing in LABEL_SPACINGS:
+                        candidate = ASSETS / "svg" / f"label__{LABEL_FONT.stem}__{text}.svg"
+                        candidate.write_text(text_svg(LABEL_FONT, text, spacing))
+                        fit = fit_reticle(candidate, alpha)
+                        if best is None or fit[0] > best[0][0]:
+                            best = (fit, spacing)
+                    (score, per_texel, corner), spacing = best
+                    svg = f"label__{LABEL_FONT.stem}__{text}.svg"
+                    (ASSETS / "svg" / svg).write_text(text_svg(LABEL_FONT, text, spacing))
+                    what = f'"{text}" in {LABEL_FONT.name}, spacing {spacing}'
+                else:
+                    kept = next((c for c in (old or {"cells": []})["cells"] if c["xbox"] == list(cell)), None)
+                    if kept is None and alpha.any():
+                        print(f"{name}: left as it was, cell {list(cell)} has no redraw")
+                        laid = None
+                        break
+                    if kept is not None:
+                        laid.append(kept)
+                    continue
+                size = render_svg(ASSETS / "svg" / svg)[..., 3].shape
+                laid.append({"xbox": list(cell), "svg": svg, "source_scale": round(per_texel, 5),
+                             "source": [round(corner[0], 4), round(corner[1], 4)],
+                             "clip": [0, 0, size[1], size[0]], "kind": "alpha", "score": round(score, 3)})
+                print(f"{name} {list(cell)} (sequence, sprite {sorted(numbers)}): {what} at "
+                      f"{per_texel:.4f} units a texel, likeness {score:.3f}")
+            if not laid or all(not c["svg"].startswith(("hud2_left_reticles__", "label__")) for c in laid):
+                continue
+            entry = {"name": name, "tag": tag, "bitmap": index, "width": width, "height": height,
+                     "format": FORMATS[bitmap["format"]], "scale": SCALE,
+                     "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]), "cells": laid}
+            if old is not None:
+                entries[entries.index(old)] = entry
+            else:
+                # (after the sheet's other bitmaps, or its folder's)
+                folder = tag.rsplit("\\", 1)[0]
+                position = max((i for i, e in enumerate(entries) if e["tag"] == tag), default=None)
+                if position is None:
+                    position = max(i for i, e in enumerate(entries) if e["tag"].startswith(folder))
+                entries.insert(position + 1, entry)
+    used = {cell["svg"] for entry in entries for cell in entry["cells"]}
+    for svg in (ASSETS / "svg").glob("*.svg"):
+        if svg.name not in used:
+            svg.unlink()
+            print(f"{svg.name}: no longer used")
+    LAYOUT.write_text(json.dumps(description, indent=1) + "\n")
 
 
 # ---------- building
@@ -605,16 +817,19 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
     scale = entry["scale"]
     image = np.zeros((entry["height"] * scale, entry["width"] * scale, 4), np.uint8)
     for cell in entry["cells"]:
-        # (the redraw drawn at the texture's scale, its coordinates with it)
-        zoom = scale // cell["source_scale"]
-        assert zoom * cell["source_scale"] == scale, entry["name"]
+        # (the redraw drawn at the texture's scale, its coordinates with it:
+        # a whole multiple of the redraw's for the PC sheets', any for the
+        # reticles')
+        zoom = scale / cell["source_scale"]
+        if zoom == int(zoom):
+            zoom = int(zoom)
         key = (cell["svg"], zoom)
         if key not in renders:
             renders[key] = render_svg(ASSETS / "svg" / cell["svg"], zoom)
         left, top, right, bottom = cell["xbox"]
         width, height = (right - left) * scale, (bottom - top) * scale
-        texels = window(clipped(renders[key], [value * zoom for value in cell["clip"]]),
-                        cell["source"][0] * zoom, cell["source"][1] * zoom, width, height)
+        texels = window(clipped(renders[key], [round(value * zoom) for value in cell["clip"]]),
+                        round(cell["source"][0] * zoom), round(cell["source"][1] * zoom), width, height)
         image[top * scale:top * scale + height, left * scale:left * scale + width] = recipe(texels, cell["kind"])
     if any(cell["kind"] in ("meter", "dxt") for cell in entry["cells"]):
         image = bleed(image)
@@ -682,13 +897,17 @@ def main() -> None:
     command.add_argument("--map", required=True)
     command.add_argument("--hek", required=True)
     command.add_argument("--svg", required=True)
+    command = commands.add_parser("reticles")
+    command.add_argument("--map", required=True)
+    command.add_argument("--reticles", required=True)
     commands.add_parser("build")
     commands.add_parser("thresholds")
     command = commands.add_parser("check")
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
-    {"layout": layout, "build": build, "thresholds": thresholds, "check": check}[arguments.command](arguments)
+    {"layout": layout, "reticles": reticles, "build": build, "thresholds": thresholds,
+     "check": check}[arguments.command](arguments)
 
 
 if __name__ == "__main__":

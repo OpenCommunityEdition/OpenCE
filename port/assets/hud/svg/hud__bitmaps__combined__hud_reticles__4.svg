@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- four diagonal wedges pointing at the centre -->
-  <polygon id="w" points="90.11,89.68 55.44,36.61 37.03,55.01" fill="#fff"/>
-  <use href="#w" transform="rotate(90 127.93 127.51)"/>
-  <use href="#w" transform="rotate(180 127.93 127.51)"/>
-  <use href="#w" transform="rotate(270 127.93 127.51)"/>
-</svg>
