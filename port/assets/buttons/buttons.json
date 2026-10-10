@@ -1,0 +1,172 @@
+{
+ "assets": [
+  {
+   "name": "a_butn__0",
+   "tag": "ui\\shell\\bitmaps\\a_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 1140253829,
+   "svg": "a_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "b_butn__0",
+   "tag": "ui\\shell\\bitmaps\\b_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 2900806204,
+   "svg": "b_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "x_butn__0",
+   "tag": "ui\\shell\\bitmaps\\x_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 2247463469,
+   "svg": "x_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "y_butn__0",
+   "tag": "ui\\shell\\bitmaps\\y_butn",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 783963872,
+   "svg": "y_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "a_butn_sm__0",
+   "tag": "ui\\shell\\bitmaps\\a_butn_sm",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 2356213272,
+   "svg": "a_butn.svg",
+   "place": [
+    0.7702,
+    -0.222,
+    -0.272
+   ]
+  },
+  {
+   "name": "b_butn_sm__0",
+   "tag": "ui\\shell\\bitmaps\\b_butn_sm",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 3999851658,
+   "svg": "b_butn.svg",
+   "place": [
+    0.7677,
+    -0.14,
+    -0.225
+   ]
+  },
+  {
+   "name": "hud_msg_icons_sm__0",
+   "tag": "ui\\hud\\bitmaps\\hud_msg_icons_sm",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 2908635490,
+   "sprites": [
+    {
+     "sequence": 0,
+     "cell": [
+      68,
+      21,
+      84,
+      41
+     ],
+     "svg": "a_butn.svg",
+     "place": [
+      0.7069,
+      1.042,
+      1.022
+     ]
+    },
+    {
+     "sequence": 1,
+     "cell": [
+      103,
+      0,
+      119,
+      20
+     ],
+     "svg": "b_butn.svg",
+     "place": [
+      0.6835,
+      1.652,
+      1.538
+     ]
+    },
+    {
+     "sequence": 2,
+     "cell": [
+      71,
+      0,
+      87,
+      20
+     ],
+     "svg": "x_butn.svg",
+     "place": [
+      0.7016,
+      0.98,
+      1.244
+     ]
+    },
+    {
+     "sequence": 3,
+     "cell": [
+      87,
+      0,
+      103,
+      20
+     ],
+     "svg": "y_butn.svg",
+     "place": [
+      0.6985,
+      1.09,
+      1.277
+     ]
+    }
+   ]
+  }
+ ]
+}

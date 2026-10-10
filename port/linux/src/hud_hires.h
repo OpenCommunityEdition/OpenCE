@@ -5,11 +5,18 @@ The high-res HUD: textures drawn from the hand-made SVG redraws of the Halo PC
 HUD sheets (port/assets/hud, made by tools/hud_assets.py), each 8x the size
 of the bitmap of the Xbox maps it stands for (4x for the largest) and in that
 bitmap's layout. The menus' titles, pictures of text in the maps, are drawn
-the same way (port/assets/titles, made by tools/title_assets.py).
+the same way (port/assets/titles, made by tools/title_assets.py), and so are
+their controller button icons (port/assets/buttons, made by
+tools/button_assets.py).
 tools/embed_assets.py makes them C data (hud_hires_embedded); hud_hires.c
 decodes them, and the texture cache (xbox_textures.c) draws one in place of
 its bitmap whenever that bitmap's pixels are uploaded: the game still sizes
 and places the bitmap by its tag, so nothing else changes.
+A texture may instead stand for only some of a bitmap's sprites (the
+buttons among the message icons the menus set into their text): the game
+draws those sprites from a placeholder bitmap of the same size
+(port/linux/game/hud_hires_tags.c), which the texture cache draws the
+texture for, and the bitmap's other sprites from the bitmap as before.
 */
 
 #ifndef HUD_HIRES_H
@@ -18,12 +25,15 @@ and places the bitmap by its tag, so nothing else changes.
 /* an embedded texture: an 8-bit RGBA PNG, and the bitmap it stands for (its
 bitmap group tag's name, its index there, and the CRC-32 of its first mip
 level's pixels as the English maps have them); coverage: a meter's, whose
-green is how much of each texel its shapes cover; point_threshold: its red
+green is how much of each texel its shapes cover (the meter shader reads
+only its blue and alpha); point_threshold: its red
 holds exact discrete segment thresholds (zero in continuous meter sprites),
 read without filtering while blue, alpha and coverage retain their mips;
-title: a menu's title (port/assets/titles, made by
-tools/title_assets.py), drawn with display.high_res_text rather than
-display.high_res_hud */
+title: a menu title (port/assets/titles, made by tools/title_assets.py) or a
+button icon (port/assets/buttons, made by tools/button_assets.py), drawn with
+display.high_res_text rather than display.high_res_hud; sprites: the sequences
+of its bitmap's group (a bit each) whose sprites it is drawn for, through a
+placeholder, or 0: the whole bitmap, in its place */
 struct hud_hires_embedded
 {
 	const char *tag;
@@ -33,6 +43,7 @@ struct hud_hires_embedded
 	int coverage;
 	int point_threshold; /* red: exact discrete meter thresholds, zero elsewhere */
 	int title;
+	unsigned int sprites;
 	const unsigned int *png;
 	unsigned int png_size;
 };
@@ -43,7 +54,7 @@ extern const unsigned int hud_hires_embedded_count;
 /* the texture standing for the bitmap whose pixels are uploaded from address
 (guest virtual) with this size, its first mip level being level0_size bytes,
 or -1: none, its setting (display.high_res_hud, or display.high_res_text for
-a title) off, or pixels other than those the
+the menus') off, or pixels other than those the
 texture was drawn for (another language's maps, which have their own text,
 or modified ones) */
 long hud_hires_override_find(unsigned long address, unsigned long width, unsigned long height,
@@ -56,6 +67,10 @@ all its mip levels, and their number; 0 if it could not be */
 unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels);
 /* whether its green is its coverage (d3d8_gl.c, nv2a_psh.c: coverage_alpha) */
 int hud_hires_override_coverage(long asset);
+/* the GL texture of the texture drawn for some of a bitmap's sprites whose
+placeholder's D3D texture has this Data, and the number of its mip levels;
+0 if data is no placeholder's */
+unsigned int hud_hires_placeholder_texture(unsigned long data, unsigned long *levels);
 /* whether its red holds exact segment thresholds, read unfiltered (d3d8_gl.c,
 nv2a_psh.c: point_threshold) */
 int hud_hires_override_point_threshold(long asset);

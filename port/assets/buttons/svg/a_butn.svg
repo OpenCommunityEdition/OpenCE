@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+<!-- The A button of the menus' button keys (ui\shell\bitmaps\a_butn), redrawn: drawn
+in the 32x32 bitmap's texels, where its art is (tools/button_assets.py). A tilted
+green oval, dark at the top and bright at the bottom, with a pale rim, and its
+letter in white, upright from its baseline and slanted. -->
+<defs>
+<!-- (along the oval's long axis, top to bottom) -->
+<linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="-12.932" x2="0" y2="12.932">
+<stop offset="0" stop-color="#08370f"/>
+<stop offset="0.5" stop-color="#056a1c"/>
+<stop offset="1" stop-color="#0a9924"/>
+</linearGradient>
+<linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="-12.932" x2="0" y2="12.932">
+<stop offset="0" stop-color="#ffffff" stop-opacity="0.74"/>
+<stop offset="1" stop-color="#ffffff" stop-opacity="0.73"/>
+</linearGradient>
+</defs>
+<g transform="translate(10.341 12.879) rotate(-26.459)">
+<ellipse id="oval" rx="8.659" ry="12.932" fill="url(#body)"/>
+<ellipse rx="8.082" ry="12.355" fill="none" stroke="url(#rim)" stroke-width="1.154"/>
+</g>
+<path id="letter" transform="matrix(1 0 -0.185 1 9.644 16.929)" fill="#ffffff"
+d="M-1.508,-11.229 L0.746,-11.229 L-3.038,0.000 L-5.292,0.000 Z M5.292,0.000 L3.038,0.000 L-0.746,-11.229 L1.508,-11.229 Z M-2.739,-4.232 L2.739,-4.232 L3.285,-2.613 L-3.285,-2.613 Z"/>
+</svg>
