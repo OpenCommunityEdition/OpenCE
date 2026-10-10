@@ -44,6 +44,8 @@ Each map can have, beside it in its folder:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <xtl.h>
 
 /* ---------- constants */
 
@@ -388,10 +390,6 @@ static void custom_edition_maps_look_for(
 	void)
 {
 	struct custom_edition_maps_globals *globals = &custom_edition_maps_globals;
-	struct file_reference directory;
-	struct file_reference file;
-	char name[MAXIMUM_FILENAME_LENGTH + 1];
-	char extension[MAXIMUM_FILENAME_LENGTH + 1];
 	char const *folders[] = { CUSTOM_EDITION_MAP_DIRECTORY, CUSTOM_EDITION_INSTALL_MAP_DIRECTORY };
 	short folder_index;
 
@@ -405,17 +403,41 @@ static void custom_edition_maps_look_for(
 	/* the game's custom_maps first, so its copy wins */
 	for (folder_index = 0; folder_index < NUMBEROF(folders); folder_index++)
 	{
+		char pattern[MAXIMUM_FILENAME_LENGTH + 1];
+		WIN32_FIND_DATAA data;
+		HANDLE find;
+
 		/* (the install's only when there is one) */
 		if (folder_index && !custom_edition_install_present())
 			continue;
-		file_reference_create_from_path(&directory, folders[folder_index], TRUE);
-		find_files_start(0, &directory);
-		while (find_files_next(&file, NULL))
+		/* A folder is listed through a handle of its own, never with
+		find_files_start and find_files_next: those keep their place in one
+		global, and as the game starts a thread of the menus' deletes the
+		files of folders with them (perform_filesystem_initialization in
+		ui_widget.c, directory_create_or_delete_contents). A listing here at
+		the same time takes that one's place, and the thread then deletes
+		the files of this folder: the maps. */
+		csprintf(pattern, "%s*.*", folders[folder_index]);
+		find = FindFirstFileA(pattern, &data);
+		if (find == INVALID_HANDLE_VALUE)
+			continue;
+		do
 		{
-			file_reference_get_name(&file, FLAG(_name_filename_bit), name);
-			file_reference_get_name(&file, FLAG(_name_extension_bit), extension);
-			custom_edition_map_add(folders[folder_index], name, extension);
-		}
+			char name[sizeof(data.cFileName) + 1];
+			char *extension;
+
+			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+				continue;
+			csmemcpy(name, data.cFileName, sizeof(data.cFileName));
+			name[sizeof(data.cFileName)] = 0;
+			extension = strrchr(name, '.');
+			if (extension)
+			{
+				*extension++ = 0;
+				custom_edition_map_add(folders[folder_index], name, extension);
+			}
+		} while (FindNextFileA(find, &data));
+		CloseHandle(find);
 	}
 	qsort(globals->maps, globals->map_count, sizeof(globals->maps[0]), custom_edition_map_compare);
 	qsort(globals->campaigns, globals->campaign_count, sizeof(globals->campaigns[0]), custom_edition_map_compare);
