@@ -24,7 +24,7 @@ anti_aliasing_values).
 
 #include <stdlib.h>
 
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 #include "zlib_prefixed.h"
 
 /* port/third_party/smaa, embedded by tools/embed_assets.py: the shader's
@@ -74,7 +74,7 @@ static struct
 
 static void shader_header(struct xgpu_text *text)
 {
-#ifdef HALO_ANDROID
+#ifdef HALO_GLES
 	xgpu_text_append(text,
 		"#version %s\n"
 		"precision highp float;\n"
@@ -188,7 +188,7 @@ static const char fxaa_source[] =
 	"\tresult = vec4(color_at(position + max(varies ? pixel_offset : 0.0, subpixel) * across), 1.0);\n"
 	"}\n";
 
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 /* the main functions of SMAA's passes, after SMAA.hlsl; its vertex
 functions' offsets are found for each pixel */
 static const char *const smaa_mains[] =
@@ -267,7 +267,7 @@ static GLuint program_build(int which)
 	{
 		xgpu_text_append(&text, "%s", fxaa_source);
 	}
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 	else if (xgpu_smaa_shader_size)
 	{
 		xgpu_text_append(&text,
@@ -358,7 +358,7 @@ static void textures_fit(BOOL smaa, unsigned long width, unsigned long height)
 	}
 }
 
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 /* a lookup texture of SMAA's from its zlib stream; 0 if it does not
 inflate */
 static GLuint lookup_texture(const unsigned int *stream, unsigned long stream_size, GLenum format,
@@ -437,7 +437,7 @@ BOOL xgpu_post_prepare(BOOL smaa)
 			return FALSE;
 		}
 	}
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 	if (smaa && !post.area)
 	{
 		post.area = lookup_texture(xgpu_smaa_area_texture, xgpu_smaa_area_texture_size, GL_RG8, GL_RG,
@@ -478,7 +478,7 @@ BOOL xgpu_post_anti_alias(BOOL smaa, GLuint framebuffer, unsigned long width, un
 	glDisable(GL_BLEND);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_POLYGON_OFFSET_FILL);
-#ifndef HALO_ANDROID
+#ifndef HALO_GLES
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 #endif
 	glBindVertexArray(post.vertex_array);
