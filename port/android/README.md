@@ -397,7 +397,6 @@ Android build defines all of (`tools/android_build.py`):
 - `HALO_GLES`: the OpenGL ES renderer;
 - `HALO_ANDROID`: the app (its display, input, files and lifecycle).
 
-
 The x86 inline assembly is replaced by C (refer to
 [port/linux/README.md](../linux/README.md#game-source-changes)).
 These changes are in `#ifdef HALO_ARM64_GUEST`:

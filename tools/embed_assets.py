@@ -211,8 +211,8 @@ def main() -> None:
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the
-    # checkout does not have. Android has no SMAA.
-    lines.append("#ifndef HALO_ANDROID")
+    # checkout does not have. The OpenGL ES renderer has no SMAA.
+    lines.append("#ifndef HALO_GLES")
     present = dict(smaa_files())
     for name, symbol in SMAA_FILES:
         data = (ROOT / SMAA_ASSETS / name).read_bytes() if name in present else b""
