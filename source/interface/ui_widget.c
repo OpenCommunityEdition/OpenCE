@@ -7642,6 +7642,30 @@ port/linux/game/menu_functions.c) the screens it shares with one player's
 campaign, New Game's levels and the difficulty, are player 1's (their rows
 the first controller's), and either player's controller uses them: player 1's
 is the one that chose co-op, player 2's the one that chose their profile */
+/* port: whether this machine has, or is adding, a second player
+(port/linux/game/menu_functions.c): co-op, split screen, the lobby's */
+extern unsigned char pc_menu_split_players(void);
+
+/* port: with one person playing, any controller drives the first player's
+menus, not only the first port's: a phone can list a device of its own (its
+touch controls) before the gamepad, which then reads port 2, and a player
+picks up whichever pad is at hand. Its screens read every controller's
+events (ui_widgets_update), and take them (below). With two or more
+players, each controller keeps to its own player's menus */
+static boolean widget_takes_any_controller(
+	struct widget_instance const *widget)
+{
+	return widget->local_player_index == 0 && !pc_menu_split_players() &&
+		(we_are_at_the_main_menu || local_player_count() <= 1);
+}
+
+/* port: the controller whose events a screen reads (NONE: every one's) */
+static short widget_event_controller(
+	struct widget_instance const *widget)
+{
+	return widget_takes_any_controller(widget) ? NONE : widget->local_player_index;
+}
+
 static boolean widget_takes_events_of_controller(
 	struct widget_instance const *widget,
 	short controller_index)
@@ -7650,6 +7674,11 @@ static boolean widget_takes_events_of_controller(
 
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
+	if (widget->local_player_index == 0 && controller_index > 0 &&
+		controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS && widget_takes_any_controller(widget))
+	{
+		return TRUE;
+	}
 	if (widget->local_player_index != 0 || !we_are_at_the_main_menu || player_spawn_count < 2 ||
 		controller_index < 0 || controller_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
 	{
@@ -8531,7 +8560,7 @@ void process_ui_widgets(
 			struct event_record event = {0};
 
 			if (widget_globals.processing_inhibited ||
-				!get_next_event(&event, widget->local_player_index))
+				!get_next_event(&event, widget_event_controller(widget)))
 			{
 				/* the widget still gets one empty event so that its animation,
 				auto-close timer and fade keep running */
@@ -8562,7 +8591,7 @@ void process_ui_widgets(
 					if (widget != widget_globals.active_widgets[widget_index])
 						break;
 				}
-				while (get_next_event(&event, widget->local_player_index));
+				while (get_next_event(&event, widget_event_controller(widget)));
 			}
 			widgets_processed = TRUE;
 			if (!widget_globals.active_widgets[widget_index] &&
