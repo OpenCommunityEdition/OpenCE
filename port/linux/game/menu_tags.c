@@ -1749,10 +1749,12 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 /* ---------- the single-player campaign's pause menu
 
 Its list gets the same SETTINGS (pause_list_patch) before REVERT TO SAVED, a
-copy of it; a list with room centres its rows (Halo PC's), and one that has
-none keeps its size, its rows closer, as its box beside the mission
-objectives' does. Settings there has only the items that work in a game
-(pause_settings_patch), and Gamepads' OK saves the profile itself. */
+copy of it. The rows use the profile settings list's pitch, so a highlight
+sits clear of the next label the way CONTROLS SETUP and the rest do. The
+prompts (B and A) stay that same gap under the last row, and the box beside
+the mission objectives grows with them. Settings there has only the items
+that work in a game (pause_settings_patch), and Gamepads' OK saves the
+profile itself. */
 
 #define PAUSE_SETTINGS_LIST "main_menu/settings_select/player_setup/player_profile_edit/profile_edit_select_list"
 #define PAUSE_SETTINGS_GAMEPADS_OK "main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_ok"
@@ -1767,15 +1769,119 @@ static char const *const pause_settings_hidden_items[] =
 	"main_menu/settings_select/player_setup/player_profile_edit/about_item",
 };
 
-/* the list's rows spaced evenly over the span its rows had (a list that grew
-for SETTINGS, back to its own size) */
-static void pause_list_fit(struct ui_widget_definition *list, short span)
-{
-	struct ui_widget_child_reference *children = list->child_widgets.address;
-	long count = list->child_widgets.count, child;
+/* the profile settings list's row pitch (CONTROLS SETUP, GAMEPADS, and the
+rest: 33 apart). The third pause box frame is the stock 159 grown by the
+48 that five rows at this pitch add (tools/port_settings.py) */
+#define PAUSE_CAMPAIGN_ROW_PITCH 33
+#define PAUSE_CAMPAIGN_BOX_FRAME 2
+#define PAUSE_CAMPAIGN_BOX_HEIGHT 207
 
-	for (child = 1; child < count; child++)
-		children[child].vertical_offset = (short)(children[0].vertical_offset + child * span / (count - 1));
+/* the port box piece for one of the map's pause box pieces, else NULL */
+static char const *pause_campaign_box_bitmap(long tag_index)
+{
+	if (tag_name_ends(tag_index, "\\pausebox2_left_center") || tag_name_ends(tag_index, "\\pausebox_right_center") ||
+		tag_name_ends(tag_index, "\\pausebox_center"))
+	{
+		return "pause/pausebox_center";
+	}
+	if (tag_name_ends(tag_index, "\\pausebox2_left") || tag_name_ends(tag_index, "\\pausebox_left"))
+		return "pause/pausebox_left";
+	if (tag_name_ends(tag_index, "\\pausebox2_right") || tag_name_ends(tag_index, "\\pausebox_right"))
+		return "pause/pausebox_right";
+	return NULL;
+}
+
+/* the screen offset of the prompts under the list (B and A), else NONE */
+static short pause_campaign_prompts(struct ui_widget_definition const *screen)
+{
+	struct ui_widget_child_reference const *children = screen->child_widgets.address;
+	long child;
+
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		if (tag_name_ends(children[child].widget_tag.index, "\\button_key_sm") ||
+			tag_name_ends(children[child].widget_tag.index, "\\button_key"))
+		{
+			return children[child].vertical_offset;
+		}
+	}
+	return NONE;
+}
+
+/* the prompts move down with the last row */
+static void pause_campaign_shift_prompts(struct ui_widget_definition *widget, short shift)
+{
+	struct ui_widget_child_reference *children = widget->child_widgets.address;
+	long child;
+
+	for (child = 0; child < widget->child_widgets.count; child++)
+	{
+		if (children[child].widget_tag.index == NONE)
+			continue;
+		if (tag_name_ends(children[child].widget_tag.index, "\\button_key_sm") ||
+			tag_name_ends(children[child].widget_tag.index, "\\button_key"))
+		{
+			children[child].vertical_offset = (short)(children[child].vertical_offset + shift);
+		}
+		else if (!pause_campaign_box_bitmap(children[child].widget_tag.index))
+		{
+			pause_campaign_shift_prompts(tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index), shift);
+		}
+	}
+}
+
+/* the box (the menu's, and the mission objectives' beside it) grows by the
+same amount, using the frame drawn for that height */
+static void pause_campaign_grow_box(struct ui_widget_definition *widget, short shift)
+{
+	struct ui_widget_child_reference *children;
+	long child;
+	boolean piece_here = FALSE;
+
+	if (!widget || shift <= 0 || widget->child_widgets.count <= 0)
+		return;
+	children = widget->child_widgets.address;
+	for (child = 0; child < widget->child_widgets.count; child++)
+	{
+		struct ui_widget_definition *child_widget;
+		char const *piece_bitmap;
+
+		if (children[child].widget_tag.index == NONE)
+			continue;
+		child_widget = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		piece_bitmap = pause_campaign_box_bitmap(children[child].widget_tag.index);
+		if (!piece_bitmap)
+		{
+			pause_campaign_grow_box(child_widget, shift);
+			continue;
+		}
+		piece_here = TRUE;
+		{
+			/* (bitmap_name is the lookup, not piece_bitmap: find calls it) */
+			long bitmap = find(piece_bitmap, build.menus->bitmap_count, bitmap_name);
+			short height = (short)(child_widget->bounds.y1 - child_widget->bounds.y0);
+
+			if (bitmap != NONE && (short)(height + shift) == PAUSE_CAMPAIGN_BOX_HEIGHT)
+			{
+				struct bitmap_group *group = bitmap_group_get(build.bitmap_tags[bitmap]);
+				struct bitmap_group_sequence *sequence = group ? group->sequences.address : NULL;
+
+				if (sequence && PAUSE_CAMPAIGN_BOX_FRAME < group->bitmaps.count)
+				{
+					sequence->first_bitmap_index = PAUSE_CAMPAIGN_BOX_FRAME;
+					sequence->bitmap_count = 1;
+					reference_set(&child_widget->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
+					child_widget->bounds.y1 = (short)(child_widget->bounds.y0 + PAUSE_CAMPAIGN_BOX_HEIGHT);
+				}
+			}
+			else
+			{
+				child_widget->bounds.y1 = (short)(child_widget->bounds.y1 + shift);
+			}
+		}
+	}
+	if (piece_here)
+		widget->bounds.y1 = (short)(widget->bounds.y1 + shift);
 }
 
 static boolean pause_settings_item_hidden(long tag_index)
@@ -1861,7 +1967,7 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 	{
 		struct ui_widget_definition *list;
 		struct ui_widget_child_reference const *rows;
-		short span, grow, bottom;
+		short span, top, grow, bottom;
 		long revert;
 
 		if (children[child].widget_tag.index == NONE)
@@ -1880,13 +1986,40 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 		if (revert == list->child_widgets.count)
 			return;
 		span = (short)(rows[list->child_widgets.count - 1].vertical_offset - rows[0].vertical_offset);
+		top = rows[0].vertical_offset;
 		bottom = list->bounds.y1;
 		if (pause_list_patch(instances, list, revert, FALSE, &grow))
 		{
-			if (grow)
+			struct ui_widget_child_reference *placed = list->child_widgets.address;
+			struct ui_widget_definition const *button =
+				tag_get(UI_WIDGET_DEFINITION_TAG, placed[0].widget_tag.index);
+			short height = (short)(button->bounds.y1 - button->bounds.y0);
+			short prompts = pause_campaign_prompts(definition);
+			short count = (short)list->child_widgets.count;
+			short row, new_last, need = 0;
+
+			for (row = 0; row < count; row++)
+				placed[row].vertical_offset = (short)(top + row * PAUSE_CAMPAIGN_ROW_PITCH);
+			new_last = placed[count - 1].vertical_offset;
+			list->bounds.y1 = bottom;
+			if (list->bounds.y1 < (short)(new_last + height))
+				list->bounds.y1 = (short)(new_last + height);
+			/* keep the gap the last row had above the prompts, and grow the
+			box by the same amount */
+			if (prompts != NONE)
 			{
-				pause_list_fit(list, span);
-				list->bounds.y1 = bottom;
+				short old_bottom = (short)(children[child].vertical_offset + top + span + height);
+				short new_bottom = (short)(children[child].vertical_offset + new_last + height);
+				short clearance = (short)(prompts - old_bottom);
+
+				if (clearance < 0)
+					clearance = 0;
+				need = (short)(new_bottom + clearance - prompts);
+			}
+			if (need > 0)
+			{
+				pause_campaign_shift_prompts(definition, need);
+				pause_campaign_grow_box(definition, need);
 			}
 			pause_settings_patch();
 			platform_log("menus: the pause menu has SETTINGS");
