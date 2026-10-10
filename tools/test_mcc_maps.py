@@ -34,7 +34,6 @@ def catalog_tool(tmp_path_factory):
     if not compiler:
         pytest.skip("a C compiler is needed for MCC catalog tests")
     work = tmp_path_factory.mktemp("mcc-catalog")
-    (work / "tag_files").mkdir()
     (work / "cseries.h").write_text(r'''
 #ifndef MCC_TEST_CSERIES_H
 #define MCC_TEST_CSERIES_H
@@ -61,21 +60,19 @@ size_t mcc_test_fread(void *,size_t,size_t,FILE *);
 #endif
 ''')
     (work / "errors.h").write_text('#define _error_silent 0\nvoid error(short,const char *,...);\n')
-    (work / "tag_files/tag_files.h").write_text("/* No tag access in the menu catalog. */\n")
-    (work / "tag_files/files.h").write_text(r'''
-struct file_reference {char name[256];};
-struct file_last_modification_date;
-#define MAXIMUM_FILENAME_LENGTH 255
-enum {_name_directory_bit,_name_parent_directory_bit,_name_filename_bit,_name_extension_bit};
-struct file_reference *file_reference_create_from_path(struct file_reference *,char const *,boolean);
-void find_files_start(unsigned long,struct file_reference const *);
-boolean find_files_next(struct file_reference *,struct file_last_modification_date *);
-char *file_reference_get_name(struct file_reference const *,unsigned long,char *);
+    (work / "xtl.h").write_text(r'''
+typedef void *HANDLE;
+typedef struct {unsigned long dwFileAttributes;char cFileName[256];} WIN32_FIND_DATAA;
+#define FILE_ATTRIBUTE_DIRECTORY 16
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+HANDLE FindFirstFileA(char const *,WIN32_FIND_DATAA *);
+int FindNextFileA(HANDLE,WIN32_FIND_DATAA *);
+int CloseHandle(HANDLE);
 ''')
     source = work / "catalog.c"
     source_code = r'''
 #include "cseries.h"
-#include "tag_files/files.h"
+#include "xtl.h"
 #include "mcc_maps.h"
 #include <stdarg.h>
 #include <stdint.h>
@@ -84,7 +81,7 @@ char *file_reference_get_name(struct file_reference const *,unsigned long,char *
 static char const *root;
 static char const *listing="list.txt";
 static FILE *inventory;
-static unsigned reads, largest, scans;
+static unsigned reads, largest, scans, closed;
 struct mcc_runtime {
     unsigned char *tag_index;
     struct {uint32_t scenario_handle,tag_count;} report;
@@ -110,30 +107,29 @@ size_t mcc_test_fread(void *out,size_t size,size_t count,FILE *file) {
     return fread(out,size,count,file);
 }
 void error(short priority,char const *format,...) {(void)priority;(void)format;}
-struct file_reference *file_reference_create_from_path(struct file_reference *r,char const *path,boolean directory) {
-    if (!directory || strcmp(path,"d:\\mcc_maps\\")) exit(22);
-    strcpy(r->name,path);return r;
-}
-void find_files_start(unsigned long flags,struct file_reference const *directory) {
+HANDLE FindFirstFileA(char const *pattern,WIN32_FIND_DATAA *data) {
     char path[1024];
-    if (flags || strcmp(directory->name,"d:\\mcc_maps\\")) exit(23);
-    if (inventory) fclose(inventory);
+    if (strcmp(pattern,"d:\\mcc_maps\\*.*") || inventory) exit(23);
     snprintf(path,sizeof(path),"%s/mcc_maps/%s",root,listing);
     inventory=fopen(path,"r");scans++;
+    if (!inventory)return INVALID_HANDLE_VALUE;
+    if (FindNextFileA(inventory,data))return inventory;
+    fclose(inventory);inventory=NULL;return INVALID_HANDLE_VALUE;
 }
-boolean find_files_next(struct file_reference *file,struct file_last_modification_date *unused) {
-    (void)unused;
-    if (!inventory || !fgets(file->name,sizeof(file->name),inventory)) return FALSE;
-    file->name[strcspn(file->name,"\r\n")]=0;return TRUE;
+int FindNextFileA(HANDLE handle,WIN32_FIND_DATAA *data) {
+    if (!inventory || handle!=inventory)exit(24);
+    if (!fgets(data->cFileName,sizeof(data->cFileName),inventory))return FALSE;
+    data->cFileName[strcspn(data->cFileName,"\r\n")]=0;
+    data->dwFileAttributes=0;
+    if (data->cFileName[0]=='/') {
+        data->dwFileAttributes=FILE_ATTRIBUTE_DIRECTORY;
+        memmove(data->cFileName,data->cFileName+1,strlen(data->cFileName));
+    }
+    return TRUE;
 }
-char *file_reference_get_name(struct file_reference const *file,unsigned long flags,char *out) {
-    char const *dot=strrchr(file->name,'.');
-    if (flags==FLAG(_name_extension_bit)) strcpy(out,dot ? dot+1 : "");
-    else if (flags==FLAG(_name_filename_bit)) {
-        size_t n=dot ? (size_t)(dot-file->name) : strlen(file->name);
-        memcpy(out,file->name,n);out[n]=0;
-    } else exit(24);
-    return out;
+int CloseHandle(HANDLE handle) {
+    if (!inventory || handle!=inventory)exit(24);
+    fclose(inventory);inventory=NULL;closed++;return TRUE;
 }
 int main(int argc,char **argv) {
     short count,i;
@@ -200,7 +196,8 @@ int main(int argc,char **argv) {
         mcc_maps_rescan();printf("rescanned=%d\n",mcc_maps_count(FALSE));
     } else if(argc>2) printf("found=%d\n",mcc_maps_find(argv[2]));
     printf("scans=%u\nreads=%u\nlargest_read=%u\n",scans,reads,largest);
-    if(inventory)fclose(inventory);
+    printf("closed=%u\n",closed);
+    if(inventory)return 33;
     return 0;
 }
 '''
@@ -277,6 +274,21 @@ def test_filename_identity_case_and_duplicate_filter(catalog_tool, tmp_path):
     assert fields["count"] == "2"
     assert fields["found"] == "1"
     assert maps == ["mcc_maps\\lower|1", "mcc_maps\\UPPER|1"]
+
+
+def test_listing_skips_directories_and_closes_its_handle(catalog_tool, tmp_path):
+    install(tmp_path, {"folder.map": header(), "level.map": header()})
+    (tmp_path / "mcc_maps/list.txt").write_text("/folder.map\nlevel.map\nno_extension\n")
+    fields, maps = run(catalog_tool, tmp_path)
+    assert maps == ["mcc_maps\\level|1"]
+    assert fields["closed"] == "1"
+
+
+def test_missing_directory_has_no_handle_to_close(catalog_tool, tmp_path):
+    fields, maps = run(catalog_tool, tmp_path)
+    assert maps == []
+    assert fields["scans"] == "1"
+    assert fields["closed"] == "0"
 
 
 def test_filename_length_limit(catalog_tool, tmp_path):

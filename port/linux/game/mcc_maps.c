@@ -9,14 +9,13 @@ list, loader, resource directory or display index is used here.
 
 #include "cseries.h"
 #include "errors.h"
-#include "tag_files/files.h"
-#include "tag_files/tag_files.h"
 #include "mcc_cache_format.h"
 #include "mcc_maps.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <xtl.h>
 
 /* main_set_map_name retains 63 characters including the namespace. */
 #define MCC_MAP_FILENAME_MAXIMUM (63 - (sizeof(MCC_MAPS_LEVEL_PREFIX) - 1))
@@ -155,23 +154,34 @@ static int mcc_map_order(void const *left, void const *right)
 
 static void mcc_maps_scan(void)
 {
-	struct file_reference directory, file;
-	char name[MAXIMUM_FILENAME_LENGTH + 1], extension[MAXIMUM_FILENAME_LENGTH + 1];
+	WIN32_FIND_DATAA data;
+	HANDLE find;
 
 	if (mcc_menu_catalog.scanned)
 		return;
 	mcc_menu_catalog.scanned = TRUE;
 	mcc_menu_catalog.count = 0;
-	file_reference_create_from_path(&directory, MCC_MAPS_DIRECTORY, TRUE);
-	find_files_start(0, &directory);
-	while (find_files_next(&file, NULL))
+	/* Keep this listing independent of the game's shared file iterator:
+	startup profile cleanup can use that iterator on another thread. */
+	find = FindFirstFileA(MCC_MAPS_DIRECTORY "*.*", &data);
+	if (find == INVALID_HANDLE_VALUE)
+		return;
+	do
 	{
-		file_reference_get_name(&file, FLAG(_name_extension_bit), extension);
-		if (csstrcasecmp(extension, "map"))
+		char name[sizeof(data.cFileName) + 1];
+		char *extension;
+
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 			continue;
-		file_reference_get_name(&file, FLAG(_name_filename_bit), name);
+		memcpy(name, data.cFileName, sizeof(data.cFileName));
+		name[sizeof(data.cFileName)] = 0;
+		extension = strrchr(name, '.');
+		if (!extension || csstrcasecmp(extension + 1, "map"))
+			continue;
+		*extension = 0;
 		mcc_map_register(name);
-	}
+	} while (FindNextFileA(find, &data));
+	CloseHandle(find);
 	qsort(mcc_menu_catalog.maps, (size_t)mcc_menu_catalog.count, sizeof(mcc_menu_catalog.maps[0]), mcc_map_order);
 	error(_error_silent, "mcc maps: %d maps found in mcc_maps", mcc_menu_catalog.count);
 }
