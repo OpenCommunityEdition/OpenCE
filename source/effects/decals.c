@@ -244,7 +244,9 @@ symbols in this file:
 enum
 {
 	NUMBER_OF_DECAL_LAYERS = 5,
-	MAXIMUM_DECALS_PER_MAP = 2048,
+	/* port: room for game.decals "insane", twelve times the game's 2048
+	(rasterizer_xbox_decals.c holds "default" to the game's own) */
+	MAXIMUM_DECALS_PER_MAP = 2048 * 12,
 	MAXIMUM_DECAL_VERTICES = 1024,
 	MAXIMUM_DECAL_SURFACE_QUEUE_SIZE = 1024
 };
