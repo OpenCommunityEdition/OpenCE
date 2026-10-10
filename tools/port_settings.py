@@ -191,15 +191,15 @@ _video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics]
 _video["categories"] = [
     ("GRAPHICS:", "video_settings/graphics", "The HUD, text, anti-aliasing, shadows and\nlighting."),
     ("FOV AND VIEWMODELS:", "video_settings/fov_viewmodels",
-     "Optional field of view and first-person weapon\ndisplay settings. Defaults keep the original view."),
+     "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
 ]
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
     "rows": [
         ("FOV:", "display.fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
-         "On-foot horizontal FOV at 16:9, in degrees.\nDefault keeps the authored view and scopes.", None),
+         "On foot, horizontal at 16:9, in degrees.\nDefault keeps the stock view.", None),
         ("VIEWMODEL FOV:", "display.viewmodel_fov", [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 5)],
-         "Weapon and hands horizontal FOV at 16:9, in degrees.\nA number sets that FOV. Default keeps the original weapon view.", None),
+         "The weapon and hands, horizontal at 16:9.\nDefault keeps the weapon's stock view.", None),
         ("VIEWMODELS:", "display.viewmodel_visible", ON_OFF,
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
     ],

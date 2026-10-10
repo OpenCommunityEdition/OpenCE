@@ -316,21 +316,6 @@ from the next main menu.
 Each setting has an environment variable. The environment variable changes
 the setting for one start of the game. It has priority over the file.
 
-Video Setup's **FOV AND VIEWMODELS** category offers optional world and
-weapon field of view settings and first person visibility. **DEFAULT** keeps
-the authored world projection. **DEFAULT** for the weapon keeps its original
-view, and viewmodels start **ON**. A chosen weapon angle is that FOV. OK
-saves and applies changes. Cancel discards them. The menu offers 80 to 150
-degrees in steps of five. The config file accepts 20 to 150 degrees,
-including fractional values, or zero for Default.
-Angles are horizontal at 16:9; other aspect ratios retain the same vertical
-view. World FOV applies to on-foot first-person views, preserving authored
-vehicle, death and cinematic cameras. Completed scopes keep their native
-view with wider FOV; a narrower FOV also narrows the scope. Aiming reticles
-scale with the world projection, while scope artwork keeps its layout.
-Viewmodel FOV also applies to attached visuals. Hiding viewmodels changes
-only their display; firing, animation, sound and world lights continue.
-
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `display.mode` | `""` | `HALO_DISPLAY_MODE` | `"fullscreen"`: the display, taken at the mode of `display.resolution` (the nearest the display has), or at its desktop mode. `"borderless"`: a window over the whole desktop, whose mode does not change. `"windowed"`: a window of `display.window_size`. Empty: `display.fullscreen` decides (`true`: borderless). F11 changes between the window and the fullscreen mode. Video Setup sets it. |
@@ -345,9 +330,9 @@ only their display; firing, animation, sound and world lights continue.
 | `debug.gpu_flush_draws` | `-1` | `HALO_GPU_FLUSH_DRAWS` | Flush the GPU's pipeline every this many draws. `-1`: every 3 on Intel graphics with Mesa's driver, which can otherwise hang in the game's long runs of small draws and reset the desktop's graphics too. `0`: never. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
-| `display.fov` | `0.0` | `HALO_FOV` | On-foot first-person horizontal FOV at 16:9, from 20 to 150 degrees. `0` keeps the authored view. Video Setup's FOV and Viewmodels screen sets it. |
-| `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | Weapon and hands horizontal FOV at 16:9, 20 to 150 degrees. `0` is Default and keeps the original weapon view. A chosen angle is that FOV. |
-| `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VIS` | Show first-person weapons, hands and attached visuals. This does not change gameplay or other players' models. |
+| `display.fov` | `0.0` | `HALO_FOV` | The first-person view's field of view on foot, in degrees across at 16:9, from 20 to 150. `0`: the stock view. Refer to "Field of view". |
+| `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | The first-person weapon's and hands' field of view, in degrees across at 16:9, from 20 to 150. `0`: the weapon's stock view, also when `display.fov` widens the world. Refer to "Field of view". |
+| `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VISIBLE` | `true`: the first-person weapon, hands and what is attached to them are drawn. `false`: they are not; firing, animation, sound and lights go on, and other players' models are drawn. |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the resolution the game draws at, laid out as before, and the menus' titles are drawn from the high-res pictures in `port/assets/titles`. `false`: the maps' bitmap fonts and titles. |
 | `display.shadow_resolution` | `128` | `HALO_SHADOW_RESOLUTION` | The size of the maps that the shadows of the objects are drawn in, in pixels each way: `128`, `256`, `512` or `1024` (other values go down to one of these). The game draws the shadow of each object into a map of 128x128 pixels, blurs it and projects it onto the ground. On a large screen, the edges of these shadows show steps that move when the object moves. A larger map makes the edges smooth; the blur is made wider to match, so the shadows are as soft as on the Xbox. Each doubling adds two passes of the blur. `128`: as on the Xbox. |
@@ -488,6 +473,29 @@ the world (such as `rasterizer_wireframe`). Refer to `NETCODE.md`.
 
 The frame rate shows at the bottom right of the screen. It is the mean over
 half a second.
+
+## Field of view
+
+Video Setup's FOV AND VIEWMODELS screen sets the field of view of the
+first-person view (`display.fov`) and of the weapon and hands
+(`display.viewmodel_fov`), from 80 to 150 degrees in steps of 5, and can
+hide the weapon (`display.viewmodel_visible`). DEFAULT, the setting's `0`,
+keeps the stock view. `config.toml` takes any angle from 20 to 150.
+
+- An angle is across the screen at 16:9. Another shape keeps the same
+  angle up and down, as the stock view does.
+- The field of view applies on foot in first person only. Vehicles, death,
+  cinematics and scripted cameras keep their own view.
+- A scope's zoom levels keep their stock view: the extra width fades out as
+  the zoom comes in. A view narrower than the stock one narrows the zoom
+  too.
+- The reticles scale with the view, so that they stay on the aim. The
+  scopes' pictures keep their place.
+- By default the weapon keeps its stock view when the world is wider:
+  arms and a gun right against the camera stretch at a wide angle.
+
+Only this machine's view changes. Nothing the machines send each other
+changes, so players with different settings play together.
 
 ## System link
 

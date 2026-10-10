@@ -81,8 +81,6 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "viewmodel_fov.h"
-#include "viewmodel_visibility.h"
 #include "errors.h"
 #include "bitmaps/bitmaps.h"
 #include "interface/hud_draw.h"
@@ -104,6 +102,7 @@ symbols in this file:
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "main/main.h"
+#include "view_fov.h" /* port: port/linux/game/view_fov.c */
 
 /* ---------- constants */
 
@@ -548,7 +547,8 @@ void rasterizer_lens_flare_submit(
 		268,
 		(parameters->compressed_window_index&_lens_flare_window_index_mask)==global_window_parameters.window_index);
 
-	if (!viewmodel_draws_geometry(parameters->compressed_window_index & _lens_flare_first_person_weapon_flag))
+	/* port: not the first-person weapon's with it hidden (view_fov.c) */
+	if (!viewmodel_draws_geometry((parameters->compressed_window_index & _lens_flare_first_person_weapon_flag) != 0))
 		return;
 	if (rasterizer_debug_options.draw_lens_flares && !screenshot_in_progress() &&
 		global_window_parameters.rasterizer_target==_rasterizer_target_render_primary)
@@ -568,12 +568,15 @@ void rasterizer_lens_flare_submit(
 			screen): its occlusion test would count no pixels, so it would not
 			be drawn, and a level of many lights (Halo PC's maps) tested
 			hundreds a frame, each a draw of its own (the sphere takes in the
-			test's offset point and size, rasterizer_lens_flares_submit_occlusion_tests) */
+			test's offset point and size, rasterizer_lens_flares_submit_occlusion_tests).
+			Not the first-person weapon's: it is drawn at the weapon's own
+			projection (display.viewmodel_fov, view_fov.c), not this frustum's */
 			if ((parameters->definition->far_fade_distance==0.0f ||
 				camera_distance<parameters->definition->far_fade_distance) &&
 				(parameters->compressed_light_color&LENS_FLARE_LIGHT_COLOR_ALPHA_MASK)>0 &&
+				((parameters->compressed_window_index&_lens_flare_first_person_weapon_flag) ||
 				render_frustum_sphere_visible(&global_window_parameters.frustum, &parameters->position,
-					3.0f * parameters->definition->occlusion_radius))
+					3.0f * parameters->definition->occlusion_radius)))
 			{
 				struct rasterizer_lens_flare_submit_parameters *lens_flare_parameters=
 					lens_flare_parameters_get((short)local_lens_flare_count++);
@@ -861,10 +864,14 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)
 			{
-				boolean first_person = (lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag) != 0;
-				if (first_person) viewmodel_projection_begin();
+				boolean first_person = (lens_flare_parameters->compressed_window_index &
+					_lens_flare_first_person_weapon_flag) != 0;
 				real occlusion_radius = definition->occlusion_radius;
 				real_point3d occlusion_point;
+
+				/* port: the first-person weapon's projection (view_fov.c) */
+				if (first_person)
+					viewmodel_projection_begin();
 
 				switch (definition->occlusion_offset_direction)
 				{
@@ -900,7 +907,8 @@ void rasterizer_lens_flares_submit_occlusion_tests(
 						occlusion_radius,
 						lens_flare_index);
 
-				if (first_person) viewmodel_projection_end();
+				if (first_person)
+					viewmodel_projection_end();
 			}
 		}
 
@@ -935,9 +943,13 @@ void rasterizer_lens_flares_draw(
 			if ((lens_flare_parameters->compressed_window_index & _lens_flare_window_index_mask) ==
 				global_window_parameters.window_index)
 			{
-				boolean first_person = (lens_flare_parameters->compressed_window_index & _lens_flare_first_person_weapon_flag) != 0;
-				if (first_person) viewmodel_projection_begin();
+				boolean first_person = (lens_flare_parameters->compressed_window_index &
+					_lens_flare_first_person_weapon_flag) != 0;
 				struct lens_flare_definition *definition = lens_flare_parameters->definition;
+
+				/* port: the first-person weapon's projection (view_fov.c) */
+				if (first_person)
+					viewmodel_projection_begin();
 
 				if (lens_flare_parameters->internal__occlusion_pixels > 0 &&
 					LENS_FLARE_LIGHT_COLOR_ALPHA(lens_flare_parameters->compressed_light_color) > 0 &&
@@ -1180,7 +1192,8 @@ void rasterizer_lens_flares_draw(
 					}
 				}
 
-				if (first_person) viewmodel_projection_end();
+				if (first_person)
+					viewmodel_projection_end();
 			}
 		}
 

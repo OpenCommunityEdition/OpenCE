@@ -111,7 +111,6 @@ symbols in this file:
 #include "rasterizer/rasterizer_models.h"
 #include "rasterizer/rasterizer_transparent_geometry.h"
 #include "render/render.h"
-#include "viewmodel_fov.h"
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 
@@ -124,6 +123,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_draw_primitives.h"
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox_models.h"
+#include "view_fov.h" /* port: port/linux/game/view_fov.c */
 
 /* ---------- constants */
 
@@ -616,7 +616,7 @@ void _rasterizer_model_end(
 			!local_do_not_change_z_stencil_states)
 		{
 			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_REJECT);
-			viewmodel_projection_end();
+			viewmodel_projection_end();	/* port: (view_fov.c) */
 			rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 		local_parameters = NULL;
@@ -645,6 +645,7 @@ void _rasterizer_model_begin(
 			!do_not_change_z_stencil_states)
 		{
 			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_WRITE);
+			/* port: the first-person weapon's projection (view_fov.c) */
 			viewmodel_projection_begin();
 			rasterizer_set_frustum_z(
 				rasterizer_globals.first_person_weapon_near_clip_distance,

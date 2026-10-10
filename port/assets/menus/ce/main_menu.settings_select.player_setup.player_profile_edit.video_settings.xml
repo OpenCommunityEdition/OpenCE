@@ -155,7 +155,6 @@
 		<string text="Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second."/>
 		<string text="In first person, turn the view the moment the\nmouse moves, not up to two ticks later."/>
 		<string text="The HUD, text, anti-aliasing, shadows and\nlighting."/>
-		<string text="Optional field of view and first-person weapon\ndisplay settings. Defaults keep the original view."/>
+		<string text="The field of view and the first-person\nweapon. Their defaults keep the stock view."/>
 	</strings>
 </menus>
-
