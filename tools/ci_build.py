@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Builds one native port in one configuration, as the GitHub workflow does
+"""Builds one port in one configuration, as the GitHub workflow does
 (.github/workflows/build.yml), and collects what it built into dist/:
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
     python tools/ci_build.py linux profile
+    python tools/ci_build.py web release
 
 Builds are portable (any x86-64 processor), so they run on other
 computers. Debug builds skip link-time and profile-guided optimisation,
@@ -14,7 +15,12 @@ and is skipped with an older one). A profile build is a debug build with
 configure.py --profile, so that the profiling build is built too. CI_COMPILER_LAUNCHER (ccache, say) is
 passed on as --compiler-launcher. A build of the main branch gets the run's
 number (HALO_BUILD_NUMBER), which its release is named after and the
-self-updater compares.
+self-updater compares (and the web site's version.json names).
+
+The web build (port/web/README.md) needs Emscripten (emcc on the PATH, as
+emsdk_env.sh puts it); dist/halo-web-<config>/ is the whole site, which a
+static host serves as it is: the workflow publishes the release build's to
+GitHub Pages.
 """
 
 import argparse
@@ -33,6 +39,7 @@ OUTPUTS = {
     "linux": ["build/linux/halo", "build/linux/libSDL3.so.0", "build/linux/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
     "android": [],  # the APK, below
+    "web": [],  # the site, below
 }
 APKS = {
     "debug": "port/android/app/build/outputs/apk/debug/app-debug.apk",
@@ -69,6 +76,15 @@ def main() -> int:
         print(f"build number {os.environ['HALO_BUILD_NUMBER']}", flush=True)
     run(configure)
 
+    if args.platform == "web":
+        # the whole site (tools/web_build.py), its licences in licenses.txt
+        run(["ninja", "web"])
+        dist = ROOT / "dist" / f"halo-web-{args.config}"
+        if dist.exists():
+            shutil.rmtree(dist)
+        shutil.copytree(ROOT / "build/web/site", dist)
+        print(f"build/web/site -> {dist.relative_to(ROOT)}", flush=True)
+        return 0
     if args.platform == "android":
         # the native part, then the app around it (Gradle's variant of the
         # same name: release is signed with the debug key, not debuggable)

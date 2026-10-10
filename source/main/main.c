@@ -3104,7 +3104,7 @@ void halt_and_catch_fire(
 	this screen never returns to it: the game stops, and the page shows the
 	error from the log, where it already is (port/web/README.md) */
 	emscripten_cancel_main_loop();
-	emscripten_force_exit(EXIT_FAILURE);
+	abort();
 #endif
 	if (!global_screenshot_count.halt_recursion_lock)
 	{

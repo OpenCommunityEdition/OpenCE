@@ -13,14 +13,18 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/help">
 		<data input="port settings help"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_online" x="54" y="73"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_allow_upnp" x="54" y="103"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" x="54" y="133"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" x="54" y="163"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_names" x="54" y="193"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_name_scale" x="54" y="223"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_team_layout" x="54" y="253"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_background" x="54" y="283"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_online" x="54" y="73" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_allow_upnp" x="54" y="103" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" x="54" y="133" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" x="54" y="163" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_names" x="54" y="193" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_names" x="54" y="73" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_name_scale" x="54" y="223" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_player_name_scale" x="54" y="103" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_team_layout" x="54" y="253" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_team_layout" x="54" y="133" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_background" x="54" y="283" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_scoreboard_background" x="54" y="163" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -28,7 +32,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_online" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_online" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/online_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/online_spinner" x="320" y="1"/>
 	</widget>
@@ -37,7 +41,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/online_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.online" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_allow_upnp" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_allow_upnp" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/allow_upnp_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/allow_upnp_spinner" x="320" y="1"/>
 	</widget>
@@ -46,7 +50,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/allow_upnp_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.allow_upnp" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/join_from_clipboard_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/join_from_clipboard_spinner" x="320" y="1"/>
 	</widget>
@@ -55,7 +59,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/join_from_clipboard_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.join_from_clipboard" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_spinner" x="320" y="1"/>
 	</widget>

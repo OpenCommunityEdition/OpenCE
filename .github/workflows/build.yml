@@ -1,8 +1,8 @@
 name: Build
 
-# Debug and release builds of the native ports (Linux, Windows, Android) for
-# every pushed commit, uploaded as artifacts. tools/ci_build.py does each
-# build; see it for the options.
+# Debug and release builds of the native ports (Linux, Windows, Android) and
+# the web port for every pushed commit, uploaded as artifacts.
+# tools/ci_build.py does each build; see it for the options.
 #
 # Kept cheap:
 # - one job per platform builds both configurations, so its set-up (tools,
@@ -18,7 +18,8 @@ name: Build
 # A successful build of main is also published as a GitHub release, the
 # newest marked latest, so that
 # https://github.com/<repository>/releases/latest/download/<file> always
-# gives the latest build; the last five are kept.
+# gives the latest build; the last five are kept. Its web build is then the
+# site on GitHub Pages (https://halocombatevolved.com/, port/web/README.md).
 on:
   push:
     paths-ignore:
@@ -259,13 +260,86 @@ jobs:
           path: dist/halo-windows-release-symbols
           retention-days: 3
 
+  web:
+    # Emscripten (emsdk, the version below, cached) builds the web port's
+    # site (port/web/README.md); the tests check its graph, the page's
+    # importer and service worker, its sockets, and that it starts in a
+    # headless Chromium (with no game data, as far as the launcher).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      EMSDK_VERSION: 6.0.10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}-${{ hashFiles('port/web/halo_sdl3.py') }}
+
+      - name: Install the toolchain
+        run: |
+          if [ ! -x ~/emsdk/upstream/emscripten/emcc ]; then
+            rm -rf ~/emsdk
+            git clone --depth 1 https://github.com/emscripten-core/emsdk.git ~/emsdk
+            ~/emsdk/emsdk install "$EMSDK_VERSION"
+          fi
+          ~/emsdk/emsdk activate "$EMSDK_VERSION"
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build ccache python3-pytest
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-web-${{ github.sha }}
+          restore-keys: ccache-web-
+
+      - name: Debug
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          python3 tools/ci_build.py web debug
+
+      - name: Release
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          python3 tools/ci_build.py web release
+
+      - name: Test
+        run: |
+          source ~/emsdk/emsdk_env.sh
+          node --test "port/web/tests/*.test.js"
+          python3 -m pytest -q tools/test_web_build.py
+
+      - name: Test in Chromium
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/playwright" playwright@1.58
+          "$RUNNER_TEMP/playwright/node_modules/.bin/playwright" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/smoke.mjs dist/halo-web-release
+
+      - name: Compile cache
+        run: ccache --show-stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-web-debug
+          path: dist/halo-web-debug
+          include-hidden-files: true
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halo-web-release
+          path: dist/halo-web-release
+          include-hidden-files: true
+          retention-days: 3
+
   release:
-    # The six builds (and the Windows builds' PDBs) as a release, tagged
+    # The eight builds (and the Windows builds' PDBs) as a release, tagged
     # build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
     # latest/download links); then all but the newest five build-* releases
     # go, tags and all. Only for main, and only when every platform built.
-    needs: [linux, android, windows]
+    needs: [linux, android, windows, web]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -344,12 +418,46 @@ jobs:
             gh release delete "$tag" --cleanup-tag --yes
           done
 
+  pages:
+    # The release's web build to GitHub Pages, which serves it at
+    # https://halocombatevolved.com/ (port/web/README.md, "Hosting"). Only
+    # main, only once every platform built and the release is out (the site
+    # and the release are one build), and a deployment is never cancelled
+    # halfway. The repository's Pages source must be GitHub Actions.
+    needs: [release]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: halo-web-release
+          path: site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
   notify:
     # A Discord embed for the run, to the DISCORD_WEBHOOK secret (nothing
     # without it): green when every platform built, red when one did not,
     # with each platform's result, this run's release (main only), and links
-    # to the latest release's builds.
-    needs: [linux, android, windows, release]
+    # to the latest release's builds and the site.
+    needs: [linux, android, windows, web, release, pages]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -360,6 +468,9 @@ jobs:
           LINUX: ${{ needs.linux.result }}
           ANDROID: ${{ needs.android.result }}
           WINDOWS: ${{ needs.windows.result }}
+          WEB: ${{ needs.web.result }}
+          PAGES: ${{ needs.pages.result }}
+          SITE_URL: https://halocombatevolved.com/
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
           SERVER: ${{ github.server_url }}
           REPOSITORY: ${{ github.repository }}
@@ -382,15 +493,18 @@ jobs:
               *) echo "➖ Skipped" ;;
             esac
           }
-          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ]; then
+          if [ "$LINUX" = success ] && [ "$ANDROID" = success ] && [ "$WINDOWS" = success ] && [ "$WEB" = success ]; then
             title="Build succeeded"; color=5763719
           else
             title="Build failed"; color=15548997
           fi
           latest="$SERVER/$REPOSITORY/releases/latest"
-          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) ([all builds]($latest))"
+          downloads="[Linux]($latest/download/halo-linux-release.zip) · [Windows]($latest/download/halo-windows-release.zip) · [Android]($latest/download/halo-android-release.zip) · [Web]($SITE_URL) ([all builds]($latest))"
           if [ -n "$RELEASE_TAG" ]; then
             release="[$RELEASE_TAG]($SERVER/$REPOSITORY/releases/tag/$RELEASE_TAG)"
+            if [ "$PAGES" = success ]; then
+              release="$release, on [the site]($SITE_URL)"
+            fi
           else
             release="None (only a successful build of main makes one)"
           fi
@@ -400,6 +514,7 @@ jobs:
             --arg description "[\`${SHA:0:7}\`]($COMMIT_URL) $subject — $ACTOR ($BRANCH)" \
             --arg release "$release" --arg downloads "$downloads" \
             --arg linux "$(status "$LINUX")" --arg windows "$(status "$WINDOWS")" --arg android "$(status "$ANDROID")" \
+            --arg web "$(status "$WEB")" \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{embeds: [{
               title: $title, url: $url, color: $color, description: $description, timestamp: $timestamp,
@@ -407,6 +522,7 @@ jobs:
                 {name: "Linux", value: $linux, inline: true},
                 {name: "Windows", value: $windows, inline: true},
                 {name: "Android", value: $android, inline: true},
+                {name: "Web", value: $web, inline: true},
                 {name: "Release", value: $release},
                 {name: "Latest release builds", value: $downloads}
               ]

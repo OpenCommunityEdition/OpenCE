@@ -16,7 +16,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_high_res_hud" x="54" y="73"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_high_res_text" x="54" y="103"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_anti_aliasing" x="54" y="133" platform="desktop"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_anti_aliasing_android" x="54" y="133" platform="android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_anti_aliasing_android" x="54" y="133" platform="android web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_shadow_resolution" x="54" y="163"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_per_pixel_lighting" x="54" y="193"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_shield_glow" x="54" y="223"/>
@@ -55,7 +55,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/anti_aliasing_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|SMAA|SSAA 2X|MSAA 2X|MSAA 4X|MSAA 8X" setting="display.anti_aliasing" values="off|fxaa|smaa|ssaa2x|msaa2x|msaa4x|msaa8x" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_anti_aliasing_android" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="android">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/op_anti_aliasing_android" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="android web">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/anti_aliasing_android_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/anti_aliasing_android_spinner" x="320" y="1"/>
 	</widget>

@@ -200,7 +200,7 @@ gamepads' only.
 | fire | left mouse button |
 | throw a grenade | right mouse button, G |
 | jump (and skip a cutscene) | space |
-| crouch | left ctrl, C |
+| crouch | left ctrl, C (C alone in the web build) |
 | melee | F, mouse button 4 |
 | reload | R |
 | action (pick up, hold to swap weapons, enter or leave a vehicle; never reloads) | E |
@@ -1082,4 +1082,11 @@ can optimize that code for each processor:
 | `bink/bink_playback.c` | `int 3` | `__builtin_trap` |
 
 The x87 control and status words (`_control87`, `_statusfp`, `_clearfp` in
-`src/msvc_crt.c`) use `fenv.h`. On Android, they use the FPCR and FPSR.
+`src/msvc_crt.c`) use `fenv.h`. On Android, they use the FPCR and FPSR. In
+the web build, the control word is only remembered.
+
+The web build's changes (`HALO_WEB`: the main loop runs one iteration for
+each of the browser's frames, the cache thread starts at a function of
+`CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
+declarations given their definitions' types, which WebAssembly needs, are
+listed in "Game source changes" in [../web/README.md](../web/README.md).

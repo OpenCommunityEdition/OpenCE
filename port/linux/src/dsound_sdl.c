@@ -1372,7 +1372,9 @@ static void audio_start(void)
 		the menus' music broke up, which 1024 does not (about 21 ms at 48 kHz,
 		11 ms more than 512) */
 		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "1024");
-#else
+#elif !defined(HALO_WEB)
+		/* (a browser's, SDL's own: with room for the page's scheduling, which
+		512 frames underran) */
 		SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "512");
 #endif
 		snprintf(audio_device_name, sizeof(audio_device_name), "%s", audio_device_setting());

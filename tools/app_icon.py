@@ -8,7 +8,9 @@
   puts in halo.exe) and the desktop builds' window icon (opence-icon-256.png,
   which tools/embed_assets.py embeds and sdl_platform.c gives the window);
 - opence-icon-render.png, the helmet alone on transparency (1024x1024, the same
-  framing): the Android app's launcher icon.
+  framing): the Android app's launcher icon;
+- opence-icon.png again: the web page's icons (port/web/site/icons), its tab's,
+  the installed web app's and the home screen's.
 
 The launcher icon is an adaptive one (Android 8 and later): the render as its
 foreground layer, the background's gradient as its background layer, and the
@@ -42,6 +44,10 @@ VISIBLE_DP = 72
 # pixels per dp of each density
 DENSITIES = {"mdpi": 1.0, "hdpi": 1.5, "xhdpi": 2.0, "xxhdpi": 3.0, "xxxhdpi": 4.0}
 WINDOWS_SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+# the web page's: its tab's (32), iOS's home screen's (180) and the web app
+# manifest's (192, 512)
+WEB_ICONS = ROOT / "port/web/site/icons"
+WEB_SIZES = [32, 180, 192, 512]
 
 
 def background_gradient(icon: Image.Image, render: Image.Image) -> tuple:
@@ -86,6 +92,13 @@ def monochrome(render: Image.Image) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+def web_icons(icon: Image.Image) -> None:
+    WEB_ICONS.mkdir(parents=True, exist_ok=True)
+    for size in WEB_SIZES:
+        icon.resize((size, size), Image.LANCZOS).save(WEB_ICONS / f"icon-{size}.png", optimize=True)
+    print(f"{WEB_ICONS.relative_to(ROOT)}: {', '.join(str(size) for size in WEB_SIZES)}")
+
+
 def main() -> None:
     icon = Image.open(ICON).convert("RGBA")
     render = Image.open(RENDER).convert("RGBA")
@@ -95,6 +108,7 @@ def main() -> None:
     print(f"{WINDOW_ICON.relative_to(ROOT)}: 256x256")
     icon.save(WINDOWS_ICON, sizes=[(size, size) for size in WINDOWS_SIZES])
     print(f"{WINDOWS_ICON.relative_to(ROOT)}: {', '.join(str(size) for size in WINDOWS_SIZES)}")
+    web_icons(icon)
 
     # the launcher's layers
     themed = monochrome(render)

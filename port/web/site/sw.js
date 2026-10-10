@@ -47,7 +47,7 @@ async function installVersion(stamp) {
   await cache.addAll(files.map((path) => new Request(path, { cache: 'no-store' })));
   await setActiveVersion(stamp.version);
   for (const other of await caches.keys()) {
-    if (other.startsWith(CACHE_PREFIX) && other !== name) await caches.delete(other);
+    if (other.startsWith(CACHE_PREFIX) && other !== name && other !== META_CACHE) await caches.delete(other);
   }
 }
 

@@ -15,8 +15,10 @@ then fills the page.
   the site's own domain do not share them.
 - Query parameters, for testing: ?set=NAME=value (any number) passes a
   setting's environment variable (port/linux/README.md, the settings
-  table), ?menu=<screen> opens a menu screen (debug.menu_open), ?play starts
-  the game at once when it can.
+  table), ?menu=<screen> opens a menu screen (debug.menu_open), ?map=<level>
+  starts a level (a10, or levels\a10\a10: the init.txt the game reads, which
+  the page removes again the next time), ?play starts the game at once when
+  it can.
 */
 
 'use strict';
@@ -414,6 +416,42 @@ function updatePlay() {
     !dataReady ? 'The game data is needed first.' : '';
 }
 
+// init.txt in the data folder: the console commands the game runs as it
+// starts. ?map= writes one, and the page removes it on the next visit
+// without ?map=, only if it wrote it.
+const INIT_MARKER = 'opence-page-wrote-init';
+
+async function prepareInit() {
+  const root = await navigator.storage.getDirectory();
+  let wrote = false;
+  try {
+    wrote = localStorage.getItem(INIT_MARKER) === '1';
+  } catch {
+    // (no localStorage: nothing to undo)
+  }
+  if (params.has('map')) {
+    const name = params.get('map');
+    const level = name.includes('\\') ? name : `levels\\${name}\\${name}`;
+    if (!/^[A-Za-z0-9_\\]+$/.test(level)) return;
+    const handle = await root.getFileHandle('init.txt', { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(`map_name ${level}\r\n`);
+    await writable.close();
+    try {
+      localStorage.setItem(INIT_MARKER, '1');
+    } catch {
+      // as above
+    }
+  } else if (wrote) {
+    await root.removeEntry('init.txt').catch(() => {});
+    try {
+      localStorage.removeItem(INIT_MARKER);
+    } catch {
+      // as above
+    }
+  }
+}
+
 function gameArguments() {
   const args = [];
   for (const value of params.getAll('set')) {
@@ -456,6 +494,7 @@ async function play() {
     // (a phone may still dim)
   }
   try {
+    await prepareInit();
     await loadScript('halo.js');
     await window.createHalo({
       canvas,
