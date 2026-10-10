@@ -805,6 +805,23 @@ boolean player_ui_save_profile(
 			player_profile_save(
 				player_ui_globals.edit_profile_index,
 				&player_ui_globals.edit_profile.current.player);
+			/* port: a local player playing with the profile gets its changes now (its button and stick
+			layouts, sensitivity, inversion), not when the profile is next chosen */
+			{
+				short local_player_index;
+
+				for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+				{
+					if (player_ui_globals.local_players[local_player_index].active_profile_index ==
+						player_ui_globals.edit_profile_index)
+					{
+						player_ui_set_active_player_profile(
+							local_player_index,
+							player_ui_globals.edit_profile_index,
+							&player_ui_globals.edit_profile.current.player);
+					}
+				}
+			}
 			result = TRUE;
 			break;
 
