@@ -129,9 +129,9 @@ int main(int argc,char **argv) {
            mcc_texture_bridge_register(&owner,format(2,2,0,1,0),0,NULL,sizeof(pixels))||
            mcc_texture_bridge_register(&owner,format(2,2,0,1,0),0,pixels,63)||
            mcc_texture_bridge_register(&owner,format(2,2,0,1,2),0,pixels,767)||
-           mcc_texture_bridge_register(&owner,format(13,2,0,1,0),0,pixels,0xffffffffUL)||
+             mcc_texture_bridge_register(&owner,format(14,2,0,1,0),0,pixels,0xffffffffUL)||
            mcc_texture_bridge_register(&owner,format(10,2,2,1,1),0,pixels,0xffffffffUL)||
-           mcc_texture_bridge_register(&owner,format(2,2,0,14,0),0,pixels,0xffffffffUL))return 6;
+             mcc_texture_bridge_register(&owner,format(2,2,0,15,0),0,pixels,0xffffffffUL))return 6;
         fail_allocate=1;
         if(mcc_texture_bridge_register(&owner,format(2,2,0,1,0),0,pixels,sizeof(pixels)))return 7;
         if(allocations||generated||uploads)return 8;
@@ -177,6 +177,13 @@ int main(int argc,char **argv) {
                 d.depth!=(unsigned)b[i].depth||d.levels!=(unsigned)b[i].mipmap_count+1||
                 xgpu_texture_face_size(&d)*(d.cube_map?6:1)!=expected_bytes[i])return 17;
         }
+    } else if(!strcmp(argv[1],"credits")) {
+        enum {chain_bytes=44739328};
+        unsigned char *data=malloc(chain_bytes);
+        if(!data)return 24;
+        header=mcc_texture_bridge_register(&owner,format(10,13,0,14,0),0,data,chain_bytes);
+        if(!header || !get(header,&texture,&target) || !texture || target!=GL_TEXTURE_2D)return 25;
+        mcc_texture_bridge_dispose();free(data);
     } else if(!strcmp(argv[1],"pressure")) {
         enum {count=13,chain_bytes=22369664};
         unsigned char *data[count];DWORD *headers[count];unsigned i,frame;
@@ -215,7 +222,7 @@ int main(int argc,char **argv) {
     return binary
 
 
-@pytest.mark.parametrize("case", ["identity", "bounds", "failure", "dispose", "palette", "descriptors", "pressure"])
+@pytest.mark.parametrize("case", ["identity", "bounds", "failure", "dispose", "palette", "descriptors", "pressure", "credits"])
 def test_mcc_texture_bridge(bridge_tool, case):
     result = subprocess.run([str(bridge_tool), case], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, f"{case}: exit {result.returncode}\n{result.stdout}{result.stderr}"

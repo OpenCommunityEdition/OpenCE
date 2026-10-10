@@ -47,9 +47,9 @@ void *mcc_texture_bridge_register(void const *bitmap,unsigned long format,
     if (!bitmap || !pixels || !bytes) return NULL;
     xgpu_texture_describe(format,size,&description);
     if (!description.width || !description.height || !description.depth ||
-        description.width>4096 || description.height>4096 || description.depth>512 ||
+        description.width>8192 || description.height>8192 || description.depth>512 ||
         (description.depth>1 && (description.width>512 || description.height>512)) ||
-        !description.levels || description.levels>13) return NULL;
+        !description.levels || description.levels>14) return NULL;
     face_bytes=xgpu_texture_face_size(&description);
     faces=description.cube_map ? 6 : 1;
     if (!face_bytes || face_bytes>bytes/faces) return NULL;

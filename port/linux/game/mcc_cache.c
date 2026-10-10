@@ -8,10 +8,12 @@
 #include "mcc_cache.h"
 #include "mcc_maps.h"
 #include "mcc_runtime.h"
+#include "mcc_resources.h"
 #include "mcc_tag_validate.h"
 #include "mcc_checkpoint.h"
 #include "mcc_grenades.h"
 #include "mcc_script_parameters.h"
+#include "mcc_campaign.h"
 #include "mcc_texture_cache.h"
 #include "mcc_ui_teams.h"
 #include <stdio.h>
@@ -210,6 +212,7 @@ boolean mcc_cache_contains(void const *address, long bytes)
 
 void mcc_cache_tags_unload(void)
 {
+    mcc_campaign_dispose();
     mcc_ui_teams_reset();
     mcc_checkpoint_dispose();
     mcc_grenades_reset();
@@ -219,6 +222,7 @@ void mcc_cache_tags_unload(void)
     mcc_geometry_dispose(&mcc_loaded_cache);
     mcc_audio_dispose(&mcc_loaded_cache);
     mcc_bitmaps_dispose(&mcc_loaded_cache);
+    mcc_resources_dispose(&mcc_loaded_cache);
     mcc_validation_dispose(&mcc_loaded_cache);
     mcc_memory_release(mcc_loaded_cache.tags, mcc_loaded_cache.capacity);
     if (mcc_stream) fclose(mcc_stream);
@@ -273,6 +277,7 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
         goto failed;
     }
     mcc_loaded = TRUE;
+    mcc_campaign_begin();
     error(_error_silent, "mcc: loaded %s (%lu tags, %lu bytes of runtime tags)", name,
         (unsigned long)runtime->report.tag_count, (unsigned long)runtime->used);
     return (struct cache_file_tag_header *)runtime->tags;

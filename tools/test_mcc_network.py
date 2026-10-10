@@ -36,7 +36,7 @@ def mcc_network_tool(tmp_path_factory):
     return binary
 
 
-@pytest.mark.parametrize("case", ["host", "receive", "prediction", "rewind_host", "rewind_client", "damage", "legacy"])
+@pytest.mark.parametrize("case", ["host", "receive", "prediction", "rewind_host", "rewind_client", "damage", "legacy", "campaign"])
 def test_mcc_network(mcc_network_tool, case):
     run = subprocess.run([str(mcc_network_tool), case], capture_output=True, text=True)
     assert run.returncode == 0, run.stdout + run.stderr

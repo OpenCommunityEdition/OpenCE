@@ -3445,6 +3445,7 @@ static boolean distributed_message_stale(
 	case _distributed_message_coop_device_states:
 	case _distributed_message_votekick_status:
 	case _distributed_message_mcc_grenades:
+	case _distributed_message_mcc_campaign:
 		break;
 	default:
 		return FALSE;
@@ -3992,6 +3993,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_statistics: entry_size = sizeof(struct distributed_player_statistics); break;
 	case _distributed_message_pings: entry_size = sizeof(struct distributed_player_ping); break;
 	case _distributed_message_mcc_grenades: entry_size = mcc_network_inventory_entry_size(); break;
+	case _distributed_message_mcc_campaign: entry_size = mcc_network_campaign_entry_size(); break;
 	case _distributed_message_actor_states: entry_size = network_actors_entry_size(); break;
 	case _distributed_message_structure_bsp: entry_size = sizeof(struct distributed_structure_bsp); break;
 	case _distributed_message_coop_presentation: entry_size = network_coop_presentation_entry_size(); break;
@@ -4168,6 +4170,9 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_mcc_grenades:
 		mcc_network_handle_inventories(entries, header.count);
+		break;
+	case _distributed_message_mcc_campaign:
+		mcc_network_handle_campaign(entries, header.count);
 		break;
 	case _distributed_message_object_changes:
 		network_objects_handle_changes(entries, header.count);

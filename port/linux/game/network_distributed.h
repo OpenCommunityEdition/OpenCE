@@ -120,6 +120,8 @@ enum
 	_distributed_message_voice_config = 82,
 	/* MCC-only extra grenade slots; ordinary inventory packets stay exact. */
 	_distributed_message_mcc_grenades = 83,
+	/* MCC-only campaign gravity and breadcrumb state. */
+	_distributed_message_mcc_campaign = 84,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

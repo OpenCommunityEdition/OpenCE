@@ -52,8 +52,8 @@ def page(packet, sequence, flags, granule):
 
 
 def stream(channels=2, residue_type=2, empty=True, bad_class=False, bad_vector=False,
-           bad_floor=False, empty_entries=1):
-    identification = b"\x01vorbis" + struct.pack("<IBIiiiBB", 0, channels, 22050, 0, 0, 0, 0x88, 1)
+           bad_floor=False, empty_entries=1, transition=False, final_frames=280):
+    identification = b"\x01vorbis" + struct.pack("<IBIiiiBB", 0, channels, 22050, 0, 0, 0, 0x86 if transition else 0x88, 1)
     comment = b"\x03vorbis" + struct.pack("<II", 0, 0) + b"\x01"
     setup = Bits()
     setup.put(2, 8)  # three codebooks
@@ -108,11 +108,12 @@ def stream(channels=2, residue_type=2, empty=True, bad_class=False, bad_vector=F
     setup.put(0, 8)
     setup.put(0, 8)
     setup.put(0, 8)
-    setup.put(0, 6)  # one mode
-    setup.put(0, 1)
-    setup.put(0, 16)
-    setup.put(0, 16)
-    setup.put(0, 8)
+    setup.put(1 if transition else 0, 6)
+    for mode in range(2 if transition else 1):
+        setup.put(mode, 1)
+        setup.put(0, 16)
+        setup.put(0, 16)
+        setup.put(0, 8)
     setup.put(1, 1)
     audio = Bits()
     audio.put(0, 1)
@@ -124,6 +125,20 @@ def stream(channels=2, residue_type=2, empty=True, bad_class=False, bad_vector=F
     # none. The later pass consumes four bits per partition/channel.
     vectors = 1 if residue_type == 2 and channels == 2 else channels
     audio.put(0, vectors + 4 * vectors)
+    if transition:
+        packets = [identification, comment, b"\x05vorbis" + setup.bytes()]
+        for i in range(4):
+            mixed = Bits()
+            mixed.put(0, 1)
+            mixed.put(i < 3, 1)
+            if i < 3:
+                mixed.put(1, 1)
+                mixed.put(i < 2, 1)
+            mixed.bits.extend(audio.bits[1:])
+            packets.append(mixed.bytes())
+        return b"".join(page(packet, i, 2 if i == 0 else 4 if i == 6 else 0,
+                             final_frames if i == 6 else max(0, (i - 3) * 128))
+                        for i, packet in enumerate(packets))
     packets = [identification, comment, b"\x05vorbis" + setup.bytes()] + [audio.bytes()] * 4
     return b"".join(page(packet, i, 2 if i == 0 else 4 if i == 6 else 0,
                          384 if i == 6 else max(0, (i - 3) * 128))
@@ -337,3 +352,34 @@ def test_pcm_returns_to_its_own_allocator(allocator_decoder, tmp_path):
     source = tmp_path / "input.ogg"
     source.write_bytes(stream())
     subprocess.run([str(allocator_decoder), str(source)], check=True, capture_output=True)
+
+
+@pytest.mark.parametrize("channels", [1, 2])
+@pytest.mark.parametrize("frames", [256, 280, 304, 320])
+def test_short_final_block_trims_preceding_overlap(decoder, tmp_path, channels, frames):
+    complete = decode(decoder, tmp_path, stream(channels=channels, transition=True, final_frames=320))
+    assert complete is not None
+    actual = decode(decoder, tmp_path, stream(channels=channels, transition=True, final_frames=frames))
+    assert actual is not None
+    assert struct.unpack_from("<III", actual) == (frames, 22050, channels)
+    assert actual[12:] == complete[12:12 + frames * channels * 2]
+
+
+@pytest.mark.parametrize("mutation", ["past_end", "before_previous_page", "drifting_page", "truncated", "crc"])
+def test_transition_validation_is_not_disabled(decoder, tmp_path, mutation):
+    data = stream(transition=True)
+    pages = [m.start() for m in re.finditer(b"OggS", data)]
+    if mutation == "truncated":
+        data = data[:-1]
+    elif mutation == "crc":
+        data = data[:-1] + bytes([data[-1] ^ 1])
+    else:
+        index = -2 if mutation == "drifting_page" else -1
+        start = pages[index]
+        end = pages[index + 1] if index == -2 else len(data)
+        modified = bytearray(data[start:end])
+        struct.pack_into("<Q", modified, 6, {"past_end": 800, "before_previous_page": 200, "drifting_page": 250}[mutation])
+        struct.pack_into("<I", modified, 22, 0)
+        struct.pack_into("<I", modified, 22, crc32(modified))
+        data = data[:start] + modified + data[end:]
+    assert decode(decoder, tmp_path, data) is None

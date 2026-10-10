@@ -50,8 +50,9 @@ so players of the two versions can play together.
 
 Halo 1 MCC custom maps use a separate `mcc_maps/` directory and the
 **MCC SINGLEPLAYER** and **MCC MULTIPLAYER** map categories. The experimental
-adapter supports modern, self-contained version-13 maps; it does not need
-Custom Edition's shared resource files. See [MCC map support](docs/mcc_maps.md)
+adapter supports modern version-13 maps with embedded resources or matching
+MCC `sounds.map` and `bitmaps.map` files in `mcc_maps`. It does not use
+Custom Edition's resource files. See [MCC map support](docs/mcc_maps.md)
 for supported features, installation and compatibility limits.
 
 On Linux and Windows, the game puts `maps/` next to the executable. On

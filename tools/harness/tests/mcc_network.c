@@ -23,6 +23,8 @@ typedef float real;
 #define _game_connection_network_server 1
 #define _game_connection_network_client 2
 #define _distributed_message_mcc_grenades 83
+#define _distributed_message_mcc_campaign 84
+#define MCC_CAMPAIGN_SNAPSHOT_BYTES 752
 #define _distributed_to_clients 0
 struct distributed_message_header {word header;byte type,count;long time;};
 struct object_iterator {long index;int done;};
@@ -40,6 +42,14 @@ static word sent_size;
 static int known=1;
 static boolean local=0;
 static real round_trip=6;
+static int campaign_sends,campaign_restores;
+static byte campaign_state[MCC_CAMPAIGN_SNAPSHOT_BYTES];
+boolean mcc_cache_tags_loaded(void) { return active; }
+void mcc_campaign_snapshot(void *out) { memcpy(out,campaign_state,sizeof(campaign_state)); }
+int mcc_campaign_restore(void const *in,unsigned long bytes) {
+    if(bytes!=sizeof(campaign_state))return 0;
+    memcpy(campaign_state,in,bytes);campaign_restores++;return 1;
+}
 short mcc_grenades_get(long index,short type) {return index==live_unit&&type>=0&&type<types?counts[type]:0;}
 void mcc_grenades_set(long index,short type,short count) {if(index==live_unit&&type>=0&&type<types)counts[type]=count;}
 boolean mcc_grenades_active(void){return active;}
@@ -57,6 +67,7 @@ long local_player_get_player_index(short index){return index==0?0:NONE;}
 struct player_datum *player_try_and_get(long index){return index==0?&player:NULL;}
 long distributed_living_unit(struct player_datum const *p){return p?p->unit:NONE;}
 void distributed_send(void *message,byte type,short count,word size,short destination){
+    if(type==84) { if(count==1&&size==sizeof(struct distributed_message_header)+MCC_CAMPAIGN_SNAPSHOT_BYTES)campaign_sends++;return; }
     (void)destination;if(type!=83||size>sizeof(sent))return;
     memcpy(sent,message,size);sent_count=count;sent_size=size;sends++;
 }
@@ -129,9 +140,16 @@ int main(int argc,char **argv){
         rate=0;type=NONE;kinds=0;mcc_network_extra_grenade_damage(0,102,&kinds,&reach,&type,&rate);CHECK(rate==0&&type==NONE);
         paid=1;mcc_network_extra_grenade_damage(0,102,&kinds,&reach,&type,&rate);CHECK(rate==4&&type==2);
         connection=2;mcc_network_note_extra_grenade(live_unit,3);CHECK(distributed_grenade_throw(0,3)==NONE);
+    }else if(!strcmp(argv[1],"campaign")){
+        types=2;mcc_network_host_tick();CHECK(campaign_sends==1&&sends==0);
+        mcc_network_handle_campaign(campaign_state,1);CHECK(campaign_restores==0);
+        connection=2;mcc_network_handle_campaign(campaign_state,0);mcc_network_handle_campaign(campaign_state,2);
+        CHECK(campaign_restores==0);mcc_network_handle_campaign(campaign_state,1);CHECK(campaign_restores==1);
+        active=0;mcc_network_handle_campaign(campaign_state,1);CHECK(campaign_restores==1);
+        connection=1;mcc_network_host_tick();CHECK(campaign_sends==1);
     }else if(!strcmp(argv[1],"legacy")){
         active=0;mcc_network_host_tick();connection=2;mcc_network_client_tick();mcc_network_handle_inventories(&packet,1);
-        CHECK(sends==0&&counts[2]==3&&counts[3]==4&&counts[0]==1&&counts[1]==2);
+        CHECK(sends==0&&campaign_sends==0&&counts[2]==3&&counts[3]==4&&counts[0]==1&&counts[1]==2);
     }else return 2;
     return 0;
 }

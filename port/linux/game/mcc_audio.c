@@ -5,6 +5,7 @@
 #include "errors.h"
 #include "sound/sound_definitions.h"
 #include "mcc_runtime.h"
+#include "mcc_resources.h"
 #include "mcc_vorbis.h"
 #include <stdlib.h>
 #include <string.h>
@@ -169,10 +170,31 @@ static int mcc_audio_store(struct mcc_audio_storage *storage, struct mcc_pcm con
     return 1;
 }
 
+/* Keep validated external ADPCM byte-for-byte, avoiding a lossy round trip. */
+static int mcc_audio_store_raw(struct mcc_audio_storage *storage,
+    unsigned char const *bytes,struct sound_permutation *permutation)
+{
+    uint32_t size=(uint32_t)permutation->samples.size;
+    if (size>MCC_AUDIO_LIMIT-storage->used) return 0;
+    if (storage->used+size>storage->capacity) {
+        uint32_t capacity=(storage->used+size+0xFFFFF)&~0xFFFFFu;
+        unsigned char *larger=realloc(storage->bytes,capacity);
+        if (!larger) return 0;
+        storage->bytes=larger;storage->capacity=capacity;
+    }
+    memcpy(storage->bytes+storage->used,bytes,size);
+    permutation->samples.file_offset=MCC_AUDIO_BASE+storage->used;
+    permutation->samples.pad&=~1;
+    storage->used+=size;
+    return 1;
+}
+
 int mcc_audio_prepare(struct mcc_runtime *runtime)
 {
     struct mcc_audio_storage *storage;
     uint32_t index,converted=0;
+    long failed_range=NONE,failed_permutation=NONE,failed_codec=NONE;
+    char const *stage="sound header", *tag_name="(unavailable)";
     if (runtime->source.size>=MCC_AUDIO_BASE) return 0;
     storage=malloc(sizeof(*storage));
     if (!storage) return 0;
@@ -184,6 +206,10 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
         uint32_t range_index,rate,output_rate;
         int channels;
         if (entry[0]!=(uint32_t)SOUND_DEFINITION_TAG) continue;
+        failed_range=failed_permutation=failed_codec=NONE;
+        stage="sound header";
+        tag_name=mcc_runtime_pointer(runtime,entry[4],256);
+        if (!tag_name || !memchr(tag_name,0,256)) tag_name="(unavailable)";
         sound=mcc_runtime_pointer(runtime,entry[5],sizeof(*sound));
         if (!sound || sound->encoding<0 || sound->encoding>1 || sound->sample_rate<0 || sound->sample_rate>1) goto failed;
         channels=sound->encoding+1; rate=sound->sample_rate ? 44100 : 22050;
@@ -192,15 +218,19 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
             struct sound_pitch_range *range=mcc_runtime_pointer(runtime,
                 (uint32_t)sound->pitch_ranges.address+range_index*sizeof(*range),sizeof(*range));
             uint32_t permutation_index;
+            failed_range=range_index;stage="pitch range";
             if (!range) goto failed;
             for (permutation_index=0;permutation_index<(uint32_t)range->permutations.count;permutation_index++) {
                 struct sound_permutation *permutation=mcc_runtime_pointer(runtime,
                     (uint32_t)range->permutations.address+permutation_index*sizeof(*permutation),sizeof(*permutation));
                 unsigned char *data;
                 struct mcc_pcm pcm;
-                int ok;
-                if (!permutation || permutation->samples.size<0 || permutation->samples.size>0x4000000 ||
-                    (permutation->samples.pad&1)) goto failed;
+                int ok,external;
+                char resource_name[288];
+                failed_permutation=permutation_index;stage="permutation header";
+                failed_codec=permutation ? permutation->compression : NONE;
+                if (!permutation || permutation->samples.size<0 || permutation->samples.size>0x4000000) goto failed;
+                external=(permutation->samples.pad&1)!=0;
                 permutation->unknown0=NONE;
                 permutation->unknown1=0;
                 permutation->unknown2=entry[3];
@@ -209,16 +239,30 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
                 permutation->sample_buffer_size=0;
                 if (!permutation->samples.size) continue;
                 data=malloc(permutation->samples.size);
+                stage="input allocation";
                 if (!data) goto failed;
-                if (!mcc_runtime_read(runtime,permutation->samples.file_offset,permutation->samples.size,data)) {
+                stage="sample read";
+                if (external) {
+                    stage="external samples (matching mcc_maps/sounds.map required)";
+                    snprintf(resource_name,sizeof(resource_name),"%s__%lu__%lu",tag_name,range_index,permutation_index);
+                    ok=mcc_resources_read(runtime,2,resource_name,permutation->samples.file_offset,permutation->samples.size,data);
+                } else ok=mcc_runtime_read(runtime,permutation->samples.file_offset,permutation->samples.size,data);
+                if (!ok) {
                     free(data); goto failed;
                 }
+                stage="codec decode or sample format";
                 ok=mcc_pcm_open(data,permutation->samples.size,permutation->compression,channels,rate,&pcm);
-                free(data);
                 if (ok && (permutation->compression!=1 || rate!=output_rate)) {
+                    stage="ADPCM output allocation or encoding";
                     ok=mcc_audio_store(storage,&pcm,channels,output_rate,permutation);
                     if (ok) converted++;
+                } else if (ok && external) {
+                    stage="external ADPCM allocation";
+                    ok=mcc_audio_store_raw(storage,data,permutation);
+                    if (ok) converted++;
                 }
+                free(data);
+                if (ok) permutation->samples.pad&=~1;
                 mcc_pcm_close(&pcm);
                 if (!ok) goto failed;
             }
@@ -229,7 +273,8 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
     error(_error_silent,"mcc audio: %lu permutations converted, %lu ADPCM bytes",converted,storage->used);
     return 1;
 failed:
-    error(_error_silent,"mcc audio: unsupported or damaged sound tag #%lu; map refused",index);
+    error(_error_silent,"mcc audio: sound tag #%lu '%s', range %ld, permutation %ld, codec %ld: %s; map refused",
+        index,tag_name,failed_range,failed_permutation,failed_codec,stage);
     return 0;
 }
 

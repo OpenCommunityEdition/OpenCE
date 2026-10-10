@@ -16,6 +16,8 @@ maps/                 Xbox game data
 custom_maps/          Halo Custom Edition data
 mcc_maps/a10.map       Halo 1 MCC custom map
 mcc_maps/a10.txt       Optional plain-text description
+mcc_maps/sounds.map    Matching MCC resources, when required by the package
+mcc_maps/bitmaps.map   Matching MCC resources, when required by the package
 ```
 
 The level identity is `mcc_maps\a10`. The filename is retained even when
@@ -23,6 +25,13 @@ the internal scenario name differs. The supplied Mercury Rising file is
 an example: its filename is `a10.map`, while its header names
 `mercury_falling`. The namespaces prevent it replacing either Xbox `a10`
 or Custom Edition `custom_maps\a10`.
+
+Some campaigns, including the supplied Combat Revolved package, keep their
+audio and textures in separate resource files. Install the matching files
+in `mcc_maps` alongside the levels. A filename alone does not establish a
+match: the loader verifies each resource's indexed name and byte range.
+It never searches `maps` or `custom_maps` for replacements. Packages that
+require different resource files must use separate game-data installations.
 
 Open the map-kind chooser and select **MCC SINGLEPLAYER** for campaign
 maps or **MCC MULTIPLAYER** for multiplayer maps. The cache header's scenario
@@ -47,9 +56,9 @@ The catalog scans only `mcc_maps`, reads each candidate's 2,048-byte header,
 and refreshes when a map menu opens. It accepts at most 1,024 entries, with
 filenames of at most 54 characters before `.map`. A description is optional;
 the default identifies the scenario type. MCC thumbnail sidecars, Workshop
-downloads and MCC package manifests are not implemented. Supported maps
-contain their own resources; do not copy `bitmaps.map`,
-`sounds.map` or `loc.map` from Custom Edition into `mcc_maps`.
+downloads and MCC package manifests are not implemented. Maps may embed
+their resources or reference matching MCC bitmap/sound payload files as
+described above. Custom Edition resource files are not substitutes.
 There is no dependency on the Custom Edition setting or its resource
 directories.
 
@@ -58,8 +67,8 @@ stage in `debug.txt` and returns a menu error. Matching the header checksum
 can detect that a network host selected a different map version; it is not
 a recomputation or authentication of the map's contents. Network support
 uses OpenCE's game protocol, not the MCC game client or its matchmaking.
-This contribution uses network protocol 26 for the additional MCC inventory
-message and grenade action values. Every participant needs a matching build
+This contribution uses network protocol 27 for the additional MCC inventory
+and campaign-state messages and grenade action values. Every participant needs a matching build
 and map data; older builds are rejected even when playing non-MCC maps.
 
 ### In-game pause menus
@@ -144,6 +153,7 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/src/mcc_memory.c` | Separate 64 MiB linked tag window; never replaces an existing allocation. |
 | `port/linux/game/mcc_geometry.c` | New model descriptors, model vertex/index conversion, external BSP vertex streams and node palettes. |
 | `port/linux/game/mcc_audio.c` | MCC sound decoding, resampling and Xbox ADPCM encoding into an MCC virtual stream. |
+| `port/linux/game/mcc_resources.c` | MCC-only indexed sound/bitmap resource files, names, ranges and file lifetime. |
 | `port/linux/game/mcc_vorbis.c` | Private namespaced Vorbis decoder, bounded Ogg validation and empty residue vector compatibility. |
 | `port/linux/game/mcc_bitmaps.c` | MCC pixel layout, BC7 decoding and shader/HUD channel normalization into an MCC virtual stream. |
 | `port/linux/game/mcc_texture_cache.c` and `port/linux/src/mcc_texture_bridge.c` | Direct bindings of checked MCC pixel allocations and lazy GPU textures, independent of the Xbox/CE staging cache. |
@@ -151,13 +161,14 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/game/mcc_hud.c` | MCC bitmap/placement scaling, including nested weapon and grenade HUD items. |
 | `port/linux/game/mcc_hud_draw.c` | MCC canvas, glyph geometry and text advances; neutral dispatch for Xbox/CE. |
 | `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking and supported MCC native functions. |
+| `port/linux/game/mcc_campaign.c` | Local-player/authority queries, gravity, campaign markers and scoped global permissions. |
 | `port/linux/game/mcc_syntax.c` | MCC's 32,767-slot syntax validation and traversal workspace. |
 | `port/linux/game/mcc_script_parameters.c` and `mcc_script_runtime.inl` | MCC parameter metadata/scopes and interpreter frames inside the existing HS stack. |
 | `port/linux/game/mcc_objects.c` | MCC multiplayer vehicle placement masks. |
 | `port/linux/game/mcc_grenades.c` | MCC slots 2/3, salted unit inventories, pickup/throw/drop behavior and HUD. |
 | `port/linux/game/mcc_player.c` | MCC grenade selection/action checks and starting-profile counts. |
-| `port/linux/game/mcc_network.c` | MCC-only host inventory messages and client reconciliation. |
-| `port/linux/game/mcc_checkpoint.c` | MCC inventory snapshot inside proven-unused CPU save memory. |
+| `port/linux/game/mcc_network.c` | MCC host inventory and campaign-state messages over the existing distributed transport. |
+| `port/linux/game/mcc_checkpoint.c` | MCC inventory/campaign snapshot inside proven-unused CPU save memory. |
 | `port/linux/game/mcc_tag_validate.c` | Independent range/ownership state while applying stock tag schemas and their validators. |
 
 Shared engine entry points have additive MCC dispatch for an MCC-namespaced
@@ -183,7 +194,7 @@ live in a separately owned table keyed by full salted unit handles.
 Selection remains in the native unit fields. MCC profile, input, HUD,
 pickup, throwing and inventory-network routes handle these slots.
 
-MCC saves put the additional counts into a 65,640-byte slot at the CPU
+MCC saves put the additional counts and campaign state into a 66,392-byte slot at the CPU
 arena's end only if the allocator's current high-water mark leaves that
 entire slot unused. No `game_state_malloc` call, pool capacity, native
 allocation checksum or save-image size changes. Native checkpoint, core
@@ -193,6 +204,20 @@ footer adds version, canonical map identity, cache checksum and payload
 CRC32. Before accepting the image, the adapter checks the payload and
 remaps incoming object-header pointers to verify every salted unit record.
 Unload restores the original unused bytes, including nonzero contents.
+The version-2 payload includes gravity, navigation markers, dialogue gain
+and the campaign's infinite-ammunition flag. Version-1 inventory snapshots
+remain readable, with the new campaign state initialized to its baseline.
+The footer remains at its original address. Images are validated before
+restoring either state.
+
+Campaign snapshots use the existing OpenCE host/client transport, authority
+checks and stale-tick filtering. They are sent only in MCC games; the native
+inventory and co-op message layouts are unchanged. Protocol version 27 is
+required on every peer because this adds message type 84 to the earlier
+version-26 contribution's inventory and grenade-action extensions.
+This is an additional message in OpenCE's protocol, not an MCC networking
+stack or compatibility with the retail MCC client. Client cheat restrictions
+remain in force; only the host decides ammunition consumption.
 
 This is an independently written implementation of documented wire formats,
 informed by reading the existing engine's public interfaces and schemas.
@@ -268,12 +293,18 @@ their complete 2-by-2 and 1-by-1 source mip blocks for those samples, while
 the GPU descriptor retains its native mip limit. Unload clears only CPU
 base pointers that still name the MCC-owned allocation.
 
-The audio adapter accepts embedded PCM16, Xbox ADPCM and Ogg Vorbis
+The audio adapter accepts embedded or externally indexed PCM16, Xbox ADPCM and Ogg Vorbis
 permutations. It uses independent bounds checks and codec state. Mono
 output uses the game's 22,050 Hz format; stereo output follows the admitted
 22,050/44,100 Hz tag rate. Necessary conversions produce an MCC-only ADPCM
 stream. Unsupported or damaged audio rejects the map instead of silently
 removing sound.
+External ADPCM that already matches the native sample rate is validated
+and retained byte-for-byte. The independent resource reader checks the
+16-byte resource header, bounded names/index tables, resource type and
+payload ranges. Sound names identify the tag, pitch range and permutation;
+bitmap names identify the tag and image. Indexed whole-tag replacements
+are still unsupported.
 
 Compiled script function and engine-global indices are linked by the
 names retained in the script strings. The adapter provides
@@ -286,6 +317,22 @@ it does not implement the MCC telemetry service. The boolean result retains
 the conditional `sleep` calls used in shipped and Ruby campaign scripts.
 It does not call `core_save_name`: that Xbox function writes a raw debug
 save, and remains unchanged and unavailable to map scripts.
+
+Additional MCC campaign operations include `local_players`,
+`game_is_authoritative`, `objects_distance_to_position`, `sleep_forever`
+(current or named script), gravity setting/reset and breadcrumb navigation
+at positions, flags or objects. Local players excludes remote and dead
+units. Sleep uses the existing interpreter stack and native wake semantics.
+Navigation has eight independently owned team markers and uses the native
+HUD drawing services; the host replicates the complete marker state and
+gravity periodically, including after changes and late joins.
+
+The two recognized `debug_ice_cream_flavor_status_*` globals for IWHBYD and
+Grunt Birthday Party are read-only false values. This does not implement
+skull gameplay, and scripts trying to set them are refused. MCC maps may
+set `sound_gain_under_dialog` and `cheat_infinite_ammo`; the adapter captures
+their previous values and restores them on unload. The native global table
+and Xbox/CE write permissions remain unchanged.
 Compiled MCC static/stub scripts support up to 16 typed parameters.
 Signatures, scoped local references and call arguments are checked before
 loading. The MCC interpreter extension keeps arguments, mutable local
@@ -339,11 +386,25 @@ references and 8,325 distinct streams: all decoded successfully and every
 sample differed from libsndfile/libvorbis by at most one signed-16-bit unit.
 These codec checks do not establish a complete campaign playthrough.
 
+Solar Flare and Spasm Playground also use valid final Vorbis granule trims
+across long/short window transitions. MCC decoding retains the requested
+PCM frames while validating the remaining packets and a bounded overlap
+tail. Page checksums, sequence, monotonic granules and decoder errors are
+still checked. A comparison of 247 permutations from the two reported
+sound tags matched libsndfile/libvorbis within one signed-16-bit unit.
+
+Combat Revolved's material-less model part retains the native renderer's
+skip behavior. Its 8192-pixel credits strip uses the MCC texture route;
+the legacy texture cache's size policy is unchanged. Each bitmap tag has
+its own virtual stream with exact tag-handle checks, allowing the total
+decoded texture storage to exceed the former single 512 MiB offset range.
+
 ## Current boundaries
 
 - Modern uncompressed version-13 maps are the target. Earlier Anniversary
-  chunk-compressed caches, Halo 2 or later MCC maps, external indexed tags,
-  and shared external bitmap/sound resource files are not supported.
+  chunk-compressed caches, Halo 2 or later MCC maps and external indexed tags
+  are not supported. Indexed MCC bitmap/sound payload resources are supported
+  when matching files are installed as described above.
 - The portable inspector accepts files up to `INT32_MAX`; runtime raw files
   must be smaller than `0x50000000` bytes because higher offsets identify
   MCC virtual resources. Runtime tag windows must be free, 64 KiB-aligned,
@@ -354,10 +415,12 @@ These codec checks do not establish a complete campaign playthrough.
   currently admits at most 64 nodes per model, 22 palette nodes per part,
   256 geometries per model and 128 parts per geometry. Each part's vertex
   and triangle counts must be nonzero and at most 65,535.
-- Non-volume bitmap dimensions are limited to 4,096 by 4,096 with depth one;
-  volumes are limited to 512 by 512 by 256. There are at most 12
+- Non-volume bitmap dimensions are limited to 8,192 by 8,192 with depth one;
+  volumes are limited to 512 by 512 by 256. There are at most 13
   mip levels after the base level. Individual raw/decoded allocations are
-  capped at 128 MiB; the normalized bitmap stream is smaller than 512 MiB.
+  capped at 128 MiB; aggregate normalized bitmap storage is capped at 1 GiB,
+  with each tag's virtual stream smaller than 512 MiB. Actual allocation and
+  GPU texture-size support remain required, especially on mobile devices.
   Linear textures must be two-dimensional, unmipped and uncompressed.
   Audio permutations are capped at 64 MiB of input and 16,777,216 decoded
   frames, with at most 256 MiB of converted audio.
@@ -411,6 +474,56 @@ C runtime (`gcc-multilib`). The existing `tools/harness` suite also checks
 legacy engine behavior. A passing parser or build alone does not establish
 map playability.
 
+### Solar Flare, Spasm and Combat Revolved compatibility checks
+
+The October 10 compatibility changes were checked in the development build
+against all 16 supplied
+maps: Solar Flare `m0` through `m3`, Spasm Playground, and Combat Revolved
+`a10`, `a30`, `a50`, `b30`, `b40`, `c10`, `c20`, `c40`, `d20`, `d40` and
+`credits`. Each passed a bounded native Windows x86 load with rendering
+and opening scripts enabled. Combat Revolved used its matching external
+`sounds.map` and `bitmaps.map`; source assets remained read-only and were
+not added to the repository. These are initial-load checks, not complete
+campaign playthroughs or automatic level-progression tests.
+
+The production Vorbis decoder was compared with libvorbis through
+libsndfile for all 158 permutations in Solar Flare's reported sound tag
+and all 89 in Spasm's. All decoded, with a maximum difference of one
+signed 16-bit PCM unit. Generated tests also cover legitimate granule
+trimming, long/short block transitions, damaged granules, CRC errors and
+truncated input; accepting these valid streams does not disable integrity
+checks.
+
+A single native process loaded Solar Flare, saved changed gravity,
+dialogue gain, infinite-ammunition state and a breadcrumb marker, changed
+them again, and restored the saved state through both checkpoint revert
+and core load. Read-only inspection of that test process confirmed the
+restored MCC snapshot and live gravity/gain values. The same process then
+loaded Xbox `a10`, CE `hugeass`, and Solar Flare again. MCC state was cleared
+on the legacy maps, their original gravity/gain restored, and the MCC-only
+functions were unavailable there. The process exited normally.
+
+A bounded two-process cooperative run used the existing host/join path
+and confirmed equal gravity, dialogue gain and breadcrumb state on host
+and client after host changes, followed by a synchronized gravity reset.
+Both exited normally. This tests the new state message on loopback; it
+does not establish Internet reliability, every campaign's co-op behavior,
+or a full campaign playthrough.
+
+After applying the fixes to the OpenCE contribution, the combined MCC,
+existing cache-format and BMP suite passed 738 tests, with six
+optional-fixture skips, and the Windows x86 release build passed.
+That contribution build also passed targeted rendered loads of Solar Flare
+`m0`, Combat Revolved `b40` and Spasm Playground. Checkpoint/core restoration,
+the MCC-to-Xbox-to-CE-to-MCC transition, and the two-process cooperative
+gravity/gain/marker checks were repeated on that build successfully.
+
+Linux and Android builds of these particular changes have not been verified
+locally; the Windows build configuration did not provide an Android target.
+Earlier CI results above predate these changes. The MCC validation workflow
+includes the new portable resource-reader cases and native Windows campaign
+cases so they run with the existing checks when the branch is published.
+
 Run the isolated tests with a C compiler and Python/pytest available:
 
 ```text
@@ -426,6 +539,7 @@ python -m pytest -q tools/test_mcc_menu.py
 python -m pytest -q tools/test_mcc_saved_games.py
 python -m pytest -q tools/test_mcc_checkpoint.py tools/test_mcc_grenades.py tools/test_mcc_network.py
 python -m pytest -q tools/test_mcc_parameters.py tools/test_mcc_scripts.py tools/test_mcc_syntax.py
+python -m pytest -q tools/test_mcc_campaign.py tools/test_mcc_resources.py
 python -m pytest -q tools/test_mcc_lifecycle.py
 ```
 

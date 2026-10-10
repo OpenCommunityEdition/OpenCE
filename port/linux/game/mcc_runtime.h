@@ -17,6 +17,7 @@ struct mcc_runtime {
     void *geometry;
     void *audio;
     void *bitmaps;
+    void *resources;
 };
 
 /* Only ranges actually loaded into tags are accessible here. BSP data is

@@ -102,6 +102,16 @@ def test_partial_gpu_failure_cleanup(geometry_tool, tmp_path, failure_at):
     assert code == 1
 
 
+@pytest.mark.parametrize("shader,expected", [(0xffff, 0), (1, 1), (0x8000, 1)])
+def test_absent_model_material_keeps_native_skip_semantics(geometry_tool, tmp_path, shader, expected):
+    data = geometry_map()
+    struct.pack_into("<H", data, 0xC00+0x940+4, shader)
+    path = tmp_path / "material.map"
+    path.write_bytes(data)
+    code, _ = run(geometry_tool, path)
+    assert code == expected
+
+
 @pytest.mark.parametrize("local", [False, True])
 def test_many_node_palette_is_owned_by_part(geometry_tool, tmp_path, local):
     data = geometry_map()

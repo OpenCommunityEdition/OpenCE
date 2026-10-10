@@ -140,7 +140,7 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
     memset(part,0,sizeof(*part));
     if (!count || count>65535 || !triangles || triangles>65535 || mg_u16(wire+0x44)!=1 ||
         mg_u16(wire+0x54)!=4 || model->nodes.count<1 || model->nodes.count>64 ||
-        mg_u16(wire+4)>=(uint32_t)model->shaders.count ||
+        (mg_u16(wire+4)!=0xFFFFu && mg_u16(wire+4)>=(uint32_t)model->shaders.count) ||
         ((signed char)wire[6]!=-1 && (unsigned char)wire[6]>=part_count) ||
         ((signed char)wire[7]!=-1 && (unsigned char)wire[7]>=part_count))
         return mg_error("invalid model part descriptor");

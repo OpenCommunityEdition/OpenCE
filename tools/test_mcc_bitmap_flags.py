@@ -49,6 +49,7 @@ def bitmap_converter(tmp_path_factory):
 #define MCC_BITMAP_BASE 0x60000000u
 #define MCC_BITMAP_LIMIT 0x1FFFFFFFu
 #define MCC_BITMAP_ALLOCATION_LIMIT 0x08000000u
+    #define MCC_BITMAP_STORAGE_LIMIT 0x40000000u
 typedef unsigned char boolean;
 struct bitmap_data {
     uint32_t signature;
@@ -59,7 +60,11 @@ struct bitmap_data {
     void *hardware_format,*base_address;
 };
 struct bitmap_group {short usage;};
-struct mcc_runtime {struct bitmap_group group;unsigned char source[350000];uint32_t size,reads;};
+    struct mcc_runtime {struct bitmap_group group;unsigned char source[350000];uint32_t size,reads;unsigned char *tag_index;void *bitmaps;};
+    static void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t address,uint32_t size) {(void)r;(void)address;(void)size;return NULL;}
+    static int mcc_resources_read(struct mcc_runtime *r,unsigned type,char const *name,uint32_t offset,uint32_t bytes,void *out) {
+        (void)r;(void)type;(void)name;(void)offset;(void)bytes;(void)out;return 0;
+    }
 static short floor_log2(unsigned value) {short n=0;while(value>1){value>>=1;n++;}return n;}
 static int bitmap_format_type_valid_width(short f,short t,short v) {(void)f;(void)t;return v>0 && v<=4096;}
 static int bitmap_format_type_valid_height(short f,short t,short v) {return bitmap_format_type_valid_width(f,t,v);}
@@ -91,7 +96,7 @@ static uint32_t global_vector_palette[256];
     source += "\n" + "\n".join(function(bitmap, name) for name in [
         "mcc_bitmap_bytes", "mcc_pixel", "mcc_channels", "mcc_bitmap_decode",
         "mcc_morton_axis", "mcc_bitmap_pack", "mcc_bitmap_lightmap_flags", "mcc_bitmap_complete_mips",
-        "mcc_texture_prepare"])
+        "mcc_texture_prepare", "mcc_bitmaps_read"])
     source += r'''
 int main(int argc,char **argv) {
     struct bitmap_data bitmap={0},original;
@@ -106,6 +111,24 @@ int main(int argc,char **argv) {
     bitmap.format=6;bitmap.flags=0x1281;bitmap.pixels_size=16;
     texture.bitmap=&bitmap;texture.handle=7;
     for(i=0;i<16;i++)runtime.source[i]=(unsigned char)i;
+    if(!strcmp(argv[1],"tag-streams")) {
+        struct mcc_texture items[3]={{0}};
+        struct bitmap_data bitmaps[3];unsigned char out[16];
+        bitmap.flags=0x81;textures.end=0x20000000u;
+        textures.items=items;textures.count=3;runtime.bitmaps=&textures;
+        for(i=0;i<3;i++) {
+            bitmaps[i]=bitmap;items[i].bitmap=&bitmaps[i];items[i].handle=i==2 ? 8 : 7;
+            if(!mcc_texture_prepare(&runtime,&textures,&items[i]))return 12;
+        }
+        if(items[0].offset!=MCC_BITMAP_BASE || items[1].offset!=MCC_BITMAP_BASE+128 ||
+            items[2].offset!=MCC_BITMAP_BASE || textures.end!=0x20000180u)return 13;
+        if(mcc_bitmaps_read(&runtime,7,MCC_BITMAP_BASE+128,16,out)!=1 ||
+            mcc_bitmaps_read(&runtime,8,MCC_BITMAP_BASE,16,out)!=1 ||
+            mcc_bitmaps_read(&runtime,8,MCC_BITMAP_BASE+128,1,out)!=0 ||
+            mcc_bitmaps_read(&runtime,9,MCC_BITMAP_BASE,1,out)!=0)return 14;
+        for(i=0;i<3;i++)free(items[i].pixels);
+        return 0;
+    }
     if(!strncmp(argv[1],"tail",4)) {
         tail=1;runtime.group.usage=0;runtime.size=349525;
         bitmap.width=1024;bitmap.height=512;bitmap.format=14;bitmap.flags=0x81;
@@ -170,7 +193,7 @@ int main(int argc,char **argv) {
 
 @pytest.mark.parametrize("case", ["known", "ordinary", "wrong-group", "missing-group", "missing-environment",
                                   "unknown-flag", "extra-pixels", "short-pixels", "bad-signature",
-                                  "wrong-format", "non-power-two", "mipmaps"])
+                                  "wrong-format", "non-power-two", "mipmaps", "tag-streams"])
 def test_mcc_lightmap_conversion(bitmap_converter, case):
     result = subprocess.run([str(bitmap_converter), case], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

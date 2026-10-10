@@ -47,7 +47,7 @@ static int mcc_ogg_validate(unsigned char const *bytes, uint32_t size, uint32_t 
     uint32_t *payload_end, uint32_t *final_page)
 {
     uint32_t table[256], offset=0, serial=0, sequence=0, i, j;
-    uint32_t last_page=0, last_end=0;
+    uint32_t last_page=0, last_end=0, previous_granule=0;
     int continued=0, ended=0;
     *payload_end=size;*final_page=0;
     for (i=0;i<256;i++) {
@@ -73,6 +73,12 @@ static int mcc_ogg_validate(unsigned char const *bytes, uint32_t size, uint32_t 
             crc=(crc<<8)^table[(crc>>24)^value];
         }
         if (crc!=mcc_ogg_u32(page+22)) return 0;
+        /* A page without a completed packet has no granule. All other known
+         * positions must progress; EOS cannot trim an earlier page's audio. */
+        if (mcc_ogg_u32(page+6)!=0xFFFFFFFFu || mcc_ogg_u32(page+10)!=0xFFFFFFFFu) {
+            if (mcc_ogg_u32(page+10) || mcc_ogg_u32(page+6)<previous_granule) return 0;
+            previous_granule=mcc_ogg_u32(page+6);
+        }
         /* Ogg permits zero-segment pages (including a separate EOS page). With
          * no lacing entries no packet begins or ends, so retain pending state.
          * https://xiph.org/ogg/doc/framing.html#page_segments */
@@ -170,7 +176,9 @@ int mcc_vorbis_decode(unsigned char const *bytes, uint32_t size, uint32_t frame_
     uint32_t expected=0, count=0, payload_end=0, final_page=0;
     unsigned char *normalized=NULL;
     short *pcm=NULL;
-    int ok=0;
+    short packet[8192 * 2];
+    uint32_t decoded=0;
+    int ok=0, boundary_known=0, boundary_bias=0;
     *samples=NULL;*frames=0;*rate=0;*channels=0;
     if (!bytes || !size || size>INT_MAX || !mcc_ogg_validate(bytes,size,&expected,&payload_end,&final_page) ||
         !expected || expected>frame_limit || expected>INT_MAX/(2*sizeof(short))) return 0;
@@ -191,16 +199,35 @@ int mcc_vorbis_decode(unsigned char const *bytes, uint32_t size, uint32_t frame_
     /* Normalization precedes the discarded overlap packet, which can itself use
      * an empty residue vector book. No Xbox/CE decoder state is accessible here. */
     if (!vorbis_pump_first_frame(&stream) || stream.error) goto done;
-    while (count<expected) {
-        int got=stb_vorbis_get_samples_short_interleaved(&stream,stream.channels,
-            pcm+count*stream.channels,(int)((expected-count)*stream.channels));
-        if (got<=0 || stream.error) goto done;
-        count+=(uint32_t)got;
+    for (;;) {
+        int got=stb_vorbis_get_frame_short_interleaved(&stream,stream.channels,packet,8192*2);
+        uint32_t retain;
+        if (stream.error) goto done;
+        if (!got) break;
+        decoded+=(uint32_t)got;
+        if (!(stream.page_flag&PAGEFLAG_last_page) && stream.last_seg_which==stream.end_seg_with_known_loc) {
+            int difference=(int)decoded-(int)stream.known_loc_for_packet;
+            /* A long block followed by a short block emits up to its right
+             * window's start, beyond the packet's centre/granule. This offset
+             * disappears again after the short packet. Accept only that exact
+             * window transition, not arbitrary drifting page positions. */
+            if (difference!=0 && difference!=(stream.blocksize_1-stream.blocksize_0)/4) goto done;
+            boundary_bias=difference;boundary_known=1;
+        }
+        retain=(uint32_t)got;
+        if (retain>expected-count) {
+            /* Vorbis I, appendix A.2. A final-packet trim plus the validated
+             * window-boundary offset is bounded by one maximum block. Never
+             * drain an unbounded remainder or suppress packet errors. */
+            if (decoded-expected>(uint32_t)stream.blocksize_1 ||
+                (!(stream.page_flag&PAGEFLAG_last_page) &&
+                 (!boundary_known || decoded-expected>(uint32_t)boundary_bias))) goto done;
+            retain=expected-count;
+        }
+        memcpy(pcm+count*stream.channels,packet,(size_t)retain*stream.channels*sizeof(short));
+        count+=retain;
     }
-    {
-        short extra[2];
-        if (stb_vorbis_get_samples_short_interleaved(&stream,stream.channels,extra,stream.channels) || stream.error) goto done;
-    }
+    if (count!=expected) goto done;
     *samples=pcm;*frames=count;*rate=stream.sample_rate;*channels=stream.channels;
     pcm=NULL;ok=1;
 done:

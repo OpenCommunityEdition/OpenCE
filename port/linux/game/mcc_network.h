@@ -8,4 +8,6 @@ void mcc_network_host_tick(void);
 void mcc_network_client_tick(void);
 word mcc_network_inventory_entry_size(void);
 void mcc_network_handle_inventories(void const *entries, short count);
+word mcc_network_campaign_entry_size(void);
+void mcc_network_handle_campaign(void const *entries, short count);
 #endif

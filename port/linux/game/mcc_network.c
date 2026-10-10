@@ -1,6 +1,8 @@
 #include "cseries.h"
 #include "mcc_network.h"
 #include "mcc_grenades.h"
+#include "mcc_campaign.h"
+#include "mcc_cache.h"
 #include "game/game.h"
 #include "game/players.h"
 #include "objects/objects.h"
@@ -46,6 +48,26 @@ static void mcc_network_observe_clock(long now)
 }
 
 word mcc_network_inventory_entry_size(void) { return sizeof(struct mcc_network_inventory); }
+word mcc_network_campaign_entry_size(void) { return MCC_CAMPAIGN_SNAPSHOT_BYTES; }
+
+static void mcc_network_campaign_tick(long now)
+{
+    struct {
+        struct distributed_message_header header;
+        byte state[MCC_CAMPAIGN_SNAPSHOT_BYTES];
+    } message;
+    if (!mcc_cache_tags_loaded() || game_connection()!=_game_connection_network_server || now%3) return;
+    /* Complete replacement snapshots also repair lost packets and late joins.
+     * OpenCE's normal host-only transport and stale-tick checks apply. */
+    mcc_campaign_snapshot(message.state);
+    distributed_send(&message,_distributed_message_mcc_campaign,1,sizeof(message),_distributed_to_clients);
+}
+
+void mcc_network_handle_campaign(void const *entries, short count)
+{
+    if (mcc_cache_tags_loaded() && game_connection()==_game_connection_network_client && count==1)
+        mcc_campaign_restore(entries,MCC_CAMPAIGN_SNAPSHOT_BYTES);
+}
 
 void mcc_network_host_tick(void)
 {
@@ -57,6 +79,7 @@ void mcc_network_host_tick(void)
     short count = 0;
     long now = game_time_get();
     short limit = MIN(64, DATAGRAM_ENTRIES(struct mcc_network_inventory));
+    mcc_network_campaign_tick(now);
     if (!mcc_grenades_active() || mcc_grenades_type_count() <= 2 ||
         game_connection() != _game_connection_network_server || now % 3) return;
     mcc_network_observe_clock(now);

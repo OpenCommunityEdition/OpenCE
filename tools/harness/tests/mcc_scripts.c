@@ -31,6 +31,8 @@ static char last_event[256];
 static struct object_datum mock_object;
 static int deleted_lists;
 word const hs_object_type_masks[6] = {0xFFFF, 3, 2, 4, 0x380, 0x40};
+struct hs_function_definition *mcc_campaign_function(short index) { (void)index;return NULL; }
+short mcc_campaign_find(char const *name) { (void)name;return NONE; }
 struct scenario *global_scenario_get(void) { return NULL; }
 boolean ai_index_from_string(struct scenario *scenario, char const *name, long *result) {
     (void)scenario;
@@ -165,8 +167,21 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "global")) {
         nodes[0].flags = 5; nodes[0].data = 0x8001; strcpy(strings, "known_global");
     }
+    if (!strcmp(argv[1], "skull_read") || !strcmp(argv[1], "skull_wrong_type")) {
+        nodes[0].flags=5;nodes[0].data=0x8001;nodes[0].type=_hs_type_boolean;
+        strcpy(strings,"debug_ice_cream_flavor_status_grunt_birthday_party");
+        if (!strcmp(argv[1], "skull_wrong_type")) {nodes[0].type=_hs_type_real;expected=0;}
+    }
+    if (!strcmp(argv[1], "skull_write")) {
+        strcpy(strings,"set");strcpy(strings+4,"debug_ice_cream_flavor_status_i_would_have_been_your_daddy");
+        nodes[2].flags=5;nodes[2].data=0x8001;nodes[2].string_offset=4;nodes[2].type=_hs_type_boolean;expected=0;
+    }
     CHECK(mcc_scripts_prepare(&runtime) == expected);
     if (!expected) { free(runtime.tags); return 0; }
+    if (!strcmp(argv[1], "skull_read")) {
+        CHECK(!(nodes[0].flags&4) && nodes[0].data==FALSE && nodes[0].constant_type==_hs_type_boolean);
+        free(runtime.tags);return 0;
+    }
     CHECK(syntax->maximum_count == 32767);
     CHECK(syntax->data == nodes);
     if (!strcmp(argv[1], "full_capacity")) {

@@ -8,6 +8,7 @@
 #include "interface/unit_hud_interface_definition.h"
 #include "rasterizer/rasterizer_swizzle.h"
 #include "mcc_runtime.h"
+#include "mcc_resources.h"
 #include <stdlib.h>
 #include <string.h>
 #define BCDEC_STATIC
@@ -17,18 +18,20 @@
 #define MCC_BITMAP_BASE 0x60000000u
 #define MCC_BITMAP_LIMIT 0x1FFFFFFFu
 #define MCC_BITMAP_ALLOCATION_LIMIT 0x08000000u
+#define MCC_BITMAP_STORAGE_LIMIT 0x40000000u
 
 struct mcc_texture {
     struct bitmap_data *bitmap;
     uint32_t handle, offset, size;
     unsigned char *pixels;
     unsigned channels;
+    uint32_t resource_handle, resource_index;
 };
 struct mcc_bitmap_clone { uint32_t source, target; unsigned channels; };
 struct mcc_textures {
     struct mcc_texture *items;
     struct mcc_bitmap_clone *clones;
-    uint32_t count, end, capacity, clone_count, tag_capacity;
+    uint32_t count, end, capacity, clone_count, tag_capacity, stream_end;
 };
 
 static void *mcc_bitmap_tag(struct mcc_runtime *runtime,uint32_t handle,uint32_t group,uint32_t size)
@@ -114,6 +117,7 @@ static int mcc_bitmap_specialize(struct mcc_runtime *runtime,struct mcc_textures
         if (textures->count>=textures->capacity) return 0;
         texture=&textures->items[textures->count++];
         texture->bitmap=&bitmaps[i];texture->handle=new_handle;texture->channels=channels;
+        texture->resource_handle=*handle;texture->resource_index=i;
     }
     textures->clones[textures->clone_count].source=*handle;
     textures->clones[textures->clone_count].target=new_handle;
@@ -417,10 +421,10 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     int convert=bitmap->format==18 || texture->channels==2 || texture->channels==4 ||
         ((bitmap->flags&16) && bitmap->format>=14 && bitmap->format<=17);
     int bytes_per_pixel=mcc_bitmap_bytes(bitmap->format);
-    uint32_t input_offset=0,output_offset=0,hardware_size,allocation;
+    uint32_t input_offset=0,output_offset=0,hardware_size,allocation,stream_offset=0,i;
     if (bitmap->width<=0 || bitmap->height<=0 || bitmap->depth<=0 || bitmap->type<0 || bitmap->type>2 ||
-        bitmap->width>4096 || bitmap->height>4096 || bitmap->depth>512 || bitmap->mipmap_count<0 || bitmap->mipmap_count>12 ||
-        bitmap->pixels_size<=0 || (bitmap->flags&0x100) || (!bytes_per_pixel && (bitmap->format<14 || bitmap->format>18))) return 0;
+        bitmap->width>8192 || bitmap->height>8192 || bitmap->depth>512 || bitmap->mipmap_count<0 || bitmap->mipmap_count>13 ||
+        bitmap->pixels_size<=0 || (!bytes_per_pixel && (bitmap->format<14 || bitmap->format>18))) return 0;
     if ((bitmap->type==1 && (bitmap->width>512 || bitmap->height>512 || bitmap->depth>256)) ||
         (bitmap->type!=1 && bitmap->depth!=1)) return 0;
     if (texture->channels && (texture->channels&(texture->channels-1))) {
@@ -464,11 +468,35 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
      * native hardware stops at a 4-texel dimension. Own enough storage for
      * both contracts, including the 2D tail sampled by CPU object lighting. */
     allocation=(MAX(hardware_size,(uint32_t)(convert ? decoded_size : raw_size))+127u)&~127u;
-    if (!hardware_size || allocation>MCC_BITMAP_ALLOCATION_LIMIT || allocation>MCC_BITMAP_LIMIT-textures->end) return 0;
+    /* The cache read contract includes the bitmap tag handle. Give each tag
+     * its own bounded virtual stream; the aggregate decoded storage can then
+     * exceed the old 512 MiB offset window without signed offsets or aliases
+     * between descriptors within one tag. Reads still require exact handles. */
+    for (i=0;i<textures->count;i++) {
+        struct mcc_texture const *previous=&textures->items[i];
+        if (previous->pixels && previous->handle==texture->handle)
+            stream_offset=MAX(stream_offset,previous->offset-MCC_BITMAP_BASE+previous->size);
+    }
+    if (!hardware_size || allocation>MCC_BITMAP_ALLOCATION_LIMIT ||
+        allocation>MCC_BITMAP_LIMIT-stream_offset || allocation>MCC_BITMAP_STORAGE_LIMIT-textures->end) {
+        error(_error_silent,"mcc bitmap: storage limit (used %lu, requested %lu)",textures->end,allocation);
+        return 0;
+    }
     raw=malloc((size_t)raw_size);
     pixels=malloc(allocation);
     if (pixels) memset(pixels,0,allocation);
-    if (!raw || !pixels || !mcc_runtime_read(runtime,bitmap->pixels_offset,(uint32_t)raw_size,raw)) goto failed;
+    if (!raw || !pixels) goto failed;
+    if (bitmap->flags&0x100) {
+        uint32_t *entry=(uint32_t *)(runtime->tag_index+(texture->resource_handle&0xFFFF)*32);
+        char const *name=mcc_runtime_pointer(runtime,entry[4],256);
+        char resource_name[272];
+        if (!name || !memchr(name,0,256)) goto failed;
+        snprintf(resource_name,sizeof(resource_name),"%s_%lu",name,(unsigned long)texture->resource_index);
+        if (!mcc_resources_read(runtime,1,resource_name,bitmap->pixels_offset,(uint32_t)raw_size,raw)) {
+            error(_error_silent,"mcc bitmap: external '%s' requires matching mcc_maps/bitmaps.map",resource_name);
+            goto failed;
+        }
+    } else if (!mcc_runtime_read(runtime,bitmap->pixels_offset,(uint32_t)raw_size,raw)) goto failed;
     if (convert) {
         for (level=0;level<=(unsigned)normalized.mipmap_count;level++) {
             unsigned w=MAX(bitmap->width>>level,1),h=MAX(bitmap->height>>level,1),d=MAX(bitmap->depth>>level,1),slice;
@@ -491,7 +519,7 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     bitmap->format=normalized.format;
     bitmap->flags=normalized.flags;
     bitmap->mipmap_count=normalized.mipmap_count;
-    bitmap->pixels_offset=MCC_BITMAP_BASE+textures->end;
+    bitmap->pixels_offset=MCC_BITMAP_BASE+stream_offset;
     bitmap->pixels_size=allocation;
     bitmap->tag_index=texture->handle;
     bitmap->cache_block_index=NONE;
@@ -499,6 +527,7 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     bitmap->base_address=NULL;
     texture->offset=bitmap->pixels_offset;texture->size=allocation;texture->pixels=pixels;
     textures->end+=allocation;
+    textures->stream_end=MAX(textures->stream_end,stream_offset+allocation);
     return 1;
 failed:
     if (raw) free(raw);
@@ -541,6 +570,7 @@ int mcc_bitmaps_prepare(struct mcc_runtime *runtime)
             if (textures->count>=runtime->report.bitmap_count) return 0;
             texture=&textures->items[textures->count++];
             texture->bitmap=&bitmaps[n];texture->handle=entry[3];
+            texture->resource_handle=entry[3];texture->resource_index=n;
         }
     }
     if (!mcc_bitmap_usages(runtime,textures)) {
@@ -574,7 +604,7 @@ int mcc_bitmaps_read(struct mcc_runtime *runtime,long tag,uint32_t offset,uint32
 uint32_t mcc_bitmaps_stream_end(struct mcc_runtime *runtime)
 {
     struct mcc_textures *textures=runtime->bitmaps;
-    return textures && textures->end ? MCC_BITMAP_BASE+textures->end : (uint32_t)runtime->source.size;
+    return textures && textures->stream_end ? MCC_BITMAP_BASE+textures->stream_end : (uint32_t)runtime->source.size;
 }
 
 int mcc_bitmaps_contains(struct mcc_runtime *runtime,uint32_t offset,uint32_t bytes)

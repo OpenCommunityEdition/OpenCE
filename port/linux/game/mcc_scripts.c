@@ -15,6 +15,7 @@
 #include "mcc_scripts.h"
 #include "mcc_script_parameters.h"
 #include "mcc_syntax.h"
+#include "mcc_campaign.h"
 #include <string.h>
 
 boolean hs_macro_function_parse(short index, long expression);
@@ -108,7 +109,7 @@ struct hs_function_definition *mcc_script_function(short index)
     if (!mcc_cache_tags_loaded()) return NULL;
     if (index == MCC_HS_DISTANCE_TO_OBJECT) return &mcc_distance_definition.definition;
     if (index == MCC_HS_MISSION_SEGMENT) return &mcc_mission_segment_definition;
-    return NULL;
+    return mcc_campaign_function(index);
 }
 
 short mcc_script_find(char const *name)
@@ -118,7 +119,7 @@ short mcc_script_find(char const *name)
     if (!csstrcasecmp(name, "mcc_mission_segment")) return MCC_HS_MISSION_SEGMENT;
     if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
         return hs_find_function_by_name("player_effect_set_max_rumble");
-    return NONE;
+    return mcc_campaign_find(name);
 }
 
 boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax)
@@ -130,6 +131,11 @@ boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_arr
     if (!function || !(call->flags & 8) || (call->flags & 3) ||
         !(node = datum_try_and_get(syntax, call->data))) return FALSE;
     next = node->next_node_index;
+    if (call->function_index == MCC_HS_CAMPAIGN_FIRST + 2) {
+        if (next == NONE) return TRUE;
+        node = datum_try_and_get(syntax, next);
+        return node && node->type == _hs_type_script && node->next_node_index == NONE;
+    }
     for (argument = 0; argument < function->parameter_count; ++argument) {
         node = datum_try_and_get(syntax, next);
         if (!node || node->type != function->parameter_types[argument]) return FALSE;
@@ -142,6 +148,12 @@ static char const *mcc_script_string(char const *strings, uint32_t bytes, long o
 {
     return offset >= 0 && (uint32_t)offset < bytes && memchr(strings + offset, 0, bytes - offset) ?
         strings + offset : NULL;
+}
+
+static boolean mcc_disabled_skull(char const *name)
+{
+    return name && (!csstrcasecmp(name,"debug_ice_cream_flavor_status_i_would_have_been_your_daddy") ||
+        !csstrcasecmp(name,"debug_ice_cream_flavor_status_grunt_birthday_party"));
 }
 
 int mcc_scripts_prepare(struct mcc_runtime *runtime)
@@ -165,6 +177,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
         return FALSE;
     }
     nodes = (struct hs_syntax_node *)(syntax + 1);
+    syntax->data = nodes;
     for (i = 0; i < syntax->count; ++i) {
         struct hs_syntax_node *node = &nodes[i];
         char const *name = NULL;
@@ -178,15 +191,35 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 return FALSE;
             name = mcc_script_string(strings, scenario->hs_string_constants.size, nodes[child].string_offset);
             if (!name) return FALSE;
+            /* These status queries describe disabled, unimplemented skulls.
+             * They are read-only constants, not writable legacy globals. */
+            if (!csstrcasecmp(name,"set")) {
+                struct hs_syntax_node *target = datum_try_and_get(syntax,nodes[child].next_node_index);
+                if (target && (target->flags & 1) && mcc_disabled_skull(
+                    mcc_script_string(strings,scenario->hs_string_constants.size,target->string_offset))) {
+                    error(_error_silent,"mcc: scripts cannot enable unsupported skull gameplay");
+                    return FALSE;
+                }
+            }
             if (!csstrcasecmp(name, "objects_distance_to_object")) index = MCC_HS_DISTANCE_TO_OBJECT;
             else if (!csstrcasecmp(name, "mcc_mission_segment")) index = MCC_HS_MISSION_SEGMENT;
             else if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
                 index = hs_find_function_by_name("player_effect_set_max_rumble");
-            else index = hs_find_function_by_name(name);
+            else {
+                index = mcc_campaign_find(name);
+                if (index == NONE) index = hs_find_function_by_name(name);
+            }
             if (index != NONE) node->function_index = nodes[child].function_index = index;
         } else if ((node->flags & 5) == 5 && ((uint16_t)node->data & 0x8000)) {
             name = mcc_script_string(strings, scenario->hs_string_constants.size, node->string_offset);
             if (!name) return FALSE;
+            if (mcc_disabled_skull(name)) {
+                if (node->type != _hs_type_boolean) return FALSE;
+                node->flags &= ~4;
+                node->constant_type = _hs_type_boolean;
+                node->data = FALSE;
+                continue;
+            }
             index = hs_find_global_by_name(name);
             if (index != NONE && ((uint16_t)index & 0x8000)) node->short_value = index;
             else index = NONE;

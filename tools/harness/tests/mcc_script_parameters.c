@@ -15,19 +15,22 @@
 #undef memset
 #undef memcpy
 #undef strcmp
+#undef strncmp
 #undef strcpy
 
 #define CHECK(value) do {if(!(value)){fprintf(stderr,"check failed at %d: %s\n",__LINE__,#value);return 1;}}while(0)
 struct hs_stack_frame {struct hs_stack_frame *previous;long expression_index;void *result;short size;byte data[2];};
 struct hs_thread_datum {short identifier;byte type,flags;long script_index,sleep_until,previous_sleep_until;
     struct hs_stack_frame *stack;long result;byte stack_data[512];};
-static struct hs_thread_datum thread;
+static struct hs_thread_datum thread,other_thread;
 static struct scenario *scenario;
 struct data_array *hs_syntax_data;
 static int loaded=1,errors,refs,returned,disabled;
 short const hs_external_global_count=443;
 static long last_result;
-static struct hs_thread_datum *hs_thread_get(long index) {(void)index;return &thread;}
+static struct hs_thread_datum *hs_thread_get(long index) {return index==1 ? &other_thread : &thread;}
+#define _hs_thread_sleeping_bit 1
+static long hs_find_thread_by_script(short script) { return script==0 ? 0 : script==1 ? 1 : NONE; }
 boolean mcc_cache_tags_loaded(void) {return loaded;}
 void error(short priority,char const *message,...) {(void)priority;(void)message;}
 void *csmemset(void *p,long value,unsigned long size) {return memset(p,(int)value,size);}
@@ -99,6 +102,33 @@ int main(int argc,char **argv) {
     nodes[2].flags=10;nodes[2].script_index=0;nodes[2].data=0x10003;
     nodes[3].type=_hs_function_name;nodes[3].next_node_index=0x10004;
     nodes[4].data=42;
+    if(!strncmp(argv[1],"sleep_",6)) {
+        int named=strcmp(argv[1],"sleep_self")!=0;
+        struct hs_thread_datum saved;
+        memset(&thread,0,sizeof(thread));memset(&other_thread,0,sizeof(other_thread));
+        frame=(void *)(thread.stack_data+32);thread.stack=frame;frame->expression_index=0x10002;
+        other_thread.sleep_until=123;nodes[4].data=1;
+        if(!named)nodes[3].next_node_index=NONE;
+        if(!strcmp(argv[1],"sleep_missing"))nodes[4].data=9;
+        if(!strcmp(argv[1],"sleep_finished"))other_thread.sleep_until=NONE;
+        mcc_sleep_forever_evaluate(0,0,TRUE);
+        if(named) {
+            CHECK(!returned && other_thread.sleep_until!=NONE-1);
+            saved=thread;memset(&thread,0,sizeof(thread));thread=saved;
+            frame->size=0;mcc_sleep_forever_evaluate(0,0,FALSE);
+            if(!strcmp(argv[1],"sleep_missing"))CHECK(other_thread.sleep_until==123);
+            else if(!strcmp(argv[1],"sleep_finished"))CHECK(other_thread.sleep_until==NONE);
+            else {
+                CHECK(other_thread.sleep_until==NONE-1 && other_thread.previous_sleep_until==123);
+                CHECK(TEST_FLAG(other_thread.flags,_hs_thread_sleeping_bit));
+                frame->size=0;mcc_sleep_forever_evaluate(0,0,TRUE);
+                frame->size=0;mcc_sleep_forever_evaluate(0,0,FALSE);
+                CHECK(other_thread.previous_sleep_until==123);
+            }
+            CHECK(thread.sleep_until==0);
+        } else CHECK(thread.sleep_until==NONE-1 && !thread.flags);
+        CHECK(returned && !errors);free(runtime.tags);return 0;
+    }
     if(!strcmp(argv[1],"count")){block[0]=17;valid=0;}
     else if(!strcmp(argv[1],"type")){type=_hs_type_void;memcpy(parameter+32,&type,2);valid=0;}
     else if(!strcmp(argv[1],"pointer")){block[1]=1;valid=0;}

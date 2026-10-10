@@ -808,8 +808,12 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 	unsigned long *converted;
 	unsigned long face, level;
 	GLenum gl_error;
-	if (!base || !texture_size_supported(description) || !description->levels ||
-		description->levels > 13 || !face_size || face_size > bytes / face_count ||
+	/* MCC credits can use an 8192-pixel strip. Keep the legacy texture cache's
+	 * size policy unchanged; this entry point owns only checked MCC pixels. */
+	if (!base || !description->width || !description->height || !description->depth ||
+		description->width > 8192 || description->height > 8192 || description->depth > 512 ||
+		(description->depth > 1 && (description->width > 512 || description->height > 512)) ||
+		!description->levels || description->levels > 14 || !face_size || face_size > bytes / face_count ||
 		information.kind == _texel_unknown) return FALSE;
 	/* Account for this upload's errors independently of earlier rendering. */
 	gl_error = glGetError();

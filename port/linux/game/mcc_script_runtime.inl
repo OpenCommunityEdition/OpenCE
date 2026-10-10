@@ -2,7 +2,39 @@
  * adapter uses its existing stack service, so arguments, recursion, sleep
  * and checkpoint state remain inside each native 512-byte thread stack. */
 #include "mcc_script_parameters.h"
+#include "mcc_campaign.h"
 long hs_cast(long thread_index, short actual_type, short desired_type, long value);
+
+void mcc_sleep_forever_evaluate(short function, long thread_index, boolean initialize)
+{
+    struct hs_thread_datum *thread=hs_thread_get(thread_index);
+    long *script=hs_stack_allocate(thread_index,sizeof(long));
+    long target=thread_index;
+    (void)function;
+    if (!script) return;
+    if (initialize) {
+        struct hs_syntax_node *call=hs_syntax_get(thread->stack->expression_index);
+        struct hs_syntax_node *predicate=call ? hs_syntax_get(call->data) : NULL;
+        if (!predicate) { hs_syntax_error(thread_index); return; }
+        *script=NONE;
+        if (predicate->next_node_index!=NONE) {
+            hs_evaluate(thread_index,predicate->next_node_index,script);
+            return;
+        }
+    }
+    if ((short)*script!=NONE) target=hs_find_thread_by_script((short)*script);
+    if (target!=NONE) {
+        struct hs_thread_datum *sleeper=hs_thread_get(target);
+        if (sleeper->sleep_until!=NONE) {
+            if (target!=thread_index && !TEST_FLAG(sleeper->flags,_hs_thread_sleeping_bit)) {
+                sleeper->previous_sleep_until=sleeper->sleep_until;
+                SET_FLAG(sleeper->flags,_hs_thread_sleeping_bit,TRUE);
+            }
+            sleeper->sleep_until=NONE-1;
+        }
+    }
+    hs_return(thread_index,0);
+}
 
 struct mcc_hs_arguments {
     unsigned long magic;

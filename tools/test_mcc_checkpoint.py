@@ -56,6 +56,15 @@ static long game_state_allocation_count;
 static int native_valid=1;
 ''' + '#include "' + (ROOT / "port/linux/game/mcc_checkpoint.c").as_posix() + '"\n' + r'''
 boolean mcc_cache_tags_loaded(void) {return loaded;}
+static int campaign_restores;
+void mcc_campaign_snapshot(void *out) {memset(out,0,MCC_CAMPAIGN_SNAPSHOT_BYTES);((unsigned char *)out)[0]=1;}
+int mcc_campaign_validate(void const *in,unsigned long bytes) {
+    return bytes==MCC_CAMPAIGN_SNAPSHOT_BYTES && ((unsigned char const *)in)[0]==1;
+}
+int mcc_campaign_restore(void const *in,unsigned long bytes) {
+    if(!mcc_campaign_validate(in,bytes))return 0;campaign_restores++;return 1;
+}
+void mcc_campaign_begin(void) {campaign_restores++;}
 struct data_array *object_header_data;
 short mcc_grenades_type_count(void) {return 4;}
 boolean mcc_level_name(char const *name) {return !strncmp(name,"mcc_maps\\",9);}
@@ -112,7 +121,7 @@ int main(int argc,char **argv) {
      memset(unit,0,sizeof(*unit));unit->identifier=1;unit->datum=(void *)(live+768);}
     game_state_globals.base_address=live;game_state_globals.cpu_allocation_size=used;
     tail=live+GAME_STATE_CPU_SIZE-MCC_CHECKPOINT_SLOT_BYTES;
-    footer=tail+MCC_CHECKPOINT_PAYLOAD_LIMIT;
+    footer=tail+MCC_CHECKPOINT_TOTAL_PAYLOAD;
     if(!strcmp(argv[1],"stock")) {
         loaded=0;strcpy(header->map_name,"levels\\a10\\a10");
         game_state_save();result=game_state_image_accept(saved,sizeof(saved));
@@ -132,9 +141,17 @@ int main(int argc,char **argv) {
     } else {
         if(!strcmp(argv[1],"core"))game_state_save_core("test");else game_state_save();
         if(writes!=1||captures!=1)return 4;
-        if(!strcmp(argv[1],"roundtrip")||!strcmp(argv[1],"core")) {
+        if(!strcmp(argv[1],"v1")) {
+            unsigned char *f=saved+(footer-live),*p=saved+(tail-live);
+            memmove(p+MCC_CAMPAIGN_SNAPSHOT_BYTES,p,payload_size);
+            mcc_checkpoint_put(f+4,1);mcc_checkpoint_put(f+8,payload_size);
+            mcc_checkpoint_put(f+12,mcc_checkpoint_checksum(p+MCC_CAMPAIGN_SNAPSHOT_BYTES,payload_size));
+            mcc_checkpoint_put(f+20,0);
+            result=game_state_image_accept(saved,sizeof(saved));
+            if(restores!=1 || campaign_restores!=1)return 12;
+        } else if(!strcmp(argv[1],"roundtrip")||!strcmp(argv[1],"core")) {
             live[4095]=33;result=game_state_image_accept(saved,sizeof(saved));
-            if(restores!=1||live[4095]!=0xA5)return 5;
+            if(restores!=1||campaign_restores!=1||live[4095]!=0xA5)return 5;
         } else if(!strcmp(argv[1],"cleanup")) {
             mcc_checkpoint_dispose();
             for(unsigned long i=0;i<MCC_CHECKPOINT_SLOT_BYTES;i++)if(tail[i]!=0xA5)return 6;
@@ -142,8 +159,12 @@ int main(int argc,char **argv) {
         } else {
             unsigned char *f=saved+(footer-live),*p=saved+(tail-live);
             if(!strcmp(argv[1],"payload"))p[7]^=1;
+            else if(!strcmp(argv[1],"campaign")) {
+                p[payload_size]=2;
+                mcc_checkpoint_put(f+12,mcc_checkpoint_checksum(p,payload_size+MCC_CAMPAIGN_SNAPSHOT_BYTES));
+            }
             else if(!strcmp(argv[1],"footer"))f[0]^=1;
-            else if(!strcmp(argv[1],"version"))f[4]=2;
+            else if(!strcmp(argv[1],"version"))f[4]=3;
             else if(!strcmp(argv[1],"reserved"))f[88]=1;
             else if(!strcmp(argv[1],"name"))strcpy(incoming->map_name,"mcc_maps\\other");
             else if(!strcmp(argv[1],"checksum"))incoming->cache_file_checksum++;
@@ -154,7 +175,7 @@ int main(int argc,char **argv) {
                 struct data_array *a=(void *)(saved+512);
                 struct object_header_datum *unit=(void *)(saved+640);
                 p[6]=1;p[8]=0;p[9]=0;p[10]=1;p[11]=0;p[12]=2;
-                mcc_checkpoint_put(f+12,mcc_checkpoint_checksum(p,16));
+                mcc_checkpoint_put(f+12,mcc_checkpoint_checksum(p,16+MCC_CAMPAIGN_SNAPSHOT_BYTES));
                 if(!strcmp(argv[1],"unit_salt"))unit->identifier=2;
                 else if(!strcmp(argv[1],"unit_type"))unit->type=2;
                 else if(!strcmp(argv[1],"unit_pointer"))unit->datum=(void *)(live+sizeof(live));
@@ -185,7 +206,7 @@ int main(int argc,char **argv) {
 @pytest.mark.parametrize("case", ["stock", "capacity", "capture_fail", "maximum", "oversize",
                                       "roundtrip", "core", "cleanup", "payload", "footer", "version",
                                       "reserved", "name", "checksum", "highwater", "native", "handles",
-                                      "unit_salt", "unit_type", "unit_pointer", "unit_array"])
+                                      "unit_salt", "unit_type", "unit_pointer", "unit_array", "v1", "campaign"])
 def test_mcc_checkpoint_and_native_hooks(checkpoint_tool, case):
     result = subprocess.run([str(checkpoint_tool), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr + f" ({case}: {result.returncode})"
