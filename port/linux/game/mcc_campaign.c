@@ -3,6 +3,8 @@
 #include "mcc_campaign.h"
 #include "mcc_cache.h"
 #include "errors.h"
+#include "cache/sound_cache.h"
+#include "sound/sound_definitions.h"
 #include "hs/hs.h"
 #include "hs/hs_scenario_definitions.h"
 #include "hs/object_lists.h"
@@ -221,7 +223,14 @@ static void mcc_position_distance_evaluate(short function, long thread, boolean 
     union { real number; long bits; } result;
     if (!args) return;
     result.number=-1.0f;
-    target.x=mcc_campaign_argument(args[1]);target.y=mcc_campaign_argument(args[2]);target.z=mcc_campaign_argument(args[3]);
+    if (function==MCC_HS_CAMPAIGN_FIRST+21) {
+        struct scenario *scenario=global_scenario_get();
+        short flag=(short)args[1];
+        if (flag<0 || flag>=scenario->cutscene_flags.count) {hs_return(thread,result.bits);return;}
+        target=((struct scenario_cutscene_flag *)scenario->cutscene_flags.address)[flag].position;
+    } else {
+        target.x=mcc_campaign_argument(args[1]);target.y=mcc_campaign_argument(args[2]);target.z=mcc_campaign_argument(args[3]);
+    }
     if (args[0]!=NONE && datum_try_and_get(object_list_header_data,args[0]) &&
         mcc_campaign_real(target.x) && mcc_campaign_real(target.y) && mcc_campaign_real(target.z)) {
         for (object=object_list_get_first(args[0],&cursor);object!=NONE;object=object_list_get_next(args[0],&cursor)) {
@@ -263,6 +272,59 @@ static void mcc_breadcrumbs_active_evaluate(short function, long thread, boolean
     hs_return(thread,TRUE);
 }
 
+/* MCC integer operators use 32-bit values, including a zero-filling right
+ * shift. Use unsigned operations so high bits and overflow are defined on
+ * both native x86 and the Android guest. Nonnegative counts wrap at 32;
+ * negative counts produce an empty mask/result. */
+static void mcc_bits_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    uint32_t value,mask,result;
+    short shift;
+    if (!args) return;
+    value=(uint32_t)args[0];shift=(short)args[1];
+    mask=shift<0 ? 0u : (UINT32_C(1) << ((unsigned)shift&31u));
+    switch (function-MCC_HS_CAMPAIGN_FIRST) {
+    case 13: result=value&(uint32_t)args[1];break;
+    case 14: result=value|(uint32_t)args[1];break;
+    case 15: result=shift<0 ? 0u : value << ((unsigned)shift&31u);break;
+    case 16: result=shift<0 ? 0u : value >> ((unsigned)shift&31u);break;
+    case 17: result=(value&mask)!=0;break;
+    case 18: result=(boolean)args[2] ? value|mask : value&~mask;break;
+    default: result=0;break;
+    }
+    hs_return(thread,(long)result);
+}
+
+static void mcc_print_if_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    void hs_print(char const *message);
+    if (!args) return;
+    if ((boolean)args[0] && args[1]) hs_print((char const *)args[1]);
+    hs_return(thread,0);
+}
+
+static void mcc_impulse_predict_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    struct sound_definition *sound;
+    long range,permutation;
+    if (!args) return;
+    /* Preload without creating a playing sound, acquiring references or
+     * choosing a random permutation. The boolean requests a blocking load. */
+    if (args[0]!=NONE) {
+        sound=sound_definition_get(args[0]);
+        for (range=0;range<sound->pitch_ranges.count;range++) {
+            struct sound_pitch_range *pitch=(struct sound_pitch_range *)sound->pitch_ranges.address+range;
+            for (permutation=0;permutation<pitch->permutations.count;permutation++)
+                _sound_cache_sound_request((struct sound_permutation *)pitch->permutations.address+permutation,
+                    (boolean)args[1],TRUE,FALSE);
+        }
+    }
+    hs_return(thread,0);
+}
+
 static void mcc_nav_evaluate(short function, long thread, boolean initialize);
 static boolean mcc_sleep_parse(short function, long expression)
 {
@@ -290,7 +352,16 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_void,0,"breadcrumbs_activate_team_nav_point_flag",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,4,{_hs_type_navpoint}},{_hs_type_enum_team,_hs_type_cutscene_flag,_hs_type_real}},
     {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point_flag",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_cutscene_flag}},
     {{_hs_type_void,0,"breadcrumbs_activate_team_nav_point_object",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,4,{_hs_type_navpoint}},{_hs_type_enum_team,_hs_type_object,_hs_type_real}},
-    {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point_object",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_object}}
+    {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point_object",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_object}},
+    {{_hs_type_long_integer,0,"bitwise_and",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_long_integer}},
+    {{_hs_type_long_integer,0,"bitwise_or",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_long_integer}},
+    {{_hs_type_long_integer,0,"bitwise_left_shift",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bitwise_right_shift",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bit_test",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bit_toggle",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,3,{_hs_type_long_integer}},{_hs_type_short_integer,_hs_type_boolean}},
+    {{_hs_type_void,0,"print_if",hs_macro_function_parse,mcc_print_if_evaluate,NULL,NULL,2,{_hs_type_boolean}},{_hs_type_string}},
+    {{_hs_type_void,0,"sound_impulse_predict",hs_macro_function_parse,mcc_impulse_predict_evaluate,NULL,NULL,2,{_hs_type_sound}},{_hs_type_boolean}},
+    {{_hs_type_real,0,"objects_distance_to_flag",hs_macro_function_parse,mcc_position_distance_evaluate,NULL,NULL,2,{_hs_type_object_list}},{_hs_type_cutscene_flag}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

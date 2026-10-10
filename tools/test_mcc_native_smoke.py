@@ -8,7 +8,8 @@ MARKER = "mcc_smoke_test"
 
 @pytest.mark.parametrize("fatal", ["type is inconsistent with usage (you need to recompile scripts.)",
                                   "the scenario's scripts won't run", "EXCEPTION halt",
-                                  "EXCEPTION assert in units.c,#1512: control_data->weapon_index"])
+                                  "EXCEPTION assert in units.c,#1512: control_data->weapon_index",
+                                  "backpack_1_argl: this is not a valid object name."])
 def test_loader_success_cannot_hide_fatal_script_error(fatal):
     assert not check_result(LOADED + "\n" + fatal, MARKER, MARKER, "b40", 0)["passed"]
 

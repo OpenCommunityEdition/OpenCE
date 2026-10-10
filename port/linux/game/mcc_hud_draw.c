@@ -51,3 +51,44 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
     cursor->x0=(short)(point.x+advance);
     return TRUE;
 }
+
+/* The four edge-center anchors are H1A additions (5..8). Keep them in
+ * MCC tags and handle them here instead of changing the native enum. */
+static boolean mcc_hud_edge(short anchor)
+{
+    return mcc_cache_tags_loaded() && anchor>=5 && anchor<=8;
+}
+
+boolean mcc_hud_anchor_point(short anchor, struct hud_placement_definition const *placement,
+    struct bitmap_data const *bitmap, real scale, rectangle2d const *window,
+    rectangle2d const *viewport, point2d *point)
+{
+    real x,y;
+    if (!mcc_hud_edge(anchor)) return FALSE;
+    x=(anchor==7 ? window->x0 : anchor==8 ? window->x1 : (window->x0+window->x1)*0.5f);
+    y=(anchor==5 ? window->y0 : anchor==6 ? window->y1 : (window->y0+window->y1)*0.5f);
+    x+=placement->offset.x*scale*(anchor==8 ? -1.0f : 1.0f)-viewport->x0;
+    y+=placement->offset.y*scale*(anchor==6 ? -1.0f : 1.0f)-viewport->y0;
+    if (bitmap) {
+        x+=(bitmap->registration_point.x-(anchor==8 ? bitmap->width : anchor<=6 ? bitmap->width*0.5f : 0))*scale;
+        y+=(bitmap->registration_point.y-(anchor==6 ? bitmap->height : anchor>=7 ? bitmap->height*0.5f : 0))*scale;
+    }
+    point->x=(short)x;point->y=(short)y;
+    return TRUE;
+}
+
+boolean mcc_hud_anchor_bounds(short anchor, real width, real height, real_rectangle2d *bounds)
+{
+    if (!mcc_hud_edge(anchor)) return FALSE;
+    bounds->x0=anchor==8 ? -width : anchor<=6 ? -width*0.5f : 0;
+    bounds->y0=anchor==6 ? -height : anchor>=7 ? -height*0.5f : 0;
+    bounds->x1=bounds->x0+width;bounds->y1=bounds->y0+height;
+    return TRUE;
+}
+
+boolean mcc_hud_anchor_number(short anchor, real width, real origin, short *cursor)
+{
+    if (!mcc_hud_edge(anchor)) return FALSE;
+    *cursor=(short)(origin+(anchor<=6 ? width*0.5f : anchor==7 ? width : 0));
+    return TRUE;
+}

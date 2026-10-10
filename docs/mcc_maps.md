@@ -160,6 +160,7 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/game/mcc_tags.c` | MCC metadata, shader-type, HUD placement and widget normalization. |
 | `port/linux/game/mcc_hud.c` | MCC bitmap/placement scaling, including nested weapon and grenade HUD items. |
 | `port/linux/game/mcc_hud_draw.c` | MCC canvas, glyph geometry and text advances; neutral dispatch for Xbox/CE. |
+| `port/linux/game/mcc_terminal.c` | MCC terminal-only font scaling; preserves the map's HUD fonts and all legacy rendering. |
 | `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking and supported MCC native functions. |
 | `port/linux/game/mcc_campaign.c` | Local-player/authority queries, gravity, campaign markers and scoped global permissions. |
 | `port/linux/game/mcc_syntax.c` | MCC's 32,767-slot syntax validation and traversal workspace. |
@@ -327,9 +328,11 @@ Navigation has eight independently owned team markers and uses the native
 HUD drawing services; the host replicates the complete marker state and
 gravity periodically, including after changes and late joins.
 
-The two recognized `debug_ice_cream_flavor_status_*` globals for IWHBYD and
-Grunt Birthday Party are read-only false values. This does not implement
-skull gameplay, and scripts trying to set them are refused. MCC maps may
+The recognized `debug_ice_cream_flavor_status_*` globals for IWHBYD,
+Grunt Birthday Party and Bandanna report false. This does not implement
+skull gameplay. A literal assignment of false is accepted because the
+skull is already disabled; attempts to enable one or assign a computed
+value are refused. MCC maps may
 set `sound_gain_under_dialog` and `cheat_infinite_ammo`; the adapter captures
 their previous values and restores them on unload. The native global table
 and Xbox/CE write permissions remain unchanged.
@@ -627,6 +630,79 @@ requires the x86 Windows game headers/toolchain and skips elsewhere.
 `port/tools/mcc_cache_report.c` builds with `mcc_cache_format.c` and only
 the C standard library, so files can also be audited outside the game.
 None of these commands downloads or bundles a game map.
+
+## Additional script and HUD compatibility
+
+The MCC function registry also supports `print_if`, `bitwise_and`,
+`bitwise_or`, `bitwise_left_shift`, `bitwise_right_shift`, `bit_test`,
+`bit_toggle`, `objects_distance_to_flag` and `sound_impulse_predict`.
+The integer operators use defined unsigned 32-bit operations; right shift
+fills with zero. Negative shift counts produce zero, while nonnegative
+counts use the low five bits. Bit-test/toggle use a bit position, and
+toggle's third argument selects set or clear. The prediction function
+requests all sound permutations from the existing sound cache without
+playing them or consuming random numbers. Its boolean selects a blocking
+request. Public signatures and the supplied compiled scripts were checked;
+this is not an exhaustive comparison with every MCC runtime edge case.
+
+When referenced, `developer_mode` is linked to an MCC scenario-owned short
+global, initially zero. Script reads, writes and native checkpoint storage
+therefore work without adding a global to the Xbox interpreter or enabling
+engine developer privileges. Loading a different scenario discards it.
+
+MCC HUD anchors 5 through 8 (top, bottom, left and right center) retain
+their authored values. MCC-only drawing handles their position, bitmap
+bounds and number alignment using the current player's window. The native
+anchor enum and its five existing cases are unchanged. Combat Revolved's
+unit HUD uses anchor 5; previously the native schema clamped it to top left.
+
+Oversized MCC terminal fonts are scaled at draw time to a 15-pixel line at
+the engine's 480p reference resolution. The supplied Combat Revolved font
+has a 33-pixel line. This affects only the console input/output, including
+wrapping and line spacing; it does not resize HUD text or modify font tags.
+Xbox/CE paths and MCC fonts at or below the nominal size remain unchanged.
+
+### B30 Evolved capacity limitation
+
+The supplied `b30_evolved.map` gets past its reported missing functions
+with these adapters, but it is **not yet playable**. It contains 640 named
+objects and a 101-entry scenery palette. The native object-name table and
+co-op presence message support 512 names; the scenario palette schema
+supports 100 entries. Earlier conversion truncated the names, followed by
+`backpack_1_argl: this is not a valid object name` during script startup.
+The MCC validator now refuses the oversized name list explicitly instead
+of reporting a loaded map after discarding required script targets.
+This check applies to every MCC map: 512 names are allowed, while 513 or
+more are refused. It does not change Xbox or Custom Edition validation.
+
+Supporting this map requires an MCC-owned name table with lifecycle,
+checkpoint and co-op synchronization support, plus an audit of palette
+consumers. Raising the shared Xbox/CE constants or dropping excess names
+is not a safe fix. The changes here do not claim that this map runs.
+
+### Checks for these changes (10 October 2026)
+
+The Windows x86 release build passed. The MCC, cache-format and BMP suite
+passed 876 tests with six optional-fixture skips. New tests cover typed
+integer operations, conditional printing, sound-cache prediction, writable
+scenario-local developer state, disabled-skull assignments, all four new
+HUD anchors, terminal layout bounds and unchanged legacy dispatch. Name
+capacity tests accept 512 and reject 513/640 without truncating the list;
+the same fixture still follows the original legacy validator behavior.
+
+The supplied Precipice and Combat Revolved B30 each passed a 70-second
+hidden native run, including delayed output after 150 simulation ticks,
+normal exit and no fatal script/assert diagnostics. Rendered Combat
+Revolved frames confirm centered shields/health and smaller console text.
+An initial transition test sent its command before map startup and was
+inconclusive; rerunning after waiting for loading verified simulation in
+MCC B30, Xbox A10, CE Hugeass and MCC B30 again in one process.
+
+B30 Evolved was tested separately and is refused at its object-name limit;
+it is not counted as a successful load. No full campaign playthrough or
+network co-op test was performed for these changes. Android remains
+unverified locally: `ninja android` reports an unknown target in this
+Windows-only configuration.
 
 ## Public format evidence
 

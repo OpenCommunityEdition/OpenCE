@@ -49,6 +49,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "mcc_hud_draw.h" /* port: MCC-only terminal sizing. */
 #include "terminal.h"
 
 #include "cache_files.h"
@@ -218,6 +219,8 @@ void terminal_draw(
 	{
 		struct font_header *font = font_definition_get(font_tag_index);
 		short line_height = font->ascending_height + font->descending_height + font->leading_height;
+		/* port: preserve native line spacing outside MCC maps. */
+		line_height = mcc_terminal_line_height(font_tag_index, line_height);
 		if (terminal_globals.input_state)
 		{
 			short buff_len;
@@ -247,6 +250,8 @@ void terminal_draw(
 				}
 				buffer[cursor_index] = '_';
 			}
+			/* port: MCC terminal font scaling does not modify the font tag. */
+			if (!mcc_terminal_draw(font_tag_index, &terminal_gets_bounds, buffer))
 			rasterizer_draw_string(&terminal_gets_bounds, NULL, NULL, 0, buffer);
 		}
 
@@ -289,6 +294,8 @@ void terminal_draw(
 				}
 
 				draw_string_set_draw_mode(font_tag_index, NONE, 0, 0, &color);
+				/* port: MCC-only scaling, also applied to console output. */
+				if (!mcc_terminal_draw(font_tag_index, &terminal_gets_bounds, line->buffer))
 				rasterizer_draw_string(&terminal_gets_bounds, NULL, NULL, 0, line->buffer);
 				draw_string_set_tab_stops(terminal_tab_stops, 0);
 			}

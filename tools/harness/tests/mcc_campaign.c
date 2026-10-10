@@ -12,6 +12,7 @@
 #include "interface/hud_definitions.h"
 #include "scenario/scenario_definitions.h"
 #include "mcc_campaign.h"
+#include "sound/sound_definitions.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,15 @@
 #undef strlen
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
+static int printed,requests,blocks;
+static struct sound_definition sound;
+static struct sound_pitch_range ranges[2];
+static struct sound_permutation permutations[3];
+void hs_print(char const *message) {if(strcmp(message,"100% literal"))abort();printed++;}
+void *tag_get(long group,long index) {if(group!='snd!'||index!=17)abort();return &sound;}
+boolean _sound_cache_sound_request(struct sound_permutation *p,boolean block,boolean load,boolean ref) {
+    if(p<permutations||p>=permutations+3||!load||ref)abort();requests++;blocks+=block;return TRUE;
+}
 static boolean loaded=TRUE;
 static short connection;
 static long args[7],result,added[4];
@@ -93,7 +103,36 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
-    if(!strcmp(argv[1],"players")) {
+    if(!strcmp(argv[1],"bits")) {
+        struct hs_function_definition *f;
+        args[0]=6;args[1]=3;call("bitwise_and");CHECK(result==2);
+        call("bitwise_or");CHECK(result==7);
+        args[0]=-1;args[1]=1;call("bitwise_right_shift");CHECK(result==0x7fffffff);
+        args[0]=1;args[1]=31;call("bitwise_left_shift");CHECK((unsigned long)result==0x80000000UL);
+        args[1]=-1;call("bitwise_left_shift");CHECK(result==0);
+        call("bitwise_right_shift");CHECK(result==0);
+        args[1]=32;call("bitwise_left_shift");CHECK(result==1);
+        args[0]=0;args[1]=31;args[2]=(long)0xffffff01;call("bit_toggle");CHECK((unsigned long)result==0x80000000UL);
+        args[0]=result;call("bit_test");CHECK(result==1);
+        args[2]=(long)0xffffff00;call("bit_toggle");CHECK(result==0);
+        args[0]=7;args[1]=-1;args[2]=1;call("bit_toggle");CHECK(result==7);
+        call("bit_test");CHECK(result==0);
+        f=mcc_campaign_function(mcc_campaign_find("bit_toggle"));
+        CHECK(f->return_type==_hs_type_long_integer && f->parameter_count==3 &&
+            f->parameter_types[1]==_hs_type_short_integer && f->parameter_types[2]==_hs_type_boolean);
+        result=123;f->evaluate(mcc_campaign_find("bit_toggle"),0,FALSE);CHECK(result==123);
+        args[0]=8;args[1]=1;call("objects_distance_to_flag");CHECK(number(result)==2.0f);
+        args[1]=NONE;call("objects_distance_to_flag");CHECK(number(result)==-1.0f);
+    } else if(!strcmp(argv[1],"print_predict")) {
+        args[1]=(long)"100% literal";args[0]=(long)0xffffff00;call("print_if");CHECK(!printed);
+        args[0]=1;call("print_if");CHECK(printed==1);
+        sound.pitch_ranges.count=2;sound.pitch_ranges.address=ranges;
+        ranges[0].permutations.count=1;ranges[0].permutations.address=permutations;
+        ranges[1].permutations.count=2;ranges[1].permutations.address=permutations+1;
+        args[0]=17;args[1]=0;call("sound_impulse_predict");CHECK(requests==3 && !blocks);
+        args[1]=(long)0xffffff01;call("sound_impulse_predict");CHECK(requests==6 && blocks==3);
+        args[0]=NONE;call("sound_impulse_predict");CHECK(requests==6);
+    } else if(!strcmp(argv[1],"players")) {
         call("local_players");CHECK(result==8&&count==2&&added[0]==0&&added[1]==2);
         units[2].object.damage_flags=1u<<_object_dead_bit;
         call("local_players");CHECK(count==1&&added[0]==0);

@@ -22,6 +22,7 @@
 #undef strcpy
 #undef strlen
 
+short const hs_external_global_count=443;
 static boolean loaded;
 static struct data_array list_data;
 struct data_array *object_list_header_data = &list_data;
@@ -65,7 +66,7 @@ long *hs_macro_function_evaluate(short function, long thread, boolean initialize
 }
 void hs_return(long thread, long value) { (void)thread; returned = value; }
 short hs_find_function_by_name(char const *name) {
-    if (!strcmp(name, "sleep")) return 321;
+    if (!strcmp(name, "sleep") || !strcmp(name,"set")) return 321;
     if (!strcmp(name, "player_effect_set_max_rumble")) return 322;
     return NONE;
 }
@@ -93,6 +94,10 @@ void *mcc_runtime_pointer(struct mcc_runtime *runtime, uint32_t address, uint32_
         runtime->tags + offset : NULL;
 }
 
+void *mcc_runtime_allocate(struct mcc_runtime *runtime,uint32_t bytes) {
+    if(runtime->used+bytes>runtime->capacity)return NULL;
+    {void *p=runtime->tags+runtime->used;runtime->used+=bytes;return p;}
+}
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\n", __LINE__); return 1; } } while (0)
 int main(int argc, char **argv) {
     struct mcc_runtime runtime = {0};
@@ -107,7 +112,8 @@ int main(int argc, char **argv) {
     CHECK(argc == 2);
     segment_index = !strcmp(argv[1], "core_segment") ? MCC_HS_CORE_SEGMENT : MCC_HS_MISSION_SEGMENT;
     runtime.used = 0x100000;
-    runtime.tags = malloc(runtime.used);
+    runtime.capacity=runtime.used+65536;
+    runtime.tags = malloc(runtime.capacity);
     CHECK(runtime.tags);
     memset(runtime.tags, 0, runtime.used);
     runtime.tag_index = runtime.tags + 40;
@@ -178,7 +184,52 @@ int main(int argc, char **argv) {
         strcpy(strings,"set");strcpy(strings+4,"debug_ice_cream_flavor_status_i_would_have_been_your_daddy");
         nodes[2].flags=5;nodes[2].data=0x8001;nodes[2].string_offset=4;nodes[2].type=_hs_type_boolean;expected=0;
     }
+    if (!strcmp(argv[1], "developer_read") || !strcmp(argv[1], "developer_cast")) {
+        nodes[0].flags=13;nodes[0].data=0x8001;
+        nodes[0].type=!strcmp(argv[1],"developer_cast") ? _hs_type_real : _hs_type_short_integer;
+        strcpy(strings,"developer_mode");
+    }
+    if (!strcmp(argv[1], "developer_write")) {
+        strcpy(strings,"set");strcpy(strings+4,"developer_mode");
+        nodes[2].flags=5;nodes[2].data=0x8001;nodes[2].string_offset=4;
+        nodes[2].type=_hs_type_short_integer;
+    }
+    if (!strcmp(argv[1],"skull_disable") || !strcmp(argv[1],"skull_enable") || !strcmp(argv[1],"skull_computed")) {
+        strcpy(strings,"set");strcpy(strings+4,"debug_ice_cream_flavor_status_bandanna");
+        nodes[0].type=_hs_type_void;
+        nodes[2].flags=5;nodes[2].data=0x8001;nodes[2].string_offset=4;nodes[2].type=_hs_type_boolean;
+        nodes[3].flags=9;nodes[3].type=nodes[3].constant_type=_hs_type_boolean;nodes[3].data=(long)0xffffff00;
+        if (!strcmp(argv[1],"skull_enable")) {nodes[3].data=1;expected=0;}
+        if (!strcmp(argv[1],"skull_computed")) {nodes[3].flags=13;expected=0;}
+    }
+    if (!strcmp(argv[1],"developer_capacity") || !strcmp(argv[1],"developer_allocation")) {
+        nodes[0].flags=13;nodes[0].data=0x8001;nodes[0].type=_hs_type_short_integer;
+        strcpy(strings,"developer_mode");expected=0;
+        if (!strcmp(argv[1],"developer_capacity")) scenario->hs_globals.count=1024-hs_external_global_count;
+        else runtime.capacity=runtime.used;
+    }
     CHECK(mcc_scripts_prepare(&runtime) == expected);
+    if (!strcmp(argv[1],"skull_disable")) {
+        CHECK(nodes[0].flags==9 && nodes[0].data==FALSE && nodes[0].constant_type==_hs_type_boolean);
+        CHECK(nodes[0].type==_hs_type_void && nodes[0].next_node_index==NONE);
+        free(runtime.tags);return 0;
+    }
+    if (!strcmp(argv[1],"developer_write")) {
+        struct hs_global *global=scenario->hs_globals.address;
+        struct hs_syntax_node *initial;
+        CHECK(scenario->hs_globals.count==1 && nodes[2].data==0 && (nodes[2].flags&4));
+        CHECK(!strcmp(global->name,"developer_mode") && global->type==_hs_type_short_integer);
+        initial=datum_try_and_get(syntax,global->initialization_expression_index);
+        CHECK(initial && initial->flags==9 && initial->short_value==0 && initial->type==_hs_type_short_integer);
+        CHECK(initial->next_node_index==NONE && initial->source_offset==NONE);
+    }
+    if (!strcmp(argv[1], "developer_read") || !strcmp(argv[1], "developer_cast")) {
+        CHECK((nodes[0].flags&4) && nodes[0].data==0 && scenario->hs_globals.count==1);
+        CHECK(((struct hs_global *)scenario->hs_globals.address)->type==_hs_type_short_integer);
+        CHECK(syntax->actual_count==5);
+        CHECK(nodes[0].type==(!strcmp(argv[1],"developer_cast") ? _hs_type_real : _hs_type_short_integer));
+        free(runtime.tags);return 0;
+    }
     if (!expected) { free(runtime.tags); return 0; }
     if (!strcmp(argv[1], "skull_read")) {
         CHECK(!(nodes[0].flags&4) && nodes[0].data==FALSE && nodes[0].constant_type==_hs_type_boolean);

@@ -19,6 +19,7 @@ struct test_child { short enumeration; short pad; struct tag_data data; struct t
 struct test_root {
     struct tag_block children; short index; short enumeration; struct tag_data file;
     struct tag_data hs_syntax_data, other_data;
+    struct tag_block object_names;
 };
 struct test_bsp { void *root; long vcount; void *vertices; long icount; void *indices; unsigned long signature; };
 struct test_device { short kind; unsigned short flags; struct tag_data identifier, profile; };
@@ -57,6 +58,8 @@ static struct tag_schema_field const child_fields[] = {
     TAG_SCHEMA_END
 };
 static struct tag_schema_definition const child_schema = TAG_SCHEMA_DEFINITION(child, struct test_child, child_fields);
+static struct tag_schema_field const name_fields[] = {TAG_SCHEMA_END};
+static struct tag_schema_definition const name_schema = {"object_name",36,name_fields};
 static struct tag_schema_field const root_fields[] = {
     TAG_SCHEMA_BLOCK(struct test_root, children, child_schema, 4),
     TAG_SCHEMA_BLOCK_INDEX(struct test_root, index, TAG_SCHEMA_ROOT, offsetof(struct test_root, children), 0),
@@ -64,6 +67,7 @@ static struct tag_schema_field const root_fields[] = {
     TAG_SCHEMA_FILE_DATA(struct test_root, file, 256),
     TAG_SCHEMA_DATA(struct test_root, hs_syntax_data, 56L + 20L * 19001),
     TAG_SCHEMA_DATA(struct test_root, other_data, 128),
+    TAG_SCHEMA_BLOCK(struct test_root, object_names, name_schema, 512),
     TAG_SCHEMA_CHECK(check_root),
     TAG_SCHEMA_END
 };
@@ -107,10 +111,14 @@ static struct tag_schema_field const grenade_fields[] = {TAG_SCHEMA_BLOCK(struct
 static struct tag_schema_definition const grenade_schema = {"game_globals",sizeof(struct test_grenades),grenade_fields};
 static struct tag_schema_field const equipment_fields[] = {TAG_SCHEMA_ENUM(struct test_equipment,grenade_type,2,0),TAG_SCHEMA_END};
 static struct tag_schema_definition const equipment_schema = {"equipment",sizeof(struct test_equipment),equipment_fields};
+struct test_anchor {short corner;};
+static struct tag_schema_field const anchor_fields[]={TAG_SCHEMA_ENUM(struct test_anchor,corner,5,0),TAG_SCHEMA_END};
+static struct tag_schema_definition const anchor_schema=TAG_SCHEMA_DEFINITION(hud_absolute_placement,struct test_anchor,anchor_fields);
 static struct tag_schema_group const groups[] = {
     {'scnr', {NONE, NONE}, &root_schema}, {'sbsp', {NONE, NONE}, &root_schema},
     {'antr', {NONE, NONE}, &graph_schema}, {'bitm', {NONE, NONE}, &bitmap_schema}, {'afp!', {NONE,NONE}, &fp_schema},
     {'matg', {NONE,NONE}, &grenade_schema}, {'eqip',{NONE,NONE}, &equipment_schema},
+    {'anch', {NONE, NONE}, &anchor_schema},
     {'trim', {NONE, NONE}, &padded_root_schema}, {0, {0, 0}, NULL}
 };
 struct tag_schema_group const *const tag_schema_group_lists[] = {groups, NULL};
@@ -150,6 +158,7 @@ int main(int argc, char **argv)
     memset(&runtime, 0, sizeof(runtime));
     runtime.capacity = 65536; runtime.used = 4096; runtime.source.size = 1024;
     if (!strncmp(argv[1], "syntax_", 7)) runtime.capacity = runtime.used = 1048576;
+    if (!strncmp(argv[1], "names_", 6)) runtime.used = runtime.capacity;
     runtime.tags = calloc(runtime.capacity, 1); CHECK(runtime.tags != NULL);
     header = (struct test_header *)runtime.tags;
     instance = (struct test_instance *)(runtime.tags + 0x28);
@@ -253,7 +262,32 @@ int main(int argc, char **argv)
             root->hs_syntax_data.size = MCC_SYNTAX_MAXIMUM_DATA_BYTES;
         }
     }
+    if (!strncmp(argv[1],"anchor_",7)) {
+        struct test_anchor *anchor=(void *)(runtime.tags+0x500);
+        header->count=2;instance[1].group='anch';instance[1].handle=(long)0xe0010001UL;
+        instance[1].root=anchor;instance[1].name=instance->name;
+        anchor->corner=(short)atoi(argv[1]+7);
+    }
+    if (!strncmp(argv[1],"names_",6)) {
+        root->object_names.count=atoi(argv[1]+6);
+        root->object_names.address=runtime.tags+0x1000;
+        expected=root->object_names.count<=512;
+    }
     CHECK(mcc_tags_validate(&runtime) == expected);
+    if (!strncmp(argv[1],"names_",6)) {
+        CHECK(root->object_names.count==atoi(argv[1]+6));
+        CHECK(tag_validate_tags(header,runtime.used,runtime.source.size,"legacy names"));
+        CHECK(root->object_names.count==512);
+        mcc_validation_dispose(&runtime);free(runtime.tags);return 0;
+    }
+    if (!strncmp(argv[1],"anchor_",7)) {
+        short input=(short)atoi(argv[1]+7);
+        struct test_anchor *anchor=instance[1].root;
+        CHECK(anchor->corner==(input>=0 && input<9 ? input : 0));
+        CHECK(tag_validate_tags(header,runtime.used,runtime.source.size,"legacy anchors"));
+        CHECK(anchor->corner==(input>=0 && input<5 ? input : 0));
+        mcc_validation_dispose(&runtime);free(runtime.tags);return 0;
+    }
     CHECK(!mcc_validation_callback_active());
     if (!strncmp(argv[1], "syntax_", 7) && expected) {
         CHECK(root->hs_syntax_data.size == MCC_SYNTAX_MAXIMUM_DATA_BYTES);

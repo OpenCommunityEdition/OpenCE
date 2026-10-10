@@ -162,10 +162,50 @@ static char const *mcc_script_string(char const *strings, uint32_t bytes, long o
         strings + offset : NULL;
 }
 
+/* Give MCC's developer flag ordinary scenario storage. This preserves
+ * script reads/writes and checkpoint lifetime without adding an external
+ * engine global or enabling native developer privileges. */
+static short mcc_developer_global(struct mcc_runtime *runtime, struct scenario *scenario,
+    struct data_array *syntax)
+{
+    extern short const hs_external_global_count;
+    struct hs_global *old,*globals;
+    struct hs_syntax_node *nodes=(struct hs_syntax_node *)(syntax+1),*initializer;
+    long count=scenario->hs_globals.count,i,slot;
+    if (count<0 || count>=1024-hs_external_global_count) return NONE;
+    old=mcc_runtime_pointer(runtime,(uint32_t)(uintptr_t)scenario->hs_globals.address,
+        (uint32_t)count*sizeof(*old));
+    if (count && !old) return NONE;
+    for (i=0;i<count;i++) {
+        if (memchr(old[i].name,0,sizeof(old[i].name)) && !csstrcasecmp(old[i].name,"developer_mode"))
+            return old[i].type==_hs_type_short_integer ? (short)i : NONE;
+    }
+    for (slot=0;slot<syntax->count;slot++) if (!nodes[slot].datum_header) break;
+    if (slot==syntax->maximum_count) return NONE;
+    globals=mcc_runtime_allocate(runtime,(uint32_t)(count+1)*sizeof(*globals));
+    if (!globals) return NONE;
+    if (count) memcpy(globals,old,count*sizeof(*globals));
+    memset(globals+count,0,sizeof(*globals));
+    memcpy(globals[count].name,"developer_mode",15);
+    globals[count].type=_hs_type_short_integer;
+    globals[count].initialization_expression_index=0x10000|slot;
+    initializer=nodes+slot;
+    memset(initializer,0,sizeof(*initializer));
+    initializer->datum_header=1;initializer->flags=9;
+    initializer->type=initializer->constant_type=_hs_type_short_integer;
+    initializer->next_node_index=NONE;initializer->source_offset=NONE;
+    if (slot>=syntax->count) syntax->count=(short)(slot+1);
+    syntax->actual_count++;
+    syntax->first_free_absolute_index=(short)(slot+1);
+    scenario->hs_globals.address=globals;scenario->hs_globals.count=count+1;
+    return (short)count;
+}
+
 static boolean mcc_disabled_skull(char const *name)
 {
     return name && (!csstrcasecmp(name,"debug_ice_cream_flavor_status_i_would_have_been_your_daddy") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_grunt_birthday_party"));
+        !csstrcasecmp(name,"debug_ice_cream_flavor_status_grunt_birthday_party") ||
+        !csstrcasecmp(name,"debug_ice_cream_flavor_status_bandanna"));
 }
 
 int mcc_scripts_prepare(struct mcc_runtime *runtime)
@@ -176,6 +216,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
     struct hs_syntax_node *nodes;
     char const *strings;
     long i, missing = 0;
+    short developer=NONE;
     memcpy(&address, runtime->tag_index + (runtime->report.scenario_handle & 0xFFFFu) * 32 + 20, 4);
     scenario = mcc_runtime_pointer(runtime, address, sizeof(*scenario));
     if (!scenario) return FALSE;
@@ -209,6 +250,17 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 struct hs_syntax_node *target = datum_try_and_get(syntax,nodes[child].next_node_index);
                 if (target && (target->flags & 1) && mcc_disabled_skull(
                     mcc_script_string(strings,scenario->hs_string_constants.size,target->string_offset))) {
+                    struct hs_syntax_node *value=datum_try_and_get(syntax,target->next_node_index);
+                    /* A literal disable is already satisfied. Retain the
+                     * expression's requested result type and sibling link;
+                     * never discard computed values or an enable request. */
+                    if (value && (value->flags&7)==1 && value->type==_hs_type_boolean &&
+                        value->constant_type==_hs_type_boolean && !value->boolean_value &&
+                        value->next_node_index==NONE) {
+                        node->flags=9;node->constant_type=_hs_type_boolean;
+                        node->data=FALSE;node->source_offset=NONE;
+                        continue;
+                    }
                     error(_error_silent,"mcc: scripts cannot enable unsupported skull gameplay");
                     return FALSE;
                 }
@@ -231,6 +283,15 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 node->flags &= ~4;
                 node->constant_type = _hs_type_boolean;
                 node->data = FALSE;
+                continue;
+            }
+            if (!csstrcasecmp(name,"developer_mode")) {
+                if (developer==NONE) developer=mcc_developer_global(runtime,scenario,syntax);
+                if (developer==NONE) {
+                    error(_error_silent,"mcc: no scenario storage for developer_mode");
+                    return FALSE;
+                }
+                node->data=developer;
                 continue;
             }
             index = hs_find_global_by_name(name);

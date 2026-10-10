@@ -1050,6 +1050,11 @@ void hud_calculate_point(
 		127,
 		placement);
 
+	/* port: MCC edge-center anchors use the current player's viewport. */
+	if (mcc_hud_anchor_point(absolute_placement->corner, placement, bitmap_data,
+		scale, &render.camera.window_bounds, &render.camera.viewport_bounds, result))
+		return;
+
 	corner = absolute_placement->corner;
 	if (corner < _hud_anchor_center)
 	{
@@ -1764,6 +1769,10 @@ static void hud_calculate_bitmap_bounds(
 	width = (clip->x1-clip->x0)*(is_interface_bitmap ? 1 : bitmap->width);
 	height = (clip->y1-clip->y0)*(is_interface_bitmap ? 1 : bitmap->height);
 
+	/* port: MCC-only bounds for its additional HUD anchors. */
+	if (mcc_hud_anchor_bounds(placement_type, width, height, bounds))
+		return;
+
 	switch (placement_type)
 	{
 	case _hud_anchor_top_left:
@@ -2080,6 +2089,10 @@ void hud_draw_numbers(
 				0.0f,
 				&origin);
 
+			/* port: MCC edge-center number alignment; native anchors keep their cases. */
+			if (!mcc_hud_anchor_number(absolute_placement->corner,
+				((digit_count-1.0f)*hud_number->screen_width+decimal_point_width)*scale,
+				origin.x, &cursor.x))
 			switch (absolute_placement->corner)
 			{
 			case _hud_anchor_top_left:

@@ -310,6 +310,14 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                     unsigned long bytes;
                     long maximum = field->maximum;
                     block->definition = NULL;
+                    /* Dropping object names breaks compiled script references
+                     * and the native/co-op name tables still have fixed size.
+                     * Refuse explicitly until MCC owns an extended runtime. */
+                    if (schema->name && !strcmp(schema->name, "scenario") &&
+                        !strcmp(field->name, "object_names") && block->count > maximum) {
+                        mcc_problem(context, 1, "object-name count exceeds the supported runtime capacity; names cannot be truncated");
+                        break;
+                    }
                     if (!element || element->size <= 0 || block->count < 0 ||
                         (unsigned long)block->count > context->length / (unsigned long)element->size) {
                         mcc_problem(context, 1, "invalid block count"); break;
@@ -412,6 +420,9 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                     if (field->type == _tag_schema_enum && schema->name &&
                         (!strcmp(schema->name, "unit") || !strcmp(schema->name, "equipment")) &&
                         !strcmp(field->name, "grenade_type")) maximum = 4;
+                    if (field->type == _tag_schema_enum && schema->name &&
+                        !strcmp(schema->name, "hud_absolute_placement") &&
+                        !strcmp(field->name, "corner")) maximum = 9;
                     if (field->type == _tag_schema_block_index) {
                         byte *target = NULL;
                         if (field->target_level == TAG_SCHEMA_ROOT) target = context->stack[0].address;
