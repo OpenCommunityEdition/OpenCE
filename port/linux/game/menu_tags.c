@@ -1752,10 +1752,10 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 /* ---------- the single-player campaign's pause menu
 
 Its list gets the same SETTINGS (pause_list_patch) before REVERT TO SAVED, a
-copy of it. The rows use the profile settings list's pitch, so a highlight
-sits clear of the next label the way CONTROLS SETUP and the rest do. The
-prompts (B and A) stay that same gap under the last row, and the box beside
-the mission objectives grows with them. Settings there has only the items
+copy of it. The rows use the PC version's pause menu's pitch, so a
+highlight sits clear of the next label. The prompts (B and A) stay that same
+gap under the last row, and the box beside the mission objectives grows with
+them. Settings there has only the items
 that work in a game (pause_settings_patch), and Gamepads' OK saves the
 profile itself. */
 
@@ -1772,12 +1772,12 @@ static char const *const pause_settings_hidden_items[] =
 	"main_menu/settings_select/player_setup/player_profile_edit/about_item",
 };
 
-/* the profile settings list's row pitch (CONTROLS SETUP, GAMEPADS, and the
-rest: 33 apart). The third pause box frame is the stock 159 grown by the
-48 that five rows at this pitch add (tools/port_settings.py) */
-#define PAUSE_CAMPAIGN_ROW_PITCH 33
+/* the PC version's pause menu's row pitch (30 apart). The third pause box
+frame is the stock 159 grown by the 36 that five rows at this pitch add
+(tools/port_settings.py) */
+#define PAUSE_CAMPAIGN_ROW_PITCH 30
 #define PAUSE_CAMPAIGN_BOX_FRAME 2
-#define PAUSE_CAMPAIGN_BOX_HEIGHT 207
+#define PAUSE_CAMPAIGN_BOX_HEIGHT 195
 
 /* the port box piece for one of the map's pause box pieces, else NULL */
 static char const *pause_campaign_box_bitmap(long tag_index)
