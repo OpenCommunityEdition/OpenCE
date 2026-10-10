@@ -305,8 +305,8 @@ static const struct config_setting config_settings[] =
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color." },
 	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
-		"How bright and far the shield glow reaches: \"default\" or \"light_show\"\n"
-		"(three times as bright and as far)." },
+		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
+		"times as far, and at full strength from a third of the flare)." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

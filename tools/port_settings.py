@@ -86,7 +86,7 @@ SCREENS = {
             ("SHIELD GLOW:", "display.shield_glow", ON_OFF,
              "Shields light their surroundings as they flare,\nin the shield's own color.", None),
             ("GLOW INTENSITY:", "display.shield_glow_intensity", [("DEFAULT", "default"), ("LIGHT SHOW", "light_show")],
-             "Light Show: the shield glow three times as\nbright and as far.", None),
+             "Light Show: the shield glow three times as far,\nat full from a third of the flare.", None),
         ],
     },
     "mouse_settings": {

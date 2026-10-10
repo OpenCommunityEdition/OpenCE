@@ -129,6 +129,6 @@
 		<string text="The size objects' shadows are drawn at: 128 as on\nthe Xbox; larger for smoother, as soft, edges."/>
 		<string text="Light models for each pixel, without the facets\nof the Xbox's lighting for each vertex."/>
 		<string text="Shields light their surroundings as they flare,\nin the shield's own color."/>
-		<string text="Light Show: the shield glow three times as\nbright and as far."/>
+		<string text="Light Show: the shield glow three times as far,\nat full from a third of the flare."/>
 	</strings>
 </menus>

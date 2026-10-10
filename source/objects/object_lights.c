@@ -716,10 +716,11 @@ void lights_dispose(
 }
 
 /* port: glows the port lights itself (port/linux/game/shield_glow.c): an
-ordinary dynamic light, not attached to a marker but to an object's node,
-kept alive and colored and sized each frame by its maker, gone a moment
-after its maker stops. Drawn with a light definition the map has (one
-without a gel, a lens flare or a flashlight's flags), so no new tags. */
+unattached light (light_new_unattached) on an object's node, kept alive and
+colored and sized each frame by its maker, gone a moment after its maker
+stops. Drawn with a light definition the map has (one without a lens flare
+or a flashlight's flags, a plasma one where there is one), so no new tags;
+NONE if it has none */
 static long light_port_glow_definition = NONE - 1;
 
 long light_port_glow_definition_get(
@@ -750,27 +751,8 @@ long light_port_glow_definition_get(
 	return light_port_glow_definition;
 }
 
-long light_port_glow_new(
-	long object_index,
-	short node_index)
-{
-	long definition_index = light_port_glow_definition_get();
-	long light_index;
-
-	if (definition_index == NONE)
-		return NONE;
-	light_index = light_new_unattached(definition_index, object_index, node_index,
-		(real_point3d const *)global_zero_vector3d, global_forward3d, 0.0f);
-	if (light_index != NONE)
-	{
-		struct light_datum *light = light_get(light_index);
-
-		SET_FLAG(light->flags, _point_light_port_glow_bit, TRUE);
-		light->color = *global_real_rgb_black;
-	}
-	return light_index;
-}
-
+/* port: a glow's light (one made with that definition, on that object) its
+color and radius for now; FALSE if it is gone */
 boolean light_port_glow_set(
 	long light_index,
 	long object_index,
@@ -782,8 +764,9 @@ boolean light_port_glow_set(
 	if (light_index == NONE || !light_data->valid)
 		return FALSE;
 	light = (struct light_datum *)datum_try_and_get(light_data, light_index);
-	if (!light || !TEST_FLAG(light->flags, _point_light_port_glow_bit) || light->object_index != object_index)
+	if (!light || light->definition_index != light_port_glow_definition || light->object_index != object_index)
 		return FALSE;
+	SET_FLAG(light->flags, _point_light_port_glow_bit, TRUE);
 	light->parent_light_index = game_time_get(); /* (alive another moment) */
 	light->color.red = PIN(color->red, 0.0f, 1.0f);
 	light->color.green = PIN(color->green, 0.0f, 1.0f);

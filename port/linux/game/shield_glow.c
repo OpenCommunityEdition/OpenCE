@@ -5,14 +5,19 @@ The energy shield's glow (Video Setup > Graphics > Shield Glow,
 display.shield_glow): as a unit's shield flares (hit, charging, falling),
 it lights what is around it, as a plasma bolt does, in the shield's own
 color: a Spartan's gold, an Elite's blue. display.shield_glow_intensity
-"light_show" makes it three times as bright and as far.
+"light_show" makes it reach three times as far, and at full strength from a
+third of the flare (a light is no brighter than full: the game's lights'
+colors go to 1).
 
 The flare's strength is the shield shader's own: the intensity its plasma is
 drawn with (its intensity source, an object function of the unit, to its
 exponent), so the glow rises and falls with the flare seen on the body. Its
 color is the shader's edge color at full brightness. The light is an
-ordinary dynamic light of the game's (object_lights.c's light_port_glow_*),
-drawn with a light definition the map already has: no new assets.
+ordinary dynamic light of the game's (light_new_unattached, which
+object_lights.c's light_port_glow_set colors and sizes), drawn with a light
+definition the map already has: no new assets. The units that glow are those
+near any local player's camera, the same for each of a split screen's views
+(lights_preprocess_scene runs for each), so each keeps its one light.
 
 Only the drawing changes: nothing the game simulates, nothing sent between
 machines.
@@ -27,6 +32,9 @@ machines.
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include "units/units.h"
+#include "camera/observer.h"
+#include "game/players.h"
+#include "objects/object_lights.h"
 
 #include <math.h>
 #include <string.h>
@@ -37,7 +45,7 @@ const char *config_string(const char *name);
 unsigned long config_changes(void);
 
 /* object_lights.c (port) */
-long light_port_glow_new(long object_index, short node_index);
+long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light_index, long object_index, real_rgb_color const *color, real radius);
 
 enum
@@ -97,6 +105,38 @@ static boolean shield_glow_enabled(
 		shield_glow_scale = intensity && !strcmp(intensity, "light_show") ? 3.f : 1.f;
 	}
 	return enabled;
+}
+
+/* a glow's light, on the unit's root node (NONE: none, or the map has no
+light definition to draw it with) */
+static long shield_glow_light_new(
+	long unit_index)
+{
+	long definition_index = light_port_glow_definition_get();
+
+	if (definition_index == NONE)
+		return NONE;
+	return light_new_unattached(definition_index, unit_index, 0, (real_point3d const *)global_zero_vector3d,
+		global_forward3d, 0.0f);
+}
+
+/* how far a point is from the nearest local player's camera */
+static real shield_glow_camera_distance(
+	real_point3d const *point)
+{
+	real nearest = SHIELD_GLOW_RANGE * 2.f;
+	short local_player_index;
+
+	for (local_player_index = local_player_get_next(NONE); local_player_index != NONE;
+		local_player_index = local_player_get_next(local_player_index))
+	{
+		struct observer_result const *camera = observer_get_camera(local_player_index);
+		real distance = camera ? distance3d(point, &camera->position) : nearest;
+
+		if (distance < nearest)
+			nearest = distance;
+	}
+	return nearest;
 }
 
 /* a unit's flare now: its strength (0: none) and color */
@@ -187,11 +227,8 @@ void shield_glow_update(
 			real flare;
 			struct shield_glow *glow;
 
-			if (distance3d(&object->object.bounding_sphere_center, &global_window_parameters.camera.position) >
-				SHIELD_GLOW_RANGE)
-			{
+			if (shield_glow_camera_distance(&object->object.bounding_sphere_center) > SHIELD_GLOW_RANGE)
 				continue;
-			}
 			flare = shield_glow_flare(iterator.index, &color);
 			glow = shield_glow_find(iterator.index, flare > SHIELD_GLOW_THRESHOLD);
 			if (!glow)
@@ -199,10 +236,16 @@ void shield_glow_update(
 			if (flare <= SHIELD_GLOW_THRESHOLD)
 				continue; /* (let go below) */
 			if (glow->light_index == NONE)
-				glow->light_index = light_port_glow_new(iterator.index, 0);
-			color.red *= flare * shield_glow_scale;
-			color.green *= flare * shield_glow_scale;
-			color.blue *= flare * shield_glow_scale;
+				glow->light_index = shield_glow_light_new(iterator.index);
+			/* (brighter, to full, every channel alike: the shield's color
+			kept) */
+			{
+				real strength = MIN(flare * shield_glow_scale, 1.f);
+
+				color.red *= strength;
+				color.green *= strength;
+				color.blue *= strength;
+			}
 			if (glow->light_index != NONE &&
 				light_port_glow_set(glow->light_index, iterator.index, &color,
 					(SHIELD_GLOW_RADIUS_MINIMUM + (SHIELD_GLOW_RADIUS_MAXIMUM - SHIELD_GLOW_RADIUS_MINIMUM) * flare) *
