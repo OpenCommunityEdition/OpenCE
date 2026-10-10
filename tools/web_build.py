@@ -130,7 +130,7 @@ WEB_EXCLUDE = {
 
 # the web runtime's units that, like posix_*.c, are the C library's side of
 # the platform layer, with its own ABI
-WEB_POSIX_SOURCES = {"web_main.c", "web_net.c", "web_stubs.c"}
+WEB_POSIX_SOURCES = {"web_main.c", "web_net.c", "web_stubs.c", "web_touch.c"}
 
 
 def _quote(path: Any) -> str:

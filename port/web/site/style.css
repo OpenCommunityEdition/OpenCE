@@ -225,4 +225,27 @@ button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad)
   z-index: 5;
 }
 
+/* the on-screen touch controls (touch.js): circles over the game */
+.touch { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.touch-control {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(219, 228, 240, 0.45);
+  background: rgba(10, 14, 20, 0.28);
+  color: rgba(219, 228, 240, 0.85);
+  font-family: "Overpass", system-ui, sans-serif;
+  font-weight: 750;
+  text-align: center;
+  line-height: 1;
+  pointer-events: none;
+}
+.touch-control.held { background: rgba(79, 179, 255, 0.45); border-color: var(--accent); }
+.touch-stick-zone { background: rgba(10, 14, 20, 0.12); border-style: dashed; }
+.touch-stick-ring, .touch-stick-knob { position: absolute; display: none; border-radius: 50%; pointer-events: none; }
+.touch-stick-ring { border: 2px solid rgba(219, 228, 240, 0.4); }
+.touch-stick-knob { background: rgba(219, 228, 240, 0.55); }
+
 [hidden] { display: none !important; }

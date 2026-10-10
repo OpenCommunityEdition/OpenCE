@@ -204,7 +204,7 @@ async function runChecks() {
   addCheck('opfs', opfs ? 'good' : 'bad', "The site's private storage (OPFS)");
   const memory = window.crossOriginIsolated && memoryAvailable();
   addCheck('memory', memory ? 'good' : 'bad', 'Memory for the game (2.1 GB)',
-    memory ? '' : 'a 64-bit browser on a computer is needed');
+    memory ? '' : 'this browser could not give the game that much: a 64-bit browser on a computer has it');
   const required = ['secure', 'isolated', 'webgl', 'opfs', 'memory'];
   return required.every((name) => results[name] === 'good');
 }
@@ -528,6 +528,8 @@ async function play() {
         else location.reload();
       },
     });
+    // the on-screen touch controls (touch.js)
+    window.HaloTouch.start(game, $('touch'));
   } catch (error) {
     showFatal(String(error && error.message ? error.message : error));
   }

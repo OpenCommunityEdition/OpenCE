@@ -17,6 +17,8 @@ game (shell_xbox.c's main, renamed halo_game_main by tools/web_build.py).
 #include <string.h>
 #include <sys/stat.h>
 
+#include "web_shared.h"
+
 int halo_game_main(void);
 /* web_library.js: a line for the page (kind 0 a status, 3 a fatal error) */
 void web_js_post(int kind, const char *text);
@@ -37,28 +39,18 @@ size_t emscripten_get_heap_size(void)
 	return size > WEB_HEAP_LIMIT ? WEB_HEAP_LIMIT : size;
 }
 
-/* ---------- what the page reads
+/* ---------- what the page reads and writes (web_shared.h) */
 
-The page reads these words of the shared memory itself (port/web/site/app.js),
-which it finds with web_state: the frames shown so far, whose count stops
-while a map loads (the game draws nothing then), so that the page shows that
-it is loading. */
+volatile int32_t web_shared[WEB_SHARED_WORDS];
 
-struct web_state
+EMSCRIPTEN_KEEPALIVE volatile int32_t *web_state(void)
 {
-	unsigned int frames_shown;
-};
-
-static struct web_state web_state_words;
-
-EMSCRIPTEN_KEEPALIVE struct web_state *web_state(void)
-{
-	return &web_state_words;
+	return web_shared;
 }
 
 void web_frame_shown(void)
 {
-	__atomic_add_fetch(&web_state_words.frames_shown, 1, __ATOMIC_RELAXED);
+	__atomic_add_fetch(&web_shared[_web_frames_shown], 1, __ATOMIC_RELAXED);
 }
 
 /* ---------- start */

@@ -16,7 +16,8 @@ the site. Nothing is uploaded.
 - A desktop browser: Chrome or Edge, or Firefox. Safari 17 or later may
   work. The page checks what it needs and says what is missing.
 - A 64-bit browser that gives the page 2.1 GB of memory (the Xbox's memory
-  window is at its top: "How it operates"). Phones are not supported yet.
+  window is at its top: "How it operates"). Desktop browsers do; a phone's
+  may not (the page says so), and iPhones are untried.
 - About 3 GB of the browser's storage: the maps (about 2 GB), and the
   game's copies of the maps it played (up to about 800 MB, as on the Xbox's
   hard disk), and the disc image (`.iso` or `.xiso`) on the computer.
@@ -60,6 +61,12 @@ The controls are the desktop builds' (refer to "Controls" in
   page a controller only then.
 - The sound starts at the first click or key press (browsers allow sound only
   then).
+- On a touchscreen, the Android app's on-screen controls (a stick, the
+  controller's buttons named by the profile's mapping, a swipe to turn) show
+  in a game while no controller is connected (`input.touch_controls`:
+  `auto`, `on`, `off`); the menus take taps. The phone vibrates with the
+  controller's rumble where the browser lets it. There is no layout editor
+  nor gyroscope aiming yet.
 
 The game keeps `config.toml`, the saved games and profiles (`save/`) and
 `debug.txt` in the browser's storage beside `maps/`. **Settings and data**
@@ -93,7 +100,6 @@ reloads.
   TCP. Split screen and the game's own network code between its players on
   one machine work (the sockets are inside the page: "How it operates").
 - No Custom Edition maps (their tag data's address is in the C heap there).
-- No touch controls (phones are not supported yet).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
@@ -205,6 +211,11 @@ multiply-adds). `tools/web_build.py` writes the graph.
 - **Left out.** The self-updater (the site updates itself), the disc image
   reader (the page's `xiso-worker.js` is), UPnP and Discord (no internet
   play), and the page-fault memory watch.
+- **The page and the game.** The memory is shared, so the page reads and
+  writes a few words of it itself (`port/web/src/web_shared.h`): the frames
+  shown, whose count standing still while a map loads makes the page say
+  so, and the touch controls' state, which `web_touch.c` hands the game as
+  the Android host does (`touch_input.c`).
 - **SDL.** SDL 3.4.16, the release the other builds use, built as an
   Emscripten port: windows, input, controllers and audio (an AudioWorklet).
   Its buffer is SDL's own size, not the desktop's 512 frames, which
@@ -266,8 +277,9 @@ a first visit downloads about 10 MB, compressed).
 | `port/web/src/web_memory_watch.c` | The memory watch by hashing |
 | `port/web/src/web_gl_host.c` | The renderer's services for WebGL 2 |
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
+| `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |
