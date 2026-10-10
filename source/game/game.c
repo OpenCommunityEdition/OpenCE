@@ -183,9 +183,9 @@ struct game_options;
 #include "units/vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #ifdef HALO_PROFILE
-#include "profile_console.h"
+#include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
-#include "cseries/profile_sections.h"
+#include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -609,7 +609,8 @@ boolean game_load(
 	struct game_options *options)
 {
 #ifdef HALO_PROFILE
-	/* (every map load passes here: main_new_map's and a network game's,
+	/* port: the profiling build's recording learns of the map (every map
+	load passes here: main_new_map's and a network game's,
 	network_game_manager.c) */
 	profile_console_map_loaded(options->map_name);
 #endif

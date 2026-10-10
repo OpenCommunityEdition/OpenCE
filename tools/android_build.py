@@ -26,8 +26,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, XDK_INCLUDE,
-                          compile_launcher, configuration_defines, game_defines_and_includes, game_sources, miniupnpc_sources,
-                          musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
+                          compile_launcher, configuration_defines, game_defines_and_includes, game_sources,
+                          miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
                           profile_use_flags, updater_defines, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer

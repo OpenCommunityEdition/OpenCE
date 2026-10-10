@@ -64,7 +64,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "cutscene/cinematics.h"
 #include "network_coop.h"
 #include "network_distributed.h"
-#include "cseries/profile_sections.h"
+#include "profile_sections.h"
 
 #include <math.h>
 

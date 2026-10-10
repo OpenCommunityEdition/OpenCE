@@ -130,6 +130,7 @@ void console_open(
 	{
 		console_globals.input_state.result[0] = '\0';
 		console_globals.active = terminal_gets_begin(&console_globals.input_state);
+		/* port: not in the profiling build (as in console_update) */
 #ifndef HALO_PROFILE
 		profile_global_enable = FALSE;
 #endif

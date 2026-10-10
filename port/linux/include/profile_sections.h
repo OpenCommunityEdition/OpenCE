@@ -1,7 +1,9 @@
 /*
 PROFILE_SECTIONS.H
 
-Wrap game CPU sections without changing normal builds.
+The profiling build's CPU sections around the game's steps (configure.py
+--profile, port/linux/src/profile_trace.c): in a normal build each wraps
+its statement and leaves nothing else.
 */
 
 #ifndef __PROFILE_SECTIONS_H

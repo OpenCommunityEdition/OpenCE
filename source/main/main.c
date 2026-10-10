@@ -381,9 +381,9 @@ symbols in this file:
 #include "networking/network_server_manager.h" /* port: a co-op game's level won */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
-#include "cseries/profile_sections.h"
+#include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 #ifdef HALO_PROFILE
-#include "profile_trace.h"
+#include "profile_trace.h" /* port: port/linux/src/profile_trace.c */
 #endif
 #include "camera/director.h"
 #include "camera/observer.h"
@@ -2382,6 +2382,7 @@ static void main_exit(
 	void)
 {
 #ifdef HALO_PROFILE
+	/* port: the profiling build's recording written out before the game goes */
 	profile_trace_shutdown();
 #endif
 	switch (main_globals.connection)

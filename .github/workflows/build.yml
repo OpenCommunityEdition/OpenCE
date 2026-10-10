@@ -73,6 +73,11 @@ jobs:
       - name: Debug
         run: python tools/ci_build.py linux debug
 
+      # (the profiling build, configure.py --profile, which no other step
+      # compiles)
+      - name: Profile
+        run: python tools/ci_build.py linux profile
+
       - name: Release
         run: python tools/ci_build.py linux release
 

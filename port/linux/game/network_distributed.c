@@ -73,7 +73,7 @@ machine (their datum identifiers need not be).
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_voice.h"
-#include "cseries/profile_sections.h"
+#include "profile_sections.h"
 
 #include <limits.h>
 #include <stdio.h>

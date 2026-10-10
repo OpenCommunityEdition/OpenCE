@@ -2842,7 +2842,7 @@ symbols in this file:
 #include "units/vehicles.h"
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #ifdef HALO_PROFILE
-#include "profile_console.h"
+#include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
 
 /* ---------- constants */

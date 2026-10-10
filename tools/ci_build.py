@@ -4,12 +4,14 @@
 
     python tools/ci_build.py linux debug
     python tools/ci_build.py android release
+    python tools/ci_build.py linux profile
 
 Builds are portable (any x86-64 processor), so they run on other
 computers. Debug builds skip link-time and profile-guided optimisation,
 which only make the build slower; release builds use both, as a local
 release build does (profile-guided optimisation needs clang 22 or later,
-and is skipped with an older one). CI_COMPILER_LAUNCHER (ccache, say) is
+and is skipped with an older one). A profile build is a debug build with
+configure.py --profile, so that the profiling build is built too. CI_COMPILER_LAUNCHER (ccache, say) is
 passed on as --compiler-launcher. A build of the main branch gets the run's
 number (HALO_BUILD_NUMBER), which its release is named after and the
 self-updater compares.
@@ -46,7 +48,7 @@ def run(command, cwd=ROOT):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("platform", choices=sorted(OUTPUTS))
-    parser.add_argument("config", choices=["debug", "release"])
+    parser.add_argument("config", choices=["debug", "release", "profile"])
     args = parser.parse_args()
 
     configure = [sys.executable, "configure.py", "--portable"]
@@ -54,6 +56,8 @@ def main() -> int:
         configure.append("--release")
     else:
         configure += ["--lto=off", "--pgo=off"]
+    if args.config == "profile":
+        configure.append("--profile")
     launcher = os.environ.get("CI_COMPILER_LAUNCHER")
     if launcher:
         configure += ["--compiler-launcher", launcher]
@@ -70,8 +74,9 @@ def main() -> int:
         # same name: release is signed with the debug key, not debuggable)
         run(["ninja", "android"])
         gradlew = "gradlew.bat" if os.name == "nt" else "./gradlew"
-        run([gradlew, "--console=plain", "-q", f"assemble{args.config.capitalize()}"], cwd=ROOT / "port/android")
-        outputs = [APKS[args.config]]
+        variant = "release" if args.config == "release" else "debug"
+        run([gradlew, "--console=plain", "-q", f"assemble{variant.capitalize()}"], cwd=ROOT / "port/android")
+        outputs = [APKS[variant]]
     else:
         run(["ninja", args.platform])
         outputs = OUTPUTS[args.platform]

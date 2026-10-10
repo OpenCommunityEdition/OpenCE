@@ -75,7 +75,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "saved games/game_state.h"
-#include "cseries/profile_sections.h"
+#include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 /* port/linux/game/network_distributed.c's */
 void network_distributed_tick(void);
 
