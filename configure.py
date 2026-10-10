@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
-from tools.linux_build import generate_linux_build, linux_configure_inputs
+from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
 
 # arguments
@@ -32,6 +32,12 @@ parser.add_argument(
     "--release",
     action="store_true",
     help="release builds (Linux, Windows, Android): assertions are not checked",
+)
+parser.add_argument(
+    "--profile",
+    action="store_true",
+    help="profiling builds (Linux, Windows, Android): CPU scopes recorded on a "
+    "console command or launch setting (README, \"Profiling builds\"); not with --pgo=train",
 )
 parser.add_argument(
     "--lto",
@@ -78,6 +84,10 @@ parser.add_argument(
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
 args = parser.parse_args()
+try:
+    check_profile_options(args.profile, args.pgo)
+except ValueError as error:
+    parser.error(str(error))
 
 # the settings the builds read
 sln = SimpleNamespace(
@@ -85,6 +95,7 @@ sln = SimpleNamespace(
     linux_cc=args.linux_cc,
     compiler_launcher=args.compiler_launcher,
     port_release=args.release,
+    port_profile=args.profile,
     port_lto=args.lto,
     port_portable=args.portable,
     port_pgo=args.pgo,

@@ -130,7 +130,9 @@ void console_open(
 	{
 		console_globals.input_state.result[0] = '\0';
 		console_globals.active = terminal_gets_begin(&console_globals.input_state);
+#ifndef HALO_PROFILE
 		profile_global_enable = FALSE;
+#endif
 	}
 
 	return;
@@ -510,7 +512,12 @@ boolean console_update(
 	{
 		console_globals.input_state.result[0] = '\0';
 		console_globals.active = terminal_gets_begin(&console_globals.input_state);
+		/* port: the profiling build: cleared mid-frame, a section already entered
+		would never exit, and its next enter assert; and opening the console
+		to type profile_stop would end the recording's timing */
+#ifndef HALO_PROFILE
 		profile_global_enable = FALSE;
+#endif
 	}
 
 	return console_globals.active;

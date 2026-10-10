@@ -1,0 +1,35 @@
+# halo profile summary, format 1
+# recording: profile_20261005-142233_host, parts 1-3 (complete)
+# build: 0 debug profile, platform: windows, role: host, own_machine: -
+# map: levels\a30\a30, players: 3 at start, 4 most
+# recorded: 2026-10-05 14:22:33 UTC, 6.0 s, 180 ticks, 360 frames, stopped: command
+# problems: none
+# units: ms = milliseconds
+
+## columns
+scope        CPU scope name (a profile section or frame timer); nested names use "."
+count        times the scope ran in the recording
+total_ms     summed inclusive time (children included), milliseconds
+mean_ms      total_ms / count
+max_ms       longest single run; aggregate sections: largest summed time in one frame
+per_frame    count / frames recorded
+per_tick_ms  total_ms / ticks recorded (game_tick.* and network_distributed_tick* only)
+frame        frame number in the recording
+at_s         seconds from the start of the recording to that frame
+frame_ms     that frame's duration
+ticks        game ticks that frame ran
+longest scopes (ms)  the frame's three scopes, at any depth, with the most time of their own (children not counted), name and that time
+
+## cpu scopes (top 40 by total_ms)
+scope                     count  total_ms  mean_ms  max_ms  per_frame  per_tick_ms
+frame                       360    2988.0    8.300  41.200       1.00            -
+render                      360    1440.0    4.000   9.800       1.00            -
+game_tick                   180     576.0    3.200   6.012       0.50        3.200
+game_tick.objects           180     252.0    1.400  12.100       0.50        1.400
+network_distributed_tick    180     108.0    0.600   4.000       0.50        0.600
+
+## worst frames (10)
+frame  at_s  frame_ms  ticks  longest scopes (ms)
+   12  0.20     40.20      2  game_tick.objects 12.1, render 9.8, network_distributed_tick 4.0
+  132  2.20     39.20      2  game_tick.objects 12.1, render 9.8, network_distributed_tick 4.0
+  252  4.20     38.20      2  game_tick.objects 12.1, render 9.8, network_distributed_tick 4.0

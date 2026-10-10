@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, WINDOWS_PROFILE, XDK_INCLUDE, lto_mode,
-                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, game_defines_and_includes,
+                          march_flag, miniupnpc_sources, pgo_mode, compile_launcher, configuration_defines, game_defines_and_includes,
                           game_sources, musl_math_cflags, musl_math_sources, opus_cflags, opus_sources, pgo_profile,
                           profile_use_flags, xdk_headers)
 from .embed_assets import hud_assets_build, hud_configure_inputs
@@ -324,8 +324,8 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
     # (a debug build checks its stack frames (/GS), and stops at the first
     # one overrun, as at the first failed assertion; a release build does
     # not, so that an overrun nobody has met cannot end a game)
-    abi = " ".join(WINDOWS_ABI_FLAGS + [march_flag(sln)] + (["-DHALO_RELEASE"] if getattr(sln, "port_release", False)
-                                                            else ["-fstack-protector-strong"]))
+    abi = " ".join(WINDOWS_ABI_FLAGS + [march_flag(sln)] + configuration_defines(sln)
+                   + ([] if getattr(sln, "port_release", False) else ["-fstack-protector-strong"]))
     sdl_include = SDL_DIR / "include"
     libs = " ".join(
         [_quote(SDL_DIR / "lib" / "x86" / "SDL3.lib")]

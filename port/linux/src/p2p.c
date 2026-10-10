@@ -58,6 +58,9 @@ only look up and create stand-ins.
 #include "port_config.h"
 #include "p2p_internal.h"
 #include "ikcp.h"
+#ifdef HALO_PROFILE
+#include "profile_trace.h"
+#endif
 
 #include <stddef.h>
 #include <stdio.h>
@@ -275,6 +278,32 @@ struct stun_server
 };
 
 pthread_mutex_t p2p_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#ifdef HALO_PROFILE
+/* the p2p thread's own track of the profiling build's recording
+(profile_trace.c): profile.c's sections are the game thread's alone */
+static struct
+{
+	int pass;
+	int tunnel_receive;
+	int kcp_update;
+	int streams;
+} p2p_profile_names;
+
+/* the recording's track lock: the game thread flips the recording and its
+arenas under it, and this thread records under it, so each record lands in
+one arena; a pass that drops the lock (DNS, key exchange) can straddle a
+cut, and profile_trace_end drops that scope */
+void p2p_profile_lock(void)
+{
+	pthread_mutex_lock(&p2p_lock);
+}
+
+void p2p_profile_unlock(void)
+{
+	pthread_mutex_unlock(&p2p_lock);
+}
+#endif
 
 static struct
 {
@@ -2824,6 +2853,13 @@ static void *p2p_thread(void *unused)
 	static int read_owners[MAXIMUM_SOCKETS], write_owners[MAXIMUM_SOCKETS];
 
 	(void)unused;
+#ifdef HALO_PROFILE
+	profile_trace_thread_register(_profile_track_p2p);
+	p2p_profile_names.pass = profile_trace_name("p2p.pass");
+	p2p_profile_names.tunnel_receive = profile_trace_name("p2p.tunnel_receive");
+	p2p_profile_names.kcp_update = profile_trace_name("p2p.kcp_update");
+	p2p_profile_names.streams = profile_trace_name("p2p.streams");
+#endif
 	pthread_mutex_lock(&p2p_lock);
 #ifndef HALO_ANDROID
 	/* (here: it may wait for a program) */
@@ -2903,6 +2939,9 @@ static void *p2p_thread(void *unused)
 			read_count = write_count = 0;
 		}
 		pthread_mutex_lock(&p2p_lock);
+#ifdef HALO_PROFILE
+		profile_trace_begin(p2p_profile_names.pass);
+#endif
 
 		/* what is ready (the lists now hold only ready sockets, in the order
 		asked, so each one's owner is found going along both); a socket
@@ -2921,7 +2960,13 @@ static void *p2p_thread(void *unused)
 			switch (owner & 255)
 			{
 			case _owner_tunnel:
+#ifdef HALO_PROFILE
+				profile_trace_begin(p2p_profile_names.tunnel_receive);
+#endif
 				tunnel_readable();
+#ifdef HALO_PROFILE
+				profile_trace_end(p2p_profile_names.tunnel_receive);
+#endif
 				break;
 			case _owner_handoff:
 				if (socket == p2p.handoff_socket)
@@ -2941,6 +2986,9 @@ static void *p2p_thread(void *unused)
 				break;
 			}
 		}
+#ifdef HALO_PROFILE
+		profile_trace_begin(p2p_profile_names.streams);
+#endif
 		for (index = 0, asked = 0; index < write_count; index++)
 		{
 			int socket = write[index];
@@ -2965,13 +3013,22 @@ static void *p2p_thread(void *unused)
 			if (stream->used && stream->state == _stream_connecting && elapsed(stream->created_time, 5000))
 				stream_local_closed(stream);
 		}
+#ifdef HALO_PROFILE
+		profile_trace_end(p2p_profile_names.streams);
+#endif
 		p2p_signal_update(read, read_count, write, write_count);
 
+#ifdef HALO_PROFILE
+		profile_trace_begin(p2p_profile_names.kcp_update);
+#endif
 		for (index = 0; index < MAXIMUM_STREAMS; index++)
 		{
 			if (p2p.streams[index].used)
 				stream_update(&p2p.streams[index]);
 		}
+#ifdef HALO_PROFILE
+		profile_trace_end(p2p_profile_names.kcp_update);
+#endif
 		update_peers();
 		expire_proxies();
 		stun_update();
@@ -2999,6 +3056,9 @@ static void *p2p_thread(void *unused)
 		p2p_discord_update();
 #ifdef HALO_ANDROID
 		poll_invite_file();
+#endif
+#ifdef HALO_PROFILE
+		profile_trace_end(p2p_profile_names.pass);
 #endif
 	}
 	return NULL;
