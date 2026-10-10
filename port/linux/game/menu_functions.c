@@ -3952,6 +3952,57 @@ static boolean profile_save_changes(struct widget_instance *widget, boolean *wid
 	return TRUE;
 }
 
+/* only what changed from before to after, into the local player's active
+profile, which the campaign saves its progress from */
+static void active_profile_take_changes(short local_player, long index, struct player_profile const *before,
+	struct player_profile const *after)
+{
+	struct player_profile active;
+	byte const *from = (byte const *)before;
+	byte const *to = (byte const *)after;
+	byte *changed = (byte *)&active;
+	long offset;
+
+	player_ui_get_active_player_profile(local_player, &active);
+	for (offset = 0; offset < (long)sizeof(active); offset++)
+	{
+		if (to[offset] != from[offset])
+			changed[offset] = to[offset];
+	}
+	player_ui_set_active_player_profile(local_player, index, &active);
+}
+
+/* "port profile settings save" (Gamepads' OK in a single-player campaign:
+menu_tags.c's pause_settings_patch): the profile saved at once, not on
+Settings' OK, its changes made the player's own, and edited again from what
+was saved, for Settings to go on with */
+static boolean profile_settings_save(struct widget_instance *widget)
+{
+	struct player_profile *edited = player_ui_get_edit_player_profile();
+	long index = player_ui_get_edit_profile_index();
+	struct player_profile before, after;
+	short local_player;
+
+	if (edited)
+		before = *edited;
+	settings_each(screen_of(widget), setting_changed_save);
+	if (!edited || !player_ui_edit_profile_is_dirty())
+		return TRUE;
+	after = *edited;
+	if (!player_ui_save_profile())
+	{
+		platform_log("menus: could not save the profile's changes");
+		return campaign_fail();
+	}
+	for (local_player = 0; local_player < MAXIMUM_LOCAL_PLAYERS; local_player++)
+	{
+		if (player_ui_get_active_player_profile_index(local_player) == index)
+			active_profile_take_changes(local_player, index, &before, &after);
+	}
+	player_ui_begin_editing_profile(index);
+	return TRUE;
+}
+
 /* "port pause end game" (the in-game pause menu's END GAME, the host's:
 menu_tags.c's pause_patch): the game ends as its time limit would, its
 players staying for the next (the carnage report, then the host's PICK GAME) */
@@ -5436,6 +5487,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "player profile save changes"))
 		{
 			return profile_save_changes(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port profile settings save"))
+		{
+			return profile_settings_save(widget);
 		}
 		else if (!strcmp(name, "direct ip connect go"))
 		{

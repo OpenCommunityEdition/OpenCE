@@ -367,6 +367,13 @@ struct player_profile *player_ui_get_edit_player_profile(
 	return result;
 }
 
+/* port */
+long player_ui_get_edit_profile_index(
+	void)
+{
+	return player_ui_globals.edit_profile_index;
+}
+
 struct game_variant *player_ui_get_edit_playlist_profile(
 	void)
 {
