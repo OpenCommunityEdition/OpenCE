@@ -488,10 +488,11 @@ enum resampler_mode
 {
 	/* windowed sinc low pass */
 	RESAMPLER_SINC,
-	/* linear interpolation: it suppresses unwanted spectral images less effectively,
-	but is a less filtered brighter alternative */
+	/* linear interpolation: it suppresses unwanted spectral images
+	less effectively, but it is a brighter alternative */
 	RESAMPLER_LINEAR,
 };
+/* audio.resampler */
 static enum resampler_mode resampler_mode = RESAMPLER_SINC;
 
 static enum resampler_mode get_resampler_mode_from_config(void)
