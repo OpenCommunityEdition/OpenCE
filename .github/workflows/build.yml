@@ -24,6 +24,11 @@ on:
     paths-ignore:
       - "**.md"
   workflow_dispatch:
+    inputs:
+      profile:
+        description: "Also build the profiling flavour (configure.py --profile) on Linux"
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -74,8 +79,10 @@ jobs:
         run: python tools/ci_build.py linux debug
 
       # (the profiling build, configure.py --profile, which no other step
-      # compiles)
+      # compiles: only when a run started by hand asks for it, as it costs a
+      # build of its own)
       - name: Profile
+        if: github.event_name == 'workflow_dispatch' && inputs.profile
         run: python tools/ci_build.py linux profile
 
       - name: Release
