@@ -99,9 +99,11 @@ void dsound_sdl_output_device_check(void);
 void updater_start(void);
 void updater_poll(SDL_Window *window);
 static void screen_keyboard_update(void);
+#ifndef HALO_GLES
 /* the windows' icon, a PNG (tools/embed_assets.py, from port/assets/icon) */
 extern const unsigned int platform_window_icon[];
 extern const unsigned long platform_window_icon_size;
+#endif
 #endif
 
 BOOL platform_sdl_initialize(void)
@@ -144,8 +146,9 @@ BOOL platform_sdl_initialize(void)
 	return TRUE;
 }
 
-#ifndef HALO_ANDROID
-/* ---------- first start without game data (xbox_files.c) */
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* ---------- first start without game data (xbox_files.c; the web page
+imports it itself) */
 
 struct data_extraction
 {
@@ -816,8 +819,9 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 #ifndef HALO_ANDROID
+#ifndef HALO_GLES
 	/* the game's icon, which the desktop shows for the window (on Windows
-	also halo.exe's own, port/windows/halo.rc) */
+	also halo.exe's own, port/windows/halo.rc; a web page has its own) */
 	if (platform_window_icon_size)
 	{
 		SDL_Surface *icon = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_window_icon, platform_window_icon_size), true);
@@ -826,6 +830,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 			platform_log("cannot set the window's icon: %s", SDL_GetError());
 		SDL_DestroySurface(icon);
 	}
+#endif
 	platform_fullscreen_requested = platform_fullscreen_setting();
 	platform_fullscreen_kind_apply();
 #endif

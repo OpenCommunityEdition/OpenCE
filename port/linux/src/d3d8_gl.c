@@ -4655,14 +4655,49 @@ void WINAPI D3DDevice_End(void)
 	if (!count || !prepare_draw(TRUE))
 		return;
 	trace_draw("immediate", type, count, device.immediate_vertices);
+#ifdef HALO_WEB
+	{
+		/* WebGL takes vertex strides of 255 bytes at most, and this vertex
+		is 256: each attribute goes in an array of its own */
+		static float *transposed;
+		static unsigned long transposed_capacity;
+		unsigned long attribute_size = 4 * sizeof(float);
+		unsigned long vertex;
+
+		if (count > transposed_capacity)
+		{
+			float *grown = realloc(transposed, count * stride);
+
+			/* (out of memory: the draw is dropped) */
+			if (!grown)
+				return;
+			transposed = grown;
+			transposed_capacity = count;
+		}
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			for (vertex = 0; vertex < count; vertex++)
+			{
+				memcpy(transposed + (index * count + vertex) * 4,
+					device.immediate_vertices + (vertex * XGPU_VERTEX_ATTRIBUTE_COUNT + index) * 4, attribute_size);
+			}
+		}
+		offset = stream_upload(transposed, count * stride);
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		{
+			state_attribute_stream(index, 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)attribute_size,
+				offset, index * count * attribute_size);
+		}
+	}
+#elif defined(HALO_GLES)
 	offset = stream_upload(device.immediate_vertices, count * stride);
-#ifdef HALO_GLES
 	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 	{
 		state_attribute_stream(index, 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)stride,
 			offset, index * 4 * sizeof(float));
 	}
 #else
+	offset = stream_upload(device.immediate_vertices, count * stride);
 	{
 		/* every attribute four floats, one after another */
 		static struct vertex_array_entry *immediate_array;

@@ -176,6 +176,10 @@ static void write_to_debug_file(
 	}
 	fprintf(file, "%s%s", prefix, string);
 	fflush(file);
+#ifdef HALO_WEB
+	/* port: and to the page's log (port/web/README.md) */
+	fputs(string, stderr);
+#endif
 }
 
 void write_to_error_file(

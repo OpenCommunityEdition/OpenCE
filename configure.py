@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # root build script: writes build.ninja for the native ports (Linux, Windows,
-# Android)
+# Android) and the web port
 
 import argparse
 import io
@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
 from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
+from tools.web_build import generate_web_build, web_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
 
 # arguments
@@ -31,7 +32,7 @@ parser.add_argument(
 parser.add_argument(
     "--release",
     action="store_true",
-    help="release builds (Linux, Windows, Android): assertions are not checked",
+    help="release builds (Linux, Windows, Android, web): assertions are not checked",
 )
 parser.add_argument(
     "--profile",
@@ -83,6 +84,11 @@ parser.add_argument(
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
 )
+parser.add_argument(
+    "--web-emcc",
+    type=str,
+    help="Emscripten's emcc for `ninja web` (default: emcc on the PATH, then EMSDK's or ~/emsdk's)",
+)
 args = parser.parse_args()
 try:
     check_profile_options(args.profile, args.pgo)
@@ -102,6 +108,7 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    web_emcc=args.web_emcc,
 )
 
 
@@ -127,6 +134,7 @@ n.newline()
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
 generate_windows_build(n, sln)
+generate_web_build(n, sln)
 
 n.comment("Reconfigure on change")
 n.rule(
@@ -144,6 +152,7 @@ n.build(
         *linux_configure_inputs(),
         *android_configure_inputs(),
         *windows_configure_inputs(),
+        *web_configure_inputs(),
     ],
 )
 n.newline()

@@ -143,6 +143,7 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "game/game_engine.h" /* port: game_engine_vehicle_placement_begin's type, which WebAssembly calls it by */
 
 /* ---------- constants */
 

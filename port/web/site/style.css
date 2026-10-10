@@ -1,0 +1,228 @@
+/* The launcher page (index.html): the colours of the game's menus, the
+   fonts the port draws them with (Overpass, and OpenCE for the title). */
+
+@font-face {
+  font-family: "OpenCE";
+  src: url("fonts/OpenCE-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Overpass";
+  font-weight: 750;
+  src: url("fonts/Overpass-750.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --background: #0a0e14;
+  --panel: #111925;
+  --panel-edge: #23324a;
+  --text: #dbe4f0;
+  --muted: #8ea0b8;
+  --accent: #4fb3ff;
+  --accent-text: #04121f;
+  --good: #5ed39a;
+  --bad: #ff6b6b;
+  --warn: #f2c14e;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+a { color: var(--accent); }
+code { font-size: 0.9em; }
+
+#launcher {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.masthead img { border-radius: 16px; flex: none; }
+.masthead h1 {
+  margin: 0;
+  font: 400 44px/1 "OpenCE", "Overpass", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+}
+.tagline { margin: 6px 0 0; color: var(--muted); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin: 16px 0;
+}
+.panel h2, .panel summary, .sheet h2 {
+  margin: 0 0 8px;
+  font: 750 15px/1.3 "Overpass", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+details.panel summary { cursor: pointer; margin: 0; }
+details.panel[open] summary { margin-bottom: 12px; }
+
+.checks { list-style: none; margin: 0; padding: 0; }
+.checks li { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
+.checks li::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  transform: translateY(-1px);
+}
+.checks li.good::before { background: var(--good); }
+.checks li.bad::before { background: var(--bad); }
+.checks li.warn::before { background: var(--warn); }
+.checks .detail { color: var(--muted); font-size: 14px; }
+
+.status { margin: 0 0 12px; }
+.note { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  background: #182436;
+  color: var(--text);
+  font: 750 14px/1 "Overpass", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+button:hover:not(:disabled), .button:hover { border-color: var(--accent); }
+button:focus-visible, .button:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled, .button.disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+
+.play-row { margin: 24px 0; }
+.play-row .primary { min-width: 200px; min-height: 52px; font-size: 18px; }
+
+.progress { margin-top: 12px; }
+.progress-bar { height: 8px; border-radius: 4px; background: #1d2a3e; overflow: hidden; }
+.progress-bar > div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: 14px; }
+
+/* the game: the canvas fills the window */
+#game { position: fixed; inset: 0; background: #000; }
+#canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+.starting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #1d2a3e;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.toolbar {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  display: flex;
+  gap: 6px;
+  opacity: 0.25;
+  transition: opacity 0.2s;
+}
+.toolbar:hover, .toolbar:focus-within { opacity: 1; }
+.toolbar button { min-height: 32px; padding: 6px 10px; font-size: 12px; background: rgba(10, 14, 20, 0.8); }
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 10;
+}
+.sheet-body {
+  width: min(760px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.sheet pre {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px;
+  background: #070a0f;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.banner {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 10px 12px 10px 16px;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  z-index: 5;
+}
+
+[hidden] { display: none !important; }

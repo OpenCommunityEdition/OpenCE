@@ -96,6 +96,11 @@ symbols in this file:
 
 #include <xtl.h>
 
+/* port: players.c's, called here undeclared, which WebAssembly cannot do with
+another type than its own */
+void player_delete(
+	long player_index);
+
 /* ---------- constants */
 
 /* the machine and player slots of a network game: the Xbox's 4 and 16, or the

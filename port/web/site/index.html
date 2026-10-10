@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OpenCE</title>
+<meta name="description" content="Halo: Combat Evolved in your browser, from your own Xbox disc image. OpenCE, the decompilation's port.">
+<meta name="theme-color" content="#0a0e14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="launcher">
+  <header class="masthead">
+    <img src="icons/icon-192.png" alt="" width="72" height="72">
+    <div>
+      <h1>OpenCE</h1>
+      <p class="tagline">Halo: Combat Evolved in your browser, from your own Xbox disc.</p>
+    </div>
+  </header>
+
+  <section class="panel" id="checks-panel" aria-labelledby="checks-title">
+    <h2 id="checks-title">This browser</h2>
+    <ul id="checks" class="checks"></ul>
+    <p id="checks-note" class="note" hidden></p>
+  </section>
+
+  <section class="panel" id="data-panel" aria-labelledby="data-title">
+    <h2 id="data-title">Game data</h2>
+    <p id="data-status" class="status">Looking…</p>
+    <div class="actions">
+      <label class="button" id="image-label">Choose a disc image…
+        <input type="file" id="image-input" accept=".iso,.xiso,application/octet-stream" hidden>
+      </label>
+      <label class="button" id="folder-label">Choose a maps folder…
+        <input type="file" id="folder-input" webkitdirectory multiple hidden>
+      </label>
+    </div>
+    <div id="import-progress" class="progress" hidden>
+      <div class="progress-bar"><div id="import-bar"></div></div>
+      <p id="import-text" class="note"></p>
+    </div>
+    <p class="note">The maps are copied out of your own disc image (an .iso of Halo: Combat Evolved for the
+      Xbox) into this browser's storage for this site. Nothing is uploaded, and the site serves no game data.</p>
+  </section>
+
+  <div class="play-row">
+    <button id="play" class="primary" disabled>Play</button>
+    <p id="play-note" class="note"></p>
+  </div>
+
+  <details class="panel" id="settings-panel">
+    <summary>Settings and data</summary>
+    <p id="storage-status" class="note"></p>
+    <div class="actions">
+      <button id="persist">Keep this site's data</button>
+      <button id="export-saves">Export saved games</button>
+      <button id="download-log">Download the log</button>
+      <button id="delete-data" class="danger">Delete the game data</button>
+    </div>
+    <p class="note">The game's own settings (Settings in its menus, and <code>config.toml</code>) travel with
+      exported saved games. Keyboard: as on the desktop, but crouch is C (Ctrl would close the tab).</p>
+  </details>
+
+  <details class="panel" id="about-panel">
+    <summary>About</summary>
+    <p>OpenCE is the Halo: Combat Evolved decompilation (Xbox build 01.01.14.2342), ported to Linux, Windows,
+      Android and the web. It is not affiliated with Microsoft or Bungie.</p>
+    <dl class="facts">
+      <dt>Build</dt><dd id="about-build">–</dd>
+      <dt>Commit</dt><dd id="about-commit">–</dd>
+      <dt>Network version</dt><dd id="about-network">–</dd>
+    </dl>
+    <p>
+      <a href="https://github.com/OpenCommunityEdition/OpenCE">Source</a> ·
+      <a href="https://github.com/OpenCommunityEdition/OpenCE/releases/latest">Linux, Windows and Android builds</a> ·
+      <a href="licenses.txt">Licences</a>
+    </p>
+  </details>
+</main>
+
+<div id="game" hidden>
+  <canvas id="canvas" tabindex="0" aria-label="The game"></canvas>
+  <div id="starting" class="starting">
+    <div class="spinner" aria-hidden="true"></div>
+    <p id="starting-text">Starting…</p>
+  </div>
+  <div class="toolbar" id="toolbar">
+    <button id="fullscreen" title="Fullscreen">Fullscreen</button>
+    <button id="leave" title="Back to the launcher (the game stops)">Quit</button>
+  </div>
+</div>
+
+<div id="fatal" class="sheet" role="alertdialog" aria-labelledby="fatal-title" hidden>
+  <div class="sheet-body">
+    <h2 id="fatal-title">The game stopped</h2>
+    <p id="fatal-text"></p>
+    <pre id="fatal-log"></pre>
+    <div class="actions">
+      <button id="fatal-log-download">Download the log</button>
+      <button id="fatal-reload" class="primary">Reload</button>
+    </div>
+  </div>
+</div>
+
+<div id="update" class="banner" role="status" hidden>
+  <span id="update-text">A new build is out.</span>
+  <button id="update-button">Update</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

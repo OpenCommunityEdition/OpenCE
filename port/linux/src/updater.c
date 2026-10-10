@@ -29,7 +29,7 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #include "port_config.h"
 #include "update.h"
 
-#ifndef HALO_ANDROID
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 
 #include "zlib_prefixed.h"
 
@@ -654,5 +654,15 @@ void updater_poll(SDL_Window *window)
 void updater_start(void)
 {
 }
+
+#ifdef HALO_WEB
+#include <SDL3/SDL.h>
+
+/* (the site updates itself: port/web/site/sw.js) */
+void updater_poll(SDL_Window *window)
+{
+	(void)window;
+}
+#endif
 
 #endif

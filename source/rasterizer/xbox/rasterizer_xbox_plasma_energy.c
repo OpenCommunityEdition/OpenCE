@@ -111,7 +111,9 @@ typedef char pixel_shader_definition_size_assert[
 
 /* ---------- prototypes */
 
-void rasterizer_set_texture(
+/* port: the definition's type (rasterizer_xbox.h), which WebAssembly calls
+it by */
+union point2d *rasterizer_set_texture(
 	short stage,
 	short bitmap_type,
 	short bitmap_index,
