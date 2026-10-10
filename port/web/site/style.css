@@ -178,6 +178,33 @@ button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad)
 }
 .toolbar:hover, .toolbar:focus-within { opacity: 1; }
 .toolbar button { min-height: 32px; padding: 6px 10px; font-size: 12px; background: rgba(10, 14, 20, 0.8); }
+/* a game hosted for the internet: its invite link (app.js) */
+.invite {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  max-width: calc(100% - 200px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(10, 14, 20, 0.85);
+  color: var(--text);
+  font-size: 12px;
+}
+.invite input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  background: #0a0e14;
+  color: var(--text);
+  font: 12px ui-monospace, monospace;
+}
+.invite button { min-height: 30px; padding: 6px 10px; font-size: 12px; }
 
 .sheet {
   position: fixed;

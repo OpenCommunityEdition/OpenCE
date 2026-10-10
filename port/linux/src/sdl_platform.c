@@ -936,8 +936,10 @@ static Uint64 frame_interval_ns(void)
 
 #endif
 #ifdef HALO_WEB
-/* port/web/src/web_main.c's: the frames shown, which the page reads */
+/* port/web/src/web_main.c's: the frames shown, which the page reads; and
+web_library.js's: a line for the page (2: an invite link to offer) */
 void web_frame_shown(void);
+void web_js_post(int kind, const char *text);
 #endif
 
 void platform_video_swap(void)
@@ -1171,9 +1173,15 @@ static void platform_invite_clipboard(BOOL look)
 
 	if (invite)
 	{
+#ifdef HALO_WEB
+		/* (a page may write the clipboard only when it is clicked: the page
+		shows the link, with a button that copies it) */
+		web_js_post(2, invite);
+#else
 		SDL_SetClipboardText(invite);
 		snprintf(seen, sizeof(seen), "%s", invite);
 		platform_log("Internet play: the invite link is on the clipboard");
+#endif
 #ifdef HALO_ANDROID
 		SDL_ShowAndroidToast("Hosting: the invite link is on the clipboard", 1, -1, 0, 0);
 #endif

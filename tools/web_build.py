@@ -126,6 +126,8 @@ WEB_EXCLUDE = {
     "posix_update.c",       # the self-updater's downloads
     "posix_upnp.c",         # internet play's router (port/web/src/web_stubs.c)
     "posix_trace_marker.c", # a Linux GPU driver's trace markers
+    "posix_dtls.c",         # internet play's WebRTC: the browser's own
+    "p2p_webrtc.c",         # (port/web/src/web_p2p.c)
 }
 
 # the web runtime's units that, like posix_*.c, are the C library's side of

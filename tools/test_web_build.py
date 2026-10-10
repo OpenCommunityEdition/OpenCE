@@ -184,8 +184,10 @@ def test_the_menus_name_known_platforms_and_match_their_generator():
             assert value.split() and set(value.split()) <= {"desktop", "android", "web"}, (path.name, value)
     for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
         assert (ROOT / "port/assets/menus/ce" / name).read_text() == "\n".join(lines), name
-    # the rows a browser has no use for are not on its screens
+    # the rows a browser has no use for are not on its screens; internet
+    # play's is (port/web/src/web_p2p.c)
     network = (ROOT / "port/assets/menus/ce/main_menu.settings_select.player_setup.player_profile_edit."
                "network_setup.xml").read_text()
-    for row in ("op_online", "op_allow_upnp", "op_join_from_clipboard", "op_auto"):
+    for row in ("op_allow_upnp", "op_join_from_clipboard", "op_auto"):
         assert re.search(rf'<child widget="[^"]*/{row}"[^>]*platform="desktop android"', network), row
+    assert re.search(r'<child widget="[^"]*/op_online"[^>]*platform="desktop android web"', network)

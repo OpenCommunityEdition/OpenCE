@@ -16,10 +16,13 @@ then fills the page.
 - Query parameters, for testing: ?set=NAME=value (any number) passes a
   setting's environment variable (port/linux/README.md, the settings
   table), ?room=<secret> joins a room (net.js; ?brokers= names other
-  message brokers), ?menu=<screen> opens a menu screen (debug.menu_open), ?map=<level>
-  starts a level (a10, or levels\a10\a10: the init.txt the game reads, which
-  the page removes again the next time), ?play starts the game at once when
-  it can.
+  message brokers, for internet play's signalling too), ?menu=<screen> opens
+  a menu screen (debug.menu_open), ?map=<level> starts a level (a10, or
+  levels\a10\a10: the init.txt the game reads, which the page removes again
+  the next time), ?play starts the game at once when it can.
+- ?join=<invite> (a halo://join/ link's code, which native builds and the
+  game here make: port/linux/src/p2p.c) joins that internet game once the
+  game starts.
 */
 
 'use strict';
@@ -518,6 +521,12 @@ function gameArguments() {
     if (/^[A-Z0-9_]+=/.test(value)) args.push('--' + value);
   }
   if (params.has('menu')) args.push('--HALO_MENU_OPEN=' + params.get('menu'));
+  // internet play's brokers (port/linux/src/p2p_signal.c), if not its own
+  const brokers = (params.get('brokers') || '').split(',').filter((url) => /^wss?:\/\/[^,\s]+$/.test(url));
+  if (brokers.length) args.push('--HALO_WEB_BROKERS=' + brokers.join(','));
+  // an invite to join (its code, or a whole link)
+  const invite = /([0-9a-f]{64})\s*$/i.exec(params.get('join') || '');
+  if (invite) args.push('halo://join/' + invite[1].toLowerCase());
   return args;
 }
 
@@ -528,6 +537,27 @@ function showFatal(text) {
   $('fatal').hidden = false;
   if (document.exitPointerLock) document.exitPointerLock();
 }
+
+// a game hosted for the internet: its invite as this page's address with
+// ?join= (which native builds take too), and a button that copies it (a
+// page may write the clipboard only when it is clicked)
+function showInvite(text) {
+  const code = /([0-9a-f]{64})/.exec(text);
+  if (!code) return;
+  $('invite-link').value = `${location.origin}${location.pathname}?join=${code[1]}`;
+  $('invite-copy').textContent = 'Copy';
+  $('invite').hidden = false;
+}
+
+$('invite-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('invite-link').value);
+    $('invite-copy').textContent = 'Copied';
+  } catch {
+    $('invite-link').select();
+  }
+});
+$('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -556,7 +586,7 @@ async function play() {
   try {
     await prepareInit();
     await loadScript('halo.js');
-    game = await window.createHalo({
+    const options = {
       canvas,
       arguments: gameArguments(),
       print: (text) => { logLine(text); console.log(text); },
@@ -566,8 +596,11 @@ async function play() {
         if (!$('starting').hidden && /data root:/.test(text)) $('starting-text').textContent = 'Loading the menus…';
       },
       haloNetSend: (address, reliable, bytes) => window.HaloNet.send(address, reliable, bytes),
+      // internet play's WebRTC connections (p2p.js)
+      haloP2P: (command, connection, bytes) => window.HaloP2P.command(command, connection, bytes),
       haloMessage: (kind, text) => {
         logLine(text);
+        if (kind === 2) showInvite(text);
         if (kind === 3) showFatal(text);
       },
       onAbort: (what) => showFatal('The game stopped: ' + what),
@@ -575,7 +608,11 @@ async function play() {
         if (status) showFatal(`The game stopped (status ${status}). The log below says why.`);
         else location.reload();
       },
-    });
+    };
+    // (the module these options become, which p2p.js calls into as soon as
+    // the game asks it for a connection)
+    window.HaloP2P.attach(options);
+    game = await window.createHalo(options);
     // the on-screen touch controls (touch.js), and the room's frames (net.js)
     window.HaloTouch.start(game, $('touch'));
     window.HaloNet.attach(game);

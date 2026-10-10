@@ -28,8 +28,16 @@ As with Winsock, each call returns -1 on failure with the error code in
 posix_socket_last_error(); blocking calls wait on one condition, which every
 change signals.
 
+Internet play (port/linux/src/p2p_signal.c) reaches its MQTT brokers over
+WebSockets here: a broker's address is its wss:// URL, which
+posix_resolve_ipv4 gives a stand-in address in 198.19.0.0/24, and a stream
+socket connected to that address is the page's WebSocket to the URL. Its
+tunnel goes over WebRTC (web_p2p.c): what arrives is handed to its socket
+here (web_net_inject).
+
 The rest of posix.h's network half, which a browser has no use for, answers
-"none" here: the command line, the desktop's link handler, Discord.
+"none" here: the command line's (but for what the page started the game
+with), the desktop's link handler, Discord.
 */
 
 #include <errno.h>
@@ -131,6 +139,17 @@ frame for the browser at address (REMOTE_EVERYONE: every one), on the
 channel that does not lose it or the one that may; the frame is a copy
 the page frees */
 void web_js_net_send(unsigned int address, int reliable, unsigned char *frame, int size);
+/* a WebSocket for a socket (its index, and its connection's number, which
+the page's calls back name it by) to a URL; bytes for it (a copy the page
+frees); and its closing */
+void web_js_websocket_open(int index, unsigned int connection, const char *url);
+void web_js_websocket_send(int index, unsigned int connection, unsigned char *bytes, int size);
+void web_js_websocket_close(int index, unsigned int connection);
+
+/* the brokers' URLs, by their stand-in addresses: 198.19.0.1 and on */
+#define MAXIMUM_WEBSOCKET_URLS 8
+#define WEBSOCKET_URL_SIZE 256
+#define IS_WEBSOCKET_ADDRESS(ip) (((ip) & 0xffffffu) == (198u | 19u << 8))
 
 /* sockaddr_in, as Winsock and BSD share it */
 struct address
@@ -180,6 +199,10 @@ struct web_socket
 	uint32_t connection;
 	int opened_here;
 	int remote_closed;
+	/* a WebSocket (to remote.ip's URL), numbered by connection too, and
+	whether it has opened */
+	int is_websocket;
+	int websocket_open;
 	/* listening: the connections waiting for accept, as indices */
 	int pending[MAXIMUM_BACKLOG];
 	int pending_count, backlog;
@@ -192,6 +215,8 @@ static __thread int last_error;
 static unsigned short next_ephemeral_port = FIRST_EPHEMERAL_PORT;
 static uint32_t next_connection = 1;
 static unsigned int local_address_value;
+static char websocket_urls[MAXIMUM_WEBSOCKET_URLS][WEBSOCKET_URL_SIZE];
+static int websocket_url_count;
 
 static unsigned short swap16(unsigned short value)
 {
@@ -370,6 +395,8 @@ static void socket_release(int index)
 	int pending;
 
 	datagrams_free(socket);
+	if (socket->is_websocket)
+		web_js_websocket_close(index, socket->connection);
 	if (socket->state == _socket_connected && socket->is_remote && !socket->remote_closed)
 		remote_stream_frame(socket, _frame_close, NULL, 0);
 	else if (socket->state == _socket_connected && socket->peer >= 0)
@@ -557,6 +584,28 @@ static int connect_remote(struct web_socket *socket, const struct address *to)
 	return succeed(0);
 }
 
+static int wait_changed(const struct timespec *deadline);
+
+/* (under net_lock) a stream to a broker's URL: connecting until the page's
+WebSocket opens, which makes it writeable (or fails, which ends it) */
+static int connect_websocket(struct web_socket *socket, const struct address *to)
+{
+	unsigned int number = to->ip >> 24;
+
+	if (number < 1 || number > (unsigned int)websocket_url_count)
+		return fail(WSAENETUNREACH);
+	if (!(socket->bytes = malloc(STREAM_CAPACITY)))
+		return fail(WSAENOBUFS);
+	socket->state = _socket_connected;
+	socket->is_websocket = 1;
+	socket->connection = next_connection++;
+	socket->remote = *to;
+	socket->remote.family = FAMILY_INET;
+	socket->local.ip = local_address();
+	web_js_websocket_open(socket_index(socket), socket->connection, websocket_urls[number - 1]);
+	return fail(WSAEWOULDBLOCK);
+}
+
 int posix_socket_connect(int descriptor, const void *address, int address_length)
 {
 	struct web_socket *socket;
@@ -588,6 +637,20 @@ int posix_socket_connect(int descriptor, const void *address, int address_length
 	if (is_remote(to.ip))
 	{
 		result = connect_remote(socket, &to);
+		pthread_mutex_unlock(&net_lock);
+		return result;
+	}
+	if (IS_WEBSOCKET_ADDRESS(to.ip))
+	{
+		result = connect_websocket(socket, &to);
+		/* (a blocking socket waits for it to open, or fail) */
+		while (!socket->nonblocking && socket->state == _socket_connected && !socket->websocket_open &&
+			!socket->remote_closed)
+		{
+			wait_changed(NULL);
+		}
+		if (!socket->nonblocking)
+			result = socket->websocket_open ? succeed(0) : fail(WSAECONNREFUSED);
 		pthread_mutex_unlock(&net_lock);
 		return result;
 	}
@@ -753,6 +816,22 @@ static int stream_send(struct web_socket *socket, const unsigned char *buffer, i
 	struct web_socket *peer;
 	unsigned int sent = 0;
 
+	if (socket->is_websocket)
+	{
+		unsigned char *copy;
+
+		if (socket->send_shut)
+			return fail(WSAESHUTDOWN);
+		if (socket->remote_closed)
+			return fail(WSAECONNRESET);
+		if (!socket->websocket_open)
+			return fail(WSAEWOULDBLOCK);
+		if (!(copy = malloc((size_t)length + 1)))
+			return fail(WSAENOBUFS);
+		memcpy(copy, buffer, (size_t)length);
+		web_js_websocket_send(socket_index(socket), socket->connection, copy, length);
+		return succeed(length);
+	}
 	if (socket->is_remote)
 	{
 		int offset;
@@ -868,7 +947,8 @@ static int readable(const struct web_socket *socket)
 	/* (data, or the end: the other end closed or shut down its sending) */
 	if (socket->byte_count > 0 || socket->receive_shut)
 		return 1;
-	return socket->is_remote ? socket->remote_closed : socket->peer < 0 || sockets[socket->peer].send_shut;
+	return socket->is_remote || socket->is_websocket ? socket->remote_closed :
+		socket->peer < 0 || sockets[socket->peer].send_shut;
 }
 
 static int receive(int descriptor, void *buffer, int length, int flags, void *address, int *address_length)
@@ -1121,6 +1201,9 @@ static int writeable(const struct web_socket *socket)
 		return 1;
 	if (socket->state != _socket_connected)
 		return 0;
+	/* (a WebSocket once it opened, or failed: as a connection's end) */
+	if (socket->is_websocket)
+		return socket->websocket_open || socket->remote_closed;
 	if (socket->is_remote)
 		return 1;
 	return socket->peer < 0 || sockets[socket->peer].byte_count < STREAM_CAPACITY;
@@ -1343,6 +1426,90 @@ EMSCRIPTEN_KEEPALIVE void web_net_peer_lost(unsigned int address)
 	pthread_mutex_unlock(&net_lock);
 }
 
+/* ---------- WebSockets, from the page (web_library.js) */
+
+/* (under net_lock) a WebSocket socket by the page's names for it, or NULL
+(closed since: the socket may be another's now) */
+static struct web_socket *websocket_of(int index, unsigned int connection)
+{
+	if (index < 0 || index >= MAXIMUM_SOCKETS || !sockets[index].is_websocket ||
+		sockets[index].connection != connection)
+	{
+		return NULL;
+	}
+	return &sockets[index];
+}
+
+EMSCRIPTEN_KEEPALIVE void web_net_websocket_opened(int index, unsigned int connection)
+{
+	struct web_socket *socket;
+
+	pthread_mutex_lock(&net_lock);
+	socket = websocket_of(index, connection);
+	if (socket)
+		socket->websocket_open = 1;
+	pthread_cond_broadcast(&net_changed);
+	pthread_mutex_unlock(&net_lock);
+}
+
+/* bytes that arrived (a copy the page frees); more than the queue holds
+ends the stream, as for another browser's */
+EMSCRIPTEN_KEEPALIVE void web_net_websocket_data(int index, unsigned int connection, const unsigned char *data,
+	int size)
+{
+	struct web_socket *socket;
+
+	pthread_mutex_lock(&net_lock);
+	socket = websocket_of(index, connection);
+	if (socket && size > 0 && !socket->remote_closed && !socket->receive_shut)
+	{
+		if ((unsigned int)size > STREAM_CAPACITY - socket->byte_count)
+			socket->remote_closed = 1;
+		else
+		{
+			int offset;
+
+			for (offset = 0; offset < size; offset++)
+				socket->bytes[(socket->read_position + socket->byte_count + offset) % STREAM_CAPACITY] = data[offset];
+			socket->byte_count += (unsigned int)size;
+		}
+	}
+	pthread_cond_broadcast(&net_changed);
+	pthread_mutex_unlock(&net_lock);
+}
+
+EMSCRIPTEN_KEEPALIVE void web_net_websocket_closed(int index, unsigned int connection)
+{
+	struct web_socket *socket;
+
+	pthread_mutex_lock(&net_lock);
+	socket = websocket_of(index, connection);
+	if (socket)
+		socket->remote_closed = 1;
+	pthread_cond_broadcast(&net_changed);
+	pthread_mutex_unlock(&net_lock);
+}
+
+/* ---------- internet play's tunnel (web_p2p.c) */
+
+void web_net_inject(unsigned int from_ip, unsigned short from_port, unsigned short to_port, const void *data, int size)
+{
+	struct address source, destination;
+
+	if (size <= 0 || size > MAXIMUM_DATAGRAM || !to_port)
+		return;
+	memset(&source, 0, sizeof(source));
+	memset(&destination, 0, sizeof(destination));
+	source.family = destination.family = FAMILY_INET;
+	source.ip = from_ip;
+	source.port = from_port;
+	destination.ip = local_address();
+	destination.port = to_port;
+	pthread_mutex_lock(&net_lock);
+	deliver_local_datagram(&source, &destination, data, size);
+	pthread_mutex_unlock(&net_lock);
+}
+
 /* ---------- addresses */
 
 posix_ulong posix_local_ipv4_address(void)
@@ -1352,7 +1519,20 @@ posix_ulong posix_local_ipv4_address(void)
 
 posix_ulong posix_resolve_ipv4(const char *host)
 {
-	/* dotted quads only: a page cannot look names up */
+	int index;
+
+	/* a broker's WebSocket URL: its stand-in address (connect_websocket) */
+	if (host && (!strncmp(host, "ws://", 5) || !strncmp(host, "wss://", 6)) && strlen(host) < WEBSOCKET_URL_SIZE)
+	{
+		pthread_mutex_lock(&net_lock);
+		for (index = 0; index < websocket_url_count && strcmp(websocket_urls[index], host); index++)
+			;
+		if (index == websocket_url_count && websocket_url_count < MAXIMUM_WEBSOCKET_URLS)
+			strcpy(websocket_urls[websocket_url_count++], host);
+		pthread_mutex_unlock(&net_lock);
+		return index < websocket_url_count ? 198u | 19u << 8 | (unsigned int)(index + 1) << 24 : 0;
+	}
+	/* otherwise dotted quads only: a page cannot look names up */
 	return parse_ipv4(host);
 }
 
@@ -1374,12 +1554,26 @@ void posix_random_bytes(void *buffer, posix_ulong size)
 
 /* ---------- the process and the desktop: none in a page */
 
+static int argument_count;
+static char **arguments;
+
+/* the arguments the page started the game with (web_main.c): an invite
+link among them is joined (p2p.c) */
+void web_net_arguments(int count, char **values)
+{
+	argument_count = count;
+	arguments = values;
+}
+
 int posix_command_line_argument(int index, char *buffer, posix_ulong size)
 {
-	(void)index;
-	if (buffer && size)
-		buffer[0] = 0;
-	return 0;
+	if (!buffer || !size)
+		return 0;
+	buffer[0] = 0;
+	if (index < 0 || index >= argument_count || !arguments[index])
+		return 0;
+	snprintf(buffer, size, "%s", arguments[index]);
+	return 1;
 }
 
 posix_ulong posix_process_id(void)

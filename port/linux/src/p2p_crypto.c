@@ -13,7 +13,6 @@ brokers carry sealed messages, so only holders of the invite read them; the
 tunnel's packets are sealed with keys only its two machines have.
 */
 
-#include "platform.h"
 #include "posix.h"
 #include "p2p_internal.h"
 
@@ -703,4 +702,16 @@ int p2p_ed25519_verify(const unsigned char *public_key, const void *message, int
 	signature a message) */
 	return p2p_ed25519_to_x25519(public_key, x25519_public) &&
 		crypto_ed25519_check(signature, public_key, message, (size_t)size) == 0;
+}
+
+/* a native build's ICE credentials (p2p_webrtc.c) from a session's secret:
+8 and 32 hexadecimal digits */
+void p2p_webrtc_credentials(const unsigned char *secret, char *ufrag, char *password)
+{
+	unsigned char digest[P2P_SHA256_SIZE];
+
+	p2p_hmac_sha256(secret, P2P_SHA256_SIZE, "webrtc ice-ufrag", 16, digest);
+	p2p_hex(digest, 4, ufrag);
+	p2p_hmac_sha256(secret, P2P_SHA256_SIZE, "webrtc ice-pwd", 14, digest);
+	p2p_hex(digest, 16, password);
 }

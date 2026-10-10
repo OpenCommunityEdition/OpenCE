@@ -77,8 +77,27 @@ browser.
 
 ### Playing together
 
-Under **Play together**, **Create a room** makes a room and its link
-(`https://halocombatevolved.com/?room=<secret>`): send it to your friends.
+**Over the internet**, as the Linux, Windows and Android builds play, and
+with them: Multiplayer, Create Game > Internet hosts a game (PUBLIC lists it
+in everyone's server browser), and Join Game > Server Browser lists the
+public games, the native builds' and the browsers' alike. A game hosted here
+shows its invite link at the top of the page, with a button that copies it:
+the site's address with `?join=<code>`, which opens the site and joins the
+game, and which a native build takes too (pasted, or on its command line);
+the native builds' own `halo://join/` links work pasted into the address
+after `?join=`. Network Setup's INTERNET PLAY turns it off.
+
+The browser reaches each other machine of the game directly, over WebRTC
+(its router permitting, as for the native builds: "Internet play" in
+[port/linux/README.md](../linux/README.md)); a native build takes the
+browser's WebRTC on its tunnel's port (port/linux/src/p2p_webrtc.c). They
+find each other through the same public MQTT brokers, here over secure
+WebSockets (EMQX's, HiveMQ's and Mosquitto's: the native builds' first broker
+has none), with everything sealed as between native builds.
+
+**In a room**: under **Play together**, **Create a room** makes a room and
+its link (`https://halocombatevolved.com/?room=<secret>`): send it to your
+friends.
 Everyone who opens it is in the room, and the browsers of a room are as the
 machines of one local network to the game: host a game under Multiplayer and
 the others find it there, as system link games are found (up to 16
@@ -98,7 +117,8 @@ For testing, the page's address takes:
 
 | Parameter | Effect |
 | --- | --- |
-| `?room=<secret>` | Joins that room (32 hex digits); `?brokers=ws://host:port[,...]` uses other MQTT brokers (WebSocket listeners), as the tests do. |
+| `?room=<secret>` | Joins that room (32 hex digits); `?brokers=ws://host:port[,...]` uses other MQTT brokers (WebSocket listeners), for rooms and internet play, as the tests do. |
+| `?join=<code>` | Joins that internet game once the game starts (an invite's 64 hex digits, as a `halo://join/` link ends). |
 | `?set=NAME=value` | Sets a setting's environment variable (the settings table in [port/linux/README.md](../linux/README.md)); repeat it for more. `?set=HALO_GL_DEBUG=1` reports WebGL errors in the log. |
 | `?menu=<screen>` | Opens a menu screen (`debug.menu_open`). |
 | `?map=<level>` | Starts a level: `a10`, or `levels\test\bloodgulch\bloodgulch`. The page writes `init.txt` for it, and removes it at the next visit without `?map=`. |
@@ -114,10 +134,12 @@ reloads.
 
 ## Limits
 
-- Network play only between browsers, in rooms ("Playing together"):
-  browsers have no UDP and no plain TCP, so they cannot reach the Linux,
-  Windows and Android builds' games, nor take part in their internet play
-  (invite links, the server browser). Split screen works.
+- No system link with the native builds on a local network (a browser has
+  no UDP): they play over the internet, as invites and the server browser
+  find them ("Playing together"). Split screen works.
+- Internet play has no relay, as on the native builds: two machines whose
+  networks let no direct connection through (some company and school
+  networks block WebRTC) cannot play together.
 - No Custom Edition maps (their tag data's address is in the C heap there).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
@@ -164,6 +186,8 @@ node --test "port/web/tests/*.test.js"   # the disc image reader, the service wo
 python -m pytest -q tools/test_web_build.py  # the build's graph, version.json, the sockets, the menus
 node port/web/tests/smoke.mjs dist/halo-web-release  # the site in a headless Chromium (Playwright)
 node port/web/tests/rooms.mjs dist/halo-web-release  # two browsers in a room (and mosquitto)
+node port/web/tests/webrtc_native.mjs chromium firefox  # the native builds' WebRTC with browsers
+node port/web/tests/internet.mjs build/web/site <maps folder>  # internet play with the Linux build
 ```
 
 The smoke test serves the site as GitHub Pages does, checks that the page
@@ -175,6 +199,17 @@ the multiplayer maps imported, one opened with
 `?room=<secret>&set=HALO_NETWORK_TEST=host:bloodgulch` and the other with
 `?room=<secret>&set=HALO_NETWORK_TEST=join` (`debug.network_test`,
 port/linux/NETCODE.md), play one and log every player's state each second.
+
+The WebRTC test builds `port/linux/src/p2p_webrtc.c` (with `posix_dtls.c`
+and Mbed TLS) for this computer around one connection, which a browser's
+data channel opens as signalling would have it; the browser sends it
+messages of every size, which come back, then again with a tenth of the
+datagrams lost each way. The internet play test needs the maps (`ui.map`
+and the multiplayer maps, which each browser imports) and the Linux build
+(`build/linux/halo`), and plays three games through a local broker: two
+browsers by invite, the native build hosting with a browser joining from the
+server browser, and the reverse (`debug.network_test` `browse`,
+`debug.network_test_public`).
 
 Playwright's screenshots of the page in headless Firefox show the game's
 canvas black (it is drawn by a worker); the game draws. Check Firefox headed,
@@ -238,6 +273,21 @@ multiply-adds). `tools/web_build.py` writes the graph.
   reach the sockets bound to their port, and streams connect to the socket
   listening on theirs. Split screen (a network game over loopback) and the
   game's own start-up use them.
+- **Internet play.** The native builds' (port/linux/src/p2p*.c), all of it:
+  the invites, the signalling and its sealing, the server browser, the
+  tunnel's sealed packets and KCP streams, the stand-ins the game's sockets
+  reach peers through. Two things differ. A broker is a WebSocket URL, which
+  `posix_resolve_ipv4` gives a stand-in address (198.19.0.x) and a stream
+  socket connected to it is the page's WebSocket (`web_library.js`), the
+  same MQTT bytes. And the tunnel to each peer is a WebRTC data channel
+  (`port/web/src/web_p2p.c`, `site/p2p.js`): the page keeps a connection
+  ready, whose ICE credentials, addresses (IPv4, and its own as mDNS names)
+  and certificate's hash a request or an answer carries, and makes up the
+  other end's description from what signalling told: a native build's is an
+  ICE-lite agent and a DTLS server, whose credentials come from the
+  session's secret; of two browsers, the host is the DTLS server. What the
+  channel receives goes to the tunnel's socket from the connection's stand-in
+  address (198.18.x.y).
 - **Rooms.** The other browsers of a room have addresses of their own in
   `10.0.0.0/8`, which `net.js` chooses (and the game is started with:
   `HALO_WEB_ADDRESS`). What the game sends to one, or broadcasts, is a frame
@@ -245,14 +295,11 @@ multiply-adds). `tools/web_build.py` writes the graph.
   (unordered, not resent), a stream's opening, bytes and end on one that
   does not. What arrives, `web_net_receive` checks and hands to the sockets.
   System link and the netcode run unchanged on top, so the network version
-  needs no change for it. (The plan was to carry internet play's own
-  invites and tunnel to browsers; that tunnel's peers exchange UDP
-  addresses, where WebRTC needs its own descriptions exchanged, which would
-  change the protocol of every build. Browser to native play is the next
-  step: port/web/README.md "Limits".)
+  needs no change for it.
 - **Left out.** The self-updater (the site updates itself), the disc image
-  reader (the page's `xiso-worker.js` is), UPnP and Discord (no internet
-  play), and the page-fault memory watch.
+  reader (the page's `xiso-worker.js` is), STUN, UPnP and Discord (a page
+  reaches none: its WebRTC finds its own addresses), and the page-fault
+  memory watch.
 - **The page and the game.** The memory is shared, so the page reads and
   writes a few words of it itself (`port/web/src/web_shared.h`): the frames
   shown, whose count standing still while a map loads makes the page say
@@ -315,13 +362,14 @@ a first visit downloads about 10 MB, compressed).
 | `tools/web_build.py` | The `ninja web` graph |
 | `port/web/halo_sdl3.py` | SDL 3.4.16 as an Emscripten port |
 | `port/web/src/web_main.c` | The entry point: the page's arguments, the storage, the heap's limit |
-| `port/web/src/web_net.c` | The sockets inside the page, and the room's other browsers |
+| `port/web/src/web_net.c` | The sockets inside the page, the room's other browsers, and the brokers' WebSockets |
+| `port/web/src/web_p2p.c` | Internet play's WebRTC connections |
 | `port/web/src/web_memory_watch.c` | The memory watch by hashing |
 | `port/web/src/web_gl_host.c` | The renderer's services for WebGL 2 |
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
-| `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
+| `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the brokers' WebSockets, the workers' errors |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

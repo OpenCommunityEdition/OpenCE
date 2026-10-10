@@ -406,7 +406,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.gpu_stats`, `debug.gpu_trace_frame`, `debug.gpu_trace_constants`, `debug.gpu_dump_shaders`, `debug.texture_dump_directory`, `debug.texture_log`, `debug.gl_debug`, `debug.texture_no_cache` | off | `HALO_GPU_STATS`, `HALO_GPU_TRACE`, `HALO_GPU_TRACE_CONSTANTS`, `HALO_GPU_DUMP_SHADERS`, `HALO_TEXTURE_DUMP`, `HALO_TEXTURE_LOG`, `HALO_GL_DEBUG`, `HALO_TEXTURE_NO_CACHE` | Tools to find problems in the graphics: counts for each frame, all the GL state of one frame, the GLSL code, the textures. |
 | `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
-| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
+| `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.network_test_public`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_NETWORK_TEST_PUBLIC`, `HALO_TEST_INPUT` | Automatic tests of system link (`game/network_test.c`). Refer to `NETCODE.md`. |
 | `debug.touch_targets` | `false` | `HALO_TOUCH_TARGETS` | Outlines the tap targets of the menus (item green, value blue, list slot yellow, legend button red, the band beside the slots of a list orange, keys of the on-screen keyboard white), marks where the last finger went down and the last tap landed for 3 seconds, and logs each tap with the target that it hit (for a value, also where it splits into previous and next): to judge the accuracy of touch. |
 | `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
 | `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
@@ -615,9 +615,41 @@ To join a game, do one of these steps:
 - Enter `halo <link>`.
 - Accept a Discord invite. Refer to "Discord".
 
+The game also takes the address of the web build's page with an invite
+(`https://halocombatevolved.com/?join=<64 digits>`), as a link.
+
 When the machines connect, the game of the host shows in Multiplayer,
 System Link. Join the game as on a local network. System link on a local
 network does not need an invite.
+
+### Browsers
+
+The web build ([port/web/README.md](../web/README.md)) plays internet games
+with the Linux, Windows and Android builds: it hosts and joins by invite, and
+the server browser lists its public games and theirs. A browser has no UDP
+socket, only WebRTC, so a native build takes a browser's WebRTC on the port
+of its tunnel (`network.tunnel_port`), as little of it as one data channel
+needs (`src/p2p_webrtc.c`):
+
+- ICE: the native build is an ICE-lite agent. It answers the checks of the
+  browser, and the browser chooses the path. The credentials come from the
+  secret of the session, which both machines have. Until the browser
+  connects, the native build sends STUN indications to the addresses of the
+  browser, which open its NAT to the checks of the browser.
+- DTLS 1.2 (`src/posix_dtls.c`, Mbed TLS: `port/third_party/mbedtls`): the
+  native build is the server, with a certificate that it makes when it
+  starts (ECDSA P-256). Each machine sends the SHA-256 of its certificate in
+  its signalling messages, which the token seals and the proof of the
+  session authenticates; the other machine accepts only that certificate.
+- SCTP, over DTLS: the browser opens the association, and one data channel,
+  agreed before (unordered, without retransmissions), carries the packets of
+  the tunnel. They are sealed as on UDP, and KCP makes the streams reliable
+  as on UDP.
+
+Two browsers connect to each other with their own WebRTC. There is no relay:
+as between native builds, two networks that do not let a direct connection
+through (some company and school networks block WebRTC) cannot play
+together.
 
 ### Voice chat
 
@@ -756,7 +788,9 @@ Only machines with the invite can find the game:
   a random number from each. The keys do not go through the brokers. Thus
   other machines with the invite cannot read or change the packets.
 - Each packet is encrypted and authenticated, with a different key in each
-  direction. A machine ignores a packet that it already received.
+  direction. A machine ignores a packet that it already received. To and
+  from a browser, the packets also go through DTLS, with the certificates
+  that the signalling messages named.
 - A machine can send only to the ports of the game on the other machine.
 - The host makes one session from each request of a player. If a person
   sends a copy of an old request again, the host ignores it. A player that

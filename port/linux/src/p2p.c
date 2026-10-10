@@ -183,6 +183,9 @@ struct peer
 	unsigned long virtual_address;
 	int is_host;
 	int connected;
+	/* the WebRTC connection carrying its tunnel (p2p_webrtc.c: a browser's),
+	or -1 (the UDP tunnel) */
+	int connection;
 	struct p2p_candidate candidates[P2P_MAXIMUM_CANDIDATES];
 	int candidate_count;
 	struct p2p_candidate endpoint;
@@ -803,7 +806,7 @@ static void peer_send_to(struct peer *peer, const struct p2p_candidate *to, cons
 	int sealed;
 	int index;
 
-	if (p2p.tunnel_socket < 0 || size > MAXIMUM_INNER_SIZE)
+	if ((p2p.tunnel_socket < 0 && peer->connection < 0) || size > MAXIMUM_INNER_SIZE)
 		return;
 	/* the header, authenticated with the rest */
 	counter = ++peer->send_counter;
@@ -814,6 +817,12 @@ static void peer_send_to(struct peer *peer, const struct p2p_candidate *to, cons
 	packet_nonce(packet, nonce);
 	sealed = p2p_aead_seal(peer->send_key, nonce, packet, TUNNEL_HEADER_SIZE, inner, size,
 		packet + TUNNEL_HEADER_SIZE);
+	/* (a browser's: over its WebRTC connection, wherever that goes) */
+	if (peer->connection >= 0)
+	{
+		p2p_webrtc_send(peer->connection, packet, TUNNEL_HEADER_SIZE + sealed);
+		return;
+	}
 	make_address(&address, to->address, to->port);
 	posix_socket_sendto(p2p.tunnel_socket, packet, TUNNEL_HEADER_SIZE + sealed, 0, &address, sizeof(address));
 }
@@ -901,6 +910,8 @@ static void drop_peer(struct peer *peer, const char *reason)
 		peer_send(peer, &bye, 1);
 	}
 	release_peer_links((int)(peer - p2p.peers), 0);
+	if (peer->connection >= 0)
+		p2p_webrtc_close(peer->connection);
 	/* a session that ended does not come back: its packets would pass
 	again */
 	memcpy(retired->secret, peer->secret, P2P_SHA256_SIZE);
@@ -985,7 +996,7 @@ int p2p_peer_turned_away(const unsigned char *peer_identifier, int is_host)
 }
 
 int p2p_peer_offered(const unsigned char *peer_identifier, const unsigned char *secret,
-	const struct p2p_candidate *candidates, int count, int is_host)
+	const struct p2p_candidate *candidates, int count, const struct p2p_webrtc *webrtc, int is_host)
 {
 	struct peer *peer = find_peer(peer_identifier);
 
@@ -1020,22 +1031,41 @@ int p2p_peer_offered(const unsigned char *peer_identifier, const unsigned char *
 		peer->receive_window = 1;
 		peer->virtual_address = virtual_address_for(peer_identifier);
 		peer->is_host = is_host;
+		peer->connection = -1;
 		peer->offered_time = p2p_now();
-		platform_log("Internet play: reaching %s %s", is_host ? "host" : "player", peer->name);
+		platform_log("Internet play: reaching %s %s%s", is_host ? "host" : "player", peer->name,
+			webrtc->kind == _p2p_webrtc_browser ? " (a browser)" : "");
 	}
 	add_candidates(peer, candidates, count);
+	peer->connection = p2p_webrtc_offered(peer->connection, (int)(peer - p2p.peers), peer->secret, webrtc,
+		candidates, count, peer->is_host);
 	return 1;
 }
 
 int p2p_peer_reoffered(const unsigned char *peer_identifier, const unsigned char *secret,
-	const struct p2p_candidate *candidates, int count)
+	const struct p2p_candidate *candidates, int count, const struct p2p_webrtc *webrtc)
 {
 	struct peer *peer = find_peer(peer_identifier);
 
 	if (!peer || memcmp(peer->secret, secret, P2P_SHA256_SIZE))
 		return 0;
 	add_candidates(peer, candidates, count);
+	if (count || webrtc->ufrag[0])
+	{
+		peer->connection = p2p_webrtc_offered(peer->connection, (int)(peer - p2p.peers), peer->secret, webrtc,
+			candidates, count, peer->is_host);
+	}
 	return 1;
+}
+
+void p2p_peer_name(int peer, char *name)
+{
+	memcpy(name, p2p.peers[peer].name, sizeof(p2p.peers[peer].name));
+}
+
+unsigned short p2p_tunnel_local_port(void)
+{
+	return p2p.tunnel_port;
 }
 
 /* whether a packet of this number from the peer is new: not received yet,
@@ -1136,8 +1166,10 @@ static void update_peers(void)
 			/* (every address it gave, until a packet sealed by it arrives
 			from one: then only that one, above. The addresses are anyone's
 			who has the invite to give, so they are sent to no longer than
-			this) */
-			for (candidate = 0; candidate < peer->candidate_count; candidate++)
+			this. A browser's go over its WebRTC connection, once it is open) */
+			if (peer->connection >= 0)
+				peer_ping(peer, &peer->endpoint);
+			for (candidate = 0; candidate < peer->candidate_count && peer->connection < 0; candidate++)
 				peer_ping(peer, &peer->candidates[candidate]);
 			peer->sent_time = p2p_now();
 		}
@@ -1171,6 +1203,10 @@ static void stun_setup(void)
 {
 	const char *text = config_string("network.stun_servers");
 
+#ifdef HALO_WEB
+	/* (a page's addresses are its WebRTC connections' own: web_p2p.c) */
+	text = "";
+#endif
 	while (*text && p2p.stun_count < MAXIMUM_STUN_SERVERS)
 	{
 		const char *end = text + strcspn(text, ",");
@@ -2261,6 +2297,24 @@ static void tunnel_received(const unsigned char *packet, int size, const struct 
 	}
 }
 
+void p2p_tunnel_packet(const unsigned char *packet, int size, unsigned long address, unsigned short port)
+{
+	struct sockaddr_in from;
+
+	make_address(&from, address, port);
+	tunnel_received(packet, size, &from);
+}
+
+void p2p_tunnel_send(unsigned long address, unsigned short port, const void *data, int size)
+{
+	struct sockaddr_in to;
+
+	if (p2p.tunnel_socket < 0)
+		return;
+	make_address(&to, address, port);
+	posix_socket_sendto(p2p.tunnel_socket, data, size, 0, &to, sizeof(to));
+}
+
 static void tunnel_readable(void)
 {
 	unsigned char packet[2048];
@@ -2274,7 +2328,9 @@ static void tunnel_readable(void)
 
 		if (size < 0)
 			break;
-		tunnel_received(packet, size, &from);
+		/* (a browser's ICE checks and DTLS, which carries its tunnel) */
+		if (!p2p_webrtc_received(packet, size, from.sin_addr.s_addr, from.sin_port))
+			tunnel_received(packet, size, &from);
 	}
 }
 
@@ -2293,14 +2349,20 @@ static int parse_invite(const char *text, unsigned char *host_hash, unsigned cha
 
 	for (search = text; *search && !start; search++)
 	{
-		static const char prefix[] = "halo://join/";
-		int length;
+		/* (a link, or the web page's address with one: ?join=) */
+		static const char *const prefixes[] = { "halo://join/", "?join=", "&join=" };
+		int prefix;
 
-		for (length = 0; prefix[length] && search[length] &&
-			(search[length] | 0x20) == prefix[length]; length++)
-			;
-		if (!prefix[length])
-			start = search + length;
+		for (prefix = 0; prefix < (int)(sizeof(prefixes) / sizeof(*prefixes)) && !start; prefix++)
+		{
+			int length;
+
+			for (length = 0; prefixes[prefix][length] && search[length] &&
+				(search[length] | 0x20) == prefixes[prefix][length]; length++)
+				;
+			if (!prefixes[prefix][length])
+				start = search + length;
+		}
 	}
 	if (!start)
 	{
@@ -2387,9 +2449,10 @@ static void update_joining(void)
 
 	if (p2p.join_requested)
 	{
-		/* the offer carries the public address, if there is one */
+		/* the offer carries the public address, if there is one, and a
+		browser's WebRTC */
 		p2p.stun_started = 1;
-		if (!stun_settled())
+		if (!stun_settled() || !p2p_webrtc_ready())
 			return;
 		p2p.join_requested = 0;
 		p2p.joining = 1;
@@ -2650,6 +2713,10 @@ static void update_upnp(void)
 
 	if (allowed < 0)
 		allowed = config_boolean("network.allow_upnp") ? 1 : 0;
+#ifdef HALO_WEB
+	/* (a page cannot reach the router) */
+	allowed = 0;
+#endif
 	if (!allowed || p2p.upnp_working || p2p.upnp_released)
 		return;
 	if (p2p.upnp_forwarded)
@@ -2851,6 +2918,8 @@ static void *p2p_thread(void *unused)
 	static int read[MAXIMUM_SOCKETS], write[MAXIMUM_SOCKETS];
 	static int asked_read[MAXIMUM_SOCKETS], asked_write[MAXIMUM_SOCKETS];
 	static int read_owners[MAXIMUM_SOCKETS], write_owners[MAXIMUM_SOCKETS];
+	/* WebRTC's connections opening or open (their timers) */
+	int webrtc_busy = 0;
 
 	(void)unused;
 #ifdef HALO_PROFILE
@@ -2871,7 +2940,7 @@ static void *p2p_thread(void *unused)
 		int asked_read_count, asked_write_count;
 		/* KCP's clock needs a pass every LOOP_INTERVAL while it carries
 		streams; otherwise the thread can sleep longer */
-		int wait = LOOP_INTERVAL * 5;
+		int wait = webrtc_busy ? LOOP_INTERVAL : LOOP_INTERVAL * 5;
 		int index, asked;
 
 		/* what to wait for */
@@ -3030,6 +3099,7 @@ static void *p2p_thread(void *unused)
 		profile_trace_end(p2p_profile_names.kcp_update);
 #endif
 		update_peers();
+		webrtc_busy = p2p_webrtc_update();
 		expire_proxies();
 		stun_update();
 		update_hosting();

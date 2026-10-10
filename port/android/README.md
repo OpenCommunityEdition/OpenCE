@@ -336,8 +336,9 @@ and supplies the thread pointer and TLS.
 - Gives the audio callback of SDL to a thread with a guest stack
   (`host/host_sdl.c`).
 - Does the calls of the guest: system calls (`host/host_syscall.c`), SDL
-  (`host/host_sdl.c`), OpenGL ES (`host/host_gl.c`), and the file and socket
-  functions of `port/linux/src/posix_*.c`.
+  (`host/host_sdl.c`), OpenGL ES (`host/host_gl.c`), and the file, socket,
+  UPnP and DTLS functions of `port/linux/src/posix_*.c` (DTLS with Mbed TLS,
+  for internet play with browsers: `posix_dtls.c`).
 
 The guest calls the host through stubs (`tools/android_imports.py`). The
 two ABIs use the same registers for 32-bit integers, floats and pointers.

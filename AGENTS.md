@@ -90,6 +90,7 @@ python tools/test_light_storage.py
 python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
+node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
 ```
 
 `tools/harness/README.md` explains how to add an asset-free test: the code
@@ -137,6 +138,11 @@ read `xbox/include`. To add a name, follow `port/include/xdk/README.md`.
   do not play together.
 - Only the host decides; clients predict their own players. Read
   `port/linux/NETCODE.md` before changing the netcode.
+- Internet play is the same code in every build, the web's too: a browser's
+  tunnel is a WebRTC data channel (`port/web/src/web_p2p.c`), which the
+  native builds take on their tunnel's socket (`p2p_webrtc.c`, `posix_dtls.c`).
+  Check a change with both (`port/web/tests/webrtc_native.mjs`, and with the
+  maps `port/web/tests/internet.mjs`).
 - Anything another machine sends is untrusted: check sizes, indices and
   rates, as the existing handlers do. `debug.network_corrupt` tests this.
 

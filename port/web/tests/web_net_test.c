@@ -8,7 +8,9 @@ by broadcast; a stream connected, accepted, written and read, and its end;
 select; and the errors Winsock gives. Then the other browsers of a room:
 the frames the page would carry to them (caught here in place of the page's
 web_js_net_send), and theirs handed in as the page hands them, malformed ones
-among them.
+among them. Then internet play's: a broker's WebSocket (its URL's stand-in
+address, the page's WebSocket opening, bytes each way, its end), a tunnel
+packet the page's WebRTC hands in, and the command line's arguments.
 */
 
 #include <assert.h>
@@ -39,6 +41,11 @@ struct address
 
 void web_net_receive(unsigned int from, int reliable, const unsigned char *frame, int size);
 void web_net_peer_lost(unsigned int address);
+void web_net_websocket_opened(int index, unsigned int connection);
+void web_net_websocket_data(int index, unsigned int connection, const unsigned char *data, int size);
+void web_net_websocket_closed(int index, unsigned int connection);
+void web_net_inject(unsigned int from_ip, unsigned short from_port, unsigned short to_port, const void *data, int size);
+void web_net_arguments(int count, char **values);
 
 #define MAXIMUM_SENT 64
 
@@ -59,6 +66,40 @@ void web_js_net_send(unsigned int address, int reliable, unsigned char *frame, i
 	sent[sent_count].frame = frame;
 	sent[sent_count].size = size;
 	sent_count++;
+}
+
+/* the page's WebSocket, as web_net.c asked for it */
+static struct
+{
+	int index;
+	unsigned int connection;
+	char url[256];
+	int opened;
+	int closed;
+	unsigned char bytes[64];
+	int size;
+} websocket;
+
+void web_js_websocket_open(int index, unsigned int connection, const char *url)
+{
+	websocket.index = index;
+	websocket.connection = connection;
+	snprintf(websocket.url, sizeof(websocket.url), "%s", url);
+	websocket.opened++;
+}
+
+void web_js_websocket_send(int index, unsigned int connection, unsigned char *bytes, int size)
+{
+	assert(index == websocket.index && connection == websocket.connection && size <= (int)sizeof(websocket.bytes));
+	memcpy(websocket.bytes, bytes, (size_t)size);
+	websocket.size = size;
+	free(bytes);
+}
+
+void web_js_websocket_close(int index, unsigned int connection)
+{
+	assert(index == websocket.index && connection == websocket.connection);
+	websocket.closed++;
 }
 
 static void sent_clear(void)
@@ -321,6 +362,76 @@ static void test_room_streams(void)
 	sent_clear();
 }
 
+static void test_internet_play(void)
+{
+	unsigned int first = posix_resolve_ipv4("wss://broker.example:8084/mqtt");
+	unsigned int second = posix_resolve_ipv4("ws://127.0.0.1:18831");
+	struct address to, from, bound;
+	unsigned char buffer[16];
+	char argument[64];
+	char *arguments[] = { "halo", "--HALO_X=1", "halo://join/00" };
+	int read[1], write[1], read_count, write_count, error_count = 0;
+	int length = sizeof(from);
+	int socket, datagram;
+
+	/* a broker's URL has a stand-in address of its own, the same each time */
+	assert((first & 0xffffff) == (198u | 19u << 8) && first >> 24 == 1);
+	assert(second >> 24 == 2 && posix_resolve_ipv4("wss://broker.example:8084/mqtt") == first);
+	assert(posix_resolve_ipv4("10.0.0.7") == (10u | 7u << 24) && posix_resolve_ipv4("example.com") == 0);
+
+	/* connecting opens the page's WebSocket; writeable once it opened */
+	socket = posix_socket(AF_INET_VALUE, SOCK_STREAM_VALUE, 0);
+	posix_socket_set_nonblocking(socket, 1);
+	to = address_of(198, 19, 0, 1, 8084);
+	assert(posix_socket_connect(socket, &to, sizeof(to)) == -1 && posix_socket_last_error() == WSAEWOULDBLOCK);
+	assert(websocket.opened == 1 && !strcmp(websocket.url, "wss://broker.example:8084/mqtt"));
+	write[0] = socket;
+	write_count = 1;
+	read_count = 0;
+	assert(posix_socket_select(read, &read_count, write, &write_count, NULL, &error_count, 0, 0, 0) == 0);
+	assert(posix_socket_send(socket, "x", 1, 0) == -1 && posix_socket_last_error() == WSAEWOULDBLOCK);
+	web_net_websocket_opened(websocket.index, websocket.connection);
+	write_count = 1;
+	assert(posix_socket_select(read, &read_count, write, &write_count, NULL, &error_count, 0, 0, 0) == 1);
+	assert(posix_socket_send(socket, "\x10\x02", 2, 0) == 2 && websocket.size == 2 && websocket.bytes[0] == 0x10);
+	/* what arrives is read as a stream's bytes; another connection's, never */
+	web_net_websocket_data(websocket.index, websocket.connection + 1, (const unsigned char *)"no", 2);
+	web_net_websocket_data(websocket.index, websocket.connection, (const unsigned char *)"\x20\x02\x00\x00", 4);
+	assert(posix_socket_recv(socket, buffer, sizeof(buffer), 0) == 4 && buffer[0] == 0x20);
+	assert(posix_socket_recv(socket, buffer, sizeof(buffer), 0) == -1 && posix_socket_last_error() == WSAEWOULDBLOCK);
+	/* its end: read as the stream's */
+	web_net_websocket_closed(websocket.index, websocket.connection);
+	assert(posix_socket_recv(socket, buffer, sizeof(buffer), 0) == 0);
+	posix_socket_close(socket);
+	assert(websocket.closed == 1);
+	/* a URL never resolved is no broker's */
+	socket = posix_socket(AF_INET_VALUE, SOCK_STREAM_VALUE, 0);
+	posix_socket_set_nonblocking(socket, 1);
+	to = address_of(198, 19, 0, 9, 1);
+	assert(posix_socket_connect(socket, &to, sizeof(to)) == -1 && posix_socket_last_error() != WSAEWOULDBLOCK);
+	posix_socket_close(socket);
+
+	/* a tunnel packet from a WebRTC connection: to the socket of its port,
+	from the connection's stand-in address */
+	datagram = posix_socket(AF_INET_VALUE, SOCK_DGRAM_VALUE, 0);
+	bound = address_of(0, 0, 0, 0, 0);
+	assert(posix_socket_bind(datagram, &bound, sizeof(bound)) == 0);
+	assert(posix_socket_getsockname(datagram, &bound, &length) == 0);
+	web_net_inject(198u | 18u << 8 | 3u << 24, 0x8813, bound.port, "tunnel", 6);
+	length = sizeof(from);
+	assert(posix_socket_recvfrom(datagram, buffer, sizeof(buffer), 0, &from, &length) == 6);
+	assert(!memcmp(buffer, "tunnel", 6) && from.ip == (198u | 18u << 8 | 3u << 24) && from.port == 0x8813);
+	web_net_inject(1, 1, bound.port, "x", 0);
+	posix_socket_set_nonblocking(datagram, 1);
+	assert(posix_socket_recvfrom(datagram, buffer, sizeof(buffer), 0, &from, &length) == -1);
+	posix_socket_close(datagram);
+
+	/* the page's arguments (an invite link among them) */
+	web_net_arguments(3, arguments);
+	assert(posix_command_line_argument(2, argument, sizeof(argument)) && !strcmp(argument, "halo://join/00"));
+	assert(!posix_command_line_argument(3, argument, sizeof(argument)) && !argument[0]);
+}
+
 int main(void)
 {
 	/* (the address the page gives the machine in a room, read once) */
@@ -330,6 +441,7 @@ int main(void)
 	sent_clear();
 	test_room_datagrams();
 	test_room_streams();
+	test_internet_play();
 	printf("web_net: ok\n");
 	return 0;
 }

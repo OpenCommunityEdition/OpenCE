@@ -142,6 +142,35 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 posix_upnp_forward_udp set up; blocks */
 void posix_upnp_stop_forwarding_udp(unsigned short external_port);
 
+/* ---------- DTLS for WebRTC (internet play with browsers, p2p_webrtc.c;
+posix_dtls.c, with port/third_party/mbedtls) */
+
+/* the SHA-256 of this run's certificate (made the first time: a
+self-signed ECDSA P-256 one, which WebRTC peers know by this hash) into
+fingerprint (32 bytes); 0 if it cannot be made */
+int posix_dtls_fingerprint(unsigned char *fingerprint);
+/* a DTLS 1.2 server for one peer, which asks for the peer's certificate;
+a handle, or -1 */
+int posix_dtls_open(void);
+void posix_dtls_close(int handle);
+/* a datagram that arrived from the peer (kept until read: a few at most) */
+void posix_dtls_input(int handle, const void *data, int size);
+/* the handshake's progress, and then the peer's data: the size of a record
+it sent (copied into buffer), 0 if none is waiting, or -1 if the connection
+failed or was closed. now is a clock of milliseconds (its retransmissions'
+timers) */
+int posix_dtls_receive(int handle, posix_ulong now, void *buffer, int size);
+/* sends a record of data, once the handshake is done: 1, or 0 if not (not
+done yet, or too large) */
+int posix_dtls_send(int handle, const void *data, int size);
+/* the next datagram for the peer (into buffer): its size, or 0 if none */
+int posix_dtls_output(int handle, void *buffer, int size);
+/* once the handshake is done: 1, with the SHA-256 of the peer's
+certificate in fingerprint (32 bytes); else 0 */
+int posix_dtls_peer_fingerprint(int handle, unsigned char *fingerprint);
+/* HMAC-SHA-1 (STUN's MESSAGE-INTEGRITY) into digest (20 bytes) */
+void posix_hmac_sha1(const void *key, int key_size, const void *data, int size, unsigned char *digest);
+
 /* ---------- the process and the desktop (internet play, p2p.c) */
 
 /* copies the command line argument at index (0 is the program) into buffer;

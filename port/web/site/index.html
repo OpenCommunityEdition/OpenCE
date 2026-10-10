@@ -102,6 +102,12 @@
     <div class="spinner" aria-hidden="true"></div>
     <p id="starting-text">Starting…</p>
   </div>
+  <div id="invite" class="invite" role="status" hidden>
+    <span>Hosting for the internet: invite players with this link</span>
+    <input id="invite-link" readonly aria-label="The invite link">
+    <button id="invite-copy">Copy</button>
+    <button id="invite-close" aria-label="Hide">Hide</button>
+  </div>
   <div class="toolbar" id="toolbar">
     <button id="fullscreen" title="Fullscreen">Fullscreen</button>
     <button id="leave" title="Back to the launcher (the game stops)">Quit</button>
@@ -127,6 +133,7 @@
 
 <script src="touch.js"></script>
 <script src="net.js"></script>
+<script src="p2p.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

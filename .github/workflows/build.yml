@@ -311,12 +311,14 @@ jobs:
           node --test "port/web/tests/*.test.js"
           python3 -m pytest -q tools/test_web_build.py
 
-      - name: Test in Chromium
+      - name: Test in Chromium and Firefox
         run: |
           npm install --no-save --prefix "$RUNNER_TEMP/playwright" playwright@1.58
-          "$RUNNER_TEMP/playwright/node_modules/.bin/playwright" install --with-deps chromium
+          "$RUNNER_TEMP/playwright/node_modules/.bin/playwright" install --with-deps chromium firefox
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/smoke.mjs dist/halo-web-release
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/rooms.mjs dist/halo-web-release
+          # (the native builds' WebRTC, port/linux/src/p2p_webrtc.c, with both)
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/webrtc_native.mjs chromium firefox
 
       - name: Compile cache
         run: ccache --show-stats

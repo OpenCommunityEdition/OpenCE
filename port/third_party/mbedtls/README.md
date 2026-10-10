@@ -12,6 +12,12 @@ Only `library/`, `include/` and `LICENSE` of the release are kept, without
 their build files, and nothing in them is changed. The default configuration
 (`include/mbedtls/mbedtls_config.h`) is used, with TLS 1.2 and 1.3.
 
+Every native build's internet play uses it for DTLS with browsers
+(`port/linux/src/posix_dtls.c`: WebRTC's DTLS 1.2 server, with a
+self-signed certificate made each run): the Linux and Windows builds, and
+the Android app's host library. The web build has none of it (a browser has
+its own WebRTC).
+
 The Linux build's self-updater (`port/linux/src/posix_update.c`) uses it to
 download new builds over HTTPS, with the system's certificate authorities.
 The Windows build uses WinHTTP instead, and the Android app Java's HTTPS.

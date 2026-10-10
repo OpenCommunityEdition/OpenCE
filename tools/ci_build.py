@@ -121,9 +121,9 @@ def main() -> int:
     # XisoExtractor.java) follow extract-xiso, whose license asks binaries
     # to carry its notice
     shutil.copy2(ROOT / "port/third_party/extract-xiso/LICENSE.TXT", dist / "extract-xiso-LICENSE.txt")
-    if args.platform == "linux":
-        # the self-updater's TLS (port/third_party/mbedtls), whose Apache
-        # license asks the same
+    if args.platform != "web":
+        # internet play's DTLS with browsers, and the Linux self-updater's TLS
+        # (port/third_party/mbedtls), whose Apache license asks the same
         shutil.copy2(ROOT / "port/third_party/mbedtls/LICENSE", dist / "mbedtls-LICENSE.txt")
     # internet play's UPnP (port/third_party/miniupnpc), in every build,
     # whose BSD license asks binaries to carry its notice

@@ -140,13 +140,13 @@ SCREENS = {
         "screen": "network_settings_screen",
         "header": ("header_profile_network_settings", f"{PE}/network_setup/header_profile_network_settings"),
         "spacing": 30,
-        # (internet play and the updates, which the web build has not: the
-        # other rows from the top there)
+        # (the router, the clipboard and the updates, which the web build
+        # has not: the other rows from the top there)
         "platform_places": True,
         "rows": [
             ("INTERNET PLAY:", "network.online", ON_OFF,
              "Host and join games over the internet by invite\nlinks; off keeps to the local network.",
-             "desktop android"),
+             "desktop android web"),
             ("UPNP PORT FORWARDING:", "network.allow_upnp", ON_OFF,
              "Let internet play ask the router to forward its\nport, for networks that stop connections.",
              "desktop android"),

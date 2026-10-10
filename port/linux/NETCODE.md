@@ -184,7 +184,10 @@ lists a public game with a password with its invite's token sealed with the
 password's key (`p2p_lobby.c`), a listing of another layout; version 21
 sends each killing blow again reliably and an object come to rest three
 times (a client waits for a player's blow before its body dies without one),
-and switches co-op's BSP on the host's crossing alone.
+and switches co-op's BSP on the host's crossing alone; version 26 has each
+machine say its WebRTC in internet play's signalling (a native build's
+certificate, a browser's ICE credentials too), so that browsers play
+(port/linux/README.md, "Browsers").
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -614,7 +617,10 @@ swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
 picks the weapon: the first whose tag name has it in it, as "sniper"), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
-button on the scores does). `debug.network_latency` and
+button on the scores does). `debug.network_test_public` lists the host's
+game in the server browser, and `browse` joins the first game listed there,
+as the server browser does (port/web/tests/internet.mjs plays the native
+build and browsers so). `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet. `debug.network_corrupt` damages
 that share of the datagrams a machine receives at random (bytes changed,

@@ -14,7 +14,10 @@ Automated system link sessions for testing the netcode without the menus
   the variant "coop" makes the game network co-op on it, at normal
   difficulty, as the Map screen does for a campaign level;
 - "join" searches for games and joins the first it finds, as picking it in
-  the system link list does.
+  the system link list does;
+- "browse" joins the first game the server browser lists (internet play's
+  public games: a host's with debug.network_test_public), as picking it
+  there does, and then as "join".
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
@@ -56,6 +59,8 @@ Called from the main loop every frame (main.c).
 #include "tag_files/tag_files.h"
 #include "camera/observer.h"
 
+#include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
+
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -63,6 +68,7 @@ Called from the main loop every frame (main.c).
 
 /* the platform layer's (port/linux/src/port_config.c) */
 const char *config_string(char const *name);
+int config_boolean(char const *name);
 double config_real(char const *name);
 long config_integer(char const *name);
 void platform_log(char const *format, ...);
@@ -80,6 +86,7 @@ enum
 	_network_test_off,
 	_network_test_host,
 	_network_test_join,
+	_network_test_browse,
 };
 
 static struct
@@ -110,6 +117,8 @@ static struct
 	char pickup_weapon[64];
 	long score_to_win;
 	long logged_time;
+	boolean public_game;
+	boolean browsing;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -161,6 +170,11 @@ static void network_test_read_settings(
 	{
 		network_test.mode = _network_test_join;
 	}
+	else if (!strcmp(setting, "browse"))
+	{
+		network_test.mode = _network_test_browse;
+	}
+	network_test.public_game = config_boolean("debug.network_test_public") != 0;
 	network_test.start_delay = (real)config_real("debug.network_test_start");
 	network_test.kill_interval = (real)config_real("debug.network_test_kill");
 	network_test.shoot_interval = (real)config_real("debug.network_test_shoot");
@@ -918,6 +932,32 @@ void network_test_update(
 
 	switch (network_test.mode)
 	{
+	case _network_test_browse:
+	{
+		struct p2p_listing games[8];
+		int count;
+
+		if (!network_test.browsing)
+		{
+			network_test.browsing = TRUE;
+			p2p_lobby_browse(TRUE);
+			platform_log("network test: browsing the public games");
+		}
+		count = p2p_lobby_games(games, NUMBEROF(games));
+		/* (the first that can be joined: no password, not failed) */
+		while (count > 0 && (!games[0].invite[0] || games[0].failed))
+		{
+			memmove(games, games + 1, sizeof(*games) * (count - 1));
+			count--;
+		}
+		if (count > 0 && p2p_join_invite(games[0].invite))
+		{
+			p2p_lobby_browse(FALSE);
+			platform_log("network test: joining %s's game (%s) from the server browser", games[0].name, games[0].map);
+			network_test.mode = _network_test_join;
+		}
+		break;
+	}
 	case _network_test_host:
 		if (!network_test.set_up)
 		{
@@ -925,6 +965,9 @@ void network_test_update(
 			main_set_multiplayer_map_name(network_test.map_name);
 			player_ui_fast_setup_network_server();
 			platform_log("network test: hosting %s", network_test.map_name);
+			/* (in the server browser, as Create Game > Internet's PUBLIC) */
+			if (network_test.public_game)
+				p2p_set_hosting_public(TRUE);
 		}
 		else if (!network_test.started)
 		{
