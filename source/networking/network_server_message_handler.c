@@ -2369,6 +2369,11 @@ static boolean network_game_server_handle_message_client_player_settings_request
 	word *message,
 	short message_size)
 {
+	/* MCC's in-game picker admits only an authenticated, team-only change. */
+	{
+		extern boolean mcc_ui_team_request(struct network_game_server *, struct network_game_server_client_machine *, word *, short);
+		if (mcc_ui_team_request(server, client_machine, message, message_size)) return TRUE;
+	}
 	/* (port: not once the game has started: every machine loads it from
 	the settings sent with the start) */
 	if (network_game_server_lobby_is_open(server))

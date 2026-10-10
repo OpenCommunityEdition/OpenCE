@@ -42,10 +42,14 @@ data and which the game takes as models (tag_schema_custom_edition_groups).
 #include "cseries.h"
 #include "cache/physical_memory_map.h"
 #include "tag_schema.h"
+#include "mcc_tag_validate.h" /* MCC callbacks have an independent context. */
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+/* NULL for Xbox/Custom Edition and in the asset-free standalone validator. */
+struct mcc_validation_dispatch const *mcc_validation_callbacks;
 
 /* ---------- constants */
 
@@ -1325,6 +1329,8 @@ boolean tag_validate_any_claimed(
 	void const *address,
 	unsigned long size)
 {
+	if (mcc_validation_callbacks)
+		return mcc_validation_callbacks->any_claimed(address, size);
 	unsigned long offset = (unsigned long)address - (unsigned long)tag_validate_globals.header;
 	unsigned long bit;
 
@@ -1361,6 +1367,14 @@ void tag_validate_refuse(
 {
 	va_list arguments;
 
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+	{
+		va_start(arguments, format);
+		mcc_validation_callbacks->message(validation, TRUE, format, arguments);
+		va_end(arguments);
+		return;
+	}
+
 	validation->refused = TRUE;
 	va_start(arguments, format);
 	validation_message(validation, "cannot be played", format, arguments);
@@ -1390,6 +1404,14 @@ void tag_validate_correct(
 {
 	va_list arguments;
 
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+	{
+		va_start(arguments, format);
+		mcc_validation_callbacks->message(validation, FALSE, format, arguments);
+		va_end(arguments);
+		return;
+	}
+
 	validation->corrections++;
 	if (validation->corrections <= MAXIMUM_LOGGED_CORRECTIONS)
 	{
@@ -1414,6 +1436,8 @@ boolean tag_validate_file_contains(
 	long offset,
 	long size)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->file_contains(validation, offset, size);
 	short range_index;
 
 	(void)validation;
@@ -1436,12 +1460,16 @@ boolean tag_validate_file_contains(
 void *tag_validate_root(
 	struct tag_validation *validation)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->root(validation);
 	return validation->depth > 0 ? validation->frames[0].base : NULL;
 }
 
 boolean tag_validate_custom_edition(
 	struct tag_validation *validation)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return FALSE;
 	(void)validation;
 
 	return tag_validate_globals.custom_edition;
@@ -1452,6 +1480,8 @@ boolean tag_validate_contains(
 	void const *address,
 	unsigned long size)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->contains(validation, address, size);
 	return region_contains(validation, address, size);
 }
 
@@ -1460,6 +1490,8 @@ void *tag_validate_tag_get(
 	long tag_index,
 	unsigned long group_tag)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->tag_get(validation, tag_index, group_tag);
 	struct tag_validate_instance *instance = instance_get(tag_index);
 	unsigned long groups[2];
 
@@ -1492,6 +1524,8 @@ void *tag_validate_vertex_buffer_data(
 	struct tag_validation *validation,
 	void const *buffer)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->buffer_data(validation, buffer, FALSE);
 	return buffer_data(validation->vertex_buffers, validation->vertex_buffer_count, buffer);
 }
 
@@ -1499,5 +1533,7 @@ void *tag_validate_index_buffer_data(
 	struct tag_validation *validation,
 	void const *buffer)
 {
+	if (mcc_validation_callbacks && mcc_validation_callbacks->owns(validation))
+		return mcc_validation_callbacks->buffer_data(validation, buffer, TRUE);
 	return buffer_data(validation->index_buffers, validation->index_buffer_count, buffer);
 }

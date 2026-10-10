@@ -121,6 +121,8 @@ symbols in this file:
 #include "text/draw_string.h"
 #include <xtl.h>
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "mcc_cache.h"
+#include "mcc_texture_cache.h"
 
 /* ---------- constants */
 
@@ -758,6 +760,11 @@ static boolean texture_cache_bitmap_valid(
 		bitmap->mipmap_count<=floor_log2(MAX(bitmap->width, MAX(bitmap->height, bitmap->depth))) &&
 		bitmap->pixels_size>=0;
 
+	/* Only MCC-owned normalized resources take this admission path. Their
+	linear rows have already been padded by the MCC bitmap adapter. */
+	if (mcc_cache_tags_loaded() && mcc_cache_bitmap_valid(bitmap))
+		return TRUE;
+
 	if (valid)
 	{
 		boolean compressed_format =
@@ -994,6 +1001,14 @@ void *_texture_cache_bitmap_get_hardware_format(
 	boolean load)
 {
 	void *hardware_format = NULL;
+
+	/* MCC owns immutable pixels and independent hardware headers. */
+	if (mcc_cache_tags_loaded())
+	{
+		hardware_format = mcc_texture_cache_get(bitmap, load);
+		if (hardware_format || mcc_cache_bitmap_valid(bitmap))
+			return hardware_format;
+	}
 
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",

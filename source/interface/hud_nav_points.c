@@ -98,6 +98,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "mcc_hud_draw.h"
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game_state.h"
@@ -817,6 +818,7 @@ void custom_render_nav_point(
 			byte alpha;
 			real fade;
 
+			arrow_scale *= mcc_hud_bitmap_scale(bitmap_group_index);
 			point.x = (short)(long)screen_position.x;
 			point.y = (short)(long)screen_position.y;
 			alpha = (byte)PIN(fast_ftol_C(arrow->opacity)*255, 0, 255);
@@ -968,6 +970,11 @@ void hud_render_nav_points(
 	}
 
 	game_engine_render_nav_points(local_player_index);
+	/* port: MCC campaign markers have separate state (mcc_campaign.c). */
+	{
+		extern void mcc_campaign_render(short local_player);
+		mcc_campaign_render(local_player_index);
+	}
 
 	return;
 }

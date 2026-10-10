@@ -65,6 +65,7 @@ symbols in this file:
 #include "interface/hud_weapon.h"
 #include "interface/unit_hud_interface_definition.h"
 #include "interface/weapon_hud_interface_definition.h"
+#include "mcc_grenades.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "objects/objects.h"
@@ -554,6 +555,11 @@ static void render_grenade_hud(
 	short local_player_index,
 	long unit_index)
 {
+	if (mcc_grenades_active())
+	{
+		mcc_grenades_hud(local_player_index, unit_index);
+		return;
+	}
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct unit_datum *unit;
@@ -841,6 +847,7 @@ static void hud_update_weapon_local_player(
 					{
 						no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
 					}
+					if (mcc_grenades_active() && mcc_grenades_total(unit_index)) no_grenades = FALSE;
 					result = (no_grenades &&
 							!unit->unit.grenade_throw_state &&
 							TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit)) ||
@@ -1137,6 +1144,7 @@ static void crosshairs_draw(
 										{
 											no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
 										}
+										if (mcc_grenades_active() && mcc_grenades_total(unit_index)) no_grenades = FALSE;
 										firing_active = no_grenades &&
 											!unit->unit.grenade_throw_state &&
 											TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit);

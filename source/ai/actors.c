@@ -281,6 +281,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "mcc_grenades.h"
 #include "actors.h"
 #include "actor_definitions.h"
 #include "actor_placement.h"
@@ -3367,6 +3368,8 @@ void actor_died(
 			grenade_roll < actor_variant_definition->items.dont_drop_grenades_chance)
 		{
 			csmemset(unit->unit.grenade_counts, 0, sizeof(unit->unit.grenade_counts));
+			if (mcc_grenades_active())
+				mcc_grenades_clear(actor->meta.unit_index);
 		}
 
 		if (weapon_index != NONE)

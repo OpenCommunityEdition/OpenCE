@@ -32,6 +32,7 @@ symbols in this file:
 
 #include "tag_files/tag_files.h"
 #include "custom_edition_maps.h"
+#include "mcc_maps.h"
 
 #define MULTIPLAYER_GAME_TEXT_TAG_NAME "ui\\multiplayer_game_text"
 #define FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING 36
@@ -213,6 +214,18 @@ static wchar_t *fallback_string(long tag_index, short string_index)
 {
 	char const *tag_name = tag_get_name(tag_index);
 	short fallback_index = string_index - FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING;
+	/* MCC owns a separate display-index range; existing map lookups below
+	are unchanged for every Xbox and Custom Edition index. */
+	if (string_index >= MCC_MAPS_FIRST_DISPLAY_INDEX &&
+		string_index < MCC_MAPS_FIRST_DISPLAY_INDEX + MCC_MAPS_MAXIMUM)
+	{
+		short mcc_index = string_index - MCC_MAPS_FIRST_DISPLAY_INDEX;
+
+		if (!csstrcasecmp(tag_name, LEVEL_NAMES_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_NAMES_TAG_NAME))
+			return (wchar_t *)mcc_maps_name(mcc_index);
+		if (!csstrcasecmp(tag_name, LEVEL_DESCRIPTIONS_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_DESCRIPTIONS_TAG_NAME))
+			return (wchar_t *)mcc_maps_description(mcc_index);
+	}
 
 	/* (a Custom Edition map's name or description, by its display index) */
 	if (!csstrcasecmp(tag_name, LEVEL_NAMES_TAG_NAME) || !csstrcasecmp(tag_name, PC_LEVEL_NAMES_TAG_NAME))

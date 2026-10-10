@@ -64,6 +64,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "cutscene/cinematics.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "mcc_network.h"
 #include "profile_sections.h"
 
 #include <math.h>
@@ -2015,6 +2016,7 @@ void network_objects_host_tick(
 	if (game_time_get() % INVENTORY_INTERVAL_TICKS == 0)
 		profile_scope(objects_host_tick_send_inventories_section, distributed_host_send_inventories();)
 	profile_scope(objects_host_tick_send_damage_animations_section, distributed_host_send_damage_animations();)
+	mcc_network_host_tick();
 }
 
 /* ---------- a client */
@@ -3128,6 +3130,7 @@ void network_objects_client_tick(
 		objects_client_check_all = TRUE;
 	distributed_client_ready_picked_up_weapons();
 	distributed_client_note_own_inventories();
+	mcc_network_client_tick();
 	distributed_client_send_vehicles();
 	distributed_client_carry_unsteered_vehicles();
 	/* (who it is, as its Discord told it: once its ready went, which makes
@@ -3146,6 +3149,7 @@ void network_objects_new_game(
 	short local_player_index;
 	short index;
 
+	mcc_network_new_game();
 	csmemset(objects_host_inventories, 0, sizeof(objects_host_inventories));
 	host_damage_animation_count = 0;
 	csmemset(client_damage_animations, 0, sizeof(client_damage_animations));

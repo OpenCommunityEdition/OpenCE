@@ -36,6 +36,10 @@ static int new_servers, clients_closed, joins_cleared, variants_cleared;
 static short expected_message;
 static boolean message_fails, send_fails, machines_fail;
 
+/* These legacy teardown cases have no pending MCC restart. Its independent
+   snapshot lifetime is exercised by test_mcc_ui_network.py. */
+static void mcc_ui_network_server_dispose(struct network_game_server *server) { (void)server; }
+
 static void note(char event)
 {
 	size_t length = strlen(order);

@@ -12,5 +12,7 @@
 		<string text="MULTIPLAYER"/>
 		<string text="CUSTOM SINGLEPLAYER"/>
 		<string text="CUSTOM MULTIPLAYER"/>
+		<string text="MCC SINGLEPLAYER"/>
+		<string text="MCC MULTIPLAYER"/>
 	</strings>
 </menus>

@@ -738,6 +738,11 @@ void player_ui_begin_editing_profile(
 	long type;
 
 	player_ui_globals.edit_profile_index = NONE;
+	/* A replacement native editor no longer belongs to MCC's pause UI. */
+	{
+		extern void mcc_ui_settings_profile_released(void);
+		mcc_ui_settings_profile_released();
+	}
 	type = saved_game_file_get_type(profile_index);
 
 	switch (type)
@@ -1268,5 +1273,10 @@ static void clear_profile_edit_data(
 	void)
 {
 	player_ui_globals.edit_profile_index = NONE;
+	/* Native Save/Cancel also ends any MCC-owned editor lease. */
+	{
+		extern void mcc_ui_settings_profile_released(void);
+		mcc_ui_settings_profile_released();
+	}
 	return;
 }
