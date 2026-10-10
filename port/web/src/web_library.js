@@ -16,4 +16,15 @@ addToLibrary({
     else if (kind == 3) console.error(message);
     else console.log(message);
   },
+
+  // a frame for another browser of the room (port/web/src/web_net.c; the
+  // page's net.js carries it): the C side's copy, freed here once taken.
+  // (async: the game's thread does not wait for the page)
+  web_js_net_send__proxy: 'async',
+  web_js_net_send__deps: ['free'],
+  web_js_net_send: (address, reliable, frame, size) => {
+    var bytes = HEAPU8.slice(frame, frame + size);
+    _free(frame);
+    if (Module.haloNetSend) Module.haloNetSend(address >>> 0, reliable, bytes);
+  },
 });

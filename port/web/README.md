@@ -75,12 +75,30 @@ game's copies of the maps), downloads the log, and deletes the game
 data. The game's own Settings screens have the settings that apply in a
 browser.
 
+### Playing together
+
+Under **Play together**, **Create a room** makes a room and its link
+(`https://halocombatevolved.com/?room=<secret>`): send it to your friends.
+Everyone who opens it is in the room, and the browsers of a room are as the
+machines of one local network to the game: host a game under Multiplayer and
+the others find it there, as system link games are found (up to 16
+browsers). The link's secret is the room: anyone with it can come in.
+
+The browsers connect to each other directly (WebRTC, through each one's
+router with the help of the STUN servers internet play uses). To find each
+other they post to a topic of the room on public MQTT brokers (EMQX's,
+HiveMQ's and Mosquitto's, over secure WebSockets): the topic is named by a
+hash of the secret and every message is sealed with a key derived from it,
+so the brokers see nothing of the room. A network that lets no WebRTC
+through (some company and school networks) keeps a browser out of rooms.
+
 ### Address parameters
 
 For testing, the page's address takes:
 
 | Parameter | Effect |
 | --- | --- |
+| `?room=<secret>` | Joins that room (32 hex digits); `?brokers=ws://host:port[,...]` uses other MQTT brokers (WebSocket listeners), as the tests do. |
 | `?set=NAME=value` | Sets a setting's environment variable (the settings table in [port/linux/README.md](../linux/README.md)); repeat it for more. `?set=HALO_GL_DEBUG=1` reports WebGL errors in the log. |
 | `?menu=<screen>` | Opens a menu screen (`debug.menu_open`). |
 | `?map=<level>` | Starts a level: `a10`, or `levels\test\bloodgulch\bloodgulch`. The page writes `init.txt` for it, and removes it at the next visit without `?map=`. |
@@ -96,9 +114,10 @@ reloads.
 
 ## Limits
 
-- No network play between machines yet: browsers have no UDP and no plain
-  TCP. Split screen and the game's own network code between its players on
-  one machine work (the sockets are inside the page: "How it operates").
+- Network play only between browsers, in rooms ("Playing together"):
+  browsers have no UDP and no plain TCP, so they cannot reach the Linux,
+  Windows and Android builds' games, nor take part in their internet play
+  (invite links, the server browser). Split screen works.
 - No Custom Edition maps (their tag data's address is in the C heap there).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
@@ -144,11 +163,18 @@ serves another site (a `halo-web-*.zip` from a release, say).
 node --test "port/web/tests/*.test.js"   # the disc image reader, the service worker
 python -m pytest -q tools/test_web_build.py  # the build's graph, version.json, the sockets, the menus
 node port/web/tests/smoke.mjs dist/halo-web-release  # the site in a headless Chromium (Playwright)
+node port/web/tests/rooms.mjs dist/halo-web-release  # two browsers in a room (and mosquitto)
 ```
 
 The smoke test serves the site as GitHub Pages does, checks that the page
 isolates itself and passes its checks, and starts the game with an empty
-maps folder, which gets as far as looking for the menus' map.
+maps folder, which gets as far as looking for the menus' map. The rooms test
+starts a local broker and two browsers that join one room and connect. A
+game between two browsers needs the maps: two pages of the same build with
+the multiplayer maps imported, one opened with
+`?room=<secret>&set=HALO_NETWORK_TEST=host:bloodgulch` and the other with
+`?room=<secret>&set=HALO_NETWORK_TEST=join` (`debug.network_test`,
+port/linux/NETCODE.md), play one and log every player's state each second.
 
 ## How it operates
 
@@ -204,10 +230,22 @@ multiply-adds). `tools/web_build.py` writes the graph.
   `port/android/host/host_watch_hash.c`).
 - **Sockets.** `port/web/src/web_net.c` gives `posix.h`'s sockets inside
   the page: one machine with a loopback address and an address of its own
-  network (`10.0.0.1`); datagrams to either, or broadcast, reach the sockets
-  bound to their port, and streams connect to the socket listening on
-  theirs. Split screen (a network game over loopback) and the game's own
-  start-up use them.
+  network (`10.0.0.1`, or the room's); datagrams to either, or broadcast,
+  reach the sockets bound to their port, and streams connect to the socket
+  listening on theirs. Split screen (a network game over loopback) and the
+  game's own start-up use them.
+- **Rooms.** The other browsers of a room have addresses of their own in
+  `10.0.0.0/8`, which `net.js` chooses (and the game is started with:
+  `HALO_WEB_ADDRESS`). What the game sends to one, or broadcasts, is a frame
+  `net.js` carries over WebRTC: a datagram on a data channel that may lose it
+  (unordered, not resent), a stream's opening, bytes and end on one that
+  does not. What arrives, `web_net_receive` checks and hands to the sockets.
+  System link and the netcode run unchanged on top, so the network version
+  needs no change for it. (The plan was to carry internet play's own
+  invites and tunnel to browsers; that tunnel's peers exchange UDP
+  addresses, where WebRTC needs its own descriptions exchanged, which would
+  change the protocol of every build. Browser to native play is the next
+  step: port/web/README.md "Limits".)
 - **Left out.** The self-updater (the site updates itself), the disc image
   reader (the page's `xiso-worker.js` is), UPnP and Discord (no internet
   play), and the page-fault memory watch.
@@ -273,13 +311,13 @@ a first visit downloads about 10 MB, compressed).
 | `tools/web_build.py` | The `ninja web` graph |
 | `port/web/halo_sdl3.py` | SDL 3.4.16 as an Emscripten port |
 | `port/web/src/web_main.c` | The entry point: the page's arguments, the storage, the heap's limit |
-| `port/web/src/web_net.c` | The sockets inside the page |
+| `port/web/src/web_net.c` | The sockets inside the page, and the room's other browsers |
 | `port/web/src/web_memory_watch.c` | The memory watch by hashing |
 | `port/web/src/web_gl_host.c` | The renderer's services for WebGL 2 |
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), its service worker (`sw.js`), the importer (`xiso-worker.js`), the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

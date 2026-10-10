@@ -46,6 +46,20 @@
       Xbox) into this browser's storage for this site. Nothing is uploaded, and the site serves no game data.</p>
   </section>
 
+  <section class="panel" id="room-panel" aria-labelledby="room-title">
+    <h2 id="room-title">Play together</h2>
+    <p id="room-status" class="status">Play system link with friends in their browsers: create a room and send them
+      its link. Each of you then finds the others' games under Multiplayer.</p>
+    <div class="actions">
+      <button id="room-create">Create a room</button>
+      <button id="room-copy" hidden>Copy the room's link</button>
+      <button id="room-leave" hidden>Leave the room</button>
+    </div>
+    <p class="note">The browsers of a room connect to each other directly. They find each other through public
+      message brokers, which see nothing of the room: what they pass on is sealed with the link's secret. The
+      Linux, Windows and Android builds cannot join a room yet.</p>
+  </section>
+
   <div class="play-row">
     <button id="play" class="primary" disabled>Play</button>
     <p id="play-note" class="note"></p>
@@ -112,6 +126,7 @@
 </div>
 
 <script src="touch.js"></script>
+<script src="net.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

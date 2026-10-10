@@ -263,8 +263,9 @@ jobs:
   web:
     # Emscripten (emsdk, the version below, cached) builds the web port's
     # site (port/web/README.md); the tests check its graph, the page's
-    # importer and service worker, its sockets, and that it starts in a
-    # headless Chromium (with no game data, as far as the launcher).
+    # importer and service worker, its sockets, that it starts in a
+    # headless Chromium (with no game data, as far as the menus' map), and
+    # that two browsers join a room through a local MQTT broker.
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
@@ -286,7 +287,7 @@ jobs:
           fi
           ~/emsdk/emsdk activate "$EMSDK_VERSION"
           sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build ccache python3-pytest
+          sudo apt-get install -y -q ninja-build ccache python3-pytest mosquitto
 
       - uses: actions/cache@v4
         with:
@@ -315,6 +316,7 @@ jobs:
           npm install --no-save --prefix "$RUNNER_TEMP/playwright" playwright@1.58
           "$RUNNER_TEMP/playwright/node_modules/.bin/playwright" install --with-deps chromium
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/smoke.mjs dist/halo-web-release
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/rooms.mjs dist/halo-web-release
 
       - name: Compile cache
         run: ccache --show-stats

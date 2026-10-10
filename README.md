@@ -76,8 +76,10 @@ functions. These are almost the same on all platforms.
 The game can play system link games on a local network and on the internet:
 
 - A system link game can have up to 128 players on up to 128 machines.
-- Linux, Windows and Android machines can play in the same game. The web
-  build plays alone and split screen for now (browsers have no UDP).
+- Linux, Windows and Android machines can play in the same game. Browsers
+  play each other in rooms, over WebRTC, as a local network
+  ([port/web/README.md](port/web/README.md)); they cannot join the other
+  builds' games (browsers have no UDP).
 - An invite link lets a machine join a game on the internet. No server of
   this project is necessary.
 - The netcode is new. Each machine moves its own player at once,

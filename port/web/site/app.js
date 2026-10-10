@@ -15,7 +15,8 @@ then fills the page.
   the site's own domain do not share them.
 - Query parameters, for testing: ?set=NAME=value (any number) passes a
   setting's environment variable (port/linux/README.md, the settings
-  table), ?menu=<screen> opens a menu screen (debug.menu_open), ?map=<level>
+  table), ?room=<secret> joins a room (net.js; ?brokers= names other
+  message brokers), ?menu=<screen> opens a menu screen (debug.menu_open), ?map=<level>
   starts a level (a10, or levels\a10\a10: the init.txt the game reads, which
   the page removes again the next time), ?play starts the game at once when
   it can.
@@ -465,8 +466,54 @@ async function prepareInit() {
   }
 }
 
+// ---------- rooms (net.js)
+
+function roomLink(secret) {
+  return `${location.origin}${location.pathname}?room=${secret}`;
+}
+
+function showRoom(status) {
+  const inRoom = !!status;
+  $('room-create').hidden = inRoom || gameStarted;
+  $('room-copy').hidden = !inRoom;
+  $('room-leave').hidden = !inRoom || gameStarted;
+  if (!inRoom) return;
+  const brokers = status.brokers ? '' : ' (finding the message brokers…)';
+  $('room-status').textContent = status.peers ?
+    `In a room with ${status.connected} of ${status.peers} other browsers connected${brokers}. Your address: ${status.address}.` :
+    `In a room, alone so far${brokers}: send its link to your friends.`;
+}
+
+async function joinRoom(secret) {
+  const brokers = (params.get('brokers') || '').split(',').filter((url) => /^wss?:\/\//.test(url));
+  showRoom(await window.HaloNet.join(secret, brokers));
+  history.replaceState(null, '', `?${new URLSearchParams({ ...Object.fromEntries(params), room: secret })}`);
+}
+
+window.HaloNet.onChange(showRoom);
+
+$('room-create').addEventListener('click', () => joinRoom(window.HaloNet.newSecret()));
+$('room-copy').addEventListener('click', async () => {
+  const status = window.HaloNet.status();
+  if (!status) return;
+  try {
+    await navigator.clipboard.writeText(roomLink(status.secret));
+    $('room-copy').textContent = 'Copied';
+    setTimeout(() => { $('room-copy').textContent = "Copy the room's link"; }, 1500);
+  } catch {
+    prompt("The room's link:", roomLink(status.secret));
+  }
+});
+$('room-leave').addEventListener('click', () => {
+  window.HaloNet.leave();
+  params.delete('room');
+  history.replaceState(null, '', params.toString() ? `?${params}` : location.pathname);
+});
+
 function gameArguments() {
   const args = [];
+  // (the game's address in the room: port/web/src/web_net.c)
+  if (window.HaloNet.address()) args.push('--HALO_WEB_ADDRESS=' + window.HaloNet.address());
   for (const value of params.getAll('set')) {
     if (/^[A-Z0-9_]+=/.test(value)) args.push('--' + value);
   }
@@ -518,6 +565,7 @@ async function play() {
         console.warn(text);
         if (!$('starting').hidden && /data root:/.test(text)) $('starting-text').textContent = 'Loading the menus…';
       },
+      haloNetSend: (address, reliable, bytes) => window.HaloNet.send(address, reliable, bytes),
       haloMessage: (kind, text) => {
         logLine(text);
         if (kind === 3) showFatal(text);
@@ -528,8 +576,9 @@ async function play() {
         else location.reload();
       },
     });
-    // the on-screen touch controls (touch.js)
+    // the on-screen touch controls (touch.js), and the room's frames (net.js)
     window.HaloTouch.start(game, $('touch'));
+    window.HaloNet.attach(game);
   } catch (error) {
     showFatal(String(error && error.message ? error.message : error));
   }
@@ -615,5 +664,6 @@ document.addEventListener('visibilitychange', async () => {
   if (results.opfs === 'good') await refreshData();
   else updatePlay();
   checkForUpdate();
+  if (/^[0-9a-f]{32}$/.test(params.get('room') || '')) await joinRoom(params.get('room'));
   if (params.has('play')) play();
 })();

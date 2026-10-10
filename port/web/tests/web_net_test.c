@@ -5,12 +5,16 @@ port/web/src/web_net.c, the web build's sockets inside the page, compiled
 for this computer and tried as the game uses them (tools/test_web_build.py
 builds and runs it): datagrams to loopback, to the machine's own address and
 by broadcast; a stream connected, accepted, written and read, and its end;
-select; and the errors Winsock gives.
+select; and the errors Winsock gives. Then the other browsers of a room:
+the frames the page would carry to them (caught here in place of the page's
+web_js_net_send), and theirs handed in as the page hands them, malformed ones
+among them.
 */
 
 #include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "posix.h"
@@ -30,6 +34,38 @@ struct address
 	unsigned int ip;
 	unsigned char zero[8];
 };
+
+/* ---------- the page, as web_net.c sees it */
+
+void web_net_receive(unsigned int from, int reliable, const unsigned char *frame, int size);
+void web_net_peer_lost(unsigned int address);
+
+#define MAXIMUM_SENT 64
+
+static struct
+{
+	unsigned int address;
+	int reliable;
+	unsigned char *frame;
+	int size;
+} sent[MAXIMUM_SENT];
+static int sent_count;
+
+void web_js_net_send(unsigned int address, int reliable, unsigned char *frame, int size)
+{
+	assert(sent_count < MAXIMUM_SENT);
+	sent[sent_count].address = address;
+	sent[sent_count].reliable = reliable;
+	sent[sent_count].frame = frame;
+	sent[sent_count].size = size;
+	sent_count++;
+}
+
+static void sent_clear(void)
+{
+	while (sent_count)
+		free(sent[--sent_count].frame);
+}
 
 static struct address address_of(unsigned int a, unsigned int b, unsigned int c, unsigned int d, unsigned short port)
 {
@@ -75,7 +111,8 @@ static void test_datagrams(void)
 		assert(posix_socket_recv(receiver, buffer, sizeof(buffer), 0) == 3);
 	}
 
-	/* another machine's: lost, as on an empty network */
+	/* another machine's: not here (the page carries it to the room's
+	browsers, or loses it) */
 	{
 		struct address far = address_of(10, 9, 9, 9, 2302);
 		posix_ulong available = 99;
@@ -148,10 +185,151 @@ static void test_streams(void)
 	posix_socket_close(lonely);
 }
 
+/* (in network byte order) */
+static unsigned int ip_of(unsigned int a, unsigned int b, unsigned int c, unsigned int d)
+{
+	return a | (b << 8) | (c << 16) | (d << 24);
+}
+
+static void test_room_datagrams(void)
+{
+	unsigned int other = ip_of(10, 9, 9, 9);
+	struct address to_other = address_of(10, 9, 9, 9, 2302), any = address_of(0, 0, 0, 0, 2302);
+	struct address broadcast = address_of(255, 255, 255, 255, 2302), from;
+	int socket = posix_socket(AF_INET_VALUE, SOCK_DGRAM_VALUE, 0);
+	int length = sizeof(from);
+	unsigned char frame[64];
+	char buffer[64];
+
+	/* this machine is the room's address the page gave it */
+	assert(posix_local_ipv4_address() == ip_of(10, 1, 2, 3));
+	assert(posix_socket_bind(socket, &any, sizeof(any)) == 0);
+	posix_socket_set_nonblocking(socket, 1);
+
+	/* to another browser: a frame on the channel that may lose it */
+	sent_clear();
+	assert(posix_socket_sendto(socket, "hi", 2, 0, &to_other, sizeof(to_other)) == 2);
+	assert(sent_count == 1 && sent[0].address == other && !sent[0].reliable && sent[0].size == 9 + 2);
+	assert(sent[0].frame[0] == 1 && !memcmp(sent[0].frame + 1, &other, 4) && !memcmp(sent[0].frame + 9, "hi", 2));
+	/* a broadcast: to every browser, and here */
+	sent_clear();
+	assert(posix_socket_sendto(socket, "all", 3, 0, &broadcast, sizeof(broadcast)) == 3);
+	assert(sent_count == 1 && sent[0].address == 0xffffffffu);
+	assert(posix_socket_recv(socket, buffer, sizeof(buffer), 0) == 3);
+	sent_clear();
+
+	/* from another browser: as from its address and port */
+	frame[0] = 1;
+	memcpy(frame + 1, &(unsigned int){ ip_of(10, 1, 2, 3) }, 4);
+	frame[5] = 0x12;
+	frame[6] = 0x34;
+	memcpy(frame + 7, &any.port, 2);
+	memcpy(frame + 9, "back", 4);
+	web_net_receive(other, 0, frame, 13);
+	assert(posix_socket_recvfrom(socket, buffer, sizeof(buffer), 0, &from, &length) == 4);
+	assert(!memcmp(buffer, "back", 4) && from.ip == other && from.port == 0x3412);
+
+	/* not for this machine, too short, from no browser's address, or
+	nothing: dropped */
+	memcpy(frame + 1, &(unsigned int){ ip_of(10, 7, 7, 7) }, 4);
+	web_net_receive(other, 0, frame, 13);
+	web_net_receive(other, 0, frame, 5);
+	web_net_receive(ip_of(127, 0, 0, 1), 0, frame, 13);
+	web_net_receive(other, 0, NULL, 0);
+	assert(posix_socket_recv(socket, buffer, sizeof(buffer), 0) == -1 &&
+		posix_socket_last_error() == WSAEWOULDBLOCK);
+	posix_socket_close(socket);
+}
+
+static void test_room_streams(void)
+{
+	unsigned int other = ip_of(10, 9, 9, 9);
+	struct address to_other = address_of(10, 9, 9, 9, 2400), port = address_of(0, 0, 0, 0, 2401);
+	int client = posix_socket(AF_INET_VALUE, SOCK_STREAM_VALUE, 0);
+	int listener = posix_socket(AF_INET_VALUE, SOCK_STREAM_VALUE, 0);
+	unsigned char frame[64], connection[4];
+	char buffer[64];
+	int accepted;
+
+	/* a stream this machine opens: its opening, its bytes, its end */
+	sent_clear();
+	assert(posix_socket_connect(client, &to_other, sizeof(to_other)) == 0);
+	assert(sent_count == 1 && sent[0].address == other && sent[0].reliable && sent[0].size == 9);
+	assert(sent[0].frame[0] == (2 | 0x80));
+	memcpy(connection, sent[0].frame + 1, 4);
+	sent_clear();
+	assert(posix_socket_send(client, "ping", 4, 0) == 4);
+	assert(sent_count == 1 && sent[0].frame[0] == (3 | 0x80) && !memcmp(sent[0].frame + 5, "ping", 4));
+	sent_clear();
+	/* the other end's bytes (it did not open it), then its end */
+	frame[0] = 3;
+	memcpy(frame + 1, connection, 4);
+	memcpy(frame + 5, "pong", 4);
+	web_net_receive(other, 1, frame, 9);
+	/* (the same on the channel that may lose it is not taken) */
+	web_net_receive(other, 0, frame, 9);
+	assert(posix_socket_recv(client, buffer, sizeof(buffer), 0) == 4 && !memcmp(buffer, "pong", 4));
+	frame[0] = 4;
+	web_net_receive(other, 1, frame, 5);
+	assert(posix_socket_recv(client, buffer, sizeof(buffer), 0) == 0);
+	assert(posix_socket_send(client, "x", 1, 0) == -1);
+	posix_socket_close(client);
+	sent_clear();
+
+	/* a stream another browser opens to a port listening here */
+	assert(posix_socket_bind(listener, &port, sizeof(port)) == 0 && posix_socket_listen(listener, 2) == 0);
+	posix_socket_set_nonblocking(listener, 1);
+	frame[0] = 2 | 0x80;
+	frame[1] = 0;
+	frame[2] = 0;
+	frame[3] = 0;
+	frame[4] = 7;
+	frame[5] = 0x50;
+	frame[6] = 0x00;
+	memcpy(frame + 7, &port.port, 2);
+	web_net_receive(other, 1, frame, 9);
+	accepted = posix_socket_accept(listener, NULL, NULL);
+	assert(accepted >= 0);
+	frame[0] = 3 | 0x80;
+	memcpy(frame + 5, "join", 4);
+	web_net_receive(other, 1, frame, 9);
+	assert(posix_socket_recv(accepted, buffer, sizeof(buffer), 0) == 4 && !memcmp(buffer, "join", 4));
+	assert(posix_socket_send(accepted, "ok", 2, 0) == 2);
+	assert(sent_count == 1 && sent[0].frame[0] == 3 && sent[0].frame[4] == 7);
+	sent_clear();
+	/* the other browser leaves: the stream ends */
+	web_net_peer_lost(other);
+	assert(posix_socket_recv(accepted, buffer, sizeof(buffer), 0) == 0);
+	posix_socket_close(accepted);
+
+	/* an opening to a port nobody listens on: its end goes back at once */
+	frame[0] = 2 | 0x80;
+	frame[4] = 8;
+	frame[7] = 0x99;
+	frame[8] = 0x99;
+	web_net_receive(other, 1, frame, 9);
+	assert(sent_count == 1 && sent[0].frame[0] == 4 && sent[0].frame[4] == 8);
+	sent_clear();
+	/* a stream's frame of no stream, or of an unknown type: nothing */
+	frame[0] = 3;
+	frame[4] = 99;
+	web_net_receive(other, 1, frame, 9);
+	frame[0] = 9;
+	web_net_receive(other, 1, frame, 9);
+	assert(sent_count == 0);
+	posix_socket_close(listener);
+	sent_clear();
+}
+
 int main(void)
 {
+	/* (the address the page gives the machine in a room, read once) */
+	setenv("HALO_WEB_ADDRESS", "10.1.2.3", 1);
 	test_datagrams();
 	test_streams();
+	sent_clear();
+	test_room_datagrams();
+	test_room_streams();
 	printf("web_net: ok\n");
 	return 0;
 }
