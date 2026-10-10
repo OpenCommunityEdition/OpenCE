@@ -10,6 +10,52 @@ from harness import function
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_mcc_completion_defers_menu_load_without_starting_xbox_credits(tmp_path):
+    compiler = shutil.which("clang") or shutil.which("cc")
+    if not compiler:
+        pytest.skip("a C compiler is required")
+    native = (ROOT / "source/main/main.c").read_text()
+    adapter = (ROOT / "port/linux/game/mcc_main.c").read_text()
+    source = r'''
+typedef int boolean;
+#define TRUE 1
+#define FALSE 0
+#define _error_silent 0
+static int active,queued,loaded,movies,logged;
+static boolean mcc_cache_tags_loaded(void) {return active;}
+static void error(int level,char const *text,...) {(void)level;(void)text;logged++;}
+static void main_goto_main_menu(void) {queued++;}
+static void main_menu_load(void) {loaded++;active=0;}
+static void game_end_credits_start(void) {movies++;}
+''' + function(adapter, "mcc_main_map_completed") + function(native, "main_roll_credits") + r'''
+int main(void) {
+    int i;
+    /* Repeated MCC loads and completion do not retain transition state. */
+    for(i=0;i<2;i++) {
+        active=1;main_roll_credits();
+        if(queued!=i+1 || loaded!=i || movies || logged!=i+1 || !active)return 1;
+        /* The main loop performs the queued transition, after this returns. */
+        main_menu_load();
+    }
+    /* With MCC inactive, both Xbox and CE retain the exact native sequence. */
+    for(i=0;i<2;i++) {
+        main_roll_credits();
+        if(queued!=2 || loaded!=3+i || movies!=1+i || logged!=3+i)return 2;
+    }
+    return 0;
+}
+'''
+    path = tmp_path / "completion.c"
+    path.write_text(source)
+    binary = tmp_path / ("completion.exe" if sys.platform == "win32" else "completion")
+    flags = (["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else [])
+    built = subprocess.run([compiler, *flags, "-std=gnu89", "-Wall", "-Wextra", "-Werror",
+                            str(path), "-o", str(binary)], capture_output=True, text=True)
+    assert built.returncode == 0, built.stderr
+    result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_initial_mcc_bsp_failure_balances_state_and_preserves_legacy_rollback(tmp_path):
     """Exercise real BSP switching with and without the MCC dispatch active."""
     compiler = shutil.which("clang") or shutil.which("cc")

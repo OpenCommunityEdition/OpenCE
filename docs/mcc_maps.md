@@ -704,6 +704,54 @@ network co-op test was performed for these changes. Android remains
 unverified locally: `ninja android` reports an unknown target in this
 Windows-only configuration.
 
+## Solar Flare M0 cinematic and completion fixes
+
+The supplied M0 has a 100-degree field of view in camera `cin_x4` (index 3).
+The native scripted camera and observer accept at most 90 degrees; the
+observer also clamps its output to that maximum. The reported assertions
+were reproduced as that camera became active. MCC metadata conversion now
+limits wider, valid cinematic lenses to 90 degrees and logs the camera
+index. This narrows those shots; it does not implement wider cinematic
+lenses. Zero still selects the native default, and already supported
+angles remain unchanged. Invalid angles (including NaN and infinity) and
+out-of-bounds camera blocks are refused. Only the in-memory MCC copy is
+changed; the map file and Xbox/CE camera code are untouched.
+
+M0's `cin_a` script calls `game_won` at the end of its cinematics. In local
+play, an unknown campaign level previously fell through to the Xbox credits
+movie immediately after loading and precaching the menu. A separate access
+violation was reproduced through menu -> M0 -> menu, even after fixing the
+camera: the cache worker was copying a pending read into protected cache
+memory during that movie transition. The matching Windows symbols identify
+`read_at` / `ReadFileEx` / `cached_map_issue_async_request` on the failing
+thread. Direct startup into M0 did not reproduce this second failure.
+
+MCC scenario completion now queues the ordinary return to the menu, without
+starting the Xbox campaign outro. Its helper lives in `mcc_main.c`, selected
+by one additive dispatch in `main_roll_credits`. When MCC is inactive the
+original statements execute unchanged. The existing network co-op win
+branch still returns to its lobby before this path. No network message or
+compatibility-version change is involved. This is an MCC-specific avoidance
+of the credits/cache interaction, not a general change to the movie player
+or background I/O. Xbox and CE completion remain unchanged.
+
+Automatic MCC campaign-package progression remains unsupported: after M0
+finishes, select M1 manually. An unrelated saved-map identity rejection is
+normal, and the map's equipment/grenade warnings are not suppressed here.
+
+Regression tests cover camera bounds, default and supported lenses, wide
+lenses, malformed floats, repeat conversion, and MCC versus legacy
+completion dispatch. The Windows x86 release build and 889 automated tests
+passed (six optional-fixture skips). Android could not be built locally:
+this Windows configuration has no `android` target.
+
+The final Windows native run started at the menu, loaded the supplied M0,
+played its entire cinematic sequence, returned to the menu and remained
+there for approximately another minute before a normal timed exit. This
+220-second test used one hidden instance at 60 FPS with audio decoding
+enabled and output muted. It produced neither camera assertions nor an
+access violation. No new network co-op playtest was performed for this fix.
+
 ## Public format evidence
 
 These are wire-format references, not copied implementation code. Current

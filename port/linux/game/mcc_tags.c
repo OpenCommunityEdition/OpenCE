@@ -60,6 +60,35 @@ static int mcc_scenario_recordings(struct mcc_runtime *r, unsigned char *scenari
     return TRUE;
 }
 
+static int mcc_scenario_cameras(struct mcc_runtime *r, unsigned char *scenario)
+{
+    uint32_t count, i;
+    unsigned char *points = mcc_block(r, scenario + 0x4F0, 0x68, &count);
+    float const native_maximum = 1.5707963267948966f;
+    if (count && !points) return FALSE;
+    for (i = 0; i < count; ++i) {
+        unsigned char *field = points + i * 0x68 + 0x40;
+        float angle;
+        memcpy(&angle, field, 4);
+        /* Zero selects the native default. Wide MCC cinematic lenses are
+         * valid authored data, but the native observer both validates and
+         * clamps to 90 degrees. Normalize the MCC copy before commands reach
+         * it; the Xbox/CE camera and its validation remain unchanged. */
+        if (angle == 0.0f) continue;
+        if (!(angle >= 0.001f && angle < 3.1415926535897932f)) {
+            error(_error_silent, "mcc: cutscene camera #%lu has an invalid field of view",
+                (unsigned long)i);
+            return FALSE;
+        }
+        if (angle > native_maximum) {
+            memcpy(field, &native_maximum, 4);
+            error(_error_silent, "mcc: cutscene camera #%lu: field of view limited to 90 degrees",
+                (unsigned long)i);
+        }
+    }
+    return TRUE;
+}
+
 static int mcc_hud(struct mcc_runtime *r, uint32_t group, unsigned char *p)
 {
     unsigned char *block;
@@ -132,7 +161,7 @@ int mcc_tags_prepare(struct mcc_runtime *r)
             return FALSE;
         }
         if (shader >= 0) memcpy(p + 0x24, &shader, 2);
-        if (group == 'scnr' && !mcc_scenario_recordings(r, p)) return FALSE;
+        if (group == 'scnr' && (!mcc_scenario_recordings(r, p) || !mcc_scenario_cameras(r, p))) return FALSE;
         if (group == 'scex') {
             uint32_t flags = mcc_word(p + 0x6C), new_group = 'schi';
             if (!mcc_word(p + 0x54)) memcpy(p + 0x54, p + 0x60, 12);
