@@ -176,6 +176,10 @@ the multiplayer maps imported, one opened with
 `?room=<secret>&set=HALO_NETWORK_TEST=join` (`debug.network_test`,
 port/linux/NETCODE.md), play one and log every player's state each second.
 
+Playwright's screenshots of the page in headless Firefox show the game's
+canvas black (it is drawn by a worker); the game draws. Check Firefox headed,
+on a virtual display.
+
 ## How it operates
 
 The game is compiled for `wasm32`, an ILP32 target as the Xbox was (32-bit
