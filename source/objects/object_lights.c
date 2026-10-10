@@ -183,6 +183,8 @@ symbols in this file:
 #include "structures/structure_visibility.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
+#include "cache/cache_files.h" /* port: (tag_iterator: light_port_glow_definition_get) */
+void shield_glow_update(void); /* port: port/linux/game/shield_glow.c */
 
 /* port: port/linux/src (halo.log) */
 void platform_log(const char *format, ...);
@@ -205,6 +207,8 @@ enum
 	_point_light_connects_to_map_bit = 1,
 	_point_light_connected_to_map_bit = 2,
 	_point_light_attached_to_first_person_weapon_bit = 3,
+	/* port: a glow the port colors and sizes itself (light_port_glow_set) */
+	_point_light_port_glow_bit = 4,
 };
 
 enum
@@ -711,9 +715,87 @@ void lights_dispose(
 	return;
 }
 
+/* port: glows the port lights itself (port/linux/game/shield_glow.c): an
+ordinary dynamic light, not attached to a marker but to an object's node,
+kept alive and colored and sized each frame by its maker, gone a moment
+after its maker stops. Drawn with a light definition the map has (one
+without a gel, a lens flare or a flashlight's flags), so no new tags. */
+static long light_port_glow_definition = NONE - 1;
+
+long light_port_glow_definition_get(
+	void)
+{
+	if (light_port_glow_definition == NONE - 1)
+	{
+		struct tag_iterator iterator;
+		long tag_index;
+		long found = NONE;
+
+		tag_iterator_new(&iterator, LIGHT_DEFINITION_TAG);
+		for (tag_index = tag_iterator_next(&iterator); tag_index != NONE; tag_index = tag_iterator_next(&iterator))
+		{
+			struct point_light_definition *definition = light_definition_get(tag_index);
+
+			if (!definition || definition->lens_flare.index != NONE ||
+				TEST_FLAG(definition->flags, _light_definition_is_first_person_flashlight_bit))
+			{
+				continue;
+			}
+			found = tag_index;
+			if (strstr(tag_get_name(tag_index), "plasma"))
+				break;
+		}
+		light_port_glow_definition = found;
+	}
+	return light_port_glow_definition;
+}
+
+long light_port_glow_new(
+	long object_index,
+	short node_index)
+{
+	long definition_index = light_port_glow_definition_get();
+	long light_index;
+
+	if (definition_index == NONE)
+		return NONE;
+	light_index = light_new_unattached(definition_index, object_index, node_index,
+		(real_point3d const *)global_zero_vector3d, global_forward3d, 0.0f);
+	if (light_index != NONE)
+	{
+		struct light_datum *light = light_get(light_index);
+
+		SET_FLAG(light->flags, _point_light_port_glow_bit, TRUE);
+		light->color = *global_real_rgb_black;
+	}
+	return light_index;
+}
+
+boolean light_port_glow_set(
+	long light_index,
+	long object_index,
+	real_rgb_color const *color,
+	real radius)
+{
+	struct light_datum *light;
+
+	if (light_index == NONE || !light_data->valid)
+		return FALSE;
+	light = (struct light_datum *)datum_try_and_get(light_data, light_index);
+	if (!light || !TEST_FLAG(light->flags, _point_light_port_glow_bit) || light->object_index != object_index)
+		return FALSE;
+	light->parent_light_index = game_time_get(); /* (alive another moment) */
+	light->color.red = PIN(color->red, 0.0f, 1.0f);
+	light->color.green = PIN(color->green, 0.0f, 1.0f);
+	light->color.blue = PIN(color->blue, 0.0f, 1.0f);
+	light->intensity_scale = radius;
+	return TRUE;
+}
+
 void lights_initialize_for_new_map(
 	void)
 {
+	light_port_glow_definition = NONE - 1; /* port: (looked for again) */
 	data_make_valid(light_data);
 	lights_game_globals->render_lights = TRUE;
 	cluster_partition_make_valid(&light_cluster_partition);
@@ -907,6 +989,7 @@ void lights_preprocess_scene(
 	/* port: the lights in order before they are drawn (a frame can come
 	between ticks: lights_port_recover) */
 	lights_port_recover();
+	shield_glow_update(); /* port: port/linux/game/shield_glow.c */
 	for (light_index = data_next_index(light_data, NONE);
 		light_index != NONE;
 		light_index = data_next_index(light_data, light_index))
@@ -977,7 +1060,12 @@ void lights_preprocess_scene(
 		object = light->object_index != NONE
 			? object_try_and_get(light->object_index)
 			: NULL;
-		if (light->parent_light_index == NONE)
+		if (TEST_FLAG(light->flags, _point_light_port_glow_bit))
+		{
+			/* port: a glow's color is as set (light_port_glow_set) */
+			intensity = 1.0f;
+		}
+		else if (light->parent_light_index == NONE)
 		{
 			real_rgb_color const *color;
 
@@ -1074,6 +1162,9 @@ void lights_preprocess_scene(
 				light->radius = (definition->radius_modifier_lower_bound * inverse_intensity
 					+ definition->radius_modifier_upper_bound * intensity)
 					* definition->radius;
+				/* port: a glow's radius is as set (light_port_glow_set) */
+				if (TEST_FLAG(light->flags, _point_light_port_glow_bit))
+					light->radius = light->intensity_scale;
 				lights_port.radius_writes++;
 				if (light->radius != 0.0f)
 				{
