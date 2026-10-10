@@ -2522,8 +2522,15 @@ that was on another BSP. */
 
 static boolean players_coop_room_to_spawn(
 	void);
+static long player_spawnable_beside(
+	struct player_datum const *player);
 static boolean player_place_beside_teammate(
 	long player_index);
+static long players_coop_respawn_unit(
+	void);
+static boolean players_coop_respawn_beside(
+	long player_index,
+	long anchor_unit_index);
 
 /* How long into a level the extra players wait before spawning. The opening
 cutscene starts a tick or so in, and the first player may still be somewhere
@@ -2577,8 +2584,14 @@ to respawn beside */
 /* how often the respawn's safety test runs while someone is dead */
 #define COOP_RESPAWN_CHECK_TICKS (TICKS_PER_SECOND / 2)
 /* after waiting this long for a safe teammate, the dead respawn beside any
-teammate standing on the ground */
+teammate standing on the ground. A large game waits this long for someone
+safe inside the largest group, then uses that group anyway */
 #define COOP_RESPAWN_FALLBACK_TICKS (10 * TICKS_PER_SECOND)
+/* this many players in a campaign game is massive co-op. Respawns go to the
+largest group, and a dead host uses that same choice */
+#define COOP_MAJORITY_PLAYERS 5
+/* teammates within this distance (world units) count as one group */
+#define COOP_MAJORITY_RADIUS 30.0f
 
 /* TRUE if an enemy projectile (a grenade, a plasma bolt) is flying near the
 unit. Players' own shots and needles stuck in a body don't count. */
@@ -2646,7 +2659,8 @@ static boolean players_coop_unit_safe(
 
 /* the unit of a living player that passes `test`, the host's first (the
 team follows the host: its players are the host machine's local ones), or
-NONE */
+NONE. A game of COOP_MAJORITY_PLAYERS or more respawns with
+players_coop_respawn_unit instead. */
 static long players_coop_unit_where(
 	boolean (*test)(long unit_index))
 {
@@ -2666,6 +2680,143 @@ static long players_coop_unit_where(
 	}
 
 	return found_index;
+}
+
+/* how many players are in this campaign game, not counting someone who quit */
+static short players_coop_session_count(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short count = 0;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (!player->quit_out_of_game)
+			count++;
+	}
+
+	return count;
+}
+
+/* TRUE when respawns use the largest group */
+static boolean players_coop_use_majority(
+	void)
+{
+	return players_coop_session_count() >= COOP_MAJORITY_PLAYERS;
+}
+
+/* TRUE when a player can be stood beside: on foot, or in a vehicle a player
+drives. An AI vehicle (Silent Cartographer's Pelican) is not */
+static boolean players_coop_unit_spawnable(
+	long unit_index)
+{
+	long player_index = unit_get(unit_index)->unit.player_index;
+
+	return player_index != NONE && player_spawnable_beside(player_get(player_index)) != NONE;
+}
+
+/* how many listed positions are within radius of the one at index, including
+itself */
+static short players_coop_near_count(
+	real_point3d const *positions,
+	short count,
+	short index,
+	real radius_squared)
+{
+	short other_index;
+	short near_count = 0;
+
+	for (other_index = 0; other_index < count; other_index++)
+	{
+		if (distance_squared3d(&positions[index], &positions[other_index]) <= radius_squared)
+			near_count++;
+	}
+
+	return near_count;
+}
+
+/* who a network co-op respawn is placed beside. Fewer than
+COOP_MAJORITY_PLAYERS uses the host's teammate (players_coop_unit_where):
+a safe one, or after COOP_RESPAWN_FALLBACK_TICKS one on the ground. A larger
+game uses the largest group on the ground. The respawn is beside someone in
+that group who is safe to spawn next to. When that whole group is in a
+fight, it waits out COOP_RESPAWN_FALLBACK_TICKS and then uses the group
+anyway. A safe player outside the group does not win. A dead host has no
+unit, so the same count applies to them. NONE while the group is still
+unsafe, or while nobody is on the ground. */
+static long players_coop_respawn_unit(
+	void)
+{
+	long unit_indices[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	real_point3d positions[NETWORK_GAME_MAXIMUM_PLAYER_COUNT];
+	struct data_iterator iterator;
+	struct player_datum *player;
+	real radius_squared = COOP_MAJORITY_RADIUS * COOP_MAJORITY_RADIUS;
+	short count = 0;
+	short anchor_index = 0;
+	short anchor_count = 0;
+	short safe_index = -1;
+	short safe_count = 0;
+	short index;
+
+	if (!players_coop_use_majority())
+	{
+		long host_index = players_coop_unit_where(players_coop_unit_safe);
+
+		if (host_index == NONE &&
+			game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
+		{
+			host_index = players_coop_unit_where(players_coop_unit_grounded);
+		}
+		return host_index;
+	}
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL && count < NETWORK_GAME_MAXIMUM_PLAYER_COUNT)
+	{
+		if (player->unit_index == NONE || !players_coop_unit_grounded(player->unit_index))
+			continue;
+		unit_indices[count] = player->unit_index;
+		positions[count] = object_get(player->unit_index)->object.bounding_sphere_center;
+		count++;
+	}
+	if (count == 0)
+		return NONE;
+	for (index = 0; index < count; index++)
+	{
+		short near_count = players_coop_near_count(positions, count, index, radius_squared);
+
+		if (near_count > anchor_count)
+		{
+			anchor_count = near_count;
+			anchor_index = index;
+		}
+	}
+	for (index = 0; index < count; index++)
+	{
+		short near_count;
+
+		if (distance_squared3d(&positions[anchor_index], &positions[index]) > radius_squared ||
+			!players_coop_unit_safe(unit_indices[index]) ||
+			!players_coop_unit_spawnable(unit_indices[index]))
+		{
+			continue;
+		}
+		near_count = players_coop_near_count(positions, count, index, radius_squared);
+		if (near_count > safe_count)
+		{
+			safe_count = near_count;
+			safe_index = index;
+		}
+	}
+	if (safe_index >= 0)
+		return unit_indices[safe_index];
+	if (game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
+		return unit_indices[anchor_index];
+
+	return NONE;
 }
 
 /* the teammate a network co-op respawn is for, while player_spawn makes
@@ -2700,12 +2851,14 @@ static struct player_starting_location const *players_coop_spawn_location(
 	return location;
 }
 
-/* Network co-op respawn: the dead come back beside the first teammate who
-is safe, or after COOP_RESPAWN_FALLBACK_TICKS beside one at least on the
-ground, so a long fight can't keep them out. The campaign's own test
-(players_respawn_coop) is map-wide (any projectile or enemy attack
-anywhere), which with many players spread out would almost never pass.
-Returns whether everyone waiting came back. */
+/* Network co-op respawn: the dead come back beside the first safe teammate,
+the host's before the others, or after COOP_RESPAWN_FALLBACK_TICKS beside
+one at least on the ground, so a long fight can't keep them out. With
+COOP_MAJORITY_PLAYERS or more they come back beside the largest group, and
+a dead host does too. The campaign's own test (players_respawn_coop) is
+map-wide (any projectile or enemy attack anywhere), which with many players
+spread out would almost never pass. Returns whether everyone waiting came
+back. */
 static boolean players_respawn_network_coop(
 	void)
 {
@@ -2720,12 +2873,7 @@ static boolean players_respawn_network_coop(
 	walks all the map's projectiles, so twice a second is enough */
 	if (game_time_get() % COOP_RESPAWN_CHECK_TICKS != 0)
 		return FALSE;
-	safe_unit_index = players_coop_unit_where(players_coop_unit_safe);
-	if (safe_unit_index == NONE &&
-		game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
-	{
-		safe_unit_index = players_coop_unit_where(players_coop_unit_grounded);
-	}
+	safe_unit_index = players_coop_respawn_unit();
 	if (safe_unit_index == NONE)
 		return FALSE;
 	data_iterator_new(&iterator, player_data);
@@ -2742,14 +2890,10 @@ static boolean players_respawn_network_coop(
 		players_coop_spawn_beside_index = NONE;
 		if (player->unit_index == NONE)
 			result = FALSE;
-		/* (beside the safe teammate, else any with room; with none, left
-		behind the teammate, where player_spawn put them) */
-		else if (!player_teleport(iterator.datum_index, safe_unit_index,
-				&object_get(safe_unit_index)->object.bounding_sphere_center) &&
-			!player_place_beside_teammate(iterator.datum_index))
-		{
+		/* (beside that teammate, else somewhere in their group; with no
+		room, left behind them, where player_spawn put them) */
+		else if (!players_coop_respawn_beside(iterator.datum_index, safe_unit_index))
 			result = FALSE;
-		}
 	}
 	if (result)
 		players_coop_state.respawn_wait_since = 0;
@@ -3032,6 +3176,49 @@ static boolean player_place_beside_teammate(
 	{
 		if (iterator.datum_index != player_index && player_spawnable_beside(other) != NONE &&
 			player_teleport(player_index, other->unit_index, &object_get(other->unit_index)->object.bounding_sphere_center))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+/* Moves a respawned player beside the chosen teammate. In a massive game
+the other spots tried are only teammates in that same group, so a failed
+spot beside the anchor does not send them to a player off on their own.
+Smaller games still try any teammate with room. FALSE leaves the player
+where player_spawn put them, behind the anchor. */
+static boolean players_coop_respawn_beside(
+	long player_index,
+	long anchor_unit_index)
+{
+	real_point3d anchor_position;
+	struct data_iterator iterator;
+	struct player_datum *other;
+	real radius_squared;
+
+	if (player_get(player_index)->unit_index == NONE)
+		return FALSE;
+	anchor_position = object_get(anchor_unit_index)->object.bounding_sphere_center;
+	if (player_teleport(player_index, anchor_unit_index, &anchor_position))
+		return TRUE;
+	if (!players_coop_use_majority())
+		return player_place_beside_teammate(player_index);
+
+	radius_squared = COOP_MAJORITY_RADIUS * COOP_MAJORITY_RADIUS;
+	data_iterator_new(&iterator, player_data);
+	while ((other = data_iterator_next(&iterator)) != NULL)
+	{
+		if (iterator.datum_index == player_index || other->unit_index == NONE ||
+			other->unit_index == anchor_unit_index || player_spawnable_beside(other) == NONE)
+		{
+			continue;
+		}
+		if (distance_squared3d(&anchor_position,
+				&object_get(other->unit_index)->object.bounding_sphere_center) <= radius_squared &&
+			player_teleport(player_index, other->unit_index,
+				&object_get(other->unit_index)->object.bounding_sphere_center))
 		{
 			return TRUE;
 		}
