@@ -1,13 +1,14 @@
 /*
 OBJECT_MESH.C
 
-An object's drawn surface (object_mesh.h), for the port's effects that work on
-what is drawn (dynamic blood paints it, stencil shadows cast it, first-person
-legs close it): the triangles of its model's most detailed geometry, in the permutation of each region the
-object shows, read from the vertex and index buffers the game draws them
-from (as powerup_render_bounds.c reads them), with each vertex's nodes and
-weight. Opaque parts only (no glass, no effects), and none the game doesn't
-draw (stripped parts). A few meshes are kept, the least used going first.
+An object's drawn surface (object_mesh.h), which first_person_legs.c finds
+the waist's rim in: the triangles of its model's most detailed geometry, in
+the permutation of each region the object shows, read from the vertex and
+index buffers the game draws them from (as powerup_render_bounds.c reads
+them), with each vertex's nodes and weight. Opaque parts only (no glass, no
+effects), and none the game doesn't draw (stripped parts). The last mesh
+read is kept, in memory taken the first time one is (none, unless an effect
+asks: about 400 KB).
 */
 
 #include "cseries.h"
@@ -26,14 +27,13 @@ draw (stripped parts). A few meshes are kept, the least used going first.
 #include "object_mesh.h"
 
 #include <xtl.h>
+#include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 /* ---------- constants */
 
 enum
 {
-	OBJECT_MESH_CACHE_SIZE = 12, /* (a vehicle, a few kinds of tree and rock, crates: all at hand) */
 	OBJECT_MESH_DETAIL_LEVELS = 5, /* (models.c's NUMBER_OF_DETAIL_LEVELS_PER_MODEL) */
 };
 
@@ -81,54 +81,12 @@ struct object_mesh_model_shader_reference
 	long unused[3];
 };
 
-struct object_mesh_slot
-{
-	struct object_mesh mesh;
-	unsigned long last_used;
-	char report[128];
-};
-
 /* ---------- globals */
 
-static struct object_mesh_slot object_mesh_slots[OBJECT_MESH_CACHE_SIZE];
-static struct object_mesh_vertex object_mesh_vertex_memory[OBJECT_MESH_CACHE_SIZE][OBJECT_MESH_MAXIMUM_VERTICES];
-static unsigned short object_mesh_triangle_memory[OBJECT_MESH_CACHE_SIZE][OBJECT_MESH_MAXIMUM_TRIANGLES][3];
-static byte object_mesh_triangle_flag_memory[OBJECT_MESH_CACHE_SIZE][OBJECT_MESH_MAXIMUM_TRIANGLES];
-static unsigned long object_mesh_clock = 0;
-static boolean object_mesh_initialized = FALSE;
+/* the mesh kept (its vertices and triangles NULL until one is asked for) */
+static struct object_mesh object_mesh_kept = { NONE };
 
 /* ---------- private code */
-
-static void object_mesh_initialize(
-	void)
-{
-	short index;
-
-	if (object_mesh_initialized)
-		return;
-	for (index = 0; index < OBJECT_MESH_CACHE_SIZE; index++)
-	{
-		object_mesh_slots[index].mesh.key = NONE;
-		object_mesh_slots[index].mesh.vertices = object_mesh_vertex_memory[index];
-		object_mesh_slots[index].mesh.triangles = object_mesh_triangle_memory[index];
-		object_mesh_slots[index].mesh.triangle_flags = object_mesh_triangle_flag_memory[index];
-		object_mesh_slots[index].last_used = 0;
-	}
-	object_mesh_initialized = TRUE;
-}
-
-/* (why the last model built has what it has: for object_mesh_report) */
-static struct
-{
-	short parts;
-	short stripped;
-	short shaders_skipped;
-	short no_buffers;
-	short formats;
-	short unreadable;
-	short full;
-	short added;
-} object_mesh_why;
 
 /* (a key for the model and the permutations it shows) */
 static long object_mesh_key(
@@ -149,8 +107,7 @@ static long object_mesh_key(
 static boolean object_mesh_add_part(
 	struct object_mesh *mesh,
 	struct model const *model,
-	struct object_mesh_model_geometry_part const *part,
-	boolean transparent_too)
+	struct object_mesh_model_geometry_part const *part)
 {
 	struct vertex_buffer const *vertex_buffer = &part->vertex_buffer;
 	struct triangle_buffer const *triangle_buffer = &part->triangle_buffer;
@@ -160,46 +117,26 @@ static boolean object_mesh_add_part(
 	long first_vertex = mesh->vertex_count;
 	long index_count;
 	long index;
-	byte triangle_flags = 0;
 
 	/* (only what the game draws, opaque) */
-	object_mesh_why.parts++;
 	if (TEST_FLAG(part->flags, _object_mesh_part_stripped_bit))
-	{
-		object_mesh_why.stripped++;
 		return TRUE;
-	}
 	if (VALID_INDEX(part->shader_index, model->shaders.count))
 	{
 		struct object_mesh_model_shader_reference const *reference = TAG_BLOCK_GET_ELEMENT(
 			&model->shaders, part->shader_index, struct object_mesh_model_shader_reference);
 		struct shader *shader = reference->shader.index != NONE && reference->shader.index != 0 ?
 			shader_definition_get(reference->shader.index) : NULL;
-		char const *shader_name = shader ? tag_get_name(reference->shader.index) : NULL;
 
-		/* (a visor, glass: no marks there) */
-		if (shader_name && (strstr(shader_name, "visor") || strstr(shader_name, "glass")))
-			triangle_flags |= OBJECT_MESH_TRIANGLE_NO_MARKS;
-
-		/* (any shader at all, on the see-through pass: a tree drawn in
-		whatever shaders it is drawn in) */
-		if (!shader || (!transparent_too && (!shader_type_is_valid_for_model(shader->base.type) ||
-			shader_type_is_transparent(shader->base.type))))
-		{
-			object_mesh_why.shaders_skipped++;
+		if (!shader || !shader_type_is_valid_for_model(shader->base.type) || shader_type_is_transparent(shader->base.type))
 			return TRUE;
-		}
 	}
-	else if (!transparent_too)
-	{
-		object_mesh_why.shaders_skipped++;
+	else
 		return TRUE;
-	}
 	if (!vertex_buffer->hardware_format ||
 		vertex_buffer->count <= 0 || !triangle_buffer->hardware_format ||
 		triangle_buffer->count <= 0)
 	{
-		object_mesh_why.no_buffers++;
 		return TRUE;
 	}
 	if (vertex_buffer->type == _rasterizer_vertex_type_model_compressed)
@@ -207,24 +144,15 @@ static boolean object_mesh_add_part(
 	else if (vertex_buffer->type == _rasterizer_vertex_type_model_uncompressed)
 		stride = sizeof(struct model_vertex_uncompressed);
 	else
-	{
-		object_mesh_why.formats++;
 		return TRUE;
-	}
 	if (triangle_buffer->type == 1)
 		index_count = triangle_buffer->count + 2; /* a strip */
 	else if (triangle_buffer->type == 0)
 		index_count = triangle_buffer->count * 3; /* a list */
 	else
-	{
-		object_mesh_why.formats++;
 		return TRUE;
-	}
 	if (mesh->vertex_count + vertex_buffer->count > OBJECT_MESH_MAXIMUM_VERTICES)
-	{
-		object_mesh_why.full++;
 		return FALSE;
-	}
 
 	IDirect3DVertexBuffer8_Lock((IDirect3DVertexBuffer8 *)vertex_buffer->hardware_format, 0, 0, &vertices, D3DLOCK_READONLY);
 	IDirect3DIndexBuffer8_Lock((IDirect3DIndexBuffer8 *)triangle_buffer->hardware_format, 0, 0, &indices, D3DLOCK_READONLY);
@@ -234,10 +162,8 @@ static boolean object_mesh_add_part(
 			IDirect3DVertexBuffer8_Unlock((IDirect3DVertexBuffer8 *)vertex_buffer->hardware_format);
 		if (indices)
 			IDirect3DIndexBuffer8_Unlock((IDirect3DIndexBuffer8 *)triangle_buffer->hardware_format);
-		object_mesh_why.unreadable++;
 		return TRUE;
 	}
-	object_mesh_why.added++;
 
 	/* its vertices, with their nodes */
 	for (index = 0; index < vertex_buffer->count; index++)
@@ -317,7 +243,6 @@ static boolean object_mesh_add_part(
 			out[0] = (unsigned short)(first_vertex + a);
 			out[1] = (unsigned short)(first_vertex + b);
 			out[2] = (unsigned short)(first_vertex + c);
-			mesh->triangle_flags[mesh->triangle_count] = triangle_flags;
 			mesh->triangle_count++;
 		}
 	}
@@ -335,11 +260,8 @@ static boolean object_mesh_build(
 	struct model *model = model_definition_get(model_index);
 	short region_index;
 	short node_index;
-	short pass;
 
-	memset(&object_mesh_why, 0, sizeof(object_mesh_why));
 	mesh->model_index = model_index;
-	mesh->outward = 1;
 	mesh->vertex_count = 0;
 	mesh->triangle_count = 0;
 	if (!model || !model->nodes.address || model->nodes.count <= 0 || !model->regions.address ||
@@ -354,12 +276,6 @@ static boolean object_mesh_build(
 
 		mesh->inverse[node_index] = node->runtime_default_inverse_matrix;
 	}
-
-	/* (what it draws opaque; or, a model drawn all in see-through shaders, a
-	tree's bark and leaves both, all of it) */
-	for (pass = 0; pass < 2 && mesh->triangle_count == 0; pass++)
-	{
-	mesh->vertex_count = 0;
 	for (region_index = 0; region_index < MIN(model->regions.count, MAXIMUM_REGIONS_PER_OBJECT); region_index++)
 	{
 		struct model_region const *region = TAG_BLOCK_GET_ELEMENT(&model->regions, region_index, struct model_region);
@@ -389,32 +305,11 @@ static boolean object_mesh_build(
 				struct object_mesh_model_geometry_part const *part = TAG_BLOCK_GET_ELEMENT(
 					&geometry->parts, part_index, struct object_mesh_model_geometry_part);
 
-				if (!object_mesh_add_part(mesh, model, part, pass == 1))
-				{
-					/* (full: what it has) */
-					region_index = MAXIMUM_REGIONS_PER_OBJECT;
-					break;
-				}
+				/* (full: what it has) */
+				if (!object_mesh_add_part(mesh, model, part))
+					return mesh->triangle_count > 0;
 			}
 		}
-	}
-	}
-	/* (which way the triangles turn: out of the model, by the volume they
-	enclose) */
-	{
-		double volume = 0.;
-		long triangle;
-
-		for (triangle = 0; triangle < mesh->triangle_count; triangle++)
-		{
-			real_point3d const *a = &mesh->vertices[mesh->triangles[triangle][0]].position;
-			real_point3d const *b = &mesh->vertices[mesh->triangles[triangle][1]].position;
-			real_point3d const *c = &mesh->vertices[mesh->triangles[triangle][2]].position;
-
-			volume += a->x * (b->y * c->z - b->z * c->y) - a->y * (b->x * c->z - b->z * c->x) +
-				a->z * (b->x * c->y - b->y * c->x);
-		}
-		mesh->outward = volume >= 0. ? 1 : -1;
 	}
 	return mesh->triangle_count > 0;
 }
@@ -424,11 +319,7 @@ static boolean object_mesh_build(
 void object_mesh_reset(
 	void)
 {
-	short index;
-
-	object_mesh_initialize();
-	for (index = 0; index < OBJECT_MESH_CACHE_SIZE; index++)
-		object_mesh_slots[index].mesh.key = NONE;
+	object_mesh_kept.key = NONE;
 }
 
 struct object_mesh const *object_mesh_get(
@@ -436,12 +327,10 @@ struct object_mesh const *object_mesh_get(
 {
 	struct object_datum *object = object_try_and_get(object_index);
 	struct object_definition *definition;
-	struct object_mesh_slot *slot = NULL;
+	struct object_mesh *mesh = &object_mesh_kept;
 	long model_index;
 	long key;
-	short index;
 
-	object_mesh_initialize();
 	if (!object)
 		return NULL;
 	definition = object_definition_get(object->definition_index);
@@ -449,55 +338,24 @@ struct object_mesh const *object_mesh_get(
 	if (model_index == NONE)
 		return NULL;
 	key = object_mesh_key(model_index, object->object.region_permutations);
-	object_mesh_clock++;
-
-	for (index = 0; index < OBJECT_MESH_CACHE_SIZE; index++)
+	if (mesh->key == key && mesh->model_index == model_index)
+		return mesh->triangle_count > 0 ? mesh : NULL;
+	if (!mesh->vertices)
 	{
-		struct object_mesh_slot *candidate = &object_mesh_slots[index];
-
-		if (candidate->mesh.key == key && candidate->mesh.model_index == model_index)
+		mesh->vertices = malloc(sizeof(*mesh->vertices) * OBJECT_MESH_MAXIMUM_VERTICES);
+		mesh->triangles = malloc(sizeof(*mesh->triangles) * OBJECT_MESH_MAXIMUM_TRIANGLES);
+		if (!mesh->vertices || !mesh->triangles)
 		{
-			candidate->last_used = object_mesh_clock;
-			return candidate->mesh.triangle_count > 0 ? &candidate->mesh : NULL;
-		}
-		if (!slot || candidate->mesh.key == NONE ||
-			(slot->mesh.key != NONE && candidate->last_used < slot->last_used))
-		{
-			slot = candidate;
+			free(mesh->vertices);
+			free(mesh->triangles);
+			mesh->vertices = NULL;
+			mesh->triangles = NULL;
+			return NULL;
 		}
 	}
-
-	slot->mesh.key = key;
-	slot->last_used = object_mesh_clock;
-	if (!object_mesh_build(&slot->mesh, model_index, object->object.region_permutations))
-		slot->mesh.triangle_count = 0; /* (remembered: none to paint) */
-	snprintf(slot->report, sizeof(slot->report),
-		"%s: %ld triangles; parts %d (added %d, stripped %d, shaders %d, no buffers %d, formats %d, unreadable %d, full %d)",
-		tag_get_name(model_index), slot->mesh.triangle_count, object_mesh_why.parts, object_mesh_why.added,
-		object_mesh_why.stripped, object_mesh_why.shaders_skipped, object_mesh_why.no_buffers, object_mesh_why.formats,
-		object_mesh_why.unreadable, object_mesh_why.full);
-	return slot->mesh.triangle_count > 0 ? &slot->mesh : NULL;
-}
-
-
-char const *object_mesh_report(
-	long object_index)
-{
-	struct object_datum *object = object_try_and_get(object_index);
-	struct object_definition *definition = object ? object_definition_get(object->definition_index) : NULL;
-	long model_index = definition ? definition->object.model.index : NONE;
-	short index;
-
-	if (model_index == NONE)
-		return "no model";
-	object_mesh_get(object_index);
-	for (index = 0; index < OBJECT_MESH_CACHE_SIZE; index++)
-	{
-		if (object_mesh_slots[index].mesh.key == object_mesh_key(model_index, object->object.region_permutations) &&
-			object_mesh_slots[index].mesh.model_index == model_index)
-		{
-			return object_mesh_slots[index].report;
-		}
-	}
-	return "?";
+	mesh->key = key;
+	/* (remembered when it has none, too) */
+	if (!object_mesh_build(mesh, model_index, object->object.region_permutations))
+		mesh->triangle_count = 0;
+	return mesh->triangle_count > 0 ? mesh : NULL;
 }

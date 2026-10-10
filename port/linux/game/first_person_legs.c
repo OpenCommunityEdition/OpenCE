@@ -80,30 +80,56 @@ boolean first_person_legs_wanted(
 		!TEST_FLAG(object->object.flags, _object_invisible_bit);
 }
 
-/* a node of the legs: the hips, thighs, calves, feet and toes (by name, as
-the game's characters name them: "bip01 l thigh") */
-static boolean first_person_legs_node(
-	char const *name)
+/* whether a node's name has part in it, whatever its case (the game's
+characters name theirs "bip01 l thigh", "Bip01 Pelvis") */
+static boolean first_person_legs_name_has(
+	char const *name,
+	char const *part)
 {
-	static char const *const parts[] = { "pelvis", "thigh", "calf", "foot", "toe", "leg" };
 	char lower[TAG_STRING_LENGTH + 1];
 	short index;
 
 	for (index = 0; index < TAG_STRING_LENGTH && name[index]; index++)
 		lower[index] = (char)(name[index] >= 'A' && name[index] <= 'Z' ? name[index] - 'A' + 'a' : name[index]);
 	lower[index] = 0;
+	return strstr(lower, part) != NULL;
+}
+
+/* a node of the legs: the hips, thighs, calves, feet and toes */
+static boolean first_person_legs_node(
+	char const *name)
+{
+	static char const *const parts[] = { "pelvis", "thigh", "calf", "foot", "toe", "leg" };
+	short index;
+
 	for (index = 0; index < (short)NUMBEROF(parts); index++)
 	{
-		if (strstr(lower, parts[index]))
+		if (first_person_legs_name_has(name, parts[index]))
 			return TRUE;
 	}
 	return FALSE;
 }
 
 /* the middle of the waist's rim in the model's space: the hips' vertices
-on triangles that run up into the body above them (FALSE: none) */
+on triangles that run up into the body above them (FALSE: none), kept for
+the mesh it was found in (a new map forgets it: first_person_legs_reset) */
 static real_point3d first_person_legs_rim[FIRST_PERSON_LEGS_MAXIMUM_RIM];
 static short first_person_legs_rim_count = 0;
+static long first_person_legs_waist_key = NONE;
+static long first_person_legs_waist_model = NONE;
+static boolean first_person_legs_waist_found = FALSE;
+static real_point3d first_person_legs_waist_middle;
+
+/* a new map: the waist found, and the mesh it was found in, forgotten (the
+new map's models have indices of their own) */
+void first_person_legs_reset(
+	void)
+{
+	first_person_legs_waist_key = NONE;
+	first_person_legs_waist_model = NONE;
+	first_person_legs_rim_count = 0;
+	object_mesh_reset();
+}
 
 static boolean first_person_legs_waist(
 	struct object_mesh const *mesh,
@@ -111,17 +137,14 @@ static boolean first_person_legs_waist(
 	short pelvis,
 	real_point3d *middle)
 {
-	static long cached_key = NONE;
-	static boolean cached_found = FALSE;
-	static real_point3d cached_middle;
 	real_point3d sum = { 0.f, 0.f, 0.f };
 	long found = 0;
 	long index;
 
-	if (mesh->key == cached_key)
+	if (mesh->key == first_person_legs_waist_key && mesh->model_index == first_person_legs_waist_model)
 	{
-		*middle = cached_middle;
-		return cached_found;
+		*middle = first_person_legs_waist_middle;
+		return first_person_legs_waist_found;
 	}
 	first_person_legs_rim_count = 0;
 	for (index = 0; index < mesh->triangle_count; index++)
@@ -163,16 +186,17 @@ static boolean first_person_legs_waist(
 			}
 		}
 	}
-	cached_key = mesh->key;
-	cached_found = found > 0;
+	first_person_legs_waist_key = mesh->key;
+	first_person_legs_waist_model = mesh->model_index;
+	first_person_legs_waist_found = found > 0;
 	if (found > 0)
 	{
-		cached_middle.x = sum.x / found;
-		cached_middle.y = sum.y / found;
-		cached_middle.z = sum.z / found + FIRST_PERSON_LEGS_LID_UP;
+		first_person_legs_waist_middle.x = sum.x / found;
+		first_person_legs_waist_middle.y = sum.y / found;
+		first_person_legs_waist_middle.z = sum.z / found + FIRST_PERSON_LEGS_LID_UP;
 	}
-	*middle = cached_middle;
-	return cached_found;
+	*middle = first_person_legs_waist_middle;
+	return first_person_legs_waist_found;
 }
 
 /* the pose to draw the legs with: the body's own (as it is drawn now), all
@@ -208,9 +232,9 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 	{
 		struct model_node const *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node);
 
-		if (pelvis == NONE && strstr(node->name, "pelvis"))
+		if (pelvis == NONE && first_person_legs_name_has(node->name, "pelvis"))
 			pelvis = index;
-		if (strstr(node->name, "thigh"))
+		if (first_person_legs_name_has(node->name, "thigh"))
 			thighs++;
 	}
 	if (pelvis == NONE || thighs == 0)
