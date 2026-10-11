@@ -40,8 +40,18 @@ symbols in this file:
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "view_fov.h" /* port: port/linux/game/view_fov.c */
 
 /* ---------- constants */
+
+/* port: rasterizer_xbox_transparent_geometry.c's
+_rasterizer_geometry_first_person_bit */
+#define PLASMA_GEOMETRY_FIRST_PERSON_BIT 7
+/* port: the farthest the shield's flare is pushed out from the first-person
+arms (display.viewmodel_shield), in world units: a body's shield stands off
+much farther than an arm's radius, which so close to the camera fills the
+view */
+#define PLASMA_FIRST_PERSON_MAXIMUM_OFFSET 0.0075f
 
 /* ---------- macros */
 
@@ -55,7 +65,7 @@ struct plasma_runtime_parameters
 
 struct rasterizer_transparent_geometry_group_plasma
 {
-	unsigned long geometry_flags; /* port: first-person displacement limit */
+	unsigned long geometry_flags; /* port: (the first-person bit) */
 	byte reserved04[8];
 	struct shader *shader;
 	short bitmap_sequence_index;
@@ -151,7 +161,7 @@ void rasterizer_plasma_energy_draw(
 	real_rgb_color const *tint;
 	real intensity;
 	real offset;
-	real offset_amount; /* port: keep the first-person shell close to the arms */
+	real offset_amount; /* port: PLASMA_FIRST_PERSON_MAXIMUM_OFFSET */
 	real primary_time;
 	real secondary_time;
 	real primary_scale;
@@ -174,13 +184,14 @@ void rasterizer_plasma_energy_draw(
 		tint = global_real_rgb_white;
 		intensity = 1.0f;
 		offset = 0.0f;
-		/* port: body shields can expand much farther than an arm's radius.
-		Limit only first-person plasma to the close-fitting 0.0075-unit shell;
-		keep smaller authored offsets and the shader's animation curve. Bit 7
-		is the first-person flag used by rasterizer_transparent_geometry.c. */
+		/* port: the shield on the first-person arms kept close to them */
 		offset_amount = plasma->offset_amount;
-		if ((group->geometry_flags & (1UL << 7)) && offset_amount > 0.0075f)
-			offset_amount = 0.0075f;
+		if (viewmodel_shield_is_visible() &&
+			TEST_FLAG(group->geometry_flags, PLASMA_GEOMETRY_FIRST_PERSON_BIT) &&
+			offset_amount > PLASMA_FIRST_PERSON_MAXIMUM_OFFSET)
+		{
+			offset_amount = PLASMA_FIRST_PERSON_MAXIMUM_OFFSET;
+		}
 		runtime = group->runtime_parameters;
 		if (runtime)
 		{
