@@ -122,6 +122,7 @@ symbols in this file:
 #include "lruv_cache.h"
 #include "memory_pool.h"
 #include "cluster_partitions.h"
+#include "decal_limit.h" /* port: port/linux/game/decal_limit.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -201,6 +202,9 @@ static game_state_after_load_proc after_load_procs[] =
 	observer_initialize_for_new_map,
 	update_queues_reset_and_fill_with_lies,
 	rasterizer_decals_update_function_pointers,
+	/* port: the decals of game.decals' larger limits, which the game state
+	does not hold (decals.c) */
+	decals_port_after_load,
 	recorded_animations_clear_debug_storage,
 	ai_debug_initialize_for_new_map,
 	structure_detail_objects_flush,

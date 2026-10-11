@@ -28,10 +28,11 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_interpolation" x="54" y="163" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_direct_camera" x="54" y="253" platform="desktop"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_direct_camera" x="54" y="193" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_graphics" x="54" y="283" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_decals" x="54" y="283" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_graphics" x="54" y="313" platform="desktop"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_graphics" x="54" y="133" platform="android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_graphics" x="54" y="223" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_fov_viewmodels" x="54" y="313" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_fov_viewmodels" x="54" y="343" platform="desktop"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_fov_viewmodels" x="54" y="163" platform="android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_fov_viewmodels" x="54" y="253" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/button_bar" y="414"/>
@@ -113,13 +114,22 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/direct_camera_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.direct_camera" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_decals" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/decals_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DEFAULT|4X|8X|INSANE" setting="game.decals" values="default|4x|8x|insane" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_graphics" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/graphics_settings_screen"/>
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics/graphics_settings_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics_label"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/graphics_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/op_fov_viewmodels" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels/fov_viewmodel_settings_screen"/>
@@ -127,7 +137,7 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels_label"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/fov_viewmodels_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
@@ -148,6 +158,7 @@
 		<string text="FRAME RATE LIMIT:"/>
 		<string text="SMOOTH MOTION:"/>
 		<string text="INSTANT AIM:"/>
+		<string text="DECALS:"/>
 		<string text="GRAPHICS:"/>
 		<string text="FOV AND VIEWMODELS:"/>
 	</strings>
@@ -161,6 +172,7 @@
 		<string text="With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate."/>
 		<string text="Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second."/>
 		<string text="In first person, turn the view the moment the\nmouse moves, not up to two ticks later."/>
+		<string text="How many bullet holes, scorch marks and blood\nstay. Insane: 12x the game's. From the next map."/>
 		<string text="The HUD, text, anti-aliasing, shadows and\nlighting."/>
 		<string text="The field of view and the first-person\nweapon. Their defaults keep the stock view."/>
 	</strings>

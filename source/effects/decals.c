@@ -238,6 +238,8 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "shaders/shader_definitions.h"
 #include "tag_files/tag_files.h"
+#include "structures/structures.h" /* port: (structure_decals_reconnect_to_structure_bsp, game.decals) */
+#include "decal_limit.h" /* port: port/linux/game/decal_limit.c */
 
 /* ---------- constants */
 
@@ -471,6 +473,22 @@ extern struct data_array *global_decal_data;
 boolean decals_enabled= TRUE;
 static real_point2d decal_points2d_temp[2][12];
 static struct decal_globals *decal_globals;
+
+/* port: game.decals above "default" (port/linux/game/decal_limit.c): the
+decals and their globals for a larger limit, outside the game state, in use
+while a map is played with one; the game state's own then stand empty (and
+are saved so) */
+static struct data_array *decals_game_state_data = NULL;
+static struct decal_globals *decals_game_state_globals = NULL;
+static struct data_array *decals_port_data = NULL;
+static struct decal_globals *decals_port_globals = NULL;
+static long decals_port_multiplier = 1;
+
+static long decals_port_maximum_count(
+	void)
+{
+	return MAXIMUM_DECALS_PER_MAP * decals_port_multiplier;
+}
 static struct decal_geometry decal_geometry = {0};
 static boolean decal_locked_count_reported = FALSE;
 static boolean decal_insert_locked_count_reported = FALSE;
@@ -518,9 +536,102 @@ void decals_initialize(
 	return;
 }
 
+/* port: the limit game.decals asks for, as a map begins (no decals are
+made): the larger storage allocated, or let go for the game's own */
+static void decals_port_storage_for_new_map(
+	void)
+{
+	long multiplier = decal_limit_multiplier();
+
+	if (!decals_game_state_data)
+	{
+		decals_game_state_data = global_decal_data;
+		decals_game_state_globals = decal_globals;
+	}
+	if (multiplier != decals_port_multiplier)
+	{
+		rasterizer_decals_port_storage(1);
+		if (decals_port_data)
+		{
+			data_dispose(decals_port_data);
+			decals_port_data = NULL;
+		}
+		if (decals_port_globals)
+		{
+			match_free("c:\\halo\\SOURCE\\effects\\decals.c", 0, decals_port_globals);
+			decals_port_globals = NULL;
+		}
+		decals_port_multiplier = 1;
+		if (multiplier > 1)
+		{
+			decals_port_data = data_new("decals (game.decals)", (short)(MAXIMUM_DECALS_PER_MAP * multiplier),
+				sizeof(struct decal_datum));
+			decals_port_globals = match_malloc("c:\\halo\\SOURCE\\effects\\decals.c", 0,
+				sizeof(struct decal_globals));
+			if (decals_port_data && decals_port_globals && rasterizer_decals_port_storage(multiplier))
+			{
+				decals_port_data->identifier_zero_invalid = TRUE;
+				decals_port_multiplier = multiplier;
+			}
+			else
+			{
+				error(_error_silent, "decals: no memory for game.decals' limit, the game's own kept");
+				if (decals_port_data)
+					data_dispose(decals_port_data);
+				if (decals_port_globals)
+					match_free("c:\\halo\\SOURCE\\effects\\decals.c", 0, decals_port_globals);
+				decals_port_data = NULL;
+				decals_port_globals = NULL;
+			}
+		}
+	}
+	global_decal_data = decals_game_state_data;
+	decal_globals = decals_game_state_globals;
+	if (decals_port_multiplier > 1)
+	{
+		/* (the game state's own, empty, as a saved game holds them) */
+		csmemset(decal_globals->first_decal_indices, NONE, sizeof(decal_globals->first_decal_indices));
+		decal_globals->first_disconnected_decal_index = NONE;
+		decal_globals->locked_count = 0;
+		decal_globals->permanent_count = 0;
+		data_make_valid(global_decal_data);
+		global_decal_data = decals_port_data;
+		decal_globals = decals_port_globals;
+	}
+
+	return;
+}
+
+/* port: after a game state is loaded (game_state.c): with a larger limit,
+the decals made before it are let go (the game state holds none of them) and
+the map's own made again as their clusters are seen; with the game's own,
+a game state saved with a larger limit holds none, so the map's are made */
+void decals_port_after_load(
+	void)
+{
+	if (decals_port_multiplier > 1)
+	{
+		decals_unlock(TRUE);
+		rasterizer_decals_port_flush();
+		csmemset(decal_globals->first_decal_indices, NONE, sizeof(decal_globals->first_decal_indices));
+		decal_globals->first_disconnected_decal_index = NONE;
+		decal_globals->locked_count = 0;
+		decal_globals->permanent_count = 0;
+		data_make_valid(global_decal_data);
+		structure_decals_reconnect_to_structure_bsp();
+	}
+	else if (decal_globals && decal_globals->permanent_count == 0)
+	{
+		structure_decals_reconnect_to_structure_bsp();
+	}
+
+	return;
+}
+
 void decals_initialize_for_new_map(
 	void)
 {
+	decals_port_storage_for_new_map(); /* port: (game.decals) */
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 610, global_decal_data);
 	match_assert("c:\\halo\\SOURCE\\effects\\decals.c", 611, decal_globals);
 
@@ -1458,7 +1569,7 @@ void decals_disconnect_from_structure_bsp(
 					struct decal_datum *decal= DECAL_GET(decal_index);
 					long next_decal_index= decal->next_decal_index;
 
-					if (iteration_count++>MAXIMUM_DECALS_PER_MAP)
+					if (iteration_count++>decals_port_maximum_count()) /* port: (game.decals) */
 					{
 						error(_error_silent, "### ERROR decals: infinite loop -- tell Bernie!!");
 						break;
@@ -1511,7 +1622,7 @@ void decals_reconnect_to_structure_bsp(
 			long next_decal_index= decal->next_decal_index;
 			struct location location;
 
-			if (iteration_count++>MAXIMUM_DECALS_PER_MAP)
+			if (iteration_count++>decals_port_maximum_count()) /* port: (game.decals) */
 			{
 				error(_error_silent, "### ERROR decals: infinite loop -- tell Bernie!!");
 				break;

@@ -131,6 +131,7 @@ symbols in this file:
 #include "memory/lruv_cache.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "decal_limit.h" /* port: port/linux/game/decal_limit.c */
 /* The XDK's stock D3DINLINE (static __forceinline) definitions supply both the
  * inline expansions used below and the out-of-line wrapper bodies January
  * retains in this object. Do not redefine D3DINLINE, take a wrapper's address
@@ -316,10 +317,16 @@ framebuffer and them comes to the same in any order, but for rounding in
 the last bit), they go by their
 blend function and bitmap, so that more of them share a batch
 (decal_batch): a definition's decals pick among its bitmaps at random. */
-static long decal_draw_order[MAXIMUM_DECALS_PER_MAP];
-static unsigned long decal_draw_keys[MAXIMUM_DECALS_PER_MAP];
-static long decal_sort_scratch[MAXIMUM_DECALS_PER_MAP];
-static unsigned long decal_sort_scratch_keys[MAXIMUM_DECALS_PER_MAP];
+static long decal_draw_order_game[MAXIMUM_DECALS_PER_MAP];
+static unsigned long decal_draw_keys_game[MAXIMUM_DECALS_PER_MAP];
+static long decal_sort_scratch_game[MAXIMUM_DECALS_PER_MAP];
+static unsigned long decal_sort_scratch_keys_game[MAXIMUM_DECALS_PER_MAP];
+/* (larger with game.decals above "default": rasterizer_decals_port_storage) */
+static long *decal_draw_order = decal_draw_order_game;
+static unsigned long *decal_draw_keys = decal_draw_keys_game;
+static long *decal_sort_scratch = decal_sort_scratch_game;
+static unsigned long *decal_sort_scratch_keys = decal_sort_scratch_keys_game;
+static long decal_draw_order_capacity = MAXIMUM_DECALS_PER_MAP;
 
 static boolean rasterizer_decal_blend_function_commutes(
 	short framebuffer_blend_function)
@@ -372,7 +379,7 @@ static long rasterizer_decals_draw_order(
 	long count = 0, first, decal_index;
 
 	for (decal_index = decal_get_first_decal_index(cluster_index, local_layer);
-		decal_index != NONE && count < MAXIMUM_DECALS_PER_MAP;
+		decal_index != NONE && count < decal_draw_order_capacity;
 		decal_index = DECAL_GET(decal_index)->next_decal_index)
 	{
 		struct decal_datum *decal = DECAL_GET(decal_index);
@@ -960,6 +967,92 @@ void _rasterizer_decals_flush(
 		0x8E,
 		local_vertex_cache);
 	decals_unlock(FALSE);
+	lruv_flush(local_vertex_cache);
+
+	return;
+}
+
+/* port: game.decals above "default" (port/linux/game/decal_limit.c): the
+decal vertices, their cache and the draw order sized for multiplier times the
+game's decals, allocated outside the game state (saved games keep the game's
+layout) and only while a map is played with such a limit; 1 puts back the
+game's own. Called with no decals made (as a map begins). FALSE when the
+memory cannot be had, the game's own then kept */
+static struct lruv_cache *rasterizer_decals_game_cache = NULL;
+static unsigned long rasterizer_decals_game_vertices = 0;
+static struct lruv_cache *rasterizer_decals_port_cache = NULL;
+static void *rasterizer_decals_port_vertices = NULL;
+static long *rasterizer_decals_port_order = NULL;
+
+boolean rasterizer_decals_port_storage(
+	long multiplier)
+{
+	long count = MAXIMUM_DECALS_PER_MAP * multiplier;
+
+	if (!rasterizer_decals_game_cache)
+	{
+		rasterizer_decals_game_cache = local_vertex_cache;
+		rasterizer_decals_game_vertices = local_d3d_vertex_buffer->Data;
+	}
+	local_vertex_cache = rasterizer_decals_game_cache;
+	local_d3d_vertex_buffer->Data = rasterizer_decals_game_vertices;
+	decal_draw_order = decal_draw_order_game;
+	decal_draw_keys = decal_draw_keys_game;
+	decal_sort_scratch = decal_sort_scratch_game;
+	decal_sort_scratch_keys = decal_sort_scratch_keys_game;
+	decal_draw_order_capacity = MAXIMUM_DECALS_PER_MAP;
+	if (rasterizer_decals_port_cache)
+	{
+		lruv_delete(rasterizer_decals_port_cache);
+		rasterizer_decals_port_cache = NULL;
+	}
+	if (rasterizer_decals_port_vertices)
+	{
+		XPhysicalFree(rasterizer_decals_port_vertices);
+		rasterizer_decals_port_vertices = NULL;
+	}
+	if (rasterizer_decals_port_order)
+	{
+		match_free("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c", 0, rasterizer_decals_port_order);
+		rasterizer_decals_port_order = NULL;
+	}
+	if (multiplier <= 1)
+		return TRUE;
+
+	rasterizer_decals_port_vertices = XPhysicalAlloc(DECAL_VERTEX_CACHE_SIZE * multiplier, -1, 0,
+		PAGE_READWRITE | PAGE_WRITECOMBINE);
+	rasterizer_decals_port_order = match_malloc("c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c", 0,
+		count * 4 * sizeof(long));
+	if (rasterizer_decals_port_vertices && rasterizer_decals_port_order)
+	{
+		rasterizer_decals_port_cache = lruv_new(
+			"decal vertex cache (game.decals)",
+			DECAL_VERTEX_CACHE_PAGE_COUNT * multiplier,
+			DECAL_VERTEX_CACHE_PAGE_SIZE_BITS,
+			count,
+			rasterizer_decal_vertices_purge_proc,
+			rasterizer_decal_vertices_locked_proc);
+	}
+	if (!rasterizer_decals_port_cache)
+	{
+		rasterizer_decals_port_storage(1);
+		return FALSE;
+	}
+	local_vertex_cache = rasterizer_decals_port_cache;
+	local_d3d_vertex_buffer->Data = (unsigned long)rasterizer_decals_port_vertices;
+	decal_draw_order = rasterizer_decals_port_order;
+	decal_draw_keys = (unsigned long *)(rasterizer_decals_port_order + count);
+	decal_sort_scratch = rasterizer_decals_port_order + count * 2;
+	decal_sort_scratch_keys = (unsigned long *)(rasterizer_decals_port_order + count * 3);
+	decal_draw_order_capacity = count;
+
+	return TRUE;
+}
+
+/* port: the decals' vertices let go (decals_port_after_load) */
+void rasterizer_decals_port_flush(
+	void)
+{
 	lruv_flush(local_vertex_cache);
 
 	return;

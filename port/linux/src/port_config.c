@@ -305,6 +305,10 @@ static const struct config_setting config_settings[] =
 		"as CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER. Their tags are checked\n"
 		"as the game's own maps' are before they run; false refuses them\n"
 		"(docs/custom_edition_caches.md)." },
+	{ "game.decals", _config_string, "\"default\"", "HALO_DECALS", _environment_value, _platform_desktop,
+		"How many decals (bullet holes, scorch marks, blood) stay before the\n"
+		"oldest give way: \"default\" (the game's own limit, 2048), \"4x\", \"8x\"\n"
+		"or \"insane\" (twelve times). Takes effect as the next map begins." },
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"
 		"(the stock game draws it on the body only)." },
