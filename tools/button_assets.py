@@ -89,6 +89,14 @@ MESSAGE_ICONS = "ui\\hud\\bitmaps\\hud_msg_icons_sm"
 MESSAGE_BUTTONS = {0: "a_butn.svg", 1: "b_butn.svg", 2: "x_butn.svg", 3: "y_butn.svg"}
 
 
+# MCC modern shoulder labels map to the Xbox black/white controls. These
+# redraws are placeholders, not CRC replacements for any native map bitmap.
+MCC_BUTTONS = [dict(name=f"mcc_{button}_butn__0", tag=f"mcc\\buttons\\{button}",
+                    bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                    crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
+               for button in ("black", "white")]
+
+
 def document(width: int, height: int, body: str) -> str:
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n')
@@ -296,7 +304,7 @@ def layout(arguments) -> None:
         # (the sprites it stands for, not the whole bitmap)
         "sprites": sprites,
     })
-    LIST.write_text(json.dumps({"assets": entries}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:

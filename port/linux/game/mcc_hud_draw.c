@@ -14,6 +14,7 @@
 #include "mcc_hud_draw.h"
 #include <string.h>
 
+long halo_screen_width(void);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
@@ -23,12 +24,12 @@ static struct {
     struct bitmap_data *bitmap;
     long asset;
     boolean attempted;
-} mcc_buttons[4];
+} mcc_buttons[6];
 
 void mcc_hud_glyphs_dispose(void)
 {
     long i;
-    for (i=0;i<4;i++) if (mcc_buttons[i].bitmap) {
+    for (i=0;i<6;i++) if (mcc_buttons[i].bitmap) {
         hud_hires_register_placeholder(mcc_buttons[i].asset,NULL);
         xgpu_mcc_texture_unbind(mcc_buttons[i].bitmap->hardware_format);
         bitmap_delete(mcc_buttons[i].bitmap);
@@ -45,7 +46,7 @@ static short mcc_hud_button_index(struct icon_hud_element_definition const *icon
     if (!hud_globals) return NONE;
     buttons=hud_globals->messaging.button_icons.address;
     if (!buttons) return NONE;
-    for (i=0;i<4 && i<hud_globals->messaging.button_icons.count;i++)
+    for (i=0;i<6 && i<hud_globals->messaging.button_icons.count;i++)
         if (icon==buttons+i) return i;
     return NONE;
 }
@@ -53,10 +54,11 @@ static short mcc_hud_button_index(struct icon_hud_element_definition const *icon
 static struct bitmap_data const *mcc_hud_button_bitmap(short index)
 {
     static char const *names[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
-        "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn"};
+        "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn",
+        "mcc\\buttons\\black","mcc\\buttons\\white"};
     long asset;
     struct bitmap_data *bitmap;
-    if (index<0 || index>=4) return NULL;
+    if (index<0 || index>=6) return NULL;
     if (mcc_buttons[index].attempted) return mcc_buttons[index].bitmap;
     mcc_buttons[index].attempted=TRUE;
     for (asset=0;asset<hud_hires_asset_count();asset++) {
@@ -140,12 +142,13 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
         if (button) {
             /* Crop transparent padding from the native 32px art. A 16x20
              * icon shares the current font's capital center, and its text
-             * advance no longer depends on the map's modern-controller art. */
+             * advance uses the text fragments' three-pixel kerning rather than
+             * the map's modern-controller cell width. */
             real button_scale=viewport_scale*(20.0f/26.0f);
-            point.x=cursor->x0;
+            point.x=(short)(cursor->x0+2.0f*viewport_scale);
             point.y=(short)(draw_unicode_string_capital_middle(cursor,L"")+10.0f*viewport_scale);
             mcc_hud_button_draw(button,&point,button_scale,color);
-            cursor->x0=(short)(point.x+21.0f*button_scale+2.0f*viewport_scale);
+            cursor->x0=(short)(point.x+21.0f*button_scale-3.0f*viewport_scale);
             return TRUE;
         }
     }
@@ -178,19 +181,47 @@ static boolean mcc_hud_edge(short anchor)
     return mcc_cache_tags_loaded() && anchor>=5 && anchor<=8;
 }
 
+static short mcc_hud_frame_inset(short gap,long maximum)
+{
+    return gap>4 ? (short)MIN(gap-gap/3,maximum) : 0;
+}
+
 boolean mcc_hud_anchor_point(short anchor, struct hud_placement_definition const *placement,
     struct bitmap_data const *bitmap, real scale, rectangle2d const *window,
     rectangle2d const *viewport, point2d *point)
 {
     real x,y;
-    if (!mcc_hud_edge(anchor)) return FALSE;
-    x=(anchor==7 ? window->x0 : anchor==8 ? window->x1 : (window->x0+window->x1)*0.5f);
-    y=(anchor==5 ? window->y0 : anchor==6 ? window->y1 : (window->y0+window->y1)*0.5f);
-    x+=placement->offset.x*scale*(anchor==8 ? -1.0f : 1.0f)-viewport->x0;
-    y+=placement->offset.y*scale*(anchor==6 ? -1.0f : 1.0f)-viewport->y0;
+    rectangle2d frame;
+    long horizontal_inset;
+    if (!mcc_cache_tags_loaded() || anchor<0 || anchor>8 || anchor==4) return FALSE;
+    horizontal_inset=halo_screen_width()/20;
+    /* MCC's 2.5% title-safe frame versus the Xbox's 7.5%. Derive each
+     * player's frame from its viewport; leave the small split-screen seam
+     * inset alone. Cap the correction at 5% of the 480p screen so zoom
+     * layouts retain their extra inset. Centre anchors use the native path. */
+    frame=*window;
+    frame.x0-=mcc_hud_frame_inset(window->x0-viewport->x0,horizontal_inset);
+    frame.x1+=mcc_hud_frame_inset(viewport->x1-window->x1,horizontal_inset);
+    frame.y0-=mcc_hud_frame_inset(window->y0-viewport->y0,24);
+    frame.y1+=mcc_hud_frame_inset(viewport->y1-window->y1,24);
+    if (anchor<4) {
+        x=(anchor&1 ? frame.x1 : frame.x0)+placement->offset.x*scale*(anchor&1 ? -1 : 1);
+        y=(anchor&2 ? frame.y1 : frame.y0)+placement->offset.y*scale*(anchor&2 ? -1 : 1);
+    } else {
+        x=(anchor==7 ? frame.x0 : anchor==8 ? frame.x1 : (frame.x0+frame.x1)*0.5f);
+        y=(anchor==5 ? frame.y0 : anchor==6 ? frame.y1 : (frame.y0+frame.y1)*0.5f);
+        x+=placement->offset.x*scale*(anchor==8 ? -1.0f : 1.0f);
+        y+=placement->offset.y*scale*(anchor==6 ? -1.0f : 1.0f);
+    }
+    x-=viewport->x0;y-=viewport->y0;
     if (bitmap) {
-        x+=(bitmap->registration_point.x-(anchor==8 ? bitmap->width : anchor<=6 ? bitmap->width*0.5f : 0))*scale;
-        y+=(bitmap->registration_point.y-(anchor==6 ? bitmap->height : anchor>=7 ? bitmap->height*0.5f : 0))*scale;
+        if (anchor<4) {
+            x+=(bitmap->registration_point.x-(anchor&1 ? bitmap->width : 0))*scale;
+            y+=(bitmap->registration_point.y-(anchor&2 ? bitmap->height : 0))*scale;
+        } else {
+            x+=(bitmap->registration_point.x-(anchor==8 ? bitmap->width : anchor<=6 ? bitmap->width*0.5f : 0))*scale;
+            y+=(bitmap->registration_point.y-(anchor==6 ? bitmap->height : anchor>=7 ? bitmap->height*0.5f : 0))*scale;
+        }
     }
     point->x=(short)x;point->y=(short)y;
     return TRUE;
