@@ -815,8 +815,13 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	if (!platform_sdl_initialize())
 		return FALSE;
 #ifndef HALO_ANDROID
+#ifdef HALO_WEB
+	/* (a browser's canvas has 8 bits a channel) */
+	platform_float_window = FALSE;
+#else
 	if (platform_float_window < 0)
 		platform_float_window = config_boolean("display.hdr") && config_boolean("display.hdr_output");
+#endif
 	if (platform_float_window)
 		platform_float_window_attributes(TRUE);
 #endif
