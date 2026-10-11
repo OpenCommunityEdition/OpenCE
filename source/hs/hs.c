@@ -13549,11 +13549,20 @@ void hs_node_gc(
 	return;
 }
 
+/* port: some multiplayer maps keep a copy of the place for each game type,
+with its own sky. The script's first switch_bsp is the copy for the type the
+host started. A later switch to another copy reloads the level every couple
+of seconds, so that request is ignored. Cleared for each map. */
+static short scripted_multiplayer_bsp = NONE;
+static boolean scripted_multiplayer_bsp_reported = FALSE;
+
 void hs_initialize_for_new_map(
 	void)
 {
 	struct scenario *scenario;
 
+	scripted_multiplayer_bsp = NONE;
+	scripted_multiplayer_bsp_reported = FALSE;
 	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
 	hs_allocate();
 	if (scenario && scenario->hs_syntax_data.size)
@@ -14957,32 +14966,37 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(debug_player_teleport_evaluate, struct hs_argume
 HS_EVALUATE_VOID_STRING(main_set_map_name_evaluate, main_set_map_name)
 HS_EVALUATE_VOID_STRING(main_set_multiplayer_map_name_evaluate, main_set_multiplayer_map_name)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(main_set_difficulty_evaluate, main_set_difficulty)
-/* port: a multiplayer script that switches BSP to change the sky reloads the
-level every couple of seconds. Three copies of one place, each with its own
-sky, is how a map such as TSCE does daybreak, dawn and day. The BSP the match
-loaded stays. A player walking through a BSP trigger still switches, and a
-campaign script still switches. */
+/* port: a campaign script still switches, and so does a player walking
+through a BSP trigger (main_switch_structure_bsp, not this). */
 static void scenario_switch_structure_bsp_evaluate(
 	short function_index,
 	long thread_index,
 	boolean initialize)
 {
 	struct hs_arguments_word const *arguments;
-	static boolean reported = FALSE;
+	short structure_bsp_index;
 
 	arguments = (struct hs_arguments_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
 	if (arguments)
 	{
-		if (game_engine_running() && global_structure_bsp_index_get() != NONE)
+		structure_bsp_index = (short)arguments->value;
+		if (!game_engine_running() || global_structure_bsp_index_get() == NONE)
 		{
-			if (!reported)
-			{
-				reported = TRUE;
-				error(_error_silent, "switch_bsp from a script is ignored in a multiplayer game; the map keeps the bsp it loaded");
-			}
+			scripted_multiplayer_bsp = NONE;
+			scripted_multiplayer_bsp_reported = FALSE;
+			scenario_switch_structure_bsp(structure_bsp_index);
 		}
-		else
-			scenario_switch_structure_bsp((short)arguments->value);
+		else if (scripted_multiplayer_bsp == NONE ||
+			scripted_multiplayer_bsp == structure_bsp_index)
+		{
+			scripted_multiplayer_bsp = structure_bsp_index;
+			scenario_switch_structure_bsp(structure_bsp_index);
+		}
+		else if (!scripted_multiplayer_bsp_reported)
+		{
+			scripted_multiplayer_bsp_reported = TRUE;
+			error(_error_silent, "switch_bsp from a script is ignored after the multiplayer game has chosen its bsp");
+		}
 		hs_return(thread_index, 0);
 	}
 	return;
