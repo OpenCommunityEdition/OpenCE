@@ -176,8 +176,8 @@ MENU_ATTRIBUTES = {
     "menus": {"root"},
     "bitmap": {"name", "width", "height", "frames", "platform"},
     "frame": {"png", "map", "index", "width", "height", "x", "y", "platform"},
-    "strings": {"name", "platform"},
-    "string": {"text", "platform"},
+    "strings": {"name", "map", "platform"},
+    "string": {"text", "map", "platform"},
     "widget": {"name", "type", "controller", "flags", "bitmap", "text", "strings", "values", "setting", "font",
                "color", "align", "description", "string_list", "list_flags", "text_flags", "header_bitmap",
                "footer_bitmap", "header_bounds", "footer_bounds", "child_controller", "x", "y", "left", "top",
@@ -259,6 +259,9 @@ def test_menus_are_well_formed():
                     assert width % logical[0] == 0 and width // logical[0] == height // logical[1], where
             elif element.tag == "strings":
                 strings[element.get("name")] = element
+                # (a string's map= is its number in the list's map list, menu_tags.c)
+                for string in element.findall("string"):
+                    assert string.get("map") is None or (element.get("map") and string.get("map").isdigit()), where
             elif element.tag == "widget":
                 name = element.get("name")
                 assert name and name not in widgets, where
