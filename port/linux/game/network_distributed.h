@@ -119,6 +119,9 @@ enum
 	_distributed_message_voice_down = 81,
 	_distributed_message_voice_config = 82,
 
+	/* co-op death text in the normal multiplayer HUD (reliable, host only) */
+	_distributed_message_coop_death = 85,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

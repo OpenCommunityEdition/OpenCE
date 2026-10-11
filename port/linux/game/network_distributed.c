@@ -4023,6 +4023,7 @@ void network_distributed_handle_message(
 	case _distributed_message_actor_states: entry_size = network_actors_entry_size(); break;
 	case _distributed_message_structure_bsp: entry_size = sizeof(struct distributed_structure_bsp); break;
 	case _distributed_message_coop_presentation: entry_size = network_coop_presentation_entry_size(); break;
+	case _distributed_message_coop_death: entry_size = network_killfeed_entry_size(); break;
 	case _distributed_message_coop_events: entry_size = network_coop_event_entry_size(); break;
 	case _distributed_message_coop_skip_vote: entry_size = network_coop_skip_vote_entry_size(); break;
 	case _distributed_message_coop_device_groups: entry_size = network_coop_device_group_entry_size(); break;
@@ -4127,6 +4128,10 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_coop_presentation:
 		network_coop_handle_presentation(entries, header.game_time);
+		break;
+	case _distributed_message_coop_death:
+		network_killfeed_handle_message(entries, (word)(size - sizeof(header)),
+			header.count, distributed_handling_stream_message);
 		break;
 	case _distributed_message_coop_events:
 		network_coop_handle_events(entries, header.count);

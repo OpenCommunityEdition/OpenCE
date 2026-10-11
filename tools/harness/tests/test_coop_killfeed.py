@@ -10,7 +10,7 @@ def generated(fault=None):
     if fault=='dedup':code=mutated(code,'killfeed_dead_units[slot] == unit_index','FALSE')
     if fault=='backlink':code=mutated(code,'dead->unit_index != unit_index','FALSE')
     return (('under_test.inc',code),)
-@pytest.mark.parametrize('case',['causes','players','dedup','scope','stale','fallback','direct'])
+@pytest.mark.parametrize('case',['causes','players','dedup','scope','stale','fallback','direct','assets','hud'])
 def test_case(case):
     status,output=run(build('coop_killfeed',generated()),case)
     assert status==0,output
