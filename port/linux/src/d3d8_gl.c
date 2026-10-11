@@ -475,18 +475,7 @@ static void render_targets_evict(void);
 /* ---------- the device */
 
 #ifdef HALO_GLES
-/* Mobile drivers (Mali) keep every orphaned copy of a buffer until the GPU
-is done with it, so a large buffer orphaned each frame costs its size per
-frame in flight and more. Instead each frame streams into the next of a few
-smaller buffers, reusing one only once the GPU has finished the frame that
-last used it (host_gl_wait_frame). A busy frame streams about 5 MB of
-vertices. */
-#define STREAM_BUFFER_SIZE (16 * 1024 * 1024)
-#define INDEX_BUFFER_SIZE (2 * 1024 * 1024)
 #define STREAM_BUFFER_RING 3
-#else
-#define STREAM_BUFFER_SIZE (32 * 1024 * 1024)
-#define INDEX_BUFFER_SIZE (8 * 1024 * 1024)
 #endif
 #define VISIBILITY_TEST_SLOTS 4096
 #ifdef HALO_GLES
@@ -545,7 +534,6 @@ struct gl_device
 #endif
 	unsigned long stream_offset;
 	GLuint index_buffer;
-	unsigned long index_offset;
 	GLuint samplers[D3DTSS_MAXSTAGES];
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
@@ -1637,30 +1625,17 @@ static void gl_initialize(void)
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
-#if defined(HALO_GLES) && !defined(HALO_WEB) /* web: every upload has a buffer of its own */
+#ifdef HALO_GLES
 	{
-		int ring;
-
 		glGenBuffers(STREAM_BUFFER_RING, device.stream_buffers);
 		glGenBuffers(STREAM_BUFFER_RING, device.index_buffers);
-		for (ring = 0; ring < STREAM_BUFFER_RING; ring++)
-		{
-			glBindBuffer(GL_ARRAY_BUFFER, device.stream_buffers[ring]);
-			glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.index_buffers[ring]);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-		}
 		device.stream_buffer = device.stream_buffers[0];
 		device.index_buffer = device.index_buffers[0];
 	}
 #endif
 #ifndef HALO_GLES
 	glGenBuffers(1, &device.stream_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, device.stream_buffer);
-	glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 	glGenBuffers(1, &device.index_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, device.index_buffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 #endif
 	glGenSamplers(D3DTSS_MAXSTAGES, device.samplers);
 	glGenQueries(VISIBILITY_TEST_SLOTS, device.queries);
@@ -4359,86 +4334,26 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 
 /* ---------- vertex data */
 
-#ifdef HALO_WEB
-/* Gives an upload a buffer of its own, so a WebGL implementation need not
-preserve a large shared buffer after every draw. The pools grow to the
-busiest frame; a buffer is respecified, not rewritten, when it is reused. */
-static GLuint web_transient_buffer(GLenum target, const void *data, unsigned long size)
-{
-	/* [0] vertex buffers, [1] index buffers: WebGL keeps a buffer to its first target */
-	static GLuint *buffers[2];
-	static unsigned long count[2], capacity[2];
-	static unsigned long frame = ~0UL;
-	unsigned int pool = target == GL_ARRAY_BUFFER ? 0 : 1;
-
-	if (frame != device.frame)
-	{
-		frame = device.frame;
-		count[0] = count[1] = 0;
-	}
-	if (count[pool] == capacity[pool])
-	{
-		GLuint *grown = realloc(buffers[pool], (capacity[pool] + 64) * sizeof(*grown));
-
-		if (!grown)
-			return 0;
-		memset(grown + capacity[pool], 0, 64 * sizeof(*grown));
-		buffers[pool] = grown;
-		capacity[pool] += 64;
-	}
-	if (!buffers[pool][count[pool]])
-		glGenBuffers(1, &buffers[pool][count[pool]]);
-	if (pool == 0)
-		state_array_buffer(buffers[pool][count[pool]]);
-	else
-		state_element_array_buffer(buffers[pool][count[pool]]);
-	glBufferData(target, (GLsizeiptr)size, data, GL_STREAM_DRAW);
-	return buffers[pool][count[pool]++];
-}
-#endif
-
-/* makes room for size bytes of uploads, orphaning the stream buffer if it
-is full. A draw reserves room for all of its streams at once: orphaning
-between two of them would leave the attributes already pointed at the
-buffer reading its new, empty storage. */
+/* Replace the shared buffer's storage once per draw, before any uploads.
+All of the draw's streams must be reserved together: replacing storage
+between streams would discard vertices the draw still needs. */
 static void stream_reserve(unsigned long size)
 {
-#ifdef HALO_WEB
-	return; /* every upload has a buffer of its own */
-#endif
-	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
+	device.stream_offset = 0;
+	if (size)
 	{
-		/* orphan the buffer and start again */
 		state_array_buffer(device.stream_buffer);
-		glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-		device.stream_offset = 0;
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)((size + 15) & ~15UL), NULL, GL_STREAM_DRAW);
 	}
 }
-
-static unsigned long stream_upload(const void *data, unsigned long size);
-
-#ifdef HALO_GLES
-/* stream_upload, at a multiple of alignment into the buffer */
-static unsigned long stream_upload_aligned(const void *data, unsigned long size, unsigned long alignment)
-{
-	stream_reserve(((size + 15) & ~15UL) + alignment);
-	device.stream_offset += (alignment - device.stream_offset % alignment) % alignment;
-	return stream_upload(data, size);
-}
-#endif
 
 static unsigned long stream_upload(const void *data, unsigned long size)
 {
 	unsigned long offset;
-	/* (as index_upload: the vertices' own bytes, in room rounded up to 16) */
+	/* (only source bytes are read; each stream's room is rounded up to 16) */
 	unsigned long length = size;
 
-#ifdef HALO_WEB
-	device.stream_buffer = web_transient_buffer(GL_ARRAY_BUFFER, data, size);
-	return 0;
-#endif
 	size = (size + 15) & ~15UL;
-	stream_reserve(size);
 	offset = device.stream_offset;
 	state_array_buffer(device.stream_buffer);
 #ifdef HALO_GLES
@@ -4494,31 +4409,9 @@ static unsigned long stream_upload_swizzled(const struct vertex_shader_object *d
 
 static unsigned long index_upload(const void *data, unsigned long size)
 {
-	unsigned long offset;
-	/* (the indices' own bytes are written; the room they take is rounded up
-	to 16, for the next ones' alignment: rounding what was read too read
-	past the caller's indices) */
-	unsigned long length = size;
-
-#ifdef HALO_WEB
-	web_transient_buffer(GL_ELEMENT_ARRAY_BUFFER, data, size);
-	return 0;
-#endif
-	size = (size + 15) & ~15UL;
 	state_element_array_buffer(device.index_buffer);
-	if (device.index_offset + size > INDEX_BUFFER_SIZE)
-	{
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-		device.index_offset = 0;
-	}
-	offset = device.index_offset;
-#ifdef HALO_GLES
-	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
-#else
-	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
-#endif
-	device.index_offset += size;
-	return offset;
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)size, data, GL_STREAM_DRAW);
+	return 0;
 }
 
 static void attribute_format(const struct vertex_element *element, GLint *size, GLenum *type, GLboolean *normalized)
@@ -5203,9 +5096,6 @@ void WINAPI D3DDevice_End(void)
 	unsigned long stride = XGPU_VERTEX_ATTRIBUTE_COUNT * 4 * sizeof(float);
 	unsigned long offset, index, count = device.immediate_count;
 	D3DPRIMITIVETYPE type = device.immediate_type;
-	/* (the vertices' place in the streaming buffer, where the attributes'
-	pointers start at its beginning) */
-	unsigned long first_vertex = 0;
 
 	device.immediate_active = FALSE;
 	if (!count || !prepare_draw(TRUE))
@@ -5217,13 +5107,9 @@ void WINAPI D3DDevice_End(void)
 	{
 		/* Only the registers written since Begin are uploaded, one after
 		another in each vertex; the others are constants (most draws write 3
-		of the 16, and a vertex of all of them is 256 bytes). On ES the
-		vertices start a whole number of vertices into the streaming buffer
-		and are drawn from there (first_vertex), so that draws of the same
-		registers keep the attributes' pointers: each pointer set is a call
-		into the driver, or the browser. All sixteen would be 256 bytes, more
-		than WebGL's largest stride (255): each attribute then goes in an
-		array of its own there. */
+		of the 16, and a vertex of all of them is 256 bytes). All sixteen
+		would exceed WebGL's largest stride (255), so each attribute then
+		goes in an array of its own there. */
 		static float *packed;
 		static unsigned long packed_capacity;
 		unsigned long attribute_size = 4 * sizeof(float);
@@ -5257,16 +5143,15 @@ void WINAPI D3DDevice_End(void)
 						attribute_size);
 				}
 			}
+			stream_reserve(count * vertex_size);
+			offset = stream_upload(packed, count * vertex_size);
 #ifdef HALO_GLES
-			offset = stream_upload_aligned(packed, count * vertex_size, vertex_size);
-			first_vertex = offset / vertex_size;
 			for (slot = 0; slot < register_count; slot++)
 			{
 				state_attribute_stream(registers[slot], 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE,
 					(GLsizei)vertex_size, 0, slot * attribute_size);
 			}
 #else
-			offset = stream_upload(packed, count * vertex_size);
 			{
 				/* (the vertex array of the last few sets of registers) */
 				static struct
@@ -5306,6 +5191,7 @@ void WINAPI D3DDevice_End(void)
 		}
 		else
 		{
+			stream_reserve(count * stride);
 #ifdef HALO_WEB
 			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 			{
@@ -5354,30 +5240,13 @@ void WINAPI D3DDevice_End(void)
 		unsigned long index_count;
 		WORD *indices = quad_indices(NULL, count, &index_count);
 
-		if (first_vertex)
-		{
-			/* (the indices from the first vertex on, past what 16 bits hold) */
-			GLuint *placed = indices ? malloc(index_count * sizeof(GLuint)) : NULL;
-
-			if (placed)
-			{
-				for (index = 0; index < index_count; index++)
-					placed[index] = (GLuint)(first_vertex + indices[index]);
-				glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_INT,
-					(const void *)index_upload(placed, index_count * sizeof(GLuint)));
-				free(placed);
-			}
-		}
-		else
-		{
-			glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
-				(const void *)index_upload(indices, index_count * sizeof(WORD)));
-		}
+		glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
+			(const void *)index_upload(indices, index_count * sizeof(WORD)));
 		free(indices);
 	}
 	else
 	{
-		glDrawArrays(primitive_mode(type), (GLint)first_vertex, (GLsizei)count);
+		glDrawArrays(primitive_mode(type), 0, (GLsizei)count);
 	}
 	gl_check_errors("immediate draw");
 }
@@ -5817,11 +5686,6 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		}
 		device.stream_buffer = device.stream_buffers[device.buffer_ring];
 		device.index_buffer = device.index_buffers[device.buffer_ring];
-		device.stream_offset = 0;
-		device.index_offset = 0;
-#else
-		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
-		device.index_offset = INDEX_BUFFER_SIZE;
 #endif
 	}
 	device.frame++;
