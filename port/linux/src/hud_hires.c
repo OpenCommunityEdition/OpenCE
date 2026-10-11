@@ -30,10 +30,6 @@ zlib (port/third_party/zlib).
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HALO_WEB
-#include <emscripten/html5_webgl.h>
-#endif
-
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 
@@ -376,18 +372,3 @@ unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 	*levels = textures[asset].levels;
 	return textures[asset].texture;
 }
-
-#ifdef HALO_WEB
-/* port: prepare only textures matched to the map, before play starts. Their
-original bitmap's pixels are still checked when a replacement is used. */
-void hud_hires_prepare(long asset)
-{
-	unsigned long levels;
-
-	if (asset < 0 || asset >= hud_hires_asset_count() || !emscripten_webgl_get_current_context())
-		return;
-	if (!config_boolean(hud_hires_embedded[asset].title ? "display.high_res_text" : "display.high_res_hud"))
-		return;
-	hud_hires_override_texture(asset, &levels);
-}
-#endif

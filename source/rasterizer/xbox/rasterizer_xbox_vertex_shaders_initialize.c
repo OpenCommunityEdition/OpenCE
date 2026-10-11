@@ -191,11 +191,6 @@ boolean rasterizer_vertex_shaders_initialize(
 		halo_vertex_shader_lighting(vertex_shader_table[10].handle);
 		halo_vertex_shader_lighting(vertex_shader_table[17].handle);
 		halo_vertex_shader_lighting(vertex_shader_table[27].handle);
-#ifdef HALO_WEB
-		/* port: compile the known vertex programs before the first frame. */
-		for (vertex_shader_index = 0; vertex_shader_index < NUMBER_OF_VERTEX_SHADERS; vertex_shader_index++)
-			halo_vertex_shader_prepare(vertex_shader_table[vertex_shader_index].handle);
-#endif
 	}
 
 	return success;

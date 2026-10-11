@@ -37,9 +37,6 @@ long hud_hires_asset_fits(long asset, long width, long height);
 unsigned long hud_hires_asset_sprites(long asset);
 int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long level0_size);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
-#ifdef HALO_WEB
-void hud_hires_prepare(long asset);
-#endif
 
 void hud_hires_tags_loaded(void);
 void hud_hires_tags_unloaded(void);
@@ -143,13 +140,6 @@ void hud_hires_tags_loaded(
 			hires_bitmap_count++;
 		}
 	}
-#ifdef HALO_WEB
-	/* port: decode and upload the map's replacements before its first frame. */
-	for (asset = 0; asset < hires_bitmap_count; asset++)
-		hud_hires_prepare(hires_bitmaps[asset].asset);
-	for (asset = 0; asset < hires_sprite_bitmap_count; asset++)
-		hud_hires_prepare(hires_sprite_bitmaps[asset].asset);
-#endif
 	platform_log("high-res hud: %ld of %ld bitmaps in this map, %ld for some of their sprites (%ld not in it)",
 		hires_bitmap_count + hires_sprite_bitmap_count, asset_count, hires_sprite_bitmap_count, missing);
 

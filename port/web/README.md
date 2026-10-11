@@ -184,6 +184,7 @@ serves another site (a `halo-web-*.zip` from a release, say).
 ```sh
 node --test "port/web/tests/*.test.js"   # the disc image reader, the service worker
 python -m pytest -q tools/test_web_build.py  # the build's graph, version.json, the sockets, the menus
+python -m pytest -q tools/test_web_index_cache.py  # cached index buffers, with address/undefined-behavior sanitizers
 node port/web/tests/smoke.mjs dist/halo-web-release  # the site in a headless Chromium (Playwright)
 node port/web/tests/rooms.mjs dist/halo-web-release  # two browsers in a room (and mosquitto)
 node port/web/tests/webrtc_native.mjs chromium firefox  # the native builds' WebRTC with browsers

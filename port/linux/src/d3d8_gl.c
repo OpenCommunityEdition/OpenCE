@@ -22,10 +22,6 @@ Conventions carried over from the Xbox:
 */
 
 #include "xgpu.h"
-#ifdef HALO_WEB
-#include "web_shader_cache.h"
-static void web_shader_program_prepare(GLuint vertex_shader, GLuint fragment_shader);
-#endif
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
@@ -1742,10 +1738,6 @@ static void gl_initialize(void)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
-#ifdef HALO_WEB
-	web_shader_cache_initialize(web_shader_program_prepare);
-	xgpu_gl_state_invalidate();
-#endif
 }
 
 /* what display.anti_aliasing's value needs of the GL context, once there is
@@ -2710,11 +2702,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
 		program->shaders_tried |= tried;
-#ifdef HALO_WEB
-		*shader = web_shader_cache_get(GL_VERTEX_SHADER, source, "vertex");
-#else
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
-#endif
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -2733,38 +2721,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 	return *shader;
 }
 
-#ifdef HALO_WEB
-/* The game's vertex programs are known at startup. All use their own
-input declarations; the three programs selected by address share one
-(rasterizer_xbox_vertex_shaders_runtime.c). Compile before play begins. */
-void halo_vertex_shader_prepare(unsigned long handle)
-{
-	struct vertex_shader_object *object = vertex_shader_from_handle((DWORD)handle);
-	struct vertex_shader_object *saved = device.vertex_shader;
-	int lit;
-
-	if (!device.gl_ready || !object || !object->instructions)
-		return;
-	device.vertex_shader = object;
-	for (lit = 0; lit <= (object->lighting.lights != 0); lit++)
-	{
-		vertex_shader_get(object, FALSE, lit);
-		vertex_shader_get(object, TRUE, lit);
-	}
-	device.vertex_shader = saved;
-}
-#endif
-
 typedef char pixel_shader_key_size_assert[sizeof(struct nv2a_pixel_shader_key) % 4 == 0 ? 1 : -1];
-
-#ifdef HALO_WEB
-/* Inactive combiner states can give different keys the same GLSL. Keep one
-shader for each source, so those keys also share their linked programs. */
-static GLuint fragment_source_get(const char *source)
-{
-	return web_shader_cache_get(GL_FRAGMENT_SHADER, source, "pixel");
-}
-#endif
 
 static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 {
@@ -2797,11 +2754,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
-#ifdef HALO_WEB
-	entry->shader = fragment_source_get(source);
-#else
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
-#endif
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -2907,19 +2860,9 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		snprintf(name, sizeof(name), "tex%d", stage);
 		glUniform1i(glGetUniformLocation(entry->program, name), stage);
 	}
-#ifdef HALO_WEB
-	web_shader_cache_linked(vertex_shader, fragment_shader);
-#endif
 	last = entry;
 	return entry;
 }
-
-#ifdef HALO_WEB
-static void web_shader_program_prepare(GLuint vertex_shader, GLuint fragment_shader)
-{
-	program_get(vertex_shader, fragment_shader);
-}
-#endif
 
 /* ---------- per-draw state */
 
@@ -5064,7 +5007,7 @@ struct index_cache_entry
 	unsigned long capacity;
 	WORD minimum, maximum;
 	GLuint buffer;
-	/* the last frame used, plus one; zero when seen only once */
+	/* the last frame used, plus one; zero when no buffer is kept */
 	unsigned long kept;
 };
 
