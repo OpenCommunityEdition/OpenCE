@@ -222,7 +222,7 @@ SCREENS["video_settings/fov_viewmodels"] = {
         ("LEGS:", "display.first_person_legs", ON_OFF,
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
-         "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+         "Your shield's flare in an armor color, whatever\nyour armor. Online, others see it too.", None),
     ],
 }
 

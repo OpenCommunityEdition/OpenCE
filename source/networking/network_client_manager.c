@@ -393,6 +393,9 @@ symbols in this file:
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 
+/* port: port/linux/game/shield_color.c */
+short shield_color_network_index(void);
+
 /* ---------- constants */
 
 enum
@@ -1521,7 +1524,8 @@ boolean network_game_client_add_player(
 	ustrncpy(player.name, profile.player_name, NETWORK_PLAYER_NAME_LENGTH - 1);
 	player.name[NETWORK_PLAYER_NAME_LENGTH - 1] = 0;
 	player.primary_color_index = profile.primary_color_index;
-	player.icon_index = NONE;
+	/* port: the player's shield color (port/linux/game/shield_color.c) */
+	player.icon_index = shield_color_network_index();
 	player.team_index = NONE;
 	player.player_list_index = NONE;
 
@@ -2890,6 +2894,45 @@ static boolean network_game_client_idle_joining(
 	return success;
 }
 
+/* port: this machine's players' colors sent again in the lobby when they
+change (an armor color chosen in the profile, display.shield_color): the
+host has each player's from when the player was added, and every machine
+draws them from the host's list. Once a second at most, until the host's
+list has them */
+static void network_game_client_update_colors(
+	struct network_game_client *client)
+{
+	static unsigned long last_sent = 0;
+	unsigned long now = system_milliseconds();
+	short shield = shield_color_network_index();
+	short player_index;
+
+	if (now - last_sent < 1000)
+		return;
+	for (player_index = 0; player_index < MAXIMUM_NUMBER_OF_PLAYERS; player_index++)
+	{
+		struct network_player player = client->game.players[player_index];
+		struct player_profile profile;
+
+		if (!network_player_is_valid(&player) || player.machine_index != (char)client->machine_index ||
+			!VALID_INDEX(player.controller_index, MAXIMUM_NUMBER_OF_LOCAL_PLAYERS))
+		{
+			continue;
+		}
+		player_ui_get_active_player_profile(player.controller_index, &profile);
+		if ((profile.primary_color_index == NONE || profile.primary_color_index == player.primary_color_index) &&
+			shield == player.icon_index)
+		{
+			continue;
+		}
+		if (profile.primary_color_index != NONE)
+			player.primary_color_index = profile.primary_color_index;
+		player.icon_index = shield;
+		last_sent = now;
+		network_game_client_update_local_player_data(client, &player);
+	}
+}
+
 static boolean network_game_client_idle_pregame(
 	struct network_game_client *client)
 {
@@ -2914,6 +2957,9 @@ static boolean network_game_client_idle_pregame(
 			{
 				network_event("network_game_client_process_incoming_messages() failed in network_game_client_idle_pregame()");
 			}
+			/* port: the players' colors, as they change */
+			if (success && client->state == _network_game_client_state_pregame)
+				network_game_client_update_colors(client);
 		}
 		else
 		{

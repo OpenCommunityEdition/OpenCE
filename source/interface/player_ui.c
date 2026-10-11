@@ -912,6 +912,43 @@ boolean player_ui_save_profile(
 	return result;
 }
 
+/* port: the armor color chosen for the player profile being edited, kept
+at once (the color picker's, menu_functions.c): in the profile's file, and
+for each local player playing with it. Kept only with the profile's other
+changes, on Settings' OK, it was lost by leaving Settings any other way, and
+over again as each campaign level began (player_profile_save_last_level_played
+writes the profile from the player's copy): the profile had no color, and
+every network game gave the player a random one */
+boolean player_ui_save_edit_profile_color(
+	short color_index)
+{
+	long profile_index = player_ui_globals.edit_profile_index;
+	struct player_profile saved;
+	short local_player_index;
+
+	if (profile_index == NONE ||
+		saved_game_file_get_type(profile_index) != _saved_game_file_type_player_profile ||
+		!VALID_INDEX(color_index, player_profile_number_of_available_primary_colors()))
+	{
+		return FALSE;
+	}
+	player_ui_globals.edit_profile.current.player.primary_color_index = color_index;
+	player_ui_globals.edit_profile.original.player.primary_color_index = color_index;
+	if (!TEST_FLAG(profile_index, _saved_game_file_index_read_only_bit) &&
+		player_profile_get(profile_index, &saved) &&
+		saved.primary_color_index != color_index)
+	{
+		saved.primary_color_index = color_index;
+		player_profile_save(profile_index, &saved);
+	}
+	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
+	{
+		if (player_ui_globals.local_players[local_player_index].active_profile_index == profile_index)
+			player_ui_globals.local_players[local_player_index].profile.primary_color_index = color_index;
+	}
+	return TRUE;
+}
+
 boolean player_ui_autolevel_enabled(
 	short controller_index)
 {

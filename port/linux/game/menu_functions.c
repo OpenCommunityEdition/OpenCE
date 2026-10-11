@@ -1614,6 +1614,8 @@ static boolean color_choose(void)
 	if (!profile)
 		return FALSE;
 	profile->primary_color_index = color_list.color;
+	/* (kept at once, not only with Settings' OK: player_ui.c) */
+	player_ui_save_edit_profile_color(color_list.color);
 	return TRUE;
 }
 

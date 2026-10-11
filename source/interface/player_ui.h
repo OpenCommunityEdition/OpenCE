@@ -59,6 +59,9 @@ struct game_variant_options const *player_ui_get_game_variant_options(
 	void);
 boolean player_ui_edit_profile_is_dirty(
 	void);
+/* port: (player_ui.c) */
+boolean player_ui_save_edit_profile_color(
+	short color_index);
 boolean player_ui_save_profile(
 	void);
 boolean player0_look_pitch_is_inverted(

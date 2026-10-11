@@ -189,7 +189,11 @@ machine say its WebRTC in internet play's signalling (a native build's
 certificate, a browser's ICE credentials too), so that browsers play
 (port/linux/README.md, "Browsers"); version 27 shares Custom Edition maps
 (below, "Map sharing"): a client asks the host for a map it lacks, and the
-game's players reach each other to send it.
+game's players reach each other to send it; version 28 sends with each player the
+shield color it chose (in the player's record's `icon_index`, which the Xbox
+game never used) and sends a player's armor and shield colors again in the
+lobby as they change, so that every machine draws each player's shield in
+that player's color (`port/linux/game/shield_color.c`).
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

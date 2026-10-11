@@ -260,6 +260,7 @@ symbols in this file:
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
+#include "saved games/player_profile.h" /* port: (the armor colors, to check a player's) */
 #include "networking/network_server_message_handler.h"
 #include "text/unicode.h"
 /* system_milliseconds(), for the settings update interval */
@@ -666,6 +667,20 @@ static void network_game_server_clean_player_name(
 	long number;
 
 	network_game_server_clean_name(player->name, NUMBEROF(player->name), L"Player");
+	/* (and its colors one of the armor colors, or NONE: the armor's a random
+	one on joining, the player's own kept on a change of settings, and the
+	shield's its own) */
+	{
+		short colors = (short)player_profile_number_of_available_primary_colors();
+		struct network_game *game = network_game_server_get_game(server);
+		struct network_player const *own = game && VALID_INDEX(own_index, MAXIMUM_NUMBER_OF_PLAYERS) ?
+			&game->players[own_index] : NULL;
+
+		if (!VALID_INDEX(player->primary_color_index, colors))
+			player->primary_color_index = own ? own->primary_color_index : NONE;
+		if (!VALID_INDEX(player->icon_index, colors))
+			player->icon_index = NONE;
+	}
 	csmemcpy(base, player->name, sizeof(base));
 	for (number = 2; number < 100 && network_game_server_player_name_taken(server, player->name, own_index); number++)
 	{
