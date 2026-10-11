@@ -391,13 +391,18 @@ def test_package_catalog_duplicates_and_resource_files(catalog_tool, tmp_path):
         # Even a resource file that resembles a level header is not a level.
         (folder / "sounds.map").write_bytes(header())
         (folder / "list.txt").write_text("a10.map\nsounds.map\n/nested\n../solo.map\n")
+        (folder / (package + ".map")).write_bytes(header(scenario=scenario))
+        with (folder / "list.txt").open("a") as listing:
+            listing.write(package + ".map\n")
     fields, maps = run(catalog_tool, tmp_path, "mcc_maps/two/a10")
-    assert maps == ["mcc_maps\\a10|1", "mcc_maps\\one\\a10|1", "mcc_maps\\solo|1", "mcc_maps\\two\\a10|0"]
-    assert fields["found"] == "3"
+    assert maps == ["mcc_maps\\a10|1", "mcc_maps\\one\\a10|1", "mcc_maps\\one\\one|1", "mcc_maps\\solo|1", "mcc_maps\\two\\a10|0", "mcc_maps\\two\\two|0"]
+    assert fields["found"] == "4"
     assert fields["label_0"] == "A10"
     assert fields["label_1"] == "A10 [one]"
-    assert fields["label_2"] == "Solo"
-    assert fields["label_3"] == "A10 [two]"
+    assert fields["label_2"] == "One [one]"
+    assert fields["label_3"] == "Solo"
+    assert fields["label_4"] == "A10 [two]"
+    assert fields["label_5"] == "Two [two]"
     assert fields["closed"] == fields["scans"] == "3"
 
 
