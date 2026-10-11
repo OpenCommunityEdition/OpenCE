@@ -7,6 +7,12 @@ e77f175595e64cb44218cc9d9d56fc365ad0e36a). Its `Jolt` folder and `LICENSE`
 are copied unchanged; the rest of the repository (samples, tests, the
 viewer, its own build files) is not needed.
 
+Checksums: the `Jolt` folder is git tree `41598db7d35e7716abf3021e9c73c42c2526b4be`
+(`git rev-parse v5.6.0:Jolt` in Jolt's repository); the SHA-256 of its
+files' SHA-256 list, `(cd port/third_party/JoltPhysics && find Jolt -type f |
+LC_ALL=C sort | xargs sha256sum) | sha256sum`, is
+`b9f6779000e5eca9896f0d459a09bf051f711a12073a2d37c89c5178bab8af3a`.
+
 The ragdolls of the dead (`game.death_physics = "ragdoll"`,
 `port/linux/game/ragdoll.c`) are simulated with it, through a small C
 interface (`port/linux/physics/ragdoll_physics.cpp`,
