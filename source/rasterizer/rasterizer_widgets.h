@@ -99,6 +99,10 @@ long _rasterizer_widget_submit_occlusion_test(
 	long index);
 long _rasterizer_widget_get_occlusion_test_result(
 	long index);
+/* port: the 3D sprites drawn until it is turned off, or a widget's state
+changes, are one draw (rasterizer_xbox_widgets.c) */
+void rasterizer_widget_batch_sprites(
+	boolean batch);
 void _rasterizer_widget_end(
 	void);
 
