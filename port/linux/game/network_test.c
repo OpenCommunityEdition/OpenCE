@@ -15,9 +15,10 @@ Automated system link sessions for testing the netcode without the menus
   difficulty, as the Map screen does for a campaign level;
 - "join" searches for games and joins the first it finds, as picking it in
   the system link list does;
-- "browse" joins the first game the server browser lists (internet play's
-  public games: a host's with debug.network_test_public), as picking it
-  there does, and then as "join".
+- "browse" joins the game with the most players that the server browser
+  lists after five seconds (internet play's public games: a host's with
+  debug.network_test_public), co-op ones last, as picking it there does,
+  and then as "join". It logs what it lists.
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared.
@@ -119,6 +120,8 @@ static struct
 	long logged_time;
 	boolean public_game;
 	boolean browsing;
+	boolean browse_listed;
+	float browse_seconds;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -934,8 +937,8 @@ void network_test_update(
 	{
 	case _network_test_browse:
 	{
-		struct p2p_listing games[8];
-		int count;
+		struct p2p_listing listed[8], games[8];
+		int listed_count, count = 0, pass, index;
 
 		if (!network_test.browsing)
 		{
@@ -943,12 +946,31 @@ void network_test_update(
 			p2p_lobby_browse(TRUE);
 			platform_log("network test: browsing the public games");
 		}
-		count = p2p_lobby_games(games, NUMBEROF(games));
-		/* (the first that can be joined: no password, not failed) */
-		while (count > 0 && (!games[0].invite[0] || games[0].failed))
+		/* (listings arriving meanwhile from every broker) */
+		network_test.browse_seconds += seconds;
+		listed_count = p2p_lobby_games(listed, NUMBEROF(listed));
+		if (!listed_count || network_test.browse_seconds < 5.0f)
+			break;
+		/* those that can be joined (no password, not failed): the list has
+		the most players first; co-op, the game with no game engine, last */
+		for (pass = 0; pass < 2; pass++)
 		{
-			memmove(games, games + 1, sizeof(*games) * (count - 1));
-			count--;
+			for (index = 0; index < listed_count; index++)
+			{
+				if (listed[index].invite[0] && !listed[index].failed && !listed[index].engine_type == pass)
+					games[count++] = listed[index];
+			}
+		}
+		if (!network_test.browse_listed)
+		{
+			network_test.browse_listed = TRUE;
+			for (index = 0; index < listed_count; index++)
+			{
+				platform_log("network test: listed %s's game (%s, %s) %d/%d players%s%s", listed[index].name,
+					listed[index].map, listed[index].gametype, listed[index].player_count,
+					listed[index].maximum_player_count, listed[index].engine_type ? "" : ", co-op",
+					listed[index].invite[0] ? "" : ", locked");
+			}
 		}
 		if (count > 0 && p2p_join_invite(games[0].invite))
 		{

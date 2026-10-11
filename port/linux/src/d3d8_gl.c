@@ -527,6 +527,8 @@ struct gl_device
 	float attributes[XGPU_VERTEX_ATTRIBUTE_COUNT][4];
 	BOOL immediate_active;
 	D3DPRIMITIVETYPE immediate_type;
+	/* the input registers written since Begin, a bit each */
+	unsigned long immediate_written;
 	float *immediate_vertices;
 	unsigned long immediate_count;
 	unsigned long immediate_capacity;
@@ -4279,6 +4281,18 @@ static void stream_reserve(unsigned long size)
 	}
 }
 
+static unsigned long stream_upload(const void *data, unsigned long size);
+
+#ifdef HALO_WEB
+/* stream_upload, at a multiple of alignment into the buffer */
+static unsigned long stream_upload_aligned(const void *data, unsigned long size, unsigned long alignment)
+{
+	stream_reserve(((size + 15) & ~15UL) + alignment);
+	device.stream_offset += (alignment - device.stream_offset % alignment) % alignment;
+	return stream_upload(data, size);
+}
+#endif
+
 static unsigned long stream_upload(const void *data, unsigned long size)
 {
 	unsigned long offset;
@@ -4667,6 +4681,7 @@ void WINAPI D3DDevice_Begin(D3DPRIMITIVETYPE primitive_type)
 	device.immediate_active = TRUE;
 	device.immediate_type = primitive_type;
 	device.immediate_count = 0;
+	device.immediate_written = 0;
 }
 
 static void immediate_emit(void)
@@ -4693,6 +4708,9 @@ void WINAPI D3DDevice_End(void)
 	unsigned long stride = XGPU_VERTEX_ATTRIBUTE_COUNT * 4 * sizeof(float);
 	unsigned long offset, index, count = device.immediate_count;
 	D3DPRIMITIVETYPE type = device.immediate_type;
+	/* (the vertices' place in the streaming buffer, where the attributes'
+	pointers start at its beginning) */
+	unsigned long first_vertex = 0;
 
 	device.immediate_active = FALSE;
 	if (!count || !prepare_draw(TRUE))
@@ -4700,36 +4718,76 @@ void WINAPI D3DDevice_End(void)
 	trace_draw("immediate", type, count, device.immediate_vertices);
 #ifdef HALO_WEB
 	{
-		/* WebGL takes vertex strides of 255 bytes at most, and this vertex
-		is 256: each attribute goes in an array of its own */
-		static float *transposed;
-		static unsigned long transposed_capacity;
+		/* Only the registers written since Begin are uploaded, one after
+		another in each vertex; the others are constants. The vertices start
+		a whole number of vertices into the streaming buffer and are drawn
+		from there (first_vertex), so that draws of the same registers keep
+		the attributes' pointers: each draw of text is a character, and each
+		pointer set is a call into the browser. All sixteen would be 256
+		bytes, more than WebGL's largest stride (255): each attribute then
+		goes in an array of its own. */
+		static float *packed;
+		static unsigned long packed_capacity;
 		unsigned long attribute_size = 4 * sizeof(float);
-		unsigned long vertex;
+		unsigned long registers[XGPU_VERTEX_ATTRIBUTE_COUNT];
+		unsigned long register_count = 0, vertex_size, vertex, slot;
 
-		if (count > transposed_capacity)
+		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
 		{
-			float *grown = realloc(transposed, count * stride);
+			if (device.immediate_written & (1UL << index))
+				registers[register_count++] = index;
+		}
+		if (count > packed_capacity)
+		{
+			float *grown = realloc(packed, count * stride);
 
 			/* (out of memory: the draw is dropped) */
 			if (!grown)
 				return;
-			transposed = grown;
-			transposed_capacity = count;
+			packed = grown;
+			packed_capacity = count;
 		}
-		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		if (register_count < XGPU_VERTEX_ATTRIBUTE_COUNT)
 		{
+			vertex_size = register_count * attribute_size;
 			for (vertex = 0; vertex < count; vertex++)
 			{
-				memcpy(transposed + (index * count + vertex) * 4,
-					device.immediate_vertices + (vertex * XGPU_VERTEX_ATTRIBUTE_COUNT + index) * 4, attribute_size);
+				for (slot = 0; slot < register_count; slot++)
+				{
+					memcpy(packed + (vertex * register_count + slot) * 4,
+						device.immediate_vertices + (vertex * XGPU_VERTEX_ATTRIBUTE_COUNT + registers[slot]) * 4,
+						attribute_size);
+				}
+			}
+			offset = stream_upload_aligned(packed, count * vertex_size, vertex_size);
+			first_vertex = offset / vertex_size;
+			for (slot = 0; slot < register_count; slot++)
+			{
+				state_attribute_stream(registers[slot], 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE,
+					(GLsizei)vertex_size, 0, slot * attribute_size);
+			}
+			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+			{
+				if (!(device.immediate_written & (1UL << index)))
+					state_attribute_value(index, device.attributes[index]);
 			}
 		}
-		offset = stream_upload(transposed, count * stride);
-		for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+		else
 		{
-			state_attribute_stream(index, 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE, (GLsizei)attribute_size,
-				offset, index * count * attribute_size);
+			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+			{
+				for (vertex = 0; vertex < count; vertex++)
+				{
+					memcpy(packed + (index * count + vertex) * 4,
+						device.immediate_vertices + (vertex * XGPU_VERTEX_ATTRIBUTE_COUNT + index) * 4, attribute_size);
+				}
+			}
+			offset = stream_upload(packed, count * stride);
+			for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+			{
+				state_attribute_stream(index, 0, device.stream_buffer, 4, GL_FLOAT, GL_FALSE, FALSE,
+					(GLsizei)attribute_size, offset, index * count * attribute_size);
+			}
 		}
 	}
 #elif defined(HALO_GLES)
@@ -4763,13 +4821,30 @@ void WINAPI D3DDevice_End(void)
 		unsigned long index_count;
 		WORD *indices = quad_indices(NULL, count, &index_count);
 
-		glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
-			(const void *)index_upload(indices, index_count * sizeof(WORD)));
+		if (first_vertex)
+		{
+			/* (the indices from the first vertex on, past what 16 bits hold) */
+			GLuint *placed = indices ? malloc(index_count * sizeof(GLuint)) : NULL;
+
+			if (placed)
+			{
+				for (index = 0; index < index_count; index++)
+					placed[index] = (GLuint)(first_vertex + indices[index]);
+				glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_INT,
+					(const void *)index_upload(placed, index_count * sizeof(GLuint)));
+				free(placed);
+			}
+		}
+		else
+		{
+			glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
+				(const void *)index_upload(indices, index_count * sizeof(WORD)));
+		}
 		free(indices);
 	}
 	else
 	{
-		glDrawArrays(primitive_mode(type), 0, (GLsizei)count);
+		glDrawArrays(primitive_mode(type), (GLint)first_vertex, (GLsizei)count);
 	}
 	gl_check_errors("immediate draw");
 }
@@ -4789,6 +4864,8 @@ static void set_attribute(INT reg, float a, float b, float c, float d)
 	device.attributes[reg][1] = b;
 	device.attributes[reg][2] = c;
 	device.attributes[reg][3] = d;
+	if (device.immediate_active)
+		device.immediate_written |= 1UL << reg;
 	/* like the hardware, writing register 0 completes a vertex */
 	if (device.immediate_active && (emit || reg == 0))
 		immediate_emit();

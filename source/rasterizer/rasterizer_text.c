@@ -384,6 +384,10 @@ rasterizer_draw_character(
 	short dx,
 	short dy)
 {
+	/* port: the string's characters so far drawn before a character is
+	cached, which can give another's place in the cache to it */
+	if (font_character->hardware_character_index == NONE)
+		rasterizer_text_flush();
 	cache_hardware_format_character(font, font_character);
 
 	if (font_character->hardware_character_index != NONE)
@@ -689,6 +693,10 @@ rasterizer_draw_character_with_dropshadow(
 	short dx,
 	short dy)
 {
+	/* port: the string's characters so far drawn before a character is
+	cached, which can give another's place in the cache to it */
+	if (font_character->hardware_character_index == NONE)
+		rasterizer_text_flush();
 	cache_hardware_format_character(font, font_character);
 
 	if (font_character->hardware_character_index != NONE)

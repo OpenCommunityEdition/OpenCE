@@ -618,9 +618,9 @@ picks the weapon: the first whose tag name has it in it, as "sniper"), and `debu
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's
-game in the server browser, and `browse` joins the first game listed there,
-as the server browser does (port/web/tests/internet.mjs plays the native
-build and browsers so). `debug.network_latency` and
+game in the server browser, and `browse` joins the one listed there with the
+most players (not co-op, if it can), as the server browser does
+(port/web/tests/internet.mjs plays the native build and browsers so). `debug.network_latency` and
 `debug.network_loss` hold back what a machine receives and drop some of its
 datagrams, to test as over the internet. `debug.network_corrupt` damages
 that share of the datagrams a machine receives at random (bytes changed,

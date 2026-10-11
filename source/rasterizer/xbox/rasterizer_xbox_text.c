@@ -137,11 +137,54 @@ void rasterizer_set_pixel_shader(
 extern void *global_d3d_device;
 extern struct pixel_shader_definition pixel_shader;
 
+/* port: the characters of a string (rasterizer_text_begin to _end) drawn
+together, as a list of quads, instead of a draw each: each draw is a call
+into the browser on the web, and a scoreboard is hundreds of characters.
+The Xbox drew them from its push buffer later all the same. The batch is
+drawn when the string ends, when it is full, and before a glyph's place in
+a texture is given to another (rasterizer_text_flush). */
+#define TEXT_BATCH_MAXIMUM_CHARACTERS 256
+static struct rasterizer_text_vertex text_batch_vertices[TEXT_BATCH_MAXIMUM_CHARACTERS * 4];
+static short text_batch_character_count = 0;
+static boolean text_batch_open = FALSE;
+
+void text_hires_set_reset_hook(void (*hook)(void)); /* port: port/linux/src/text_hires.c */
+void rasterizer_text_flush(void);
+
 /* ---------- public code */
 
 void rasterizer_text_end(
 	void)
 {
+	/* port: (text_batch_vertices) */
+	rasterizer_text_flush();
+	text_batch_open = FALSE;
+
+	return;
+}
+
+/* port: draws the characters batched (text_batch_vertices) */
+void rasterizer_text_flush(
+	void)
+{
+	short vertex_count = text_batch_character_count * 4;
+	short vertex_index;
+
+	if (!vertex_count)
+		return;
+	text_batch_character_count = 0;
+	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_QUADLIST);
+	for (vertex_index = 0; vertex_index < vertex_count; vertex_index++)
+	{
+		IDirect3DDevice8_SetVertexDataColor(global_d3d_device, 9, text_batch_vertices[vertex_index].color);
+		IDirect3DDevice8_SetVertexData2f(global_d3d_device, 4,
+			text_batch_vertices[vertex_index].u, text_batch_vertices[vertex_index].v);
+		IDirect3DDevice8_SetVertexData2f(global_d3d_device, 0,
+			text_batch_vertices[vertex_index].x, text_batch_vertices[vertex_index].y);
+	}
+	if (IDirect3DDevice8_End(global_d3d_device) < 0)
+		error(2, "### ERROR rasterizer_text_flush failed");
+
 	return;
 }
 
@@ -390,6 +433,9 @@ maps_done:
 			0,
 			D3DTSS_ALPHAKILL,
 			0);
+		/* port: (text_batch_vertices) */
+		text_batch_open = TRUE;
+		text_hires_set_reset_hook(rasterizer_text_flush);
 	}
 
 	return;
@@ -409,6 +455,14 @@ void rasterizer_text_draw_character(
 	if (rasterizer_debug_options.draw_dynamic_screen_geometry &&
 		global_window_parameters.rasterizer_target == 0)
 	{
+		/* port: in a string, batched (text_batch_vertices) */
+		if (text_batch_open)
+		{
+			csmemcpy(&text_batch_vertices[text_batch_character_count * 4], vertices, 4 * sizeof(*vertices));
+			if (++text_batch_character_count == TEXT_BATCH_MAXIMUM_CHARACTERS)
+				rasterizer_text_flush();
+			return;
+		}
 		success = IDirect3DDevice8_Begin(
 			global_d3d_device,
 			D3DPT_TRIANGLEFAN) >= 0;

@@ -54,6 +54,9 @@ void text_hires_register_atlas(const unsigned long *texture, unsigned long width
 placeholder's, its rasterized glyphs uploaded; 0 otherwise */
 unsigned int text_hires_atlas_texture(unsigned long data);
 
+/* a function called before the atlas is emptied, which draws what has been
+batched from it (rasterizer_xbox_text.c's rasterizer_text_flush) */
+void text_hires_set_reset_hook(void (*hook)(void));
 /* d3d8_gl.c: the display's pixels for each of the 480 lines */
 float halo_screen_pixel_scale(void);
 
