@@ -1,3 +1,5 @@
+## Supported MCC Maps (updated 11-OCT-2026 @ 7:15PM)
+
 **Singleplayer Maps**
 
 - Assault (The M1 Map Pack): Loads
@@ -36,7 +38,7 @@
 - Substation (Inferno’s Ancient Mod Pack): Loads
 - Vertigo (Inferno’s Ancient Mod Pack): Loads
 
-**Unsupported Maps**
+## Unsupported MCC Maps (updated 11-OCT-2026 @ 7:15PM)
 
 - A10_Mirrored / A10_Mirrored_LC (Mirror of Autumn): MCC map error
 - BioHalo: MCC map error
