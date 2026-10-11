@@ -523,7 +523,7 @@ changes, so players with different settings play together.
 
 ## Ragdolls
 
-Video Setup's DEATH AND BLOOD screen sets how bodies fall when they die
+Video Setup > Graphics > PHYSICS sets how bodies fall when they die
 (`game.death_physics`). RAGDOLL makes each biped that dies a ragdoll,
 simulated with Jolt Physics (`port/third_party/JoltPhysics`) through
 `port/linux/physics/ragdoll_physics.cpp`; `port/linux/game/ragdoll.c` builds

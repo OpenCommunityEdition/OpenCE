@@ -41,7 +41,7 @@ frozen pose (the node matrices and the biped's ragdoll bit); a ragdoll whose
 body changed under it (a revert, a teleport) starts again from the body.
 
 Settings: config.toml's game.death_physics, "ragdoll" or "classic" (Video
-Settings' Death Physics), and the console's `ragdoll` command (`ragdoll`
+Setup > Graphics > Physics), and the console's `ragdoll` command (`ragdoll`
 alone lists the parameters; `ragdoll off`, `ragdoll on`, `ragdoll <name>
 <value>`).
 
@@ -676,7 +676,7 @@ static void ragdoll_parameters_initialize(
 	ragdoll_parameters_initialized = TRUE;
 }
 
-/* game.death_physics (Video Settings' Death Physics): "ragdoll" (or unset)
+/* game.death_physics (Video Setup > Graphics > Physics): "ragdoll" (or unset)
 or "classic", the game's own deaths; read again whenever a setting changes */
 static boolean ragdolls_enabled(
 	void)
@@ -3552,7 +3552,7 @@ long ragdoll_console_command(
 		return TRUE;
 	}
 
-	/* on and off: Video Settings' Death Physics (config.toml's
+	/* on and off: Video Setup > Graphics > Physics (config.toml's
 	game.death_physics), kept */
 	if (!strcmp(word, "on") || !strcmp(word, "off") || !strcmp(word, "1") || !strcmp(word, "0") ||
 		!strcmp(word, "true") || !strcmp(word, "false"))
