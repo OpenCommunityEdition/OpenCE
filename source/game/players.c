@@ -415,7 +415,7 @@ typedef char players_static_data_screen_flash_offset_assert[
 /* ---------- prototypes */
 
 static boolean players_respawn_network_coop(
-	void);
+	boolean first_spawn);
 static struct player_starting_location const *players_coop_spawn_location(
 	struct player_starting_location *location);
 static long is_player_in_trigger(
@@ -2413,7 +2413,7 @@ boolean players_respawn_coop(
 	/* port: network co-op checks safety around each teammate instead
 	(players_respawn_network_coop) */
 	if (game_connection() == _game_connection_network_server && network_coop_active())
-		return players_respawn_network_coop();
+		return players_respawn_network_coop(FALSE);
 
 	players_globals->respawn_failure = 0;
 	result = FALSE;
@@ -2740,12 +2740,14 @@ static short players_coop_near_count(
 /* who a network co-op respawn is placed beside. Fewer than
 COOP_MAJORITY_PLAYERS uses the host's teammate (players_coop_unit_where):
 a safe one, or after COOP_RESPAWN_FALLBACK_TICKS one on the ground. A larger
-game uses the largest group on the ground. The respawn is beside someone in
-that group who is safe to spawn next to. When that whole group is in a
-fight, it waits out COOP_RESPAWN_FALLBACK_TICKS and then uses the group
-anyway. A safe player outside the group does not win. A dead host has no
-unit, so the same count applies to them. NONE while the group is still
-unsafe, or while nobody is on the ground. */
+game uses the largest group of living teammates, jumping, riding, or
+standing where the BSP has no cluster (a beach) included. The respawn is
+beside someone in that group who is safe to spawn next to. When that whole
+group is in a fight, it waits out COOP_RESPAWN_FALLBACK_TICKS and then uses
+the group anyway, someone standing in the BSP if the group has one. A safe
+player outside the group does not win. A dead host has no unit, so the same
+count applies to them. NONE while the group is still unsafe, or while
+nobody is alive. */
 static long players_coop_respawn_unit(
 	void)
 {
@@ -2776,7 +2778,11 @@ static long players_coop_respawn_unit(
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL && count < NETWORK_GAME_MAXIMUM_PLAYER_COUNT)
 	{
-		if (player->unit_index == NONE || !players_coop_unit_grounded(player->unit_index))
+		/* every living teammate, not only one the BSP calls grounded: a
+		fight is people jumping, riding, or standing where the cluster is
+		none, and leaving them out made a lone safe player the whole group
+		or left nobody to fall back on */
+		if (player->unit_index == NONE)
 			continue;
 		unit_indices[count] = player->unit_index;
 		positions[count] = object_get(player->unit_index)->object.bounding_sphere_center;
@@ -2814,7 +2820,31 @@ static long players_coop_respawn_unit(
 	if (safe_index >= 0)
 		return unit_indices[safe_index];
 	if (game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
-		return unit_indices[anchor_index];
+	{
+		short fallback_index = anchor_index;
+		short fallback_count = 0;
+
+		/* someone standing in the BSP, even under fire, before a teammate
+		who is in the air or outside the BSP */
+		for (index = 0; index < count; index++)
+		{
+			short near_count;
+
+			if (distance_squared3d(&positions[anchor_index], &positions[index]) > radius_squared ||
+				!players_coop_unit_grounded(unit_indices[index]) ||
+				!players_coop_unit_spawnable(unit_indices[index]))
+			{
+				continue;
+			}
+			near_count = players_coop_near_count(positions, count, index, radius_squared);
+			if (near_count > fallback_count)
+			{
+				fallback_count = near_count;
+				fallback_index = index;
+			}
+		}
+		return unit_indices[fallback_index];
+	}
 
 	return NONE;
 }
@@ -2860,7 +2890,7 @@ map-wide (any projectile or enemy attack anywhere), which with many players
 spread out would almost never pass. Returns whether everyone waiting came
 back. */
 static boolean players_respawn_network_coop(
-	void)
+	boolean first_spawn)
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
@@ -2879,9 +2909,19 @@ static boolean players_respawn_network_coop(
 	data_iterator_new(&iterator, player_data);
 	while ((player = data_iterator_next(&iterator)) != NULL)
 	{
-		/* players still waiting for the level's first checkpoint spawn then */
-		if (player->unit_index != NONE || player->quit_out_of_game ||
-			players_coop_waiting_to_start(iterator.datum_index))
+		/* a first spawn is someone who has not died yet, past the opening.
+		a death is everyone else, and not someone still held for that opening */
+		if (player->unit_index != NONE || player->quit_out_of_game)
+			continue;
+		if (first_spawn)
+		{
+			if (player->statistics.deaths != 0 || cinematic_in_progress() ||
+				game_time_get() < COOP_LEVEL_START_TICKS)
+			{
+				continue;
+			}
+		}
+		else if (players_coop_waiting_to_start(iterator.datum_index))
 		{
 			continue;
 		}
@@ -4758,13 +4798,21 @@ void players_update_before_game(
 						/* port: in network co-op the first player spawns at the map's
 						start; everyone else, late joiners included, spawns beside a
 						player already in the game once nothing holds them back
-						(players_coop_may_spawn) */
+						(players_coop_may_spawn). A large game whose teammates are
+						not spawnable (a fight, or standing where the BSP has no
+						cluster) waits out COOP_RESPAWN_FALLBACK_TICKS and then
+						uses that group, the same rule as a death */
 						if (game_connection() != _game_connection_network_server)
 							player_spawn(iterator.datum_index);
 						else if (players_coop_may_spawn())
 						{
 							player_spawn(iterator.datum_index);
 							player_place_beside_teammate(iterator.datum_index);
+						}
+						else if (players_coop_use_majority() && !cinematic_in_progress() &&
+							players_checkpoint.valid)
+						{
+							players_respawn_network_coop(TRUE);
 						}
 					}
 					else if (!players_globals->all_dead)
