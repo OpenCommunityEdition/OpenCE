@@ -221,7 +221,12 @@ static void lock_level(const DWORD *resource, unsigned long face, unsigned long 
 	pitch = xgpu_texture_level_pitch(&description, level);
 	bits = (char *)resource_data(resource[1]);
 	if (bits)
+	{
 		bits += face * xgpu_texture_face_size(&description) + xgpu_texture_level_offset(&description, level);
+		/* (the level, which the game locks to write) */
+		memory_watch_prepare_write(bits, pitch * (description.compressed ?
+			(level_dimension(description.height, level) + 3) / 4 : level_dimension(description.height, level)));
+	}
 	if (rectangle && bits)
 	{
 		/* swizzled textures cannot be addressed by rectangle; only linear
@@ -264,7 +269,10 @@ void WINAPI D3DVolumeTexture_LockBox(D3DVolumeTexture *texture, UINT level, D3DL
 	slice = row_pitch * level_dimension(description.height, level);
 	bits = (char *)resource_data(resource[1]);
 	if (bits)
+	{
 		bits += xgpu_texture_level_offset(&description, level);
+		memory_watch_prepare_write(bits, slice * level_dimension(description.depth, level));
+	}
 	if (box && bits)
 		bits += box->Front * slice + box->Top * row_pitch + box->Left * (row_pitch / level_dimension(description.width, level));
 	locked->RowPitch = (INT)row_pitch;
@@ -355,9 +363,12 @@ HRESULT WINAPI D3DDevice_CreateVertexBuffer(UINT length, DWORD usage, DWORD fvf,
 
 void WINAPI D3DVertexBuffer_Lock(D3DVertexBuffer *buffer, UINT offset, UINT size, BYTE **data, DWORD flags)
 {
-	(void)size;
+	/* (whatever the flags say: the decals' vertices are written under
+	D3DLOCK_READONLY) */
 	(void)flags;
 	*data = buffer->Data ? (BYTE *)resource_data(buffer->Data) + offset : NULL;
+	if (*data)
+		memory_watch_prepare_write(*data, size);
 }
 
 HRESULT WINAPI D3DDevice_CreateIndexBuffer(UINT length, DWORD usage, D3DFORMAT format, D3DPOOL pool, D3DIndexBuffer **result)
@@ -421,6 +432,8 @@ void WINAPI D3DPalette_Lock(D3DPalette *palette, D3DCOLOR **colors, DWORD flags)
 {
 	(void)flags;
 	*colors = (D3DCOLOR *)resource_data(palette->Data);
+	if (*colors)
+		memory_watch_prepare_write(*colors, 256 * sizeof(D3DCOLOR));
 }
 
 /* ---------- D3DX */

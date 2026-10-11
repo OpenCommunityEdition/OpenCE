@@ -19,11 +19,12 @@ def test_plasma_first_person_displacement(tmp_path, control):
     text = (ROOT / "source/rasterizer/xbox/rasterizer_xbox_plasma_energy.c").read_text()
     draw = function(text, "rasterizer_plasma_energy_draw")
     if control == "no-limit":
-        draw = draw.replace("offset_amount > 0.0075f", "offset_amount > 1.0f")
+        draw = draw.replace("offset_amount > PLASMA_FIRST_PERSON_MAXIMUM_OFFSET", "offset_amount > 1.0f")
     elif control == "world-limit":
-        draw = draw.replace("group->geometry_flags & (1UL << 7)", "1")
+        draw = draw.replace("TEST_FLAG(group->geometry_flags, PLASMA_GEOMETRY_FIRST_PERSON_BIT)", "1")
     elif control == "overwrite-small":
-        draw = draw.replace("offset_amount > 0.0075f", "1")
+        draw = draw.replace("offset_amount > PLASMA_FIRST_PERSON_MAXIMUM_OFFSET", "1")
+    constants = "\n".join(re.findall(r"^#define PLASMA_[^\n]+", text, re.M))
     types = "\n".join(structure(text, n) for n in [
         "plasma_runtime_parameters", "rasterizer_transparent_geometry_group_plasma",
         "shader_transparent_plasma_definition"])
@@ -42,7 +43,10 @@ struct transparent_geometry_group;
 #define TRUE 1
 #define match_assert(a,b,c) ((void)0)
 #define csmemset memset
-''' + types + "\n" + defines + r'''
+#define TEST_FLAG(value,bit) ((value) & (1UL << (bit)))
+static int shield_visible=1;
+static int viewmodel_shield_is_visible(void){return shield_visible;}
+''' + constants + "\n" + types + "\n" + defines + r'''
 static int global_d3d_device=1;
 static struct {real game_time_sec;} global_frame_parameters={2};
 static struct {int plasma_energy_enabled;} rasterizer_debug_options={1};
@@ -95,8 +99,10 @@ int main(void){
     values[1]=1;rasterizer_plasma_energy_draw(&group);CHECK(near(captured_offset,.0075f));
     values[1]=0;rasterizer_plasma_energy_draw(&group);CHECK(captured_offset==0&&captured_intensity==0);
     group.runtime_parameters=NULL;rasterizer_plasma_energy_draw(&group);CHECK(captured_offset==0);
-    CHECK(draws==21);
-    rasterizer_debug_options.plasma_energy_enabled=0;rasterizer_plasma_energy_draw(&group);CHECK(draws==21);
+    group.runtime_parameters=&runtime;values[1]=1;shield_visible=0;
+    rasterizer_plasma_energy_draw(&group);CHECK(near(captured_offset,.03f));
+    CHECK(draws==22);
+    rasterizer_debug_options.plasma_energy_enabled=0;rasterizer_plasma_energy_draw(&group);CHECK(draws==22);
     return 0;
 }
 '''

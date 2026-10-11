@@ -326,6 +326,75 @@ static void structure_render_dynamic_triangles_from_bitvector(
 	return;
 }
 
+/* port: the surface indices in ascending order, as qsort_4byte with
+compare_surface_indices puts them, sorted by their bytes (a radix sort)
+instead of by comparisons through a function: the sort took a twentieth of
+the web build's frame */
+static void structure_render_sort_surface_indices(
+	long *surface_indices,
+	long surface_count)
+{
+	static long *scratch = NULL;
+	static long scratch_count = 0;
+	unsigned long counts[256];
+	unsigned long maximum = 0;
+	long *source = surface_indices;
+	long *destination;
+	long index;
+	short shift;
+
+	for (index = 0; index < surface_count; index++)
+	{
+		if (surface_indices[index] < 0)
+			break;
+		if ((unsigned long)surface_indices[index] > maximum)
+			maximum = (unsigned long)surface_indices[index];
+	}
+	if (index < surface_count || surface_count <= 32)
+	{
+		qsort_4byte(surface_indices, surface_count, compare_surface_indices);
+		return;
+	}
+	if (scratch_count < surface_count)
+	{
+		long *grown = (long *)realloc(scratch, surface_count * sizeof(long));
+
+		if (!grown)
+		{
+			qsort_4byte(surface_indices, surface_count, compare_surface_indices);
+			return;
+		}
+		scratch = grown;
+		scratch_count = surface_count;
+	}
+	destination = scratch;
+	for (shift = 0; shift < 32 && (maximum >> shift); shift += 8)
+	{
+		unsigned long total = 0;
+		long *swap;
+
+		memset(counts, 0, sizeof(counts));
+		for (index = 0; index < surface_count; index++)
+			counts[((unsigned long)source[index] >> shift) & 0xff]++;
+		for (index = 0; index < 256; index++)
+		{
+			unsigned long bucket = counts[index];
+
+			counts[index] = total;
+			total += bucket;
+		}
+		for (index = 0; index < surface_count; index++)
+			destination[counts[((unsigned long)source[index] >> shift) & 0xff]++] = source[index];
+		swap = source;
+		source = destination;
+		destination = swap;
+	}
+	if (source != surface_indices)
+		memcpy(surface_indices, source, surface_count * sizeof(long));
+
+	return;
+}
+
 static void structure_render_dynamic_triangles_from_indices(
 	long surface_count,
 	long *surface_indices,
@@ -334,7 +403,7 @@ static void structure_render_dynamic_triangles_from_indices(
 	struct structure_bsp *structure_bsp = global_structure_bsp_get();
 	long surface_index_index;
 
-	qsort_4byte(surface_indices, surface_count, compare_surface_indices);
+	structure_render_sort_surface_indices(surface_indices, surface_count); /* port: (not qsort_4byte) */
 
 	for (surface_index_index = 0;
 		surface_index_index < surface_count;
