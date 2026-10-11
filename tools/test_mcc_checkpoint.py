@@ -110,7 +110,7 @@ int main(int argc,char **argv) {
     struct game_state_header *header=(void *)live,*incoming=(void *)saved;
     if(argc!=2)return 2;
     memset(live,0xA5,sizeof(live));
-    memset(header,0,sizeof(*header));strcpy(header->map_name,"mcc_maps\\a10");
+    memset(header,0,sizeof(*header));strcpy(header->map_name,"mcc_maps\\one\\a10");
     header->cache_file_checksum=0x12345678;
     object_header_data=(void *)(live+512);
     memset(object_header_data,0,sizeof(*object_header_data));
@@ -176,7 +176,7 @@ int main(int argc,char **argv) {
             else if(!strcmp(argv[1],"footer"))f[0]^=1;
             else if(!strcmp(argv[1],"version"))f[4]=3;
             else if(!strcmp(argv[1],"reserved"))f[88]=1;
-            else if(!strcmp(argv[1],"name"))strcpy(incoming->map_name,"mcc_maps\\other");
+            else if(!strcmp(argv[1],"name"))strcpy(incoming->map_name,"mcc_maps\\two\\a10");
             else if(!strcmp(argv[1],"checksum"))incoming->cache_file_checksum++;
             else if(!strcmp(argv[1],"highwater"))game_state_globals.cpu_allocation_size=GAME_STATE_CPU_SIZE-1;
             else if(!strcmp(argv[1],"native")){game_state_allocation_count=1;native_valid=0;}

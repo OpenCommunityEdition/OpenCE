@@ -9,6 +9,7 @@
 #include "mcc_maps.h"
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
+#include "mcc_package.h"
 #include "mcc_tag_validate.h"
 #include "mcc_checkpoint.h"
 #include "mcc_grenades.h"
@@ -53,20 +54,7 @@ boolean mcc_level_name(char const *name)
 
 static int mcc_path(char const *name, char path[128])
 {
-    size_t n, i;
-    char const *stem;
-    if (!mcc_prefix(name)) return FALSE;
-    stem = name + sizeof(MCC_MAPS_LEVEL_PREFIX) - 1;
-    n = strlen(stem);
-    if (!n || n > 63 - (sizeof(MCC_MAPS_LEVEL_PREFIX) - 1) ||
-        stem[n - 1] == '.' || stem[n - 1] == ' ')
-        return FALSE;
-    for (i = 0; i < n; ++i) {
-        unsigned char c = (unsigned char)stem[i];
-        if (c < 32 || strchr("/\\:*?\"<>|", c)) return FALSE;
-    }
-    snprintf(path, 128, "%s%s.map", MCC_MAPS_DIRECTORY, stem);
-    return TRUE;
+    return mcc_package_map_path(name, path);
 }
 
 /* Checkpoints store the scenario tag's name, not the menu's level name.
@@ -74,13 +62,15 @@ static int mcc_path(char const *name, char path[128])
  * the same file even when its internal scenario path names a stock level. */
 static int mcc_scenario_identity(struct mcc_runtime *runtime, char const *name)
 {
-    char checked_path[128];
+    char checked_path[128], canonical[64];
     char *identity;
     uint32_t address, index;
     size_t length;
-    if (!runtime || !runtime->tag_index || !mcc_path(name, checked_path)) return FALSE;
+    if (!runtime || !runtime->tag_index || !mcc_path(name, checked_path) ||
+        !mcc_package_name(name, canonical)) return FALSE;
     index = runtime->report.scenario_handle & 0xFFFFu;
     if (index >= runtime->report.tag_count) return FALSE;
+    name = canonical;
     length = strlen(name + sizeof(MCC_MAPS_LEVEL_PREFIX) - 1);
     identity = mcc_runtime_allocate(runtime, (uint32_t)(sizeof(MCC_MAPS_LEVEL_PREFIX) + length));
     if (!identity) return FALSE;
@@ -136,9 +126,10 @@ unsigned long mcc_cache_checksum(char const *name)
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
     FILE *stream = mcc_open(name, &source, &identity);
+    uint32_t checksum;
     if (!stream) return 0;
     fclose(stream);
-    return identity.checksum;
+    return mcc_package_checksum(name, identity.checksum, &checksum) ? checksum : 0;
 }
 
 boolean mcc_cache_present(char const *name, unsigned long checksum, char *message, long size)
@@ -146,13 +137,18 @@ boolean mcc_cache_present(char const *name, unsigned long checksum, char *messag
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
     FILE *stream = mcc_open(name, &source, &identity);
+    uint32_t actual;
     if (!stream) {
         snprintf(message, (size_t)size, "The MCC map %.63s is missing or is not a valid version-13 cache. Copy its .map file into mcc_maps.", name ? name : "");
         return FALSE;
     }
     fclose(stream);
-    if (checksum && identity.checksum != checksum) {
-        snprintf(message, (size_t)size, "The MCC map %.63s differs from the host's copy. Put the same version in mcc_maps.", name);
+    if (!mcc_package_checksum(name, identity.checksum, &actual)) {
+        snprintf(message, (size_t)size, "The MCC package resources for %.63s could not be read.", name);
+        return FALSE;
+    }
+    if (checksum && actual != checksum) {
+        snprintf(message, (size_t)size, "The MCC map %.63s or its package resources differ from the host. Install the same complete package.", name);
         return FALSE;
     }
     return TRUE;
@@ -238,10 +234,12 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
     struct mcc_cache_identity identity;
     unsigned char *raw = NULL;
     enum mcc_cache_status status;
+    uint32_t package_checksum;
     char const *problem = "the map could not be opened";
     mcc_cache_tags_unload();
     mcc_stream = mcc_open(name, &runtime->source, &identity);
     if (!mcc_stream) goto failed;
+    if (!mcc_package_name(name, runtime->level_name)) goto failed;
     /* The virtual streams are disjoint from the on-disk file. */
     problem = "the file overlaps the MCC virtual resource range";
     if (identity.file_length >= 0x50000000u) goto failed;
@@ -278,6 +276,10 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
         problem = "the map header could not be read";
         goto failed;
     }
+    problem = "the MCC package resources could not be fingerprinted";
+    if (!mcc_package_checksum(name, identity.checksum, &package_checksum)) goto failed;
+    /* The cache header checksum feeds native save validation as well as the lobby. */
+    memcpy((unsigned char *)header + 0x64, &package_checksum, 4);
     mcc_loaded = TRUE;
     mcc_campaign_begin();
     error(_error_silent, "mcc: loaded %s (%lu tags, %lu bytes of runtime tags)", name,

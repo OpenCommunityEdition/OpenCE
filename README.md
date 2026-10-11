@@ -24,7 +24,9 @@ Halo 1 MCC custom maps use the separate `mcc_maps` directory and the
 the appropriate category automatically. This experimental adapter targets
 modern version-13 maps. Maps may contain their own resources or require
 matching MCC `sounds.map` and `bitmaps.map` files alongside the levels in
-`mcc_maps`; Custom Edition resource files are not substitutes.
+`mcc_maps`. Use separate package folders such as `mcc_maps/solar_flare/`
+for levels with their own resources; maps in those folders appear in the
+same MCC menu lists. Custom Edition resource files are not substitutes.
 See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
 validation results and remaining compatibility limits.
 

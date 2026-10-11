@@ -11,6 +11,7 @@ list, loader, resource directory or display index is used here.
 #include "errors.h"
 #include "mcc_cache_format.h"
 #include "mcc_maps.h"
+#include "mcc_package.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,7 +26,7 @@ struct mcc_menu_map
 {
 	char file_name[MCC_MAP_FILENAME_MAXIMUM + 1];
 	char level_name[64];
-	wchar_t name[MCC_MAP_FILENAME_MAXIMUM + 1];
+	wchar_t name[64];
 	wchar_t description[MCC_MAP_DESCRIPTION_MAXIMUM + 1];
 	boolean campaign;
 };
@@ -90,7 +91,8 @@ static void mcc_map_description_read(struct mcc_menu_map *map)
 
 static void mcc_map_register(char const *name)
 {
-	char path[128];
+	char path[128], candidate[128], canonical[64];
+	char const *display;
 	unsigned char header[MCC_CACHE_HEADER_BYTES];
 	struct mcc_cache_identity identity;
 	struct mcc_menu_map *map;
@@ -99,16 +101,11 @@ static void mcc_map_register(char const *name)
 	size_t name_length = strlen(name), index;
 	boolean start_word = TRUE;
 
-	if (!name_length || name_length > MCC_MAP_FILENAME_MAXIMUM || mcc_menu_catalog.count == MCC_MAPS_MAXIMUM ||
-		name[name_length - 1] == '.' || name[name_length - 1] == ' ')
-		return;
-	for (index = 0; index < name_length; index++)
-	{
-		unsigned char character = (unsigned char)name[index];
-
-		if (character < 32 || strchr("/\\:*?\"<>|", character))
-			return;
-	}
+	if (!name_length || name_length > MCC_MAP_FILENAME_MAXIMUM || mcc_menu_catalog.count == MCC_MAPS_MAXIMUM)
+        return;
+    snprintf(candidate, sizeof(candidate), "%s%s", MCC_MAPS_LEVEL_PREFIX, name);
+    if (!mcc_package_name(candidate, canonical)) return;
+    name = canonical + sizeof(MCC_MAPS_LEVEL_PREFIX) - 1;
 	for (index = 0; index < (size_t)mcc_menu_catalog.count; index++)
 	{
 		if (!csstrcasecmp(mcc_menu_catalog.maps[index].file_name, name))
@@ -132,9 +129,11 @@ static void mcc_map_register(char const *name)
 	memcpy(map->file_name, name, name_length + 1);
 	snprintf(map->level_name, sizeof(map->level_name), "%s%s", MCC_MAPS_LEVEL_PREFIX, name);
 	map->campaign = identity.scenario_type == 0;
-	for (index = 0; index < name_length; index++)
+	display = strrchr(name, '\\');
+	display = display ? display + 1 : name;
+	for (index = 0; display[index]; index++)
 	{
-		unsigned char character = (unsigned char)name[index];
+		unsigned char character = (unsigned char)display[index];
 
 		if (character == '_')
 			character = ' ';
@@ -152,38 +151,67 @@ static int mcc_map_order(void const *left, void const *right)
 		((struct mcc_menu_map const *)right)->file_name);
 }
 
+/* Exactly one package level; directory entries never become arbitrary paths. */
+static void mcc_maps_scan_directory(char const *package)
+{
+    WIN32_FIND_DATAA data;
+    HANDLE find;
+    char pattern[128];
+    snprintf(pattern,sizeof(pattern),"%s%s%s*.*",MCC_MAPS_DIRECTORY,package,package[0] ? "\\" : "");
+    find=FindFirstFileA(pattern,&data);
+    if (find==INVALID_HANDLE_VALUE) return;
+    do {
+        char name[sizeof(data.cFileName)+1], relative[128], candidate[128], canonical[64];
+        char *extension;
+        size_t length;
+        memcpy(name,data.cFileName,sizeof(data.cFileName));
+        name[sizeof(data.cFileName)]=0;
+        length=strlen(name);
+        if (!length || strpbrk(name,"/\\") || length>58) continue;
+        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (package[0]) continue;
+            snprintf(candidate,sizeof(candidate),"%s%s\\x",MCC_MAPS_LEVEL_PREFIX,name);
+            if (mcc_package_name(candidate,canonical)) mcc_maps_scan_directory(name);
+            continue;
+        }
+        extension=strrchr(name,'.');
+        if (!extension || csstrcasecmp(extension+1,"map")) continue;
+        *extension=0;
+        if (!csstrcasecmp(name,"sounds") || !csstrcasecmp(name,"bitmaps") || !csstrcasecmp(name,"loc")) continue;
+        snprintf(relative,sizeof(relative),"%s%s%s",package,package[0] ? "\\" : "",name);
+        mcc_map_register(relative);
+    } while (FindNextFileA(find,&data));
+    CloseHandle(find);
+}
+
 static void mcc_maps_scan(void)
 {
-	WIN32_FIND_DATAA data;
-	HANDLE find;
-
-	if (mcc_menu_catalog.scanned)
-		return;
-	mcc_menu_catalog.scanned = TRUE;
-	mcc_menu_catalog.count = 0;
-	/* Keep this listing independent of the game's shared file iterator:
-	startup profile cleanup can use that iterator on another thread. */
-	find = FindFirstFileA(MCC_MAPS_DIRECTORY "*.*", &data);
-	if (find == INVALID_HANDLE_VALUE)
-		return;
-	do
-	{
-		char name[sizeof(data.cFileName) + 1];
-		char *extension;
-
-		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-			continue;
-		memcpy(name, data.cFileName, sizeof(data.cFileName));
-		name[sizeof(data.cFileName)] = 0;
-		extension = strrchr(name, '.');
-		if (!extension || csstrcasecmp(extension + 1, "map"))
-			continue;
-		*extension = 0;
-		mcc_map_register(name);
-	} while (FindNextFileA(find, &data));
-	CloseHandle(find);
-	qsort(mcc_menu_catalog.maps, (size_t)mcc_menu_catalog.count, sizeof(mcc_menu_catalog.maps[0]), mcc_map_order);
-	error(_error_silent, "mcc maps: %d maps found in mcc_maps", mcc_menu_catalog.count);
+    short i,j;
+    if (mcc_menu_catalog.scanned) return;
+    mcc_menu_catalog.scanned=TRUE;
+    mcc_menu_catalog.count=0;
+    mcc_maps_scan_directory("");
+    qsort(mcc_menu_catalog.maps,(size_t)mcc_menu_catalog.count,sizeof(mcc_menu_catalog.maps[0]),mcc_map_order);
+    /* Keep familiar labels unless another package uses the same basename. */
+    for (i=0;i<mcc_menu_catalog.count;i++) {
+        struct mcc_menu_map *map=&mcc_menu_catalog.maps[i];
+        char const *base=strrchr(map->file_name,'\\');
+        base=base ? base+1 : map->file_name;
+        for (j=0;j<mcc_menu_catalog.count;j++) {
+            char const *other=strrchr(mcc_menu_catalog.maps[j].file_name,'\\');
+            size_t n,k;
+            other=other ? other+1 : mcc_menu_catalog.maps[j].file_name;
+            if (i==j || csstrcasecmp(base,other)) continue;
+            if (base!=map->file_name) {
+                for (n=0;map->name[n];n++) {}
+                map->name[n++]=' ';map->name[n++]='[';
+                for (k=0;k<(size_t)(base-map->file_name-1);k++) map->name[n++]=(unsigned char)map->file_name[k];
+                map->name[n++]=']';map->name[n]=0;
+            }
+            break;
+        }
+    }
+    error(_error_silent,"mcc maps: %d maps found in mcc_maps and its packages",mcc_menu_catalog.count);
 }
 
 void mcc_maps_rescan(void)
@@ -250,13 +278,14 @@ short mcc_maps_type_index(short row, boolean campaign)
 short mcc_maps_find(char const *level_name)
 {
 	short index;
+    char canonical[64];
 
-	if (!level_name || _strnicmp(level_name, MCC_MAPS_LEVEL_PREFIX, sizeof(MCC_MAPS_LEVEL_PREFIX) - 1))
+	if (!mcc_package_name(level_name, canonical))
 		return NONE;
 	mcc_maps_scan();
 	for (index = 0; index < mcc_menu_catalog.count; index++)
 	{
-		if (!csstrcasecmp(level_name, mcc_menu_catalog.maps[index].level_name))
+		if (!csstrcasecmp(canonical, mcc_menu_catalog.maps[index].level_name))
 			return index;
 	}
 	return NONE;

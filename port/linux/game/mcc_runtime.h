@@ -7,6 +7,7 @@
 struct bitmap_data;
 
 struct mcc_runtime {
+    char level_name[64]; /* Canonical MCC package/map, retained through conversion. */
     unsigned char *tags;
     unsigned char *tag_index;
     uint32_t used;

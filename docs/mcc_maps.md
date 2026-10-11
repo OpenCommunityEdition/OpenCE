@@ -26,17 +26,33 @@ an example: its filename is `a10.map`, while its header names
 `mercury_falling`. The namespaces prevent it replacing either Xbox `a10`
 or Custom Edition `custom_maps\a10`.
 
-Some campaigns, including the supplied Combat Revolved package, keep their
-audio and textures in separate resource files. Install the matching files
-in `mcc_maps` alongside the levels. A filename alone does not establish a
-match: the loader verifies each resource's indexed name and byte range.
-It never searches `maps` or `custom_maps` for replacements. Packages that
-require different resource files must use separate game-data installations.
+Some campaigns keep audio and textures in separate resource files. Install
+one package per immediate subdirectory; its levels use only the resources
+in that directory, with no fallback to root resources or another package:
+
+```text
+mcc_maps/solar_flare/m0.map
+mcc_maps/solar_flare/m1.map
+mcc_maps/solar_flare/sounds.map
+mcc_maps/solar_flare/bitmaps.map
+mcc_maps/combat_revolved/a10.map
+mcc_maps/combat_revolved/sounds.map
+mcc_maps/combat_revolved/bitmaps.map
+```
+
+The package's resource files are optional for self-contained levels. Missing
+required resources report the expected path in `debug.txt`. Existing loose
+levels keep using root-level resource files. Nothing searches `maps` or
+`custom_maps`. A package level's identity is `mcc_maps\solar_flare\m0`;
+the folder name must be the same on every player's installation. The menu
+still lists individual levels in the same two categories, adding `[package]`
+only when level basenames collide. Optional `.txt` descriptions remain beside
+the corresponding level. No manifest or folder-navigation menu is required.
 
 Open the map-kind chooser and select **MCC SINGLEPLAYER** for campaign
 maps or **MCC MULTIPLAYER** for multiplayer maps. The cache header's scenario
 type determines the category, independently of the filename; both lists
-read the same `mcc_maps` folder. New Game's campaign maps proceed to difficulty
+read `mcc_maps` and its immediate package folders. New Game's campaign maps proceed to difficulty
 selection, and multiplayer maps can be explored alone. The network host
 map screen routes campaign maps to cooperative setup and multiplayer maps
 to gametypes. Split-screen multiplayer skips **MCC SINGLEPLAYER**, just as
@@ -47,21 +63,31 @@ Each selected MCC campaign map is treated as an independent scenario.
 Automatic progression through a package's campaign map sequence is not
 implemented; the MCC package manifest is not interpreted.
 
-MCC checkpoints retain the canonical `mcc_maps\<filename>` scenario
+MCC checkpoints retain the canonical `mcc_maps\[package\]<filename>` scenario
 identity, including when the original tag names an Xbox campaign level.
 Continue and Load Game have MCC-specific routes with separate saved-name
 storage; they do not turn an MCC checkpoint into a stock campaign level.
 
-The catalog scans only `mcc_maps`, reads each candidate's 2,048-byte header,
+The catalog scans only `mcc_maps` and one package directory level, reads each candidate's 2,048-byte header,
 and refreshes when a map menu opens. It accepts at most 1,024 entries, with
-filenames of at most 54 characters before `.map`. A description is optional;
+relative level paths of at most 54 characters before `.map`, including the
+package name and separator. Deeper nesting, traversal and invalid names are
+rejected. Moving an existing loose map into a package changes its saved-game
+identity; keep it at its old location to continue an existing checkpoint. A description is optional;
 the default identifies the scenario type. MCC thumbnail sidecars, Workshop
 downloads and MCC package manifests are not implemented. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing
 stage in `debug.txt` and returns a menu error. Matching the header checksum
-can detect that a network host selected a different map version; it is not
+can detect that a network host selected a different map version. For packaged
+levels, the fingerprint also streams every byte of any sibling `sounds.map`
+and `bitmaps.map`, distinguishing absent and empty files. Both resources are
+included even if a particular level does not use them. This adds disk I/O at
+load/admission, not per frame. Package checkpoints use the same fingerprint;
+changing resources invalidates them. Loose levels retain their previous
+checksum behavior for compatibility. CRC32 is an accidental mismatch check, not
+security authentication; the level header checksum is still not
 a recomputation or authentication of the map's contents. Network support
 uses GulchCE's game protocol, not the MCC game client or its matchmaking.
 
@@ -139,6 +165,7 @@ are not an MCC implementation dependency. The independent components are:
 
 | Component | Responsibility |
 | --- | --- |
+| `port/linux/game/mcc_package.c` | Validated package paths and resource-content fingerprints. |
 | `port/linux/game/mcc_maps.c` | Catalog, display identities, names and descriptions. |
 | `port/linux/game/mcc_cache_format.c` | Portable little-endian version-13 reader and file-range audit. |
 | `port/linux/game/mcc_cache.c` | MCC path admission, read-only file lifetime, conversion and streaming dispatch. |
