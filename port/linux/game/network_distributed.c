@@ -4131,7 +4131,7 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_coop_death:
 		network_killfeed_handle_message(entries, (word)(size - sizeof(header)),
-			header.count, distributed_handling_stream_message);
+			header.count, !network_connection_last_read_was_unreliable());
 		break;
 	case _distributed_message_coop_events:
 		network_coop_handle_events(entries, header.count);

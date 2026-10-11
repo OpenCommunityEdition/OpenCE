@@ -70,6 +70,9 @@ static void usnprintf(wchar_t *out,unsigned n,wchar_t const *format,...){
 static wchar_t hud_text[63];
 static void hud_print_message(short local,wchar_t const *s){CHECK(local==0,"wrong HUD recipient");wcsncpy(hud_text,s,63);snprintf(shown_text,sizeof(shown_text),"%ls",s);shown++;}
 #include "under_test.inc"
+static boolean unreliable,distributed_handling_stream_message;
+static boolean network_connection_last_read_was_unreliable(void){return unreliable;}
+#include "dispatch.inc"
 static void setup(void){
  for(int i=0;i<128;i++)handles[i]=NONE;for(int i=0;i<20;i++)unit_handles[i]=NONE;
  memset(players,0,sizeof(players));memset(units,0,sizeof(units));
@@ -145,8 +148,8 @@ int main(int argc,char **argv){CHECK(argc==2,"case");char const *case_name=argv[
   role=1;
   for(unsigned n=0;n<sizeof(m->text)+3;n++)if(n!=sizeof(m->text))network_killfeed_handle_message(m->text,n,1,TRUE);
   network_killfeed_handle_message(m->text,sizeof(m->text),0,TRUE);network_killfeed_handle_message(m->text,sizeof(m->text),2,TRUE);CHECK(shown==1,"malformed payload accepted");
-  network_killfeed_handle_message(m->text,sizeof(m->text),1,TRUE);CHECK(shown==2,"client HUD missing");
-  network_killfeed_handle_message(m->text,sizeof(m->text),1,FALSE);CHECK(shown==2,"unreliable message accepted");
+  dispatch(m->text,wire_size,1);CHECK(shown==2,"client HUD missing");
+  unreliable=TRUE;dispatch(m->text,wire_size,1);CHECK(shown==2,"unreliable message accepted");unreliable=FALSE;
   role=2;network_killfeed_handle_message(m->text,sizeof(m->text),1,TRUE);CHECK(shown==2,"client forged host message");
   role=1;coop=FALSE;network_killfeed_handle_message(m->text,sizeof(m->text),1,TRUE);CHECK(shown==2,"competitive feed changed");
   coop=TRUE;for(unsigned i=0;i<63;i++)m->text[i]='|';network_killfeed_handle_message(m->text,sizeof(m->text),1,TRUE);CHECK(wcslen(hud_text)==62&&hud_text[0]=='?',"untrusted text not bounded");
