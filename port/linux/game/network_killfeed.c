@@ -147,10 +147,10 @@ void network_killfeed_note_death(long unit_index, struct damage_data const *dama
     dead = player_try_and_get(dead_index);
     if (!killfeed_present(dead) || dead->unit_index != unit_index) return;
     killfeed_dead_units[slot] = unit_index;
+    if (TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_silent_bit) ||
+        TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_no_statistics_bit)) return;
     if (!damage)
     {
-        if (TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_silent_bit) ||
-            TEST_FLAG(unit->object.damage_flags, _object_die_act_of_god_no_statistics_bit)) return;
         killfeed_player_name(dead, name);
         usnprintf(line, NUMBEROF(line), L"%s %s", name,
             TEST_FLAG(unit->object.flags, _object_outside_of_map_bit) ? L"fell out of the world" : L"died");

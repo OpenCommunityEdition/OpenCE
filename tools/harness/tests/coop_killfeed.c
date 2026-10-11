@@ -114,7 +114,7 @@ int main(int argc,char **argv){CHECK(argc==2,"case");char const *case_name=argv[
   network_killfeed_note_death(unit_handles[1],NULL);CHECK(sent==1,"duplicate direct death");
   network_killfeed_reset();network_killfeed_note_death(unit_handles[1],&d);network_killfeed_note_death(unit_handles[1],NULL);CHECK(sent==2,"damage and direct duplicate");
   network_killfeed_reset();d.flags=FLAG(_damage_no_statistics_bit);network_killfeed_note_death(unit_handles[1],&d);network_killfeed_note_death(unit_handles[1],NULL);CHECK(sent==2,"no-statistics death announced by fallback");
-  for(int bit=_object_die_act_of_god_silent_bit;bit<=_object_die_act_of_god_no_statistics_bit;bit++){network_killfeed_reset();units[1].object.damage_flags=FLAG(bit);network_killfeed_note_death(unit_handles[1],NULL);CHECK(sent==2,"silent script death announced");}
+  for(int bit=_object_die_act_of_god_silent_bit;bit<=_object_die_act_of_god_no_statistics_bit;bit++){network_killfeed_reset();units[1].object.damage_flags=FLAG(bit);d.flags=0;network_killfeed_note_death(unit_handles[1],&d);network_killfeed_note_death(unit_handles[1],NULL);CHECK(sent==2,"silent script death announced");}
  }
  else CASE("fallback") {
   d.definition_index=NONE;d.owner_object_index=NONE;players[1].name[1]='|';players[1].name[2]='\n';network_killfeed_note_death(unit_handles[1],&d);CHECK(!strcmp(shown_text,"Q??xote died"),"unsafe/unknown text");
