@@ -74,7 +74,7 @@ The game can play system link games on a local network and on the internet:
 
 [docs/supported_mcc_maps.md](docs/supported_mcc_maps.md) contains two separate lists regarding the experimental MCC map support for GulchCE, a fork of OpenCE; one for singleplayer maps, and another for multiplayer maps. Any maps that may have vague filenames will include either the associated workshop addon name or its associated set of maps (Ex: Digsite) in parentheses.
 
-QUICK DISCLAIMER: Not all maps have been tested equally. Most of the maps tested were for the purpose of finding out whether or not they successfully load without any errors on startup. That said, additional notes for anything played more thoroughly will be provided.
+**QUICK DISCLAIMER:** Not all maps have been tested equally. Most of the maps tested were for the purpose of finding out whether or not they successfully load without any errors on startup. That said, additional notes for anything played more thoroughly will be provided.
 
 Furthermore, there may be more maps supported outside of this list. These are only the maps that have been tested and subsequently updated. You are encouraged to try maps outside of this list.
 
