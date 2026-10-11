@@ -14957,7 +14957,36 @@ HS_EVALUATE_VOID_FROM_ARGUMENTS(debug_player_teleport_evaluate, struct hs_argume
 HS_EVALUATE_VOID_STRING(main_set_map_name_evaluate, main_set_map_name)
 HS_EVALUATE_VOID_STRING(main_set_multiplayer_map_name_evaluate, main_set_multiplayer_map_name)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(main_set_difficulty_evaluate, main_set_difficulty)
-HS_EVALUATE_VOID_FROM_ARGUMENTS(scenario_switch_structure_bsp_evaluate, struct hs_arguments_word, (scenario_switch_structure_bsp(arguments->value)))
+/* port: a multiplayer script that switches BSP to change the sky reloads the
+level every couple of seconds. Three copies of one place, each with its own
+sky, is how a map such as TSCE does daybreak, dawn and day. The BSP the match
+loaded stays. A player walking through a BSP trigger still switches, and a
+campaign script still switches. */
+static void scenario_switch_structure_bsp_evaluate(
+	short function_index,
+	long thread_index,
+	boolean initialize)
+{
+	struct hs_arguments_word const *arguments;
+	static boolean reported = FALSE;
+
+	arguments = (struct hs_arguments_word const *)hs_macro_function_evaluate(function_index, thread_index, initialize);
+	if (arguments)
+	{
+		if (game_engine_running() && global_structure_bsp_index_get() != NONE)
+		{
+			if (!reported)
+			{
+				reported = TRUE;
+				error(_error_silent, "switch_bsp from a script is ignored in a multiplayer game; the map keeps the bsp it loaded");
+			}
+		}
+		else
+			scenario_switch_structure_bsp((short)arguments->value);
+		hs_return(thread_index, 0);
+	}
+	return;
+}
 HS_EVALUATE_VOID_STRING(main_crash_evaluate, main_crash)
 HS_EVALUATE_VOID_STRING(debug_dump_memory_for_file_evaluate, debug_dump_memory_for_file)
 HS_EVALUATE_VOID_STRING(profile_dump_to_file_evaluate, profile_dump_to_file)
