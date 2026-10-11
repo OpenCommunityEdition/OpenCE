@@ -25,7 +25,7 @@ static struct player_datum players[128];static long handles[128];
 static struct unit_datum units[20];static long unit_handles[20];
 static int role=2;static boolean coop=TRUE,playing=TRUE,menu=FALSE;
 static long percent=100;static unsigned long clock_ms=1000;static long tick=30;
-static int killed,cleared,shown,sent,chatted,warned;static long last_killed;
+static int shown,sent,chatted,warned;
 static char shown_text[256],chat_text[256];static byte wire[2048];static word wire_size;
 static void *player_data=(void*)1;
 struct data_iterator {long datum_index;int next;};
@@ -48,9 +48,6 @@ static boolean game_team_is_enemy(short a,short b){return a>=0&&b>=0&&a!=b;}
 static char const *tags[]={"characters\\cyborg\\cyborg","characters\\grunt\\grunt","characters\\elite\\elite","characters\\hunter\\hunter","characters\\floodcombat elite\\floodcombat elite","vehicles\\wraith\\wraith","weapons\\plasma grenade\\explosion","weapons\\frag grenade\\explosion","globals\\falling","globals\\maximum distance"};
 static char const *tag_get_name(long index){return tags[index];}
 static struct damage_effect_definition *damage_effect_definition_get(long index){return &damage_def;}
-static void unit_kill(long index){killed++;last_killed=index;}
-static void chat_close(void){cleared++;}
-static void chat_clear(void){chat_close();}
 static void chat_note_line(char const *text){chatted++;snprintf(chat_text,sizeof(chat_text),"%s",text);}
 static void console_warning(char const *text,...){warned++;}
 static void terminal_printf(real_argb_color const *color,char const *format,...){va_list args;va_start(args,format);vsnprintf(shown_text,sizeof(shown_text),format,args);va_end(args);shown++;}
