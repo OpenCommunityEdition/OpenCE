@@ -105,6 +105,10 @@ said lately: it is not dropped for adding no players or loading slowly
 (network_server_manager.c) */
 boolean map_share_machine_downloading(
 	long machine_index);
+/* (the host) whether that download is not finished: the machines that have
+the map do not wait for it (network_server_manager.c) */
+boolean map_share_machine_needs_map(
+	long machine_index);
 
 /* the distributed messages of map sharing (network_distributed.c, and the
 host's message handler), in the lobby too: from_stream says the message came
