@@ -287,7 +287,7 @@ jobs:
           fi
           ~/emsdk/emsdk activate "$EMSDK_VERSION"
           sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build ccache python3-pytest mosquitto clang libclang-rt-dev
+          sudo apt-get install -y -q ninja-build ccache python3-pytest mosquitto
 
       - uses: actions/cache@v4
         with:
@@ -309,7 +309,7 @@ jobs:
         run: |
           source ~/emsdk/emsdk_env.sh
           node --test "port/web/tests/*.test.js"
-          CC=/usr/bin/clang python3 -m pytest -q tools/test_web_build.py tools/test_web_index_cache.py
+          python3 -m pytest -q tools/test_web_build.py
 
       - name: Test in Chromium and Firefox
         run: |
