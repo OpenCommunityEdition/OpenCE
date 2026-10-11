@@ -3283,6 +3283,30 @@ void players_respawn_at_checkpoint(
 	return;
 }
 
+boolean player_position_switches_bsp(
+	real_point3d const *position)
+{
+	struct scenario *scenario = global_scenario_get();
+	short index;
+
+	if (!position || !scenario || global_structure_bsp_index == NONE)
+		return FALSE;
+	/* port: a short counter stops at SHORT_MAX (a map's count) */
+	for (index = 0; index < MIN(scenario->bsp_switch_trigger_volumes.count, SHORT_MAX); index++)
+	{
+		struct scenario_bsp_switch_trigger_volume *volume = TAG_BLOCK_GET_ELEMENT(
+			&scenario->bsp_switch_trigger_volumes, index, struct scenario_bsp_switch_trigger_volume);
+
+		if (volume->source_structure_bsp_index == global_structure_bsp_index &&
+			scenario_trigger_volume_test_point(volume->trigger_volume_index, position))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 /* port: the trigger that switches away from the loaded structure BSP the
 unit stands in, or NONE */
 static short players_coop_bsp_switch_trigger(
