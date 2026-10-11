@@ -232,6 +232,12 @@ static const struct config_setting config_settings[] =
 		"mouse (the bullets' own autoaim stays)." },
 	{ "input.mouse_sensitivity", _config_real, "1.0", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement." },
+	{ "input.playstation_kernel_driver", _config_boolean, "false", "HALO_PLAYSTATION_KERNEL_DRIVER",
+		_environment_value, _platform_desktop,
+		"Linux: a PlayStation controller (DualSense, DualShock 4) through the\n"
+		"kernel's driver of it (hid-playstation, hid-sony), which needs no setup;\n"
+		"false: through SDL's own, which needs Steam's udev rules to open it. Read\n"
+		"at start-up." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,

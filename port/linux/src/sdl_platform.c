@@ -136,6 +136,21 @@ BOOL platform_sdl_initialize(void)
 	controller emulation in xinput_sdl.c) */
 	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 #endif
+#if defined(__linux__) && !defined(HALO_ANDROID)
+	/* input.playstation_kernel_driver: a PlayStation pad through the
+	kernel's driver of it (hid-playstation's, hid-sony's: its buttons,
+	sticks, triggers and rumble) where the kernel has one, not SDL's own:
+	SDL's reads the pad's hidraw node, which only udev rules (Steam's) open
+	to the player, and a pad it took and could not open was not found at
+	all. SDL's own has the lightbar and the motion sensors */
+	if (config_boolean("input.playstation_kernel_driver"))
+	{
+		if (SDL_GetPathInfo("/sys/bus/hid/drivers/playstation", NULL))
+			SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5, "0");
+		if (SDL_GetPathInfo("/sys/bus/hid/drivers/sony", NULL))
+			SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4, "0");
+	}
+#endif
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
 	{
 		platform_log("SDL_Init failed: %s", SDL_GetError());
