@@ -1055,6 +1055,12 @@ static void object_damage_aftermath(
 			object_definition->object.acceleration_scale,
 			TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit),
 			damage_effect->damage.category);
+		/* (a multiplayer game's headshot: the hard ping its kill is heard with) */
+		if (TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) &&
+			TEST_FLAG(being_damaged_flags, _object_being_damaged_force_hard_ping_bit))
+		{
+			ragdoll_note_multiplayer_headshot(object_index);
+		}
 	}
 #endif
 

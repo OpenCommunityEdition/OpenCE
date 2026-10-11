@@ -120,24 +120,16 @@ struct ragdoll_slot
 	float mass = 0.f;
 	BodyID environment[RAGDOLL_PHYSICS_ENVIRONMENT_LAYERS];
 	uint64 environment_hash[RAGDOLL_PHYSICS_ENVIRONMENT_LAYERS] = {};
-	BodyID seat; // (a dead body sitting in a vehicle: the seat under and behind it)
 };
 
 /* what a body is, in its user data */
 const uint64 k_user_ragdoll = 1ull << 32;
 const uint64 k_user_vehicle = 2ull << 32;
-const uint64 k_user_vehicle_mesh = 3ull << 32; // (its real surfaces: for the dead sitting in it)
-const uint64 k_user_seat = 4ull << 32; // (a seat's, for the ragdoll of its slot alone)
 const uint64 k_user_kind = 0xffffffff00000000ull;
 
 const int k_maximum_contacts = 64;
 
 /* a vehicle a ragdoll passes through (its own, sat in), key + 1; 0: none */
-long g_ignore_vehicle[RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS] = {};
-/* the vehicle whose surfaces (not its hull) a ragdoll meets, key + 1; 0: none */
-long g_seat_vehicle[RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS] = {};
-
-/* the vehicles meeting ragdolls, as Jolt finds them in a step */
 class vehicle_contact_listener final : public ContactListener
 {
 public:
@@ -146,46 +138,6 @@ public:
 
 	ValidateResult OnContactValidate(const Body &a, const Body &b, RVec3Arg, const CollideShapeResult &) override
 	{
-		uint64 kind_a = a.GetUserData() & k_user_kind;
-		uint64 kind_b = b.GetUserData() & k_user_kind;
-		const Body *vehicle = kind_a == k_user_vehicle && kind_b == k_user_ragdoll ? &a :
-			kind_b == k_user_vehicle && kind_a == k_user_ragdoll ? &b : nullptr;
-
-		// (a vehicle's surfaces: only for the dead sitting in it)
-		const Body *mesh = kind_a == k_user_vehicle_mesh && kind_b == k_user_ragdoll ? &a :
-			kind_b == k_user_vehicle_mesh && kind_a == k_user_ragdoll ? &b : nullptr;
-		if (mesh)
-		{
-			const Body *ragdoll = mesh == &a ? &b : &a;
-			int slot = (int)(ragdoll->GetUserData() & 0xffffffffull);
-			long key = (long)(uint32)(mesh->GetUserData() & 0xffffffffull);
-
-			if (slot < 0 || slot >= RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS || g_seat_vehicle[slot] != key + 1)
-				return ValidateResult::RejectContact;
-			return ValidateResult::AcceptAllContactsForThisBodyPair;
-		}
-		if (kind_a == k_user_vehicle_mesh || kind_b == k_user_vehicle_mesh)
-			return ValidateResult::RejectContact;
-		// (a seat: only its own body sits in it)
-		if (kind_a == k_user_seat || kind_b == k_user_seat)
-		{
-			const Body *seat = kind_a == k_user_seat ? &a : &b;
-			const Body *other = seat == &a ? &b : &a;
-
-			if ((other->GetUserData() & k_user_kind) == k_user_ragdoll &&
-				(other->GetUserData() & 0xffffffffull) == (seat->GetUserData() & 0xffffffffull))
-				return ValidateResult::AcceptAllContactsForThisBodyPair;
-			return ValidateResult::RejectContact;
-		}
-		if (vehicle)
-		{
-			const Body *ragdoll = vehicle == &a ? &b : &a;
-			int slot = (int)(ragdoll->GetUserData() & 0xffffffffull);
-			long key = (long)(uint32)(vehicle->GetUserData() & 0xffffffffull);
-
-			if (slot >= 0 && slot < RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS && g_ignore_vehicle[slot] == key + 1)
-				return ValidateResult::RejectContact; // (not the whole pair: Jolt asserts on that inside compound shapes)
-		}
 		return ValidateResult::AcceptAllContactsForThisBodyPair;
 	}
 
@@ -265,7 +217,6 @@ struct vehicle_slot
 {
 	long key = -1; // (the game's object index; -1: free)
 	BodyID id;
-	BodyID mesh; // its surfaces, for the dead sitting in it
 	uint64 hash = 0; // its points', for its shape
 	bool given = false; // this tick
 };
@@ -409,11 +360,6 @@ extern "C" void ragdoll_physics_destroy(int index)
 {
 	ragdoll_slot *slot = slot_get(index);
 
-	if (index >= 0 && index < RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS)
-	{
-		g_ignore_vehicle[index] = 0;
-		g_seat_vehicle[index] = 0;
-	}
 	if (!slot)
 		return;
 	if (slot->ragdoll)
@@ -424,12 +370,6 @@ extern "C" void ragdoll_physics_destroy(int index)
 	}
 	for (int layer = 0; layer < RAGDOLL_PHYSICS_ENVIRONMENT_LAYERS; ++layer)
 		environment_remove(*slot, layer);
-	if (!slot->seat.IsInvalid())
-	{
-		bodies().RemoveBody(slot->seat);
-		bodies().DestroyBody(slot->seat);
-		slot->seat = BodyID();
-	}
 	slot->mass = 0.f;
 }
 
@@ -574,7 +514,6 @@ extern "C" int ragdoll_physics_create(int index, struct ragdoll_physics_bone con
 		part.mPosition = RVec3(position);
 		part.mRotation = rotation;
 		part.mMotionType = EMotionType::Dynamic;
-		part.mAllowDynamicOrKinematic = true; // (a body left sitting in a seat: its pelvis held there)
 		part.mObjectLayer = layers::ragdoll;
 		part.mMotionQuality = EMotionQuality::LinearCast; // (no passing through thin walls at speed)
 		part.mFriction = settings->friction;
@@ -876,91 +815,6 @@ extern "C" void ragdoll_physics_bounds(int index, float center[3], float *radius
 	*radius = 0.5f * box.GetSize().Length() / k_metres;
 }
 
-/* ---------- a body held in a seat */
-
-extern "C" void ragdoll_physics_pin(int index, int bone, float const position[3], float const rotation[4])
-{
-	ragdoll_slot *slot = slot_get(index);
-
-	if (!slot || !slot->ragdoll || bone < 0 || bone >= (int)slot->ragdoll->GetBodyCount())
-		return;
-	Vec3 where = metres(position);
-	Quat turn(rotation[0], rotation[1], rotation[2], rotation[3]);
-	if (!finite3(where) || !std::isfinite(turn.GetW()) || turn.Length() < 0.5f)
-		return;
-	turn = turn.Normalized();
-	BodyID id = slot->ragdoll->GetBodyID(bone);
-	if (bodies().GetMotionType(id) != EMotionType::Kinematic)
-	{
-		bodies().SetMotionType(id, EMotionType::Kinematic, EActivation::Activate);
-		bodies().SetPositionAndRotation(id, RVec3(where), turn, EActivation::Activate);
-	}
-	RVec3 was = bodies().GetPosition(id);
-	bodies().MoveKinematic(id, RVec3(where), turn, k_tick);
-	// (the vehicle moving: the limbs hanging from the pelvis move with it)
-	if ((Vec3(was) - where).LengthSq() > 1e-8f)
-		slot->ragdoll->Activate(false);
-}
-
-extern "C" void ragdoll_physics_drive(int index, int bone, float const position[3], float const rotation[4],
-	float const base_velocity[3], float strength)
-{
-	ragdoll_slot *slot = slot_get(index);
-
-	if (!slot || !slot->ragdoll || bone < 0 || bone >= (int)slot->ragdoll->GetBodyCount())
-		return;
-	BodyID id = slot->ragdoll->GetBodyID(bone);
-	if (bodies().GetMotionType(id) != EMotionType::Dynamic)
-		return;
-	Vec3 target = metres(position);
-	Vec3 base = metres(base_velocity) / k_tick;
-	Quat turn(rotation[0], rotation[1], rotation[2], rotation[3]);
-	if (!finite3(target) || !finite3(base) || !std::isfinite(turn.GetW()) || turn.Length() < 0.5f)
-		return;
-	turn = turn.Normalized();
-	strength = Clamp(strength, 0.f, 1.f);
-	RVec3 where;
-	Quat now;
-	bodies().GetPositionAndRotation(id, where, now);
-	// (toward where the pose has it, over a tick, by strength: what it was
-	// doing keeps the rest, so it sways, lags and swings back)
-	Vec3 linear = bodies().GetLinearVelocity(id);
-	Vec3 wanted = base + (target - Vec3(where)) / k_tick;
-	Quat change = turn * now.Conjugated();
-	if (change.GetW() < 0.f)
-		change = -change;
-	Vec3 axis;
-	float angle;
-	change.GetAxisAngle(axis, angle);
-	Vec3 spin = bodies().GetAngularVelocity(id);
-	Vec3 wanted_spin = angle > 1e-5f ? axis * (angle / k_tick) : Vec3::sZero();
-	Vec3 new_linear = linear * (1.f - strength) + wanted * strength;
-	Vec3 new_spin = spin * (1.f - strength) + wanted_spin * strength;
-	if (!finite3(new_linear) || !finite3(new_spin))
-		return;
-	bodies().SetLinearAndAngularVelocity(id, new_linear, new_spin);
-	if (!bodies().IsActive(id))
-		bodies().ActivateBody(id);
-}
-
-extern "C" void ragdoll_physics_unpin(int index, int bone)
-{
-	ragdoll_slot *slot = slot_get(index);
-
-	if (!slot || !slot->ragdoll || bone < 0 || bone >= (int)slot->ragdoll->GetBodyCount())
-		return;
-	BodyID id = slot->ragdoll->GetBodyID(bone);
-	if (bodies().GetMotionType(id) == EMotionType::Kinematic)
-		bodies().SetMotionType(id, EMotionType::Dynamic, EActivation::Activate);
-	slot->ragdoll->Activate(false);
-}
-
-extern "C" void ragdoll_physics_ignore_vehicle(int index, long key)
-{
-	if (index >= 0 && index < RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS)
-		g_ignore_vehicle[index] = key < 0 ? 0 : key + 1;
-}
-
 /* ---------- vehicles */
 
 extern "C" void ragdoll_physics_vehicles_begin(void)
@@ -984,11 +838,6 @@ extern "C" void ragdoll_physics_vehicles_end(void)
 			{
 				bodies().RemoveBody(vehicle.id);
 				bodies().DestroyBody(vehicle.id);
-			}
-			if (!vehicle.mesh.IsInvalid())
-			{
-				bodies().RemoveBody(vehicle.mesh);
-				bodies().DestroyBody(vehicle.mesh);
 			}
 			vehicle = vehicle_slot();
 		}
@@ -1065,12 +914,6 @@ extern "C" void ragdoll_physics_vehicle(long key, float const *points, int point
 	bodies().SetPositionRotationAndVelocity(vehicle->id, RVec3(where), turn, moving, spinning);
 	if (moving.LengthSq() > 1.0e-6f || spinning.LengthSq() > 1.0e-6f)
 		bodies().ActivateBody(vehicle->id);
-	if (!vehicle->mesh.IsInvalid())
-	{
-		bodies().SetPositionRotationAndVelocity(vehicle->mesh, RVec3(where), turn, moving, spinning);
-		if (moving.LengthSq() > 1.0e-6f || spinning.LengthSq() > 1.0e-6f)
-			bodies().ActivateBody(vehicle->mesh);
-	}
 	g_world.fastest_vehicle = std::max(g_world.fastest_vehicle, moving.Length() * k_tick);
 }
 
@@ -1080,116 +923,6 @@ static vehicle_slot *vehicle_find(long key)
 		if (each.key == key && !each.id.IsInvalid())
 			return &each;
 	return nullptr;
-}
-
-extern "C" int ragdoll_physics_vehicle_has_mesh(long key)
-{
-	vehicle_slot *vehicle = g_world.started ? vehicle_find(key) : nullptr;
-
-	return !vehicle || !vehicle->mesh.IsInvalid();
-}
-
-extern "C" void ragdoll_physics_vehicle_mesh(long key, float const *triangles, int triangle_count)
-{
-	vehicle_slot *vehicle = g_world.started ? vehicle_find(key) : nullptr;
-
-	if (!vehicle || !vehicle->mesh.IsInvalid() || !triangles || triangle_count <= 0)
-		return;
-	TriangleList list;
-	list.reserve((size_t)triangle_count);
-	for (int t = 0; t < triangle_count; ++t)
-	{
-		Vec3 a = metres(&triangles[t * 9 + 0]);
-		Vec3 b = metres(&triangles[t * 9 + 3]);
-		Vec3 c = metres(&triangles[t * 9 + 6]);
-		if (finite3(a) && finite3(b) && finite3(c))
-			list.push_back(Triangle(Float3(a.GetX(), a.GetY(), a.GetZ()), Float3(b.GetX(), b.GetY(), b.GetZ()),
-				Float3(c.GetX(), c.GetY(), c.GetZ())));
-	}
-	if (list.empty())
-		return;
-	MeshShapeSettings mesh(list);
-	ShapeSettings::ShapeResult result = mesh.Create();
-	if (result.HasError())
-		return;
-	RVec3 where;
-	Quat turn;
-	bodies().GetPositionAndRotation(vehicle->id, where, turn);
-	BodyCreationSettings creation(result.Get(), where, turn, EMotionType::Kinematic, layers::ragdoll);
-	creation.mFriction = 0.9f; // (a body sits, it does not slide off the seat)
-	creation.mOverrideMassProperties = EOverrideMassProperties::MassAndInertiaProvided; // (a mesh has none of its own)
-	creation.mMassPropertiesOverride.SetMassAndInertiaOfSolidBox(Vec3(2.f, 2.f, 2.f), 500.f);
-	creation.mRestitution = 0.f;
-	creation.mAllowSleeping = false;
-	creation.mUserData = k_user_vehicle_mesh | (uint64)(uint32)key;
-	Body *body = bodies().CreateBody(creation);
-	if (body == nullptr)
-		return;
-	vehicle->mesh = body->GetID();
-	bodies().AddBody(vehicle->mesh, EActivation::Activate);
-	bodies().SetLinearAndAngularVelocity(vehicle->mesh, bodies().GetLinearVelocity(vehicle->id),
-		bodies().GetAngularVelocity(vehicle->id));
-}
-
-extern "C" void ragdoll_physics_seat(int index, float const position[3], float const rotation[4],
-	float const velocity[3], float const cushion_half[3], float const back_center[3], float const back_half[3])
-{
-	ragdoll_slot *slot = slot_get(index);
-
-	if (!slot || !slot->ragdoll)
-		return;
-	Vec3 where = metres(position);
-	Vec3 moving = metres(velocity) / k_tick;
-	Quat turn(rotation[0], rotation[1], rotation[2], rotation[3]);
-	if (!finite3(where) || !finite3(moving) || !std::isfinite(turn.GetW()) || turn.Length() < 0.5f)
-		return;
-	turn = turn.Normalized();
-	if (slot->seat.IsInvalid())
-	{
-		// (its cushion about its origin, its back behind: in its own frame)
-		Ref<StaticCompoundShapeSettings> seat = new StaticCompoundShapeSettings();
-		seat->AddShape(Vec3::sZero(), Quat::sIdentity(), new BoxShape(metres(cushion_half), 0.01f));
-		seat->AddShape(metres(back_center), Quat::sIdentity(), new BoxShape(metres(back_half), 0.01f));
-		ShapeSettings::ShapeResult result = seat->Create();
-		if (result.HasError())
-			return;
-		BodyCreationSettings creation(result.Get(), RVec3(where), turn, EMotionType::Kinematic, layers::ragdoll);
-		creation.mFriction = 1.f;
-		creation.mRestitution = 0.f;
-		creation.mAllowSleeping = false;
-		creation.mUserData = k_user_seat | (uint64)(uint32)index;
-		Body *body = bodies().CreateBody(creation);
-		if (body == nullptr)
-			return;
-		slot->seat = body->GetID();
-		bodies().AddBody(slot->seat, EActivation::Activate);
-	}
-	// (where the vehicle has it now, moving with it through the tick)
-	bodies().SetPositionRotationAndVelocity(slot->seat, RVec3(where), turn, moving, Vec3::sZero());
-	if (moving.LengthSq() > 1.0e-8f)
-	{
-		bodies().ActivateBody(slot->seat);
-		slot->ragdoll->Activate(false);
-	}
-}
-
-extern "C" void ragdoll_physics_seat_remove(int index)
-{
-	ragdoll_slot *slot = slot_get(index);
-
-	if (!slot || slot->seat.IsInvalid())
-		return;
-	bodies().RemoveBody(slot->seat);
-	bodies().DestroyBody(slot->seat);
-	slot->seat = BodyID();
-	if (slot->ragdoll)
-		slot->ragdoll->Activate(false);
-}
-
-extern "C" void ragdoll_physics_seat_vehicle(int index, long key)
-{
-	if (index >= 0 && index < RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS)
-		g_seat_vehicle[index] = key < 0 ? 0 : key + 1;
 }
 
 extern "C" int ragdoll_physics_vehicle_contacts(struct ragdoll_physics_contact *contacts, int maximum)

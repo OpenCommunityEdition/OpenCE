@@ -114,20 +114,6 @@ void ragdoll_physics_translate(int slot, float const offset[3]);
 /* its world bounds: centre and radius */
 void ragdoll_physics_bounds(int slot, float center[3], float *radius);
 
-/* a body left sitting in a seat: the bone (its pelvis) held where the seat
-has it, moving there over the next tick; the rest hangs from it, limp */
-void ragdoll_physics_pin(int slot, int bone, float const position[3], float const rotation[4]);
-/* a bone eased toward where a pose has it (strength of the way there each
-tick, 0 to 1), moving at base_velocity (world units a tick) besides: a body
-sitting limp holds its pose, swaying with what jolts it */
-void ragdoll_physics_drive(int slot, int bone, float const position[3], float const rotation[4],
-	float const base_velocity[3], float strength);
-/* ... let go: the bone falls with the rest */
-void ragdoll_physics_unpin(int slot, int bone);
-/* the vehicle (its key) the ragdoll passes through: the one it sits in, and
-for a moment once thrown from it; -1: none */
-void ragdoll_physics_ignore_vehicle(int slot, long key);
-
 /* the vehicles near the ragdolls, for a tick: given between _begin and _end,
 each as the convex hull of its collision's points (in its own frame, world
 units), where it is and how it moves (world units and radians a tick). Jolt
@@ -137,23 +123,6 @@ void ragdoll_physics_vehicles_begin(void);
 void ragdoll_physics_vehicle(long key, float const *points, int point_count, float const position[3],
 	float const rotation[4], float const velocity[3], float const angular_velocity[3]);
 void ragdoll_physics_vehicles_end(void);
-
-/* a vehicle's surfaces (triangles in its frame, as its points are), for the
-dead sitting in it, who meet them rather than its hull: made once; 1 when
-it has them, or is not given this tick */
-int ragdoll_physics_vehicle_has_mesh(long key);
-void ragdoll_physics_vehicle_mesh(long key, float const *triangles, int triangle_count);
-/* a seat for a ragdoll sitting dead in a vehicle, its own alone: a cushion
-(half sizes, about the seat's origin) and a back (its centre and half sizes,
-in the seat's frame), where the seat is now and moving at velocity (world
-units a tick); made at the first call, moved at each */
-void ragdoll_physics_seat(int slot, float const position[3], float const rotation[4],
-	float const velocity[3], float const cushion_half[3], float const back_center[3], float const back_half[3]);
-void ragdoll_physics_seat_remove(int slot);
-
-/* the vehicle (its key) whose surfaces the ragdoll meets: the one it sits
-in; -1: none */
-void ragdoll_physics_seat_vehicle(int slot, long key);
 
 /* a vehicle meeting a ragdoll in the last step (one a pair, the hardest) */
 struct ragdoll_physics_contact

@@ -2833,9 +2833,6 @@ void unit_died(
 		else
 			unit_detach_from_parent(unit_index);
 	}
-#if RAGDOLLS
-	ragdoll_unit_left_seat(unit_index);
-#endif
 
 	unit->unit.speech.queued.priority = 0;
 	unit_drop_inventory_weapons(unit_index);

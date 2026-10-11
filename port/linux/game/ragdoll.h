@@ -48,17 +48,6 @@ thrown out: it dies as the game has it die */
 void ragdoll_unit_killed_in_seat(
 	long unit_index);
 
-/* from unit_kill, after the game took a unit killed in a seat out of it:
-where it put it (a body left sitting there is thrown out to it when someone
-gets in) */
-void ragdoll_unit_left_seat(
-	long unit_index);
-
-/* from game_tick, after objects_update: the dead left sitting in their seats
-where their vehicles ended the tick */
-void ragdolls_seated_after_objects(
-	void);
-
 /* from biped_delete */
 void ragdoll_biped_deleted(
 	long biped_index);
@@ -79,6 +68,25 @@ void ragdoll_note_damage(
 	real acceleration_scale,
 	boolean lethal,
 	short damage_category);
+
+/* ... the killing blow just noted was a multiplayer game's headshot (a
+sniper's: the body always goes limp at once; a pistol's, or another weapon's
+that headshots in multiplayer: half of them, by the body, the others play
+the death animation as any other death) */
+void ragdoll_note_multiplayer_headshot(
+	long object_index);
+
+/* network play, where each machine may have ragdolls or not: only how this
+machine draws the dead, nothing the game decides (port/linux/NETCODE.md).
+A client keeps a body its ragdoll has where it lies here, unless the host
+moves it far (TRUE: the host's position not taken); a host reports a body
+its ragdoll has where it fell, still (FALSE: the object's own) */
+boolean ragdoll_network_keeps_position(
+	long object_index,
+	real_point3d const *host_position);
+boolean ragdoll_network_reported(
+	long object_index,
+	real_point3d *position);
 
 /* from object_set_position: a ragdolled body moved (the host's word on where
 it lies, a script, a teleport) moves whole, in the pose it has; TRUE when it

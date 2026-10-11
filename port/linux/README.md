@@ -342,7 +342,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.viewmodel_shield` | `false` | `HALO_VIEWMODEL_SHIELD` | `true`: the energy shield's flare (its hits, its charging, its fall) is drawn on the first-person arms too, as on the body, with the unit's own shield shader, kept closer to the arms than to the body. The stock game draws it on the body only. |
 | `display.first_person_legs` | `false` | `HALO_FIRST_PERSON_LEGS` | `true`: your own body is drawn from the waist down in first person, so you see your legs when you look down, moving as the body's animation moves them. Refer to "Field of view". |
 | `display.shield_color` | `default` | `HALO_SHIELD_COLOR` | Your energy shield's flare as this machine draws it: `default` (the shield's own) or a multiplayer armor color (`white`, `black`, `red`, `blue`, `gray`, `yellow`, `green`, `pink`, `purple`, `cyan`, `cobalt`, `orange`, `teal`, `sage`, `brown`, `tan`, `maroon`, `salmon`), whatever the armor's, on the body and, with `display.viewmodel_shield`, on the first-person arms. The shield's own shader is drawn with its two colors replaced at their brightness; the flare is added to what is behind it, so `black` is drawn a faint grey. Only this machine sees it. |
-| `game.death_physics` | `classic` | `HALO_DEATH_PHYSICS` | How bodies fall when they die: `classic` (the game's own death animations) or `ragdoll` (limp ragdolls simulated with Jolt Physics, thrown by what killed them, tumbling down stairs and over ledges, pushed by later hits and by vehicles; the dead in a vehicle's seat may stay sitting in it). How this machine draws its dead: nothing sent between machines changes. Desktop builds with `port/third_party/JoltPhysics`. Refer to "Ragdolls". |
+| `game.death_physics` | `classic` | `HALO_DEATH_PHYSICS` | How bodies fall when they die: `classic` (the game's own death animations) or `ragdoll` (limp ragdolls simulated with Jolt Physics, thrown by what killed them, tumbling down stairs and over ledges, pushed by later hits and by vehicles). How this machine draws its dead: nothing sent between machines changes. Desktop builds with `port/third_party/JoltPhysics`. Refer to "Ragdolls". |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
 | `display.high_res_text` | `true` | `HALO_HIGH_RES_TEXT` | `true`: the menus' and HUD's text is drawn with the fonts in `port/assets/fonts` (Overpass, in place of the maps' Interstate) at the resolution the game draws at, laid out as before; the menus' titles are drawn from the high-res pictures in `port/assets/titles`, and the controller button icons from those in `port/assets/buttons`. `false`: the maps' bitmap fonts, titles and button icons. |
 | `display.shadow_resolution` | `128` | `HALO_SHADOW_RESOLUTION` | The size of the maps that the shadows of the objects are drawn in, in pixels each way: `128`, `256`, `512` or `1024` (other values go down to one of these). The game draws the shadow of each object into a map of 128x128 pixels, blurs it and projects it onto the ground. On a large screen, the edges of these shadows show steps that move when the object moves. A larger map makes the edges smooth; the blur is made wider to match, so the shadows are as soft as on the Xbox. Each doubling adds two passes of the blur. `128`: as on the Xbox. |
@@ -536,15 +536,33 @@ it from the biped's skeleton and moves the biped's nodes with it.
   vehicle. A few dozen are simulated at once: when another dies, the one
   most at rest gives way, and one frozen while still moving is woken again
   when a place frees.
-- A body killed in a vehicle's seat may stay sitting in it, riding with
-  it, until someone takes the seat, the vehicle turns over or crashes.
-- Killed falling far, or thrown out of a seat as the game throws them, the
-  dead fall as the game has them fall.
+- Half of deaths play the death animation to its end before the body goes
+  limp (a melee blow, an explosion or a wall ends it sooner); the others go
+  limp once the body is down. A sniper round or a melee blow knocks the
+  body over at once; a sniper round in the head throws it over backward.
+- In a multiplayer game, a killing sniper headshot always goes limp at once;
+  a killing pistol headshot (any weapon's multiplayer headshot) does on half
+  of the bodies, chosen by the body, so every machine with ragdolls agrees.
+- Killed falling far, or in a vehicle's seat, the dead fall as the game has
+  them fall.
 - The console command `ragdoll` sets and shows its tuning.
 
 Only this machine's dead are moved: the bodies, and where they come to
-rest, are not sent between machines. Builds without Jolt (and Android)
-compile the ragdolls out.
+rest, are not sent between machines, and players with ragdolls and players
+without play together. In a network game a client keeps a ragdoll where it
+lies while the host's body is within 3 world units of where it fell (the
+host moving it farther, through a teleporter, moves the ragdoll there), and
+a host reports a ragdoll's body where it fell, still, so that a machine
+without ragdolls leaves its own body where it fell instead of sliding it
+after the host's ragdoll (`ragdoll_network_...`, called from
+`network_objects.c`).
+
+Its cost: Jolt steps only while a body moves (about 0.05 ms a tick with
+several bodies falling, measured in a test harness), the level around a body is
+gathered again only when the body leaves it, and the meshes Jolt is given
+are kept while their triangles are the same. Nothing is added to what the
+machines send each other. Builds without Jolt (and Android) compile the
+ragdolls out.
 
 ## System link
 
@@ -1131,7 +1149,7 @@ Other changes:
 | `structures/structure_render.c` | The structure's visible surfaces are put in order by a radix sort, not `qsort_4byte`: the same order. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
-| `units/bipeds.c`, `units/units.c`, `objects/damage.c`, `objects/objects.c`, `game/game.c`, `hs/hs.c` | The dead are ragdolls (`game.death_physics`, `ragdoll.c`): a ragdoll moves its biped's body; damage pushes it; a unit killed in a seat, or leaving one, tells the ragdolls; the `ragdoll` console command. |
+| `units/bipeds.c`, `units/units.c`, `objects/damage.c`, `objects/objects.c`, `hs/hs.c` | The dead are ragdolls (`game.death_physics`, `ragdoll.c`): a ragdoll moves its biped's body; damage pushes it, and a multiplayer killing headshot is noted; a unit killed in a seat falls as the game has it; the `ragdoll` console command. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:

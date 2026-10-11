@@ -32,8 +32,11 @@ and the bodies Jolt moves written back into the bipeds' node matrices.
 
 A body Jolt puts to sleep (or simulated for ragdoll_max_seconds) freezes: it
 frees its slot and keeps its pose, and a later hit wakes it. Every machine
-simulates its own bodies: nothing goes over the network, and a body's
-position from the host moves the whole ragdoll there. A saved game holds the
+simulates its own bodies: nothing goes over the network. In a network game
+a client keeps its ragdoll where it lies while the host's body is near where
+it fell (the host moving it far moves the whole ragdoll there), and a host
+reports a ragdoll's body where it fell, so that machines with ragdolls and
+machines without each keep their own bodies (ragdoll_network_...). A saved game holds the
 frozen pose (the node matrices and the biped's ragdoll bit); a ragdoll whose
 body changed under it (a revert, a teleport) starts again from the body.
 
@@ -162,10 +165,6 @@ struct ragdoll_parameters
 	real hyperextend;
 	real spine_limit;
 	real joint_limit;
-	real seated_share;
-	real seated_crash;
-	real seated_surfaces;
-	real seated_hold;
 	real debug;
 };
 
@@ -252,7 +251,7 @@ struct ragdoll_pending_hit
 	long object_index; /* NONE: free */
 	long time;
 	boolean has_point;
-	byte pad;
+	boolean multiplayer_headshot; /* a killing headshot in a multiplayer game */
 	short category; /* the damage's (RAGDOLL_DAMAGE_CATEGORY_...) */
 	real_point3d point;
 	real_vector3d point_velocity; /* the whole body's, given at the point, world units a tick */
@@ -308,6 +307,25 @@ static void ragdoll_thud_prepare(struct ragdoll *ragdoll, long biped_index, bool
 static void ragdoll_apply_hit(struct ragdoll *ragdoll, struct ragdoll_pending_hit const *hit);
 static void ragdolls_step(void);
 static boolean ragdolls_enabled(void);
+static void ragdoll_network_note(long object_index, real_point3d const *spot);
+
+/* (network play: where each body went limp here) */
+enum
+{
+	RAGDOLL_NETWORK_BODIES = 64,
+};
+
+/* (how far a host's body may be from where it went limp here, world units,
+before the host is taken to have moved it: a teleporter, a lift) */
+#define RAGDOLL_NETWORK_REACH 3.f
+
+static struct
+{
+	long object_index; /* NONE: free */
+	real_point3d spot;
+} ragdoll_network_bodies[RAGDOLL_NETWORK_BODIES];
+static short ragdoll_network_next = 0;
+static boolean ragdoll_network_initialized = FALSE;
 
 /* ---------- globals */
 
@@ -357,9 +375,6 @@ static struct ragdoll_parameter_definition const ragdoll_parameter_definitions[]
 	{ "hyperextend", &ragdoll_parameters.hyperextend, 7.5f, 0.f, 90.f, "degrees a knee or elbow bends past straight (Halo 2: 7.5)" },
 	{ "spine_limit", &ragdoll_parameters.spine_limit, 20.f, 0.f, 180.f, "every bone (halo2_skeleton 0): degrees a spine or clavicle joint turns" },
 	{ "joint_limit", &ragdoll_parameters.joint_limit, 35.f, 0.f, 180.f, "every bone (halo2_skeleton 0): degrees any other joint turns" },
-	{ "seated_share", &ragdoll_parameters.seated_share, 0.5f, 0.f, 1.f, "the share of bodies killed in a vehicle's seat that stay there, limp (the seat stays free: anyone getting in throws the body out)" },
-	{ "seated_crash", &ragdoll_parameters.seated_crash, 0.06f, 0.f, 1.f, "world units a tick a vehicle's speed changes by in one tick (a crash) that throws its seated dead out" },
-	{ "seated_surfaces", &ragdoll_parameters.seated_surfaces, 0.f, 0.f, 1.f, "1: the seated dead meet their vehicle's own surfaces too (some vehicles' are solid where the seats are, and throw them out); 0: their seat alone" },
 	{ "debug", &ragdoll_parameters.debug, 0.f, 0.f, 1.f, "1: draw the ragdolls' bones (with debug_objects 1)" },
 };
 
@@ -661,9 +676,8 @@ static void ragdoll_parameters_initialize(
 	ragdoll_parameters_initialized = TRUE;
 }
 
-/* game.death_physics (Video Settings' Death Physics): "ragdoll", or
-"classic" (the default), the game's own deaths; read again whenever a
-setting changes */
+/* game.death_physics (Video Settings' Death Physics): "ragdoll" (or unset)
+or "classic", the game's own deaths; read again whenever a setting changes */
 static boolean ragdolls_enabled(
 	void)
 {
@@ -779,6 +793,41 @@ static boolean ragdoll_dying_touches(
 once, as Halo 2's thrown bodies do */
 static boolean ragdoll_vehicle_hit(long biped_index, real_vector3d *velocity);
 
+/* a multiplayer game's killing headshot that is not a sniper's: whether
+the body goes limp at once (half of them; the others play the death
+animation). By the body alone (its datum index, new each life), so every
+machine decides it the same way */
+static boolean ragdoll_multiplayer_headshot_limp(
+	long object_index)
+{
+	unsigned long coin = (unsigned long)object_index * 2654435761ul;
+
+	coin = (coin ^ (coin >> 16)) * 2246822519ul;
+	coin ^= coin >> 13;
+	return ((coin >> 8) & 1) != 0;
+}
+
+/* killed just now by a multiplayer game's headshot that makes it limp at
+once (a sniper's always, others' by ragdoll_multiplayer_headshot_limp) */
+static boolean ragdoll_multiplayer_headshot_killed(
+	long object_index)
+{
+	short index;
+
+	for (index = 0; index < RAGDOLL_MAXIMUM_PENDING_HITS; index++)
+	{
+		struct ragdoll_pending_hit const *hit = &ragdoll_pending_hits[index];
+
+		if (hit->object_index == object_index && hit->multiplayer_headshot && game_time_get() - hit->time <= 2 &&
+			game_time_get() >= hit->time &&
+			(hit->category == RAGDOLL_DAMAGE_CATEGORY_SNIPER || ragdoll_multiplayer_headshot_limp(object_index)))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 static boolean ragdoll_thrown(
 	long object_index)
 {
@@ -798,6 +847,13 @@ static boolean ragdoll_thrown(
 		over, no death animation) */
 		if (hit->object_index == object_index && game_time_get() - hit->time <= 2 &&
 			(hit->category == RAGDOLL_DAMAGE_CATEGORY_SNIPER || hit->category == RAGDOLL_DAMAGE_CATEGORY_MELEE))
+		{
+			return TRUE;
+		}
+		/* (a multiplayer game's killing headshot by another weapon, a
+		pistol's: half of them, by the body) */
+		if (hit->object_index == object_index && game_time_get() - hit->time <= 2 && hit->multiplayer_headshot &&
+			ragdoll_multiplayer_headshot_limp(object_index))
 		{
 			return TRUE;
 		}
@@ -1062,69 +1118,6 @@ static boolean ragdoll_dying_update(
 
 /* ---------- public code */
 
-/* ---------- the dead left sitting in their seats */
-
-/* port: a share of those killed in a vehicle's seat stay sitting there,
-limp: the pelvis held in the seat, the rest hanging from it. Only how the
-body is drawn: the game has taken it out of the seat as ever (the seat is
-free, nothing else changes), and the body is no target for shots while it
-sits. Anyone getting into that seat throws it out where the game would
-have; the vehicle on its side or roof, or a crash, throws it loose. */
-
-/* the seat: its cushion's top this far under the pelvis's origin (world
-units), its sizes */
-#define RAGDOLL_SEAT_DROP 0.08f
-#define RAGDOLL_SEAT_HALF_DEPTH 0.09f
-#define RAGDOLL_SEAT_HALF_WIDTH 0.09f
-#define RAGDOLL_SEAT_HALF_THICK 0.02f
-
-enum
-{
-	RAGDOLL_MAXIMUM_SEATED = 16,
-	/* ticks a body thrown from a seat passes through the vehicle's hull (it
-	starts inside it) */
-	RAGDOLL_SEATED_THROWN_TICKS = 90,
-};
-
-struct ragdoll_seated
-{
-	long biped_index; /* NONE: free */
-	long vehicle_index;
-	short seat_index;
-	short node_count;
-	boolean started; /* its body on the seat (after the game took it out) */
-	boolean released; /* thrown: passing through the hull until released_time */
-	boolean velocity_valid;
-	byte pad;
-	long released_time;
-	real_point3d exit_local; /* where the game put it, getting out, in the vehicle's frame */
-	real_vector3d last_vehicle_velocity;
-	real_matrix4x3 pin_vehicle; /* the vehicle as the pelvis was last held */
-	real_matrix4x3 root_local; /* the pelvis as it sat, in the vehicle's frame */
-	real_matrix4x3 seat_local; /* its seat (under the pelvis, facing as it faced), the same */
-	real_matrix4x3 local[RAGDOLL_MAXIMUM_NODES]; /* the body, in the vehicle's frame */
-	real_matrix4x3 target_local[RAGDOLL_MAXIMUM_NODES]; /* the pose it slumps in, the same */
-};
-
-static struct ragdoll_seated ragdoll_seated_bodies[RAGDOLL_MAXIMUM_SEATED];
-
-/* (to halo.log: what became of the dead left sitting) */
-#ifndef RAGDOLL_TEST
-void platform_log(const char *format, ...);
-#endif
-static void ragdoll_seated_log(char const *format, char const *what)
-{
-#ifndef RAGDOLL_TEST
-	char text[160];
-
-	snprintf(text, sizeof(text), format, what);
-	platform_log("ragdolls: a body sitting dead in a vehicle %s", text);
-#else
-	(void)format;
-	(void)what;
-#endif
-}
-
 void ragdolls_initialize_for_new_map(
 	void)
 {
@@ -1133,12 +1126,11 @@ void ragdolls_initialize_for_new_map(
 	ragdoll_parameters_initialize();
 	for (index = 0; index < RAGDOLL_MAXIMUM_ACTIVE; index++)
 		ragdolls[index].object_index = NONE;
+	ragdoll_network_initialized = FALSE;
 	for (index = 0; index < RAGDOLL_MAXIMUM_PENDING_HITS; index++)
 		ragdoll_pending_hits[index].object_index = NONE;
 	for (index = 0; index < RAGDOLL_MAXIMUM_DYING; index++)
 		ragdoll_dying[index].object_index = NONE;
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED; index++)
-		ragdoll_seated_bodies[index].biped_index = NONE;
 	for (index = 0; index < RAGDOLL_MAXIMUM_UNSETTLED; index++)
 		ragdoll_unsettled[index].object_index = NONE;
 	ragdoll_physics_reset();
@@ -1149,663 +1141,6 @@ void ragdolls_dispose_from_old_map(
 	void)
 {
 	ragdolls_initialize_for_new_map();
-}
-
-
-
-static struct ragdoll_seated *ragdoll_seated_find(
-	long biped_index)
-{
-	short index;
-
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED; index++)
-	{
-		if (ragdoll_seated_bodies[index].biped_index == biped_index)
-			return &ragdoll_seated_bodies[index];
-	}
-	return NULL;
-}
-
-/* a dead body sits in the vehicle, as a ragdoll */
-static boolean ragdoll_seated_in(
-	long vehicle_index)
-{
-	short index;
-
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED; index++)
-	{
-		struct ragdoll_seated const *seated = &ragdoll_seated_bodies[index];
-
-		if (seated->biped_index != NONE && seated->started && !seated->released &&
-			seated->vehicle_index == vehicle_index && ragdoll_find(seated->biped_index))
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
-
-static real_matrix4x3 const *ragdoll_seated_vehicle_matrix(
-	long vehicle_index)
-{
-	struct object_datum *vehicle = object_try_and_get(vehicle_index);
-
-	if (!vehicle || vehicle->object.node_matrices.size < (long)sizeof(real_matrix4x3))
-		return NULL;
-	return (real_matrix4x3 const *)object_header_block_get(vehicle_index, &vehicle->object.node_matrices);
-}
-
-/* the body's skeleton put where the vehicle has it (local), the object
-about it */
-static void ragdoll_seated_place(
-	struct ragdoll_seated *seated,
-	real_matrix4x3 const *vehicle_matrix)
-{
-	struct biped_datum *biped = biped_get(seated->biped_index);
-	struct biped_definition *definition = biped_definition_get(biped->definition_index);
-	real_matrix4x3 *matrices = (real_matrix4x3 *)object_header_block_get(seated->biped_index, &biped->object.node_matrices);
-	long matrix_count = biped->object.node_matrices.size / (long)sizeof(real_matrix4x3);
-	real_point3d minimum, maximum, center;
-	real_vector3d half;
-	short index;
-
-	if (matrix_count < seated->node_count)
-		return;
-	for (index = 0; index < seated->node_count; index++)
-		matrix4x3_multiply(vehicle_matrix, &seated->local[index], &matrices[index]);
-	minimum = maximum = matrices[0].position;
-	for (index = 0; index < seated->node_count; index++)
-	{
-		real_point3d const *p = &matrices[index].position;
-
-		minimum.x = MIN(minimum.x, p->x); minimum.y = MIN(minimum.y, p->y); minimum.z = MIN(minimum.z, p->z);
-		maximum.x = MAX(maximum.x, p->x); maximum.y = MAX(maximum.y, p->y); maximum.z = MAX(maximum.z, p->z);
-	}
-	center.x = (minimum.x + maximum.x) * 0.5f;
-	center.y = (minimum.y + maximum.y) * 0.5f;
-	center.z = (minimum.z + maximum.z) * 0.5f;
-	ragdoll_sub(&maximum, &center, &half);
-	object_disconnect_from_map(seated->biped_index);
-	biped->object.position.x = matrices[0].position.x;
-	biped->object.position.y = matrices[0].position.y;
-	biped->object.position.z = minimum.z;
-	biped->object.bounding_sphere_center = center;
-	biped->object.bounding_sphere_radius = MAX(definition->object.bounding_radius, ragdoll_length(&half) + 0.25f);
-	object_bounds_cache_update(seated->biped_index, &biped->object.bounding_sphere_center, biped->object.bounding_sphere_radius);
-	object_reconnect_to_map(seated->biped_index, NULL);
-	{
-		struct object_datum *vehicle = object_try_and_get(seated->vehicle_index);
-
-		biped->object.translational_velocity = vehicle ? vehicle->object.translational_velocity : *global_zero_vector3d;
-	}
-	biped->object.angular_velocity = *global_zero_vector3d;
-	{
-		struct ragdoll *ragdoll = ragdoll_find(seated->biped_index);
-
-		/* (the ragdoll's own record of where it wrote the body: else it takes
-		this for the body moved under it) */
-		if (ragdoll)
-		{
-			ragdoll->written_object_position = biped->object.position;
-			ragdoll->written_root_position = matrices[0].position;
-		}
-	}
-}
-
-/* the body's skeleton as it is now, in the vehicle's frame */
-static void ragdoll_seated_take(
-	struct ragdoll_seated *seated,
-	real_matrix4x3 const *vehicle_matrix)
-{
-	struct biped_datum *biped = biped_get(seated->biped_index);
-	real_matrix4x3 const *matrices = (real_matrix4x3 const *)object_header_block_get(seated->biped_index, &biped->object.node_matrices);
-	real_matrix4x3 inverse;
-	short index;
-
-	matrix4x3_inverse(vehicle_matrix, &inverse);
-	for (index = 0; index < seated->node_count; index++)
-		matrix4x3_multiply(&inverse, &matrices[index], &seated->local[index]);
-}
-
-/* a ragdoll for the body, sitting as it is, moving with the vehicle */
-static struct ragdoll *ragdoll_seated_wake(
-	long biped_index)
-{
-	struct ragdoll *ragdoll = ragdoll_allocate(biped_index);
-
-	if (ragdoll && !ragdoll_seed(ragdoll, biped_index, NULL))
-	{
-		ragdoll_free(ragdoll);
-		ragdoll = NULL;
-	}
-	if (ragdoll)
-		ragdoll_thud_prepare(ragdoll, biped_index, FALSE);
-	return ragdoll;
-}
-
-static boolean ragdoll_seated_seat_taken(
-	struct ragdoll_seated const *seated)
-{
-	struct object_datum *vehicle = object_try_and_get(seated->vehicle_index);
-	long child = vehicle ? vehicle->object.first_child_object_index : NONE;
-	short guard = 0;
-
-	while (child != NONE && guard++ < 64)
-	{
-		struct object_datum *object = object_try_and_get(child);
-
-		if (!object)
-			break;
-		if (child != seated->biped_index &&
-			(object->object.type == _object_type_biped || object->object.type == _object_type_vehicle) &&
-			unit_get(child)->unit.parent_seat_index == seated->seat_index)
-		{
-			return TRUE;
-		}
-		child = object->object.next_object_index;
-	}
-	return FALSE;
-}
-
-/* thrown from the seat: by someone getting in (out where the game puts a
-body leaving it), or loose (over with the vehicle, or a crash) */
-static void ragdoll_seated_release(
-	struct ragdoll_seated *seated,
-	boolean getting_in,
-	real_matrix4x3 const *vehicle_matrix,
-	char const *why)
-{
-	ragdoll_seated_log("let go: %s", why);
-	struct biped_datum *biped = biped_get(seated->biped_index);
-	struct ragdoll *ragdoll;
-	real_vector3d offset = *global_zero_vector3d;
-
-	SET_FLAG(biped->object.flags, _object_no_collisions_bit, FALSE);
-	if (getting_in && vehicle_matrix)
-	{
-		/* (the whole body moved there, as it sits; then it falls) */
-		real_matrix4x3 *matrices = (real_matrix4x3 *)object_header_block_get(seated->biped_index, &biped->object.node_matrices);
-		real_point3d exit;
-		short index;
-
-		matrix4x3_transform_point(vehicle_matrix, &seated->exit_local, &exit);
-		exit.z += 0.25f;
-		ragdoll_sub(&exit, &matrices[0].position, &offset);
-		for (index = 0; index < seated->node_count; index++)
-			ragdoll_add_scaled(&matrices[index].position, &offset, 1.f);
-		ragdoll_seated_take(seated, vehicle_matrix);
-		ragdoll_seated_place(seated, vehicle_matrix);
-	}
-	ragdoll = ragdoll_find(seated->biped_index);
-	if (ragdoll && ragdoll_length(&offset) > 0.f)
-	{
-		float moved[3];
-
-		moved[0] = offset.i;
-		moved[1] = offset.j;
-		moved[2] = offset.k;
-		ragdoll_physics_translate(ragdoll_slot(ragdoll), moved);
-		ragdoll->structure_valid = FALSE;
-	}
-	if (!ragdoll && ragdolls_enabled())
-		ragdoll = ragdoll_seated_wake(seated->biped_index);
-	if (ragdoll)
-	{
-		struct ragdoll_node const *root = &ragdoll->nodes[0];
-		int slot = ragdoll_slot(ragdoll);
-
-		if (root->body != NONE)
-			ragdoll_physics_unpin(slot, root->body);
-		ragdoll_physics_seat_vehicle(slot, -1);
-		ragdoll_physics_seat_remove(slot);
-		ragdoll_physics_ignore_vehicle(slot, getting_in ? -1 : seated->vehicle_index);
-	}
-	seated->released = TRUE;
-	seated->released_time = game_time_get();
-	if (!ragdoll)
-		seated->biped_index = NONE;
-}
-
-/* the body's tick while it sits: TRUE, it sits (and biped_update does
-nothing else); FALSE, it is thrown, a ragdoll as any other */
-static boolean ragdoll_seated_update(
-	struct ragdoll_seated *seated,
-	boolean enabled)
-{
-	long biped_index = seated->biped_index;
-	struct biped_datum *biped = biped_get(biped_index);
-	struct object_datum *vehicle = object_try_and_get(seated->vehicle_index);
-	real_matrix4x3 const *vehicle_matrix = ragdoll_seated_vehicle_matrix(seated->vehicle_index);
-	struct ragdoll *ragdoll;
-	real_vector3d change;
-	boolean moving;
-	boolean just_started = FALSE;
-
-	if (seated->released)
-	{
-		/* (clear of the hull by now: it meets it as any other body) */
-		if (game_time_get() - seated->released_time >= RAGDOLL_SEATED_THROWN_TICKS ||
-			game_time_get() < seated->released_time)
-		{
-			ragdoll = ragdoll_find(biped_index);
-			if (ragdoll)
-				ragdoll_physics_ignore_vehicle(ragdoll_slot(ragdoll), -1);
-			seated->biped_index = NONE;
-		}
-		return FALSE;
-	}
-	if (!enabled || !vehicle || !vehicle_matrix || ragdoll_parameters.seated_share <= 0.f)
-	{
-		ragdoll_seated_release(seated, FALSE, vehicle_matrix, "its vehicle gone, ragdolls off, or seated_share 0");
-		return FALSE;
-	}
-	if (ragdoll_seated_seat_taken(seated))
-	{
-		ragdoll_seated_release(seated, TRUE, vehicle_matrix, "someone took the seat");
-		return FALSE;
-	}
-	ragdoll_sub((real_point3d const *)&vehicle->object.translational_velocity,
-		(real_point3d const *)&seated->last_vehicle_velocity, &change);
-	moving = ragdoll_length(&vehicle->object.translational_velocity) > 0.004f ||
-		ragdoll_length(&vehicle->object.angular_velocity) > 0.004f;
-	if (vehicle->object.up.k < 0.3f ||
-		(seated->velocity_valid && ragdoll_length(&change) > ragdoll_parameters.seated_crash))
-	{
-		ragdoll_seated_release(seated, FALSE, vehicle_matrix,
-			vehicle->object.up.k < 0.3f ? "the vehicle over on its side or roof" : "a crash (the vehicle's speed changed hard)");
-		return FALSE;
-	}
-	seated->last_vehicle_velocity = vehicle->object.translational_velocity;
-	seated->velocity_valid = TRUE;
-
-	if (!seated->started)
-	{
-		just_started = TRUE;
-		seated->started = TRUE;
-		SET_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_BIT, TRUE);
-		SET_FLAG(biped->object.flags, _object_do_not_recompute_node_matrices_bit, TRUE);
-		SET_FLAG(biped->unit.animation.flags, _unit_animation_ignore_translation_bit, TRUE);
-		SET_FLAG(biped->object.flags, _object_no_collisions_bit, TRUE);
-		biped_stop_limp_body_physics(biped_index);
-		ragdoll_seated_place(seated, vehicle_matrix);
-	}
-
-	/* (limp from the first, its pelvis held in the seat and its limbs eased
-	toward the pose it slumped in, so they sway and swing with the vehicle
-	but stay in it; frozen, still, it rides as it lies, and the vehicle
-	moving wakes it) */
-	ragdoll = ragdoll_find(biped_index);
-	if (!ragdoll && (moving || just_started))
-	{
-		ragdoll_seated_place(seated, vehicle_matrix);
-		ragdoll = ragdoll_seated_wake(biped_index);
-		if (ragdoll)
-		{
-			ragdoll_physics_ignore_vehicle(ragdoll_slot(ragdoll), seated->vehicle_index);
-			if (ragdoll_parameters.seated_surfaces >= 0.5f)
-				ragdoll_physics_seat_vehicle(ragdoll_slot(ragdoll), seated->vehicle_index);
-			seated->pin_vehicle = *vehicle_matrix;
-		}
-	}
-	if (ragdoll)
-	{
-		ragdoll_update(ragdoll, biped_index);
-		/* (the pose it took, in the frame the vehicle had in the step) */
-		if (ragdoll_find(biped_index) == ragdoll)
-		{
-			real_matrix4x3 seat;
-			real_matrix4x3 const *matrices = (real_matrix4x3 const *)object_header_block_get(
-				biped_index, &biped->object.node_matrices);
-
-			/* (fallen or flung out of it: a ragdoll as any other) */
-			matrix4x3_multiply(&seated->pin_vehicle, &seated->root_local, &seat);
-			if (distance3d(&matrices[0].position, &seat.position) > 0.5f)
-			{
-				ragdoll_seated_release(seated, FALSE, NULL, "fallen or flung more than half a world unit from the seat");
-				return FALSE;
-			}
-			ragdoll_seated_take(seated, &seated->pin_vehicle);
-		}
-	}
-	ragdoll_seated_place(seated, vehicle_matrix);
-	SET_FLAG(biped->object.flags, _object_at_rest_bit, FALSE);
-	return TRUE;
-}
-
-/* from ragdolls_step, before the world moves: each seated body's pelvis held
-in its seat */
-static void ragdolls_seated_pin(
-	void)
-{
-	short index;
-
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED; index++)
-	{
-		struct ragdoll_seated *seated = &ragdoll_seated_bodies[index];
-		struct ragdoll *ragdoll;
-		real_matrix4x3 const *vehicle_matrix;
-		real_matrix4x3 root;
-		struct ragdoll_quaternion q;
-		float position[3];
-		float rotation[4];
-
-		if (seated->biped_index == NONE || !seated->started || seated->released)
-			continue;
-		ragdoll = ragdoll_find(seated->biped_index);
-		vehicle_matrix = ragdoll_seated_vehicle_matrix(seated->vehicle_index);
-		if (!ragdoll || !vehicle_matrix)
-			continue;
-		matrix4x3_multiply(vehicle_matrix, &seated->root_local, &root);
-		{
-			real_vector3d frame[3];
-
-			frame[0] = root.forward;
-			frame[1] = root.left;
-			frame[2] = root.up;
-			ragdoll_orthonormalize(frame);
-			ragdoll_quaternion_from_frame(frame, &q);
-		}
-		position[0] = root.position.x;
-		position[1] = root.position.y;
-		position[2] = root.position.z;
-		rotation[0] = q.i;
-		rotation[1] = q.j;
-		rotation[2] = q.k;
-		rotation[3] = q.w;
-		/* (not held: it sits on the vehicle's seat and floor, Jolt's; the
-		vehicle as it is now, the frame its pose is read in) */
-		(void)position;
-		(void)rotation;
-		seated->pin_vehicle = *vehicle_matrix;
-		/* (its seat, under it and behind it, moving with the vehicle) */
-		{
-			struct object_datum *vehicle = object_try_and_get(seated->vehicle_index);
-			real_matrix4x3 seat;
-			real_vector3d frame[3];
-			struct ragdoll_quaternion sq;
-			float seat_position[3], seat_rotation[4], velocity[3] = { 0.f, 0.f, 0.f };
-			float cushion[3] = { RAGDOLL_SEAT_HALF_DEPTH, RAGDOLL_SEAT_HALF_WIDTH, RAGDOLL_SEAT_HALF_THICK };
-			float back_center[3] = { -RAGDOLL_SEAT_HALF_DEPTH - 0.02f, 0.f, 0.15f };
-			float back_half[3] = { 0.02f, RAGDOLL_SEAT_HALF_WIDTH, 0.15f };
-
-			matrix4x3_multiply(vehicle_matrix, &seated->seat_local, &seat);
-			/* (its centre half its thickness under its top) */
-			ragdoll_add_scaled(&seat.position, &seat.up, -RAGDOLL_SEAT_HALF_THICK);
-			frame[0] = seat.forward;
-			frame[1] = seat.left;
-			frame[2] = seat.up;
-			ragdoll_orthonormalize(frame);
-			ragdoll_quaternion_from_frame(frame, &sq);
-			seat_position[0] = seat.position.x;
-			seat_position[1] = seat.position.y;
-			seat_position[2] = seat.position.z;
-			seat_rotation[0] = sq.i;
-			seat_rotation[1] = sq.j;
-			seat_rotation[2] = sq.k;
-			seat_rotation[3] = sq.w;
-			if (vehicle)
-			{
-				velocity[0] = vehicle->object.translational_velocity.i;
-				velocity[1] = vehicle->object.translational_velocity.j;
-				velocity[2] = vehicle->object.translational_velocity.k;
-			}
-			ragdoll_physics_seat(ragdoll_slot(ragdoll), seat_position, seat_rotation, velocity, cushion,
-				back_center, back_half);
-		}
-	}
-}
-
-void ragdolls_seated_after_objects(
-	void)
-{
-	short index;
-
-	/* (every object has moved this tick: the seated where their vehicles
-	ended it, as it is drawn) */
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED; index++)
-	{
-		struct ragdoll_seated *seated = &ragdoll_seated_bodies[index];
-		real_matrix4x3 const *vehicle_matrix;
-
-		if (seated->biped_index == NONE || !seated->started || seated->released)
-			continue;
-		if (!object_try_and_get(seated->biped_index))
-		{
-			seated->biped_index = NONE;
-			continue;
-		}
-		vehicle_matrix = ragdoll_seated_vehicle_matrix(seated->vehicle_index);
-		if (vehicle_matrix)
-			ragdoll_seated_place(seated, vehicle_matrix);
-	}
-}
-
-void ragdoll_unit_left_seat(
-	long unit_index)
-{
-	struct ragdoll_seated *seated = ragdoll_seated_find(unit_index);
-	real_matrix4x3 const *vehicle_matrix;
-	real_matrix4x3 inverse;
-
-	if (!seated || seated->started)
-		return;
-	vehicle_matrix = ragdoll_seated_vehicle_matrix(seated->vehicle_index);
-	if (!vehicle_matrix)
-	{
-		seated->biped_index = NONE;
-		return;
-	}
-	matrix4x3_inverse(vehicle_matrix, &inverse);
-	matrix4x3_transform_point(&inverse, &object_get(unit_index)->object.position, &seated->exit_local);
-	/* (the pose it sat in kept, not the game's falling out of it) */
-	SET_FLAG(biped_get(unit_index)->object.flags, _object_do_not_recompute_node_matrices_bit, TRUE);
-	ragdoll_seated_place(seated, vehicle_matrix);
-}
-
-
-/* (v turned by angle radians about the unit axis) */
-static void ragdoll_seated_turn(
-	real_vector3d *v,
-	real_vector3d const *axis,
-	real angle)
-{
-	real c = (real)cos(angle);
-	real sn = (real)sin(angle);
-	real d = ragdoll_dot(axis, v);
-	real_vector3d cross;
-	real_vector3d result;
-
-	ragdoll_cross(axis, v, &cross);
-	result.i = v->i * c + cross.i * sn + axis->i * d * (1.f - c);
-	result.j = v->j * c + cross.j * sn + axis->j * d * (1.f - c);
-	result.k = v->k * c + cross.k * sn + axis->k * d * (1.f - c);
-	*v = result;
-}
-
-/* the node and every node below it turned about the node (in the vehicle's
-frame) */
-static void ragdoll_seated_turn_subtree(
-	struct ragdoll_seated *seated,
-	struct model const *model,
-	short root,
-	real_vector3d const *axis,
-	real angle)
-{
-	real_point3d pivot = seated->local[root].position;
-	short index;
-
-	for (index = 0; index < seated->node_count; index++)
-	{
-		short walk = index;
-		short guard = 0;
-		real_matrix4x3 *m = &seated->local[index];
-		real_vector3d offset;
-
-		while (walk != NONE && walk != root && guard++ < RAGDOLL_MAXIMUM_NODES)
-			walk = TAG_BLOCK_GET_ELEMENT(&model->nodes, walk, struct model_node)->parent_node_index;
-		if (walk != root)
-			continue;
-		ragdoll_sub(&m->position, &pivot, &offset);
-		ragdoll_seated_turn(&offset, axis, angle);
-		m->position = pivot;
-		ragdoll_add_scaled(&m->position, &offset, 1.f);
-		ragdoll_seated_turn(&m->forward, axis, angle);
-		ragdoll_seated_turn(&m->left, axis, angle);
-		ragdoll_seated_turn(&m->up, axis, angle);
-	}
-}
-
-/* limp where it sat: slumped forward a little, its head fallen forward and
-to a side, its arms dropped (the pose it died in otherwise) */
-static void ragdoll_seated_slump(
-	struct ragdoll_seated *seated,
-	real_vector3d const *facing_local,
-	real_vector3d const *up_local)
-{
-	struct biped_datum *biped = biped_get(seated->biped_index);
-	struct biped_definition *definition = biped_definition_get(biped->definition_index);
-	struct model const *model = definition->object.model.index != NONE ?
-		model_definition_get(definition->object.model.index) : NULL;
-	real_vector3d up = *up_local;
-	real_vector3d facing = *facing_local;
-	real_vector3d left;
-	short spine = NONE, head = NONE, index;
-	short depth_spine = SHRT_MAX;
-
-	if (!model || model->nodes.count < seated->node_count)
-		return;
-	ragdoll_vector_add_scaled(&facing, &up, -ragdoll_dot(&facing, &up));
-	if (ragdoll_normalize(&facing) <= 0.f)
-		return;
-	ragdoll_cross(&up, &facing, &left);
-	if (ragdoll_normalize(&left) <= 0.f)
-		return;
-	for (index = 0; index < seated->node_count; index++)
-	{
-		char const *name = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node)->name;
-
-		if (strstr(name, "spine"))
-		{
-			short depth = 0, walk = index;
-
-			while (walk != NONE && depth < RAGDOLL_MAXIMUM_NODES)
-			{
-				walk = TAG_BLOCK_GET_ELEMENT(&model->nodes, walk, struct model_node)->parent_node_index;
-				depth++;
-			}
-			if (depth < depth_spine)
-			{
-				depth_spine = depth;
-				spine = index;
-			}
-		}
-		if (head == NONE && strstr(name, "head"))
-			head = index;
-	}
-	/* (the chest forward) */
-	if (spine != NONE)
-		ragdoll_seated_turn_subtree(seated, model, spine, &left, real_local_random_range(0.15f, 0.3f));
-	/* (the arms down from the wheel or the gun) */
-	for (index = 0; index < seated->node_count; index++)
-	{
-		char const *name = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node)->name;
-
-		if (strstr(name, "upperarm"))
-			ragdoll_seated_turn_subtree(seated, model, index, &left, real_local_random_range(0.3f, 0.6f));
-	}
-	/* (the head fallen forward, and over to a side) */
-	if (head != NONE)
-	{
-		ragdoll_seated_turn_subtree(seated, model, head, &left, real_local_random_range(0.45f, 0.75f));
-		ragdoll_seated_turn_subtree(seated, model, head, &facing,
-			real_local_random_range(0.15f, 0.4f) * (local_random_range(0, 2) ? 1.f : -1.f));
-	}
-}
-
-static void ragdoll_seated_begin(
-	long unit_index)
-{
-	struct biped_datum *biped = biped_get(unit_index);
-	long vehicle_index = biped->object.parent_object_index;
-	real_matrix4x3 const *vehicle_matrix = ragdoll_seated_vehicle_matrix(vehicle_index);
-	long matrix_count = biped->object.node_matrices.size / (long)sizeof(real_matrix4x3);
-	struct ragdoll_seated *seated = NULL;
-	unsigned long coin;
-	short index;
-
-	ragdoll_parameters_initialize();
-	if (!ragdolls_enabled() || !vehicle_matrix || biped->unit.parent_seat_index == NONE ||
-		matrix_count <= 0 || matrix_count > RAGDOLL_MAXIMUM_NODES || !ragdoll_eligible(unit_index))
-	{
-		return;
-	}
-	coin = ((unsigned long)unit_index * 2246822519ul) ^ ((unsigned long)game_time_get() * 3266489917ul);
-	coin = (coin ^ (coin >> 13)) * 2654435761ul;
-	if ((real)((coin >> 8) & 0xffff) >= ragdoll_parameters.seated_share * 65536.f)
-		return;
-	for (index = 0; index < RAGDOLL_MAXIMUM_SEATED && !seated; index++)
-	{
-		struct ragdoll_seated *each = &ragdoll_seated_bodies[index];
-
-		if (each->biped_index == NONE || !object_try_and_get(each->biped_index))
-			seated = each;
-	}
-	if (!seated)
-		return; /* (too many sitting dead: this one falls out) */
-	csmemset(seated, 0, sizeof(*seated));
-	seated->biped_index = unit_index;
-	seated->vehicle_index = vehicle_index;
-	seated->seat_index = biped->unit.parent_seat_index;
-	seated->node_count = (short)matrix_count;
-	ragdoll_seated_take(seated, vehicle_matrix);
-	seated->root_local = seated->local[0];
-	seated->pin_vehicle = *vehicle_matrix;
-	{
-		real_matrix4x3 inverse;
-		real_vector3d facing;
-		real_vector3d up_local;
-
-		matrix4x3_inverse(vehicle_matrix, &inverse);
-		matrix4x3_transform_vector(&inverse, &biped->object.forward, &facing);
-		matrix4x3_transform_vector(&inverse, &object_get(vehicle_index)->object.up, &up_local);
-		if (ragdoll_normalize(&up_local) <= 0.f)
-			up_local.i = 0.f, up_local.j = 0.f, up_local.k = 1.f;
-		ragdoll_seated_slump(seated, &facing, &up_local);
-	}
-	csmemcpy(seated->target_local, seated->local, sizeof(seated->target_local));
-	seated->root_local = seated->target_local[0];
-	ragdoll_seated_log("%s", "stays in its seat");
-	/* (its seat: under its pelvis, level in the vehicle, facing as it faced) */
-	{
-		real_matrix4x3 inverse;
-		real_vector3d facing;
-
-		real_vector3d up_local;
-
-		/* (the vehicle's own frame, its root node's, need not stand upright:
-		up and the facing as the world has them, in it) */
-		matrix4x3_inverse(vehicle_matrix, &inverse);
-		matrix4x3_transform_vector(&inverse, &biped->object.forward, &facing);
-		matrix4x3_transform_vector(&inverse, &object_get(vehicle_index)->object.up, &up_local);
-		if (ragdoll_normalize(&up_local) <= 0.f)
-			up_local.i = 0.f, up_local.j = 0.f, up_local.k = 1.f;
-		ragdoll_vector_add_scaled(&facing, &up_local, -ragdoll_dot(&facing, &up_local));
-		if (ragdoll_normalize(&facing) <= 0.f)
-		{
-			real_vector3d any = { { 1.f, 0.f, 0.f } };
-
-			facing = any;
-			ragdoll_vector_add_scaled(&facing, &up_local, -ragdoll_dot(&facing, &up_local));
-			ragdoll_normalize(&facing);
-		}
-		csmemset(&seated->seat_local, 0, sizeof(seated->seat_local));
-		seated->seat_local.scale = 1.f;
-		seated->seat_local.forward = facing;
-		seated->seat_local.up = up_local;
-		ragdoll_cross(&seated->seat_local.up, &seated->seat_local.forward, &seated->seat_local.left);
-		seated->seat_local.position = seated->root_local.position;
-		ragdoll_add_scaled(&seated->seat_local.position, &up_local, -RAGDOLL_SEAT_DROP);
-	}
 }
 
 void ragdoll_unit_killed_in_seat(
@@ -1828,9 +1163,6 @@ void ragdoll_unit_killed_in_seat(
 			if (((coin >> 8) & 0xffff) < 0x8000)
 				SET_FLAG(biped_get(unit_index)->biped.flags, BIPED_PORT_RAGDOLL_CLASSIC_BIT, TRUE);
 		}
-		/* (else, a share stay sitting, limp) */
-		if (!TEST_FLAG(biped_get(unit_index)->biped.flags, BIPED_PORT_RAGDOLL_CLASSIC_BIT))
-			ragdoll_seated_begin(unit_index);
 	}
 }
 
@@ -1838,10 +1170,7 @@ void ragdoll_biped_deleted(
 	long biped_index)
 {
 	struct ragdoll *ragdoll = ragdoll_find(biped_index);
-	struct ragdoll_seated *seated = ragdoll_seated_find(biped_index);
 
-	if (seated)
-		seated->biped_index = NONE;
 	if (ragdoll)
 		ragdoll_free(ragdoll);
 }
@@ -1872,15 +1201,6 @@ boolean ragdoll_biped_update(
 	takes the body back, from where the ragdoll left it */
 	if (!dead)
 	{
-		{
-			struct ragdoll_seated *seated = ragdoll_seated_find(biped_index);
-
-			if (seated)
-			{
-				seated->biped_index = NONE;
-				SET_FLAG(biped->object.flags, _object_no_collisions_bit, FALSE);
-			}
-		}
 		if (ragdoll)
 			ragdoll_freeze(ragdoll, biped_index);
 		if (ragdolled)
@@ -1891,26 +1211,6 @@ boolean ragdoll_biped_update(
 		SET_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_FAILED_BIT, FALSE);
 		SET_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_CLASSIC_BIT, FALSE);
 		return FALSE;
-	}
-
-	/* left sitting in its seat, dead */
-	{
-		struct ragdoll_seated *seated = ragdoll_seated_find(biped_index);
-
-		if (seated && biped->object.parent_object_index == NONE)
-		{
-			if (ragdoll_seated_update(seated, enabled))
-			{
-				for (index = 0; index < RAGDOLL_MAXIMUM_PENDING_HITS; index++)
-				{
-					if (ragdoll_pending_hits[index].object_index == biped_index)
-						ragdoll_pending_hits[index].object_index = NONE;
-				}
-				return TRUE;
-			}
-			ragdolled = TEST_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_BIT);
-			ragdoll = ragdoll_find(biped_index);
-		}
 	}
 
 	/* in a seat, the seat has the body until it falls out; killed there (a
@@ -1953,7 +1253,7 @@ pilot blown out of a Banshee), it falls as the game has it fall */
 		/* falling to its death (a second and more in the air as it died, or
 		killed by the fall): the game's own fall, scream and landing */
 		if (!woken && !ragdoll_dying_find(biped_index) &&
-			(biped->biped.airborne_ticks > 30 ||
+			((biped->biped.airborne_ticks > 30 && !ragdoll_multiplayer_headshot_killed(biped_index)) ||
 				biped->unit.last_damage_category == RAGDOLL_DAMAGE_CATEGORY_FALLING))
 		{
 			SET_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_CLASSIC_BIT, TRUE);
@@ -1992,6 +1292,9 @@ pilot blown out of a Banshee), it falls as the game has it fall */
 					break;
 				}
 			}
+
+			/* (where it went limp, for network play) */
+			ragdoll_network_note(biped_index, &biped->object.position);
 
 			/* (a skeleton it cannot use: the stock death, for good) */
 			ragdoll = ragdoll_allocate(biped_index);
@@ -2190,6 +1493,120 @@ void ragdoll_note_damage(
 		}
 		ragdoll_pending_hits[oldest] = hit;
 	}
+}
+
+void ragdoll_note_multiplayer_headshot(
+	long object_index)
+{
+	short index;
+
+	if (!ragdolls_enabled())
+		return;
+	for (index = 0; index < RAGDOLL_MAXIMUM_PENDING_HITS; index++)
+	{
+		struct ragdoll_pending_hit *hit = &ragdoll_pending_hits[index];
+
+		if (hit->object_index == object_index && hit->time == game_time_get())
+			hit->multiplayer_headshot = TRUE;
+	}
+}
+
+/* ---------- network play */
+
+/* In a network game the host sends each body's position, and a machine
+without ragdolls plays the game's own death there: each machine's bodies lie
+where its own deaths took them. Only the drawing differs; nothing here is
+sent or decided differently. Where each body went limp here (its death spot)
+is kept: a client keeps its ragdoll where it lies while the host's body is
+near that spot, and a host reports the spot, so that the bodies of machines
+without ragdolls stay where they fell rather than following this one's. */
+
+static short ragdoll_network_find(
+	long object_index)
+{
+	short index;
+
+	if (!ragdoll_network_initialized)
+		return NONE;
+	for (index = 0; index < RAGDOLL_NETWORK_BODIES; index++)
+	{
+		if (ragdoll_network_bodies[index].object_index == object_index)
+			return index;
+	}
+	return NONE;
+}
+
+/* the body went limp here, at this spot */
+static void ragdoll_network_note(
+	long object_index,
+	real_point3d const *spot)
+{
+	short index = ragdoll_network_find(object_index);
+
+	if (!ragdoll_network_initialized)
+	{
+		for (index = 0; index < RAGDOLL_NETWORK_BODIES; index++)
+			ragdoll_network_bodies[index].object_index = NONE;
+		ragdoll_network_initialized = TRUE;
+		index = NONE;
+	}
+	if (index == NONE)
+	{
+		index = ragdoll_network_next;
+		ragdoll_network_next = (short)((ragdoll_network_next + 1) % RAGDOLL_NETWORK_BODIES);
+	}
+	ragdoll_network_bodies[index].object_index = object_index;
+	ragdoll_network_bodies[index].spot = *spot;
+}
+
+/* a body lying as this machine's ragdoll has it */
+static boolean ragdoll_network_body(
+	long object_index)
+{
+	struct object_datum *object = object_try_and_get(object_index);
+	struct biped_datum *biped;
+
+	if (!object || object->object.type != _object_type_biped)
+		return FALSE;
+	biped = biped_get(object_index);
+	return TEST_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_BIT) &&
+		TEST_FLAG(biped->object.damage_flags, _object_dead_bit) &&
+		biped->object.parent_object_index == NONE;
+}
+
+boolean ragdoll_network_keeps_position(
+	long object_index,
+	real_point3d const *host_position)
+{
+	short index;
+	real_point3d const *spot;
+
+	if (!ragdoll_network_body(object_index))
+		return FALSE;
+	if (!host_position || !ragdoll_valid_point(host_position))
+		return TRUE;
+	index = ragdoll_network_find(object_index);
+	spot = index != NONE ? &ragdoll_network_bodies[index].spot : &object_get(object_index)->object.position;
+	if (distance3d(host_position, spot) <= RAGDOLL_NETWORK_REACH)
+		return TRUE;
+	/* (moved far on the host: there, and near there from now on) */
+	ragdoll_network_note(object_index, host_position);
+	return FALSE;
+}
+
+boolean ragdoll_network_reported(
+	long object_index,
+	real_point3d *position)
+{
+	short index;
+
+	if (!ragdoll_network_body(object_index))
+		return FALSE;
+	index = ragdoll_network_find(object_index);
+	if (index == NONE)
+		return FALSE;
+	*position = ragdoll_network_bodies[index].spot;
+	return TRUE;
 }
 
 /* ---------- slots */
@@ -3416,70 +2833,6 @@ static void ragdolls_vehicles(
 				ragdoll_physics_vehicle(vehicle->object_index, ragdoll_vehicle_points, (int)point_count,
 					position, turn, velocity, spin);
 			}
-			/* (the dead sitting in it meet its surfaces, its seats and floor, not
-			its hull: made once, in its frame) */
-			if (ragdoll_parameters.seated_surfaces >= 0.5f && ragdoll_seated_in(vehicle->object_index) &&
-				!ragdoll_physics_vehicle_has_mesh(vehicle->object_index))
-			{
-				long triangle_count = 0;
-
-				for (prism_index = 0; prism_index < ragdoll_features.count[_collision_feature_prism]; prism_index++)
-				{
-					struct collision_prism const *prism = &ragdoll_features.prisms[prism_index];
-					real_point3d points[MAXIMUM_POINTS_PER_COLLISION_PRISM];
-					long count = MIN(prism->point_count, MAXIMUM_POINTS_PER_COLLISION_PRISM);
-					long point_index;
-
-					if (prism->object_index != vehicle->object_index || count < 3 || !valid_real_plane3d(&prism->plane) ||
-						prism->projection_axis < _x || prism->projection_axis > _z)
-					{
-						continue;
-					}
-					for (point_index = 0; point_index < count; point_index++)
-					{
-						real_point3d world;
-						real_vector3d offset;
-						real_vector3d local;
-
-						project_point2d(&prism->points[point_index], &prism->plane, prism->projection_axis,
-							prism->projection_sign, &world);
-						ragdoll_sub(&world, &object->object.position, &offset);
-						ragdoll_to_local(frame, &offset, &local);
-						points[point_index].x = local.i;
-						points[point_index].y = local.j;
-						points[point_index].z = local.k;
-					}
-					{
-						real_vector3d normal_local;
-
-						ragdoll_to_local(frame, &prism->plane.n, &normal_local);
-						for (point_index = 1; point_index + 1 < count && triangle_count < RAGDOLL_MAXIMUM_TRIANGLES; point_index++)
-						{
-							real_point3d const *a = &points[0];
-							real_point3d const *b = &points[point_index];
-							real_point3d const *c = &points[point_index + 1];
-							real_vector3d ab, ac, normal;
-							real *out = &ragdoll_triangles[triangle_count * 9];
-
-							ragdoll_sub(b, a, &ab);
-							ragdoll_sub(c, a, &ac);
-							ragdoll_cross(&ab, &ac, &normal);
-							if (ragdoll_dot(&normal, &normal_local) < 0.f)
-							{
-								real_point3d const *swap = b;
-
-								b = c;
-								c = swap;
-							}
-							out[0] = a->x; out[1] = a->y; out[2] = a->z;
-							out[3] = b->x; out[4] = b->y; out[5] = b->z;
-							out[6] = c->x; out[7] = c->y; out[8] = c->z;
-							triangle_count++;
-						}
-					}
-				}
-				ragdoll_physics_vehicle_mesh(vehicle->object_index, ragdoll_triangles, (int)triangle_count);
-			}
 		}
 	}
 	ragdoll_physics_vehicles_end();
@@ -3532,7 +2885,6 @@ static void ragdolls_step(
 	/* (vehicles first: a body one meets wakes, and is stepped this tick) */
 	if (ragdolls_enabled())
 		ragdolls_vehicles();
-	ragdolls_seated_pin();
 
 	for (index = 0; index < RAGDOLL_MAXIMUM_ACTIVE; index++)
 	{
@@ -3580,14 +2932,6 @@ static void ragdolls_step(
 				if (contact->slot < 0 || contact->slot >= RAGDOLL_MAXIMUM_ACTIVE ||
 					ragdolls[contact->slot].object_index == NONE)
 					continue;
-				/* (a body that sat dead in this vehicle, coming out of it: no
-				hit, no blood) */
-				{
-					struct ragdoll_seated const *seated = ragdoll_seated_find(ragdolls[contact->slot].object_index);
-
-					if (seated && seated->vehicle_index == contact->vehicle)
-						continue;
-				}
 				point.x = contact->point[0];
 				point.y = contact->point[1];
 				point.z = contact->point[2];
@@ -4050,13 +3394,6 @@ boolean ragdoll_object_set_position(
 
 	if (object->object.type != _object_type_biped)
 		return FALSE;
-	/* (sitting in its seat: it stays with the vehicle) */
-	{
-		struct ragdoll_seated *seated = ragdoll_seated_find(object_index);
-
-		if (seated && seated->started && !seated->released)
-			return TRUE;
-	}
 	biped = biped_get(object_index);
 	if (!TEST_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_BIT) ||
 		!TEST_FLAG(biped->object.damage_flags, _object_dead_bit) ||

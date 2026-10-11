@@ -67,6 +67,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "profile_sections.h"
 
 #include <math.h>
+#include "ragdoll.h"
 
 /* physics.c's */
 extern real global_gravity;
@@ -710,6 +711,12 @@ static void distributed_object_move(
 	struct object_datum *object = object_get(object_index);
 	real_vector3d offset;
 
+#if RAGDOLLS
+	/* (a body this machine's ragdoll has: where it lies here, unless the host
+	moved it far; how the dead lie is each machine's own, ragdoll.c) */
+	if (ragdoll_network_keeps_position(object_index, position))
+		return;
+#endif
 	/* (drawn from where it was, the difference fading over a few ticks) */
 	offset.i = object->object.position.x - position->x;
 	offset.j = object->object.position.y - position->y;
@@ -757,6 +764,11 @@ boolean network_objects_reconcile(
 	/* (what cannot be, from a message: not taken) */
 	if (!distributed_transform_valid(position, forward, up, velocity, angular_velocity, &valid_forward, &valid_up))
 		return FALSE;
+#if RAGDOLLS
+	/* (a body this machine's ragdoll has: where it lies here, ragdoll.c) */
+	if (ragdoll_network_keeps_position(object_index, position))
+		return FALSE;
+#endif
 	dx = position->x - object->object.position.x;
 	dy = position->y - object->object.position.y;
 	dz = position->z - object->object.position.z;
@@ -837,6 +849,15 @@ static void distributed_state_from_object(
 		&state->translational_velocity);
 	distributed_vector_pack(&object->object.angular_velocity, DISTRIBUTED_ANGULAR_VELOCITY_SCALE,
 		&state->angular_velocity);
+#if RAGDOLLS
+	/* (a body this machine's ragdoll has: where it fell, still, so that a
+	machine without ragdolls leaves its own body where it fell; ragdoll.c) */
+	if (ragdoll_network_reported(object_index, &state->position))
+	{
+		distributed_vector_pack(global_zero_vector3d, DISTRIBUTED_VELOCITY_SCALE, &state->translational_velocity);
+		distributed_vector_pack(global_zero_vector3d, DISTRIBUTED_ANGULAR_VELOCITY_SCALE, &state->angular_velocity);
+	}
+#endif
 }
 
 /* the vehicle the player's unit drives, or NONE */
@@ -1044,6 +1065,14 @@ static void distributed_change_from_object(
 	change->up = object->object.up;
 	change->translational_velocity = object->object.translational_velocity;
 	change->angular_velocity = object->object.angular_velocity;
+#if RAGDOLLS
+	/* (a body this machine's ragdoll has: where it fell, still; ragdoll.c) */
+	if (ragdoll_network_reported(object_index, &change->position))
+	{
+		change->translational_velocity = *global_zero_vector3d;
+		change->angular_velocity = *global_zero_vector3d;
+	}
+#endif
 	csmemcpy(change->change_colors, object->object.base_change_colors, sizeof(change->change_colors));
 	csmemcpy(change->region_permutations, object->object.region_permutations, sizeof(change->region_permutations));
 	SET_FLAG(change->flags, _distributed_object_at_rest_bit, TEST_FLAG(object->object.flags, _object_at_rest_bit));
@@ -2598,8 +2627,15 @@ void network_objects_handle_states(
 		while the host's falls hangs there; but not one this machine drives,
 		which the host's word, a round trip old, would stop as it sets off) */
 		at_rest = TEST_FLAG(state->flags, _distributed_object_at_rest_bit) || distributed_vehicle_unsteered(state->object_index);
-		if (!own_vehicle)
+		/* (not a body this machine's ragdoll has: its own at rest or not) */
+		if (!own_vehicle
+#if RAGDOLLS
+			&& !ragdoll_network_keeps_position(state->object_index, &state->position)
+#endif
+			)
+		{
 			SET_FLAG(object->object.flags, _object_at_rest_bit, at_rest);
+		}
 		dx = state->position.x - object->object.position.x;
 		dy = state->position.y - object->object.position.y;
 		dz = state->position.z - object->object.position.z;
