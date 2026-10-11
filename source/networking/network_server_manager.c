@@ -474,6 +474,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "interface/player_ui.h"
 #include "tag_files/tag_files.h"
+#include "map_share.h" /* port: port/linux/game/map_share.c */
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c), and the
 server browser's listing of a public game (p2p_lobby.c) */
@@ -3342,6 +3343,9 @@ void network_game_server_change_map_name(
 		map_name,
 		NETWORK_GAME_MAP_NAME_LENGTH - 1);
 	server->game.map.name[NETWORK_GAME_MAP_NAME_LENGTH - 1] = 0;
+	/* port: a Custom Edition map by the name its hash makes, which the
+	players download it by (port/linux/game/map_share.c) */
+	map_share_level_name_hash(server->game.map.name, NETWORK_GAME_MAP_NAME_LENGTH);
 	server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 
 	if (!network_game_server_send_game_data_pregame(server))
@@ -3527,6 +3531,10 @@ static boolean network_game_server_client_machine_timed_out(
 	}
 	if (TEST_FLAG(machine->flags, _network_client_machine_level_loaded_bit))
 		return silence > NETWORK_GAME_SERVER_CLIENT_TIMEOUT;
+	/* (port: downloading the map, which it says every few seconds, before
+	its players join: port/linux/game/map_share.c) */
+	if (map_share_machine_downloading(machine->machine_index))
+		return FALSE;
 	/* (joining the game in progress: waiting for its players to be added,
 	or loading; port: one that adds none in the time a machine has to in
 	the pregame holds its slot for nothing) */
@@ -4078,6 +4086,8 @@ static void network_game_server_cooperative_round(
 	server->game.variant_options.friendly_fire = friendly_fire;
 	csstrncpy(server->game.map.name, network_game_server_cooperative_next_map, sizeof(server->game.map.name) - 1);
 	server->game.map.name[sizeof(server->game.map.name) - 1] = 0;
+	/* port: by the name its hash makes (port/linux/game/map_share.c) */
+	map_share_level_name_hash(server->game.map.name, sizeof(server->game.map.name));
 	server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 	main_set_multiplayer_map_name(server->game.map.name);
 	server->game.maximum_teams = 1;
@@ -4153,6 +4163,8 @@ static boolean network_game_server_setup_game_from_playlist(
 		network_game_generate_local_machine_name(machine_name);
 		ustrncpy(server->game.name, machine_name, NETWORK_GAME_NAME_LENGTH - 1);
 		server->game.name[NETWORK_GAME_NAME_LENGTH - 1] = L'\0';
+		/* port: by the name its hash makes (port/linux/game/map_share.c) */
+		map_share_level_name_hash(server->game.map.name, sizeof(server->game.map.name));
 		server->game.map.version = (long)cache_files_map_version(server->game.map.name);
 		server->game.minimum_players = 2;
 		server->game.maximum_players = MAXIMUM_NETWORK_PLAYER_COUNT;
@@ -4636,6 +4648,7 @@ static boolean network_game_server_idle_pregame_tasks(
 			else if (network_game_server_client_machine_is_joined_to_game(server, client_machine) &&
 				!network_game_server_client_machine_is_local(server, client_machine) &&
 				!network_game_server_machine_has_players(server, client_machine->machine_index) &&
+				!map_share_machine_downloading(client_machine->machine_index) &&
 				(!network_game_has_free_player_slot(&server->game) ||
 					system_milliseconds() - network_game_server_client_machine_join_times[client_machine->machine_index] >
 						NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT))

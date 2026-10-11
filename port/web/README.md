@@ -140,7 +140,9 @@ reloads.
 - Internet play has no relay, as on the native builds: two machines whose
   networks let no direct connection through (some company and school
   networks block WebRTC) cannot play together.
-- No Custom Edition maps (their tag data's address is in the C heap there).
+- No Custom Edition maps (their tag data's address is in the C heap there),
+  so a browser neither downloads nor sends one (map sharing,
+  `port/linux/NETCODE.md`).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a

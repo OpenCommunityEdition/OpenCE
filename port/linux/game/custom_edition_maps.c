@@ -15,10 +15,15 @@ A map's level name is custom_maps\<name> (CUSTOM_EDITION_LEVEL_NAME_PREFIX),
 which the cache loader reads from the custom maps folders alone: a map named
 as one of the game's own levels (a30.map, bloodgulch.map) is listed and
 played as itself. The game engine keeps 63 characters of a level name, so a
-map whose name is longer than 51 is skipped.
+map whose name is longer than 51 is skipped. A map in the custom_maps folder
+is named for its hash (<name>_<hash>.map) once it has been found: a network
+game's level name then says which version of the map it is on, and a player
+without it can download it (map_share.h). The menus show the name without
+the hash, unless two versions of a map are listed.
 
 Each map can have, beside it in its folder:
-- <name>.bmp, its picture (bmp_files.c). The middle is cropped to the
+- <name>.bmp, its picture (bmp_files.c; for a map named for its hash, a
+  picture named without the hash also does). The middle is cropped to the
   menus' picture shape. It is read the first time it is drawn, and freed
   when the maps are rescanned. Without one, the unknown level's picture
   is shown.
@@ -41,6 +46,7 @@ Each map can have, beside it in its folder:
 #include "bmp_files.h"
 #include "custom_edition_cache.h"
 #include "custom_edition_maps.h"
+#include "map_share.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,29 +186,32 @@ static void custom_edition_maps_forget(
 	return;
 }
 
-/* the map's index in stock_maps, or NONE */
+/* the map's index in stock_maps, or NONE (by its name without its hash) */
 static short stock_map_index(
 	char const *name)
 {
+	short length = map_share_name_base_length(name);
 	short index;
 
 	for (index = 0; index < NUMBEROF(stock_maps); index++)
 	{
-		if (!csstrcasecmp(name, stock_maps[index].file))
+		if ((short)csstrlen(stock_maps[index].file) == length && !_strnicmp(name, stock_maps[index].file, length))
 			return index;
 	}
 	return NONE;
 }
 
 /* A map's menu name: Halo PC's name for its own maps, otherwise the file
-name with underscores as spaces and words capitalized ("the_bay_of_pigs"
-becomes "The Bay Of Pigs"). */
+name (without the hash it ends in, unless `hash`) with underscores as spaces
+and words capitalized ("the_bay_of_pigs" becomes "The Bay Of Pigs"). */
 static void display_name_make(
 	char const *name,
+	boolean hash,
 	wchar_t *display_name)
 {
 	boolean word_start = TRUE;
-	short index = stock_map_index(name);
+	short index = hash ? NONE : stock_map_index(name);
+	short length = hash ? (short)csstrlen(name) : map_share_name_base_length(name);
 
 	if (index != NONE)
 	{
@@ -210,7 +219,7 @@ static void display_name_make(
 		return;
 	}
 
-	for (index = 0; name[index]; index++)
+	for (index = 0; index < length; index++)
 	{
 		unsigned char character = (unsigned char)name[index];
 
@@ -245,6 +254,13 @@ static void custom_edition_map_description_read(
 
 	csprintf(path, "%s%s%s", map->folder, map->name, DESCRIPTION_EXTENSION);
 	stream = fopen(path, "rb");
+	/* (a map named for its hash: its description named without it too) */
+	if (!stream && map_share_name_hashed(map->name))
+	{
+		csprintf(path, "%s%.*s%s", map->folder, (int)map_share_name_base_length(map->name), map->name,
+			DESCRIPTION_EXTENSION);
+		stream = fopen(path, "rb");
+	}
 	if (stream)
 	{
 		text_size = (long)fread(text, 1, sizeof(text), stream);
@@ -371,8 +387,11 @@ static void custom_edition_map_add(
 	csstrcpy(map->name, name);
 	csstrncpy(map->folder, folder, sizeof(map->folder) - 1);
 	csprintf(map->level_name, "%s%s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, name);
-	display_name_make(name, map->display_name);
+	display_name_make(name, FALSE, map->display_name);
 	custom_edition_map_description_read(map);
+	/* (named for its hash, renamed: map_share_files.c) */
+	if (!map_share_name_hashed(name))
+		map_share_name_map(folder, name);
 
 	return;
 }
@@ -384,6 +403,28 @@ static int custom_edition_map_compare(
 	return (int)csstrcasecmp(
 		((struct custom_edition_map const *)first)->name,
 		((struct custom_edition_map const *)second)->name);
+}
+
+/* Two versions of a map (its name the same but for its hash) listed: each
+shown with its hash, to tell them apart. The maps are sorted by name. */
+static void custom_edition_maps_tell_versions_apart(
+	struct custom_edition_map *maps,
+	short count)
+{
+	short index;
+
+	for (index = 0; index + 1 < count; index++)
+	{
+		struct custom_edition_map *map = &maps[index];
+		struct custom_edition_map *next = &maps[index + 1];
+		short length = map_share_name_base_length(map->name);
+
+		if (length == map_share_name_base_length(next->name) && !_strnicmp(map->name, next->name, length))
+		{
+			display_name_make(map->name, TRUE, map->display_name);
+			display_name_make(next->name, TRUE, next->display_name);
+		}
+	}
 }
 
 static void custom_edition_maps_look_for(
@@ -441,6 +482,8 @@ static void custom_edition_maps_look_for(
 	}
 	qsort(globals->maps, globals->map_count, sizeof(globals->maps[0]), custom_edition_map_compare);
 	qsort(globals->campaigns, globals->campaign_count, sizeof(globals->campaigns[0]), custom_edition_map_compare);
+	custom_edition_maps_tell_versions_apart(globals->maps, globals->map_count);
+	custom_edition_maps_tell_versions_apart(globals->campaigns, globals->campaign_count);
 	error(_error_silent, "custom edition: %d multiplayer maps for the level list, %d campaign maps", globals->map_count,
 		globals->campaign_count);
 
@@ -462,6 +505,13 @@ static struct bitmap_data *custom_edition_map_picture_read(
 
 	csprintf(path, "%s%s%s", map->folder, map->name, PICTURE_EXTENSION);
 	stream = fopen(path, "rb");
+	/* (a map named for its hash: its picture named without it too) */
+	if (!stream && map_share_name_hashed(map->name))
+	{
+		csprintf(path, "%s%.*s%s", map->folder, (int)map_share_name_base_length(map->name), map->name,
+			PICTURE_EXTENSION);
+		stream = fopen(path, "rb");
+	}
 	if (!stream)
 	{
 		return NULL;

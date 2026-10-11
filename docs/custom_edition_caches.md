@@ -33,6 +33,26 @@ network games, and is never taken for one of the campaign's levels (saved
 games, progress, the next level). The game engine keeps 63 characters of a
 level name, so a map whose file name is longer than 51 is not listed.
 
+A map in `custom_maps` is named for its contents once the map lists (or a
+host picking it) find it: `hugeass.map` becomes `hugeass_0e2b3ee4.map`, the
+first 8 hexadecimal digits of its hash after `_`, its `.bmp` and `.txt`
+renamed with it (`port/linux/game/map_share_files.c`; the name is cut short
+to keep the level name within 63 characters). A network game's level name
+then says which version of the map it is on, a player without it downloads
+it under that name (`port/linux/NETCODE.md`, "Map sharing"), and two
+versions of a map keep apart. A level name without the hash (a saved last
+map, a test's) finds the one map of that name in `custom_maps`. The menus
+show a map without its hash, unless two versions of it are listed. Maps in
+a Custom Edition install's folder keep their names.
+
+A map needs only the resource maps that hold its tags: its tag index says
+which (`cache_file_resource_maps_needed`, `cache_file_formats.c`: a tag
+whose entry's word at 0x18 is set is held whole by `bitmaps.map` for a
+bitmap, `sounds.map` for a sound, `loc.map` for a font, string list or HUD
+message text). A map without such tags of a kind plays without that
+resource map; one that lacks a resource map it needs is refused, saying
+which.
+
 ### In the menus
 
 The map lists (New Game's, and the Map screen of Create Game's INTERNET and
@@ -438,8 +458,14 @@ a campaign level at the difficulty chosen; the Map screen's (LAN) listed its
 difficulties, set up co-op in Server Setup and showed it in the lobby as
 co-op. With `debug.network_test`, two machines on loopback played
 `custom_maps\a30` as network co-op and `custom_maps\hugeass` as slayer; a
-joining machine without the map, without the resource maps, or with a maps
-folder missing the host's Xbox map was shown each error and left the game.
+joining machine with a maps folder missing the host's Xbox map was shown the
+error and left the game. A joining machine without `hugeass` (or without
+`sounds.map` and `loc.map` too) downloaded them and played (map sharing,
+`port/linux/NETCODE.md`): in the lobby, into a game in progress, from the
+host and another player at once with a second machine downloading beside it
+(on loopback, and through internet play's tunnels with a local broker), each
+file the same as the host's; with `network.map_download` off, or a host with
+`network.map_share` off, it was shown the error and left.
 
 ### Not tested
 
