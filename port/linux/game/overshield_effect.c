@@ -1,8 +1,7 @@
 /*
 OVERSHIELD_EFFECT.C
 
-The overshield, as this machine draws it (Video Setup > Graphics >
-Overshield, display.overshield_effect):
+The overshield, as every machine draws it:
 
 - As it charges, the shield's flare rises up the body from the feet to the
   top of the head, its edge soft, and stays lit, whole, for as long as the
@@ -10,7 +9,8 @@ Overshield, display.overshield_effect):
   a full shield, or 3 seconds when the shield was down (the charge's from
   nothing); from any other shield, 2. Meanwhile the shield's own flares
   (its hits, its recharge) are not drawn over it.
-- The flare's energy moves at 30% of its speed.
+- The flare's energy moves at 30% of its speed, in the overshield's own
+  color (the powerup's), whatever shield color its player chose.
 - On the first-person arms (with display.viewmodel_shield) it comes up as
   the rise reaches them, and stays.
 - A hit on it plays what a hit on an Elite's shield plays (the hitting
@@ -45,9 +45,6 @@ from below its lowest node to above its highest.
 #include "sound/sound_definitions.h"
 #include "objects/light_definitions.h"
 
-/* port/linux/src/port_config.c */
-int config_boolean(const char *name);
-unsigned long config_changes(void);
 /* port/linux/game/view_fov.c */
 boolean viewmodel_shield_is_visible(void);
 
@@ -71,6 +68,9 @@ from a down one (the charge's own times: 2 and 3 of shield a second) */
 /* where on the rise the arms come up, and over how much of it */
 #define OVERSHIELD_EFFECT_ARMS_START 0.55f
 #define OVERSHIELD_EFFECT_ARMS_LENGTH 0.3f
+
+/* the overshield's color: the powerup's */
+static real_rgb_color const overshield_effect_rgb = { 0.992f, 0.306f, 0.455f }; /* (253, 78, 116) */
 
 /* the plasma shader's fields after its header (rasterizer_xbox_plasma_energy.c's) */
 struct overshield_effect_plasma
@@ -109,18 +109,11 @@ static struct
 } overshield_effect_models[OVERSHIELD_EFFECT_MODELS];
 static short overshield_effect_next_model = 0;
 
+/* (a feature of every game: each machine draws every player's overshield) */
 static boolean overshield_effect_enabled(
 	void)
 {
-	static unsigned long changes = (unsigned long)-1;
-	static boolean enabled = FALSE;
-
-	if (changes != config_changes())
-	{
-		changes = config_changes();
-		enabled = config_boolean("display.overshield_effect") != 0;
-	}
-	return enabled;
+	return TRUE;
 }
 
 static boolean overshield_effect_model_heights(
@@ -400,4 +393,25 @@ boolean overshield_effect_hit_effect_allowed(
 		}
 	}
 	return TRUE;
+}
+
+/* the color a plasma shader drawn with values from overshield_effect_values
+is drawn in, the overshield's own; FALSE for values not from it */
+boolean overshield_effect_color(
+	real const *values,
+	real_rgb_color *color)
+{
+	real energy_speed, inverse_softness, height;
+
+	if (!overshield_effect_draw(values, &energy_speed, &inverse_softness, &height))
+		return FALSE;
+	*color = overshield_effect_rgb;
+	return TRUE;
+}
+
+/* the overshield's color, for its glow */
+real_rgb_color const *overshield_effect_glow_color(
+	void)
+{
+	return &overshield_effect_rgb;
 }

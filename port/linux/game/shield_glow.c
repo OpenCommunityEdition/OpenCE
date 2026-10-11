@@ -49,6 +49,7 @@ long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light_index, long object_index, real_rgb_color const *color, real radius);
 /* port/linux/game/overshield_effect.c */
 real overshield_effect_flare(long unit_index);
+real_rgb_color const *overshield_effect_glow_color(void);
 
 enum
 {
@@ -179,6 +180,9 @@ static real shield_glow_flare(
 	value = (real)pow((double)value, (double)plasma->intensity_exponent);
 
 	*color = plasma->perpendicular_color;
+	/* (an overshield: its own color) */
+	if (overshield_effect_flare(unit_index) >= 0.f)
+		*color = *overshield_effect_glow_color();
 	peak = MAX(color->red, MAX(color->green, color->blue));
 	if (!(peak > 0.f))
 		return 0.f;

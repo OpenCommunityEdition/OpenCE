@@ -317,12 +317,6 @@ static const struct config_setting config_settings[] =
 	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
 		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
 		"times as far, and at full strength from a third of the flare)." },
-	{ "display.overshield_effect", _config_boolean, "false", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
-		"The overshield as this machine draws it: its flare rising up the body as\n"
-		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
-		"its energy slower, on the first-person arms too with viewmodel_shield;\n"
-		"a hit on it plays what the projectile plays on an Elite's shield. Only\n"
-		"what is drawn and heard changes." },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
 		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"

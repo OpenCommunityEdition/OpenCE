@@ -144,6 +144,7 @@ boolean shield_color_override(real_rgb_color const *colors, real_rgb_color *chos
 void shield_color_apply(real_rgb_color const *chosen, real_rgb_color const *original, real_rgb_color *result);
 /* port: port/linux/game/overshield_effect.c */
 boolean overshield_effect_draw(real const *values, real *energy_speed, real *inverse_softness, real *height);
+boolean overshield_effect_color(real const *values, real_rgb_color *color);
 /* port: port/linux/src/d3d8_gl.c */
 void d3d8_gl_set_height_fade(float inverse_softness, float height, float offset, float scale);
 
@@ -228,7 +229,8 @@ void rasterizer_plasma_energy_draw(
 		(port/linux/game/shield_color.c) */
 		perpendicular_color = plasma->perpendicular_color;
 		parallel_color = plasma->parallel_color;
-		if (shield_color_override(runtime ? runtime->colors : NULL, &chosen))
+		if ((runtime && overshield_effect_color(runtime->exponents, &chosen)) ||
+			shield_color_override(runtime ? runtime->colors : NULL, &chosen))
 		{
 			shield_color_apply(&chosen, &plasma->perpendicular_color, &perpendicular_color);
 			shield_color_apply(&chosen, &plasma->parallel_color, &parallel_color);
