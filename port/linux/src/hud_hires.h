@@ -62,6 +62,10 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 /* its GL texture (decoded and uploaded, mipmapped, on first use; 0 if it
 could not be), and the number of its mip levels */
 unsigned int hud_hires_override_texture(long asset, unsigned long *levels);
+#ifdef HALO_WEB
+/* warm a matched map texture on the game worker, when its setting is enabled */
+void hud_hires_prepare(long asset);
+#endif
 /* a GL texture drawn from an 8-bit RGBA PNG (as the tools write them), with
 all its mip levels, and their number; 0 if it could not be */
 unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned long *levels);

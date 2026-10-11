@@ -324,9 +324,15 @@ void game_state_save(
 {
 	game_state_call_before_save_procs();
 
+	/* port: web saves complete synchronously. Keep their elapsed time so
+	the next update and interpolated frame are not skipped. */
+#ifndef HALO_WEB
 	main_stop_time();
+#endif
 	game_state_globals.saved_game_valid = (game_state_write_to_file()!=FALSE);
+#ifndef HALO_WEB
 	main_start_time();
+#endif
 	game_state_note_event("checkpoint saved");
 
 	return;

@@ -22,6 +22,10 @@ Conventions carried over from the Xbox:
 */
 
 #include "xgpu.h"
+#ifdef HALO_WEB
+#include "web_shader_cache.h"
+static void web_shader_program_prepare(GLuint vertex_shader, GLuint fragment_shader);
+#endif
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
@@ -1738,6 +1742,10 @@ static void gl_initialize(void)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
+#ifdef HALO_WEB
+	web_shader_cache_initialize(web_shader_program_prepare);
+	xgpu_gl_state_invalidate();
+#endif
 }
 
 /* what display.anti_aliasing's value needs of the GL context, once there is
@@ -2702,7 +2710,11 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
 		program->shaders_tried |= tried;
+#ifdef HALO_WEB
+		*shader = web_shader_cache_get(GL_VERTEX_SHADER, source, "vertex");
+#else
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
+#endif
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -2721,7 +2733,38 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 	return *shader;
 }
 
+#ifdef HALO_WEB
+/* The game's vertex programs are known at startup. All use their own
+input declarations; the three programs selected by address share one
+(rasterizer_xbox_vertex_shaders_runtime.c). Compile before play begins. */
+void halo_vertex_shader_prepare(unsigned long handle)
+{
+	struct vertex_shader_object *object = vertex_shader_from_handle((DWORD)handle);
+	struct vertex_shader_object *saved = device.vertex_shader;
+	int lit;
+
+	if (!device.gl_ready || !object || !object->instructions)
+		return;
+	device.vertex_shader = object;
+	for (lit = 0; lit <= (object->lighting.lights != 0); lit++)
+	{
+		vertex_shader_get(object, FALSE, lit);
+		vertex_shader_get(object, TRUE, lit);
+	}
+	device.vertex_shader = saved;
+}
+#endif
+
 typedef char pixel_shader_key_size_assert[sizeof(struct nv2a_pixel_shader_key) % 4 == 0 ? 1 : -1];
+
+#ifdef HALO_WEB
+/* Inactive combiner states can give different keys the same GLSL. Keep one
+shader for each source, so those keys also share their linked programs. */
+static GLuint fragment_source_get(const char *source)
+{
+	return web_shader_cache_get(GL_FRAGMENT_SHADER, source, "pixel");
+}
+#endif
 
 static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 {
@@ -2754,7 +2797,11 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
+#ifdef HALO_WEB
+	entry->shader = fragment_source_get(source);
+#else
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
+#endif
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -2860,9 +2907,19 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		snprintf(name, sizeof(name), "tex%d", stage);
 		glUniform1i(glGetUniformLocation(entry->program, name), stage);
 	}
+#ifdef HALO_WEB
+	web_shader_cache_linked(vertex_shader, fragment_shader);
+#endif
 	last = entry;
 	return entry;
 }
+
+#ifdef HALO_WEB
+static void web_shader_program_prepare(GLuint vertex_shader, GLuint fragment_shader)
+{
+	program_get(vertex_shader, fragment_shader);
+}
+#endif
 
 /* ---------- per-draw state */
 
@@ -4990,7 +5047,10 @@ the mirror does not hold. An index array drawn twice the same is kept
 instead, rebased, in a buffer of its own: a draw of it compares its indices
 with a copy and draws from the buffer. Arrays that change (the structure's
 visible triangles, made each frame) are never the same twice, and are
-uploaded as before. When the buffer is full, everything kept is forgotten. */
+uploaded as before. Each kept array has its own buffer, so adding another
+cannot make WebGL preserve a large buffer that earlier draws still read.
+Live cache payload is limited to INDEX_CACHE_BUFFER_SIZE bytes; deleted
+buffers may remain referenced by inactive vertex arrays. */
 #define INDEX_CACHE_BUFFER_SIZE (8 * 1024 * 1024)
 #define INDEX_CACHE_SLOTS 8192
 #define INDEX_CACHE_PROBES 4
@@ -5003,24 +5063,36 @@ struct index_cache_entry
 	WORD *copy;
 	unsigned long capacity;
 	WORD minimum, maximum;
-	/* in the buffer (when kept is the epoch), or not yet: seen once */
-	unsigned long offset;
+	GLuint buffer;
+	/* the last frame used, plus one; zero when seen only once */
 	unsigned long kept;
 };
 
 static struct
 {
-	GLuint buffer;
 	unsigned long used;
-	/* entries kept in an earlier epoch are not in the buffer */
-	unsigned long epoch;
+	unsigned long next_eviction;
 	struct index_cache_entry entries[INDEX_CACHE_SLOTS];
-} index_cache = { 0, 0, 1 };
+} index_cache;
 
-/* the buffer offset of the rebased indices kept for the array, with their
+static void index_cache_release(struct index_cache_entry *entry)
+{
+	if (!entry->buffer)
+		return;
+	glDeleteBuffers(1, &entry->buffer);
+	index_cache.used -= entry->count * sizeof(WORD);
+	entry->buffer = 0;
+	entry->kept = 0;
+	/* Deletion unbinds it; cached vertex arrays must not remember its
+	name if the browser gives that name to a new buffer. */
+	gl_state.element_array_buffer = (GLuint)-1;
+	vertex_array_cache_invalidate();
+}
+
+/* the buffer of the rebased indices kept for the array, with their
 extent; FALSE if it is not kept (yet) */
 static BOOL index_cache_get(const WORD *indices, unsigned long count, unsigned long *minimum, unsigned long *maximum,
-	unsigned long *offset)
+	GLuint *buffer)
 {
 	unsigned long slot = (((unsigned long)indices >> 1) ^ (count * 2654435761UL)) % INDEX_CACHE_SLOTS;
 	unsigned long probe, size = count * sizeof(WORD), index;
@@ -5041,44 +5113,44 @@ static BOOL index_cache_get(const WORD *indices, unsigned long count, unsigned l
 	}
 	if (entry && entry->copy && !memcmp(entry->copy, indices, size))
 	{
-		if (entry->kept == index_cache.epoch)
+		if (!entry->buffer)
 		{
-			*minimum = entry->minimum;
-			*maximum = entry->maximum;
-			*offset = entry->offset;
-			return TRUE;
+			/* the second time the same: kept from now on */
+			if (size > INDEX_CACHE_BUFFER_SIZE)
+				return FALSE;
+			rebased = malloc(size + 2);
+			if (!rebased)
+				return FALSE;
+			for (index = 0; index < count; index++)
+				rebased[index] = (WORD)(indices[index] - entry->minimum);
+			/* Evict only enough old buffers to make room. Their CPU
+			copies still recognize the next draw's indices. */
+			while (index_cache.used + size > INDEX_CACHE_BUFFER_SIZE)
+			{
+				index_cache_release(&index_cache.entries[index_cache.next_eviction]);
+				index_cache.next_eviction = (index_cache.next_eviction + 1) % INDEX_CACHE_SLOTS;
+			}
+			glGenBuffers(1, &entry->buffer);
+			if (!entry->buffer)
+			{
+				free(rebased);
+				return FALSE;
+			}
+			state_element_array_buffer(entry->buffer);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)size, rebased, GL_STATIC_DRAW);
+			free(rebased);
+			index_cache.used += size;
 		}
-		/* the second time the same: kept from now on */
-		if (index_cache.used + ((size + 15) & ~15UL) > INDEX_CACHE_BUFFER_SIZE)
-		{
-			index_cache.epoch++;
-			index_cache.used = 0;
-		}
-		if (!index_cache.buffer)
-		{
-			glGenBuffers(1, &index_cache.buffer);
-			state_element_array_buffer(index_cache.buffer);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_CACHE_BUFFER_SIZE, NULL, GL_STATIC_DRAW);
-		}
-		rebased = malloc(size + 2);
-		if (!rebased)
-			return FALSE;
-		for (index = 0; index < count; index++)
-			rebased[index] = (WORD)(indices[index] - entry->minimum);
-		state_element_array_buffer(index_cache.buffer);
-		host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)index_cache.used, (unsigned int)size, rebased);
-		free(rebased);
-		entry->offset = index_cache.used;
-		entry->kept = index_cache.epoch;
-		index_cache.used += (size + 15) & ~15UL;
+		entry->kept = device.frame + 1;
 		*minimum = entry->minimum;
 		*maximum = entry->maximum;
-		*offset = entry->offset;
+		*buffer = entry->buffer;
 		return TRUE;
 	}
 	/* seen for the first time, or changed: remembered */
 	if (!entry)
 		entry = oldest;
+	index_cache_release(entry);
 	if (entry->capacity < count)
 	{
 		WORD *grown = realloc(entry->copy, size);
@@ -5120,12 +5192,12 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		mirror_range((unsigned long)index_data, vertex_count * sizeof(WORD), &index_buffer, &index_offset, &generation);
 #ifdef HALO_WEB
 	if (!mirrored && primitive_type != D3DPT_QUADLIST &&
-		index_cache_get(index_data, vertex_count, &minimum, &maximum, &index_offset))
+		index_cache_get(index_data, vertex_count, &minimum, &maximum, &index_buffer))
 	{
 		trace_draw("indexed", primitive_type, vertex_count, NULL);
 		setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
-		state_element_array_buffer(index_cache.buffer);
-		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
+		state_element_array_buffer(index_buffer);
+		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, NULL);
 		return;
 	}
 #endif
