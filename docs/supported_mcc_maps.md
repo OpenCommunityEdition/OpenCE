@@ -1,51 +1,146 @@
-## Supported MCC Maps (updated 11-OCT-2026 @ 7:15PM)
+## Supported MCC Maps (updated 11-OCT-2026)
 
-**Singleplayer Maps**
+### Singleplayer Maps
 
-- Assault (The M1 Map Pack): Loads
-- B20 (Digsite): Loads
-- C10 (Recovered Footage): Loads
-- C40 (Recovered Footage): Loads
-- City (Digsite): Loads
-- CrashSite: Works from start to finish on Normal!
-- Defense (The M1 Map Pack): Loads
-- Destructo (Digsite): Works from start to finish on Normal!
-- Hoverboard (Inferno’s Ancient Mod Pack): Loads
-- Inf (RUMINATE): Loads
-- Moonbase (The M1 Map Pack): Loads
-- Nuts (Inferno’s Ancient Mod Pack): Loads
-- Spacestation (Digsite): Loads
-- Spasm_Playground (Digsite): Loads
-- The_Rush: Works from start to finish on Normal!
+- **Assault**
+  - Map Pack: The M1 Map Pack
+- **B20**
+  - Map Pack: Digsite
+- **C10**
+  - Map Pack: Recovered Footage
+- **C40**
+  - Map Pack: Recovered Footage
+- **Casemate**
+  - Map Pack: Casemate
+- **City**
+  - Map Pack: Digsite
+- **Crash Site**
+  - Map Pack: Crash Site
+- **Defense**
+  - Map Pack: The M1 Map Pack
+- **Destructo**
+  - Map Pack: Digsite
+- **Firefight Freezerburn**
+  - Map Pack: Firefight Freezerburn
+- **Hoverboard**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Inf**
+  - Map Pack: RUMINATE
+- **Mercury Rising**
+  - Map Pack: Mercury Rising & Mercury Rising II
+- **Mercury Rising 2**
+  - Map Pack: Mercury Rising & Mercury Rising II
+- **Moonbase**
+  - Map Pack: The M1 Map Pack
+- **Nuts**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Security Breach**
+  - Map Pack: Security Breach
+- **Spacestation**
+  - Map Pack: Digsite
+- **Spasm_Playground**
+  - Map Pack: Digsite
+- **The_Rush**
+  - Map Pack: The_Rush
+- **The Truth & Reconciliation: Revisited**
+  - Map Pack: The Truth & Reconciliation: Revisited
 
-**Multiplayer Maps**
+### Multiplayer Maps
 
-- Amplitude (Inferno’s Ancient Mod Pack): Loads
-- Anomly (Inferno’s Ancient Mod Pack): Loads
-- Cairo (Inferno’s Ancient Mod Pack): Loads
-- Circle_Pit (Inferno’s Ancient Mod Pack): Loads
-- Dismal (Inferno’s Ancient Mod Pack): Loads
-- Duet (Inferno’s Ancient Mod Pack): Loads
-- Harbinger (Inferno’s Ancient Mod Pack): Loads
-- HighGround (Inferno’s Ancient Mod Pack): Loads
-- Lefty (Inferno’s Ancient Mod Pack): Loads
-- Mindfuck (Inferno’s Ancient Mod Pack): Loads
-- Pipeline (Inferno’s Ancient Mod Pack): Loads
-- Shard (Inferno’s Ancient Mod Pack): Loads
-- Snowtrap (Inferno’s Ancient Mod Pack): Loads
-- SplashSite: Loads! :D
-- Station_Omega (Inferno’s Ancient Mod Pack): Loads
-- Substation (Inferno’s Ancient Mod Pack): Loads
-- Vertigo (Inferno’s Ancient Mod Pack): Loads
+- **Amplitude**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Anomly**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Cairo**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Circle_Pit**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Despondency**
+  - Map Pack: Despondency
+- **Dismal**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Duet**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Harbinger**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **HighGround**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Judgement**
+  - Map Pack: Judgement
+- **Lefty**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Mindfuck**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Pipeline**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Promenade**
+  - Map Pack: Promenade
+- **Shard**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Snowtrap**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Splash Site**
+  - Map Pack: Splash Site
+- **Station_Omega**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Substation**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Vertigo**
+  - Map Pack: Inferno's Ancient Mod Pack
+- **Vivarium**
+  - Map Pack: Vivarium
 
-## Unsupported MCC Maps (updated 11-OCT-2026 @ 7:15PM)
+## Work In Progress Supported MCC Maps (updated 11-OCT-2026)
 
-- A10_Mirrored / A10_Mirrored_LC (Mirror of Autumn): MCC map error
-- BioHalo: MCC map error
-- Canyon-Plus (Halo CE+ Beyond): MCC map error
-- DTSP (Sali Singleplayer Pack): MCC map error
-- Epsilon (Inferno’s Ancient Mod Pack): MCC map error
-- Salisp (Sali Singleplayer Pack): MCC map error
-- SWFTC20 (New Super Wacky Funtime: Ultimate MCC Edition): MCC map error
-- Halo CE+ Beyond: Apart from CO2-Plus, all other maps bluescreen on startup.
-- Orion MP (The Entire Map Pack): Every map from this workshop addon bluescreens on startup.
+### Singleplayer Maps
+
+- **Halo Combat Revolved**
+  - Map Pack: Halo Combat Revolved
+  - Status: Majority of maps load; some exceed the hardcoded Xbox limit of 512 named script objects and are refused.
+- **Ruby's Rebalanced Halo CE**
+  - Map Pack: Ruby's Rebalanced Halo CE
+  - Status: Majority of maps load; some exceed the hardcoded Xbox limit of 512 named script objects and are refused.
+
+### Multiplayer Maps
+
+- N/A (for now)
+
+## Unsupported MCC Maps (updated 11-OCT-2026)
+
+- **A10_Mirrored / A10_Mirrored_LC**
+  - Map Pack: Mirror of Autumn
+  - Status: MCC map error
+- **BioHalo**
+  - Map Pack: Not specified
+  - Status: MCC map error
+- **Canyon-Plus**
+  - Map Pack: Halo CE+ Beyond
+  - Status: MCC map error
+- **DTSP**
+  - Map Pack: Sali Singleplayer Pack
+  - Status: MCC map error
+- **Epsilon**
+  - Map Pack: Inferno's Ancient Mod Pack
+  - Status: MCC map error
+- **Halo CE+ Beyond**
+  - Map Pack: Halo CE+ Beyond
+  - Status: Apart from CO2-Plus, all other maps bluescreen on startup.
+- **Orion MP**
+  - Map Pack: The Entire Map Pack
+  - Status: Every map from this workshop addon bluescreens on startup.
+- **Salisp**
+  - Map Pack: Sali Singleplayer Pack
+  - Status: MCC map error
+- **SWFTC20**
+  - Map Pack: New Super Wacky Funtime: Ultimate MCC Edition
+  - Status: MCC map error
+
+## Map Compatibility Summary
+
+| Status | Category | Entries |
+|---|---|---:|
+| ✅ | Supported Singleplayer | 21 |
+| ✅ | Supported Multiplayer | 21 |
+| 🚧 | Work In Progress | 2 |
+| ❌ | Unsupported | 9 |
+| | **Total** | **53** |
