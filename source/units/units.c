@@ -695,6 +695,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -4993,7 +4994,10 @@ void unit_adjust_projectile_ray(
 	{
 		real_point3d camera_position;
 
-		unit_get_camera_position(unit_index, &camera_position);
+		/* port: local third-person passengers fire along the rendered view,
+		not the seat's eye. The aiming direction and original projection stay. */
+		if (!use_aiming_vector || !passenger_camera_position(unit_index, &camera_position))
+			unit_get_camera_position(unit_index, &camera_position);
 		vector_from_points3d(&camera_position, origin, &relative);
 		projection =
 			((relative.i*direction->i + relative.k*direction->k) +

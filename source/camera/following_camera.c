@@ -55,6 +55,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 
 /* ---------- constants */
 
@@ -254,6 +255,10 @@ void following_camera_update(
 			-_pi / 2.f,
 			_pi / 2.f);
 		vector3d_from_euler_angles2d(&command->forward, &facing);
+		/* port: passengers look where their seat allows them to aim, including
+		its bounds, rather than the vehicle's or a free camera's facing. */
+		if (passenger_camera_aim(controls->local_player_index, &command->forward))
+			euler_angles2d_from_vector3d(&facing, &command->forward);
 
 		match_vassert(
 			"c:\\halo\\SOURCE\\camera\\following_camera.c",

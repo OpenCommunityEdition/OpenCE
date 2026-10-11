@@ -211,6 +211,7 @@ symbols in this file:
 
 #include "real_math.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 
 /* ---------- constants */
 
@@ -739,7 +740,15 @@ static void handle_one_player_input(
 				1);
 		}
 
-		if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
+		/* port: passenger third person has no weapon zoom. Also leave an
+	existing zoom when the setting is enabled while already seated. */
+		if (passenger_camera_blocks_zoom(local_player_index))
+		{
+			player->zoom_level = NONE;
+			if (unit->unit.current_zoom_level != NONE || unit->unit.desired_zoom_level != NONE)
+				unit_unzoom(player->unit_index);
+		}
+		else if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
 			player_control_camera_control_is_active() &&
 			current_weapon_index != NONE &&
 			!cinematic_in_progress())
@@ -2103,6 +2112,9 @@ static void player_control_modify_desired_angles(
 		player->desired_angles.pitch,
 		player->pitch_minimum,
 		player->pitch_maximum);
+	/* port: Warthog passenger third person stops input at the actual aiming
+	pitch bounds, so reversing at the edge has no invisible excess to undo. */
+	passenger_camera_clip_pitch(local_player_index, &player->desired_angles);
 
 	return;
 }

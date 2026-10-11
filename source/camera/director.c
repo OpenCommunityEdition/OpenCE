@@ -122,6 +122,7 @@ symbols in this file:
 #include "camera_scripting.h"
 #include "dead_camera.h"
 #include "coop_spectate.h" /* port: port/linux/game/coop_spectate.c */
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 #include "editor_flying_camera.h"
 #include "first_person_camera.h"
 #include "flying_camera.h"
@@ -176,6 +177,12 @@ enum camera_control_flags
 	_camera_control_down_bit,
 	_camera_control_roll_left_bit,
 	_camera_control_roll_right_bit
+};
+
+/* port: local passenger override of the stock seat states (0 through 3). */
+enum
+{
+	_director_seat_state_passenger = 4
 };
 
 static void director_process_variables(
@@ -618,10 +625,19 @@ static void director_choose_game_perspective(
 	director_perspective perspective;
 	short following;
 	long unit_index;
+	boolean passenger_view;
 	struct director *director = director_get(local_player_index);
 
 	unit_index = player_control_get_unit_index(local_player_index);
 	following = director_desired_perspective(unit_index, &perspective);
+	/* port: only the local director uses the passenger setting. A distinct
+	seat state also makes changing it while seated switch the camera. */
+	passenger_view = passenger_camera_local_player(unit_index) == local_player_index;
+	if (passenger_view)
+	{
+		following = TRUE;
+		perspective = _director_seat_state_passenger;
+	}
 	if (force || director->seat_state != perspective)
 	{
 		if (following == TRUE)
@@ -632,7 +648,11 @@ static void director_choose_game_perspective(
 				director_set_camera(
 					local_player_index,
 					(director_camera_update_proc)following_camera_update,
-					!force);
+					!force && !passenger_view);
+				/* port: start the passenger view on entry, without spending the
+				first second interpolating out of the first-person camera. */
+				if (passenger_view)
+					director->camera_change_pause = 0.f;
 			}
 		}
 		else if (force || director->camera_proc == (director_camera_update_proc)following_camera_update)

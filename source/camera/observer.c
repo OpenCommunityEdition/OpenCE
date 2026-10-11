@@ -102,6 +102,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "observer.h"
+#include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 
 #include "game/players.h"
 #include "networking/network_connection.h"
@@ -1151,6 +1152,11 @@ static void observer_postcheck(
 	real focus_distance = PIN(observer->focus_distance, 0.f, REAL_MAX);
 	real_vector2d heading;
 	real water_depth;
+
+	/* port: align the rendered passenger camera even during a smoothed seat
+	transition, before its offset and collision checks use the orientation. */
+	if (passenger_camera_aim(local_player_index, &observer->forward))
+		observer_up_from_forward(&observer->forward, &observer->up);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\camera\\observer.c",
