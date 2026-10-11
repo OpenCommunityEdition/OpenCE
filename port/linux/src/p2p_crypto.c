@@ -715,3 +715,10 @@ void p2p_webrtc_credentials(const unsigned char *secret, char *ufrag, char *pass
 	p2p_hmac_sha256(secret, P2P_SHA256_SIZE, "webrtc ice-pwd", 14, digest);
 	p2p_hex(digest, 16, password);
 }
+
+/* ---------- BLAKE2b (Monocypher's): map sharing's pieces (map_share.c) */
+
+void p2p_blake2b_256(const void *data, unsigned long size, unsigned char *digest)
+{
+	crypto_blake2b(digest, 32, (const uint8_t *)data, (size_t)size);
+}

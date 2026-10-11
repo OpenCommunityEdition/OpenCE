@@ -2117,6 +2117,88 @@ enum cache_file_status resource_map_open(
 	return _cache_file_status_ok;
 }
 
+enum cache_file_status cache_file_resource_maps_needed(
+	struct cache_file_source *source,
+	uint32_t *types)
+{
+	struct cache_file_identity identity;
+	uint8_t tag_index[TAG_INDEX_BYTES];
+	uint8_t *instances;
+	uint32_t instances_address;
+	uint32_t instances_offset;
+	int32_t tag_count;
+	int32_t tag_index_value;
+	enum cache_file_status status = cache_file_identify(source, &identity);
+
+	*types = 0;
+	if (status == _cache_file_status_ok && identity.format != _cache_file_format_custom_edition_cache)
+	{
+		status = _cache_file_status_unsupported_version;
+	}
+	if (status != _cache_file_status_ok)
+	{
+		return status;
+	}
+	if (identity.tag_data_size < TAG_INDEX_BYTES ||
+		!source->read(source->context, identity.tag_data_offset, TAG_INDEX_BYTES, tag_index))
+	{
+		return _cache_file_status_read_failed;
+	}
+	if (read_u32(tag_index + TAG_INDEX_SIGNATURE_OFFSET) != TAG_INDEX_SIGNATURE)
+	{
+		return _cache_file_status_bad_tag_index_signature;
+	}
+	/* (the instances lie in the tag data, at the address the tag cache
+	gives them) */
+	tag_count = read_s32(tag_index + TAG_INDEX_COUNT_OFFSET);
+	instances_address = read_u32(tag_index + TAG_INDEX_INSTANCES_OFFSET);
+	if (tag_count <= 0 || (uint32_t)tag_count > ABSOLUTE_INDEX_MASK + 1 ||
+		instances_address < CUSTOM_EDITION_TAG_CACHE_ADDRESS ||
+		!range_fits(instances_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS, (uint32_t)tag_count * TAG_INSTANCE_BYTES,
+			identity.tag_data_size))
+	{
+		return _cache_file_status_bad_tag_instances_range;
+	}
+	instances_offset = instances_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS;
+	instances = malloc((size_t)tag_count * TAG_INSTANCE_BYTES);
+	if (!instances)
+	{
+		return _cache_file_status_out_of_memory;
+	}
+	if (!source->read(source->context, identity.tag_data_offset + instances_offset,
+		(uint32_t)tag_count * TAG_INSTANCE_BYTES, instances))
+	{
+		free(instances);
+		return _cache_file_status_read_failed;
+	}
+	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
+	{
+		uint8_t const *instance = instances + (uint32_t)tag_index_value * TAG_INSTANCE_BYTES;
+
+		if (!read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET))
+		{
+			continue;
+		}
+		switch (read_u32(instance + TAG_INSTANCE_GROUP_OFFSET))
+		{
+		case BITMAP_GROUP_TAG:
+			*types |= 1u << _resource_map_bitmaps;
+			break;
+		case SOUND_GROUP_TAG:
+			*types |= 1u << _resource_map_sounds;
+			break;
+		case FONT_GROUP_TAG:
+		case UNICODE_STRING_LIST_GROUP_TAG:
+		case HUD_MESSAGE_TEXT_GROUP_TAG:
+			*types |= 1u << _resource_map_locale;
+			break;
+		}
+	}
+	free(instances);
+
+	return _cache_file_status_ok;
+}
+
 void resource_map_close(
 	struct resource_map *map)
 {
