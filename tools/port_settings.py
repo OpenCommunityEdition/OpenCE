@@ -205,8 +205,8 @@ SCREENS["video_settings/graphics"] = {
         ("PHYSICS:", "game.death_physics", [("CLASSIC", "classic"), ("RAGDOLL", "ragdoll")],
          "Ragdoll: bodies fall limp, thrown by what killed\nthem. Classic: the game's own death animations.",
          "desktop"),
-        ("ITEM PHYSICS:", "game.item_physics", [("CLASSIC", "classic"), ("JOLT", "jolt")],
-         "Jolt: dropped guns and grenades tumble, lean\non things and fall off ledges.",
+        ("WEAPONS PHYSICS:", "game.item_physics", [("CLASSIC", "classic"), ("ENHANCED", "enhanced")],
+         "Classic: dropped guns and grenades stay put.\nEnhanced: they tumble, lean and fall off ledges.",
          "desktop"),
     ],
 }

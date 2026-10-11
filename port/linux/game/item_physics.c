@@ -2,7 +2,7 @@
 ITEM_PHYSICS.C
 
 Weapons and grenades lying about, moved by Jolt Physics (game.item_physics,
-"jolt"; the ragdolls' world, ragdoll_physics.h): an item the game sets moving
+"enhanced"; the ragdolls' world, ragdoll_physics.h): an item the game sets moving
 (dropped, thrown, pushed by a shot or a blast, item_accelerate) is a rigid
 body, the convex hull of its model, that falls, tumbles, slides off ledges
 and comes to lean against what it meets, until it sleeps; then it lies where
@@ -93,7 +93,7 @@ static boolean item_physics_enabled(
 		char const *value = config_string("game.item_physics");
 
 		changes = config_changes();
-		enabled = value && !strcmp(value, "jolt");
+		enabled = value && (!strcmp(value, "enhanced") || !strcmp(value, "jolt"));
 	}
 	return enabled;
 }
