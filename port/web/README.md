@@ -261,6 +261,10 @@ multiply-adds). `tools/web_build.py` writes the graph.
     each attribute (`d3d8_gl.c`).
   - No feedback loops: a draw that samples the target it draws into samples
     a copy of it.
+  - No blend of a constant color factor with a constant alpha one (the
+    meters, as the ammo counters on the weapons): the source's factor is
+    applied by the pixel shader instead (`nv2a_pixel_shader_key`'s
+    `source_blend`).
   - No `glCopyImageSubData`, `glDrawElementsBaseVertex` or
     `glMemoryBarrier`: the ES renderer's blits and rebased indices. An
     index array drawn twice the same is kept rebased in a buffer of its own
