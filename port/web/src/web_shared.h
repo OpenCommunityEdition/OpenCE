@@ -33,7 +33,12 @@ enum
 	_web_touch_state = 20,
 	_web_touch_presses = 27,
 	_web_touch_look = 44,
-	WEB_SHARED_WORDS = 48,
+	/* the game's: whether it wants the mouse for the aim (its relative mode,
+	platform_mouse_capture): the page asks for the pointer lock itself on a
+	click (app.js), as a request from the game's thread, which reaches the
+	page outside the click, is refused once the player has let it go */
+	_web_mouse_wanted = 48,
+	WEB_SHARED_WORDS = 49,
 };
 
 #define WEB_TOUCH_INPUTS 17

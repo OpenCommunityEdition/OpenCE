@@ -621,6 +621,21 @@ async function play() {
   }
 }
 
+// While the game wants the mouse for the aim (its word in web_shared.h,
+// port/web/src), a click on it takes the pointer lock back, from the click
+// itself: the game's own request comes from its thread, after the click, and
+// the browser refuses that once the player has let the lock go (Escape).
+const MOUSE_WANTED_WORD = 48;
+
+$('canvas').addEventListener('pointerdown', (event) => {
+  const canvas = event.currentTarget;
+  if (event.pointerType !== 'mouse' || !game || !game._web_state || document.pointerLockElement === canvas) return;
+  if (!game.HEAPU32[(game._web_state() >> 2) + MOUSE_WANTED_WORD]) return;
+  const request = canvas.requestPointerLock();
+  // (refused for a moment after Escape: the next click asks again)
+  if (request && request.catch) request.catch(() => {});
+});
+
 // The game counts the frames it shows in its memory (web_state,
 // port/web/src/web_main.c), which the page reads: while the count stands
 // still, the game is starting or loading a map, and the page says so.

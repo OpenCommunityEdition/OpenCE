@@ -936,6 +936,8 @@ static Uint64 frame_interval_ns(void)
 
 #endif
 #ifdef HALO_WEB
+#include "web_shared.h"
+
 /* port/web/src/web_main.c's: the frames shown, which the page reads; and
 web_library.js's: a line for the page (2: an invite link to offer) */
 void web_frame_shown(void);
@@ -970,6 +972,11 @@ void platform_video_swap(void)
 
 void platform_mouse_capture(BOOL capture)
 {
+#ifdef HALO_WEB
+	/* (for the page, which takes the pointer lock back on a click:
+	web_shared.h) */
+	__atomic_store_n(&web_shared[_web_mouse_wanted], capture ? 1 : 0, __ATOMIC_RELAXED);
+#endif
 	if (platform_window)
 		SDL_SetWindowRelativeMouseMode(platform_window, capture ? true : false);
 }
