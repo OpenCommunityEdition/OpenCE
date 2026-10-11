@@ -128,8 +128,10 @@ void *tag_block_get_element_with_size(struct tag_block const *block, long index,
 
 /* port: tag_block_get_element_with_size without a call where all it checks
 holds (the game's most frequent call: a fortieth of the web build's frame),
-and that function where something does not, which notes and handles it */
-static __inline void *tag_block_get_element_fast(
+and that function where something does not, which notes and handles it
+(__inline__: msvc_comdat.c makes __inline weak, which a static function
+cannot be) */
+static __inline__ void *tag_block_get_element_fast(
 	struct tag_block const *block,
 	long index,
 	long element_size)
