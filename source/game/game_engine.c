@@ -7192,6 +7192,29 @@ boolean game_engine_man_out(
 	return man_out;
 }
 
+/* port: display.big_multiplayer_guns (port/linux/src/port_config.c):
+"classic" (each item's multiplayer scale, as the game draws weapons and
+equipment lying about in multiplayer) or "enhanced" (their own size, as in
+the campaign) */
+const char *config_string(const char *name);
+unsigned long config_changes(void);
+
+static boolean game_engine_items_big(
+	void)
+{
+	static unsigned long changes = (unsigned long)-1;
+	static boolean big = TRUE;
+
+	if (changes != config_changes())
+	{
+		const char *value = config_string("display.big_multiplayer_guns");
+
+		changes = config_changes();
+		big = !value || csstrcmp(value, "enhanced") != 0;
+	}
+	return big;
+}
+
 real_rgb_color *game_engine_player_get_change_color(
 	real_rgb_color *change_color,
 	long player_index)
@@ -8118,6 +8141,10 @@ static void game_engine_update_weapons(
 				definition->item.scale != 0.f
 					? definition->item.scale
 					: 1.f;
+			/* port: or their own size, as the campaign has them
+			(display.big_multiplayer_guns) */
+			if (!game_engine_items_big())
+				item->object.scale = 1.f;
 
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",

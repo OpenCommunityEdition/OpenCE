@@ -311,6 +311,10 @@ static const struct config_setting config_settings[] =
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },
+	{ "display.big_multiplayer_guns", _config_string, "\"classic\"", "HALO_BIG_MULTIPLAYER_GUNS", _environment_value, _platform_all,
+		"Weapons and equipment lying about in multiplayer: \"classic\" (the\n"
+		"game's, drawn larger than in the campaign) or \"enhanced\" (their real\n"
+		"size, as in the campaign). Only how they are drawn changes." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color." },
