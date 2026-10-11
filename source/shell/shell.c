@@ -8,6 +8,7 @@ SHELL.C
 #include "shell.h"
 #include "errors.h"
 #include "tag_files.h"
+#include "files.h"
 #include "real_math.h"
 #include "game_state.h"
 #include "rasterizer.h"
@@ -36,6 +37,9 @@ boolean shell_initialize(
 		
 		errors_initialize();
 		tag_files_open();
+		/* port: Custom Edition maps live in custom_maps, beside maps.
+		Make that folder when this launch does not already have it. */
+		directory_create("custom_maps");
 		real_math_initialize();
 		game_state_initialize();
 		
