@@ -149,6 +149,21 @@ Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
   wait: the host drops a machine that it has not heard from for 15 seconds,
   and while a Deck that hosts sleeps, the other players have no host.
 
+### NVIDIA on Wayland
+
+The game is a 32-bit program. NVIDIA's driver draws OpenGL into a Wayland
+window through its `egl-wayland` library, which most distributions only
+ship 64-bit (Arch and its derivatives have no 32-bit package of it). A
+32-bit OpenGL window on Wayland then falls back to Mesa's `llvmpipe`, which
+draws on the processor: the log shows `OpenGL ... on llvmpipe`, and the
+game is slow or never finishes loading.
+
+So on a Wayland desktop with NVIDIA's driver loaded, the game opens its
+window through XWayland (X11), where the 32-bit driver draws, unless a
+32-bit `egl-wayland` is installed. The log says so ("video: NVIDIA's
+driver ..."). `SDL_VIDEO_DRIVER=wayland` or `SDL_VIDEO_DRIVER=x11` chooses
+the video driver yourself.
+
 ## Files and folders
 
 | Xbox drive | Folder |
