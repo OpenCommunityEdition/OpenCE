@@ -546,6 +546,15 @@ struct gl_device
 	unsigned long stream_offset;
 	GLuint index_buffer;
 	unsigned long index_offset;
+#ifdef HALO_WEB
+	/* (web_chunk_get) the room in the stream and index buffers, the draws
+	made so far, and the count at each buffer's latest write */
+	unsigned long stream_capacity;
+	unsigned long index_capacity;
+	unsigned long draw_serial;
+	unsigned long stream_serial;
+	unsigned long index_serial;
+#endif
 	GLuint samplers[D3DTSS_MAXSTAGES];
 
 	GLuint queries[VISIBILITY_TEST_SLOTS];
@@ -3783,6 +3792,9 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.immediate_draws++;
 	else
 		stats.draws++;
+#ifdef HALO_WEB
+	device.draw_serial++;
+#endif
 	draw_flush();
 	state_program(entry->program);
 	if (key.source_blend && entry->blend_constant >= 0)
@@ -4359,12 +4371,96 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 
 /* ---------- vertex data */
 
+#ifdef HALO_WEB
+/* port: WebGL on Metal (Chrome's and Safari's ANGLE) waits for the GPU to
+finish everything queued before it writes a buffer that a queued draw reads
+(without its shadow buffers, which Chrome leaves off): a glBufferSubData
+into the stream buffer after each draw was a wait for the GPU each draw,
+some 2000 a frame, the frame rate a few frames each second. So each draw's
+uploads go into a buffer of their own that no queued draw reads, taken from
+pools of a few sizes, one set for each frame of the ring: a buffer is
+written again only STREAM_BUFFER_RING frames on, when the GPU is done with
+it. */
+#define WEB_CHUNK_SHIFT 12 /* 4 KB */
+#define WEB_CHUNK_CLASSES 14 /* to 32 MB */
+
+static struct web_chunks
+{
+	GLuint *buffers;
+	unsigned long count;
+	unsigned long capacity;
+	unsigned long next;
+} web_chunks[2][STREAM_BUFFER_RING][WEB_CHUNK_CLASSES];
+
+/* a buffer of at least size bytes for this frame's vertices (index 0) or
+indices (index 1), bound, and its size */
+static GLuint web_chunk_get(int indices, unsigned long size, unsigned long *capacity)
+{
+	struct web_chunks *chunks;
+	int chunk_class = 0;
+	GLuint buffer;
+
+	while (chunk_class < WEB_CHUNK_CLASSES - 1 && (1UL << (WEB_CHUNK_SHIFT + chunk_class)) < size)
+		chunk_class++;
+	chunks = &web_chunks[indices][device.buffer_ring][chunk_class];
+	*capacity = 1UL << (WEB_CHUNK_SHIFT + chunk_class);
+	if (chunks->next == chunks->count)
+	{
+		if (chunks->count == chunks->capacity)
+		{
+			unsigned long grown_capacity = chunks->capacity ? chunks->capacity * 2 : 64;
+			GLuint *grown = realloc(chunks->buffers, grown_capacity * sizeof(*grown));
+
+			if (!grown)
+			{
+				/* (out of memory: the frame's own buffer, written as before) */
+				*capacity = indices ? INDEX_BUFFER_SIZE : STREAM_BUFFER_SIZE;
+				return indices ? device.index_buffers[device.buffer_ring] : device.stream_buffers[device.buffer_ring];
+			}
+			chunks->buffers = grown;
+			chunks->capacity = grown_capacity;
+		}
+		glGenBuffers(1, &chunks->buffers[chunks->count]);
+		buffer = chunks->buffers[chunks->count++];
+		if (indices)
+			state_element_array_buffer(buffer);
+		else
+			state_array_buffer(buffer);
+		glBufferData(indices ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER, (GLsizeiptr)*capacity, NULL, GL_STREAM_DRAW);
+	}
+	return chunks->buffers[chunks->next++];
+}
+
+/* the ring's next frame: its buffers are free again */
+static void web_chunks_begin_frame(void)
+{
+	int indices, chunk_class;
+
+	for (indices = 0; indices < 2; indices++)
+	{
+		for (chunk_class = 0; chunk_class < WEB_CHUNK_CLASSES; chunk_class++)
+			web_chunks[indices][device.buffer_ring][chunk_class].next = 0;
+	}
+	device.stream_capacity = 0;
+	device.index_capacity = 0;
+}
+#endif
+
 /* makes room for size bytes of uploads, orphaning the stream buffer if it
 is full. A draw reserves room for all of its streams at once: orphaning
 between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
+#ifdef HALO_WEB
+	/* (a new buffer when a draw since the latest write may read this one) */
+	if (size && (device.stream_offset + size > device.stream_capacity ||
+		(device.stream_offset && device.stream_serial != device.draw_serial)))
+	{
+		device.stream_buffer = web_chunk_get(0, size, &device.stream_capacity);
+		device.stream_offset = 0;
+	}
+#else
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -4372,6 +4468,7 @@ static void stream_reserve(unsigned long size)
 		glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 		device.stream_offset = 0;
 	}
+#endif
 }
 
 static unsigned long stream_upload(const void *data, unsigned long size);
@@ -4400,6 +4497,9 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ARRAY_BUFFER, offset, length, data);
+#endif
+#ifdef HALO_WEB
+	device.stream_serial = device.draw_serial;
 #endif
 	device.stream_offset += size;
 	return offset;
@@ -4456,17 +4556,31 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	unsigned long length = size;
 
 	size = (size + 15) & ~15UL;
+#ifdef HALO_WEB
+	/* (as stream_reserve) */
+	if (device.index_offset + size > device.index_capacity ||
+		(device.index_offset && device.index_serial != device.draw_serial))
+	{
+		device.index_buffer = web_chunk_get(1, size, &device.index_capacity);
+		device.index_offset = 0;
+	}
+	state_element_array_buffer(device.index_buffer);
+#else
 	state_element_array_buffer(device.index_buffer);
 	if (device.index_offset + size > INDEX_BUFFER_SIZE)
 	{
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 		device.index_offset = 0;
 	}
+#endif
 	offset = device.index_offset;
 #ifdef HALO_GLES
 	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
+#endif
+#ifdef HALO_WEB
+	device.index_serial = device.draw_serial;
 #endif
 	device.index_offset += size;
 	return offset;
@@ -5770,6 +5884,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		device.index_buffer = device.index_buffers[device.buffer_ring];
 		device.stream_offset = 0;
 		device.index_offset = 0;
+#ifdef HALO_WEB
+		web_chunks_begin_frame();
+#endif
 #else
 		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 		device.index_offset = INDEX_BUFFER_SIZE;
