@@ -191,6 +191,12 @@ certificate, a browser's ICE credentials too), so that browsers play
 signalling with its existing MCC campaign snapshots (previously version 28);
 peers must use the same combined protocol.
 
+GulchCE version 30 retains those messages and adds MCC package-qualified map
+identities and package resource fingerprints to map admission. The existing
+map-version field carries the fingerprint; no packet fields are added. Peers
+must agree on this meaning, so version 29 clients cannot join version 30 games.
+Xbox and Custom Edition map checksum calculations are unchanged.
+
 Version 27 includes MCC extra-grenade inventory/action support and campaign
 state snapshots for gravity, dialogue gain and breadcrumb markers. All
 participants need the same protocol version, including on Xbox or Custom

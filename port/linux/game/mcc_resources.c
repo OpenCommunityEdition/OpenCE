@@ -2,9 +2,17 @@
  * decoded explicitly; no CE resource state or readers are shared. */
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
+#include "mcc_package.h"
+#include "cseries.h"
+#include "errors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Logging includes the game's allocation macros. This reader owns libc
+ * allocations (including calloc), so keep their original matching frees. */
+#undef malloc
+#undef free
 
 #define MCC_RESOURCE_METADATA_LIMIT 0x1000000u
 struct mcc_resource_item { uint32_t name, size, offset; };
@@ -34,13 +42,18 @@ static int mcc_resource_compare(void const *a,void const *b)
     return x<y ? -1 : x>y;
 }
 
-static int mcc_resource_open(struct mcc_resource_file *file,unsigned type)
+static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level)
 {
     unsigned char header[16],entry[12];
     uint32_t names,index,count,names_bytes,i;
     long length;
-    file->stream=fopen(type==1 ? "mcc_maps/bitmaps.map" : "mcc_maps/sounds.map","rb");
-    if (!file->stream) return 0;
+    char path[128];
+    if (!mcc_package_resource_path(level,type,path)) return 0;
+    file->stream=fopen(path,"rb");
+    if (!file->stream) {
+        error(_error_silent,"mcc resources: cannot open %s (required by %s)",path,level);
+        return 0;
+    }
     if (fseek(file->stream,0,SEEK_END) || (length=ftell(file->stream))<16 ||
         fseek(file->stream,0,SEEK_SET) || fread(header,1,16,file->stream)!=16) goto failed;
     names=mcc_resource_word(header+4);index=mcc_resource_word(header+8);count=mcc_resource_word(header+12);
@@ -65,6 +78,7 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type)
     qsort(file->items,count,sizeof(*file->items),mcc_resource_compare);
     return 1;
 failed:
+    error(_error_silent,"mcc resources: invalid resource file %s (required by %s)",path,level);
     mcc_resource_close(file);return 0;
 }
 
@@ -83,7 +97,7 @@ int mcc_resources_read(struct mcc_runtime *runtime,unsigned type,char const *nam
         runtime->resources=resources;
     }
     file=&resources->files[type-1];
-    if (!file->stream && !mcc_resource_open(file,type)) return 0;
+    if (!file->stream && !mcc_resource_open(file,type,runtime->level_name)) return 0;
     hi=file->count;
     while (lo<hi) {
         uint32_t middle=lo+(hi-lo)/2;

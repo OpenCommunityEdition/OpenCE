@@ -243,7 +243,7 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
                 if (!data) goto failed;
                 stage="sample read";
                 if (external) {
-                    stage="external samples (matching mcc_maps/sounds.map required)";
+                    stage="external samples (matching sounds.map required alongside this level)";
                     snprintf(resource_name,sizeof(resource_name),"%s__%lu__%lu",tag_name,range_index,permutation_index);
                     ok=mcc_resources_read(runtime,2,resource_name,permutation->samples.file_offset,permutation->samples.size,data);
                 } else ok=mcc_runtime_read(runtime,permutation->samples.file_offset,permutation->samples.size,data);

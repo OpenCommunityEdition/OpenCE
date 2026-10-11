@@ -503,7 +503,7 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
         if (!name || !memchr(name,0,256)) goto failed;
         snprintf(resource_name,sizeof(resource_name),"%s_%lu",name,(unsigned long)texture->resource_index);
         if (!mcc_resources_read(runtime,1,resource_name,bitmap->pixels_offset,(uint32_t)raw_size,raw)) {
-            error(_error_silent,"mcc bitmap: external '%s' requires matching mcc_maps/bitmaps.map",resource_name);
+            error(_error_silent,"mcc bitmap: external '%s' requires matching bitmaps.map alongside this level",resource_name);
             goto failed;
         }
     } else if (!mcc_runtime_read(runtime,bitmap->pixels_offset,(uint32_t)raw_size,raw)) goto failed;

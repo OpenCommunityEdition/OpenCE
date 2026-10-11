@@ -74,13 +74,15 @@ int CloseHandle(HANDLE);
 #include "cseries.h"
 #include "xtl.h"
 #include "mcc_maps.h"
+#include "mcc_package.h"
+#include "mcc_cache_format.h"
 #include <stdarg.h>
 #include <stdint.h>
 #undef fopen
 #undef fread
 static char const *root;
 static char const *listing="list.txt";
-static FILE *inventory;
+static unsigned inventories;
 static unsigned reads, largest, scans, closed;
 struct mcc_runtime {
     unsigned char *tag_index;
@@ -95,8 +97,9 @@ void *mcc_runtime_allocate(struct mcc_runtime *r,uint32_t bytes) {
 FILE *mcc_test_fopen(char const *path,char const *mode) {
     char translated[1024];
     if (strncmp(path,"d:\\mcc_maps\\",12) || strcmp(mode,"rb") ||
-        strpbrk(path+12,"\\/:*?\"<>|")) exit(20);
+        strpbrk(path+12,":*?\"<>|")) exit(20);
     snprintf(translated,sizeof(translated),"%s/mcc_maps/%s",root,path+12);
+    {char *p;for(p=translated;*p;p++)if(*p=='\\')*p='/';}
     return fopen(translated,mode);
 }
 size_t mcc_test_fread(void *out,size_t size,size_t count,FILE *file) {
@@ -108,16 +111,19 @@ size_t mcc_test_fread(void *out,size_t size,size_t count,FILE *file) {
 }
 void error(short priority,char const *format,...) {(void)priority;(void)format;}
 HANDLE FindFirstFileA(char const *pattern,WIN32_FIND_DATAA *data) {
-    char path[1024];
-    if (strcmp(pattern,"d:\\mcc_maps\\*.*") || inventory) exit(23);
-    snprintf(path,sizeof(path),"%s/mcc_maps/%s",root,listing);
+    char path[1024];FILE *inventory;size_t n;char *p;
+    if (strncmp(pattern,"d:\\mcc_maps\\",12)) exit(23);
+    snprintf(path,sizeof(path),"%s/mcc_maps/%s",root,pattern+12);
+    for(p=path;*p;p++)if(*p=='\\')*p='/';
+    n=strlen(path);if(n<3 || strcmp(path+n-3,"*.*"))exit(23);
+    strcpy(path+n-3,listing);
     inventory=fopen(path,"r");scans++;
     if (!inventory)return INVALID_HANDLE_VALUE;
-    if (FindNextFileA(inventory,data))return inventory;
-    fclose(inventory);inventory=NULL;return INVALID_HANDLE_VALUE;
+    if (FindNextFileA(inventory,data)){inventories++;return inventory;}
+    fclose(inventory);return INVALID_HANDLE_VALUE;
 }
 int FindNextFileA(HANDLE handle,WIN32_FIND_DATAA *data) {
-    if (!inventory || handle!=inventory)exit(24);
+    FILE *inventory=(FILE *)handle;
     if (!fgets(data->cFileName,sizeof(data->cFileName),inventory))return FALSE;
     data->cFileName[strcspn(data->cFileName,"\r\n")]=0;
     data->dwFileAttributes=0;
@@ -128,12 +134,19 @@ int FindNextFileA(HANDLE handle,WIN32_FIND_DATAA *data) {
     return TRUE;
 }
 int CloseHandle(HANDLE handle) {
-    if (!inventory || handle!=inventory)exit(24);
-    fclose(inventory);inventory=NULL;closed++;return TRUE;
+    fclose((FILE *)handle);inventories--;closed++;return TRUE;
 }
+
 int main(int argc,char **argv) {
     short count,i;
     if(argc<2)return 2;
+    if(argc==5 && !strcmp(argv[2],"admit")) {
+        char message[256]={0};unsigned long checksum;
+        root=argv[1];checksum=mcc_cache_checksum(argv[3]);
+        printf("checksum=%lu\n",checksum);
+        printf("accepted=%d\n",mcc_cache_present(argv[3],strtoul(argv[4],NULL,0),message,sizeof(message)));
+        printf("message=%s\n",message);return 0;
+    }
     if(argc==4 && (!strcmp(argv[2],"identity") || !strcmp(argv[2],"identity_fail"))) {
         unsigned char entries[64],before[64];
         uint32_t address=0;int accepted;
@@ -182,6 +195,7 @@ int main(int argc,char **argv) {
         short found=mcc_maps_find(level),row=mcc_maps_index(i,FALSE);
         if(found!=i || row!=i || !level || strlen(level)>63)return 25;
         printf("map=%s|%d\n",level,mcc_maps_campaign(i));
+        printf("label_%d=%ls\n",i,mcc_maps_name(i));
     }
     for(i=0;i<mcc_maps_count(TRUE);i++) {
         short index=mcc_maps_index(i,TRUE);
@@ -197,19 +211,20 @@ int main(int argc,char **argv) {
     } else if(argc>2) printf("found=%d\n",mcc_maps_find(argv[2]));
     printf("scans=%u\nreads=%u\nlargest_read=%u\n",scans,reads,largest);
     printf("closed=%u\n",closed);
-    if(inventory)return 33;
+    if(inventories)return 33;
     return 0;
 }
 '''
     # Exercise the actual side-effect-free runtime admission functions too.
     cache_source = (ROOT / "port/linux/game/mcc_cache.c").read_text()
     admission = "\n".join(function(cache_source, name) for name in
-                          ("mcc_prefix", "mcc_path", "mcc_scenario_identity"))
-    source.write_text(source_code.replace("int main(int argc,char **argv)", admission + "\nint main(int argc,char **argv)"))
+                          ("mcc_path", "mcc_scenario_identity", "mcc_file_read", "mcc_open", "mcc_cache_checksum", "mcc_cache_present"))
+    source.write_text(source_code.replace("int main(int argc,char **argv)", "#define fopen mcc_test_fopen\n#define fread mcc_test_fread\n" + admission + "\n#undef fopen\n#undef fread\nint main(int argc,char **argv)"))
     output = work / ("catalog.exe" if sys.platform == "win32" else "catalog")
     command = [compiler, "-std=c99", "-Wall", "-Wextra", "-Werror",
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
+               str(ROOT / "port/linux/game/mcc_package.c"),
                str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
@@ -227,7 +242,7 @@ def install(root, entries):
 
 
 def run(tool, root, *args):
-    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10)
+    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10, cwd=root)
     assert result.returncode == 0, result.stdout + result.stderr
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if not line.startswith("map="))
     maps = [line[4:] for line in result.stdout.splitlines() if line.startswith("map=")]
@@ -363,3 +378,55 @@ def test_saved_identity_keeps_mcc_namespace(catalog_tool, tmp_path, name, expect
 def test_saved_identity_allocation_failure_does_not_modify_tags(catalog_tool, tmp_path):
     fields, _ = run(catalog_tool, tmp_path, "identity_fail", "mcc_maps\\a10")
     assert fields["accepted"] == "0"
+
+
+def test_package_catalog_duplicates_and_resource_files(catalog_tool, tmp_path):
+    install(tmp_path, {"a10.map": header(), "solo.map": header()})
+    root = tmp_path / "mcc_maps"
+    (root / "list.txt").write_text("a10.map\nsolo.map\n/one\n/two\n/..\n")
+    for package, scenario in (("one", 0), ("two", 1)):
+        folder = root / package
+        folder.mkdir()
+        (folder / "a10.map").write_bytes(header(scenario=scenario))
+        # Even a resource file that resembles a level header is not a level.
+        (folder / "sounds.map").write_bytes(header())
+        (folder / "list.txt").write_text("a10.map\nsounds.map\n/nested\n../solo.map\n")
+    fields, maps = run(catalog_tool, tmp_path, "mcc_maps/two/a10")
+    assert maps == ["mcc_maps\\a10|1", "mcc_maps\\one\\a10|1", "mcc_maps\\solo|1", "mcc_maps\\two\\a10|0"]
+    assert fields["found"] == "3"
+    assert fields["label_0"] == "A10"
+    assert fields["label_1"] == "A10 [one]"
+    assert fields["label_2"] == "Solo"
+    assert fields["label_3"] == "A10 [two]"
+    assert fields["closed"] == fields["scans"] == "3"
+
+
+@pytest.mark.parametrize("stem", ["pkg/level", "pkg\\level", "p/" + "a" * 52])
+def test_package_saved_identity(catalog_tool, tmp_path, stem):
+    fields, _ = run(catalog_tool, tmp_path, "identity", "mcc_maps/" + stem)
+    assert fields["accepted"] == "1"
+    assert fields["identity"] == "mcc_maps\\" + stem.replace("/", "\\")
+
+
+@pytest.mark.parametrize("stem", ["p/q/level", "p//level", "./level", "p/../level", "p /level", "p./level", "/level", "p/", "p/" + "a" * 53])
+def test_package_invalid_paths(catalog_tool, tmp_path, stem):
+    fields, _ = run(catalog_tool, tmp_path, "path", "mcc_maps/" + stem)
+    assert fields["accepted"] == "0"
+
+
+def test_network_admission_checks_package_resources(catalog_tool, tmp_path):
+    folder = tmp_path / "mcc_maps/pkg"
+    folder.mkdir(parents=True)
+    level = header()
+    struct.pack_into("<I", level, 0x64, 1234)
+    (folder / "a10.map").write_bytes(level)
+    (folder / "sounds.map").write_bytes(b"original audio")
+    host, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", "0")
+    peer, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", host["checksum"])
+    assert peer["accepted"] == "1"
+    (folder / "sounds.map").write_bytes(b"modified audio")
+    peer, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", host["checksum"])
+    assert peer["accepted"] == "0"
+    assert "package resources differ" in peer["message"]
+    missing, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/other/a10", host["checksum"])
+    assert missing["accepted"] == "0"

@@ -28,6 +28,7 @@ FAILURES = ("recompile scripts", "recompile.)", "error loading scripts",
 def check_result(trace, console, marker, map_name, exit_code):
     combined = (trace + "\n" + console).lower()
     failures = [message for message in FAILURES if message in combined]
+    map_name = map_name.replace("/", "\\")
     loaded = f"mcc: loaded mcc_maps\\{map_name.lower()} (" in trace.lower()
     # The console echoes commands; an echoed print expression is not evidence
     # it executed. Require the entire output line after the sleep has finished.
@@ -38,6 +39,7 @@ def check_result(trace, console, marker, map_name, exit_code):
 
 
 def run_case(args, name, binary):
+    name = name.replace("/", "\\")
     started = time.monotonic()
     data, output = args.data_root, args.output / name
     output.mkdir(parents=True, exist_ok=True)
@@ -128,8 +130,8 @@ def main():
     if args.seconds < 20 or args.seconds > 300:
         parser.error("--seconds must be between 20 and 300")
     for name in args.maps:
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", name) or not (args.data_root / "mcc_maps" / (name + ".map")).is_file():
-            parser.error("supply existing map basenames from the disposable data root")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)?", name) or not (args.data_root / "mcc_maps" / (name + ".map")).is_file():
+            parser.error("supply existing loose or package/map names from the disposable data root")
     args.data_root, args.output = args.data_root.resolve(), args.output.resolve()
     binary = args.output / "bin" / "halo.exe"
     binary.parent.mkdir(parents=True, exist_ok=True)
