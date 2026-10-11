@@ -180,7 +180,7 @@ SCREENS = {
              "Level the view while walking.", None),
             ("BUTTON LAYOUT:", "profile.button_preset",
              [("DEFAULT", "0"), ("SWAP TRIGGERS", "1"), ("SWAP A, L TRIGGER", "2"), ("SWAP B, L TRIGGER", "3"),
-              ("SWAP B, R STICK", "4")],
+              ("SWAP B, R STICK", "4"), ("SWAP B, R BUMPER", "5")],
              "Which of the controller's buttons does what (not\nthe keyboard's: Controls Setup sets those).", None),
             ("STICK LAYOUT:", "profile.joystick_preset",
              [("DEFAULT", "0"), ("SOUTHPAW", "1"), ("LEGACY", "2"), ("LEGACY SOUTHPAW", "3")],
