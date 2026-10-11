@@ -5080,8 +5080,9 @@ boolean network_game_server_reset_to_pregame(
 
 	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
 	csmemset(network_game_server_map_pending, 0, sizeof(network_game_server_map_pending));
-	csmemset(network_game_server_held_players, 0, sizeof(network_game_server_held_players));
-	network_game_server_held_player_count = 0;
+	/* port: players held out of the game for a map download that did not
+	finish in it are the pregame's again, as the others are */
+	network_game_server_restore_held_players(server);
 	server->next_update_number = 0;
 	server->time_of_first_client_loading_completion = 0;
 	server->sent_start_game_message = FALSE;
