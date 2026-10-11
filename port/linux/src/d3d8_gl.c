@@ -1637,7 +1637,7 @@ static void gl_initialize(void)
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
-#ifdef HALO_GLES
+#if defined(HALO_GLES) && !defined(HALO_WEB) /* web: every upload has a buffer of its own */
 	{
 		int ring;
 
@@ -4359,12 +4359,53 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 
 /* ---------- vertex data */
 
+#ifdef HALO_WEB
+/* Gives an upload a buffer of its own, so a WebGL implementation need not
+preserve a large shared buffer after every draw. The pools grow to the
+busiest frame; a buffer is respecified, not rewritten, when it is reused. */
+static GLuint web_transient_buffer(GLenum target, const void *data, unsigned long size)
+{
+	/* [0] vertex buffers, [1] index buffers: WebGL keeps a buffer to its first target */
+	static GLuint *buffers[2];
+	static unsigned long count[2], capacity[2];
+	static unsigned long frame = ~0UL;
+	unsigned int pool = target == GL_ARRAY_BUFFER ? 0 : 1;
+
+	if (frame != device.frame)
+	{
+		frame = device.frame;
+		count[0] = count[1] = 0;
+	}
+	if (count[pool] == capacity[pool])
+	{
+		GLuint *grown = realloc(buffers[pool], (capacity[pool] + 64) * sizeof(*grown));
+
+		if (!grown)
+			return 0;
+		memset(grown + capacity[pool], 0, 64 * sizeof(*grown));
+		buffers[pool] = grown;
+		capacity[pool] += 64;
+	}
+	if (!buffers[pool][count[pool]])
+		glGenBuffers(1, &buffers[pool][count[pool]]);
+	if (pool == 0)
+		state_array_buffer(buffers[pool][count[pool]]);
+	else
+		state_element_array_buffer(buffers[pool][count[pool]]);
+	glBufferData(target, (GLsizeiptr)size, data, GL_STREAM_DRAW);
+	return buffers[pool][count[pool]++];
+}
+#endif
+
 /* makes room for size bytes of uploads, orphaning the stream buffer if it
 is full. A draw reserves room for all of its streams at once: orphaning
 between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
+#ifdef HALO_WEB
+	return; /* every upload has a buffer of its own */
+#endif
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -4392,6 +4433,10 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	/* (as index_upload: the vertices' own bytes, in room rounded up to 16) */
 	unsigned long length = size;
 
+#ifdef HALO_WEB
+	device.stream_buffer = web_transient_buffer(GL_ARRAY_BUFFER, data, size);
+	return 0;
+#endif
 	size = (size + 15) & ~15UL;
 	stream_reserve(size);
 	offset = device.stream_offset;
@@ -4455,6 +4500,10 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	past the caller's indices) */
 	unsigned long length = size;
 
+#ifdef HALO_WEB
+	web_transient_buffer(GL_ELEMENT_ARRAY_BUFFER, data, size);
+	return 0;
+#endif
 	size = (size + 15) & ~15UL;
 	state_element_array_buffer(device.index_buffer);
 	if (device.index_offset + size > INDEX_BUFFER_SIZE)
