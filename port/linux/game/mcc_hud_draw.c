@@ -2,12 +2,117 @@
  * Keep full-resolution texture samples and convert only screen geometry. */
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
 #include "game/players.h"
+#include "interface/hud.h"
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "text/draw_string.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "mcc_cache.h"
 #include "mcc_hud_draw.h"
+#include <string.h>
+
+long hud_hires_asset_count(void);
+char const *hud_hires_asset_tag(long asset);
+void hud_hires_register_placeholder(long asset, unsigned long const *texture);
+void xgpu_mcc_texture_unbind(unsigned long const *resource);
+
+static struct {
+    struct bitmap_data *bitmap;
+    long asset;
+    boolean attempted;
+} mcc_buttons[4];
+
+void mcc_hud_glyphs_dispose(void)
+{
+    long i;
+    for (i=0;i<4;i++) if (mcc_buttons[i].bitmap) {
+        hud_hires_register_placeholder(mcc_buttons[i].asset,NULL);
+        xgpu_mcc_texture_unbind(mcc_buttons[i].bitmap->hardware_format);
+        bitmap_delete(mcc_buttons[i].bitmap);
+    }
+    memset(mcc_buttons,0,sizeof(mcc_buttons));
+}
+
+/* Identify the controller entry, not its sequence: custom weapon/pickup
+ * icons can use the same sequence numbers and must retain their artwork. */
+static short mcc_hud_button_index(struct icon_hud_element_definition const *icon)
+{
+    short i;
+    struct icon_hud_element_definition const *buttons;
+    if (!hud_globals) return NONE;
+    buttons=hud_globals->messaging.button_icons.address;
+    if (!buttons) return NONE;
+    for (i=0;i<4 && i<hud_globals->messaging.button_icons.count;i++)
+        if (icon==buttons+i) return i;
+    return NONE;
+}
+
+static struct bitmap_data const *mcc_hud_button_bitmap(short index)
+{
+    static char const *names[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
+        "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn"};
+    long asset;
+    struct bitmap_data *bitmap;
+    if (index<0 || index>=4) return NULL;
+    if (mcc_buttons[index].attempted) return mcc_buttons[index].bitmap;
+    mcc_buttons[index].attempted=TRUE;
+    for (asset=0;asset<hud_hires_asset_count();asset++) {
+        if (strcmp(hud_hires_asset_tag(asset),names[index])) continue;
+        /* Reuse OpenCE's embedded hand-drawn buttons. The placeholder has
+         * the original 32px layout, independent of the MCC sprite sheet. */
+        bitmap=bitmap_2d_new(32,32,0,11);
+        if (!bitmap) return NULL;
+        if (!rasterizer_bitmap_new(bitmap)) {bitmap_delete(bitmap);return NULL;}
+        hud_hires_register_placeholder(asset,bitmap->hardware_format);
+        mcc_buttons[index].asset=asset;
+        mcc_buttons[index].bitmap=bitmap;
+        return bitmap;
+    }
+    return NULL;
+}
+
+/* Menu artwork has straight alpha; the gameplay HUD's multiply-add blend
+ * would expose RGB stored under transparent pixels around the button. */
+static void mcc_hud_button_draw(struct bitmap_data const *bitmap, point2d const *point,
+    real scale, pixel32 color)
+{
+    struct rasterizer_dynamic_screen_geometry_parameters parameters;
+    struct dynamic_screen_vertex vertices[4];
+    short i;
+    memset(&parameters,0,sizeof(parameters));
+    parameters.map[0]=(struct bitmap_data *)bitmap;
+    parameters.map_texture_scale[0].i=parameters.map_texture_scale[0].j=1.0f;
+    parameters.map_scale[0].i=parameters.map_scale[0].j=1.0f;
+    parameters.framebuffer_blend_function=0; /* alpha blend */
+    for (i=0;i<4;i++) {
+        boolean right=((i+1)&2)!=0, bottom=i>1;
+        vertices[i].position.x=point->x+(right ? 21.0f*scale : 0.0f);
+        vertices[i].position.y=point->y-(bottom ? 0.0f : 26.0f*scale);
+        vertices[i].texture_coordinates.x=right ? 21.0f/32.0f : 0.0f;
+        vertices[i].texture_coordinates.y=bottom ? 26.0f/32.0f : 0.0f;
+        vertices[i].color=(color&0xFF000000UL)|0xFFFFFFUL;
+    }
+    rasterizer_psuedo_dynamic_screen_quad_draw(&parameters,vertices);
+}
+
+/* MCC child anchors are 0=inherited, 1..9=the nine absolute anchors.
+ * The field occupies offset 6 in a weapon HUD element header (native pad).
+ * Resolve into caller-owned storage, never into the shared parent tag. */
+struct hud_absolute_placement_definition const *mcc_hud_child_placement(
+    struct hud_absolute_placement_definition const *parent, void const *element,
+    struct hud_absolute_placement_definition *storage)
+{
+    unsigned short child;
+    if (!mcc_cache_tags_loaded()) return parent;
+    memcpy(&child,(unsigned char const *)element+6,sizeof(child));
+    if (!child || child>9) return parent;
+    *storage=*parent;
+    storage->corner=(short)(child-1);
+    return storage;
+}
 
 real mcc_hud_canvas_scale(void)
 {
@@ -30,6 +135,20 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
     point2d point;
     if (!mcc_cache_tags_loaded()) return FALSE;
     viewport_scale=!menu && local_player_count()>1 ? 0.75f : 1.0f;
+    if (!menu) {
+        struct bitmap_data const *button=mcc_hud_button_bitmap(mcc_hud_button_index(icon));
+        if (button) {
+            /* Crop transparent padding from the native 32px art. A 16x20
+             * icon shares the current font's capital center, and its text
+             * advance no longer depends on the map's modern-controller art. */
+            real button_scale=viewport_scale*(20.0f/26.0f);
+            point.x=cursor->x0;
+            point.y=(short)(draw_unicode_string_capital_middle(cursor,L"")+10.0f*viewport_scale);
+            mcc_hud_button_draw(button,&point,button_scale,color);
+            cursor->x0=(short)(point.x+21.0f*button_scale+2.0f*viewport_scale);
+            return TRUE;
+        }
+    }
     pixel_scale=viewport_scale*mcc_hud_bitmap_scale(bitmap_group_index);
     /* Icon offsets and extra text advances are font-relative, unlike the
      * HUD placement anchors. MCC tags retain the native values here. */

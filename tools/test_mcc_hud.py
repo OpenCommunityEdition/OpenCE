@@ -24,6 +24,7 @@ def hud_tool(tmp_path_factory):
     work = tmp_path_factory.mktemp("mcc-hud")
     source = (ROOT / "port/linux/game/mcc_hud_draw.c").read_text()
     functions = "\n".join(function(source, name) for name in [
+        "mcc_hud_glyphs_dispose", "mcc_hud_button_index", "mcc_hud_button_bitmap", "mcc_hud_button_draw",
         "mcc_hud_canvas_scale", "mcc_hud_bitmap_scale", "mcc_hud_icon_draw"])
     code = r'''
 #include <stdlib.h>
@@ -36,8 +37,14 @@ typedef unsigned long pixel32;
 typedef struct {short x,y;} point2d;
 typedef struct {short x0,y0,x1,y1;} rectangle2d;
 typedef struct {float x0,x1,y0,y1;} real_rectangle2d;
-struct bitmap_data {short width,height;};
+struct bitmap_data {short width,height;unsigned long *hardware_format;};
 struct bitmap_group {unsigned flags;};
+struct dynamic_screen_vertex {struct {float x,y;}position,texture_coordinates;pixel32 color;};
+struct rasterizer_dynamic_screen_geometry_parameters {
+    struct bitmap_data *map[3];
+    struct {float i,j;}map_texture_scale[3],map_scale[3];
+    short framebuffer_blend_function;
+};
 struct icon_hud_element_definition {
     short sequence_index,width_offset;point2d offset;
     unsigned long color;char frame_rate;unsigned char flags;short text_index;
@@ -51,6 +58,35 @@ static float drawn_scale;
 static point2d drawn_point;
 static pixel32 drawn_color;
 static struct bitmap_group group;
+static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[4];
+static struct {struct {struct {long count;void *address;} button_icons;} messaging;} globals,*hud_globals;
+static int allocations,registrations,deletions;
+static struct bitmap_data native_bitmap;
+static unsigned long hardware[2];
+static char const *assets[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
+    "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn"};
+static long hud_hires_asset_count(void) {return 4;}
+static char const *hud_hires_asset_tag(long i) {return assets[i];}
+static struct bitmap_data *bitmap_2d_new(short w,short h,short m,short f) {
+    if(w!=32||h!=32||m||f!=11)abort();allocations++;
+    native_bitmap.width=w;native_bitmap.height=h;return &native_bitmap;
+}
+static int rasterizer_bitmap_new(struct bitmap_data *b) {b->hardware_format=hardware;return 1;}
+static void hud_hires_register_placeholder(long a,unsigned long const *t) {
+    if(a<0||a>=4||(t&&t!=hardware))abort();registrations+=t?1:-1;
+}
+static void xgpu_mcc_texture_unbind(unsigned long const *t) {if(t!=hardware)abort();}
+static void bitmap_delete(struct bitmap_data *b) {if(b!=&native_bitmap)abort();deletions++;}
+static void rasterizer_psuedo_dynamic_screen_quad_draw(
+    struct rasterizer_dynamic_screen_geometry_parameters *p,struct dynamic_screen_vertex *v) {
+    if(p->framebuffer_blend_function||p->map[0]!=&native_bitmap||p->map[1]||p->map[2])abort();
+    if(p->map_scale[0].i!=1||p->map_scale[0].j!=1||
+       p->map_texture_scale[0].i!=1||p->map_texture_scale[0].j!=1)abort();
+    if(v[0].texture_coordinates.x||v[0].texture_coordinates.y||
+       v[2].texture_coordinates.x!=21.0f/32||v[2].texture_coordinates.y!=26.0f/32)abort();
+    draws++;drawn_scale=(v[2].position.y-v[0].position.y)/26;
+    drawn_point.x=(short)v[0].position.x;drawn_point.y=(short)v[2].position.y;drawn_color=v[0].color;
+}
 static int mcc_cache_tags_loaded(void) {return mcc;}
 static int local_player_count(void) {return players;}
 static struct bitmap_group *bitmap_group_get(long id) {
@@ -68,20 +104,33 @@ static void hud_draw_bitmap_direct(struct bitmap_data const *bitmap,short corner
 }
 ''' + functions + r'''
 int main(int argc,char **argv) {
-    struct bitmap_data bitmap={256,256};
+    struct bitmap_data bitmap={256,256,NULL};
     real_rectangle2d clip={0.0f,30.0f/256,0.0f,38.0f/256};
     rectangle2d cursor={100,120,200,140},before=cursor;
     struct icon_hud_element_definition icon={0,-6,{-2,15},0xFF123456,0,2,0},saved=icon;
+    struct icon_hud_element_definition buttons[18],*active=&icon;
     int menu,handled;
-    if(argc!=6 && argc!=7)return 2;
+    if(argc!=6 && argc!=7 && argc!=8)return 2;
     mcc=atoi(argv[1]);players=atoi(argv[2]);menu=atoi(argv[3]);
     group.flags=(unsigned)atoi(argv[4]);icon.flags=(unsigned char)atoi(argv[5]);
     if(argc==7)icon.offset.y=(short)atoi(argv[6]);saved=icon;
+    if(argc==8) {
+        int b=atoi(argv[7]);if(b<0||b>=18)return 8;
+        memset(buttons,0,sizeof(buttons));buttons[b]=icon;buttons[b].sequence_index=99;
+        globals.messaging.button_icons.count=18;globals.messaging.button_icons.address=buttons;
+        hud_globals=&globals;active=&buttons[b];
+    }
     if(!menu) {clip.x1=clip.y1=93.0f/256;}
-    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,0xFFABCDEF,&icon,menu);
+    handled=mcc_hud_icon_draw(17,&bitmap,&clip,&cursor,0xFFABCDEF,active,menu);
     if(memcmp(&icon,&saved,sizeof(icon)))return 3;
     if(!mcc && (memcmp(&cursor,&before,sizeof(cursor))||draws||lookups||handled))return 4;
     if(mcc_hud_bitmap_scale(NONE)!=1.0f)return 5;
+    if(argc==8 && mcc && !menu && atoi(argv[7])<4) {
+        if(allocations!=1||registrations!=1||lookups)return 9;
+        if(mcc_hud_button_bitmap((short)atoi(argv[7]))!=&native_bitmap||allocations!=1)return 10;
+        mcc_hud_glyphs_dispose();mcc_hud_glyphs_dispose();
+        if(registrations||deletions!=1)return 11;
+    } else if(allocations||registrations)return 12;
     printf("%d %d %.3f %d %d %d %lu %.3f\n",handled,draws,drawn_scale,
         drawn_point.x,drawn_point.y,cursor.x0,drawn_color,mcc_hud_canvas_scale());
     return 0;
@@ -143,6 +192,29 @@ def test_messaging_offsets_preserve_stock_and_map_authored_values(hud_tool, play
     assert int(result.stdout.split()[4]) == int(140 - offset_y * viewport)
 
 
+@pytest.mark.parametrize("button", range(4))
+@pytest.mark.parametrize("players", [1, 2, 4])
+@pytest.mark.parametrize("flags", [0, 16, 128])
+def test_gameplay_native_buttons_ignore_mcc_sheet_and_offsets(hud_tool, button, players, flags):
+    result=subprocess.run([str(hud_tool),"1",str(players),"0",str(flags),"6","0",str(button)],
+                          capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    handled,draws,scale,x,y,cursor,color,canvas=result.stdout.split()
+    viewport=1.0 if players==1 else 0.75
+    assert (handled,draws,x)==("1","1","100")
+    assert float(scale)==pytest.approx(viewport*20/26,abs=0.0006)
+    assert int(y)==int(128+10*viewport)
+    assert int(cursor)==int(100+(21*20/26+2)*viewport)
+    assert int(color)==0xFFFFFFFF
+
+
+@pytest.mark.parametrize("loaded,menu,button", [(0,0,0),(0,1,2),(1,1,0),(1,1,1),(1,0,4),(1,0,17)])
+def test_native_glyph_scope_preserves_menus_other_formats_and_icons(hud_tool, loaded, menu, button):
+    result=subprocess.run([str(hud_tool),str(loaded),"1",str(menu),"16","2","0",str(button)],
+                          capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+
+
 @pytest.fixture(scope="module")
 def anchor_tool(tmp_path_factory):
     compiler = shutil.which("clang")
@@ -192,6 +264,51 @@ int main(int argc,char **argv) {
     result=subprocess.run(command,capture_output=True,text=True)
     assert result.returncode==0,result.stderr
     return binary
+
+
+@pytest.fixture(scope="module")
+def child_anchor_tool(tmp_path_factory):
+    compiler=shutil.which("clang")
+    if not compiler:pytest.skip("clang is needed")
+    work=tmp_path_factory.mktemp("mcc-child-anchors")
+    source=(ROOT/"port/linux/game/mcc_hud_draw.c").read_text()
+    code=r'''
+#include <stdlib.h>
+#include <string.h>
+struct hud_absolute_placement_definition {short corner,pad;long unused[8];};
+static int loaded;
+static int mcc_cache_tags_loaded(void) {return loaded;}
+'''+function(source,"mcc_hud_child_placement")+r'''
+int main(int argc,char **argv) {
+    unsigned short header[18]={0};
+    struct hud_absolute_placement_definition parent={4,71,{22}},saved=parent,out={-1,0,{0}};
+    struct hud_absolute_placement_definition const *result;
+    int child;
+    if(argc!=3)return 2;loaded=atoi(argv[1]);child=atoi(argv[2]);header[3]=(unsigned short)child;
+    result=mcc_hud_child_placement(&parent,loaded?header:NULL,&out);
+    if(memcmp(&parent,&saved,sizeof(parent)))return 3;
+    if(loaded && child>=1 && child<=9) {
+        if(result!=&out||out.corner!=child-1||out.pad!=71||out.unused[0]!=22)return 4;
+    } else if(result!=&parent||out.corner!=-1)return 5;
+    /* Each element must start from the parent, not the previous override. */
+    header[3]=0;result=mcc_hud_child_placement(&parent,header,&out);
+    return result!=&parent||result->corner!=4;
+}
+'''
+    path=work/"child.c";path.write_text(code)
+    binary=work/("child.exe" if sys.platform=="win32" else "child")
+    command=[compiler,"-std=gnu89","-Wall","-Wextra","-Werror",str(path),"-o",str(binary)]
+    if sys.platform=="win32":command[1:1]=["--target=i686-pc-windows-msvc","-fuse-ld=lld"]
+    result=subprocess.run(command,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    return binary
+
+
+@pytest.mark.parametrize("loaded",[0,1])
+@pytest.mark.parametrize("child",[-1,*range(11),32767])
+def test_child_anchors_are_mcc_only_bounded_and_do_not_mutate_parent(child_anchor_tool, loaded, child):
+    result=subprocess.run([str(child_anchor_tool),str(loaded),str(child)],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
 
 
 @pytest.mark.parametrize("scale", [1.0, 0.75])
