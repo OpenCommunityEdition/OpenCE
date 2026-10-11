@@ -47,6 +47,8 @@ unsigned long config_changes(void);
 /* object_lights.c (port) */
 long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light_index, long object_index, real_rgb_color const *color, real radius);
+/* port/linux/game/overshield_effect.c */
+real overshield_effect_flare(long unit_index);
 
 enum
 {
@@ -165,6 +167,13 @@ static real shield_glow_flare(
 	if (source < 1 || source > 4)
 		return 0.f;
 	value = object->object.outgoing_function_values[source - 1];
+	/* (an overshield: lit as it rises, then whole while it lasts) */
+	{
+		real overshield = overshield_effect_flare(unit_index);
+
+		if (overshield >= 0.f)
+			value = overshield;
+	}
 	if (!(value > 0.f))
 		return 0.f;
 	value = (real)pow((double)value, (double)plasma->intensity_exponent);

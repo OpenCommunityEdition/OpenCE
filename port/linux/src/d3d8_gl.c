@@ -377,6 +377,7 @@ struct draw_uniforms
 	float texture_scale[4][4];
 	float screen_offset;
 	float texture_lod_bias[4];
+	float height_fade[4];
 };
 
 struct program_entry
@@ -394,6 +395,7 @@ struct program_entry
 	GLint bump_matrix, bump_luminance, texture_scale;
 	GLint texture_lod_bias;
 	GLint screen_offset;
+	GLint height_fade;
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
@@ -2851,6 +2853,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->texture_scale = glGetUniformLocation(entry->program, "texture_scale");
 	entry->texture_lod_bias = glGetUniformLocation(entry->program, "texture_lod_bias");
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
+	entry->height_fade = glGetUniformLocation(entry->program, "height_fade");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
@@ -3623,7 +3626,25 @@ static void gl_check_errors(const char *where)
 
 /* the uniforms of the latest draws, converted from these inputs; the serial
 counts the conversions */
-#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES)
+#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES + 4)
+
+/* the height fade of the draws that follow (d3d8_gl_set_height_fade): off
+while its scale is zero */
+static float height_fade_value[4];
+
+/* The draws that follow fade out above a height on their model (the shield
+flare rising up a body: port/linux/game/overshield_effect.c): each vertex's
+colors are scaled by clamp((height - z) * inverse_softness, 0, 1), where z,
+its height in the model's space, is (oT0.z - offset) / scale (the plasma
+shader's noise coordinate, rasterizer_xbox_plasma_energy.c). A scale of zero
+turns it off, as it is for every other draw. */
+void d3d8_gl_set_height_fade(float inverse_softness, float height, float offset, float scale)
+{
+	height_fade_value[0] = inverse_softness;
+	height_fade_value[1] = height;
+	height_fade_value[2] = offset;
+	height_fade_value[3] = scale;
+}
 
 static DWORD draw_uniform_inputs[DRAW_UNIFORM_INPUT_COUNT];
 static struct draw_uniforms draw_uniforms;
@@ -3914,6 +3935,8 @@ static struct program_entry *prepare_draw(BOOL immediate)
 			inputs[count++] = state[D3DTSS_BUMPENVLOFFSET];
 			inputs[count++] = state[D3DTSS_MIPMAPLODBIAS];
 		}
+		memcpy(&inputs[count], height_fade_value, sizeof(height_fade_value));
+		count += 4;
 		if (!draw_uniforms_serial || memcmp(inputs, draw_uniform_inputs, sizeof(inputs)))
 		{
 			struct draw_uniforms *converted = &draw_uniforms;
@@ -3952,6 +3975,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 				converted->texture_lod_bias[stage] = dword_to_float(state[D3DTSS_MIPMAPLODBIAS]);
 			}
 			converted->screen_offset = (float)UI_OFFSET;
+			memcpy(converted->height_fade, height_fade_value, sizeof(converted->height_fade));
 		}
 	}
 	/* and a program that has had them since needs none of them */
@@ -3973,6 +3997,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	uniform_vec4(entry->texture_scale, entry->uniforms.texture_scale[0], draw_uniforms.texture_scale[0], 4);
 	uniform_float(entry->screen_offset, &entry->uniforms.screen_offset, draw_uniforms.screen_offset);
 	uniform_vec4(entry->texture_lod_bias, entry->uniforms.texture_lod_bias, draw_uniforms.texture_lod_bias, 1);
+	uniform_vec4(entry->height_fade, entry->uniforms.height_fade, draw_uniforms.height_fade, 1);
 	return entry;
 }
 
