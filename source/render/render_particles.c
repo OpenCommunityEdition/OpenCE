@@ -18,6 +18,8 @@ symbols in this file:
 
 #include "camera/director.h"
 #include "cseries/cseries.h"
+/* port: optionally retain particles below their screen-size cutoff. */
+#include "render_lod.h" /* port: port/linux/game/render_lod.c */
 #include "cseries/profile.h"
 #include "effects/particles.h"
 #include "game/players.h"
@@ -318,7 +320,7 @@ void render_particles(
 									&position,
 									radius);
 
-							if (diameter > definition->lod_cutoff)
+							if (render_lod_particle_visible(diameter, definition->lod_cutoff))
 							{
 								real fade;
 								real scale;

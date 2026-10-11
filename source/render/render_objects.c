@@ -84,6 +84,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+/* port: optional full-detail lighting updates and shadow size. */
+#include "render_lod.h" /* port: port/linux/game/render_lod.c */
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "memory/data.h"
@@ -920,7 +922,7 @@ static void object_render_state_refresh(
 
 	if (TEST_FLAG(object_get(object_index)->object.flags, _object_static_lighting_recompute_bit))
 	{
-		if (level_of_detail_pixels > OBJECT_RENDER_STATE_LARGE_PIXELS)
+		if (render_lod_disabled() || level_of_detail_pixels > OBJECT_RENDER_STATE_LARGE_PIXELS)
 		{
 			refresh = refresh_age > 0;
 		}
@@ -1136,7 +1138,7 @@ static void render_object(
 			level_of_detail_pixels = object_get_level_of_detail_pixels(data->object_index);
 			shadow_darkness = 1.f - real_rgb_color_brightness(&data->lighting->shadow_color);
 
-			if (level_of_detail_pixels > OBJECT_SHADOW_MINIMUM_PIXELS &&
+			if ((render_lod_disabled() || level_of_detail_pixels > OBJECT_SHADOW_MINIMUM_PIXELS) &&
 				shadow_darkness > OBJECT_SHADOW_MINIMUM_DARKNESS)
 			{
 				real size_fraction =
@@ -1145,6 +1147,9 @@ static void render_object(
 					(shadow_darkness - OBJECT_SHADOW_MINIMUM_DARKNESS) * 9.0909081f;
 
 				size_fraction = PIN(size_fraction, 0.f, 1.f);
+				/* port: remove only distance/detail fading, not lighting. */
+				if (render_lod_disabled())
+					size_fraction = 1.f;
 				darkness_fraction = PIN(darkness_fraction, 0.f, 1.f);
 
 				if (render_object_shadow_begin(data, darkness_fraction * size_fraction))
