@@ -33,9 +33,9 @@ the others as <name>.part and renamed when whole (a .part found again is
 checked piece by piece and taken up where it was), into custom_maps under
 the map's own name, which is its hash's.
 
-A game in the lobby waits for the download (its host waits for every
-machine to have the map), and a game in progress is joined once it is done;
-the host does not drop a machine that says it is downloading.
+A machine still downloading does not hold the lobby: the machines that
+have the map start, and it joins the game in progress once the download is
+done. The host does not drop a machine that says it is downloading.
 */
 
 /* ---------- headers */
@@ -2645,6 +2645,16 @@ boolean map_share_machine_downloading(
 		&map_share_globals.machines[machine_index] : NULL;
 
 	return machine && machine->downloading && !elapsed(machine->heard_at, system_milliseconds(), DOWNLOADING_TIMEOUT);
+}
+
+boolean map_share_machine_needs_map(
+	long machine_index)
+{
+	struct host_machine const *machine = host_machine_valid(machine_index) ?
+		&map_share_globals.machines[machine_index] : NULL;
+
+	return machine && machine->downloading && !machine->downloaded &&
+		!elapsed(machine->heard_at, system_milliseconds(), DOWNLOADING_TIMEOUT);
 }
 
 static boolean host_in_game(
