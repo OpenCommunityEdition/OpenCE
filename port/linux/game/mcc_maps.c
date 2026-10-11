@@ -186,29 +186,22 @@ static void mcc_maps_scan_directory(char const *package)
 
 static void mcc_maps_scan(void)
 {
-    short i,j;
+    short i;
     if (mcc_menu_catalog.scanned) return;
     mcc_menu_catalog.scanned=TRUE;
     mcc_menu_catalog.count=0;
     mcc_maps_scan_directory("");
     qsort(mcc_menu_catalog.maps,(size_t)mcc_menu_catalog.count,sizeof(mcc_menu_catalog.maps[0]),mcc_map_order);
-    /* Keep familiar labels unless another package uses the same basename. */
+    /* Show the owning package for every packaged level. */
     for (i=0;i<mcc_menu_catalog.count;i++) {
         struct mcc_menu_map *map=&mcc_menu_catalog.maps[i];
         char const *base=strrchr(map->file_name,'\\');
-        base=base ? base+1 : map->file_name;
-        for (j=0;j<mcc_menu_catalog.count;j++) {
-            char const *other=strrchr(mcc_menu_catalog.maps[j].file_name,'\\');
+        if (base) {
             size_t n,k;
-            other=other ? other+1 : mcc_menu_catalog.maps[j].file_name;
-            if (i==j || csstrcasecmp(base,other)) continue;
-            if (base!=map->file_name) {
-                for (n=0;map->name[n];n++) {}
-                map->name[n++]=' ';map->name[n++]='[';
-                for (k=0;k<(size_t)(base-map->file_name-1);k++) map->name[n++]=(unsigned char)map->file_name[k];
-                map->name[n++]=']';map->name[n]=0;
-            }
-            break;
+            for (n=0;map->name[n];n++) {}
+            map->name[n++]=' ';map->name[n++]='[';
+            for (k=0;k<(size_t)(base-map->file_name);k++) map->name[n++]=(unsigned char)map->file_name[k];
+            map->name[n++]=']';map->name[n]=0;
         }
     }
     error(_error_silent,"mcc maps: %d maps found in mcc_maps and its packages",mcc_menu_catalog.count);

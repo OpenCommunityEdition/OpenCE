@@ -46,7 +46,7 @@ levels keep using root-level resource files. Nothing searches `maps` or
 `custom_maps`. A package level's identity is `mcc_maps\solar_flare\m0`;
 the folder name must be the same on every player's installation. The menu
 still lists individual levels in the same two categories, adding `[package]`
-only when level basenames collide. Optional `.txt` descriptions remain beside
+to every level inside a package folder. Optional `.txt` descriptions remain beside
 the corresponding level. No manifest or folder-navigation menu is required.
 
 Open the map-kind chooser and select **MCC SINGLEPLAYER** for campaign
