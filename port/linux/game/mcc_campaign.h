@@ -13,6 +13,7 @@ void mcc_campaign_dispose(void);
 void mcc_campaign_render(short local_player);
 void mcc_campaign_snapshot(void *out);
 real mcc_campaign_effects_gain(void);
+real mcc_campaign_mix_gain(boolean music);
 int mcc_campaign_validate(void const *in, unsigned long bytes);
 int mcc_campaign_restore(void const *in, unsigned long bytes);
 /* Implemented beside the native interpreter's private stack declarations. */

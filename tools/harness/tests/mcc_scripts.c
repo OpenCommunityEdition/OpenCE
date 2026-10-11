@@ -18,10 +18,12 @@
 #undef free
 #undef memset
 #undef memcpy
+#undef memcmp
 #undef strcmp
 #undef strcpy
 #undef strlen
 #undef strstr
+#undef strncmp
 
 short const hs_external_global_count=443;
 static boolean loaded;
@@ -46,6 +48,7 @@ void object_list_delete(long list) { (void)list; ++deleted_lists; }
 
 void *csmemcpy(void *to, void const *from, unsigned long bytes) { return memcpy(to, from, bytes); }
 void *csmemset(void *to, long value, unsigned long bytes) { return memset(to, value, bytes); }
+char *csstrcpy(char *to, char const *from) {return strcpy(to,from);}
 long csstrcasecmp(char const *a, char const *b) { return _stricmp(a, b); }
 void error(short priority, char const *format, ...) {
     va_list args;
@@ -219,7 +222,28 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[1],"prediction_disable")) {nodes[3].data=0;expected=0;}
         if (!strcmp(argv[1],"prediction_computed")) {nodes[3].flags=13;expected=0;}
     }
+    if (!strcmp(argv[1],"scratch")) {
+        char counter[3]={'f',argc>=3 ? argv[2][0] : '0',0};
+        scenario->hs_string_constants.size=1152;
+        strcpy(strings,"set");strcpy(strings+4,counter);
+        nodes[2].flags=nodes[3].flags=13;nodes[2].data=nodes[3].data=0x8001;
+        nodes[2].string_offset=nodes[3].string_offset=4;
+        nodes[2].type=nodes[3].type=_hs_type_real;
+    }
     CHECK(mcc_scripts_prepare(&runtime) == expected);
+    if (!strcmp(argv[1],"scratch")) {
+        struct hs_global *global=scenario->hs_globals.address;
+        struct hs_syntax_node *initial=datum_try_and_get(syntax,global->initialization_expression_index);
+        char const *relocated=(char const *)scenario->hs_string_constants.address+nodes[2].string_offset;
+        CHECK(scenario->hs_globals.count==1 && nodes[2].data==0 && nodes[3].data==0);
+        CHECK(global->type==_hs_type_real && initial && initial->data==0 && initial->type==_hs_type_real);
+        CHECK(!strcmp(global->name,relocated) && !strncmp(relocated,"__mcc_scratch_f",14));
+        CHECK(nodes[2].string_offset==nodes[3].string_offset && syntax->actual_count==5);
+        CHECK(nodes[2].string_offset<scenario->hs_string_constants.size-1024);
+        CHECK(!memcmp((char const *)scenario->hs_string_constants.address+scenario->hs_string_constants.size-1024,
+            runtime.tags+0xE0000,1024));
+        free(runtime.tags);return 0;
+    }
     if (strstr(argv[1],"prediction")==argv[1]) {
         if (expected) CHECK(nodes[0].flags==9 && nodes[0].data==0 && nodes[0].type==_hs_type_void && nodes[0].constant_type==nodes[0].type);
         free(runtime.tags);return 0;

@@ -898,23 +898,105 @@ has a 33-pixel line. This affects only the console input/output, including
 wrapping and line spacing; it does not resize HUD text or modify font tags.
 Xbox/CE paths and MCC fonts at or below the nominal size remain unchanged.
 
-### B30 Evolved capacity limitation
+### Extended MCC object names (11 October 2026)
 
-The supplied `b30_evolved.map` gets past its reported missing functions
-with these adapters, but it is **not yet playable**. It contains 640 named
-objects and a 101-entry scenery palette. The native object-name table and
-co-op presence message support 512 names; the scenario palette schema
-supports 100 entries. Earlier conversion truncated the names, followed by
-`backpack_1_argl: this is not a valid object name` during script startup.
-The MCC validator now refuses the oversized name list explicitly instead
-of reporting a loaded map after discarding required script targets.
-This check applies to every MCC map: 512 names are allowed, while 513 or
-more are refused. It does not change Xbox or Custom Edition validation.
+MCC maps may now contain up to 32,767 named objects. Maps with 513 or more
+names use `mcc_object_names.c`; maps with at most 512 names retain the native
+table. Xbox and Custom Edition keep their existing limits, allocations and
+validation. This extends script names without increasing live-object
+capacity. The scenery palette is extended separately below. Counts above
+32,767 are refused explicitly; script targets are never dropped to fit.
 
-Supporting this map requires an MCC-owned name table with lifecycle,
-checkpoint and co-op synchronization support, plus an audit of palette
-consumers. Raising the shared Xbox/CE constants or dropping excess names
-is not a safe fix. The changes here do not claim that this map runs.
+The separate table follows creation, naming, deletion, restart and map
+unload. An MCC checkpoint stores the table in a checked unused part of the
+native save image, alongside the existing MCC state. Its length, checksum
+and object handles are validated before restoration. Checkpoints for smaller
+MCC maps retain their existing format. A save without enough unused memory
+is refused rather than overwriting engine allocations.
+
+Singleplayer uses the table locally. Network games use OpenCE's existing
+host-authoritative replication for units and items, and MCC-only bounded
+presence messages for named scenery and devices. The host sends chunks of
+512 names every half second. The client requires two distinct matching
+updates before creating or deleting an object; packet ranges, padding,
+map name count, BSP and timestamps are checked. These messages work in
+co-op and multiplayer and require network version 34 on every peer.
+
+B30 Evolved's 640-name list is now retained. A hidden Windows run verified
+simulation, creation/deletion of `help_boulder` (name index 529), checkpoint
+reversion restoring that name, and a return to the menu. Its 31-character
+cutscene flag names are also preserved by the MCC validator. This is not
+a complete playthrough. Its four script refusals were traced to writes to
+`f0`-`f4`, `sound_enable` and `map_reset`, and are now resolved:
+
+- MCC `f0`-`f5` references use private scenario real variables initialized
+  to zero. These script counters survive checkpoints without changing the
+  native renderer's debug controls. Appended names preserve the console's
+  separate 1 KiB text reserve.
+- `sound_enable` controls an MCC map-local mute, including music, carried
+  in the campaign snapshot's flag bit 3. It preserves player volume settings,
+  survives checkpoints, follows the host, and clears on map disposal.
+- `map_reset` uses the existing restart operation: a local reset in
+  singleplayer, and the MCC pause menu's reliable round restart in a network
+  game. A client cannot request it through this script function.
+
+B30 Evolved also exposed two rendering problems, handled only for MCC:
+
+- The CMT fluid-burst effect spans more than the native eight bitmap pages.
+  `mcc_sprites.c` submits each full batch through the existing renderer and
+  starts another with the remaining sprite budget. It retains the native
+  eight-group structure, shader, bitmap pages and first-person projection;
+  excess pages are not silently discarded.
+- A signed object function can produce an intermediate RGB color below zero.
+  MCC's object adapter preserves RGB extrapolation so the native object code
+  can apply darkening and its existing final clamp. This avoids the native
+  interpolation helper's premature assertion, without clamping the function
+  itself or changing Xbox/CE interpolation. HSV interpolation is unchanged.
+
+MCC scenery palettes also retain up to 32,767 entries. The original 100-entry
+limit is an authoring/schema limit: placement and synchronization already
+read the palette's dynamic tag block through checked signed-short indices.
+Only the MCC validator raises it; Xbox/CE schemas and live-object capacity
+remain unchanged. Oversized or out-of-bounds blocks are refused, and invalid
+placement indices retain the existing validation behavior. B30 Evolved's
+101st entry, referenced by scenery placement 1997/name 639, is no longer
+truncated. A hidden Windows test created this entry, and a two-instance
+co-op test verified its creation, deletion and recreation after a reliable
+scripted restart on both peers. A checkpoint retest restored this same
+name 639 and the private script counter, restarted the map and returned to
+the menu without assertions. An earlier timed probe missed its expected
+checkpoint values; the focused retest produced both explicit success markers.
+This does not claim a complete campaign playthrough.
+
+Validation (12 October 2026): the Windows x86 release build and 902 MCC tests
+passed, with two optional-fixture skips. Boundary fixtures exercise 511/512,
+640 and 32,767 names, rejected overflow, stale checkpoint handles, malformed
+network chunks, aliases, BSP changes and unchanged legacy dispatch. Sprite
+fixtures draw 65 bitmap pages without loss, retain first-person projection,
+handle allocation failure and retain Xbox/CE behavior. Palette fixtures
+cover 100/101/32,767 entries, overflow, out-of-range indices, overlapping
+blocks, truncated buffers and unchanged legacy truncation at 100.
+
+Two hidden Windows instances verified high-index creation/deletion in both
+co-op and the multiplayer game-engine path. The latter used B30 as a state
+replication probe; it has no multiplayer starts, so this is not a playable
+multiplayer-match test. The final co-op sequence also verified synchronized
+muting/unmuting, reliable scripted restart and name recreation afterward.
+A final singleplayer sequence restored name 529 and a private script counter
+from a checkpoint, resumed simulation after a scripted reset, returned to
+the menu and exited normally. A separate 140-second rendered B30 run passed
+both former renderer failure points, printed its delayed simulation marker,
+and exited normally without script refusals or assertion diagnostics.
+
+Android and web targets are unavailable in the local Windows build graph
+(`ninja android`/`ninja web` report unknown targets); hosted builds remain
+required. The broader legacy harness cannot run fully on this Windows
+setup: 351 tests passed, four skipped and 43 failed at compilation because
+of missing POSIX headers or incompatible harness typedefs. Those failures
+are not claimed as passing regression checks.
+
+The capacity refusal described in the dated October 10 checks below was
+the previous behavior, replaced by this extension.
 
 ### Checks for these changes (10 October 2026)
 

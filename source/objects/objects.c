@@ -6,6 +6,8 @@ OBJECTS.C
 
 #include "cseries.h"
 #include "objects.h"
+#include "mcc_object_names.h" /* port: port/linux/game/mcc_object_names.c */
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.c */
 
 #include "damage.h"
 #include "light_definitions.h"
@@ -379,6 +381,9 @@ void object_set_object_index_for_name_index(
 	short name_index,
 	long object_index)
 {
+	/* port: expanded MCC names use a separate table. */
+	if (mcc_object_names_active()) { mcc_object_names_set(name_index, object_index); return; }
+
 	/* port: and one the name list holds (a map's count; retail has up to
 	448 names) */
 	if (VALID_INDEX(name_index, MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO)))
@@ -1665,6 +1670,9 @@ short objects_in_clusters_by_indices(
 long object_index_from_name_index(
 	short name_index)
 {
+	/* port: expanded MCC names use a separate table. */
+	if (mcc_object_names_active()) return mcc_object_names_get(name_index);
+
 	return name_index>=0 && name_index<MAXIMUM_OBJECT_NAMES_PER_SCENARIO ? object_name_list[name_index] : NONE;
 }
 
@@ -4621,6 +4629,9 @@ static void object_name_list_free(
 static void object_name_list_clear(
 	void)
 {
+	/* port: clear MCC state on every new map and restart. */
+	if (mcc_object_names_active()) mcc_object_names_clear();
+
 	memset(object_name_list, NONE, MAXIMUM_OBJECT_NAMES_PER_SCENARIO * sizeof(*object_name_list));
 
 	return;
@@ -4631,6 +4642,9 @@ static void object_name_list_new(
 	short name_index)
 {
 	struct object_datum *object = object_get(object_index);
+
+	/* port: extended indices must not enter the legacy table. */
+	if (mcc_object_names_active()) { mcc_object_names_claim(name_index, object_index); return; }
 
 	match_assert(
 		"c:\\halo\\SOURCE\\objects\\objects.c",
@@ -4676,6 +4690,9 @@ void object_claim_scenario_name(
 	long object_index,
 	short name_index)
 {
+	/* port: expanded MCC names preserve the same first-owner rule. */
+	if (mcc_object_names_active()) { mcc_object_names_claim(name_index, object_index); return; }
+
 	if (object_index == NONE ||
 		!VALID_INDEX(name_index, MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO)) ||
 		object_name_list[name_index] != NONE)
@@ -4691,6 +4708,9 @@ static void object_name_list_delete(
 	long object_index)
 {
 	struct object_datum *object = object_get(object_index);
+
+	/* port: MCC also clears aliases outside the legacy name range. */
+	if (mcc_object_names_active()) { mcc_object_names_delete(object_index); return; }
 
 	if (object->object.name_index!=NONE)
 	{
@@ -4715,6 +4735,9 @@ static void object_name_list_delete(
 static long object_name_list_lookup(
 	short name_index)
 {
+	/* port: expanded MCC names use a separate table. */
+	if (mcc_object_names_active()) return mcc_object_names_get(name_index);
+
 	return VALID_INDEX(name_index, MAXIMUM_OBJECT_NAMES_PER_SCENARIO) ? object_name_list[name_index] : NONE;
 }
 
@@ -5312,7 +5335,11 @@ static void object_compute_change_colors(
 				cc_index,
 				struct object_change_color_definition);
 
-			if (change_color->scaled_by)
+			/* port: MCC signed RGB functions are clamped below, after darkening. */
+			if (change_color->scaled_by && !mcc_object_color_extrapolate(
+				&object->object.outgoing_change_colors[cc_index], change_color->scale_flags,
+				&change_color->color_lower_bound, &change_color->color_upper_bound,
+				OBJECT_INCOMING_FUNCTION_GET_VALUE(object, change_color->scaled_by)))
 			{
 				rgb_colors_interpolate(
 					&object->object.outgoing_change_colors[cc_index],

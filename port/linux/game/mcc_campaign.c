@@ -2,6 +2,8 @@
  * replaced. State belongs to MCC snapshots, never the Xbox/CE tag data. */
 #include "mcc_campaign.h"
 #include "mcc_cache.h"
+#include "mcc_ui_network.h"
+#include "main/main.h"
 #include "errors.h"
 #include "cache/sound_cache.h"
 #include "sound/sound_definitions.h"
@@ -115,7 +117,7 @@ void mcc_campaign_dispose(void)
 void mcc_campaign_snapshot(void *out)
 {
     mcc_campaign.dialog_gain=sound_gain_under_dialog;
-    mcc_campaign.flags=(cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
+    mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
         (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u);
     mcc_campaign.ambient_base=object_light_ambient_base;mcc_campaign.ambient_scale=object_light_ambient_scale;
     memcpy(out,&mcc_campaign,sizeof(mcc_campaign));
@@ -131,7 +133,7 @@ int mcc_campaign_validate(void const *in, unsigned long bytes)
     memcpy(&state,in,bytes);
     if (state.version!=(bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? 1u : 2u) ||
         !(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
-        (state.flags & ~(bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? 1u : 7u)) ||
+        (state.flags & ~(bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ? 1u : 15u)) ||
         !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
         !mcc_campaign_real(state.dialog_gain) ||
         !(state.gravity>=-1000.0f && state.gravity<=1000.0f)) return 0;
@@ -179,6 +181,35 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
 real mcc_campaign_effects_gain(void)
 {
     return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.effects_gain : 1.0f;
+}
+
+/* Script muting is additional to the player's audio settings, and belongs
+ * to this map's checkpoint/network state. Music is muted too. */
+real mcc_campaign_mix_gain(boolean music)
+{
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned) return 1.0f;
+    return (mcc_campaign.flags&8u) ? 0.0f : music ? 1.0f : mcc_campaign.effects_gain;
+}
+
+static void mcc_sound_enable_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (!args) return;
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned && game_connection()!=_game_connection_network_client) {
+        if ((boolean)args[0]) mcc_campaign.flags&=~8u;
+        else mcc_campaign.flags|=8u;
+    }
+    hs_return(thread,0);
+}
+
+static void mcc_map_reset_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    hs_return(thread,0);
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || game_connection()==_game_connection_network_client) return;
+    if (game_connection()==_game_connection_network_server) {
+        if (!mcc_ui_restart_network_game()) error(_error_silent,"mcc: scripted network map restart could not be requested");
+    } else main_reset_map();
 }
 
 static void mcc_effects_gain_get_evaluate(short function, long thread, boolean initialize)
@@ -452,7 +483,9 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_boolean,0,"script_finished",hs_macro_function_parse,mcc_script_finished_evaluate,NULL,NULL,1,{_hs_type_string}},{0}},
     {{_hs_type_long_integer,0,"game_time_authoritative",hs_macro_function_parse,mcc_authoritative_time_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_real,0,"sound_get_effects_gain",hs_macro_function_parse,mcc_effects_gain_get_evaluate,NULL,NULL,0,{0}},{0}},
-    {{_hs_type_void,0,"sound_set_effects_gain",hs_macro_function_parse,mcc_effects_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}}
+    {{_hs_type_void,0,"sound_set_effects_gain",hs_macro_function_parse,mcc_effects_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
+    {{_hs_type_void,0,"sound_enable",hs_macro_function_parse,mcc_sound_enable_evaluate,NULL,NULL,1,{_hs_type_boolean}},{0}},
+    {{_hs_type_void,0,"map_reset",hs_macro_function_parse,mcc_map_reset_evaluate,NULL,NULL,0,{0}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

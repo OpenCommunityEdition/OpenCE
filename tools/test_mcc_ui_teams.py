@@ -140,6 +140,7 @@ static void cleanup(void *unused){(void)unused;}
 #define mcc_campaign_dispose() cleanup(NULL)
 #define mcc_resources_dispose(p) cleanup(p)
 #define mcc_grenades_reset() cleanup(NULL)
+#define mcc_object_names_clear() cleanup(NULL)
 #define mcc_parameters_dispose() cleanup(NULL)
 #define mcc_texture_cache_dispose() cleanup(NULL)
 #define mcc_geometry_dispose(p) cleanup(p)

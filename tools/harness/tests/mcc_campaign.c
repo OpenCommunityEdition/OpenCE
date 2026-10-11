@@ -22,7 +22,9 @@
 #undef strlen
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static int printed,requests,blocks;
+static int printed,requests,blocks,restarts,network_restarts;
+void main_reset_map(void) {restarts++;}
+boolean mcc_ui_restart_network_game(void) {network_restarts++;return TRUE;}
 static struct sound_definition sound;
 static struct sound_pitch_range ranges[2];
 static struct sound_permutation permutations[3];
@@ -206,11 +208,27 @@ int main(int argc,char **argv) {
         units[2].object.damage_flags=1u<<_object_dead_bit;draws=0;mcc_campaign_render(0);CHECK(!draws);
         units[2].object.damage_flags=0;args[0]=1;args[1]=2;call("breadcrumbs_deactivate_team_nav_point_object");mcc_campaign_render(0);CHECK(!draws);
         loaded=FALSE;mcc_campaign_render(0);CHECK(!draws);
+    } else if(!strcmp(argv[1],"mute_restart")) {
+        CHECK(mcc_campaign_mix_gain(FALSE)==1 && mcc_campaign_mix_gain(TRUE)==1);
+        args[0]=bits(.25f);call("sound_set_effects_gain");
+        args[0]=0;call("sound_enable");
+        CHECK(mcc_campaign_mix_gain(FALSE)==0 && mcc_campaign_mix_gain(TRUE)==0);
+        CHECK(mcc_campaign_effects_gain()==.25f);
+        mcc_campaign_snapshot(saved);mcc_campaign_begin();CHECK(mcc_campaign_mix_gain(TRUE)==1);
+        connection=_game_connection_network_client;
+        CHECK(mcc_campaign_restore(saved,sizeof(saved)));
+        args[0]=1;call("sound_enable");CHECK(mcc_campaign_mix_gain(TRUE)==0);
+        call("map_reset");CHECK(!restarts && !network_restarts);
+        connection=_game_connection_network_server;call("map_reset");CHECK(network_restarts==1 && !restarts);
+        connection=_game_connection_local;call("map_reset");CHECK(restarts==1);
+        call("sound_enable");CHECK(mcc_campaign_mix_gain(TRUE)==1 && mcc_campaign_mix_gain(FALSE)==.25f);
+        args[0]=0;call("sound_enable");mcc_campaign_dispose();CHECK(mcc_campaign_mix_gain(TRUE)==1);
+        loaded=FALSE;call("map_reset");CHECK(restarts==1);
     } else if(!strcmp(argv[1],"validation")) {
         mcc_campaign_snapshot(saved);CHECK(mcc_campaign_validate(saved,sizeof(saved)));
         CHECK(!mcc_campaign_validate(saved,sizeof(saved)-1));
         memcpy(bad,saved,sizeof(saved));bad[0]=3;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
-        memcpy(bad,saved,sizeof(saved));bad[12]=8;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[12]=16;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));{long nan=0x7fc00000;memcpy(bad+4,&nan,4);}CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));bad[16]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         CHECK(global_gravity==original);

@@ -12,6 +12,7 @@
 #include "mcc_package.h"
 #include "mcc_tag_validate.h"
 #include "mcc_checkpoint.h"
+#include "mcc_object_names.h"
 #include "mcc_grenades.h"
 #include "mcc_script_parameters.h"
 #include "mcc_campaign.h"
@@ -214,6 +215,7 @@ void mcc_cache_tags_unload(void)
     mcc_ui_teams_reset();
     mcc_checkpoint_dispose();
     mcc_grenades_reset();
+    mcc_object_names_clear();
     mcc_parameters_dispose();
     mcc_loaded = FALSE;
     mcc_texture_cache_dispose();

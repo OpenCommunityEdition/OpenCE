@@ -1,10 +1,27 @@
-/* MCC scenario vehicles retain their own multiplayer placement masks. These
- * rules are active only during an MCC game and never modify a game variant. */
+/* MCC object compatibility: signed change colors and multiplayer placement
+ * masks. The legacy object paths and game variants remain unchanged. */
 #include "cseries.h"
 #include "game/game_engine.h"
 #include "mcc_cache.h"
 #include "mcc_objects.h"
 #include <string.h>
+
+/* Signed object functions can extrapolate an RGB change color. The caller
+ * darkens and clamps the final color; the native interpolation helper asserts
+ * too early, before that clamp. Keep the same arithmetic for this MCC case. */
+boolean mcc_object_color_extrapolate(union real_rgb_color *result, unsigned long flags,
+    union real_rgb_color const *lower, union real_rgb_color const *upper, real fraction)
+{
+    real inverse;
+    /* Bit zero selects the native HSV interpolation path. */
+    if (!mcc_cache_tags_loaded() || (flags & 1u) ||
+        (fraction >= 0.f && fraction <= 1.f)) return FALSE;
+    inverse = 1.f - fraction;
+    result->red = inverse * lower->red + fraction * upper->red;
+    result->green = inverse * lower->green + fraction * upper->green;
+    result->blue = inverse * lower->blue + fraction * upper->blue;
+    return TRUE;
+}
 
 static unsigned short mcc_vehicle_default_mask(void)
 {

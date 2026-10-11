@@ -162,11 +162,11 @@ static char const *mcc_script_string(char const *strings, uint32_t bytes, long o
         strings + offset : NULL;
 }
 
-/* Give MCC's developer flag ordinary scenario storage. This preserves
+/* Give MCC compatibility variables ordinary scenario storage. This preserves
  * script reads/writes and checkpoint lifetime without adding an external
  * engine global or enabling native developer privileges. */
-static short mcc_developer_global(struct mcc_runtime *runtime, struct scenario *scenario,
-    struct data_array *syntax)
+static short mcc_local_global(struct mcc_runtime *runtime, struct scenario *scenario,
+    struct data_array *syntax, char const *name, short type)
 {
     extern short const hs_external_global_count;
     struct hs_global *old,*globals;
@@ -177,8 +177,8 @@ static short mcc_developer_global(struct mcc_runtime *runtime, struct scenario *
         (uint32_t)count*sizeof(*old));
     if (count && !old) return NONE;
     for (i=0;i<count;i++) {
-        if (memchr(old[i].name,0,sizeof(old[i].name)) && !csstrcasecmp(old[i].name,"developer_mode"))
-            return old[i].type==_hs_type_short_integer ? (short)i : NONE;
+        if (memchr(old[i].name,0,sizeof(old[i].name)) && !csstrcasecmp(old[i].name,name))
+            return old[i].type==type ? (short)i : NONE;
     }
     for (slot=0;slot<syntax->count;slot++) if (!nodes[slot].datum_header) break;
     if (slot==syntax->maximum_count) return NONE;
@@ -186,13 +186,13 @@ static short mcc_developer_global(struct mcc_runtime *runtime, struct scenario *
     if (!globals) return NONE;
     if (count) memcpy(globals,old,count*sizeof(*globals));
     memset(globals+count,0,sizeof(*globals));
-    memcpy(globals[count].name,"developer_mode",15);
-    globals[count].type=_hs_type_short_integer;
+    strcpy(globals[count].name,name);
+    globals[count].type=type;
     globals[count].initialization_expression_index=0x10000|slot;
     initializer=nodes+slot;
     memset(initializer,0,sizeof(*initializer));
     initializer->datum_header=1;initializer->flags=9;
-    initializer->type=initializer->constant_type=_hs_type_short_integer;
+    initializer->type=initializer->constant_type=type;
     initializer->next_node_index=NONE;initializer->source_offset=NONE;
     if (slot>=syntax->count) syntax->count=(short)(slot+1);
     syntax->actual_count++;
@@ -235,7 +235,10 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
     struct hs_syntax_node *nodes;
     char const *strings;
     long i, missing = 0;
-    short developer=NONE;
+    short developer=NONE, scratch[6]={NONE,NONE,NONE,NONE,NONE,NONE};
+    long scratch_strings=NONE;
+    static char const scratch_names[6][17]={"__mcc_scratch_f0","__mcc_scratch_f1",
+        "__mcc_scratch_f2","__mcc_scratch_f3","__mcc_scratch_f4","__mcc_scratch_f5"};
     memcpy(&address, runtime->tag_index + (runtime->report.scenario_handle & 0xFFFFu) * 32 + 20, 4);
     scenario = mcc_runtime_pointer(runtime, address, sizeof(*scenario));
     if (!scenario) return FALSE;
@@ -322,12 +325,36 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 continue;
             }
             if (!csstrcasecmp(name,"developer_mode")) {
-                if (developer==NONE) developer=mcc_developer_global(runtime,scenario,syntax);
+                if (developer==NONE) developer=mcc_local_global(runtime,scenario,syntax,"developer_mode",_hs_type_short_integer);
                 if (developer==NONE) {
                     error(_error_silent,"mcc: no scenario storage for developer_mode");
                     return FALSE;
                 }
                 node->data=developer;
+                continue;
+            }
+            /* Maps use these debug floats as script counters. Give them
+             * ordinary scenario storage, not the native renderer's controls.
+             * Rename tokens too: the native recompiler resolves them again. */
+            if ((name[0]=='f' || name[0]=='F') && name[1]>='0' && name[1]<='5' && !name[2]) {
+                unsigned slot=(unsigned)(name[1]-'0');
+                if (scratch_strings==NONE) {
+                    char *expanded;
+                    if (scenario->hs_string_constants.size<1024) return FALSE;
+                    expanded=mcc_runtime_allocate(runtime,
+                        (uint32_t)scenario->hs_string_constants.size+sizeof(scratch_names));
+                    if (!expanded) return FALSE;
+                    /* The final 1 KiB belongs to console source, not map strings. */
+                    scratch_strings=scenario->hs_string_constants.size-1024;
+                    memcpy(expanded,strings,(unsigned long)scratch_strings);
+                    memcpy(expanded+scratch_strings,scratch_names,sizeof(scratch_names));
+                    memset(expanded+scratch_strings+sizeof(scratch_names),0,1024);
+                    strings=expanded;scenario->hs_string_constants.address=expanded;
+                    scenario->hs_string_constants.size+=sizeof(scratch_names);
+                }
+                if (scratch[slot]==NONE) scratch[slot]=mcc_local_global(runtime,scenario,syntax,scratch_names[slot],_hs_type_real);
+                if (scratch[slot]==NONE) return FALSE;
+                node->data=scratch[slot];node->string_offset=scratch_strings+slot*sizeof(scratch_names[0]);
                 continue;
             }
             index = hs_find_global_by_name(name);

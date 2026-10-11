@@ -42,6 +42,8 @@ static word sent_size;
 static int known=1;
 static boolean local=0;
 static real round_trip=6;
+void mcc_object_names_network_reset(void) {}
+void mcc_object_names_host_tick(void) {}
 static int campaign_sends,campaign_restores;
 static byte campaign_state[MCC_CAMPAIGN_SNAPSHOT_BYTES];
 boolean mcc_cache_tags_loaded(void) { return active; }

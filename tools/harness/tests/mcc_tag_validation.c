@@ -20,6 +20,8 @@ struct test_root {
     struct tag_block children; short index; short enumeration; struct tag_data file;
     struct tag_data hs_syntax_data, other_data;
     struct tag_block object_names;
+    struct tag_block scenery_palette;
+    short palette_entry_index;
 };
 struct test_bsp { void *root; long vcount; void *vertices; long icount; void *indices; unsigned long signature; };
 struct test_device { short kind; unsigned short flags; struct tag_data identifier, profile; };
@@ -68,6 +70,8 @@ static struct tag_schema_field const root_fields[] = {
     TAG_SCHEMA_DATA(struct test_root, hs_syntax_data, 56L + 20L * 19001),
     TAG_SCHEMA_DATA(struct test_root, other_data, 128),
     TAG_SCHEMA_BLOCK(struct test_root, object_names, name_schema, 512),
+    TAG_SCHEMA_BLOCK(struct test_root, scenery_palette, name_schema, 100),
+    TAG_SCHEMA_BLOCK_INDEX(struct test_root, palette_entry_index, TAG_SCHEMA_ROOT, offsetof(struct test_root, scenery_palette), FLAG(_tag_schema_none_bit)),
     TAG_SCHEMA_CHECK(check_root),
     TAG_SCHEMA_END
 };
@@ -114,7 +118,11 @@ static struct tag_schema_definition const equipment_schema = {"equipment",sizeof
 struct test_anchor {short corner;};
 static struct tag_schema_field const anchor_fields[]={TAG_SCHEMA_ENUM(struct test_anchor,corner,5,0),TAG_SCHEMA_END};
 static struct tag_schema_definition const anchor_schema=TAG_SCHEMA_DEFINITION(hud_absolute_placement,struct test_anchor,anchor_fields);
+struct test_flag {long unused;char name[31];byte padding;byte rest[56];};
+static struct tag_schema_field const flag_fields[]={TAG_SCHEMA_STRING(struct test_flag,name),TAG_SCHEMA_END};
+static struct tag_schema_definition const flag_schema=TAG_SCHEMA_DEFINITION(cutscene_flag,struct test_flag,flag_fields);
 static struct tag_schema_group const groups[] = {
+    {'cflg',{NONE,NONE},&flag_schema},
     {'scnr', {NONE, NONE}, &root_schema}, {'sbsp', {NONE, NONE}, &root_schema},
     {'antr', {NONE, NONE}, &graph_schema}, {'bitm', {NONE, NONE}, &bitmap_schema}, {'afp!', {NONE,NONE}, &fp_schema},
     {'matg', {NONE,NONE}, &grenade_schema}, {'eqip',{NONE,NONE}, &equipment_schema},
@@ -158,7 +166,8 @@ int main(int argc, char **argv)
     memset(&runtime, 0, sizeof(runtime));
     runtime.capacity = 65536; runtime.used = 4096; runtime.source.size = 1024;
     if (!strncmp(argv[1], "syntax_", 7)) runtime.capacity = runtime.used = 1048576;
-    if (!strncmp(argv[1], "names_", 6)) runtime.used = runtime.capacity;
+    if (!strncmp(argv[1], "names_", 6)) runtime.used = runtime.capacity = 2097152;
+    if (!strncmp(argv[1], "palette_", 8)) runtime.used = runtime.capacity = 2097152;
     runtime.tags = calloc(runtime.capacity, 1); CHECK(runtime.tags != NULL);
     header = (struct test_header *)runtime.tags;
     instance = (struct test_instance *)(runtime.tags + 0x28);
@@ -166,8 +175,9 @@ int main(int argc, char **argv)
     child = (struct test_child *)(runtime.tags + 0x200);
     header->instances = instance; header->count = 1; header->scenario = (long)0xe0000000UL; header->signature = 'tags';
     instance->group = 'scnr'; instance->parent[0] = instance->parent[1] = NONE;
-    instance->handle = header->scenario; instance->root = root; instance->name = (char *)runtime.tags + 0x180;
+    instance->handle = header->scenario; instance->root = root; instance->name = (char *)runtime.tags + 0x1c0;
     strcpy(instance->name, "scenario");
+    root->palette_entry_index = NONE;
     root->children.count = 1; root->children.address = child; root->index = 7; root->enumeration = 9;
     root->file.file_offset = 100; root->file.size = 8;
     child->data.address = runtime.tags + 0x300; child->data.size = 16;
@@ -274,9 +284,47 @@ int main(int argc, char **argv)
     if (!strncmp(argv[1],"names_",6)) {
         root->object_names.count=atoi(argv[1]+6);
         root->object_names.address=runtime.tags+0x1000;
-        expected=root->object_names.count<=512;
+        expected=root->object_names.count<=32767;
+    }
+    if(!strcmp(argv[1],"flag_name")) {
+        struct test_flag *flag=(void*)(runtime.tags+0x500);
+        header->count=2;instance[1].group='cflg';instance[1].handle=(long)0xe0010001UL;
+        instance[1].root=flag;instance[1].name=instance->name;
+        memcpy(flag->name,"return_cart_cliffs_dropoff_flag",31);
+    }
+    if (!strncmp(argv[1], "palette_", 8)) {
+        root->scenery_palette.count = atoi(argv[1]+8);
+        if (!root->scenery_palette.count) root->scenery_palette.count = 101;
+        root->scenery_palette.address = runtime.tags+0x1000;
+        root->palette_entry_index = (short)(root->scenery_palette.count-1);
+        expected = root->scenery_palette.count<=32767;
+        if (!strcmp(argv[1], "palette_bad_index")) root->palette_entry_index = 101;
+        if (!strcmp(argv[1], "palette_outside")) {
+            root->scenery_palette.address = runtime.tags+runtime.used-36; expected = 0;
+        }
+        if (!strcmp(argv[1], "palette_overlap")) {
+            root->scenery_palette.address = child; expected = 0;
+        }
     }
     CHECK(mcc_tags_validate(&runtime) == expected);
+    if (!strncmp(argv[1], "palette_", 8)) {
+        int count = atoi(argv[1]+8);
+        if (!count) count = 101;
+        CHECK(root->scenery_palette.count == count);
+        if (expected) {
+            CHECK(root->palette_entry_index == (!strcmp(argv[1], "palette_bad_index") ? NONE : count-1));
+            CHECK(tag_validate_tags(header,runtime.used,runtime.source.size,"legacy scenery"));
+            CHECK(root->scenery_palette.count == MIN(count,100));
+            CHECK(root->palette_entry_index == (count>100 ? NONE : count-1));
+        }
+        mcc_validation_dispose(&runtime); free(runtime.tags); return 0;
+    }
+    if(!strcmp(argv[1],"flag_name")) {
+        struct test_flag *flag=(void*)(runtime.tags+0x500);
+        CHECK(!strcmp(flag->name,"return_cart_cliffs_dropoff_flag"));
+        CHECK(tag_validate_tags(header,runtime.used,runtime.source.size,"legacy flag"));
+        CHECK(flag->name[30]==0);
+    }
     if (!strncmp(argv[1],"names_",6)) {
         CHECK(root->object_names.count==atoi(argv[1]+6));
         CHECK(tag_validate_tags(header,runtime.used,runtime.source.size,"legacy names"));

@@ -1,5 +1,6 @@
 #include "cseries.h"
 #include "mcc_network.h"
+#include "mcc_object_names_network.h"
 #include "mcc_grenades.h"
 #include "mcc_campaign.h"
 #include "mcc_cache.h"
@@ -29,6 +30,7 @@ static long mcc_network_last_tick = NONE;
 void mcc_network_new_game(void)
 {
     long slot;
+    mcc_object_names_network_reset();
     csmemset(mcc_network_sent, 0, sizeof(mcc_network_sent));
     csmemset(mcc_network_own, 0, sizeof(mcc_network_own));
     mcc_network_last_tick = NONE;
@@ -80,6 +82,7 @@ void mcc_network_host_tick(void)
     long now = game_time_get();
     short limit = MIN(64, DATAGRAM_ENTRIES(struct mcc_network_inventory));
     mcc_network_campaign_tick(now);
+    mcc_object_names_host_tick();
     if (!mcc_grenades_active() || mcc_grenades_type_count() <= 2 ||
         game_connection() != _game_connection_network_server || now % 3) return;
     mcc_network_observe_clock(now);

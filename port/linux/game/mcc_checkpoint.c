@@ -11,6 +11,7 @@
 #include "mcc_checkpoint.h"
 #include "mcc_grenades.h"
 #include "mcc_campaign.h"
+#include "mcc_object_names.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,11 @@ static struct {
     unsigned char *original;
     unsigned char *address;
 } mcc_checkpoint_owner;
+
+static struct {
+    unsigned char *original, *address;
+    unsigned long bytes;
+} mcc_checkpoint_names_owner;
 
 static uint32_t mcc_checkpoint_word(void const *data)
 {
@@ -111,6 +117,77 @@ static int mcc_checkpoint_units(void const *image, void const *current,
     return 1;
 }
 
+/* Extended names occupy a second checked slot immediately before the existing
+ * footer/payload. Small MCC maps retain their existing checkpoint format. */
+static unsigned char *mcc_checkpoint_names_tail(void const *image, unsigned long used,
+    unsigned long capacity, unsigned long bytes)
+{
+    unsigned long required = MCC_CHECKPOINT_SLOT_BYTES + bytes + 16;
+    if (used > capacity || required > capacity - used) return NULL;
+    return (unsigned char *)image + capacity - required;
+}
+
+static int mcc_checkpoint_names_claim(unsigned char *tail, unsigned long bytes)
+{
+    if (mcc_checkpoint_names_owner.original)
+        return mcc_checkpoint_names_owner.address == tail && mcc_checkpoint_names_owner.bytes == bytes;
+    mcc_checkpoint_names_owner.original = malloc(bytes);
+    if (!mcc_checkpoint_names_owner.original) return 0;
+    memcpy(mcc_checkpoint_names_owner.original, tail, bytes);
+    mcc_checkpoint_names_owner.address = tail;
+    mcc_checkpoint_names_owner.bytes = bytes;
+    return 1;
+}
+
+static int mcc_checkpoint_names_capture(void *image, unsigned long used, unsigned long capacity)
+{
+    unsigned long bytes = mcc_object_names_snapshot(NULL);
+    unsigned char *tail;
+    if (!bytes) return 1;
+    tail = mcc_checkpoint_names_tail(image, used, capacity, bytes);
+    if (!tail || !mcc_checkpoint_names_claim(tail, bytes + 16)) return 0;
+    memset(tail, 0, 16);
+    if (mcc_object_names_snapshot(tail + 16) != bytes) return 0;
+    memcpy(tail, "MCCN", 4);
+    mcc_checkpoint_put(tail + 4, 1);
+    mcc_checkpoint_put(tail + 8, bytes);
+    mcc_checkpoint_put(tail + 12, mcc_checkpoint_checksum(tail + 16, bytes));
+    return 1;
+}
+
+static int mcc_checkpoint_names_validate(void const *image, void const *current,
+    unsigned long used, unsigned long capacity)
+{
+    unsigned long bytes = mcc_object_names_snapshot(NULL), i;
+    unsigned char *tail, *current_tail;
+    struct data_array const *array;
+    struct object_header_datum const *headers;
+    if (!bytes) return 1;
+    tail = mcc_checkpoint_names_tail(image, used, capacity, bytes);
+    current_tail = mcc_checkpoint_names_tail(current, used, capacity, bytes);
+    if (!tail || !current_tail || memcmp(tail, "MCCN", 4) ||
+        mcc_checkpoint_word(tail + 4) != 1 || mcc_checkpoint_word(tail + 8) != bytes ||
+        mcc_checkpoint_word(tail + 12) != mcc_checkpoint_checksum(tail + 16, bytes) ||
+        !mcc_object_names_validate(tail + 16, bytes)) return 0;
+    array = mcc_checkpoint_incoming(image, current, used, object_header_data, sizeof(*array));
+    if (!array || !array->valid || array->size != sizeof(*headers) || array->count < 0 ||
+        array->count > 8192 || array->count > array->maximum_count) return 0;
+    headers = mcc_checkpoint_incoming(image, current, used, array->data,
+        (unsigned long)array->count * sizeof(*headers));
+    if (!headers) return 0;
+    for (i = 0; i < bytes; i += 4) {
+        uint32_t handle = mcc_checkpoint_word(tail + 16 + i), index = handle & 0xFFFFu;
+        struct object_header_datum const *object;
+        if (handle == 0xFFFFFFFFu) continue;
+        if (index >= (unsigned)array->count) return 0;
+        object = headers + index;
+        if (!(uint16_t)object->identifier || (uint16_t)object->identifier != (uint16_t)(handle >> 16) ||
+            object->type >= 12 ||
+            !mcc_checkpoint_incoming(image, current, used, object->datum, sizeof(struct object_datum))) return 0;
+    }
+    return mcc_checkpoint_names_claim(current_tail, bytes + 16);
+}
+
 int mcc_checkpoint_capture(void *image, unsigned long total,
     unsigned long used, unsigned long capacity)
 {
@@ -119,7 +196,8 @@ int mcc_checkpoint_capture(void *image, unsigned long total,
     uint32_t bytes;
     if (!mcc_cache_tags_loaded()) return 1;
     tail = mcc_checkpoint_tail(image, total, used, capacity);
-    if (!tail || !mcc_checkpoint_identity(header) || !mcc_checkpoint_claim(tail)) goto failed;
+    if (!tail || !mcc_checkpoint_identity(header) || !mcc_checkpoint_claim(tail) ||
+        !mcc_checkpoint_names_capture(image, used, capacity)) goto failed;
     bytes = mcc_grenades_snapshot(NULL, 0);
     if (bytes < 8 || bytes > MCC_CHECKPOINT_PAYLOAD_LIMIT) goto failed;
     footer = tail + MCC_CHECKPOINT_TOTAL_PAYLOAD;
@@ -175,6 +253,7 @@ int mcc_checkpoint_validate(void const *image, unsigned long total,
         !mcc_grenades_snapshot_validate(tail, bytes - campaign_bytes) ||
         (campaign_bytes && !mcc_campaign_validate(tail + bytes - campaign_bytes, campaign_bytes)) ||
         !mcc_checkpoint_units(image, current_image, used, tail) ||
+        !mcc_checkpoint_names_validate(image, current_image, used, capacity) ||
         !mcc_checkpoint_claim(current_tail)) goto failed;
     return 1;
 failed:
@@ -189,6 +268,11 @@ int mcc_checkpoint_restore(void const *image, unsigned long total,
     uint32_t bytes, campaign_bytes, version;
     if (!mcc_cache_tags_loaded()) return 1;
     if (!mcc_checkpoint_validate(image, total, used, capacity, image)) return 0;
+    if (mcc_object_names_active()) {
+        unsigned long names_bytes = mcc_object_names_snapshot(NULL);
+        unsigned char *names = mcc_checkpoint_names_tail(image, used, capacity, names_bytes);
+        if (!mcc_object_names_restore(names + 16, names_bytes)) return 0;
+    }
     tail = mcc_checkpoint_tail(image, total, used, capacity);
     bytes = mcc_checkpoint_word(tail + MCC_CHECKPOINT_TOTAL_PAYLOAD + 8);
     campaign_bytes = mcc_checkpoint_word(tail + MCC_CHECKPOINT_TOTAL_PAYLOAD + 20);
@@ -207,6 +291,11 @@ int mcc_checkpoint_restore(void const *image, unsigned long total,
 
 void mcc_checkpoint_dispose(void)
 {
+    if (mcc_checkpoint_names_owner.original) {
+        memcpy(mcc_checkpoint_names_owner.address, mcc_checkpoint_names_owner.original, mcc_checkpoint_names_owner.bytes);
+        free(mcc_checkpoint_names_owner.original);
+    }
+    memset(&mcc_checkpoint_names_owner, 0, sizeof(mcc_checkpoint_names_owner));
     if (mcc_checkpoint_owner.original) {
         memcpy(mcc_checkpoint_owner.address, mcc_checkpoint_owner.original, MCC_CHECKPOINT_SLOT_BYTES);
         free(mcc_checkpoint_owner.original);

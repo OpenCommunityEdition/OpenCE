@@ -1149,9 +1149,9 @@ static real sound_manager_master_gain(
 {
 	real gain = sound_class_get_gain(class_index) * sound_manager_port_volume(class_index);
 
-	/* port: MCC scripts own a separate effects multiplier; inactive maps get 1. */
+	/* port: MCC scripts own effects gain and map-local muting; inactive maps get 1. */
 	{
-		if (class_index != _sound_class_music) gain *= mcc_campaign_effects_gain();
+		gain *= mcc_campaign_mix_gain(class_index == _sound_class_music);
 	}
 
 	if (class_index != _sound_class_scripted_dialog_to_player &&
