@@ -752,6 +752,11 @@ started first), to test that nothing another machine sends can crash the
 game: a host and a client with a third of their datagrams damaged must play
 on, their logs noting what they refused.
 
+With `log`, `debug.network_test` hosts and joins nothing: it logs the game
+one machine plays (a `map_name` in `init.txt` plays one without the menus),
+as above. `debug.network_test_cues` has the host, or that machine, run
+console lines at their ticks, from the first tick every player is in.
+
 The host logs to `debug.txt` when a player on another machine presses the
 action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does

@@ -2450,6 +2450,13 @@ static void main_update_time_unthrottled(
 	{
 		seconds_elapsed = main_globals.recording_dt;
 	}
+	else if (halo_fixed_step() && main_globals.connection == _game_connection_local)
+	{
+		/* port: debug.fixed_step, a frame a tick whatever time has passed, as
+		a movie's frames are its recording's: what runs once a frame (aiming)
+		sees the game's time, and the game plays the same every time */
+		seconds_elapsed = 1.0f / TICKS_PER_SECOND;
+	}
 	else
 	{
 		seconds_elapsed = PIN(seconds_elapsed, 0.0f, 1.0f);
@@ -2691,6 +2698,11 @@ static void main_update_time(
 	if (main_globals.movie)
 	{
 		seconds_elapsed = main_globals.recording_dt;
+	}
+	else if (halo_fixed_step() && main_globals.connection == _game_connection_local)
+	{
+		/* port: debug.fixed_step, as main_update_time_unthrottled */
+		seconds_elapsed = 1.0f / TICKS_PER_SECOND;
 	}
 	else
 	{

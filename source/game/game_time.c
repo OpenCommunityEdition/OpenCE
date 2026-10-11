@@ -440,6 +440,15 @@ void game_time_update(
 			game_time_globals->leftover_dt = game_time - ticks_elapsed_real/ticks_per_second;
 			if (game_time_globals->leftover_dt < 0.f)
 				game_time_globals->leftover_dt = 0.f;
+			/* port: debug.fixed_step, a game of this machine alone: one tick a
+			frame that has time (main.c gives it a tick's; a 30th of a second in
+			a float is not one tick exactly), so that what runs once a frame
+			(aiming) sees the game's time; game_speed has no effect */
+			if (halo_fixed_step() && game_connection() == _game_connection_local && time_delta_sec > 0.f)
+			{
+				ticks_elapsed = 1;
+				game_time_globals->leftover_dt = 0.f;
+			}
 			match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 306,
 				game_time_globals->leftover_dt>=0.f && game_time_globals->leftover_dt<100.f);
 
