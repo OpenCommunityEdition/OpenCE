@@ -579,6 +579,7 @@ reached, and (map_data) a saved game on the level */
 #define ROW_TEXT_LENGTH 64
 #define MAXIMUM_PROFILES 32
 #define SOUND_ERROR 4
+#define SOUND_CURSOR 1
 #define SOUND_FORWARD 2
 #define SOUND_BACK 3
 
@@ -1599,6 +1600,7 @@ static boolean color_list_initialize(struct widget_instance *list)
 
 /* (ui_widget.c) whether the pointer moved the menus' focus last */
 boolean ui_widget_port_pointer_focused(void);
+boolean ui_widget_port_hover_focused(void);
 
 /* Whether a list whose focus is on its first or last row moves on: when the
 d-pad put it there. The pointer resting there would make it move every
@@ -3695,21 +3697,25 @@ static boolean browser_item_usable(struct widget_instance *child)
 }
 
 /* the browser's focus, off what cannot have it (at the start, or a row whose
-game went): the first game, else the buttons (off those hidden) */
-static void browser_focus(struct widget_instance *list)
+game went): the first game, else the buttons (off those hidden); the row of
+the game chosen is `chosen_row` (NONE: none shown) */
+static void browser_focus(struct widget_instance *list, short chosen_row)
 {
 	char const *const choices[] = { "server_item_1", "join_game_button_bar" };
 	struct widget_instance *focused = list->focused_child;
 	struct widget_instance *row;
 	short index;
 
-	/* (the rows' backgrounds: the focused one's outlined frame. The engine
-	shows a list item's focus only on a bitmap of two frames, and theirs has
-	three: normal, focused, selected) */
+	/* (the rows' backgrounds, as Custom Edition's: the chosen game's
+	outlined in yellow, the focused one's in blue. The engine shows a list
+	item's focus only on a bitmap of two frames, and theirs has three:
+	normal, focused, selected) */
 	for (row = list->child; row; row = row->next)
 	{
-		if (browser_row_index(row) != NONE)
-			row->animation.current_frame_index = row == focused ? 1 : 0;
+		short row_index = browser_row_index(row);
+
+		if (row_index != NONE)
+			row->animation.current_frame_index = row_index == chosen_row ? 2 : row == focused ? 1 : 0;
 	}
 	focus_off_hidden(named(list, "join_game_button_bar", 0));
 	if (focused && focused->visible && !focused->disabled)
@@ -3762,7 +3768,7 @@ static boolean browser_initialize(struct widget_instance *screen, struct event_r
 		for (child = list ? list->child : NULL; child; child = child->next)
 			child->disabled = !browser_item_usable(child);
 		if (list)
-			browser_focus(list);
+			browser_focus(list, NONE);
 	}
 	visible_set(named(screen, "scroll_up_button", 0), FALSE);
 	visible_set(named(screen, "scroll_down_button", 0), FALSE);
@@ -3899,6 +3905,17 @@ static struct
 	boolean password_joined;
 } lobby_browser;
 
+/* the row of the browser's chosen game, NONE if it is not on the rows */
+static short browser_chosen_row(void)
+{
+	boolean server_browser = multiplayer.mode == _multiplayer_mode_server_browser;
+	short chosen = server_browser ? lobby_browser.chosen : multiplayer.game_chosen;
+	short row = server_browser ? (short)(chosen - lobby_browser.first) : chosen;
+
+	return chosen < (server_browser ? lobby_browser.count : multiplayer.game_count) && row >= 0 &&
+		row < BROWSER_ROWS ? row : NONE;
+}
+
 static void lobby_browser_begin(void)
 {
 	lobby_browser.count = 0;
@@ -4031,9 +4048,10 @@ static void lobby_browser_update(struct widget_instance *list)
 			first_row->visible = TRUE;
 			lobby_browser_focus_row(list, 0);
 			focused = 0;
+			lobby_browser.chosen = lobby_browser.first;
 		}
 	}
-	if (focused != NONE)
+	if (focused != NONE && !ui_widget_port_hover_focused())
 		lobby_browser.chosen = (short)(lobby_browser.first + focused);
 	chosen = lobby_browser.chosen;
 	for (row = list->child; row; row = row->next)
@@ -4187,7 +4205,7 @@ static void lobby_browser_update(struct widget_instance *list)
 		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%s %d", label, lobby_browser.count);
 		text_set(named(stats, "server_count_label", 0), text);
 	}
-	browser_focus(list);
+	browser_focus(list, browser_chosen_row());
 }
 
 /* the game's host reached by its invite (joined, once it is reached:
@@ -4385,7 +4403,7 @@ static void browser_update(struct widget_instance *list)
 		return;
 	}
 	browser_games_read();
-	if (focused != NONE && focused < multiplayer.game_count)
+	if (focused != NONE && focused < multiplayer.game_count && !ui_widget_port_hover_focused())
 		multiplayer.game_chosen = focused;
 	for (row = list->child; row; row = row->next)
 	{
@@ -4453,7 +4471,7 @@ static void browser_update(struct widget_instance *list)
 		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%s %d", label, multiplayer.game_count);
 		text_set(named(stats, "server_count_label", 0), text);
 	}
-	browser_focus(list);
+	browser_focus(list, browser_chosen_row());
 }
 
 /* "direct ip connect go" (Direct Link's PASTE LINK): the invite
@@ -4489,13 +4507,25 @@ static boolean browser_join(struct widget_instance *widget, short controller, bo
 	return ui_widget_port_join(widget, multiplayer.games[multiplayer.game_chosen], LOBBY_NAME, widget_deleted);
 }
 
-/* "gamespy select item" (a row: joins its game) and "gamespy select button"
-(Join) */
+/* "gamespy select item" (a row: chooses its game, or joins it once chosen)
+and "gamespy select button" (Join) */
 static boolean browser_select(struct widget_instance *widget, struct event_record *event, short controller,
 	boolean *widget_deleted)
 {
 	short row = browser_row_index(widget);
 
+	/* (a row not chosen, clicked after the pointer passed over it: chosen,
+	as Custom Edition's; a click on it chosen, a double click, A or JOIN
+	joins its game. Not the A press a join posts: lobby_browser_select) */
+	if (row != NONE && row != browser_chosen_row() && !lobby_browser.ready)
+	{
+		if (multiplayer.mode == _multiplayer_mode_server_browser)
+			lobby_browser.chosen = (short)(lobby_browser.first + row);
+		else
+			multiplayer.game_chosen = row;
+		ui_play_audio_feedback_sound(SOUND_CURSOR);
+		return TRUE;
+	}
 	if (multiplayer.mode == _multiplayer_mode_server_browser)
 		return lobby_browser_select(widget, controller, row, widget_deleted);
 	if (row != NONE)
