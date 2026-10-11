@@ -189,7 +189,8 @@ machine say its WebRTC in internet play's signalling (a native build's
 certificate, a browser's ICE credentials too), so that browsers play
 (port/linux/README.md, "Browsers"); version 27 shares Custom Edition maps
 (below, "Map sharing"): a client asks the host for a map it lacks, and the
-game's players reach each other to send it.
+game's players reach each other to send it; version 28 adds votes to ban
+for 12 hours with a reason, and no votes (below, the players' votes).
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -261,7 +262,20 @@ for `network.votekick_ban_minutes`. The host sends each client
 `_distributed_message_votekick_status` every second while a vote runs (and
 as it changes), for the scoreboard, whose right click frees the mouse to
 pick a player; the host's own scoreboard adds Kick and Ban. Builds without
-votes drop both kinds as unknown, so the network version is unchanged.
+votes drop both kinds as unknown.
+
+A vote may be to ban instead, for 12 hours, with a reason the starter types
+(up to 63 printable characters). `_distributed_message_vote_choice` carries
+a vote started with its kind and reason, or a yes or no in the vote running
+(at most one request a second, from the client's stream, as the vote to
+kick's); the host sends `_distributed_message_vote_details` (the kind, the
+reason, the no votes, whether the client voted no) with each status. A
+yes is still sent as `_distributed_message_votekick`, so that hosts of
+version 27 count it. A vote that can no longer pass (the yes and those who
+have not voted fewer than needed) fails at once. A ban that passes is a
+line of the host's `bans.txt` with `until=` (seconds since 1970), after
+which `network_distributed_banned` passes over it: it lasts though the
+host's game is started again, and the host may take it out by hand.
 
 Voice chat (`network_voice.c`, the sound in `port/linux/src/voice_audio.c`)
 travels as distributed messages too, but in the lobby as well as in a game:

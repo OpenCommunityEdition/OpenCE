@@ -125,6 +125,13 @@ enum
 	_distributed_message_map_share_offer = 84,
 	_distributed_message_map_share_sources = 85,
 	_distributed_message_map_share_progress = 86,
+	/* a player's yes or no in the vote running, or a vote to kick or ban
+	started with its reason (network_votekick.c): to the host, reliably,
+	which takes it only from the voter's own stream */
+	_distributed_message_vote_choice = 87,
+	/* the vote running's kind, reason and no votes, to each client with
+	_distributed_message_votekick_status (unreliable: network_votekick.c) */
+	_distributed_message_vote_details = 88,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -290,6 +297,14 @@ void network_votekick_host_tick(void);
 stream (anything else is refused) */
 void network_votekick_handle_request(long machine_index, void const *entries, boolean from_stream);
 word network_votekick_request_entry_size(void);
+void network_votekick_handle_choice(long machine_index, void const *entries, boolean from_stream);
+word network_votekick_choice_entry_size(void);
+void network_votekick_handle_details(void const *entries);
+word network_votekick_details_entry_size(void);
+/* (the host) a machine banned by a vote: its line in BANS_FILE, kept until
+the seconds have gone by (network_distributed.c) */
+void network_distributed_vote_ban(long machine_index, unsigned long address, char const *names, char const *reason,
+	unsigned long seconds);
 /* (a client) the host's count */
 void network_votekick_handle_status(void const *entries);
 word network_votekick_status_entry_size(void);

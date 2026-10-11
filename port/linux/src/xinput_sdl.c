@@ -323,6 +323,43 @@ void platform_text_field(int typing, int password)
 #endif
 }
 
+/* the game's own line of text in play, a vote's reason
+(platform_game_typing: game_engine.c): as with the console, the keys type
+into it (escape too, which cancels it) and move nothing */
+static BOOL game_typing;
+
+void platform_game_typing(int typing)
+{
+	game_typing = typing != 0;
+}
+
+/* F1 and F2 in play, a vote's yes and no (platform_vote_key: game_engine.c):
+pressed since last asked */
+static BOOL vote_key_down[2];
+static int vote_key_pressed;
+
+int platform_vote_key(void)
+{
+	int key = vote_key_pressed;
+
+	vote_key_pressed = 0;
+	return key;
+}
+
+static void vote_keys_update(const struct platform_input_state *input, BOOL playing)
+{
+	int index;
+
+	for (index = 0; index < 2; index++)
+	{
+		BOOL down = playing && input->keys[index ? SDL_SCANCODE_F2 : SDL_SCANCODE_F1];
+
+		if (down && !vote_key_down[index])
+			vote_key_pressed = index + 1;
+		vote_key_down[index] = down;
+	}
+}
+
 static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
 {
 	const unsigned char *k = input->keys;
@@ -394,7 +431,8 @@ static void keys_held_over_switch(struct platform_input_state *input)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
 	static int context = -1;
-	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0);
+	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0) |
+		(game_typing ? 8 : 0);
 	int scancode;
 
 	if (context != next_context)
@@ -988,7 +1026,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		wheel_update();
 		keyboard_actions_held = 0;
 		keys_held_over_switch(&input);
-		console_active = console_is_active();
+		console_active = console_is_active() || (game_typing && !input.menus);
+		vote_keys_update(&input, !console_active && !input.menus);
 		held = console_active ? 0 : keyboard_bound_actions(&input);
 		keyboard_screenshot(held);
 		if (!console_active)
@@ -1073,7 +1112,7 @@ DWORD WINAPI XInputDebugGetKeystroke(PXINPUT_DEBUG_KEYSTROKE keystroke)
 		/* key ups always pass, so no key is left latched down; while typing,
 		escape does not (it cancels, as B: the game's own escape leaves the
 		menus, main.c) */
-		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() ||
+		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() || game_typing ||
 			(text_typing && next.virtual_key != 0x1B /* escape */))
 		{
 			keystroke->VirtualKey = next.virtual_key;

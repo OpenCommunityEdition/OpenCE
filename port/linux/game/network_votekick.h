@@ -16,6 +16,16 @@ enum
 {
 	/* a player's name in ASCII, with its end */
 	VOTEKICK_NAME_TEXT_SIZE = 16,
+	/* a vote's reason in ASCII, with its end */
+	VOTE_REASON_SIZE = 64,
+};
+
+/* a vote's kinds */
+enum
+{
+	_network_vote_kick,
+	/* (for 12 hours: network_votekick.c) */
+	_network_vote_ban,
 };
 
 /* ---------- structures */
@@ -28,9 +38,16 @@ struct network_votekick_status
 	short votes;
 	short needed;
 	short seconds_left;
-	/* this machine has voted; may vote */
+	/* this machine has voted (yes); may vote */
 	boolean voted;
 	boolean may_vote;
+	/* ... voted no */
+	boolean voted_no;
+	short no_votes;
+	/* _network_vote_kick or _network_vote_ban, and the reason its starter
+	typed (a ban's) */
+	short kind;
+	char reason[VOTE_REASON_SIZE];
 };
 
 /* ---------- prototypes/NETWORK_VOTEKICK.C */
@@ -42,6 +59,12 @@ boolean network_votekick_get_status(struct network_votekick_status *status);
 /* this machine votes against the player (absolute index): starts a vote,
 or votes in the one running; the host answers on the console */
 boolean network_votekick_request(short player_index);
+/* this machine starts a vote to ban the player (absolute index) for 12
+hours, with the reason typed */
+boolean network_votekick_request_ban(short player_index, char const *reason);
+/* this machine votes yes or no in the vote running (F1, F2); FALSE when it
+cannot (none running, voted, too new) */
+boolean network_votekick_vote(boolean yes);
 /* whether this machine hosts the game (its scoreboard offers Kick and Ban) */
 boolean network_votekick_host(void);
 /* (the host) kicks, or bans, the machine of the player (absolute index):

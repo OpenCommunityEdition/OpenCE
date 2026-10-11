@@ -3474,6 +3474,7 @@ static boolean distributed_message_stale(
 	case _distributed_message_coop_screen_effect:
 	case _distributed_message_coop_device_states:
 	case _distributed_message_votekick_status:
+	case _distributed_message_vote_details:
 		break;
 	default:
 		return FALSE;
@@ -3670,12 +3671,33 @@ their address, Discord user and names, and why; separated by tabs, each
 part kept to the characters allowed and their lengths (what a player could
 tell: their Discord user and names). The Discord user of the machine at
 the index, if it is one in the game (NONE: none) */
+static void distributed_write_player_record_until(
+	char const *file_name,
+	char const *address,
+	long machine_index,
+	char const *names,
+	char const *reason,
+	unsigned long until);
+
 static void distributed_write_player_record(
 	char const *file_name,
 	char const *address,
 	long machine_index,
 	char const *names,
 	char const *reason)
+{
+	distributed_write_player_record_until(file_name, address, machine_index, names, reason, 0);
+}
+
+/* ... and (until: not 0) when it ends, in seconds since 1970 (BANS_FILE's
+"until=": a vote's ban, network_distributed_vote_ban) */
+static void distributed_write_player_record_until(
+	char const *file_name,
+	char const *address,
+	long machine_index,
+	char const *names,
+	char const *reason,
+	unsigned long until)
 {
 	char discord_id[DISCORD_ID_SIZE] = "";
 	char discord_name[DISCORD_NAME_SIZE] = "";
@@ -3709,11 +3731,14 @@ static void distributed_write_player_record(
 	}
 	/* (the Discord user as the machine told it, which it may say is anyone's:
 	marked so) */
-	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s\n", when,
+	fprintf(file, "%s\tip=%s\thwid=%s\tdiscord_username=%s%s\tdiscord_id=%s%s\tplayers=%s\treason=%s", when,
 		kept_address, hardware_id[0] ? hardware_id : "none",
 		discord_name[0] ? discord_name : "none", discord_name[0] ? " (self-reported)" : "",
 		discord_id[0] ? discord_id : "none", discord_id[0] ? " (self-reported)" : "",
 		kept_names, kept_reason);
+	if (until)
+		fprintf(file, "\tuntil=%lu", until);
+	fprintf(file, "\n");
 	fclose(file);
 }
 
@@ -3756,6 +3781,11 @@ boolean network_distributed_banned(
 	while (!banned && fgets(line, sizeof(line), file))
 	{
 		char const *ip = strstr(line, "ip=");
+		char const *until = strstr(line, "\tuntil=");
+
+		/* (a vote's ban, which ends: gone by, it keeps no one out) */
+		if (until && strtoul(until + 7, NULL, 10) <= (unsigned long)time(NULL))
+			continue;
 		char const *hwid = strstr(line, "hwid=");
 		size_t length = csstrlen(text);
 		size_t hardware_id_length = csstrlen(kept_hardware_id);
@@ -3816,6 +3846,25 @@ void network_distributed_ban(
 		console_warning("%s", notice);
 		error(_error_log, "%s", notice);
 	}
+}
+
+/* (the host: network_votekick.c) a machine banned by a vote of the players
+for so many seconds: its line in BANS_FILE, until then (the notice is the
+vote's own) */
+void network_distributed_vote_ban(
+	long machine_index,
+	unsigned long address,
+	char const *names,
+	char const *reason,
+	unsigned long seconds)
+{
+	char text[32];
+	char why[160];
+
+	distributed_address_text(address, text, sizeof(text));
+	snprintf(why, sizeof(why), "banned by vote for %lu hours: %s", seconds / 3600, reason);
+	distributed_write_player_record_until(BANS_FILE, text, machine_index, names, why,
+		(unsigned long)time(NULL) + seconds);
 }
 
 /* (the host: network_server_manager.c, its kick command) players kicked by
@@ -4044,6 +4093,8 @@ void network_distributed_handle_message(
 	case _distributed_message_pickups: entry_size = sizeof(struct distributed_pickup); break;
 	case _distributed_message_votekick: entry_size = network_votekick_request_entry_size(); break;
 	case _distributed_message_votekick_status: entry_size = network_votekick_status_entry_size(); break;
+	case _distributed_message_vote_choice: entry_size = network_votekick_choice_entry_size(); break;
+	case _distributed_message_vote_details: entry_size = network_votekick_details_entry_size(); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
@@ -4069,6 +4120,8 @@ void network_distributed_handle_message(
 	case _distributed_message_coop_skip_vote:
 	case _distributed_message_votekick:
 	case _distributed_message_votekick_status:
+	case _distributed_message_vote_choice:
+	case _distributed_message_vote_details:
 		if (header.count < 1)
 			return;
 		break;
@@ -4088,6 +4141,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_inputs:
 	case _distributed_message_coop_skip_vote:
 	case _distributed_message_votekick:
+	case _distributed_message_vote_choice:
 		if (machine_index == NONE || game_connection() != _game_connection_network_server)
 			return;
 		break;
@@ -4147,6 +4201,12 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_votekick_status:
 		network_votekick_handle_status(entries);
+		break;
+	case _distributed_message_vote_choice:
+		network_votekick_handle_choice(machine_index, entries, distributed_handling_stream_message);
+		break;
+	case _distributed_message_vote_details:
+		network_votekick_handle_details(entries);
 		break;
 	case _distributed_message_coop_device_groups:
 		network_coop_handle_device_groups(entries, header.count);

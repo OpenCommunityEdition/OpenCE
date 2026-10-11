@@ -1872,6 +1872,9 @@ host's Kick and Ban, Ban picked twice */
 enum
 {
 	_scoreboard_item_vote,
+	/* (port: a vote to ban for 12 hours, with a reason typed:
+	game_engine_vote_reason) */
+	_scoreboard_item_vote_ban,
 	_scoreboard_item_mute,
 	_scoreboard_item_kick,
 	_scoreboard_item_ban,
@@ -1925,12 +1928,20 @@ static void scoreboard_menu_items(
 	if (network_votekick_get_status(&status) &&
 		status.player_index == DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index))
 	{
-		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to kick (%d of %d)" :
-			L"Vote to kick (%d of %d)", status.votes, status.needed);
+		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to %s (%d of %d)" : L"Vote to %s (%d of %d)",
+			status.kind == _network_vote_ban ? L"ban" : L"kick", status.votes, status.needed);
 	}
 	else
 	{
 		usprintf(labels[_scoreboard_item_vote], L"Start a vote to kick");
+#ifndef HALO_ANDROID
+		/* (a reason is typed: with a keyboard) */
+		if (!network_votekick_get_status(&status))
+		{
+			offered[_scoreboard_item_vote_ban] = TRUE;
+			usprintf(labels[_scoreboard_item_vote_ban], L"Start a vote to ban (12 hours)");
+		}
+#endif
 	}
 	/* (its machine's voice: this machine's own choice) */
 	{
@@ -1993,6 +2004,215 @@ static boolean scoreboard_point_in(
 	return x >= rectangle->x0 && x < rectangle->x1 && y >= rectangle->y0 && y < rectangle->y1;
 }
 
+/* port: the reason for a vote to ban, typed into a box in the middle of the
+screen (Enter starts the vote, Escape cancels; the keys move nothing while
+it is open: xinput_sdl.c's platform_game_typing), and the vote running
+shown at the top of the screen, its reason too, with F1 yes and F2 no
+(network_votekick.c) */
+void platform_game_typing(int typing);
+int platform_vote_key(void);
+unsigned long system_milliseconds(void);
+
+static struct
+{
+	boolean open;
+	/* the player (absolute index) */
+	short player_index;
+	char text[VOTE_REASON_SIZE];
+	short length;
+} vote_reason = { FALSE, NONE, "", 0 };
+
+static void game_engine_vote_reason_close(
+	void)
+{
+	if (vote_reason.open)
+		platform_game_typing(FALSE);
+	vote_reason.open = FALSE;
+}
+
+static void game_engine_vote_reason_open(
+	short player_index)
+{
+	vote_reason.open = TRUE;
+	vote_reason.player_index = player_index;
+	vote_reason.text[0] = 0;
+	vote_reason.length = 0;
+	platform_game_typing(TRUE);
+}
+
+/* the keys typed into the box */
+static void game_engine_vote_reason_update(
+	void)
+{
+	struct key_stroke key;
+
+	if (!vote_reason.open)
+		return;
+	if (!network_votekick_available() || !player_try_and_get(vote_reason.player_index))
+	{
+		game_engine_vote_reason_close();
+		return;
+	}
+	while (vote_reason.open && input_get_key(&key))
+	{
+		switch (key.key_code)
+		{
+		case _key_escape:
+			game_engine_vote_reason_close();
+			break;
+		case _key_return:
+		case _keypad_enter:
+			if (vote_reason.length > 0)
+			{
+				network_votekick_request_ban(vote_reason.player_index, vote_reason.text);
+				game_engine_vote_reason_close();
+			}
+			break;
+		case _key_backspace:
+			if (vote_reason.length > 0)
+				vote_reason.text[--vote_reason.length] = 0;
+			break;
+		default:
+			if (key.ascii_code >= 32 && key.ascii_code < 127 && vote_reason.length < VOTE_REASON_SIZE - 1)
+			{
+				vote_reason.text[vote_reason.length++] = key.ascii_code;
+				vote_reason.text[vote_reason.length] = 0;
+			}
+			break;
+		}
+	}
+}
+
+/* an ASCII line after a wide one */
+static void vote_append_ascii(
+	wchar_t *string,
+	long size,
+	char const *text)
+{
+	long length = 0;
+
+	while (string[length])
+		length++;
+	for (; *text && length < size - 1; text++)
+		string[length++] = (wchar_t)(unsigned char)*text;
+	string[length] = 0;
+}
+
+/* a panel of lines centred across the screen from the top given, the
+first brighter */
+static void vote_draw_panel(
+	wchar_t (*lines)[160],
+	short count,
+	short top,
+	real_argb_color const *first_color)
+{
+	rectangle2d bounds = render.camera.window_bounds;
+	long font_index = hud_get_font_index();
+	struct font_header *font;
+	short line_height;
+	short width;
+	short index;
+	rectangle2d panel;
+
+	if (font_index == NONE)
+		return;
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	font = font_definition_get(font_index);
+	line_height = (short)(font->leading_height + font->descending_height + font->ascending_height);
+	if (line_height <= 0)
+		return;
+	width = (short)MIN(560, (bounds.x1 - bounds.x0) - 32);
+	panel.x0 = (short)(bounds.x0 + ((bounds.x1 - bounds.x0) - width) / 2);
+	panel.x1 = (short)(panel.x0 + width);
+	panel.y0 = (short)(top - line_height / 2);
+	panel.y1 = (short)(top + count * line_height + line_height / 2);
+	draw_quad(&panel, 0xB0101010);
+	for (index = 0; index < count; index++)
+	{
+		real_argb_color color;
+		rectangle2d text = panel;
+
+		if (index == 0)
+			color = *first_color;
+		else
+		{
+			color.alpha = 1.0f;
+			color.red = color.green = color.blue = 0.9f;
+		}
+		text.y0 = (short)(top + index * line_height);
+		text.y1 = (short)(text.y0 + line_height);
+		/* (2: centred, draw_string.c's _text_justification_center) */
+		draw_string_set_draw_mode(font_index, NONE, 2, 0, &color);
+		rasterizer_draw_unicode_string(&text, NULL, NULL, 0, lines[index]);
+	}
+	draw_string_set_draw_mode(font_index, NONE, 0, 0, first_color);
+}
+
+static void game_engine_rasterize_vote(
+	void)
+{
+	rectangle2d bounds = render.camera.window_bounds;
+	struct network_votekick_status vote;
+	wchar_t lines[5][160];
+	short count = 0;
+	real_argb_color color;
+	int key = platform_vote_key();
+
+	offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+	game_engine_vote_reason_update();
+	color.alpha = 1.0f;
+	color.red = 1.0f;
+	color.green = 0.75f;
+	color.blue = 0.3f;
+	if (vote_reason.open)
+	{
+		struct player_datum *target = player_try_and_get(vote_reason.player_index);
+
+		usprintf(lines[count++], L"Vote to ban %s for 12 hours", target ? target->name : L"?");
+		usprintf(lines[count], L"Reason: ");
+		vote_append_ascii(lines[count], 160, vote_reason.text);
+		vote_append_ascii(lines[count++], 160, (system_milliseconds() / 500) % 2 ? "_" : " ");
+		usprintf(lines[count++], vote_reason.length ? L"Enter: start the vote    Escape: cancel" :
+			L"Type why they should be banned    Escape: cancel");
+		vote_draw_panel(lines, count, (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 40 / 100), &color);
+		return;
+	}
+	if (!network_votekick_available() || !network_votekick_get_status(&vote))
+		return;
+	if (key && vote.may_vote && !vote.voted && !vote.voted_no)
+		network_votekick_vote(key == 1);
+	{
+		struct data_iterator iterator;
+		struct player_datum *target;
+		wchar_t const *name = L"?";
+		boolean against_you = FALSE;
+
+		data_iterator_new(&iterator, player_data);
+		while ((target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) == vote.player_index)
+			{
+				name = target->name;
+				against_you = target->local_player_index != NONE;
+			}
+		}
+		if (vote.kind == _network_vote_ban)
+			usprintf(lines[count++], L"Vote to ban %s for 12 hours", name);
+		else
+			usprintf(lines[count++], L"Vote to kick %s", name);
+		if (vote.reason[0])
+		{
+			usprintf(lines[count], L"Reason: ");
+			vote_append_ascii(lines[count++], 160, vote.reason);
+		}
+		usprintf(lines[count++], L"Yes %d of %d needed    No %d    %d s left", vote.votes, vote.needed, vote.no_votes,
+			vote.seconds_left);
+		usprintf(lines[count++], against_you ? L"This vote is against you" : vote.voted ? L"You voted yes" :
+			vote.voted_no ? L"You voted no" : vote.may_vote ? L"F1: yes    F2: no" : L"You are too new here to vote");
+	}
+	vote_draw_panel(lines, count, (short)(bounds.y0 + (bounds.y1 - bounds.y0) * 12 / 100), &color);
+}
+
 /* the item picked, done */
 static void scoreboard_menu_pick(
 	short item)
@@ -2003,6 +2223,9 @@ static void scoreboard_menu_pick(
 	{
 	case _scoreboard_item_vote:
 		network_votekick_request(player_index);
+		break;
+	case _scoreboard_item_vote_ban:
+		game_engine_vote_reason_open(player_index);
 		break;
 	case _scoreboard_item_mute:
 	{
@@ -2455,8 +2678,8 @@ static void game_engine_rasterize_scoreboard(
 		color.red = 1.0f;
 		color.green = 0.75f;
 		color.blue = 0.3f;
-		usprintf(row_string, L"Vote to kick %s: %d of %d, %d s left%s", name, vote.votes, vote.needed,
-			vote.seconds_left, note);
+		usprintf(row_string, L"Vote to %s %s: %d of %d, %d s left%s", vote.kind == _network_vote_ban ? L"ban" : L"kick",
+			name, vote.votes, vote.needed, vote.seconds_left, note);
 		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
 	}
 	if (network && pointer_state >= 0)
@@ -4034,6 +4257,10 @@ static void game_engine_post_rasterize_in_game(
 	shown) */
 	if (fade <= 0.0f && local_player_index == local_player_get_next(NONE))
 		game_engine_rasterize_voice_speakers();
+	/* (port: the vote running, or a vote's reason being typed: the first
+	view's) */
+	if (local_player_index == local_player_get_next(NONE))
+		game_engine_rasterize_vote();
 
 	game_engine_globals.hud_message_timers[local_player_index] = fade;
 

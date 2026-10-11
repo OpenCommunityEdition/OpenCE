@@ -876,7 +876,12 @@ Only machines with the invite can find the game:
   show the pointer, and click the name of the player. Then click **Start
   a vote to kick**. Other players vote in the same way, and see the vote on
   the scoreboard. `votekick <player name>` in the developer console does
-  the same. The host also gets **Kick** and **Ban** in this menu: these do
+  the same. **Start a vote to ban (12 hours)** opens a box: type why, then
+  press Enter to start the vote (Escape cancels). While a vote runs, the top
+  of the screen shows it, with the reason for a ban: press F1 to vote yes or
+  F2 to vote no. A vote that can no longer pass ends at once. A ban by vote
+  is a line in the host's `bans.txt` that ends after 12 hours (`until=`),
+  so it lasts if the host restarts the game. The host also gets **Kick** and **Ban** in this menu: these do
   the same as the `kick` and `ban` commands (click **Ban** two times). The
   host counts the votes, and these rules prevent abuse:
   - The vote passes when more than half of the players vote for it, and at

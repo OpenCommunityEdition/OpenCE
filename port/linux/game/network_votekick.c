@@ -43,6 +43,14 @@ votes against:
   against it is too, as if the vote passed, and while the vote runs it is
   refused if it tries to join again: no one dodges a vote by leaving.
 
+A vote may instead be to ban the player, for BAN_HOURS: started from the
+scoreboard's "Start a vote to ban" with a reason typed (game_engine.c),
+which every player is shown with the vote; it passes as a vote to kick
+does, and its ban is a line of the host's bans.txt that ends
+(network_distributed_vote_ban), so that it lasts though the host's game is
+started again. Each player votes yes (F1, or the name picked again) or no
+(F2); a vote that can no longer pass fails at once.
+
 A client hears the host's count every second (and as it changes), for the
 scoreboard. A build without votes drops both messages as kinds it does not
 know: its players cannot vote, and count as players who did not.
@@ -91,6 +99,8 @@ enum
 	/* a client forgets the host's count it has not heard again this long */
 	STATUS_TIMEOUT_MILLISECONDS = 3000,
 	MAXIMUM_VOTEKICK_MACHINES = HALO_PORT_MAXIMUM_NETWORK_MACHINES,
+	/* a vote to ban's ban */
+	BAN_HOURS = 12,
 };
 
 /* the status's flags */
@@ -122,6 +132,33 @@ struct distributed_votekick_status
 	byte pad[3];
 };
 
+/* a yes or no in the vote running, or a vote started (choice yes) of a kind
+with its reason */
+struct distributed_vote_choice
+{
+	/* the player voted against (absolute index) */
+	byte player_index;
+	/* _network_vote_kick or _network_vote_ban */
+	byte kind;
+	/* TRUE: yes */
+	byte yes;
+	byte pad;
+	char reason[VOTE_REASON_SIZE];
+};
+
+/* the vote running's details, with its status */
+struct distributed_vote_details
+{
+	byte player_index;
+	byte kind;
+	byte no_votes;
+	/* this machine voted no */
+	byte voted_no;
+	char reason[VOTE_REASON_SIZE];
+};
+
+typedef char distributed_vote_choice_size_assert[sizeof(struct distributed_vote_choice) == 4 + VOTE_REASON_SIZE ? 1 : -1];
+typedef char distributed_vote_details_size_assert[sizeof(struct distributed_vote_details) == 4 + VOTE_REASON_SIZE ? 1 : -1];
 typedef char distributed_votekick_request_size_assert[sizeof(struct distributed_votekick_request) == 4 ? 1 : -1];
 typedef char distributed_votekick_status_size_assert[sizeof(struct distributed_votekick_status) == 8 ? 1 : -1];
 
@@ -138,6 +175,8 @@ struct votekick_voter
 	/* has played long enough to vote (the host's, always) */
 	boolean eligible;
 	boolean voted;
+	/* ... no */
+	boolean voted_no;
 };
 
 /* an address and hardware id remembered until a time (system_milliseconds) */
@@ -183,6 +222,15 @@ static struct
 	/* as last counted, and told */
 	short votes;
 	short needed;
+	/* _network_vote_kick or _network_vote_ban, and why (the starter's words) */
+	short kind;
+	char reason[VOTE_REASON_SIZE];
+	/* the machines that voted no, the host's; as last counted, and of those
+	who may vote */
+	boolean voted_no[MAXIMUM_VOTEKICK_MACHINES];
+	boolean host_voted_no;
+	short no_votes;
+	short electorate;
 } votekick;
 
 /* the host: no vote before this (a vote's end and the gap after) */
@@ -193,9 +241,11 @@ static struct votekick_identity votekick_kept_out_identities[MAXIMUM_REMEMBERED]
 static struct votekick_identity votekick_cooling_starters[MAXIMUM_REMEMBERED];
 static struct votekick_identity votekick_protected_targets[MAXIMUM_REMEMBERED];
 
-/* a client: the host's count, as last heard (the time: 0, none) */
+/* a client: the host's count, as last heard (the time: 0, none), and its
+details */
 static struct distributed_votekick_status votekick_status;
 static unsigned long votekick_status_heard;
+static struct distributed_vote_details votekick_details;
 
 /* ---------- the count (pure: tools/harness/tests/votekick_count.c) */
 
@@ -394,6 +444,7 @@ void network_votekick_machine_joined(
 	votekick_generations[machine_index]++;
 	votekick_requested[machine_index] = FALSE;
 	votekick.voted[machine_index] = FALSE;
+	votekick.voted_no[machine_index] = FALSE;
 }
 
 /* (network_server_manager.c) whether a machine of the address (as it
@@ -453,6 +504,7 @@ static void votekick_voter_get(
 		voter->host = TRUE;
 		voter->eligible = TRUE;
 		voter->voted = votekick.active && votekick.host_voted;
+		voter->voted_no = votekick.active && votekick.host_voted_no;
 		return;
 	}
 	voter->address = distributed_machine_real_address(machine_index);
@@ -461,6 +513,8 @@ static void votekick_voter_get(
 	voter->eligible = votekick_played_ticks[machine_index] >= votekick_voter_ticks();
 	voter->target = votekick.active && machine_index == votekick.target_machine;
 	voter->voted = votekick.active && votekick.voted[machine_index] &&
+		votekick.voted_generations[machine_index] == votekick_generations[machine_index];
+	voter->voted_no = votekick.active && votekick.voted_no[machine_index] &&
 		votekick.voted_generations[machine_index] == votekick_generations[machine_index];
 }
 
@@ -497,6 +551,18 @@ static void votekick_recount(
 		votekick_voter_get(machine_indices[index], &voters[index]);
 	votekick_count(voters, count, &votekick.votes, &electorate);
 	votekick.needed = votekick_votes_needed(electorate);
+	votekick.electorate = electorate;
+	/* (the no votes, counted as the yes are) */
+	for (index = 0; index < count; index++)
+		voters[index].voted = voters[index].voted_no;
+	votekick_count(voters, count, &votekick.no_votes, &electorate);
+}
+
+/* whether the vote can still pass: the yes, and those who have not voted */
+static boolean votekick_can_pass(
+	void)
+{
+	return votekick.votes + MAX(0, votekick.electorate - 1 - votekick.votes - votekick.no_votes) >= votekick.needed;
 }
 
 /* the name of a machine's players for a notice (NONE: the host's own) */
@@ -545,6 +611,27 @@ static void votekick_send_status(
 		}
 		distributed_send_to_machine(machine_indices[index], &message, _distributed_message_votekick_status, 1,
 			(word)sizeof(message));
+		/* (the vote's kind, reason and no votes: a build without them drops
+		this as a kind it does not know) */
+		{
+			struct
+			{
+				struct distributed_message_header header;
+				struct distributed_vote_details details;
+			} details;
+
+			csmemset(&details, 0, sizeof(details));
+			details.details.player_index = message.status.player_index;
+			if (votekick.active)
+			{
+				details.details.kind = (byte)votekick.kind;
+				details.details.no_votes = (byte)PIN(votekick.no_votes, 0, 255);
+				details.details.voted_no = (byte)voter.voted_no;
+				csmemcpy(details.details.reason, votekick.reason, VOTE_REASON_SIZE);
+			}
+			distributed_send_to_machine(machine_indices[index], &details, _distributed_message_vote_details, 1,
+				(word)sizeof(details));
+		}
 	}
 }
 
@@ -564,9 +651,23 @@ is kept out as well */
 static void votekick_pass(
 	boolean left)
 {
-	char notice[160];
+	char notice[200];
 	long ban_minutes = PIN(config_integer("network.votekick_ban_minutes"), 1, 24 * 60);
 
+	if (votekick.kind == _network_vote_ban)
+	{
+		snprintf(notice, sizeof(notice), left ? "%s left during the vote to ban them, banned for %d hours (%s)" :
+			"%s banned by vote for %d hours (%s)", votekick.target_names, BAN_HOURS, votekick.reason);
+		distributed_send_notice(notice);
+		network_distributed_vote_ban(left ? NONE : votekick.target_machine, votekick.target_address,
+			votekick.target_names, votekick.reason, BAN_HOURS * 3600UL);
+		votekick_remember(votekick_kept_out_identities, votekick.target_address, votekick.target_hardware_id,
+			BAN_HOURS * 3600UL * 1000UL);
+		if (!left)
+			network_game_server_kick_machine(votekick.target_machine, FALSE);
+		votekick_end();
+		return;
+	}
 	if (left)
 	{
 		snprintf(notice, sizeof(notice), "%s left during the vote to kick them, kept out for %ld minute%s",
@@ -591,8 +692,8 @@ static void votekick_fail(
 {
 	char notice[160];
 
-	snprintf(notice, sizeof(notice), "The vote to kick %s failed (%d of %d)", votekick.target_names, votekick.votes,
-		votekick.needed);
+	snprintf(notice, sizeof(notice), "The vote to %s %s failed (%d of %d)",
+		votekick.kind == _network_vote_ban ? "ban" : "kick", votekick.target_names, votekick.votes, votekick.needed);
 	distributed_send_notice(notice);
 	votekick_remember(votekick_cooling_starters, votekick.starter_address, votekick.starter_hardware_id,
 		STARTER_COOLDOWN_SECONDS * 1000UL);
@@ -609,11 +710,29 @@ static void votekick_refuse(
 	distributed_send_notice_to_machine(machine_index, text);
 }
 
+/* the reason kept: printable, without a tab or a line's end (it goes in
+bans.txt), ended */
+static void votekick_reason_sanitize(
+	char *destination,
+	char const *source)
+{
+	long length = 0;
+
+	for (; source && *source && length < VOTE_REASON_SIZE - 1; source++)
+		destination[length++] = *source >= 32 && *source < 127 ? *source : ' ';
+	while (length > 0 && destination[length - 1] == ' ')
+		length--;
+	destination[length] = 0;
+}
+
 /* a machine's vote against a player (NONE: the host's own machine): a new
-vote, or one for the vote running */
+vote of the kind (yes, with its reason), or a yes or no in the vote running */
 static void votekick_host_request(
 	long machine_index,
-	short player_index)
+	short player_index,
+	short kind,
+	boolean yes,
+	char const *reason)
 {
 	struct player_datum *player = distributed_player(player_index);
 	long target_machine = player ? distributed_player_machine(player_index) : NONE;
@@ -673,8 +792,24 @@ static void votekick_host_request(
 			votekick_refuse(machine_index, "votekick: you have not played long enough on this server to vote");
 			return;
 		}
-		if (voter.voted)
+		if (voter.voted || voter.voted_no)
 			return;
+		if (!yes)
+		{
+			if (machine_index == NONE)
+				votekick.host_voted_no = TRUE;
+			else
+			{
+				votekick.voted_no[machine_index] = TRUE;
+				votekick.voted_generations[machine_index] = votekick_generations[machine_index];
+			}
+			votekick_recount();
+			if (!votekick_can_pass())
+				votekick_fail();
+			else
+				votekick_send_status();
+			return;
+		}
 		if (machine_index == NONE)
 			votekick.host_voted = TRUE;
 		else
@@ -691,8 +826,9 @@ static void votekick_host_request(
 			if (votekick.votes != votes && votekick.votes < votekick.needed)
 			{
 				votekick_names(machine_index, names, sizeof(names));
-				snprintf(notice, sizeof(notice), "%s voted to kick %s (%d of %d)", names, votekick.target_names,
-					votekick.votes, votekick.needed);
+				snprintf(notice, sizeof(notice), "%s voted to %s %s (%d of %d)", names,
+					votekick.kind == _network_vote_ban ? "ban" : "kick", votekick.target_names, votekick.votes,
+					votekick.needed);
 				distributed_send_notice(notice);
 			}
 		}
@@ -703,6 +839,22 @@ static void votekick_host_request(
 		return;
 	}
 	/* a new vote */
+	if (!yes)
+	{
+		votekick_refuse(machine_index, "vote: no vote is running");
+		return;
+	}
+	if (kind == _network_vote_ban)
+	{
+		char kept[VOTE_REASON_SIZE];
+
+		votekick_reason_sanitize(kept, reason);
+		if (!kept[0])
+		{
+			votekick_refuse(machine_index, "voteban: type a reason to ban them");
+			return;
+		}
+	}
 	if (votekick_gap && !votekick_time_reached(now, votekick_next_allowed))
 	{
 		snprintf(notice, sizeof(notice), "votekick: the next vote can start in %lu seconds",
@@ -744,6 +896,8 @@ static void votekick_host_request(
 	votekick.starter_address = voter.address;
 	csstrcpy(votekick.starter_hardware_id, voter.hardware_id);
 	votekick.started_at = now;
+	votekick.kind = kind == _network_vote_ban ? _network_vote_ban : _network_vote_kick;
+	votekick_reason_sanitize(votekick.reason, reason);
 	if (machine_index == NONE)
 		votekick.host_voted = TRUE;
 	else
@@ -753,10 +907,19 @@ static void votekick_host_request(
 	}
 	votekick_recount();
 	votekick_names(machine_index, names, sizeof(names));
-	snprintf(notice, sizeof(notice), "%s started a vote to kick %s (%d of %d): open the scores and pick the name to vote",
-		names, votekick.target_names, votekick.votes, votekick.needed);
+	if (votekick.kind == _network_vote_ban)
+	{
+		snprintf(notice, sizeof(notice), "%s started a vote to ban %s for %d hours: %s (F1 yes, F2 no)", names,
+			votekick.target_names, BAN_HOURS, votekick.reason);
+	}
+	else
+	{
+		snprintf(notice, sizeof(notice), "%s started a vote to kick %s (%d of %d): F1 yes, F2 no", names,
+			votekick.target_names, votekick.votes, votekick.needed);
+	}
 	distributed_send_notice(notice);
-	error(_error_log, "votekick: started by machine %ld against machine %ld", machine_index, target_machine);
+	error(_error_log, "vote%s: started by machine %ld against machine %ld", votekick.kind == _network_vote_ban ? "ban" :
+		"kick", machine_index, target_machine);
 	if (votekick.votes >= votekick.needed)
 		votekick_pass(FALSE);
 	else
@@ -784,7 +947,38 @@ void network_votekick_handle_request(
 	csmemcpy(&request, entries, sizeof(request));
 	if (request.player_index >= MAXIMUM_TRACKED_PLAYERS)
 		return;
-	votekick_host_request(machine_index, request.player_index);
+	votekick_host_request(machine_index, request.player_index, _network_vote_kick, TRUE, NULL);
+}
+
+void network_votekick_handle_choice(
+	long machine_index,
+	void const *entries,
+	boolean from_stream)
+{
+	struct distributed_vote_choice choice;
+	unsigned long now = system_milliseconds();
+
+	if (!votekick_host() || !votekick_machine_valid(machine_index) || !from_stream)
+		return;
+	/* (at most one a second, as requests) */
+	if (votekick_requested[machine_index] &&
+		!votekick_time_reached(now, votekick_request_times[machine_index] + REQUEST_INTERVAL_MILLISECONDS))
+	{
+		return;
+	}
+	votekick_requested[machine_index] = TRUE;
+	votekick_request_times[machine_index] = now;
+	csmemcpy(&choice, entries, sizeof(choice));
+	choice.reason[VOTE_REASON_SIZE - 1] = 0;
+	if (choice.player_index >= MAXIMUM_TRACKED_PLAYERS || choice.kind > _network_vote_ban)
+		return;
+	votekick_host_request(machine_index, choice.player_index, choice.kind, choice.yes != 0, choice.reason);
+}
+
+word network_votekick_choice_entry_size(
+	void)
+{
+	return sizeof(struct distributed_vote_choice);
 }
 
 word network_votekick_request_entry_size(
@@ -801,6 +995,7 @@ void network_votekick_new_game(
 		distributed_send_notice("The vote ended with the game");
 	votekick.active = FALSE;
 	csmemset(&votekick_status, 0, sizeof(votekick_status));
+	csmemset(&votekick_details, 0, sizeof(votekick_details));
 	votekick_status_heard = 0;
 }
 
@@ -834,6 +1029,11 @@ void network_votekick_host_tick(
 			votekick_pass(FALSE);
 			return;
 		}
+		if (!votekick_can_pass())
+		{
+			votekick_fail();
+			return;
+		}
 		if (votekick_time_reached(system_milliseconds(), votekick.started_at + VOTE_SECONDS * 1000))
 		{
 			votekick_fail();
@@ -865,6 +1065,23 @@ word network_votekick_status_entry_size(
 	return sizeof(struct distributed_votekick_status);
 }
 
+void network_votekick_handle_details(
+	void const *entries)
+{
+	if (game_connection() != _game_connection_network_client)
+		return;
+	csmemcpy(&votekick_details, entries, sizeof(votekick_details));
+	votekick_details.reason[VOTE_REASON_SIZE - 1] = 0;
+	if (votekick_details.kind > _network_vote_ban)
+		votekick_details.kind = _network_vote_kick;
+}
+
+word network_votekick_details_entry_size(
+	void)
+{
+	return sizeof(struct distributed_vote_details);
+}
+
 /* ---------- every machine (network_votekick.h) */
 
 boolean network_votekick_get_status(
@@ -886,7 +1103,11 @@ boolean network_votekick_get_status(
 		status->needed = votekick.needed;
 		status->seconds_left = (short)MAX(0, VOTE_SECONDS - (long)(elapsed / 1000));
 		status->voted = votekick.host_voted;
+		status->voted_no = votekick.host_voted_no;
 		status->may_vote = TRUE;
+		status->kind = votekick.kind;
+		status->no_votes = votekick.no_votes;
+		csstrcpy(status->reason, votekick.reason);
 		return TRUE;
 	}
 	if (game_connection() != _game_connection_network_client || !votekick_status_heard ||
@@ -902,6 +1123,14 @@ boolean network_votekick_get_status(
 	status->seconds_left = votekick_status.seconds_left;
 	status->voted = TEST_FLAG(votekick_status.flags, _votekick_status_voted_bit);
 	status->may_vote = TEST_FLAG(votekick_status.flags, _votekick_status_may_vote_bit);
+	/* (the details of the same vote: a host without them, a vote to kick) */
+	if (votekick_details.player_index == votekick_status.player_index)
+	{
+		status->kind = votekick_details.kind;
+		status->no_votes = votekick_details.no_votes;
+		status->voted_no = votekick_details.voted_no != 0;
+		csstrcpy(status->reason, votekick_details.reason);
+	}
 	return status->player_index != NONE;
 }
 
@@ -1064,7 +1293,7 @@ boolean network_votekick_request(
 	}
 	if (votekick_host())
 	{
-		votekick_host_request(NONE, player_index);
+		votekick_host_request(NONE, player_index, _network_vote_kick, TRUE, NULL);
 		return TRUE;
 	}
 	if (game_connection() != _game_connection_network_client)
@@ -1076,4 +1305,62 @@ boolean network_votekick_request(
 	message.request.player_index = distributed_player_to_byte(player_index);
 	distributed_send(&message, _distributed_message_votekick, 1, (word)sizeof(message), _distributed_to_host_reliably);
 	return TRUE;
+}
+
+/* a choice to the host (the host's own: counted here) */
+static boolean votekick_send_choice(
+	short player_index,
+	short kind,
+	boolean yes,
+	char const *reason)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_vote_choice choice;
+	} message;
+
+	if (!distributed_player(player_index))
+		return FALSE;
+	if (votekick_host())
+	{
+		votekick_host_request(NONE, player_index, kind, yes, reason);
+		return TRUE;
+	}
+	if (game_connection() != _game_connection_network_client)
+		return FALSE;
+	csmemset(&message, 0, sizeof(message));
+	message.choice.player_index = distributed_player_to_byte(player_index);
+	message.choice.kind = (byte)kind;
+	message.choice.yes = (byte)(yes != 0);
+	if (reason)
+		votekick_reason_sanitize(message.choice.reason, reason);
+	distributed_send(&message, _distributed_message_vote_choice, 1, (word)sizeof(message), _distributed_to_host_reliably);
+	return TRUE;
+}
+
+boolean network_votekick_request_ban(
+	short player_index,
+	char const *reason)
+{
+	if (distributed_player(player_index) && distributed_player_is_local(player_index))
+	{
+		console_warning("voteban: not against your own players");
+		return FALSE;
+	}
+	return votekick_send_choice(player_index, _network_vote_ban, TRUE, reason);
+}
+
+boolean network_votekick_vote(
+	boolean yes)
+{
+	struct network_votekick_status status;
+
+	if (!network_votekick_get_status(&status) || status.voted || status.voted_no || !status.may_vote)
+		return FALSE;
+	/* (a yes as the name picked again, which a host without no votes takes
+	too) */
+	if (yes)
+		return network_votekick_request(status.player_index);
+	return votekick_send_choice(status.player_index, status.kind, FALSE, NULL);
 }
