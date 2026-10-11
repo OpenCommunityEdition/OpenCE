@@ -32,6 +32,7 @@ struct fixture
 	uint64_t hash[PAGES];
 	uint32_t hashed_frame[PAGES];
 	uint32_t generation[PAGES];
+	uint8_t unchanged[PAGES];
 	volatile uint32_t current;
 	struct watch_hash watch;
 };
@@ -197,6 +198,59 @@ static void test_ranges_are_clamped(void)
 	teardown(&f);
 }
 
+/* a page unchanged for long: hashed every few frames, or at once again
+after a write is announced */
+static void test_stable_page_is_hashed_less_often(void)
+{
+	struct fixture f;
+	uint32_t before, check, frame;
+
+	setup(&f);
+	f.watch.unchanged = f.unchanged;
+	watch_hash_protect(&f.watch, 1, 1);
+	for (check = 0; check < WATCH_HASH_STABLE_CHECKS; check++)
+	{
+		watch_hash_begin_frame(&f.watch);
+		watch_hash_generation(&f.watch, 1, 1);
+	}
+	CHECK(f.unchanged[1] == WATCH_HASH_STABLE_CHECKS);
+	before = watch_hash_generation(&f.watch, 1, 1);
+	*byte_of(&f, 1, 40) ^= 1;
+	watch_hash_begin_frame(&f.watch);
+	CHECK(watch_hash_generation(&f.watch, 1, 1) == before);
+	/* seen within WATCH_HASH_STABLE_FRAMES frames all the same */
+	for (frame = 2; frame < WATCH_HASH_STABLE_FRAMES; frame++)
+	{
+		watch_hash_begin_frame(&f.watch);
+		watch_hash_generation(&f.watch, 1, 1);
+	}
+	watch_hash_begin_frame(&f.watch);
+	CHECK(watch_hash_generation(&f.watch, 1, 1) > before);
+	CHECK(f.unchanged[1] == 0);
+	teardown(&f);
+}
+
+static void test_announced_write_is_seen_next_frame(void)
+{
+	struct fixture f;
+	uint32_t before, check;
+
+	setup(&f);
+	f.watch.unchanged = f.unchanged;
+	watch_hash_protect(&f.watch, 2, 2);
+	for (check = 0; check < WATCH_HASH_STABLE_CHECKS; check++)
+	{
+		watch_hash_begin_frame(&f.watch);
+		watch_hash_generation(&f.watch, 2, 2);
+	}
+	before = watch_hash_generation(&f.watch, 2, 2);
+	watch_hash_prepare_write(&f.watch, 2, 2);
+	*byte_of(&f, 2, 4000) ^= 1;
+	watch_hash_begin_frame(&f.watch);
+	CHECK(watch_hash_generation(&f.watch, 2, 2) > before);
+	teardown(&f);
+}
+
 int main(void)
 {
 	test_unchanged_page_keeps_generation();
@@ -208,6 +262,8 @@ int main(void)
 	test_range_returns_newest();
 	test_begin_frame_changes_serial();
 	test_ranges_are_clamped();
+	test_stable_page_is_hashed_less_often();
+	test_announced_write_is_seen_next_frame();
 	if (failures)
 		printf("%d failures\n", failures);
 	else

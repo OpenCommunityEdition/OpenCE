@@ -99,7 +99,17 @@ void watch_hash_protect(struct watch_hash *watch, uint32_t first, uint32_t last)
 		watch->watched[page] = 1;
 		watch->hash[page] = watch_hash_page(page_memory(watch, page));
 		watch->hashed_frame[page] = watch->frame;
+		if (watch->unchanged)
+			watch->unchanged[page] = 0;
 	}
+}
+
+/* a stable page hashed recently enough: not hashed again yet
+(host_watch_hash.h) */
+static int stable_for_now(const struct watch_hash *watch, uint32_t page)
+{
+	return watch->unchanged && watch->unchanged[page] >= WATCH_HASH_STABLE_CHECKS &&
+		watch->frame - watch->hashed_frame[page] < WATCH_HASH_STABLE_FRAMES;
 }
 
 uint32_t watch_hash_generation(struct watch_hash *watch, uint32_t first, uint32_t last)
@@ -110,7 +120,7 @@ uint32_t watch_hash_generation(struct watch_hash *watch, uint32_t first, uint32_
 		return 0;
 	for (page = first; page <= last; page++)
 	{
-		if (watch->watched[page] && watch->hashed_frame[page] != watch->frame)
+		if (watch->watched[page] && watch->hashed_frame[page] != watch->frame && !stable_for_now(watch, page))
 		{
 			uint64_t hash = watch_hash_page(page_memory(watch, page));
 
@@ -119,6 +129,12 @@ uint32_t watch_hash_generation(struct watch_hash *watch, uint32_t first, uint32_
 			{
 				watch->hash[page] = hash;
 				watch->generation[page] = __sync_add_and_fetch(watch->current_generation, 1);
+				if (watch->unchanged)
+					watch->unchanged[page] = 0;
+			}
+			else if (watch->unchanged && watch->unchanged[page] < WATCH_HASH_STABLE_CHECKS)
+			{
+				watch->unchanged[page]++;
 			}
 		}
 		if (watch->generation[page] > newest)
@@ -138,6 +154,16 @@ void watch_hash_forget(struct watch_hash *watch, uint32_t first, uint32_t last)
 		watch->watched[page] = 0;
 		watch->generation[page] = __sync_add_and_fetch(watch->current_generation, 1);
 	}
+}
+
+void watch_hash_prepare_write(struct watch_hash *watch, uint32_t first, uint32_t last)
+{
+	uint32_t page;
+
+	if (!watch->unchanged || !clamp(watch, first, &last))
+		return;
+	for (page = first; page <= last; page++)
+		watch->unchanged[page] = 0;
 }
 
 /*

@@ -86,11 +86,21 @@ static int text_enabled(void)
 	return enabled;
 }
 
+static void (*reset_hook)(void);
+
+void text_hires_set_reset_hook(void (*hook)(void))
+{
+	reset_hook = hook;
+}
+
 /* the atlas emptied: every glyph to be rasterized again */
 static void atlas_reset(float scale)
 {
 	long index;
 
+	/* (text batched from the glyphs there drawn first) */
+	if (reset_hook && atlas)
+		reset_hook();
 	if (!atlas)
 		atlas = malloc(ATLAS_SIZE * ATLAS_SIZE);
 	if (atlas)

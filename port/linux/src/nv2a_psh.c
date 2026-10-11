@@ -620,6 +620,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		XGPU_PIXEL_UNIFORMS);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
+	if (key->source_blend)
+		xgpu_text_append(&text, "uniform vec4 blend_constant;\n");
 	if (key->per_pixel_lighting)
 		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
@@ -745,6 +747,17 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
 #endif
+	if (key->source_blend)
+	{
+		static const char *const factors[] =
+		{
+			"blend_constant", "(1.0 - blend_constant)", "vec4(blend_constant.a)", "vec4(1.0 - blend_constant.a)"
+		};
+
+		xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0) * %s;\n}\n",
+			factors[(key->source_blend - 1) & 3]);
+		return text.buffer;
+	}
 	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n}\n");
 	return text.buffer;
 }

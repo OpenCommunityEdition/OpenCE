@@ -255,18 +255,36 @@ multiply-adds). `tools/web_build.py` writes the graph.
     converted (`xbox_textures.c`).
   - S3TC only for 2D textures whose sides are multiples of 4: the others
     are decoded.
-  - A vertex stride of at most 255 bytes: the 256-byte immediate-mode
-    vertex is drawn from an array for each attribute (`d3d8_gl.c`).
+  - A vertex stride of at most 255 bytes: an immediate-mode draw uploads
+    only the registers written since `Begin` (as every build does), and one
+    that writes all sixteen (256 bytes a vertex) is drawn from an array for
+    each attribute (`d3d8_gl.c`).
   - No feedback loops: a draw that samples the target it draws into samples
     a copy of it.
+  - No blend of a constant color factor with a constant alpha one (the
+    meters, as the ammo counters on the weapons): the source's factor is
+    applied by the pixel shader instead (`nv2a_pixel_shader_key`'s
+    `source_blend`).
   - No `glCopyImageSubData`, `glDrawElementsBaseVertex` or
-    `glMemoryBarrier`: the ES renderer's blits and rebased indices.
+    `glMemoryBarrier`: the ES renderer's blits and rebased indices. An
+    index array drawn twice the same is kept rebased in a buffer of its own
+    and drawn from there, not uploaded at each draw (`d3d8_gl.c`'s index
+    cache).
+  - Each call into WebGL costs a crossing from WebAssembly into the
+    browser, so draws whose streams all come from the mirror bind a vertex
+    array made for those places once (`d3d8_gl.c`'s vertex array cache),
+    rather than pointing each attribute again. The renderer draws only from
+    buffers, so Emscripten's emulation of client-side arrays (`FULL_ES3`),
+    which wrapped every draw, is not linked.
   - Buffer writes are copies the browser orders with the draws, so the
     streaming buffers never wait for the GPU (`port/web/src/web_gl_host.c`).
 - **Memory watch.** WebAssembly cannot protect pages, so the textures'
   memory is watched by hashing it once a frame, as the Android host does
   under the x86 emulator (`port/web/src/web_memory_watch.c`,
-  `port/android/host/host_watch_hash.c`).
+  `port/android/host/host_watch_hash.c`). A page that has stayed the same
+  for 30 checks is hashed every 60 frames, until the game locks it or a
+  file is read into it (no other write into such a page was seen in a
+  match).
 - **Sockets.** `port/web/src/web_net.c` gives `posix.h`'s sockets inside
   the page: one machine with a loopback address and an address of its own
   network (`10.0.0.1`, or the room's); datagrams to either, or broadcast,
