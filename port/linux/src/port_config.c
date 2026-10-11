@@ -159,6 +159,9 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
+	{ "display.third_person", _config_boolean, "false", "HALO_THIRD_PERSON", _environment_value, _platform_all,
+		"On foot, use a right-shoulder camera. Zoom returns to first person.\n"
+		"The reticle follows the stock aim point; weapon behaviour is unchanged." },
 	{ "display.fov", _config_real, "0.0", "HALO_FOV", _environment_value, _platform_all,
 		"The first-person view's field of view on foot, in degrees across at\n"
 		"16:9 (20 to 150); 0 keeps the stock view. Vehicles, cinematics and\n"

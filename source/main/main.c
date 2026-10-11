@@ -332,6 +332,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "errors.h"
 #include "cseries/profile.h"
 #include "cseries/cseries_windows.h"
@@ -1213,6 +1214,8 @@ void set_window_camera_values(
 				1.0f);
 	}
 
+	/* port: the shoulder view is applied after interpolation and camera effects. */
+	third_person_camera(window->local_player_index, observer ? &window->rasterizer_camera : NULL);
 	window->rasterizer_camera.mirrored = FALSE;
 	window->rasterizer_camera.z_near = rasterizer_globals.near_clip_distance;
 	window->rasterizer_camera.z_far = rasterizer_globals.far_clip_distance;
