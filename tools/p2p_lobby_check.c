@@ -9,9 +9,11 @@ bad signatures, other keys and small-order keys turned away; and a listing
 from a host (this program, through stand-ins for p2p.c and p2p_signal.c) to
 a browser (this program again): taken, and a tampered one, one on another's
 slot, an older one, a retained one of long ago, a tombstone and a listing
-older than it each handled as they must be; and a game with a password,
+older than it each handled as they must be; a game with a password,
 listed locked (its token nowhere in the listing), opened by its password
-alone. Prints PASS or the failures.
+alone; and the hosts' pings: a game's host probed with its listing's token,
+its ping listed and kept, probed again on Refresh, and a game with a
+password never. Prints PASS or the failures.
 */
 
 #include "p2p_internal.h"
@@ -78,6 +80,23 @@ void p2p_signal_lobby_publish(const unsigned char *listing, int size, int closin
 	publish_count++;
 }
 void p2p_signal_lobby_quit(void) {}
+
+/* the probes asked for (p2p.c's), and the last one's host and token: each
+ends at once, its host not reached (as p2p.c's does when it needs no
+tunnel) */
+static int probe_count;
+static unsigned char probed_hash[P2P_KEY_HASH_SIZE], probed_token[P2P_TOKEN_SIZE];
+int p2p_probe_start(const unsigned char *host_hash, const unsigned char *token)
+{
+	unsigned char host[P2P_IDENTIFIER_SIZE];
+
+	memcpy(probed_hash, host_hash, P2P_KEY_HASH_SIZE);
+	memcpy(probed_token, token, P2P_TOKEN_SIZE);
+	probe_count++;
+	p2p_identifier_from_hash(host_hash, host);
+	p2p_lobby_probed(host, -1);
+	return 1;
+}
 
 /* the p2p thread's calls: under p2p_lock, as there (p2p_lobby_update lets
 go of it while it checks signatures) */
@@ -259,6 +278,18 @@ static void lobby_checks(void)
 		snprintf(expected_invite, sizeof(expected_invite), "halo://join/%s", text);
 	}
 	check(count == 1 && !strcmp(listing.invite, expected_invite), "the listing's invite is the host's");
+	{
+		unsigned char hash[P2P_KEY_HASH_SIZE];
+
+		p2p_key_hash(x25519_public, hash);
+		check(probe_count == 1 && !memcmp(probed_hash, hash, P2P_KEY_HASH_SIZE) &&
+			!memcmp(probed_token, token, P2P_TOKEN_SIZE), "the browser probes the host with the listing's token");
+	}
+	check(count == 1 && listing.ping == -1, "a host not reached has no ping");
+	pthread_mutex_lock(&p2p_lock);
+	p2p_lobby_probed(listing.identifier, 42);
+	pthread_mutex_unlock(&p2p_lock);
+	check(games(&listing) == 1 && listing.ping == 42, "the host's ping is listed");
 	check(count == 1 && !strcmp(listing.name, "Test game") && !strcmp(listing.map, "bloodgulch") &&
 		!strcmp(listing.gametype, "Slayer") && listing.player_count == 3 && listing.maximum_player_count == 16 &&
 		listing.engine_type == 2 && listing.open && listing.has_teams && !listing.in_progress, "the listing's details");
@@ -272,6 +303,11 @@ static void lobby_checks(void)
 	check(publish_count == 2, "a change published within 5 s");
 	hear(published, published_size, 0, NULL);
 	check(games(&listing) == 1 && listing.in_progress, "the browser takes the newer listing");
+	check(listing.ping == 42 && probe_count == 1, "the ping is kept, and not timed again soon");
+	p2p_lobby_refresh();
+	lobby_update(token, 3, 16);
+	check(probe_count == 2 && games(&listing) == 1 && listing.ping == 42,
+		"Refresh times the ping again; one not reached keeps the last");
 	/* the older one again: no change */
 	hear(first, first_size, 0, NULL);
 	check(games(&listing) == 1 && listing.in_progress, "an older listing is ignored");
@@ -330,6 +366,10 @@ static void lobby_checks(void)
 	lobby_update(token, 3, 16);
 	hear(published, published_size, 0, NULL);
 	check(games(&listing) == 1 && listing.locked && !listing.invite[0], "a game with a password is listed locked");
+	count = probe_count;
+	p2p_lobby_refresh();
+	lobby_update(token, 3, 16);
+	check(probe_count == count, "a game with a password is not probed");
 	{
 		int offset, found = 0;
 

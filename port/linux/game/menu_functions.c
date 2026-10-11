@@ -4073,9 +4073,10 @@ static void lobby_browser_update(struct widget_instance *list)
 		text_set(named(row, "server_item_type", 0), game_type_name(game->engine_type));
 		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d/%d", game->player_count, game->maximum_player_count);
 		text_set(named(row, "server_item_players", 0), text);
-		/* (no ping yet: its host is reached only on joining) */
-		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : !game->open ? L"CLOSED" :
-			game->in_progress ? L"LIVE" : L"-");
+		/* (its host's ping, once probed: p2p_lobby.c) */
+		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d", game->ping);
+		text_set(named(row, "server_item_ping", 0), game->failed ? L"FAILED" : game->ping >= 0 ? text :
+			!game->open ? L"CLOSED" : game->in_progress ? L"LIVE" : L"-");
 		/* (the lock: a game with a password. Its bitmap's first frame is
 		empty, the PC version's for no lock; the next is the lock, in the
 		menus' blue) */
@@ -4410,6 +4411,7 @@ static void browser_update(struct widget_instance *list)
 		short index = browser_row_index(row);
 		struct advertised_game *game;
 		wchar_t text[ROW_TEXT_LENGTH];
+		int ping;
 
 		if (index == NONE)
 			continue;
@@ -4425,7 +4427,10 @@ static void browser_update(struct widget_instance *list)
 		text_set(named(row, "server_item_type", 0), game_type_name(game->engine_type));
 		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d/%d", game->player_count, game->maximum_player_count);
 		text_set(named(row, "server_item_players", 0), text);
-		text_set(named(row, "server_item_ping", 0), advertised_in_progress(game) ? L"LIVE" : L"");
+		/* (a Direct Link game's host: the tunnel's ping) */
+		ping = multiplayer.mode == _multiplayer_mode_direct_link ? p2p_peer_ping(game->xnaddr + 2) : -1;
+		usnprintf(text, ROW_TEXT_LENGTH - 1, L"%d", ping);
+		text_set(named(row, "server_item_ping", 0), ping >= 0 ? text : advertised_in_progress(game) ? L"LIVE" : L"");
 		visible_set(named(row, "server_item_locked", 0), FALSE);
 		visible_set(named(row, "server_item_dedicated", 0), FALSE);
 		visible_set(named(row, "server_item_classic", 0), FALSE);

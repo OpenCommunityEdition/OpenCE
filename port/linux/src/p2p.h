@@ -31,6 +31,9 @@ const unsigned char *p2p_identifier(void);
 /* the address the game reaches the machine with this identifier at, if it
 is an internet play peer (reached yet or not) */
 int p2p_peer_address(const unsigned char *identifier, unsigned long *address);
+/* the ping to the machine with this identifier, in milliseconds, if the
+tunnel reaches it; -1 if not, or not timed yet */
+int p2p_peer_ping(const unsigned char *identifier);
 
 /* a destination the game sends to or connects to (stream: a TCP socket;
 socket: the game's UDP socket connected to it, else -1): 1 if it is a peer's

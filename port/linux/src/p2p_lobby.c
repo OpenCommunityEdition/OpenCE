@@ -53,6 +53,10 @@ going private does.
 Checking signatures takes work, and anyone can send listings: at most
 VERIFY_BUDGET milliseconds of it each pass of the p2p thread, from a queue
 of MAXIMUM_QUEUED; the rest is dropped (hosts publish again).
+
+Each game's host is probed for its ping (p2p_probe_start: the tunnel to it
+timed, p2p.c), a few at once, again each PROBE_REFRESH and on Refresh. A
+game with a password is not: its token is sealed.
 */
 
 #include "platform.h"
@@ -92,6 +96,7 @@ enum
 	TRIGGER_INTERVAL = 5000,
 	QUERY_JITTER = 2000,
 	GAME_EXPIRY = 90000,
+	PROBE_REFRESH = 120000,
 	TOMBSTONE_TIME = 600000,
 	VERIFY_BUDGET = 2,
 	/* seconds */
@@ -135,6 +140,13 @@ struct game
 	unsigned char payload[MAXIMUM_LISTING_SIZE];
 	int payload_size;
 	struct p2p_listing listing;
+	/* its invite's token (none: a password's game); its host's ping
+	(-1: not known), whether it is being probed, and when it last was */
+	int has_token;
+	unsigned char token[P2P_TOKEN_SIZE];
+	int ping;
+	int probing;
+	unsigned long probed_time;
 };
 
 struct tombstone
@@ -620,6 +632,7 @@ static void listing_take(const struct queued *queued, const struct listing *list
 		game = &lobby.games[index];
 		memset(game, 0, sizeof(*game));
 		memcpy(game->key_hash, queued->key_hash, P2P_KEY_HASH_SIZE);
+		game->ping = -1;
 		game->used = 1;
 	}
 	game->sequence = listing->sequence;
@@ -628,6 +641,8 @@ static void listing_take(const struct queued *queued, const struct listing *list
 	game->payload_size = queued->size;
 	shown = &game->listing;
 	shown->locked = (listing->flags & _listing_password) != 0;
+	game->has_token = !shown->locked;
+	memcpy(game->token, listing->token, P2P_TOKEN_SIZE);
 	if (shown->locked)
 	{
 		/* (its invite once the password opens its token: p2p_listing_unlock) */
@@ -653,7 +668,35 @@ static void listing_take(const struct queued *queued, const struct listing *list
 	shown->open = (listing->flags & _listing_open) != 0;
 	shown->in_progress = (listing->flags & _listing_in_progress) != 0;
 	shown->has_teams = (listing->flags & _listing_has_teams) != 0;
-	shown->ping = -1;
+}
+
+/* the hosts' pings: those not known lately probed, while there is room (a
+few refused, and the rest wait for a later pass) */
+static void update_probes(void)
+{
+	int refused = 0;
+	int index;
+
+	for (index = 0; index < MAXIMUM_GAMES && refused < P2P_MAXIMUM_PROBES; index++)
+	{
+		struct game *game = &lobby.games[index];
+
+		if (!game->used || !game->has_token || game->probing ||
+			(game->probed_time && !elapsed(game->probed_time, PROBE_REFRESH)))
+		{
+			continue;
+		}
+		/* (set first: a probe that needs no tunnel ends at once,
+		p2p_lobby_probed) */
+		game->probing = 1;
+		game->probed_time = p2p_now() | 1;
+		if (!p2p_probe_start(game->key_hash, game->token))
+		{
+			game->probing = 0;
+			game->probed_time = 0;
+			refused++;
+		}
+	}
 }
 
 /* a host heard listing a game of a newer network version (lobby.newer) */
@@ -735,6 +778,27 @@ static void update_browsing(void)
 			lobby.games[index].used = 0;
 		if (lobby.newer[index].used && elapsed(lobby.newer[index].heard_time, GAME_EXPIRY))
 			lobby.newer[index].used = 0;
+	}
+	if (lobby.browsing)
+		update_probes();
+}
+
+void p2p_lobby_probed(const unsigned char *identifier, int ping)
+{
+	int index;
+
+	for (index = 0; index < MAXIMUM_GAMES; index++)
+	{
+		struct game *game = &lobby.games[index];
+
+		if (game->used && !memcmp(game->listing.identifier, identifier, P2P_IDENTIFIER_SIZE))
+		{
+			game->probing = 0;
+			game->probed_time = p2p_now() | 1;
+			/* (one not reached this time keeps the last it had) */
+			if (ping >= 0)
+				game->ping = ping;
+		}
 	}
 }
 
@@ -861,9 +925,17 @@ void p2p_lobby_browse(int on)
 
 void p2p_lobby_refresh(void)
 {
+	int index;
+
 	pthread_mutex_lock(&p2p_lock);
 	if (lobby.browsing)
 		lobby.query_wanted = 1;
+	/* (the pings timed again) */
+	for (index = 0; index < MAXIMUM_GAMES; index++)
+	{
+		if (!lobby.games[index].probing)
+			lobby.games[index].probed_time = 0;
+	}
 	pthread_mutex_unlock(&p2p_lock);
 }
 
@@ -899,6 +971,7 @@ int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
 			continue;
 		games[count] = lobby.games[index].listing;
 		games[count].failed = (unsigned char)identifier_failed(games[count].identifier);
+		games[count].ping = (short)lobby.games[index].ping;
 		count++;
 	}
 	pthread_mutex_unlock(&p2p_lock);

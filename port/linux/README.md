@@ -855,14 +855,23 @@ GAME joins only with the correct password. The invite link of the game joins
 it without the password. The host keeps the password only while the game
 runs.
 
-In the Server Browser, select a game to join it. The game joins the invite
-of the game, as for a link. When it reaches the host, it opens the lobby.
-If it cannot reach the host in 30 seconds, it marks the game FAILED; when
-this machine's NAT gives each destination its own port and no router forwards
-`network.tunnel_port`, the line below the games says so (turn on UPnP on the
-router, or forward the port: refer to "Connection"). A game
-that is full or starting shows CLOSED. REFRESH asks the hosts for their
-listings again.
+In the Server Browser, as in Custom Edition's, a click selects a game
+(outlined in yellow), and a click on the selected game, a double click, A,
+Enter or JOIN joins it. The game joins the invite of the game, as for a
+link. When it reaches the host, it opens the lobby. If it cannot reach the
+host in 30 seconds, it marks the game FAILED; when this machine's NAT gives
+each destination its own port and no router forwards
+`network.tunnel_port`, the line below the games says so (turn on UPnP on
+the router, or forward the port: refer to "Connection").
+
+The PING column shows the round trip to each host in milliseconds. The
+browser times it as a join would reach the host: it makes the tunnel with
+the listing's invite, keeps the shortest of three pings, and closes the
+tunnel again. It times a few hosts at once, each again every two minutes
+and on REFRESH. Joining a host whose tunnel is open uses that tunnel. A
+game with a password, whose invite the listing hides, shows no ping, nor
+does a host not reached; a game that is full or starting shows CLOSED.
+REFRESH also asks the hosts for their listings again.
 
 How it operates (`src/p2p_lobby.c`):
 

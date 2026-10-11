@@ -34,19 +34,24 @@ enum
 	/* the other players of its game a machine asks to reach at once
 	(p2p_reach_player) */
 	P2P_MAXIMUM_PLAYER_JOINS = 8,
+	/* the server browser's public games' hosts probed at once, for their
+	ping (p2p_probe_start) */
+	P2P_MAXIMUM_PROBES = 4,
 };
 
 typedef char p2p_player_key_hash_size_assert[P2P_PLAYER_KEY_HASH_SIZE == P2P_KEY_HASH_SIZE ? 1 : -1];
 
 /* who offered a session (p2p_peer_offered): a joiner (to this machine,
-hosting or answering its game's players), the invite's host, or another
-player of the host's game this machine asked for (p2p_reach_player), which
-answers as a host does */
+hosting or answering its game's players), the invite's host, another player
+of the host's game this machine asked for (p2p_reach_player), which answers
+as a host does, or a public game's host probed for its ping
+(p2p_probe_start) */
 enum
 {
 	_p2p_offered_joiner,
 	_p2p_offered_host,
 	_p2p_offered_player,
+	_p2p_offered_probe,
 };
 
 typedef char p2p_listing_invite_size_assert[P2P_LISTING_INVITE_SIZE == P2P_LINK_SIZE ? 1 : -1];
@@ -152,6 +157,12 @@ the host; 0 if there is no room, or the request to the host is of another
 token. Stopped by its identifier */
 int p2p_signal_join_player(const unsigned char *player_hash, const unsigned char *token);
 void p2p_signal_stop_joining_player(const unsigned char *identifier);
+/* ... and a public game's host (whose key has this hash) with its listing's
+token, only to time the tunnel to it (p2p_probe_start): a request of its own
+token, whose answers come to a topic of their own; 0 if there is no room.
+Stopped by its identifier */
+int p2p_signal_probe(const unsigned char *host_hash, const unsigned char *token);
+void p2p_signal_stop_probe(const unsigned char *identifier);
 /* whether any broker is connected */
 int p2p_signal_connected(void);
 /* every broker's connection made anew at once: after the p2p thread was
@@ -328,6 +339,13 @@ void p2p_tunnel_send(unsigned long address, unsigned short port, const void *dat
 void p2p_peer_name(int peer, char *name);
 /* the tunnel's socket's port (network byte order) */
 unsigned short p2p_tunnel_local_port(void);
+/* the server browser's probe of a public game's host (its key's hash, its
+listing's token): the tunnel to it made, timed and closed again, its ping
+told p2p_lobby_probed (at once for this machine's own game, and a host the
+tunnel reaches already); 0 if it cannot start now (no room, the public
+address not known yet). The probes end as the browser closes. Under
+p2p_lock, on the p2p thread */
+int p2p_probe_start(const unsigned char *host_hash, const unsigned char *token);
 
 /* ---------- p2p_lobby.c: public games' listings */
 
@@ -342,6 +360,9 @@ slot's retained copy, sent on subscribing */
 void p2p_lobby_slot_heard(const char *hash_text, const unsigned char *payload, int size, int retained);
 /* a query was heard */
 void p2p_lobby_query_heard(void);
+/* a probe of a host (its identifier) ended: its ping in milliseconds, -1 if
+it was not reached; under p2p_lock */
+void p2p_lobby_probed(const unsigned char *identifier, int ping);
 /* the game is quitting: a listed game's tombstone, and its slot cleared,
 written to the brokers at once; under p2p_lock */
 void p2p_lobby_quit(void);
