@@ -6,6 +6,45 @@ Write tracking by page contents (host_watch_hash.h).
 
 #include "host_watch_hash.h"
 
+#ifdef __wasm_simd128__
+/*
+FNV-style mixing in sixteen independent 32-bit lanes, four vectors of four
+(WebAssembly's SIMD: the web build, web_memory_watch.c), so that no lane
+waits for another and the multiplies are the vector unit's own; its 64-bit
+multiplies are scalar, which made the hashing of every watched page each
+frame a quarter of the web build's frame, twice what this takes. A change of
+one word changes its lane's state for good (xor and an odd multiply are both
+invertible), and the fold keeps every lane's bits, so a single-word write
+always shows. Changes of several words could cancel each other, which is
+unlikely for game data. (host_watch_hash.h)
+*/
+typedef uint32_t watch_hash_lanes __attribute__((vector_size(16), aligned(4), may_alias));
+
+uint64_t watch_hash_page(const uint8_t *page)
+{
+	const watch_hash_lanes *words = (const watch_hash_lanes *)page;
+	const watch_hash_lanes prime = { 0x01000193u, 0x01000193u, 0x01000193u, 0x01000193u };
+	watch_hash_lanes lane0 = { 0x811c9dc5u, 0x9e3779b9u, 0x85ebca6bu, 0xc2b2ae35u };
+	watch_hash_lanes lane1 = { 0x27d4eb2fu, 0x165667b1u, 0xd3a2646cu, 0xfd7046c5u };
+	watch_hash_lanes lane2 = { 0xb55a4f09u, 0x7feb352du, 0x846ca68bu, 0x2c1b3c6du };
+	watch_hash_lanes lane3 = { 0x297a2d39u, 0xe6546b64u, 0xcc9e2d51u, 0x1b873593u };
+	watch_hash_lanes folded;
+	uint32_t index;
+
+	for (index = 0; index < WATCH_HASH_PAGE_SIZE / sizeof(watch_hash_lanes); index += 4)
+	{
+		lane0 = (lane0 ^ words[index + 0]) * prime;
+		lane1 = (lane1 ^ words[index + 1]) * prime;
+		lane2 = (lane2 ^ words[index + 2]) * prime;
+		lane3 = (lane3 ^ words[index + 3]) * prime;
+	}
+	/* (each vector's lanes turned before they are combined, so that the same
+	change in two of them does not cancel) */
+	folded = lane0 ^ ((lane1 << 8) | (lane1 >> 24)) ^ ((lane2 << 16) | (lane2 >> 16)) ^ ((lane3 << 24) | (lane3 >> 8));
+	return ((uint64_t)(folded[0] ^ ((folded[2] << 13) | (folded[2] >> 19))) << 32) |
+		(folded[1] ^ ((folded[3] << 13) | (folded[3] >> 19)));
+}
+#else
 /*
 FNV-style mixing in four independent lanes, so that the multiplies of
 one lane do not wait for another's. A change of one word changes its
@@ -30,6 +69,7 @@ uint64_t watch_hash_page(const uint8_t *page)
 	return lane0 ^ ((lane1 << 16) | (lane1 >> 48)) ^ ((lane2 << 32) | (lane2 >> 32)) ^
 		((lane3 << 48) | (lane3 >> 16));
 }
+#endif
 
 /* clamps last to the watched memory; 0 when nothing is left of the range */
 static int clamp(const struct watch_hash *watch, uint32_t first, uint32_t *last)
