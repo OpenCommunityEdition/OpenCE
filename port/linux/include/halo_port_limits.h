@@ -66,8 +66,9 @@ is newer (network_client_manager.c). A host advertises it, with its netcode,
 in its game's advertisement's reserved bytes (network_server_message_handler.c),
 which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
-/* MCC package names and resource fingerprints require matching peers. */
-#define HALO_PORT_NETWORK_VERSION 30
+/* MCC packets and upstream CE map sharing have distinct message IDs. */
+/* Versions 31-32 are reserved for the separately published camera branch. */
+#define HALO_PORT_NETWORK_VERSION 33
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0
