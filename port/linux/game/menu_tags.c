@@ -1814,6 +1814,35 @@ static short pause_campaign_prompts(struct ui_widget_definition const *screen)
 	return NONE;
 }
 
+/* The generated co-op menu borrows the campaign's Cancel/Select footer.
+It cannot reference it in XML: ui.map does not contain this widget. The
+footer and its children belong to the same loaded map as the pause menu. */
+static void pause_coop_prompts_patch(void)
+{
+	long screen = tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN);
+	long prompts = widget_named("pause/coop/prompts");
+	struct ui_widget_definition const *campaign;
+	struct ui_widget_child_reference const *children;
+	long child;
+
+	if (screen == NONE || prompts == NONE)
+		return;
+	campaign = tag_get(UI_WIDGET_DEFINITION_TAG, screen);
+	children = campaign->child_widgets.address;
+	for (child = 0; child < campaign->child_widgets.count; child++)
+	{
+		long tag = children[child].widget_tag.index;
+
+		if (tag != NONE && (tag_name_ends(tag, "\\button_key_sm") || tag_name_ends(tag, "\\button_key")))
+		{
+			struct ui_widget_definition *destination = tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[prompts]);
+
+			*destination = *(struct ui_widget_definition const *)tag_get(UI_WIDGET_DEFINITION_TAG, tag);
+			return;
+		}
+	}
+}
+
 /* the prompts move down with the last row */
 static void pause_campaign_shift_prompts(struct ui_widget_definition *widget, short shift)
 {
@@ -2179,6 +2208,7 @@ void menu_tags_loaded(
 			if (box != NONE)
 				pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, build.widget_tags[box]), 3);
 			pause_settings_patch();
+			pause_coop_prompts_patch();
 		}
 		if (build.failed)
 			goto failed;

@@ -1458,7 +1458,11 @@ def _coop_pause() -> list:
                           ("flags", "pass_unhandled_to_focused_child")],
                          ['<on event="b" close="all"/>', '<on event="back" close="all"/>',
                           f'<child widget="{base}/box" x="{x}" y="{y}"/>',
-                          f'<child widget="{base}/list" x="{x + 8}" y="{y + 43}"/>'])
+                          f'<child widget="{base}/list" x="{x + 8}" y="{y + 43}"/>',
+                          f'<child widget="{base}/prompts" x="{x + 25}" y="{y + 168}"/>'])
+    # The campaign's own footer is installed by menu_tags.c after map load;
+    # ui.map does not contain it, so an external XML reference would fail.
+    lines += _widget(f"{base}/prompts", [("width", 200), ("height", 22)], [])
     lines += _widget(f"{base}/box", [("width", 226), ("height", 194)],
                      [f'<child widget="{base}/box_{piece}" x="{x}"/>'
                       for piece, x in [("left", -4), ("center", 12), ("right", 206)]])
