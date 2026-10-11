@@ -16,6 +16,7 @@
 #include "mcc_campaign.h"
 #include "mcc_texture_cache.h"
 #include "mcc_ui_teams.h"
+#include "mcc_hud_draw.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -212,6 +213,7 @@ boolean mcc_cache_contains(void const *address, long bytes)
 
 void mcc_cache_tags_unload(void)
 {
+    mcc_hud_glyphs_dispose();
     mcc_campaign_dispose();
     mcc_ui_teams_reset();
     mcc_checkpoint_dispose();

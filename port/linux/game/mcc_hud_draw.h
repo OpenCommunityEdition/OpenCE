@@ -6,6 +6,7 @@
 
 struct bitmap_data;
 struct hud_placement_definition;
+struct hud_absolute_placement_definition;
 struct icon_hud_element_definition;
 
 /* Neutral for every non-MCC cache. No native or CE tag is rewritten. */
@@ -14,6 +15,10 @@ real mcc_hud_bitmap_scale(long bitmap_group_index);
 boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bitmap,
     real_rectangle2d const *clip, rectangle2d *cursor, pixel32 color,
     struct icon_hud_element_definition const *icon, boolean menu);
+void mcc_hud_glyphs_dispose(void);
+struct hud_absolute_placement_definition const *mcc_hud_child_placement(
+    struct hud_absolute_placement_definition const *parent, void const *element,
+    struct hud_absolute_placement_definition *storage);
 
 boolean mcc_hud_anchor_point(short anchor, struct hud_placement_definition const *placement,
     struct bitmap_data const *bitmap, real scale, rectangle2d const *window,

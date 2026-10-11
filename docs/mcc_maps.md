@@ -275,6 +275,20 @@ matching cursor advances so text remains beside the correctly sized icons.
 Pause glyphs align to the active UI font's capitals instead of inheriting
 a map's custom HUD icon baseline.
 
+Gameplay A/B/X/Y prompts use OpenCE's embedded hand-drawn button artwork,
+with visible bounds centered on the active font's capitals. Controller entries
+are identified by their HUD-global entry, not their sprite sequence, so custom
+weapon/pickup pictures remain map-authored. MCC owns and releases these bitmap
+placeholders on unload; the pause-menu path is unchanged.
+
+Weapon HUD static elements, meters, numbers and overlays also honor MCC's
+per-element child anchors (0 inherits, 1..9 select an absolute anchor).
+The field occupies the native header's padding at byte 6, as documented by
+[Invader's weapon HUD format](https://github.com/SnowyMouse/invader/blob/master/src/tag/hek/definition/weapon_hud_interface.json).
+Each draw resolves a temporary placement without changing the parent tag.
+This places A50_Revisited's visor at the screen edges; invalid child anchors
+retain the parent placement. Xbox/CE returns the original parent untouched.
+
 MCC textures bind their immutable converted allocations directly through an
 MCC-owned hardware-header registry. Exact registered header identity grants
 access to the pixels; a copied descriptor or arbitrary physical-address word
