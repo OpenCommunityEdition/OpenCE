@@ -16,6 +16,8 @@
   - Map Pack: Digsite
 - **Crash Site**
   - Map Pack: Crash Site
+- **Cursed Halo**
+  - Map Pack: Cursed Halo
 - **Defense**
   - Map Pack: The M1 Map Pack
 - **Destructo**
