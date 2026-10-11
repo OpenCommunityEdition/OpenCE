@@ -65,4 +65,8 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 
+#ifdef HALO_ANDROID
+#include "halo_porting_ui.h"
+#endif
+
 #endif

@@ -6,91 +6,42 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Properties;
 
-/**
- * The touch controls' layout (TouchControls): each control's kind, place,
- * size and whether it shows, with the settings that go with them, in the
- * overlay's logical units. Places are kept for the display the layout is
- * on and saved on a 960 x 540 grid, so a layout moves between displays of
- * other shapes. A layout file is Java properties text (version 3; 1 and 2
- * are still read).
- */
+/** Display-relative positions, visibility and action types for touch controls. */
 final class TouchLayout {
-    /** the kinds of control: a button of TouchControls's list, by index */
-    static final int LEFT = 16;
-    static final int FIRE_LEFT = 17;
-    static final int BASE_COUNT = 18;
-    static final int MAX_CONTROLS = 64;
-    static final float MIN_SIZE = 0.5f;
-    static final float MAX_SIZE = 2f;
-    static final float MIN_OPACITY = 0.2f;
-    static final float MAX_OPACITY = 1f;
-    static final float MIN_SENSITIVITY = 0.25f;
-    static final float MAX_SENSITIVITY = 4f;
-    /**
-     * the largest minimum radius: a finger's width is capped here on a small,
-     * dense display, where the D-pad's buttons (69 apart) would overlap
-     */
-    static final float MAX_MINIMUM_RADIUS = 34;
-
-    /** the saved grid */
-    private static final float GRID_WIDTH = 960;
-    private static final float GRID_HEIGHT = 540;
-    private static final int VERSION = 3;
-    private static final int MAX_FILE_LENGTH = 65536;
-
-    /** each kind's default place on the grid, and its radius */
+    static final int LEFT = 16, FIRE_LEFT = 17, CAMERA = 18;
     private static final float[][] DEFAULTS = {
-        {856, 447}, {913, 377}, {794, 377}, {850, 312}, {915, 239}, {802, 239},
-        {236, 449}, {691, 449}, {360, 490}, {438, 490}, {570, 36}, {390, 36},
-        {100, 237}, {100, 335}, {51, 286}, {149, 286}, {115, 440}, {255, 239}
+        {811.36505f,411.75003f}, {877.21124f,366.6001f}, {883.5595f,281.63678f},
+        {843.4512f,219.71782f}, {808.50323f,310.98508f}, {777.5762f,219.08284f},
+        {893.86035f,484.31088f}, {558.1477f,504.46585f}, {420.64713f,502.42935f},
+        {488.61844f,501.0651f}, {570,36}, {390,36}, {247.43086f,320.87274f},
+        {234.66917f,405.15228f}, {207.84561f,351.7265f}, {272.89108f,368.7666f},
+        {115.00001f,440}, {112.52527f,287.46466f}, {650,36}
+    };
+    private static final float[] DEFAULT_SIZES = {
+        1.1f,1.2f,1f,1f,1.3f,1f,1f,0.9f,1f,1f,1f,1f,1f,1f,1f,1f,1f,1f,1f
     };
     private static final float[] RADII = {
-        36, 32, 34, 32, 39, 35, 32, 32, 27, 29, 28, 28, 25, 25, 25, 25, 64, 39
+        36,32,34,32,39,35,32,32,27,29,28,28,25,25,25,25,64,39,29
     };
-
+    // One extra slot preserves every copy when migrating a full 64-control layout.
+    static final int BASE_COUNT = 19, MAX_CONTROLS = 65;
     private static final class Control {
         final int type;
-        float x;
-        float y;
+        float x, y;
         boolean shown = true;
         float size = 1f;
-
-        Control(int type, float x, float y) {
-            this.type = type;
-            this.x = x;
-            this.y = y;
-        }
+        Control(int type, float x, float y) { this.type = type; this.x = x; this.y = y; }
     }
-
-    /** a layout and the sensitivity saved with it */
-    static final class Configuration {
-        final TouchLayout layout;
-        final float sensitivity;
-
-        Configuration(TouchLayout layout, float sensitivity) {
-            this.layout = layout;
-            this.sensitivity = sensitivity;
-        }
-    }
-
     private final ArrayList<Control> controls = new ArrayList<>();
-    private float width = GRID_WIDTH;
-    private float height = GRID_HEIGHT;
-    /** the smallest radius a control is drawn and touched at, in logical units */
-    private float minimumRadius;
 
-    boolean rumbleEnabled = true;
-    boolean gyroscopeEnabled = false;
-    /** how solid the controls are drawn, MIN_OPACITY..MAX_OPACITY */
-    float opacity = 1f;
-    /** the move stick goes where the thumb lands in the lower left, not at its place */
-    boolean floatingStick = false;
+    private float width = 960, height = 540;
+    boolean rumbleEnabled = true, gyroscopeEnabled = false, fpsCounter = false;
+    float gyroscopeSensitivity = 1f;
+    boolean overlayDisabled;
+    float fieldOfView = 70f;
+    static final float MIN_FOV = 55f, MAX_FOV = 90f;
+    static final float MIN_SIZE = 0.5f, MAX_SIZE = 2f;
 
-    TouchLayout() {
-        resetDefaults();
-    }
-
-    /** places the layout on a display of this size, in logical units */
     void bounds(float width, float height) {
         if (!Float.isFinite(width) || !Float.isFinite(height) || width <= 0 || height <= 0)
             throw new IllegalArgumentException("Invalid display dimensions");
@@ -98,238 +49,177 @@ final class TouchLayout {
             control.x *= width / this.width;
             control.y *= height / this.height;
         }
-        this.width = width;
-        this.height = height;
-        keepAllInside();
+        this.width = width; this.height = height;
+        for (int i = 0; i < size(); i++) move(i, x(i), y(i));
     }
+    float savedX(int i) { return x(i) * 960 / width; }
+    float savedY(int i) { return y(i) * 540 / height; }
 
-    /**
-     * the smallest radius, in logical units, at which a control is drawn and
-     * touched (a finger's width, whatever the display's density), at most
-     * MAX_MINIMUM_RADIUS
-     */
-    void setMinimumRadius(float radius) {
-        minimumRadius = Float.isFinite(radius) && radius > 0 ? Math.min(radius, MAX_MINIMUM_RADIUS) : 0;
-        keepAllInside();
-    }
-
-    int size() {
-        return controls.size();
-    }
-
-    int type(int control) {
-        return controls.get(control).type;
-    }
-
-    float x(int control) {
-        return controls.get(control).x;
-    }
-
-    float y(int control) {
-        return controls.get(control).y;
-    }
-
-    float savedX(int control) {
-        return x(control) * GRID_WIDTH / width;
-    }
-
-    float savedY(int control) {
-        return y(control) * GRID_HEIGHT / height;
-    }
-
-    float radius(int control) {
-        return Math.max(RADII[type(control)] * sizeScale(control), minimumRadius);
-    }
-
-    float sizeScale(int control) {
-        return controls.get(control).size;
-    }
-
+    TouchLayout() { resetDefaults(); }
+    int size() { return controls.size(); }
+    int type(int control) { return controls.get(control).type; }
+    float x(int control) { return controls.get(control).x; }
+    float y(int control) { return controls.get(control).y; }
+    float radius(int control) { return RADII[type(control)] * controls.get(control).size; }
+    float sizeScale(int control) { return controls.get(control).size; }
     void setSize(int control, float size) {
         if (!Float.isFinite(size) || size < MIN_SIZE || size > MAX_SIZE)
             throw new IllegalArgumentException("Button size must be between 50% and 200%");
         controls.get(control).size = size;
         move(control, x(control), y(control));
     }
+    boolean shown(int control) { return controls.get(control).shown; }
+    void setShown(int control, boolean shown) { controls.get(control).shown = shown; }
 
-    boolean shown(int control) {
-        return controls.get(control).shown;
-    }
-
-    void setShown(int control, boolean shown) {
-        controls.get(control).shown = shown;
-    }
-
-    void setOpacity(float opacity) {
-        if (!validOpacity(opacity))
-            throw new IllegalArgumentException("Opacity must be between 20% and 100%");
-        this.opacity = opacity;
-    }
-
-    /** the default controls, at their default places, sizes and visibility */
     void resetDefaults() {
         controls.clear();
-        for (int i = 0; i < DEFAULTS.length; i++)
-            controls.add(new Control(i, DEFAULTS[i][0] * width / GRID_WIDTH, DEFAULTS[i][1] * height / GRID_HEIGHT));
-        keepAllInside();
+        for (int i = 0; i < DEFAULTS.length; i++) {
+            Control control = new Control(i, DEFAULTS[i][0]*width/960, DEFAULTS[i][1]*height/540);
+            control.size = DEFAULT_SIZES[i];
+            controls.add(control);
+        }
+        for (int i = 0; i < size(); i++) move(i, x(i), y(i));
     }
 
-    /** adds a copy of a control beside it; -1 if there may be no more (or it is the stick) */
     int duplicate(int source) {
-        if (size() >= MAX_CONTROLS || type(source) == LEFT)
-            return -1;
-        float offset = radius(source) * 2 + 12;
-        Control added = new Control(type(source), x(source) + offset, y(source));
+        if (size() >= MAX_CONTROLS || type(source) == LEFT) return -1;
+        Control added = new Control(type(source), x(source)+radius(source)*2+12, y(source));
         added.size = sizeScale(source);
         controls.add(added);
-        int index = size() - 1;
-        // where there is no room to the right, the copy goes to the left
-        if (added.x > width - radius(index))
-            added.x = x(source) - offset;
+        int index = size()-1;
+        // If there is no space on the right, place the copy to the left instead.
+        if (added.x > width-radius(source)) added.x = x(source)-radius(source)*2-12;
         move(index, added.x, added.y);
         return index;
     }
 
-    /** shows a hidden control of this kind, or else adds a copy; -1 if neither can be */
     int add(int type) {
-        if (type < 0 || type >= BASE_COUNT)
-            return -1;
+        if (type < 0 || type >= BASE_COUNT) return -1;
         for (int i = 0; i < size(); i++) {
-            if (type(i) == type && !shown(i)) {
-                setShown(i, true);
-                return i;
-            }
+            if (type(i) == type && !shown(i)) { setShown(i, true); return i; }
         }
         return duplicate(type);
     }
 
-    /** moves a control, keeping all of it on the display */
-    void move(int control, float x, float y) {
-        if (!Float.isFinite(x) || !Float.isFinite(y))
-            return;
-        float radius = radius(control);
-        controls.get(control).x = Math.max(radius, Math.min(width - radius, x));
-        controls.get(control).y = Math.max(radius, Math.min(height - radius, y));
-    }
-
-    /** puts a control at a saved place on the grid, if it is a valid one */
-    void restore(int control, float x, float y) {
-        if (Float.isFinite(x) && Float.isFinite(y) && x >= 0 && x <= GRID_WIDTH && y >= 0 && y <= GRID_HEIGHT) {
-            controls.get(control).x = x;
-            controls.get(control).y = y;
-        }
-    }
-
-    private void keepAllInside() {
-        for (int i = 0; i < size(); i++)
-            move(i, x(i), y(i));
-    }
-
-    /** the layout as a layout file's text, with the look sensitivity */
     String exportConfiguration(float sensitivity) {
-        if (!validSensitivity(sensitivity))
-            throw new IllegalArgumentException("Invalid sensitivity");
+        if (!validSensitivity(sensitivity) || !validSensitivity(gyroscopeSensitivity)) throw new IllegalArgumentException("Invalid sensitivity");
         Properties values = new Properties();
         values.setProperty("format", "halo-touch-layout");
-        values.setProperty("version", Integer.toString(VERSION));
+        values.setProperty("version", "4");
+        values.setProperty("gyroscope-sensitivity", Float.toString(gyroscopeSensitivity));
+        values.setProperty("fps-counter", Boolean.toString(fpsCounter));
         values.setProperty("rumble", Boolean.toString(rumbleEnabled));
         values.setProperty("gyroscope", Boolean.toString(gyroscopeEnabled));
-        values.setProperty("opacity", Float.toString(opacity));
-        values.setProperty("floating-stick", Boolean.toString(floatingStick));
+        values.setProperty("overlay-disabled", Boolean.toString(overlayDisabled));
+        values.setProperty("field-of-view", Float.toString(fieldOfView));
         values.setProperty("count", Integer.toString(size()));
         values.setProperty("sensitivity", Float.toString(sensitivity));
         for (int i = 0; i < size(); i++) {
-            String key = "control." + i + ".";
-            values.setProperty(key + "type", Integer.toString(type(i)));
-            values.setProperty(key + "x", Float.toString(savedX(i)));
-            values.setProperty(key + "y", Float.toString(savedY(i)));
-            values.setProperty(key + "visible", Boolean.toString(shown(i)));
-            values.setProperty(key + "size", Float.toString(sizeScale(i)));
+            String key = "control."+i+".";
+            values.setProperty(key+"type", Integer.toString(type(i)));
+            values.setProperty(key+"x", Float.toString(savedX(i)));
+            values.setProperty(key+"y", Float.toString(savedY(i)));
+            values.setProperty(key+"visible", Boolean.toString(shown(i)));
+            values.setProperty(key+"size", Float.toString(sizeScale(i)));
         }
         StringWriter text = new StringWriter();
-        try {
-            values.store(text, "Halo Android touch layout");
-        } catch (IOException e) {
-            throw new IllegalStateException(e);
-        }
+        try { values.store(text, "Halo Android touch layout"); }
+        catch (IOException e) { throw new IllegalStateException(e); }
         return text.toString();
     }
 
-    /** reads a layout file's text; throws IllegalArgumentException for anything not valid */
+    static final class Configuration {
+        final TouchLayout layout;
+        final float sensitivity;
+        Configuration(TouchLayout layout, float sensitivity) {
+            this.layout = layout; this.sensitivity = sensitivity;
+        }
+    }
+
+    private static boolean validSensitivity(float value) {
+        return Float.isFinite(value) && value >= 0.25f && value <= 4f;
+    }
+
     static Configuration importConfiguration(String text) {
-        if (text == null || text.length() > MAX_FILE_LENGTH)
-            throw new IllegalArgumentException("Invalid layout file");
+        if (text == null || text.length() > 65536) throw new IllegalArgumentException("Invalid layout file");
         Properties values = new Properties();
         try {
             values.load(new StringReader(text));
-            int version = readVersion(values);
+            String version = values.getProperty("version");
+            if (!"halo-touch-layout".equals(values.getProperty("format")) ||
+                    !("1".equals(version) || "2".equals(version) || "3".equals(version) || "4".equals(version)))
+                throw new IllegalArgumentException("Unsupported layout file");
             int count = Integer.parseInt(values.getProperty("count"));
             float sensitivity = Float.parseFloat(values.getProperty("sensitivity"));
-            if (count < BASE_COUNT || count > MAX_CONTROLS || !validSensitivity(sensitivity))
+            if (count < 18 || count > MAX_CONTROLS || !validSensitivity(sensitivity))
                 throw new IllegalArgumentException("Invalid layout settings");
             TouchLayout layout = new TouchLayout();
             layout.controls.clear();
-            if (version >= 2) {
+            if (values.containsKey("overlay-disabled")) layout.overlayDisabled = readBoolean(values, "overlay-disabled");
+            if (values.containsKey("field-of-view")) {
+                layout.fieldOfView = Float.parseFloat(values.getProperty("field-of-view"));
+                if (!Float.isFinite(layout.fieldOfView) || layout.fieldOfView < MIN_FOV || layout.fieldOfView > MAX_FOV)
+                    throw new IllegalArgumentException("Invalid field of view");
+            }
+            if (!"1".equals(version)) {
                 layout.rumbleEnabled = readBoolean(values, "rumble");
                 layout.gyroscopeEnabled = readBoolean(values, "gyroscope");
+                if ("3".equals(version) || "4".equals(version)) {
+                    layout.fpsCounter = readBoolean(values, "fps-counter");
+                    layout.gyroscopeSensitivity = Float.parseFloat(values.getProperty("gyroscope-sensitivity"));
+                    if (!validSensitivity(layout.gyroscopeSensitivity))
+                        throw new IllegalArgumentException("Invalid gyroscope sensitivity");
+                }
             }
-            if (version >= 3) {
-                float opacity = Float.parseFloat(values.getProperty("opacity"));
-                if (!validOpacity(opacity))
-                    throw new IllegalArgumentException("Invalid opacity");
-                layout.opacity = opacity;
-                layout.floatingStick = readBoolean(values, "floating-stick");
+            int base = "4".equals(version) ? BASE_COUNT : 18;
+            if (count < base) throw new IllegalArgumentException("Incomplete base controls");
+            for (int i = 0; i < count; i++) {
+                String key = "control."+i+".";
+                int type = Integer.parseInt(values.getProperty(key+"type"));
+                float x = Float.parseFloat(values.getProperty(key+"x"));
+                float y = Float.parseFloat(values.getProperty(key+"y"));
+                String shown = values.getProperty(key+"visible");
+                float size = !"1".equals(version) ? Float.parseFloat(values.getProperty(key+"size")) : 1f;
+                if (type < 0 || type >= base || (i < base && type != i) ||
+                        (i >= base && type == LEFT) || !Float.isFinite(x) || !Float.isFinite(y) ||
+                        x < 0 || x > 960 || y < 0 || y > 540 ||
+                        !("true".equals(shown) || "false".equals(shown)) ||
+                        !Float.isFinite(size) || size < MIN_SIZE || size > MAX_SIZE)
+                    throw new IllegalArgumentException("Invalid control in layout file");
+                Control control = new Control(type, x, y);
+                control.shown = Boolean.parseBoolean(shown);
+                control.size = size;
+                layout.controls.add(control);
             }
-            for (int i = 0; i < count; i++)
-                layout.controls.add(readControl(values, i, version));
+            if (base == 18) {
+                Control camera = new Control(CAMERA, DEFAULTS[CAMERA][0], DEFAULTS[CAMERA][1]);
+                layout.controls.add(CAMERA, camera);
+            }
             return new Configuration(layout, sensitivity);
         } catch (IOException | NullPointerException e) {
             throw new IllegalArgumentException("Incomplete layout file", e);
         }
     }
 
-    private static int readVersion(Properties values) {
-        if (!"halo-touch-layout".equals(values.getProperty("format")))
-            throw new IllegalArgumentException("Unsupported layout file");
-        String version = values.getProperty("version");
-        for (int known = 1; known <= VERSION; known++) {
-            if (Integer.toString(known).equals(version))
-                return known;
-        }
-        throw new IllegalArgumentException("Unsupported layout file");
-    }
-
-    private static Control readControl(Properties values, int index, int version) {
-        String key = "control." + index + ".";
-        int type = Integer.parseInt(values.getProperty(key + "type"));
-        float x = Float.parseFloat(values.getProperty(key + "x"));
-        float y = Float.parseFloat(values.getProperty(key + "y"));
-        String shown = values.getProperty(key + "visible");
-        float size = version >= 2 ? Float.parseFloat(values.getProperty(key + "size")) : 1f;
-        boolean validType = type >= 0 && type < BASE_COUNT && (index >= BASE_COUNT ? type != LEFT : type == index);
-        boolean validPlace = Float.isFinite(x) && Float.isFinite(y) && x >= 0 && x <= GRID_WIDTH
-            && y >= 0 && y <= GRID_HEIGHT;
-        boolean validSize = Float.isFinite(size) && size >= MIN_SIZE && size <= MAX_SIZE;
-        if (!validType || !validPlace || !validSize || !("true".equals(shown) || "false".equals(shown)))
-            throw new IllegalArgumentException("Invalid control in layout file");
-        Control control = new Control(type, x, y);
-        control.shown = Boolean.parseBoolean(shown);
-        control.size = size;
-        return control;
-    }
-
     private static boolean readBoolean(Properties values, String key) {
         String value = values.getProperty(key);
         if (!("true".equals(value) || "false".equals(value)))
-            throw new IllegalArgumentException("Invalid " + key + " option");
+            throw new IllegalArgumentException("Invalid "+key+" option");
         return Boolean.parseBoolean(value);
     }
 
-    static boolean validSensitivity(float value) {
-        return Float.isFinite(value) && value >= MIN_SENSITIVITY && value <= MAX_SENSITIVITY;
+    void move(int control, float x, float y) {
+        if (!Float.isFinite(x) || !Float.isFinite(y)) return;
+        float radius = radius(control);
+        controls.get(control).x = Math.max(radius, Math.min(width-radius, x));
+        controls.get(control).y = Math.max(radius, Math.min(height-radius, y));
     }
 
-    static boolean validOpacity(float value) {
-        return Float.isFinite(value) && value >= MIN_OPACITY && value <= MAX_OPACITY;
+    void restore(int control, float x, float y) {
+        if (Float.isFinite(x) && Float.isFinite(y) && x >= 0
+                && x <= 960 && y >= 0 && y <= 540) {
+            controls.get(control).x = x;
+            controls.get(control).y = y;
+        }
     }
 }

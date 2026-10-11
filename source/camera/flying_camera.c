@@ -81,7 +81,12 @@ void flying_camera_update(
 		rasterizer_debug_options.freeze_flying_camera--;
 	}
 
+#ifdef HALO_ANDROID
+    /* Direct touch deltas already describe the user's movement this frame. */
+    result->timer = controls->active ? 0.0f : 0.3f;
+#else
 	result->timer = 0.3f;
+#endif
 	vector3d_from_euler_angles2d(&result->forward, &camera->facing);
 	observer_up_from_forward(&result->forward, &result->up);
 	rotate_vector_about_axis(

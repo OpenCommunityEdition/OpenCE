@@ -12,6 +12,11 @@ RASTERIZER_TEXT.H
 
 /* ---------- structures */
 
+#ifdef HALO_ANDROID
+#include "math/integer_math.h"
+void rasterizer_text_set_ui_scale(int x, int y, int percent);
+#endif
+
 struct bitmap_data;
 struct dynamic_screen_vertex;
 struct font_character;

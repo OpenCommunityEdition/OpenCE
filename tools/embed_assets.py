@@ -78,6 +78,15 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def android_menu_files() -> List[str]:
+    """Those of the menus' files that only the Android build embeds
+    (menus.json's android_files: the app's Porting options art,
+    tools/porting_assets.py)."""
+    if not (ROOT / MENU_LIST).is_file():
+        return []
+    return json.loads((ROOT / MENU_LIST).read_text()).get("android_files", [])
+
+
 def smaa_files() -> List[tuple]:
     """SMAA's files that the checkout has, with their symbols."""
     return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
@@ -205,23 +214,41 @@ def main() -> None:
     lines.append('#include "menu_files.h"')
     lines.append("")
     menus = menu_files()
+    # (the Android app's own are in its build only)
+    android_only = set(android_menu_files())
     for index, name in enumerate(menus):
         data = (ROOT / MENU_ASSETS / name).read_bytes()
         if name.endswith(".png"):
             png_size(data, name)
+        if name in android_only:
+            lines.append("#ifdef HALO_ANDROID")
         lines.append(f"static const unsigned int menu{index}[] = {{")
         lines.extend(words(data))
         lines.append("};")
+        if name in android_only:
+            lines.append("#endif")
         lines.append("")
     lines.append("const struct menu_file_embedded menu_files_embedded[] =")
     lines.append("{")
     for index, name in enumerate(menus):
         size = (ROOT / MENU_ASSETS / name).stat().st_size
+        if name in android_only:
+            lines.append("#ifdef HALO_ANDROID")
         lines.append(f'\t{{ "{name}", menu{index}, {size} }},')
-    if not menus:
+        if name in android_only:
+            lines.append("#endif")
+    if len(menus) == len(android_only & set(menus)):
         lines.append("\t{ 0 },")
     lines.append("};")
-    lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    everywhere = len([name for name in menus if name not in android_only])
+    if everywhere != len(menus):
+        lines.append("#ifdef HALO_ANDROID")
+        lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+        lines.append("#else")
+        lines.append(f"const unsigned int menu_files_embedded_count = {everywhere};")
+        lines.append("#endif")
+    else:
+        lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the

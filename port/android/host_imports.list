@@ -33,6 +33,16 @@ host_sdl_get_clipboard_text
 host_sdl_show_toast
 host_sdl_show_simple_message_box
 host_sdl_get_gamepads
+host_touch_read
+host_touch_rumble
+host_touch_camera_read
+host_touch_look_read
+host_touch_field_of_view
+host_touch_cheats_read
+host_touch_cheat_result
+host_touch_cheat_sync
+host_touch_hud_read
+host_touch_app_version
 host_sdl_open_gamepad
 host_sdl_gamepad_from_id
 host_sdl_gamepad_axis
@@ -56,10 +66,13 @@ host_gl_fence_frame
 host_gl_wait_frame
 host_android_path
 host_gesture_insets
-host_touch_read
-host_touch_look_read
-host_touch_rumble
 host_touch_scene
 host_touch_bindings
 
 host_errno
+
+host_porting_menu_read
+host_porting_action
+host_touch_ui_context
+host_touch_pointer_read
+host_touch_frame

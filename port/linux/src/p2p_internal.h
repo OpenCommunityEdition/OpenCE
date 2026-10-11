@@ -128,6 +128,21 @@ asks anew, with a new nonce (as after the session with the host ended
 before the tunnel reached it: the host makes one session of a request) */
 void p2p_signal_join(const unsigned char *host_hash, const unsigned char *token);
 void p2p_signal_stop_joining(void);
+#ifdef HALO_ANDROID
+/* Session relay topics carry the existing authenticated tunnel packets. All
+calls are on the p2p thread under p2p_lock. */
+void p2p_signal_relay_add(const unsigned char *identifier, const unsigned char *send_key,
+	const unsigned char *receive_key);
+void p2p_signal_relay_remove(const unsigned char *identifier);
+int p2p_signal_relay_send(const unsigned char *identifier, const unsigned char *packet, int size);
+int p2p_relay_received(const unsigned char *identifier, const unsigned char *packet, int size);
+enum
+{
+	P2P_RELAY_PACKET_SIZE = 2048,
+	/* Tunnel header (15), authentication tag (16), ping/pong payload (5). */
+	P2P_RELAY_PROBE_SIZE = 36,
+};
+#endif
 /* whether any broker is connected */
 int p2p_signal_connected(void);
 /* the server browser's topics: the own slot and the queries (a listed

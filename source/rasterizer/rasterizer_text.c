@@ -750,6 +750,13 @@ rasterizer_draw_character_with_dropshadow(
 	return;
 }
 
+#ifdef HALO_ANDROID
+void rasterizer_text_set_ui_scale(int x, int y, int percent)
+{
+    rasterizer_text_set_scale(percent > 0 ? (real)percent/100.0f : 1.0f, (real)x, (real)y);
+}
+#endif
+
 /* ---------- private code */
 
 /* port: text drawn scale times larger about a point (in screen units), until

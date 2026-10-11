@@ -3509,6 +3509,9 @@ static boolean main_loop_iteration(
 		shell_idle();
 		event_manager_update();
 		telnet_console_process();
+#ifdef HALO_ANDROID
+		android_touch_cheats_update();
+#endif
 		profile_scope_exit(main_platform_events_section)
 
 		if (!shell_application_is_paused())

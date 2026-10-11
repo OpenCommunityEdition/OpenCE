@@ -1,65 +1,341 @@
-/*
-HOST_TOUCH.C
-
-The on-screen touch controls between the overlay and the game. The overlay
-(app/.../TouchControls.java) is an Android view over SDL's surface: it
-hands its stick, buttons, view swipes and gyroscope turns over JNI on the UI
-thread, and the game reads them through host imports when it reads port 0's
-controller (port/linux/src/xinput_sdl.c). The game hands back what the
-overlay needs to know: whether it is in a game with no menu or cinematic up
-and the input.touch_controls setting (host_touch_scene), the profile's
-button mapping, which names the buttons (host_touch_bindings), and how hard
-port 0 rumbles.
-*/
-
+/* UI thread writes one snapshot; the guest reads it on the input thread. */
 #include <jni.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
-
-/* a press shorter than this still reaches the game: it reads the
-controller once a frame and acts at 30 ticks a second, and a quick tap can
-go down and up between two reads */
-#define TOUCH_TAP_NS 60000000LL
-/* view motion and rumble older than this are dropped: left over from the
-menus, a cinematic or the app in the background */
-#define TOUCH_STALE_NS 150000000LL
-
-/* SDL's 15 gamepad buttons, then the left and right triggers */
-#define TOUCH_INPUTS 17
+#include "../../linux/include/halo_porting_ui.h"
 
 static pthread_mutex_t touch_lock = PTHREAD_MUTEX_INITIALIZER;
-/* the SDL axes (left x, y, right x, y, left trigger, right trigger), then
-the SDL button bits */
-static int32_t touch_state[7];
-static int64_t touch_pressed_ns[TOUCH_INPUTS];
+static int32_t touch_state[7]; /* SDL axes followed by SDL button bits */
 static float look_delta[2];
-static int64_t look_ns;
-/* the gyroscope's turn, apart: the profile's invert is the swipe's only */
-static float gyro_delta[2];
-static int64_t gyro_ns;
+static int camera_pending;
+static struct timespec look_time;
+static uint32_t cheat_pending, cheat_busy;
+static int32_t cheat_commands[16], cheat_status[16];
 static int rumble_amplitude;
-static int64_t rumble_ns;
-static volatile int touch_scene;
-/* the game control on each controller button (-1: none), and a count of
-its changes, which the overlay polls */
-#define TOUCH_BUTTONS 16
-static int32_t touch_bindings[TOUCH_BUTTONS];
-static int touch_bindings_serial;
+static struct timespec rumble_time;
+static int ui_menus = 1, ui_context, ui_action, ui_value, ui_revision;
+static float ui_point[6]; /* normalized x/y, click, back, scroll, scrollbar */
+static struct halo_porting_menu porting_menu;
+static int frame_count, frame_fps;
+static struct timespec frame_time;
+static float field_of_view = 70.0f;
+/* Edit in-game UI: x and y of the weapons' panel, the health panel and the
+   motion sensor, as fractions of the screen. */
+static float hud_offsets[6];
+/* The installed app's version, for the main menu's build label. */
+static char app_version[HALO_APP_VERSION_SIZE];
 
-static int64_t now_ns(void)
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeFieldOfView(
+    JNIEnv *env, jclass cls, jfloat degrees)
 {
-	struct timespec now;
-
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	return (int64_t)now.tv_sec * 1000000000LL + now.tv_nsec;
+    (void)env; (void)cls;
+    if (!(degrees >= 55.0f && degrees <= 90.0f)) return;
+    pthread_mutex_lock(&touch_lock);
+    field_of_view = degrees;
+    pthread_mutex_unlock(&touch_lock);
 }
 
-/* the inputs of a state as bits: buttons, then the triggers */
-static uint32_t touch_inputs(const int32_t *state)
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeHudLayout(
+    JNIEnv *env, jclass cls, jfloatArray values)
 {
-	return ((uint32_t)state[6] & 0x7fff) | (state[4] ? 1u << 15 : 0) | (state[5] ? 1u << 16 : 0);
+    jfloat next[6];
+    int i;
+    (void)cls;
+    if (!values || (*env)->GetArrayLength(env, values) != 6) return;
+    (*env)->GetFloatArrayRegion(env, values, 0, 6, next);
+    for (i = 0; i < 6; ++i)
+        if (!(next[i] >= -1.0f && next[i] <= 1.0f)) return;
+    pthread_mutex_lock(&touch_lock);
+    memcpy(hud_offsets, next, sizeof(hud_offsets));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeAppVersion(
+    JNIEnv *env, jclass cls, jstring version)
+{
+    const char *text;
+    (void)cls;
+    if (!version) return;
+    text = (*env)->GetStringUTFChars(env, version, NULL);
+    if (!text) return;
+    pthread_mutex_lock(&touch_lock);
+    strncpy(app_version, text, sizeof(app_version)-1);
+    app_version[sizeof(app_version)-1] = 0;
+    pthread_mutex_unlock(&touch_lock);
+    (*env)->ReleaseStringUTFChars(env, version, text);
+}
+
+void host_touch_app_version(char *buffer, unsigned int size)
+{
+    if (!size) return;
+    pthread_mutex_lock(&touch_lock);
+    strncpy(buffer, app_version, size-1);
+    buffer[size-1] = 0;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_hud_read(float *offsets)
+{
+    pthread_mutex_lock(&touch_lock);
+    memcpy(offsets, hud_offsets, sizeof(hud_offsets));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+float host_touch_field_of_view(void)
+{
+    float degrees;
+    pthread_mutex_lock(&touch_lock);
+    degrees = field_of_view;
+    pthread_mutex_unlock(&touch_lock);
+    return degrees;
+}
+
+void host_touch_ui_context(int menus, int context)
+{
+    pthread_mutex_lock(&touch_lock);
+    if (ui_menus != menus) {
+        camera_pending = 0;
+        memset(touch_state, 0, sizeof(touch_state));
+        memset(look_delta, 0, sizeof(look_delta));
+        memset(ui_point, 0, sizeof(ui_point));
+    }
+    ui_menus = menus; if (context >= 0) ui_context = context;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_pointer_read(float *point)
+{
+    pthread_mutex_lock(&touch_lock);
+    memcpy(point, ui_point, sizeof(ui_point));
+    ui_point[2] = ui_point[3] = ui_point[4] = ui_point[5] = 0;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_porting_menu_read(struct halo_porting_menu *menu)
+{
+    pthread_mutex_lock(&touch_lock);
+    memcpy(menu, &porting_menu, sizeof(*menu));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_porting_action(int revision, int action, int value)
+{
+    pthread_mutex_lock(&touch_lock);
+    int slider = action >= 40 && action <= 43;
+    int valid_slider = 0;
+    if (slider && porting_menu.page) {
+        for (int i = 0; i < porting_menu.count; ++i)
+            if (porting_menu.rows[i].action == action && porting_menu.rows[i].value >= 0)
+                valid_slider = 1;
+    }
+    /* A slider owns its gesture across value acknowledgements. Keep the
+       newest position, while still checking it belongs to the current page. */
+    if ((!ui_action || (valid_slider && ui_action == action)) &&
+        (revision == porting_menu.revision || valid_slider)) {
+        ui_action = action; ui_value = value; ui_revision = porting_menu.revision;
+    }
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_frame(void)
+{
+    struct timespec now;
+    double elapsed;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    pthread_mutex_lock(&touch_lock);
+    if (!frame_time.tv_sec) frame_time = now;
+    ++frame_count;
+    elapsed = now.tv_sec-frame_time.tv_sec + (now.tv_nsec-frame_time.tv_nsec)/1e9;
+    if (elapsed >= 0.5) {
+        frame_fps = (int)(frame_count/elapsed + 0.5);
+        frame_count = 0; frame_time = now;
+    }
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT jintArray JNICALL Java_com_halo_decomp_TouchControls_nativeMenuPoll(JNIEnv *env, jclass cls)
+{
+    jint values[6]; jintArray result;
+    (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    values[0] = ui_menus; values[1] = ui_context; values[2] = ui_action;
+    values[3] = ui_value; values[4] = ui_revision; values[5] = frame_fps;
+    ui_action = 0;
+    pthread_mutex_unlock(&touch_lock);
+    result = (*env)->NewIntArray(env, 6);
+    if (result) (*env)->SetIntArrayRegion(env, result, 0, 6, values);
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeMenuPointer(
+    JNIEnv *env, jclass cls, jfloat x, jfloat y, jboolean click, jboolean back,
+    jfloat scroll, jboolean scrollbar)
+{
+    (void)env; (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    if (ui_menus) {
+        ui_point[0] = x; ui_point[1] = y;
+        if (click) ui_point[2] = 1;
+        if (back) ui_point[3] = 1;
+        ui_point[4] += scroll;
+        if (scrollbar) ui_point[5] = 1;
+    }
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeMenuPublish(
+    JNIEnv *env, jclass cls, jint revision, jint page, jboolean editing,
+    jstring title, jobjectArray labels, jintArray actions, jintArray values)
+{
+    struct halo_porting_menu next = {0};
+    const char *text; int i; jint ids[HALO_PORTING_ROWS], progress[HALO_PORTING_ROWS];
+    (void)cls;
+    next.revision = revision; next.page = page; next.editing = editing;
+    next.count = (*env)->GetArrayLength(env, labels);
+    if (next.count > HALO_PORTING_ROWS || (*env)->GetArrayLength(env, actions) != next.count ||
+        (*env)->GetArrayLength(env, values) != next.count) return;
+    text = (*env)->GetStringUTFChars(env, title, NULL);
+    if (!text) return;
+    strncpy(next.title, text, sizeof(next.title)-1);
+    (*env)->ReleaseStringUTFChars(env, title, text);
+    (*env)->GetIntArrayRegion(env, actions, 0, next.count, ids);
+    (*env)->GetIntArrayRegion(env, values, 0, next.count, progress);
+    for (i = 0; i < next.count; ++i) {
+        jstring label = (jstring)(*env)->GetObjectArrayElement(env, labels, i);
+        text = (*env)->GetStringUTFChars(env, label, NULL);
+        if (!text) return;
+        strncpy(next.rows[i].text, text, sizeof(next.rows[i].text)-1);
+        (*env)->ReleaseStringUTFChars(env, label, text);
+        (*env)->DeleteLocalRef(env, label);
+        next.rows[i].action = ids[i]; next.rows[i].value = progress[i];
+    }
+    pthread_mutex_lock(&touch_lock);
+    porting_menu = next;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_rumble(unsigned int low, unsigned int high)
+{
+    unsigned int strength = low > high ? low : high;
+    pthread_mutex_lock(&touch_lock);
+    rumble_amplitude = strength ? 64 + (strength * 191u / 65535u) : 0;
+    clock_gettime(CLOCK_MONOTONIC, &rumble_time);
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeRumble(JNIEnv *env, jclass cls)
+{
+    struct timespec now;
+    int amplitude;
+    (void)env; (void)cls;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    pthread_mutex_lock(&touch_lock);
+    amplitude = rumble_amplitude;
+    if ((now.tv_sec-rumble_time.tv_sec)*1000000000LL + now.tv_nsec-rumble_time.tv_nsec > 150000000LL)
+        amplitude = 0;
+    pthread_mutex_unlock(&touch_lock);
+    return amplitude;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLook(
+    JNIEnv *env, jclass cls, jfloat dx, jfloat dy)
+{
+    (void)env; (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    if (!ui_menus) { look_delta[0] += dx; look_delta[1] += dy; }
+    clock_gettime(CLOCK_MONOTONIC, &look_time);
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLookReset(JNIEnv *env, jclass cls)
+{
+    (void)env; (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    look_delta[0] = look_delta[1] = 0;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeCameraMode(JNIEnv *env, jclass cls)
+{
+    (void)env; (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    if (!ui_menus) camera_pending = 1;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+int host_touch_camera_read(void)
+{
+    int pending;
+    pthread_mutex_lock(&touch_lock);
+    pending = camera_pending; camera_pending = 0;
+    pthread_mutex_unlock(&touch_lock);
+    return pending;
+}
+
+void host_touch_look_read(float *delta)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    pthread_mutex_lock(&touch_lock);
+    memcpy(delta, look_delta, sizeof(look_delta));
+    /* Discard movement left over from menus, cutscenes or a suspended app. */
+    if ((now.tv_sec-look_time.tv_sec)*1000000000LL + now.tv_nsec-look_time.tv_nsec > 150000000LL)
+        delta[0] = delta[1] = 0;
+    look_delta[0] = look_delta[1] = 0;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_halo_decomp_TouchControls_nativeCheatRequest(
+    JNIEnv *env, jclass cls, jint id, jboolean enabled)
+{
+    (void)env; (void)cls;
+    if (id < 0 || id >= 16) return JNI_FALSE;
+    pthread_mutex_lock(&touch_lock);
+    if (cheat_busy & (1u << id)) { pthread_mutex_unlock(&touch_lock); return JNI_FALSE; }
+    cheat_commands[id] = enabled != 0;
+    cheat_pending |= 1u << id;
+    cheat_busy |= 1u << id;
+    pthread_mutex_unlock(&touch_lock);
+    return JNI_TRUE;
+}
+
+JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeCheatStatus(
+    JNIEnv *env, jclass cls, jint id)
+{
+    int status;
+    (void)env; (void)cls;
+    if (id < 0 || id >= 16) return -1;
+    pthread_mutex_lock(&touch_lock);
+    status = (cheat_busy & (1u << id)) ? -2 : cheat_status[id];
+    pthread_mutex_unlock(&touch_lock);
+    return status;
+}
+
+unsigned int host_touch_cheats_read(int *commands)
+{
+    unsigned int pending;
+    pthread_mutex_lock(&touch_lock);
+    pending = cheat_pending; cheat_pending = 0;
+    memcpy(commands, cheat_commands, sizeof(cheat_commands));
+    pthread_mutex_unlock(&touch_lock);
+    return pending;
+}
+
+void host_touch_cheat_result(int id, int status)
+{
+    pthread_mutex_lock(&touch_lock);
+    cheat_status[id] = status;
+    cheat_busy &= ~(1u << id);
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_cheat_sync(int id, int active)
+{
+    pthread_mutex_lock(&touch_lock);
+    if (!(cheat_busy & (1u << id)) && cheat_status[id] >= 0) cheat_status[id] = active;
+    pthread_mutex_unlock(&touch_lock);
 }
 
 JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeState(
@@ -67,163 +343,31 @@ JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeState(
 	jint lt, jint rt, jint buttons)
 {
 	int32_t next[] = { lx, ly, rx, ry, lt, rt, buttons };
-	uint32_t pressed;
-	int64_t now = now_ns();
-	int input;
-
 	(void)env;
 	(void)cls;
 	pthread_mutex_lock(&touch_lock);
-	pressed = touch_inputs(next) & ~touch_inputs(touch_state);
-	for (input = 0; input < TOUCH_INPUTS; input++)
-	{
-		if (pressed & (1u << input))
-			touch_pressed_ns[input] = now;
-	}
 	memcpy(touch_state, next, sizeof(next));
+	if (porting_menu.editing || (ui_menus && porting_menu.page))
+		memset(touch_state, 0, sizeof(touch_state));
 	pthread_mutex_unlock(&touch_lock);
 }
 
-/* the guest's: the overlay's controller state, with each press held for
-at least TOUCH_TAP_NS */
 void host_touch_read(int32_t *state)
 {
-	int64_t now = now_ns();
-	int input;
-
 	pthread_mutex_lock(&touch_lock);
 	memcpy(state, touch_state, sizeof(touch_state));
-	for (input = 0; input < TOUCH_INPUTS; input++)
-	{
-		if (touch_pressed_ns[input] && now - touch_pressed_ns[input] < TOUCH_TAP_NS)
-		{
-			if (input < 15)
-				state[6] |= 1 << input;
-			else if (!state[4 + input - 15])
-				state[4 + input - 15] = 32767;
-		}
-	}
 	pthread_mutex_unlock(&touch_lock);
 }
 
-JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLook(
-	JNIEnv *env, jclass cls, jfloat dx, jfloat dy)
-{
-	(void)env;
-	(void)cls;
-	pthread_mutex_lock(&touch_lock);
-	look_delta[0] += dx;
-	look_delta[1] += dy;
-	look_ns = now_ns();
-	pthread_mutex_unlock(&touch_lock);
-}
-
-JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeGyro(
-	JNIEnv *env, jclass cls, jfloat dx, jfloat dy)
-{
-	(void)env;
-	(void)cls;
-	pthread_mutex_lock(&touch_lock);
-	gyro_delta[0] += dx;
-	gyro_delta[1] += dy;
-	gyro_ns = now_ns();
-	pthread_mutex_unlock(&touch_lock);
-}
-
-JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLookReset(JNIEnv *env, jclass cls)
-{
-	(void)env;
-	(void)cls;
-	pthread_mutex_lock(&touch_lock);
-	look_delta[0] = look_delta[1] = 0.0f;
-	gyro_delta[0] = gyro_delta[1] = 0.0f;
-	pthread_mutex_unlock(&touch_lock);
-}
-
-/* the guest's: the view swipe, then the gyroscope's turn, since the last
-read, into delta[4], in the overlay's logical pixels with its sensitivity
-applied */
-void host_touch_look_read(float *delta)
-{
-	int64_t now = now_ns();
-
-	pthread_mutex_lock(&touch_lock);
-	memcpy(delta, look_delta, sizeof(look_delta));
-	memcpy(delta + 2, gyro_delta, sizeof(gyro_delta));
-	if (now - look_ns > TOUCH_STALE_NS)
-		delta[0] = delta[1] = 0.0f;
-	if (now - gyro_ns > TOUCH_STALE_NS)
-		delta[2] = delta[3] = 0.0f;
-	look_delta[0] = look_delta[1] = 0.0f;
-	gyro_delta[0] = gyro_delta[1] = 0.0f;
-	pthread_mutex_unlock(&touch_lock);
-}
-
-/* the guest's: port 0's motors (XInputSetState), each 0..65535; the game
-sends them every frame, and zero while paused or with the profile's
-vibration off */
-void host_touch_rumble(unsigned int low, unsigned int high)
-{
-	unsigned int strength = low > high ? low : high;
-
-	pthread_mutex_lock(&touch_lock);
-	rumble_amplitude = strength ? 64 + (int)(strength * 191u / 65535u) : 0;
-	rumble_ns = now_ns();
-	pthread_mutex_unlock(&touch_lock);
-}
-
-/* the phone's vibration strength, 0 or 64..255 */
-JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeRumble(JNIEnv *env, jclass cls)
-{
-	int amplitude;
-
-	(void)env;
-	(void)cls;
-	pthread_mutex_lock(&touch_lock);
-	amplitude = now_ns() - rumble_ns > TOUCH_STALE_NS ? 0 : rumble_amplitude;
-	pthread_mutex_unlock(&touch_lock);
-	return amplitude;
-}
-
-/* the guest's, at every read of port 0: port/linux/src/touch_input.c's
-_touch_scene_* bits */
+/* The touch controls of port/linux/src/touch_input.c publish the scene
+   and the profile's bindings. This overlay tracks the menus through
+   host_touch_ui_context and draws icons, so both are accepted and unused. */
 void host_touch_scene(int scene)
 {
-	touch_scene = scene;
+    (void)scene;
 }
 
-/* the guest's, when the profile's mapping changes: the game control on
-each of the 16 controller buttons (port/linux/game/touch_game.c) */
 void host_touch_bindings(const int32_t *controls)
 {
-	pthread_mutex_lock(&touch_lock);
-	memcpy(touch_bindings, controls, sizeof(touch_bindings));
-	touch_bindings_serial++;
-	pthread_mutex_unlock(&touch_lock);
-}
-
-/* the mapping into controls[16]; returns its count of changes (0 before the
-game has sent it) */
-JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeBindings(JNIEnv *env, jclass cls,
-	jintArray controls)
-{
-	int32_t copy[TOUCH_BUTTONS];
-	int serial;
-
-	(void)cls;
-	pthread_mutex_lock(&touch_lock);
-	memcpy(copy, touch_bindings, sizeof(copy));
-	serial = touch_bindings_serial;
-	pthread_mutex_unlock(&touch_lock);
-	if (controls && (*env)->GetArrayLength(env, controls) >= TOUCH_BUTTONS)
-		(*env)->SetIntArrayRegion(env, controls, 0, TOUCH_BUTTONS, (const jint *)copy);
-	return serial;
-}
-
-/* 0 until the game has read its controller once */
-JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeScene(JNIEnv *env, jclass cls)
-{
-	(void)env;
-	(void)cls;
-	return touch_scene;
+    (void)controls;
 }

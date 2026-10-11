@@ -7,9 +7,19 @@ public final class TouchLayoutTest {
     }
     public static void main(String[] args) {
         TouchLayout layout = new TouchLayout();
-        check(layout.size() == 18, "All 17 buttons and the movement stick must be editable");
-        check(layout.x(TouchLayout.LEFT) == 115 && layout.y(TouchLayout.FIRE_LEFT) == 239,
-              "Existing layouts must start with the original controls");
+        check(layout.size() == 19, "All 18 buttons and the movement stick must be editable");
+        try {
+            java.util.Properties defaults = new java.util.Properties();
+            try (java.io.Reader reader = java.nio.file.Files.newBufferedReader(java.nio.file.Path.of(args[0]))) { defaults.load(reader); }
+            for (int i = 0; i < 18; i++) {
+                String key = "control."+i+".";
+                check(Math.abs(layout.x(i)-Float.parseFloat(defaults.getProperty(key+"x"))) < 0.001f &&
+                      Math.abs(layout.y(i)-Float.parseFloat(defaults.getProperty(key+"y"))) < 0.001f &&
+                      layout.sizeScale(i) == Float.parseFloat(defaults.getProperty(key+"size")) &&
+                      layout.shown(i) == Boolean.parseBoolean(defaults.getProperty(key+"visible")),
+                      "Default control must match supplied layout: "+i);
+            }
+        } catch (java.io.IOException e) { throw new AssertionError(e); }
         layout.move(TouchLayout.LEFT, -500, -500);
         check(layout.x(TouchLayout.LEFT) >= 64 && layout.y(TouchLayout.LEFT) == 64,
               "Dragging must keep the full stick inside the screen without a toolbar exclusion");
@@ -35,7 +45,7 @@ public final class TouchLayoutTest {
         check(reopened.y(10) == 36, "Reopening must preserve unmoved top-row controls");
         reopened.bounds(1200, 540);
         reopened.move(0, 9999, 1);
-        check(reopened.x(0) == 1164 && reopened.y(0) == 36,
+        check(reopened.x(0) == 1200-reopened.radius(0) && reopened.y(0) == reopened.radius(0),
               "Controls must reach the full widescreen edge and top edge");
         TouchLayout wide = new TouchLayout();
         wide.restore(0, reopened.savedX(0), reopened.savedY(0));
@@ -43,7 +53,7 @@ public final class TouchLayoutTest {
         check(wide.x(0) == reopened.x(0), "Widescreen positions must survive reload");
         // Duplicates retain their action and are independently placed and hidden.
         int copy = wide.duplicate(4);
-        check(copy == 18 && wide.type(copy) == 4, "Fire copies must retain the fire action");
+        check(copy == 19 && wide.type(copy) == 4, "Fire copies must retain the fire action");
         wide.setShown(4, false);
         wide.move(copy, 300, 100);
         check(!wide.shown(4) && wide.shown(copy), "Hiding an original must not hide its copy");
@@ -51,7 +61,7 @@ public final class TouchLayoutTest {
         String exported = wide.exportConfiguration(2.25f);
         TouchLayout.Configuration imported = TouchLayout.importConfiguration(exported);
         imported.layout.bounds(1200, 540);
-        check(imported.sensitivity == 2.25f && imported.layout.size() == 19,
+        check(imported.sensitivity == 2.25f && imported.layout.size() == 20,
               "Configuration must preserve sensitivity and duplicates");
         for (int i = 0; i < wide.size(); i++) {
             check(imported.layout.type(i) == wide.type(i) && imported.layout.shown(i) == wide.shown(i)
@@ -62,10 +72,10 @@ public final class TouchLayoutTest {
         check(wide.add(4) == 4 && wide.shown(4), "Add must restore a hidden button first");
         wide.setShown(TouchLayout.LEFT, false);
         check(wide.add(TouchLayout.LEFT) == TouchLayout.LEFT, "Hidden move stick must be restorable");
-        reject(exported.replace("version=3", "version=9"));
-        reject(exported.replace("control.18.type=4", "control.18.type=16"));
-        reject(exported.replace("control.18.x=240.0", "control.18.x=NaN"));
-        reject(exported.replace("count=19", "count=10000"));
+        reject(exported.replace("version=4", "version=9"));
+        reject(exported.replace("control.19.type=4", "control.19.type=16"));
+        reject(exported.replaceAll("(?m)^control\\.19\\.x=.*$", "control.19.x=NaN"));
+        reject(exported.replace("count=20", "count=10000"));
         reject(exported.replace("sensitivity=2.25", "sensitivity=Infinity"));
         reject(exported.replace("control.0.visible=false", "control.0.visible=maybe")
             .replace("control.0.visible=true", "control.0.visible=maybe"));
@@ -82,65 +92,72 @@ public final class TouchLayoutTest {
         check(wide.x(copy)+wide.radius(copy) <= 1200 && wide.y(copy)+wide.radius(copy) <= 540,
               "Growing a button at the edge must keep it reachable");
         String sizedText = sized.layout.exportConfiguration(2.25f);
-        reject(sizedText.replace("control.18.size=1.6", "control.18.size=NaN"));
-        reject(sizedText.replace("control.18.size=1.6", "control.18.size=3.0"));
+        reject(sizedText.replace("control.19.size=1.6", "control.19.size=NaN"));
+        reject(sizedText.replace("control.19.size=1.6", "control.19.size=3.0"));
         reject(sizedText.replace("rumble=false", "rumble=invalid"));
         reject(sizedText.replace("gyroscope=true", "gyroscope=invalid"));
-        String legacy = sizedText.replace("version=3", "version=1").replaceAll("(?m)^.*\\.size=.*\\R", "")
-            .replaceAll("(?m)^(rumble|gyroscope|opacity|floating-stick)=.*\\R", "");
+        wide.gyroscopeSensitivity = 3.75f; wide.fpsCounter = true;
+        String version3 = wide.exportConfiguration(2.25f);
+        TouchLayout.Configuration hardware = TouchLayout.importConfiguration(version3);
+        check(hardware.layout.gyroscopeSensitivity == 3.75f && hardware.layout.fpsCounter,
+              "Version 3 must preserve independent gyro sensitivity and FPS preference");
+        reject(version3.replace("gyroscope-sensitivity=3.75", "gyroscope-sensitivity=NaN"));
+        reject(version3.replace("gyroscope-sensitivity=3.75", "gyroscope-sensitivity=4.01"));
+        reject(version3.replace("fps-counter=true", "fps-counter=invalid"));
+        TouchLayout.Configuration version2 = TouchLayout.importConfiguration(legacy(version3, 2)
+            .replaceAll("(?m)^(gyroscope-sensitivity|fps-counter)=.*\\R", ""));
+        check(version2.layout.gyroscopeEnabled && !version2.layout.rumbleEnabled &&
+              version2.layout.gyroscopeSensitivity == 1 && !version2.layout.fpsCounter,
+              "Version 2 must retain hardware toggles and default the new settings");
+        String legacy = legacy(sizedText, 1).replaceAll("(?m)^.*\\.size=.*\\R", "")
+            .replaceAll("(?m)^(rumble|gyroscope)=.*\\R", "");
         TouchLayout.Configuration old = TouchLayout.importConfiguration(legacy);
         check(old.layout.sizeScale(copy) == 1 && old.layout.rumbleEnabled && !old.layout.gyroscopeEnabled,
               "Legacy layouts must load with default sizes and gyro disabled");
-        // Opacity (version 3) round-trips; version 2 files load fully opaque.
-        sized.layout.setOpacity(0.45f);
-        String translucent = sized.layout.exportConfiguration(2.25f);
-        check(TouchLayout.importConfiguration(translucent).layout.opacity == 0.45f, "Opacity must survive export/import");
-        reject(translucent.replace("opacity=0.45", "opacity=0.05"));
-        reject(translucent.replace("opacity=0.45", "opacity=NaN"));
-        sized.layout.floatingStick = true;
-        check(TouchLayout.importConfiguration(sized.layout.exportConfiguration(2.25f)).layout.floatingStick,
-              "The floating stick must survive export/import");
-        sized.layout.floatingStick = false;
-        reject(translucent.replace("floating-stick=false", "floating-stick=maybe"));
-        String version2 = translucent.replace("version=3", "version=2").replaceAll("(?m)^(opacity|floating-stick)=.*\\R", "");
-        check(TouchLayout.importConfiguration(version2).layout.opacity == 1f
-              && !TouchLayout.importConfiguration(version2).layout.floatingStick,
-              "Version 2 layouts load fully opaque, with the stick in its place");
-        reject(translucent.replaceAll("(?m)^opacity=.*\\R", ""));
-        try {
-            sized.layout.setOpacity(1.5f);
-            throw new AssertionError("Out-of-range opacity was accepted");
-        } catch (IllegalArgumentException expected) {
-            // refused
-        }
-        // A finger-sized minimum radius enlarges small buttons and keeps them on the display.
-        TouchLayout fingers = new TouchLayout();
-        fingers.setMinimumRadius(30);
-        check(fingers.radius(12) == 30 && fingers.radius(TouchLayout.LEFT) == 64,
-              "The minimum radius enlarges small controls only");
-        fingers.move(12, 0, 0);
-        check(fingers.x(12) == 30 && fingers.y(12) == 30, "Enlarged controls stay inside the display");
-        check(fingers.savedX(12) == 30, "The minimum radius does not change saved places");
-        fingers.setMinimumRadius(80);
-        check(fingers.radius(12) == TouchLayout.MAX_MINIMUM_RADIUS, "The minimum radius is capped");
-        TouchLayout dense = new TouchLayout();
-        dense.setMinimumRadius(80);
-        for (int a = 12; a <= 15; a++) {
-            for (int b = a + 1; b <= 15; b++) {
-                check(Math.hypot(dense.x(a) - dense.x(b), dense.y(a) - dense.y(b)) >= dense.radius(a) + dense.radius(b),
-                      "At the capped minimum radius the D-pad's buttons stay apart");
-            }
-        }
-        fingers.setMinimumRadius(Float.NaN);
-        check(fingers.radius(12) == 25, "An invalid minimum radius is none");
         wide.resetDefaults();
-        check(wide.size() == 18 && wide.shown(4) && wide.x(4) == 915*1200f/960,
+        check(wide.size() == 19 && wide.shown(4) && Math.abs(wide.x(4)-808.50323f*1200f/960) < 0.001f,
               "Reset restores defaults on the current display and removes all copies");
-        check(wide.sizeScale(4) == 1f && !wide.rumbleEnabled && wide.gyroscopeEnabled,
+        check(wide.sizeScale(4) == 1.3f && !wide.rumbleEnabled && wide.gyroscopeEnabled,
               "Button reset must restore sizes without changing General settings");
         while (wide.duplicate(4) >= 0) {}
         check(wide.size() == TouchLayout.MAX_CONTROLS, "Duplicate count must be bounded");
+        wide.overlayDisabled = true; wide.fieldOfView = 85f;
+        String general = wide.exportConfiguration(1f);
+        TouchLayout.Configuration settings = TouchLayout.importConfiguration(general);
+        check(settings.layout.overlayDisabled && settings.layout.fieldOfView == 85f, "Overlay and FOV must persist");
+        reject(general.replace("field-of-view=85.0", "field-of-view=NaN"));
+        reject(general.replace("field-of-view=85.0", "field-of-view=91.0"));
+        reject(general.replace("overlay-disabled=true", "overlay-disabled=invalid"));
+        settings = TouchLayout.importConfiguration(general.replaceAll("(?m)^(field-of-view|overlay-disabled)=.*\\R", ""));
+        check(!settings.layout.overlayDisabled && settings.layout.fieldOfView == 70f, "Older exports must get safe defaults");
+        TouchLayout full = new TouchLayout();
+        while (full.size() < 65) check(full.duplicate(4) >= 0, "Full layout copies");
+        TouchLayout migrated = TouchLayout.importConfiguration(legacy(full.exportConfiguration(1), 3)).layout;
+        check(migrated.size() == 65 && migrated.type(18) == TouchLayout.CAMERA && migrated.type(64) == 4,
+              "Full legacy layouts must keep every copy and gain Camera mode");
+        check(TouchLayout.importConfiguration(migrated.exportConfiguration(1)).layout.size() == 65,
+              "Full migrated layout must remain reloadable");
+        check(migrated.duplicate(4) == -1, "Migration capacity must stay bounded");
         System.out.println("Touch layout, visibility, duplication and import/export checks passed");
+    }
+
+    private static String legacy(String text, int version) {
+        try {
+            java.util.Properties p = new java.util.Properties();
+            p.load(new java.io.StringReader(text));
+            int count = Integer.parseInt(p.getProperty("count"));
+            for (int i = TouchLayout.CAMERA; i < count; i++) {
+                for (String field : new String[]{"type", "x", "y", "visible", "size"}) {
+                    String key = "control."+i+"."+field;
+                    String next = p.getProperty("control."+(i+1)+"."+field);
+                    if (next == null) p.remove(key); else p.setProperty(key, next);
+                }
+            }
+            p.setProperty("count", Integer.toString(count-1));
+            p.setProperty("version", Integer.toString(version));
+            java.io.StringWriter out = new java.io.StringWriter(); p.store(out, "Legacy test");
+            return out.toString();
+        } catch(java.io.IOException e) { throw new AssertionError(e); }
     }
 
     private static void reject(String text) {

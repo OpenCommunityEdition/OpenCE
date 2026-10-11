@@ -2266,6 +2266,9 @@ boolean game_engine_running(void);
 void game_engine_end_game(void);
 /* the platform layer's */
 int p2p_join_invite(char const *text);
+#ifdef HALO_ANDROID
+int p2p_join_status(void);
+#endif
 int p2p_invite_link(char *link, int size);
 void p2p_set_hosting_allowed(int allowed);
 int p2p_peer_address(unsigned char const *identifier, unsigned long *address);
@@ -3125,7 +3128,11 @@ static void browser_games_read(void)
 	short pass, index;
 
 	multiplayer.game_count = 0;
+#ifdef HALO_ANDROID
+	if (!games)
+#else
 	if (!games || multiplayer.mode == _multiplayer_mode_server_browser)
+#endif
 		return;
 	/* (the open games, then those under way) */
 	for (pass = 0; pass < 2; pass++)
@@ -3135,7 +3142,12 @@ static void browser_games_read(void)
 			struct advertised_game *game = &games[index];
 
 			if (network_game_client_advertised_game_is_valid(game) && !advertised_in_progress(game) == (pass == 0) &&
+#ifdef HALO_ANDROID
+				(multiplayer.mode == _multiplayer_mode_server_browser ||
+					game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link)))
+#else
 				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link))
+#endif
 			{
 				multiplayer.games[multiplayer.game_count++] = game;
 			}
@@ -3877,13 +3889,41 @@ static void browser_update(struct widget_instance *list)
 	{
 		wchar_t text[ROW_TEXT_LENGTH * 2];
 
+#ifdef HALO_ANDROID
+		if (!multiplayer.game_count)
+#else
 		if (multiplayer.mode == _multiplayer_mode_server_browser)
 			text[0] = 0;
 		else if (!multiplayer.game_count)
+#endif
 		{
+#ifdef HALO_ANDROID
+			usnprintf(text, NUMBEROF(text) - 1, L"%s", multiplayer.mode != _multiplayer_mode_lan ?
+				L"Host an Internet game, then share its link. Join with PASTE LINK (no public directory)." :
+#else
 			usnprintf(text, NUMBEROF(text) - 1, L"%s", multiplayer.mode == _multiplayer_mode_direct_link ?
 				L"Copy an invite link and PASTE LINK, or accept a Discord invite" :
+#endif
 				L"Looking for games on your LAN...");
+#ifdef HALO_ANDROID
+			if (multiplayer.mode != _multiplayer_mode_lan)
+			{
+				wchar_t const *status = NULL;
+				switch (p2p_join_status())
+				{
+				case -1: status = L"Internet play is disabled (network.online)."; break;
+				case -2: status = L"Host did not answer. Check it is hosting an Internet game, then paste its current link."; break;
+				case -3: status = L"Invalid or outdated invite. Copy a fresh link from the host."; break;
+				case -4: status = L"This is your own invite. Send it to the other player."; break;
+				case 1: status = L"Connecting to invite brokers..."; break;
+				case 2: status = L"Contacting the invite's host..."; break;
+				case 3: status = L"Connecting to host: trying direct UDP and encrypted relay..."; break;
+				case 4: status = L"Connected through relay. Looking for the host's game..."; break;
+				case 5: status = L"Connected directly. Looking for the host's game..."; break;
+				}
+				if (status) usnprintf(text, NUMBEROF(text) - 1, L"%s", status);
+			}
+#endif
 		}
 		else
 		{
@@ -3922,7 +3962,11 @@ static void browser_update(struct widget_instance *list)
 link on the clipboard reached, its game then in the list */
 static boolean direct_link_from_clipboard(void)
 {
+#ifdef HALO_ANDROID
+	char text[1024];
+#else
 	char text[TEXT_FIELD_LENGTH];
+#endif
 	char *link = text;
 	size_t length;
 

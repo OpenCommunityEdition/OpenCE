@@ -2029,6 +2029,17 @@ static void set_textbox_to_build_number(
 			build_number_string,
 			sizeof(build_number_string));
 	}
+#ifdef HALO_ANDROID
+	/* the app's own version, as the installed package has it (the game's
+	build until the app has told it: port/android/host/host_touch.c) */
+	{
+		char version[HALO_APP_VERSION_SIZE];
+
+		host_touch_app_version(version, sizeof(version));
+		if (version[0])
+			ascii_to_wide(version, build_number_string, sizeof(build_number_string));
+	}
+#endif
 
 	if (!widget->parameters.text_box.text)
 	{

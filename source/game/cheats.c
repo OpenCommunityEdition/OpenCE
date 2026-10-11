@@ -67,6 +67,42 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
+#ifdef HALO_ANDROID
+#include "../../port/android/guest/runtime/guest_host.h"
+#include "../../port/android/include/halo_startup_cheats.h"
+
+static unsigned int android_startup_pending;
+static int android_startup_flags[10];
+static boolean android_startup_loaded;
+
+/* Read only the menu-owned block, once for each map. One-shot commands wait
+   until the local player's unit exists; the UI map never consumes them. */
+static void android_startup_cheats_load(void)
+{
+    FILE *file = fopen("d:\\init.txt", "r");
+    char line[200];
+    boolean block = FALSE;
+    int i;
+    android_startup_pending = 0;
+    android_startup_loaded = FALSE;
+    csmemset(android_startup_flags, 0, sizeof(android_startup_flags));
+    if (!file) return;
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\r\n")] = 0;
+        if (!strcmp(line, ANDROID_CHEATS_BEGIN)) { block = TRUE; android_startup_loaded = TRUE; continue; }
+        if (!strcmp(line, ANDROID_CHEATS_END)) { block = FALSE; continue; }
+        if (!block) continue;
+        for (i = 0; i < 16; i++) {
+            if (i < 10) {
+                char command[100];
+                sprintf(command, "%s 1", android_startup_commands[i]);
+                if (!strcmp(line, command)) android_startup_flags[i] = 1;
+            } else if (!strcmp(line, android_startup_commands[i])) android_startup_pending |= 1u << i;
+        }
+    }
+    fclose(file);
+}
+#endif
 
 /* ---------- constants */
 
@@ -260,6 +296,16 @@ void cheats_load(
 
 		fclose(file);
 	}
+#ifdef HALO_ANDROID
+    else
+    {
+        /* Built-in equivalents of the prototype cheats.txt button shortcuts. */
+        csstrcpy(cheat_strings[_gamepad_analog_button_a], "cheat_teleport_to_camera");
+        csstrcpy(cheat_strings[_gamepad_analog_button_b], "set cheat_deathless_player 1");
+        csstrcpy(cheat_strings[_gamepad_analog_button_x], "set cheat_deathless_player 0");
+        csstrcpy(cheat_strings[_gamepad_analog_button_y], "cheat_all_weapons");
+    }
+#endif
 
 	return;
 }
@@ -310,6 +356,13 @@ void cheats_initialize_for_new_map(
 	void)
 {
 	cheats_load();
+#ifdef HALO_ANDROID
+    android_startup_cheats_load();
+    {
+        int i;
+        for (i = 10; i < 16; i++) host_touch_cheat_sync(i, 0);
+    }
+#endif
 
 	return;
 }
@@ -481,3 +534,64 @@ void cheat_all_vehicles(
 
 	return;
 }
+
+#ifdef HALO_ANDROID
+/* UI commands cross the host boundary; only the game thread touches game data. */
+void android_touch_cheats_update(void)
+{
+    boolean *flags[] = { &cheat.deathless_player, &cheat.jetpack,
+        &cheat.infinite_ammo, &cheat.bump_possession, &cheat.super_jump,
+        &cheat.reflexive_damage_effects, &cheat.medusa, &cheat.omnipotent,
+        &cheat.controller_enabled, &cheat.bottomless_clip };
+    int commands[16];
+    unsigned int pending = host_touch_cheats_read(commands);
+    long player_index = local_player_get_player_index(0);
+    boolean available = !network_game_distributed_client() &&
+        player_index != NONE && player_get(player_index)->unit_index != NONE;
+    int i;
+
+    cheats_network_client_enforce();
+    if (available) {
+        if (android_startup_loaded) {
+            for (i = 0; i < 10; i++) *flags[i] = android_startup_flags[i] != 0;
+            android_startup_loaded = FALSE;
+        }
+        for (i = 10; i < 16; i++) {
+            if (android_startup_pending & (1u << i)) {
+                if (i == 15 && observer_get_camera(0)->location.cluster_index == NONE) continue;
+                /* Explicit pause-menu commands take precedence on this frame. */
+                if (!(pending & (1u << i))) { pending |= 1u << i; commands[i] = 1; }
+                android_startup_pending &= ~(1u << i);
+            }
+        }
+    }
+    for (i = 0; i < 16; i++)
+    {
+        if (pending & (1u << i))
+        {
+            if (!available)
+                host_touch_cheat_result(i, -1);
+            else
+            {
+                int result = 1;
+                if (i < 10) { *flags[i] = commands[i] != 0; result = *flags[i]; }
+                else switch (i)
+                {
+                case 10: cheat_active_camouflage_local_player(0); break;
+                case 11: cheat_active_camouflage(); break;
+                case 12: cheat_all_powerups(); break;
+                case 13: cheat_all_vehicles(); break;
+                case 14: cheat_all_weapons(); break;
+                case 15:
+                    if (observer_get_camera(0)->location.cluster_index == NONE) result = -1;
+                    else cheat_teleport_to_camera();
+                    break;
+                }
+                host_touch_cheat_result(i, result);
+            }
+        }
+        if (i < 10) host_touch_cheat_sync(i, *flags[i]);
+        else if (!available) host_touch_cheat_sync(i, 0);
+    }
+}
+#endif

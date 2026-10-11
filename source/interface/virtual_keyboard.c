@@ -974,6 +974,29 @@ void virtual_keyboard_process(
 	return;
 }
 
+#ifdef HALO_ANDROID
+void virtual_keyboard_touch(short x, short y, boolean click, boolean back)
+{
+    long key, row, column;
+    if (!virtual_keyboard_globals.active) return;
+    if (back) { virtual_keyboard_cancel(); return; }
+    if (!click) return;
+    for (key = 0; key < NUMBER_OF_VIRTUAL_KEYS; ++key) {
+        rectangle2d *bounds = &keyboard_rect[key];
+        if (x < bounds->x0 || x >= bounds->x1 || y < bounds->y0 || y >= bounds->y1) continue;
+        for (row = 0; row < VIRTUAL_KEYBOARD_ROW_COUNT; ++row)
+            for (column = 0; column < VIRTUAL_KEYBOARD_COLUMN_COUNT; ++column)
+                if (virtual_keyboard_layout_table[row][column] == key) {
+                    virtual_keyboard_globals.row = row;
+                    virtual_keyboard_globals.column = column;
+                    virtual_keyboard_globals.last_event = _event_key_select;
+                    virtual_keyboard_select();
+                    return;
+                }
+    }
+}
+#endif
+
 /* ---------- private code */
 
 static boolean virtual_keyboard_select(

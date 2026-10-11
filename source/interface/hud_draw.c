@@ -1001,6 +1001,24 @@ pixel32 real_alpha_intensity_to_pixel32(
 	return real_argb_color_to_pixel32(&color);
 }
 
+#ifdef HALO_ANDROID
+/* Edit in-game UI (Porting options > General): where the player put the
+weapons' panel (what the HUD anchors at the top left), the health panel (top
+right) and the motion sensor (bottom left), as fractions of the screen each
+is moved by (port/android/host/host_touch.c). The HUD's messages are no part
+of a panel and stay (hud_messaging.c). */
+extern void host_touch_hud_read(float *offsets);
+static boolean hud_android_panel_offsets = TRUE;
+
+void hud_android_panel_offsets_enable(
+	boolean enable)
+{
+	hud_android_panel_offsets = enable;
+
+	return;
+}
+#endif
+
 void hud_calculate_point(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *absolute_placement,
@@ -1053,6 +1071,19 @@ void hud_calculate_point(
 			(TEST_FLAG(corner, _hud_anchor_bottom_bit) ? -1 : 1) * scale +
 			render.camera.window_bounds.v[corner & FLAG(_hud_anchor_bottom_bit)] -
 			render.camera.viewport_bounds.y0;
+#ifdef HALO_ANDROID
+		/* (the touch player's own screen: a split screen keeps its layout) */
+		if (hud_android_panel_offsets && corner <= _hud_anchor_bottom_left && local_player_count() == 1)
+		{
+			float offsets[6];
+
+			host_touch_hud_read(offsets);
+			point.x += offsets[corner * 2] *
+				(render.camera.window_bounds.x1 - render.camera.window_bounds.x0);
+			point.y += offsets[corner * 2 + 1] *
+				(render.camera.window_bounds.y1 - render.camera.window_bounds.y0);
+		}
+#endif
 	}
 	else
 	{

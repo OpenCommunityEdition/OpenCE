@@ -32,6 +32,43 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .ninja_syntax import Writer
 
+
+class WindowsAndroidWriter:
+    """The build on Windows itself: the port's POSIX rules run in Git for
+    Windows' Bash (tools/android_windows_shell.py), with the NDK's Windows
+    compilers. Linux and WSL (tools/wsl_build_android.sh) do not use it."""
+    def __init__(self, writer: Writer):
+        self.writer = writer
+        git = shutil.which("git")
+        self.bash = Path(git).resolve().parent.parent / "bin/bash.exe" if git else Path("")
+        if not self.bash.is_file():
+            raise RuntimeError("Android builds on Windows require Git for Windows (Bash).")
+
+    def __getattr__(self, name):
+        return getattr(self.writer, name)
+
+    def build(self, outputs, rule, **kwargs):
+        if rule.startswith("android_") and rule != "android_gradle":
+            first = outputs[0] if isinstance(outputs, list) else outputs
+            script = Path(str(first) + ".shell")
+            script.parent.mkdir(parents=True, exist_ok=True)
+            variables = dict(kwargs.get("variables") or {})
+            variables["android_rule_script"] = script.as_posix()
+            kwargs["variables"] = variables
+        return self.writer.build(outputs=outputs, rule=rule, **kwargs)
+
+    def rule(self, name, command, **kwargs):
+        if name != "android_gradle":
+            # Pass the expanded command through a file: Windows command-line
+            # quoting otherwise strips the Python path's embedded quotes.
+            original_rsp = kwargs.pop("rspfile", None)
+            original_content = kwargs.pop("rspfile_content", "")
+            kwargs["rspfile"] = "$android_rule_script"
+            kwargs["rspfile_content"] = command + " #HALO_RSP# " + str(original_content)
+            command = (f'$python tools/android_windows_shell.py "$android_rule_script" '
+                       f'"{self.bash.as_posix()}"' + (f' "{original_rsp}"' if original_rsp else ""))
+        self.writer.rule(name=name, command=command, **kwargs)
+
 PORT_DIR = Path("port/android")
 LINUX_DIR = Path("port/linux")
 BUILD = Path("build/android")
@@ -247,6 +284,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
+    windows = os.name == "nt"
+    if windows:
+        n = WindowsAndroidWriter(n)
     prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
     _host_tag = os.environ.get("ANDROID_NDK_HOST_TAG", "")
     if not _host_tag:
@@ -265,9 +305,10 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         _host_tag = _tags[0]
     toolchain = prebuilt / _host_tag
     sysroot_include = toolchain / "sysroot" / "usr" / "include"
-    host_cc = toolchain / "bin" / f"aarch64-linux-android{ANDROID_API}-clang"
+    host_cc = (f'{toolchain.as_posix()}/bin/clang.exe --target=aarch64-linux-android{ANDROID_API}'
+               if windows else str(toolchain / "bin" / f"aarch64-linux-android{ANDROID_API}-clang"))
     ndk_bin = toolchain / "bin"
-    guest_cc = getattr(sln, "android_guest_cc", None) or "clang"
+    guest_cc = getattr(sln, "android_guest_cc", None) or (f"{ndk_bin.as_posix()}/clang.exe" if windows else "clang")
 
     guest_dir = BUILD / "guest"
     obj_dir = guest_dir / "obj"
@@ -290,7 +331,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.comment("Android build (ninja android); see port/android/README.md")
     n.variable("android_guest_cc", guest_cc)
     n.variable("android_host_cc", str(host_cc))
-    n.variable("android_ndk_bin", str(ndk_bin))
+    n.variable("android_ndk_bin", ndk_bin.as_posix())
 
     # ---------- generated headers and sources
 
@@ -312,7 +353,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.build(outputs=syscall_h, rule="android_syscall_h", inputs=arch / "bits" / "syscall.h.in")
     n.rule(
         name="android_version_h",
-        command=f"echo '#define VERSION \"{MUSL_VERSION}\"' > $out",
+        command=f'echo \'#define VERSION "{MUSL_VERSION}"\' > $out',
         description="ANDROID MUSL $out",
     )
     n.build(outputs=version_h, rule="android_version_h")
@@ -321,7 +362,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     gl_stamp = gl_include / "stamp"
     n.rule(
         name="android_gl_include",
-        command=(f"mkdir -p {gl_include} && ln -sfn {sysroot_include}/GLES2 {gl_include}/GLES2 && "
+        command=(f"mkdir -p {gl_include} && cp -r {sysroot_include.as_posix()}/GLES2 {sysroot_include.as_posix()}/GLES3 "
+                 f"{sysroot_include.as_posix()}/KHR {gl_include}/ && touch $out") if windows else
+                (f"mkdir -p {gl_include} && ln -sfn {sysroot_include}/GLES2 {gl_include}/GLES2 && "
                  f"ln -sfn {sysroot_include}/GLES3 {gl_include}/GLES3 && "
                  f"ln -sfn {sysroot_include}/KHR {gl_include}/KHR && touch $out"),
         description="ANDROID GL HEADERS",
@@ -332,8 +375,8 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     gl_imports = gen_dir / "gl_imports.list"
     n.rule(
         name="android_gl_stubs",
-        command=(f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {sysroot_include}/GLES3/gl32.h "
-                 f"{sysroot_include}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"),
+        command=(f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {sysroot_include.as_posix()}/GLES3/gl32.h "
+                 f"{sysroot_include.as_posix()}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"),
         description="ANDROID GL STUBS",
     )
     n.build(outputs=[guest_gl_c, gl_imports], rule="android_gl_stubs",
@@ -543,7 +586,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.rule(
         name="android_sdl3",
         command=(f"cmake -S {SDL_DIR} -B {sdl_build} -G Ninja "
-                 f"-DCMAKE_TOOLCHAIN_FILE={ndk}/build/cmake/android.toolchain.cmake "
+                 f"-DCMAKE_TOOLCHAIN_FILE={ndk.as_posix()}/build/cmake/android.toolchain.cmake "
                  f"-DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-{ANDROID_API} -DCMAKE_BUILD_TYPE=Release "
                  f"-DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF "
                  # 16 KB pages (Android 15 and later), as the host library
@@ -628,12 +671,15 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.rule(
         name="android_gradle",
         # Gradle leaves the APK alone when its contents would not change
-        command=(f"cd {PORT_DIR} && ./gradlew --console=plain -q assembleDebug && "
+        command=(f"{python} tools/android_windows_gradle.py") if windows else
+                (f"cd {PORT_DIR} && ./gradlew --console=plain -q assembleDebug && "
                  "touch app/build/outputs/apk/debug/app-debug.apk"),
         description="ANDROID GRADLE $out",
         pool="console",
     )
     n.build(outputs=apk, rule="android_gradle", inputs=[libmain, staged_sdl, staged_image, staged_brokers],
-            implicit=[sdl_android_mouse_listener])
+            # (the app's own sources: Gradle is not run for a change it would not see)
+            implicit=[sdl_android_mouse_listener, *sorted((PORT_DIR / "app/src").rglob("*.java")),
+                      *sorted((PORT_DIR / "app/src").rglob("*.xml")), PORT_DIR / "app/build.gradle"])
     n.build(outputs="android_apk", rule="phony", inputs=apk)
     n.newline()

@@ -79,6 +79,12 @@ void hud_calculate_point(
 	boolean in_multiplayer,
 	real override_scale,
 	point2d *result);
+#ifdef HALO_ANDROID
+/* Edit in-game UI: whether hud_calculate_point moves the panels the player
+moved (not for what is no part of one, as the HUD's messages) */
+void hud_android_panel_offsets_enable(
+	boolean enable);
+#endif
 boolean hud_multitexture_overlays_follow_zoom(
 	struct tag_block const *multitexture_overlays);
 boolean hud_number_shows_only_when_zoomed(

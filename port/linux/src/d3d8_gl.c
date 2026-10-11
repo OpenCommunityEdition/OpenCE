@@ -24,6 +24,9 @@ Conventions carried over from the Xbox:
 #include "xgpu.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
+#ifdef HALO_ANDROID
+#include "halo_porting_ui.h"
+#endif
 #include "port_config.h"
 #include "main/console.h"
 
@@ -1993,6 +1996,40 @@ int halo_scoreboard_pointer_update(int offered, struct halo_ui_pointer *pointer)
 }
 #endif
 
+#ifdef HALO_ANDROID
+/* Android: the overlay's pointer (port/android/host/host_touch.c) */
+int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
+{
+
+    float point[6];
+    struct render_target_entry *back_buffer = render_target_get(&device.back_buffer);
+    int pixel_width, pixel_height, width, height, left, top;
+    float sx, sy;
+    platform_menus_set_active(menus_active != 0);
+    host_touch_pointer_read(point);
+    if (!menus_active || !back_buffer) return 0;
+    platform_video_drawable_size(&pixel_width, &pixel_height);
+    width = pixel_width;
+    height = (int)((long)width * back_buffer->target.gl_height / back_buffer->target.gl_width);
+    if (height > pixel_height) {
+        height = pixel_height;
+        width = (int)((long)height * back_buffer->target.gl_width / back_buffer->target.gl_height);
+    }
+    if (width <= 0 || height <= 0) return 0;
+    left = (pixel_width-width)/2; top = (pixel_height-height)/2;
+    sx = (point[0]*pixel_width-left)*back_buffer->target.width/width;
+    sy = (point[1]*pixel_height-top)*back_buffer->target.height/height;
+    memset(pointer, 0, sizeof(*pointer));
+    pointer->x = pointer->click_x = (short)(sx-(halo_screen_width()-640)/2);
+    pointer->y = pointer->click_y = (short)sy;
+    pointer->left_clicks = point[2] != 0;
+    pointer->right_clicks = point[3] != 0;
+    pointer->scroll_pixels = (short)(point[4]*back_buffer->target.height);
+    pointer->scroll_drag = point[5] != 0;
+    pointer->side_step = point[0] < 0.18f ? -1 : point[0] > 0.82f ? 1 : 0;
+    return 1;
+}
+#else
 int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 {
 	struct platform_ui_pointer state;
@@ -2013,6 +2050,7 @@ int halo_ui_pointer_update(int menus_active, struct halo_ui_pointer *pointer)
 	ui_point_from_window(state.down_x, state.down_y, &pointer->down_x, &pointer->down_y);
 	return 1;
 }
+#endif
 
 /* takes up the display's shape and resolution, or the window's, if they
 have changed; between frames, since the game's layout and the targets must
@@ -5687,6 +5725,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	(void)destination_rectangle;
 	(void)unused;
 	(void)unused2;
+#ifdef HALO_ANDROID
+	host_touch_frame();
+#endif
 	if (screenshot_every < 0)
 		screenshot_every = config_integer("debug.screenshot_every");
 

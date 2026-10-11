@@ -399,6 +399,9 @@ void console_startup(
 	char buffer[200];
 	FILE *file;
 	short newest_previous_command_index;
+#ifdef HALO_ANDROID
+    boolean android_cheats_block = FALSE;
+#endif
 
 	if (!game_in_editor())
 	{
@@ -414,6 +417,12 @@ void console_startup(
 		while (fgets(buffer, NUMBEROF(buffer)-1, file))
 		{
 			strtok(buffer, "\r\n\t");
+#ifdef HALO_ANDROID
+            /* The map startup hook applies these after a player is spawned. */
+            if (!strcmp(buffer, "; BEGIN ANDROID STARTUP CHEATS")) { android_cheats_block = TRUE; continue; }
+            if (!strcmp(buffer, "; END ANDROID STARTUP CHEATS")) { android_cheats_block = FALSE; continue; }
+            if (android_cheats_block) continue;
+#endif
 			newest_previous_command_index = (console_globals.newest_previous_command_index + 1) % MAXIMUM_NUMBER_OF_PREVIOUS_COMMANDS;
 
 			console_globals.newest_previous_command_index = newest_previous_command_index;

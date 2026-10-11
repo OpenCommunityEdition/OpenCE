@@ -44,6 +44,14 @@ drive the controller.
 #include "halo_keyboard.h"
 
 #include <SDL3/SDL.h>
+#ifdef HALO_ANDROID
+/* The Android app's overlay (port/android/app/.../TouchControls.java) is a
+controller of its own: its stick and buttons are merged into port 0 by
+touch_gamepad_state, its swipe and gyroscope aim as the mouse does
+(halo_linux_mouse_look), and the phone vibrates from player_rumble.c. The
+touch controls of touch_input.c are the web build's. */
+#include "guest_host.h"
+#endif
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,7 +104,7 @@ the touch controls (their swipe, gyroscope or stick: halo_linux_mouse_aiming,
 halo_linux_touch_aiming) */
 static Uint64 mouse_aimed_ms = 0;
 static Uint64 stick_aimed_ms = 0;
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 static Uint64 touch_aimed_ms = 0;
 #endif
 
@@ -151,14 +159,35 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	mouse_pending_y = 0.0f;
 	mouse_polls_unconsumed = 0;
 	pthread_mutex_unlock(&mouse_lock);
+#ifdef HALO_ANDROID
+	{
+		float delta[2];
+
+		/* (logical display pixels, with the overlay's sensitivity applied) */
+		host_touch_look_read(delta);
+		*yaw = -delta[0] * scale;
+		*pitch = -delta[1] * scale;
+		if (delta[0] != 0.0f || delta[1] != 0.0f)
+		{
+			pthread_mutex_lock(&mouse_lock);
+			mouse_aimed_ms = SDL_GetTicks();
+			pthread_mutex_unlock(&mouse_lock);
+		}
+	}
+	if (x == 0.0f && y == 0.0f)
+		return *yaw != 0.0f || *pitch != 0.0f;
+	*yaw += -x * scale * mouse_sensitivity();
+	*pitch += (invert ? y : -y) * scale * vertical_sensitivity;
+#else
 	if (x == 0.0f && y == 0.0f)
 		return FALSE;
 	*yaw = -x * scale * mouse_sensitivity();
 	*pitch = (invert ? y : -y) * scale * vertical_sensitivity;
+#endif
 	return TRUE;
 }
 
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 /* the touch controls moved the player or the aim (halo_linux_touch_aiming) */
 static void touch_used(void)
 {
@@ -178,7 +207,7 @@ int halo_linux_touch_move(short controller_index, float *forward, float *strafe)
 	*strafe = 0.0f;
 	if (controller_index != 0)
 		return FALSE;
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 	if (!touch_input_move(forward, strafe))
 		return FALSE;
 	touch_used();
@@ -201,7 +230,7 @@ int halo_linux_touch_look(short gamepad_index, float *yaw, float *pitch, float *
 	*gyro_pitch = 0.0f;
 	if (gamepad_index != 0)
 		return FALSE;
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 	touch_input_look(0.0022f, yaw, pitch, gyro_yaw, gyro_pitch);
 	if (*yaw == 0.0f && *pitch == 0.0f && *gyro_yaw == 0.0f && *gyro_pitch == 0.0f)
 		return FALSE;
@@ -217,7 +246,7 @@ assist (input.touch_aim_assist false): no magnetism, as for the mouse
 (player_control.c), until a stick moves the aim again */
 int halo_linux_touch_aiming(short gamepad_index)
 {
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 	int aiming;
 
 	if (gamepad_index != 0 || touch_input_aim_assist())
@@ -874,6 +903,45 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
 }
 
+#ifdef HALO_ANDROID
+/* the overlay's controller (host_touch.c), merged into port 0's */
+static void touch_gamepad_state(XINPUT_GAMEPAD *pad)
+{
+	int state[7], index;
+	static const WORD digital[] = {
+		0, 0, 0, 0, XINPUT_GAMEPAD_BACK, 0, XINPUT_GAMEPAD_START,
+		XINPUT_GAMEPAD_LEFT_THUMB, XINPUT_GAMEPAD_RIGHT_THUMB,
+		0, 0, XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_DOWN,
+		XINPUT_GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_RIGHT
+	};
+	static const int analog[] = {
+		XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y
+	};
+	SHORT *sticks[] = { &pad->sThumbLX, &pad->sThumbLY, &pad->sThumbRX, &pad->sThumbRY };
+
+	host_touch_read(state);
+	for (index = 0; index < 4; index++)
+	{
+		SHORT value = stick((Sint16)state[index], index == 1 || index == 3);
+
+		if (abs(value) > abs(*sticks[index]))
+			*sticks[index] = value;
+		merge_button(pad, analog[index], (state[6] & (1 << index)) != 0);
+	}
+	for (index = 0; index < (int)(sizeof(digital) / sizeof(digital[0])); index++)
+	{
+		if (state[6] & (1 << index))
+			pad->wButtons |= digital[index];
+	}
+	merge_button(pad, XINPUT_GAMEPAD_WHITE, (state[6] & (1 << 9)) != 0);
+	merge_button(pad, XINPUT_GAMEPAD_BLACK, (state[6] & (1 << 10)) != 0);
+	if (state[4])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = 255;
+	if (state[5])
+		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = 255;
+}
+#endif
+
 /* ---------- XAPI */
 
 VOID WINAPI XInitDevices(DWORD preallocation_type_count, PXDEVICE_PREALLOC_TYPE preallocation_types)
@@ -1000,9 +1068,12 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		}
 		if (port_gamepad(gamepads, count, 0))
 			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+#ifdef HALO_ANDROID
+		touch_gamepad_state(&state->Gamepad);
+#endif
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 		touch_input_controls(&state->Gamepad, input.menus);
 #endif
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
@@ -1038,7 +1109,7 @@ DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 	feedback->Header.dwStatus = ERROR_SUCCESS;
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_WEB)
 	/* the phone vibrates for the touch controls' player (in a browser, where
 	it can) */
 	if (port == 0)

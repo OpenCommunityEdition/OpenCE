@@ -32,8 +32,12 @@ ninja) and these items:
   1.2.5 and SDL 3.4.16 to `build/android/third_party`. Gradle downloads the
   Android Gradle Plugin.
 
-On Windows, build in WSL2 (Ubuntu 24.04). The Android build does not run
-on Windows itself. Enter
+On Windows, build in WSL2 (Ubuntu 24.04), or on Windows itself with Git for
+Windows: its Bash runs the build's commands and the Windows NDK's clang
+builds the guest and the host (`tools/android_build.py`,
+`WindowsAndroidWriter`). Set `ANDROID_HOME` to the SDK folder, with the NDK
+and Android API 35, then enter `python configure.py` and `ninja android_apk`
+as on Linux. For WSL, enter
 `wsl -d Ubuntu -- bash tools/wsl_setup_android.sh` one time: it installs
 the tools and the Android SDK and NDK in WSL (apt asks for your
 password). Then enter
@@ -82,11 +86,17 @@ To install the data with the app:
 
 1. Copy the disc image to the phone.
 2. Start the app.
-3. Push the button. The file picker of the system opens.
+3. Push **Choose disc image**. The file picker of the system opens.
 4. Select the disc image.
 5. Wait while the app extracts the data (approximately 1.8 GB). Then the
    game starts.
 6. You can delete the disc image.
+
+Alternatively, choose **Choose extracted maps** and select the folder that
+contains `ui.map` and the other extracted map files, or its parent folder
+with a `maps` subfolder. The system folder picker grants read access; the
+app copies the files into its own storage. An invalid or failed import
+leaves the existing maps in place. The source folder is never modified.
 
 To install the data from a computer:
 
@@ -103,6 +113,11 @@ To make a copy of the saved games, enter
 `adb pull /sdcard/Android/data/com.halo.decomp/files/save/u` (the profiles).
 An `adb pull` of the whole `save` folder stops at the `blam.lst` files of
 `save/z`, which adb cannot read.
+
+The main menu's build label shows the installed app's version, read from the
+package at every start: a release's name (`build 186`), or another build's
+version name and code (`v1.0 (1)`).
+Tap it to open https://github.com/cybersecurity/halo-ce-universal.
 
 ## Controls
 
@@ -128,82 +143,158 @@ with the positions on the Xbox controller:
 | Create | back | |
 
 The controller gets the rumble. The back gesture of Android is the B
-button. A Bluetooth or USB keyboard operates as on Linux.
+button. Bluetooth and USB keyboards also work. The screen
+accepts multi-touch input through an on-screen controller for player 1.
+The left stick moves; drag anywhere outside it to look around. Looking uses
+relative finger displacement directly, with no right stick acceleration.
+Action buttons stay held while dragging, so either Fire button can also aim.
+A second Fire button on the left lets you shoot while aiming with the right hand.
+Menus accept direct taps on the rendered items, including the in-game
+keyboard used for names. The game maps touch positions through the same
+letterboxing and widescreen centering as the renderer. Android Back returns
+to the previous screen. Taps on empty left/right screen edges select the
+previous/next item using the current list's direction, including mission
+selection and option lists. **Touch/Hide** remains visible in menus and gameplay unless
+**Disable all overlay** is enabled. Menus start with the controller hidden; **Touch** restores its
+buttons and movement stick for screens that need them. Swipe aiming, phone
+rumble and gyro aim stop while a game menu is open.
 
-The touchscreen operates the menus: tap an item to select it (on a
-setting with values, tap its left or right half), tap a button of the key
-at the bottom of a screen (for example "B = Back") to push it, and drag to
-scroll a list (down or right steps back, up or left steps forward). A drag
-stops at the first and the last item, and it does not change a setting's
-value. Touches that start in the edge-gesture zones of Android do not tap
-or scroll at the sides, and do not scroll at the top and bottom, because the
-first swipe from an edge in full screen only shows the system bars.
+### Porting options
 
-A tap during a cinematic that can be skipped skips it, as A does. On the
-on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
-"A =ENTER" to accept the name.
+The main menu replaces **Quit** with **Porting options** in the original
+list position, using the native menu font, size and blue color. Android Back
+at the main screen no longer opens the Quit dialog. The pause
+menu also adds a single **Porting options** entry containing **Overlay
+settings**, **General** and **Cheats**. Its frame, original text and touch
+targets are enlarged by 12%. These screens are rendered by Halo,
+using the menu font and colors from the loaded map's widget definitions.
+The engine extends `ui.map` and the level pause UI at runtime; imported map
+files do not need to be replaced or modified.
 
-### Touch controls
+Porting screens use a full-screen native blue UI bitmap and text enlarged to 160% of the
+map's large UI font, with 60-pixel touch rows in the 640x480 UI space.
+Lists show every setting in a vertically scrollable viewport: swipe up/down
+or drag the scrollbar on the right. **Back** stays below the list. Page
+titles are cyan to distinguish them from the option labels. Standalone
+labels use an explicit alpha so main-menu tags whose
+original text alpha is zero remain visible outside their plasma pass.
+Labels use the original text-box renderer with an independent visible instance;
+scaling is scoped to glyph vertices and resets after each label. The blue UI
+bitmap is selected from the current map and fills the entire widescreen area.
 
-In a game, the app shows touch controls over the picture. They are a
-controller for player 1. With the default buttons of the profile:
+- **Overlay settings** contains **Edit buttons layout**, **Hide or add
+  buttons**, **Edit buttons size**, **Look sensitivity** and **Disable all overlay**. The
+  global toggle also hides Hide/Touch and FPS and releases held inputs. Direct
+  menu taps and physical controllers still work. The default positions and
+  sizes match the supplied October 3 layout; Reset restores them. Layout editing
+  shows the controls for dragging while keeping the current game menu open
+  and the campaign paused. Tap **Save and exit** to return to Overlay settings.
+  **Export** and **Import** retain Android's document picker. The button
+  manager lets you hide/show, duplicate and add buttons, including restoring
+  the movement stick. Reset requires confirmation. Size sliders range from
+  50% to 200%; look sensitivity ranges from 0.25x to 4x. All controls,
+  including copies, can be reached by scrolling without Previous/Next pages.
+- **General** contains **Rumble**, **Gyroscope**, **Gyroscope sensitivity**,
+  **FPS counter**, **Field of view (FOV)** and **Edit in-game UI** (below). FOV uses a 55–90 degree slider
+  with a 70 degree default, preserves weapon zoom and is saved for both menus.
+  Unsupported hardware is marked unavailable. Rumble
+  defaults on, gyro and FPS default off. Gyro sensitivity has its own
+  horizontal slider from 0.25x to 4x, independent of swipe look sensitivity.
+  Gyro handles both landscape orientations. FPS measures presented game
+  frames over half-second intervals and displays during gameplay.
+- **Cheats** in the main menu selects startup cheats in a dedicated `init.txt`
+  block, with all sixteen disabled initially and other file contents preserved.
+  Flags apply after player spawn; instant actions run once per map (teleport
+  waits for a valid camera). The pause menu retains all ten live engine flags
+  and six instant actions and never edits the startup file. Enabled
+  flags have green rows; instant actions remain repeatable. Requests and
+  displayed states follow the existing engine acknowledgement path. Cheats
+  require an active player; network clients retain the host's existing rules.
+  Available spawned objects depend on the current map.
 
-| Control | Function in the game |
-| --- | --- |
-| stick (lower left) | move |
-| swipe on the screen away from the buttons | look |
-| Fire | right trigger |
-| Grenade | left trigger |
-| A / Jump, B / Melee, X / Reload, Y / Weapon | A, B, X, Y |
-| Crouch, Zoom | left and right stick clicks |
-| Light, Gren. type | white, black |
-| Pause, Back | start, back |
-| Up, Down, Left, Right | D-pad |
+All mobile controls now use original cyan vector HUD icons instead of text.
+**Camera mode** switches between first-person, flying and following cameras
+with one tap, following the engine's existing host/client camera rules.
+It can be moved, resized, hidden and duplicated in Overlay settings from
+both main and pause menus. **Gren. type** keeps its original hold behavior.
+In flying mode, **Zoom** toggles player/camera control; swipe and gyro aiming
+rotate the flying camera while its controls are active, and the movement
+stick translates it at about 8 metres per second at full deflection.
+Zoom switches once per press, including when held across several frames.
+Swipe aiming uses the same **Look sensitivity** setting as the player camera
+(default **2x** for new configurations; existing preferences are preserved).
+The sensitivity slider can be dragged beyond either edge to reach its full
+0.25x–4x range. Fire/Grenade control vertical camera movement.
 
-The names on the buttons follow the profile's "Button layout" (Settings >
-Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
-The stick moves the player with every "Stick layout", southpaw too.
+Version 4 `.halolayout` files include the Camera mode control. Imports of
+versions 1–3 insert it without losing existing positions or button copies.
+These files also preserve gyro sensitivity and the FPS
+preference, FOV and Disable all overlay. Missing new settings use 70 degrees
+and enabled overlays. Startup cheats are separate from layout exports. Version 1 and 2 layouts remain supported; their gyro sensitivity
+defaults to 1x and FPS to off. Version 1 retains its default button sizes,
+Rumble on and Gyroscope off. Clearing app data clears the saved settings.
 
-A finger that holds a button can also swipe to look, so you can fire and
-aim with one thumb. The controls are a finger wide (48 dp) or larger, but
-on a small screen of high density they stay apart rather than reach that
-size. A short tap reaches the game even when it is shorter than one frame.
-Swipes that start in the edge-gesture zones of Android do not turn the
-view. The swipe aims as the controller's stick does, not as a mouse: the
-aim slows over a target and follows a moving one, as with a controller,
-and it follows the profile's "invert look" (the gyroscope turns the view
-as the phone turns, never inverted). The setting `input.touch_aim_assist`
-turns the aim assist off. "Look sensitivity" sets how far a swipe turns;
-the mouse settings do not apply.
+Validation: `python tools/test_touch_layout.py` checks persistence, legacy
+imports, invalid settings and gyro integration/orientation. `ninja android`
+and `ninja android_apk` compile the native renderer/input bridge and app.
+`python tools/test_menu_touch.py` executes the actual Java gesture handlers
+with recording inputs to check Touch/Hide, menu button release, direct taps,
+swipe suppression and slider dragging across setting acknowledgements.
+Visual layout, taps on imported map variants, phone rumble and sensor
+response must also be checked on an Android device.
+`python tools/test_camera_touch.py` executes the actual director input function
+to check tap switching, held-grenade compatibility, Zoom control ownership,
+flying-camera swipe and movement. `python tools/test_porting_ui.py` executes the actual text-box/porting functions
+with a recording renderer to check zero-alpha/faded template visibility,
+enlarged row dispatch and full-screen native bitmap selection. It requires
+the Windows Android NDK and Node; it does not validate GPU presentation.
 
-The touch controls show only in a game. In the menus and during
-cinematics they hide, and the touchscreen operates the menus as described
-above. They also hide when a controller is connected, for example the
-built-in controller of a handheld. A device without a touchscreen (a TV)
-never shows them. The setting `input.touch_controls` changes this (refer
-to "Settings").
+### Flying camera
 
-The buttons at the top of the screen:
+Flying-camera control
+uses the same touch/gyro look reader as the player camera. While free-camera
+controls are selected, the earlier player-input pass leaves the motion
+accumulator intact for the director, so every swipe reaches the camera.
 
-- "Hide" removes the controls (and stops the gyroscope aiming and the
-  vibration) until you push "Touch"; the app remembers it.
-- "Options" opens these items:
-  - "General": the phone's vibration (on by default; it follows the
-    vibration setting of the game's profile), aiming with the gyroscope
-    (off by default), a floating move stick (off by default: the stick goes
-    where your thumb lands in the lower left of the screen), the opacity of
-    the controls, "Hide or add buttons" (hide a button, add a copy of a
-    button) and "Edit buttons size".
-  - "Edit buttons layout": drag the controls to new positions, then push
-    "Save". "Export" and "Import" write and read a layout file with the
-    file picker of the system.
-  - "Look sensitivity".
+### Porting options: the menus' own look
 
-"Hide" and "Options" act when the finger lifts on them: a swipe that
-starts on them turns the view instead.
+**PORTING OPTIONS** is written in capitals in both menus:
 
-The app keeps the layout in its own preferences, not in `config.toml`.
-Removing the app's data or the app removes the layout.
+- In the main menu the other items are pictures of text, not text. The entry
+  is now a picture made the same way (`tools/porting_assets.py`): the same
+  typeface (OpenCE), size, half-transparent blue and, when selected, the same
+  white text with a blue glow. The game's own widget draws and animates it in
+  Quit's place; the picture is twice as wide as the other items' for the longer
+  text. With `display.menus = "xbox"` there is no such picture, and the entry
+  is drawn as text as before.
+- In the pause menu the entry has the font, colour, justification and 112%
+  size of the menu's own items, and its text sits in its row where theirs does.
+
+Every title and row of the Porting options screens is in capitals. Opened from
+the main menu they are set in the main menu's typeface, one picture a
+character (`pc\porting\font`, tinted as it is drawn, made smaller when a row
+would not fit); opened from the pause menu, in the pause menu's own font. The
+layout editor's labels are capitals too.
+
+**General > Edit in-game UI** moves the game's own HUD. The editor shows three
+panels to drag: **RADAR** (the motion sensor), **WEAPONS** (the panel at the
+top left) and **HEALTH** (the panel at the top right). **SAVE** keeps them and
+returns to General, **RESET** puts them back, and Android Back saves too. The
+game moves everything it anchors at that corner of the screen by the same
+distance, so a panel moves whole; the HUD's messages stay. A panel cannot
+leave the screen. The places are fractions of the screen, kept in the app's
+preferences (`hud-layout`) and applied again at every start. They are not part
+of a `.halolayout` file: **Export** and **Import** leave them alone. A split
+screen keeps the game's own layout.
+
+Validation: `python tools/test_touch_layout.py` also checks the panels' rest
+places, dragging, screen limits, saving and that an export holds no HUD.
+`python tools/test_hud_layout_engine.py` runs the game's actual HUD placement
+with moved panels, `python tools/test_porting_ui.py` the main menu's picture
+swap, the pause menu's style and the typeface's layout. The engine tests need
+the Windows Android NDK and Node, or Edge or Chrome when Node is not installed
+(`tools/wasm_test.py`). How the menus and the moved HUD look must still be
+checked on a device.
 
 ## Settings
 
@@ -223,8 +314,6 @@ These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
-| `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
@@ -479,10 +568,6 @@ assembly of the port is necessary:
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to `0x8c000000`. If ART uses them, the app shows a message
   (refer to "The fixed addresses").
-- Touch operates the menus and skips cinematics. In the game, the touch
-  controls appear when no controller is connected; their size follows the
-  height of the screen (larger on a tablet than on a phone), never smaller
-  than a finger.
 - Kernels with 16 KB pages (a developer option of Android 15) do not
   operate. The Xbox memory uses 4 KB pages.
 - The x86 Android emulator runs the app through its ARM translation. The

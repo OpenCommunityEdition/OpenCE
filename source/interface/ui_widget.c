@@ -6663,6 +6663,10 @@ static boolean ui_mouse_menus_active(
 	return virtual_keyboard_active() || ui_mouse_menu() != NULL || game_engine_showing_postgame();
 }
 
+#ifdef HALO_ANDROID
+#include "ui_widget_porting.h"
+
+#endif
 /* port: a row of a list to choose from (the PC version's menus' lists of
 gametypes, maps, profiles, levels and games: port/assets/menus) */
 static boolean ui_mouse_selection_row(
@@ -6776,6 +6780,9 @@ static void ui_widgets_process_mouse(
 	boolean pointer_active;
 	boolean keyboard_active;
 
+#ifdef HALO_ANDROID
+	ui_porting_prepare();
+#endif
 	ui_debug_frame++;
 	pointer_active = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) != 0;
 	if (pointer_active)
@@ -6801,6 +6808,11 @@ static void ui_widgets_process_mouse(
 		if (ui_debug_targets_enabled())
 			ui_debug_log_keyboard_tap(pointer.click_x, pointer.click_y, hit);
 	}
+#ifdef HALO_ANDROID
+	/* Android Back while typing closes the keyboard. */
+	if (pointer_active && keyboard_active && pointer.right_clicks)
+		virtual_keyboard_touch(pointer.click_x, pointer.click_y, FALSE, TRUE);
+#endif
 	if (!pointer_active || keyboard_active)
 	{
 		ui_mouse_press_count = 0;
@@ -6809,6 +6821,27 @@ static void ui_widgets_process_mouse(
 	}
 	else
 	{
+#ifdef HALO_ANDROID
+        if (ui_porting_pointer(&pointer)) {
+            ui_mouse_press_count = 0;
+            ui_mouse_hover_pending = ui_mouse_click_pending = FALSE;
+            ui_mouse_target_count = 0;
+            ui_mouse_targets_settled = FALSE;
+            return;
+        }
+        /* Screen-edge taps move the focused menu list without activating it.
+           Use the list's own axes for both mission carousels and option lists. */
+        if (pointer.left_clicks && pointer.side_step &&
+            !ui_mouse_target_at(pointer.click_x, pointer.click_y)) {
+            struct widget_instance *list = ui_mouse_wheel_widget(ui_mouse_menu(), TRUE);
+            if (list) {
+                short back, forward;
+                ui_mouse_list_directions(list, &back, &forward);
+                ui_mouse_press(pointer.side_step < 0 ? back : forward);
+                pointer.left_clicks = 0;
+            }
+        }
+#endif
 		if (pointer.moved)
 		{
 			ui_mouse_hover_pending = TRUE;
@@ -6992,6 +7025,10 @@ static void widget_instance_render_recursive(
 	long input_index;
 	struct widget_instance *child;
 	struct bitmap_data *bitmap;
+#ifdef HALO_ANDROID
+    struct ui_widget_definition adjusted_definition;
+    point2d unscaled_offset;
+#endif
 	/* port: (custom_edition_maps_picture) */
 	struct bitmap_data *custom_edition_picture;
 	short frame_index;
@@ -7003,6 +7040,10 @@ static void widget_instance_render_recursive(
 	}
 	offset.x += widget->horizontal_offset;
 	offset.y += widget->vertical_offset;
+#ifdef HALO_ANDROID
+    unscaled_offset = offset;
+    if (!ui_porting_adjust_widget(widget, &definition, &adjusted_definition, &offset)) return;
+#endif
 	for (input_index = 0;
 		input_index < definition->game_data_inputs.count;
 		input_index++)
@@ -7016,7 +7057,36 @@ static void widget_instance_render_recursive(
 	}
 	if (!widget->visible)
 		return;
+#ifdef HALO_ANDROID
+    if (ui_porting_context && (ui_porting_menu.page || ui_porting_menu.editing) &&
+        ui_mouse_widget_is_item(widget)) return;
+#endif
 	ui_mouse_note_target(widget, definition, offset);
+#ifdef HALO_ANDROID
+    if (widget->type == _ui_widget_type_text_box && widget->parameters.text_box.text) {
+        /* The main menu's build label shows the app's version; a tap on it
+           opens the project's page. */
+        wchar_t const *credit = widget->parameters.text_box.text;
+        char expected[HALO_APP_VERSION_SIZE];
+        int n = 0;
+        host_touch_app_version(expected, sizeof(expected));
+        while (expected[n] && credit[n] == (wchar_t)expected[n]) ++n;
+        if (n && !expected[n] && !credit[n] && ui_porting_context == 1 && !ui_porting_menu.page) {
+            ui_porting_credit_bounds = definition->bounds;
+            ui_porting_credit_bounds.x0 += offset.x;
+            ui_porting_credit_bounds.x1 += offset.x;
+            ui_porting_credit_bounds.y0 += offset.y;
+            ui_porting_credit_bounds.y1 += offset.y;
+            ui_porting_credit_visible = TRUE;
+        }
+    }
+#endif
+#ifdef HALO_ANDROID
+    /* Keep the original list position/focus target, replace its Quit artwork:
+       with our picture (ui_porting_adjust_widget), or with text drawn after
+       the menu where the map has no such picture (ui_porting_render). */
+    if (ui_porting_is_quit(widget) && ui_porting_item_bitmap() == NONE) return;
+#endif
 	/* port: a Custom Edition map's picture, drawn over the whole widget, or
 	the unknown level's frame for a map without one
 	(port/linux/game/custom_edition_maps.c) */
@@ -7080,6 +7150,12 @@ static void widget_instance_render_recursive(
 			clip->y0 += offset.y;
 			clip->y1 += offset.y;
 		}
+#ifdef HALO_ANDROID
+		/* PORTING OPTIONS is wider than the item it stands in: the clip, which
+		starts at the item's own left, would squeeze the picture into it */
+		if (ui_porting_context == 1 && ui_porting_is_quit(widget) && ui_porting_item_bitmap() != NONE)
+			clip = NULL;
+#endif
 		if (widen_to_screen && clip)
 		{
 			/* widen the clip by the same amount (it is offset-shifted but
@@ -7145,12 +7221,35 @@ static void widget_instance_render_recursive(
 	switch (widget->type)
 	{
 	case _ui_widget_type_text_box:
+#ifdef HALO_ANDROID
+        if (ui_porting_context == 2 && !ui_porting_menu.page && widget->parent) {
+            /* (the first item's text, for PORTING OPTIONS below the list) */
+            if (!ui_porting_item_text && (ui_mouse_widget_is_item(widget) ||
+                ui_mouse_widget_is_item(widget->parent))) {
+                ui_porting_item_text = widget;
+                ui_porting_item_text_bounds = definition->bounds;
+                ui_porting_item_text_bounds.x0 += offset.x+definition->horizontal_offset;
+                ui_porting_item_text_bounds.x1 += offset.x;
+                ui_porting_item_text_bounds.y0 += offset.y+definition->vertical_offset;
+                ui_porting_item_text_bounds.y1 += offset.y;
+            }
+            rasterizer_text_set_ui_scale(definition->bounds.x0+offset.x,
+                definition->bounds.y0+offset.y, 112);
+            adjusted_definition.bounds.x1 = definition->bounds.x0+
+                (definition->bounds.x1-definition->bounds.x0)*100/112;
+            adjusted_definition.bounds.y1 = definition->bounds.y0+
+                (definition->bounds.y1-definition->bounds.y0)*100/112;
+        }
+#endif
 		widget_instance_render_text_box(
 			widget,
 			definition,
 			clip_rect,
 			offset,
 			widget_instance_text_box_is_focused(widget));
+#ifdef HALO_ANDROID
+        rasterizer_text_set_ui_scale(0, 0, 100);
+#endif
 		/* port: what the menus draw beside a text (the lobby's speaker
 		icons: port/linux/game/menu_functions.c), its bounds as it was
 		drawn in them (widget_instance_render_text_box), its font and
@@ -7195,6 +7294,9 @@ static void widget_instance_render_recursive(
 	}
 	if (render_children)
 	{
+#ifdef HALO_ANDROID
+        offset = unscaled_offset;
+#endif
 		for (child = widget->child; child; child = child->next)
 		{
 			focus = child == widget->focused_child;
@@ -7351,6 +7453,10 @@ void render_ui_widgets(
 				bounds.y1 = window_bounds->y1 - window_bounds->y0;
 				offset.x = 0;
 				offset.y = 0;
+#ifdef HALO_ANDROID
+                ui_porting_credit_visible = FALSE;
+                ui_porting_item_text = NULL;
+#endif
 				/* the mouse drives the first player's menus; a widget shown in
 				every viewport (a dialog for everyone) is noted in the first
 				player's render only, and once a frame */
@@ -7363,6 +7469,9 @@ void render_ui_widgets(
 					TRUE,
 					FALSE);
 				ui_mouse_noting_targets = FALSE;
+#ifdef HALO_ANDROID
+                ui_porting_render(widget, &bounds);
+#endif
 				if (widget_globals.debug_show_path)
 				{
 					real_argb_color color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -7712,6 +7821,36 @@ static void widget_instance_process_one_event_recursive(
 {
 	boolean event_handled = FALSE;
 	boolean widget_deleted = FALSE;
+#ifdef HALO_ANDROID
+    if (ui_porting_context == 1 && event->type == _event_type_button &&
+        event->data.button.value == 1) {
+        if (ui_porting_is_quit(widget) &&
+            (event->data.button.index == _gamepad_analog_button_a ||
+             event->data.button.index == _gamepad_binary_button_start)) {
+            host_porting_action(ui_porting_menu.revision, 1, 0);
+            *return_widget_deleted = FALSE;
+            return;
+        }
+        /* Android Back at the root must not open the obsolete Quit dialog. */
+        if (!widget->parent &&
+            (event->data.button.index == _widget_event_b_button ||
+             event->data.button.index == _widget_event_back_button)) {
+            char const *name = tag_get_name(widget->definition_tag_index);
+            if (name && (!strcmp(name, "pc\\main_menu\\main_menu") ||
+                !strcmp(name, "ui\\shell\\main_menu\\main_menu"))) {
+                *return_widget_deleted = FALSE;
+                return;
+            }
+        }
+    }
+    if (!widget->parent && ui_porting_context && ui_porting_menu.page) {
+        *return_widget_deleted = FALSE;
+        if (event->type == _event_type_button && event->data.button.value == 1 &&
+            event->data.button.index == _widget_event_b_button)
+            host_porting_action(ui_porting_menu.revision, 90, 0);
+        return;
+    }
+#endif
 	boolean event_for_this_widget = widget_takes_events_of_controller(widget, event->controller_index);
 	long audio_feedback = _ui_audio_feedback_none;
 

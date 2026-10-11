@@ -502,16 +502,33 @@ real player_control_get_field_of_view(
 			control->unit_index,
 			unit->unit.current_weapon_index);
 
+#ifdef HALO_ANDROID
+		real base_field_of_view = definition->unit.camera_field_of_view;
+		{
+			extern float host_touch_field_of_view(void);
+			base_field_of_view = PIN(base_field_of_view * host_touch_field_of_view()/70.0f,
+				DEGREES_TO_RADIANS(1.f), DEGREES_TO_RADIANS(90.f));
+		}
+
+#endif
 		if (weapon_index != NONE)
 		{
 			field_of_view = weapon_get_field_of_view(
 				weapon_index,
+#ifdef HALO_ANDROID
+				base_field_of_view,
+#else
 				definition->unit.camera_field_of_view,
+#endif
 				control->zoom_level);
 		}
 		else
 		{
+#ifdef HALO_ANDROID
+			field_of_view = base_field_of_view;
+#else
 			field_of_view = definition->unit.camera_field_of_view;
+#endif
 		}
 	}
 	return field_of_view;
@@ -1337,7 +1354,15 @@ static void get_local_player_input_blob(
 						real mouse_yaw;
 						real mouse_pitch;
 
+#ifdef HALO_ANDROID
+						/* Leave the shared, sensitivity-scaled delta for the free camera:
+                           player input runs first and must not drain its swipe/gyro. */
+                        if (
+                            !director_flying_controls_active(local_player_index) &&
+                            halo_linux_mouse_look(gamepad_index, &mouse_yaw, &mouse_pitch))
+#else
 						if (halo_linux_mouse_look(gamepad_index, &mouse_yaw, &mouse_pitch))
+#endif
 						{
 							if (player->unit_index != NONE && control->zoom_level != NONE)
 							{

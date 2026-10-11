@@ -60,6 +60,9 @@ void cheat_active_camouflage_local_player(
 /* ---------- globals */
 
 extern struct cheat_globals cheat;
+#ifdef HALO_ANDROID
+void android_touch_cheats_update(void);
+#endif
 
 /* ---------- public code */
 

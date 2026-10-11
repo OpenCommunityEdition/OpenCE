@@ -76,6 +76,19 @@ int host_sdl_scancode_from_name(const char *name);
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);
+void host_touch_read(int *state);
+void host_touch_rumble(unsigned int low, unsigned int high);
+void host_touch_look_read(float *delta);
+int host_touch_camera_read(void);
+float host_touch_field_of_view(void);
+unsigned int host_touch_cheats_read(int *commands);
+void host_touch_cheat_result(int id, int status);
+void host_touch_cheat_sync(int id, int active);
+/* Edit in-game UI: the x and y each of the weapons' panel, the health panel
+and the motion sensor is moved by, as fractions of the screen, into offsets[6] */
+void host_touch_hud_read(float *offsets);
+/* the installed app's version for the main menu's build label, "" until the app told it */
+void host_touch_app_version(char *buffer, unsigned int size);
 unsigned int host_sdl_open_gamepad(unsigned int id);
 unsigned int host_sdl_gamepad_from_id(unsigned int id);
 int host_sdl_gamepad_axis(unsigned int gamepad, int axis);
@@ -114,24 +127,15 @@ void host_gl_wait_frame(unsigned int slot);
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
 
+#ifdef HALO_ANDROID
+#include "../../../linux/include/halo_porting_ui.h"
+#endif
 /* the edges where Android keeps its gestures, as left, top, right, bottom
 in pixels of the current orientation, into insets[4]; all 0 when unknown */
 void host_gesture_insets(int *insets);
-
-/* ---------- the on-screen touch controls (host_touch.c) */
-
-/* the overlay's controller: the SDL axes (left x, y, right x, y, left
-trigger, right trigger) and the SDL button bits, into state[7] */
-void host_touch_read(int *state);
-/* the overlay's view swipe, then its gyroscope turn, since the last read,
-into delta[4] */
-void host_touch_look_read(float *delta);
-/* port 0's motors, for the phone's vibration */
-void host_touch_rumble(unsigned int low, unsigned int high);
-/* tells the overlay when to show: touch_input.c's _touch_scene_* */
+/* the touch controls of port/linux/src/touch_input.c report these; the app's
+overlay follows the menus through host_touch_ui_context instead */
 void host_touch_scene(int scene);
-/* the game control on each of the 16 controller buttons (touch_game.c),
-for the overlay's labels */
 void host_touch_bindings(const int *controls);
 
 #endif

@@ -25,6 +25,10 @@ int p2p_hand_off_invite(void);
 /* joins the game an invite link or code leads to; text may hold other
 words around it. Returns nonzero if it held an invite */
 int p2p_join_invite(const char *text);
+#ifdef HALO_ANDROID
+/* 0 idle; 1 broker, 2 host, 3 transport, 4 relay, 5 UDP; negative: off, timeout, invalid, own link. */
+int p2p_join_status(void);
+#endif
 
 /* this machine's identifier, which its XNADDR carries (6 bytes) */
 const unsigned char *p2p_identifier(void);

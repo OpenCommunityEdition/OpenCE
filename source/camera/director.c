@@ -297,6 +297,17 @@ boolean director_inhibited_input(
 	return director_get(local_player_index)->inhibited_input;
 }
 
+#ifdef HALO_ANDROID
+/* Whether direct mouse/touch look belongs to the flying camera. The player
+   polls before director_update, so inhibition alone cannot protect the delta. */
+boolean director_flying_controls_active(short local_player_index)
+{
+    struct director *director = director_get(local_player_index);
+    return director->camera_proc == (director_camera_update_proc)flying_camera_update &&
+        director->debug_controls;
+}
+
+#endif
 director_perspective director_get_perspective(
 	short local_player_index)
 {
@@ -810,6 +821,13 @@ static boolean director_update_controls(
 		unsigned long control_flags;
 		struct gamepad_state const *gamepad =
 			input_get_gamepad_state((short)player_index);
+#ifdef HALO_ANDROID
+        /* A 30 Hz snapshot is reused by several render frames. */
+        static boolean zoom_down[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+        boolean down = gamepad->buttons[_gamepad_binary_button_right_thumb] != 0;
+        boolean zoom_pressed = down && !zoom_down[local_player_index];
+        zoom_down[local_player_index] = down;
+#endif
 
 		if (director_camera_switch_fast)
 		{
@@ -834,8 +852,13 @@ static boolean director_update_controls(
 			director->camera_proc !=
 				(director_camera_update_proc)following_camera_update)
 		{
+#ifdef HALO_ANDROID
+            if (zoom_pressed)
+                director->debug_controls = !director->debug_controls;
+#else
 			if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1)
 				director->debug_controls = !director->debug_controls;
+#endif
 			if (director->debug_controls)
 			{
 				control_flags = 0;
@@ -860,12 +883,33 @@ static boolean director_update_controls(
 				controls->facing_delta.pitch =
 					(real)gamepad->sticks[_gamepad_stick_right].y *
 						director_globals.dtime * 0.0000196349538f;
+#ifdef HALO_ANDROID
+				/* Consume direct swipe/gyro motion here while flying controls own
+				   facing; the inhibited player must not consume the same delta. */
+				if (local_player_index == 0) {
+					extern int halo_linux_mouse_look(short, real *, real *);
+					real yaw, pitch;
+					halo_linux_mouse_look(0, &yaw, &pitch);
+					controls->facing_delta.yaw += yaw;
+					controls->facing_delta.pitch += pitch;
+				}
+#endif
 				controls->position_delta.i =
 					(real)gamepad->sticks[_gamepad_stick_left].y *
+#ifdef HALO_ANDROID
+						director->debug_input_scale * director_globals.dtime *
+                        0.00025f; /* Full stick: about 8 metres per second. */
+#else
 						director->debug_input_scale * director_globals.dtime * 0.00005f;
+#endif
 				controls->position_delta.j =
 					(real)gamepad->sticks[_gamepad_stick_left].x *
+#ifdef HALO_ANDROID
+						director->debug_input_scale * director_globals.dtime *
+                        -0.00025f;
+#else
 						director->debug_input_scale * director_globals.dtime * -0.00005f;
+#endif
 				controls->position_delta.k +=
 					director->debug_variables[_variable_height].delta;
 				controls->active = TRUE;
@@ -923,6 +967,12 @@ static boolean director_update_controls(
 		}
 	}
 
+#ifdef HALO_ANDROID
+	if (local_player_index == 0) {
+		extern int host_touch_camera_read(void);
+		if (host_touch_camera_read()) switch_camera = TRUE;
+	}
+#endif
 	return switch_camera;
 }
 

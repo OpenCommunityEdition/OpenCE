@@ -347,6 +347,12 @@ static const struct config_setting config_settings[] =
 		"clipboard) that lets whoever has it join over the internet; opening a\n"
 		"link (or copying one before switching to the game) joins. Only people\n"
 		"with the invite can join. Off keeps system link to the local network." },
+#ifdef HALO_ANDROID
+	{ "network.relay_fallback", _config_boolean, "true", "HALO_NET_RELAY", _environment_value, _platform_all,
+		"Fallback for strict/mobile NAT: relay encrypted game packets through\n"
+		"network.signalling_brokers. Public brokers are for testing; for reliable\n"
+		"play configure a broker you operate. False uses direct UDP only." },
+#endif
 	{ "network.join_from_clipboard", _config_boolean, "true", "HALO_NET_JOIN_FROM_CLIPBOARD", _environment_value,
 		_platform_all,
 		"Join the game of an invite link found on the clipboard when the game\n"

@@ -170,6 +170,14 @@ public class HaloActivity extends SDLActivity {
             .show();
     }
 
+    /** Android Back leaves the Porting options and the layout editor first */
+    @Override
+    public void onBackPressed() {
+        if (touchControls != null && touchControls.menuBack())
+            return;
+        super.onBackPressed();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();

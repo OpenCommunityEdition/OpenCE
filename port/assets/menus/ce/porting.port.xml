@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Android app's Porting options art (tools/porting_assets.py) -->
+<menus>
+	<bitmap name="porting/menu_porting_options" platform="android">
+		<frame png="ce/port/porting/menu_porting_options__0.png" width="512" height="64"/>
+		<frame png="ce/port/porting/menu_porting_options__1.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="porting/font" platform="android">
+		<frame png="ce/port/porting/font__00.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__01.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__02.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__03.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__04.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__05.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__06.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__07.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__08.png" width="13" height="28"/>
+		<frame png="ce/port/porting/font__09.png" width="19" height="28"/>
+		<frame png="ce/port/porting/font__10.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__11.png" width="19" height="28"/>
+		<frame png="ce/port/porting/font__12.png" width="27" height="28"/>
+		<frame png="ce/port/porting/font__13.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__14.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__15.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__16.png" width="24" height="28"/>
+		<frame png="ce/port/porting/font__17.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__18.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__19.png" width="20" height="28"/>
+		<frame png="ce/port/porting/font__20.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__21.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__22.png" width="31" height="28"/>
+		<frame png="ce/port/porting/font__23.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__24.png" width="20" height="28"/>
+		<frame png="ce/port/porting/font__25.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__26.png" width="24" height="28"/>
+		<frame png="ce/port/porting/font__27.png" width="13" height="28"/>
+		<frame png="ce/port/porting/font__28.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__29.png" width="20" height="28"/>
+		<frame png="ce/port/porting/font__30.png" width="24" height="28"/>
+		<frame png="ce/port/porting/font__31.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__32.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__33.png" width="21" height="28"/>
+		<frame png="ce/port/porting/font__34.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__35.png" width="23" height="28"/>
+		<frame png="ce/port/porting/font__36.png" width="11" height="28"/>
+		<frame png="ce/port/porting/font__37.png" width="16" height="28"/>
+		<frame png="ce/port/porting/font__38.png" width="24" height="28"/>
+		<frame png="ce/port/porting/font__39.png" width="27" height="28"/>
+		<frame png="ce/port/porting/font__40.png" width="11" height="28"/>
+		<frame png="ce/port/porting/font__41.png" width="14" height="28"/>
+		<frame png="ce/port/porting/font__42.png" width="14" height="28"/>
+		<frame png="ce/port/porting/font__43.png" width="14" height="28"/>
+		<frame png="ce/port/porting/font__44.png" width="14" height="28"/>
+		<frame png="ce/port/porting/font__45.png" width="22" height="28"/>
+		<frame png="ce/port/porting/font__46.png" width="15" height="28"/>
+		<frame png="ce/port/porting/font__47.png" width="25" height="28"/>
+		<frame png="ce/port/porting/font__48.png" width="11" height="28"/>
+		<frame png="ce/port/porting/font__49.png" width="11" height="28"/>
+		<frame png="ce/port/porting/font__50.png" width="13" height="28"/>
+		<frame png="ce/port/porting/font__51.png" width="24" height="28"/>
+		<frame png="ce/port/porting/font__52.png" width="25" height="28"/>
+		<frame png="ce/port/porting/font__53.png" width="25" height="28"/>
+		<frame png="ce/port/porting/font__54.png" width="25" height="28"/>
+	</bitmap>
+</menus>

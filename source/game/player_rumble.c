@@ -41,6 +41,10 @@ symbols in this file:
 #include "game/player_rumble.h"
 
 #include "game/players.h"
+#ifdef HALO_ANDROID
+#include "game/game.h"
+#include "../../port/android/guest/runtime/guest_host.h"
+#endif
 #include "input/input.h"
 #include "interface/player_ui.h"
 #include "math/periodic_functions.h"
@@ -297,6 +301,16 @@ void rumble_update(
 		}
 
 		player_index = local_player_get_player_index(local_player_index);
+#ifdef HALO_ANDROID
+        /* Phone feedback follows player 1's effects directly. The Android Rumble
+         * toggle controls it independently of the imported Xbox profile and the
+         * asynchronous controller feedback thread. Physical pads retain that path. */
+        if (local_player_index == 0)
+        {
+            boolean active = player_index != NONE && game_in_progress() && !game_time_get_paused();
+            host_touch_rumble(active ? motors.left : 0, active ? motors.right : 0);
+        }
+#endif
 		if (player_index != NONE)
 		{
 			long controller_index = player_get(player_index)->local_player_index;

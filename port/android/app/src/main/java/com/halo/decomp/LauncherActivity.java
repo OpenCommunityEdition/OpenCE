@@ -9,6 +9,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.provider.Settings;
+import android.provider.DocumentsContract;
+import android.database.Cursor;
+import java.io.InputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -35,11 +40,13 @@ import java.nio.channels.FileChannel;
  */
 public class LauncherActivity extends Activity {
     private static final int PICK_IMAGE = 1;
+    private static final int PICK_MAPS = 2;
 
     private File dataRoot;
     private TextView status;
     private ProgressBar progress;
     private Button pick;
+    private Button pickMaps;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -143,6 +150,8 @@ public class LauncherActivity extends Activity {
         message.setText("Choose an Xbox disc image of Halo: Combat Evolved (an .iso or .xiso file, any "
             + "version) on this device. Its maps folder is copied into the app's storage (about 1.8 GB), "
             + "and you can delete the image afterwards.\n\n"
+            + "Or choose a folder containing extracted maps (ui.map and the other .map files), "
+            + "or a folder with a maps subfolder.\n\n"
             + "You can also copy a maps folder from a computer:\n"
             + "adb push <folder with maps>/. " + (dataRoot != null ? dataRoot.getAbsolutePath() : "") + "/");
         message.setTextColor(Color.rgb(200, 205, 210));
@@ -162,6 +171,16 @@ public class LauncherActivity extends Activity {
             startActivityForResult(intent, PICK_IMAGE);
         });
         layout.addView(pick, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        pickMaps = new Button(this);
+        pickMaps.setText("Choose extracted maps");
+        pickMaps.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(intent, PICK_MAPS);
+        });
+        layout.addView(pickMaps, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT));
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -193,13 +212,21 @@ public class LauncherActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != PICK_IMAGE || resultCode != RESULT_OK || data == null || data.getData() == null)
+        if ((requestCode != PICK_IMAGE && requestCode != PICK_MAPS) || resultCode != RESULT_OK || data == null || data.getData() == null)
             return;
         Uri image = data.getData();
         pick.setEnabled(false);
+        pickMaps.setEnabled(false);
         progress.setVisibility(View.VISIBLE);
-        status.setText("Reading the disc image...");
-        new Thread(() -> importImage(image)).start();
+        if (requestCode == PICK_MAPS) {
+            progress.setIndeterminate(true);
+            status.setText("Reading extracted maps...");
+            new Thread(() -> importMaps(image), "Halo maps import").start();
+        } else {
+            progress.setIndeterminate(false);
+            status.setText("Reading the disc image...");
+            new Thread(() -> importImage(image), "Halo disc import").start();
+        }
     }
 
     private void report(String text, int permille) {
@@ -215,8 +242,117 @@ public class LauncherActivity extends Activity {
             status.setText(text);
             progress.setVisibility(View.GONE);
             pick.setEnabled(true);
+            pickMaps.setEnabled(true);
             pick.requestFocus();
         });
+    }
+
+    private static final class MapDocument {
+        final Uri uri;
+        final String name;
+        final boolean directory;
+        MapDocument(Uri uri, String name, boolean directory) {
+            this.uri = uri; this.name = name; this.directory = directory;
+        }
+    }
+
+    private ArrayList<MapDocument> children(Uri directory) throws IOException {
+        Uri query = DocumentsContract.buildChildDocumentsUriUsingTree(directory,
+            DocumentsContract.getDocumentId(directory));
+        String[] columns = {DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE};
+        ArrayList<MapDocument> result = new ArrayList<>();
+        try (Cursor cursor = getContentResolver().query(query, columns, null, null, null)) {
+            if (cursor == null) throw new IOException("The selected folder cannot be read");
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(1);
+                if (!validDocumentName(name))
+                    throw new IOException("Invalid filename in the selected folder");
+                result.add(new MapDocument(DocumentsContract.buildDocumentUriUsingTree(directory,
+                    cursor.getString(0)), name, DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2))));
+            }
+        }
+        return result;
+    }
+
+    private boolean validDocumentName(String name) {
+        return name != null && !name.isEmpty() && !name.equals(".") && !name.equals("..") &&
+            name.indexOf('/') < 0 && name.indexOf('\\') < 0;
+    }
+
+    private boolean hasUiMap(ArrayList<MapDocument> entries) {
+        for (MapDocument entry : entries)
+            if (!entry.directory && entry.name.equalsIgnoreCase("ui.map")) return true;
+        return false;
+    }
+
+    private void copyMaps(Uri source, File destination, int depth) throws IOException {
+        if (depth > 32) throw new IOException("Too many nested folders");
+        if (!destination.mkdir()) throw new IOException("Cannot create the maps folder");
+        byte[] buffer = new byte[256 * 1024];
+        for (MapDocument entry : children(source)) {
+            if (!validDocumentName(entry.name)) throw new IOException("Invalid filename in the selected folder");
+            // Halo's map filenames are lowercase, even when a disc extraction used uppercase.
+            String name = entry.name.toLowerCase(java.util.Locale.ROOT);
+            File target = new File(destination, name);
+            if (target.exists()) throw new IOException("Duplicate filename: " + entry.name);
+            if (entry.directory) {
+                copyMaps(entry.uri, target, depth + 1);
+            } else {
+                report("Copying " + entry.name + "...", -1);
+                try (InputStream input = getContentResolver().openInputStream(entry.uri)) {
+                    if (input == null) throw new IOException("Cannot read " + entry.name);
+                    try (OutputStream output = new FileOutputStream(target)) {
+                        int count;
+                        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                    }
+                }
+            }
+        }
+    }
+
+    // Only called for app-owned temporary directories created by this import.
+    private void removeImport(File file) {
+        File[] contents = file.listFiles();
+        if (contents != null) for (File child : contents) removeImport(child);
+        file.delete();
+    }
+
+    private void importMaps(Uri tree) {
+        File staging = null;
+        try {
+            if (dataRoot == null) throw new IOException("App storage is unavailable");
+            Uri source = DocumentsContract.buildDocumentUriUsingTree(tree,
+                DocumentsContract.getTreeDocumentId(tree));
+            ArrayList<MapDocument> entries = children(source);
+            if (!hasUiMap(entries)) {
+                for (MapDocument entry : entries) {
+                    if (entry.directory && entry.name.equalsIgnoreCase("maps")) {
+                        source = entry.uri; entries = children(source); break;
+                    }
+                }
+            }
+            if (!hasUiMap(entries)) throw new IOException("Choose a maps folder containing ui.map, or its parent folder");
+            staging = new File(dataRoot, "maps-import-" + System.nanoTime());
+            copyMaps(source, staging, 0);
+            if (new File(staging, "ui.map").length() == 0) throw new IOException("ui.map is empty");
+            File destination = new File(dataRoot, "maps");
+            File previous = new File(dataRoot, "maps-before-import-" + System.nanoTime());
+            boolean backedUp = destination.exists();
+            if (backedUp && !destination.renameTo(previous)) throw new IOException("Cannot prepare app storage");
+            if (!staging.renameTo(destination)) {
+                if (backedUp && !previous.renameTo(destination))
+                    throw new IOException("Cannot install maps; previous files are preserved in " + previous.getName());
+                throw new IOException("Cannot install copied maps");
+            }
+            staging = null;
+            if (backedUp) removeImport(previous);
+            handler.post(this::startGame);
+        } catch (Exception exception) {
+            fail("Import failed: " + exception.getMessage());
+        } finally {
+            if (staging != null) removeImport(staging);
+        }
     }
 
     private void importImage(Uri image) {
