@@ -55,7 +55,8 @@ struct plasma_runtime_parameters
 
 struct rasterizer_transparent_geometry_group_plasma
 {
-	byte reserved00[0xC];
+	unsigned long geometry_flags; /* port: first-person displacement limit */
+	byte reserved04[8];
 	struct shader *shader;
 	short bitmap_sequence_index;
 	byte reserved12[0x5A];
@@ -150,6 +151,7 @@ void rasterizer_plasma_energy_draw(
 	real_rgb_color const *tint;
 	real intensity;
 	real offset;
+	real offset_amount; /* port: keep the first-person shell close to the arms */
 	real primary_time;
 	real secondary_time;
 	real primary_scale;
@@ -172,6 +174,13 @@ void rasterizer_plasma_energy_draw(
 		tint = global_real_rgb_white;
 		intensity = 1.0f;
 		offset = 0.0f;
+		/* port: body shields can expand much farther than an arm's radius.
+		Limit only first-person plasma to the close-fitting 0.0075-unit shell;
+		keep smaller authored offsets and the shader's animation curve. Bit 7
+		is the first-person flag used by rasterizer_transparent_geometry.c. */
+		offset_amount = plasma->offset_amount;
+		if ((group->geometry_flags & (1UL << 7)) && offset_amount > 0.0075f)
+			offset_amount = 0.0075f;
 		runtime = group->runtime_parameters;
 		if (runtime)
 		{
@@ -192,7 +201,7 @@ void rasterizer_plasma_energy_draw(
 				if (source >= 1 && source <= 4)
 					offset = (real)pow(
 						(double)runtime->exponents[source - 1],
-						(double)plasma->offset_exponent) * plasma->offset_amount;
+						(double)plasma->offset_exponent) * offset_amount;
 			}
 		}
 
