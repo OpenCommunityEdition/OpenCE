@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="pause/coop/1p_pause_game" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" close="all"/>
+		<on event="back" close="all"/>
+		<child widget="pause/coop/box" x="210" y="147"/>
+		<child widget="pause/coop/list" x="218" y="190"/>
+	</widget>
+	<widget name="pause/coop/2p_pause_game" width="640" height="240" flags="pass_unhandled_to_focused_child">
+		<on event="b" close="all"/>
+		<on event="back" close="all"/>
+		<child widget="pause/coop/box" x="210" y="35"/>
+		<child widget="pause/coop/list" x="218" y="78"/>
+	</widget>
+	<widget name="pause/coop/4p_pause_game" width="320" height="240" flags="pass_unhandled_to_focused_child">
+		<on event="b" close="all"/>
+		<on event="back" close="all"/>
+		<child widget="pause/coop/box" x="50" y="29"/>
+		<child widget="pause/coop/list" x="58" y="72"/>
+	</widget>
+	<widget name="pause/coop/box" width="226" height="194">
+		<child widget="pause/coop/box_left" x="-4"/>
+		<child widget="pause/coop/box_center" x="12"/>
+		<child widget="pause/coop/box_right" x="206"/>
+	</widget>
+	<widget name="pause/coop/box_left" width="16" height="256" bitmap="pause/pausebox_left">
+	</widget>
+	<widget name="pause/coop/box_center" width="194" height="256" bitmap="pause/pausebox_center">
+	</widget>
+	<widget name="pause/coop/box_right" width="16" height="256" bitmap="pause/pausebox_right">
+	</widget>
+	<widget name="pause/coop/list" type="column_list" width="202" height="110" flags="pass_unhandled_to_focused_child up_down_tabs_items">
+		<child widget="pause/coop/resume" y="0"/>
+		<child widget="pause/coop/settings" y="35"/>
+		<child widget="pause/coop/leave" y="70"/>
+	</widget>
+	<widget name="pause/coop/resume" type="text" width="202" height="27" text="RESUME GAME" font="ui\large_ui" color="#FF7FAFFF" align="center">
+		<on event="a" close="all"/>
+		<on event="start" close="all"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/coop/settings" type="text" width="202" height="27" text="SETTINGS" font="ui\large_ui" color="#FF7FAFFF" align="center">
+		<on event="a" run="profile set edit begin" branch="true" open="main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen"/>
+		<on event="start" run="profile set edit begin" branch="true" open="main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/coop/leave" type="text" width="202" height="27" text="LEAVE GAME" font="ui\large_ui" color="#FF7FAFFF" align="center">
+		<on event="a" run="port coop leave game"/>
+		<on event="start" run="port coop leave game"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

@@ -1443,12 +1443,52 @@ def _map_kind() -> list:
     return lines
 
 
+def _coop_pause() -> list:
+    """The multiplayer pause layout for campaign maps, which contain only
+    campaign pause tags. Leave Game is the host's end-to-lobby action, so it
+    needs no separate End Game row. Coordinates match the three-row MP menu,
+    including its two- and four-viewport forms."""
+    base = "pause/coop"
+    lines = []
+    for count, width, height, x, y in [(1, 640, 480, 210, 147),
+                                       (2, 640, 240, 210, 35),
+                                       (4, 320, 240, 50, 29)]:
+        lines += _widget(f"{base}/{count}p_pause_game",
+                         [("width", width), ("height", height),
+                          ("flags", "pass_unhandled_to_focused_child")],
+                         ['<on event="b" close="all"/>', '<on event="back" close="all"/>',
+                          f'<child widget="{base}/box" x="{x}" y="{y}"/>',
+                          f'<child widget="{base}/list" x="{x + 8}" y="{y + 43}"/>'])
+    lines += _widget(f"{base}/box", [("width", 226), ("height", 194)],
+                     [f'<child widget="{base}/box_{piece}" x="{x}"/>'
+                      for piece, x in [("left", -4), ("center", 12), ("right", 206)]])
+    for piece, width in [("left", 16), ("center", 194), ("right", 16)]:
+        lines += _widget(f"{base}/box_{piece}", [("width", width), ("height", 256),
+                                               ("bitmap", f"pause/pausebox_{piece}")], [])
+    lines += _widget(f"{base}/list", [("type", "column_list"), ("width", 202), ("height", 110),
+                                    ("flags", "pass_unhandled_to_focused_child up_down_tabs_items")],
+                     [f'<child widget="{base}/{name}" y="{index * 35}"/>'
+                      for index, name in enumerate(["resume", "settings", "leave"])])
+    for name, label, handler in [
+            ("resume", "RESUME GAME", 'close="all"'),
+            ("settings", "SETTINGS", 'run="profile set edit begin" branch="true" '
+             f'open="{PE}/player_profile_edit_screen"'),
+            ("leave", "LEAVE GAME", 'run="port coop leave game"')]:
+        lines += _widget(f"{base}/{name}", [("type", "text"), ("width", 202), ("height", 27),
+                                           ("text", label), ("font", "ui\\large_ui"),
+                                           ("color", "#FF7FAFFF"), ("align", "center")],
+                         [f'<on event="a" {handler}/>', f'<on event="start" {handler}/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>'])
+    return lines
+
+
 def multiplayer_files() -> dict:
     """the port's multiplayer widgets: the browser's additions, the server
     settings, the lobby"""
     head = ['<?xml version="1.0" encoding="UTF-8"?>',
             "<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->", "<menus>"]
     return {
+        "pause.coop.xml": head + _coop_pause() + ["</menus>", ""],
         f"{MT}/join_game".replace("/", ".") + ".port.xml": head + _join_game_extras() + ["</menus>", ""],
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],

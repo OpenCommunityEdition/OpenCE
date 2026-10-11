@@ -8265,10 +8265,7 @@ static boolean ui_check_for_pause_game(
 						network_game_client_get_machine_index(client);
 					char const *widget_name;
 
-					/* port: a campaign map has only the campaign's pause screen */
-					if (network_coop_active())
-						widget_name = "ui\\shell\\solo_game\\pause_game\\pause_game";
-					else switch (local_player_count)
+					switch (local_player_count)
 					{
 					case 1:
 						widget_name =
@@ -8294,6 +8291,9 @@ static boolean ui_check_for_pause_game(
 						widget_name = NULL;
 						break;
 					}
+					/* port: campaign maps get the multiplayer pause menu too. */
+					if (widget_name)
+						widget_name = pc_menus_screen(widget_name);
 					if (widget_name &&
 						!ui_widget_load_by_name_or_tag(
 							widget_name,
