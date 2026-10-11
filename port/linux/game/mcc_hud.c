@@ -1,6 +1,6 @@
-/* MCC HUD normalization. MCC placements use a 960p canvas; the native
- * viewport uses 480p. Bitmap half-HUD flags apply in addition to that canvas
- * conversion. Keep the original bitmap pixels and sprite texture coordinates. */
+/* MCC HUD normalization. Unflagged placements use a 960p canvas; legacy
+ * high-resolution placements retain their 480p offsets. Bitmap half-HUD flags
+ * apply independently of anchor conversion. Keep the original bitmap pixels and sprite texture coordinates. */
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "interface/unit_hud_interface_definition.h"
@@ -105,9 +105,13 @@ static int mcc_hud_half_bitmap(struct mcc_runtime *r,uint32_t handle,int *half)
 
 static void mcc_hud_offset(struct hud_placement_definition *placement)
 {
-    placement->offset.x/=2;
-    placement->offset.y/=2;
-    /* MCC does not apply the old PC placement high-resolution flag. */
+    /* Legacy high-resolution placements keep their 480p anchor offsets.
+     * Other MCC placements use the doubled canvas. Bitmap resolution is
+     * independent of this flag. Consume it before native drawing. */
+    if (!(placement->multiplayer_scaling_flags&4)) {
+        placement->offset.x/=2;
+        placement->offset.y/=2;
+    }
     placement->multiplayer_scaling_flags&=~4;
 }
 

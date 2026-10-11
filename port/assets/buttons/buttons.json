@@ -207,6 +207,38 @@
      ]
     }
    ]
+  },
+  {
+   "name": "mcc_black_butn__0",
+   "tag": "mcc\\buttons\\black",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "black_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "mcc_white_butn__0",
+   "tag": "mcc\\buttons\\white",
+   "bitmap": 0,
+   "width": 32,
+   "height": 32,
+   "format": "dxt3",
+   "scale": 8,
+   "crc": 0,
+   "svg": "white_butn.svg",
+   "place": [
+    1,
+    0,
+    0
+   ]
   }
  ]
 }

@@ -111,13 +111,21 @@ int main(int argc,char **argv) {
         struct hud_placement_definition p={{20,-12},{2.0f,4.0f},4};
         mcc_hud_scale(&p,1);
         if(p.scale.i!=0.5f || p.scale.j!=1.0f || p.multiplayer_scaling_flags ||
-            p.offset.x!=10 || p.offset.y!=-6) return 9;
+            p.offset.x!=20 || p.offset.y!=-12) return 9;
         p.scale.i=2.0f;p.scale.j=4.0f;p.multiplayer_scaling_flags=4;
         mcc_hud_scale(&p,0);
         if(p.scale.i!=1.0f || p.scale.j!=2.0f || p.multiplayer_scaling_flags) return 10;
         p.scale.i=2.0f;p.scale.j=4.0f;p.multiplayer_scaling_flags=7;
         mcc_hud_scale(&p,0);
         if(p.scale.i!=1.0f || p.scale.j!=2.0f || p.multiplayer_scaling_flags!=3) return 11;
+        /* A50's legacy flashlight reaches the bottom; its unflagged visor
+         * remains on the doubled canvas. Neither changes bitmap size rules. */
+        p.offset.x=0;p.offset.y=408;p.multiplayer_scaling_flags=4;
+        mcc_hud_offset(&p);
+        if(p.offset.y!=408 || p.multiplayer_scaling_flags) return 40;
+        p.offset.x=-224;p.offset.y=-56;p.multiplayer_scaling_flags=0;
+        mcc_hud_offset(&p);
+        if(p.offset.x!=-112 || p.offset.y!=-28) return 41;
         return 0;
     }
     if (!strcmp(argv[1],"score-hint")) {

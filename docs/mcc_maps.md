@@ -262,8 +262,10 @@ that require different channel layouts gets separate MCC-owned tag and
 pixel copies, with the relevant consumer's reference redirected. The tag
 index can grow into a separate checked allocation for those copies.
 
-MCC HUD placements use a 960p canvas, converted to the native 480p canvas
-in MCC-owned tags. Bitmap half-scale flags are a separate factor, so high
+Unflagged MCC HUD placements use a 960p canvas, converted to native 480p
+coordinates in MCC-owned tags. Legacy high-resolution placements (flag 4)
+already carry 480p anchor offsets and retain them. Bitmap size conversion
+is independent of that offset flag; the flag is consumed before native drawing. Bitmap half-scale flags are a separate factor, so high
 resolution images retain their original texels. Anchors, number advances,
 waypoint/damage margins and direct icon geometry are normalized; the
 motion-sensor radius and font-relative icon offsets/advances already use
@@ -1104,3 +1106,27 @@ memory limits and must not be applied indiscriminately.
 | Xbox-order model and HUD meter flags | [Invader model shader schema](https://github.com/SnowyMouse/invader/blob/master/src/tag/hek/definition/shader_model.json), [HUD meter schema](https://github.com/SnowyMouse/invader/blob/master/src/tag/hek/definition/hud_interface_types.json); Ruby and Mercury contain mixed flag states. |
 | Empty Vorbis residue vectors contribute zero | [Xiph Vorbis 1.3.7 codebook implementation](https://github.com/xiph/vorbis/blob/v1.3.7/lib/codebook.c), `vorbis_book_decodevs_add`, `vorbis_book_decodev_add`, `vorbis_book_decodevv_add`; synthetic multi-pass streams and independent Ruby PCM comparison. |
 | Header and historical format differences | [Reclaimers map documentation](https://c20.reclaimers.net/h1/maps/), [SnowyMouse CEA format research](https://gist.github.com/SnowyMouse/39168bddd597549038a35d78aee39513); historical chunk compression is outside this implementation's scope. |
+
+### Gameplay glyph and HUD placement follow-up
+
+Gameplay A/B/X/Y use the embedded OpenCE redraws with compact text-fragment
+spacing. The modern shoulder labels use Xbox white (LB) and black (RB),
+matching `xinput_sdl.c`; the two neutral variants reuse the button redraw's
+oval. Other controls and custom pickup artwork retain their existing path.
+Pause menus are unchanged. All replacements are selected by controller-entry
+identity, never by a shared sprite sequence number.
+
+A50_Revisited mixes legacy high-resolution placements with unflagged visor
+and number placements. Halving every anchor offset compressed the ammo
+layout, moved the flashlight meter toward the centre, and overlapped the
+shield panel with the visor. Preserving the flagged offsets corrects those
+relationships without map-name checks or changing the Xbox/CE renderer.
+MCC anchors also use a 2.5% title-safe inset, matching the supplied reference,
+rather than Xbox's 7.5%; this keeps the flashlight above the bottom visor.
+Centre-anchored crosshairs and the inner split-screen seam retain their
+existing calculations.
+The supplied [Workshop reference](https://images.steamusercontent.com/ugc/2013710564213466041/A0A23236FCCA6F4C077C15F6428B257FED2FEF8A/)
+and a hidden native-renderer capture were used to compare the visor join and
+ammo layout. A separate bounded capture enabled the flashlight and verified
+its meter above the bottom visor. Regression cases cover split-screen seams,
+zoom inset preservation, controller mappings, and neutral Xbox/CE dispatch.

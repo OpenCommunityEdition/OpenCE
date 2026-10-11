@@ -58,14 +58,15 @@ static float drawn_scale;
 static point2d drawn_point;
 static pixel32 drawn_color;
 static struct bitmap_group group;
-static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[4];
+static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_buttons[6];
 static struct {struct {struct {long count;void *address;} button_icons;} messaging;} globals,*hud_globals;
 static int allocations,registrations,deletions;
 static struct bitmap_data native_bitmap;
 static unsigned long hardware[2];
 static char const *assets[]={"ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn",
-    "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn"};
-static long hud_hires_asset_count(void) {return 4;}
+    "ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn",
+    "mcc\\buttons\\black","mcc\\buttons\\white"};
+static long hud_hires_asset_count(void) {return 6;}
 static char const *hud_hires_asset_tag(long i) {return assets[i];}
 static struct bitmap_data *bitmap_2d_new(short w,short h,short m,short f) {
     if(w!=32||h!=32||m||f!=11)abort();allocations++;
@@ -73,7 +74,7 @@ static struct bitmap_data *bitmap_2d_new(short w,short h,short m,short f) {
 }
 static int rasterizer_bitmap_new(struct bitmap_data *b) {b->hardware_format=hardware;return 1;}
 static void hud_hires_register_placeholder(long a,unsigned long const *t) {
-    if(a<0||a>=4||(t&&t!=hardware))abort();registrations+=t?1:-1;
+    if(a<0||a>=6||(t&&t!=hardware))abort();registrations+=t?1:-1;
 }
 static void xgpu_mcc_texture_unbind(unsigned long const *t) {if(t!=hardware)abort();}
 static void bitmap_delete(struct bitmap_data *b) {if(b!=&native_bitmap)abort();deletions++;}
@@ -125,7 +126,7 @@ int main(int argc,char **argv) {
     if(memcmp(&icon,&saved,sizeof(icon)))return 3;
     if(!mcc && (memcmp(&cursor,&before,sizeof(cursor))||draws||lookups||handled))return 4;
     if(mcc_hud_bitmap_scale(NONE)!=1.0f)return 5;
-    if(argc==8 && mcc && !menu && atoi(argv[7])<4) {
+    if(argc==8 && mcc && !menu && atoi(argv[7])<6) {
         if(allocations!=1||registrations!=1||lookups)return 9;
         if(mcc_hud_button_bitmap((short)atoi(argv[7]))!=&native_bitmap||allocations!=1)return 10;
         mcc_hud_glyphs_dispose();mcc_hud_glyphs_dispose();
@@ -192,7 +193,7 @@ def test_messaging_offsets_preserve_stock_and_map_authored_values(hud_tool, play
     assert int(result.stdout.split()[4]) == int(140 - offset_y * viewport)
 
 
-@pytest.mark.parametrize("button", range(4))
+@pytest.mark.parametrize("button", range(6))
 @pytest.mark.parametrize("players", [1, 2, 4])
 @pytest.mark.parametrize("flags", [0, 16, 128])
 def test_gameplay_native_buttons_ignore_mcc_sheet_and_offsets(hud_tool, button, players, flags):
@@ -201,14 +202,15 @@ def test_gameplay_native_buttons_ignore_mcc_sheet_and_offsets(hud_tool, button, 
     assert result.returncode==0,result.stderr
     handled,draws,scale,x,y,cursor,color,canvas=result.stdout.split()
     viewport=1.0 if players==1 else 0.75
-    assert (handled,draws,x)==("1","1","100")
+    assert (handled,draws)==("1","1")
+    assert int(x)==int(100+2*viewport)
     assert float(scale)==pytest.approx(viewport*20/26,abs=0.0006)
     assert int(y)==int(128+10*viewport)
-    assert int(cursor)==int(100+(21*20/26+2)*viewport)
+    assert int(cursor)==int(int(100+2*viewport)+(21*20/26-3)*viewport)
     assert int(color)==0xFFFFFFFF
 
 
-@pytest.mark.parametrize("loaded,menu,button", [(0,0,0),(0,1,2),(1,1,0),(1,1,1),(1,0,4),(1,0,17)])
+@pytest.mark.parametrize("loaded,menu,button", [(0,0,0),(0,1,2),(1,1,0),(1,1,1),(1,0,6),(1,0,17)])
 def test_native_glyph_scope_preserves_menus_other_formats_and_icons(hud_tool, loaded, menu, button):
     result=subprocess.run([str(hud_tool),str(loaded),"1",str(menu),"16","2","0",str(button)],
                           capture_output=True,text=True)
@@ -222,7 +224,7 @@ def anchor_tool(tmp_path_factory):
         pytest.skip("clang is needed")
     work = tmp_path_factory.mktemp("mcc-anchors")
     source = (ROOT / "port/linux/game/mcc_hud_draw.c").read_text()
-    routines = "\n".join(function(source, n) for n in ["mcc_hud_edge", "mcc_hud_anchor_point",
+    routines = "\n".join(function(source, n) for n in ["mcc_hud_edge", "mcc_hud_frame_inset", "mcc_hud_anchor_point",
                             "mcc_hud_anchor_bounds", "mcc_hud_anchor_number"])
     code = r'''
 #include <stdlib.h>
@@ -236,7 +238,9 @@ struct bitmap_data {short width,height;point2d registration_point;};
 struct hud_placement_definition {point2d offset;};
 #define TRUE 1
 #define FALSE 0
+#define MIN(a,b) ((a)<(b)?(a):(b))
 static int loaded;
+static long halo_screen_width(void) {return 840;}
 static int mcc_cache_tags_loaded(void) {return loaded;}
 ''' + routines + r'''
 int main(int argc,char **argv) {
@@ -245,7 +249,11 @@ int main(int argc,char **argv) {
     point2d point={-99,-99};
     real_rectangle2d bounds={-99,-99,-99,-99};
     short cursor=-99,anchor;int a,b,c;float scale;
-    if(argc!=4)return 2;
+    if(argc!=4 && argc!=5)return 2;
+    if(argc==5) {
+        if(atoi(argv[4])==1) {window=(rectangle2d){64,36,422,236};viewport=(rectangle2d){0,0,426,240};}
+        else {window=(rectangle2d){180,30,700,430};}
+    }
     loaded=atoi(argv[1]);anchor=(short)atoi(argv[2]);scale=(float)atof(argv[3]);
     a=mcc_hud_anchor_point(anchor,&placement,NULL,scale,&window,&viewport,&point);
     b=mcc_hud_anchor_bounds(anchor,200,80,&bounds);
@@ -313,10 +321,10 @@ def test_child_anchors_are_mcc_only_bounded_and_do_not_mutate_parent(child_ancho
 
 @pytest.mark.parametrize("scale", [1.0, 0.75])
 @pytest.mark.parametrize("anchor,origin,direction,bounds,cursor", [
-    (5, (420,20), (1,1), (-100,100,0,80), 350),
-    (6, (420,420), (1,-1), (-100,100,-80,0), 350),
-    (7, (20,220), (1,1), (0,200,-40,40), 400),
-    (8, (820,220), (-1,1), (-200,0,-40,40), 300)])
+    (5, (420,6), (1,1), (-100,100,0,80), 350),
+    (6, (420,434), (1,-1), (-100,100,-80,0), 350),
+    (7, (6,220), (1,1), (0,200,-40,40), 400),
+    (8, (834,220), (-1,1), (-200,0,-40,40), 300)])
 def test_mcc_edge_anchors_follow_player_window(anchor_tool,scale,anchor,origin,direction,bounds,cursor):
     result=subprocess.run([str(anchor_tool),"1",str(anchor),str(scale)],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
@@ -327,7 +335,7 @@ def test_mcc_edge_anchors_follow_player_window(anchor_tool,scale,anchor,origin,d
     assert values[9]==cursor
 
 
-@pytest.mark.parametrize("loaded,anchor", [(0,n) for n in range(10)]+[(1,n) for n in [-1,0,1,2,3,4,9]])
+@pytest.mark.parametrize("loaded,anchor", [(0,n) for n in range(10)]+[(1,n) for n in [-1,4,9]])
 def test_edge_dispatch_preserves_legacy_and_unknown_anchors(anchor_tool,loaded,anchor):
     result=subprocess.run([str(anchor_tool),str(loaded),str(anchor),"1"],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
@@ -395,3 +403,39 @@ def test_terminal_scales_only_oversized_mcc_text(terminal_tool,loaded,height):
         assert values[7:]==[min(32767,int(100+640/(15/height))),min(32767,401+height)]
     else:
         assert values[:4]==[height,0,0,0]
+
+
+def test_shoulder_redraws_match_native_controller_order():
+    import json
+    import struct
+    assets = ROOT / "port/assets/buttons"
+    entries = json.loads((assets / "buttons.json").read_text())["assets"]
+    by_tag = {entry["tag"]: entry for entry in entries}
+    source = (ROOT / "port/linux/game/mcc_hud_draw.c").read_text()
+    # Controller entries 4/5 are black/white; physical RB/LB map to them.
+    body = function(source, "mcc_hud_button_bitmap")
+    assert body.index('buttons\\\\black') < body.index('buttons\\\\white')
+    for color in ("black", "white"):
+        entry = by_tag["mcc\\buttons\\" + color]
+        assert entry["crc"] == 0
+        assert (entry["width"], entry["height"], entry["scale"]) == (32, 32, 8)
+        png = (assets / (entry["name"] + ".png")).read_bytes()
+        assert png[:8] == b"\x89PNG\r\n\x1a\n"
+        assert struct.unpack_from(">II", png, 16) == (256, 256)
+        assert png[24:26] == bytes((8, 6))  # RGBA8
+
+
+@pytest.mark.parametrize("anchor,expected", [(0,(16,26)),(1,(824,26)),(2,(16,414)),(3,(824,414))])
+def test_mcc_corner_anchors_use_mcc_safe_frame(anchor_tool, anchor, expected):
+    result=subprocess.run([str(anchor_tool),"1",str(anchor),"1"],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    values=list(map(float,result.stdout.split()))
+    assert values[:3]==[1,0,0]
+    assert values[3:5]==list(expected)
+
+
+@pytest.mark.parametrize("layout,anchor,expected", [(1,1,(412,32)),(1,3,(412,216)),(2,0,(128,26))])
+def test_mcc_safe_frame_preserves_split_seams_and_zoom_inset(anchor_tool,layout,anchor,expected):
+    result=subprocess.run([str(anchor_tool),"1",str(anchor),"1",str(layout)],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    assert list(map(float,result.stdout.split()))[3:5]==list(expected)

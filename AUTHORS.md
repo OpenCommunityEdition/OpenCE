@@ -5,7 +5,8 @@
 - **The game's icon** (the Android app's launcher icon, `halo.exe`'s icon
   and the desktop windows' icon): by ORION (`port/assets/icon`).
 - **The controller's A, B, X and Y buttons** (the menus' button icons and
-  the HUD messages'): redraws by saulob (`port/assets/buttons`).
+  the HUD messages'): redraws by saulob (`port/assets/buttons`). The MCC
+  black/white button variants reuse that oval artwork with neutral gradients.
 - **The high-res HUD** (its meters, icons, scopes and messages, and the
   weapons' reticles): redraws by MrBruh (`port/assets/hud`), based on
   reference photos by Aerocatia. The sniper rifle's zoom labels (2x, 10x)
