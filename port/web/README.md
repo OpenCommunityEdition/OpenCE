@@ -266,7 +266,9 @@ multiply-adds). `tools/web_build.py` writes the graph.
 - **Memory watch.** WebAssembly cannot protect pages, so the textures'
   memory is watched by hashing it once a frame, as the Android host does
   under the x86 emulator (`port/web/src/web_memory_watch.c`,
-  `port/android/host/host_watch_hash.c`).
+  `port/android/host/host_watch_hash.c`). A page that has stayed the same
+  for 30 checks is hashed every 4 frames, until the game locks it or a
+  file is read into it.
 - **Sockets.** `port/web/src/web_net.c` gives `posix.h`'s sockets inside
   the page: one machine with a loopback address and an address of its own
   network (`10.0.0.1`, or the room's); datagrams to either, or broadcast,

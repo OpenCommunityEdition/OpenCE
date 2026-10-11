@@ -9,6 +9,15 @@ host_memory.c would stop the game at its first write to a cached page.
 A watched page's hash is kept. Asking for its generation hashes it again,
 at most once a frame (watch_hash_begin_frame), and a different hash counts
 as a write. A write is therefore seen in the next frame, not at once.
+
+Hashing every page drawn from each frame is a large part of the frame on
+the web (port/web/src/web_memory_watch.c), where most of them never change
+once loaded. With the optional unchanged counts, a page whose hash stayed the
+same WATCH_HASH_STABLE_CHECKS times in a row is hashed only every
+WATCH_HASH_STABLE_FRAMES frames, until a write into it is announced
+(watch_hash_prepare_write: the file layer's reads, the Direct3D locks) or
+its hash changes. A write that is not announced into such a page is seen up
+to that many frames late.
 */
 
 #ifndef HOST_WATCH_HASH_H
@@ -17,6 +26,8 @@ as a write. A write is therefore seen in the next frame, not at once.
 #include <stdint.h>
 
 #define WATCH_HASH_PAGE_SIZE 0x1000u
+#define WATCH_HASH_STABLE_CHECKS 30u
+#define WATCH_HASH_STABLE_FRAMES 4u
 
 struct watch_hash
 {
@@ -31,6 +42,9 @@ struct watch_hash
 	uint32_t *generation;
 	volatile uint32_t *current_generation;
 	uint32_t frame;
+	/* NULL, or page_count entries: the checks in a row that found the page
+	unchanged (up to WATCH_HASH_STABLE_CHECKS) */
+	uint8_t *unchanged;
 };
 
 /* a hash of one page (WATCH_HASH_PAGE_SIZE bytes, 8-byte aligned) that
@@ -43,13 +57,16 @@ ignored. */
 void watch_hash_protect(struct watch_hash *watch, uint32_t first, uint32_t last);
 
 /* The newest generation among pages first to last (inclusive), after hashing
-again the watched ones not yet hashed this frame; a page whose hash
-changed gets a new generation. 0 if the range is outside the watched
-memory. */
+again the watched ones not yet hashed this frame (a stable one may wait,
+above); a page whose hash changed gets a new generation. 0 if the range is
+outside the watched memory. */
 uint32_t watch_hash_generation(struct watch_hash *watch, uint32_t first, uint32_t last);
 
 /* The pages were remapped: treat them as written and unwatched. */
 void watch_hash_forget(struct watch_hash *watch, uint32_t first, uint32_t last);
+
+/* The pages are about to be written: hash them every frame again. */
+void watch_hash_prepare_write(struct watch_hash *watch, uint32_t first, uint32_t last);
 
 /* A new frame: pages may be hashed again, and the serial changes. */
 void watch_hash_begin_frame(struct watch_hash *watch);

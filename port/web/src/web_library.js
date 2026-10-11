@@ -9,6 +9,16 @@ WebSockets of internet play's brokers.
 */
 
 addToLibrary({
+  // Emscripten's clock (clock_gettime, the game's GetTickCount and
+  // QueryPerformanceCounter: port/linux/src/xbox_kernel.c) with this
+  // thread's time origin read once: reading performance.timeOrigin each time
+  // made a read of the clock take 1.7 times as long (in a worker in Chrome,
+  // where performance.now() alone takes about 300 ns). (Runs on the calling
+  // thread.)
+  $webTimeOrigin: 0,
+  emscripten_get_now__deps: ['$webTimeOrigin'],
+  emscripten_get_now: () => (webTimeOrigin ||= performance.timeOrigin) + performance.now(),
+
   // kind: 0 a status, 1 a notice, 2 an invite link of a game hosted for the
   // internet (to offer), 3 a fatal error (the game stops)
   web_js_post__proxy: 'sync',

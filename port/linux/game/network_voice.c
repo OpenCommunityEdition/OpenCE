@@ -959,14 +959,14 @@ void network_voice_update(
 boolean network_voice_machine_speaking(
 	long machine_index)
 {
-	unsigned long now = system_milliseconds();
-
+	/* (the clock read only for a machine that has spoken: this is asked for
+	every player each frame, and a read of the clock is slow in a browser) */
 	if (!voice_session || !voice_machine_valid(machine_index))
 		return FALSE;
 	if (machine_index == network_game_client_get_local_machine_index())
-		return voice_talked && now - voice_talked_at < VOICE_SPEAKING_MS;
-	return voice_heard[machine_index] && now - voice_heard_at[machine_index] < VOICE_SPEAKING_MS &&
-		!voice_muted[machine_index];
+		return voice_talked && system_milliseconds() - voice_talked_at < VOICE_SPEAKING_MS;
+	return voice_heard[machine_index] && !voice_muted[machine_index] &&
+		system_milliseconds() - voice_heard_at[machine_index] < VOICE_SPEAKING_MS;
 }
 
 boolean network_voice_machine_muted(
