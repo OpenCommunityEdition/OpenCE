@@ -322,6 +322,11 @@ static const struct config_setting config_settings[] =
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
 		"gray, yellow, green, pink, purple, cyan, cobalt, orange, teal, sage,\n"
 		"brown, tan, maroon or salmon." },
+	{ "game.item_physics", _config_string, "\"classic\"", "HALO_ITEM_PHYSICS", _environment_value, _platform_desktop,
+		"How weapons and grenades lying about move: \"classic\" (the game's own:\n"
+		"they bounce, then lie flat) or \"jolt\" (rigid bodies, Jolt Physics:\n"
+		"they tumble, lean against what they meet and fall off ledges; pushed by\n"
+		"shots and blasts as the game pushes them)." },
 	{ "game.death_physics", _config_string, "\"classic\"", "HALO_DEATH_PHYSICS", _environment_value, _platform_desktop,
 		"How bodies fall when they die: \"classic\" (the game's own death\n"
 		"animations) or \"ragdoll\" (limp, thrown by what killed them, tumbling\n"

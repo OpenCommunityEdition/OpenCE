@@ -76,6 +76,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "units/units.h"
+boolean item_physics_update(long item_index, boolean allowed); /* port: port/linux/game/item_physics.c */
 
 /* ---------- constants */
 
@@ -588,8 +589,13 @@ boolean item_update(
 	global_current_collision_users[global_current_collision_user_depth++] =
 		_collision_user_items;
 
+	/* port: or Jolt moves it (port/linux/game/item_physics.c), not an item
+	that keeps upright or floats */
 	if (TEST_FLAG(item->object.flags, _object_connected_to_map_bit) &&
-		item->object.parent_object_index == NONE)
+		item->object.parent_object_index == NONE &&
+		!item_physics_update(item_index,
+			!TEST_FLAG(definition->item.flags, _item_definition_always_maintains_z_up_bit) &&
+			!TEST_FLAG(definition->item.flags, _item_definition_antigravity_bit)))
 	{
 		if (TEST_FLAG(
 				definition->item.flags,

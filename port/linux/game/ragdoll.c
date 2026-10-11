@@ -308,6 +308,8 @@ static void ragdoll_apply_hit(struct ragdoll *ragdoll, struct ragdoll_pending_hi
 static void ragdolls_step(void);
 static boolean ragdolls_enabled(void);
 static void ragdoll_network_note(long object_index, real_point3d const *spot);
+/* item_physics.c: the items' bodies, forgotten with the world's */
+void item_physics_reset(void);
 
 /* (network play: where each body went limp here) */
 enum
@@ -1134,6 +1136,7 @@ void ragdolls_initialize_for_new_map(
 	for (index = 0; index < RAGDOLL_MAXIMUM_UNSETTLED; index++)
 		ragdoll_unsettled[index].object_index = NONE;
 	ragdoll_physics_reset();
+	item_physics_reset();
 	ragdoll_step_time = NONE;
 }
 
@@ -2870,6 +2873,15 @@ static boolean ragdoll_vehicle_hit(
 	return FALSE;
 }
 
+/* the world's gravity, as a share of the game's (item_physics.c's items
+fall as the game's) */
+real ragdoll_gravity_scale(
+	void)
+{
+	ragdoll_parameters_initialize();
+	return ragdoll_parameters.gravity_scale;
+}
+
 /* ---------- the world's tick */
 
 static void ragdolls_step(
@@ -2911,7 +2923,8 @@ static void ragdolls_step(
 	match_assert("ragdoll.c", __LINE__, global_current_collision_user_depth > 1);
 	global_current_collision_user_depth--;
 
-	if (any)
+	/* (and for the items Jolt moves: item_physics.c) */
+	if (any || ragdoll_physics_items_any())
 	{
 		ragdoll_physics_step(
 			(int)PIN((long)ragdoll_parameters.collision_steps, 1, 8),

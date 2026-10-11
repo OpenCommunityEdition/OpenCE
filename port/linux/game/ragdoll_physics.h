@@ -137,6 +137,30 @@ struct ragdoll_physics_contact
 /* the contacts of the last step, up to maximum; their count */
 int ragdoll_physics_vehicle_contacts(struct ragdoll_physics_contact *contacts, int maximum);
 
+/* ---------- items (port/linux/game/item_physics.c): a rigid body each, a
+convex hull of the item's points (its model's space, world units), against
+the level near it (its own triangles, as a ragdoll's) and the ragdolls */
+
+enum
+{
+	RAGDOLL_PHYSICS_MAXIMUM_ITEMS = 48,
+};
+
+/* a body for the item in the slot, where it is (its position, its rotation
+x y z w), moving as it does (world units and radians a tick); its gravity a
+share of the world's (ragdoll_physics_step's); FALSE if none could be made */
+int ragdoll_physics_item_create(int slot, float const *points, int point_count, float const position[3],
+	float const rotation[4], float const velocity[3], float const spin[3], float gravity_factor);
+void ragdoll_physics_item_destroy(int slot);
+int ragdoll_physics_item_exists(int slot);
+/* where the item's body is and how it moves; whether it is awake */
+int ragdoll_physics_item_get(int slot, float position[3], float rotation[4], float velocity[3], float spin[3]);
+/* a push (world units and radians a tick), which wakes it */
+void ragdoll_physics_item_add_velocity(int slot, float const velocity[3], float const spin[3]);
+void ragdoll_physics_item_set_environment(int slot, float const *triangles, int triangle_count);
+/* whether any item has a body (the world is stepped for them too) */
+int ragdoll_physics_items_any(void);
+
 #ifdef __cplusplus
 }
 #endif

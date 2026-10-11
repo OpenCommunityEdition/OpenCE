@@ -205,6 +205,9 @@ SCREENS["video_settings/graphics"] = {
         ("PHYSICS:", "game.death_physics", [("CLASSIC", "classic"), ("RAGDOLL", "ragdoll")],
          "Ragdoll: bodies fall limp, thrown by what killed\nthem. Classic: the game's own death animations.",
          "desktop"),
+        ("ITEM PHYSICS:", "game.item_physics", [("CLASSIC", "classic"), ("JOLT", "jolt")],
+         "Jolt: dropped guns and grenades tumble, lean\non things and fall off ledges.",
+         "desktop"),
     ],
 }
 _video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics]

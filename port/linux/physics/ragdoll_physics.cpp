@@ -125,6 +125,7 @@ struct ragdoll_slot
 /* what a body is, in its user data */
 const uint64 k_user_ragdoll = 1ull << 32;
 const uint64 k_user_vehicle = 2ull << 32;
+const uint64 k_user_item = 3ull << 32;
 const uint64 k_user_kind = 0xffffffff00000000ull;
 
 const int k_maximum_contacts = 64;
@@ -223,6 +224,13 @@ struct vehicle_slot
 
 const int k_maximum_vehicles = 24;
 
+struct item_slot
+{
+	BodyID body;
+	BodyID environment;
+	uint64 environment_hash = 0;
+};
+
 struct world
 {
 	bool started = false;
@@ -235,6 +243,7 @@ struct world
 	object_layer_pair_filter object_pairs;
 	ragdoll_slot slots[RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS];
 	vehicle_slot vehicles[k_maximum_vehicles];
+	item_slot items[RAGDOLL_PHYSICS_MAXIMUM_ITEMS];
 	vehicle_contact_listener contacts;
 	float fastest_vehicle = 0.f; // metres a tick, this tick
 };
@@ -351,6 +360,8 @@ extern "C" void ragdoll_physics_reset(void)
 		return;
 	for (int slot = 0; slot < RAGDOLL_PHYSICS_MAXIMUM_RAGDOLLS; ++slot)
 		ragdoll_physics_destroy(slot);
+	for (int slot = 0; slot < RAGDOLL_PHYSICS_MAXIMUM_ITEMS; ++slot)
+		ragdoll_physics_item_destroy(slot);
 	ragdoll_physics_vehicles_begin();
 	ragdoll_physics_vehicles_end();
 	g_world.system->OptimizeBroadPhase();
@@ -671,7 +682,7 @@ extern "C" void ragdoll_physics_step(int collision_steps, float gravity)
 		return;
 	g_world.contacts.count = 0;
 
-	bool any = false;
+	bool any = ragdoll_physics_items_any() != 0;
 	for (const ragdoll_slot &slot : g_world.slots)
 		any = any || slot.ragdoll != nullptr;
 	if (!any)
@@ -933,4 +944,200 @@ extern "C" int ragdoll_physics_vehicle_contacts(struct ragdoll_physics_contact *
 	for (int index = 0; index < count; ++index)
 		contacts[index] = g_world.contacts.contacts[index];
 	return count;
+}
+
+/* ---------- items */
+
+namespace
+{
+
+item_slot *item_get(int slot)
+{
+	if (!g_world.started || slot < 0 || slot >= RAGDOLL_PHYSICS_MAXIMUM_ITEMS)
+		return nullptr;
+	return &g_world.items[slot];
+}
+
+void item_body_remove(BodyID &id)
+{
+	if (!id.IsInvalid())
+	{
+		bodies().RemoveBody(id);
+		bodies().DestroyBody(id);
+		id = BodyID();
+	}
+}
+
+} // namespace
+
+extern "C" int ragdoll_physics_items_any(void)
+{
+	if (!g_world.started)
+		return 0;
+	for (const item_slot &slot : g_world.items)
+		if (!slot.body.IsInvalid())
+			return 1;
+	return 0;
+}
+
+extern "C" int ragdoll_physics_item_exists(int index)
+{
+	item_slot *slot = item_get(index);
+
+	return slot && !slot->body.IsInvalid();
+}
+
+extern "C" void ragdoll_physics_item_destroy(int index)
+{
+	item_slot *slot = item_get(index);
+
+	if (!slot)
+		return;
+	item_body_remove(slot->body);
+	item_body_remove(slot->environment);
+	slot->environment_hash = 0;
+}
+
+extern "C" int ragdoll_physics_item_create(int index, float const *points, int point_count, float const position[3],
+	float const rotation[4], float const velocity[3], float const spin[3], float gravity_factor)
+{
+	if (!ragdoll_physics_initialize())
+		return 0;
+	item_slot *slot = item_get(index);
+	if (!slot || !points || point_count < 4)
+		return 0;
+	// (its level, given first, stays)
+	item_body_remove(slot->body);
+
+	Array<Vec3> hull;
+	hull.reserve((size_t)point_count);
+	for (int p = 0; p < point_count; ++p)
+	{
+		Vec3 point = metres(&points[p * 3]);
+		if (finite3(point))
+			hull.push_back(point);
+	}
+	if (hull.size() < 4)
+		return 0;
+	// (a thin item, a pistol on its side, keeps a convex radius smaller than
+	// itself)
+	ConvexHullShapeSettings settings(hull, 0.004f);
+	settings.mMaxConvexRadius = 0.004f;
+	ShapeSettings::ShapeResult result = settings.Create();
+	if (result.HasError())
+		return 0;
+
+	Vec3 where = metres(position);
+	Vec3 moving = metres(velocity) / k_tick;
+	Vec3 spinning = Vec3(spin[0], spin[1], spin[2]) / k_tick;
+	if (!finite3(where) || !finite3(moving) || !finite3(spinning))
+		return 0;
+	BodyCreationSettings creation(result.Get(), RVec3(where), quaternion(rotation), EMotionType::Dynamic,
+		layers::ragdoll);
+	creation.mUserData = k_user_item | (uint64)(uint32)index;
+	creation.mMotionQuality = EMotionQuality::LinearCast; // (thrown fast, not through a wall)
+	creation.mFriction = 0.7f;
+	creation.mRestitution = 0.12f;
+	creation.mLinearDamping = 0.1f;
+	creation.mAngularDamping = 0.4f;
+	creation.mGravityFactor = gravity_factor;
+	creation.mOverrideMassProperties = EOverrideMassProperties::CalculateInertia;
+	creation.mMassPropertiesOverride.mMass = 3.f; // (kilograms: a rifle's, about)
+	creation.mLinearVelocity = moving;
+	creation.mAngularVelocity = spinning;
+	Body *body = bodies().CreateBody(creation);
+	if (body == nullptr)
+	{
+		trace("out of bodies for an item");
+		return 0;
+	}
+	slot->body = body->GetID();
+	bodies().AddBody(slot->body, EActivation::Activate);
+	return 1;
+}
+
+extern "C" int ragdoll_physics_item_get(int index, float position[3], float rotation[4], float velocity[3], float spin[3])
+{
+	item_slot *slot = item_get(index);
+
+	if (!slot || slot->body.IsInvalid())
+		return 0;
+	RVec3 where;
+	Quat turn;
+	bodies().GetPositionAndRotation(slot->body, where, turn);
+	world_units(Vec3(where), position);
+	rotation[0] = turn.GetX();
+	rotation[1] = turn.GetY();
+	rotation[2] = turn.GetZ();
+	rotation[3] = turn.GetW();
+	world_units(bodies().GetLinearVelocity(slot->body) * k_tick, velocity);
+	Vec3 turning = bodies().GetAngularVelocity(slot->body) * k_tick;
+	spin[0] = turning.GetX();
+	spin[1] = turning.GetY();
+	spin[2] = turning.GetZ();
+	return bodies().IsActive(slot->body) ? 1 : 0;
+}
+
+extern "C" void ragdoll_physics_item_add_velocity(int index, float const velocity[3], float const spin[3])
+{
+	item_slot *slot = item_get(index);
+
+	if (!slot || slot->body.IsInvalid())
+		return;
+	Vec3 moving = metres(velocity) / k_tick;
+	Vec3 spinning = Vec3(spin[0], spin[1], spin[2]) / k_tick;
+	if (!finite3(moving) || !finite3(spinning))
+		return;
+	bodies().AddLinearAndAngularVelocity(slot->body, moving, spinning);
+	bodies().ActivateBody(slot->body);
+}
+
+extern "C" void ragdoll_physics_item_set_environment(int index, float const *triangles, int triangle_count)
+{
+	if (!ragdoll_physics_initialize())
+		return;
+	item_slot *slot = item_get(index);
+
+	if (!slot)
+		return;
+	uint64 hash = triangle_count > 0 && triangles ?
+		HashBytes(triangles, (size_t)triangle_count * 9 * sizeof(float), (uint64)triangle_count + 3) : 0;
+	if (hash != 0 && hash == slot->environment_hash && !slot->environment.IsInvalid())
+		return;
+	item_body_remove(slot->environment);
+	slot->environment_hash = 0;
+	if (triangle_count <= 0 || !triangles)
+		return;
+
+	Vec3 origin = metres(&triangles[0]);
+	TriangleList list;
+	list.reserve((size_t)triangle_count);
+	for (int t = 0; t < triangle_count; ++t)
+	{
+		Vec3 a = metres(&triangles[t * 9 + 0]) - origin;
+		Vec3 b = metres(&triangles[t * 9 + 3]) - origin;
+		Vec3 c = metres(&triangles[t * 9 + 6]) - origin;
+		if (finite3(a) && finite3(b) && finite3(c))
+			list.push_back(Triangle(Float3(a.GetX(), a.GetY(), a.GetZ()), Float3(b.GetX(), b.GetY(), b.GetZ()),
+				Float3(c.GetX(), c.GetY(), c.GetZ())));
+	}
+	if (list.empty())
+		return;
+	MeshShapeSettings mesh(list);
+	mesh.mActiveEdgeCosThresholdAngle = std::cos(DegreesToRadians(5.f));
+	ShapeSettings::ShapeResult result = mesh.Create();
+	if (result.HasError())
+		return;
+	BodyCreationSettings level(result.Get(), RVec3(origin), Quat::sIdentity(), EMotionType::Static, layers::level);
+	level.mFriction = 1.f;
+	level.mRestitution = 0.f;
+	Body *body = bodies().CreateBody(level);
+	if (body == nullptr)
+		return;
+	slot->environment = body->GetID();
+	slot->environment_hash = hash;
+	bodies().AddBody(slot->environment, EActivation::DontActivate);
+	// (the item lying on it wakes to find it)
+	if (!slot->body.IsInvalid())
+		bodies().ActivateBody(slot->body);
 }
