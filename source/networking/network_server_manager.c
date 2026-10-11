@@ -2911,9 +2911,7 @@ static boolean network_game_server_admit_held_players(
 				network_game_server_held_players[network_game_server_held_player_count];
 		}
 		player.player_list_index = NONE;
-		if (!network_game_server_original_grenade_peers_support(server, &server->game.variant,
-				server->game.player_count + 1) ||
-			!network_game_server_machine_may_add_player_ingame(server, machine_index) ||
+		if (!network_game_server_machine_may_add_player_ingame(server, machine_index) ||
 			!network_game_add_player(&server->game, &player))
 		{
 			network_event("failed to add a player from machine #%ld after the map downloaded",
