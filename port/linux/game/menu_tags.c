@@ -36,7 +36,6 @@ pause it as its pause menu does.
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "game/game.h"
-#include "networking/network_game_manager.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
@@ -57,7 +56,6 @@ int platform_audio_devices(int recording, char (*names)[128], int maximum);
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
 boolean network_game_is_active(void);
-struct network_game *network_game_get_game(void);
 
 /* cache_files.c's (port) */
 void *cache_files_tag_instances(long *count);
@@ -2098,15 +2096,14 @@ void menu_tags_loaded(
 
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && single_player_campaign_map();
-	/* The scenario and game engine are initialized after cache tags load;
-	network_coop_active() cannot identify the new campaign at this point. */
-	boolean coop = game_map && tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE &&
-		(game_connection() == _game_connection_network_client || game_connection() == _game_connection_network_server);
+	/* Tags load before the new scenario is initialized. Its campaign pause
+	screen tells us which footer is available, not what session is running. */
+	boolean campaign_pause = game_map && tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN) != NONE;
 
 	/* (ui.map, and a multiplayer map: its pause menu's SETTINGS; a
 	single-player campaign's too) */
-	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign && !coop) ||
-		(!menus_pc_chosen() && !coop))
+	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign_pause) ||
+		!menus_pc_chosen())
 	{
 		return;
 	}
@@ -2201,7 +2198,7 @@ void menu_tags_loaded(
 		pause_patch(instances);
 		if (campaign)
 			pause_campaign_patch(instances);
-		if (coop)
+		if (campaign_pause)
 		{
 			long box = widget_named("pause/coop/box");
 
@@ -2350,27 +2347,7 @@ char const *pc_menus_screen(
 			"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen" },
 	};
 	short index;
-	struct network_game *game;
 
-	/* A campaign map has no multiplayer pause tags. Use the same layout,
-	buttons and settings, supplied by port_settings.py, for every viewport.
-	Keep its stock pause screen as a fallback if menu loading failed. */
-	if (network_coop_active() && strstr(name, "ui\\shell\\multiplayer_game\\pause_game\\") == name)
-	{
-		char const *screen = strstr(name, "1p_pause_game") ? "pc\\pause\\coop\\1p_pause_game" :
-			strstr(name, "2p_pause_game") ? "pc\\pause\\coop\\2p_pause_game" : "pc\\pause\\coop\\4p_pause_game";
-
-		return menu_tags.loaded && tag_loaded(UI_WIDGET_DEFINITION_TAG, screen) != NONE ? screen : CAMPAIGN_PAUSE_SCREEN;
-	}
-	/* Co-op already retains its current (or next campaign) map. The host
-	returns straight to the same lobby as its clients, rather than MP's
-	postgame map picker, which has no previous screen to go back to.
-	Resetting the round has already loaded ui.map here, so identify the
-	session by its variant/difficulty rather than the current scenario. */
-	game = network_game_get_game();
-	if (game && !game->variant.game_engine_index && game->difficulty >= 0 && game->difficulty < 4 &&
-		!strcmp(name, screens[0].game_name))
-		return menu_tags.loaded ? screens[1].menu_name : screens[1].game_name;
 	if (!menu_tags.loaded)
 		return name;
 	for (index = 0; index < NUMBEROF(screens); index++)
@@ -2379,6 +2356,43 @@ char const *pc_menus_screen(
 			return screens[index].menu_name;
 	}
 	return name;
+}
+
+/* Called only for a confirmed network campaign. Xbox menus and failed PC
+menu loads retain the campaign screen: those maps have no multiplayer one. */
+char const *pc_menus_coop_pause_screen(
+	char const *name)
+{
+	static char const *const game_names[] =
+	{
+		"ui\\shell\\multiplayer_game\\pause_game\\1p_pause_game",
+		"ui\\shell\\multiplayer_game\\pause_game\\2p_pause_game",
+		"ui\\shell\\multiplayer_game\\pause_game\\4p_pause_game",
+	};
+	static char const *const menu_names[] =
+	{
+		"pc\\pause\\coop\\1p_pause_game",
+		"pc\\pause\\coop\\2p_pause_game",
+		"pc\\pause\\coop\\4p_pause_game",
+	};
+	short index;
+
+	if (menu_tags.loaded)
+		for (index = 0; index < NUMBEROF(game_names); index++)
+			if (!strcmp(name, game_names[index]) && tag_loaded(UI_WIDGET_DEFINITION_TAG, menu_names[index]) != NONE)
+				return menu_names[index];
+	return CAMPAIGN_PAUSE_SCREEN;
+}
+
+/* The client captures the actual co-op state before loading ui.map. Only
+the PC co-op host goes straight to its lobby; Xbox and other games keep
+their existing postgame map-selection flow. */
+char const *pc_menus_postgame_screen(
+	boolean cooperative)
+{
+	if (menu_tags.loaded && cooperative)
+		return "pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen";
+	return pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper");
 }
 
 char const *pc_menu_game_data_input_name(

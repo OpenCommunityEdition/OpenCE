@@ -215,7 +215,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 void main_screen_shell_load(
 	void);
 void network_game_reset_to_pregame_ui(
-	void);
+	boolean cooperative); /* port: captured before the played map is unloaded */
 void display_error(
 	short error_code,
 	short local_player_index,

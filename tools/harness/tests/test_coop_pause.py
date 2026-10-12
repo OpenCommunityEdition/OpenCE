@@ -9,17 +9,31 @@ import port_settings
 
 def generated(fault=None):
     leave=function(read("port/linux/game/menu_functions.c"),"coop_leave_game")
-    route=function(read("port/linux/game/menu_tags.c"),"pc_menus_screen")
+    tags=read("port/linux/game/menu_tags.c")
+    route='\n'.join(function(tags,n) for n in ['pc_menus_screen','pc_menus_coop_pause_screen','pc_menus_postgame_screen'])
+    reset=function(read('source/interface/ui_widget.c'),'network_game_reset_to_pregame_ui')
+    transition=function(read('source/networking/network_client_manager.c'),'network_game_client_switch_to_pregame')
     if fault=="host":leave=mutated(leave,"if (global_network_game_server_get())","if (TRUE)")
     if fault=="client":leave=mutated(leave,"network_game_server_port_cooperative_won(NULL);","network_game_client_local_player_quit(0);")
-    return (("under_test.inc",leave+"\n"+route),)
+    if fault=='xbox-pause':route=mutated(route,'if (menu_tags.loaded)','if (TRUE)')
+    if fault=='xbox-postgame':route=mutated(route,'if (menu_tags.loaded && cooperative)','if (cooperative)')
+    if fault=='mp-postgame':reset=mutated(reset,'pc_menus_postgame_screen(cooperative)','pc_menus_postgame_screen(TRUE)')
+    if fault=='late-capture':
+        transition=mutated(transition,'boolean cooperative = network_coop_active();','boolean cooperative;')
+        transition=mutated(transition,'network_game_reset_for_next_round(&client->game, TRUE);',
+                           'network_game_reset_for_next_round(&client->game, TRUE); cooperative = network_coop_active();')
+    return (("under_test.inc",'\n'.join([leave,route,reset,transition])),)
 
-@pytest.mark.parametrize("case",["host","client","local","routes"])
+@pytest.mark.parametrize("case",['host','client','local','pause-pc','pause-xbox','generic-routes',
+    'coop-pc-host','coop-pc-client','coop-xbox-host','coop-xbox-client',
+    'mp-pc-host','mp-pc-client','mp-xbox-host','mp-xbox-client','already-pregame','splitscreen'])
 def test_case(case):
     status,output=run(build("coop_pause",generated()),case)
     assert status==0,output
 
-@pytest.mark.parametrize("fault,case",[("host","client"),("client","host")])
+@pytest.mark.parametrize("fault,case",[("host","client"),("client","host"),
+    ('xbox-pause','pause-xbox'),('xbox-postgame','coop-xbox-host'),
+    ('mp-postgame','mp-pc-host'),('late-capture','coop-pc-host')])
 def test_negative(fault,case):
     status,output=run(build("coop_pause",generated(fault)),case)
     assert status==CHECK_FAILED,output

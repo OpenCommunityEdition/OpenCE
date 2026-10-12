@@ -4648,8 +4648,9 @@ void display_error_damaged_media(
 	return;
 }
 
+/* port: the play mode is captured before map teardown. */
 void network_game_reset_to_pregame_ui(
-	void)
+	boolean cooperative)
 {
 	ui_widgets_close_all();
 	if (network_game_is_splitscreen_local())
@@ -4680,7 +4681,7 @@ void network_game_reset_to_pregame_ui(
 			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
 			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
 			if (!ui_widget_load_by_name_or_tag(
-				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
+				pc_menus_postgame_screen(cooperative),
 				NONE, NULL, NONE, NONE, NONE, NONE))
 			{
 				error(_error_silent, "failed to load map select postgame screen");
@@ -8288,9 +8289,9 @@ static boolean ui_check_for_pause_game(
 						widget_name = NULL;
 						break;
 					}
-					/* port: campaign maps get the multiplayer pause menu too. */
-					if (widget_name)
-						widget_name = pc_menus_screen(widget_name);
+					/* port: only network co-op needs a campaign pause fallback. */
+					if (widget_name && network_coop_active())
+						widget_name = pc_menus_coop_pause_screen(widget_name);
 					if (widget_name &&
 						!ui_widget_load_by_name_or_tag(
 							widget_name,
