@@ -152,8 +152,8 @@ without changing their contents.
 
 All full-screen MCC pause menus offer **Settings**, including campaign,
 network co-op and multiplayer, with either main-menu style. This opens
-OpenCE�s native in-game audio, video and controls screens for the initiating
-controller, using upstream�s option filtering and profile saving. Campaign
+OpenCEs native in-game audio, video and controls screens for the initiating
+controller, using upstreams option filtering and profile saving. Campaign
 menus use 30-pixel row spacing and taller panels to accommodate the option. Split-screen players use Settings
 from the main menu, since the native editor needs a full viewport.
 Restart,
@@ -688,7 +688,7 @@ Xbox names were the four vibrate-alias calls and six
 uncompressed cubemaps in the fixture confirmed mip-major storage (all six
 faces within each mip): lower mip pixels matched upper mip averages to
 less than 0.26/255 mean RGB error. Face-major interpretation produced
-37–80/255 error. BC7 follows the same layout in the adapter; that particular
+37â80/255 error. BC7 follows the same layout in the adapter; that particular
 layout comparison did not independently test BC7.
 
 The second supplied fixture, `Nitra v2/dangercanyon.map`, also passes the
@@ -1143,7 +1143,7 @@ The MCC function table additionally supports `list_count_not_dead`,
 sleeping, and unknown scripts are not reported as completed. The authoritative
 clock uses local/server game ticks, or the latest received host tick on clients.
 
-Effects gain is an MCC-owned multiplier (default 1, accepted range 0–4).
+Effects gain is an MCC-owned multiplier (default 1, accepted range 0â4).
 It affects non-music sound classes without changing saved user volume settings.
 The small additive connection in the common sound mixer returns a neutral
 multiplier outside an active MCC campaign. The MCC writable-global whitelist
@@ -1183,7 +1183,7 @@ Several data corrections are confined to MCC conversion:
 - Non-power-of-two 2D bitmaps retain their dimensions in a linear ARGB texture.
   Their declared source mip chain is validated, but only the base level is
   retained because the native linear texture path has no mipmaps. This handles
-  Aerowalk's 1920×1080 HUD bitmap.
+  Aerowalk's 1920Ã1080 HUD bitmap.
 
 Judgement's `game_time_authoritative` conversion is supported, but the supplied
 Workshop package declares `InheritSharedFiles: FromMCC` and references 687
@@ -1493,3 +1493,4 @@ Validation on Windows (portable release, based on main `dccbc62b`):
 
 All implementation changes are in MCC modules. No shared engine source,
 Xbox/Custom Edition loader or network message layout was changed.
+For authored biped seats and their network isolation, see [MCC seats](mcc_seats.md).

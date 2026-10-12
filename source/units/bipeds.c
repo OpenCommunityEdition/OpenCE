@@ -276,6 +276,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
 
 /* port: port/linux/game/network_objects.c's (a client deletes the host's
 objects on the host's word alone) */
@@ -4261,6 +4262,9 @@ boolean biped_update(
 		{
 			animation.state_desired =
 				(char)((parent->object.damage_flags & FLAG(_object_dead_bit)) | 0x20);
+			/* port: MCC seats use seat animations, not infection attachment. */
+			if (mcc_seat_update(biped_index))
+				animation.state_desired = _unit_state_idle;
 		}
 	}
 	else

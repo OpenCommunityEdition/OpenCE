@@ -260,6 +260,14 @@ supplies the camera choice; no messages, packet layouts or client authority
 change. All peers must use the same aiming behavior. Version 37 is reserved for
 the separate optional third-person branch and is not compatible with this one.
 
+GulchCE version 39 permits authored MCC biped seats in the existing host-to-client
+seat state. The host checks the action, proximity, occupancy and animation before
+boarding; clients apply the host's object identity and seat. Biped parents do not
+become client-owned predicted vehicles. No packet layout changes, but older peers
+would reject these parents and disagree about attachments and camera/aiming.
+Xbox and Custom Edition keep their existing vehicle-seat behavior; all peers
+still need the matching network version.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
