@@ -209,6 +209,16 @@ GulchCE version 33 adds upstream Custom Edition map sharing alongside MCC.
 Map sharing retains upstream IDs 83-86; MCC moves to 87-88. Versions 31-32 belong
 to the separate camera test branch and are not compatible with this protocol.
 
+GulchCE version 34 adds MCC named-object presence chunks (message 89) for
+MCC scenarios with more than 512 names, up to 32,767. The host sends bounded
+512-name chunks every 15 ticks, in co-op and multiplayer. Clients validate
+the count, range, padding, BSP and timestamp, and confirm a difference in
+two distinct snapshots before creating/deleting scenery or devices. Native
+unit/item replication is retained. Smaller MCC, Xbox and Custom Edition
+maps keep their original name tables and messages. All peers need version
+34; it cannot connect to version 33, including on legacy maps. Version 34
+also assigns campaign flag bit 3 to MCC script-controlled muting.
+
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
 and the cheat buttons run only commands that change nothing of the game

@@ -42,8 +42,8 @@ def checkpoint_tool(tmp_path_factory):
 #include <stdint.h>
 #define TRUE 1
 #define FALSE 0
-#define GAME_STATE_SIZE 262144
-#define GAME_STATE_CPU_SIZE 196608
+#define GAME_STATE_SIZE 524288
+#define GAME_STATE_CPU_SIZE 393216
 #define csmemcpy memcpy
 static int loaded=1, malformed=0, reject_handles=0, captures=0, restores=0, writes=0;
 static uint32_t payload_size=16;
@@ -57,6 +57,13 @@ static int native_valid=1;
 ''' + '#include "' + (ROOT / "port/linux/game/mcc_checkpoint.c").as_posix() + '"\n' + r'''
 boolean mcc_cache_tags_loaded(void) {return loaded;}
 static int campaign_restores;
+static unsigned long name_bytes;
+static unsigned char name_state[MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM];
+int mcc_object_names_active(void) {return name_bytes!=0;}
+unsigned long mcc_object_names_snapshot(void *out) {if(out)memcpy(out,name_state,name_bytes);return name_bytes;}
+int mcc_object_names_validate(void const *in,unsigned long bytes) {return bytes==name_bytes && (!bytes||in);}
+int mcc_object_names_restore(void const *in,unsigned long bytes) {if(!mcc_object_names_validate(in,bytes))return 0;memcpy(name_state,in,bytes);return 1;}
+
 void mcc_campaign_snapshot(void *out) {memset(out,0,MCC_CAMPAIGN_SNAPSHOT_BYTES);((unsigned char *)out)[0]=1;}
 int mcc_campaign_validate(void const *in,unsigned long bytes) {
     return (bytes==MCC_CAMPAIGN_SNAPSHOT_BYTES || bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES) && ((unsigned char const *)in)[0]==1;
@@ -120,6 +127,30 @@ int main(int argc,char **argv) {
     {struct object_header_datum *unit=object_header_data->data;
      memset(unit,0,sizeof(*unit));unit->identifier=1;unit->datum=(void *)(live+768);}
     game_state_globals.base_address=live;game_state_globals.cpu_allocation_size=used;
+    if(!strncmp(argv[1],"names_",6)) {
+        unsigned char *name_tail;
+        name_bytes=!strcmp(argv[1],"names_maximum")?MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM:640*4;
+        memset(name_state,255,name_bytes);
+        mcc_checkpoint_put(name_state+513*4,0x00010000);
+        if(!mcc_checkpoint_capture(live,sizeof(live),used,GAME_STATE_CPU_SIZE))return 21;
+        memcpy(saved,live,sizeof(live));
+        name_tail=mcc_checkpoint_names_tail(saved,used,GAME_STATE_CPU_SIZE,name_bytes);
+        if(!strcmp(argv[1],"names_roundtrip")||!strcmp(argv[1],"names_maximum")) {
+            memset(name_state,0,name_bytes);
+            if(!game_state_image_accept(saved,sizeof(saved)))return 22;
+            if(mcc_checkpoint_word(name_state+513*4)!=0x00010000 || mcc_checkpoint_word(name_state)!=0xFFFFFFFFu)return 23;
+            mcc_checkpoint_dispose();
+            return 0;
+        }
+        if(!strcmp(argv[1],"names_crc"))name_tail[16]^=1;
+        if(!strcmp(argv[1],"names_missing"))name_tail[0]=0;
+        if(!strcmp(argv[1],"names_salt")) {
+            mcc_checkpoint_put(name_tail+16+513*4,0x00020000);
+            mcc_checkpoint_put(name_tail+12,mcc_checkpoint_checksum(name_tail+16,name_bytes));
+        }
+        if(game_state_image_accept(saved,sizeof(saved)))return 24;
+        mcc_checkpoint_dispose();return 0;
+    }
     tail=live+GAME_STATE_CPU_SIZE-MCC_CHECKPOINT_SLOT_BYTES;
     footer=tail+MCC_CHECKPOINT_TOTAL_PAYLOAD;
     if(!strcmp(argv[1],"stock")) {
@@ -216,7 +247,7 @@ int main(int argc,char **argv) {
 @pytest.mark.parametrize("case", ["stock", "capacity", "capture_fail", "maximum", "oversize",
                                       "roundtrip", "core", "cleanup", "payload", "footer", "version",
                                       "reserved", "name", "checksum", "highwater", "native", "handles",
-                                      "unit_salt", "unit_type", "unit_pointer", "unit_array", "v1", "campaign", "campaign_v1"])
+                                      "unit_salt", "unit_type", "unit_pointer", "unit_array", "v1", "campaign", "campaign_v1", "names_roundtrip", "names_maximum", "names_crc", "names_missing", "names_salt"])
 def test_mcc_checkpoint_and_native_hooks(checkpoint_tool, case):
     result = subprocess.run([str(checkpoint_tool), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr + f" ({case}: {result.returncode})"

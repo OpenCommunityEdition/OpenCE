@@ -67,6 +67,7 @@ index and tag, since the map placed them at the same index everywhere.
 /* ---------- headers */
 
 #include "cseries.h"
+#include "mcc_object_names.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
 #include "camera/camera_scripting.h"
@@ -1286,6 +1287,8 @@ static void host_send_object_names(
 	struct distributed_coop_object_names *names = &message.names;
 	short name_index;
 
+	/* Expanded MCC maps carry all names in their dedicated messages. */
+	if (mcc_object_names_active()) return;
 	csmemset(names, 0, sizeof(*names));
 	names->structure_bsp_index = global_structure_bsp_index_get();
 	names->name_count = (short)MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO);
@@ -2892,6 +2895,8 @@ void network_coop_handle_object_names(
 {
 	struct distributed_coop_object_names const *names = entries;
 	short name_index;
+
+	if (mcc_object_names_active()) return;
 
 	if (!coop_client())
 		return;

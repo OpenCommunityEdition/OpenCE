@@ -4,6 +4,7 @@
 #include "mcc_tag_validate.h"
 #include "mcc_runtime.h"
 #include "mcc_syntax.h"
+#include "mcc_object_names.h"
 #include "tag_schema.h"
 
 #include <stdint.h>
@@ -317,13 +318,26 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                     unsigned long bytes;
                     long maximum = field->maximum;
                     block->definition = NULL;
-                    /* Dropping object names breaks compiled script references
-                     * and the native/co-op name tables still have fixed size.
-                     * Refuse explicitly until MCC owns an extended runtime. */
+                    /* The MCC table owns extended names; never truncate indices
+                     * embedded in scripts, placements and saved objects. */
                     if (schema->name && !strcmp(schema->name, "scenario") &&
-                        !strcmp(field->name, "object_names") && block->count > maximum) {
-                        mcc_problem(context, 1, "object-name count exceeds the supported runtime capacity; names cannot be truncated");
-                        break;
+                        !strcmp(field->name, "object_names")) {
+                        maximum = MCC_OBJECT_NAMES_MAXIMUM;
+                        if (block->count > maximum) {
+                            mcc_problem(context, 1, "object-name count exceeds MCC's 32767-name capacity; names cannot be truncated");
+                            break;
+                        }
+                    }
+                    /* Scenery palettes use dynamic tag blocks at runtime.
+                     * Preserve MCC entries beyond the Xbox authoring limit;
+                     * placement indices and native iteration remain signed shorts. */
+                    if (schema->name && !strcmp(schema->name, "scenario") &&
+                        !strcmp(field->name, "scenery_palette")) {
+                        maximum = 32767;
+                        if (block->count > maximum) {
+                            mcc_problem(context, 1, "scenery palette exceeds MCC's 32767-entry capacity; entries cannot be truncated");
+                            break;
+                        }
                     }
                     if (!element || element->size <= 0 || block->count < 0 ||
                         (unsigned long)block->count > context->length / (unsigned long)element->size) {
@@ -447,8 +461,16 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                         mcc_set_integer(member, field->size, optional ? NONE : 0);
                         mcc_problem(context, 0, "index or enumeration corrected");
                     }
-                } else if (field->type == _tag_schema_string && field->size && !memchr(member, 0, field->size)) {
-                    member[field->size - 1] = 0; mcc_problem(context, 0, "string terminated");
+                } else if (field->type == _tag_schema_string && field->size) {
+                    long width = field->size;
+                    /* MCC flag names occupy 32 bytes. The native declaration
+                     * calls the last byte padding; it can hold the terminator. */
+                    if (schema->name && !strcmp(schema->name, "cutscene_flag") &&
+                        !strcmp(field->name, "name") && width == 31 &&
+                        field->offset + 32 <= schema->size) width = 32;
+                    if (!memchr(member, 0, width)) {
+                        member[width - 1] = 0; mcc_problem(context, 0, "string terminated");
+                    }
                 } else if (field->type == _tag_schema_reset) {
                     if (field->size <= 4) mcc_set_integer(member, field->size, field->target_offset);
                     else memset(member, 0, field->size);

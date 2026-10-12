@@ -98,10 +98,10 @@
 
 - **Halo Combat Revolved**
   - Map Pack: Halo Combat Revolved
-  - Status: Majority of maps load; some exceed the hardcoded Xbox limit of 512 named script objects and are refused.
+  - Status: Majority of maps load. Maps previously refused for exceeding 512 named script objects need retesting with the extended MCC capacity (32,767 names).
 - **Ruby's Rebalanced Halo CE**
   - Map Pack: Ruby's Rebalanced Halo CE
-  - Status: Majority of maps load; some exceed the hardcoded Xbox limit of 512 named script objects and are refused.
+  - Status: Majority of maps load. Maps previously refused for exceeding 512 named script objects need retesting with the extended MCC capacity (32,767 names).
 
 ### Multiplayer Maps
 

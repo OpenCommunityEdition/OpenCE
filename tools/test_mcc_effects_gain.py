@@ -24,7 +24,8 @@ enum {_sound_class_music, _sound_class_scripted_dialog_to_player,
       effects};
 static struct {real nondialog_gain;} sound_manager_globals={.5f};
 static real script_gain=1;
-real mcc_campaign_effects_gain(void) {return script_gain;}
+static int muted;
+real mcc_campaign_mix_gain(int music) {return muted ? 0 : music ? 1 : script_gain;}
 static real sound_class_get_gain(short c) {(void)c;return .5f;}
 static real sound_manager_port_volume(short c) {return c==_sound_class_music ? .75f : .25f;}
 """ + mixer + """
@@ -36,7 +37,9 @@ int main(void) {
     script_gain=.5f;
     if(sound_manager_master_gain(0)!=baseline[0]) return 2;
     for(c=1;c<5;c++) if(sound_manager_master_gain(c)!=baseline[c]*.5f) return 3;
-    script_gain=1;
+    muted=1;
+    for(c=0;c<5;c++) if(sound_manager_master_gain(c)!=0) return 5;
+    muted=0;script_gain=1;
     for(c=0;c<5;c++) if(sound_manager_master_gain(c)!=baseline[c]) return 4;
     return 0;
 }
