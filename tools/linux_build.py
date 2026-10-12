@@ -190,6 +190,32 @@ PLATFORM_FLAGS = [
 # Platform files named posix_*.c talk to glibc only. They are built with the
 # host's native ABI (no -malign-double, no 16-bit wchar_t, no XDK headers) so
 # glibc structures such as struct stat have their real layout.
+# the ragdolls' physics engine (port/linux/game/ragdoll.c): Jolt Physics, in
+# port/third_party/JoltPhysics when it is there (github.com/jrouwe/JoltPhysics),
+# and its C interface; C++17 without exceptions or RTTI, with the host's ABI
+# (a 32-bit wchar_t: native objects, as the posix_* units)
+JOLT_DIR = Path("port/third_party/JoltPhysics")
+RAGDOLL_PHYSICS_SOURCE = Path("port/linux/physics/ragdoll_physics.cpp")
+JOLT_FLAGS = [
+    "--target=i686-linux-gnu",
+    "-m32",
+    "-fno-pic",
+    "-std=c++17",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-DNDEBUG",
+    "-ffp-contract=off",
+    OPTIMISATION,
+    "-g",
+    "-w",
+]
+
+
+def jolt_present() -> bool:
+    """whether the ragdolls build: Jolt is in port/third_party/JoltPhysics"""
+    return (JOLT_DIR / "Jolt" / "Jolt.h").is_file() and RAGDOLL_PHYSICS_SOURCE.is_file()
+
+
 POSIX_FLAGS = [
     "--target=i686-linux-gnu",
     "-m32",
@@ -509,6 +535,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
+    jolt = jolt_present()
+    if jolt:
+        libs += " -lstdc++"
 
     def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
              implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
@@ -546,6 +575,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             f"-iquote {Path(config['game_sources'])}",
             game_defines_and_includes(config),
             sdk_flags,
+            # (the ragdolls, with Jolt: ragdoll.h)
+            "-DHALO_JOLT" if jolt else "",
         ])
         for source in game_sources(config):
             # The halt screen and version command identify this native build.
@@ -627,6 +658,12 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # (port/include/halo_math.h)
         for source in musl_math_sources():
             add_object(source, musl_math_cflags(abi))
+        # the ragdolls' physics: Jolt and its C interface
+        if jolt:
+            jolt_cflags = " ".join(JOLT_FLAGS + [march_flag(sln), f"-I{JOLT_DIR}", f"-I{Path(config['game_sources'])}"])
+            for source in sorted((JOLT_DIR / "Jolt").rglob("*.cpp")):
+                add_object(source, jolt_cflags, posix=True)
+            add_object(RAGDOLL_PHYSICS_SOURCE, jolt_cflags, posix=True)
 
         n.build(
             outputs=output,

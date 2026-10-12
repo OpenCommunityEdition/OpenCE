@@ -2844,6 +2844,7 @@ symbols in this file:
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
+#include "ragdoll.h" /* port: port/linux/game/ragdoll.c */
 
 /* ---------- constants */
 
@@ -15435,6 +15436,17 @@ static boolean hs_compile_and_evaluate_command(
 			return network_votekick_player_named(name);
 		}
 	}
+#if RAGDOLLS
+	/* port: the ragdolls' own command (`ragdoll`, port/linux/game/ragdoll.c):
+	how this machine draws its dead, nothing of the game's, so in anyone's
+	game */
+	{
+		long ragdoll_result = ragdoll_console_command(expression);
+
+		if (ragdoll_result != NONE)
+			return (boolean)ragdoll_result;
+	}
+#endif
 	/* port: playing in another's game, the host decides the game: no
 	cheats, no game speed, nothing else a command changes of the game (the
 	game run each tick also puts back what was changed before joining,

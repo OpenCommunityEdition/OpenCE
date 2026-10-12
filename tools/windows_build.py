@@ -63,6 +63,28 @@ ZLIB_SOURCES = ("adler32.c", "crc32.c", "inffast.c", "inflate.c", "inftrees.c", 
 # (its names prefixed, and the one Z_PREFIX leaves, its error messages, which
 # the game's zlib names the same)
 ZLIB_DEFINES = ("-DZ_PREFIX", "-Dz_errmsg=z_port_errmsg")
+# the ragdolls' physics engine (port/linux/game/ragdoll.c): Jolt Physics, in
+# port/third_party/JoltPhysics when it is there (github.com/jrouwe/JoltPhysics;
+# its Jolt folder is all the build needs), and its C interface
+JOLT_DIR = Path("port/third_party/JoltPhysics")
+RAGDOLL_PHYSICS_SOURCE = Path("port/linux/physics/ragdoll_physics.cpp")
+# C++17 without exceptions or RTTI, as Jolt's own builds; the same defines
+# for every unit that includes Jolt's headers
+JOLT_FLAGS = [
+    "-std=c++17",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-D_HAS_EXCEPTIONS=0",
+    "-D_HAS_STATIC_RTTI=0",
+    "-DNDEBUG",
+    "-D_CRT_SECURE_NO_WARNINGS",
+    "-w",
+]
+
+
+def jolt_present() -> bool:
+    """whether the ragdolls build: Jolt is in port/third_party/JoltPhysics"""
+    return (JOLT_DIR / "Jolt" / "Jolt.h").is_file() and RAGDOLL_PHYSICS_SOURCE.is_file()
 
 
 def updater_defines(release: bool) -> str:
@@ -267,6 +289,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         return
     linux_config: Dict[str, Any] = json.loads((LINUX_DIR / "port.json").read_text(encoding="utf-8"))
     config = _load_config()
+    jolt = jolt_present()
+    if not jolt:
+        print(f"No ragdolls: Jolt Physics is not in {JOLT_DIR} (github.com/jrouwe/JoltPhysics)", file=sys.stderr)
 
     tags_header = BUILD / "halo_msvc_tags.h"
     obj_dir = BUILD / "obj"
@@ -386,6 +411,8 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             # the Xbox SDK declarations (port/include/xdk) come before the
             # Windows SDK, which has headers of the same names
             f"-I{XDK_INCLUDE}",
+            # (the ragdolls, with Jolt: ragdoll.h)
+            "-DHALO_JOLT" if jolt else "",
         ])
         for source in game_sources(linux_config):
             # The halt screen and version command identify this native build.
@@ -480,6 +507,16 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # (port/include/halo_math.h)
         for source in musl_math_sources():
             add_object(source, musl_math_cflags(abi))
+        # the ragdolls' physics: Jolt and its C interface (C++, with the
+        # Microsoft C++ library the Build Tools have)
+        if jolt:
+            jolt_cflags = " ".join([
+                "--target=i686-pc-windows-msvc", march_flag(sln), OPTIMISATION, "-g", "-gcodeview",
+                "-ffp-contract=off", *JOLT_FLAGS, f"-I{JOLT_DIR}", f"-I{Path(linux_config['game_sources'])}",
+            ])
+            for source in sorted((JOLT_DIR / "Jolt").rglob("*.cpp")):
+                add_object(source, jolt_cflags)
+            add_object(RAGDOLL_PHYSICS_SOURCE, jolt_cflags)
 
         n.build(
             outputs=output,

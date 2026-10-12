@@ -200,7 +200,12 @@ _graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_alia
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 30,
     "same_place": ["anti_aliasing_android"],
-    "rows": [row for row in _video["rows"] if row[1] in _graphics],
+    "rows": [row for row in _video["rows"] if row[1] in _graphics] + [
+        # (Jolt Physics, which the desktop builds have)
+        ("PHYSICS:", "game.death_physics", [("CLASSIC", "classic"), ("RAGDOLL", "ragdoll")],
+         "Ragdoll: bodies fall limp, thrown by what killed\nthem. Classic: the game's own death animations.",
+         "desktop"),
+    ],
 }
 _video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics]
 _video["categories"] = [

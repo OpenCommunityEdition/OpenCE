@@ -259,6 +259,7 @@ symbols in this file:
 #include "models/model_definitions.h"
 #include "objects/damage.h"
 #include "units/biped_limp_noodle.h"
+#include "ragdoll.h" /* port: port/linux/game/ragdoll.c */
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
 #include "units/vehicle_definitions.h"
@@ -604,12 +605,19 @@ void bipeds_initialize(
 void bipeds_initialize_for_new_map(
 	void)
 {
+#if RAGDOLLS
+	/* port: no ragdoll of the last map's (port/linux/game/ragdoll.c) */
+	ragdolls_initialize_for_new_map();
+#endif
 	return;
 }
 
 void bipeds_dispose_from_old_map(
 	void)
 {
+#if RAGDOLLS
+	ragdolls_dispose_from_old_map();
+#endif
 	return;
 }
 
@@ -634,6 +642,10 @@ void biped_place(
 void biped_delete(
 	long biped_index)
 {
+#if RAGDOLLS
+	/* port: its ragdoll's slot freed (port/linux/game/ragdoll.c) */
+	ragdoll_biped_deleted(biped_index);
+#endif
 	return;
 }
 
@@ -1407,6 +1419,11 @@ void biped_render_debug(
 	real height;
 	real width;
 
+#if RAGDOLLS
+	/* port: `ragdoll debug 1` (port/linux/game/ragdoll.c) */
+	ragdoll_render_debug(biped_index);
+#endif
+
 	if (debug_objects_biped_physics_pills)
 	{
 		biped_get_physics_pill(biped_index, &base, &height, &width);
@@ -1657,6 +1674,18 @@ void biped_accelerate(
 {
 	struct biped_datum *biped = biped_get(biped_index);
 	struct biped_definition *definition = biped_definition_get(biped->definition_index);
+
+#if RAGDOLLS
+	/* port: a ragdoll's body is pushed by the ragdoll (ragdoll_note_damage);
+	the game's random numbers drawn as the push below draws them, so the
+	game's own random rolls stay the same with ragdolls as without */
+	if (TEST_FLAG(biped->biped.flags, BIPED_PORT_RAGDOLL_BIT))
+	{
+		if (!TEST_FLAG(definition->unit.flags, _unit_is_special_bit))
+			(void)real_random();
+		return;
+	}
+#endif
 
 	if (!TEST_FLAG(definition->unit.flags, _unit_is_special_bit))
 	{
@@ -4231,6 +4260,17 @@ boolean biped_update(
 
 	if (debug_biped_skip_update)
 		return TRUE;
+
+#if RAGDOLLS
+	/* port: a dead biped is a ragdoll, which has its body this tick
+	(port/linux/game/ragdoll.c) */
+	if (ragdoll_biped_update(biped_index))
+	{
+		/* (a body fallen out of the world is erased, as the game's are) */
+		biped_check_discard(biped_index);
+		return TRUE;
+	}
+#endif
 
 	profile_enter(biped_update_section);
 	biped_verify_object_vectors(biped_index, "pre-update");

@@ -138,6 +138,7 @@ symbols in this file:
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "ragdoll.h" /* port: port/linux/game/ragdoll.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1040,6 +1041,28 @@ static void object_damage_aftermath(
 
 	/* port: (a client's replay of the host's nonlethal damage too) */
 	damage_data_validate_owner(damage);
+
+#if RAGDOLLS
+	/* port: the hit pushes a ragdoll, or the killing blow the ragdoll it makes
+	(port/linux/game/ragdoll.c) */
+	if (object->object.type == _object_type_biped)
+	{
+		ragdoll_note_damage(
+			object_index,
+			damage,
+			MAX(shield_damage + body_damage, damage_effect->damage.damage_upper_bound * damage->scale),
+			damage_effect->damage.instantaneous_acceleration,
+			object_definition->object.acceleration_scale,
+			TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit),
+			damage_effect->damage.category);
+		/* (a multiplayer game's headshot: the hard ping its kill is heard with) */
+		if (TEST_FLAG(being_damaged_flags, _object_being_damaged_body_depleted_bit) &&
+			TEST_FLAG(being_damaged_flags, _object_being_damaged_force_hard_ping_bit))
+		{
+			ragdoll_note_multiplayer_headshot(object_index);
+		}
+	}
+#endif
 
 	if (object_definition->object.acceleration_scale > _real_epsilon)
 	{
