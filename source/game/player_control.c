@@ -208,6 +208,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
 
 #include "real_math.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
@@ -556,6 +557,8 @@ void player_control_get_unit_camera_info(
 			}
 		}
 
+		/* port: MCC biped seats carry the same authored camera as vehicles. */
+		mcc_seat_camera(camera_info);
 		if (camera_info->seat_index == NONE)
 		{
 			camera_info->camera = &unit_definition_get(unit->definition_index)->unit.camera;

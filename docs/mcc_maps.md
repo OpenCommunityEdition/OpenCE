@@ -1432,3 +1432,5 @@ the active map before reading inventory, holds no state across map changes,
 and leaves Xbox/Custom Edition paths unchanged. Existing host-controlled
 inventory synchronization is sufficient, but network version 38 prevents
 peers with the previous aiming behavior from joining.
+
+For authored biped seats and their network isolation, see [MCC seats](mcc_seats.md).
