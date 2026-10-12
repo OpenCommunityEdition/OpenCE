@@ -254,6 +254,12 @@ all players, including those playing Xbox/Custom Edition maps, need version 36.
 No message layout or client authority changes. The checksums detect accidental
 resource mismatches; they do not authenticate untrusted files or clients.
 
+GulchCE version 38 adds MCC weapon-authored third-person camera selection to
+deterministic aiming. Existing inventory and weapon-selection synchronization
+supplies the camera choice; no messages, packet layouts or client authority
+change. All peers must use the same aiming behavior. Version 37 is reserved for
+the separate optional third-person branch and is not compatible with this one.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
