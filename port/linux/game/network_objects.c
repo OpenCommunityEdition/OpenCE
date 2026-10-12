@@ -54,6 +54,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "models/model_definitions.h"
 #include "units/units.h"
 #include "units/bipeds.h"
+#include "mcc_seats.h"
 #include "units/biped_definitions.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicle_datum.h"
@@ -2989,6 +2990,15 @@ void network_objects_set_seat(
 			return;
 		}
 		vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(vehicle_index, _object_mask_vehicle);
+		/* MCC biped seats use the host's existing seat state and all the
+		same identity, capacity and attachment-cycle checks below. */
+		if (!vehicle)
+		{
+			vehicle = mcc_seat_parent(vehicle_index);
+			if (vehicle && (TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit) ||
+				!unit_has_animation_to_enter_seat(unit_index, vehicle_index, seat_index)))
+				return;
+		}
 		if (!vehicle || seat_index < 0 ||
 			seat_index >= unit_definition_get(vehicle->definition_index)->unit.seats.count)
 		{

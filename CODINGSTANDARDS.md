@@ -26,7 +26,7 @@ inventory when an authorized change makes it inaccurate.
 | Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign` |
 | Weapon-authored camera selection | `mcc_camera` |
 | Networking and named-object synchronization | `mcc_network`, `mcc_object_names_network` |
-| Player inventory, objects and recordings | `mcc_player`, `mcc_grenades`, `mcc_objects`, `mcc_recordings` |
+| Player inventory, objects, seats and recordings | `mcc_player`, `mcc_grenades`, `mcc_objects`, `mcc_seats`, `mcc_recordings` |
 | Rendering, HUD and audio conversion | `mcc_geometry`, `mcc_bitmaps`, `mcc_texture_cache`, `mcc_hud`, `mcc_hud_draw`, `mcc_sprites`, `mcc_audio`, `mcc_vorbis` |
 | Menus and pause UI | `mcc_ui`, `mcc_ui_teams`, `mcc_pause`, `mcc_pause_runtime` |
 

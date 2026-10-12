@@ -72,7 +72,8 @@ Raise it with any change to what the machines send each other. */
 /* MCC package/root selection and dependency-based resource checksums must agree. */
 /* Version 37 belongs to the optional camera branch. MCC weapon-authored
  * cameras change deterministic aiming; all peers must implement that choice. */
-#define HALO_PORT_NETWORK_VERSION 38
+/* Version 39 admits MCC biped parents in host-authoritative seat state. */
+#define HALO_PORT_NETWORK_VERSION 39
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0
