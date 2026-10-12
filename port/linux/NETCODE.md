@@ -475,7 +475,11 @@ menus show a map without its hash, unless two versions are listed.
    would leave a falling body hanging until its turn round all of them),
    and a few of those at rest, round them all. A client takes the host's
    word on whether each is at rest even when its copy is close enough to
-   leave where it is. A client puts its copies there, and the difference is
+   leave where it is. A body's pose goes with it: one lying limp that the
+   host moves stops lying limp (the blast that moved the host's reaches
+   only the machines that see the body's player), and one the host has at
+   rest is on the ground, so it lies limp again where it stops instead of
+   keeping the pose of its fall in the air. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
    jump. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's
