@@ -280,6 +280,7 @@ void light_volume_render(
 					0,
 					definition->map.index,
 					definition->sequence_index);
+				rasterizer_widget_batch_sprites(TRUE); /* port: one draw */
 				count = definition->count;
 				for (sprite_index = 0; sprite_index < count; sprite_index++)
 				{
@@ -315,6 +316,7 @@ void light_volume_render(
 						0.0f,
 						real_argb_color_to_pixel32(&color));
 				}
+				rasterizer_widget_batch_sprites(FALSE); /* port: (drawn) */
 				rasterizer_widget_end();
 			}
 		}

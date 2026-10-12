@@ -138,6 +138,9 @@ button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad)
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; font-size: 14px; }
 
+.site-footer { margin: 32px 0 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.site-footer p { margin: 0; }
+
 /* the game: the canvas fills the window */
 #game { position: fixed; inset: 0; background: #000; }
 #canvas {

@@ -12,7 +12,7 @@ def generated(fault=None):
     if fault=='authority': policy=mutated(policy,'machine_index != NONE ||','FALSE ||')
     if fault=='override': inp=mutated(inp,'network_aim_assist_block_mouse() &&','FALSE &&')
     if fault=='controller': inp=mutated(inp,'if (gamepad_index != 0) return FALSE;','if (FALSE) return FALSE;')
-    return (('policy.inc',policy),('input.inc',inp))
+    return (('policy.inc',policy),('input.inc',inp),('message_ids.inc',message_ids()))
 
 @pytest.mark.parametrize('case',['allowed','devices','scope','replication','admission','reset'])
 def test_case(case):
@@ -32,3 +32,19 @@ def test_menu():
     assert [s.attrib['text'] for s in choices]==['ALLOWED','BLOCK M+KB']
     assert 313+28<345 and 345+60<414
     assert '"network.block_mouse_aim_assist", { "false", "true" }' in read('port/linux/game/menu_functions.c')
+
+
+def message_ids():
+    """Compile the production IDs so map-sharing collisions reach the tests."""
+    return re.search(r'enum\s*\{.*?_distributed_message_player_prediction.*?\};',
+                     read('port/linux/game/network_distributed.h'), re.S).group(0)
+
+
+def test_message_ids():
+    import network_format
+    messages = {name: int(value) for name, value in network_format.items().items()
+                if name.startswith('enum _distributed_message_')}
+    assert len(set(messages.values())) == len(messages), messages
+    assert messages['enum _distributed_message_aim_assist_policy'] == 87
+    assert [messages['enum _distributed_message_map_share_' + name]
+            for name in ('request', 'offer', 'sources', 'progress')] == [83, 84, 85, 86]

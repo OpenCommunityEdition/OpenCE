@@ -136,6 +136,12 @@ this list to generate the guest's entry points */
 	X(glBeginQuery) \
 	X(glEndQuery) \
 	X(glGetQueryObjectuiv)
+/* entry points of extensions, which a driver may lack: loaded where the
+context has the extension, never required (gl_functions.c). On ES 3.0 and
+3.1 these stand in for glDrawElementsBaseVertex */
+#define GL_OPTIONAL_FUNCTIONS(X) \
+	X(glDrawElementsBaseVertexEXT) \
+	X(glDrawElementsBaseVertexOES)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
@@ -258,6 +264,9 @@ this list to generate the guest's entry points */
 
 #define GL_DECLARE_FUNCTION(name) extern __typeof__(&name) halo_##name;
 GL_FUNCTIONS(GL_DECLARE_FUNCTION)
+#ifdef HALO_GLES
+GL_OPTIONAL_FUNCTIONS(GL_DECLARE_FUNCTION)
+#endif
 #undef GL_DECLARE_FUNCTION
 
 /* call sites use the ordinary names; gl_functions.c, which defines the

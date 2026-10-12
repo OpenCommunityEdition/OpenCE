@@ -3,7 +3,8 @@
 #include <string.h>
 typedef unsigned short word;
 enum { _game_connection_local, _game_connection_network_client, _game_connection_network_server };
-enum { _distributed_message_aim_assist_policy = 83, _distributed_to_clients_reliably };
+#include "message_ids.inc"
+enum { _distributed_to_clients_reliably };
 struct distributed_message_header { word header; byte type,count; long game_time; };
 #define GET_MESSAGE_TYPE(h) (((h)>>2)&3)
 static int connection=2,playing=1,menu=0,block=0,preference=1;
@@ -25,7 +26,7 @@ static void distributed_send_to_machine_reliably(long machine,void *data,byte ty
 #include "policy.inc"
 #include "input.inc"
 static void receive(int from,int value,int count,int size){
- struct aim_assist_policy_message m={{8,83,count,0},value};
+ struct aim_assist_policy_message m={{8,_distributed_message_aim_assist_policy,count,0},value};
  network_aim_assist_handle_message(from,(word*)&m,size);
 }
 int main(int argc,char **argv){CHECK(argc==2,"case");char const *case_name=argv[1];network_aim_assist_reset();

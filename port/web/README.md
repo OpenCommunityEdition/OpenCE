@@ -140,7 +140,9 @@ reloads.
 - Internet play has no relay, as on the native builds: two machines whose
   networks let no direct connection through (some company and school
   networks block WebRTC) cannot play together.
-- No Custom Edition maps (their tag data's address is in the C heap there).
+- No Custom Edition maps (their tag data's address is in the C heap there),
+  so a browser neither downloads nor sends one (map sharing,
+  `port/linux/NETCODE.md`).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
@@ -255,20 +257,42 @@ multiply-adds). `tools/web_build.py` writes the graph.
     converted (`xbox_textures.c`).
   - S3TC only for 2D textures whose sides are multiples of 4: the others
     are decoded.
-  - A vertex stride of at most 255 bytes: the 256-byte immediate-mode
-    vertex is drawn from an array for each attribute (`d3d8_gl.c`).
+  - A vertex stride of at most 255 bytes: an immediate-mode draw uploads
+    only the registers written since `Begin` (as every build does), and one
+    that writes all sixteen (256 bytes a vertex) is drawn from an array for
+    each attribute (`d3d8_gl.c`).
   - No feedback loops: a draw that samples the target it draws into samples
     a copy of it.
+  - No blend of a constant color factor with a constant alpha one (the
+    meters, as the ammo counters on the weapons): the source's factor is
+    applied by the pixel shader instead (`nv2a_pixel_shader_key`'s
+    `source_blend`).
   - No `glCopyImageSubData`, `glDrawElementsBaseVertex` or
-    `glMemoryBarrier`: the ES renderer's blits and rebased indices.
-  - Buffer writes are copies the browser orders with the draws, so the
-    streaming buffers never wait for the GPU (`port/web/src/web_gl_host.c`).
+    `glMemoryBarrier`: the ES renderer's blits and rebased indices. An
+    index array drawn twice the same is kept rebased in a buffer of its own
+    and drawn from there, not uploaded at each draw (`d3d8_gl.c`'s index
+    cache).
+  - Each call into WebGL costs a crossing from WebAssembly into the
+    browser, so draws whose streams all come from the mirror bind a vertex
+    array made for those places once (`d3d8_gl.c`'s vertex array cache),
+    rather than pointing each attribute again. The renderer draws only from
+    buffers, so Emscripten's emulation of client-side arrays (`FULL_ES3`),
+    which wrapped every draw, is not linked.
+  - Buffer writes are copies the browser orders with the draws, but WebGL
+    on Metal (ANGLE, in Chrome and Safari on a Mac) first waits for the GPU
+    to finish what was queued before when a queued draw reads the buffer.
+    So each draw's vertices and indices go into a buffer that no queued
+    draw reads: one of a pool for each frame of the ring, in sizes of 4 KB
+    to 32 MB, written again only when that frame comes round again
+    (`web_chunk_get` in `d3d8_gl.c`). Written after each draw into one
+    buffer, as before, the frames waited for the GPU some 2000 times each.
 - **Memory watch.** WebAssembly cannot protect pages, so the textures'
   memory is watched by hashing it once a frame, as the Android host does
   under the x86 emulator (`port/web/src/web_memory_watch.c`,
   `port/android/host/host_watch_hash.c`). A page that has stayed the same
-  for 30 checks is hashed every 4 frames, until the game locks it or a
-  file is read into it.
+  for 30 checks is hashed every 60 frames, until the game locks it or a
+  file is read into it (no other write into such a page was seen in a
+  match).
 - **Sockets.** `port/web/src/web_net.c` gives `posix.h`'s sockets inside
   the page: one machine with a loopback address and an address of its own
   network (`10.0.0.1`, or the room's); datagrams to either, or broadcast,
