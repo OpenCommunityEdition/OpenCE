@@ -649,6 +649,33 @@ def test_minimal_custom_edition_cache_loads_with_every_resource(report_tool, tmp
     assert report["convert"] == "ok"
 
 
+def test_the_resource_maps_a_map_needs_come_from_its_tag_index(report_tool, tmp_path):
+    """the tags whose index entry says a resource map holds them (word 0x18):
+    a bitmap bitmaps.map, a sound sounds.map, strings, a font and HUD text
+    loc.map (map sharing sends those with the map)"""
+    _, report = report_one(report_tool, Map().write(tmp_path))
+    assert report["resource_maps_needed"] == "bitmaps, sounds, loc"
+
+
+def test_a_map_whose_tags_are_its_own_needs_none_of_their_resource_maps(report_tool, tmp_path):
+    """the external bitmap and sound marked as held in the map: only
+    loc.map is needed (the load then fails, as their addresses are not the
+    map's; the scan reads the index alone)"""
+    path = Map().write(tmp_path)
+    _, report = report_one(report_tool, path)
+    data = bytearray(path.read_bytes())
+    tag_data_offset = int(report["tag_data"].split("+")[0], 16)
+    index_instances = struct.unpack_from("<I", data, tag_data_offset)[0]
+    instances = tag_data_offset + index_instances - BASE
+    for index in range(struct.unpack_from("<i", data, tag_data_offset + 0x0C)[0]):
+        entry = instances + index * 0x20
+        if struct.unpack_from("<I", data, entry)[0] in (code("bitm"), code("snd!")):
+            struct.pack_into("<I", data, entry + 0x18, 0)
+    path.write_bytes(data)
+    _, report = report_one(report_tool, path)
+    assert report["resource_maps_needed"] == "loc"
+
+
 def test_relocation_counts_every_resource_pointer(report_tool, tmp_path):
     """bitmap: sequences, sprites, bitmaps (3); sound: pitch ranges,
     permutations, mouth data (3); strings: block + 2 strings (3); font:

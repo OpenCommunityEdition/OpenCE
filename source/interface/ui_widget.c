@@ -4648,9 +4648,6 @@ void display_error_damaged_media(
 	return;
 }
 
-/* port: menu_tags.c's */
-char const *pc_menus_screen(char const *name);
-
 void network_game_reset_to_pregame_ui(
 	void)
 {

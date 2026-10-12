@@ -137,6 +137,7 @@ symbols in this file:
 #include "tag_schema.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "cache_file_formats.h" /* port: CUSTOM_EDITION_TAG_CACHE_BYTES */
+#include "map_share.h" /* port: port/linux/game/map_share.c */
 
 /* ---------- constants */
 
@@ -1062,7 +1063,10 @@ gives (cache_files_give_time_to_precache).
 A Halo Custom Edition map (custom_maps\<name>) is looked for in the Custom
 Edition maps folders (port/linux/game/custom_edition_cache.c), and must be
 the host's version (`version`, cache_files_map_version's on the host); any
-other map in the game's own. */
+other map in the game's own. One this machine lacks (or whose resource maps
+it lacks) is asked of the host instead, if it may be (map sharing:
+port/linux/game/map_share.c): it is taken as present, and downloaded before
+it is precached. */
 boolean cache_files_map_present(
 	char const *map_name,
 	unsigned long version)
@@ -1077,8 +1081,11 @@ boolean cache_files_map_present(
 		return TRUE;
 	if (custom_edition_level_name(map_name))
 	{
-		if (custom_edition_cache_present(map_name, version, message, sizeof(message)))
+		if (custom_edition_cache_present(map_name, version, message, sizeof(message)) ||
+			map_share_download_begin(map_name, version, message))
+		{
 			return TRUE;
+		}
 	}
 	else
 	{
@@ -1128,6 +1135,10 @@ boolean cache_files_give_time_to_precache(
 	the main menu and three multiplayer maps played) matched none, so was
 	taken for a map missing from the disc (the damaged disc error) */
 	if (!map_name || !map_name[0])
+		return FALSE;
+	/* port: a map being downloaded (port/linux/game/map_share.c) is not
+	there yet: precached once it is */
+	if (map_share_downloading(map_name))
 		return FALSE;
 	if (cache_files_precache_map_loaded(map_name))
 	{

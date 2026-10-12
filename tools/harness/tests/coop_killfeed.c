@@ -9,7 +9,8 @@ typedef unsigned short word;
 typedef struct {real alpha,red,green,blue;} real_argb_color;
 #define SET_FLAG(v,b,on) ((v)=((v)&~(1u<<(b)))|((on)?1u<<(b):0))
 enum { _game_connection_local, _game_connection_network_client, _game_connection_network_server };
-enum { _distributed_message_coop_death=85, _distributed_message_social_request=96,_distributed_message_social_line,_distributed_message_social_scores };
+#include "message_ids.inc"
+enum { _distributed_message_social_request=96,_distributed_message_social_line,_distributed_message_social_scores };
 enum { _distributed_to_clients, _distributed_to_clients_reliably };
 enum { _object_dead_bit, _object_outside_of_map_bit, _damage_no_statistics_bit, _damage_headshot_bit, _damage_chain_reaction_bit };
 struct distributed_message_header { word header; byte type,count; long game_time; };
