@@ -365,6 +365,8 @@ static char const *const port_function_names[] =
 	"port setup edit",
 	"port setup options init", "port setup options save",
 	"port map list back",
+	"port mcc solo folder back",
+	"port mcc host folder back",
 	"port pause end game",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",

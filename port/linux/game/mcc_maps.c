@@ -312,3 +312,142 @@ boolean mcc_maps_level_campaign(char const *level_name)
 {
 	return mcc_maps_campaign(mcc_maps_find(level_name));
 }
+
+static void mcc_map_package(short index, char package[64])
+{
+	char const *name = mcc_menu_catalog.maps[index].file_name;
+	char const *separator = strchr(name, '\\');
+	size_t length = separator ? (size_t)(separator - name) : 0;
+
+	memcpy(package, name, length);
+	package[length] = 0;
+}
+
+static void mcc_map_browser_key(struct mcc_map_browser const *browser, short row, char key[64])
+{
+	if (browser->folders[row])
+		mcc_map_package(browser->entries[row], key);
+	else
+		snprintf(key, 64, "%s", mcc_maps_level_name(browser->entries[row]));
+}
+
+void mcc_map_browser_select(struct mcc_map_browser *browser, short row)
+{
+	if (row < 0 || row >= browser->count)
+		return;
+	browser->chosen = row;
+	mcc_map_browser_key(browser, row, browser->selected);
+}
+
+void mcc_map_browser_open(struct mcc_map_browser *browser, boolean campaign)
+{
+	char package[64], previous[64] = "", key[64];
+	short index, pass, row;
+
+	mcc_maps_scan();
+	browser->campaign = campaign;
+	browser->count = browser->chosen = 0;
+	/* Folder rows precede loose maps. The catalog already sorts package/map
+	identities case-insensitively and admits only one package depth. */
+	for (pass = 0; pass < 2; pass++)
+	{
+		for (index = 0; index < mcc_menu_catalog.count; index++)
+		{
+			boolean folder;
+
+			if (mcc_menu_catalog.maps[index].campaign != campaign)
+				continue;
+			mcc_map_package(index, package);
+			folder = !browser->package[0] && package[0];
+			if (browser->package[0])
+			{
+				if (pass || csstrcasecmp(browser->package, package))
+					continue;
+			}
+			else if ((pass == 0) != folder || (folder && !csstrcasecmp(previous, package)))
+				continue;
+			row = browser->count++;
+			browser->entries[row] = index;
+			browser->folders[row] = folder;
+			if (folder)
+				snprintf(previous, sizeof(previous), "%s", package);
+			mcc_map_browser_key(browser, row, key);
+			if (!csstrcasecmp(browser->selected, key))
+				browser->chosen = row;
+		}
+	}
+	/* A removed/now-empty package returns safely to its parent. */
+	if (!browser->count && browser->package[0])
+	{
+		browser->package[0] = 0;
+		mcc_map_browser_open(browser, campaign);
+		return;
+	}
+	if (browser->count)
+		mcc_map_browser_select(browser, browser->chosen);
+	else
+		browser->selected[0] = 0;
+}
+
+boolean mcc_map_browser_enter(struct mcc_map_browser *browser, short row)
+{
+	if (row < 0 || row >= browser->count || !browser->folders[row])
+		return FALSE;
+	mcc_map_package(browser->entries[row], browser->package);
+	browser->selected[0] = 0;
+	mcc_map_browser_open(browser, browser->campaign);
+	return TRUE;
+}
+
+boolean mcc_map_browser_back(struct mcc_map_browser *browser)
+{
+	if (!browser->package[0])
+		return FALSE;
+	snprintf(browser->selected, sizeof(browser->selected), "%s", browser->package);
+	browser->package[0] = 0;
+	mcc_map_browser_open(browser, browser->campaign);
+	return TRUE;
+}
+
+short mcc_map_browser_index(struct mcc_map_browser const *browser, short row)
+{
+	return row >= 0 && row < browser->count && !browser->folders[row] ? browser->entries[row] : NONE;
+}
+
+void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wchar_t text[64])
+{
+	short used = 0, index;
+	char package[64];
+	wchar_t const *name;
+	size_t length;
+
+	text[0] = 0;
+	if (row < 0 || row >= browser->count)
+		return;
+	index = browser->entries[row];
+	if (browser->folders[row])
+	{
+		mcc_map_package(index, package);
+		text[used++] = '[';
+		for (length = 0; package[length] && used < 62; length++)
+		{
+			unsigned char c = (unsigned char)package[length];
+			text[used++] = c >= 32 && c < 127 ? c : '?';
+		}
+		text[used++] = ']';
+	}
+	else
+	{
+		char const *base = strrchr(mcc_menu_catalog.maps[index].file_name, '\\');
+
+		base = base ? base + 1 : mcc_menu_catalog.maps[index].file_name;
+		length = strlen(base);
+		name = mcc_maps_name(index);
+		while (used < 63 && (size_t)used < length && name[used])
+		{
+			text[used] = name[used];
+			used++;
+		}
+	}
+	text[used] = 0;
+}

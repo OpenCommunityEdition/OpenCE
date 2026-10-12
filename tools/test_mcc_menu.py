@@ -25,21 +25,23 @@ def menu_tool(tmp_path_factory):
     states = "\n".join(re.search(r"static struct\s*\{[^}]*\}\s*" + name + r";",
                                  implementation, re.S).group()
                        for name in ["mcc_solo_list", "level_list", "map_list", "mcc_host_list"])
-    names = ["map_kind_mcc", "map_kind_singleplayer", "map_kind_shown", "map_kind_first",
-             "mcc_solo_choose", "mcc_host_list_choose", "level_list_update",
-             "map_list_update", "map_list_back"]
+    names = ["map_kind_mcc", "map_kind_singleplayer", "map_kind_shown", "map_kind_first", "mcc_browser_focus", "mcc_solo_folder_choose",
+             "mcc_solo_choose", "mcc_solo_back", "mcc_host_list_choose", "level_list_update",
+             "map_list_update", "map_list_back", "mcc_host_back", "level_list_initialize", "map_list_initialize"]
     source = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
 typedef int boolean;
+#include "mcc_maps.h"
 #define TRUE 1
 #define FALSE 0
 #define NONE (-1)
 #define MAP_KIND_ROWS 10
 #define NUMBER_OF_GAME_DIFFICULTY_LEVELS 4
 #define LEVEL_UNAVAILABLE 99
+#define NUMBER_OF_SINGLE_PLAYER_LEVELS 10
 #define SOUND_FORWARD 1
 #define SOUND_BACK 2
 #define SERVER_SETUP_NAME "server_setup"
@@ -48,7 +50,7 @@ typedef int boolean;
 #define PIN(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define csmemset memset
 enum {MAP_STEP_MAPS, MAP_STEP_DIFFICULTIES};
-struct player_profile {int unused;};
+struct player_profile {int last_single_player_map_played;};
 struct widget_instance {struct {struct {short selected_index;struct widget_instance *extended_description;} list;} parameters;};
 static struct widget_instance spinner, description, list;
 static struct {short shown_level,saved_level;struct {boolean available;void *finished;} levels[10];} campaign;
@@ -57,22 +59,39 @@ static int opened, backed, last_controller, last_difficulty, last_sound, focus_f
 static int solo_updated, host_updated, legacy_updated;
 static char last_level[40];
 ''' + kinds + '\n' + states + r'''
+static struct mcc_map_browser mcc_solo_browsers[2],mcc_host_browsers[2];
 static struct widget_instance *named(struct widget_instance *widget,char const *name,short marker) {
     (void)widget;(void)marker;
+    if(!strcmp(name,"solo_level_select_list") || !strcmp(name,"mp_map_select_list_2"))return &list;
     return !strcmp(name,"list_item_0_map_kind_spinner") ? (no_spinner ? NULL : &spinner) : &description;
 }
 /* A sorted mixed catalog: MP, SP, MP, SP, MP. */
-static short mcc_maps_type_count(boolean singleplayer) {return empty_catalog ? 0 : singleplayer ? 2 : 3;}
-static short mcc_maps_type_index(short row,boolean singleplayer) {
+short mcc_maps_type_count(boolean singleplayer) {return empty_catalog ? 0 : singleplayer ? 2 : 3;}
+short mcc_maps_type_index(short row,boolean singleplayer) {
     if (row<0 || row>=mcc_maps_type_count(singleplayer))return NONE;
     return singleplayer ? row*2+1 : row*2;
 }
-static char const *mcc_maps_level_name(short index) {
+char const *mcc_maps_level_name(short index) {
     static char const *names[]={"mcc_maps\\mp0","mcc_maps\\sp0","mcc_maps\\mp1","mcc_maps\\sp1","mcc_maps\\mp2"};
     return index<0 || index>=5 ? NULL : names[index];
 }
-static boolean mcc_maps_campaign(short index) {return index==1 || index==3;}
-static boolean campaign_profile(short controller,struct player_profile *profile) {(void)profile;last_controller=controller;return TRUE;}
+boolean mcc_maps_campaign(short index) {return index==1 || index==3;}
+void mcc_map_browser_open(struct mcc_map_browser *b,boolean campaign) {
+    short i;b->campaign=campaign;b->count=mcc_maps_type_count(campaign);if(b->chosen>=b->count)b->chosen=0;
+    for(i=0;i<b->count;i++){b->entries[i]=mcc_maps_type_index(i,campaign);b->folders[i]=FALSE;}
+}
+short mcc_map_browser_index(struct mcc_map_browser const *b,short row) {
+    return row>=0 && row<b->count && !b->folders[row] ? b->entries[row] : NONE;
+}
+void mcc_map_browser_select(struct mcc_map_browser *b,short row) {b->chosen=row;}
+boolean mcc_map_browser_enter(struct mcc_map_browser *b,short row) {
+    if(row<0 || row>=b->count || !b->folders[row])return FALSE;
+    strcpy(b->package,"package");b->folders[row]=FALSE;b->chosen=0;return TRUE;
+}
+boolean mcc_map_browser_back(struct mcc_map_browser *b) {
+    if(!b->package[0])return FALSE;b->package[0]=0;b->chosen=1;return TRUE;
+}
+static boolean campaign_profile(short controller,struct player_profile *profile) {(void)profile;last_controller=controller;profile->last_single_player_map_played=0;return TRUE;}
 static boolean campaign_fail(void) {failed++;return FALSE;}
 static void main_set_map_name(char const *name) {strcpy(last_level,name);}
 static void main_defer_map_map_change(void) {deferred++;}
@@ -89,6 +108,17 @@ static boolean ui_widget_port_mcc_multiplayer_map_choose(char const *name) {
 static boolean ui_widget_port_open(struct widget_instance *widget,char const *name,boolean *deleted) {
     (void)widget; if(strcmp(name,SERVER_SETUP_NAME))exit(70);opened++;*deleted=TRUE;return TRUE;
 }
+static void mcc_maps_rescan_stub(void) {}
+#define mcc_maps_rescan mcc_maps_rescan_stub
+static void campaign_levels_read(struct player_profile *p) {(void)p;campaign.saved_level=NONE;campaign.levels[0].available=TRUE;}
+static short ui_widget_port_multiplayer_maps(char const *const **names,short *last) {*names=NULL;*last=0;return 1;}
+static void map_kind_set(struct widget_instance *widget,short kind) {(void)widget;spinner.parameters.list.selected_index=kind;}
+static void *global_network_game_server_get(void) {return &list;}
+static boolean network_game_is_splitscreen_local(void) {return FALSE;}
+static void custom_edition_maps_look_again(void) {}
+static short xbox_multiplayer_map_count(short count) {return count;}
+static short focused_row(struct widget_instance *widget) {(void)widget;return 0;}
+static void focus_row(struct widget_instance *widget,short row) {(void)widget;(void)row;}
 static void map_kind_focus(struct widget_instance *widget,short first,short chosen) {(void)widget;focus_first=first;focus_chosen=chosen;}
 static void ui_play_audio_feedback_sound(short sound) {last_sound=sound;}
 static void ui_widget_port_go_back(struct widget_instance *widget) {(void)widget;backed++;}
@@ -121,6 +151,7 @@ int main(int argc,char **argv) {
     boolean deleted=FALSE;
     if(argc<2)return 99;
     list.parameters.list.extended_description=&description;
+    {int i;for(i=0;i<2;i++){mcc_map_browser_open(&mcc_solo_browsers[i],i);mcc_map_browser_open(&mcc_host_browsers[i],i);}}
     if(!strcmp(argv[1],"kinds")) {
         int i;printf("%d\n",NUMBER_OF_MAP_KINDS);
         for(i=0;i<NUMBER_OF_MAP_KINDS;i++)printf("%d %d\n",map_kind_singleplayer(i),map_kind_mcc(i));
@@ -162,13 +193,13 @@ int main(int argc,char **argv) {
         CHECK(!multiplayer && !cooperated && !opened && mcc_host_list.step==MAP_STEP_MAPS,14);return 0;
     }
     if(!strcmp(argv[1],"empty")) {
-        empty_catalog=TRUE;mcc_solo_list.campaign=atoi(argv[2]);mcc_host_list.campaign=atoi(argv[2]);
+        empty_catalog=TRUE;mcc_solo_browsers[0].count=mcc_solo_browsers[1].count=mcc_host_browsers[0].count=mcc_host_browsers[1].count=0;mcc_solo_list.campaign=atoi(argv[2]);mcc_host_list.campaign=atoi(argv[2]);
         CHECK(!mcc_solo_choose(0) && !mcc_host_list_choose(&list,&deleted),15);
         CHECK(failed==2 && !launched && !deferred && !cooperated && !multiplayer && !opened,16);return 0;
     }
     if(!strcmp(argv[1],"back")) {
         map_list.kind=MAP_KIND_MCC_SINGLEPLAYER;mcc_host_list.campaign=TRUE;
-        mcc_host_list.step=MAP_STEP_DIFFICULTIES;mcc_host_list.level=3;mcc_host_list.chosen=2;
+        mcc_host_browsers[TRUE].chosen=1;mcc_host_list.step=MAP_STEP_DIFFICULTIES;mcc_host_list.level=3;mcc_host_list.chosen=2;
         CHECK(map_list_back(&list,&deleted),17);
         CHECK(mcc_host_list.step==MAP_STEP_MAPS && mcc_host_list.chosen==1 && focus_chosen==1,18);
         CHECK(!deleted && !backed && last_sound==SOUND_BACK,19);
@@ -200,6 +231,35 @@ int main(int argc,char **argv) {
         }
         CHECK(!failed && !launched && !deferred && !cooperated && !multiplayer,31);return 0;
     }
+    if(!strcmp(argv[1],"folder")) {
+        map_list.kind=MAP_KIND_MCC_SINGLEPLAYER;mcc_host_list.campaign=TRUE;
+        mcc_host_browsers[TRUE].folders[0]=TRUE;
+        CHECK(!mcc_host_list_choose(&list,&deleted),40);
+        CHECK(!cooperated && !multiplayer && !opened && !failed && !deleted,41);
+        CHECK(mcc_host_browsers[TRUE].package[0] && last_sound==SOUND_FORWARD,42);
+        CHECK(mcc_host_back(&description,&deleted) && !deleted && !backed && focus_chosen==1,43);
+        mcc_solo_list.campaign=TRUE;mcc_solo_browsers[TRUE].folders[0]=TRUE;
+        CHECK(mcc_solo_folder_choose(&list) && !launched && !deferred && !failed,44);
+        level_list.kind=MAP_KIND_MCC_SINGLEPLAYER;
+        CHECK(mcc_solo_back(&list,&deleted) && !deleted && !mcc_solo_browsers[TRUE].package[0],45);
+        CHECK(mcc_solo_back(&list,&deleted) && deleted,46);deleted=FALSE;
+        strcpy(mcc_solo_browsers[TRUE].package,"keep");level_list.kind=MAP_KIND_CUSTOM_SINGLEPLAYER;
+        CHECK(mcc_solo_back(&list,&deleted) && deleted && mcc_solo_browsers[TRUE].package[0],47);
+        return 0;
+    }
+    if(!strcmp(argv[1],"recreate")) {
+        level_list.kind=MAP_KIND_MCC_SINGLEPLAYER;mcc_solo_browsers[TRUE].chosen=1;
+        strcpy(mcc_solo_browsers[TRUE].package,"campaign");
+        CHECK(level_list_initialize(&list,0),50);
+        CHECK(level_list.kind==MAP_KIND_MCC_SINGLEPLAYER && mcc_solo_list.chosen==1 && focus_chosen==1,51);
+        CHECK(!strcmp(mcc_solo_browsers[TRUE].package,"campaign"),52);
+        map_list.kind=MAP_KIND_MCC_MULTIPLAYER;mcc_host_browsers[FALSE].chosen=2;
+        CHECK(map_list_initialize(&list),53);
+        CHECK(map_list.kind==MAP_KIND_MCC_MULTIPLAYER && mcc_host_list.chosen==2,54);
+        level_list.kind=MAP_KIND_SINGLEPLAYER;CHECK(level_list_initialize(&list,0),55);
+        CHECK(level_list.kind==MAP_KIND_SINGLEPLAYER && level_list.chosen==0,56);
+        return 0;
+    }
     return 97;
 }
 '''
@@ -207,7 +267,7 @@ int main(int argc,char **argv) {
     path = work / "menu.c"
     path.write_text(source)
     executable = work / ("menu.exe" if os.name == "nt" else "menu")
-    command = [compiler, "-std=c99", str(path), "-o", str(executable)]
+    command = [compiler, "-I", str(ROOT / "port/linux/game"), "-std=c99", str(path), "-o", str(executable)]
     if os.name == "nt":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
     result = subprocess.run(command, capture_output=True, text=True)
@@ -262,3 +322,49 @@ def test_coop_back_restores_filtered_row_and_then_exits(menu_tool):
 @pytest.mark.parametrize("target", [1, 3, 4, 5])
 def test_category_change_resets_mcc_state_and_preserves_legacy_dispatch(menu_tool, host, target):
     run(menu_tool, "switch", host, target)
+
+
+def test_folder_activation_stays_in_menu(menu_tool):
+    run(menu_tool, "folder")
+
+
+def test_recreated_mcc_lists_restore_selection(menu_tool):
+    run(menu_tool, "recreate")
+
+def test_generated_folder_back_controls_and_descriptions():
+    import xml.etree.ElementTree as ET
+    import port_settings
+    base = ROOT / "port/assets/menus/ce"
+    tree = ET.parse(base / "main_menu.solo_level_select.xml")
+    name = "main_menu/solo_level_select/solo_level_select_list"
+    widget = tree.find(f".//widget[@name='{name}']")
+    expected = [ET.fromstring(line).attrib for line in port_settings.WIDGET_PATCHES[name]["handlers"]]
+    assert [node.attrib for node in widget.findall("on")] == expected
+    for event in ("b", "back"):
+        handler = widget.find(f"on[@event='{event}']")
+        assert handler.attrib == {"event": event, "run": "port mcc solo folder back"}
+    generated = "\n".join(port_settings.multiplayer_files()["main_menu.new_select.port.xml"])
+    assert (base / "main_menu.new_select.port.xml").read_text() == generated
+    for filename, parent in [
+        ("main_menu.solo_level_select.xml", "main_menu/solo_level_select/replay_level_right_item"),
+        ("main_menu.multiplayer_type_select.mp_map_select.xml", port_settings.MT + "/mp_map_select/mp_map_right_item"),
+    ]:
+        widget = ET.parse(base / filename).find(f".//widget[@name='{parent}']")
+        for label in ("name", "help"):
+            assert widget.find(f"child[@widget='main_menu/new_select/mcc_folder_{label}']") is not None
+
+
+def test_screen_back_handlers_reach_mcc_lists_before_default_back():
+    import xml.etree.ElementTree as ET
+    import port_settings
+    base = ROOT / "port/assets/menus/ce"
+    for filename, name, handler in [
+        ("main_menu.solo_level_select.xml", "main_menu/solo_level_select/solo_level_select_screen", "solo"),
+        ("main_menu.multiplayer_type_select.mp_map_select.xml", port_settings.MT + "/mp_map_select/mp_map_select_screen", "host"),
+        ("main_menu.multiplayer_type_select.connected.xml", port_settings.MT + "/connected/connected_map_select_wrapper", "host"),
+    ]:
+        widget = ET.parse(base / filename).find(f".//widget[@name='{name}']")
+        expected = [ET.fromstring(line).attrib for line in port_settings.WIDGET_PATCHES[name]["handlers"]]
+        assert [node.attrib for node in widget.findall("on")] == expected
+        for event in ("b", "back"):
+            assert widget.find(f"on[@event='{event}']").attrib == {"event": event, "run": f"port mcc {handler} folder back"}

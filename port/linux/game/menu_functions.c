@@ -1117,6 +1117,9 @@ static void map_description_show(struct widget_instance *description, short leve
 	struct widget_instance *widget;
 	short marker;
 
+	/* MCC folder descriptions have no map display index. */
+	visible_set(named(description, "mcc_folder_name", 0), FALSE);
+	visible_set(named(description, "mcc_folder_help", 0), FALSE);
 	visible_set(named(description, "replay_level_right_name", 0), level != NONE);
 	visible_set(named(description, "replay_level_right_pic", 0), level != NONE);
 	visible_set(named(description, "replay_level_right_data", 0), level != NONE);
@@ -1147,6 +1150,19 @@ static struct
 	boolean campaign;
 } mcc_solo_list;
 
+static struct mcc_map_browser mcc_solo_browsers[2];
+
+static void mcc_browser_focus(struct widget_instance *list, struct mcc_map_browser *browser,
+	short *first, short *chosen)
+{
+	*chosen = browser->chosen;
+	*first = map_kind_first(*chosen, browser->count);
+	if (browser->count)
+		map_kind_focus(list, *first, *chosen);
+	else
+		focus_row(list, 0);
+}
+
 static void mcc_map_description_show(struct widget_instance *description, short index)
 {
 	struct widget_instance *picture;
@@ -1159,25 +1175,56 @@ static void mcc_map_description_show(struct widget_instance *description, short 
 
 static void mcc_solo_map_text(short row, wchar_t *text)
 {
-	ustrncpy(text, mcc_maps_name(mcc_maps_type_index(row, mcc_solo_list.campaign)), ROW_TEXT_LENGTH - 1);
-	text[ROW_TEXT_LENGTH - 1] = 0;
+	mcc_map_browser_text(&mcc_solo_browsers[mcc_solo_list.campaign], row, text);
+}
+
+static void mcc_browser_description(struct widget_instance *description, struct mcc_map_browser *browser)
+{
+	short index = mcc_map_browser_index(browser, browser->chosen);
+	wchar_t text[ROW_TEXT_LENGTH];
+
+	visible_set(named(description, "mp_map_right_item", 0), TRUE);
+	mcc_map_description_show(description, index);
+	if (index == NONE)
+	{
+		mcc_map_browser_text(browser, browser->chosen, text);
+		text_set(named(description, "mcc_folder_name", 0), text);
+		text_set(named(description, "mcc_folder_help", 0), browser->count ?
+			L"Open folder to\r\nchoose a map." : L"No MCC maps found\r\nin this category.");
+		visible_set(named(description, "mcc_folder_name", 0), TRUE);
+		visible_set(named(description, "mcc_folder_help", 0), TRUE);
+	}
+}
+
+static boolean mcc_solo_folder_choose(struct widget_instance *list)
+{
+	struct mcc_map_browser *browser = &mcc_solo_browsers[mcc_solo_list.campaign];
+
+	if (!mcc_map_browser_enter(browser, mcc_solo_list.chosen))
+		return FALSE;
+	mcc_browser_focus(list, browser, &mcc_solo_list.first, &mcc_solo_list.chosen);
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
 }
 
 static void mcc_solo_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
-	short count = mcc_maps_type_count(mcc_solo_list.campaign);
-	short row = map_kind_rows_update(list, &mcc_solo_list.first, count, mcc_solo_map_text);
+	struct mcc_map_browser *browser = &mcc_solo_browsers[mcc_solo_list.campaign];
+	short row = map_kind_rows_update(list, &mcc_solo_list.first, browser->count, mcc_solo_map_text);
 
 	if (row != NONE)
+	{
 		mcc_solo_list.chosen = row;
-	mcc_map_description_show(description, mcc_maps_type_index(mcc_solo_list.chosen, mcc_solo_list.campaign));
+		mcc_map_browser_select(browser, row);
+	}
+	mcc_browser_description(description, browser);
 	profile_name_show(description);
 }
 
 static boolean mcc_solo_choose(short controller)
 {
-	short index = mcc_maps_type_index(mcc_solo_list.chosen, mcc_solo_list.campaign);
+	short index = mcc_map_browser_index(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.chosen);
 	char const *level_name = mcc_maps_level_name(index);
 	struct player_profile profile;
 
@@ -1206,6 +1253,27 @@ static struct
 	char const *const *map_names;
 	short map_count;
 } level_list;
+
+/* Handle Back explicitly: a failed handler would propagate B to the
+screen's default back action even after returning to the package list. */
+static boolean mcc_solo_back(struct widget_instance *list, boolean *widget_deleted)
+{
+	struct widget_instance *child = named(list, "solo_level_select_list", 0);
+
+	if (child)
+		list = child;
+	if (map_kind_mcc(level_list.kind) && mcc_map_browser_back(&mcc_solo_browsers[mcc_solo_list.campaign]))
+	{
+		mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+			&mcc_solo_list.first, &mcc_solo_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	ui_widget_port_go_back(list);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
 
 /* a map list's entries of a kind (the Map screen's difficulties aside) */
 static short map_kind_count(short kind, short multiplayer_map_count)
@@ -1253,6 +1321,7 @@ static boolean level_list_initialize(struct widget_instance *list, short control
 {
 	struct player_profile profile;
 	short level, last_used;
+	short mcc_kind = level_list.kind;
 
 	mcc_maps_rescan();
 	mcc_solo_list.first = mcc_solo_list.chosen = 0;
@@ -1272,6 +1341,16 @@ static boolean level_list_initialize(struct widget_instance *list, short control
 	level_list.first = map_kind_first(level, NUMBER_OF_SINGLE_PLAYER_LEVELS);
 	map_kind_set(list, level_list.kind);
 	map_kind_focus(list, level_list.first, level_list.chosen);
+	/* MCC keeps its folder when the difficulty screen recreates this list. */
+	if (map_kind_mcc(mcc_kind))
+	{
+		level_list.kind = mcc_kind;
+		mcc_solo_list.campaign = mcc_kind == MAP_KIND_MCC_SINGLEPLAYER;
+		mcc_map_browser_open(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.campaign);
+		map_kind_set(list, mcc_kind);
+		mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+			&mcc_solo_list.first, &mcc_solo_list.chosen);
+	}
 	return TRUE;
 }
 
@@ -1290,8 +1369,14 @@ static void level_list_update(struct widget_instance *list)
 	{
 		if (map_kind_mcc(kind))
 		{
-			mcc_solo_list.first = mcc_solo_list.chosen = 0;
+			boolean chooser = focused_row(list) == 0;
+
 			mcc_solo_list.campaign = kind == MAP_KIND_MCC_SINGLEPLAYER;
+			mcc_map_browser_open(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.campaign);
+			mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+				&mcc_solo_list.first, &mcc_solo_list.chosen);
+			if (chooser)
+				focus_row(list, 0);
 		}
 		level_list.kind = kind;
 		level_list.first = level_list.chosen = 0;
@@ -2701,36 +2786,48 @@ static struct
 	boolean campaign;
 } mcc_host_list;
 
+static struct mcc_map_browser mcc_host_browsers[2];
+
 static void mcc_host_map_text(short row, wchar_t *text)
 {
-	ustrncpy(text, mcc_maps_name(mcc_maps_type_index(row, mcc_host_list.campaign)), ROW_TEXT_LENGTH - 1);
-	text[ROW_TEXT_LENGTH - 1] = 0;
+	mcc_map_browser_text(&mcc_host_browsers[mcc_host_list.campaign], row, text);
 }
 
 static void mcc_host_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
+	struct mcc_map_browser *browser = &mcc_host_browsers[mcc_host_list.campaign];
 	short count = mcc_host_list.step == MAP_STEP_DIFFICULTIES ? NUMBER_OF_GAME_DIFFICULTY_LEVELS :
-		mcc_maps_type_count(mcc_host_list.campaign);
+		browser->count;
 	short row = map_kind_rows_update(list, &mcc_host_list.first, count,
 		mcc_host_list.step == MAP_STEP_DIFFICULTIES ? map_difficulty_text : mcc_host_map_text);
-	short shown;
 
 	if (row != NONE)
+	{
 		mcc_host_list.chosen = row;
-	shown = mcc_host_list.step == MAP_STEP_DIFFICULTIES ? mcc_host_list.level :
-		mcc_maps_type_index(mcc_host_list.chosen, mcc_host_list.campaign);
-	visible_set(named(description, "mp_map_right_item", 0), shown != NONE);
-	mcc_map_description_show(description, shown);
+		if (mcc_host_list.step != MAP_STEP_DIFFICULTIES)
+			mcc_map_browser_select(browser, row);
+	}
+	if (mcc_host_list.step == MAP_STEP_DIFFICULTIES)
+		mcc_map_description_show(description, mcc_host_list.level);
+	else
+		mcc_browser_description(description, browser);
 	profile_name_show(description);
 }
 
 static boolean mcc_host_list_choose(struct widget_instance *list, boolean *widget_deleted)
 {
+	struct mcc_map_browser *browser = &mcc_host_browsers[mcc_host_list.campaign];
 	short index = mcc_host_list.step == MAP_STEP_DIFFICULTIES ? mcc_host_list.level :
-		mcc_maps_type_index(mcc_host_list.chosen, mcc_host_list.campaign);
+		mcc_map_browser_index(browser, mcc_host_list.chosen);
 	char const *level_name = mcc_maps_level_name(index);
 
+	if (mcc_host_list.step != MAP_STEP_DIFFICULTIES && mcc_map_browser_enter(browser, mcc_host_list.chosen))
+	{
+		mcc_browser_focus(list, browser, &mcc_host_list.first, &mcc_host_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		return FALSE;
+	}
 	if (!level_name)
 		return campaign_fail();
 	if (mcc_host_list.step == MAP_STEP_DIFFICULTIES)
@@ -2743,6 +2840,7 @@ static boolean mcc_host_list_choose(struct widget_instance *list, boolean *widge
 		return ui_widget_port_mcc_multiplayer_map_choose(level_name);
 	if (mcc_host_list.multiplayer_only)
 		return campaign_fail();
+	mcc_map_browser_select(browser, mcc_host_list.chosen);
 	mcc_host_list.level = index;
 	mcc_host_list.step = MAP_STEP_DIFFICULTIES;
 	mcc_host_list.chosen = (short)PIN(main_get_difficulty(), 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
@@ -2757,6 +2855,7 @@ static boolean map_list_initialize(struct widget_instance *list)
 {
 	char const *const *names;
 	short last_used = 0;
+	short mcc_kind = map_list.kind;
 
 	map_list.hosting = global_network_game_server_get() != NULL && !network_game_is_splitscreen_local();
 	mcc_maps_rescan();
@@ -2774,6 +2873,15 @@ static boolean map_list_initialize(struct widget_instance *list)
 	}
 	map_kind_set(list, map_list.kind);
 	map_step_open(list, MAP_STEP_MAPS, last_used);
+	if (map_kind_mcc(mcc_kind) && (map_list.hosting || mcc_kind == MAP_KIND_MCC_MULTIPLAYER))
+	{
+		map_list.kind = mcc_kind;
+		mcc_host_list.campaign = mcc_kind == MAP_KIND_MCC_SINGLEPLAYER;
+		mcc_map_browser_open(&mcc_host_browsers[mcc_host_list.campaign], mcc_host_list.campaign);
+		map_kind_set(list, mcc_kind);
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
+	}
 	return TRUE;
 }
 
@@ -2789,9 +2897,16 @@ static void map_list_update(struct widget_instance *list)
 	{
 		if (map_kind_mcc(kind))
 		{
+			boolean chooser = focused_row(list) == 0;
+
 			csmemset(&mcc_host_list, 0, sizeof(mcc_host_list));
 			mcc_host_list.multiplayer_only = !map_list.hosting;
 			mcc_host_list.campaign = kind == MAP_KIND_MCC_SINGLEPLAYER;
+			mcc_map_browser_open(&mcc_host_browsers[mcc_host_list.campaign], mcc_host_list.campaign);
+			mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+				&mcc_host_list.first, &mcc_host_list.chosen);
+			if (chooser)
+				focus_row(list, 0);
 		}
 		map_list.kind = kind;
 		map_list.step = MAP_STEP_MAPS;
@@ -2866,17 +2981,16 @@ static boolean map_list_back(struct widget_instance *list, boolean *widget_delet
 {
 	if (map_kind_mcc(map_list.kind) && mcc_host_list.step == MAP_STEP_DIFFICULTIES)
 	{
-		short row, count = mcc_maps_type_count(mcc_host_list.campaign);
-
 		mcc_host_list.step = MAP_STEP_MAPS;
-		mcc_host_list.chosen = 0;
-		for (row = 0; row < count; row++)
-		{
-			if (mcc_maps_type_index(row, mcc_host_list.campaign) == mcc_host_list.level)
-				mcc_host_list.chosen = row;
-		}
-		mcc_host_list.first = map_kind_first(mcc_host_list.chosen, count);
-		map_kind_focus(list, mcc_host_list.first, mcc_host_list.chosen);
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
+	if (map_kind_mcc(map_list.kind) && mcc_map_browser_back(&mcc_host_browsers[mcc_host_list.campaign]))
+	{
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
 		ui_play_audio_feedback_sound(SOUND_BACK);
 		return TRUE;
 	}
@@ -2887,6 +3001,19 @@ static boolean map_list_back(struct widget_instance *list, boolean *widget_delet
 		return TRUE;
 	}
 	ui_widget_port_go_back(list);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* Screens consume B before forwarding events to their list children. */
+static boolean mcc_host_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	struct widget_instance *list = named(widget, "mp_map_select_list_2", 0);
+
+	if (list && map_kind_mcc(map_list.kind))
+		return map_list_back(list, widget_deleted);
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	ui_widget_port_go_back(widget);
 	*widget_deleted = TRUE;
 	return TRUE;
 }
@@ -5827,6 +5954,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return map_list_back(widget, widget_deleted);
 		}
+		else if (!strcmp(name, "port mcc host folder back"))
+		{
+			return mcc_host_back(widget, widget_deleted);
+		}
 		else if (!strcmp(name, "mp profiles list initialize"))
 		{
 			if (!strcmp(widget->name, "playlist_select_list"))
@@ -5984,7 +6115,13 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "solo level set map"))
 		{
+			if (map_kind_mcc(level_list.kind) && mcc_solo_folder_choose(widget))
+				return FALSE;
 			return level_choose(controller);
+		}
+		else if (!strcmp(name, "port mcc solo folder back"))
+		{
+			return mcc_solo_back(widget, widget_deleted);
 		}
 		else if (!strcmp(name, "difficulty item select"))
 		{
