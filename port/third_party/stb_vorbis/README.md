@@ -12,7 +12,7 @@ Unlike the other libraries here, `stb_vorbis.c` is **not** unchanged: a Custom
 Edition map is untrusted input, and the decoder reads the map's streams, so
 it carries checks upstream does not have, each marked with a `port:`
 comment. As changed, its SHA-256 is
-`8d2cd42e0da417bb908a6c618cf9e5ba8294c9ea03be4d35924e63e156d58018`.
+`16ceceac06245040d7ec5965d150a08aa53d663a4cecbe3302f447a12a03b6a3`.
 
 - `alloca.h` included on macOS too.
 - `submap_floor` and `submap_residue` hold 16 entries, as many as the
@@ -28,6 +28,9 @@ comment. As changed, its SHA-256 is
   count, are no larger than the stream holds; the comment list is zeroed
   when allocated, and its length 0 when it is not.
 - A code book's entries times its dimensions is at most 2^24.
+- `do_floor` masks the table index of the flat run after a floor's last
+  point to 255, as `draw_line` masks its own (upstream reads past
+  `inverse_db_table` for a floor value over 255).
 
 `LICENSE` is a copy of that notice. The Custom Edition maps' Ogg Vorbis
 sounds are decoded with it when a map loads

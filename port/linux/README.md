@@ -778,7 +778,9 @@ on the internet. It also downloads the resource maps that the map needs
 the top of the screen shows the progress. In the lobby, the game starts when
 every player has the map. If the game already operates, you join it when
 the download is complete. If no player sends any of the map for a minute,
-you leave the game, and the main menu tells you why.
+you leave the game, and the main menu tells you why. If the downloaded map
+cannot be played, the game deletes the files that it downloaded, and you
+leave the game.
 
 All the players help (HELP SEND MAPS in Settings > Network Setup > Map
 Sharing, `network.map_seed`), as the peers of a torrent do:

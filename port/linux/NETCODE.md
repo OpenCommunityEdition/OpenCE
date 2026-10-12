@@ -412,13 +412,19 @@ menus show a map without its hash, unless two versions are listed.
   file, and keeps one map's part file at most (the one kept before is
   deleted), so that a host cannot fill a disk with offers.
   The client checks the map again once it has it (`custom_edition_cache_present`),
-  and tells the host its progress every two seconds (`_progress`); the host
-  does not drop a machine downloading (and for 20 seconds after) for adding
-  no players or loading slowly, while what it says it has grew by a piece
-  (or to the whole, and no more than the files offered) in the last 80
-  seconds, counted from the first offer however often it asks again. A
-  download that brings nothing for a minute, or a host that does not answer
-  in 30 seconds, leaves the game, saying why.
+  and deletes the files the download put in custom_maps if it cannot be
+  played (or if one of them could not be put there), so that none is taken
+  for present; it tells the host its progress every two seconds
+  (`_progress`). The host does not drop a machine downloading (and for 20
+  seconds after) for adding no players or loading slowly, while what it says
+  it has grew by a piece (or to the whole, and no more than the files
+  offered) in the last 80 seconds, counted from the first offer of the
+  game's map however often, and for whatever level, the machine asks again.
+  It takes a machine's requests five seconds apart at most: one that comes
+  sooner waits its turn (the last of them kept). A connection forgets which
+  pieces the other end has of the download's files when the download ends.
+  A download that brings nothing for a minute, or a host that does not
+  answer in 30 seconds, leaves the game, saying why.
 - The download's progress is drawn at the top of the screen.
 
 ## Stages

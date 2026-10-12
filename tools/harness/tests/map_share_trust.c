@@ -3,9 +3,10 @@ MAP_SHARE_TRUST.C (test)
 
 What map sharing (port/linux/game/map_share.c) takes of another machine's
 word: the LAN addresses a host names, the pieces' hashes (asked of the host
-first, none in a frame refused), and a client's progress, which keeps it in
-the host's game only while it grows. test_map_share_trust.py takes the
-constants and structures (config.inc) and the code (under_test.inc).
+first, none in a frame refused), a client's progress, which keeps it in the
+host's game only while it grows, and its requests for the map, taken a few
+seconds apart at most. test_map_share_trust.py takes the constants and
+structures (config.inc) and the code (under_test.inc).
 */
 
 #include "harness.h"
@@ -19,6 +20,7 @@ typedef unsigned short word;
 #define csmemcmp(first, second, size) memcmp(first, second, size)
 #define csstrcmp(first, second) strcmp(first, second)
 #define csstrncmp(first, second, count) strncmp(first, second, count)
+#define csstrncpy(destination, source, count) strncpy(destination, source, count)
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define _error_silent 0
 #define error(level, ...) ((void)0)
@@ -47,6 +49,7 @@ static struct network_game fake_game;
 static unsigned long fake_machine_addresses[MAP_SHARE_MACHINES];
 static struct map_share_file fake_file;
 static int fake_offers;
+static byte fake_offer_result;
 static int fake_opened;
 static int fake_failed;
 static char const *fake_closed;
@@ -79,13 +82,19 @@ static void map_share_fill_header(struct distributed_message_header *header, byt
 	header->type = type;
 }
 
+/* (an offer's result, after its header and level name) */
 static boolean network_distributed_server_send_to_machine_reliably(long machine_index, void *message, word size)
 {
 	(void)machine_index;
-	(void)message;
 	(void)size;
+	fake_offer_result = ((byte const *)message)[sizeof(struct distributed_message_header) + LEVEL_NAME_BYTES];
 	fake_offers++;
 	return TRUE;
+}
+
+static void host_sources(long machine_index)
+{
+	(void)machine_index;
 }
 
 static struct map_share_file *map_share_file_get(short index)
@@ -113,6 +122,8 @@ static char const *tag_name_strip_path(char const *name)
 #define custom_edition_resource_map_file_path(kind, path) 0
 #define custom_edition_map_resource_maps_needed(level_name) 0UL
 #define map_share_name_hashed(name) ((name)[0] != 0)
+#define map_share_hash_digits(hash, digits) strcpy(digits, "0e2b3ee4")
+#define map_share_name_base_length(name) ((short)(strrchr(name, '_') ? strrchr(name, '_') - (name) : strlen(name)))
 
 /* the pieces' hashes: a file's hash the first piece's here, which is enough to
 tell a whole list from none */
@@ -191,6 +202,17 @@ static void host_ask(void)
 	request.wanted = FLAG(_map_share_file_map);
 	host_request(3, &request);
 	host_offer(3, _offer_ok);
+}
+
+/* machine 3's request for a level, as it comes over its connection */
+static void host_asked_for(char const *level_name)
+{
+	struct distributed_map_share_request request;
+
+	memset(&request, 0, sizeof(request));
+	strcpy(request.level_name, level_name);
+	request.wanted = FLAG(_map_share_file_map);
+	host_asked(3, &request);
 }
 
 /* machine 3 says it has `done` bytes */
@@ -348,6 +370,84 @@ int main(int argc, char **argv)
 		fake_machine_addresses[3] = ADDRESS(10, 0, 0, 4);
 		host_ask();
 		CHECK(map_share_machine_downloading(3), "another machine in the slot was taken for the last");
+		return 0;
+	}
+	/* nor does asking for another level between, which is answered that it
+	is not the game's; a game on another map starts the count again */
+	CASE("progress-other-level-between")
+	{
+		struct distributed_map_share_request request;
+
+		host_setup();
+		host_ask();
+		host_wait(DOWNLOADING_STALL_TIMEOUT + 2000, 0);
+		CHECK(!map_share_machine_downloading(3), "a machine that has had nothing for long is still downloading");
+		memset(&request, 0, sizeof(request));
+		strcpy(request.level_name, "custom_maps\\bloodgulch_00000000");
+		request.wanted = FLAG(_map_share_file_map);
+		host_request(3, &request);
+		CHECK(fake_offers == 2 && fake_offer_result == _offer_unavailable, "another level was offered");
+		host_ask();
+		CHECK(!map_share_machine_downloading(3), "asking for another level between made a machine downloading again");
+		host_request(3, &request);
+		host_ask();
+		CHECK(!map_share_machine_downloading(3), "asking for another level between, again, made it downloading");
+		/* (the host's game on another map) */
+		strcpy(fake_game.map.name, "custom_maps\\hugeass2_0e2b3ee4");
+		host_ask();
+		CHECK(map_share_machine_downloading(3), "a game on another map kept the last map's count");
+		return 0;
+	}
+	/* a machine's requests are taken MAP_REQUEST_INTERVAL apart at most: one
+	sooner waits, the last of them taken in its turn (a millisecond more: the
+	time a request was taken is kept odd, never 0) */
+	CASE("requests-apart")
+	{
+		int asked;
+
+		host_setup();
+		host_asked_for(fake_game.map.name);
+		host_update();
+		CHECK(fake_offers == 1 && fake_offer_result == _offer_ok, "the first request was not answered");
+		for (asked = 0; asked < 50; asked++)
+		{
+			fake_now += 10;
+			host_asked_for(asked & 1 ? fake_game.map.name : "custom_maps\\bloodgulch_00000000");
+			host_update();
+		}
+		CHECK(fake_offers == 1, "requests one after another were all answered: %d", fake_offers);
+		fake_now += MAP_REQUEST_INTERVAL + 1;
+		host_update();
+		CHECK(fake_offers == 2 && fake_offer_result == _offer_ok, "the last request was not answered in its turn");
+		CHECK(!strcmp(map_share_globals.machines[3].request.level_name, fake_game.map.name),
+			"a request before the last was taken");
+		host_update();
+		CHECK(fake_offers == 2, "a request was answered twice");
+		/* (asked again later, its download failed: answered at once) */
+		fake_now += MAP_REQUEST_INTERVAL + 1;
+		host_asked_for(fake_game.map.name);
+		host_update();
+		CHECK(fake_offers == 3, "a request a while after the last was not answered at once");
+		return 0;
+	}
+	/* a request waiting its turn after one answered that the level is not the
+	game's, which leaves nothing else to look at */
+	CASE("requests-apart-after-another-level")
+	{
+		host_setup();
+		host_asked_for("custom_maps\\bloodgulch_00000000");
+		CHECK(fake_offers == 1 && fake_offer_result == _offer_unavailable, "another level was offered");
+		host_asked_for(fake_game.map.name);
+		host_update();
+		CHECK(fake_offers == 1, "a request just after another was answered at once");
+		fake_now += MAP_REQUEST_INTERVAL + 1;
+		host_update();
+		CHECK(fake_offers == 2 && fake_offer_result == _offer_ok, "the request that waited was never answered");
+		/* (another machine in the slot: not held for the last's requests) */
+		fake_machine_addresses[3] = ADDRESS(10, 0, 0, 4);
+		host_asked_for(fake_game.map.name);
+		CHECK(map_share_globals.machines[3].address == ADDRESS(10, 0, 0, 4),
+			"another machine in the slot waited for the last's turn");
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);

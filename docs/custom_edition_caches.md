@@ -191,9 +191,11 @@ Loading, step by step (`custom_edition_cache_load`):
    its lightmaps and their materials: every block within the BSP and aligned,
    every material's uncompressed environment vertices (56 bytes) and
    lightmap vertices (20 bytes) within the BSP and of the size their counts
-   give, lightmap vertices exactly when the lightmap has a bitmap, and every
-   normal, binormal, tangent and incident radiosity within ±1.005 (the game's
-   vertex compressor asserts on anything further out).
+   give, at most 64000 of each (the game's limit, to which the validator
+   cuts a material's counts), lightmap vertices exactly when the lightmap
+   has a bitmap, and every normal, binormal, tangent and incident radiosity
+   within ±1.005 (the game's vertex compressor asserts on anything further
+   out).
 5. The header checksum is computed as OpenSauce computes it, before anything
    changes the tag data; a mismatch is reported, not refused.
 6. The tags held by resource maps are read into the tag cache after the tag
@@ -384,9 +386,11 @@ every tag as it checks an Xbox map's (`tag_validate_custom_edition_tags`,
 called by `custom_edition_cache_tags_load`): every block and data within
 the loaded tags and overlapping no other's, counts cut to the game's
 capacities, indices, enums and tag references corrected, runtime values
-reset, then the graph checks (collision BSPs, node trees, scripts' syntax).
-A map whose pointers cannot be trusted is refused; what can be corrected is,
-and logged. What differs from an Xbox map:
+reset, then the graph checks (collision BSPs, node trees, scripts' syntax),
+and a tag name that lies in any tag's block or data is emptied (what the
+game writes there could take away its end). A map whose pointers cannot be
+trusted is refused; what can be corrected is, and logged. What differs
+from an Xbox map:
 
 - the tag header has no vertex or index buffers, and the tag cache is the
   Custom Edition one (23 MB);

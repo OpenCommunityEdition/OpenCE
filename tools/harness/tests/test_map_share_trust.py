@@ -1,6 +1,6 @@
 """What map sharing (map_share.c) takes of another machine's word: the LAN addresses a host names, the pieces' hashes
-(the host's first, a frame of none refused), and a client's progress, which keeps it in the host's game only while it
-grows."""
+(the host's first, a frame of none refused), a client's progress, which keeps it in the host's game only while it
+grows, and its requests for the map, taken a few seconds apart at most."""
 
 import sys
 from pathlib import Path
@@ -10,7 +10,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["source-addresses", "hashes-sources", "hashes-frames", "progress-advances", "progress-asked-again"]
+CASES = ["source-addresses", "hashes-sources", "hashes-frames", "progress-advances", "progress-asked-again",
+         "progress-other-level-between", "requests-apart", "requests-apart-after-another-level"]
 
 # a fault in map_share.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -33,11 +34,23 @@ NEGATIVE_CONTROLS = {
                             "unsigned long advanced_at = 0;"), "host_request", "progress-asked-again"),
     "slot-kept-for-the-last": (("machine->advanced_at && machine->address", "machine->advanced_at"),
                                "host_request", "progress-asked-again"),
+    "the-level-asked-for-counts": (("game && !csstrncmp(machine->advanced_level, game->map.name, LEVEL_NAME_BYTES - 1)",
+                                    "!csstrncmp(machine->request.level_name, request->level_name, LEVEL_NAME_BYTES)"),
+                                   "host_request", "progress-other-level-between"),
+    "another-map-counts-on": (("game && !csstrncmp(machine->advanced_level, game->map.name, LEVEL_NAME_BYTES - 1)",
+                               "game"), "host_request", "progress-other-level-between"),
+    "every-request-taken": (("machine->requested_at && machine->address", "FALSE && machine->address"),
+                            "host_asked", "requests-apart"),
+    "waiting-request-lost": (("machine->request_waiting && elapsed(", "FALSE && elapsed("), "host_update",
+                             "requests-apart"),
+    "waiting-request-overlooked": ((" && !machine->request_waiting)", ")"), "host_update",
+                                   "requests-apart-after-another-level"),
 }
 
 FUNCTIONS = ("get_long", "elapsed", "address_internet", "address_private", "source_address_allowed", "hashes_source",
              "frame_hashes", "host_machine_valid", "host_machine_downloading", "map_share_machine_downloading",
-             "map_share_machine_needs_map", "host_offer", "host_request", "host_progress")
+             "map_share_machine_needs_map", "level_name_copy", "host_offer", "host_request", "host_asked",
+             "host_update", "host_progress")
 
 
 def generated(fault=None, faulty_function=None):
