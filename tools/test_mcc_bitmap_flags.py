@@ -62,11 +62,11 @@ struct bitmap_data {
 struct bitmap_group {short usage;};
     struct mcc_runtime {struct bitmap_group group;unsigned char source[350000];uint32_t size,reads;unsigned char *tag_index;void *bitmaps;};
     static void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t address,uint32_t size) {(void)r;(void)address;(void)size;return NULL;}
-    static int mcc_resources_read(struct mcc_runtime *r,unsigned type,char const *name,uint32_t offset,uint32_t bytes,void *out) {
-        (void)r;(void)type;(void)name;(void)offset;(void)bytes;(void)out;return 0;
+    static int mcc_resources_read(struct mcc_runtime *r,unsigned type,char const *name,uint32_t offset,uint32_t bytes,void *out,char const *group) {
+        (void)r;(void)type;(void)name;(void)offset;(void)bytes;(void)out;(void)group;return 0;
     }
 static short floor_log2(unsigned value) {short n=0;while(value>1){value>>=1;n++;}return n;}
-static int bitmap_format_type_valid_width(short f,short t,short v) {(void)f;(void)t;return v>0 && v<=4096;}
+static int bitmap_format_type_valid_width(short f,short t,short v) {(void)f;(void)t;return v>0 && v<=30000;}
 static int bitmap_format_type_valid_height(short f,short t,short v) {return bitmap_format_type_valid_width(f,t,v);}
 static int bitmap_format_type_valid_depth(short f,short t,short v) {(void)f;(void)t;return v==1;}
 static void *mcc_bitmap_tag(struct mcc_runtime *r,uint32_t h,uint32_t g,uint32_t s) {
@@ -112,6 +112,26 @@ int main(int argc,char **argv) {
     bitmap.format=6;bitmap.flags=0x1281;bitmap.pixels_size=16;
     texture.bitmap=&bitmap;texture.handle=7;
     for(i=0;i<16;i++)runtime.source[i]=(unsigned char)i;
+    if(!strcmp(argv[1],"swizzle8192")) {
+        bitmap.width=8192;bitmap.height=2;bitmap.format=6;bitmap.flags=0x81;
+        bitmap.pixels_size=32768;runtime.size=32768;runtime.group.usage=0;
+        for(i=0;i<16384;i++) {runtime.source[i*2]=(unsigned char)i;runtime.source[i*2+1]=(unsigned char)(i>>8);}
+        if(!mcc_texture_prepare(&runtime,&textures,&texture) || bitmap.pixels_size!=32768)return 26;
+        if(memcmp(texture.pixels+4,runtime.source+16384,2) ||
+            memcmp(texture.pixels+16384,runtime.source+8192,2) ||
+            memcmp(texture.pixels+32766,runtime.source+32766,2))return 27;
+        free(texture.pixels);return 0;
+    }
+    if(!strncmp(argv[1],"wide",4)) {
+        bitmap.width=15360;bitmap.height=4;bitmap.format=14;bitmap.flags=0x83;
+        bitmap.pixels_size=30720;runtime.size=30720;runtime.group.usage=1;
+        if(!strcmp(argv[1],"wide-short")) {bitmap.pixels_size--;return mcc_texture_prepare(&runtime,&textures,&texture)?24:0;}
+        if(!strcmp(argv[1],"wide-limit")) {bitmap.width=16385;return mcc_texture_prepare(&runtime,&textures,&texture)?25:0;}
+        if(!mcc_texture_prepare(&runtime,&textures,&texture) || bitmap.format!=11 ||
+            !(bitmap.flags&16) || bitmap.width!=15360 || bitmap.pixels_size!=245760)return 22;
+        if(texture.pixels[245759]!=255)return 23;
+        free(texture.pixels);return 0;
+    }
     if(!strcmp(argv[1],"tag-streams")) {
         struct mcc_texture items[3]={{0}};
         struct bitmap_data bitmaps[3];unsigned char out[16];
@@ -208,7 +228,7 @@ int main(int argc,char **argv) {
 
 @pytest.mark.parametrize("case", ["known", "ordinary", "wrong-group", "missing-group", "missing-environment",
                                   "unknown-flag", "extra-pixels", "short-pixels", "bad-signature",
-                                  "wrong-format", "non-power-two", "mipmaps", "tag-streams", "npot", "npot-short"])
+                                  "wrong-format", "non-power-two", "mipmaps", "tag-streams", "npot", "npot-short", "wide", "wide-short", "wide-limit", "swizzle8192"])
 def test_mcc_lightmap_conversion(bitmap_converter, case):
     result = subprocess.run([str(bitmap_converter), case], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

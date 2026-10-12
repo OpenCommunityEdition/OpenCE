@@ -131,9 +131,12 @@ done:
 }
 
 static enum mcc_cache_status mcc_check_assets(void *data, struct mcc_cache_report *r,
-    uint32_t group, uint32_t address) {
+    uint32_t group, uint32_t address, char const *name,
+    int (*visit)(void *, struct mcc_resource_reference const *), void *context) {
     uint8_t *tag;
     uint32_t i, count;
+    struct mcc_resource_reference ref;
+    memset(&ref,0,sizeof(ref));ref.tag_name=name;
     if (group == MCC_FOURCC('b','i','t','m')) {
         uint8_t *bitmaps;
         tag = mcc_cache_pointer(data,r,address,0x6C);
@@ -146,7 +149,11 @@ static enum mcc_cache_status mcc_check_assets(void *data, struct mcc_cache_repor
             uint16_t format = mcc_u16(b+0xC), flags = mcc_u16(b+0xE);
             if (!mcc_u16(b+4) || !mcc_u16(b+6) || !mcc_u16(b+8) || format>18)
                 return MCC_CACHE_BAD_BITMAP;
-            if (flags & 0x100) r->external_bitmap_count++;
+            if (flags & 0x100) {
+                r->external_bitmap_count++;
+                ref.type=1;ref.first=i;ref.offset=mcc_u32(b+0x18);ref.bytes=mcc_u32(b+0x1C);
+                if (visit && !visit(context,&ref)) return MCC_CACHE_BAD_BITMAP;
+            }
             else if (!mcc_range(mcc_u32(b+0x18),mcc_u32(b+0x1C),r->identity.file_length))
                 return MCC_CACHE_BAD_BITMAP;
             r->bitmap_count++;
@@ -168,7 +175,13 @@ static enum mcc_cache_status mcc_check_assets(void *data, struct mcc_cache_repor
             for (j=0;j<n;j++) {
                 uint8_t *p = permutations+j*0x7C;
                 /* tag_data flags bit zero selects the external sounds map. */
-                if (mcc_u32(p+0x44)&1) r->external_sound_count++;
+                if (mcc_u32(p+0x44)&1) {
+                    if (mcc_u32(p+0x40)) {
+                        r->external_sound_count++;
+                        ref.type=2;ref.first=i;ref.second=j;ref.offset=mcc_u32(p+0x48);ref.bytes=mcc_u32(p+0x40);
+                        if (visit && !visit(context,&ref)) return MCC_CACHE_BAD_SOUND;
+                    }
+                }
                 else if (!mcc_range(mcc_u32(p+0x48),mcc_u32(p+0x40),r->identity.file_length))
                     return MCC_CACHE_BAD_SOUND;
                 r->sound_permutation_count++;
@@ -176,6 +189,25 @@ static enum mcc_cache_status mcc_check_assets(void *data, struct mcc_cache_repor
         }
     }
     return MCC_CACHE_OK;
+}
+
+int mcc_cache_visit_resources(void *data,struct mcc_cache_report const *report,
+    int (*visit)(void *,struct mcc_resource_reference const *),void *context)
+{
+    struct mcc_cache_report checked;
+    uint32_t i;
+    if (!data || !report || report->status!=MCC_CACHE_OK || !visit) return 0;
+    checked=*report;
+    for (i=0;i<report->tag_count;i++) {
+        uint8_t *entry=mcc_cache_pointer(data,report,report->tag_base+40+i*32,32);
+        char *name;
+        uint32_t address;
+        if (!entry) return 0;
+        address=mcc_u32(entry+16);name=mcc_cache_pointer(data,report,address,1);
+        if (!name || !memchr(name,0,report->identity.tag_data_size-(address-report->tag_base))) return 0;
+        if (mcc_check_assets(data,&checked,mcc_u32(entry),mcc_u32(entry+20),name,visit,context)!=MCC_CACHE_OK) return 0;
+    }
+    return 1;
 }
 
 enum mcc_cache_status mcc_cache_load(struct mcc_cache_source const *source,
@@ -223,7 +255,7 @@ enum mcc_cache_status mcc_cache_load(struct mcc_cache_source const *source,
             return mcc_fail(r,MCC_CACHE_BAD_TAG,address);
         if (group==MCC_FOURCC('m','o','d','2')) r->model_count++;
         if (group==MCC_FOURCC('s','o','t','r')) r->generic_shader_count++;
-        status=mcc_check_assets(data,r,group,address);
+        status=mcc_check_assets(data,r,group,address,name,NULL,NULL);
         if (status) return mcc_fail(r,status,address);
     }
     r->problem_tag=r->scenario_handle&0xFFFF;

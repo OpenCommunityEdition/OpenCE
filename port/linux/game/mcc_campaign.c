@@ -413,6 +413,13 @@ static void mcc_bits_evaluate(short function, long thread, boolean initialize)
     hs_return(thread,(long)result);
 }
 
+static void mcc_abs_real_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    /* HS real values are IEEE-754 words; clearing the sign also handles -0. */
+    if (args) hs_return(thread,(long)((uint32_t)args[0]&UINT32_C(0x7fffffff)));
+}
+
 static void mcc_print_if_evaluate(short function, long thread, boolean initialize)
 {
     long *args=hs_macro_function_evaluate(function,thread,initialize);
@@ -485,7 +492,8 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_real,0,"sound_get_effects_gain",hs_macro_function_parse,mcc_effects_gain_get_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_void,0,"sound_set_effects_gain",hs_macro_function_parse,mcc_effects_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
     {{_hs_type_void,0,"sound_enable",hs_macro_function_parse,mcc_sound_enable_evaluate,NULL,NULL,1,{_hs_type_boolean}},{0}},
-    {{_hs_type_void,0,"map_reset",hs_macro_function_parse,mcc_map_reset_evaluate,NULL,NULL,0,{0}},{0}}
+    {{_hs_type_void,0,"map_reset",hs_macro_function_parse,mcc_map_reset_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_real,0,"abs_real",hs_macro_function_parse,mcc_abs_real_evaluate,NULL,NULL,1,{_hs_type_real}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

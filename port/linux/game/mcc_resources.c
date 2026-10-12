@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 /* Logging includes the game's allocation macros. This reader owns libc
  * allocations (including calloc), so keep their original matching frees. */
@@ -21,6 +22,7 @@ struct mcc_resource_file {
     char *names;
     struct mcc_resource_item *items;
     uint32_t count,data_bytes;
+    char path[128];
 };
 struct mcc_resources { struct mcc_resource_file files[2]; };
 
@@ -42,15 +44,17 @@ static int mcc_resource_compare(void const *a,void const *b)
     return x<y ? -1 : x>y;
 }
 
-static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level)
+static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level,char const *explicit_path)
 {
     unsigned char header[16],entry[12];
     uint32_t names,index,count,names_bytes,i;
     long length;
     char path[128];
-    if (!mcc_package_resource_path(level,type,path)) return 0;
-    file->stream=fopen(path,"rb");
+    if (explicit_path) {
+        snprintf(path,sizeof(path),"%s",explicit_path);errno=0;file->stream=fopen(path,"rb");
+    } else file->stream=mcc_package_resource_open(level,type,path);
     if (!file->stream) {
+        if (errno==ENOENT) return -1;
         error(_error_silent,"mcc resources: cannot open %s (required by %s)",path,level);
         return 0;
     }
@@ -76,54 +80,140 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char c
     file->count=count;
     file->data_bytes=names;
     qsort(file->items,count,sizeof(*file->items),mcc_resource_compare);
+    strcpy(file->path,path);
     return 1;
 failed:
     error(_error_silent,"mcc resources: invalid resource file %s (required by %s)",path,level);
     mcc_resource_close(file);return 0;
 }
 
-int mcc_resources_read(struct mcc_runtime *runtime,unsigned type,char const *name,
-    uint32_t offset,uint32_t bytes,void *out)
+static struct mcc_resource_file *mcc_resource_get(struct mcc_runtime *runtime,unsigned type)
 {
     struct mcc_resources *resources;
     struct mcc_resource_file *file;
-    uint32_t lo=0,hi,i;
-    struct mcc_resource_item const *relocated=NULL;
-    if (!runtime || type<1 || type>2 || !name || !out || !bytes) return 0;
+    if (!runtime || type<1 || type>2) return NULL;
     resources=runtime->resources;
     if (!resources) {
         resources=calloc(1,sizeof(*resources));
-        if (!resources) return 0;
+        if (!resources) return NULL;
         runtime->resources=resources;
     }
     file=&resources->files[type-1];
-    if (!file->stream && !mcc_resource_open(file,type,runtime->level_name)) return 0;
-    hi=file->count;
-    while (lo<hi) {
-        uint32_t middle=lo+(hi-lo)/2;
-        if (file->items[middle].offset<offset) lo=middle+1;
-        else hi=middle;
-    }
-    for (;lo<file->count && file->items[lo].offset==offset;lo++) {
-        struct mcc_resource_item const *item=&file->items[lo];
-        if (bytes<=item->size && !strcmp(file->names+item->name,name))
-            return !fseek(file->stream,(long)offset,SEEK_SET) && fread(out,1,bytes,file->stream)==bytes;
-    }
-    /* Shared caches can be repacked independently of a scenario. A stale
-     * offset must never select unrelated bytes: accept a unique full name
-     * and exact size from the supplied cache's validated directory instead.
-     * Prefix reads still require their original offset. */
-    if (offset<16 || offset>file->data_bytes || bytes>file->data_bytes-offset) return 0;
-    for (i=0;i<file->count;i++) {
-        struct mcc_resource_item const *item=&file->items[i];
-        if (!strcmp(file->names+item->name,name)) {
-            if (relocated || bytes!=item->size) return 0;
-            relocated=item;
-        }
-    }
-    return relocated && !fseek(file->stream,(long)relocated->offset,SEEK_SET) &&
-        fread(out,1,bytes,file->stream)==bytes;
+    if (!file->stream && mcc_resource_open(file,type,runtime->level_name,NULL)!=1) return NULL;
+    return file;
 }
+
+static int mcc_resource_read(struct mcc_resource_file *file,char const *name,
+    uint32_t offset,uint32_t bytes,void *out,char const *group_name)
+{
+    uint32_t i;
+    struct mcc_resource_item const *found=NULL;
+    if (!name || !bytes || offset<16 || offset>file->data_bytes || bytes>file->data_bytes-offset) return 0;
+    for (i=0;i<file->count;i++) if (!strcmp(file->names+file->items[i].name,name)) {
+        if (found) return 0;
+        found=&file->items[i];
+    }
+    if (found) {
+        /* Only whole, uniquely named members may be relocated. */
+        if (bytes>found->size || (offset!=found->offset && bytes!=found->size)) return 0;
+        offset=found->offset;
+    } else {
+        /* Grouped MCC resources require the original, bounded slice. */
+        if (!group_name) return 0;
+        for (i=0;i<file->count;i++) if (!strcmp(file->names+file->items[i].name,group_name)) {
+            if (found) return 0;
+            found=&file->items[i];
+        }
+        if (!found || offset<found->offset || offset-found->offset>found->size ||
+            bytes>found->size-(offset-found->offset)) return 0;
+    }
+    return !out || (!fseek(file->stream,(long)offset,SEEK_SET) && fread(out,1,bytes,file->stream)==bytes);
+}
+
+int mcc_resources_read(struct mcc_runtime *runtime,unsigned type,char const *name,
+    uint32_t offset,uint32_t bytes,void *out,char const *group_name)
+{
+    struct mcc_resource_file *file=mcc_resource_get(runtime,type);
+    return file && out && mcc_resource_read(file,name,offset,bytes,out,group_name);
+}
+
+struct mcc_resource_probe {struct mcc_resource_file *file;unsigned type;};
+static int mcc_resource_check(void *context,struct mcc_resource_reference const *ref)
+{
+    struct mcc_resource_probe *probe=context;
+    char name[288],group[288];
+    if (ref->type!=probe->type) return 1;
+    if (strlen(ref->tag_name)>255) return 0;
+    if (ref->type==1) snprintf(name,sizeof(name),"%s_%lu",ref->tag_name,(unsigned long)ref->first);
+    else snprintf(name,sizeof(name),"%s__%lu__%lu",ref->tag_name,(unsigned long)ref->first,(unsigned long)ref->second);
+    snprintf(group,sizeof(group),"%s%s",ref->tag_name,ref->type==1 ? "__pixels" : "__permutations");
+    return mcc_resource_read(probe->file,name,ref->offset,ref->bytes,NULL,group);
+}
+
+static int mcc_resource_equal(FILE *a,FILE *b)
+{
+    unsigned char left[16384],right[16384];
+    size_t n,m;
+    if (fseek(a,0,SEEK_SET) || fseek(b,0,SEEK_SET)) return 0;
+    do {
+        n=fread(left,1,sizeof(left),a);m=fread(right,1,sizeof(right),b);
+        if (n!=m || memcmp(left,right,n)) return 0;
+    } while (n);
+    return !ferror(a) && !ferror(b);
+}
+
+int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
+{
+    struct mcc_resources *resources;
+    unsigned type;
+    if (!runtime || runtime->resources) return 0;
+    if (!runtime->report.external_bitmap_count && !runtime->report.external_sound_count) return 1;
+    resources=calloc(1,sizeof(*resources));
+    if (!resources) return 0;
+    runtime->resources=resources;
+    for (type=1;type<=2;type++) {
+        struct mcc_resource_file *selected=&resources->files[type-1];
+        struct mcc_resource_probe probe;
+        int status,set;
+        if (!(type==1 ? runtime->report.external_bitmap_count : runtime->report.external_sound_count)) continue;
+        probe.type=type;probe.file=selected;
+        /* Explicit package and legacy root files are authoritative. */
+        status=mcc_resource_open(selected,type,runtime->level_name,NULL);
+        if (!status) return 0;
+        if (status==1) {
+            if (!mcc_cache_visit_resources(raw,&runtime->report,mcc_resource_check,&probe)) {
+                error(_error_silent,"mcc resources: %s does not satisfy every external reference in %s",selected->path,runtime->level_name);
+                return 0;
+            }
+        } else for (set=0;set<2;set++) {
+            struct mcc_resource_file candidate;
+            char path[128];
+            memset(&candidate,0,sizeof(candidate));
+            snprintf(path,sizeof(path),"mcc_maps/_shared/%s/%s.map",set ? "multiplayer" : "singleplayer",type==1 ? "bitmaps" : "sounds");
+            status=mcc_resource_open(&candidate,type,runtime->level_name,path);
+            if (!status) return 0;
+            if (status<0) continue;
+            probe.file=&candidate;
+            if (mcc_cache_visit_resources(raw,&runtime->report,mcc_resource_check,&probe)) {
+                if (selected->stream && !mcc_resource_equal(selected->stream,candidate.stream)) {
+                    error(_error_silent,"mcc resources: ambiguous shared %s for %s; put the intended file beside the level",
+                        type==1 ? "bitmaps.map" : "sounds.map",runtime->level_name);
+                    mcc_resource_close(&candidate);return 0;
+                }
+                if (!selected->stream) {*selected=candidate;memset(&candidate,0,sizeof(candidate));}
+            }
+            mcc_resource_close(&candidate);
+        }
+        if (!selected->stream) {
+            error(_error_silent,"mcc resources: no complete matching %s for %s; check the package and MCC shared folders",
+                type==1 ? "bitmaps.map" : "sounds.map",runtime->level_name);
+            return 0;
+        }
+        error(_error_silent,"mcc resources: using %s (required by %s)",selected->path,runtime->level_name);
+    }
+    return 1;
+}
+
 
 void mcc_resources_dispose(struct mcc_runtime *runtime)
 {
@@ -131,4 +221,58 @@ void mcc_resources_dispose(struct mcc_runtime *runtime)
     if (!resources) return;
     mcc_resource_close(&resources->files[0]);mcc_resource_close(&resources->files[1]);
     free(resources);runtime->resources=NULL;
+}
+int mcc_resources_checksum(struct mcc_runtime *runtime,unsigned resources,uint32_t *checksum)
+{
+    unsigned char buffer[32768];
+    uint32_t table[256],crc,i,j;
+    unsigned type;
+    size_t bytes,k;
+    FILE *file;
+    struct mcc_resource_file *selected;
+    if (!runtime || !checksum || (resources&~3u)) return 0;
+    crc=~runtime->report.identity.checksum;
+    /* Self-contained maps neither open nor fingerprint unrelated resources. */
+    if (!resources) { *checksum=runtime->report.identity.checksum ? runtime->report.identity.checksum : 1;return 1; }
+    for (i=0;i<256;i++) {
+        uint32_t value=i;
+        for (j=0;j<8;j++) value=(value>>1)^(0xEDB88320u & (0u-(value&1u)));
+        table[i]=value;
+    }
+    for (type=1;type<=2;type++) {
+        if (!(resources&(1u<<(type-1)))) continue;
+        selected=mcc_resource_get(runtime,type);
+        if (!selected) return 0;
+        file=selected->stream;
+        if (fseek(file,0,SEEK_SET)) return 0;
+        /* Fingerprint the selected contents, not their installation location. */
+        crc=(crc>>8)^table[(crc^type)&255];
+        while ((bytes=fread(buffer,1,sizeof(buffer),file))!=0)
+            for (k=0;k<bytes;k++) crc=(crc>>8)^table[(crc^buffer[k])&255];
+        if (ferror(file)) return 0;
+        crc=(crc>>8)^table[(crc^0xff)&255];
+    }
+    *checksum=~crc;
+    if (!*checksum) *checksum=1; /* Zero means no comparison in native admission. */
+    return 1;
+}
+
+int mcc_resources_probe(char const *name,struct mcc_cache_source const *source,uint32_t *checksum)
+{
+    struct mcc_runtime runtime;
+    unsigned char header[MCC_CACHE_HEADER_BYTES];
+    struct mcc_cache_identity identity;
+    void *raw;
+    int ok;
+    memset(&runtime,0,sizeof(runtime));
+    if (!source || !source->read || !mcc_package_name(name,runtime.level_name) ||
+        !source->read(source->context,0,sizeof(header),header) ||
+        mcc_cache_identify(header,sizeof(header),source->size,&identity)!=MCC_CACHE_OK) return 0;
+    raw=malloc(identity.tag_data_size);
+    if (!raw) return 0;
+    ok=mcc_cache_load(source,raw,identity.tag_data_size,&runtime.report)==MCC_CACHE_OK &&
+        mcc_resources_select(&runtime,raw) && mcc_resources_checksum(&runtime,
+            (runtime.report.external_bitmap_count ? 1u : 0u)|(runtime.report.external_sound_count ? 2u : 0u),checksum);
+    mcc_resources_dispose(&runtime);free(raw);
+    return ok;
 }

@@ -23,6 +23,12 @@ def validation_tool(tmp_path_factory):
 #ifndef TEST_CSERIES_H
 #define TEST_CSERIES_H
 #include <stddef.h>
+#include <stdlib.h>
+void *validation_malloc(size_t size);
+void validation_free(void *pointer);
+/* Match cseries.h: malloc/free are paired wrappers; calloc is not. */
+#define malloc validation_malloc
+#define free validation_free
 typedef unsigned char byte;
 typedef unsigned char boolean;
 typedef float real;
@@ -46,12 +52,34 @@ struct tag_reference { unsigned long group_tag; char *name; long name_length; lo
 #endif
 """)
     binary = directory / ("validation.exe" if os.name == "nt" else "validation")
+    allocator = directory / "allocator.c"
+    allocator.write_text('''
+#include <stdlib.h>
+static void *allocations[100000];
+void *validation_malloc(size_t size) {
+    unsigned i;
+    void *p = malloc(size);
+    if (!p) return NULL;
+    for (i = 0; i < 100000; i++) if (!allocations[i]) {
+        allocations[i] = p; return p;
+    }
+    abort();
+}
+void validation_free(void *p) {
+    unsigned i;
+    if (!p) return;
+    for (i = 0; i < 100000; i++) if (allocations[i] == p) {
+        allocations[i] = NULL; free(p); return;
+    }
+    abort(); /* Detect mixing the engine allocator with CRT calloc. */
+}
+''')
     target = (["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
               if sys.platform == "win32" else ["-m32"])
     command = [compiler, *target, "-std=gnu99", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                "-Wno-multichar", "-fsanitize=undefined", "-fsanitize-trap=undefined",
                f"-I{directory}", f"-I{GAME}", str(GAME / "mcc_tag_validate.c"),
-               str(GAME / "tag_validate.c"), str(ROOT / "tools/harness/tests/mcc_tag_validation.c"),
+               str(GAME / "tag_validate.c"), str(ROOT / "tools/harness/tests/mcc_tag_validation.c"), str(allocator),
                "-o", str(binary)]
     built = subprocess.run(command, capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
@@ -75,7 +103,10 @@ int main(void) { return tag_validate_corrections() != 0; }
     return binary
 
 
-@pytest.mark.parametrize("case", ["valid", "overlap", "outside", "negative", "cycle",
+@pytest.mark.parametrize("case", ["valid", "overlap", "outside", "negative", "cycle", "alias", "alias_partial", "alias_group", "alias_bad_child", "alias_block", "alias_block_partial",
+                                     "graph_model", "graph_model_mismatch", "graph_model_outside", "graph_model_cycle", "damage_names",
+                                     "prefix_smaller", "prefix_expand", "prefix_tail_overlap", "empty_weapon", "empty_weapon_nonzero",
+                                     "animation_data", "animation_data_outside",
                                      "file_range", "handle", "unknown_group", "bsp",
                                      "legacy_isolation", "callbacks", "misaligned", "stream_hole",
                                      "collection", "collection_outside", "device", "device_outside",

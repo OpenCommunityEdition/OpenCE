@@ -36,8 +36,9 @@ void *mcc_texture_bridge_find(void const *bitmap)
     return NULL;
 }
 
-void *mcc_texture_bridge_register(void const *bitmap,unsigned long format,
-    unsigned long size,void const *pixels,unsigned long bytes)
+static void *mcc_texture_register(void const *bitmap,unsigned long format,
+    unsigned long size,void const *pixels,unsigned long bytes,
+    unsigned long width,unsigned long height,unsigned long pitch)
 {
     struct mcc_gpu_texture *entry;
     struct xgpu_texture_description description;
@@ -46,8 +47,15 @@ void *mcc_texture_bridge_register(void const *bitmap,unsigned long format,
     if (existing) return existing;
     if (!bitmap || !pixels || !bytes) return NULL;
     xgpu_texture_describe(format,size,&description);
+    if (width || height || pitch) {
+        if (description.format!=D3DFMT_LIN_A8R8G8B8 || description.cube_map ||
+            description.depth!=1 || description.levels!=1 || !width || !height ||
+            width>16384 || height>16384 || pitch<width*4 || (pitch&63) || pitch>65536) return NULL;
+        description.width=width;description.height=height;description.pitch=pitch;
+    }
     if (!description.width || !description.height || !description.depth ||
-        description.width>8192 || description.height>8192 || description.depth>512 ||
+        description.width>(description.linear ? 16384u : 8192u) ||
+        description.height>(description.linear ? 16384u : 8192u) || description.depth>512 ||
         (description.depth>1 && (description.width>512 || description.height>512)) ||
         !description.levels || description.levels>14) return NULL;
     face_bytes=xgpu_texture_face_size(&description);
@@ -69,6 +77,20 @@ void *mcc_texture_bridge_register(void const *bitmap,unsigned long format,
     bucket=mcc_texture_bucket(entry->header);
     entry->hardware_next=mcc_gpu_hardware[bucket];mcc_gpu_hardware[bucket]=entry;
     return entry->header;
+}
+
+void *mcc_texture_bridge_register(void const *bitmap,unsigned long format,
+    unsigned long size,void const *pixels,unsigned long bytes)
+{
+    return mcc_texture_register(bitmap,format,size,pixels,bytes,0,0,0);
+}
+
+/* Linear Xbox headers have only 12-bit dimensions and an 8-bit pitch.
+ * Keep wider MCC dimensions in the identity-checked descriptor instead. */
+void *mcc_texture_bridge_register_linear(void const *bitmap,unsigned long format,
+    unsigned long width,unsigned long height,unsigned long pitch,void const *pixels,unsigned long bytes)
+{
+    return mcc_texture_register(bitmap,format,0,pixels,bytes,width,height,pitch);
 }
 
 BOOL xgpu_mcc_texture_get(DWORD const *resource,D3DCOLOR const *palette,

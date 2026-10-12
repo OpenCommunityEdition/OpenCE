@@ -125,6 +125,10 @@ static boolean mcc_hs_parameter_evaluate(long thread_index, struct hs_syntax_nod
     if (mcc_parameter_type(node, NULL) == -1) return FALSE;
     value = mcc_hs_parameter_address(thread_index, node, &type);
     if (!value) hs_syntax_error(thread_index);
+    /* The native cast table has no short-to-long entry. Widen MCC local
+     * parameters here, preserving the native table for Xbox and CE scripts. */
+    else if (type == _hs_type_short_integer && node->type == _hs_type_long_integer)
+        *destination = (short)*value;
     else *destination = hs_cast(thread_index, type, node->type, *value);
     return TRUE;
 }

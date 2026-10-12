@@ -12,7 +12,7 @@ def parameters_tool(native_mcc_harness):
 
 @pytest.mark.parametrize("case", ["metadata", "count", "type", "pointer", "slot", "orphan", "flags",
                                   "call_arity", "call_type", "global_scope", "legacy", "return", "snapshot",
-                                  "nested_scope", "recursive_arguments", "lists", "set", "overflow", "ai_cast",
+                                  "nested_scope", "recursive_arguments", "lists", "set", "overflow", "ai_cast", "widen",
                                   "global_capacity", "global_overflow", "maximum", "disabled", "predicate", "script_kind",
                                   "high_node", "negative_count", "sleep_self", "sleep_named", "sleep_missing", "sleep_finished", "finished"])
 def test_mcc_parameter_metadata_and_runtime(parameters_tool, case):

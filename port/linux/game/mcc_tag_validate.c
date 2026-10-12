@@ -55,11 +55,20 @@ struct mcc_validation_context {
     char const *field;
     boolean rejected;
     boolean geometry_access;
+    unsigned long visits;
+};
+struct mcc_allocation {
+    struct mcc_allocation *next;
+    void const *address;
+    unsigned long size;
+    struct tag_schema_definition const *schema;
 };
 static struct {
     struct mcc_runtime *runtime;
     struct mcc_validation_header *header;
     byte *claims;
+    byte *aliases;
+    struct mcc_allocation *allocations[1024];
     unsigned long claim_bytes;
     long corrections;
     struct mcc_validation_context *active;
@@ -125,6 +134,69 @@ static int mcc_claim(void const *address, unsigned long size)
         byte mask = (byte)(1U << (bit & 7));
         if (mcc_validation.claims[bit >> 3] & mask) return 0;
         mcc_validation.claims[bit >> 3] |= mask;
+    }
+    return 1;
+}
+
+/* BioHalo shares whole blocks and same-schema prefixes. Each use is walked
+ * and checked against its own parent bounds; cycles and cross-schema aliases
+ * remain invalid. Raw data must retain its exact extent. */
+static int mcc_claim_allocation(void const *address,unsigned long size,struct tag_schema_definition const *schema)
+{
+    unsigned bucket=((uintptr_t)address>>2)%1024;
+    struct mcc_allocation *entry;
+    for (entry=mcc_validation.allocations[bucket];entry;entry=entry->next)
+        if (entry->address==address) {
+            if (entry->schema!=schema) return 0;
+            if (entry->size==size) return 1;
+            if (!schema) return 0;
+            if (size>entry->size) {
+                if (!mcc_claim((byte const *)address+entry->size,size-entry->size)) return 0;
+                entry->size=size;
+            }
+            return 1;
+        }
+    if (!mcc_claim(address,size)) return 0;
+    entry=malloc(sizeof(*entry));
+    if (!entry) return 0;
+    entry->address=address;entry->size=size;entry->schema=schema;
+    entry->next=mcc_validation.allocations[bucket];mcc_validation.allocations[bucket]=entry;
+    return 1;
+}
+
+static void mcc_allocations_dispose(void)
+{
+    unsigned bucket;
+    for (bucket=0;bucket<1024;bucket++) {
+        struct mcc_allocation *entry=mcc_validation.allocations[bucket];
+        while (entry) {struct mcc_allocation *next=entry->next;free(entry);entry=next;}
+        mcc_validation.allocations[bucket]=NULL;
+    }
+}
+
+static int mcc_zero_block(void const *address, unsigned long bytes)
+{
+    unsigned long i;
+    for (i=0;i<bytes;i++) if (((byte const *)address)[i]) return 0;
+    return 1;
+}
+
+static int mcc_interned_name(struct tag_schema_definition const *schema)
+{
+    struct tag_schema_field const *field;
+    if (schema->size!=32) return 0;
+    for (field=schema->fields;field->type!=_tag_schema_terminator;field++)
+        if (field->type!=_tag_schema_string || field->offset || field->size!=32) return 0;
+    return 1;
+}
+
+static int mcc_value_block(struct tag_schema_definition const *schema)
+{
+    struct tag_schema_field const *field;
+    for (field=schema->fields;field->type!=_tag_schema_terminator;field++) {
+        if (field->type==_tag_schema_block || field->type==_tag_schema_data ||
+            field->type==_tag_schema_file_data || field->type==_tag_schema_reference ||
+            field->type==_tag_schema_struct || field->type==_tag_schema_check) return 0;
     }
     return 1;
 }
@@ -205,6 +277,49 @@ static struct tag_schema_field const *mcc_field(struct tag_schema_definition con
     return NULL;
 }
 
+/* Some compiled graphs omit their parent hierarchy. Recover it only from
+ * the model referenced by the same object, with identical ordered names.
+ * Multiple associated models must agree; the normal tree check follows. */
+static int mcc_animation_model_tree(struct mcc_validation_context *context,
+    struct tag_block const *nodes,struct tag_schema_definition const *schema)
+{
+    struct mcc_validation_header *header=mcc_validation.header;
+    short links[64][3];
+    long i,j;
+    int found=0;
+    if (!schema->name || schema->size!=64 || nodes->count<2 || nodes->count>64) return 0;
+    for (j=0;j<nodes->count;j++)
+        if (mcc_integer((byte *)nodes->address+j*64+36,2,0)!=0) return 0;
+    if (mcc_integer((byte *)nodes->address+32,2,0)!=NONE ||
+        mcc_integer((byte *)nodes->address+34,2,0)!=NONE) return 0;
+    for (i=0;i<header->count;i++) {
+        struct mcc_validation_instance *object=header->instances+i,*model;
+        struct tag_block const *model_nodes;
+        long model_handle,graph_handle;
+        if (object->parents[0]!='obje' && object->parents[1]!='obje') continue;
+        if (!mcc_range(context->region,context->length,object->root,72)) return 0;
+        memcpy(&graph_handle,(byte *)object->root+68,4);
+        if (graph_handle!=context->handle) continue;
+        memcpy(&model_handle,(byte *)object->root+52,4);
+        model=mcc_instance(model_handle);
+        if (!model || model->group!='mode' || !mcc_range(context->region,context->length,model->root,232)) return 0;
+        model_nodes=(struct tag_block const *)((byte *)model->root+184);
+        if (model_nodes->count!=nodes->count ||
+            !mcc_range(context->region,context->length,model_nodes->address,nodes->count*156)) return 0;
+        for (j=0;j<nodes->count;j++) {
+            byte const *source=(byte const *)model_nodes->address+j*156;
+            byte const *target=(byte const *)nodes->address+j*64;
+            if (!memchr(source,0,32) || !memchr(target,0,32) || strcmp((char const *)source,(char const *)target)) return 0;
+            if (found && memcmp(links[j],source+32,6)) return 0;
+            memcpy(links[j],source+32,6);
+        }
+        found=1;
+    }
+    if (!found) return 0;
+    for (j=0;j<nodes->count;j++) memcpy((byte *)nodes->address+j*64+32,links[j],6);
+    return 1;
+}
+
 /* MCC graph indices are signed shorts, rather than the Xbox authoring
  * tool's 256-animation limit. Keep node-tree and permutation-list checks
  * independent, using the published schema offsets after structural checks. */
@@ -219,6 +334,7 @@ static int mcc_animation_graph_check(struct mcc_validation_context *context,
     byte reached[64], *states;
     short queue[64];
     long head, tail, first;
+    int recovered;
     if (!nodes_field || !animations_field || !nodes_field->definition || !animations_field->definition) return 0;
     nodes_schema = nodes_field->definition; animations_schema = animations_field->definition;
     sibling = mcc_field(nodes_schema, "next_sibling_node_index");
@@ -229,6 +345,7 @@ static int mcc_animation_graph_check(struct mcc_validation_context *context,
     nodes = (struct tag_block const *)(address + nodes_field->offset);
     animations = (struct tag_block const *)(address + animations_field->offset);
     if (nodes->count < 0 || nodes->count > 64 || animations->count < 0 || animations->count > 32767) return 0;
+    recovered=mcc_animation_model_tree(context,nodes,nodes_schema);
     memset(reached, 0, sizeof(reached)); head = tail = 0;
     if (nodes->count) {
         byte const *root = nodes->address;
@@ -252,6 +369,7 @@ static int mcc_animation_graph_check(struct mcc_validation_context *context,
         }
     }
     if (tail != nodes->count) return 0;
+    if (recovered) mcc_problem(context,0,"animation hierarchy restored from its associated model's matching nodes");
     if (nodes->count && mcc_integer((byte *)nodes->address+sibling->offset,2,0)!=NONE) {
         short none=NONE;
         memcpy((byte *)nodes->address+sibling->offset,&none,sizeof(none));
@@ -344,9 +462,28 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                         mcc_problem(context, 1, "invalid block count"); break;
                     }
                     bytes = (unsigned long)block->count * (unsigned long)element->size;
+                    /* BioHalo interns scalar records in other allocations.
+                     * Isolate overlapping values before correcting them. A
+                     * pointer-bearing block is eligible only when entirely
+                     * zero (no pointers or counts). Its checks still apply. */
+                    if (bytes && context->region==mcc_validation.runtime->tags &&
+                        mcc_range(context->region,context->length,block->address,bytes) &&
+                        (mcc_interned_name(element) ||
+                         (mcc_validation_any_claimed(block->address,bytes) &&
+                          (mcc_value_block(element) || mcc_zero_block(block->address,bytes))))) {
+                        void *copy;
+                        if (!(copy=mcc_runtime_allocate(mcc_validation.runtime,bytes))) {
+                            mcc_problem(context,1,"no room to isolate interned block");break;
+                        }
+                        memcpy(copy,block->address,bytes);block->address=copy;
+                        context->length=mcc_validation.runtime->used;
+                    }
                     if (bytes && (!mcc_range(context->region, context->length, block->address, bytes) ||
-                        !mcc_claim(block->address, bytes))) {
-                        mcc_problem(context, 1, "block leaves loaded data or overlaps another allocation"); break;
+                        !mcc_claim_allocation(block->address, bytes, element))) {
+                        char message[192];
+                        snprintf(message,sizeof(message),"block %s at +%08lx (%lu bytes) leaves loaded data or overlaps another allocation",
+                            element->name,(unsigned long)((uintptr_t)block->address-(uintptr_t)context->region),bytes);
+                        mcc_problem(context, 1, message); break;
                     }
                     if (schema->name && !strcmp(schema->name, "game_globals") && !strcmp(field->name, "grenades")) {
                         maximum = 4;
@@ -387,7 +524,21 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                             mcc_problem(context, 1, "file data leaves MCC stream");
                     } else if (data->size) {
                         if (mcc_range(context->region, context->length, data->address, data->size)) {
-                            if (!mcc_claim(data->address, (unsigned long)data->size))
+                            /* Optimized animation, text and unused input-device
+                             * metadata can share prefixes or padding. Isolate
+                             * these bytes before the normal format callbacks. */
+                            if (schema->name && (!strcmp(schema->name,"animation") ||
+                                !strcmp(schema->name,"string_list_entry") ||
+                                !strcmp(schema->name,"unicode_string_list_entry") ||
+                                !strcmp(schema->name,"mcc_device_defaults")) &&
+                                context->region==mcc_validation.runtime->tags &&
+                                mcc_validation_any_claimed(data->address,data->size)) {
+                                void *copy=mcc_runtime_allocate(mcc_validation.runtime,data->size);
+                                if (!copy) {mcc_problem(context,1,"no room to isolate shared data");break;}
+                                memcpy(copy,data->address,data->size);data->address=copy;
+                                context->length=mcc_validation.runtime->used;
+                            }
+                            if (!mcc_claim_allocation(data->address, (unsigned long)data->size, NULL))
                                 mcc_problem(context, 1, "data overlaps another allocation");
                         } else if (!mcc_geometry_contains(mcc_validation.runtime, data->address, data->size)) {
                             mcc_problem(context, 1, "data leaves loaded bytes and owned geometry");
@@ -485,7 +636,11 @@ static void mcc_walk(struct mcc_validation_context *context, byte *address,
     struct tag_schema_definition const *schema, int checks)
 {
     unsigned long alignment;
+    int ancestor;
     if (!schema || schema->size <= 0) { mcc_problem(context, 1, "invalid schema size"); return; }
+    if (++context->visits>4000000UL) {mcc_problem(context,1,"tag traversal exceeds validation budget");return;}
+    for (ancestor=0;ancestor<context->depth;ancestor++)
+        if (context->stack[ancestor].address==address) {mcc_problem(context,1,"cyclic tag block");return;}
     alignment = schema->size % 4 == 0 ? 4 : schema->size % 2 == 0 ? 2 : 1;
     if ((uintptr_t)address & (alignment - 1)) { mcc_problem(context, 1, "misaligned tag or block element"); return; }
     if (context->depth >= MCC_VALIDATION_DEPTH) { mcc_problem(context, 1, "block nesting exceeds limit"); return; }
@@ -499,11 +654,20 @@ static void mcc_walk(struct mcc_validation_context *context, byte *address,
     --context->depth;
 }
 
+static int mcc_root_compare(void const *a, void const *b)
+{
+    struct mcc_validation_instance const *x=*(struct mcc_validation_instance const *const *)a;
+    struct mcc_validation_instance const *y=*(struct mcc_validation_instance const *const *)b;
+    uintptr_t first=(uintptr_t)x->root, second=(uintptr_t)y->root;
+    return first<second ? -1 : first>second;
+}
+
 int mcc_tags_validate(struct mcc_runtime *runtime)
 {
     struct mcc_validation_context context;
     struct mcc_validation_header *header;
     long i;
+    struct mcc_validation_instance **roots;
     int pass;
     if (!runtime || !runtime->tags || ((uintptr_t)runtime->tags & 3) ||
         runtime->used < sizeof(*header) || runtime->used > runtime->capacity ||
@@ -523,6 +687,10 @@ int mcc_tags_validate(struct mcc_runtime *runtime)
         !mcc_claim(header, sizeof(*header)) || !mcc_claim(header->instances, header->count * sizeof(*header->instances))) {
         mcc_problem(&context, 1, "invalid tag header or instance table"); return 0;
     }
+    roots=malloc(header->count*sizeof(*roots));
+    mcc_validation.aliases=malloc(header->count);
+    if (!roots || !mcc_validation.aliases) {free(roots);return 0;}
+    memset(mcc_validation.aliases,0,header->count);
     for (i = 0; i < header->count && !context.rejected; ++i) {
         struct mcc_validation_instance *instance = &header->instances[i];
         struct tag_schema_group const *group = mcc_group(instance->group);
@@ -537,15 +705,32 @@ int mcc_tags_validate(struct mcc_runtime *runtime)
             if (!mcc_range(context.region, context.length, instance->root, 1)) mcc_problem(&context, 1, "tag root outside cache");
             continue;
         }
-        if (!mcc_range(context.region, context.length, instance->root, group->definition->size) ||
-            !mcc_claim(instance->root, group->definition->size)) mcc_problem(&context, 1, "tag root outside cache or overlaps allocation");
+        if (!mcc_range(context.region, context.length, instance->root, group->definition->size))
+            mcc_problem(&context, 1, "tag root outside cache");
     }
+    for (i=0;i<header->count;i++) roots[i]=header->instances+i;
+    qsort(roots,header->count,sizeof(*roots),mcc_root_compare);
+    for (i=0;i<header->count && !context.rejected;i++) {
+        struct mcc_validation_instance *instance=roots[i];
+        struct tag_schema_group const *group=mcc_group(instance->group);
+        context.handle=instance->handle;
+        if (!instance->root || !group || !group->definition) continue;
+        /* Compiled MCC caches can deduplicate complete tags (BioHalo's
+         * landing-beacon lens flares). Validate each same-group root once;
+         * partial overlaps and roots interpreted as different groups fail. */
+        if (i && roots[i-1]->root==instance->root && roots[i-1]->group==instance->group)
+            mcc_validation.aliases[instance-header->instances]=1;
+        else if (!mcc_claim(instance->root,group->definition->size))
+            mcc_problem(&context,1,"tag root overlaps another allocation");
+    }
+    free(roots);
     for (pass = 0; pass < 2 && !context.rejected; ++pass)
         for (i = 0; i < header->count && !context.rejected; ++i) {
             struct mcc_validation_instance *instance = &header->instances[i];
             struct tag_schema_group const *group = mcc_group(instance->group);
             context.handle = instance->handle;
-            if (instance->root && group && group->definition) mcc_walk(&context, instance->root, group->definition, pass);
+            if (instance->root && group && group->definition && !mcc_validation.aliases[i])
+                mcc_walk(&context, instance->root, group->definition, pass);
         }
     if (!mcc_instance(header->scenario) || mcc_instance(header->scenario)->group != 'scnr')
         mcc_problem(&context, 1, "scenario handle does not identify a scenario");
@@ -566,6 +751,7 @@ int mcc_bsp_validate(struct mcc_runtime *runtime, long handle, void *address, lo
     if (first < runtime->used) return 0;
     instance = mcc_instance(handle);
     if (!instance || instance->group != 'sbsp' || !schema || !schema->definition) return 0;
+    mcc_allocations_dispose();
     for (bit = runtime->used; bit < runtime->capacity; ++bit) mcc_validation.claims[bit >> 3] &= (byte)~(1U << (bit & 7));
     memset(&context, 0, sizeof(context)); context.region = address; context.length = size; context.handle = handle;
     if (header->signature != 'sbsp' || !mcc_claim(header, sizeof(*header)) ||
@@ -580,7 +766,9 @@ int mcc_bsp_validate(struct mcc_runtime *runtime, long handle, void *address, lo
 void mcc_validation_dispose(struct mcc_runtime *runtime)
 {
     if (runtime != mcc_validation.runtime) return;
+    mcc_allocations_dispose();
     if (mcc_validation.claims) free(mcc_validation.claims);
+    if (mcc_validation.aliases) free(mcc_validation.aliases);
     memset(&mcc_validation, 0, sizeof(mcc_validation));
 }
 boolean mcc_validation_owns(struct tag_validation *validation)

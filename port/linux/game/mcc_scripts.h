@@ -15,5 +15,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime);
 /* MCC permits an AI reference in an object/unit or object-list expression. */
 int mcc_script_parse_ai(struct hs_syntax_node *node, char const *text);
 boolean mcc_script_ai_cast(short actual_type, short desired_type);
+boolean mcc_script_can_cast(short actual_type, short desired_type);
+long mcc_script_cast(short actual_type, short desired_type, long value);
 long mcc_script_cast_ai(short desired_type, long reference);
 #endif

@@ -17,6 +17,85 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="module")
+def unarmed_hud_tool(tmp_path_factory):
+    compiler = shutil.which("clang")
+    if not compiler:
+        pytest.skip("clang is needed for MCC HUD tests")
+    work = tmp_path_factory.mktemp("mcc-unarmed-hud")
+    body = function((ROOT / "port/linux/game/mcc_hud.c").read_text(), "mcc_hud_default")
+    code = r'''
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#define NONE (-1)
+#define _hud_anchor_center 4
+#define _error_silent 0
+struct tag_reference {long group_tag;char *name;long length,index;};
+struct weapon_hud_interface_definition {
+    struct tag_reference parent_hud;
+    struct {short corner;} absolute_placement;
+    unsigned char visuals[256];
+};
+struct hud_globals_definition {struct {struct tag_reference default_weapon_hud;} defaults;};
+struct mcc_runtime {unsigned char *tag_index;struct {uint32_t tag_count;} report;};
+static unsigned char arena[2097152], original[1048576];
+static unsigned used, calls, fail_at, warnings;
+static void *mcc_runtime_allocate(struct mcc_runtime *r,uint32_t bytes) {
+    void *p;(void)r;
+    if (++calls==fail_at || bytes>sizeof(arena)-used) return NULL;
+    p=arena+used;used=(used+bytes+15)&~15u;memset(p,0,bytes);return p;
+}
+static void error(short level,char const *text,...) {(void)level;(void)text;warnings++;}
+''' + body + r'''
+int main(int argc,char **argv) {
+    struct mcc_runtime r;
+    struct hud_globals_definition g, second;
+    struct weapon_hud_interface_definition *hud;
+    uint32_t empty=UINT32_MAX,*entry,count;unsigned i;int mode,ok;
+    if(argc!=2)return 2;mode=atoi(argv[1]);
+    memset(&g,0,sizeof(g));memset(original,0x51,sizeof(original));
+    g.defaults.default_weapon_hud.index=mode==1 ? 0x12340001 : NONE;
+    second=g;r.tag_index=original;count=mode==6 ? 32767 : 2;
+    r.report.tag_count=mode==2 ? 32768 : count;
+    if(mode>=3 && mode<=5)fail_at=mode-2;
+    ok=mcc_hud_default(&r,&g,&empty);
+    if(mode>=2 && mode<=5) return ok || g.defaults.default_weapon_hud.index!=NONE ||
+        r.tag_index!=original || empty!=UINT32_MAX;
+    if(!ok)return 3;
+    if(mode==1)return calls || warnings || r.tag_index!=original ||
+        g.defaults.default_weapon_hud.index!=0x12340001 || empty!=UINT32_MAX;
+    if(r.report.tag_count!=count+1 || memcmp(r.tag_index,original,count*32) || warnings!=1)return 4;
+    entry=(uint32_t *)(r.tag_index+count*32);
+    if(entry[0]!='wphi' || entry[1]!=UINT32_MAX || entry[2]!=UINT32_MAX ||
+       entry[3]!=empty || entry[6] || entry[7] ||
+       g.defaults.default_weapon_hud.group_tag!='wphi' ||
+       (uint32_t)g.defaults.default_weapon_hud.index!=empty ||
+       strcmp((char *)(uintptr_t)entry[4],"mcc_runtime\\unarmed_hud"))return 5;
+    hud=(void *)(uintptr_t)entry[5];
+    if(hud->parent_hud.index!=NONE || hud->parent_hud.group_tag!='wphi' ||
+       hud->absolute_placement.corner!=_hud_anchor_center)return 6;
+    for(i=0;i<sizeof(hud->visuals);i++)if(hud->visuals[i])return 7;
+    if(!mcc_hud_default(&r,&second,&empty) || calls!=3 || warnings!=1 ||
+       second.defaults.default_weapon_hud.index!=g.defaults.default_weapon_hud.index)return 8;
+    return 0;
+}
+'''
+    source = work / "unarmed.c"
+    source.write_text(code)
+    binary = work / "unarmed.exe"
+    target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else ["-m32"]
+    subprocess.run([compiler, *target, "-std=c89", "-Wall", "-Wextra", "-Werror",
+                    "-Wno-multichar", str(source), "-o", str(binary)], check=True, capture_output=True)
+    return binary
+
+
+@pytest.mark.parametrize("case", range(7))
+def test_missing_unarmed_hud_is_owned_empty_and_failure_safe(unarmed_hud_tool, case):
+    result = subprocess.run([str(unarmed_hud_tool), str(case)], capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.fixture(scope="module")
 def hud_tool(tmp_path_factory):
     compiler = shutil.which("clang")
     if not compiler:

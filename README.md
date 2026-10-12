@@ -19,25 +19,42 @@ operate. The maps of the European (PAL) version were made for a slower
 console. The port changes them to play as the North American (NTSC) maps do,
 so players of the two versions can play together.
 
-Halo 1 MCC custom maps use the separate `mcc_maps` directory and the
-**MCC SINGLEPLAYER** and **MCC MULTIPLAYER** menu options. Maps appear in
-the appropriate category automatically. This experimental adapter targets
-modern version-13 maps. Maps may contain their own resources or require
-matching MCC `sounds.map` and `bitmaps.map` files alongside the levels in
-`mcc_maps`. 
-
-Use separate package folders such as `mcc_maps/solar_flare/`
-for levels with their own resources; maps in those folders appear in the
-same MCC menu lists. Custom Edition resource files are not substitutes.
-See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
-validation results and remaining compatibility limits.
-
 On Linux and Windows, the game puts `maps/` next to the executable. On
 Android, copy the disc image to the phone first. The app puts `maps/` in its
 data folder. Refer to [port/android/README.md](port/android/README.md). On
 the web, the page copies `maps/` out of the disc image into the browser's
 storage for the site; nothing is uploaded. Refer to
 [port/web/README.md](port/web/README.md).
+
+## How do I install MCC maps?
+
+MCC custom maps use the separate `mcc_maps` directory and the
+**MCC SINGLEPLAYER** and **MCC MULTIPLAYER** menu options. Maps appear in
+the appropriate category automatically.
+
+Inside `mcc_maps`, you need to create a `_shared` folder, and two subfolders inside 
+the `_shared` folder: `singleplayer` and `multiplayer`. From your existing Halo 1 MCC
+installation, you need to take:
+
+- The bitmaps.map file from `halo1/maps` and put it into `mcc_maps/_shared/singleplayer`. 
+- You then need to take the bitmaps.map AND sounds.map files from `halo1/maps/custom_edition` 
+and put these into `mcc_maps/_shared/multiplayer`.
+
+Use separate package folders such as `mcc_maps/Solar Flare/`
+for levels with their own resources (e.g. bitmaps.map and sounds.map); maps in
+those folders appear in the same MCC menu lists.
+
+You cannot use Custom Edition resource files in these folders. You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
+
+The shared folder names are installation labels: either map type can use either
+set when its resource references match. Package files take priority, followed
+by existing root-level resources. If neither is present, the loader checks both
+shared sets and requires one complete, unambiguous match for each needed file.
+It never combines partial matches or loads resources a map does not need.
+External `loc.map` support is not implemented.
+
+See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
+validation results and remaining compatibility limits.
 
 ## Supported MCC Maps (credits to ConeLordDaytona)
 

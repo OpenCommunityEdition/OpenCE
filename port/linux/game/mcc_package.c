@@ -1,4 +1,4 @@
-/* One optional package directory, with no resource search or fallback. */
+/* One optional package directory, with explicit MCC-root resource fallback. */
 #include "mcc_package.h"
 #include <stdio.h>
 #include <string.h>
@@ -53,37 +53,19 @@ int mcc_package_resource_path(char const *name, unsigned type, char path[128])
     return 1;
 }
 
-int mcc_package_checksum(char const *name, uint32_t map_checksum, uint32_t *checksum)
+FILE *mcc_package_resource_open(char const *name,unsigned type,char path[128])
 {
-    char canonical[64],path[128];
-    unsigned char buffer[32768];
-    uint32_t table[256],crc=~map_checksum,i,j;
-    unsigned type;
-    size_t bytes,k;
     FILE *file;
-    if (!checksum || !mcc_package_name(name,canonical)) return 0;
-    /* Preserve existing loose-map checkpoint and network identities. */
-    if (!strchr(canonical+9,'\\')) { *checksum=map_checksum;return 1; }
-    for (i=0;i<256;i++) {
-        uint32_t value=i;
-        for (j=0;j<8;j++) value=(value>>1)^(0xEDB88320u & (0u-(value&1u)));
-        table[i]=value;
-    }
-    for (type=1;type<=2;type++) {
-        if (!mcc_package_resource_path(canonical,type,path)) return 0;
-        errno=0;
+    char root[128];
+    path[0]=0;
+    if (!mcc_package_resource_path(name,type,path) ||
+        !mcc_package_resource_path("mcc_maps/root",type,root)) {errno=EINVAL;return NULL;}
+    errno=0;
+    file=fopen(path,"rb");
+    /* A present but unreadable or invalid override must never be replaced. */
+    if (!file && errno==ENOENT && strcmp(path,root)) {
+        strcpy(path,root);
         file=fopen(path,"rb");
-        if (!file && errno!=ENOENT) return 0;
-        /* Separate absent, empty and populated resources and their types. */
-        crc=(crc>>8)^table[(crc^(type*2+(file!=NULL)))&255];
-        if (!file) continue;
-        while ((bytes=fread(buffer,1,sizeof(buffer),file))!=0)
-            for (k=0;k<bytes;k++) crc=(crc>>8)^table[(crc^buffer[k])&255];
-        if (ferror(file)) { fclose(file);return 0; }
-        fclose(file);
-        crc=(crc>>8)^table[(crc^0xff)&255];
     }
-    *checksum=~crc;
-    if (!*checksum) *checksum=1; /* Zero means no comparison in native admission. */
-    return 1;
+    return file;
 }

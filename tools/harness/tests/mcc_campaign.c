@@ -153,6 +153,15 @@ int main(int argc,char **argv) {
         result=123;f->evaluate(mcc_campaign_find("bit_toggle"),0,FALSE);CHECK(result==123);
         args[0]=8;args[1]=1;call("objects_distance_to_flag");CHECK(number(result)==2.0f);
         args[1]=NONE;call("objects_distance_to_flag");CHECK(number(result)==-1.0f);
+    } else if(!strcmp(argv[1],"abs_real")) {
+        struct hs_function_definition *definition=mcc_campaign_function(mcc_campaign_find("abs_real"));
+        CHECK(definition && definition->return_type==_hs_type_real && definition->parameter_count==1);
+        args[0]=bits(-3.5f);call("abs_real");CHECK(number(result)==3.5f);
+        args[0]=bits(3.5f);call("abs_real");CHECK(number(result)==3.5f);
+        args[0]=(long)0x80000000;call("abs_real");CHECK(result==0);
+        args[0]=0;call("abs_real");CHECK(result==0);
+        args[0]=(long)0xff800000;call("abs_real");CHECK(result==0x7f800000);
+        result=123;definition->evaluate(mcc_campaign_find("abs_real"),0,FALSE);CHECK(result==123);
     } else if(!strcmp(argv[1],"print_predict")) {
         args[1]=(long)"100% literal";args[0]=(long)0xffffff00;call("print_if");CHECK(!printed);
         args[0]=1;call("print_if");CHECK(printed==1);

@@ -242,6 +242,18 @@ upstream version 28 and GulchCE version 34 cannot join these games. MCC
 message IDs 87-89 and package fingerprints are retained. The wire-format
 record is regenerated for the combined implementation.
 
+GulchCE version 36 requires both peers to use MCC package-first resource
+selection and dependency-based fingerprints. Explicit root files take precedence
+over automatic selection between `_shared/singleplayer` and `_shared/multiplayer`;
+a candidate must satisfy all references of its type, and differing complete
+candidates are refused as ambiguous. Only externally referenced
+bitmap and sound files contribute; loose MCC levels now include their used
+resources too. Identical selected contents match across installation locations.
+Required missing files fail admission. Version 35 and earlier cannot join;
+all players, including those playing Xbox/Custom Edition maps, need version 36.
+No message layout or client authority changes. The checksums detect accidental
+resource mismatches; they do not authenticate untrusted files or clients.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

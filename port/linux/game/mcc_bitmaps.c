@@ -332,7 +332,7 @@ static int mcc_bitmap_pack(struct bitmap_data *bitmap,unsigned char const *sourc
     uint32_t source_size,unsigned char *target,uint32_t target_size)
 {
     static unsigned const cube_face[6]={0,2,1,3,4,5};
-    uint32_t x_address[4096],y_address[4096],z_address[512],out=0;
+    uint32_t x_address[8192],y_address[8192],z_address[512],out=0;
     unsigned face,faces=bitmap->type==2 ? 6 : 1;
     unsigned maximum=rasterizer_xbox_bitmap_get_max_mipmap_count(bitmap);
     unsigned bytes=mcc_bitmap_bytes(bitmap->format);
@@ -359,6 +359,7 @@ static int mcc_bitmap_pack(struct bitmap_data *bitmap,unsigned char const *sourc
                 if (size>target_size-out) return 0;
                 if (!bytes) memcpy(target+out,source+at,size);
                 else {
+                    if (width>8192 || height>8192 || depth>512) return 0;
                     for (x=0;x<width;x++) x_address[x]=mcc_morton_axis(x,width,height,depth,0);
                     for (y=0;y<height;y++) y_address[y]=mcc_morton_axis(y,width,height,depth,1);
                     for (z=0;z<depth;z++) z_address[z]=mcc_morton_axis(z,width,height,depth,2);
@@ -424,8 +425,9 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     int non_power_two=bitmap->type==0 && ((bitmap->width&(bitmap->width-1)) || (bitmap->height&(bitmap->height-1)));
     uint32_t input_offset=0,output_offset=0,hardware_size,allocation,stream_offset=0,i;
     if (bitmap->width<=0 || bitmap->height<=0 || bitmap->depth<=0 || bitmap->type<0 || bitmap->type>2 ||
-        bitmap->width>8192 || bitmap->height>8192 || bitmap->depth>512 || bitmap->mipmap_count<0 || bitmap->mipmap_count>13 ||
+        bitmap->width>16384 || bitmap->height>16384 || bitmap->depth>512 || bitmap->mipmap_count<0 || bitmap->mipmap_count>13 ||
         bitmap->pixels_size<=0 || (!bytes_per_pixel && (bitmap->format<14 || bitmap->format>18))) return 0;
+    if ((bitmap->width>8192 || bitmap->height>8192) && !non_power_two && !(bitmap->flags&16)) return 0;
     if ((bitmap->type==1 && (bitmap->width>512 || bitmap->height>512 || bitmap->depth>256)) ||
         (bitmap->type!=1 && bitmap->depth!=1)) return 0;
     if (texture->channels && (texture->channels&(texture->channels-1))) {
@@ -499,11 +501,12 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     if (bitmap->flags&0x100) {
         uint32_t *entry=(uint32_t *)(runtime->tag_index+(texture->resource_handle&0xFFFF)*32);
         char const *name=mcc_runtime_pointer(runtime,entry[4],256);
-        char resource_name[272];
+        char resource_name[272],group_name[272];
         if (!name || !memchr(name,0,256)) goto failed;
         snprintf(resource_name,sizeof(resource_name),"%s_%lu",name,(unsigned long)texture->resource_index);
-        if (!mcc_resources_read(runtime,1,resource_name,bitmap->pixels_offset,(uint32_t)raw_size,raw)) {
-            error(_error_silent,"mcc bitmap: external '%s' requires matching bitmaps.map alongside this level",resource_name);
+        snprintf(group_name,sizeof(group_name),"%s__pixels",name);
+        if (!mcc_resources_read(runtime,1,resource_name,bitmap->pixels_offset,(uint32_t)raw_size,raw,group_name)) {
+            error(_error_silent,"mcc bitmap: external '%s' does not match the selected MCC bitmaps.map",resource_name);
             goto failed;
         }
     } else if (!mcc_runtime_read(runtime,bitmap->pixels_offset,(uint32_t)raw_size,raw)) goto failed;
