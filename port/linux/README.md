@@ -798,8 +798,9 @@ the map lists find `hugeass.map`, the game renames it `hugeass_0e2b3ee4.map`
 names, and a game always loads the version of the host. The menus show the
 map without the hash, and with it only when you have two versions of the
 map. The downloaded map has the same name. A download that stops leaves a
-`.part` file in `custom_maps`; the next download of that map continues from
-it. Maps in the folder of a Halo Custom Edition install
+`.part` file in `custom_maps` (only of the last map whose download stopped,
+and only if it holds part of the map); the next download of that map
+continues from it. Maps in the folder of a Halo Custom Edition install
 (`paths.custom_edition`) keep their names, and the host does not share them.
 Copy a map to `custom_maps` to share it.
 

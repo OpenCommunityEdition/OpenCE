@@ -563,10 +563,10 @@ every layout used was then checked against the sample maps.
 - **What the validator corrects is lost.** A community map's data that the
   validator corrects (an index past its block, an enum past its values) is
   what the game then runs; Halo PC read past such data unchecked.
-- **Ogg Vorbis sounds** are decoded when the map loads (stb_vorbis, public
-  domain) and encoded again as Xbox ADPCM in memory
-  (`port/linux/game/custom_edition_sounds.c`); one that cannot be decoded is
-  silenced, and still logs when played.
+- **Ogg Vorbis sounds** are decoded when the map loads (stb_vorbis, with
+  added bounds checks: `port/third_party/stb_vorbis`) and encoded again as
+  Xbox ADPCM in memory (`port/linux/game/custom_edition_sounds.c`); one that
+  cannot be decoded is silenced, and still logs when played.
 - **Models of 44 nodes or more** are drawn a part's nodes at a time, given
   local nodes when they have none; one whose part's vertices name more
   nodes than a part holds is refused.

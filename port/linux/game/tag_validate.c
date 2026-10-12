@@ -966,7 +966,8 @@ static boolean definition_fits(
 	return TRUE;
 }
 
-/* whether every group's schema fits (definition_fits), found once */
+/* whether every group's schema fits (definition_fits), Custom Edition's
+too, found once */
 static boolean schemas_fit(
 	void)
 {
@@ -975,12 +976,16 @@ static boolean schemas_fit(
 	if (fit == NONE)
 	{
 		struct tag_schema_group const *const *list;
+		struct tag_schema_group const *group;
 
 		fit = TRUE;
+		for (group = tag_schema_custom_edition_groups; group->group_tag && fit; group++)
+		{
+			if (group->definition && !definition_fits(group->definition, 0))
+				fit = FALSE;
+		}
 		for (list = tag_schema_group_lists; *list && fit; list++)
 		{
-			struct tag_schema_group const *group;
-
 			for (group = *list; group->group_tag && fit; group++)
 			{
 				if (group->definition && !definition_fits(group->definition, 0))

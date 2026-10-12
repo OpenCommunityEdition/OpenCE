@@ -17,6 +17,10 @@ NEGATIVE_CONTROLS = {
                         "hex_digit", "hashed-names"),
     "lets-slashes-through": (("strchr(\"/\\\\:", "strchr(\"\\\\:"), "map_share_name_safe", "safe-names"),
     "lets-dots-through": (("name[0] == '.' || ", ""), "map_share_name_safe", "safe-names"),
+    "lets-devices-through": ((" ||\n\t\tname_device(name)", ""), "map_share_name_safe", "safe-names"),
+    "com-ports-not-devices": (("(!_strnicmp(name, \"com\", 3) || ", "("), "name_device", "safe-names"),
+    "spaces-make-a-name": (("while (length && name[length - 1] == ' ')", "while (0)"), "name_device", "safe-names"),
+    "every-con-a-device": (("(long)csstrlen(devices[index]) == length && ", ""), "name_device", "safe-names"),
     "no-underscore": (("|| name[length - MAP_SHARE_NAME_DIGITS - 1] != '_'", ""), "map_share_name_hashed",
                       "hashed-names"),
     "keeps-the-underscore": (("length - MAP_SHARE_NAME_DIGITS - 1)", "length - MAP_SHARE_NAME_DIGITS)"),
@@ -37,8 +41,8 @@ def generated(fault=None, faulty_function=None):
     for name in ("MAP_SHARE_NAME_DIGITS", "MAP_SHARE_PIECE_BYTES"):
         config += f"#define {name} {constant(header, name)}\n"
     text = ""
-    for name in ("hex_digit", "map_share_name_hashed", "map_share_name_safe", "map_share_name_base_length",
-                 "map_share_hash_digits", "map_share_piece_count"):
+    for name in ("hex_digit", "map_share_name_hashed", "name_device", "map_share_name_safe",
+                 "map_share_name_base_length", "map_share_hash_digits", "map_share_piece_count"):
         code = function(source, name)
         if fault and name == faulty_function:
             code = mutated(code, *fault)

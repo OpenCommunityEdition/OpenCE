@@ -51,7 +51,8 @@ boolean map_share_name_hashed(
 /* Whether a map's name (from another machine's level name) is only a file
 name of the custom_maps folder: printable ASCII, no separator or character
 a file system refuses, no dot or space at either end (so never "." or
-".."). */
+".."), and not a name Windows takes for a device (CON, NUL, COM1 and the
+like, before the first dot). */
 boolean map_share_name_safe(
 	char const *name);
 /* the length of a map's file name without the hash it ends in (all of it,
@@ -101,8 +102,8 @@ for a game in progress until the map is downloaded (network_client_manager.c) */
 boolean map_share_holds_players(
 	void);
 /* (the host) whether a client machine is downloading the game's map, as it
-said lately: it is not dropped for adding no players or loading slowly
-(network_server_manager.c) */
+said lately, and what it says it has grew lately: it is not dropped for
+adding no players or loading slowly (network_server_manager.c) */
 boolean map_share_machine_downloading(
 	long machine_index);
 /* (the host) whether that download is not finished: the machines that have

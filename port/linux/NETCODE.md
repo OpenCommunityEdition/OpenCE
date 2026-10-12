@@ -367,22 +367,36 @@ menus show a map without its hash, unless two versions are listed.
   have them (`_sources`: an address on a LAN, internet play's key hash on the
   internet), again every ten seconds. A map whose hash is not its name's is
   not offered. The client checks that the map's hash is its name's, and
-  that no file is larger than the cache loader takes.
+  that no file is larger than the cache loader takes, and refuses a map
+  name Windows takes for a device (`CON`, `NUL`, `COM1` and the like,
+  before the first dot). It connects to a LAN machine the host names only
+  at an address of the host's kind (a private network's if the host's is,
+  loopback only if the host's is; never 0.0.0.0, multicast or internet
+  play's), so that a host cannot send its players anywhere.
 - **The swarm.** The client connects to the host and up to eight of the
   others on port 5153 (of two downloading, the one of the lower machine
   connects). Each end says which files it has, whole or by piece, and tells
   the other of each piece it gets; the client asks for the rarest pieces
   first (from a random place, so that clients ask for different pieces), two
   at a time from each connection, sixteen in all, and the last few again of
-  whoever is quicker. The pieces' hashes come from any end that has them,
-  checked against the file's hash; each piece is checked against its own as
-  it arrives, and an end that sends a wrong one is not asked again. A machine
+  whoever is quicker. The pieces' hashes come from the host (from the
+  others it named after ten seconds without them, and from the connections
+  other machines made after thirty), all of them within a minute, checked
+  against the file's hash; a frame of none is refused. Each piece is
+  checked against its own as it arrives, and an end that sends a wrong one
+  is not asked again. A machine
   sends of the game's files (its map, the resource maps the map needs, a
   download's pieces) no faster than `network.map_share_upload` (the host,
   1024 KB/s) or `network.map_seed_upload` (a player, 256 KB/s), round all
   its connections a 16 KiB block at a time, so that the game's own traffic
   keeps the rest of the upload; `network.map_seed = false` sends none. A
   player that has downloaded the map sends it on at once.
+- **Connections.** A machine takes up to 24 connections, of which 15 others
+  made (the rest are kept for its own download's), four from one address,
+  eight at once that have not said hello (the oldest makes way); a
+  connection says hello within ten seconds, and one that sends no whole
+  frame for 30 seconds is closed. The host takes connections only from its
+  game's machines' addresses.
 - **Internet play.** The players of an internet game reach its host alone.
   A player that shares answers the holders of the invite it joined with as
   its host does (`p2p_set_answering_players`), and a downloading client asks
@@ -391,13 +405,20 @@ menus show a map without its hash, unless two versions are listed.
   the host, in one topic of the invite's token). Its map sharing connection
   then goes through their tunnel, as the game's connections go.
 - **Writing.** A download is written to `<file>.part` beside its file in
-  custom_maps, and renamed when every piece is had. A part file found again
-  is checked piece by piece on the hashing thread and taken up where it was.
+  custom_maps, each piece at its place as it comes (the file is not made its
+  size at once), and renamed when every piece is had. A part file found
+  again is checked piece by piece on the hashing thread and taken up where
+  it was. A download that stops deletes a part file that holds none of its
+  file, and keeps one map's part file at most (the one kept before is
+  deleted), so that a host cannot fill a disk with offers.
   The client checks the map again once it has it (`custom_edition_cache_present`),
   and tells the host its progress every two seconds (`_progress`); the host
   does not drop a machine downloading (and for 20 seconds after) for adding
-  no players or loading slowly. A download that brings nothing for a minute,
-  or a host that does not answer in 30 seconds, leaves the game, saying why.
+  no players or loading slowly, while what it says it has grew by a piece
+  (or to the whole, and no more than the files offered) in the last 80
+  seconds, counted from the first offer however often it asks again. A
+  download that brings nothing for a minute, or a host that does not answer
+  in 30 seconds, leaves the game, saying why.
 - The download's progress is drawn at the top of the screen.
 
 ## Stages

@@ -151,14 +151,42 @@ boolean map_share_name_hashed(
 	return TRUE;
 }
 
+/* whether Windows takes a file of this name for a device: its name before
+the first dot, spaces after it aside, is CON, PRN, AUX, NUL, CONIN$, CONOUT$,
+or COM or LPT and a digit, in any case (CON.x_1a2b3c4d.map.part is the
+console) */
+static boolean name_device(
+	char const *name)
+{
+	static char const *const devices[] = { "con", "prn", "aux", "nul", "conin$", "conout$" };
+	long length = 0;
+	short index;
+
+	while (name[length] && name[length] != '.')
+		length++;
+	while (length && name[length - 1] == ' ')
+		length--;
+	if (length == 4 && (!_strnicmp(name, "com", 3) || !_strnicmp(name, "lpt", 3)) && name[3] >= '0' && name[3] <= '9')
+		return TRUE;
+	for (index = 0; index < (short)(sizeof(devices) / sizeof(devices[0])); index++)
+	{
+		if ((long)csstrlen(devices[index]) == length && !_strnicmp(name, devices[index], length))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 boolean map_share_name_safe(
 	char const *name)
 {
 	long length = (long)csstrlen(name);
 	long index;
 
-	if (!length || name[0] == '.' || name[0] == ' ' || name[length - 1] == '.' || name[length - 1] == ' ')
+	if (!length || name[0] == '.' || name[0] == ' ' || name[length - 1] == '.' || name[length - 1] == ' ' ||
+		name_device(name))
+	{
 		return FALSE;
+	}
 	for (index = 0; index < length; index++)
 	{
 		unsigned char character = (unsigned char)name[index];

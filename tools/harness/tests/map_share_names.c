@@ -60,6 +60,13 @@ int main(int argc, char **argv)
 		{
 			"", ".", "..", ".x_0e2b3ee4", "../x_0e2b3ee4", "..\\x", "a/b", "c:x", "x.", " x", "x ", "a*b", "a?b", "a\"b", "a<b",
 			"a>b", "a|b", "a\tb", "caf\xE9",
+			/* Windows' devices, before the first dot, in any case */
+			"CON.x_0e2b3ee4", "con.x_0e2b3ee4", "Nul.map", "PRN", "aux .x_0e2b3ee4", "COM1.x_0e2b3ee4", "lpt9.x", "com0.x",
+			"CONIN$.x", "conout$",
+		};
+		static char const *const safe[] =
+		{
+			"con_0e2b3ee4", "console.x_0e2b3ee4", "com10.x", "com.x", "lptx.x", "a.con", "nul_0e2b3ee4", "auxiliary",
 		};
 		int index;
 
@@ -67,6 +74,8 @@ int main(int argc, char **argv)
 		CHECK(map_share_name_safe("Elite_Alpha_Siege (v2).final"), "a name with spaces and dots inside was refused");
 		for (index = 0; index < (int)(sizeof(unsafe) / sizeof(unsafe[0])); index++)
 			CHECK(!map_share_name_safe(unsafe[index]), "the name \"%s\" was taken", unsafe[index]);
+		for (index = 0; index < (int)(sizeof(safe) / sizeof(safe[0])); index++)
+			CHECK(map_share_name_safe(safe[index]), "the name \"%s\" was refused", safe[index]);
 		return 0;
 	}
 	/* the menus' name leaves the hash out */

@@ -1760,6 +1760,8 @@ static int codebook_decode_scalar(vorb *f, Codebook *c)
 
 #endif
 
+// port: a sparse code book's value looked up only for a code that was
+// found (the scalar decode gives -1 when none is)
 #define DECODE(var,f,c)                                       \
    DECODE_RAW(var,f,c)                                        \
    if (c->sparse && var >= 0) var = c->sorted_values[var];
@@ -3687,6 +3689,7 @@ static int start_decoder(vorb *f)
 
    for(i=0; i < f->comment_list_length; ++i) {
       len = get32_packet(f);
+      // port: as the vendor's length
       if (len < 0 || (USE_MEMORY(f) && len > f->stream_end - f->stream)) return error(f, VORBIS_invalid_setup);
       f->comment_list[i] = (char*)setup_malloc(f, sizeof(char) * (len+1));
       if (f->comment_list[i] == NULL)               return error(f, VORBIS_outofmem);
