@@ -65,6 +65,35 @@ pixel32 real_a_rgb_color_to_pixel32(
 	real alpha,
 	real_rgb_color const *color);
 
+/* port: decals of one quad the caller places and moves (blood's drips:
+port/linux/game/blood.c) */
+/* (port: while set, decal_new_quad maps only this middle share of its
+picture along and across the quad, and quads are made at their
+definition's fullest intensity: a drip's run, a thin slice down the middle
+of a splat stretched along it, not its faint edge stretched thin) */
+extern real decal_port_texture_core_along;
+extern real decal_port_texture_core_across;
+extern boolean decal_port_full_intensity;
+long decal_new_quad(
+	long decal_definition_index,
+	real_point3d const *point,
+	real_vector3d const *normal,
+	real_vector3d const *axis,
+	real half_length,
+	real half_width,
+	short cluster_index,
+	real_point3d corners[4]);
+boolean decal_move_quad(
+	long decal_index,
+	long decal_definition_index,
+	real_point3d const corners[4],
+	short cluster_index);
+void decal_definition_color(
+	long decal_definition_index,
+	real_rgb_color *color);
+real decal_definition_radius(
+	long decal_definition_index);
+
 /* ---------- globals */
 
 extern boolean decals_enabled;
