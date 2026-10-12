@@ -10,6 +10,72 @@ maps, touch controls). The project is published as OpenCE.
 Start with [README.md](README.md). The other documents are listed at the
 end.
 
+## GulchCE instructions for every assignment
+
+Read this file before starting each assignment and explicitly confirm your
+understanding of its requirements. Then review the MCC isolation rules
+below and explicitly confirm your understanding of them before proceeding.
+Read [CODINGSTANDARDS.md](CODINGSTANDARDS.md) for supplementary working and
+review guidance. Those standards do not relax the isolation rules.
+
+### MCC isolation
+
+- Preserve the established Halo 1 Xbox and Custom Edition implementations
+  and functionality. Do not change, rename, remove, obscure or repurpose
+  their code, scripts, variables or loading paths to implement MCC support.
+  The narrowly scoped shared-engine additions described below are allowed;
+  they must preserve the existing Xbox and Custom Edition logic and behavior.
+- MCC support must remain independently implemented in dedicated MCC
+  modules. Xbox maps use `maps`, Custom Edition maps use `custom_maps`, and
+  MCC maps and their package folders use `mcc_maps`.
+- Existing Xbox and Custom Edition code may be analysed for reference;
+  this does not authorize editing or hijacking it for MCC compatibility.
+  Do not copy proprietary MCC code or prohibited SDK material. Follow the
+  third-party licensing and source-provenance rules below and in the
+  coding standards.
+- Minimal additive shared-engine hooks, declarations or extension points
+  are allowed only when strictly necessary for authorized MCC functionality
+  that cannot be implemented through existing interfaces in MCC modules.
+  Keep MCC compatibility logic in MCC-owned modules and shared additions
+  as small as possible. Guard MCC-specific execution and state so Xbox and
+  Custom Edition retain their existing paths, behavior and limits. Handle
+  MCC discovery before loading and cleanup after unloading explicitly.
+- For each shared addition, explain why an MCC-module-only solution is
+  insufficient, identify the affected engine paths, mark source additions
+  with `port:` as required below, and verify legacy behavior and map-family
+  transitions. This permission covers necessary integration, not replacing,
+  renaming or refactoring established Xbox or Custom Edition implementations
+  for convenience or code reduction. Existing hooks are not blanket
+  permission for broader changes. See `CODINGSTANDARDS.md` for the boundary
+  inventory. If a feature cannot fit within these constraints,
+  explain the specific conflict and stop that part of the work. Do not
+  proceed unless the user explicitly changes the applicable constraint.
+- The general permission below for minimal changes to `source/` does not
+  override these stricter rules for MCC work. Refactoring, deduplication,
+  cleanup and line-count targets are not exceptions.
+- Explicitly requested upstream merges and general engine fixes have their
+  own scope. For upstream merges, retain authoritative OpenCE changes and
+  preserve MCC integration; do not use the merge to introduce unrelated
+  changes to Xbox or Custom Edition support. Identify and validate any
+  behavior affected by conflict resolution.
+- Check preservation of Xbox and Custom Edition behavior as well as MCC
+  compatibility. Report the actual validation performed and its limits;
+  a successful load or green test suite is not proof of full compatibility.
+
+### Project preferences
+
+- Use descriptive branch names without a `codex/` prefix.
+- Do not write or update PR descriptions unless the user explicitly asks;
+  the user handles them. This does not remove the requirement to record
+  rationale and validation in commit messages.
+- Run at most two game instances concurrently during automated testing.
+  A two-instance co-op test within an authorized task needs no additional
+  permission. Use isolated data/save folders and hidden windows or a
+  virtual display; stop only the processes you started.
+- Keep temporary test maps bounded and clean up only your own verified
+  fixtures after testing. Preserve the user's original maps, saves and
+  useful diagnostic logs.
+
 ## Layout
 
 | Path | Contents |
@@ -209,6 +275,7 @@ as documentation of file formats, never copied.
 | Document | About |
 | --- | --- |
 | [README.md](README.md) | Downloads, game data, building, build options, profiling builds |
+| [CODINGSTANDARDS.md](CODINGSTANDARDS.md) | Supplementary coding, MCC boundaries, evidence and review standards |
 | [port/linux/README.md](port/linux/README.md) | The Linux build, controls, menus, every setting, updates, frame rate, field of view, system link, internet play, voice chat, the server browser, map sharing, security, map checks, how the port operates, the game source changes |
 | [port/linux/NETCODE.md](port/linux/NETCODE.md) | The distributed netcode, network versions, joining a game in progress, map sharing, transport, testing |
 | [port/windows/README.md](port/windows/README.md) | The Windows build, its headers, inline functions, crash reports |
