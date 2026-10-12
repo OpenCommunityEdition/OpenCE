@@ -1918,6 +1918,23 @@ int p2p_signal_connected(void)
 	return 0;
 }
 
+void p2p_signal_reconnect(void)
+{
+	int index;
+
+	for (index = 0; index < signalling.broker_count; index++)
+	{
+		struct broker *broker = &signalling.brokers[index];
+
+		if (broker->state == _broker_idle && broker->socket < 0 && !broker->failures)
+			continue;
+		broker_close(broker, 0);
+		broker->failures = 0;
+		/* (again at once) */
+		broker->state_time = p2p_now() - MAXIMUM_RETRY_INTERVAL;
+	}
+}
+
 static void sync_all_topics(void)
 {
 	int index;
