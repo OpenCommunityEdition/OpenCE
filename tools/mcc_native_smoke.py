@@ -22,7 +22,7 @@ FAILURES = ("recompile scripts", "recompile.)", "error loading scripts",
             "scripts won't run", "unsupported script", "invalid script",
             "mcc: refused", "exception halt", "exception assert", "assertion failed",
             "failed to allocate", "could not load", "invalid mcc script parameter",
-            "this is not a valid object name")
+            "this is not a valid object name", "i expected a value of type")
 
 
 def check_result(trace, console, marker, map_name, exit_code):

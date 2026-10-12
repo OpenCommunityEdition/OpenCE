@@ -102,14 +102,27 @@ def test_partial_gpu_failure_cleanup(geometry_tool, tmp_path, failure_at):
     assert code == 1
 
 
-@pytest.mark.parametrize("shader,expected", [(0xffff, 0), (1, 1), (0x8000, 1)])
-def test_absent_model_material_keeps_native_skip_semantics(geometry_tool, tmp_path, shader, expected):
+@pytest.mark.parametrize("shader", [0, 0xffff, 1, 0x8000])
+def test_model_material_correction_preserves_geometry(geometry_tool, tmp_path, shader):
     data = geometry_map()
     struct.pack_into("<H", data, 0xC00+0x940+4, shader)
     path = tmp_path / "material.map"
     path.write_bytes(data)
+    code, fields = run(geometry_tool, path)
+    assert code == 0
+    assert fields["created_buffers"] == "2"
+    assert fields["shader_sum"] == ("-1" if shader == 0xffff else "0")
+    result = subprocess.run([str(geometry_tool), str(path)], capture_output=True, text=True)
+    assert ("missing material" in result.stderr) == (shader not in (0, 0xffff))
+
+
+def test_missing_entire_material_list_is_refused(geometry_tool, tmp_path):
+    data = geometry_map()
+    struct.pack_into("<I", data, 0xC00+0x8DC, 0)
+    path = tmp_path / "no_materials.map"
+    path.write_bytes(data)
     code, _ = run(geometry_tool, path)
-    assert code == expected
+    assert code == 1
 
 
 @pytest.mark.parametrize("local", [False, True])

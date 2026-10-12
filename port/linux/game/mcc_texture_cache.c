@@ -43,6 +43,13 @@ void *mcc_texture_cache_get(struct bitmap_data const *bitmap,boolean load)
         D3DFORMAT_BORDERSOURCE_COLOR|D3DFORMAT_DMACHANNEL_A;
     if (linear) {
         pitch=(unsigned long)bitmap_mipmap_get_row_pitch((struct bitmap_data *)bitmap,0);
+        if (bitmap->width>4096 || bitmap->height>4096 || pitch>16384) {
+            format|=(1<<D3DFORMAT_MIPMAP_SHIFT)|(2<<D3DFORMAT_DIMENSION_SHIFT);
+            registered=mcc_texture_bridge_register_linear(bitmap,format,bitmap->width,bitmap->height,
+                (pitch+63)&~63UL,pixels,bytes);
+            if (registered) ((struct bitmap_data *)bitmap)->base_address=(void *)pixels;
+            return registered;
+        }
         pitch=(pitch+D3DTEXTURE_PITCH_ALIGNMENT-1)/D3DTEXTURE_PITCH_ALIGNMENT;
         if (!pitch || pitch>(D3DSIZE_PITCH_MASK>>D3DSIZE_PITCH_SHIFT)+1) return NULL;
         format|=(1<<D3DFORMAT_MIPMAP_SHIFT)|(2<<D3DFORMAT_DIMENSION_SHIFT);

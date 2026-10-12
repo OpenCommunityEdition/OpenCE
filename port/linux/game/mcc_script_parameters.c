@@ -27,11 +27,12 @@ static unsigned short mcc_parameter_seen[MCC_PARAMETER_NODES];
 static long mcc_parameter_walk[MCC_PARAMETER_NODES];
 static unsigned mcc_signature_count, mcc_parameter_node_count;
 
-/* Preparation precedes publication of active MCC state. Match the specific
- * MCC AI conversion here without enabling it for any other map. */
+/* Preparation precedes active MCC state. Account for MCC's AI conversions
+ * and signed short-to-long widening without changing the native cast table. */
 static int mcc_parameter_cast(short actual, short desired)
 {
-    return hs_can_cast(actual, desired) || (actual == _hs_type_ai &&
+    return hs_can_cast(actual, desired) ||
+        (actual == _hs_type_short_integer && desired == _hs_type_long_integer) || (actual == _hs_type_ai &&
         (HS_TYPE_IS_OBJECT(desired) || desired == _hs_type_object_list));
 }
 
@@ -64,7 +65,7 @@ int mcc_parameter_compile(struct hs_syntax_node const *node)
 {
     int type = mcc_parameter_type(node, NULL);
     if (type == -1) return -1;
-    return hs_type_valid(type) && hs_type_valid(node->type) && hs_can_cast((short)type, node->type);
+    return hs_type_valid(type) && hs_type_valid(node->type) && mcc_parameter_cast((short)type, node->type);
 }
 
 int mcc_parameter_set_valid(struct hs_syntax_node const *node, struct hs_syntax_node const *value)
@@ -100,7 +101,11 @@ static int mcc_parameter_scope(struct hs_syntax_node *nodes, unsigned count, lon
             mcc_parameter_owners[index] = owner;
             mcc_parameter_types[index] = mcc_signatures[owner].types[node->data];
             if (!hs_type_valid(node->type) ||
-                !mcc_parameter_cast(mcc_parameter_types[index], node->type)) return 0;
+                !mcc_parameter_cast(mcc_parameter_types[index], node->type)) {
+                error(_error_silent,"mcc: script #%d parameter node #%u cannot cast type %d to %d",
+                    owner,index,mcc_parameter_types[index],node->type);
+                return 0;
+            }
         }
         links[0] = node->next_node_index;
         links[1] = node->flags & 1 ? NONE : node->data;
@@ -122,7 +127,8 @@ int mcc_parameters_prepare(struct mcc_runtime *runtime, struct scenario *scenari
     struct hs_script *scripts;
     struct hs_global *globals;
     struct hs_syntax_node *nodes;
-    unsigned i, j, count, has_parameters = 0;
+    unsigned i = 0, j = 0, count, has_parameters = 0;
+    char const *stage = "table bounds";
     mcc_parameters_dispose();
     if (!syntax || syntax->count < 0 || syntax->count > MCC_PARAMETER_NODES ||
         scenario->hs_scripts.count < 0 || scenario->hs_scripts.count > MCC_PARAMETER_SCRIPTS ||
@@ -136,6 +142,7 @@ int mcc_parameters_prepare(struct mcc_runtime *runtime, struct scenario *scenari
     if ((scenario->hs_scripts.count && !scripts) || (scenario->hs_globals.count && !globals)) goto fail;
     memset(mcc_parameter_owners, 0xFF, sizeof(mcc_parameter_owners));
     memset(mcc_parameter_seen, 0, sizeof(mcc_parameter_seen));
+    stage = "script signature";
     for (i = 0; i < (unsigned)scenario->hs_scripts.count; ++i) {
         uint32_t fields[3];
         unsigned char const *parameters;
@@ -155,11 +162,14 @@ int mcc_parameters_prepare(struct mcc_runtime *runtime, struct scenario *scenari
     }
     for (i = 0; i < count; ++i) if (nodes[i].datum_header && (nodes[i].flags & 0x10)) has_parameters = 1;
     if (has_parameters) {
+        stage = "script scope";
         for (i = 0; i < (unsigned)scenario->hs_scripts.count; ++i)
             if (!mcc_parameter_scope(nodes, count, scripts[i].root_expression_index, (short)i, i + 1)) goto fail;
+        stage = "global scope";
         for (i = 0; i < (unsigned)scenario->hs_globals.count; ++i)
             if (!mcc_parameter_scope(nodes, count, globals[i].initialization_expression_index, NONE,
                 i + MCC_PARAMETER_SCRIPTS + 1)) goto fail;
+        stage = "call arguments";
         for (i = 0; i < count; ++i) {
             struct hs_syntax_node *call = nodes + i, *argument;
             struct mcc_script_signature const *signature;
@@ -187,6 +197,6 @@ int mcc_parameters_prepare(struct mcc_runtime *runtime, struct scenario *scenari
     return 1;
 fail:
     mcc_parameters_dispose();
-    error(_error_silent, "mcc: invalid parameter block, scope or script call arguments");
+    error(_error_silent, "mcc: invalid %s at entry #%u, argument #%u",stage,i,j);
     return 0;
 }

@@ -830,13 +830,22 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 	unsigned long *converted;
 	unsigned long face, level;
 	GLenum gl_error;
-	/* MCC credits can use an 8192-pixel strip. Keep the legacy texture cache's
+	GLint maximum;
+	/* MCC effects can use a 15360-pixel strip. Keep the legacy texture cache's
 	 * size policy unchanged; this entry point owns only checked MCC pixels. */
 	if (!base || !description->width || !description->height || !description->depth ||
-		description->width > 8192 || description->height > 8192 || description->depth > 512 ||
+		description->width > 16384 || description->height > 16384 || description->depth > 512 ||
 		(description->depth > 1 && (description->width > 512 || description->height > 512)) ||
 		!description->levels || description->levels > 14 || !face_size || face_size > bytes / face_count ||
 		information.kind == _texel_unknown) return FALSE;
+	glGetIntegerv(target == GL_TEXTURE_CUBE_MAP ? GL_MAX_CUBE_MAP_TEXTURE_SIZE :
+		target == GL_TEXTURE_3D ? GL_MAX_3D_TEXTURE_SIZE : GL_MAX_TEXTURE_SIZE, &maximum);
+	if (maximum <= 0 || description->width > (unsigned long)maximum ||
+		description->height > (unsigned long)maximum || description->depth > (unsigned long)maximum) {
+		platform_log("mcc textures: %lux%lux%lu exceeds this GPU's %d-texel limit",
+			description->width,description->height,description->depth,maximum);
+		return FALSE;
+	}
 	/* Account for this upload's errors independently of earlier rendering. */
 	gl_error = glGetError();
 	if (gl_error != GL_NO_ERROR)

@@ -133,6 +133,8 @@ boolean mcc_syntax_functions_check(struct scenario *scenario, struct data_array 
         if (!mcc_syntax_expression_valid(syntax, script->root_expression_index, script->return_type,
             node_refusal, &name)) {
             BIT_VECTOR_SET_FLAG(disabled_scripts, i, TRUE);
+            if (scripts<16) error(_error_silent,"mcc: script %.32s rejected at %s",
+                script->name,name ? name : "damaged expression");
             if (!first_owner) { first_owner = script->name; first_name = name; }
             ++scripts;
         }

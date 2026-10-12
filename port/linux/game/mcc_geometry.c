@@ -202,7 +202,8 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
     memset(part,0,sizeof(*part));
     if (!count || count>65535 || !triangles || triangles>65535 || mg_u16(wire+0x44)!=1 ||
         mg_u16(wire+0x54)!=4 || model->nodes.count<1 || model->nodes.count>64 ||
-        (mg_u16(wire+4)!=0xFFFFu && mg_u16(wire+4)>=(uint32_t)model->shaders.count) ||
+        model->shaders.count<0 ||
+        (mg_u16(wire+4)!=0xFFFFu && !model->shaders.count) ||
         ((signed char)wire[6]!=-1 && (unsigned char)wire[6]>=part_count) ||
         ((signed char)wire[7]!=-1 && (unsigned char)wire[7]>=part_count))
         return mg_error("invalid model part descriptor");
@@ -240,6 +241,11 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
     /* Only the common 32-byte material/centroid prefix is shared by the two
      * formats. Blocks and hardware descriptors are new runtime objects. */
     memcpy(part,wire,0x20);
+    /* Match the engine schema's required-index correction for a missing
+     * material. MacWorld's damaged Elite torso references one past the end.
+     * Keep the geometry; the caller reports the visible fallback. */
+    if (mg_u16(wire+4)!=0xFFFFu && mg_u16(wire+4)>=(uint32_t)model->shaders.count)
+        part->shader=0;
     part->flags&=~2u;
     if (local) {
         for (i=0;i<2;i++) {
@@ -298,7 +304,16 @@ int mcc_geometry_prepare(struct mcc_runtime *r) {
             if (!parts || block->count>128) return mg_error("invalid model parts block");
             new_parts=mcc_runtime_allocate(r,(uint32_t)block->count*sizeof(*new_parts));
             if (block->count && !new_parts) return mg_error("no room for model part descriptors");
-            for (p=0;p<block->count;p++) if (!mg_part(r,model,parts+p*0x84,(uint32_t)p,(uint32_t)block->count,&new_parts[p])) return 0;
+            for (p=0;p<block->count;p++) {
+                if (!mg_part(r,model,parts+p*0x84,(uint32_t)p,(uint32_t)block->count,&new_parts[p])) {
+                    error(_error_silent,"MCC geometry: tag #%lu, geometry %ld, part %ld, shader %u (model has %ld shaders)",
+                        (unsigned long)i,g,p,(unsigned)mg_u16(parts+p*0x84+4),model->shaders.count);
+                    return 0;
+                }
+                if (new_parts[p].shader!=(short)mg_u16(parts+p*0x84+4))
+                    error(_error_silent,"MCC geometry: tag #%lu, geometry %ld, part %ld: missing material %u; using material 0 (appearance may differ)",
+                        (unsigned long)i,g,p,(unsigned)mg_u16(parts+p*0x84+4));
+            }
             destination->address=new_parts;
             destination->definition=NULL;
         }

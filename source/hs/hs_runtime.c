@@ -1805,8 +1805,9 @@ boolean hs_can_cast(
 	short object_type;
 
 	{
-		extern boolean mcc_script_ai_cast(short actual_type, short desired_type);
-		if (mcc_script_ai_cast(actual_type, desired_type))
+		/* port: MCC-only AI casts and signed integer widening. */
+		extern boolean mcc_script_can_cast(short actual_type, short desired_type);
+		if (mcc_script_can_cast(actual_type, desired_type))
 			return TRUE;
 	}
 
@@ -1863,10 +1864,11 @@ long hs_cast(
 	long value)
 {
 	{
-		extern boolean mcc_script_ai_cast(short actual_type, short desired_type);
-		extern long mcc_script_cast_ai(short desired_type, long reference);
-		if (mcc_script_ai_cast(actual_type, desired_type))
-			return mcc_script_cast_ai(desired_type, value);
+		/* port: MCC-only AI casts and signed integer widening. */
+		extern boolean mcc_script_can_cast(short actual_type, short desired_type);
+		extern long mcc_script_cast(short actual_type, short desired_type, long value);
+		if (mcc_script_can_cast(actual_type, desired_type))
+			return mcc_script_cast(actual_type, desired_type, value);
 	}
 
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x5d8, thread_index,

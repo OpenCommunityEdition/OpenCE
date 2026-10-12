@@ -45,6 +45,14 @@ for levels with their own resources (e.g. bitmaps.map and sounds.map); maps in
 those folders appear in the same MCC menu lists.
 
 You cannot use Custom Edition resource files in these folders. You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
+
+The shared folder names are installation labels: either map type can use either
+set when its resource references match. Package files take priority, followed
+by existing root-level resources. If neither is present, the loader checks both
+shared sets and requires one complete, unambiguous match for each needed file.
+It never combines partial matches or loads resources a map does not need.
+External `loc.map` support is not implemented.
+
 See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
 validation results and remaining compatibility limits.
 

@@ -38,7 +38,7 @@ boolean mcc_cache_tags_loaded(void) {return loaded;}
 void error(short priority,char const *message,...) {(void)priority;(void)message;}
 void *csmemset(void *p,long value,unsigned long size) {return memset(p,(int)value,size);}
 void *csmemcpy(void *p,void const *from,unsigned long size) {return memcpy(p,from,size);}
-boolean hs_can_cast(short a,short b) {return a==b || (a==_hs_type_short_integer && b==_hs_type_long_integer) ||
+boolean hs_can_cast(short a,short b) {return a==b ||
     (loaded && a==_hs_type_ai && (HS_TYPE_IS_OBJECT(b)||b==_hs_type_object_list));}
 long hs_cast(long index,short from,short to,long value) {(void)index;(void)from;(void)to;return value;}
 void object_list_add_reference(long index) {if(index!=NONE)refs++;}
@@ -159,6 +159,7 @@ int main(int argc,char **argv) {
     else if(!strcmp(argv[1],"global_scope")){scenario->hs_globals.count=1;globals[0].initialization_expression_index=0x10000;valid=0;}
     else if(!strcmp(argv[1],"lists")){type=_hs_type_object_list;memcpy(parameter+32,&type,2);nodes[0].type=nodes[4].type=type;}
     else if(!strcmp(argv[1],"ai_cast")){type=_hs_type_ai;memcpy(parameter+32,&type,2);nodes[4].type=type;nodes[0].type=_hs_type_unit;}
+    else if(!strcmp(argv[1],"widen")){type=_hs_type_short_integer;memcpy(parameter+32,&type,2);nodes[4].type=type;}
     else if(!strcmp(argv[1],"global_capacity")||!strcmp(argv[1],"global_overflow")) {
         scenario->hs_globals.count=581+(!strcmp(argv[1],"global_overflow"));
         for(i=0;i<scenario->hs_globals.count;i++)globals[i].initialization_expression_index=NONE;
@@ -203,6 +204,14 @@ int main(int argc,char **argv) {
     frame->previous=(void *)thread.stack_data;frame->expression_index=0x10002;thread.stack=frame;
     CHECK(mcc_hs_script_evaluate(0,0,TRUE));
     state=(void *)frame->data;CHECK(state->values[0]==42&&state->phase==0);
+    if(!strcmp(argv[1],"widen")) {
+        long value;
+        state->phase=1;
+        state->values[0]=0x1234ffff;CHECK(mcc_hs_parameter_evaluate(0,nodes,&value)&&value==-1);
+        state->values[0]=0x8000;CHECK(mcc_hs_parameter_evaluate(0,nodes,&value)&&value==-32768);
+        state->values[0]=32767;CHECK(mcc_hs_parameter_evaluate(0,nodes,&value)&&value==32767);
+        goto done;
+    }
     if(!strcmp(argv[1],"snapshot")) {
         unsigned char snapshot[sizeof(thread)];memcpy(snapshot,&thread,sizeof(thread));
         memset(&thread,0,sizeof(thread));memcpy(&thread,snapshot,sizeof(thread));

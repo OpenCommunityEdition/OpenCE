@@ -83,11 +83,10 @@ int CloseHandle(HANDLE);
 static char const *root;
 static char const *listing="list.txt";
 static unsigned inventories;
+static int admission_reads;
 static unsigned reads, largest, scans, closed;
-struct mcc_runtime {
-    unsigned char *tag_index;
-    struct {uint32_t scenario_handle,tag_count;} report;
-};
+#include "mcc_runtime.h"
+#include "mcc_resources.h"
 static char saved_identity[64];
 static int allocation_fails;
 void *mcc_runtime_allocate(struct mcc_runtime *r,uint32_t bytes) {
@@ -104,7 +103,7 @@ FILE *mcc_test_fopen(char const *path,char const *mode) {
 }
 size_t mcc_test_fread(void *out,size_t size,size_t count,FILE *file) {
     size_t bytes=size*count;
-    if (bytes>2048) exit(21);
+    if (bytes>2048 && !admission_reads) exit(21);
     if (bytes>largest) largest=(unsigned)bytes;
     reads++;
     return fread(out,size,count,file);
@@ -142,7 +141,7 @@ int main(int argc,char **argv) {
     if(argc<2)return 2;
     if(argc==5 && !strcmp(argv[2],"admit")) {
         char message[256]={0};unsigned long checksum;
-        root=argv[1];checksum=mcc_cache_checksum(argv[3]);
+        root=argv[1];admission_reads=1;checksum=mcc_cache_checksum(argv[3]);
         printf("checksum=%lu\n",checksum);
         printf("accepted=%d\n",mcc_cache_present(argv[3],strtoul(argv[4],NULL,0),message,sizeof(message)));
         printf("message=%s\n",message);return 0;
@@ -225,7 +224,7 @@ int main(int argc,char **argv) {
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
                str(ROOT / "port/linux/game/mcc_package.c"),
-               str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(output)]
+               str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
     result = subprocess.run(command, capture_output=True, text=True)
@@ -422,16 +421,37 @@ def test_package_invalid_paths(catalog_tool, tmp_path, stem):
 def test_network_admission_checks_package_resources(catalog_tool, tmp_path):
     folder = tmp_path / "mcc_maps/pkg"
     folder.mkdir(parents=True)
-    level = header()
+    from test_mcc_cache_format import resource_dependency_map
+    level = resource_dependency_map()
     struct.pack_into("<I", level, 0x64, 1234)
     (folder / "a10.map").write_bytes(level)
-    (folder / "sounds.map").write_bytes(b"original audio")
+    from test_mcc_resources import fixture_blob
+    blob = fixture_blob()
+    # Match the generated tag name and original offset in the dependency map.
+    blob[24:40] = b"res__0__0\0" + bytes(6)
+    struct.pack_into("<I", level, 0xB00+0x850+0x48, 16)
+    (folder / "a10.map").write_bytes(level)
+    (folder / "sounds.map").write_bytes(blob)
     host, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", "0")
     peer, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", host["checksum"])
     assert peer["accepted"] == "1"
-    (folder / "sounds.map").write_bytes(b"modified audio")
+    blob[16] ^= 1
+    (folder / "sounds.map").write_bytes(blob)
     peer, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/pkg/a10", host["checksum"])
     assert peer["accepted"] == "0"
     assert "package resources differ" in peer["message"]
     missing, _ = run(catalog_tool, tmp_path, "admit", "mcc_maps/other/a10", host["checksum"])
     assert missing["accepted"] == "0"
+
+
+def test_shared_resource_directory_is_not_a_package(catalog_tool, tmp_path):
+    install(tmp_path, {"level.map": header()})
+    root = tmp_path / "mcc_maps"
+    (root / "list.txt").write_text("level.map\n/_ShArEd\n")
+    shared = root / "_ShArEd"
+    shared.mkdir()
+    (shared / "level.map").write_bytes(header())
+    (shared / "list.txt").write_text("level.map\n/singleplayer\n/multiplayer\n")
+    fields, _ = run(catalog_tool, tmp_path)
+    assert fields["count"] == "1"
+    assert fields["scans"] == "1"

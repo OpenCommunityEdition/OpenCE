@@ -226,7 +226,7 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
                 unsigned char *data;
                 struct mcc_pcm pcm;
                 int ok,external;
-                char resource_name[288];
+                char resource_name[288],group_name[288];
                 failed_permutation=permutation_index;stage="permutation header";
                 failed_codec=permutation ? permutation->compression : NONE;
                 if (!permutation || permutation->samples.size<0 || permutation->samples.size>0x4000000) goto failed;
@@ -243,9 +243,10 @@ int mcc_audio_prepare(struct mcc_runtime *runtime)
                 if (!data) goto failed;
                 stage="sample read";
                 if (external) {
-                    stage="external samples (matching sounds.map required alongside this level)";
+                    stage="external samples (selected MCC sounds.map data does not match)";
                     snprintf(resource_name,sizeof(resource_name),"%s__%lu__%lu",tag_name,range_index,permutation_index);
-                    ok=mcc_resources_read(runtime,2,resource_name,permutation->samples.file_offset,permutation->samples.size,data);
+                    snprintf(group_name,sizeof(group_name),"%s__permutations",tag_name);
+                    ok=mcc_resources_read(runtime,2,resource_name,permutation->samples.file_offset,permutation->samples.size,data,group_name);
                 } else ok=mcc_runtime_read(runtime,permutation->samples.file_offset,permutation->samples.size,data);
                 if (!ok) {
                     free(data); goto failed;

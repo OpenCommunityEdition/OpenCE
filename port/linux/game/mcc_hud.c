@@ -4,6 +4,8 @@
 #include "cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "interface/unit_hud_interface_definition.h"
+#include "interface/weapon_hud_interface_definition.h"
+#include "errors.h"
 #include "mcc_runtime.h"
 #include <string.h>
 
@@ -141,9 +143,43 @@ static int mcc_hud_items(struct mcc_runtime *r,unsigned char *definition,uint32_
     return 1;
 }
 
+/* MCC can omit the unarmed HUD. The native update path requires a tag even
+ * between client spawn and receipt of its weapons. An empty owned definition
+ * preserves the omitted visuals without changing the shared HUD path. */
+static int mcc_hud_default(struct mcc_runtime *r,struct hud_globals_definition *globals,uint32_t *empty)
+{
+    static char const name[]="mcc_runtime\\unarmed_hud";
+    struct weapon_hud_interface_definition *hud;
+    unsigned char *index;
+    uint32_t *entry,count=r->report.tag_count;
+    char *owned_name;
+    if (globals->defaults.default_weapon_hud.index!=NONE) return 1;
+    if (*empty==UINT32_MAX) {
+        /* Native tag lookup uses a signed 16-bit absolute index. */
+        if (count>32767) return 0;
+        index=mcc_runtime_allocate(r,(count+1)*32);
+        hud=mcc_runtime_allocate(r,sizeof(*hud));
+        owned_name=mcc_runtime_allocate(r,sizeof(name));
+        if (!index || !hud || !owned_name) return 0;
+        memcpy(index,r->tag_index,count*32);
+        memcpy(owned_name,name,sizeof(name));
+        hud->parent_hud.group_tag='wphi';hud->parent_hud.index=NONE;
+        hud->absolute_placement.corner=_hud_anchor_center;
+        *empty=0xE1740000u|count;
+        entry=(uint32_t *)(index+count*32);
+        entry[0]='wphi';entry[1]=entry[2]=UINT32_MAX;entry[3]=*empty;
+        entry[4]=(uint32_t)(uintptr_t)owned_name;entry[5]=(uint32_t)(uintptr_t)hud;
+        r->tag_index=index;r->report.tag_count=count+1;
+        error(_error_silent,"mcc hud: omitted unarmed HUD represented by an empty definition");
+    }
+    globals->defaults.default_weapon_hud.group_tag='wphi';
+    globals->defaults.default_weapon_hud.index=(long)*empty;
+    return 1;
+}
+
 int mcc_hud_bitmaps_prepare(struct mcc_runtime *r)
 {
-    uint32_t i;
+    uint32_t i,empty=UINT32_MAX;
     for (i=0;i<r->report.tag_count;i++) {
         uint32_t *entry=(uint32_t *)(r->tag_index+i*32),n,count;
         unsigned char *p,*block;
@@ -184,7 +220,7 @@ int mcc_hud_bitmaps_prepare(struct mcc_runtime *r)
             mcc_hud_offset((void *)(p+0xF4));
         } else if (entry[0]=='hudg') {
             struct hud_globals_definition *globals=mcc_runtime_pointer(r,entry[5],sizeof(*globals));
-            if (!globals) return 0;
+            if (!globals || !mcc_hud_default(r,globals,&empty)) return 0;
             mcc_hud_offset(&globals->messaging.placement);
             globals->waypoint.top_offset*=0.5f;
             globals->waypoint.bottom_offset*=0.5f;

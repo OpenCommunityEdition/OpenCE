@@ -49,6 +49,19 @@ long mcc_script_cast_ai(short desired_type, long reference)
     return result;
 }
 
+boolean mcc_script_can_cast(short actual_type,short desired_type)
+{
+    return mcc_script_ai_cast(actual_type,desired_type) || (mcc_cache_tags_loaded() &&
+        actual_type==_hs_type_short_integer && desired_type==_hs_type_long_integer);
+}
+
+long mcc_script_cast(short actual_type,short desired_type,long value)
+{
+    /* Widen globals as well as parameters; sign extension is required. */
+    if (actual_type==_hs_type_short_integer) return (long)(short)value;
+    return mcc_script_cast_ai(desired_type,value);
+}
+
 static void mcc_distance_evaluate(short function, long thread, boolean initialize)
 {
     long *arguments = hs_macro_function_evaluate(function, thread, initialize);

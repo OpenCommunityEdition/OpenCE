@@ -177,6 +177,20 @@ int main(int argc,char **argv) {
                 d.depth!=(unsigned)b[i].depth||d.levels!=(unsigned)b[i].mipmap_count+1||
                 xgpu_texture_face_size(&d)*(d.cube_map?6:1)!=expected_bytes[i])return 17;
         }
+    } else if(!strcmp(argv[1],"wide_linear")) {
+        struct bitmap_data b={15360,256,1,0,11,0,16,NULL};
+        struct xgpu_texture_description d;
+        unsigned long fmt=(D3DFMT_LIN_A8R8G8B8<<D3DFORMAT_FORMAT_SHIFT)|(1<<D3DFORMAT_MIPMAP_SHIFT);
+        owned_bytes=15360*256*4;owned=malloc(owned_bytes);if(!owned)return 26;
+        header=mcc_texture_cache_get(&b,TRUE);
+        if(!header || !xgpu_mcc_texture_get(header,NULL,&texture,&target,&d) ||
+            d.width!=15360 || d.height!=256 || d.pitch!=61440 || !d.linear ||
+            xgpu_texture_face_size(&d)!=owned_bytes || last_pixels!=owned)return 27;
+        if(mcc_texture_bridge_register_linear(&other,fmt,15360,256,61440,owned,owned_bytes-1) ||
+            mcc_texture_bridge_register_linear(&other,fmt,15360,256,16384,owned,owned_bytes) ||
+            mcc_texture_bridge_register_linear(&other,fmt,16385,256,65536,owned,owned_bytes) ||
+            mcc_texture_bridge_register_linear(&other,fmt,15360,256,61441,owned,owned_bytes))return 28;
+        mcc_texture_bridge_dispose();free((void *)owned);
     } else if(!strcmp(argv[1],"credits")) {
         enum {chain_bytes=44739328};
         unsigned char *data=malloc(chain_bytes);
@@ -222,7 +236,7 @@ int main(int argc,char **argv) {
     return binary
 
 
-@pytest.mark.parametrize("case", ["identity", "bounds", "failure", "dispose", "palette", "descriptors", "pressure", "credits"])
+@pytest.mark.parametrize("case", ["identity", "bounds", "failure", "dispose", "palette", "descriptors", "pressure", "credits", "wide_linear"])
 def test_mcc_texture_bridge(bridge_tool, case):
     result = subprocess.run([str(bridge_tool), case], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, f"{case}: exit {result.returncode}\n{result.stdout}{result.stderr}"

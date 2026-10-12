@@ -289,6 +289,11 @@ int main(int argc, char **argv) {
     {
         struct hs_syntax_node ai = {0};
         CHECK(mcc_script_ai_cast(_hs_type_ai, _hs_type_unit));
+        CHECK(mcc_script_can_cast(_hs_type_short_integer, _hs_type_long_integer));
+        CHECK(mcc_script_cast(_hs_type_short_integer, _hs_type_long_integer, 0xFFFF) == -1);
+        CHECK(mcc_script_cast(_hs_type_short_integer, _hs_type_long_integer, 32767) == 32767);
+        CHECK(mcc_script_cast(_hs_type_short_integer, _hs_type_long_integer, 0x8000) == -32768);
+        CHECK(!mcc_script_can_cast(_hs_type_long_integer, _hs_type_short_integer));
         ai.flags = 9; ai.constant_type = _hs_type_ai; ai.type = _hs_type_unit;
         CHECK(mcc_script_parse_ai(&ai, "falcon/pilot") == 1 && ai.data == (long)0x80000018);
         CHECK(mcc_script_parse_ai(&ai, "missing/pilot") == 0);
@@ -300,6 +305,7 @@ int main(int argc, char **argv) {
         CHECK(mcc_script_cast_ai(_hs_type_unit, NONE) == NONE);
         loaded = FALSE;
         CHECK(!mcc_script_ai_cast(_hs_type_ai, _hs_type_unit));
+        CHECK(!mcc_script_can_cast(_hs_type_short_integer, _hs_type_long_integer));
         loaded = TRUE;
     }
     CHECK(mcc_script_find("player_effect_set_max_vibrate") == 322);

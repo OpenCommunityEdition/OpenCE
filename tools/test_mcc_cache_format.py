@@ -82,6 +82,47 @@ def test_complete_minimal_map(report_tool, tmp_path):
     assert report["bsps"] == "1"
 
 
+def resource_dependency_map(kind="snd!", external=1, size=4):
+    data = minimal_map()
+    scenario = bytes(data[TAG_OFFSET+0x80:TAG_OFFSET+0x630])
+    bsp = bytes(data[TAG_OFFSET+0x630:TAG_OFFSET+0x650])
+    data.extend(bytes(0x900-0x650))
+    put32(data, 8, len(data))
+    put32(data, 20, 0x900)
+    put32(data, TAG_OFFSET+12, 3)
+    data[TAG_OFFSET+0x100:TAG_OFFSET+0x6B0] = scenario
+    data[TAG_OFFSET+0x700:TAG_OFFSET+0x720] = bsp
+    put32(data, TAG_OFFSET+0x100+0x5A8, BASE+0x700)
+    put32(data, TAG_OFFSET+40+20, BASE+0x100)
+    put32(data, TAG_OFFSET+40+16, BASE+0xA0)
+    put32(data, TAG_OFFSET+72+16, BASE+0xA5)
+    data[TAG_OFFSET+0xA0:TAG_OFFSET+0xAD] = b"scnr\0bsp\0res\0"
+    struct.pack_into("<8I", data, TAG_OFFSET+104, fourcc(kind), 0xFFFFFFFF, 0xFFFFFFFF,
+                     0xE1760002, BASE+0xA9, BASE+0x740, 0, 0)
+    if kind == "snd!":
+        struct.pack_into("<3I", data, TAG_OFFSET+0x740+0x98, 1, BASE+0x800, 0)
+        struct.pack_into("<3I", data, TAG_OFFSET+0x800+0x3C, 1, BASE+0x850, 0)
+        struct.pack_into("<3I", data, TAG_OFFSET+0x850+0x40, size, external, 0x800)
+    else:
+        struct.pack_into("<3I", data, TAG_OFFSET+0x740+0x60, 1, BASE+0x800, 0)
+        struct.pack_into("<6H", data, TAG_OFFSET+0x804, 1, 1, 1, 0, 11, external*0x100)
+        struct.pack_into("<2I", data, TAG_OFFSET+0x818, 0x800, size)
+    return data
+
+
+@pytest.mark.parametrize("kind,external,size,count", [
+    ("snd!", 0, 4, 0), ("snd!", 1, 4, 1), ("snd!", 1, 0, 0),
+    ("bitm", 0, 4, 0), ("bitm", 1, 4, 1),
+])
+def test_resource_dependencies_are_taken_from_checked_tags(report_tool, tmp_path, kind, external, size, count):
+    data = resource_dependency_map(kind, external, size)
+    path = tmp_path / "dependencies.map"
+    path.write_bytes(data)
+    code, report = audit(report_tool, path)
+    assert code == 0, report
+    assert int(report["external_sounds" if kind == "snd!" else "external_bitmaps"]) == count
+
+
 @pytest.mark.parametrize("offset,value,error", [
     (4, 609, "not a Halo 1 MCC version-13 cache"),
     (4, 5, "not a Halo 1 MCC version-13 cache"),

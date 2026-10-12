@@ -48,6 +48,12 @@ struct mcc_cache_source {
     uint64_t size;
 };
 
+struct mcc_resource_reference {
+    char const *tag_name;
+    unsigned type;
+    uint32_t first, second, offset, bytes;
+};
+
 struct mcc_cache_bsp {
     uint32_t file_offset, size, address, tag_handle;
     uint32_t structure_address;
@@ -88,6 +94,9 @@ enum mcc_cache_status mcc_cache_inspect(struct mcc_cache_source const *source,
 /* Return a validated slice within loaded raw tags, or NULL. */
 void *mcc_cache_pointer(void *tag_data, struct mcc_cache_report const *report,
     uint32_t address, uint32_t bytes);
+/* Visit external payloads in validated, unconverted tags. */
+int mcc_cache_visit_resources(void *tag_data, struct mcc_cache_report const *report,
+    int (*visit)(void *, struct mcc_resource_reference const *), void *context);
 char const *mcc_cache_status_string(enum mcc_cache_status status);
 
 #endif

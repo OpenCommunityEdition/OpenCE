@@ -182,7 +182,7 @@ int main(int argc, char **argv)
         }
         CHECK(mcc_syntax_functions_check(&scenario, syntax, refusal, disabled_scripts, disabled_globals));
         if (!strcmp(test, "root_type") || !strcmp(test, "damaged_root") || !strcmp(test, "shared_child")) {
-            CHECK(disabled_scripts[0] == 1 && !disabled_globals[0] && errors == 1);
+            CHECK(disabled_scripts[0] == 1 && !disabled_globals[0] && errors == 2);
         } else {
             CHECK(!disabled_scripts[0] && !disabled_globals[0] && !errors);
             CHECK(visited == (unsigned)syntax->actual_count);
@@ -191,10 +191,10 @@ int main(int argc, char **argv)
             nodes[MCC_SYNTAX_CAPACITY - 1].source_offset = 99;
             globals[0].initialization_expression_index = handle(MCC_SYNTAX_CAPACITY - 1);
             CHECK(mcc_syntax_functions_check(&scenario, syntax, refusal, disabled_scripts, disabled_globals));
-            CHECK(disabled_scripts[0] == 1 && disabled_globals[0] == 1 && errors == 1);
+            CHECK(disabled_scripts[0] == 1 && disabled_globals[0] == 1 && errors == 2);
             loaded = FALSE;
             CHECK(!mcc_syntax_functions_check(&scenario, syntax, refusal, disabled_scripts, disabled_globals));
-            CHECK(disabled_scripts[0] == 1 && disabled_globals[0] == 1 && errors == 1);
+            CHECK(disabled_scripts[0] == 1 && disabled_globals[0] == 1 && errors == 2);
         }
     }
     free(before);

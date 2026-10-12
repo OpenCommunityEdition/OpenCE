@@ -102,7 +102,7 @@ int main(int argc,char **argv) {
     FILE *file;
     long length;
     uint32_t i;
-    int success, palette_parts=0, palette_sum=0;
+    int success, palette_parts=0, palette_sum=0, shader_sum=0;
     if (argc<2 || argc>3) return 2;
     if (argc==3) fail_at=atoi(argv[2]);
     memset(&r,0,sizeof(r));
@@ -130,7 +130,10 @@ int main(int argc,char **argv) {
         unsigned long bytes=0;
         unsigned char const *nodes=NULL;
         short n,j;
+        short shader;
         void *payload=mcc_geometry_buffer_data(&r,b->hardware_format,0,&bytes);
+        /* Native model part: material at +4, vertex buffer at +0x54. */
+        memcpy(&shader,(byte *)b-0x50,2);shader_sum+=shader;
         if (!payload || payload!=b->base_address || bytes!=(unsigned long)b->count*32 ||
             !mcc_geometry_contains(&r,payload,bytes) ||
             mcc_geometry_buffer_data(&r,b->hardware_format,1,NULL)) return 10;
@@ -149,6 +152,7 @@ int main(int argc,char **argv) {
     mcc_geometry_dispose(&r);
     printf("converted=%d\ncreated_buffers=%d\nactive_buffers=%d\npalette_parts=%d\npalette_sum=%d\n",
         success,created_buffers,active_buffers,palette_parts,palette_sum);
+    printf("shader_sum=%d\n",shader_sum);
     if (active_buffers || r.geometry) return 8;
 #ifdef _WIN32
     VirtualFree(r.tags,0,0x8000);

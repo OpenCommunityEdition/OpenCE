@@ -126,11 +126,12 @@ unsigned long mcc_cache_checksum(char const *name)
 {
     struct mcc_cache_identity identity;
     struct mcc_cache_source source;
-    FILE *stream = mcc_open(name, &source, &identity);
-    uint32_t checksum;
+    FILE *stream=mcc_open(name,&source,&identity);
+    uint32_t checksum=0;
     if (!stream) return 0;
+    if (!mcc_resources_probe(name,&source,&checksum)) checksum=0;
     fclose(stream);
-    return mcc_package_checksum(name, identity.checksum, &checksum) ? checksum : 0;
+    return checksum;
 }
 
 boolean mcc_cache_present(char const *name, unsigned long checksum, char *message, long size)
@@ -143,11 +144,12 @@ boolean mcc_cache_present(char const *name, unsigned long checksum, char *messag
         snprintf(message, (size_t)size, "The MCC map %.63s is missing or is not a valid version-13 cache. Copy its .map file into mcc_maps.", name ? name : "");
         return FALSE;
     }
-    fclose(stream);
-    if (!mcc_package_checksum(name, identity.checksum, &actual)) {
-        snprintf(message, (size_t)size, "The MCC package resources for %.63s could not be read.", name);
+    if (!mcc_resources_probe(name,&source,&actual)) {
+        fclose(stream);
+        snprintf(message,(size_t)size,"The MCC map or required resources for %.63s failed validation. See debug.txt.",name);
         return FALSE;
     }
+    fclose(stream);
     if (checksum && actual != checksum) {
         snprintf(message, (size_t)size, "The MCC map %.63s or its package resources differ from the host. Install the same complete package.", name);
         return FALSE;
@@ -251,6 +253,10 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
     status = mcc_cache_load(&runtime->source, raw, identity.tag_data_size, &runtime->report);
     problem = mcc_cache_status_string(status);
     if (status != MCC_CACHE_OK) goto failed;
+    problem = "no unambiguous matching MCC resources (see the preceding diagnostic)";
+    if (!mcc_resources_select(runtime,raw) || !mcc_resources_checksum(runtime,
+        (runtime->report.external_bitmap_count ? 1u : 0u)|(runtime->report.external_sound_count ? 2u : 0u),
+        &package_checksum)) goto failed;
     runtime->capacity = MCC_CACHE_TAG_CAPACITY;
     runtime->tags = mcc_memory_reserve(runtime->report.tag_base, runtime->capacity);
     problem = "the MCC tag address window is unavailable";
@@ -278,8 +284,6 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
         problem = "the map header could not be read";
         goto failed;
     }
-    problem = "the MCC package resources could not be fingerprinted";
-    if (!mcc_package_checksum(name, identity.checksum, &package_checksum)) goto failed;
     /* The cache header checksum feeds native save validation as well as the lobby. */
     memcpy((unsigned char *)header + 0x64, &package_checksum, 4);
     mcc_loaded = TRUE;

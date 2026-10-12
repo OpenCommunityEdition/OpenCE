@@ -169,7 +169,7 @@ static void mcc_maps_scan_directory(char const *package)
         length=strlen(name);
         if (!length || strpbrk(name,"/\\") || length>58) continue;
         if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            if (package[0]) continue;
+            if (package[0] || !csstrcasecmp(name,"_shared")) continue;
             snprintf(candidate,sizeof(candidate),"%s%s\\x",MCC_MAPS_LEVEL_PREFIX,name);
             if (mcc_package_name(candidate,canonical)) mcc_maps_scan_directory(name);
             continue;
