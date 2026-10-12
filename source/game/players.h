@@ -72,6 +72,9 @@ struct network_player
 {
 	wchar_t name[12];
 	short primary_color_index;
+	/* port: the player's shield color (display.shield_color: an armor color's
+	index, NONE for the shield's own; port/linux/game/shield_color.c), which
+	the Xbox game never used (every machine sent NONE) */
 	short icon_index;
 	char machine_index;
 	char controller_index;

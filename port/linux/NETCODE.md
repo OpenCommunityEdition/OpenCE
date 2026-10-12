@@ -197,7 +197,12 @@ a map it lacks, and the game's players reach each other to send it; version
 28 holds the players of a machine still downloading the map out of the game
 until it has the map, keeps a multiplayer map's first scripted BSP, leaves
 dynamic lights and the flashlight on past the Xbox game's player and vehicle
-limits, and readies a second weapon picked up while firing.
+limits, and readies a second weapon picked up while firing; version 29
+sends with each player the shield color it chose (in the player's record's
+`icon_index`, which the Xbox game never used) and sends a player's armor and
+shield colors again in the lobby as they change, so that a machine that shows
+others' shield colors (`display.others_shield_colors`) draws each player's
+shield in that player's color (`port/linux/game/shield_color.c`).
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
