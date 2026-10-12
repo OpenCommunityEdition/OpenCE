@@ -537,13 +537,20 @@ static void hud_update_unit_local_player(
 				client does not drain shields. The lower value arrived as a
 				hit, so the meter flashed and the shield damage sound played
 				for the whole overshield. A small step from past full is that
-				drain. A larger step is a hit, and the meter still flashes.
-				The step is closed here, so one late packet cannot leave the
-				meter a little behind and keep the flash going. */
-				if (hud_state->last_shield_vitality > 1.0f && shield_drop <= 0.05f)
+				drain (no more than about 25 ticks of it). A larger step is a
+				hit, and the meter still flashes. The step is closed here, so
+				one late packet cannot leave the meter a little behind and keep
+				the flash going, and a hit's flash already fading goes on
+				fading, as when the shield holds still. */
+				if (hud_state->last_shield_vitality > 1.0f && shield_drop <= 0.02f)
 				{
 					hud_state->last_shield_vitality = unit->object.shield_vitality;
-					hud_state->fade_time = -1.0f;
+					if (hud_state->fade_time > 0.0f)
+					{
+						hud_state->fade_time +=
+							(real)(game_time_get() - hud_state->last_shield_hit_time) *
+							(1.0f / TICKS_PER_SECOND);
+					}
 					hud_state->last_shield_hit_time = game_time_get();
 				}
 				else

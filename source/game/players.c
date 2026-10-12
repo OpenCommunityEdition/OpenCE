@@ -2744,10 +2744,10 @@ game uses the largest group of living teammates, jumping, riding, or
 standing where the BSP has no cluster (a beach) included. The respawn is
 beside someone in that group who is safe to spawn next to. When that whole
 group is in a fight, it waits out COOP_RESPAWN_FALLBACK_TICKS and then uses
-the group anyway, someone standing in the BSP if the group has one. A safe
+someone standing in the BSP anyway, in the group if it has one. A safe
 player outside the group does not win. A dead host has no unit, so the same
 count applies to them. NONE while the group is still unsafe, or while
-nobody is alive. */
+nobody alive is standing in the BSP. */
 static long players_coop_respawn_unit(
 	void)
 {
@@ -2821,29 +2821,35 @@ static long players_coop_respawn_unit(
 		return unit_indices[safe_index];
 	if (game_time_get() + 1 - players_coop_state.respawn_wait_since >= COOP_RESPAWN_FALLBACK_TICKS)
 	{
-		short fallback_index = anchor_index;
+		short fallback_index = -1;
 		short fallback_count = 0;
+		boolean fallback_in_group = FALSE;
 
-		/* someone standing in the BSP, even under fire, before a teammate
-		who is in the air or outside the BSP */
+		/* someone standing in the BSP, even under fire: in the group if it
+		has one, else anyone. Never someone in the air, outside the BSP or
+		riding an AI vehicle (the Pelican): NONE waits for one */
 		for (index = 0; index < count; index++)
 		{
 			short near_count;
+			boolean in_group;
 
-			if (distance_squared3d(&positions[anchor_index], &positions[index]) > radius_squared ||
-				!players_coop_unit_grounded(unit_indices[index]) ||
+			if (!players_coop_unit_grounded(unit_indices[index]) ||
 				!players_coop_unit_spawnable(unit_indices[index]))
 			{
 				continue;
 			}
+			in_group = distance_squared3d(&positions[anchor_index], &positions[index]) <= radius_squared;
+			if (fallback_in_group && !in_group)
+				continue;
 			near_count = players_coop_near_count(positions, count, index, radius_squared);
-			if (near_count > fallback_count)
+			if ((in_group && !fallback_in_group) || near_count > fallback_count)
 			{
 				fallback_count = near_count;
 				fallback_index = index;
+				fallback_in_group = in_group;
 			}
 		}
-		return unit_indices[fallback_index];
+		return fallback_index >= 0 ? unit_indices[fallback_index] : NONE;
 	}
 
 	return NONE;

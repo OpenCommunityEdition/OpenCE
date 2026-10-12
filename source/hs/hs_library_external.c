@@ -1102,11 +1102,12 @@ void hs_teleport_players_not_in_trigger_volume(
 		if (flag)
 		{
 			boolean here = FALSE;
+			real_point3d origin;
 
 			if (arrived_count == 0)
 				hs_object_orient(player->unit_index, cutscene_flag_index, TRUE, TRUE);
 			here = coop_scripts_unit_near(player->unit_index, &flag->position) &&
-				!player_position_switches_bsp(&object_get(player->unit_index)->object.position);
+				!player_position_switches_bsp(object_get_origin(player->unit_index, &origin));
 			if (!here)
 				here = coop_scripts_arrive_at(player_index, &flag->position, arrived, arrived_count);
 			if (here && arrived_count < NUMBEROF(arrived))
