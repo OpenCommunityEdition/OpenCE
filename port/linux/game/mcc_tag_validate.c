@@ -285,13 +285,18 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
 {
     struct mcc_validation_header *header=mcc_validation.header;
     short links[64][3];
-    long i,j;
-    int found=0;
+    long i,j,root_child;
+    int found=0,parents_omitted=1,links_omitted=1;
     if (!schema->name || schema->size!=64 || nodes->count<2 || nodes->count>64) return 0;
-    for (j=0;j<nodes->count;j++)
-        if (mcc_integer((byte *)nodes->address+j*64+36,2,0)!=0) return 0;
-    if (mcc_integer((byte *)nodes->address+32,2,0)!=NONE ||
-        mcc_integer((byte *)nodes->address+34,2,0)!=NONE) return 0;
+    for (j=0;j<nodes->count;j++) {
+        byte const *node=(byte *)nodes->address+j*64;
+        if (mcc_integer(node+36,2,0)!=0) parents_omitted=0;
+        if (mcc_integer(node+32,2,0)!=NONE || mcc_integer(node+34,2,0)!=NONE ||
+            mcc_integer(node+36,2,0)!=NONE) links_omitted=0;
+    }
+    if (!parents_omitted && !links_omitted) return 0;
+    if (mcc_integer((byte *)nodes->address+32,2,0)!=NONE) return 0;
+    root_child=mcc_integer((byte *)nodes->address+34,2,0);
     for (i=0;i<header->count;i++) {
         struct mcc_validation_instance *object=header->instances+i,*model;
         struct tag_block const *model_nodes;
@@ -316,6 +321,19 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
         found=1;
     }
     if (!found) return 0;
+    /* Exile's Flood Banshee retains the matching model's non-root links,
+     * but puts the last sibling in the root's first-child slot. Admit that
+     * exact convention as well as omitted links, never an arbitrary tree. */
+    if (root_child!=NONE) {
+        long child=links[0][1],last=NONE,steps=0;
+        for (j=1;j<nodes->count;j++)
+            if (memcmp((byte *)nodes->address+j*64+32,links[j],6)) return 0;
+        while (child!=NONE) {
+            if (child<=0 || child>=nodes->count || steps++>=nodes->count) return 0;
+            last=child;child=links[child][0];
+        }
+        if (root_child!=last) return 0;
+    }
     for (j=0;j<nodes->count;j++) memcpy((byte *)nodes->address+j*64+32,links[j],6);
     return 1;
 }
@@ -334,7 +352,7 @@ static int mcc_animation_graph_check(struct mcc_validation_context *context,
     byte reached[64], *states;
     short queue[64];
     long head, tail, first;
-    int recovered;
+    int recovered,parents_recovered=0;
     if (!nodes_field || !animations_field || !nodes_field->definition || !animations_field->definition) return 0;
     nodes_schema = nodes_field->definition; animations_schema = animations_field->definition;
     sibling = mcc_field(nodes_schema, "next_sibling_node_index");
@@ -360,15 +378,22 @@ static int mcc_animation_graph_check(struct mcc_validation_context *context,
         byte const *node = (byte const *)nodes->address + index * nodes_schema->size;
         long child_index = mcc_integer(node + child->offset, 2, 0);
         while (child_index != NONE) {
-            byte const *descendant;
+            byte *descendant;
             if (child_index < 0 || child_index >= nodes->count || reached[child_index] || tail >= 64) return 0;
-            descendant = (byte const *)nodes->address + child_index * nodes_schema->size;
+            descendant = (byte *)nodes->address + child_index * nodes_schema->size;
+            /* An explicit, uniquely reached child supplies an omitted
+             * parent. Conflicting parents and cyclic links still fail. */
+            if (mcc_integer(descendant + parent->offset, 2, 0)==NONE) {
+                mcc_set_integer(descendant+parent->offset,2,index);
+                parents_recovered=1;
+            }
             if (mcc_integer(descendant + parent->offset, 2, 0) != index) return 0;
             reached[child_index] = 1; queue[tail++] = (short)child_index;
             child_index = mcc_integer(descendant + sibling->offset, 2, 0);
         }
     }
     if (tail != nodes->count) return 0;
+    if (parents_recovered) mcc_problem(context,0,"omitted animation parents restored from the complete child tree");
     if (recovered) mcc_problem(context,0,"animation hierarchy restored from its associated model's matching nodes");
     if (nodes->count && mcc_integer((byte *)nodes->address+sibling->offset,2,0)!=NONE) {
         short none=NONE;
@@ -557,6 +582,8 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                     mcc_validation_callbacks = &mcc_callbacks;
                     if (!strcmp(field->name, "bitmap_data_check"))
                         accepted = mcc_bitmaps_valid(mcc_validation.runtime, (struct bitmap_data *)address);
+                    else if (!strcmp(field->name, "bitmap_group_check"))
+                        accepted = mcc_bitmaps_group_valid(mcc_validation.runtime, address);
                     else if (!strcmp(field->name, "animation_graph_check"))
                         accepted = mcc_animation_graph_check(context, address, schema);
                     else accepted = field->check((struct tag_validation *)context, address);

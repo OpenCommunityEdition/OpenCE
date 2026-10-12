@@ -104,14 +104,14 @@ int main(void) { return tag_validate_corrections() != 0; }
 
 
 @pytest.mark.parametrize("case", ["valid", "overlap", "outside", "negative", "cycle", "alias", "alias_partial", "alias_group", "alias_bad_child", "alias_block", "alias_block_partial",
-                                     "graph_model", "graph_model_mismatch", "graph_model_outside", "graph_model_cycle", "damage_names",
+                                     "graph_model", "graph_model_mismatch", "graph_model_outside", "graph_model_cycle", "graph_model_tail", "graph_model_tail_conflict", "graph_model_tail_cycle", "graph_model_empty", "graph_model_empty_partial", "damage_names",
                                      "prefix_smaller", "prefix_expand", "prefix_tail_overlap", "empty_weapon", "empty_weapon_nonzero",
                                      "animation_data", "animation_data_outside",
                                      "file_range", "handle", "unknown_group", "bsp",
                                      "legacy_isolation", "callbacks", "misaligned", "stream_hole",
                                      "collection", "collection_outside", "device", "device_outside",
                                      "trimmed_structure", "graph_large", "graph_cycle", "graph_node_cycle",
-                                     "graph_orphan", "graph_root_sibling", "graph_root_outside", "graph_root_orphan", "bitmap_owned", "bitmap_unowned", "first_person_slots",
+                                     "graph_orphan", "graph_missing_parent", "graph_conflicting_parent", "graph_missing_parent_cycle", "graph_root_sibling", "graph_root_outside", "graph_root_orphan", "bitmap_owned", "bitmap_unowned", "first_person_slots",
                                      "grenades_zero", "grenades_one", "grenades_two", "grenades_four", "grenades_excess",
                                      "anchor_0", "anchor_4", "anchor_5", "anchor_6", "anchor_7", "anchor_8", "anchor_9", "anchor_-1",
                                      "flag_name", "names_512", "names_513", "names_640", "names_32767", "names_32768",

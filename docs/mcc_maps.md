@@ -152,8 +152,8 @@ without changing their contents.
 
 All full-screen MCC pause menus offer **Settings**, including campaign,
 network co-op and multiplayer, with either main-menu style. This opens
-OpenCE�s native in-game audio, video and controls screens for the initiating
-controller, using upstream�s option filtering and profile saving. Campaign
+OpenCEs native in-game audio, video and controls screens for the initiating
+controller, using upstreams option filtering and profile saving. Campaign
 menus use 30-pixel row spacing and taller panels to accommodate the option. Split-screen players use Settings
 from the main menu, since the native editor needs a full viewport.
 Restart,
@@ -688,7 +688,7 @@ Xbox names were the four vibrate-alias calls and six
 uncompressed cubemaps in the fixture confirmed mip-major storage (all six
 faces within each mip): lower mip pixels matched upper mip averages to
 less than 0.26/255 mean RGB error. Face-major interpretation produced
-37–80/255 error. BC7 follows the same layout in the adapter; that particular
+37â80/255 error. BC7 follows the same layout in the adapter; that particular
 layout comparison did not independently test BC7.
 
 The second supplied fixture, `Nitra v2/dangercanyon.map`, also passes the
@@ -1143,7 +1143,7 @@ The MCC function table additionally supports `list_count_not_dead`,
 sleeping, and unknown scripts are not reported as completed. The authoritative
 clock uses local/server game ticks, or the latest received host tick on clients.
 
-Effects gain is an MCC-owned multiplier (default 1, accepted range 0–4).
+Effects gain is an MCC-owned multiplier (default 1, accepted range 0â4).
 It affects non-music sound classes without changing saved user volume settings.
 The small additive connection in the common sound mixer returns a neutral
 multiplier outside an active MCC campaign. The MCC writable-global whitelist
@@ -1183,7 +1183,7 @@ Several data corrections are confined to MCC conversion:
 - Non-power-of-two 2D bitmaps retain their dimensions in a linear ARGB texture.
   Their declared source mip chain is validated, but only the base level is
   retained because the native linear texture path has no mipmaps. This handles
-  Aerowalk's 1920×1080 HUD bitmap.
+  Aerowalk's 1920Ã1080 HUD bitmap.
 
 Judgement's `game_time_authoritative` conversion is supported, but the supplied
 Workshop package declares `InheritSharedFiles: FromMCC` and references 687
@@ -1433,4 +1433,64 @@ and leaves Xbox/Custom Edition paths unchanged. Existing host-controlled
 inventory synchronization is sufficient, but network version 38 prevents
 peers with the previous aiming behavior from joining.
 
+
+## Large texture sets, cinematic abort and incomplete animation links
+
+The MCC bitmap adapter permits up to 2 GiB of converted texture storage per
+map. Individual allocations remain limited to 128 MiB, and each tag retains
+its existing bounded virtual stream. Allocation failures refuse the map with
+a diagnostic; the larger budget is not a guarantee that every platform has
+enough free address space or memory. Unconverted pixels no longer require an
+extra intermediate copy. The MCC bitmap-group callback checks owned converted
+allocations and sequence ranges instead of applying the legacy file-backed
+bitmap budget, which would otherwise empty XAM's 4096-pixel textures. Xbox and
+Custom Edition retain their own validation and storage limits.
+
+XAM A30 additionally has a graph with all links omitted and several graphs
+with missing parent indices. Fully omitted links can be recovered only from
+an associated model with matching ordered node names; associated models must
+agree. An omitted parent can be derived from an explicit child link only while
+validating a complete, uniquely reachable tree. Flood Forgotten Exile's Flood
+Banshee has a separate pattern: its root names the last sibling rather than
+the first child. Recovery requires matching names and every non-root link to
+agree with the associated model. Conflicting links, cycles and unreachable
+nodes remain rejected. Repairs are logged and confined to converted MCC tags.
+
+The MCC-only zero-argument, void `cinematic_abort` adapter schedules OpenCE's
+existing cinematic skip operation. This preserves its skippable-checkpoint
+requirements and host-controlled co-op revert. A network client cannot invoke
+that operation through this adapter. No new packet or client authority is
+introduced. The signature is documented at
+https://andrew.gg/scripts/00reference.html; the evaluator mapping to cinematic
+skip is independently documented at
+https://surreptitiousresearch.github.io/halocea_docs/21_script_presentation.html.
+Implementation uses the existing OpenCE interface, not MCC implementation code.
+
+
+Validation on Windows (portable release, based on main `dccbc62b`):
+
+- 1,032 MCC tests passed, two skipped; 128 legacy cache-format tests passed,
+  four skipped. The final zero-argument evaluator correction passed all 13
+  campaign-handler tests, including client/inactive-map guards. Validator
+  callback dispatch was also rechecked with all 85 validator cases passing.
+- Original Workshop XAM A30, Better with Friends B40 and Flood Forgotten Exile
+  STKFT_V1 each completed a 100-second hidden renderer-enabled run, with a
+  marker after 150 simulation ticks, no assertions and normal exit. XAM
+  converted 1,285,707,392 texture bytes and reached mission segment `01_start`.
+  That executable's SHA-256 is
+  `d36af2b0ac5248215ac42a4062ca4136127fc72d17d81360e34593f2ec2c6ba9`.
+- None of the three supplied Better with Friends maps contains a
+  `cinematic_abort` symbol. The adapter was therefore exercised explicitly
+  through the live MCC console interpreter on B40, followed by 150 simulation
+  ticks and normal exit in a 45-second run. This caught and corrected an
+  argument-stack assertion in the initial adapter; the test stub now rejects
+  zero-argument macro evaluation too. Final executable SHA-256:
+  `b2839039ed14f37c7d3a127d18d116c0d7daac3201ea81553fe90209ce0e1693`.
+- Local Android and Web Ninja targets are unavailable. These runs do not
+  establish full campaign completion, visual correctness of every asset,
+  actual checkpoint-skipping behavior in an authored `cinematic_abort` map,
+  online co-op behavior or Linux/Android/Web runtime compatibility.
+
+All implementation changes are in MCC modules. No shared engine source,
+Xbox/Custom Edition loader or network message layout was changed.
 For authored biped seats and their network isolation, see [MCC seats](mcc_seats.md).

@@ -18,7 +18,9 @@
 #define MCC_BITMAP_BASE 0x60000000u
 #define MCC_BITMAP_LIMIT 0x1FFFFFFFu
 #define MCC_BITMAP_ALLOCATION_LIMIT 0x08000000u
-#define MCC_BITMAP_STORAGE_LIMIT 0x40000000u
+/* XAM's original textures alone exceed 1 GiB. Keep a bounded aggregate
+ * budget; individual allocations and per-tag stream offsets stay smaller. */
+#define MCC_BITMAP_STORAGE_LIMIT 0x80000000u
 
 struct mcc_texture {
     struct bitmap_data *bitmap;
@@ -490,14 +492,13 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
             stream_offset=MAX(stream_offset,previous->offset-MCC_BITMAP_BASE+previous->size);
     }
     if (!hardware_size || allocation>MCC_BITMAP_ALLOCATION_LIMIT ||
+        stream_offset>MCC_BITMAP_LIMIT || textures->end>MCC_BITMAP_STORAGE_LIMIT ||
         allocation>MCC_BITMAP_LIMIT-stream_offset || allocation>MCC_BITMAP_STORAGE_LIMIT-textures->end) {
         error(_error_silent,"mcc bitmap: storage limit (used %lu, requested %lu)",textures->end,allocation);
         return 0;
     }
     raw=malloc((size_t)raw_size);
-    pixels=malloc(allocation);
-    if (pixels) memset(pixels,0,allocation);
-    if (!raw || !pixels) goto failed;
+    if (!raw) goto out_of_memory;
     if (bitmap->flags&0x100) {
         uint32_t *entry=(uint32_t *)(runtime->tag_index+(texture->resource_handle&0xFFFF)*32);
         char const *name=mcc_runtime_pointer(runtime,entry[4],256);
@@ -511,6 +512,9 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
         }
     } else if (!mcc_runtime_read(runtime,bitmap->pixels_offset,(uint32_t)raw_size,raw)) goto failed;
     if (convert) {
+        pixels=malloc(allocation);
+        if (!pixels) goto out_of_memory;
+        memset(pixels,0,allocation);
         for (level=0;level<=(unsigned)normalized.mipmap_count;level++) {
             unsigned w=MAX(bitmap->width>>level,1),h=MAX(bitmap->height>>level,1),d=MAX(bitmap->depth>>level,1),slice;
             unsigned source_bytes=bytes_per_pixel ? w*h*bytes_per_pixel : ((w+3)/4)*((h+3)/4)*(bitmap->format==14 ? 8 : 16);
@@ -519,11 +523,13 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
                 input_offset+=source_bytes;output_offset+=w*h*4;
             }
         }
-    } else memcpy(pixels,raw,(size_t)raw_size);
-    free(raw);raw=NULL;
+    } else {pixels=raw;raw=NULL;}
+    if (raw) free(raw);
+    raw=NULL;
     hardware=malloc(allocation);
-    if (hardware) memset(hardware,0,allocation);
-    if (!hardware || !mcc_bitmap_pack(&normalized,pixels,(uint32_t)(convert ? decoded_size : raw_size),hardware,
+    if (!hardware) goto out_of_memory;
+    memset(hardware,0,allocation);
+    if (!mcc_bitmap_pack(&normalized,pixels,(uint32_t)(convert ? decoded_size : raw_size),hardware,
         normalized.type==0 && (normalized.flags&2) ? allocation : hardware_size)) goto failed;
     free(pixels);pixels=hardware;hardware=NULL;
     if (bitmap->mipmap_count!=normalized.mipmap_count)
@@ -543,6 +549,9 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
     textures->end+=allocation;
     textures->stream_end=MAX(textures->stream_end,stream_offset+allocation);
     return 1;
+out_of_memory:
+    error(_error_silent,"mcc bitmap: out of memory for tag %08lx (stored %lu, texture %lu bytes)",
+        texture->handle,textures->end,allocation);
 failed:
     if (raw) free(raw);
     if (pixels) free(pixels);
@@ -645,6 +654,27 @@ int mcc_bitmaps_valid(struct mcc_runtime *runtime,struct bitmap_data *bitmap)
             bitmap_verify(bitmap,FALSE) && rasterizer_xbox_bitmap_get_pixel_data_size(bitmap)<=(long)texture->size;
     }
     return 0;
+}
+
+/* MCC pixels are owned allocations, not the legacy file stream (whose
+ * per-bitmap budget is smaller). Structural validation precedes this call. */
+int mcc_bitmaps_group_valid(struct mcc_runtime *runtime,void *address)
+{
+    struct bitmap_group *group=address;
+    long i;
+    if (group->pixel_data.file_offset!=0) return 0;
+    for (i=0;i<group->bitmaps.count;i++)
+        if (!mcc_bitmaps_valid(runtime,(struct bitmap_data *)group->bitmaps.address+i)) return 0;
+    for (i=0;i<group->sequences.count;i++) {
+        struct bitmap_group_sequence *sequence=(struct bitmap_group_sequence *)group->sequences.address+i;
+        if (sequence->first_bitmap_index<0 || sequence->bitmap_count<0 ||
+            sequence->first_bitmap_index>group->bitmaps.count ||
+            sequence->bitmap_count>group->bitmaps.count-sequence->first_bitmap_index) {
+            error(_error_silent,"mcc bitmap: sequence %ld outside converted bitmap group; disabled",i);
+            sequence->first_bitmap_index=sequence->bitmap_count=0;
+        }
+    }
+    return 1;
 }
 
 /* The renderer may bind the immutable MCC allocation directly. A copied

@@ -49,7 +49,6 @@ def bitmap_converter(tmp_path_factory):
 #define MCC_BITMAP_BASE 0x60000000u
 #define MCC_BITMAP_LIMIT 0x1FFFFFFFu
 #define MCC_BITMAP_ALLOCATION_LIMIT 0x08000000u
-    #define MCC_BITMAP_STORAGE_LIMIT 0x40000000u
 typedef unsigned char boolean;
 struct bitmap_data {
     uint32_t signature;
@@ -59,7 +58,9 @@ struct bitmap_data {
     int32_t pixels_offset,pixels_size,tag_index,cache_block_index;
     void *hardware_format,*base_address;
 };
-struct bitmap_group {short usage;};
+struct tag_block {long count;void *address;};
+struct bitmap_group_sequence {short first_bitmap_index,bitmap_count;};
+struct bitmap_group {short usage;struct {long file_offset;} pixel_data;struct tag_block bitmaps,sequences;};
     struct mcc_runtime {struct bitmap_group group;unsigned char source[350000];uint32_t size,reads;unsigned char *tag_index;void *bitmaps;};
     static void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t address,uint32_t size) {(void)r;(void)address;(void)size;return NULL;}
     static int mcc_resources_read(struct mcc_runtime *r,unsigned type,char const *name,uint32_t offset,uint32_t bytes,void *out,char const *group) {
@@ -88,7 +89,17 @@ static uint32_t global_vector_palette[256];
 #define BCDEC_STATIC
 #define BCDEC_IMPLEMENTATION
 #include "bcdec.h"
+static int test_allocations,test_fail_at,test_live;
+static void *test_bitmap_malloc(size_t n) {
+    void *p;
+    if (++test_allocations==test_fail_at) return NULL;
+    p=malloc(n);if(p)test_live++;return p;
+}
+static void test_bitmap_free(void *p) {if(!p)abort();test_live--;free(p);}
+#define malloc test_bitmap_malloc
+#define free test_bitmap_free
 '''
+    source += "\n" + next(line for line in bitmap.splitlines() if line.startswith("#define MCC_BITMAP_STORAGE_LIMIT "))
     source += "\n" + structure(bitmap, "mcc_texture")
     source += "\n" + structure(bitmap, "mcc_bitmap_clone")
     source += "\n" + structure(bitmap, "mcc_textures")
@@ -97,8 +108,10 @@ static uint32_t global_vector_palette[256];
     source += "\n" + "\n".join(function(bitmap, name) for name in [
         "mcc_bitmap_bytes", "mcc_pixel", "mcc_channels", "mcc_bitmap_decode",
         "mcc_morton_axis", "mcc_bitmap_pack", "mcc_bitmap_lightmap_flags", "mcc_bitmap_complete_mips",
-        "mcc_texture_prepare", "mcc_bitmaps_read"])
+        "mcc_texture_prepare", "mcc_bitmaps_read", "mcc_bitmaps_valid", "mcc_bitmaps_group_valid"])
     source += r'''
+#undef malloc
+#undef free
 int main(int argc,char **argv) {
     struct bitmap_data bitmap={0},original;
     struct mcc_textures textures={0};
@@ -112,6 +125,35 @@ int main(int argc,char **argv) {
     bitmap.format=6;bitmap.flags=0x1281;bitmap.pixels_size=16;
     texture.bitmap=&bitmap;texture.handle=7;
     for(i=0;i<16;i++)runtime.source[i]=(unsigned char)i;
+    if(!strncmp(argv[1],"group-",6)) {
+        struct bitmap_group_sequence sequence={0,1};
+        if(!mcc_texture_prepare(&runtime,&textures,&texture))return 31;
+        textures.count=1;textures.items=&texture;runtime.bitmaps=&textures;
+        runtime.group.bitmaps.count=1;runtime.group.bitmaps.address=&bitmap;
+        runtime.group.sequences.count=1;runtime.group.sequences.address=&sequence;
+        if(!strcmp(argv[1],"group-large")) {
+            bitmap.width=bitmap.height=4096;bitmap.pixels_size=texture.size=89478528;
+        }
+        if(!strcmp(argv[1],"group-unowned")) {texture.bitmap=NULL;expect=0;}
+        if(!strcmp(argv[1],"group-offset")) {runtime.group.pixel_data.file_offset=1;expect=0;}
+        if(!strcmp(argv[1],"group-sequence")) sequence.bitmap_count=2;
+        if(mcc_bitmaps_group_valid(&runtime,&runtime.group)!=expect)return 32;
+        if(!strcmp(argv[1],"group-sequence") && sequence.bitmap_count)return 33;
+        free(texture.pixels);return 0;
+    }
+    if(!strncmp(argv[1],"allocation-",11)) {
+        test_fail_at=atoi(argv[1]+11);texture.channels=2;
+        if(mcc_texture_prepare(&runtime,&textures,&texture) || test_live || texture.pixels || textures.end)return 30;
+        return 0;
+    }
+    if(!strncmp(argv[1],"storage-",8)) {
+        int accept=!strcmp(argv[1],"storage-large");
+        textures.end=accept ? 0x40000000u : !strcmp(argv[1],"storage-full") ? MCC_BITMAP_STORAGE_LIMIT-64 : 0xffffffffu;
+        converted=mcc_texture_prepare(&runtime,&textures,&texture);
+        if(converted!=accept || (!accept && runtime.reads))return 28;
+        if(accept && (textures.end!=0x40000080u || memcmp(texture.pixels,runtime.source,4)))return 29;
+        free(texture.pixels);return 0;
+    }
     if(!strcmp(argv[1],"swizzle8192")) {
         bitmap.width=8192;bitmap.height=2;bitmap.format=6;bitmap.flags=0x81;
         bitmap.pixels_size=32768;runtime.size=32768;runtime.group.usage=0;
@@ -228,7 +270,8 @@ int main(int argc,char **argv) {
 
 @pytest.mark.parametrize("case", ["known", "ordinary", "wrong-group", "missing-group", "missing-environment",
                                   "unknown-flag", "extra-pixels", "short-pixels", "bad-signature",
-                                  "wrong-format", "non-power-two", "mipmaps", "tag-streams", "npot", "npot-short", "wide", "wide-short", "wide-limit", "swizzle8192"])
+                                  "group-large", "group-unowned", "group-offset", "group-sequence",
+                                  "wrong-format", "non-power-two", "mipmaps", "tag-streams", "npot", "npot-short", "wide", "wide-short", "wide-limit", "swizzle8192", "storage-large", "storage-full", "storage-overflow", "allocation-1", "allocation-2", "allocation-3"])
 def test_mcc_lightmap_conversion(bitmap_converter, case):
     result = subprocess.run([str(bitmap_converter), case], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

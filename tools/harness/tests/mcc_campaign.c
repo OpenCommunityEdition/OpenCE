@@ -22,7 +22,8 @@
 #undef strlen
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static int printed,requests,blocks,restarts,network_restarts;
+static int printed,requests,blocks,restarts,network_restarts,cinematic_skips;
+void main_skip_cinematic(void) {cinematic_skips++;}
 void main_reset_map(void) {restarts++;}
 boolean mcc_ui_restart_network_game(void) {network_restarts++;return TRUE;}
 static struct sound_definition sound;
@@ -93,7 +94,12 @@ long object_list_get_first(long list,long *cursor) {(void)list;*cursor=0;return 
 long object_list_get_next(long list,long *cursor) {(void)list;return ++*cursor==1 ? 2 : NONE;}
 boolean hs_macro_function_parse(short f,long x) {(void)f;(void)x;return TRUE;}
 boolean hs_parse(long x,short type) {(void)x;(void)type;return TRUE;}
-long *hs_macro_function_evaluate(short f,long t,boolean initialize) {(void)f;(void)t;return initialize ? args : NULL;}
+long *hs_macro_function_evaluate(short f,long t,boolean initialize) {
+    (void)t;
+    /* The real interpreter rejects a zero-byte argument stack allocation. */
+    if(!mcc_campaign_function(f)->parameter_count)abort();
+    return initialize ? args : NULL;
+}
 void hs_return(long thread,long value) {(void)thread;result=value;}
 void mcc_sleep_forever_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
 void mcc_script_finished_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
@@ -115,6 +121,17 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
+    if(!strcmp(argv[1],"cinematic_abort")) {
+        short id=mcc_campaign_find("cinematic_abort");
+        struct hs_function_definition *definition=mcc_campaign_function(id);
+        CHECK(definition && definition->return_type==_hs_type_void && !definition->parameter_count);
+        connection=_game_connection_network_client;
+        definition->evaluate(id,1,FALSE);CHECK(!cinematic_skips);
+        connection=_game_connection_network_client;call("cinematic_abort");CHECK(!cinematic_skips);
+        connection=_game_connection_local;loaded=FALSE;call("cinematic_abort");CHECK(!cinematic_skips);
+        loaded=TRUE;call("cinematic_abort");CHECK(cinematic_skips==1 && result==0);
+        connection=_game_connection_network_server;call("cinematic_abort");CHECK(cinematic_skips==2);
+    } else
     if(!strcmp(argv[1],"oct11")) {
         args[0]=8;call("list_count_not_dead");CHECK(result==2);
         units[2].object.damage_flags=1u<<_object_dead_bit;
