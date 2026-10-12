@@ -1038,16 +1038,21 @@ COOP_SETUP_SCREENS = [
             "Damage from the other players will only reduce\\nshields. Health will be unaffected.",
             "Players can be hurt by damage from explosives\\nfired by the other players.",
         ]),
-        ("coop_extra_enemies", "EXTRA ENEMIES:", ["NONE", "PER PLAYER", "STATIC MULTIPLIER"], [
+        ("coop_extra_enemies", "EXTRA ENEMIES:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
+            "Enemy squads grow with the players: by the value of\\n'Per Player' for each player past the first.",
+            "Enemy squads use 'Multiplier', however many players\\nthere are.",
             "Enemy squads are as the campaign has them.",
-            "Enemy squads grow with the players: by the amount\\nbelow for each player past the first.",
-            "Enemy squads are the amount below times as large,\\nhowever many players there are.",
         ]),
-        ("coop_enemies_per_player", "PER PLAYER:", [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
-         ["For each player past the first, enemy squads get\\nthis much more of themselves (100%: as many again)."] *
-         len(COOP_ENEMIES_PERCENTAGES)),
+        ("coop_extra_vehicles", "EXTRA VEHICLES:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
+            "Vehicles respawn after being driven a short distance\\nbased on the number of players: by the value of\\n'Per Player' for each player past the first.",
+            "Vehicles respawn after being driven a short distance,\\nup to 'Multiplier' times as many in total, however\\nmany players there are.",
+            "Vehicles are as the campaign has them.",
+        ]),
         ("coop_enemies_multiplier", "MULTIPLIER:", [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
-         ["Each enemy squad is this many times as large."] * len(COOP_ENEMIES_MULTIPLIERS)),
+         ["Static amounts for the options set to this mode."] * len(COOP_ENEMIES_MULTIPLIERS)),
+        ("coop_enemies_per_player", "PER PLAYER:", [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
+         ["For each player past the first, options set to Per\\nPlayer get this much more (100%: as many again)."] *
+         len(COOP_ENEMIES_PERCENTAGES)),
         ("coop_player_collisions", "PLAYER COLLISIONS:", ["ON", "OFF"], [
             "Players bump into each other, as in the campaign.",
             "Players walk through each other, so that no one\\nblocks a doorway. The AI's characters still block.",
@@ -1077,7 +1082,7 @@ TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
                for key, title, _, _ in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]})
 # (the rows of a co-op options screen in one place, the one shown: PER
 # PLAYER's and MULTIPLIER's, by EXTRA ENEMIES')
-SETUP_OPTION_SAME_PLACE = {"coop_enemies_multiplier"}
+SETUP_OPTION_SAME_PLACE = set()
 
 
 def _setup_option_screen(base: str, key: str, rows: list) -> list:
