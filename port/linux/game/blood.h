@@ -75,7 +75,7 @@ short blood_drops_for_drawing(
 void blood_drops_render(
 	void);
 
-/* from object_damage_aftermath: a biped hit (blood on a vehicle behind it) */
+/* from object_damage_aftermath: a biped hit (blood on the wall or slope behind it) */
 void blood_biped_damaged(
 	long biped_index,
 	struct damage_data const *damage,

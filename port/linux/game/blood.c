@@ -260,7 +260,7 @@ unsigned long config_changes(void);
 static void blood_drop_fall(long decal_definition_index, real_point3d const *point, real radius);
 
 /* Video Settings' Dynamic Blood (config.toml's game.dynamic_blood, off by
-default): all of this module's blood, on walls, vehicles and characters, and
+default): all of this module's blood, on the level's walls and slopes, and
 running down them; off, the game's own blood alone. Read again whenever a
 setting changes */
 static boolean blood_violence_allowed(void)
