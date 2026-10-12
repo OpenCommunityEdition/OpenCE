@@ -1044,8 +1044,8 @@ COOP_SETUP_SCREENS = [
             "Enemy squads are as the campaign has them.",
         ]),
         ("coop_extra_vehicles", "EXTRA VEHICLES:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
-            "Vehicles respawn after being driven a short distance\\nbased on the number of players: by the value of\\n'Per Player' for each player past the first.",
-            "Vehicles respawn after being driven a short distance,\\nup to 'Multiplier' times as many in total, however\\nmany players there are.",
+            "Vehicles respawn after being driven a short distance\\nbased on the number of players: by half the value of\\n'Per Player' for each player past the first.",
+            "Vehicles respawn after being driven a short distance,\\nwith extra copies equal to ('Multiplier' - 1) / 2,\\nrounded down, however many players there are.",
             "Vehicles are as the campaign has them.",
         ]),
         ("coop_enemies_multiplier", "MULTIPLIER:", [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
