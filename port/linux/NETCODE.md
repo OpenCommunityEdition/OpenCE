@@ -184,12 +184,28 @@ lists a public game with a password with its invite's token sealed with the
 password's key (`p2p_lobby.c`), a listing of another layout; version 21
 sends each killing blow again reliably and an object come to rest three
 times (a client waits for a player's blow before its body dies without one),
-and switches co-op's BSP on the host's crossing alone; version 26 has each
-machine say its WebRTC in internet play's signalling (a native build's
-certificate, a browser's ICE credentials too), so that browsers play
-(port/linux/README.md, "Browsers"). GulchCE version 29 combines that
-signalling with its existing MCC campaign snapshots (previously version 28);
-peers must use the same combined protocol.
+and switches co-op's BSP on the host's crossing alone; version 22 names a
+Custom Edition map `custom_maps\<name>`, which older clients cannot load or
+explain; version 23 keeps the blocks of a Custom Edition map that 22 cut to
+the Xbox tools' limits, so both place the same objects; version 24 sends the
+gametype's PC vehicle set; version 25 sends a unit's integrated light with
+its object state; version 26 has each machine say its WebRTC in internet
+play's signalling (a native build's certificate, a browser's ICE credentials
+too), so that browsers play (port/linux/README.md, "Browsers"); version 27
+shares Custom Edition maps (below, "Map sharing"): a client asks the host for
+a map it lacks, and the game's players reach each other to send it; version
+28 holds the players of a machine still downloading the map out of the game
+until it has the map, keeps a multiplayer map's first scripted BSP, leaves
+dynamic lights and the flashlight on past the Xbox game's player and vehicle
+limits, and readies a second weapon picked up while firing.
+
+`port/linux/network_format.txt` records the wire format of the current
+version (`tools/network_format.py`): `test_linux_port.py` fails when the
+sources' messages, kinds, bits, structs sent whole or the sizes of their
+arrays differ from it.
+
+GulchCE version 29 combines upstream WebRTC signalling with its existing
+MCC campaign snapshots (previously GulchCE version 28).
 
 GulchCE version 30 retains those messages and adds MCC package-qualified map
 identities and package resource fingerprints to map admission. The existing
@@ -197,7 +213,7 @@ map-version field carries the fingerprint; no packet fields are added. Peers
 must agree on this meaning, so version 29 clients cannot join version 30 games.
 Xbox and Custom Edition map checksum calculations are unchanged.
 
-Version 27 includes MCC extra-grenade inventory/action support and campaign
+GulchCE version 27 includes MCC extra-grenade inventory/action support and campaign
 state snapshots for gravity, dialogue gain and breadcrumb markers. All
 participants need the same protocol version, including on Xbox or Custom
 Edition maps; their existing inventory packet layouts are unchanged. MCC
@@ -218,6 +234,14 @@ unit/item replication is retained. Smaller MCC, Xbox and Custom Edition
 maps keep their original name tables and messages. All peers need version
 34; it cannot connect to version 33, including on legacy maps. Version 34
 also assigns campaign flag bit 3 to MCC script-controlled muting.
+
+GulchCE version 35 combines upstream OpenCE version 28's map-download
+admission, multiplayer BSP, lighting and weapon-selection rules with the
+MCC messages and semantics from GulchCE version 34. Both peers must use 35;
+upstream version 28 and GulchCE version 34 cannot join these games. MCC
+message IDs 87-89 and package fingerprints are retained. The wire-format
+record is regenerated for the combined implementation.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
@@ -491,7 +515,11 @@ menus show a map without its hash, unless two versions are listed.
    would leave a falling body hanging until its turn round all of them),
    and a few of those at rest, round them all. A client takes the host's
    word on whether each is at rest even when its copy is close enough to
-   leave where it is. A client puts its copies there, and the difference is
+   leave where it is. A body's pose goes with it: one lying limp that the
+   host moves stops lying limp (the blast that moved the host's reaches
+   only the machines that see the body's player), and one the host has at
+   rest is on the ground, so it lies limp again where it stops instead of
+   keeping the pose of its fall in the air. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
    jump. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's

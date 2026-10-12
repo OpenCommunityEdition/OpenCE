@@ -68,8 +68,8 @@ which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
 /* MCC packets and upstream CE map sharing have distinct message IDs. */
 /* Versions 31-32 are reserved for the separately published camera branch. */
-/* MCC maps above 512 names synchronise presence in bounded host snapshots. */
-#define HALO_PORT_NETWORK_VERSION 34
+/* Combine upstream version 28 simulation/admission rules with MCC version 34. */
+#define HALO_PORT_NETWORK_VERSION 35
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags */
 #define HALO_PORT_ADVERTISED_VERSION_OFFSET 0

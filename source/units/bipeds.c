@@ -537,6 +537,17 @@ boolean rider_ejection = TRUE;
 
 static struct profile_section biped_update_section = {"biped_update", NONE, TRUE};
 
+/* port: coop_scripts.c sets this around one teleport */
+static boolean biped_fix_ignores_players;
+
+void biped_fix_ignore_players(
+	boolean ignore)
+{
+	biped_fix_ignores_players = ignore;
+
+	return;
+}
+
 extern boolean debug_objects_biped_autoaim_pills;
 extern boolean debug_objects_biped_physics_pills;
 
@@ -1160,8 +1171,10 @@ boolean biped_fix_position(
 				_collision_test_for_bipeds_passthrough_living_flags :
 				_collision_test_for_bipeds_living_flags;
 			/* port: (where it fits among the other players, as it moves:
-			_biped_physics_in_pass_through_players_bit) */
-			if (biped->unit.player_index != NONE && !network_coop_player_collisions())
+			_biped_physics_in_pass_through_players_bit). A scripted co-op
+			teleport can also stand on a teammate for this one call. */
+			if (biped_fix_ignores_players ||
+				(biped->unit.player_index != NONE && !network_coop_player_collisions()))
 				collision_flags |= FLAG(_collision_test_skip_player_bipeds_bit);
 		}
 
