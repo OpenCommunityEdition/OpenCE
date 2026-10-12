@@ -27,7 +27,7 @@ to that many frames late.
 
 #define WATCH_HASH_PAGE_SIZE 0x1000u
 #define WATCH_HASH_STABLE_CHECKS 30u
-#define WATCH_HASH_STABLE_FRAMES 4u
+#define WATCH_HASH_STABLE_FRAMES 60u
 
 struct watch_hash
 {

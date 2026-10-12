@@ -55,7 +55,7 @@ static void telnet_console_print(char const *text){snprintf(shown_text,sizeof(sh
 static void distributed_send(void *message,byte type,byte count,word size,int direction){memcpy(wire,message,size);wire_size=size;sent++;}
 boolean network_distributed_client_send_reliably(void *message,word size){memcpy(wire,message,size);wire_size=size;sent++;return TRUE;}
 
-enum { _distributed_message_suicide_request=84 };
+#include "message_ids.inc"
 #include "under_test.inc"
 static void setup(void){
  for(int i=0;i<128;i++)handles[i]=NONE;for(int i=0;i<20;i++)unit_handles[i]=NONE;
@@ -66,7 +66,7 @@ static void setup(void){
 }
 
 static void request(long machine,long player,long unit,boolean reliable,int size,int count){
- struct suicide_request m={{8,84,count,30},player,unit};network_suicide_handle_message(machine,(word*)&m,size,reliable);
+ struct suicide_request m={{8,_distributed_message_suicide_request,count,30},player,unit};network_suicide_handle_message(machine,(word*)&m,size,reliable);
 }
 int main(int argc,char **argv){CHECK(argc==2,"case");char const *case_name=argv[1];setup();network_suicide_reset();boolean success=FALSE;
  CASE("commands") {

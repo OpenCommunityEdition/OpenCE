@@ -305,7 +305,6 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas",
         "-sMIN_WEBGL_VERSION=2",
         "-sMAX_WEBGL_VERSION=2",
-        "-sFULL_ES3=1",
         "-sGL_ENABLE_GET_PROC_ADDRESS=1",
         "-sWASMFS=1",
         "-lopfs.js",

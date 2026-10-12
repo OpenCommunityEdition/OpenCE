@@ -1889,7 +1889,11 @@ void rasterizer_debug_model_vertices(
 	short triangle_vertex_index;
 	char model_vertex_string[256];
 	char triangle_vertex_string[256];
-	struct rasterizer_debug_model_vertex debug_vertices[MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES];
+	/* port: static. render_model calls this for each part it draws, and
+	the compiler inlines it there: on the stack, the Windows build probed
+	the 128 KB the debug display rarely uses a page at a time (_chkstk) for
+	every model drawn */
+	static struct rasterizer_debug_model_vertex debug_vertices[MAXIMUM_RASTERIZER_DEBUG_MODEL_VERTICES];
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",

@@ -165,11 +165,69 @@ extern struct pixel_shader_definition pixel_shader;
 
 static boolean warned_about_too_many_transparent_geometry_groups;
 
+/* port: the 3D sprites of a light volume (a plasma bolt's glow, a couple
+of hundred of them) as one list of quads, instead of a draw each: each
+draw is a call into the browser on the web, and work for the driver
+everywhere; the Xbox drew them from its push buffer. Only the sprites'
+own registers differ between them (rasterizer_widget_batch_sprites). */
+#define WIDGET_SPRITE_BATCH_MAXIMUM 256
+
+struct widget_sprite_batch_vertex
+{
+	real x, y, z;
+	short u, v;
+};
+
+static struct
+{
+	unsigned long color;
+	struct widget_sprite_batch_vertex vertices[4];
+} widget_sprite_batch[WIDGET_SPRITE_BATCH_MAXIMUM];
+static short widget_sprite_batch_count = 0;
+static boolean widget_sprite_batching = FALSE;
+
+/* port: draws the sprites batched (widget_sprite_batch) */
+static void rasterizer_widget_draw_sprite_batch(
+	void)
+{
+	short sprite_index;
+	short vertex_index;
+
+	if (!widget_sprite_batch_count)
+		return;
+	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_QUADLIST);
+	for (sprite_index = 0; sprite_index < widget_sprite_batch_count; sprite_index++)
+	{
+		IDirect3DDevice8_SetVertexDataColor(global_d3d_device, 9, widget_sprite_batch[sprite_index].color);
+		for (vertex_index = 0; vertex_index < 4; vertex_index++)
+		{
+			struct widget_sprite_batch_vertex const *vertex = &widget_sprite_batch[sprite_index].vertices[vertex_index];
+
+			IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, vertex->u, vertex->v);
+			IDirect3DDevice8_SetVertexData4f(global_d3d_device, 0, vertex->x, vertex->y, vertex->z, 1.0f);
+		}
+	}
+	IDirect3DDevice8_End(global_d3d_device);
+	widget_sprite_batch_count = 0;
+
+	return;
+}
+
+void rasterizer_widget_batch_sprites(
+	boolean batch)
+{
+	rasterizer_widget_draw_sprite_batch();
+	widget_sprite_batching = batch;
+
+	return;
+}
+
 /* ---------- public code */
 
 void _rasterizer_widget_end(
 	void)
 {
+	rasterizer_widget_batch_sprites(FALSE); /* port: (widget_sprite_batch) */
 	return;
 }
 
@@ -548,6 +606,7 @@ boolean _rasterizer_widget_set_texture(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
 		285,
 		global_d3d_device);
+	rasterizer_widget_draw_sprite_batch(); /* port: (widget_sprite_batch) */
 	if (bitmap_group_index != NONE)
 		success = rasterizer_set_texture_non_blocking(
 			stage_index,
@@ -600,6 +659,7 @@ void _rasterizer_widget_set_tint_factor(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
 		318,
 		global_d3d_device);
+	rasterizer_widget_draw_sprite_batch(); /* port: (widget_sprite_batch) */
 	IDirect3DDevice8_SetVertexData2f(
 		global_d3d_device,
 		10,
@@ -616,6 +676,7 @@ void _rasterizer_widget_set_zbuffer_enable(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_widgets.c",
 		334,
 		global_d3d_device);
+	rasterizer_widget_draw_sprite_batch(); /* port: (widget_sprite_batch) */
 	D3DDevice_SetRenderState_ZEnable(zbuffer_enable);
 
 	return;
@@ -790,6 +851,35 @@ void _rasterizer_widget_draw_sprite3d(
 			scale_x = scale_y = 1.0f;
 		}
 
+		/* port: (widget_sprite_batch) */
+		if (widget_sprite_batching)
+		{
+			struct widget_sprite_batch_vertex *vertices;
+
+			if (widget_sprite_batch_count == WIDGET_SPRITE_BATCH_MAXIMUM)
+				rasterizer_widget_draw_sprite_batch();
+			widget_sprite_batch[widget_sprite_batch_count].color = color;
+			vertices = widget_sprite_batch[widget_sprite_batch_count].vertices;
+			vertices[0].x = projected_center.x - scale_x * axis_x;
+			vertices[0].y = projected_center.y - scale_y * axis_y;
+			vertices[0].u = 0;
+			vertices[0].v = 0;
+			vertices[1].x = projected_center.x + scale_x * axis_y;
+			vertices[1].y = projected_center.y - scale_y * axis_x;
+			vertices[1].u = 1;
+			vertices[1].v = 0;
+			vertices[2].x = projected_center.x + scale_x * axis_x;
+			vertices[2].y = projected_center.y + scale_y * axis_y;
+			vertices[2].u = 1;
+			vertices[2].v = 1;
+			vertices[3].x = projected_center.x - scale_x * axis_y;
+			vertices[3].y = projected_center.y + scale_y * axis_x;
+			vertices[3].u = 0;
+			vertices[3].v = 1;
+			vertices[0].z = vertices[1].z = vertices[2].z = vertices[3].z = projected_center.z;
+			widget_sprite_batch_count++;
+			return;
+		}
 		IDirect3DDevice8_Begin(
 			global_d3d_device,
 			D3DPT_TRIANGLEFAN);

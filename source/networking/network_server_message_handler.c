@@ -270,6 +270,9 @@ void network_distributed_handle_message(long machine_index, word const *message,
 /* port/linux/game/network_voice.c's: voice chat, in the lobby too */
 boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
+/* port/linux/game/map_share.c's: map sharing, in the lobby too */
+boolean map_share_handles_message(word const *message, word size);
+void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
 /* ---------- constants */
@@ -1377,6 +1380,20 @@ boolean network_game_server_handle_client_message(
 						network_game_server_get_client_machine(server, machine, &machine_index))
 					{
 						network_voice_handle_message(machine_index, message, message_buffer_size);
+					}
+					break;
+				}
+				/* (port: map sharing's from any machine that joined, in the
+				lobby too, from its stream alone: map_share.c) */
+				if (map_share_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						map_share_handle_message(machine_index, message, message_buffer_size, TRUE);
 					}
 					break;
 				}
