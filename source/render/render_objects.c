@@ -375,6 +375,8 @@ void render_objects(
 /* port: port/linux/game/first_person_legs.c */
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+/* port: port/linux/game/item_draw_scale.c */
+real_matrix4x3 const *item_draw_scale_node_matrices(long object_index, real_matrix4x3 const *nodes);
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
 
@@ -481,9 +483,11 @@ static void render_object_list(
 		down, nothing it carries */
 		boolean legs = !data->shadow && !render.camera.mirrored &&
 			object_is_first_person_camera(object_index) && first_person_legs_wanted(object_index);
+		/* port: and a multiplayer item lying about drawn at its own size
+		(display.big_multiplayer_guns: port/linux/game/item_draw_scale.c) */
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
-			object_get_node_matrices(object_index);
+			item_draw_scale_node_matrices(object_index, object_get_node_matrices(object_index));
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
