@@ -83,6 +83,8 @@ symbols in this file:
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
 #include "effects/material_effects.h"
+#include "effects/material_effect_definitions.h"
+#include "game/game_globals.h"
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "memory/data.h"
@@ -94,6 +96,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "sound/game_sound.h"
 #include "sound/sound_definitions.h"
+#include "blood.h" /* port: port/linux/game/blood.c */
 
 /* ---------- constants */
 
@@ -645,6 +648,9 @@ static boolean particle_update_physics(
 			real_vector3d collision_normal;
 			short collision_material_type;
 			unsigned long collision_flags;
+#if BLOOD_EFFECTS
+			real_point3d position_before = particle->position;
+#endif
 
 			collision_flags = point_physics_update(
 				0,
@@ -658,6 +664,85 @@ static boolean particle_update_physics(
 				&collision_material_type,
 				particle_get_radius(particle_index),
 				dt);
+
+#if BLOOD_EFFECTS
+			/* port: blood flying at an object (a vehicle, a rock, a crate) lands
+			on it exactly as it lands on a wall (port/linux/game/blood.c): the
+			same collision effect or material effect the level would get, made at
+			the object's surface, whose decals blood_decal_onto_object paints onto
+			its drawn model */
+			{
+				real_point3d hit_point;
+				real_vector3d hit_normal;
+				boolean has_effect = definition->collision_effect.index != NONE &&
+					definition->collision_effect.group_tag == EFFECT_DEFINITION_TAG;
+				boolean has_material = definition->collision_material_effects.index != NONE;
+
+				if ((has_effect || has_material) &&
+					blood_particle_meets_object(has_effect ? definition->collision_effect.index : definition->collision_material_effects.index,
+						particle->definition_index, &position_before, &particle->position, &hit_point, &hit_normal))
+				{
+					real_vector3d toward;
+					real scale = (magnitude3d(&particle->translational_velocity) -
+						particle_collision_effect_scale_bounds[_particle_collision_scale_lower_bound]) /
+						(particle_collision_effect_scale_bounds[_particle_collision_scale_upper_bound] -
+							particle_collision_effect_scale_bounds[_particle_collision_scale_lower_bound]);
+
+					scale = PIN(scale, 0.f, 1.f);
+					toward.i = particle->position.x - position_before.x;
+					toward.j = particle->position.y - position_before.y;
+					toward.k = particle->position.z - position_before.z;
+					if (normalize3d(&toward) == 0.f)
+					{
+						toward.i = -hit_normal.i;
+						toward.j = -hit_normal.j;
+						toward.k = -hit_normal.k;
+					}
+					/* (just short of the surface, headed into it) */
+					particle->position.x = hit_point.x - toward.i * 0.01f;
+					particle->position.y = hit_point.y - toward.j * 0.01f;
+					particle->position.z = hit_point.z - toward.k * 0.01f;
+					particle->direction = toward;
+					/* (its decals painted onto the object directly; then its effect,
+					for what else it makes: a splash, a sound) */
+					{
+						short painted = 0;
+
+						if (has_effect)
+							painted += blood_effect_onto_object(definition->collision_effect.index, NONE, &hit_point, &hit_normal, FALSE);
+						if (has_material)
+						{
+							painted += blood_material_effect_onto_object(definition->collision_material_effects.index, NONE,
+								&hit_point, &hit_normal);
+						}
+						if (painted == 0)
+							blood_splash_meets_object(particle->definition_index, &position_before, &particle->position,
+								particle_get_radius(particle_index));
+					}
+					if (has_effect)
+					{
+						particle_effect_new(particle, definition->collision_effect.group_tag,
+							definition->collision_effect.index, scale);
+					}
+					if (has_material)
+					{
+						/* (its splash and sound, as a hard surface's) */
+						material_effect_new(definition->collision_material_effects.index, _material_effect_impact,
+							_material_thin_metal, &hit_point, &hit_normal, &particle->location, scale);
+					}
+					particle_delete(particle_index);
+					return FALSE;
+				}
+				/* (a blood particle with no impact of its own: it paints what it
+				meets itself) */
+				if (blood_splash_meets_object(particle->definition_index, &position_before, &particle->position,
+					particle_get_radius(particle_index)))
+				{
+					particle_delete(particle_index);
+					return FALSE;
+				}
+			}
+#endif
 
 			if (TEST_FLAG(collision_flags, _point_physics_collided_with_structure_bit))
 			{

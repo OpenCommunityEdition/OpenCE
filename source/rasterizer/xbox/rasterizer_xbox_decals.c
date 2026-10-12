@@ -593,6 +593,16 @@ void _rasterizer_decal_vertices_delete(
 	return;
 }
 
+/* port: a decal's vertices marked as used now, so the cache keeps them over
+ones longer unused (blood painted on a vehicle, behind the camera, is not
+drawn, but is not to make way for every new bullet hole: port/linux/game/blood.c) */
+void rasterizer_decal_vertices_touch(
+	long cache_index)
+{
+	if (cache_index != NONE && local_vertex_cache)
+		lruv_block_touch(local_vertex_cache, cache_index);
+}
+
 void _rasterizer_decals_begin(
 	short layer)
 {

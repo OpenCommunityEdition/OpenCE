@@ -483,6 +483,8 @@ void rasterizer_decal_vertices_unlock(
 	void);
 long rasterizer_decal_vertices_new(
 	long size);
+void rasterizer_decal_vertices_touch( /* port */
+	long cache_index);
 void rasterizer_decal_vertices_delete(
 	long decal_vertex_buffer_index);
 

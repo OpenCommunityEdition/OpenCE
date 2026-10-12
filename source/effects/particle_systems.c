@@ -90,6 +90,7 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
+#include "blood.h" /* port: port/linux/game/blood.c */
 
 /* ---------- constants */
 
@@ -920,6 +921,10 @@ static void particle_system_update_particle_default(
 			&interpolated_physics);
 	}
 
+#if BLOOD_EFFECTS
+	{
+		real_point3d position_before = particle->position;
+#endif
 	collision_flags = point_physics_update(
 		0,
 		physics,
@@ -932,6 +937,16 @@ static void particle_system_update_particle_default(
 		NULL,
 		variables.radius,
 		delta_time);
+#if BLOOD_EFFECTS
+		/* port: a blood system's particle meeting a vehicle or a character
+		paints it and ends (port/linux/game/blood.c) */
+		if (blood_splash_meets_object(system->definition_index, &position_before, &particle->position, variables.radius))
+		{
+			particle->valid = FALSE;
+			return;
+		}
+	}
+#endif
 
 	if ((TEST_FLAG(collision_flags, _point_physics_in_air_bit) &&
 			TEST_FLAG(type_definition->flags, _particle_system_type_dies_in_air_bit)) ||
