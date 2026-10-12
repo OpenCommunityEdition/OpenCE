@@ -111,7 +111,7 @@ static long reset(void) {
  memset(definitions,0,sizeof(definitions));
  for(i=0;i<8;i++){definitions[i].type=i;definitions[i].object.physics.index=0;definitions[i].object.bounding_radius=1;}
  enabled=coop=floor_present=1;connection=2;percent=50;multiplier=2;mode="per_player";blocked=sphere_blocked=allocation_failed=nearby=0;
- headers.actual_count=1;global_structure_bsp_index=0;now=new_count=0;game.players[0]=game.players[1]=game.players[2]=1;
+ headers.actual_count=1;global_structure_bsp_index=0;now=new_count=0;for(i=0;i<5;i++)game.players[i]=1;
  physics.mass_points.count=1;physics.mass_points.address=&mass_point;mass_point.radius=.2f;
  index=make(0,1);make(9,1);coop_vehicles_new_game();coop_vehicles_register(index,&sources[0]);return index;
 }
@@ -124,10 +124,10 @@ static void drive(long index,float metres) {
 static void counts(void) {
  int p,x,m;reset();
  for(p=1;p<=128;p++)for(x=25;x<=200;x+=25)
-  CHECK(vehicles_extra_count(p,x,0)==((p-1)*x)/100,"players %d percentage %d",p,x);
- CHECK(vehicles_extra_count(2,50,0)==0&&vehicles_extra_count(3,50,0)==1,"round down per vehicle");
+  CHECK(vehicles_extra_count(p,x,0)==((p-1)*x)/200,"players %d percentage %d",p,x);
+ CHECK(vehicles_extra_count(3,50,0)==0&&vehicles_extra_count(4,50,0)==0&&vehicles_extra_count(5,50,0)==1,"round down per vehicle");
  for(m=2;m<=32;m*=2)for(p=1;p<=128;p++)
-  CHECK(vehicles_extra_count(p,50,m)==m-1,"static vehicle count depends on players");
+  CHECK(vehicles_extra_count(p,50,m)==(m-1)/2,"static vehicle count depends on players");
  mode="multiplier";multiplier=4;coop_vehicles_new_game();
  CHECK(vehicles_multiplier==4&&vehicles_enabled,"static config");
  mode="invalid";coop_vehicles_new_game();CHECK(!vehicles_enabled,"unknown mode enabled");
@@ -161,12 +161,12 @@ static void delivery(void) {
  drive(index,11);CHECK(new_count==1&&get(last_copy)->object.position.z==.5f,"copy not on ground pad");
 }
 static void chain(void) {
- long index=reset();game.players[3]=game.players[4]=1;settle();drive(index,11);CHECK(new_count==1,"first copy");
+ long index=reset();game.players[5]=game.players[6]=game.players[7]=game.players[8]=1;settle();drive(index,11);CHECK(new_count==1,"first copy");
  drive(last_copy,11);CHECK(new_count==2,"second copy");drive(last_copy,11);CHECK(new_count==2,"budget amplified");
  index=reset();mode="multiplier";multiplier=4;coop_vehicles_new_game();coop_vehicles_register(index,&sources[0]);
  memset(&game,0,sizeof(game));game.players[0]=1;settle();
- drive(index,11);drive(last_copy,11);drive(last_copy,11);CHECK(new_count==3,"static copies missing");
- drive(last_copy,11);CHECK(new_count==3,"static budget amplified");
+ drive(index,11);CHECK(new_count==1,"halved static copies missing");
+ drive(last_copy,11);CHECK(new_count==1,"static budget amplified");
 }
 static void blocked_test(void) {
  long index=reset();settle();blocked=1;drive(index,11);CHECK(!new_count,"occupied pad");
