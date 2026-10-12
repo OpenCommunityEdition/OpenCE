@@ -1,4 +1,4 @@
-"""Conditional co-op rows, relative child positions and help indices."""
+"""All 27 enemy/pickup/vehicle modes, row positions and help indices."""
 import sys
 from pathlib import Path
 
@@ -18,7 +18,7 @@ def generated(fault=None):
 
 @pytest.mark.parametrize('case', ['layout', 'help', 'unrelated'])
 def test_case(case):
-    status, output = run(build('coop_vehicles_menu', generated()), case)
+    status, output = run(build('coop_scaling_menu', generated()), case)
     assert status == 0, output
 
 
@@ -27,7 +27,11 @@ def test_case(case):
     (('if (row->visible && !strncmp(row->name, "op_coop_", 8))', 'if (!strncmp(row->name, "op_coop_", 8))'), 'layout'),
     (('index += spinner->parameters.list.number_of_items;',
       'if (row->visible) index += spinner->parameters.list.number_of_items;'), 'help'),
+    (('struct widget_instance *pickups = named(list, "coop_extra_pickups_spinner", 0);',
+      'struct widget_instance *pickups = NULL;'), 'layout'),
+    (('struct widget_instance *vehicles = named(list, "coop_extra_vehicles_spinner", 0);',
+      'struct widget_instance *vehicles = NULL;'), 'layout'),
 ])
 def test_negative_control(fault, case):
-    status, output = run(build('coop_vehicles_menu', generated(fault)), case)
+    status, output = run(build('coop_scaling_menu', generated(fault)), case)
     assert status == CHECK_FAILED, output

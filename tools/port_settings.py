@@ -1043,13 +1043,18 @@ COOP_SETUP_SCREENS = [
             "Enemy squads use 'Multiplier', however many players\\nthere are.",
             "Enemy squads are as the campaign has them.",
         ]),
+        ("coop_extra_pickups", "EXTRA PICKUPS:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
+            "Pickups grow with the players: by the value of\\n'Per Player' for each player past the first.",
+            "Pickups use 'Multiplier', up to eight times as many,\\nhowever many players there are.",
+            "Pickups are as the campaign has them.",
+        ]),
         ("coop_extra_vehicles", "EXTRA VEHICLES:", ["PER PLAYER", "STATIC MULTIPLIER", "NONE"], [
             "Vehicles respawn after being driven a short distance\\nbased on the number of players: by two thirds the value of\\n'Per Player' for each player past the first.",
             "Vehicles respawn after being driven a short distance,\\nwith extra copies equal to ('Multiplier' - 1) * 2/3,\\nrounded down, however many players there are.",
             "Vehicles are as the campaign has them.",
         ]),
         ("coop_enemies_multiplier", "MULTIPLIER:", [f"{value}X" for value in COOP_ENEMIES_MULTIPLIERS],
-         ["Static amounts for the options set to this mode."] * len(COOP_ENEMIES_MULTIPLIERS)),
+         ["Static amounts for the options set to this mode.\\nPickups are capped at eight times as many."] * len(COOP_ENEMIES_MULTIPLIERS)),
         ("coop_enemies_per_player", "PER PLAYER:", [f"{value}%" for value in COOP_ENEMIES_PERCENTAGES],
          ["For each player past the first, options set to Per\\nPlayer get this much more (100%: as many again)."] *
          len(COOP_ENEMIES_PERCENTAGES)),

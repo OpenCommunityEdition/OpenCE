@@ -4746,6 +4746,8 @@ static struct gametype_option const gametype_options[] =
 		{ "off", "on", "shields_only", "explosives_only" } },
 	{ "coop_extra_enemies_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_enemies_mode",
 		{ "per_player", "multiplier", "none" } },
+	{ "coop_extra_pickups_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_pickups",
+		{ "per_player", "multiplier", "none" } },
 	{ "coop_extra_vehicles_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_vehicles",
 		{ "per_player", "multiplier", "none" } },
 	{ "coop_enemies_per_player_spinner", _option_setting, 0, 0, 5, { 0 }, "network.coop_enemies",
@@ -5281,16 +5283,19 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_primary_weapon", 0), custom);
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
-	/* CO-OP OPTIONS: enemies and vehicles share the amount rows.
+	/* CO-OP OPTIONS: enemies, pickups and vehicles share the amount rows.
 	Mixed modes may need both rows at once. */
 	if (named(list, "coop_extra_enemies_spinner", 0))
 	{
 		short mode = named(list, "coop_extra_enemies_spinner", 0)->parameters.list.selected_index;
 
+		struct widget_instance *pickups = named(list, "coop_extra_pickups_spinner", 0);
 		struct widget_instance *vehicles = named(list, "coop_extra_vehicles_spinner", 0);
 		boolean per_player = mode == _cooperative_enemies_per_player ||
+			(pickups && pickups->parameters.list.selected_index == _cooperative_enemies_per_player) ||
 			(vehicles && vehicles->parameters.list.selected_index == _cooperative_enemies_per_player);
 		boolean multiplier = mode == _cooperative_enemies_multiplier ||
+			(pickups && pickups->parameters.list.selected_index == _cooperative_enemies_multiplier) ||
 			(vehicles && vehicles->parameters.list.selected_index == _cooperative_enemies_multiplier);
 
 		visible_set(named(list, "op_coop_enemies_per_player", 0), per_player);

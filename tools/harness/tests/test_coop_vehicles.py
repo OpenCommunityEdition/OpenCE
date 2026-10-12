@@ -38,7 +38,7 @@ def test_menu():
     import port_settings
     rows = port_settings.COOP_SETUP_SCREENS[0][3]
     names = [row[0] for row in rows]
-    assert names[names.index('coop_extra_enemies') + 1] == 'coop_extra_vehicles'
+    assert names[names.index('coop_extra_pickups') + 1] == 'coop_extra_vehicles'
     assert names[names.index('coop_extra_vehicles') + 1] == 'coop_enemies_multiplier'
     row = rows[names.index('coop_extra_vehicles')]
     assert row[2] == ['PER PLAYER', 'STATIC MULTIPLIER', 'NONE']
