@@ -657,8 +657,10 @@ void player_ui_fast_setup_network_server(
 	game_connection_set(_game_connection_local);
 	main_set_multiplayer_map_name("");
 	player_ui_globals.multiplayer_variant_specified = FALSE;
+	/* port: the pregame screen the menus open (the port's lobby with its
+	menus loaded, as ui_widget.c opens it), not ui.map's by name */
 	if (ui_widget_load_by_name_or_tag(
-		"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",
+		pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen"),
 		NONE,
 		NULL,
 		NONE,
