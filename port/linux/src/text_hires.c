@@ -6,7 +6,10 @@ The game's text drawn with fonts at the display's resolution (text_hires.h).
 Each font tag the fonts draw (port/assets/fonts/fonts.json) gets its font
 sized so that its capitals are as tall as the tag's: the game's layout,
 from the tag's character widths, is kept, and the fonts were chosen to fit
-those widths. A glyph is rasterized when first drawn, at the display's
+the Xbox maps' widths. A tag whose letters are narrower (the fonts of a
+Custom Edition loc.map) gets its font narrowed until its letters are, on
+the whole, as wide as the tag's, so that they do not run into each other;
+the Xbox maps' fonts are narrowed by a few hundredths. A glyph is rasterized when first drawn, at the display's
 pixels per unit of the 480 lines, into an 8-bit atlas; the GL texture the
 game's placeholder bitmap stands for (xbox_textures.c) is the atlas, its new
 rows uploaded when the placeholder is bound. A change of the display's
@@ -28,7 +31,9 @@ scale (a window made fullscreen) or a full atlas starts it over.
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "../../third_party/stb/stb_truetype.h"
 
-#define MAXIMUM_FONTS 8
+/* (the Xbox maps' tags and a Custom Edition loc.map's, which share names,
+each at its oversamples) */
+#define MAXIMUM_FONTS 16
 #define ATLAS_SIZE 2048
 /* clear texels around each glyph, so that filtering never reaches the next */
 #define ATLAS_PADDING 2
@@ -37,9 +42,14 @@ scale (a window made fullscreen) or a full atlas starts it over.
 static struct
 {
 	char tag[64];
+	/* the tag's measures it was made for */
+	float cap_height;
+	long letters_width;
 	stbtt_fontinfo info;
 	/* font units to units of the 480 lines */
 	float scale;
+	/* the glyphs' widths, against their heights, to fit the tag's letters */
+	float narrowing;
 	/* how many times the display's pixels its glyphs are rasterized with */
 	float oversample;
 } fonts[MAXIMUM_FONTS];
@@ -113,27 +123,37 @@ static void atlas_reset(float scale)
 	dirty_bottom = ATLAS_SIZE;
 }
 
-long text_hires_font(char const *tag_name, float cap_height, float oversample)
+long text_hires_font(char const *tag_name, float cap_height, short const *letter_widths, float oversample)
 {
 	unsigned int index;
 	long font;
+	long letters_width = 0;
 	int x0, y0, x1, y1;
+	int letter;
 
-	if (!text_enabled() || !tag_name || cap_height <= 0.0f)
+	if (!text_enabled() || !tag_name || cap_height <= 0.0f || !letter_widths)
 		return -1;
 	/* (text is never drawn with fewer pixels than the display's) */
 	if (oversample < 1.0f)
 		oversample = 1.0f;
+	for (letter = 0; letter < TEXT_HIRES_FIT_LETTERS; letter++)
+		letters_width += letter_widths[letter] > 0 ? letter_widths[letter] : 0;
 	for (font = 0; font < font_count; font++)
 	{
-		if (!names_differ(fonts[font].tag, tag_name) && fonts[font].oversample == oversample)
+		if (!names_differ(fonts[font].tag, tag_name) && fonts[font].cap_height == cap_height &&
+			fonts[font].letters_width == letters_width && fonts[font].oversample == oversample)
+		{
 			return fonts[font].scale > 0.0f ? font : -1;
+		}
 	}
 	if (font_count >= MAXIMUM_FONTS)
 		return -1;
 	font = font_count++;
 	snprintf(fonts[font].tag, sizeof(fonts[font].tag), "%s", tag_name);
+	fonts[font].cap_height = cap_height;
+	fonts[font].letters_width = letters_width;
 	fonts[font].scale = 0.0f;
+	fonts[font].narrowing = 1.0f;
 	fonts[font].oversample = oversample;
 	for (index = 0; index < text_hires_embedded_count; index++)
 	{
@@ -149,7 +169,26 @@ long text_hires_font(char const *tag_name, float cap_height, float oversample)
 			break;
 		}
 		fonts[font].scale = cap_height / (float)(y1 - y0);
-		platform_log("high-res text: %s drawn with %s", tag_name, embedded->file);
+		{
+			float tag_width = 0.0f;
+			float font_width = 0.0f;
+
+			for (letter = 0; letter < TEXT_HIRES_FIT_LETTERS; letter++)
+			{
+				int glyph = stbtt_FindGlyphIndex(&fonts[font].info, letter < 26 ? 'A' + letter : 'a' + letter - 26);
+				int advance = 0, bearing = 0;
+
+				if (letter_widths[letter] <= 0 || !glyph)
+					continue;
+				stbtt_GetGlyphHMetrics(&fonts[font].info, glyph, &advance, &bearing);
+				tag_width += letter_widths[letter];
+				font_width += advance * fonts[font].scale;
+			}
+			if (tag_width > 0.0f && font_width > tag_width)
+				fonts[font].narrowing = tag_width / font_width;
+		}
+		platform_log("high-res text: %s (capitals %.0f units) drawn with %s, %.0f%% wide",
+			tag_name, cap_height, embedded->file, fonts[font].narrowing * 100.0f);
 		break;
 	}
 	return fonts[font].scale > 0.0f ? font : -1;
@@ -191,13 +230,14 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 	{
 		/* rasterized now */
 		float pixels = fonts[font].scale * scale * fonts[font].oversample;
+		float pixels_x = pixels * fonts[font].narrowing;
 		int index = stbtt_FindGlyphIndex(&fonts[font].info, (int)code);
 		int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 		int width, height, advance = 0, bearing = 0;
 
 		if (index)
 		{
-			stbtt_GetGlyphBitmapBox(&fonts[font].info, index, pixels, pixels, &x0, &y0, &x1, &y1);
+			stbtt_GetGlyphBitmapBox(&fonts[font].info, index, pixels_x, pixels, &x0, &y0, &x1, &y1);
 			stbtt_GetGlyphHMetrics(&fonts[font].info, index, &advance, &bearing);
 		}
 		width = x1 - x0;
@@ -219,7 +259,7 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 			}
 			stbtt_MakeGlyphBitmap(&fonts[font].info,
 				atlas + (pack_y + ATLAS_PADDING) * ATLAS_SIZE + pack_x + ATLAS_PADDING,
-				width, height, ATLAS_SIZE, pixels, pixels, index);
+				width, height, ATLAS_SIZE, pixels_x, pixels, index);
 			if (pack_y < dirty_top)
 				dirty_top = pack_y;
 			if (pack_y + height + 2 * ATLAS_PADDING > dirty_bottom)
@@ -233,7 +273,7 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 		glyphs[slot].height = (short)(width > 0 && height > 0 ? height : 0);
 		glyphs[slot].left = (short)x0;
 		glyphs[slot].top = (short)y0;
-		glyphs[slot].advance = advance * fonts[font].scale;
+		glyphs[slot].advance = advance * fonts[font].scale * fonts[font].narrowing;
 		if (width > 0 && height > 0)
 		{
 			pack_x += width + 2 * ATLAS_PADDING;

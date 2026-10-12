@@ -140,7 +140,9 @@ reloads.
 - Internet play has no relay, as on the native builds: two machines whose
   networks let no direct connection through (some company and school
   networks block WebRTC) cannot play together.
-- No Custom Edition maps (their tag data's address is in the C heap there).
+- No Custom Edition maps (their tag data's address is in the C heap there),
+  so a browser neither downloads nor sends one (map sharing,
+  `port/linux/NETCODE.md`).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
@@ -276,8 +278,14 @@ multiply-adds). `tools/web_build.py` writes the graph.
     rather than pointing each attribute again. The renderer draws only from
     buffers, so Emscripten's emulation of client-side arrays (`FULL_ES3`),
     which wrapped every draw, is not linked.
-  - Buffer writes are copies the browser orders with the draws, so the
-    streaming buffers never wait for the GPU (`port/web/src/web_gl_host.c`).
+  - Buffer writes are copies the browser orders with the draws, but WebGL
+    on Metal (ANGLE, in Chrome and Safari on a Mac) first waits for the GPU
+    to finish what was queued before when a queued draw reads the buffer.
+    So each draw's vertices and indices go into a buffer that no queued
+    draw reads: one of a pool for each frame of the ring, in sizes of 4 KB
+    to 32 MB, written again only when that frame comes round again
+    (`web_chunk_get` in `d3d8_gl.c`). Written after each draw into one
+    buffer, as before, the frames waited for the GPU some 2000 times each.
 - **Memory watch.** WebAssembly cannot protect pages, so the textures'
   memory is watched by hashing it once a frame, as the Android host does
   under the x86 emulator (`port/web/src/web_memory_watch.c`,

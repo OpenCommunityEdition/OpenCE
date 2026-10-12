@@ -346,6 +346,16 @@ enum cache_file_status cache_file_identify(
 	struct cache_file_source *source,
 	struct cache_file_identity *identity);
 
+/* The resource maps a Custom Edition cache needs, from its tag index alone:
+in *types a bit (1 << type) for each resource_map_type holding one of its
+tags whole, which the tag's index entry says (its word at 0x18): bitmaps
+(bitm) bitmaps.map, sounds (snd!) sounds.map, fonts, string lists and HUD
+message text (font, ustr, hmt ) loc.map (map sharing sends them with the
+map: port/linux/game/map_share.c). */
+enum cache_file_status cache_file_resource_maps_needed(
+	struct cache_file_source *source,
+	uint32_t *types);
+
 /* The format of a cache header already in memory (CACHE_FILE_HEADER_BYTES
 bytes), from its signatures and version alone: for callers that hold a
 header but not its file. */

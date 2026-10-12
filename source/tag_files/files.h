@@ -146,6 +146,8 @@ char *file_reference_get_name(const struct file_reference *reference, unsigned l
 boolean file_references_equal(const struct file_reference *reference0, const struct file_reference *reference1);
 struct file_reference *file_reference_create_from_path(struct file_reference *reference, const char *path, boolean is_directory);
 void directory_create_or_delete_contents(const char *directory_name);
+/* port: makes the folder when it is missing (shell_initialize: custom_maps) */
+void directory_create(const char *directory_name);
 boolean datastore_read(const char *file_name, const char *field_name, long length, void *data);
 boolean datastore_write(const char *file_name, const char *field_name, long length, const void *data);
 

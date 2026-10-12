@@ -85,11 +85,32 @@ versions of a map; 0 if it has no file or the file is not a Custom Edition
 cache. */
 unsigned long custom_edition_map_checksum(
 	char const *level_name);
+/* The file of the map `map_name` (a level name or a file name) in the
+Custom Edition maps folders, into `path` (256 characters): the custom_maps
+folder's map named for its hash (<name>_<hash>.map, map_share.h) for a name
+without it, if there is one map of that name. FALSE if none. */
+boolean custom_edition_map_file_path(
+	char const *map_name,
+	char *path);
+/* The resource map of `type` (enum resource_map_type: bitmaps.map,
+sounds.map, loc.map) in the first maps folder that has it, into `path` (256
+characters); FALSE if none has it. */
+boolean custom_edition_resource_map_file_path(
+	short type,
+	char *path);
+/* The resource maps the level's map needs (a bit, 1 << type, for each
+resource map its tags are held in: cache_file_resource_maps_needed); 0 if
+it has no file, or none. */
+unsigned long custom_edition_map_resource_maps_needed(
+	char const *level_name);
+/* the file of the Custom Edition map loaded, or NULL */
+char const *custom_edition_cache_loaded_path(
+	void);
 /* Whether this machine can play the level `level_name` (custom_maps\<name>),
 as a network game's client must: its file present and a Custom Edition
 cache of the host's version (`checksum`, custom_edition_map_checksum's on
 the host; 0 for any), Custom Edition maps able to run, and the resource maps
-present. When not, `message` (`message_size` characters) says why, for the
+it needs present. When not, `message` (`message_size` characters) says why, for the
 player, and what to do. */
 boolean custom_edition_cache_present(
 	char const *level_name,
