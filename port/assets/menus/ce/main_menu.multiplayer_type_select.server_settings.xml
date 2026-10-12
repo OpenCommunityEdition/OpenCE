@@ -356,8 +356,8 @@
 		<string text="Enemy squads grow with the players: by the value of\n'Per Player' for each player past the first."/>
 		<string text="Enemy squads use 'Multiplier', however many players\nthere are."/>
 		<string text="Enemy squads are as the campaign has them."/>
-		<string text="Vehicles respawn after being driven a short distance\nbased on the number of players: by half the value of\n'Per Player' for each player past the first."/>
-		<string text="Vehicles respawn after being driven a short distance,\nwith extra copies equal to ('Multiplier' - 1) / 2,\nrounded down, however many players there are."/>
+		<string text="Vehicles respawn after being driven a short distance\nbased on the number of players: by two thirds the value of\n'Per Player' for each player past the first."/>
+		<string text="Vehicles respawn after being driven a short distance,\nwith extra copies equal to ('Multiplier' - 1) * 2/3,\nrounded down, however many players there are."/>
 		<string text="Vehicles are as the campaign has them."/>
 		<string text="Static amounts for the options set to this mode."/>
 		<string text="Static amounts for the options set to this mode."/>

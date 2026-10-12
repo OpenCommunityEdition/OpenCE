@@ -46,7 +46,8 @@ typedef char coop_vehicle_type_offset_assert[
 
 enum { VEHICLE_HOMES = 256, VEHICLE_SETTLE_TICKS = 15 };
 #define VEHICLE_CLEARANCE 1.15f
-#define VEHICLE_SCALING_DIVISOR 2
+#define VEHICLE_SCALING_NUMERATOR 2
+#define VEHICLE_SCALING_DENOMINATOR 3
 #define VEHICLE_COLLISION_FLAGS (FLAG(_collision_test_structure_bit) | FLAG(_collision_test_objects_bit) | \
 	_collision_test_objects_sight_blocking_flags | FLAG(_collision_test_front_facing_surfaces_bit) | \
 	FLAG(_collision_test_back_facing_surfaces_bit))
@@ -80,12 +81,12 @@ static boolean vehicles_host(void)
 	return vehicles_enabled && game_connection() == _game_connection_network_server && network_coop_active();
 }
 
-/* Halve extra growth in either mode, then round each vehicle down. */
+/* Apply two-thirds extra growth in either mode, then round down. */
 static short vehicles_extra_count(short players, short percent, short multiplier)
 {
-	return multiplier > 0 ? (short)((PIN(multiplier, 2, 32) - 1) / VEHICLE_SCALING_DIVISOR) :
+	return multiplier > 0 ? (short)((PIN(multiplier, 2, 32) - 1) * VEHICLE_SCALING_NUMERATOR / VEHICLE_SCALING_DENOMINATOR) :
 		(short)(MAX(0, MIN(players, HALO_PORT_MAXIMUM_NETWORK_PLAYERS) - 1) *
-		(long)PIN(percent, 25, 200) / (100 * VEHICLE_SCALING_DIVISOR));
+		(long)PIN(percent, 25, 200) * VEHICLE_SCALING_NUMERATOR / (100 * VEHICLE_SCALING_DENOMINATOR));
 }
 
 static short vehicles_player_count(void)

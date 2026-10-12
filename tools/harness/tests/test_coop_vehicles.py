@@ -19,7 +19,7 @@ def test_case(case):
     assert status == 0, output
 
 @pytest.mark.parametrize('fault,case', [
-    (('#define VEHICLE_SCALING_DIVISOR 2', '#define VEHICLE_SCALING_DIVISOR 1'), 'counts'),
+    (('#define VEHICLE_SCALING_NUMERATOR 2', '#define VEHICLE_SCALING_NUMERATOR 3'), 'counts'),
     (('game_connection() == _game_connection_network_server', 'TRUE'), 'authority'),
     (('#define VEHICLE_CLEARANCE 1.15f', '#define VEHICLE_CLEARANCE 1.0f'), 'driving'),
     (('(home->radius + vehicle->object.bounding_sphere_radius)', '(home->radius)'), 'driving'),
@@ -44,6 +44,6 @@ def test_menu():
     assert row[2] == ['PER PLAYER', 'STATIC MULTIPLIER', 'NONE']
     assert row[3][0].replace('\\n', ' ') == (
         "Vehicles respawn after being driven a short distance based on the number of players: "
-        "by half the value of 'Per Player' for each player past the first.")
+        "by two thirds the value of 'Per Player' for each player past the first.")
     assert '"network.coop_vehicles", _config_string' in read('port/linux/src/port_config.c')
     assert 'coop_vehicles_register(result, scenario_object);' in read('source/objects/objects.c')
