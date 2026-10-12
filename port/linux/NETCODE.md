@@ -201,7 +201,8 @@ limits, and readies a second weapon picked up while firing.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
-sources' messages, kinds, bits or structs sent whole differ from it.
+sources' messages, kinds, bits, structs sent whole or the sizes of their
+arrays differ from it.
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console

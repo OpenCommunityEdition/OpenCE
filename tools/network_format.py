@@ -2,11 +2,13 @@
 """The wire format of HALO_PORT_NETWORK_VERSION (port/linux/network_format.txt).
 
 Taken from the sources: the game's message numbers, sizes and fields
-(network_messages.c, .h) and the distributed netcode's (network_*.c, .h):
-the enums with _distributed_ members, the DISTRIBUTED_ constants, and the
-structs sent whole (the _message structs, those whose size is taken, and the
-structs in them) as hashes. An entry the netcode packs itself (a unit's
-state, a relayed action) is covered by its flags and least size only.
+(network_messages.c, .h) and the distributed netcode's (network_*.c, .h,
+map_share*.c, .h): the enums with _distributed_ members, the DISTRIBUTED_
+constants, the structs sent whole (the _message structs, those whose size is
+taken, and the structs in them) as hashes, and the constants their arrays
+are sized by, as their definitions. An entry the netcode packs itself (a
+unit's state, a relayed action) is covered by its flags and its least and
+largest sizes only.
 
 test_linux_port.py fails when the sources differ from the record. An item
 changed or removed is one older builds cannot read: raise the version and
@@ -42,6 +44,7 @@ def _hash(text):
 def items():
     """the wire format's items, name to value"""
     paths = sorted((ROOT / "port/linux/game").glob("network_*.[ch]"))
+    paths += sorted((ROOT / "port/linux/game").glob("map_share*.[ch]"))
     paths += [ROOT / "source/networking/network_messages.c", ROOT / "source/networking/network_messages.h"]
     texts = [re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S) for path in paths]
     everything = "\n".join(texts)
@@ -74,6 +77,41 @@ def items():
         sent |= held
     for name in sent:
         add(f"struct {name}", _hash(structs[name]))
+    # the constants the structs' arrays are sized by, and the netcode's
+    # DISTRIBUTED_ sizes in enums of no name, as their definitions' text, with
+    # the names those use in turn
+    bounds = set()
+    for name in sent:
+        for size in re.findall(r"\[([^\]]+)\]", structs[name].split("{", 1)[1]):
+            bounds |= set(re.findall(r"\b[A-Z_][A-Z0-9_]*\b", size))
+    bounds |= set(re.findall(r"^\s*(DISTRIBUTED_\w+)\s*=", everything, re.M)) - {
+        key.split(" ", 1)[1] for key in result if key.startswith("enum ")}
+    headers = None
+    pending, done = sorted(bounds), set()
+    while pending:
+        name = pending.pop()
+        if name in done:
+            continue
+        done.add(name)
+        pattern = rf"^#define {name}\b[ \t]*((?:[^\n]*\\\n)*[^\n]*)|\b{name}[ \t]*=(?!=)([^,{{}};]*)"
+        found = re.findall(pattern, everything, re.M)
+        if not found:
+            if headers is None:
+                headers = "\n".join(re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S)
+                                    for root in ("source", "port/linux/include", "port/linux/game", "port/linux/src")
+                                    for path in sorted((ROOT / root).rglob("*.h")))
+            found = re.findall(pattern, headers, re.M)
+        if not found:
+            # (an enum's member counted, NUMBER_OF_ at its end: the enum)
+            found = [("enum " + _hash(block), "") for text in (everything, headers)
+                     for block in _blocks(text, r"\benum\b[^;{]*\{")
+                     if re.search(rf"\b{name}\s*[,}}]", block)][:1]
+        if not found:
+            assert name not in bounds, f"{name}: a size of the wire format with no definition found"
+            continue
+        values = sorted({" ".join((define or expression).replace("\\\n", " ").split()) for define, expression in found})
+        add(f"bound {name}", " | ".join(values))
+        pending += re.findall(r"\b[A-Z_][A-Z0-9_]*\b", " ".join(values))
     messages = texts[-2]
     for name, size in re.findall(r"^DEFINE_NETWORK_GAME_MESSAGE\((\w+), (.*)\);", messages, re.M):
         add(f"size {name}", " ".join(size.split()))
