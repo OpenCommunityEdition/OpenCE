@@ -6,6 +6,7 @@ OBJECTS.C
 
 #include "cseries.h"
 #include "objects.h"
+#include "coop_pickups.h" /* port: the host's extra campaign pickups */
 
 #include "damage.h"
 #include "light_definitions.h"
@@ -3954,6 +3955,8 @@ long object_new_from_scenario(
 				if (result!=NONE)
 				{
 					object_type_place(result, scenario_object);
+					/* port: only authored placements receive extra pickups. */
+					coop_pickups_register(result, scenario_object, palette);
 					if (scenario_object->name_index!=NONE)
 					{
 						object_name_list_new(result, scenario_object->name_index);

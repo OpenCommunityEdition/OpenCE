@@ -236,9 +236,10 @@
 		<on event="created" run="port setup options init"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_friendly_fire" x="54" y="73"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" x="54" y="103"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="133"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="133"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" x="54" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="193"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="223"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -276,25 +277,23 @@
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_extra_enemies">
-		<string text="NONE"/>
 		<string text="PER PLAYER"/>
 		<string text="STATIC MULTIPLIER"/>
+		<string text="NONE"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_label"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_spinner" x="286" y="1"/>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_enemies_per_player" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_extra_pickups" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
-	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_enemies_per_player">
-		<string text="25%"/>
-		<string text="50%"/>
-		<string text="100%"/>
-		<string text="150%"/>
-		<string text="200%"/>
+	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_extra_pickups">
+		<string text="PER PLAYER"/>
+		<string text="STATIC MULTIPLIER"/>
+		<string text="NONE"/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_multiplier_label"/>
@@ -312,11 +311,27 @@
 		<string text="16X"/>
 		<string text="32X"/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_enemies_per_player" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_enemies_per_player">
+		<string text="25%"/>
+		<string text="50%"/>
+		<string text="100%"/>
+		<string text="150%"/>
+		<string text="200%"/>
+	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_player_collisions" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -328,8 +343,9 @@
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels">
 		<string text="FRIENDLY FIRE:"/>
 		<string text="EXTRA ENEMIES:"/>
-		<string text="PER PLAYER:"/>
+		<string text="EXTRA PICKUPS:"/>
 		<string text="MULTIPLIER:"/>
+		<string text="PER PLAYER:"/>
 		<string text="PLAYER COLLISIONS:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options">
@@ -337,19 +353,22 @@
 		<string text="Players can be hurt by weapons or explosives\nfired by the other players."/>
 		<string text="Damage from the other players will only reduce\nshields. Health will be unaffected."/>
 		<string text="Players can be hurt by damage from explosives\nfired by the other players."/>
+		<string text="Enemy squads grow with the players: by the value of\n'Per Player' for each player past the first."/>
+		<string text="Enemy squads use 'Multiplier', however many players\nthere are."/>
 		<string text="Enemy squads are as the campaign has them."/>
-		<string text="Enemy squads grow with the players: by the amount\nbelow for each player past the first."/>
-		<string text="Enemy squads are the amount below times as large,\nhowever many players there are."/>
-		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
-		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
-		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
-		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
-		<string text="For each player past the first, enemy squads get\nthis much more of themselves (100%: as many again)."/>
-		<string text="Each enemy squad is this many times as large."/>
-		<string text="Each enemy squad is this many times as large."/>
-		<string text="Each enemy squad is this many times as large."/>
-		<string text="Each enemy squad is this many times as large."/>
-		<string text="Each enemy squad is this many times as large."/>
+		<string text="Pickups grow with the players: by the value of\n'Per Player' for each player past the first."/>
+		<string text="Pickups use 'Multiplier', up to eight times as many,\nhowever many players there are."/>
+		<string text="Pickups are as the campaign has them."/>
+		<string text="Static amounts for the options set to this mode.\nPickups are capped at eight times as many."/>
+		<string text="Static amounts for the options set to this mode.\nPickups are capped at eight times as many."/>
+		<string text="Static amounts for the options set to this mode.\nPickups are capped at eight times as many."/>
+		<string text="Static amounts for the options set to this mode.\nPickups are capped at eight times as many."/>
+		<string text="Static amounts for the options set to this mode.\nPickups are capped at eight times as many."/>
+		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
+		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
+		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
+		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
+		<string text="For each player past the first, options set to Per\nPlayer get this much more (100%: as many again)."/>
 		<string text="Players bump into each other, as in the campaign."/>
 		<string text="Players walk through each other, so that no one\nblocks a doorway. The AI's characters still block."/>
 	</strings>
