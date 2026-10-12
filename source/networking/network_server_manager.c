@@ -732,6 +732,15 @@ static boolean network_game_server_drop_client_machine(
 static void network_game_server_start_late_joiner(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine);
+static void network_game_server_hold_map_fetcher_players(
+	struct network_game_server *server);
+static void network_game_server_restore_held_players(
+	struct network_game_server *server);
+static void network_game_server_discard_held_players(
+	long machine_index);
+static boolean network_game_server_queue_held_players(
+	struct network_game_server *server,
+	long machine_index);
 static void network_game_server_release_map_fetchers(
 	struct network_game_server *server);
 static void network_game_server_keep_late_joiners_alive(
@@ -852,6 +861,10 @@ static unsigned long network_game_server_client_machine_join_times[MAXIMUM_NETWO
 not sent the start with the others. Once the download is done it is started
 then, in progress if the game has begun. */
 static boolean network_game_server_map_pending[MAXIMUM_NETWORK_MACHINE_COUNT];
+/* port: those machines' players, taken out of the game the others start, and
+put back when the download is done (they spawn then, not before) */
+static struct network_player network_game_server_held_players[MAXIMUM_NETWORK_PLAYER_COUNT];
+static long network_game_server_held_player_count;
 enum
 {
 	NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT = 15 * MILLISECONDS_PER_SECOND,
@@ -1795,7 +1808,10 @@ boolean network_game_server_start_network_game(
 		/* port: once the settings are out, the start is sent once: a machine
 		that missed it (its connection failed, and is closed) is dropped, and
 		sent again, the start reached those that loaded it already (which
-		refuse a second start) and the wait for the others never began */
+		refuse a second start) and the wait for the others never began.
+		A machine still downloading the map is left out of this start, and so
+		are its players: they spawn when it joins, not while it is downloading. */
+		network_game_server_hold_map_fetcher_players(server);
 		if (network_game_server_send_game_settings_to_all_machines(server, &server->game, sizeof(server->game)) &&
 			((message = create_network_game_message(
 				_message_server_begin_game,
@@ -1816,6 +1832,7 @@ boolean network_game_server_start_network_game(
 				if (!network_game_server_client_machine_is_joined_to_game(server, machine))
 				{
 					network_game_server_map_pending[machine_index] = FALSE;
+					network_game_server_discard_held_players(machine_index);
 					continue;
 				}
 				if (map_share_machine_needs_map(machine->machine_index))
@@ -1840,6 +1857,7 @@ boolean network_game_server_start_network_game(
 		}
 		else
 		{
+			network_game_server_restore_held_players(server);
 			network_event("failed to signal client machines to begin loading for network game");
 		}
 	}
@@ -2807,9 +2825,107 @@ static void network_game_server_start_late_joiner(
 		begin_game.unused);
 }
 
+/* port: a machine still downloading the map is not in the game the others
+start, and neither are its players. They are put back when it joins. */
+static void network_game_server_hold_map_fetcher_players(
+	struct network_game_server *server)
+{
+	long index;
+
+	network_game_server_held_player_count = 0;
+	for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT; index++)
+	{
+		struct network_player player = server->game.players[index];
+
+		if (!network_player_is_valid(&player) || !map_share_machine_needs_map(player.machine_index))
+			continue;
+		if (network_game_server_held_player_count < MAXIMUM_NETWORK_PLAYER_COUNT)
+		{
+			network_game_server_held_players[network_game_server_held_player_count++] = player;
+		}
+		if (!network_game_remove_player(&server->game, &player))
+			network_event("failed to hold a player still downloading the map");
+		else
+			network_event("holding a player on machine #%d until the map is downloaded",
+				player.machine_index);
+	}
+}
+
+static void network_game_server_restore_held_players(
+	struct network_game_server *server)
+{
+	long index;
+
+	for (index = 0; index < network_game_server_held_player_count; index++)
+	{
+		struct network_player player = network_game_server_held_players[index];
+
+		if (!network_game_add_player(&server->game, &player))
+			network_event("failed to put back a player held for a map download");
+	}
+	network_game_server_held_player_count = 0;
+}
+
+static void network_game_server_discard_held_players(
+	long machine_index)
+{
+	long index = 0;
+
+	while (index < network_game_server_held_player_count)
+	{
+		if (network_game_server_held_players[index].machine_index != machine_index)
+		{
+			index++;
+			continue;
+		}
+		network_game_server_held_player_count--;
+		if (index < network_game_server_held_player_count)
+		{
+			network_game_server_held_players[index] =
+				network_game_server_held_players[network_game_server_held_player_count];
+		}
+	}
+}
+
+/* the held players are queued to join the game that is already going, as
+any late joiner's players are (network_game_server_queue_player_for_addition):
+the same checks, a name made unique against whoever joined meanwhile, and the
+machine started, or refused, once they are in. FALSE if it had none held. */
+static boolean network_game_server_queue_held_players(
+	struct network_game_server *server,
+	long machine_index)
+{
+	boolean any = FALSE;
+	long index = 0;
+
+	while (index < network_game_server_held_player_count)
+	{
+		struct network_player player;
+
+		if (network_game_server_held_players[index].machine_index != machine_index)
+		{
+			index++;
+			continue;
+		}
+		player = network_game_server_held_players[index];
+		network_game_server_held_player_count--;
+		if (index < network_game_server_held_player_count)
+		{
+			network_game_server_held_players[index] =
+				network_game_server_held_players[network_game_server_held_player_count];
+		}
+		player.player_list_index = NONE;
+		network_game_server_queue_player_for_addition(server, &player);
+		network_event("a player from machine #%ld joins now that the map is downloaded",
+			machine_index);
+		any = TRUE;
+	}
+	return any;
+}
+
 /* port: a machine that was still downloading the map when the others
-started. Once the download is done, it loads with them if the game has not
-begun, or joins the game in progress if it has. */
+started. Once the download is done and the game has begun, its players are
+queued to join, and it starts when they are in. */
 static void network_game_server_release_map_fetchers(
 	struct network_game_server *server)
 {
@@ -2819,34 +2935,30 @@ static void network_game_server_release_map_fetchers(
 	{
 		struct network_game_server_client_machine *machine =
 			&server->client_machines[machine_index];
-		struct message_server_begin_game begin_game = { 0 };
-		struct network_message *message;
 
 		if (!network_game_server_map_pending[machine_index])
 			continue;
 		if (!network_game_server_client_machine_is_joined_to_game(server, machine))
 		{
 			network_game_server_map_pending[machine_index] = FALSE;
+			network_game_server_discard_held_players(machine_index);
 			continue;
 		}
 		if (map_share_machine_needs_map(machine->machine_index))
+			continue;
+		if (server->state != _network_game_server_state_ingame)
 			continue;
 		network_game_server_map_pending[machine_index] = FALSE;
 		if (TEST_FLAG(machine->flags, _network_client_machine_level_loaded_bit) ||
 			TEST_FLAG(machine->flags, _network_client_machine_started_late_bit))
 		{
+			network_game_server_discard_held_players(machine_index);
 			continue;
 		}
-		if (server->state == _network_game_server_state_ingame)
-		{
+		/* (one that had no players added before the start has none held: it
+		starts now, and its add request is queued as any late joiner's) */
+		if (!network_game_server_queue_held_players(server, machine_index))
 			network_game_server_start_late_joiner(server, machine);
-			continue;
-		}
-		message = create_network_game_message(_message_server_begin_game, &begin_game, sizeof(begin_game));
-		if (!message || !network_game_server_send_message_to_client_machine(server, machine, message))
-			network_event("failed to start machine #%d now that it has the map", machine->machine_index);
-		else
-			network_event("machine #%d has the map; it loads with the others", machine->machine_index);
 	}
 }
 
@@ -3620,6 +3732,15 @@ static boolean network_game_server_client_machine_timed_out(
 	its players join: port/linux/game/map_share.c) */
 	if (map_share_machine_downloading(machine->machine_index))
 		return FALSE;
+	/* (its players were held out of the game until the download finishes,
+	so it has none yet: only its silence times it out, as a crashed one or
+	one whose download failed would otherwise keep its slot and its players
+	held all game) */
+	if (machine->machine_index >= 0 && machine->machine_index < MAXIMUM_NETWORK_MACHINE_COUNT &&
+		network_game_server_map_pending[machine->machine_index])
+	{
+		return silence > NETWORK_GAME_SERVER_LATE_JOINER_TIMEOUT;
+	}
 	/* (joining the game in progress: waiting for its players to be added,
 	or loading; port: one that adds none in the time a machine has to in
 	the pregame holds its slot for nothing) */
@@ -4923,6 +5044,8 @@ boolean network_game_server_reset_to_pregame(
 
 	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
 	csmemset(network_game_server_map_pending, 0, sizeof(network_game_server_map_pending));
+	csmemset(network_game_server_held_players, 0, sizeof(network_game_server_held_players));
+	network_game_server_held_player_count = 0;
 	server->next_update_number = 0;
 	server->time_of_first_client_loading_completion = 0;
 	server->sent_start_game_message = FALSE;

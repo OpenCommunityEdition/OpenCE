@@ -116,4 +116,15 @@ without its widget */
 #define HALO_PORT_MAXIMUM_LIGHTS_PER_MAP 4096 /* (896) */
 #define HALO_PORT_MAXIMUM_GAME_LOOPING_SOUNDS 4096 /* (1024) */
 
+/* ---------- rasterizer
+
+A frame's transparent geometry groups: each transparent part of a model drawn,
+each widget drawn (light volumes, antennas, flags, glows), each batch of
+dynamic geometry (particles, contrails), each transparent surface of the
+structure. A full pool draws the frame without the
+rest ("too many transparent geometry groups" in debug.txt): a b30 co-op game
+with eight times the enemies asked for 464 in a frame. Each group is 160
+bytes */
+#define HALO_PORT_MAXIMUM_TRANSPARENT_GEOMETRY_GROUPS 2048 /* (384) */
+
 #endif /* __HALO_PORT_CAPACITY_H */

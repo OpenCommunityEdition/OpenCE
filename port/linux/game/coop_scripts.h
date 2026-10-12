@@ -8,6 +8,8 @@ Campaign scripts made to work for every player in network co-op
 #ifndef __COOP_SCRIPTS_H
 #define __COOP_SCRIPTS_H
 
+#include "math/real_math.h"
+
 /* ---------- prototypes */
 
 /* hs_library_external.c's volume_test_objects_all: whether to count the
@@ -25,9 +27,28 @@ void coop_scripts_gather_in_volume(
 (the "followers"). Each does nothing unless `unit_index` is player0's in a
 co-op host's game. */
 
-/* hs_library_external.c's object_teleport: around player0 */
+/* How far from a script's teleport the other players may stand. Farther
+than this, an open doorway would walk the group into the next room. */
+#define COOP_SCRIPT_TELEPORT_RADIUS 8.f
+
+/* hs_library_external.c's object_teleport: player0's followers go to
+`destination` (the cutscene flag), spreading around it so a large group
+fits. `destination` is the flag even when player0 did not reach it. */
 void coop_scripts_teleport_followers(
-	long unit_index);
+	long unit_index,
+	real_point3d const *destination);
+/* TRUE if the unit is within COOP_SCRIPT_TELEPORT_RADIUS of `destination` */
+boolean coop_scripts_unit_near(
+	long unit_index,
+	real_point3d const *destination);
+/* Place this player at `destination`, or on the floor around players
+already listed in `arrived_unit_indices`. Returns whether they are there
+afterwards. Nothing happens unless this machine is the co-op host. */
+boolean coop_scripts_arrive_at(
+	long player_index,
+	real_point3d const *destination,
+	long const *arrived_unit_indices,
+	short arrived_count);
 /* units.c's unit_suspended */
 void coop_scripts_suspend_followers(
 	long unit_index,

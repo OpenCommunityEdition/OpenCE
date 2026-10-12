@@ -1067,7 +1067,7 @@ void network_test_update(
 			network_test.joined = TRUE;
 			ui_widgets_close_all();
 			ui_widget_load_by_name_or_tag(
-				"ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen",
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen"),
 				NONE, NULL, NONE, NONE, NONE, NONE);
 			platform_log("network test: joining");
 		}
