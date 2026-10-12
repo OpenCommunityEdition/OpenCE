@@ -1021,11 +1021,15 @@ void update_queues_reset_and_fill_with_lies(
 	}
 	if (update_server_globals.initialized)
 	{
+		struct data_iterator iterator;
 		struct update_server_queue_datum *queue;
 
 		update_server_start();
-		queue = datum_get(update_server_globals.queues, 0);
-		queue->next_update_number = update_server_globals.next_update_number_to_build;
+		/* port: co-op player slots can have gaps, including slot zero.
+		Reset every live queue after a checkpoint load, not just slot zero. */
+		data_iterator_new(&iterator, update_server_globals.queues);
+		while ((queue = data_iterator_next(&iterator)) != NULL)
+			queue->next_update_number = update_server_globals.next_update_number_to_build;
 	}
 	else if (update_client_globals.initialized)
 	{
