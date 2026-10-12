@@ -90,6 +90,8 @@ static boolean animation_graph_check(struct tag_validation *validation, void *ba
 { (void)validation; (void)base; ++callback_failures; return FALSE; }
 static boolean bitmap_data_check(struct tag_validation *validation, void *base)
 { (void)validation; (void)base; ++callback_failures; return FALSE; }
+static boolean bitmap_group_check(struct tag_validation *validation, void *base)
+{ (void)validation; (void)base; ++callback_failures; return FALSE; }
 static struct tag_schema_field const graph_node_fields[] = {
     TAG_SCHEMA_BLOCK_INDEX(struct test_graph_node, next_sibling_node_index, TAG_SCHEMA_ROOT, offsetof(struct test_graph,nodes), FLAG(_tag_schema_none_bit)),
     TAG_SCHEMA_BLOCK_INDEX(struct test_graph_node, first_child_node_index, TAG_SCHEMA_ROOT, offsetof(struct test_graph,nodes), FLAG(_tag_schema_none_bit)),
@@ -125,7 +127,9 @@ static struct tag_schema_field const model_fields[]={
 };
 static struct tag_schema_definition const model_schema={"model",232,model_fields};
 static struct tag_schema_definition const object_schema={"object",72,empty_fields};
-static struct tag_schema_field const bitmap_fields[] = {TAG_SCHEMA_CHECK(bitmap_data_check),TAG_SCHEMA_END};
+static struct tag_schema_field const bitmap_fields[] = {
+    TAG_SCHEMA_CHECK(bitmap_data_check),TAG_SCHEMA_CHECK(bitmap_group_check),TAG_SCHEMA_END
+};
 static struct tag_schema_definition const bitmap_schema = {"bitmap",4,bitmap_fields};
 static struct tag_schema_field const fp_element_fields[] = {TAG_SCHEMA_END};
 static struct tag_schema_definition const fp_element_schema = {"index",2,fp_element_fields};
@@ -166,6 +170,8 @@ int mcc_bitmaps_contains(struct mcc_runtime *runtime, uint32_t offset, uint32_t 
 { (void)runtime; (void)offset; (void)size; return 0; }
 int mcc_bitmaps_valid(struct mcc_runtime *runtime, struct bitmap_data *bitmap)
 { (void)runtime; return bitmap == valid_bitmap; }
+int mcc_bitmaps_group_valid(struct mcc_runtime *runtime, void *group)
+{ (void)runtime; return group == valid_bitmap; }
 void *mcc_geometry_buffer_data(struct mcc_runtime *runtime, void const *buffer, int indices, unsigned long *bytes)
 {
     (void)runtime; *bytes = indices ? sizeof(external_indices) : sizeof(external_vertices);
@@ -301,6 +307,11 @@ int main(int argc, char **argv)
         if (!strcmp(argv[1],"graph_cycle")) {animations[256].next_animation_index=0; expected=0;}
         if (!strcmp(argv[1],"graph_node_cycle")) {nodes[1].first_child_node_index=0; expected=0;}
         if (!strcmp(argv[1],"graph_orphan")) {nodes[0].first_child_node_index=NONE; expected=0;}
+        if (!strcmp(argv[1],"graph_missing_parent")) nodes[1].parent_node_index=NONE;
+        if (!strcmp(argv[1],"graph_conflicting_parent")) {nodes[1].parent_node_index=1;expected=0;}
+        if (!strcmp(argv[1],"graph_missing_parent_cycle")) {
+            nodes[1].parent_node_index=NONE;nodes[1].first_child_node_index=0;expected=0;
+        }
         if (!strcmp(argv[1],"graph_root_sibling")) nodes[0].next_sibling_node_index=1;
         if (!strcmp(argv[1],"graph_root_outside")) nodes[0].next_sibling_node_index=3;
         if (!strcmp(argv[1],"graph_root_orphan")) {nodes[0].next_sibling_node_index=1;nodes[0].first_child_node_index=NONE;expected=0;}
@@ -317,6 +328,27 @@ int main(int argc, char **argv)
             strcpy((char *)model_nodes,"root");strcpy((char *)model_nodes+156,"child");
             memcpy(model_nodes+32,links,6);memcpy(model_nodes+156+32,links+3,6);
             nodes[0].first_child_node_index=NONE;
+            if (!strncmp(argv[1],"graph_model_empty",17)) {
+                nodes[0].parent_node_index=nodes[1].parent_node_index=NONE;
+                if (!strcmp(argv[1],"graph_model_empty_partial")) {
+                    nodes[1].next_sibling_node_index=0;expected=0;
+                }
+            }
+            if (!strncmp(argv[1],"graph_model_tail",16)) {
+                short tail_links[3]={NONE,NONE,0},sibling=2;
+                block->count=graph->nodes.count=3;
+                strcpy(nodes[2].name,"tail");strcpy((char *)model_nodes+312,"tail");
+                memcpy(model_nodes+312+32,tail_links,6);
+                memcpy(model_nodes+156+32,&sibling,2);
+                nodes[0].first_child_node_index=2;nodes[1].next_sibling_node_index=2;
+                nodes[2].next_sibling_node_index=nodes[2].first_child_node_index=NONE;
+                nodes[2].parent_node_index=0;
+                if (!strcmp(argv[1],"graph_model_tail_conflict")) {nodes[1].first_child_node_index=2;expected=0;}
+                if (!strcmp(argv[1],"graph_model_tail_cycle")) {
+                    short cycle=1;memcpy(model_nodes+312+32,&cycle,2);
+                    nodes[2].next_sibling_node_index=1;expected=0;
+                }
+            }
             if (!strcmp(argv[1],"graph_model_mismatch")) {model_nodes[156]='x';expected=0;}
             if (!strcmp(argv[1],"graph_model_outside")) {block->address=runtime.tags+runtime.used-1;expected=0;}
             if (!strcmp(argv[1],"graph_model_cycle")) {short cycle=0;memcpy(model_nodes+156+34,&cycle,2);expected=0;}
@@ -442,6 +474,8 @@ int main(int argc, char **argv)
         }
     }
     if (!strcmp(argv[1],"first_person_slots")) CHECK(((struct test_first_person *)instance[1].root)->animations.count==30);
+    if (!strcmp(argv[1],"graph_model_tail"))
+        CHECK(((struct test_graph_node *)((struct test_graph *)instance[1].root)->nodes.address)->first_child_node_index==1);
     if (!strcmp(argv[1],"graph_root_sibling") || !strcmp(argv[1],"graph_root_outside"))
         CHECK(((struct test_graph_node *)((struct test_graph *)instance[1].root)->nodes.address)->next_sibling_node_index==NONE);
     if (!strcmp(argv[1],"grenades_four")) {
