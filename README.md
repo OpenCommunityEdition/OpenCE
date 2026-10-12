@@ -42,7 +42,8 @@ and put these into `mcc_maps/_shared/multiplayer`.
 
 Use separate package folders such as `mcc_maps/Solar Flare/`
 for levels with their own resources (e.g. bitmaps.map and sounds.map); maps in
-those folders appear in the same MCC menu lists.
+those folders appear as selectable folders in the MCC menus. Open a folder to
+choose a level, or select a loose map directly. Back returns to the folder list.
 
 You cannot use Custom Edition resource files in these folders. You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
 

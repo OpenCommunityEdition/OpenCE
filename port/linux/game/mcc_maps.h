@@ -20,4 +20,21 @@ wchar_t const *mcc_maps_description(short index);
 boolean mcc_maps_campaign(short index);
 boolean mcc_maps_level_campaign(char const *level_name);
 
+/* Menu-only views. Identities, not catalog indices, survive a rescan. */
+struct mcc_map_browser
+{
+	char package[64], selected[64];
+	short entries[MCC_MAPS_MAXIMUM];
+	boolean folders[MCC_MAPS_MAXIMUM];
+	short count, chosen;
+	boolean campaign;
+};
+
+void mcc_map_browser_open(struct mcc_map_browser *browser, boolean campaign);
+void mcc_map_browser_select(struct mcc_map_browser *browser, short row);
+boolean mcc_map_browser_enter(struct mcc_map_browser *browser, short row);
+boolean mcc_map_browser_back(struct mcc_map_browser *browser);
+short mcc_map_browser_index(struct mcc_map_browser const *browser, short row);
+void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wchar_t text[64]);
+
 #endif

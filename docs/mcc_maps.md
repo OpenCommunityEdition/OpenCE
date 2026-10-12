@@ -58,10 +58,29 @@ Self-contained levels do not open or fingerprint resources. Only required types
 are considered. Chosen paths and failures are logged in `debug.txt`. `loc.map`
 is unsupported. Nothing searches other packages, `maps` or `custom_maps`.
 A package level's identity is `mcc_maps\solar_flare\m0`;
-the folder name must be the same on every player's installation. The menu
-still lists individual levels in the same two categories, adding `[package]`
-to every level inside a package folder. Optional `.txt` descriptions remain beside
-the corresponding level. No manifest or folder-navigation menu is required.
+the folder name must be the same on every player's installation. Optional
+`.txt` descriptions remain beside the corresponding level. No manifest is
+required.
+
+The two MCC categories show package folders first (alphabetically, in brackets),
+then loose maps. Open a folder to choose one of its levels; the rows omit the
+repeated package suffix, while the selected map's details retain its identity.
+Only folders with maps of the selected category appear. A mixed package appears
+in both categories, with campaign and multiplayer maps filtered separately.
+Back returns from a folder to the package list; at the root it exits as before.
+Campaign difficulty selection still follows mission selection. Returning from
+that screen restores the MCC folder and selected mission. Each category remembers
+its folder/selection for the current session, separately for New Game and hosting.
+A rescan restores selections by identity, and returns to the root if a package
+has disappeared. `_shared`, resources and empty/unsupported-only folders are not
+selectable packages.
+
+Folder grouping lives in `mcc_maps.c`. The existing MCC menu callbacks bind its
+rows to the shared widgets. MCC Back handlers on the enclosing screens and
+lists are needed because screens consume Back before their children; two
+MCC-only description widgets show folder and empty-category text. The common description update
+hides those widgets when leaving MCC. Xbox/CE lists, map identities, loading,
+resource selection, checkpoints and network messages are unchanged.
 
 Open the map-kind chooser and select **MCC SINGLEPLAYER** for campaign
 maps or **MCC MULTIPLAYER** for multiplayer maps. The cache header's scenario

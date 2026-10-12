@@ -655,16 +655,40 @@ WIDGET_PATCHES = {
         '<on event="b" run="port map list back"/>',
         '<on event="back" run="port map list back"/>',
     ]},
-    "main_menu/solo_level_select/solo_level_select_list": {"swap": {"main_menu/new_select/list_item_0": MAP_KIND_CHOOSER}},
+    "main_menu/solo_level_select/solo_level_select_list": {"swap": {"main_menu/new_select/list_item_0": MAP_KIND_CHOOSER},
+                                                          "handlers": [
+        '<on event="created" run="initialize sp level list solo"/>',
+        '<on event="deleted" run="dispose sp level list"/>',
+        '<on event="custom_activation" run="solo level set map" open="main_menu/difficulty_select/difficulty_select_list_screen"/>',
+        '<on event="b" run="port mcc solo folder back"/>',
+        '<on event="back" run="port mcc solo folder back"/>',
+    ]},
+    "main_menu/solo_level_select/solo_level_select_screen": {"handlers": [
+        '<on event="b" run="port mcc solo folder back"/>',
+        '<on event="back" run="port mcc solo folder back"/>',
+    ]},
+    f"{MT}/mp_map_select/mp_map_select_screen": {"handlers": [
+        '<on event="created" run="net server defer start"/>',
+        '<on event="b" run="port mcc host folder back"/>',
+        '<on event="back" run="port mcc host folder back"/>',
+    ]},
+    f"{MT}/connected/connected_map_select_wrapper": {"handlers": [
+        '<on event="b" run="port mcc host folder back"/>',
+        '<on event="back" run="port mcc host folder back"/>',
+    ]},
     # (each description shows the other kind's maps too: a campaign level's
     # picture, name and words on the Map screen, a multiplayer map's on New
     # Game's)
     f"{MT}/mp_map_select/mp_map_right_item": {"children": [
+        '<child widget="main_menu/new_select/mcc_folder_name"/>',
+        '<child widget="main_menu/new_select/mcc_folder_help"/>',
         '<child widget="main_menu/solo_level_select/replay_level_right_name"/>',
         '<child widget="main_menu/solo_level_select/replay_level_right_pic"/>',
         '<child widget="main_menu/solo_level_select/replay_level_right_data"/>',
     ]},
     "main_menu/solo_level_select/replay_level_right_item": {"children": [
+        '<child widget="main_menu/new_select/mcc_folder_name"/>',
+        '<child widget="main_menu/new_select/mcc_folder_help"/>',
         f'<child widget="{MT}/mp_map_select/mp_map_right_name"/>',
         f'<child widget="{MT}/mp_map_select/mp_map_right_pic"/>',
         f'<child widget="{MT}/mp_map_select/mp_map_right_data"/>',
@@ -1440,6 +1464,11 @@ def _map_kind() -> list:
                      ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     lines += _strings("main_menu/new_select/var_map_kinds",
                       ["SINGLEPLAYER", "MULTIPLAYER", "CUSTOM SINGLEPLAYER", "CUSTOM MULTIPLAYER", "MCC SINGLEPLAYER", "MCC MULTIPLAYER"])
+    for name, top, height in (("name", 204, 54), ("help", 270, 124)):
+        lines += _widget(f"main_menu/new_select/mcc_folder_{name}",
+                         [("type", "text"), ("controller", 1), ("left", 417), ("top", top),
+                          ("width", 146), ("height", height), ("font", "ui\\small_ui"),
+                          ("color", "#FF2896FF")], [])
     return lines
 
 
