@@ -1394,3 +1394,22 @@ These tests exercise startup, simulation, joining, resource rejection and
 cleanup. They are not full campaign playthroughs, visual certification of every
 material, or proof of all possible network behavior. Review was a component and
 combined-diff self-review, not an independent review.
+
+## Weapon-authored cameras
+
+MCC weapon flags bit 17 (`0x20000`) requests a third-person camera, as
+documented by https://c20.reclaimers.net/h1/tags/object/item/weapon/.
+Spasm Playground uses it on its Digsite weapons; its player bipeds carry
+a single authored camera track. `mcc_camera` selects the native following
+camera and its existing unit/default track, interpolation and collision
+handling. Unflagged weapons and zoom use first person; existing seat,
+cinematic and death camera handling takes precedence. This is independent
+of the optional OpenCE third-person mode and has no toggle or preference.
+
+The additive hook in `director_desired_perspective` is necessary because
+both camera selection and deterministic aiming use that shared function;
+there is no registered camera-selection extension. The MCC adapter checks
+the active map before reading inventory, holds no state across map changes,
+and leaves Xbox/Custom Edition paths unchanged. Existing host-controlled
+inventory synchronization is sufficient, but network version 38 prevents
+peers with the previous aiming behavior from joining.
