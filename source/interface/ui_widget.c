@@ -3220,6 +3220,17 @@ static void widget_instance_set_focused_child_by_index(
 	return;
 }
 
+/* port: the map list a finished match opens on its own, after the menu
+history was closed with the match */
+static boolean widget_name_is_postgame_map_list(
+	char const *name)
+{
+	return name &&
+		(!csstrcmp(name, "pc\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_wrapper") ||
+		 !csstrcmp(name, "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper") ||
+		 !csstrcmp(name, "ui\\shell\\main_menu\\multiplayer_type_select\\split_screen\\splitscreen_map_select_postgame_wrapper"));
+}
+
 static void widget_instance_go_back_to_previous(
 	struct widget_instance *widget)
 {
@@ -3227,6 +3238,8 @@ static void widget_instance_go_back_to_previous(
 	short widget_stack = (widget->local_player_index == NONE) ? 0 : widget->local_player_index;
 	short previous_local_player_index = NONE;
 	long previous_widget_tag;
+	struct widget_instance *top = widget_instance_get_topmost_parent(widget);
+	char const *closed_name = top ? tag_get_name(top->definition_tag_index) : NULL;
 
 	if (widget_globals.widget_stack[widget_stack])
 	{
@@ -3238,7 +3251,7 @@ static void widget_instance_go_back_to_previous(
 	{
 		previous_widget_tag = NONE;
 	}
-	ui_widget_delete(widget_instance_get_topmost_parent(widget));
+	ui_widget_delete(top);
 	if (previous_widget_tag != NONE)
 	{
 		struct widget_instance *new_widget = ui_widget_load_by_name_or_tag(
@@ -3257,6 +3270,17 @@ static void widget_instance_go_back_to_previous(
 				new_widget,
 				data.focused_child_index);
 		}
+	}
+	/* port: that list has no screen before it. Back would leave the
+	menu's world up with no buttons, logo or music. Any other screen
+	with no history is left as it was. A network game returns through
+	the main menu; the menu's own world loads its shell. */
+	else if (widget_name_is_postgame_map_list(closed_name))
+	{
+		if (global_network_game_server_get() || global_network_game_client_get())
+			network_game_abort();
+		else if (main_menu_is_active())
+			main_goto_main_menu();
 	}
 
 	return;
