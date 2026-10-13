@@ -737,6 +737,10 @@ static void network_game_server_restore_held_players(
 	struct network_game_server *server);
 static void network_game_server_discard_held_players(
 	long machine_index);
+/* port: a player a machine still downloading the map asks for, held */
+static void network_game_server_hold_requested_player(
+	long machine_index,
+	struct network_player const *player);
 static boolean network_game_server_queue_held_players(
 	struct network_game_server *server,
 	long machine_index);
@@ -2618,7 +2622,17 @@ void network_game_server_update_ticks(
 					client_machine = &server->client_machines[client_machine_index];
 				}
 
-				if (client_machine &&
+				/* port: a machine still downloading the map is not in the game
+				yet: a player it asks for waits with those held at the start
+				(one whose download began in the pregame asks on, not knowing
+				the game has started), and joins with them once the map is
+				there (network_game_server_release_map_fetchers). Added now, it
+				was started at once, without the map: the damaged disc error */
+				if (client_machine && map_share_machine_needs_map(client_machine->machine_index))
+				{
+					network_game_server_hold_requested_player(client_machine_index, &server->queued_player);
+				}
+				else if (client_machine &&
 					network_game_server_machine_may_add_player_ingame(server, client_machine_index) &&
 					network_game_server_add_player_to_game(
 						server,
@@ -2883,6 +2897,32 @@ static void network_game_server_discard_held_players(
 				network_game_server_held_players[network_game_server_held_player_count];
 		}
 	}
+}
+
+/* port: a player a machine still downloading the map asked for in the game
+already going, held with those held at the start (once), and the machine
+released with them once the download is done */
+static void network_game_server_hold_requested_player(
+	long machine_index,
+	struct network_player const *player)
+{
+	long index;
+
+	if (!VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+		return;
+	network_game_server_map_pending[machine_index] = TRUE;
+	for (index = 0; index < network_game_server_held_player_count; index++)
+	{
+		if (network_game_server_held_players[index].machine_index == player->machine_index &&
+			network_game_server_held_players[index].controller_index == player->controller_index)
+		{
+			return;
+		}
+	}
+	if (network_game_server_held_player_count >= MAXIMUM_NETWORK_PLAYER_COUNT)
+		return;
+	network_game_server_held_players[network_game_server_held_player_count++] = *player;
+	network_event("holding a player on machine #%ld until the map is downloaded", machine_index);
 }
 
 /* the held players are queued to join the game that is already going, as
