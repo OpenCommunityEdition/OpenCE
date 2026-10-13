@@ -1,0 +1,43 @@
+name: Merge upstream
+
+# Take OpenCE's main when the merge is clean, then start the release build.
+# A push made with this workflow's token does not start the build on its own,
+# so a clean merge starts Build by hand. A conflict stops here for a person.
+on:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge OpenCommunityEdition/OpenCE
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/OpenCommunityEdition/OpenCE.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "OpenCE main is already in this branch"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git merge upstream/main --no-edit
+          git push origin HEAD:main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Start the release build
+        if: steps.merge.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --ref main
