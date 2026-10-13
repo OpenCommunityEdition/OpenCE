@@ -175,6 +175,12 @@ static const struct config_setting config_settings[] =
 		"pixel by the lights the game gives them, without the facets the light\n"
 		"of each vertex shows across curved surfaces; false lights each vertex,\n"
 		"as the Xbox does." },
+	{ "display.model_detail", _config_string, "\"stock\"", "HALO_MODEL_DETAIL", _environment_value, _platform_all,
+		"Which of their levels of detail models are drawn at: \"stock\" chooses by\n"
+		"their size on the Xbox's 480 lines, at any resolution; \"native\" by their\n"
+		"size on the display's, so that more detail is kept at a distance at high\n"
+		"resolutions; \"highest\" draws the models \"native\" does, each at its most\n"
+		"detailed level." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
