@@ -52,4 +52,8 @@ void machine_try_to_open_with_damage(
 boolean machine_update(
 	long machine_index);
 
+/* port: carry elevator riders with the current tick's collision transform. */
+boolean machine_get_elevator_position(long machine_index, real_point3d *position);
+void machine_move_elevator_riders(long machine_index, real_point3d const *previous_position);
+
 #endif // __DEVICE_MACHINES_H

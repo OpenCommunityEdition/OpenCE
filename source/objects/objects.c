@@ -18,6 +18,7 @@ OBJECTS.C
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "devices/device_definitions.h"
+#include "devices/device_machines.h" /* port: elevator movement and rider carry */
 #include "devices/devices.h"
 #include "editor/editor_stubs.h"
 #include "effects/contrail_definitions.h"
@@ -3825,6 +3826,9 @@ boolean object_force_inside_bsp(
 static boolean object_update(
 	long object_index)
 {
+	/* port: the floor transform before this tick's device motion. */
+	real_point3d elevator_position;
+	boolean elevator;
 	struct object_header_datum *header = object_header_get(object_index);
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *object_definition = object_definition_get(object->definition_index);
@@ -3847,6 +3851,10 @@ static boolean object_update(
 			}
 		}
 
+		/* port: preserve the floor before device_update advances its phase. */
+		elevator = object->object.type == _object_type_machine &&
+			machine_get_elevator_position(object_index, &elevator_position);
+
 		object_type_update(object_index);
 		if (object_definition->object.collision_model.index!=NONE)
 		{
@@ -3858,6 +3866,9 @@ static boolean object_update(
 		if (!TEST_FLAG(object->object.flags, _object_do_not_recompute_node_matrices_bit))
 		{
 			object_compute_node_matrices(object_index);
+			/* port: carry by this tick's movement, after its collision nodes. */
+			if (elevator)
+				machine_move_elevator_riders(object_index, &elevator_position);
 		}
 
 		object_compute_function_values(object_index);

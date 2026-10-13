@@ -128,7 +128,15 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   sync), so its player's height reaches the host a round trip behind the
   host's elevator, under its floor going up, where the host's copy would
   fall through it. Each machine's elevator carries its own copy up and
-  down, and they meet where it stops.
+  down, and they meet where it stops. Floor contact keeps that protection
+  through a stop or reversal; the remembered attachment alone after leaving
+  a stopped platform does not. A client echoing a prediction while still on
+  the same elevator keeps its local floor height, rather than applying the
+  difference between the platforms' phases to its current height. Jumps,
+  leaving the platform and authoritative teleports correct normally. Rider
+  carry uses the platform's current collision displacement, including phase
+  corrections, rather than its previous tick's displacement. These changes
+  add no fields or messages to the network protocol.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, fired from within
   its reach, the target where the host had it when the shooter saw it, no
