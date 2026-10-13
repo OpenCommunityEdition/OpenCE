@@ -296,6 +296,19 @@ never sends a machine its own. A listener sets the gain and pan of a voice
 heard for being near by its own view of the speaker's unit. Mutes are each
 machine's own. Builds without voice chat never say they hear voices, so the
 host sends them none, and drop the kinds as unknown.
+
+The visors' colors (`visor_color.c`, `display.visor_color`) travel the same
+way, in the lobby and in a game: `visor_color_handles_message` takes them
+before the checks that a game is running. A machine sends its color to the
+host reliably (`_distributed_message_visor_color`) while the host's table has
+another for it, every three seconds at most; the host takes it only from that
+machine's own stream, and only an armor color's index or none, and sends
+every machine's color to each machine reliably
+(`_distributed_message_visor_colors`) when one changes, half a second apart
+at the soonest, and every ten seconds. Each machine draws another player's
+visor in its machine's color only with `display.others_visor_colors`. Builds
+without visor colors drop both kinds as unknown, so the network version is
+unchanged.
 A speed hack of less than a tenth is let be: the host's bounds on how far
 and how fast a client's player moves and fires hold it to the host's time
 anyway.

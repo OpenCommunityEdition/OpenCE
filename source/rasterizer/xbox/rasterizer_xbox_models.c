@@ -124,6 +124,9 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_internal.h"
 #include "rasterizer/xbox/rasterizer_xbox_models.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+/* port: port/linux/game/visor_color.c */
+void visor_color_model_begin(void const *shader, long object_index);
+void visor_color_model_end(void);
 
 /* ---------- constants */
 
@@ -1728,6 +1731,9 @@ void _rasterizer_model_draw(
 			{
 				shader_model = (struct shader_model_definition *)
 					shader_get_and_verify_type(shader, _shader_type_model);
+				/* port: a Spartan's visor in its chosen color
+				(port/linux/game/visor_color.c) */
+				visor_color_model_begin(shader, local_parameters->unique_identifier);
 				alpha_blended_decal = (boolean)TEST_FLAG(
 					shader_model->model.flags,
 					_shader_model_alpha_blended_decal_bit);
@@ -2442,6 +2448,7 @@ void _rasterizer_model_draw(
 		}
 	}
 
+	visor_color_model_end(); /* port: port/linux/game/visor_color.c */
 	return;
 }
 

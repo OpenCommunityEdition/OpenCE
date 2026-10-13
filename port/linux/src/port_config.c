@@ -308,6 +308,14 @@ static const struct config_setting config_settings[] =
 	{ "display.viewmodel_shield", _config_boolean, "false", "HALO_VIEWMODEL_SHIELD", _environment_value, _platform_all,
 		"The energy shield's flare on the first-person arms too, as on the body\n"
 		"(the stock game draws it on the body only)." },
+	{ "display.visor_color", _config_string, "\"default\"", "HALO_VISOR_COLOR", _environment_value, _platform_all,
+		"Your Spartan's visor in a multiplayer armor color (\"white\", \"black\",\n"
+		"\"red\"... as the profile's colors; black a deep, glossy black), or\n"
+		"\"default\", its gold. Sent to the other players in network games." },
+	{ "display.others_visor_colors", _config_boolean, "false", "HALO_OTHERS_VISOR_COLORS", _environment_value,
+		_platform_all,
+		"Other players' visors in the colors they chose (display.visor_color);\n"
+		"false: their gold, as stock." },
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },

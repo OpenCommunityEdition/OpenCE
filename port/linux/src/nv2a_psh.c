@@ -622,6 +622,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
 		xgpu_text_append(&text, "uniform vec4 blend_constant;\n");
+	if (key->recolor)
+		xgpu_text_append(&text, "uniform vec4 recolor;\n");
 	if (key->per_pixel_lighting)
 		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
@@ -747,6 +749,11 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
 #endif
+	if (key->recolor)
+	{
+		xgpu_text_append(&text,
+			"\tresult.rgb = recolor.rgb * pow(clamp(dot(clamp(result.rgb, 0.0, 1.0), vec3(0.299, 0.587, 0.114)), 0.0, 1.0), recolor.a);\n");
+	}
 	if (key->source_blend)
 	{
 		static const char *const factors[] =

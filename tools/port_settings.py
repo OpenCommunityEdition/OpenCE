@@ -223,6 +223,10 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
          "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+        ("VISOR COLOR:", "display.visor_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "Your visor in an armor color. Black: deep, as\nan ODST's. Default: its gold.", None),
+        ("SHOW CUSTOM VISORS:", "display.others_visor_colors", ON_OFF,
+         "Lets you decide if you want to see others'\ncustom visor colors, or stay classic.", None),
     ],
 }
 
