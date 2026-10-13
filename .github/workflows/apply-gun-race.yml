@@ -1,0 +1,32 @@
+name: Apply Gun Race
+
+# Apply the Gun Race rules patch, remove this helper, and start the release build.
+on:
+  push:
+    paths:
+      - gun-race-rules.patch
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply Gun Race
+        run: |
+          git apply --index gun-race-rules.patch
+          git rm -f gun-race-rules.patch .github/workflows/apply-gun-race.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Wire Gun Race into the game."
+          git push
+
+      - name: Start the release build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --ref main
