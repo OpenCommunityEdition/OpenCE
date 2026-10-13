@@ -11,6 +11,7 @@ list, loader, resource directory or display index is used here.
 #include "errors.h"
 #include "mcc_cache_format.h"
 #include "mcc_maps.h"
+#include "mcc_cache.h"
 #include "mcc_package.h"
 
 #include <stdio.h>
@@ -209,6 +210,7 @@ static void mcc_maps_scan(void)
 
 void mcc_maps_rescan(void)
 {
+	mcc_cache_precache_clear();
 	mcc_menu_catalog.scanned = FALSE;
 }
 

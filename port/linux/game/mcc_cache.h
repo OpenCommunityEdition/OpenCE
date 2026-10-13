@@ -12,6 +12,8 @@ boolean mcc_cache_available(char const *name);
 boolean mcc_cache_present(char const *name, unsigned long checksum,
     char *message, long message_size);
 boolean mcc_cache_require(char const *name, unsigned long checksum);
+boolean mcc_cache_precache_ready(char const *name);
+void mcc_cache_precache_clear(void);
 unsigned long mcc_cache_checksum(char const *name);
 struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header);
 boolean mcc_cache_tags_loaded(void);

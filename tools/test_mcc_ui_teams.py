@@ -136,6 +136,7 @@ static int mcc_loaded;
 static FILE *mcc_stream;
 static void cleanup(void *unused){(void)unused;}
 #define mcc_checkpoint_dispose() cleanup(NULL)
+#define mcc_cache_precache_clear() cleanup(NULL)
     #define mcc_hud_glyphs_dispose() cleanup(NULL)
 #define mcc_campaign_dispose() cleanup(NULL)
 #define mcc_resources_dispose(p) cleanup(p)

@@ -1152,7 +1152,7 @@ boolean cache_files_give_time_to_precache(
 	boolean result = FALSE;
 
 	if (mcc_level_name(map_name))
-		return mcc_cache_require(map_name, 0);
+		return mcc_cache_precache_ready(map_name); /* port: MCC readiness polling, not admission */
 
 	/* port: no map named yet is nothing to precache. A client joining over
 	the internet asks for its multiplayer map (network_game_client_update_precache_status)
