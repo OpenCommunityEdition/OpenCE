@@ -13,10 +13,90 @@ end.
 ## GulchCE instructions for every assignment
 
 Read this file before starting each assignment and explicitly confirm your
-understanding of its requirements. Then review the MCC isolation rules
-below and explicitly confirm your understanding of them before proceeding.
+understanding of its requirements. Then review the isolation rules below
+and explicitly confirm your understanding of them before proceeding.
 Read [CODINGSTANDARDS.md](CODINGSTANDARDS.md) for supplementary working and
 review guidance. Those standards do not relax the isolation rules.
+
+### Applying these requirements
+
+- The common project requirements apply to every assignment, including
+  building, testing, networking, licensing, source provenance and Git
+  conventions.
+- Before implementation, identify whether the assignment adds a general
+  feature, implements MCC compatibility, fixes existing behavior, merges
+  upstream changes or combines these activities. Briefly state which
+  isolation requirements apply.
+- General feature work must follow the general feature isolation rules.
+  MCC compatibility work must additionally follow the MCC isolation rules;
+  the general rules do not relax the stricter MCC boundaries.
+- For mixed assignments, apply the relevant rules to each affected part.
+  Classify work by what it changes, not merely by the assignment's title.
+  A general feature request does not authorize unrelated MCC compatibility
+  changes or changes to map-family boundaries.
+- When shared-engine work can affect multiple map families, inspect and
+  validate the affected Xbox, Custom Edition and MCC paths. Incidental use
+  of a shared engine service by MCC does not make all general engine work
+  MCC-specific, but existing MCC guards, ownership and cleanup must remain
+  intact.
+- These rules provide standing permission for necessary integration that
+  meets their conditions within an authorized assignment. Explain the
+  rationale and perform the required validation without requesting separate
+  approval for routine compliant changes. If a specific change conflicts
+  with an isolation rule, stop only the affected part, explain the conflict,
+  and continue independent work that remains within scope. A general
+  request to complete a feature does not itself waive an isolation rule.
+
+### General feature isolation
+
+- Preserve the established Halo 1 Xbox and Custom Edition implementations.
+  Do not replace, rename, remove, obscure or repurpose their code, scripts,
+  variables or loading paths to implement a new feature. The narrowly
+  scoped additive integration described below is allowed.
+- Keep feature logic in dedicated feature modules, extending an existing
+  feature-owned module where appropriate. Use existing engine interfaces
+  where possible. Minimal registration and wiring in build files, settings,
+  menus and declarations are allowed when necessary for the authorized
+  feature and must follow the applicable project rules. This does not
+  authorize moving feature logic into established engine implementations.
+  Keep MCC-specific compatibility logic in MCC-owned modules.
+- Optional features must preserve established behavior when disabled.
+  They must default to off or stock behavior unless the user explicitly
+  authorizes a different default. When enabled, changes must remain limited
+  to the authorized feature; unrelated behavior and map-family boundaries
+  must be preserved. Follow the Settings requirements below for features
+  that depart from the stock game's look or behavior.
+- Existing implementations may be analysed for reference. This does not
+  authorize replacing or repurposing them for new feature compatibility.
+  Follow the third-party licensing, source-provenance and Xbox SDK rules
+  in this file and the coding standards.
+- Minimal additive shared-engine hooks, declarations or extension points
+  are allowed only when strictly necessary for authorized functionality
+  that cannot be implemented through existing interfaces in feature
+  modules. Keep feature logic in feature-owned modules and shared additions
+  as small as possible. Guard feature-specific execution and state with
+  the appropriate activation conditions.
+- Handle initialization and cleanup at the feature's relevant lifecycle
+  boundaries. These may include enabling or disabling the feature, map
+  loading and unloading, failed loads, session changes and shutdown.
+  Feature state must not leak into later sessions or unaffected paths.
+- For each shared addition, explain why a feature-module-only solution is
+  insufficient, identify the affected engine paths, and mark changes to
+  `source/` with `port:` as required below. Verify established behavior
+  with the feature disabled, the intended behavior with it enabled, and
+  relevant lifecycle and map-family transitions.
+- This permission covers necessary integration, not replacing, renaming
+  or refactoring established implementations for convenience or code
+  reduction. Existing hooks are not blanket permission for broader
+  changes. Refactoring, deduplication, cleanup and line-count targets are
+  not exceptions.
+- If a feature cannot fit within these constraints, explain the specific
+  conflict and stop that part of the work. Do not proceed unless the user
+  explicitly changes the applicable constraint.
+- Report the actual validation performed and its limits. Scale checks to
+  the affected behavior without waiving required platform or networking
+  checks. A successful load or green test suite is not proof of full
+  compatibility.
 
 ### MCC isolation
 
@@ -46,21 +126,45 @@ review guidance. Those standards do not relax the isolation rules.
   transitions. This permission covers necessary integration, not replacing,
   renaming or refactoring established Xbox or Custom Edition implementations
   for convenience or code reduction. Existing hooks are not blanket
-  permission for broader changes. See `CODINGSTANDARDS.md` for the boundary
-  inventory. If a feature cannot fit within these constraints,
+  permission for broader changes. See `CODINGSTANDARDS.md` for the MCC
+  boundary inventory. If a feature cannot fit within these constraints,
   explain the specific conflict and stop that part of the work. Do not
   proceed unless the user explicitly changes the applicable constraint.
 - The general permission below for minimal changes to `source/` does not
   override these stricter rules for MCC work. Refactoring, deduplication,
   cleanup and line-count targets are not exceptions.
 - Explicitly requested upstream merges and general engine fixes have their
-  own scope. For upstream merges, retain authoritative OpenCE changes and
-  preserve MCC integration; do not use the merge to introduce unrelated
-  changes to Xbox or Custom Edition support. Identify and validate any
-  behavior affected by conflict resolution.
+  own scope, as described below. They do not authorize unrelated changes
+  to Xbox or Custom Edition support or relax the rules for implementing
+  MCC compatibility.
 - Check preservation of Xbox and Custom Edition behavior as well as MCC
   compatibility. Report the actual validation performed and its limits;
   a successful load or green test suite is not proof of full compatibility.
+
+### Existing behavior fixes and upstream merges
+
+- Authorized fixes to existing behavior may modify the responsible
+  implementation directly; they do not require a separate feature module
+  merely because code changes are needed. Keep the fix focused, explain
+  the intended behavior change, and preserve unrelated functionality.
+  Retain the required `port:` markers for changes to `source/`.
+- MCC compatibility fixes remain subject to MCC isolation. Calling work
+  a bug fix or general engine fix does not authorize repurposing Xbox or
+  Custom Edition implementations for MCC.
+- Base the distinction between a general engine defect and an MCC
+  compatibility requirement on evidence about the existing engine contract,
+  accepted inputs and intended behavior. An MCC map exposing a failure does
+  not by itself establish either classification. Document why a proposed
+  shared fix corrects existing engine behavior rather than adapting it to
+  MCC-specific data or semantics. If the distinction remains unresolved and
+  affects whether a change is permitted, explain the uncertainty and stop
+  that part of the work.
+- For explicitly requested upstream merges, retain authoritative OpenCE
+  changes and preserve MCC and other feature integration. Do not use the
+  merge to introduce unrelated changes to Xbox or Custom Edition support.
+  Identify and validate behavior affected by conflict resolution.
+- Apply the required platform, networking and regression checks to the
+  affected paths. Report what was verified and any remaining limits.
 
 ### Project preferences
 
