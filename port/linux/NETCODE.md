@@ -277,6 +277,14 @@ retain their original simulation paths, but all peers require version 40.
 Xbox and Custom Edition keep their existing vehicle-seat behavior; all peers
 still need the matching network version.
 
+GulchCE version 41 adds the reliable host-to-client MCC game-speed message
+(message 90: the distributed header and one float). It carries the host-approved
+clock multiplier, including zero while paused, so clients advance at the host's
+scripted rate. Clients reject invalid values and messages from other clients;
+the host does not accept client speed changes. Xbox and Custom Edition retain
+their existing clock behavior. All peers need version 41 because older clients
+would ignore the message and simulate MCC maps at the wrong rate.
+
 
 A client plays by its host's rules: in another's game (searching for it,
 in its lobby, or playing it) the developer console, the telnet console
